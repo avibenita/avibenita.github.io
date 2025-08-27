@@ -1,68 +1,67 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Statistical Calculators Hub</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Header/nav styles (served from your repo) -->
-  <link rel="stylesheet" href="/assets/css/header.css" />
+  <!-- Header CSS for local server -->
+  <link rel="stylesheet" href="../assets/css/Header.css">
 
-  <!-- Optional: basic page background to match your theme -->
   <style>
-    :root{
-      --surface-0:#0c1624;
-    }
-    html, body { height: 100%; }
-    body{
-      margin:0;
-      background: linear-gradient(180deg,#0b1422 0%, var(--surface-0) 60%, #0a1422 100%);
-    }
-    /* space for a fixed header if your header.css fixes it to the top */
-    main{ padding-top: 80px; }
-    .frame-wrap{
-      width: 100%;
-      height: calc(100vh - 100px); /* header + a bit of breathing room */
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 0 12px 16px;
-    }
-    .app-frame{
-      width: 100%;
-      height: 100%;
-      border: 0;
-      border-radius: 12px;
-      box-shadow: 0 20px 60px rgba(0,0,0,.35);
-      background: #0f1b2b;
-    }
+    html, body { margin: 0; }
+    iframe { border: 0; width: 100%; min-height: 940px; }
+    #site-header{position:sticky; top:0; z-index:50}
   </style>
+  <title>Statistical Calculators Hub</title>
 </head>
-<body>
 
-  <!-- Site header injected here -->
+<body>
   <div id="site-header"></div>
+
+  <!-- Set src via script to avoid <base> changing the intended folder -->
+  <iframe id="app" title="Calculators Hub"></iframe>
+
   <script>
-    fetch('/partials/header.html')
-      .then(r => {
-        if(!r.ok) throw new Error('Header not found');
-        return r.text();
-      })
-      .then(html => { document.getElementById('site-header').innerHTML = html; })
-      .catch(err => console.warn('[header] load failed:', err));
+    // Ensure iframe points to the file next to this document, regardless of <base>
+    (function(){
+      var app = document.getElementById('app');
+      app.src = new URL('IframeWix.html', location.href).toString();
+    })();
   </script>
 
-  <main>
-    <div class="frame-wrap">
-      <!-- Your calculators app runs inside this iframe -->
-      <iframe
-        class="app-frame"
-        src="/statistical-calculators/iframewix.html"
-        title="Statistical Calculators"
-        loading="eager"
-        allow="clipboard-read; clipboard-write">
-      </iframe>
-    </div>
-  </main>
+  <!-- Forward child -> Wix page code -->
+  <script>
+    window.addEventListener('message', (e) => {
+      try { window.parent && window.parent.postMessage(e.data, '*'); } catch (_){}
+    });
+  </script>
 
+  <!-- Load header from partials directory -->
+  <script>
+  (function(){
+    // Load header content
+    fetch('/partials/header.html')
+      .then(response => {
+        if (!response.ok) throw new Error('Header not found');
+        return response.text();
+      })
+      .then(html => {
+        const headerContainer = document.getElementById('site-header');
+        if (headerContainer) {
+          headerContainer.innerHTML = html;
+        }
+        
+        // Load header JavaScript
+        const script = document.createElement('script');
+        script.src = '/assets/js/header.js';
+        document.body.appendChild(script);
+        
+        console.log('[header] loaded successfully');
+      })
+      .catch(err => {
+        console.warn('[header] failed to load:', err);
+      });
+  })();
+  </script>
 </body>
 </html>

@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pareto-Ultimate - The Ultimate Pareto Analysis Utility | Metrics Institute</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet"/>
+    <link rel="stylesheet" href="../assets/css/Header.css">
+    <style>
+        /* Midnight theme variables matching 00indexBlue.html */
+        :root{
+          --accent-1:#60a5fa; --accent-2:#2563eb; --accent-3:#1d4ed8; --accent-glow:rgba(96,165,250,.35);
+          --surface-0:#0c1624; --surface-1:#132235; --surface-2:#162a40; --border:#24405f;
+          --text-1:#eaf2ff; --text-2:#9db3d8; --muted:#7fa0cc;
+          --shadow-xl:0 30px 80px rgba(0,0,0,.45); --radius-xl:18px; --radius-lg:14px;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            line-height: 1.6;
+            background:
+              radial-gradient(1200px 600px at 20% -10%, rgba(37,99,235,.22), transparent 60%),
+              linear-gradient(180deg,#0b1422 0%, var(--surface-0) 60%, #0a1422 100%);
+            color: var(--text-1);
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header placeholder (if you later inject header.html) */
+        #site-header{position:sticky; top:0; z-index:50}
+
+        /* Hero */
+        .hero{
+            position:relative; overflow:hidden; text-align:center;
+            padding:88px 0 64px;
+            background:linear-gradient(180deg, transparent 0%, rgba(13, 30, 58, .35) 100%);
+            border-bottom:1px solid rgba(96,165,250,.12);
+        }
+        .hero::before{
+            content:""; position:absolute; inset:-10%;
+            background: radial-gradient(600px 300px at 75% 10%, rgba(96,165,250,.18), transparent 60%);
+            filter: blur(2px);
+        }
+        .hero h1{
+            font-size: clamp(2rem, 3.5vw, 3.25rem);
+            margin:0 0 14px; letter-spacing:.3px;
+            color:var(--accent-1);
+            text-shadow: 0 6px 22px rgba(37,99,235,.25);
+        }
+        .hero p{
+            margin:0 auto 28px; max-width:880px; color:var(--text-2); font-size:clamp(1rem,1.4vw,1.25rem);
+        }
+        .cta{
+            display:inline-flex; align-items:center; gap:.6rem; font-weight:700;
+            padding:14px 22px; border-radius:999px; color:#fff;
+            background:linear-gradient(135deg, var(--accent-2), var(--accent-1));
+            box-shadow: 0 12px 34px rgba(37,99,235,.35), 0 0 0 1px rgba(96,165,250,.15) inset;
+            transition: transform .25s ease, filter .25s ease;
+            text-decoration: none;
+        }
+        .cta:hover{ transform: translateY(-2px); filter:brightness(1.05) }
+
+        /* Section shells */
+        section{padding:72px 0}
+        .section-title{ text-align:center; font-size:clamp(1.6rem,2.5vw,2.2rem); color:var(--accent-1); letter-spacing:.3px }
+        .section-sub{ text-align:center; color:var(--text-2); margin-top:8px }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .hero-text h1 {
+            font-size: 3.2rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #fff, #e0e7ff, #fff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-text .tagline {
+            font-size: 1.4rem;
+            margin-bottom: 1.5rem;
+            opacity: 0.9;
+            font-style: italic;
+            color: #e0e7ff;
+        }
+
+        .hero-text p {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+
+        .pareto-visual {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .pareto-chart {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.2);
+            width: 100%;
+            max-width: 350px;
+        }
+
+        .chart-bars {
+            display: flex;
+            align-items: end;
+            justify-content: space-between;
+            height: 120px;
+            margin-bottom: 1rem;
+            padding: 0 10px;
+        }
+
+        .bar {
+            width: 25px;
+            background: linear-gradient(to top, #ff6b6b, #ee5a24);
+            border-radius: 3px 3px 0 0;
+            margin: 0 2px;
+            animation: growBar 2s ease-out forwards;
+            transform-origin: bottom;
+            opacity: 0.9;
+        }
+
+        .bar:nth-child(1) { height: 100%; animation-delay: 0.2s; }
+        .bar:nth-child(2) { height: 85%; animation-delay: 0.4s; }
+        .bar:nth-child(3) { height: 70%; animation-delay: 0.6s; }
+        .bar:nth-child(4) { height: 45%; animation-delay: 0.8s; }
+        .bar:nth-child(5) { height: 30%; animation-delay: 1s; }
+        .bar:nth-child(6) { height: 20%; animation-delay: 1.2s; }
+        .bar:nth-child(7) { height: 15%; animation-delay: 1.4s; }
+        .bar:nth-child(8) { height: 10%; animation-delay: 1.6s; }
+
+        @keyframes growBar {
+            from { transform: scaleY(0); }
+            to { transform: scaleY(1); }
+        }
+
+        .eighty-twenty {
+            display: flex;
+            justify-content: space-between;
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ff6b6b;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(238, 90, 36, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-secondary {
+            background: linear-gradient(45deg, transparent, transparent);
+            border: 2px solid white;
+            box-shadow: none;
+        }
+
+        .cta-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .cta-button:hover::before {
+            left: 100%;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(238, 90, 36, 0.4);
+        }
+
+        /* Pareto Principle Section */
+        .pareto-principle {
+            padding: 80px 0;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+
+        .principle-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            align-items: center;
+        }
+
+        .principle-text {
+            font-size: 1.1rem;
+            line-height: 1.8;
+        }
+
+        .principle-text h3 {
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+            color: #333;
+        }
+
+        .principle-visual {
+            text-align: center;
+        }
+
+        .big-numbers {
+            display: flex;
+            justify-content: space-around;
+            margin: 2rem 0;
+        }
+
+        .number-block {
+            text-align: center;
+        }
+
+        .big-number {
+            font-size: 4rem;
+            font-weight: bold;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .number-label {
+            font-size: 1.2rem;
+            color: #666;
+            margin-top: 0.5rem;
+        }
+
+        /* Why Different Section */
+        .why-different {
+            padding: 80px 0;
+            background: white;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 3rem;
+            color: #333;
+            position: relative;
+        }
+
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 4px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border-radius: 2px;
+        }
+
+        .advantages-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .advantage-card {
+            background: linear-gradient(135f, #f8f9ff 0%, #e6efff 100%);
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            border-left: 5px solid #667eea;
+        }
+
+        .advantage-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 60px rgba(0,0,0,0.12);
+        }
+
+        .advantage-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        /* Proprietary Features */
+        .proprietary-features {
+            padding: 80px 0;
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+            color: #333;
+        }
+
+        .strength-index {
+            background: rgba(255,255,255,0.9);
+            border-radius: 20px;
+            padding: 3rem;
+            text-align: center;
+            margin-top: 3rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+        }
+
+        .strength-index h3 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .index-visual {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 2rem 0;
+        }
+
+        .gauge {
+            width: 200px;
+            height: 100px;
+            border: 8px solid #e0e0e0;
+            border-bottom: none;
+            border-radius: 200px 200px 0 0;
+            position: relative;
+            background: linear-gradient(to right, #ff6b6b 0%, #ffa726 50%, #66bb6a 100%);
+            background-clip: padding-box;
+        }
+
+        .gauge-needle {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform-origin: bottom center;
+            transform: translateX(-50%) rotate(45deg);
+            width: 4px;
+            height: 80px;
+            background: #333;
+            border-radius: 2px;
+            animation: needleMove 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes needleMove {
+            0% { transform: translateX(-50%) rotate(-30deg); }
+            100% { transform: translateX(-50%) rotate(60deg); }
+        }
+
+        /* Features Section */
+        .features {
+            padding: 80px 0;
+            background: white;
+        }
+
+        .features-intro {
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto 3rem;
+            font-size: 1.2rem;
+            color: #666;
+        }
+
+        .features-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1.5rem;
+            margin-top: 3rem;
+        }
+
+        .feature-item {
+            background: linear-gradient(135deg, #f8f9ff 0%, #e6efff 100%);
+            border-radius: 15px;
+            padding: 1.5rem;
+            border-left: 5px solid #667eea;
+            transition: all 0.3s ease;
+        }
+
+        .feature-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.1);
+        }
+
+        .feature-item h4 {
+            color: #333;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .feature-item p {
+            color: #666;
+            font-size: 0.95rem;
+        }
+
+        /* Use Cases Section */
+        .use-cases {
+            padding: 80px 0;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+
+        .use-cases-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .use-case {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .use-case:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 60px rgba(0,0,0,0.15);
+        }
+
+        .use-case-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Download Section */
+        .download-section {
+            padding: 80px 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+        }
+
+        .download-content h2 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .download-content p {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+
+        /* Footer */
+        footer {
+            background: #2c3e50;
+            color: white;
+            padding: 3rem 0 1rem;
+            text-align: center;
+        }
+
+        .footer-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .footer-section h4 {
+            margin-bottom: 1rem;
+            color: #667eea;
+        }
+
+        .footer-section a {
+            color: #bbb;
+            text-decoration: none;
+            display: block;
+            margin-bottom: 0.5rem;
+            transition: color 0.3s ease;
+        }
+
+        .footer-section a:hover {
+            color: #667eea;
+        }
+
+        .footer-bottom {
+            border-top: 1px solid #34495e;
+            padding-top: 1rem;
+            color: #bbb;
+        }
+
+        /* Animations */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.6s ease;
+        }
+
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .hero-content,
+            .principle-content {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .hero-text h1 {
+                font-size: 2.5rem;
+            }
+
+            .cta-buttons {
+                justify-content: center;
+            }
+
+            .advantages-grid,
+            .features-list,
+            .use-cases-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .big-numbers {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+  <div id="site-header"></div>
+
+    <section class="hero" id="home">
+        <div class="container">
+            <h1><i class="fa-solid fa-chart-simple"></i> Pareto-Ultimate©</h1>
+            <p>Unlock dramatic business improvements by identifying your vital few. Advanced <strong>80/20 analysis</strong> that works directly on raw databases with thousands of observations.</p>
+            <a class="cta" href="#download"><i class="fa-solid fa-download"></i> Get Pareto-Ultimate</a>
+        </div>
+    </section>
+
+    <section class="pareto-principle">
+        <div class="container">
+            <div class="principle-content">
+                <div class="principle-text">
+                    <h3>The Power of 80/20</h3>
+                    <p>The Pareto principle states that roughly 80% of effects come from 20% of causes. This fundamental law applies across business: 80% of sales from 20% of customers, 80% of problems from 20% of sources, 80% of profits from 20% of products.</p>
+                    <p><strong>Smart businesses leverage this insight for dramatic profitability improvements</strong> by focusing on the most effective areas while eliminating, automating, delegating, or retraining the rest.</p>
+                </div>
+                <div class="principle-visual">
+                    <div class="big-numbers">
+                        <div class="number-block">
+                            <div class="big-number">80</div>
+                            <div class="number-label">% Effects</div>
+                        </div>
+                        <div class="number-block">
+                            <div class="big-number">20</div>
+                            <div class="number-label">% Causes</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="why-different">
+        <div class="container">
+            <h2 class="section-title">What Makes Pareto-Ultimate© Different</h2>
+            <div class="advantages-grid">
+                <div class="advantage-card fade-in">
+                    <div class="advantage-icon">🎯</div>
+                    <h3>Raw Database Analysis</h3>
+                    <p>Works directly on raw databases with thousands of observations, not summarized data like other add-ons. Get deeper, more accurate insights.</p>
+                </div>
+                <div class="advantage-card fade-in">
+                    <div class="advantage-icon">🔬</div>
+                    <h3>Pure Pareto Focus</h3>
+                    <p>Dedicated solely to 80/20 analysis, not a marginal feature of complex software. Takes Pareto analysis to a completely new level.</p>
+                </div>
+                <div class="advantage-card fade-in">
+                    <div class="advantage-icon">⚡</div>
+                    <h3>Advanced Drill-Down</h3>
+                    <p>Breakdown analysis by secondary variables with complete drill-down capability for multi-dimensional insights.</p>
+                </div>
+                <div class="advantage-card fade-in">
+                    <div class="advantage-icon">📊</div>
+                    <h3>Beyond Pivot Tables</h3>
+                    <p>Features a powerful crosstabulation module that's even more potent than Excel Pivot tables for complex analysis.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="proprietary-features">
+        <div class="container">
+            <h2 class="section-title" style="color: white;">Proprietary Innovation</h2>
+            <div class="strength-index">
+                <h3>Pareto Strength Index©</h3>
+                <p>Our exclusive proprietary metric that indicates at a glance the degree to which your data fits the Pareto paradigm. No other tool offers this unique insight.</p>
+                <div class="index-visual">
+                    <div class="gauge">
+                        <div class="gauge-needle"></div>
+                    </div>
+                </div>
+                <p><strong>Instantly know how strongly the 80/20 rule applies to your specific dataset</strong></p>
+            </div>
+        </div>
+    </section>
+
+    <section class="features" id="features">
+        <div class="container">
+            <h2 class="section-title">Comprehensive Feature Set</h2>
+            <div class="features-intro">
+                <p>Pareto-Ultimate© combines advanced analytical capabilities with intuitive Excel integration, delivering professional-grade Pareto analysis tools that scale from simple datasets to complex enterprise data.</p>
+            </div>
+            <div class="features-list">
+                <div class="feature-item fade-in">
+                    <h4>📈 Raw Database Processing</h4>
+                    <p>Analyze thousands of observations directly from raw databases for maximum accuracy and detail.</p>
+                </div>
+                <div class="feature-item fade-in">
+                    <h4>🔍 Multi-Variable Breakdown</h4>
+                    <p>Breakdown analysis by secondary variables with complete drill-down capability for deeper insights.</p>
+                </div>
+                <div class="feature-item fade-in">
+                    <h4>📊 Third Variable Integration</h4>
+                    <p>Reference continuous variables to analyze sums, averages, or other statistics beyond simple occurrence counts.</p>
+                </div>
+                <div class="feature-item fade-in">
+                    <h4>🎯 Full ABC Analysis</h4>
+                    <p>Complete ABC classification analysis to categorize items by importance and impact.</p>
+                </div>
+                <div class="feature-item fade-in">
+                    <h4>⚡ Advanced Crosstabulation</h4>
+                    <p>Powerful crosstabulation module that surpasses Excel Pivot table capabilities.</p>
+                </div>
+                <div class="feature-item fade-in">
+                    <h4>🎛️ Category Control</h4>
+                    <p>Complete control over which categories to include in your analysis for focused insights.</p>
+                </div>
+                <div class="feature-item fade-in">
+                    <h4>📤 Flexible Export</h4>
+                    <p>Export analysis to Excel in both tabular and graphical formats for comprehensive reporting.</p>
+                </div>
+                <div class="feature-item fade-in">
+                    <h4>🔎 Subset Analysis</h4>
+                    <p>Perform analysis on specific subsets of your data for targeted business insights.</p>
+                </div>
+                <div class="feature-item fade-in">
+                    <h4>© Pareto Strength Index</h4>
+                    <p>Proprietary metric showing how well your data fits the Pareto paradigm at a glance.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="use-cases" id="use-cases">
+        <div class="container">
+            <h2 class="section-title">Transform Your Business Analysis</h2>
+            <div class="use-cases-grid">
+                <div class="use-case fade-in">
+                    <div class="use-case-icon">💰</div>
+                    <h4>Revenue Optimization</h4>
+                    <p>Identify your top 20% of customers generating 80% of revenue and focus your efforts accordingly.</p>
+                </div>
+                <div class="use-case-icon fade-in">
+                    <div class="use-case-icon">📦</div>
+                    <h4>Inventory Management</h4>
+                    <p>Discover which 20% of products drive 80% of sales to optimize stock levels and reduce costs.</p>
+                </div>
+                <div class="use-case fade-in">
+                    <div class="use-case-icon">🔧</div>
+                    <h4>Quality Control</h4>
+                    <p>Find the 20% of issues causing 80% of defects to prioritize improvement efforts effectively.</p>
+                </div>
+                <div class="use-case fade-in">
+                    <div class="use-case-icon">👥</div>
+                    <h4>Sales Performance</h4>
+                    <p>Analyze sales team performance to identify top performers and replicate their success strategies.</p>
+                </div>
+                <div class="use-case fade-in">
+                    <div class="use-case-icon">⏱️</div>
+                    <h4>Time Management</h4>
+                    <p>Identify which 20% of activities produce 80% of results to maximize productivity and efficiency.</p>
+                </div>
+                <div class="use-case fade-in">
+                    <div class="use-case-icon">🎯</div>
+                    <h4>Marketing ROI</h4>
+                    <p>Determine which marketing channels deliver the highest return on investment for budget allocation.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="download-section" id="download">
+        <div class="container">
+            <div class="download-content">
+                <h2>Ready to Discover Your Vital Few?</h2>
+                <p>Join thousands of businesses using Pareto-Ultimate© to unlock dramatic profitability improvements through data-driven 80/20 analysis.</p>
+                <div class="cta-buttons">
+                    <a href="#" class="cta-button">Download Pareto-Ultimate©</a>
+                    <a href="#" class="cta-button cta-secondary">View Documentation</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>Pareto-Ultimate©</h4>
+                    <a href="#">Download</a>
+                    <a href="#">User Guide</a>
+                    <a href="#">Video Tutorials</a>
+                    <a href="#">Case Studies</a>
+                </div>
+                <div class="footer-section">
+                    <h4>Resources</h4>
+                    <a href="#">Pareto Principle Guide</a>
+                    <a href="#">ABC Analysis</a>
+                    <a href="#">Business Applications</a>
+                    <a href="#">Support</a>
+                </div>
+                <div class="footer-section">
+                    <h4>Metrics Institute</h4>
+                    <a href="../">All Products</a>
+                    <a href="#">Statistical Calculators</a>
+                    <a href="#">Statico-Interactive™</a>
+                    <a href="#">EzPaste</a>
+                </div>
+                <div class="footer-section">
+                    <h4>Connect</h4>
+                    <a href="#">LinkedIn</a>
+                    <a href="#">Twitter</a>
+                    <a href="#">YouTube</a>
+                    <a href="#">Newsletter</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Metrics Institute. Pareto-Ultimate© - Unlocking your business potential through the power of 80/20.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Fade in animation on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, observerOptions);
+
+        // Observe all fade-in elements
+        document.querySelectorAll('.fade-in').forEach(el => {
+            observer.observe(el);
+        });
+
+        // Header background opacity on scroll
+        window.addEventListener('scroll', () => {
+            const header = document.querySelector('header');
+            const scrolled = window.pageYOffset;
+            const opacity = Math.min(scrolled / 100, 0.95);
+            header.style.background = `linear-gradient(135deg, rgba(102, 126, 234, ${opacity}) 0%, rgba(118, 75, 162, ${opacity}) 100%)`;
+        });
+
+        // Interactive hover effects for cards
+        document.querySelectorAll('.advantage-card, .feature-item, .use-case').forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-5px) scale(1.02)';
+            });
+            
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0) scale(1)';
+            });
+        });
+    </script>
+    <script>
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Fade in animation on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, observerOptions);
+
+        // Observe all fade-in elements
+        document.querySelectorAll('.fade-in').forEach(el => {
+            observer.observe(el);
+        });
+
+        // Add some interactive hover effects
+        document.querySelectorAll('.product-card').forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-10px) scale(1.02)';
+            });
+
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0) scale(1)';
+            });
+        });
+
+        // Header background opacity on scroll
+        window.addEventListener('scroll', () => {
+            const header = document.querySelector('header');
+            const scrolled = window.pageYOffset;
+            const opacity = Math.min(scrolled / 100, 0.95);
+            header.style.background = `linear-gradient(135deg, rgba(102, 126, 234, ${opacity}) 0%, rgba(118, 75, 162, ${opacity}) 100%)`;
+        });
+    </script>
+
+
+<!-- Load header from partials directory -->
+<script>
+(function(){
+  // Load header content
+  fetch('../partials/header.html')
+    .then(response => {
+      if (!response.ok) throw new Error('Header not found');
+      return response.text();
+    })
+    .then(html => {
+      const headerContainer = document.getElementById('site-header');
+      if (headerContainer) {
+        headerContainer.innerHTML = html;
+      }
+      
+      // Load header JavaScript
+      const script = document.createElement('script');
+      script.src = '../assets/js/header.js';
+      document.body.appendChild(script);
+      
+      console.log('[header] loaded successfully');
+    })
+    .catch(err => {
+      console.warn('[header] failed to load:', err);
+    });
+})();
+</script>
+</body>
+</html>

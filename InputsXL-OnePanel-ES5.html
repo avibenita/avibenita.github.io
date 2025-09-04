@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <meta charset="utf-8" />
+  <title>InputsXL — One Panel (ES5)</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+  <style>
+    body{margin:0;background:#232a33;color:#fff;font-family:Segoe UI,Arial,sans-serif}
+    .card{ width:520px; max-width:96vw; background:#2e3642; border-radius:14px; box-shadow:0 8px 22px rgba(0,0,0,.35); margin:14px auto; overflow:hidden }
+    .card-head{ background:#10151d; color:#ffd3d3; padding:10px 16px; font-weight:900 }
+    .card-body{ padding:14px }
+    .section{ padding:6px 0 }
+    .divider{ height:1px; background:rgba(255,255,255,.12); margin:12px 0 }
+    .field{ display:-ms-grid; display:grid; -ms-grid-columns:150px 1fr auto; grid-template-columns:150px 1fr auto; grid-gap:10px; align-items:center; margin-bottom:10px }
+    .field label{ color:#cfd3dc; font-size:12px }
+    input[type=text], input[type=number], select{ width:100%; background:#3b4351; color:#fff; border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:8px 10px }
+    .btn{ background:#6471ff; border:0; border-radius:10px; color:#fff; padding:8px 12px; font-weight:800; cursor:pointer }
+    .btn.alt{ background:#2f3548 } .btn.icon{ display:inline-block } .btn.full{ width:100% }
+    .btn[disabled]{opacity:.5; cursor:not-allowed}
+    .hint{ color:#cfd3dc; font-size:12px; margin:6px 0 0 }
+    .tabs{ margin-bottom:12px }
+    .tabs button{ background:#2f3548; color:#fff; border:1px solid rgba(255,255,255,.14); border-radius:10px; padding:8px 14px; font-weight:800; cursor:pointer; margin-right:8px }
+    .tabs button.active{ background:linear-gradient(180deg,#4a5066,#34394e) }
+    .panel{ display:none } .panel.active{ display:block }
+    .slab{ background:#5a6073; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,.1) }
+    .slab .row{ display:-ms-grid; display:grid; -ms-grid-columns: 160px 1fr 90px; grid-template-columns:160px 1fr 90px; grid-gap:10px; align-items:center; margin:8px 0 }
+    .pill{ display:inline-block; background:#2f3548; color:#fff; padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,.14); font-weight:800; text-align:center }
+    .stats-grid{ display:-ms-grid; display:grid; -ms-grid-columns: 1fr 1fr 1fr 1fr 1fr 1fr; grid-template-columns:repeat(6,1fr); grid-gap:10px }
+    .stat{ background:linear-gradient(180deg,#4a4e60,#3b4054); padding:10px; border-radius:12px; text-align:center; border:1px solid rgba(255,255,255,.08) }
+    .stat .lbl{ color:#d1d5e1; font-size:12px } .stat .val{ font-weight:800; font-size:18px; color:#ffd3d3 }
+    table.freq{ width:100%; border-collapse:collapse; margin-top:6px }
+    table.freq th, table.freq td{ border:1px solid rgba(255,255,255,.15); padding:6px 8px; text-align:left }
+    table.freq th{ background:#3a4150; color:#cfd3dc }
+  </style>
+</head>
+<body>
+  <section class="card">
+    <div class="card-head">Univariate analysis</div>
+    <div class="card-body">
+
+      <div class="section">
+        <div class="field">
+          <label>Range</label>
+          <input id="tbRange" type="text" placeholder="e.g. Sheet1!A1:D200" />
+          <button class="btn icon" id="btnPick"><i class="fa-regular fa-hand-pointer"></i> Pick</button>
+        </div>
+        <div class="field">
+          <label>Variable</label>
+          <select id="ddlVariable"><option value="">(select header)</option></select>
+          <div>
+            <button class="btn alt icon" id="btnNamed"><i class="fa-solid fa-tag"></i> Named…</button>
+            <button class="btn icon" id="btnDemo"><i class="fa-solid fa-flask"></i> Demo</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Decimals / Header</label>
+          <select id="ddlDecimals"><option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
+          <select id="ddlHasHeader"><option value="1" selected>Headers in top row</option><option value="0">No header</option></select>
+          <button class="btn icon" id="btnGetData"><i class="fa-solid fa-database"></i> Get Data</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section">
+        <div class="tabs">
+          <button id="tab-trim" class="active">Trim range</button>
+          <button id="tab-transform">Transform</button>
+          <button id="tab-groups">Subgrouping</button>
+        </div>
+
+        <div id="panel-trim" class="panel active">
+          <div class="slab">
+            <div class="row"><span>From Left to Right</span><input id="slMin" type="range" min="0" max="100" value="0" step="1" /><span id="lblMin" class="pill">—</span></div>
+            <div class="row"><span>From Right to Left</span><input id="slMax" type="range" min="0" max="100" value="100" step="1" /><span id="lblMax" class="pill">—</span></div>
+            <div class="row"><span>Explicit values</span>
+              <div style="display:grid;grid-template-columns:1fr 1fr;grid-gap:8px">
+                <input id="tbMin" type="number" placeholder="min (blank = auto)" />
+                <input id="tbMax" type="number" placeholder="max (blank = auto)" />
+              </div>
+              <span id="tileN" class="pill">n=0</span>
+            </div>
+          </div>
+          <div class="field">
+            <label>Trim %</label>
+            <input id="tbTrimL" type="number" min="0" max="40" step="1" placeholder="lower %" />
+            <input id="tbTrimU" type="number" min="0" max="40" step="1" placeholder="upper %" />
+            <select id="ddlTruncAction"><option value="exclude">Exclude</option><option value="winsor">Winsorize</option></select>
+          </div>
+          <div class="field"><label></label><span></span><button class="btn alt icon" id="btnResetTT"><i class="fa-solid fa-arrow-rotate-left"></i> Reset</button></div>
+        </div>
+
+        <div id="panel-transform" class="panel">
+          <div class="field">
+            <label>Transform</label>
+            <select id="ddlTransform">
+              <option value="none" selected>None</option>
+              <option value="ln">ln(x)</option>
+              <option value="log10">log10(x)</option>
+              <option value="sqrt">sqrt(x)</option>
+              <option value="square">x^2</option>
+              <option value="z">z-score</option>
+              <option value="minmax">Min–Max [0,1]</option>
+            </select>
+            <input id="tbLambda" type="number" step="0.1" placeholder="λ (optional)" />
+          </div>
+          <p class="hint">Quick stats below ignore transforms — they reflect trimming only.</p>
+        </div>
+
+        <div id="panel-groups" class="panel">
+          <div class="field">
+            <label>Group header (one cell)</label>
+            <input id="tbGroupHeader" type="text" placeholder="e.g. Sheet1!C1" />
+            <button class="btn icon" id="btnPickGroupHeader"><i class="fa-regular fa-hand-pointer"></i> Pick</button>
+          </div>
+          <div class="field">
+            <label>Group value</label>
+            <select id="ddlGroupValue"><option value="__ALL__">All subgroups at once</option></select>
+            <button class="btn alt" id="btnClearGroups">Clear</button>
+          </div>
+          <table class="freq" id="groupFreq"></table>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section">
+        <div class="stats-grid" id="miniStats"></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section">
+        <div class="field"><label></label><span></span><button class="btn full icon" id="btnShowResults"><i class="fa-solid fa-superscript"></i> Run</button></div>
+        <p class="hint"><span id="resultsStatus"><i class="fa-solid fa-circle"></i> No data yet</span></p>
+      </div>
+
+    </div>
+  </section>
+
+  <script>
+    // ----------- Helpers (ES5) -----------
+    function qs(id){ return document.getElementById(id); }
+    function addClass(el, name){ if(!el) return; if((' '+el.className+' ').indexOf(' '+name+' ')<0){ el.className = (el.className? el.className+' ' : '') + name; } }
+    function removeClass(el, name){ if(!el) return; var s=' '+el.className+' '; while(s.indexOf(' '+name+' ')>=0){ s = s.replace(' '+name+' ', ' '); } el.className = s.replace(/^\\s+|\\s+$/g,''); }
+    function setActive(id){ var panels=['panel-trim','panel-transform','panel-groups']; var tabs=['tab-trim','tab-transform','tab-groups']; var i; for(i=0;i<panels.length;i++){ removeClass(qs(panels[i]), 'active'); removeClass(qs(tabs[i]), 'active'); } addClass(qs(id.replace('panel','tab')), 'active'); addClass(qs(id), 'active'); }
+    function toNum(x){ var n=parseFloat(x); return isNaN(n)? 0 : n; }
+    function parseNullable(s){ if(s==null) return null; s=(''+s).replace(/^\\s+|\\s+$/g,''); return s===''? null : parseFloat(s); }
+    function mean(a){ if(!a.length) return 0; var s=0,i; for(i=0;i<a.length;i++) s+=a[i]; return s/a.length; }
+    function stdev(a){ var n=a.length; if(n<2) return 0; var m=mean(a), s=0, i; for(i=0;i<n;i++){ var d=a[i]-m; s+=d*d; } return Math.sqrt(s/(n-1)); }
+    function arrMin(a){ if(!a.length) return 0; var m=a[0],i; for(i=1;i<a.length;i++) if(a[i]<m) m=a[i]; return m; }
+    function arrMax(a){ if(!a.length) return 0; var m=a[0],i; for(i=1;i<a.length;i++) if(a[i]>m) m=a[i]; return m; }
+    function sortedCopy(a){ var b=a.slice(0); b.sort(function(x,y){return x-y;}); return b; }
+    function quantile(sorted, p){ if(!sorted.length) return 0; var i=(sorted.length-1)*p; var lo=Math.floor(i), hi=Math.ceil(i); if(lo===hi) return sorted[lo]; return sorted[lo]*(hi-i)+sorted[hi]*(i-lo); }
+    function fmt(v){ var dec=appState.decimals||2; return Number(v).toFixed(dec); }
+
+    // ----------- Bridge -----------
+    function sendMessageToVB6(action, payload){ try{ if(window.external && window.external.OrdoWebView1_JSMessage){ window.external.OrdoWebView1_JSMessage(action + '|' + (payload || '')); } }catch(e){} }
+
+    // ----------- State -----------
+    var appState = {
+      rawValues: [], rawGroups: [], valuesTrimmed: [], values: [],
+      decimals: 2, hasHeader: 1,
+      selectedGroup: "__ALL__"
+    };
+
+    // ----------- Pipeline -----------
+    function recalcPipeline(){
+      var vals = appState.rawValues.slice(0);
+      // subgroup filter
+      if(appState.rawGroups.length && appState.selectedGroup !== "__ALL__"){
+        var keep = [], i;
+        for(i=0;i<vals.length;i++){ if(String(appState.rawGroups[i])===String(appState.selectedGroup)) keep.push(vals[i]); }
+        vals = keep;
+      }
+      if(!vals.length){ appState.valuesTrimmed=[]; appState.values=[]; renderStats([]); return; }
+
+      // bounds
+      var mn = arrMin(vals), mx = arrMax(vals);
+      var vmin = parseNullable(qs('tbMin').value); if(vmin==null) vmin = mn;
+      var vmax = parseNullable(qs('tbMax').value); if(vmax==null) vmax = mx;
+      var tl = toNum(qs('tbTrimL').value)||0, tu = toNum(qs('tbTrimU').value)||0;
+      if(tl||tu){ var srt = sortedCopy(vals); var lo = quantile(srt, Math.min(.5, Math.max(0, tl/100))); var hi = quantile(srt, Math.max(.5, Math.min(1, 1-tu/100))); if(vmin==null) vmin=lo; if(vmax==null) vmax=hi; }
+      var act = qs('ddlTruncAction').value;
+      var out = [], j;
+      if(act==='winsor'){ for(j=0;j<vals.length;j++){ var v=vals[j]; if(v<vmin) v=vmin; if(v>vmax) v=vmax; out.push(v); } }
+      else { for(j=0;j<vals.length;j++){ var w=vals[j]; if(w>=vmin && w<=vmax) out.push(w); } }
+      appState.valuesTrimmed = out.slice(0); // stats
+
+      // transform for results (ignored by stats)
+      var tv = out.slice(0), t = qs('ddlTransform').value, lam = parseNullable(qs('tbLambda').value); if(lam==null) lam=1;
+      if(t==='ln'){ var out2=[], k; for(k=0;k<tv.length;k++){ if(tv[k]>0) out2.push(Math.log(tv[k])); } tv=out2; }
+      else if(t==='log10'){ var out3=[], kk; for(kk=0;kk<tv.length;kk++){ if(tv[kk]>0) out3.push(Math.log(tv[kk])/Math.log(10)); } tv=out3; }
+      else if(t==='sqrt'){ var out4=[], k3; for(k3=0;k3<tv.length;k3++){ if(tv[k3]>=0) out4.push(Math.sqrt(tv[k3])); } tv=out4; }
+      else if(t==='square'){ for(k=0;k<tv.length;k++){ tv[k]=tv[k]*tv[k]; } }
+      else if(t==='z'){ var m=mean(tv), s=stdev(tv)||1e-9; for(k=0;k<tv.length;k++){ tv[k]=(tv[k]-m)/s; } }
+      else if(t==='minmax'){ var mn2=arrMin(tv), mx2=arrMax(tv), d=(mx2-mn2)||1; for(k=0;k<tv.length;k++){ tv[k]=(tv[k]-mn2)/d; } }
+      appState.values = tv;
+
+      renderStats(appState.valuesTrimmed);
+      syncSliderLabels();
+    }
+
+    function renderStats(arr){
+      var g = qs('miniStats'); if(!g) return;
+      if(!arr || !arr.length){ g.innerHTML = '<div class=\"hint\">No stats to show.</div>'; updateTileN(0); return; }
+      var n = arr.length, m = mean(arr), sd = stdev(arr), mn = arrMin(arr), mx = arrMax(arr);
+      var med = quantile(sortedCopy(arr), .5);
+      updateTileN(n);
+      var items = [['n',n], ['Average',m], ['std',sd], ['MIN',mn], ['Median',med], ['MAX',mx]];
+      var html = '', i; for(i=0;i<items.length;i++){ html += '<div class=\"stat\"><div class=\"lbl\">'+items[i][0]+'</div><div class=\"val\">'+fmt(items[i][1])+'</div></div>'; }
+      g.innerHTML = html;
+    }
+    function updateTileN(n){ var el = qs('tileN'); if(el) el.innerHTML = 'n='+n; }
+
+    // ----------- Groups -----------
+    function renderGroupLevels(){
+      var tbl = qs('groupFreq'); var ddl = qs('ddlGroupValue'); if(!tbl||!ddl) return;
+      if(!appState.rawGroups.length){ ddl.innerHTML='<option value=\"__ALL__\">All subgroups at once</option>'; tbl.innerHTML=''; return; }
+      var counts = {}; var i, g;
+      for(i=0;i<appState.rawGroups.length;i++){ g = String(appState.rawGroups[i]); counts[g] = (counts[g]||0)+1; }
+      // dropdown
+      var opts = '<option value=\"__ALL__\">All subgroups at once</option>'; for(g in counts){ if(counts.hasOwnProperty(g)){ opts += '<option value=\"'+g+'\">'+g+'</option>'; } }
+      ddl.innerHTML = opts;
+      // table
+      var rows = '<tr><th>Group</th><th>n</th></tr>'; for(g in counts){ if(counts.hasOwnProperty(g)){ rows += '<tr><td>'+g+'</td><td>'+counts[g]+'</td></tr>'; } }
+      tbl.innerHTML = rows;
+    }
+
+    // ----------- Sliders -----------
+    function sliderToValue(pct){
+      var arr = appState.rawValues; if(!arr || !arr.length) return 0;
+      var mn = arrMin(arr), mx = arrMax(arr);
+      return mn + (mx - mn) * (pct/100);
+    }
+    function syncFromSliders(){
+      var sMin = qs('slMin'), sMax = qs('slMax');
+      if(toNum(sMin.value) > toNum(sMax.value)) sMax.value = sMin.value;
+      var vMin = sliderToValue(toNum(sMin.value)), vMax = sliderToValue(toNum(sMax.value));
+      qs('tbMin').value = fmt(vMin);
+      qs('tbMax').value = fmt(vMax);
+      syncSliderLabels();
+      resultsDirty = true; updateResultsCTA();
+      recalcPipeline();
+    }
+    function syncSliderLabels(){
+      var lblMin = qs('lblMin'), lblMax = qs('lblMax');
+      var vmin = parseNullable(qs('tbMin').value), vmax = parseNullable(qs('tbMax').value);
+      if(lblMin) lblMin.innerHTML = (vmin==null? '—' : fmt(vmin));
+      if(lblMax) lblMax.innerHTML = (vmax==null? '—' : fmt(vmax));
+    }
+
+    // ----------- Results CTA -----------
+    var resultsDirty = true;
+    function updateResultsCTA(){
+      var btn = qs('btnShowResults'), status = qs('resultsStatus'), hasData = appState.rawValues && appState.rawValues.length>0;
+      if(btn) btn.disabled = !hasData;
+      if(status){
+        if(!hasData) status.innerHTML = '<i class=\"fa-solid fa-circle\"></i> No data yet';
+        else if(resultsDirty) status.innerHTML = '<i class=\"fa-solid fa-circle-notch\"></i> Changes pending — results hidden';
+        else status.innerHTML = '<i class=\"fa-solid fa-check\"></i> Showing results';
+      }
+    }
+
+    // ----------- Host Hooks -----------
+    window.populateFromVB6 = function(jsonString){
+      try{
+        var data = JSON.parse(jsonString);
+        if(data && data.values && data.values.length){
+          var i;
+          appState.rawValues = [];
+          for(i=0;i<data.values.length;i++){ var v = parseFloat(data.values[i]); if(!isNaN(v)) appState.rawValues.push(v); }
+          appState.rawGroups = (data.groups && data.groups.length===data.values.length) ? data.groups : [];
+          renderGroupLevels();
+          recalcPipeline();
+          updateResultsCTA();
+          return true;
+        }
+      }catch(ex){}
+      return false;
+    };
+    window.setHeadersFromVB6 = function(h){
+      try{
+        var sel = qs('ddlVariable'), arr = (typeof h==='string')? JSON.parse(h) : h, i, opt='<option value=\"\">(select header)</option>';
+        for(i=0;i<arr.length;i++){ opt += '<option value=\"'+arr[i]+'\">'+arr[i]+'</option>'; }
+        sel.innerHTML = opt; return true;
+      }catch(ex){}
+      return false;
+    };
+
+    // ----------- Init / Wiring -----------
+    function init(){
+      // Tabs
+      qs('tab-trim').onclick = function(){ setActive('panel-trim'); };
+      qs('tab-transform').onclick = function(){ setActive('panel-transform'); };
+      qs('tab-groups').onclick = function(){ setActive('panel-groups'); };
+
+      // Buttons
+      qs('btnPick').onclick = function(){ sendMessageToVB6('PickRange','PickRange'); };
+      qs('btnNamed').onclick = function(){ sendMessageToVB6('ChooseNamedRange','ChooseNamedRange'); };
+      qs('btnGetData').onclick = function(){
+        var rangeAddr = qs('tbRange').value||'';
+        var hasHeader = parseInt(qs('ddlHasHeader').value,10)||0;
+        appState.hasHeader = hasHeader;
+        appState.decimals = parseInt(qs('ddlDecimals').value,10)||2;
+        sendMessageToVB6('GetHeadersFromExcel', JSON.stringify({ range: rangeAddr, hasHeader: hasHeader }));
+        var varName = qs('ddlVariable').value||'';
+        if(varName){ sendMessageToVB6('GetVariableData', JSON.stringify({ range: rangeAddr, variable: varName })); }
+        else{ sendMessageToVB6('GetDataFromExcel', JSON.stringify({ range: rangeAddr, hasHeader: hasHeader })); }
+      };
+      qs('ddlVariable').onchange = function(){
+        var rangeAddr = qs('tbRange').value||'';
+        var varName = qs('ddlVariable').value||'';
+        if(varName && rangeAddr){ sendMessageToVB6('GetVariableData', JSON.stringify({ range: rangeAddr, variable: varName })); }
+      };
+      qs('btnDemo').onclick = function(){
+        var sample = { title:'Demo ages', values:[21,22,23,24,22,26,23,21,25,23,24,22,24,26,26,21,22,21,23,26,24,25,22,23,24,21,22,26,24,23,25,26,24,23,22,21,26,26,24,23],
+                       groups:["A","A","B","B","A","B","A","A","B","A","B","A","B","B","B","A","A","A","B","B","B","A","A","B","B","A","A","B","B","A","B","B","A","A","B","A","B","B","A","A"] };
+        window.populateFromVB6(JSON.stringify(sample));
+        qs('tbRange').value = 'Demo!A2:A41';
+      };
+      qs('btnPickGroupHeader').onclick = function(){ sendMessageToVB6('PickGroupHeader','PickGroupHeader'); };
+      qs('btnClearGroups').onclick = function(){ appState.rawGroups=[]; appState.selectedGroup="__ALL__"; renderGroupLevels(); recalcPipeline(); };
+
+      // Sliders + inputs
+      qs('slMin').oninput = syncFromSliders;
+      qs('slMax').oninput = syncFromSliders;
+      var ids = ['tbMin','tbMax','tbTrimL','tbTrimU','ddlTruncAction','ddlTransform','tbLambda','ddlGroupValue'];
+      for(var i=0;i<ids.length;i++){
+        (function(id){
+          var el = qs(id);
+          if(!el) return;
+          var evt = (id==='ddlTruncAction' || id.indexOf('ddl')===0)? 'change' : 'input';
+          el[evt] = function(){
+            if(id==='ddlGroupValue'){ appState.selectedGroup = el.value; }
+            resultsDirty = true; updateResultsCTA();
+            recalcPipeline();
+          };
+        })(ids[i]);
+      }
+
+      qs('btnShowResults').onclick = function(){ 
+        // Send the filtered and transformed data to the host
+        var payload = {
+          keepModule: true,
+          filteredValues: appState.values,
+          valuesTrimmed: appState.valuesTrimmed,
+          rawValues: appState.rawValues,
+          selectedGroup: appState.selectedGroup,
+          transform: qs('ddlTransform').value,
+          filters: {
+            minValue: parseNullable(qs('tbMin').value),
+            maxValue: parseNullable(qs('tbMax').value),
+            trimLower: toNum(qs('tbTrimL').value),
+            trimUpper: toNum(qs('tbTrimU').value),
+            truncAction: qs('ddlTruncAction').value,
+            lambda: parseNullable(qs('tbLambda').value)
+          }
+        };
+        sendMessageToVB6('ShowResults', JSON.stringify(payload)); 
+        resultsDirty=false; 
+        updateResultsCTA(); 
+      };
+      // Initial demo if no host
+      try{
+        if(!(window.external && window.external.OrdoWebView1_JSMessage)){
+          qs('btnDemo').click();
+        }
+      }catch(ex){ qs('btnDemo').click(); }
+    }
+
+    if(document.readyState === 'complete' || document.readyState === 'interactive'){ init(); }
+    else if(document.addEventListener){ document.addEventListener('DOMContentLoaded', init); }
+    else { window.attachEvent('onload', init); }
+  </script>
+</body>
+</html>

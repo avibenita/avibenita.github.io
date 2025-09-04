@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>InputsXL — One Panel (Responsive)</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+  <style>
+    :root{
+      --ink:#fff; --mut:#cfd3dc; --bg:#232a33; --card:#2e3642; --head:#10151d; --line:rgba(255,255,255,.12); --brand:#6471ff;
+      --pad:14px;
+    }
+    *{ box-sizing:border-box }
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 Segoe UI,Arial,sans-serif}
+    .wrap{ display:flex; justify-content:center; padding:clamp(8px,2.5vh,18px); }
+    .card{
+      width:min(980px, 100%);
+      background:var(--card);
+      border-radius:14px;
+      box-shadow:0 8px 22px rgba(0,0,0,.35);
+      overflow:hidden;
+    }
+    .card-head{ background:var(--head); color:#ffd3d3; padding:10px 16px; font-weight:900; font-size:clamp(14px, 2.1vw, 16px) }
+    .card-body{ padding:var(--pad) }
+    .section{ padding:6px 0 }
+    .divider{ height:1px; background:var(--line); margin:12px 0 }
+    /* Fields */
+    .field{
+      display:grid;
+      grid-template-columns: 200px 1fr auto;
+      gap:10px;
+      align-items:center;
+      margin-bottom:10px;
+    }
+    .field label{ color:var(--mut); font-size:12px; font-weight:600 }
+    input[type=text], input[type=number], select{
+      width:100%; background:#3b4351; color:var(--ink);
+      border:1px solid var(--line); border-radius:10px; padding:8px 10px; min-height:36px;
+    }
+    .btn{ background:var(--brand); border:0; border-radius:10px; color:#fff; padding:9px 12px; font-weight:800; cursor:pointer; min-height:36px }
+    .btn.alt{ background:#2f3548 }
+    .btn.icon i{ margin-right:8px }
+    .btn.full{ width:100% }
+    .hint{ color:var(--mut); font-size:12px; margin:6px 0 0 }
+    /* Tabs */
+    .tabset{ border:1px solid var(--line); border-radius:14px; overflow:hidden; margin-top:12px }
+    .tabs{ display:flex; background:#1e2530; border-bottom:1px solid var(--line); overflow:auto; -webkit-overflow-scrolling:touch; }
+    .tabs button{
+      flex:1 0 auto; background:transparent; color:var(--mut);
+      border:none; border-right:1px solid var(--line); padding:12px 14px; font-weight:800; cursor:pointer; white-space:nowrap;
+    }
+    .tabs button:last-child{ border-right:none }
+    .tabs button.active{ background:linear-gradient(180deg,#4a5066,#3a4555); color:#ffd3d3; box-shadow:inset 0 -3px 0 var(--brand) }
+    .panel{ display:none } .panel.active{ display:block }
+    .tab-content{ padding:16px }
+    /* Trim slab */
+    .slab{ background:#5a6073; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,.1) }
+    .slab .row{
+      display:grid; grid-template-columns: 180px 1fr 100px;
+      gap:10px; align-items:center; margin:8px 0
+    }
+    .pill{ display:inline-block; background:#2f3548; color:#fff; padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,.14); font-weight:800; text-align:center }
+    /* Transform options */
+    .radgrid{ display:grid; grid-template-columns:repeat(3, minmax(140px, 1fr)); gap:10px }
+    .opt{ display:flex; align-items:center; gap:8px; background:#3b4351; border:1px solid var(--line); border-radius:10px; padding:10px; cursor:pointer; min-height:42px }
+    .opt input{ accent-color:var(--brand) }
+    .opt.selected{ outline:2px solid rgba(100,113,255,.35) }
+    /* Stats responsive grid */
+    .stats{
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap:12px;
+    }
+    .stat{ background:linear-gradient(180deg,#4a4e60,#3b4054); padding:14px 12px; border-radius:12px; text-align:center; border:1px solid rgba(255,255,255,.08) }
+    .stat .lbl{ color:#d1d5e1; font-size:11px; margin-bottom:4px }
+    .stat .val{ font-weight:800; font-size:clamp(14px, 2.6vw, 18px); color:#ffd3d3; word-break:break-word; line-height:1.2 }
+    table.freq{ width:100%; border-collapse:collapse; margin-top:6px }
+    table.freq th, table.freq td{ border:1px solid rgba(255,255,255,.15); padding:6px 8px; text-align:left }
+    table.freq th{ background:#3a4150; color:#cfd3dc }
+
+    /* ---------- RESPONSIVE BREAKPOINTS ---------- */
+    @media (max-width: 920px){
+      .field{ grid-template-columns: 160px 1fr auto; }
+      .slab .row{ grid-template-columns: 150px 1fr 90px; }
+    }
+    @media (max-width: 740px){
+      .field{ grid-template-columns: 1fr; }
+      .field > *{ width:100% }
+      .field label{ margin-bottom:4px }
+      .tabs button{ flex:0 0 auto }
+      .slab .row{ grid-template-columns: 1fr; align-items:stretch }
+      .slab .row > :last-child{ justify-self:start }
+      .radgrid{ grid-template-columns:repeat(2, minmax(140px, 1fr)); }
+    }
+    @media (max-width: 460px){
+      :root{ --pad:10px }
+      .card-head{ padding:8px 12px }
+      .tab-content{ padding:12px }
+      .radgrid{ grid-template-columns:1fr; }
+      .btn, input[type=text], input[type=number], select{ min-height:40px; font-size:14px }
+      .pill{ padding:6px 10px }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="card" role="main">
+      <div class="card-head">Univariate analysis</div>
+      <div class="card-body">
+
+        <!-- Top inputs -->
+        <div class="section">
+          <div class="field">
+            <label>Select a rectangular range where the headers are in the top row</label>
+            <input id="tbRange" type="text" placeholder="e.g. Sheet1!A1:D200" />
+            <button class="btn icon" id="btnPick"><i class="fa-regular fa-hand-pointer"></i>Pick</button>
+          </div>
+          <div class="field">
+            <label>Select the variable to study</label>
+            <select id="ddlVariable"><option value="">(select header)</option></select>
+            <span></span>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Tabbed area -->
+        <div class="section tabset">
+          <div class="tabs">
+            <button id="tab-summary" class="active">Dataset Summary</button>
+            <button id="tab-trim">Trim range</button>
+            <button id="tab-transform">Transform</button>
+            <button id="tab-groups">Subgrouping</button>
+          </div>
+          <div class="tab-content">
+            <div id="panel-summary" class="panel active">
+              <div id="summaryContent">
+                <div class="hint" style="text-align:center; padding:20px;">
+                  <i class="fa-solid fa-database" style="font-size:24px; color:var(--mut); margin-bottom:10px;"></i><br/>
+                  No data loaded yet. Select a range and variable to see dataset summary.
+                </div>
+              </div>
+            </div>
+
+            <div id="panel-trim" class="panel">
+              <div class="slab">
+                <div class="row">
+                  <span>From Left to Right</span>
+                  <input id="slMin" type="range" min="0" max="100" value="0" step="1" />
+                  <span id="lblMin" class="pill">—</span>
+                </div>
+                <div class="row">
+                  <span>From Right to Left</span>
+                  <input id="slMax" type="range" min="0" max="100" value="100" step="1" />
+                  <span id="lblMax" class="pill">—</span>
+                </div>
+                <div class="row">
+                  <span>Explicit values</span>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                    <input id="tbMin" type="number" placeholder="min (blank = auto)" />
+                    <input id="tbMax" type="number" placeholder="max (blank = auto)" />
+                  </div>
+                  <span id="tileN" class="pill">n=0</span>
+                </div>
+              </div>
+              <div class="field"><label></label><span></span><button class="btn alt icon" id="btnResetTT"><i class="fa-solid fa-arrow-rotate-left"></i>Reset</button></div>
+            </div>
+
+            <div id="panel-transform" class="panel">
+              <h4 style="margin:0 0 12px;color:#ffd3d3;">Select Transformation Function</h4>
+              <div class="radgrid" id="radTransforms">
+                <label class="opt selected"><input type="radio" name="transform" value="none" checked /> None</label>
+                <label class="opt"><input type="radio" name="transform" value="ln"   /> ln(x)</label>
+                <label class="opt"><input type="radio" name="transform" value="log10"/> log10(x)</label>
+                <label class="opt"><input type="radio" name="transform" value="sqrt" /> √x</label>
+                <label class="opt"><input type="radio" name="transform" value="square" /> x²</label>
+                <label class="opt"><input type="radio" name="transform" value="z" /> z-score</label>
+                <label class="opt"><input type="radio" name="transform" value="minmax" /> Min–Max [0,1]</label>
+              </div>
+              <p class="hint">Quick stats below ignore transforms — they reflect trimming only.</p>
+            </div>
+
+            <div id="panel-groups" class="panel">
+              <div class="field">
+                <label>Select the column header (one cell only) containing the subgroups</label>
+                <input id="tbGroupHeader" type="text" placeholder="e.g. Sheet1!C1" />
+                <button class="btn icon" id="btnPickGroupHeader"><i class="fa-regular fa-hand-pointer"></i>Pick</button>
+              </div>
+              <div class="field">
+                <label>Group value</label>
+                <select id="ddlGroupValue"><option value="__ALL__">All subgroups at once</option></select>
+                <button class="btn alt" id="btnClearGroups">Clear</button>
+              </div>
+              <table class="freq" id="groupFreq"></table>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Stats -->
+        <div class="section">
+          <div class="stats" id="miniStats"></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Run -->
+        <div class="section">
+          <div class="field"><label></label><span></span><button class="btn full icon" id="btnShowResults"><i class="fa-solid fa-superscript"></i>Run</button></div>
+          <p class="hint"><span id="resultsStatus"><i class="fa-solid fa-circle"></i> No data yet</span></p>
+        </div>
+
+      </div>
+    </section>
+  </div>
+
+  <script>
+    function qs(id){ return document.getElementById(id); }
+    function addClass(el, c){ if(!el) return; if((' '+el.className+' ').indexOf(' '+c+' ')<0){ el.className = (el.className? el.className+' ' : '')+c; } }
+    function removeClass(el,c){ if(!el) return; var s=(' '+el.className+' ').replace(' '+c+' ',' '); while(s.indexOf(' '+c+' ')>=0){ s=s.replace(' '+c+' ',' '); } el.className = s.trim(); }
+    function setActive(id){ var P=['panel-summary','panel-trim','panel-transform','panel-groups'], T=['tab-summary','tab-trim','tab-transform','tab-groups']; for(var i=0;i<P.length;i++){ removeClass(qs(P[i]),'active'); removeClass(qs(T[i]),'active'); } addClass(qs(id),'active'); addClass(qs(id.replace('panel','tab')),'active'); }
+    function toNum(x){ var n=parseFloat(x); return isNaN(n)? 0:n; }
+    function parseNullable(s){ if(s==null) return null; s=(''+s).trim(); return s===''? null : parseFloat(s); }
+    function sortedCopy(a){ var b=a.slice(0); b.sort(function(x,y){return x-y;}); return b; }
+    function mean(a){ if(!a.length) return 0; for(var i=0,s=0;i<a.length;i++) s+=a[i]; return s/a.length; }
+    function stdev(a){ var n=a.length; if(n<2) return 0; var m=mean(a), s=0; for(var i=0;i<n;i++){ var d=a[i]-m; s+=d*d; } return Math.sqrt(s/(n-1)); }
+    function quantile(sorted, p){ if(!sorted.length) return 0; var i=(sorted.length-1)*p, lo=Math.floor(i), hi=Math.ceil(i); return lo===hi? sorted[lo] : sorted[lo]*(hi-i)+sorted[hi]*(i-lo); }
+    function fmt(v){ return Number(v).toFixed(2); }
+
+    function sendToHost(action, payload){
+      try{ if(window.vbHost && typeof window.vbHost.RaiseMessageEvent==='function'){ window.vbHost.RaiseMessageEvent(String(action), String(payload||'')); return true; } }catch(e){}
+      return false;
+    }
+
+    var S = { rawValues:[], rawGroups:[], valuesTrimmed:[], values:[], selectedGroup:"__ALL__" };
+
+    function recalc(){
+      var vals = S.rawValues.slice(0);
+      if(S.rawGroups.length && S.selectedGroup !== "__ALL__"){
+        var f=[]; for(var i=0;i<vals.length;i++){ if(String(S.rawGroups[i])===String(S.selectedGroup)) f.push(vals[i]); } vals=f;
+      }
+      if(!vals.length){ S.valuesTrimmed=[]; S.values=[]; renderStats([]); statusDirty(); return; }
+
+      var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+      var vmin = parseNullable(qs('tbMin').value); if(vmin==null) vmin=mn;
+      var vmax = parseNullable(qs('tbMax').value); if(vmax==null) vmax=mx;
+
+      var out=[];
+      for(var j=0;j<vals.length;j++){
+        var v=vals[j];
+        if(v>=vmin && v<=vmax){ out.push(v); }
+      }
+      S.valuesTrimmed = out.slice(0);
+
+      var t = (document.querySelector('input[name="transform"]:checked')||{}).value || 'none';
+      var tv = out.slice(0);
+      if(t==='ln'){ var a=[]; for(var k=0;k<tv.length;k++){ if(tv[k]>0) a.push(Math.log(tv[k])); } tv=a; }
+      else if(t==='log10'){ var a2=[], L=Math.log; for(var k2=0;k2<tv.length;k2++){ if(tv[k2]>0) a2.push(L(tv[k2])/L(10)); } tv=a2; }
+      else if(t==='sqrt'){ var a3=[]; for(var k3=0;k3<tv.length;k3++){ if(tv[k3]>=0) a3.push(Math.sqrt(tv[k3])); } tv=a3; }
+      else if(t==='square'){ for(var k4=0;k4<tv.length;k4++){ tv[k4]=tv[k4]*tv[k4]; } }
+      else if(t==='z'){ var m=mean(tv), s=stdev(tv)||1e-9; for(var k5=0;k5<tv.length;k5++){ tv[k5]=(tv[k5]-m)/s; } }
+      else if(t==='minmax'){ var mn2=Math.min.apply(null,tv), mx2=Math.max.apply(null,tv), d=(mx2-mn2)||1; for(var k6=0;k6<tv.length;k6++){ tv[k6]=(tv[k6]-mn2)/d; } }
+      S.values = tv;
+
+      renderStats(S.valuesTrimmed);
+      renderDatasetSummary();
+      syncSliderLabels();
+      statusDirty();
+    }
+
+    function syncSliderLabels(){
+      var vmin = parseNullable(qs('tbMin').value), vmax = parseNullable(qs('tbMax').value);
+      if(vmin == null && S.rawValues.length) {
+        var slMin = qs('slMin');
+        vmin = slMin ? sliderToValue(toNum(slMin.value)) : Math.min.apply(null, S.rawValues);
+      }
+      if(vmax == null && S.rawValues.length) {
+        var slMax = qs('slMax');
+        vmax = slMax ? sliderToValue(toNum(slMax.value)) : Math.max.apply(null, S.rawValues);
+      }
+      qs('lblMin').innerHTML = (vmin==null? '—' : fmt(vmin));
+      qs('lblMax').innerHTML = (vmax==null? '—' : fmt(vmax));
+    }
+    function updateSlidersForNewData(){
+      if(!S.rawValues.length) return;
+      var mn = Math.min.apply(null, S.rawValues);
+      var mx = Math.max.apply(null, S.rawValues);
+      var slMin = qs('slMin'), slMax = qs('slMax');
+      var tbMin = qs('tbMin'), tbMax = qs('tbMax');
+      var lblMin = qs('lblMin'), lblMax = qs('lblMax');
+      if(slMin) slMin.value = 0;
+      if(slMax) slMax.value = 100;
+      if(tbMin) tbMin.value = '';
+      if(tbMax) tbMax.value = '';
+      if(lblMin) lblMin.innerHTML = fmt(mn);
+      if(lblMax) lblMax.innerHTML = fmt(mx);
+    }
+    function sliderToValue(pct){
+      var a=S.rawValues; if(!a.length) return 0; var mn=Math.min.apply(null,a), mx=Math.max.apply(null,a);
+      return mn + (mx-mn)*(pct/100);
+    }
+    function valueToSlider(val){
+      var a=S.rawValues; if(!a.length) return 0;
+      var mn=Math.min.apply(null,a), mx=Math.max.apply(null,a);
+      var range = mx - mn;
+      if(range === 0) return 0;
+      return Math.max(0, Math.min(100, ((val - mn) / range) * 100));
+    }
+    function explicitValuesChanged(){
+      var tbMin = qs('tbMin'), tbMax = qs('tbMax');
+      var slMin = qs('slMin'), slMax = qs('slMax');
+      var vmin = parseNullable(tbMin.value);
+      var vmax = parseNullable(tbMax.value);
+      if(vmin !== null && S.rawValues.length) slMin.value = valueToSlider(vmin);
+      if(vmax !== null && S.rawValues.length) slMax.value = valueToSlider(vmax);
+      if(toNum(slMin.value) > toNum(slMax.value)) {
+        if(vmin !== null && vmax === null) slMax.value = slMin.value;
+        else if(vmax !== null && vmin === null) slMin.value = slMax.value;
+      }
+      recalc();
+    }
+    function slidersChanged(){
+      var sMin=qs('slMin'), sMax=qs('slMax');
+      if(toNum(sMin.value) > toNum(sMax.value)) sMax.value = sMin.value;
+      qs('tbMin').value = fmt(sliderToValue(toNum(sMin.value)));
+      qs('tbMax').value = fmt(sliderToValue(toNum(sMax.value)));
+      recalc();
+    }
+    function renderStats(a){
+      var g=qs('miniStats'); if(!a.length){ g.innerHTML='<div class="hint">No stats to show.</div>'; qs('tileN').innerHTML='n=0'; return; }
+      var n=a.length, m=mean(a), sd=stdev(a), mn=Math.min.apply(null,a), mx=Math.max.apply(null,a), s=sortedCopy(a);
+      var q25=quantile(s,.25), med=quantile(s,.5), q75=quantile(s,.75);
+      qs('tileN').innerHTML='n='+n;
+      function item(lbl,val,isInteger){ return '<div class="stat"><div class="lbl">'+lbl+'</div><div class="val">'+(isInteger ? val : fmt(val))+'</div></div>'; }
+      g.innerHTML = item('n',n,true)+item('Average',m)+item('std',sd)+item('MIN',mn)+item('Q25',q25)+item('Median',med)+item('Q75',q75)+item('MAX',mx);
+    }
+    function renderDatasetSummary(){
+      var summaryEl = qs('summaryContent');
+      if(!S.rawValues.length){
+        summaryEl.innerHTML = '<div class="hint" style="text-align:center; padding:20px;"><i class="fa-solid fa-database" style="font-size:24px; color:var(--mut); margin-bottom:10px;"></i><br/>No data loaded yet. Select a range and variable to see dataset summary.</div>';
+        return;
+      }
+      var n=S.rawValues.length, m=mean(S.rawValues), sd=stdev(S.rawValues);
+      var mn=Math.min.apply(null,S.rawValues), mx=Math.max.apply(null,S.rawValues), s=sortedCopy(S.rawValues);
+      var q25=quantile(s,.25), med=quantile(s,.5), q75=quantile(s,.75);
+      var range = mx - mn;
+      var cv = m !== 0 ? (sd/Math.abs(m))*100 : 0;
+      var selectedVar = qs('ddlVariable').value || 'Unknown';
+      var selectedRange = qs('tbRange').value || 'Unknown';
+      var html = '<div style="padding:10px;">';
+      html += '<h4 style="margin:0 0 15px; color:#ffd3d3; text-align:center;"><i class="fa-solid fa-chart-bar"></i> Dataset Overview</h4>';
+      html += '<div style="background:#3b4351; padding:12px; border-radius:8px; margin-bottom:15px;">';
+      html += '<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; font-size:13px;">';
+      html += '<div><strong>Range:</strong> ' + selectedRange + '</div>';
+      html += '<div><strong>Variable:</strong> ' + selectedVar + '</div>';
+      html += '</div></div>';
+      html += '<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:15px;">';
+      html += '<div style="background:#4a4e60; padding:12px; border-radius:8px; text-align:center;">';
+      html += '<div style="color:#d1d5e1; font-size:11px; margin-bottom:4px;">SAMPLE SIZE</div>';
+      html += '<div style="font-size:24px; font-weight:800; color:#ffd3d3;">' + n + '</div>';
+      html += '</div>';
+      html += '<div style="background:#4a4e60; padding:12px; border-radius:8px; text-align:center;">';
+      html += '<div style="color:#d1d5e1; font-size:11px; margin-bottom:4px;">RANGE</div>';
+      html += '<div style="font-size:16px; font-weight:800; color:#ffd3d3;">' + fmt(range) + '</div>';
+      html += '</div></div>';
+      html += '<div style="background:#3b4351; padding:12px; border-radius:8px; margin-bottom:15px;">';
+      html += '<div style="color:#ffd3d3; font-size:12px; font-weight:600; margin-bottom:8px;">Distribution Summary</div>';
+      html += '<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; font-size:12px;">';
+      html += '<div>Mean: <strong>' + fmt(m) + '</strong></div>';
+      html += '<div>Median: <strong>' + fmt(med) + '</strong></div>';
+      html += '<div>Std Dev: <strong>' + fmt(sd) + '</strong></div>';
+      html += '<div>Min: <strong>' + fmt(mn) + '</strong></div>';
+      html += '<div>Max: <strong>' + fmt(mx) + '</strong></div>';
+      html += '<div>CV: <strong>' + fmt(cv) + '%</strong></div>';
+      html += '</div></div>';
+      if(S.rawGroups.length){
+        var groupCounts = {}; for(var i=0; i<S.rawGroups.length; i++){ var g = String(S.rawGroups[i]); groupCounts[g] = (groupCounts[g] || 0) + 1; }
+        var numGroups = Object.keys(groupCounts).length;
+        html += '<div style="background:#2f3548; padding:12px; border-radius:8px;">';
+        html += '<div style="color:#ffd3d3; font-size:12px; font-weight:600; margin-bottom:8px;">Subgroups (' + numGroups + ' groups)</div>';
+        html += '<div style="font-size:11px; line-height:1.4;">';
+        for(var group in groupCounts){ if(groupCounts.hasOwnProperty(group)){ html += '<span style="display:inline-block; background:#4a5066; padding:2px 6px; border-radius:4px; margin:2px;">' + group + ' (n=' + groupCounts[group] + ')</span>'; } }
+        html += '</div></div>';
+      }
+      html += '</div>';
+      summaryEl.innerHTML = html;
+    }
+    function renderGroupLevels(){
+      var ddl=qs('ddlGroupValue'), tbl=qs('groupFreq'); if(!S.rawGroups.length){ ddl.innerHTML='<option value="__ALL__">All subgroups at once</option>'; tbl.innerHTML=''; return; }
+      var c={}, i,g; for(i=0;i<S.rawGroups.length;i++){ g=String(S.rawGroups[i]); c[g]=(c[g]||0)+1; }
+      var opts='<option value="__ALL__">All subgroups at once</option>'; for(g in c){ if(c.hasOwnProperty(g)) opts+='<option value="'+g+'">'+g+'</option>'; }
+      ddl.innerHTML=opts;
+      var rows='<tr><th>Group</th><th>n</th></tr>'; for(g in c){ if(c.hasOwnProperty(g)) rows+='<tr><td>'+g+'</td><td>'+c[g]+'</td></tr>'; }
+      tbl.innerHTML=rows;
+    }
+    var resultsDirty=true;
+    function statusDirty(){
+      var st=qs('resultsStatus'); if(!S.rawValues.length){ st.innerHTML='<i class="fa-solid fa-circle"></i> No data yet'; qs('btnShowResults').disabled=true; return; }
+      qs('btnShowResults').disabled=false;
+      st.innerHTML = resultsDirty? '<i class="fa-solid fa-circle-notch"></i> Changes pending — results hidden' : '<i class="fa-solid fa-check"></i> Showing results';
+    }
+
+    window.populateFromVB6 = function(jsonString){
+      try{
+        var d=JSON.parse(jsonString);
+        if(d && d.values && d.values.length){
+          S.rawValues=[];
+          for(var i=0;i<d.values.length;i++){
+            var v=parseFloat(d.values[i]);
+            if(!isNaN(v)) S.rawValues.push(v);
+          }
+          S.rawGroups=(d.groups && d.groups.length===d.values.length)? d.groups:[];
+          updateSlidersForNewData();
+          renderGroupLevels();
+          recalc();
+          return true;
+        }
+      }catch(ex){}
+      return false;
+    };
+    window.setHeadersFromVB6 = function(h){
+      try{
+        var sel=qs('ddlVariable'), arr=(typeof h==='string')? JSON.parse(h):h, i, opt='<option value="">(select header)</option>';
+        for(i=0;i<arr.length;i++) opt+='<option value="'+arr[i]+'">'+arr[i]+'</option>';
+        sel.innerHTML=opt;
+        if(arr.length > 0) {
+          sel.value = arr[0];
+          var r=qs('tbRange').value||'', v=arr[0];
+          if(r && v) sendToHost('GetVariableData', JSON.stringify({ range:r, variable:v }));
+        }
+        return true;
+      }catch(ex){}
+      return false;
+    };
+    window.setRangeAndFetch = function(range, hasHeader){
+      try{
+        var el = document.getElementById('tbRange');
+        if (el) {
+          el.value = range || '';
+          var evt;
+          if (typeof Event === 'function') { evt = new Event('change', {bubbles:true}); el.dispatchEvent(evt); }
+          else if (document.createEvent) { evt = document.createEvent('HTMLEvents'); evt.initEvent('change', true, false); el.dispatchEvent(evt); }
+          else if (el.fireEvent) { el.fireEvent('onchange'); }
+        }
+      }catch(e){}
+      if (range) sendToHost('GetHeadersFromExcel', JSON.stringify({ range: range, hasHeader: hasHeader ? 1 : 0 }));
+      return true;
+    };
+
+    function init(){
+      qs('tab-summary').onclick=function(){ setActive('panel-summary'); };
+      qs('tab-trim').onclick=function(){ setActive('panel-trim'); };
+      qs('tab-transform').onclick=function(){ setActive('panel-transform'); };
+      qs('tab-groups').onclick=function(){ setActive('panel-groups'); };
+
+      qs('btnPick').onclick=function(){ sendToHost('PickRange',''); };
+      qs('tbRange').addEventListener('change', function(){
+        var r=this.value||''; if(r) sendToHost('GetHeadersFromExcel', JSON.stringify({ range:r, hasHeader:1 }));
+      });
+      qs('ddlVariable').onchange=function(){ var r=qs('tbRange').value||'', v=this.value||''; if(r && v) sendToHost('GetVariableData', JSON.stringify({ range:r, variable:v })); };
+
+      qs('btnPickGroupHeader').onclick=function(){ sendToHost('PickGroupHeader',''); };
+      qs('btnClearGroups').onclick=function(){ S.rawGroups=[]; S.selectedGroup="__ALL__"; renderGroupLevels(); recalc(); };
+      qs('ddlGroupValue').onchange=function(){ S.selectedGroup=this.value||"__ALL__"; recalc(); };
+
+      qs('slMin').oninput=slidersChanged; qs('slMax').oninput=slidersChanged;
+      ['tbMin','tbMax'].forEach(function(id){ var el=qs(id); el.oninput=explicitValuesChanged; });
+
+      var rads = document.querySelectorAll('input[name="transform"]');
+      for(var i=0;i<rads.length;i++){ rads[i].addEventListener('change', function(){ var labels=document.querySelectorAll('.opt'); for(var j=0;j<labels.length;j++) removeClass(labels[j],'selected'); addClass(this.parentNode,'selected'); recalc(); }); }
+
+      qs('btnResetTT').onclick=function(){ qs('slMin').value=0; qs('slMax').value=100; qs('tbMin').value=''; qs('tbMax').value=''; recalc(); };
+
+      qs('btnShowResults').onclick=function(){ 
+        // Send the filtered and transformed data to the host
+        var payload = {
+          keepModule: true,
+          filteredValues: S.values,
+          valuesTrimmed: S.valuesTrimmed,
+          rawValues: S.rawValues,
+          selectedGroup: S.selectedGroup,
+          transform: (document.querySelector('input[name="transform"]:checked')||{}).value || 'none',
+          filters: {
+            minValue: parseNullable(qs('tbMin').value),
+            maxValue: parseNullable(qs('tbMax').value)
+          }
+        };
+        sendToHost('ShowResults', JSON.stringify(payload)); 
+        resultsDirty=false; 
+        statusDirty(); 
+      };
+
+      statusDirty();
+    }
+
+    if(document.readyState==='complete' || document.readyState==='interactive') init();
+    else document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>

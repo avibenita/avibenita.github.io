@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Template</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+
+  <style>
+    :root {
+      --panel-bg: #484b57;
+      --panel-radius: 10px;
+      --panel-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
+      --header-bg: #000;
+      --header-color: rgb(255,192,192);
+      --panel-width: 700px;  /* New variable for panel width */
+      --panel-min-width: 280px;  /* New variable for minimum width */
+      --panel-max-width: 1100px;  /* New variable for maximum width */
+      --histogram-panel-width: 900px;  /* New variable specifically for histogram panel */
+      --histogram-height-min: 300px;    /* Minimum height of histogram */
+      --histogram-height-max: 500px;    /* Maximum height of histogram */
+      --histogram-height-ratio: 0.4;    /* Height ratio relative to viewport */
+      --highlight-bg: rgba(255, 192, 192, 0.2);  /* Light pink background for highlights */
+      --highlight-text: rgb(255, 192, 192);      /* Pink text for highlights */
+    }
+
+    body {
+      background-color: #282c39;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      color: white;
+    }
+
+    .header-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 32px;
+      margin: 0;
+      color: var(--header-color);
+    }
+
+    .dropdown {
+      position: relative;
+    }
+
+     body {
+      background-color: #282c39;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      color: white;
+    }
+
+  
+  
+  
+
+    .panel-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+      margin: 20px;
+    }
+
+    .panel {
+      background-color: var(--panel-bg);
+      border-radius: var(--panel-radius);
+      box-shadow: var(--panel-shadow);
+      flex: 0 0 auto;
+      min-width: var(--panel-min-width);
+      max-width: var(--panel-max-width);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-heading {
+      background-color: var(--header-bg);
+      color: var(--header-color);
+      font-weight: bold;
+      padding: 10px 15px;
+      font-size: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-body {
+      padding: 15px;
+    }
+
+    .field {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .value {
+      background-color: rgba(255, 255, 255, 0.1);
+      padding: 4px 10px;
+      border-radius: 5px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th, td {
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 8px;
+      text-align: center;
+      font-size: 12px;
+      vertical-align: middle;  /* Center content vertically */
+    }
+
+    /* Style for the first block of rows */
+    tr:nth-child(2) td {
+      font-weight: bold;
+      font-size: 19px;
+    }
+
+    /* Empty row for gaps */
+    tr.gap-row {
+      height: 10px;
+      background-color: transparent;
+      border: none;
+    }
+
+    tr.gap-row td {
+      border: none !important;  /* Force remove all borders */
+      padding: 0;
+      height: 30px;
+      background-color: transparent;
+    }
+
+    /* Remove any extra spacing and ensure no borders */
+    tr.gap-row td[colspan] {
+      height: 10px;
+      padding: 0;
+      margin: 0;
+      line-height: 0;
+      border: none !important;
+    }
+
+    /* Ensure regular rows maintain their borders */
+    tr:not(.gap-row) td,
+    tr:not(.gap-row) th {
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    /* Remove borders from cells adjacent to gap rows */
+    tr:not(.gap-row) + tr.gap-row td,
+    tr.gap-row + tr:not(.gap-row) td,
+    tr:not(.gap-row) + tr.gap-row th,
+    tr.gap-row + tr:not(.gap-row) th {
+      border-top: none;
+      border-bottom: none;
+    }
+
+    /* For the last row that has 3 columns */
+    tr:last-child th:nth-child(3),
+    tr:last-child td:nth-child(3) {
+      width: 20%;
+    }
+    tr:last-child th:nth-child(4),
+    tr:last-child td:nth-child(4),
+    tr:last-child th:nth-child(5),
+    tr:last-child td:nth-child(5) {
+      width: 0;
+      display: none;
+    }
+
+    th {
+      background-color: rgba(0, 0, 0, 0.6);
+    }
+
+    @media (max-width: 768px) {
+      .panel {
+        flex: 1 1 100%;
+      }
+    }
+
+    /* Add styles for highlighted cells */
+    .highlight-cell {
+      background-color: var(--highlight-bg);
+      color: var(--highlight-text);
+      font-weight: bold;
+    }
+
+    .stat-symbol {
+      font-family: "Times New Roman", serif;
+      font-style: italic;
+    }
+  </style>
+
+  <style type="text/css">
+    /* Updated controls styling for horizontal layout */
+    .controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: relative;
+    }
+    
+    .slider-range-labels {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      margin-top: 2px;
+      font-size: clamp(0.6rem, 1.2vw, 0.8rem);
+    }
+    
+    label {
+      font-weight: 600;
+      color: white;
+      margin-right: 5px;
+      font-size: clamp(0.7rem, 1.5vw, 0.9rem);
+    }
+    
+    input[type="range"] {
+      width: 150px;
+      height: 5px;
+    }
+    
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+    }
+    
+    .value-display {
+      font-weight: 600;
+      color: white;
+      min-width: 30px;
+      text-align: center;
+      font-size: clamp(0.7rem, 1.5vw, 0.6rem);
+    }
+    
+    .tooltip {
+      position: absolute;
+      padding: 8px;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      border-radius: 4px;
+      pointer-events: none;
+      font-size: 14px;
+      z-index: 100;
+    }
+    
+    .axis text {
+      font-size: clamp(8px, 1.5vw, 10px);
+      fill: white;
+    }
+    
+    .axis path, .axis line {
+      fill: none;
+      stroke: #ddd;
+      shape-rendering: crispEdges;
+    }
+    
+    .bin-range-label {
+      fill: #555;
+      font-size: clamp(7px, 1.2vw, 2px);
+      text-anchor: middle;
+    }
+    
+    .normal-line {
+      fill: none;
+      stroke: yellow;
+      stroke-width: 2;
+      stroke-dasharray: 3,3;
+    }
+    
+    .bar-label {
+      fill: #333;
+      font-size: clamp(8px, 1.vw, 10px);
+      text-anchor: middle;
+      pointer-events: none;
+    }
+    
+    .bar-label-percent {
+      fill: white;
+      font-size: clamp(10px, 1.5vw, 12px);
+      text-anchor: middle;
+      pointer-events: none;
+    }
+    
+    #histogram {
+      width: 100%;
+      height: auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    /* Make SVG responsive */
+    svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    
+    /* Range truncation controls */
+    .range-controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      flex-wrap: wrap;
+    }
+    
+    .range-slider-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .range-display {
+      display: flex;
+      gap: 10px;
+      font-size: 0.8rem;
+      color: #ccc;
+    }
+    
+    .reset-button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.8rem;
+    }
+    
+    .reset-button:hover {
+      background-color: #2980b9;
+    }
+
+    /* Angle slider container */
+    .angle-slider-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header with Dropdown -->
+  <dropdown-menu></dropdown-menu>
+
+
+
+
+<!-- Add this panel before the histogram panel -->
+<div class="panel-row">
+  <div class="panel" style="width: 800px;">
+    <div class="panel-heading">
+      Summary Statistics
+      <span style="margin-left: auto; display: flex; gap: 10px;">
+        <label>Decimals
+          <select onchange="updateDecimalAll(this.value)">
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+          </select>
+        </label>
+      </span>
+    </div>
+    <div class="panel-body">
+      <table style="width:100%; text-align:center">
+        <tr>
+          <th>n</th>
+          <th><span class="stat-symbol">x̄</span> (Average)</th>
+          <th><span class="stat-symbol">s</span> (Std Dev)</th>
+          <th><span class="stat-symbol">s²</span> (Variance)</th>
+          <th>Range</th>
+        </tr>
+        <tr>
+          <td id="stat-n">--</td>
+          <td id="stat-mean">--</td>
+          <td id="stat-stddev">--</td>
+          <td id="stat-variance">--</td>
+          <td id="stat-range">--</td>
+        </tr>
+        <!-- Empty row for gap -->
+        <tr class="gap-row">
+          <td colspan="5"></td>
+        </tr>
+        <tr>
+          <th>MIN</th>
+          <th>Q<sub>1</sub></th>
+          <th><span class="stat-symbol">x̃</span> (Median)</th>
+          <th>Q<sub>3</sub></th>
+          <th>MAX</th>
+        </tr>
+        <tr>
+          <td id="stat-min">--</td>
+          <td id="stat-q25">--</td>
+          <td id="stat-median">--</td>
+          <td id="stat-q75">--</td>
+          <td id="stat-max">--</td>
+        </tr>
+        <!-- Empty row for gap -->
+        <tr class="gap-row">
+          <td colspan="5"></td>
+        </tr>
+        <tr>
+          <th>CV(%)</th>
+          <th><span class="stat-symbol">g₂</span> (Kurtosis)</th>
+          <th><span class="stat-symbol">g₁</span> (Skewness)</th>
+          <th colspan="2"></th>
+        </tr>
+        <tr>
+          <td id="stat-cv">--</td>
+          <td id="stat-kurtosis">--</td>
+          <td id="stat-skewness">--</td>
+          <td colspan="2"></td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+
+
+
+  <div class="panel-row">
+    <div class="panel" style="width: var(--histogram-panel-width);">
+      <div class="panel-heading">
+        Interactive Histogram
+        <span style="margin-left: auto;">
+          <i class="fas fa-expand" style="margin-left: 10px; cursor: pointer;" title="Expand"></i>
+          <i class="fas fa-redo" style="margin-left: 10px; cursor: pointer;" title="Reload"></i>
+          <i class="fas fa-times" style="margin-left: 10px; cursor: pointer;" title="Close"></i>
+        </span>
+      </div>
+
+      <!-- Updated controls section - horizontal layout -->
+      <div class="controls">
+        <div class="control-group">
+          <label for="numBins">Number of Bins:</label>
+          <span id="numBinsValue" class="value-display">5</span>
+          <input type="range" id="numBins" min="1" max="20" value="5" step="1">
+        </div>
+
+        <div class="control-group">
+          <label for="showNormal">Show Normal:</label>
+          <input type="checkbox" id="showNormal" checked>
+        </div>
+      </div>
+
+      <div id="histogram"></div>
+
+      <!-- Updated range controls - horizontal layout -->
+      <div class="range-controls">
+        <span>Min</span>
+        <span id="leftRangeValue" class="value-display">0</span>
+        <input type="range" id="leftTruncation" min="0" max="100" value="0" step="1">
+        <input type="range" id="rightTruncation" min="0" max="100" value="100" step="1">
+        <span id="rightRangeValue" class="value-display">100</span>
+        <span>Max</span>
+        <button id="resetRanges" class="reset-button">Reset</button>
+        
+        <div class="range-display">
+          <span id="data-min-value">Min: 0</span>
+          <span id="data-max-value">Max: 100</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+
+ 
+    <script>
+
+
+
+
+       // Function to create a responsive SVG sizing
+function createResponsiveSVG() {
+    // Remove any existing SVG to avoid duplicates when resizing
+    d3.select("#histogram svg").remove();
+    
+    // Get the container width and ensure it's valid
+    const histogramContainer = document.getElementById("histogram");
+    if (!histogramContainer) return null;
+    
+    const containerWidth = histogramContainer.clientWidth;
+    if (containerWidth <= 0) return null;
+    
+    // Calculate appropriate height based on viewport and container width
+    const viewportHeight = window.innerHeight;
+    const desiredHeight = Math.min(
+        viewportHeight * getComputedStyle(document.documentElement).getPropertyValue('--histogram-height-ratio'), // Use CSS variable
+        Math.max(
+            parseInt(getComputedStyle(document.documentElement).getPropertyValue('--histogram-height-min')), // Use CSS variable
+            Math.min(
+                parseInt(getComputedStyle(document.documentElement).getPropertyValue('--histogram-height-max')), // Use CSS variable
+                containerWidth * 0.4
+            )
+        )
+    );
+    
+    // Set the dimensions and margins for the graph
+    const margin = {
+        top: 20, 
+        right: Math.max(10, containerWidth * 0.02), 
+        bottom: 50, 
+        left: Math.max(10, containerWidth * 0.02)
+    };
+    
+    // Responsive width/height
+    const width = containerWidth - margin.left - margin.right;
+    const height = desiredHeight - margin.top - margin.bottom;
+    
+    // Create the SVG container
+    const svg = d3.select("#histogram")
+        .append("svg")
+        .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+        .attr("preserveAspectRatio", "xMidYMid meet")
+        .append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+    
+    // Add the x axis group
+    const xAxis = svg.append("g")
+        .attr("class", "axis")
+        .attr("transform", `translate(0,${height})`);
+    
+    // Add a group for the bars
+    const barsGroup = svg.append("g");
+    
+    // Add a path for the normal curve
+    const normalCurvePath = svg.append("path")
+        .attr("class", "normal-line");
+    
+    return { svg, xAxis, width, height, barsGroup, normalCurvePath };
+}
+
+// Create a tooltip
+const tooltip = d3.select("body")
+    .append("div")
+    .attr("class", "tooltip")
+    .style("opacity", 0);
+
+// Generate normal distribution data
+function generateNormalData(n, mean = 0, stddev = 1) {
+    return Array.from({length: n}, () => {
+        // Box-Muller transform
+        const u1 = Math.random();
+        const u2 = Math.random();
+        const z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+        return z0 * stddev + mean;
+    });
+}
+
+// Calculate mean of an array
+function calculateMean(data) {
+    if (data.length === 0) return 0;
+    return data.reduce((sum, value) => sum + value, 0) / data.length;
+}
+
+// Calculate standard deviation of an array
+function calculateStdDev(data, mean) {
+    if (data.length === 0) return 0;
+    const variance = data.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / data.length;
+    return Math.sqrt(variance);
+}
+
+// Normal distribution probability density function
+function normalPDF(x, mean, stddev) {
+    if (stddev === 0) return 0;
+    return (1 / (stddev * Math.sqrt(2 * Math.PI))) * 
+           Math.exp(-0.5 * Math.pow((x - mean) / stddev, 2));
+}
+
+// Create custom binning function that ensures bins cover min to max properly
+function createHistogramBins(data, numBins) {
+    if (data.length === 0) return [];
+    
+    const min = Math.min(...data);
+    const max = Math.max(...data);
+    const range = max - min;
+    
+    // Handle edge case where all values are the same
+    if (range === 0) {
+        return [{
+            x0: min,
+            x1: min,
+            length: data.length
+        }];
+    }
+    
+    // Create bins
+    const binWidth = range / numBins;
+    const bins = [];
+    
+    for (let i = 0; i < numBins; i++) {
+        const binStart = i === 0 ? min : min + i * binWidth;
+        const binEnd = i === numBins - 1 ? max : min + (i + 1) * binWidth;
+        
+        // Count values in this bin - fixed to avoid recomputation issues
+        let binCount = 0;
+        for (let j = 0; j < data.length; j++) {
+            const val = data[j];
+            if ((i === 0 ? val >= binStart : val > binStart) && val <= binEnd) {
+                binCount++;
+            }
+        }
+        
+        bins.push({
+            x0: binStart,
+            x1: binEnd,
+            length: binCount
+        });
+    }
+    
+    return bins;
+}
+
+// Store the global state
+let originalData = [];
+let originalMin, originalMax;
+let currentData = [];
+let svgComponents = null;
+let labelAngle = 0;
+let updateTimer = null; // For debouncing updates
+
+// Function to update the histogram
+function updateHistogram(data, numBins, showNormalDist) {
+    // If no data, don't attempt to update
+    if (!data || data.length === 0) return;
+    
+    // Check if histogram container exists
+    const histogramContainer = document.getElementById("histogram");
+    if (!histogramContainer) return;
+    
+    // If SVG components don't exist or the container size has changed significantly, recreate them
+    const currentContainerWidth = histogramContainer.clientWidth;
+    if (!svgComponents || Math.abs(currentContainerWidth - (svgComponents.lastContainerWidth || 0)) > 50) {
+        svgComponents = createResponsiveSVG();
+        if (svgComponents) {
+            svgComponents.lastContainerWidth = currentContainerWidth;
+        }
+    }
+    
+    // If still no SVG components, return early
+    if (!svgComponents) return;
+    
+    const { svg, xAxis, width, height, barsGroup, normalCurvePath } = svgComponents;
+    
+    try {
+        // Calculate mean and standard deviation
+        const mean = calculateMean(data);
+        const stddev = calculateStdDev(data, mean);
+        const minValue = Math.min(...data);
+        const maxValue = Math.max(...data);
+        
+        // Set up the x scale using min/max from the data
+        const x = d3.scaleLinear()
+            .domain([minValue, maxValue])
+            .range([0, width]);
+        
+        // Create histogram bins with custom function
+        const histogram = createHistogramBins(data, numBins);
+        
+        // If no bins or empty bins, don't update further
+        if (histogram.length === 0) return;
+        
+        // Set up the y scale
+        const y = d3.scaleLinear()
+            .domain([0, d3.max(histogram, d => d.length) || 1])
+            .range([height, 0]);
+        
+        // Prepare the x-axis
+        xAxis.selectAll("*").remove();
+        
+        // Create a baseline
+        xAxis.append("line")
+            .attr("x1", 0)
+            .attr("y1", 0)
+            .attr("x2", width)
+            .attr("y2", 0)
+            .attr("stroke", "#ddd");
+        
+        // Always add tick marks
+        histogram.forEach(bin => {
+            xAxis.append("line")
+                .attr("x1", x(bin.x0))
+                .attr("y1", 0)
+                .attr("x2", x(bin.x0))
+                .attr("y2", 5)
+                .attr("stroke", "#ddd");
+        });
+        
+        // Add the last tick mark
+        xAxis.append("line")
+            .attr("x1", x(histogram[histogram.length-1].x1))
+            .attr("y1", 0)
+            .attr("x2", x(histogram[histogram.length-1].x1))
+            .attr("y2", 5)
+            .attr("stroke", "#ddd");
+        
+        // Add bin range labels with the current angle
+histogram.forEach(bin => {
+    const midpoint = x(bin.x0) + (x(bin.x1) - x(bin.x0)) / 2;
+
+    let labelAngle = 0; // Fixed at 17 degrees
+    // Calculate the vertical position based on angle
+    const yPos = labelAngle === 0 ? 20 : 10;
+    
+    xAxis.append("text")
+        .attr("class", "bin-range-label")
+        .attr("x", midpoint)
+        .attr("y", yPos)
+        .attr("transform", `rotate(${labelAngle}, ${midpoint}, ${yPos})`)
+        .style("text-anchor", labelAngle === 0 ? "middle" : "start")
+        .text(`${bin.x0.toFixed(1)}-${bin.x1.toFixed(1)}`);
+});
+        
+        // Create color scale
+        const colorScale = d3.scaleLinear()
+            .domain([0, d3.max(histogram, d => d.length) || 1])
+            .range(["#74b9ff", "#0984e3"]);
+        
+        // Remove existing bars and labels
+        barsGroup.selectAll("*").remove();
+        
+        // Create bars
+        const bars = barsGroup.selectAll(".bar")
+            .data(histogram)
+            .enter()
+            .append("rect")
+            .attr("class", "bar")
+            .attr("x", d => x(d.x0) + 1)
+            .attr("y", d => y(d.length))
+            .attr("width", d => Math.max(0, x(d.x1) - x(d.x0) - 1))
+            .attr("height", d => height - y(d.length))
+            .attr("fill", d => colorScale(d.length))
+            .on("mouseover", function(event, d) {
+                tooltip.transition()
+                    .duration(200)
+                    .style("opacity", .9);
+                
+                // Display range format depending on if it's first bin or last bin
+                let rangeText = "";
+                if (d === histogram[0]) {
+                    rangeText = `Range: ${d.x0.toFixed(2)} ≤ x ≤ ${d.x1.toFixed(2)}`;
+                } else {
+                    rangeText = `Range: ${d.x0.toFixed(2)} < x ≤ ${d.x1.toFixed(2)}`;
+                }
+                
+                tooltip.html(`${rangeText}<br>Count: ${d.length}<br>Percentage: ${(d.length / data.length * 100).toFixed(1)}%`)
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 28) + "px");
+                
+                d3.select(this)
+                    .attr("fill", "#e74c3c");
+            })
+            .on("mouseout", function(event, d) {
+                tooltip.transition()
+                    .duration(500)
+                    .style("opacity", 0);
+                
+                d3.select(this)
+                    .attr("fill", colorScale(d.length));
+            });
+        
+        // Add labels on the bars if tall enough
+        const containerWidth = document.getElementById("histogram").clientWidth;
+        if (containerWidth > 500) {
+            // Add percentage labels
+            barsGroup.selectAll(".bar-label-percent")
+                .data(histogram)
+                .enter()
+                .append("text")
+                .attr("class", "bar-label-percent")
+                .attr("x", d => x(d.x0) + (x(d.x1) - x(d.x0)) / 2)
+                .attr("y", d => y(d.length) - 3)
+                .text(d => (d.length / data.length * 100).toFixed(0) + '%')
+                .filter(d => height - y(d.length) > 20); // Only show labels on taller bars
+        }
+        
+        // Draw normal curve if checkbox is checked
+        if (showNormalDist && stddev > 0) {
+            // Generate matched normal distribution data points for the curve
+            const curvePoints = [];
+            const range = maxValue - minValue;
+            
+            // If range is 0, don't draw curve
+            if (range === 0) {
+                normalCurvePath.style("opacity", 0);
+                return;
+            }
+            
+            const step = range / 100;
+            
+            // Expand the curve range a bit beyond data range for better visualization
+            const curveMin = Math.max(minValue - range * 0.1, mean - 4 * stddev);
+            const curveMax = Math.min(maxValue + range * 0.1, mean + 4 * stddev);
+            
+            for (let i = curveMin; i <= curveMax; i += step) {
+                curvePoints.push({
+                    x: i,
+                    y: normalPDF(i, mean, stddev)
+                });
+            }
+            
+            // Scale the curve to match histogram height
+            const maxPDF = d3.max(curvePoints, d => d.y) || 0;
+            const maxHistHeight = d3.max(histogram, d => d.length) || 1;
+            const scaleFactor = maxHistHeight / (maxPDF || 1); // Avoid division by zero
+            
+            // Create the line function
+            const line = d3.line()
+                .x(d => x(d.x))
+                .y(d => y(d.y * scaleFactor))
+                .curve(d3.curveBasis);
+            
+            // Draw the curve
+            normalCurvePath
+                .datum(curvePoints)
+                .attr("d", line)
+                .style("opacity", 1);
+        } else {
+            normalCurvePath.style("opacity", 0);
+        }
+    } catch (err) {
+        console.error("Error updating histogram:", err);
+    }
+}
+
+// Function to convert between percentage and actual data value
+function percentToValue(percent) {
+    return originalMin + (originalMax - originalMin) * (percent / 100);
+}
+
+// Function to update the truncation UI and filter data accordingly
+function updateTruncationControls() {
+    // Debounce updates to prevent too frequent redraws
+    clearTimeout(updateTimer);
+    updateTimer = setTimeout(() => {
+        try {
+            const leftPercent = parseFloat(d3.select("#leftTruncation").property("value"));
+            const rightPercent = parseFloat(d3.select("#rightTruncation").property("value"));
+            
+            // Calculate the actual values based on percentages
+            const leftValue = percentToValue(leftPercent);
+            const rightValue = percentToValue(rightPercent);
+            
+            // Display the actual truncation values
+            d3.select("#leftRangeValue").text(leftValue.toFixed(2));
+            d3.select("#rightRangeValue").text(rightValue.toFixed(2));
+            
+            // Filter the data based on the thresholds
+            currentData = originalData.filter(d => d >= leftValue && d <= rightValue);
+            
+            // Guard against empty selection
+            if (currentData.length === 0) {
+                currentData = [originalData[0]]; // Use at least one data point
+            }
+            
+            // Update the histogram with the truncated data
+            updateHistogram(
+                currentData,
+                parseInt(d3.select("#numBins").property("value")),
+                d3.select("#showNormal").property("checked")
+            );
+        } catch (err) {
+            console.error("Error in truncation control update:", err);
+        }
+    }, 50); // 50ms debounce
+}
+
+// Initialize the controls and data
+function initialize() {
+    try {
+        // Generate some initial data
+        originalData = generateNormalData(1000, 50, 15);
+        currentData = [...originalData];
+        
+        // Determine the data range
+        originalMin = Math.min(...originalData);
+        originalMax = Math.max(...originalData);
+        
+        // Update range display
+        d3.select("#data-min-value").text(`Min: ${originalMin.toFixed(2)}`);
+// Update range display
+        d3.select("#data-min-value").text(`Min: ${originalMin.toFixed(2)}`);
+        d3.select("#data-max-value").text(`Max: ${originalMax.toFixed(2)}`);
+        
+        // Initialize sliders with the actual data range values
+        d3.select("#leftRangeValue").text(originalMin.toFixed(2));
+        d3.select("#rightRangeValue").text(originalMax.toFixed(2));
+        
+        // Set up event listeners for the controls with debouncing
+        d3.select("#numBins").on("input", function() {
+            try {
+                const value = +this.value;
+                d3.select("#numBinsValue").text(value);
+                
+                clearTimeout(updateTimer);
+                updateTimer = setTimeout(() => {
+                    updateHistogram(currentData, value, d3.select("#showNormal").property("checked"));
+                }, 50);
+            } catch (err) {
+                console.error("Error in numBins handler:", err);
+            }
+        });
+        
+        d3.select("#showNormal").on("change", function() {
+            try {
+                updateHistogram(
+                    currentData, 
+                    +d3.select("#numBins").property("value"), 
+                    this.checked
+                );
+            } catch (err) {
+                console.error("Error in showNormal handler:", err);
+            }
+        });
+        
+        // Label angle slider
+        d3.select("#labelAngle").on("input", function() {
+            try {
+                labelAngle = +this.value;
+                d3.select("#labelAngleValue").text(labelAngle + "°");
+                
+                clearTimeout(updateTimer);
+                updateTimer = setTimeout(() => {
+                    updateHistogram(
+                        currentData, 
+                        +d3.select("#numBins").property("value"), 
+                        d3.select("#showNormal").property("checked")
+                    );
+                }, 50);
+            } catch (err) {
+                console.error("Error in labelAngle handler:", err);
+            }
+        });
+        
+        // Range truncation sliders - separate event handling to avoid conflicts
+        d3.select("#leftTruncation").on("input", function() {
+            try {
+                const leftPercent = +this.value;
+                const rightPercent = +d3.select("#rightTruncation").property("value");
+                
+                // Make sure right value is greater than left value
+                if (leftPercent >= rightPercent - 1) {
+                    d3.select("#rightTruncation").property("value", Math.min(100, leftPercent + 1));
+                }
+                
+                updateTruncationControls();
+            } catch (err) {
+                console.error("Error in leftTruncation handler:", err);
+            }
+        });
+        
+        d3.select("#rightTruncation").on("input", function() {
+            try {
+                const rightPercent = +this.value;
+                const leftPercent = +d3.select("#leftTruncation").property("value");
+                
+                // Make sure left value is less than right value
+                if (rightPercent <= leftPercent + 1) {
+                    d3.select("#leftTruncation").property("value", Math.max(0, rightPercent - 1));
+                }
+                
+                updateTruncationControls();
+            } catch (err) {
+                console.error("Error in rightTruncation handler:", err);
+            }
+        });
+        
+        // Reset ranges button
+        d3.select("#resetRanges").on("click", function() {
+            try {
+                // Reset sliders to full range
+                d3.select("#leftTruncation").property("value", 0);
+                d3.select("#rightTruncation").property("value", 100);
+                
+                // Reset to original data
+                currentData = [...originalData];
+                
+                // Reset displayed values
+                d3.select("#leftRangeValue").text(originalMin.toFixed(2));
+                d3.select("#rightRangeValue").text(originalMax.toFixed(2));
+                
+                // Redraw histogram
+                updateHistogram(
+                    currentData, 
+                    +d3.select("#numBins").property("value"), 
+                    d3.select("#showNormal").property("checked")
+                );
+            } catch (err) {
+                console.error("Error in reset handler:", err);
+            }
+        });
+        
+        // Initial render
+        const initialBins = +d3.select("#numBins").property("value");
+        d3.select("#numBinsValue").text(initialBins);
+        updateHistogram(currentData, initialBins, d3.select("#showNormal").property("checked"));
+        
+        // Add resize listener for responsiveness
+        window.addEventListener('resize', function() {
+            try {
+                clearTimeout(updateTimer);
+                updateTimer = setTimeout(() => {
+                    // Force recreation of SVG components by clearing them
+                    svgComponents = null;
+                    // Re-render the histogram which will recreate SVG components
+                    updateHistogram(
+                        currentData,
+                        +d3.select("#numBins").property("value"),
+                        d3.select("#showNormal").property("checked")
+                    );
+                }, 150); // Longer debounce for resize events
+            } catch (err) {
+                console.error("Error in resize handler:", err);
+            }
+        });
+    } catch (err) {
+        console.error("Error in initialization:", err);
+    }
+}
+
+// Function to handle JSON data from external source
+function populateHistogram(jsonString, numBins) {
+  console.log("Received JSON:", jsonString);
+    try {
+        // Parse the JSON data
+        const jsonData = JSON.parse(jsonString);
+        // Check if the data is in the expected format
+        if (Array.isArray(jsonData.values)) {
+            // Store the original data
+            originalData = jsonData.values;
+            currentData = [...originalData];
+            
+            // Determine the data range
+            originalMin = Math.min(...originalData);
+            originalMax = Math.max(...originalData);
+            
+            // Update range display
+            d3.select("#data-min-value").text(`Min: ${originalMin.toFixed(2)}`);
+            d3.select("#data-max-value").text(`Max: ${originalMax.toFixed(2)}`);
+            
+            // Initialize slider display values
+            d3.select("#leftRangeValue").text(originalMin.toFixed(2));
+            d3.select("#rightRangeValue").text(originalMax.toFixed(2));
+            
+            // Reset sliders
+            d3.select("#leftTruncation").property("value", 0);
+            d3.select("#rightTruncation").property("value", 100);
+            
+            // Update the title if provided
+            if (window.updateHeaderTitle) {
+  updateHeaderTitle(jsonData.title);
+}
+
+            
+            // Update the histogram
+            const showNormalDist = d3.select("#showNormal").property("checked");
+            updateHistogram(currentData, numBins, showNormalDist);
+            
+            // Return success
+            return true;
+        } else {
+            console.error("Invalid JSON format: 'values' array not found");
+            return false;
+        }
+    } catch (e) {
+        console.error("Error parsing JSON:", e);
+        return false;
+    }
+}
+
+// Expose the populateHistogram function globally for external access
+window.populateHistogram = populateHistogram;
+
+
+</script>
+
+   <script>
+  let decimalPlaces = 2;
+
+  function updateDecimalAll(val) {
+    decimalPlaces = parseInt(val);
+    syncSummaryStats();
+  }
+
+  function syncSummaryStats() {
+
+    if (!currentData || currentData.length === 0) return;
+    const mean = calculateMean(currentData);
+    const stddev = calculateStdDev(currentData, mean);
+    const median = calculateMedian(currentData);
+    const variance = stddev ** 2;
+    const sorted = [...currentData].sort((a, b) => a - b);
+    const n = sorted.length;
+    const min = sorted[0];
+    const max = sorted[n - 1];
+    const q25 = sorted[Math.floor(n * 0.25)];
+    const q75 = sorted[Math.floor(n * 0.75)];
+    const range = max - min;
+    const cv = mean !== 0 ? (stddev / mean * 100) : 0;
+
+    const skewness = n > 2 ? (
+      n / ((n - 1) * (n - 2)) *
+      sorted.reduce((acc, val) => acc + Math.pow((val - mean) / stddev, 3), 0)
+    ) : 0;
+
+    const kurtosis = n > 3 ? (
+      (n*(n+1))/((n-1)*(n-2)*(n-3)) *
+      sorted.reduce((acc, val) => acc + Math.pow((val - mean) / stddev, 4), 0)
+      - (3*(n-1)**2)/((n-2)*(n-3))
+    ) : 0;
+
+    document.getElementById('stat-n').textContent = n;
+    document.getElementById('stat-mean').textContent = mean.toFixed(decimalPlaces);
+    document.getElementById('stat-stddev').textContent = stddev.toFixed(decimalPlaces);
+    document.getElementById('stat-median').textContent = median.toFixed(decimalPlaces);
+    document.getElementById('stat-range').textContent = range.toFixed(decimalPlaces);
+    document.getElementById('stat-variance').textContent = variance.toFixed(decimalPlaces);
+    document.getElementById('stat-min').textContent = min.toFixed(decimalPlaces);
+    document.getElementById('stat-max').textContent = max.toFixed(decimalPlaces);
+    document.getElementById('stat-q25').textContent = q25.toFixed(decimalPlaces);
+    document.getElementById('stat-q75').textContent = q75.toFixed(decimalPlaces);
+    document.getElementById('stat-cv').textContent = cv.toFixed(decimalPlaces);
+    document.getElementById('stat-kurtosis').textContent = kurtosis.toFixed(decimalPlaces);
+    document.getElementById('stat-skewness').textContent = skewness.toFixed(decimalPlaces);
+  }
+
+  function calculateMedian(data) {
+    const sorted = [...data].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+
+  window.addEventListener('DOMContentLoaded', function () {
+    if (typeof updateHistogram === 'function') {
+      const originalUpdateHistogram = updateHistogram;
+      updateHistogram = function (data, numBins, showNormalDist) {
+        originalUpdateHistogram(data, numBins, showNormalDist);
+        syncSummaryStats();
+      };
+    }
+  });
+
+    syncSummaryStats();
+// Initialize the visualization
+initialize();        
+</script>
+
+
+
+
+
+
+
+<script>
+class DropdownMenu extends HTMLElement {
+  constructor() {
+    super();
+    const shadow = this.attachShadow({ mode: "open" });
+    shadow.innerHTML = `
+      <style>
+        :host { display: block; font-family: Arial; padding-left: 10px; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: #1f1f2f; padding: 20px; }
+        h1 { font-size: 28px; color: rgb(255,192,192); margin: 0; }
+        .dropdown { position: relative; }
+        .dropbtn { background: linear-gradient(to right, rgb(255,192,192), rgb(255,160,160)); color: black; font-weight: bold; border: none; border-radius: 6px; padding: 8px 16px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+        .dropdown-content { margin-top: 5px; position: absolute; top: 100%; left: 10%; transform: translateX(-40%) scaleY(0); background-color: white; color: black; border-radius: 6px; overflow: hidden; box-shadow: 2px 4px 8px rgba(0,0,0,0.4); min-width: 420px; font-size: 14px; column-count: 1; column-gap: 0; opacity: 0; transition: all 0.25s ease-in-out; transform-origin: top; pointer-events: none; z-index: 1000; }
+        .dropdown-content.show { transform: translateX(-40%) scaleY(1); opacity: 1; pointer-events: auto; }
+        .dropdown-content a { padding: 6px 10px; display: flex; align-items: center; text-decoration: none; color: black; transition: background 0.2s ease; }
+        .dropdown-content a:hover { background-color: rgb(255,160,160); color: white; }
+        .dropdown-content a.selected { background-color: rgb(255,160,160); color: white; font-weight: bold; }
+        .dropdown-content a img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+      </style>
+      <div class="header">
+        <h1 id="title">Histogram & Stats</h1>
+        <div class="dropdown">
+          <button class="dropbtn">Select Analysis ▼</button>
+          <div class="dropdown-content">
+            <a href="javascript:void(0)" onclick="sendMessageToVB6('Case00', 'Case00')">Histogram & Stats</a> 
+            <a href="javascript:void(0)" onclick="sendMessageToVB6('Case10', 'Case10')">Box-Plot</a>   
+            <a href="javascript:void(0)" onclick="sendMessageToVB6('Case20', 'Case20')">Cumulative Distribution</a>
+            <a href="javascript:void(0)" onclick="sendMessageToVB6('Case30', 'Case30')">Percentiles</a>
+            <a href="javascript:void(0)" onclick="sendMessageToVB6('Case40', 'Case40')">Outliers Detection</a>
+<a href="javascript:void(0)">--------------------------------------------------</a>
+            <a href="javascript:void(0)" onclick="sendMessageToVB6('Case50', 'Case50')">Tests of Normality</a>
+            <a href="javascript:void(0)" onclick="sendMessageToVB6('Case60', 'Case60')">PP-QQ Plots</a>
+            <a href="javascript:void(0)" onclick="sendMessageToVB6('Case70', 'Case70')">Hypothesis Testing</a>
+            <a href="javascript:void(0)" onclick="sendMessageToVB6('Case90', 'Case90')">Confidence Intervals </a>            
+            <a href="javascript:void(0)" onclick="sendMessageToVB6('Case100', 'Case100')">Kernel Density</a>   
+             
+           
+          </div>
+        </div>
+      </div>
+    `;
+/*<a href="javascript:void(0)" onclick="sendMessageToVB6('Case80', 'Case80')"><img src="Icons/normal_cdf_icon.svg" alt="icon" />Cumulative Distribution</a>*/
+    const title = shadow.getElementById("title");
+    const dropdown = shadow.querySelector(".dropdown-content");
+    const btn = shadow.querySelector(".dropbtn");
+
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      dropdown.classList.toggle("show");
+    });
+
+    window.addEventListener("click", () => {
+      dropdown.classList.remove("show");
+    });
+
+    shadow.querySelectorAll("a").forEach(link => {
+
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        const action = link.dataset.action;
+        const label = link.textContent.trim();
+
+        title.textContent = label;
+        dropdown.querySelectorAll("a").forEach(a => a.classList.remove("selected"));
+        link.classList.add("selected");
+        dropdown.classList.remove("show");
+
+        try {
+          if (window.external && window.external.OrdoWebView1_JSMessage) {
+            window.external.OrdoWebView1_JSMessage(action + "|" + label);
+          }
+        } catch (err) {
+          console.warn("VB6 bridge error:", err.message);
+        }
+      });
+    });
+ 
+    window.updateHeaderTitle = (newTitle) => {
+
+      title.textContent = newTitle;
+      dropdown.querySelectorAll("a").forEach(link => {
+        link.classList.remove("selected");
+        if (link.textContent.trim().includes(newTitle.trim())) {
+          link.classList.add("selected");
+        }
+      });
+    };
+  }
+}
+customElements.define("dropdown-menu", DropdownMenu);
+</script>
+ 
+  </body>
+  </html>

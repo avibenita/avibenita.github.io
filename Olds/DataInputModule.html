@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Input Module</title>
+    
+    <!-- Office.js for Excel Add-in functionality -->
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    
+    <style>
+        :root {
+            --surface-0: #0c1624; /* page background */
+            --surface-1: #1a1f2e; /* cards / panels */
+            --surface-2: #242938; /* input backgrounds */
+            --border: #2d3748; /* border color */
+            --accent-1: rgb(255,165,120); /* warm orange */
+            --accent-2: rgb(120,200,255); /* cyan blue */
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255,255,255,0.8);
+            --text-muted: rgba(255,255,255,0.6);
+            --panel-bg: #484b57;
+            --panel-radius: 10px;
+            --panel-shadow: 0px 4px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow-x: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--surface-0);
+            color: var(--text-primary);
+        }
+
+        .main-container {
+            width: 100%;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .content-wrapper {
+            width: 100%;
+            max-width: 800px;
+            background: var(--surface-1);
+            border-radius: var(--panel-radius);
+            box-shadow: var(--panel-shadow);
+            border: 1px solid var(--border);
+            padding: 30px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            color: var(--accent-1);
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            font-size: 1rem;
+            color: var(--text-secondary);
+        }
+
+        .import-method-selector {
+            background: var(--surface-0);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .import-method-selector h3 {
+            color: var(--accent-1);
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+
+        .radio-option input[type="radio"] {
+            accent-color: var(--accent-1);
+        }
+
+        .radio-option input[type="radio"]:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Modern browsers with :has() support */
+        .radio-option:has(input:disabled) {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .radio-option:has(input:disabled) span {
+            color: var(--text-muted);
+        }
+
+        /* Fallback for browsers without :has() support */
+        .radio-option.disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .radio-option.disabled span {
+            color: var(--text-muted);
+        }
+
+        .info-text {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .input-section {
+            background: var(--surface-0);
+            border: 2px solid var(--accent-2);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .input-section.paste-section {
+            border-color: var(--accent-1);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .section-icon {
+            font-size: 24px;
+            margin-right: 12px;
+        }
+
+        .section-title {
+            color: var(--accent-2);
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .paste-section .section-title {
+            color: var(--accent-1);
+        }
+
+        .range-input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .range-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            background: var(--surface-2);
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .range-input:focus {
+            outline: none;
+            border-color: var(--accent-2);
+            box-shadow: 0 0 0 3px rgba(120, 200, 255, 0.2);
+        }
+
+        .data-textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 15px;
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: vertical;
+            transition: border-color 0.3s ease;
+            background: var(--surface-2);
+            color: var(--text-primary);
+        }
+
+        .data-textarea:focus {
+            outline: none;
+            border-color: var(--accent-1);
+            box-shadow: 0 0 0 2px rgba(255, 165, 120, 0.2);
+        }
+
+        .data-textarea::placeholder {
+            color: var(--text-muted);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--accent-2), #4CAF50);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(120, 200, 255, 0.4);
+        }
+
+        .btn.secondary {
+            background: linear-gradient(135deg, var(--surface-2), var(--border));
+        }
+
+        .btn.parse-btn {
+            background: linear-gradient(135deg, var(--accent-1), #ff6b6b);
+        }
+
+        .btn.parse-btn:hover {
+            box-shadow: 0 4px 12px rgba(255, 165, 120, 0.4);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .status-message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .status-message.success {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid #4CAF50;
+            color: #4CAF50;
+        }
+
+        .status-message.error {
+            background: rgba(244, 67, 54, 0.1);
+            border: 1px solid #f44336;
+            color: #f44336;
+        }
+
+        .status-message.info {
+            background: rgba(120, 200, 255, 0.1);
+            border: 1px solid var(--accent-2);
+            color: var(--accent-2);
+        }
+
+        .parsing-spinner {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            background: var(--surface-0);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255, 165, 120, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--accent-1);
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .spinner-text {
+            color: var(--text-secondary);
+            font-size: 14px;
+            vertical-align: middle;
+        }
+
+        .data-preview {
+            background: var(--surface-0);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .data-preview h3 {
+            color: var(--accent-1);
+            margin-bottom: 15px;
+        }
+
+        .data-preview table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .data-preview th,
+        .data-preview td {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            text-align: left;
+        }
+
+        .data-preview th {
+            background: var(--surface-2);
+            color: var(--accent-1);
+            font-weight: 600;
+        }
+
+        .data-preview td {
+            color: var(--text-primary);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 10px;
+            }
+            
+            .content-wrapper {
+                padding: 20px;
+            }
+            
+            .radio-group {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .range-input-group {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="content-wrapper">
+            <div class="header">
+                <h1>📊 Data Input Module</h1>
+                <p>Clean and efficient data input for Excel ranges or pasted data</p>
+            </div>
+
+            <!-- Import Method Selector -->
+            <div class="import-method-selector">
+                <h3>Choose Import Method:</h3>
+                <div class="radio-group">
+                    <label class="radio-option">
+                        <input type="radio" name="importMethod" value="range" id="rangeMethod" checked>
+                        <span>📗 Excel Range Reference</span>
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="importMethod" value="paste" id="pasteMethod">
+                        <span>📋 Copy & Paste</span>
+                    </label>
+                </div>
+                <div class="info-text">
+                    💡 The data should include headers in the first row
+                </div>
+            </div>
+
+            <!-- Excel Range Input Section -->
+            <div id="rangeInputSection" class="input-section">
+                <div class="section-header">
+                    <span class="section-icon">📗</span>
+                    <h3 class="section-title">Excel Range Reference</h3>
+                </div>
+                <div class="range-input-group">
+                    <input type="text" id="excelRange" class="range-input" placeholder="Sheet1!A1:D10" />
+                    <button class="btn" onclick="loadExcelRange()">📗 Load Range</button>
+                    <button class="btn secondary" onclick="getCurrentSelection()">📍 Get Selection</button>
+                </div>
+            </div>
+
+            <!-- Data Input Area (Paste) -->
+            <div id="dataInputArea" class="input-section paste-section hidden">
+                <div class="section-header">
+                    <span class="section-icon">📋</span>
+                    <h3 class="section-title">Paste Your Data</h3>
+                </div>
+                <textarea
+                    class="data-textarea"
+                    id="dataInput"
+                    placeholder="Paste your Excel data here...
+
+Example format:
+Product	Region	Sales	Quarter
+Widget A	North	1500	Q1
+Widget B	South	2300	Q1
+Widget A	East	1800	Q2
+Widget C	West	2100	Q1
+Widget B	North	1900	Q2
+
+💡 Data will be automatically parsed when pasted!
+🧪 Use tab-separated or comma-separated values"
+                ></textarea>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="button-group">
+                <button id="parseDataBtn" class="btn parse-btn" onclick="parseData()">
+                    🔄 Parse Data
+                </button>
+                <button id="loadDemoBtn" class="btn secondary" onclick="loadDemoData()">
+                    ✨ Load Demo Data
+                </button>
+                <button id="clearDataBtn" class="btn secondary" onclick="clearData()">
+                    🗑️ Clear Data
+                </button>
+            </div>
+
+            <!-- Status Messages -->
+            <div id="statusMessage" class="status-message"></div>
+
+            <!-- Parsing Spinner -->
+            <div id="parsingSpinner" class="parsing-spinner">
+                <div class="spinner"></div>
+                <span class="spinner-text">Processing data...</span>
+            </div>
+
+            <!-- Data Preview -->
+            <div id="dataPreview" class="data-preview">
+                <h3>📊 Data Preview</h3>
+                <div id="dataPreviewContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables for data storage
+        let parsedData = [];
+        let headers = [];
+        let isExcelAvailable = false;
+
+        // Check if Office.js is available
+        function checkExcelAvailability() {
+            // Default to Excel range being enabled
+            const rangeMethod = document.getElementById('rangeMethod');
+            if (rangeMethod) {
+                rangeMethod.disabled = false;
+                rangeMethod.checked = true; // Ensure it's checked by default
+            }
+            
+            if (typeof Office !== 'undefined') {
+                try {
+                    Office.onReady((info) => {
+                        if (info.host === Office.HostType.Excel) {
+                            isExcelAvailable = true;
+                            console.log('✅ Excel context available - Excel features enabled');
+                            updateUIForExcelContext();
+                        } else {
+                            console.log('ℹ️ Running outside Excel context - disabling Excel features');
+                            disableExcelFeatures();
+                        }
+                    });
+                } catch (error) {
+                    console.log('ℹ️ Office.js error - treating as non-Excel context');
+                    setTimeout(() => disableExcelFeatures(), 100);
+                }
+            } else {
+                console.log('ℹ️ Office.js not available - disabling Excel features after delay');
+                // Give a longer delay to allow Office.js to load if it's coming
+                setTimeout(() => {
+                    if (typeof Office === 'undefined') {
+                        disableExcelFeatures();
+                    }
+                }, 2000);
+            }
+        }
+
+        function updateUIForExcelContext() {
+            const rangeMethod = document.getElementById('rangeMethod');
+            if (rangeMethod) {
+                rangeMethod.disabled = false;
+                rangeMethod.checked = true; // Keep it selected in Excel context
+                rangeMethod.parentElement.classList.remove('disabled');
+                rangeMethod.parentElement.removeAttribute('title');
+                isExcelAvailable = true;
+            }
+            // Make sure the correct UI is shown
+            toggleImportMethod();
+        }
+
+        function disableExcelFeatures() {
+            const rangeMethod = document.getElementById('rangeMethod');
+            const pasteMethod = document.getElementById('pasteMethod');
+            
+            if (rangeMethod) {
+                rangeMethod.disabled = true;
+                rangeMethod.parentElement.classList.add('disabled');
+                rangeMethod.parentElement.title = 'Excel range selection is only available when running as an Excel add-in';
+            }
+            
+            if (pasteMethod) {
+                pasteMethod.checked = true;
+            }
+            
+            toggleImportMethod();
+        }
+
+        // Initialize the module when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            setupImportMethodHandling();
+            setupDataInputHandling();
+            checkExcelAvailability();
+        });
+
+        // Setup import method radio button handling
+        function setupImportMethodHandling() {
+            const rangeMethod = document.getElementById('rangeMethod');
+            const pasteMethod = document.getElementById('pasteMethod');
+            
+            rangeMethod.addEventListener('change', toggleImportMethod);
+            pasteMethod.addEventListener('change', toggleImportMethod);
+            
+            // Initial state
+            toggleImportMethod();
+        }
+
+        // Setup automatic data parsing on paste
+        function setupDataInputHandling() {
+            const dataInput = document.getElementById('dataInput');
+            
+            // Auto-parse when data is pasted
+            dataInput.addEventListener('paste', function() {
+                setTimeout(() => {
+                    if (dataInput.value.trim()) {
+                        parseData();
+                    }
+                }, 100);
+            });
+        }
+
+        // Toggle between import methods
+        function toggleImportMethod() {
+            const rangeMethod = document.getElementById('rangeMethod');
+            const rangeInputSection = document.getElementById('rangeInputSection');
+            const dataInputArea = document.getElementById('dataInputArea');
+            
+            if (rangeMethod.checked && !rangeMethod.disabled) {
+                rangeInputSection.classList.remove('hidden');
+                dataInputArea.classList.add('hidden');
+            } else {
+                rangeInputSection.classList.add('hidden');
+                dataInputArea.classList.remove('hidden');
+            }
+        }
+
+        // Load data from Excel range
+        async function loadExcelRange() {
+            // Check if Office.js is available at runtime
+            if (typeof Office === 'undefined' || !Office.context) {
+                showMessage('Excel integration not available. Office.js is required for this feature.', 'error');
+                return;
+            }
+            
+            if (!isExcelAvailable) {
+                showMessage('Excel context not detected. This feature works best in Excel add-ins.', 'info');
+                // Continue anyway - might work in some contexts
+            }
+
+            const rangeInput = document.getElementById('excelRange');
+            const rangeAddress = rangeInput.value.trim();
+            
+            if (!rangeAddress) {
+                showMessage('Please enter a range address (e.g., Sheet1!A1:D10)', 'error');
+                return;
+            }
+
+            showSpinner(true);
+            showMessage('Loading data from Excel range...', 'info');
+            
+            try {
+                await Excel.run(async (context) => {
+                    let range;
+                    
+                    if (rangeAddress.includes('!')) {
+                        const [sheetName, cellRange] = rangeAddress.split('!');
+                        const worksheet = context.workbook.worksheets.getItem(sheetName);
+                        range = worksheet.getRange(cellRange);
+                    } else {
+                        range = context.workbook.worksheets.getActiveWorksheet().getRange(rangeAddress);
+                    }
+                    
+                    range.load("address, values, rowCount, columnCount");
+                    await context.sync();
+                    
+                    if (range.rowCount < 2) {
+                        throw new Error('Range must have at least a header row and one data row');
+                    }
+                    
+                    // Process the data
+                    const values = range.values;
+                    headers = values[0].map(h => String(h || '').trim()).filter(h => h !== '');
+                    
+                    if (headers.length === 0) {
+                        throw new Error('No valid headers found in the first row');
+                    }
+                    
+                    // Convert to data objects
+                    parsedData = [];
+                    for (let i = 1; i < values.length; i++) {
+                        if (values[i] && values[i].some(cell => cell !== null && cell !== undefined && cell !== '')) {
+                            const row = {};
+                            headers.forEach((header, index) => {
+                                const value = values[i][index];
+                                row[header] = value === null || value === undefined ? '' : String(value).trim();
+                            });
+                            parsedData.push(row);
+                        }
+                    }
+                    
+                    if (parsedData.length === 0) {
+                        throw new Error('No valid data rows found in the range');
+                    }
+                    
+                    // Update textarea for reference
+                    const csvText = [headers.join('\t'), ...parsedData.map(row => 
+                        headers.map(header => row[header]).join('\t')
+                    )].join('\n');
+                    
+                    document.getElementById('dataInput').value = csvText;
+                    
+                    showMessage(`✅ Successfully loaded ${parsedData.length} rows with ${headers.length} columns from ${range.address}`, 'success');
+                    showDataPreview();
+                    
+                    // Trigger custom event for external applications
+                    triggerDataLoadedEvent();
+                });
+                
+            } catch (error) {
+                console.error('Error loading Excel range:', error);
+                showMessage(`Error loading range: ${error.message}`, 'error');
+            } finally {
+                showSpinner(false);
+            }
+        }
+
+        // Get current Excel selection
+        async function getCurrentSelection() {
+            if (!isExcelAvailable) {
+                showMessage('This feature is only available when running as an Excel add-in', 'error');
+                return;
+            }
+
+            try {
+                await Excel.run(async (context) => {
+                    const selectedRange = context.workbook.getSelectedRange();
+                    selectedRange.load(['address', 'worksheet']);
+                    
+                    await context.sync();
+                    
+                    const worksheetName = selectedRange.worksheet.name;
+                    const rangeAddress = selectedRange.address.split('!')[1];
+                    const fullAddress = `${worksheetName}!${rangeAddress}`;
+                    
+                    document.getElementById('excelRange').value = fullAddress;
+                    showMessage(`📍 Current selection captured: ${fullAddress}`, 'success');
+                });
+                
+            } catch (error) {
+                console.error('Error getting selection:', error);
+                showMessage('Error getting current selection. Please select a range in Excel first.', 'error');
+            }
+        }
+
+        // Parse pasted data
+        function parseData() {
+            const dataInput = document.getElementById('dataInput');
+            const inputText = dataInput.value.trim();
+            
+            if (!inputText) {
+                showMessage('Please paste some data first', 'error');
+                return;
+            }
+            
+            showSpinner(true);
+            showMessage('Parsing data...', 'info');
+            
+            try {
+                // Detect delimiter (tab or comma)
+                const lines = inputText.split('\n').filter(line => line.trim() !== '');
+                if (lines.length < 2) {
+                    throw new Error('Data must have at least a header row and one data row');
+                }
+                
+                // Determine delimiter
+                const firstLine = lines[0];
+                const delimiter = firstLine.includes('\t') ? '\t' : ',';
+                
+                // Parse headers
+                headers = firstLine.split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''));
+                
+                if (headers.length === 0) {
+                    throw new Error('No valid headers found');
+                }
+                
+                // Parse data rows
+                parsedData = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(delimiter).map(v => v.trim().replace(/^"|"$/g, ''));
+                    
+                    if (values.some(v => v !== '')) {
+                        const row = {};
+                        headers.forEach((header, index) => {
+                            row[header] = values[index] || '';
+                        });
+                        parsedData.push(row);
+                    }
+                }
+                
+                if (parsedData.length === 0) {
+                    throw new Error('No valid data rows found');
+                }
+                
+                showMessage(`✅ Successfully parsed ${parsedData.length} rows with ${headers.length} columns`, 'success');
+                showDataPreview();
+                
+                // Trigger custom event for external applications
+                triggerDataLoadedEvent();
+                
+            } catch (error) {
+                console.error('Error parsing data:', error);
+                showMessage(`Error parsing data: ${error.message}`, 'error');
+            } finally {
+                showSpinner(false);
+            }
+        }
+
+        // Load demo data
+        function loadDemoData() {
+            const demoData = `Product	Region	Salesperson	Sales	Quarter
+Widget A	North	John	1500	Q1
+Widget B	South	Jane	2300	Q1
+Widget A	East	Bob	1800	Q2
+Widget C	West	Alice	2100	Q1
+Widget B	North	Charlie	1900	Q2
+Widget A	South	Diana	2200	Q2
+Widget C	East	Frank	1700	Q1
+Widget B	West	Grace	2000	Q2
+Widget A	West	Henry	1600	Q1
+Widget C	North	Ivy	1900	Q2`;
+
+            document.getElementById('dataInput').value = demoData;
+            
+            // Switch to paste method
+            document.getElementById('pasteMethod').checked = true;
+            toggleImportMethod();
+            
+            // Parse the demo data
+            parseData();
+        }
+
+        // Clear all data
+        function clearData() {
+            parsedData = [];
+            headers = [];
+            document.getElementById('dataInput').value = '';
+            document.getElementById('excelRange').value = '';
+            document.getElementById('dataPreview').classList.add('hidden');
+            showMessage('Data cleared', 'info');
+            
+            // Trigger custom event for external applications
+            triggerDataClearedEvent();
+        }
+
+        // Show data preview table
+        function showDataPreview() {
+            if (parsedData.length === 0) {
+                document.getElementById('dataPreview').classList.add('hidden');
+                return;
+            }
+            
+            const previewContent = document.getElementById('dataPreviewContent');
+            const maxRows = Math.min(10, parsedData.length);
+            
+            let tableHTML = '<table><thead><tr>';
+            headers.forEach(header => {
+                tableHTML += `<th>${header}</th>`;
+            });
+            tableHTML += '</tr></thead><tbody>';
+            
+            for (let i = 0; i < maxRows; i++) {
+                tableHTML += '<tr>';
+                headers.forEach(header => {
+                    tableHTML += `<td>${parsedData[i][header] || ''}</td>`;
+                });
+                tableHTML += '</tr>';
+            }
+            
+            tableHTML += '</tbody></table>';
+            
+            if (parsedData.length > maxRows) {
+                tableHTML += `<p style="margin-top: 10px; color: var(--text-muted); font-size: 12px;">Showing first ${maxRows} of ${parsedData.length} rows</p>`;
+            }
+            
+            previewContent.innerHTML = tableHTML;
+            document.getElementById('dataPreview').classList.remove('hidden');
+        }
+
+        // Show status message
+        function showMessage(message, type = 'info') {
+            const messageEl = document.getElementById('statusMessage');
+            messageEl.textContent = message;
+            messageEl.className = `status-message ${type}`;
+            messageEl.style.display = 'block';
+            
+            // Auto-hide after 5 seconds for success/info messages
+            if (type !== 'error') {
+                setTimeout(() => {
+                    messageEl.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        // Show/hide spinner
+        function showSpinner(show) {
+            const spinner = document.getElementById('parsingSpinner');
+            spinner.style.display = show ? 'block' : 'none';
+        }
+
+        // Trigger custom events for external applications
+        function triggerDataLoadedEvent() {
+            const event = new CustomEvent('dataLoaded', {
+                detail: {
+                    data: parsedData,
+                    headers: headers,
+                    rowCount: parsedData.length,
+                    columnCount: headers.length
+                }
+            });
+            window.dispatchEvent(event);
+        }
+
+        function triggerDataClearedEvent() {
+            const event = new CustomEvent('dataCleared');
+            window.dispatchEvent(event);
+        }
+
+        // Public API for external applications
+        window.DataInputModule = {
+            // Get parsed data
+            getData: () => parsedData,
+            
+            // Get headers
+            getHeaders: () => headers,
+            
+            // Get data info
+            getDataInfo: () => ({
+                data: parsedData,
+                headers: headers,
+                rowCount: parsedData.length,
+                columnCount: headers.length
+            }),
+            
+            // Check if data is loaded
+            hasData: () => parsedData.length > 0,
+            
+            // Set data programmatically
+            setData: (data, headerArray) => {
+                if (Array.isArray(data) && Array.isArray(headerArray)) {
+                    parsedData = data;
+                    headers = headerArray;
+                    showDataPreview();
+                    triggerDataLoadedEvent();
+                }
+            },
+            
+            // Clear data programmatically
+            clear: clearData,
+            
+            // Load demo data programmatically
+            loadDemo: loadDemoData
+        };
+
+        console.log('✅ Data Input Module loaded successfully');
+        console.log('📖 Use window.DataInputModule for programmatic access');
+    </script>
+</body>
+</html>

@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Box Plot Analysis</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://code.highcharts.com/highcharts-more.js"></script>
+
+  <style>
+    :root {
+      --surface-0: #0c1624;
+      --surface-1: #1a1f2e;
+      --surface-2: #242938;
+      --border: #2d3748;
+      --accent-1: rgb(255,165,120);
+      --accent-2: rgb(120,200,255);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255,255,255,0.8);
+      --text-muted: rgba(255,255,255,0.6);
+      --panel-bg: var(--surface-1);
+      --panel-radius: 10px;
+      --panel-shadow: 0px 4px 20px rgba(0, 0, 0, 0.4);
+      --header-bg: #000;
+      --header-color: var(--accent-1);
+    }
+
+    body {
+      background-color: var(--surface-0);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      color: var(--text-primary);
+    }
+
+    .panel {
+      margin: 15px;
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--panel-radius);
+      box-shadow: var(--panel-shadow);
+    }
+
+    .panel-heading {
+      padding: 12px 20px;
+      background: var(--header-bg);
+      color: var(--header-color);
+      border-radius: var(--panel-radius) var(--panel-radius) 0 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-body {
+      padding: 15px;
+    }
+
+    .centered-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    #withOutliers, #withoutOutliers {
+      width: 100%;
+      height: 300px;
+      margin-bottom: 15px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+    }
+
+    .awaiting-panel {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 400px;
+      text-align: center;
+    }
+
+    .loading-dots::after {
+      content: '';
+      animation: loading-dots 1.5s steps(4, end) infinite;
+    }
+
+    @keyframes loading-dots {
+      0%, 20% { content: ''; }
+      40% { content: '.'; }
+      60% { content: '..'; }
+      80%, 100% { content: '...'; }
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% {
+        transform: scale(1);
+        opacity: 0.7;
+        filter: drop-shadow(0 0 5px var(--accent-1));
+      }
+      50% {
+        transform: scale(1.1);
+        opacity: 1;
+        filter: drop-shadow(0 0 15px var(--accent-1));
+      }
+    }
+
+    /* Header dropdown styles */
+    .header-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 15px 20px;
+      background: var(--header-bg);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 10px;
+    }
+
+    .dropdown-container {
+      position: relative;
+    }
+
+    .dropdown-btn {
+      background: var(--surface-2);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .dropdown-btn:hover {
+      background: var(--border);
+    }
+
+    .dropdown-content {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      box-shadow: var(--panel-shadow);
+      min-width: 200px;
+      z-index: 1000;
+      display: none;
+    }
+
+    .dropdown-content.show {
+      display: block;
+    }
+
+    .analysis-option {
+      padding: 10px 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+
+    .analysis-option:hover {
+      background: var(--surface-2);
+    }
+
+    .analysis-option.active {
+      background: rgba(255, 165, 120, 0.2);
+      color: var(--accent-1);
+    }
+
+    .option-icon {
+      font-size: 16px;
+      width: 20px;
+      text-align: center;
+    }
+
+    .dropdown-separator {
+      height: 1px;
+      background: var(--border);
+      margin: 8px 12px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header with dropdown -->
+  <div class="header-container">
+        <div style="flex: 0 0 auto;">Results Panel</div>
+        <div style="flex: 1; text-align: center;">
+          <div id="selectedAnalysisTitle" style="font-size: 1.4rem; font-weight: 700; color: var(--accent-1); margin-bottom: 4px;">Box Plot Analysis</div>
+      <div id="variableNameDisplay" style="font-size: 1rem; font-weight: 500; color: var(--text-secondary); font-style: italic;">Sample Data</div>
+        </div>
+        <div style="flex: 0 0 auto;">
+          <div class="dropdown-container">
+            <button class="dropdown-btn" onclick="toggleAnalysisDropdown()">
+              Advanced Analysis Options
+              <div class="dropdown-arrow" style="display: inline-block; margin-left: 8px;">▼</div>
+            </button>
+            
+            <div class="dropdown-content" id="analysisDropdown">
+          <div class="analysis-option" data-case="Case00" data-base-name="Interactive Histogram" data-file="demos/0HistogramPlusSyte_responsive.html" onclick="selectAnalysis('Case00', 'Interactive Histogram', this)">
+                <div class="option-icon">📈</div>
+                <div class="option-text">Interactive Histogram</div>
+              </div>
+          <div class="analysis-option active" data-case="Case10" data-base-name="Box Plot Analysis" data-file="demos/0BoxPlot_responsive.html" onclick="selectAnalysis('Case10', 'Box Plot Analysis', this)">
+                <div class="option-icon">📦</div>
+                <div class="option-text">Box Plot Analysis</div>
+              </div>
+          <div class="analysis-option" data-case="Case20" data-base-name="Cumulative Distribution" data-file="../0HistogramPlusPlus/HTMLtemplates/0cumulative-probability-chart.html" onclick="selectAnalysis('Case20', 'Cumulative Distribution', this)">
+                <div class="option-icon">📈</div>
+                <div class="option-text">Cumulative Distribution</div>
+              </div>
+              <div class="dropdown-separator"></div>
+          <div class="analysis-option" data-case="Case30" data-base-name="Percentiles" data-file="../0HistogramPlusPlus/HTMLtemplates/0percentile-calculator.html" onclick="selectAnalysis('Case30', 'Percentiles', this)">
+                <div class="option-icon">📊</div>
+                <div class="option-text">Percentiles</div>
+              </div>
+          <div class="analysis-option" data-case="Case40" data-base-name="Outliers Detection" data-file="../0HistogramPlusPlus/HTMLtemplates/0outliers-panel.html" onclick="selectAnalysis('Case40', 'Outliers Detection', this)">
+                <div class="option-icon">🎯</div>
+                <div class="option-text">Outliers Detection</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="centered-container">
+    <!-- Box Plot Panel -->
+    <div class="panel" id="boxplot-panel">
+      <div class="panel-heading">
+        <span>Box Plot Analysis</span>
+        <div>
+          <i class="fas fa-chart-box" style="margin-left: 15px; color: var(--accent-1);"></i>
+  </div>
+</div>
+
+      <div class="panel-body">
+        <!-- Awaiting data state -->
+        <div id="awaiting-data" class="awaiting-panel">
+          <div>
+            <div style="margin-bottom: 24px;">
+              <i class="fas fa-chart-box" style="font-size: 32px; color: var(--accent-1); animation: pulse-glow 2s ease-in-out infinite;"></i>
+            </div>
+            <div style="font-size: 20px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">
+              Awaiting Data<span class="loading-dots"></span>
+            </div>
+            <div style="font-size: 14px; color: var(--text-secondary); line-height: 1.6; max-width: 400px;">
+              This is a sample Box Plot analysis. In the full application, this would display box plots with outlier detection.
+            </div>
+          </div>
+        </div>
+        
+        <!-- Charts container (hidden initially) -->
+        <div id="charts-container" style="display: none;">
+          <div id="withOutliers"></div>
+              <div id="withoutOutliers"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+   <script>
+    // Generate sample data for demonstration
+    function generateSampleData() {
+      const data = [];
+      const mean = 50;
+      const stddev = 15;
+      
+      // Generate normal distribution with some outliers
+      for (let i = 0; i < 100; i++) {
+        const u1 = Math.random();
+        const u2 = Math.random();
+        const z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+        data.push(z0 * stddev + mean);
+      }
+      
+      // Add some outliers
+      data.push(100, 105, -10, -5, 110);
+      
+      return data;
+    }
+
+    // Calculate box plot statistics
+    function calculateBoxPlotStats(values) {
+      const sorted = values.slice().sort((a, b) => a - b);
+      const n = sorted.length;
+      
+      const q1 = sorted[Math.floor(n * 0.25)];
+      const median = sorted[Math.floor(n * 0.5)];
+      const q3 = sorted[Math.floor(n * 0.75)];
+      const iqr = q3 - q1;
+      
+        const lowerFence = q1 - 1.5 * iqr;
+        const upperFence = q3 + 1.5 * iqr;
+      
+      const outliers = sorted.filter(v => v < lowerFence || v > upperFence);
+      const min = sorted.find(v => v >= lowerFence) || sorted[0];
+      const max = sorted.reverse().find(v => v <= upperFence) || sorted[0];
+      
+        return {
+        min: sorted[0],
+        q1,
+        median,
+        q3,
+        max: sorted[sorted.length - 1],
+        adjustedMin: min,
+        adjustedMax: max,
+          outliers
+        };
+    }
+
+    // Create box plot charts
+    function createBoxPlots(data) {
+      const stats = calculateBoxPlotStats(data);
+      
+      // Chart with outliers
+      Highcharts.chart('withOutliers', {
+          chart: { 
+            type: 'boxplot', 
+            backgroundColor: 'transparent',
+          height: 300
+          },
+          title: { 
+          text: 'Box Plot with Outliers',
+          style: { color: '#ffffff', fontSize: '16px' }
+          },
+          xAxis: {
+          categories: ['Sample Data'],
+          labels: { style: { color: '#ffffff' } }
+          },
+          yAxis: {
+          labels: { style: { color: '#ffffff' } },
+            gridLineColor: 'rgba(255,255,255,0.1)',
+            title: { 
+              text: 'Values',
+            style: { color: '#ffffff' }
+            }
+          },
+        legend: { enabled: false },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          style: { color: '#ffffff' }
+          },
+          plotOptions: {
+            boxplot: {
+            fillColor: 'rgba(255, 165, 120, 0.3)',
+              lineWidth: 2,
+              medianColor: '#ffffff',
+              medianWidth: 3,
+              stemColor: '#ffffff',
+              whiskerColor: '#ffffff',
+              whiskerWidth: 2
+            }
+          },
+        series: [{
+              name: 'Box Plot', 
+          data: [[stats.min, stats.q1, stats.median, stats.q3, stats.max]],
+              color: '#e94560'
+        }]
+      });
+
+      // Chart without outliers + outlier points
+      Highcharts.chart('withoutOutliers', {
+          chart: { 
+            backgroundColor: 'transparent',
+          height: 300
+          },
+          title: { 
+          text: 'Box Plot without Outliers + Outlier Points',
+          style: { color: '#ffffff', fontSize: '16px' }
+          },
+          xAxis: {
+          categories: ['Sample Data'],
+          labels: { style: { color: '#ffffff' } }
+          },
+          yAxis: {
+          labels: { style: { color: '#ffffff' } },
+            gridLineColor: 'rgba(255,255,255,0.1)',
+            title: { 
+              text: 'Values',
+            style: { color: '#ffffff' }
+          }
+        },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            style: { color: '#ffffff' }
+          },
+          plotOptions: {
+            boxplot: {
+            fillColor: 'rgba(120, 200, 255, 0.3)',
+              lineWidth: 2,
+              medianColor: '#ffffff',
+              medianWidth: 3,
+              stemColor: '#ffffff',
+              whiskerColor: '#ffffff',
+              whiskerWidth: 2
+            }
+          },
+        series: [{
+              name: 'Box Plot', 
+          type: 'boxplot',
+          data: [[stats.adjustedMin, stats.q1, stats.median, stats.q3, stats.adjustedMax]],
+          color: '#00bcd4'
+        }, {
+          name: `Outliers (${stats.outliers.length})`,
+            type: 'scatter',
+          data: stats.outliers.map(v => [0, v]),
+          marker: { radius: 4 },
+          color: '#ff6b6b'
+        }]
+      });
+    }
+
+    // Initialize with sample data
+    function initialize() {
+      // Disable all Highcharts animations globally
+      Highcharts.setOptions({
+        chart: {
+          animation: false
+        },
+        plotOptions: {
+          series: {
+            animation: false
+          },
+          boxplot: {
+            animation: false
+          },
+          scatter: {
+            animation: false
+          }
+        },
+        tooltip: {
+          animation: false
+        },
+        legend: {
+          animation: false
+        }
+      });
+      
+      const sampleData = generateSampleData();
+      
+      // Hide awaiting panel and show charts immediately
+      document.getElementById('awaiting-data').style.display = 'none';
+      document.getElementById('charts-container').style.display = 'block';
+      
+      // Create the charts immediately
+      createBoxPlots(sampleData);
+    }
+
+    // Start initialization when page loads
+    initialize();
+
+    // Dropdown functionality
+    function toggleAnalysisDropdown() {
+      const dropdown = document.getElementById('analysisDropdown');
+      const btn = document.querySelector('.dropdown-btn');
+      
+      dropdown.classList.toggle('show');
+      btn.classList.toggle('open');
+    }
+
+    function selectAnalysis(caseId, analysisName, element) {
+      // Update the title
+      document.getElementById('selectedAnalysisTitle').textContent = analysisName;
+      
+      // Update active state
+      document.querySelectorAll('.analysis-option').forEach(opt => opt.classList.remove('active'));
+      element.classList.add('active');
+      
+      // Close dropdown
+      toggleAnalysisDropdown();
+      
+      // Get the file path from data attribute
+      const filePath = element.getAttribute('data-file');
+      
+      if (filePath && filePath !== 'demos/0BoxPlot_responsive.html') {
+        // Check if we're in an iframe (modal)
+        if (window.parent && window.parent !== window) {
+          // We're in an iframe - communicate with parent to load new content
+          try {
+            window.parent.postMessage({
+              type: 'loadAnalysis',
+              file: filePath,
+              title: analysisName
+            }, '*');
+          } catch (e) {
+            console.log('Could not communicate with parent, loading in current window');
+            window.location.href = filePath;
+          }
+        } else {
+          // We're in the main window - load directly
+          window.location.href = filePath;
+        }
+      }
+      
+      console.log('Selected analysis:', analysisName, 'Case:', caseId, 'File:', filePath);
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+      const dropdown = document.getElementById('analysisDropdown');
+      const btn = document.querySelector('.dropdown-btn');
+      
+      if (!event.target.closest('.dropdown-container')) {
+          dropdown.classList.remove('show');
+          btn.classList.remove('open');
+      }
+    });
+</script>
+</body>
+</html>

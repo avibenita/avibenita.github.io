@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Professional QQ/PP Plots - Highcharts</title>
+  
+  <!-- Load scripts with proper error handling -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.min.js" onload="console.log('Highcharts loaded')" onerror="console.error('Failed to load Highcharts')"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/exporting.min.js" onload="console.log('Exporting module loaded')" onerror="console.error('Failed to load exporting module')"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/export-data.min.js" onload="console.log('Export-data module loaded')" onerror="console.error('Failed to load export-data module')"></script>
+  
+  <style>
+   :root {
+      --panel-bg: #484b57;
+      --panel-radius: 10px;
+      --panel-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
+      --header-bg: #000;
+      --header-color: rgb(255,192,192);
+   }
+
+  body {
+    background-color: #282c39;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  .main-wrapper {
+    flex-grow: 1;
+    padding: 0 30px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .layout-wrapper {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    width: 100%;
+    margin-top: 10px;
+    gap: 50px;
+    justify-content: flex-start;
+  }
+
+  .sidebar {
+    background-color: #3a3d4d;
+    padding: 15px;
+    border-radius: 10px;
+    width: 200px;
+    min-width: 165px;
+    max-width: 240px;
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    position: sticky;
+    top: 20px;
+    margin: 0;
+    flex-shrink: 0;
+  }
+
+  .control-section {
+    background-color: #484b57;
+    padding: 12px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .section-label {
+    color: white;
+    font-weight: bold;
+    font-size: 14px;
+    margin: 0 0 10px 0;
+    padding: 0;
+  }
+
+  .radio-group label {
+    display: block;
+    margin-bottom: 8px;
+    cursor: pointer;
+    position: relative;
+    padding-left: 25px;
+    font-size: 13px;
+  }
+
+  .radio-group input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .checkmark {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 16px;
+    width: 16px;
+    background-color: #eee;
+    border-radius: 50%;
+  }
+
+  .radio-group label:hover input ~ .checkmark {
+    background-color: #ccc;
+  }
+
+  .radio-group input:checked ~ .checkmark {
+    background-color: #2196F3;
+  }
+
+  .checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+  }
+
+  .radio-group input:checked ~ .checkmark:after {
+    display: block;
+  }
+
+  .checkmark:after {
+    top: 5px;
+    left: 5px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: white;
+  }
+
+  .radio-group input[type="radio"]:checked + .checkmark + span {
+    font-weight: bold;
+    color: #fff;
+  }
+
+  .stats-box {
+    background-color: #2c3e50;
+    color: #ecf0f1;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+  }
+
+  .info-box {
+    background-color: #34495e;
+    color: #ecf0f1;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    border-left: 4px solid #3498db;
+  }
+
+  .main-content {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    justify-content: flex-start;
+    width: 100%;
+    min-width: 800px;
+    margin: 0;
+  }
+
+  .plot-column {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .panel {
+    background-color: #484b57;
+    border-radius: 10px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
+    width: 450px;
+    height: 380px;
+    display: flex;
+    flex-direction: column;
+    opacity: 1;
+    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .panel.fade-out {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .panel.fade-in {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .panel-heading {
+    background-color: #000;
+    color: rgb(255,192,192);
+    font-weight: bold;
+    padding: 10px 15px;
+    font-size: 15px;
+    border-radius: 10px 10px 0 0;
+    flex-shrink: 0;
+  }
+
+  .panel-body {
+    padding: 15px;
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .chart-container {
+    width: 420px;
+    height: 320px;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: opacity 0.5s ease;
+  }
+  .panel[style*="display: none"] .chart-container {
+    opacity: 0;
+  }
+
+  .no-data-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 420px;
+    height: 320px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    border: 2px dashed #dee2e6;
+    color: #6c757d;
+    font-size: 14px;
+    text-align: center;
+  }
+
+  /* Add spinner styles */
+  .spinner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: none;  /* Hidden by default */
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;  /* Start fully transparent */
+    transition: opacity 0.3s ease;  /* Smooth transition for opacity */
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .spinner-overlay.show {
+    display: flex;
+    opacity: 1;  /* Fade in when shown */
+  }
+
+</style>
+</head>
+<body>
+  <!-- Header with Dropdown -->
+  <dropdown-menu></dropdown-menu>
+  
+  <main class="main-wrapper"> 
+    <div class="layout-wrapper">
+      <div class="sidebar">
+        <div class="control-section">
+          <div class="section-label">Distribution:</div>
+          <div class="radio-group" id="distributionRadios">
+            <label onclick="handleRadioClick('normal')">
+              <input type="radio" name="distribution" value="normal" checked>
+              <span class="checkmark"></span>
+              Normal
+            </label>
+            <label onclick="handleRadioClick('exponential')">
+              <input type="radio" name="distribution" value="exponential">
+              <span class="checkmark"></span>
+              Exponential
+            </label>
+            <label onclick="handleRadioClick('uniform')">
+              <input type="radio" name="distribution" value="uniform">
+              <span class="checkmark"></span>
+              Uniform
+            </label>
+            <label onclick="handleRadioClick('weibull')">
+              <input type="radio" name="distribution" value="weibull">
+              <span class="checkmark"></span>
+              Weibull
+            </label>
+            <label onclick="handleRadioClick('gamma')">
+              <input type="radio" name="distribution" value="gamma">
+              <span class="checkmark"></span>
+              Gamma
+            </label>
+            <label onclick="handleRadioClick('logNormal')">
+              <input type="radio" name="distribution" value="logNormal">
+              <span class="checkmark"></span>
+              LogNormal
+            </label>
+            <label onclick="handleRadioClick('beta')">
+              <input type="radio" name="distribution" value="beta">
+              <span class="checkmark"></span>
+              Beta
+            </label>
+            <label onclick="handleRadioClick('paretto')">
+              <input type="radio" name="distribution" value="paretto">
+              <span class="checkmark"></span>
+              Paretto
+            </label>
+          </div>
+        </div>
+
+        <div class="stats-box" id="statsBox">
+          <strong>Dataset Stats:</strong><br>
+          N: <span id="sampleSize">-</span><br>
+          Mean: <span id="sampleMean">-</span><br>
+          Std: <span id="sampleStd">-</span>
+        </div>
+
+        
+      </div>
+
+      <div class="main-content">
+        <div class="plot-column">
+          <div class="panel">
+            <div class="panel-heading">QQ Plot (SPSS Convention)</div>
+            <div class="panel-body">
+              <div class="spinner-overlay">
+                <div class="spinner"></div>
+              </div>
+              <div class="chart-container" id="qqPlot">
+                <div class="no-data-message">Waiting for data injection...</div>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-heading">QQ Plot - Detrended</div>
+            <div class="panel-body">
+              <div class="spinner-overlay">
+                <div class="spinner"></div>
+              </div>
+              <div class="chart-container" id="qqDetrended">
+                <div class="no-data-message">Waiting for data injection...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="plot-column">
+          <div class="panel">
+            <div class="panel-heading">PP Plot (SPSS Convention)</div>
+            <div class="panel-body">
+              <div class="spinner-overlay">
+                <div class="spinner"></div>
+              </div>
+              <div class="chart-container" id="ppPlot">
+                <div class="no-data-message">Waiting for data injection...</div>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-heading">PP Plot - Detrended</div>
+            <div class="panel-body">
+              <div class="spinner-overlay">
+                <div class="spinner"></div>
+              </div>
+              <div class="chart-container" id="ppDetrended">
+                <div class="no-data-message">Waiting for data injection...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Define test function first, before any other code
+    function testFunction() {
+      console.log('Test function called!');
+      const result = document.getElementById('testResult');
+      if (result) {
+        result.textContent = 'JavaScript is working! ✓';
+        result.style.color = '#2ecc71';
+      }
+      
+      // Now test radio buttons
+      const radios = document.querySelectorAll('input[name="distribution"]');
+      console.log('Found', radios.length, 'radio buttons');
+      
+      // Change all alerts to console.log and visual feedback
+      radios.forEach((radio, index) => {
+        console.log('Radio', index, ':', radio.value, 'checked:', radio.checked);
+      });
+    }
+
+    // Handle radio button clicks with direct onclick handlers
+    function handleRadioClick(distributionValue) {
+      console.log('Radio clicked:', distributionValue);
+      
+      // Visual feedback
+      const result = document.getElementById('testResult');
+      if (result) {
+        result.textContent = 'Clicked: ' + distributionValue + ' ✓';
+        result.style.color = '#e67e22';
+      }
+      
+      // Update the actual radio button
+      document.querySelectorAll('input[name="distribution"]').forEach(radio => {
+        radio.checked = (radio.value === distributionValue);
+      });
+      
+      // Call the selection function
+      selectDistribution(distributionValue);
+    }
+
+    // Wait for all scripts to load before initializing
+    function initializeApp() {
+      // Check if Highcharts is available
+      if (typeof Highcharts === 'undefined') {
+        console.error('Highcharts not loaded, retrying in 500ms');
+        setTimeout(initializeApp, 500);
+        return;
+      }
+
+      // Set suppressVB6Notify to true for initial load
+      suppressVB6Notify = true;
+
+      // Ensure all spinners are hidden on initialization
+      document.querySelectorAll('.spinner-overlay').forEach(spinner => {
+        spinner.classList.remove('show');
+      });
+
+      // Highcharts global options
+      Highcharts.setOptions({
+        chart: {
+          style: {
+            fontFamily: 'Arial, sans-serif'
+          }
+        },
+        colors: ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c']
+      });
+      
+      console.log('Highcharts initialized successfully');
+    }
+
+    let currentData = null;
+    let showQQ = true;
+    let selectedDistribution = 'normal';
+    let suppressVB6Notify = false;
+
+    // Global function that can be called from the shadow DOM
+    window.handlePlotTypeChange = function(plotType) {
+      console.log('Plot type changed to:', plotType);
+      showQQ = plotType === 'qq';
+      updatePlotTypeVisibility();
+    };
+
+    function updatePlots() {
+      if (currentData) {
+        // Update panel headings with distribution info
+        const distLabel = selectedDistribution.charAt(0).toUpperCase() + selectedDistribution.slice(1);
+        document.querySelector('#qqPlot').closest('.panel').querySelector('.panel-heading').textContent = `QQ Plot (${distLabel})`;
+        document.querySelector('#qqDetrended').closest('.panel').querySelector('.panel-heading').textContent = `QQ Plot - Detrended (${distLabel})`;
+        document.querySelector('#ppPlot').closest('.panel').querySelector('.panel-heading').textContent = `PP Plot (${distLabel})`;
+        document.querySelector('#ppDetrended').closest('.panel').querySelector('.panel-heading').textContent = `PP Plot - Detrended (${distLabel})`;
+        
+        // Create all charts
+        const charts = [
+          createHighchartsPlot("qqPlot", currentData.qqData, "QQ Plot", "Sample Quantiles", "Theoretical Quantiles", false, true),
+          createHighchartsPlot("ppPlot", currentData.ppData, "PP Plot", "Empirical CDF", "Theoretical CDF", false, true)
+        ];
+
+        if (currentData.qqDetrendedData && currentData.qqDetrendedData.length > 0) {
+          charts.push(createHighchartsPlot("qqDetrended", currentData.qqDetrendedData, "QQ Plot - Detrended", "Observed Value", "Deviation from Expected", true, false));
+        }
+        if (currentData.ppDetrendedData && currentData.ppDetrendedData.length > 0) {
+          charts.push(createHighchartsPlot("ppDetrended", currentData.ppDetrendedData, "PP Plot - Detrended", "Observed Cum Prob", "Deviation from Expected", true, false));
+        }
+
+        // Hide spinners after all charts are rendered
+        Promise.all(charts.map(chart => {
+          if (chart) {
+            return new Promise(resolve => {
+              chart.callbacks.push(() => {
+                resolve();
+              });
+            });
+          }
+          return Promise.resolve();
+        })).then(() => {
+          document.querySelectorAll('.spinner-overlay').forEach(spinner => {
+            spinner.classList.remove('show');
+          });
+        });
+      }
+    }
+
+    function createHighchartsPlot(containerId, data, title, xLabel, yLabel, isDetrended = false, addDiagonal = false) {
+      const container = document.getElementById(containerId);
+      if (!container) {
+        console.warn(`Container ${containerId} not found`);
+        return null;
+      }
+      
+      if (typeof Highcharts === 'undefined') {
+        console.error('Highcharts not available for creating chart');
+        return null;
+      }
+      
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        console.warn('No data provided for chart:', containerId);
+        container.innerHTML = '<div class="no-data-message">No data available</div>';
+        return null;
+      }
+      
+      // Clear any existing no-data message
+      container.innerHTML = '';
+      
+      try {
+        const chart = Highcharts.chart(containerId, {
+          chart: {
+            type: 'scatter',
+            zoomType: 'xy',
+            backgroundColor: '#ffffff',
+            plotBorderColor: '#cccccc',
+            plotBorderWidth: 1,
+            height: 320
+          },
+          title: { text: null },
+          xAxis: {
+            title: { text: xLabel, style: { fontSize: '12px', fontWeight: 'bold' } },
+            gridLineWidth: 1,
+            gridLineColor: '#e8e8e8',
+            lineColor: '#cccccc',
+            tickColor: '#cccccc'
+          },
+          yAxis: {
+            title: { text: yLabel, style: { fontSize: '12px', fontWeight: 'bold' } },
+            gridLineWidth: 1,
+            gridLineColor: '#e8e8e8',
+            lineColor: '#cccccc',
+            tickColor: '#cccccc'
+          },
+          legend: {
+            enabled: false,
+            align: 'right',
+            verticalAlign: 'top',
+            floating: true,
+            backgroundColor: 'rgba(255,255,255,0.9)',
+            borderWidth: 1,
+            borderRadius: 5,
+            shadow: true
+          },
+          plotOptions: {
+            scatter: {
+              marker: {
+                radius: 4,
+                symbol: 'circle',
+                states: { hover: { enabled: true, lineColor: 'rgb(100,100,100)' } }
+              },
+              states: { hover: { marker: { enabled: false } } }
+            },
+            line: { marker: { enabled: false }, enableMouseTracking: false }
+          },
+          tooltip: {
+            formatter: function() {
+              return `<b>Data Point</b><br/>${xLabel}: ${this.x.toFixed(3)}<br/>${yLabel}: ${this.y.toFixed(3)}`;
+            },
+            backgroundColor: 'rgba(50,50,50,0.9)',
+            style: { color: 'white', fontSize: '11px' },
+            borderRadius: 5
+          },
+          series: [{
+            name: 'Data Points',
+            data: data,
+            color: isDetrended ? '#e67e22' : '#3498db',
+            marker: { fillColor: isDetrended ? '#e67e22' : '#3498db', lineWidth: 1, lineColor: 'white' }
+          }],
+          exporting: {
+            enabled: true,
+            buttons: {
+              contextButton: {
+                menuItems: [
+                  'viewFullscreen',
+                  'printChart',
+                  'separator',
+                  'downloadPNG',
+                  'downloadJPEG',
+                  'downloadPDF',
+                  'downloadSVG'
+                ]
+              }
+            }
+          },
+          credits: { enabled: false }
+        });
+        
+        if (isDetrended) {
+          chart.yAxis[0].addPlotLine({
+            color: '#e74c3c',
+            dashStyle: 'Dash',
+            width: 2,
+            value: 0,
+            label: {
+              text: 'Perfect Fit',
+              style: { color: '#e74c3c', fontSize: '10px' }
+            }
+          });
+        } else if (addDiagonal) {
+          const minVal = Math.min(...data.map(p => Math.min(p[0], p[1])));
+          const maxVal = Math.max(...data.map(p => Math.max(p[0], p[1])));
+          chart.addSeries({
+            name: 'Perfect Fit',
+            type: 'line',
+            data: [[minVal, minVal], [maxVal, maxVal]],
+            color: '#e74c3c',
+            dashStyle: 'Dash',
+            lineWidth: 2,
+            enableMouseTracking: false,
+            showInLegend: true
+          });
+        }
+        return chart;
+      } catch (e) { 
+        console.error('Chart creation failed:', e);
+        container.innerHTML = '<div class="no-data-message">Chart creation failed</div>';
+        return null; 
+      }
+    }
+
+    function updatePlotTypeVisibility() {
+      console.log('Updating plot visibility. showQQ:', showQQ);
+      
+      // Fade out all panels first
+      const qqPanels = Array.from(document.querySelectorAll('#qqPlot, #qqDetrended')).map(panel => panel.closest('.panel'));
+      const ppPanels = Array.from(document.querySelectorAll('#ppPlot, #ppDetrended')).map(panel => panel.closest('.panel'));
+      const allPanels = qqPanels.concat(ppPanels);
+      
+      allPanels.forEach(panel => {
+        if (panel) {
+          panel.classList.remove('fade-in');
+          panel.classList.add('fade-out');
+        }
+      });
+      
+      // After fade out, show the correct panels and fade them in
+      setTimeout(() => {
+        qqPanels.forEach(panel => {
+          if (panel) {
+            panel.style.display = showQQ ? 'flex' : 'none';
+            if (showQQ) {
+              panel.classList.remove('fade-out');
+              panel.classList.add('fade-in');
+            }
+          }
+        });
+        ppPanels.forEach(panel => {
+          if (panel) {
+            panel.style.display = !showQQ ? 'flex' : 'none';
+            if (!showQQ) {
+              panel.classList.remove('fade-out');
+              panel.classList.add('fade-in');
+            }
+          }
+        });
+      }, 350); // match the CSS transition duration
+    }
+
+    // Handle distribution selection (called from VB6 and user clicks)
+    function selectDistribution(distributionValue) {
+      // Only show spinner if this is a user-initiated change (not initial load)
+      if (!suppressVB6Notify) {
+        document.querySelectorAll('.spinner-overlay').forEach(spinner => {
+          spinner.classList.add('show');
+        });
+      }
+
+      selectedDistribution = distributionValue;
+      console.log('Distribution selected:', distributionValue);
+      
+      // Visual feedback instead of alert
+      const result = document.getElementById('testResult');
+      if (result) {
+        result.textContent = 'Selected: ' + distributionValue + ' ✓';
+        result.style.color = '#e67e22';
+      }
+      
+      // Update radio button selection
+      document.querySelectorAll('input[name="distribution"]').forEach(radio => {
+        radio.checked = (radio.value === distributionValue);
+      });
+      
+      // Only send message to VB6 if not suppressed (to prevent infinite loops)
+      if (!suppressVB6Notify) {
+        console.log('Sending to VB6: Case60|' + distributionValue);
+        sendMessageToVB6('Case60', distributionValue);
+      }
+    }
+
+    // Make selectDistribution globally accessible for VB6
+    window.selectDistribution = selectDistribution;
+    document.addEventListener("DOMContentLoaded", () => {
+      selectDistribution("normal");
+      console.log('DOM loaded, initializing app');
+      initializeApp();
+      updatePlotTypeVisibility();
+    });
+
+    // VB6 Integration Function - Primary data injection entry point
+    window.injectDataFromVB6 = function(jsonStr) {
+      if (typeof Highcharts === 'undefined') {
+        console.error('Highcharts not loaded, cannot inject data');
+        return;
+      }
+      
+      try {
+        // Show spinners only if this is not the initial load
+        if (!suppressVB6Notify) {
+          document.querySelectorAll('.spinner-overlay').forEach(spinner => {
+            spinner.classList.add('show');
+          });
+        }
+
+        const obj = JSON.parse(jsonStr);
+        if (!Array.isArray(obj.qqData) || !Array.isArray(obj.ppData)) {
+          throw 'Invalid data structure: qqData and ppData must be arrays';
+        }
+        
+        // Convert data format for Highcharts
+        const qqHighchartsData = obj.qqData.map(d => [d.x, d.y]);
+        const ppHighchartsData = obj.ppData.map(d => [d.x, d.y]);
+        let qqDetrendedHighcharts = [];
+        let ppDetrendedHighcharts = [];
+        
+        if (obj.qqDetrendedData && obj.ppDetrendedData) {
+          qqDetrendedHighcharts = obj.qqDetrendedData.map(d => [d.x, d.y]);
+          ppDetrendedHighcharts = obj.ppDetrendedData.map(d => [d.x, d.y]);
+        }
+        
+        // Store injected data
+        currentData = {
+          qqData: qqHighchartsData,
+          ppData: ppHighchartsData,
+          qqDetrendedData: qqDetrendedHighcharts,
+          ppDetrendedData: ppDetrendedHighcharts
+        };
+        
+        // Update stats box based on injected data
+        if (obj.qqData && obj.qqData.length > 0) {
+          const values = obj.qqData.map(d => d.y); // Use observed values (y-axis)
+          const n = values.length;
+          const mean = values.reduce((a, b) => a + b, 0) / n;
+          const std = Math.sqrt(values.reduce((sum, x) => sum + Math.pow(x - mean, 2), 0) / (n - 1));
+          
+          document.getElementById('sampleSize').textContent = n;
+          document.getElementById('sampleMean').textContent = mean.toFixed(3);
+          document.getElementById('sampleStd').textContent = std.toFixed(3);
+        }
+        
+        // Update plots with new data
+        updatePlots();
+
+        // Ensure correct plot type is visible
+        updatePlotTypeVisibility();
+        
+        // After initial load, set suppressVB6Notify to false for future updates
+        suppressVB6Notify = false;
+        
+        console.log('Data injection successful');
+      } catch (e) {
+        console.error('Data injection failed:', e);
+        alert('Data injection failed: ' + e);
+      }
+    };
+/*
+    // Global function for VB6 messaging
+    function sendMessageToVB6(action, label) {
+      try {
+        if (window.external && window.external.OrdoWebView1_JSMessage) {
+          alert (action + "|" + label);
+          window.external.OrdoWebView1_JSMessage(action + "|" + label);
+        }
+      } catch (err) {
+        console.warn("VB6 bridge error:", err.message);
+      }
+    }
+    */
+  </script>
+
+  <script>
+    class DropdownMenu extends HTMLElement {
+      constructor() {
+        super();
+        const shadow = this.attachShadow({ mode: "open" });
+        shadow.innerHTML = `
+          <style>
+            :host { display: block; font-family: Arial; padding-left: 10px; }
+            .header { 
+              display: flex; 
+              justify-content: space-between; 
+              align-items: center; 
+              background: #1f1f2f; 
+              padding: 20px; 
+              position: relative; 
+            }
+            h1 { 
+              font-size: 28px; 
+              color: rgb(255,192,192); 
+              margin: 0; 
+            }
+            .plot-type-box {
+              position: absolute;
+              left: 50%;
+              transform: translateX(-50%);
+              background: #2c3e50;
+              padding: 8px 20px;
+              border-radius: 8px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+              display: flex;
+              gap: 20px;
+              align-items: center;
+            }
+            .plot-type-box label {
+              color: white;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              font-size: 14px;
+              padding: 4px 8px;
+              border-radius: 4px;
+              transition: all 0.2s ease;
+            }
+            .plot-type-box label:hover {
+              background: rgba(255,255,255,0.1);
+            }
+            .plot-type-box input[type="radio"] {
+              margin: 0;
+              cursor: pointer;
+              width: 16px;
+              height: 16px;
+              accent-color: rgb(255,192,192);
+            }
+            .plot-type-box input[type="radio"]:checked + span {
+              color: rgb(255,192,192);
+              font-weight: bold;
+            }
+            .dropdown { 
+              position: relative; 
+              margin-left: auto; 
+            }
+            .dropbtn { 
+              background: linear-gradient(to right, rgb(255,192,192), rgb(255,160,160)); 
+              color: black; 
+              font-weight: bold; 
+              border: none; 
+              border-radius: 6px; 
+              padding: 8px 16px; 
+              cursor: pointer; 
+              display: flex; 
+              align-items: center; 
+              gap: 6px; 
+            }
+            .dropdown-content { 
+              margin-top: 5px; 
+              position: absolute; 
+              top: 100%; 
+              left: 10%; 
+              transform: translateX(-40%) scaleY(0); 
+              background-color: white; 
+              color: black; 
+              border-radius: 6px; 
+              overflow: hidden; 
+              box-shadow: 2px 4px 8px rgba(0,0,0,0.4); 
+              min-width: 420px; 
+              font-size: 14px; 
+              column-count: 1; 
+              column-gap: 0; 
+              opacity: 0; 
+              transition: all 0.25s ease-in-out; 
+              transform-origin: top; 
+              pointer-events: none; 
+              z-index: 1000; 
+            }
+            .dropdown-content.show { 
+              transform: translateX(-40%) scaleY(1); 
+              opacity: 1; 
+              pointer-events: auto; 
+            }
+            .dropdown-content a { 
+              padding: 6px 10px; 
+              display: flex; 
+              align-items: center; 
+              text-decoration: none; 
+              color: black; 
+              transition: background 0.2s ease; 
+            }
+            .dropdown-content a:hover { 
+              background-color: rgb(255,160,160); 
+              color: white; 
+            }
+            .dropdown-content a.selected { 
+              background-color: rgb(255,160,160); 
+              color: white; 
+              font-weight: bold; 
+            }
+          </style>
+          <div class="header">
+            <h1 id="title">PP-QQ Plots</h1>
+            <div class="plot-type-box">
+              <label>
+                <input type="radio" name="plotType" value="qq" checked>
+                <span>QQ Plot</span>
+              </label>
+              <label>
+                <input type="radio" name="plotType" value="pp">
+                <span>PP Plot</span>
+              </label>
+            </div>
+            <div class="dropdown">
+              <button class="dropbtn">Select Analysis ▼</button>
+              <div class="dropdown-content">
+                <a href="javascript:void(0)" data-action="Case00">Histogram & Stats</a> 
+                <a href="javascript:void(0)" data-action="Case10">Box-Plot</a>   
+                <a href="javascript:void(0)" data-action="Case20">Cumulative Distribution</a>
+                <a href="javascript:void(0)" data-action="Case30">Percentiles</a>
+                <a href="javascript:void(0)" data-action="Case40">Outliers Detection</a>
+                <a href="javascript:void(0)">--------------------------------------------------</a>
+                <a href="javascript:void(0)" data-action="Case50">Tests of Normality</a>
+                <a href="javascript:void(0)" data-action="Case60">PP-QQ Plots</a>
+                <a href="javascript:void(0)" data-action="Case70">Hypothesis Testing</a>
+                <a href="javascript:void(0)" data-action="Case90">Confidence Intervals</a>            
+                <a href="javascript:void(0)" data-action="Case100">Kernel Density</a>   
+              </div>
+            </div>
+          </div>
+        `;
+        
+        const title = shadow.getElementById("title");
+        const dropdown = shadow.querySelector(".dropdown-content");
+        const btn = shadow.querySelector(".dropbtn");
+    
+        // Set up radio button event listeners
+        const radioButtons = shadow.querySelectorAll('input[name="plotType"]');
+        radioButtons.forEach(radio => {
+          radio.addEventListener('change', (e) => {
+            console.log('Radio button changed:', e.target.value);
+            if (window.handlePlotTypeChange) {
+              window.handlePlotTypeChange(e.target.value);
+            }
+          });
+        });
+        
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          dropdown.classList.toggle("show");
+        });
+
+        window.addEventListener("click", () => {
+          dropdown.classList.remove("show");
+        });
+
+        shadow.querySelectorAll("a").forEach(link => {
+          link.addEventListener("click", (e) => {
+            e.preventDefault();
+            const action = link.dataset.action;
+            const label = link.textContent.trim();
+
+            if (action) {
+              title.textContent = label;
+              dropdown.querySelectorAll("a").forEach(a => a.classList.remove("selected"));
+              link.classList.add("selected");
+              dropdown.classList.remove("show");
+
+              if (window.sendMessageToVB6) {
+          
+                window.sendMessageToVB6(action, label);
+              }
+            }
+          });
+        });
+      }
+    }
+    customElements.define("dropdown-menu", DropdownMenu);
+  </script>
+</body>
+</html>

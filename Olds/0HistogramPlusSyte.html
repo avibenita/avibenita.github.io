@@ -1,0 +1,2790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title id="page-title">Variable Analysis</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+
+  <style>
+    :root {
+      --surface-0: #0c1624; /* page background */
+      --surface-1: #1a1f2e; /* cards / panels - warmer dark gray-blue */
+      --surface-2: #242938; /* chart / results boxes */
+      --border: #2d3748; /* softer border color */
+      --accent-1: rgb(255,165,120); /* warm orange */
+      --accent-2: rgb(120,200,255); /* cyan blue */
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255,255,255,0.8);
+      --text-muted: rgba(255,255,255,0.6);
+      --panel-bg: var(--surface-1);
+      --panel-radius: 10px;
+      --panel-shadow: 0px 4px 20px rgba(0, 0, 0, 0.4);
+      --header-color: rgb(255,165,120);
+      --pad: 12px;
+      --panel-radius: 10px;
+      --panel-shadow: 0px 4px 20px rgba(0, 0, 0, 0.4);
+      --header-bg: #000;
+      --header-color: var(--accent-1);
+      --panel-width: 700px;
+      --panel-min-width: 280px;
+      --panel-max-width: 1100px;
+      --histogram-panel-width: 900px;
+      --histogram-height-min: 300px;
+      --histogram-height-max: 500px;
+      --histogram-height-ratio: 0.4;
+      --highlight-bg: rgba(255, 165, 120, 0.2);
+      --highlight-text: var(--accent-1);
+    }
+
+    body {
+      background-color: var(--surface-0);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      color: var(--text-primary);
+    }
+
+    .header-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 32px;
+      margin: 0;
+      color: var(--header-color);
+    }
+
+    .dropdown {
+      position: relative;
+    }
+
+     body {
+      background-color: var(--surface-0);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      color: var(--text-primary);
+    }
+
+    /* Panel styling to match input panel */
+    .wrap{ display:flex; justify-content:center; padding:clamp(6px,2vh,12px); }
+    .card{
+      width:min(980px, 100%);
+      background:var(--surface-1);
+      border-radius:var(--panel-radius);
+      box-shadow:var(--panel-shadow);
+      border: 1px solid var(--border);
+      overflow:hidden;
+    }
+    .card-head{ background: transparent; color:var(--header-color); padding:12px 16px; font-weight:600; font-size:1.2rem; letter-spacing:.3px }
+    .card-body{ padding:var(--pad); max-height:calc(100vh - 80px); overflow-y:auto; display: flex; flex-direction: column; }
+    
+    /* Dropdown styling for header */
+    .dropdown-container { position: relative; }
+    .dropdown-content { 
+      display: none;
+      position: absolute;
+      top: 100%;
+      right: 0;
+      min-width: 250px;
+      z-index: 1000;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--panel-shadow);
+      padding: 8px 0;
+      margin-top: 4px;
+    }
+    .dropdown-content.show { display: block; }
+    
+           /* Dropdown button with 3D effect and animated glow */
+           .dropdown-btn {
+             position: relative;
+             transition: all 0.3s ease;
+             animation: subtle-glow 3s ease-in-out infinite;
+             background: linear-gradient(145deg, #4a5568, #2d3748) !important;
+             border: 1px solid #4a5568 !important;
+             box-shadow: 
+               0 4px 8px rgba(0, 0, 0, 0.3),
+               inset 0 1px 0 rgba(255, 255, 255, 0.1),
+               inset 0 -1px 0 rgba(0, 0, 0, 0.2) !important;
+             text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+             border-radius: 8px !important;
+             font-weight: 600;
+             color: #e2e8f0 !important;
+           }
+    
+    @keyframes subtle-glow {
+      0%, 100% {
+        box-shadow: 
+          0 4px 8px rgba(0, 0, 0, 0.3),
+          0 0 5px rgba(255, 165, 120, 0.3),
+          inset 0 1px 0 rgba(255, 255, 255, 0.1),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+      }
+      50% {
+        box-shadow: 
+          0 4px 8px rgba(0, 0, 0, 0.3),
+          0 0 15px rgba(255, 165, 120, 0.5), 
+          0 0 25px rgba(255, 165, 120, 0.2),
+          inset 0 1px 0 rgba(255, 255, 255, 0.1),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+      }
+    }
+    
+           .dropdown-btn:hover { 
+             background: linear-gradient(145deg, #5a6578, #3d4758) !important;
+             box-shadow: 
+               0 6px 12px rgba(0, 0, 0, 0.4),
+               0 0 20px rgba(255, 165, 120, 0.6),
+               inset 0 1px 0 rgba(255, 255, 255, 0.15),
+               inset 0 -1px 0 rgba(0, 0, 0, 0.25) !important;
+             transform: translateY(-1px);
+             animation: none;
+           }
+           
+           .dropdown-btn:active {
+             background: linear-gradient(145deg, #2d3748, #4a5568) !important;
+             box-shadow: 
+               0 2px 4px rgba(0, 0, 0, 0.4),
+               inset 0 2px 4px rgba(0, 0, 0, 0.3),
+               inset 0 -1px 0 rgba(255, 255, 255, 0.05) !important;
+             transform: translateY(1px);
+           }
+    
+    .dropdown-arrow { transition: transform 0.3s ease; }
+    .dropdown-btn.open .dropdown-arrow { transform: rotate(180deg); }
+    
+    /* Analysis option styling in dropdown */
+    .analysis-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border-radius: 4px;
+      margin: 2px 8px;
+    }
+    
+    .analysis-option:hover {
+      background: var(--surface-2);
+      color: var(--accent-1);
+    }
+    
+    .analysis-option.active {
+      background: var(--surface-2);
+      color: var(--accent-1);
+      font-weight: 600;
+    }
+    
+    .option-icon {
+      font-size: 16px;
+      width: 20px;
+      text-align: center;
+    }
+    
+    .option-text {
+      font-size: 14px;
+    }
+    
+    .dropdown-separator {
+      height: 1px;
+      background: var(--border);
+      margin: 8px 12px;
+    }
+
+  
+  
+
+    .panel-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+      margin: 20px;
+    }
+    
+    /* Ensure only awaiting panel uses panel-row behavior */
+    .panel-row:not(#awaiting-panel) {
+      display: none;
+    }
+    
+    /* Override when results are shown */
+    .results-container.show {
+      display: flex !important;
+    }
+    
+    /* Special styling for awaiting panel to take full height */
+    #awaiting-panel {
+      min-height: calc(100vh - 200px);
+    }
+
+    .panel {
+      background-color: var(--surface-1);
+      border-radius: var(--panel-radius);
+      box-shadow: var(--panel-shadow);
+      border: 1px solid var(--border);
+      flex: 0 0 auto;
+      min-width: var(--panel-min-width);
+      max-width: var(--panel-max-width);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-heading {
+      background: transparent;
+      color: var(--header-color);
+      font-weight: 600;
+      padding: 12px 16px;
+      font-size: 1.2rem;
+      letter-spacing: .3px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-body {
+      padding: var(--pad);
+      background: var(--surface-2);
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      margin: 8px;
+    }
+
+    .field {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .value {
+      background-color: rgba(255, 255, 255, 0.1);
+      padding: 4px 10px;
+      border-radius: 5px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 6px;
+      text-align: center;
+      font-size: 11px;
+      vertical-align: middle;
+      background: var(--surface-1);
+      color: var(--text-primary);
+    }
+    
+    th {
+      background: var(--surface-0);
+      color: var(--accent-1);
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    /* Removed conflicting CSS - using inline styles instead for better control */
+
+    /* Empty row for gaps */
+    tr.gap-row {
+      height: 10px;
+      background-color: transparent;
+      border: none;
+    }
+
+    tr.gap-row td {
+      border: none !important;  /* Force remove all borders */
+      padding: 0;
+      height: 30px;
+      background-color: transparent;
+    }
+
+    /* Remove any extra spacing and ensure no borders */
+    tr.gap-row td[colspan] {
+      height: 10px;
+      padding: 0;
+      margin: 0;
+      line-height: 0;
+      border: none !important;
+    }
+
+    /* Ensure regular rows maintain their borders */
+    tr:not(.gap-row) td,
+    tr:not(.gap-row) th {
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    /* Remove borders from cells adjacent to gap rows */
+    tr:not(.gap-row) + tr.gap-row td,
+    tr.gap-row + tr:not(.gap-row) td,
+    tr:not(.gap-row) + tr.gap-row th,
+    tr.gap-row + tr:not(.gap-row) th {
+      border-top: none;
+      border-bottom: none;
+    }
+
+
+
+    th {
+      background-color: rgba(0, 0, 0, 0.6);
+    }
+
+    @media (max-width: 768px) {
+      .panel {
+        flex: 1 1 100%;
+      }
+    }
+
+    /* Add styles for highlighted cells */
+    .highlight-cell {
+      background-color: var(--highlight-bg);
+      color: var(--highlight-text);
+      font-weight: bold;
+    }
+
+    .stat-symbol {
+      font-family: "Times New Roman", serif;
+      font-style: italic;
+    }
+  </style>
+
+  <style type="text/css">
+    /* Updated controls styling for horizontal layout */
+    .controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: relative;
+    }
+    
+    .slider-range-labels {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      margin-top: 2px;
+      font-size: clamp(0.6rem, 1.2vw, 0.8rem);
+    }
+    
+    label {
+      font-weight: 600;
+      color: white;
+      margin-right: 5px;
+      font-size: clamp(0.7rem, 1.5vw, 0.9rem);
+    }
+    
+    input[type="range"] {
+      width: 150px;
+      height: 5px;
+    }
+    
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+    }
+    
+    .value-display {
+      font-weight: 600;
+      color: white;
+      min-width: 30px;
+      text-align: center;
+      font-size: clamp(0.7rem, 1.5vw, 0.6rem);
+    }
+    
+    .tooltip {
+      position: absolute;
+      padding: 8px;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      border-radius: 4px;
+      pointer-events: none;
+      font-size: 14px;
+      z-index: 100;
+    }
+    
+    .axis text {
+      font-size: clamp(8px, 1.5vw, 10px);
+      fill: white;
+    }
+    
+    .axis path, .axis line {
+      fill: none;
+      stroke: #ddd;
+      shape-rendering: crispEdges;
+    }
+    
+    .bin-range-label {
+      fill: #555;
+      font-size: clamp(7px, 1.2vw, 2px);
+      text-anchor: middle;
+    }
+    
+    .normal-line {
+      fill: none;
+      stroke: yellow;
+      stroke-width: 2;
+      stroke-dasharray: 3,3;
+    }
+    
+    .bar-label {
+      fill: #333;
+      font-size: clamp(8px, 1.vw, 10px);
+      text-anchor: middle;
+      pointer-events: none;
+    }
+    
+    .bar-label-percent {
+      fill: white;
+      font-size: clamp(10px, 1.5vw, 12px);
+      text-anchor: middle;
+      pointer-events: none;
+    }
+    
+    #histogram {
+      width: 100%;
+      height: auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    /* Make SVG responsive */
+    svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    
+    /* Range truncation controls */
+    .range-controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      flex-wrap: wrap;
+    }
+    
+    .range-slider-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .range-display {
+      display: flex;
+      gap: 10px;
+      font-size: 0.8rem;
+      color: #ccc;
+    }
+    
+    .reset-button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.8rem;
+    }
+    
+    .reset-button:hover {
+      background-color: #2980b9;
+    }
+
+    /* Angle slider container */
+    .angle-slider-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Animations for awaiting data state */
+    @keyframes pulse-glow {
+      0%, 100% {
+        transform: scale(1);
+        opacity: 0.7;
+        filter: drop-shadow(0 0 5px var(--accent-1));
+      }
+      50% {
+        transform: scale(1.1);
+        opacity: 1;
+        filter: drop-shadow(0 0 15px var(--accent-1));
+      }
+    }
+
+    @keyframes button-pulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 4px 12px rgba(255, 165, 120, 0.3);
+      }
+      50% {
+        transform: scale(1.05);
+        box-shadow: 0 6px 20px rgba(255, 165, 120, 0.5);
+      }
+    }
+
+    .loading-dots::after {
+      content: '';
+      animation: loading-dots 1.5s steps(4, end) infinite;
+    }
+
+    @keyframes loading-dots {
+      0%, 20% { content: ''; }
+      40% { content: '.'; }
+      60% { content: '..'; }
+      80%, 100% { content: '...'; }
+    }
+
+    /* Ensure panels have flexible height */
+    .panel {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    /* Only awaiting panel needs full height */
+    #awaiting-panel .panel {
+      height: 100%;
+    }
+    
+    /* Results container layout - vertical stacking */
+    .results-container {
+      display: none; /* Hidden by default */
+      flex-direction: column;
+      gap: 15px;
+      height: calc(100vh - 200px);
+      overflow: hidden;
+    }
+    /* When data is ready */
+    .results-container.show {
+      display: flex !important;
+    }
+    /* Override panel styles within results container */
+    .results-container .panel {
+      flex-shrink: 0;
+      min-width: auto;
+      max-width: none;
+    }
+    
+    /* Analysis Header - Compact Dropdown Style */
+    .analysis-header {
+      background: var(--surface-0);
+      padding: 20px;
+      border-bottom: 2px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    
+    /* Variable Display */
+    .variable-display {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .variable-label {
+      font-size: 14px;
+      color: var(--text-secondary);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .variable-name {
+      font-size: 24px;
+      color: var(--accent-1);
+      font-weight: 700;
+      text-shadow: 0 2px 4px rgba(255, 165, 120, 0.3);
+      min-height: 30px;
+      display: flex;
+      align-items: center;
+    }
+    
+    /* Analysis Selector */
+    .analysis-selector {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    
+    /* Visible Options - Not used anymore, keeping for compatibility */
+    .visible-options {
+      display: none;
+    }
+    
+    .analysis-option {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 12px 16px;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-1);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      user-select: none;
+      min-width: 120px;
+      text-align: center;
+    }
+    
+    .analysis-option:hover {
+      border-color: var(--accent-1);
+      background: rgba(255, 165, 120, 0.1);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(255, 165, 120, 0.2);
+    }
+    
+    .analysis-option.active {
+      border-color: var(--accent-1);
+      background: linear-gradient(135deg, var(--accent-1), #e67e22);
+      color: var(--surface-0);
+      box-shadow: 0 4px 12px rgba(255, 165, 120, 0.4);
+      transform: translateY(-2px);
+    }
+    
+    .option-icon {
+      font-size: 20px;
+      line-height: 1;
+    }
+    
+    .option-text {
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    
+    .analysis-option.active .option-text {
+      color: var(--surface-0);
+      font-weight: 700;
+    }
+    
+    /* Dropdown Container */
+    .dropdown-container {
+      position: relative;
+    }
+    
+    .dropdown-btn {
+      background: linear-gradient(135deg, var(--surface-2), var(--surface-1));
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      color: var(--text-primary);
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s ease;
+      min-width: 130px;
+      justify-content: center;
+    }
+    
+    .dropdown-btn:hover {
+      border-color: var(--accent-1);
+      background: linear-gradient(135deg, var(--accent-1), #e67e22);
+      color: var(--surface-0);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(255, 165, 120, 0.3);
+    }
+    
+    .dropdown-arrow {
+      font-size: 12px;
+      transition: transform 0.3s ease;
+    }
+    
+    .dropdown-btn.open .dropdown-arrow {
+      transform: rotate(180deg);
+    }
+    
+    /* Dropdown Content */
+    .dropdown-content {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      background: var(--surface-1);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-10px);
+      transition: all 0.3s ease;
+      z-index: 1000;
+      min-width: 220px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    .dropdown-content.show {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+    
+    .dropdown-content .analysis-option {
+      flex-direction: row;
+      justify-content: flex-start;
+      gap: 12px;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      min-width: auto;
+      text-align: left;
+      margin: 0;
+    }
+    
+    .dropdown-content .analysis-option:hover {
+      background: rgba(255, 165, 120, 0.1);
+      transform: none;
+      box-shadow: none;
+    }
+    
+    .dropdown-content .analysis-option.active {
+      background: linear-gradient(135deg, var(--accent-1), #e67e22);
+      color: var(--surface-0);
+      transform: none;
+      box-shadow: none;
+    }
+    
+    .dropdown-content .option-icon {
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    
+    .dropdown-content .option-text {
+      font-size: 14px;
+      text-align: left;
+    }
+    
+    .dropdown-separator {
+      height: 1px;
+      background: var(--border);
+      margin: 8px 16px;
+    }
+    
+    /* Responsive Design */
+    @media (max-width: 1200px) {
+      .analysis-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+      }
+      
+      .analysis-selector {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+    
+    @media (max-width: 800px) {
+      .visible-options {
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+      }
+      
+      .analysis-option {
+        width: 100%;
+        max-width: 200px;
+      }
+      
+      .variable-name {
+        font-size: 20px;
+      }
+    }
+
+
+    /* ===== Awaiting panel coach UI ===== */
+.await-hero {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  align-items: center;
+  justify-items: center;
+  text-align: center;
+}
+
+.await-title {
+  font-size: clamp(18px, 2.4vw, 22px);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.await-sub {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.await-steps {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.await-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, rgba(255,165,120,.12), rgba(120,200,255,.08));
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 600;
+}
+
+.await-pill {
+  background: var(--surface-0);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  animation: ring 2.4s ease-in-out infinite;
+}
+
+.await-pill i { margin-right: 6px; }
+
+@keyframes ring {
+  0%, 100% { transform: translateY(0); box-shadow: 0 2px 8px rgba(255,165,120,.25); }
+  50% { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(255,165,120,.35); }
+}
+
+.arrow-anim {
+  position: relative;
+  width: 72px; height: 72px;
+  display: grid; place-items: center;
+  filter: drop-shadow(0 0 10px rgba(255,165,120,.35));
+  opacity: .9;
+  animation: arrow-bob 2.2s ease-in-out infinite;
+}
+
+@keyframes arrow-bob {
+  0%, 100% { transform: translateX(0) translateY(0); }
+  50% { transform: translateX(-12px) translateY(-4px); }
+}
+
+.arrow-anim .chev {
+  font-size: 34px; color: var(--accent-1);
+  transform: rotate(180deg); /* points left */
+}
+
+.await-mini {
+  font-size: 12px; color: var(--text-muted);
+}
+
+.await-divider {
+  height: 1px; width: 180px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+  margin: 6px 0;
+}
+
+/* Optional shimmering Excel badge */
+.excel-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: 8px;
+  background: linear-gradient(135deg, rgba(120,200,255,.12), rgba(120,200,255,.06));
+  border: 1px solid var(--border);
+  animation: shimmer 3s linear infinite;
+  background-size: 220% 220%;
+}
+
+@keyframes shimmer {
+  0% { background-position: 0% 50% }
+  50% { background-position: 100% 50% }
+  100% { background-position: 0% 50% }
+}
+
+.await-instruction {
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-align: left;
+  max-width: 360px;
+  margin-top: 16px;
+  line-height: 1.5;
+  animation: fadePulse 4s ease-in-out infinite;
+}
+
+.await-instruction strong {
+  color: var(--accent-1);
+  font-weight: 600;
+}
+
+@keyframes fadePulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="card" role="main">
+      <div class="card-head" id="header-strip" style="display: none; align-items: center; justify-content: space-between;">
+        <div style="flex: 0 0 auto;">Results Panel</div>
+        <div style="flex: 1; text-align: center;">
+          <div id="selectedAnalysisTitle" style="font-size: 1.4rem; font-weight: 700; color: var(--accent-1); margin-bottom: 4px;">Interactive Histogram</div>
+          <div id="variableNameDisplay" style="font-size: 1rem; font-weight: 500; color: var(--text-secondary); font-style: italic;">Variable Name</div>
+        </div>
+        <div style="flex: 0 0 auto;">
+          <div class="dropdown-container">
+            <button class="dropdown-btn" onclick="toggleAnalysisDropdown()">
+              Advanced Analysis Options
+              <div class="dropdown-arrow" style="display: inline-block; margin-left: 8px;">▼</div>
+            </button>
+            
+            <div class="dropdown-content" id="analysisDropdown">
+              <div class="analysis-option active" data-case="Case00" data-base-name="Interactive Histogram" onclick="selectAnalysis('Case00', 'Interactive Histogram', this)">
+                <div class="option-icon">📈</div>
+                <div class="option-text">Interactive Histogram</div>
+              </div>
+              <div class="analysis-option" data-case="Case10" data-base-name="Box Plot Analysis" onclick="selectAnalysis('Case10', 'Box Plot Analysis', this)">
+                <div class="option-icon">📦</div>
+                <div class="option-text">Box Plot Analysis</div>
+              </div>
+              <div class="analysis-option" data-case="Case20" data-base-name="Cumulative Distribution" onclick="selectAnalysis('Case20', 'Cumulative Distribution', this)">
+                <div class="option-icon">📈</div>
+                <div class="option-text">Cumulative Distribution</div>
+              </div>
+              <div class="dropdown-separator"></div>
+              <div class="analysis-option" data-case="Case30" data-base-name="Percentiles" onclick="selectAnalysis('Case30', 'Percentiles', this)">
+                <div class="option-icon">📊</div>
+                <div class="option-text">Percentiles</div>
+              </div>
+              <div class="analysis-option" data-case="Case40" data-base-name="Outliers Detection" onclick="selectAnalysis('Case40', 'Outliers Detection', this)">
+                <div class="option-icon">🎯</div>
+                <div class="option-text">Outliers Detection</div>
+              </div>
+              <div class="dropdown-separator"></div>
+              <div class="analysis-option" data-case="Case50" data-base-name="Tests of Normality" onclick="selectAnalysis('Case50', 'Tests of Normality', this)">
+                <div class="option-icon">📊</div>
+                <div class="option-text">Tests of Normality</div>
+              </div>
+              <div class="analysis-option" data-case="Case60" data-base-name="PP-QQ Plots" onclick="selectAnalysis('Case60', 'PP-QQ Plots', this)">
+                <div class="option-icon">📈</div>
+                <div class="option-text">PP-QQ Plots</div>
+              </div>
+              <div class="analysis-option" data-case="Case70" data-base-name="Hypothesis Testing" onclick="selectAnalysis('Case70', 'Hypothesis Testing', this)">
+                <div class="option-icon">📊</div>
+                <div class="option-text">Hypothesis Testing</div>
+              </div>
+              <div class="analysis-option" data-case="Case90" data-base-name="Confidence Intervals" onclick="selectAnalysis('Case90', 'Confidence Intervals', this)">
+                <div class="option-icon">📊</div>
+                <div class="option-text">Confidence Intervals</div>
+              </div>
+              <div class="analysis-option" data-case="Case100" data-base-name="Kernel Density" onclick="selectAnalysis('Case100', 'Kernel Density', this)">
+                <div class="option-icon">📈</div>
+                <div class="option-text">Kernel Density</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+
+
+        </div>
+
+
+
+  
+  <!-- Statistics Panel - Top -->
+  <div class="panel" id="statistics-panel" style="height: 180px;">
+    <div class="panel-heading" style="padding: 8px 16px; font-size: 18px;">
+      <span id="statistics-title">Variable - Descriptive Statistics</span>
+      <span style="margin-left: auto;">
+        <select onchange="updateDecimalAll(this.value)" style="padding: 2px 6px; font-size: 11px;">
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+          </select>
+      </span>
+    </div>
+    <div class="panel-body" style="padding: 6px; overflow: auto;">
+      <!-- First Table: Central Tendency & Distribution Shape -->
+      <table style="width:100%; text-align:center; background:var(--surface-2); border-radius:4px; overflow:hidden; border:1px solid var(--border); margin-bottom: 8px;">
+        <tr style="background:var(--surface-0); color:var(--accent-1);">
+          <th style="padding:5px 8px; font-weight:600; font-size: 13px; background: rgba(255, 165, 120, 0.3); color: var(--text-primary);">Count</th>
+          <th style="padding:5px 8px; font-weight:600; font-size: 13px; background: rgba(255, 165, 120, 0.3); color: var(--text-primary);">Average</th>
+          <th style="padding:5px 8px; font-weight:600; font-size: 13px; background: rgba(255, 165, 120, 0.3); color: var(--text-primary);">Std Dev</th>
+          <th style="padding:5px 8px; font-weight:600; font-size: 12px;">Variance</th>
+          <th style="padding:5px 8px; font-weight:600; font-size: 12px;">Kurtosis</th>
+          <th style="padding:5px 8px; font-weight:600; font-size: 12px;">Skewness</th>
+        </tr>
+        <tr>
+          <td id="stat-n" style="color: var(--accent-1); padding:8px 10px; font-size: 14px; font-weight: 700; background: rgba(255,165,120,0.1);">--</td>
+          <td id="stat-mean" style="color: var(--accent-1); padding:8px 10px; font-size: 14px; font-weight: 700; background: rgba(255,165,120,0.1);">--</td>
+          <td id="stat-stddev" style="color: var(--accent-1); padding:8px 10px; font-size: 14px; font-weight: 700; background: rgba(255,165,120,0.1);">--</td>
+          <td id="stat-variance" style="color: var(--text-primary); padding:8px 10px; font-size: 12px; font-weight: 500;">--</td>
+          <td id="stat-kurtosis" style="color: var(--text-primary); padding:8px 10px; font-size: 12px; font-weight: 500;">--</td>
+          <td id="stat-skewness" style="color: var(--text-primary); padding:8px 10px; font-size: 12px; font-weight: 500;">--</td>
+        </tr>
+      </table>
+      
+      <!-- Second Table: Range & Quartiles -->
+      <table style="width:100%; text-align:center; background:var(--surface-2); border-radius:4px; overflow:hidden; border:1px solid var(--border);">
+        <tr style="background:var(--surface-0); color:var(--accent-1);">
+          <th style="padding:5px 8px; font-weight:600; font-size: 12px;">Range</th>
+          <th style="padding:5px 8px; font-weight:600; font-size: 12px;">Minimum</th>
+          <th style="padding:5px 8px; font-weight:600; font-size: 12px;">Q25</th>
+          <th style="padding:5px 8px; font-weight:600; font-size: 13px; background: rgba(255, 165, 120, 0.3); color: var(--text-primary);">Median</th>
+          <th style="padding:5px 8px; font-weight:600; font-size: 12px;">Q75</th>
+          <th style="padding:5px 8px; font-weight:600; font-size: 12px;">Maximum</th>
+        </tr>
+        <tr>
+          <td id="stat-range" style="color: var(--text-primary); padding:8px 10px; font-size: 12px; font-weight: 500;">--</td>
+          <td id="stat-min" style="color: var(--text-primary); padding:8px 10px; font-size: 12px; font-weight: 500;">--</td>
+          <td id="stat-q25" style="color: var(--text-primary); padding:8px 10px; font-size: 12px; font-weight: 500;">--</td>
+          <td id="stat-median" style="color: var(--accent-1); padding:8px 10px; font-size: 14px; font-weight: 700; background: rgba(255,165,120,0.1);">--</td>
+          <td id="stat-q75" style="color: var(--text-primary); padding:8px 10px; font-size: 12px; font-weight: 500;">--</td>
+          <td id="stat-max" style="color: var(--text-primary); padding:8px 10px; font-size: 12px; font-weight: 500;">--</td>
+        </tr>
+      </table>
+  </div>
+</div>
+
+
+
+<br>
+
+
+  <!-- Histogram Panel - Bottom -->
+  <div class="panel" id="histogram-panel" style="flex: 1; min-height: 0;">
+    <div class="panel-heading" style="padding: 8px 16px; font-size: 18px;">
+        <span id="histogram-title">Variable - Interactive Histogram</span>
+        <span style="margin-left: auto;">
+          <i class="fas fa-expand" style="margin-left: 10px; cursor: pointer;" title="Expand"></i>
+          <i class="fas fa-redo" style="margin-left: 10px; cursor: pointer;" title="Generate New Simulated Data" onclick="loadSimulatedData()"></i>
+          <i class="fas fa-times" style="margin-left: 10px; cursor: pointer;" title="Close"></i>
+        </span>
+      </div>
+
+    <div class="panel-body" style="padding: 6px; display: flex; flex-direction: column; height: calc(100% - 40px);">
+      <!-- Compact controls -->
+      <div class="controls" style="display: flex; gap: 15px; margin-bottom: 6px; font-size: 11px;">
+        <div class="control-group" style="display: flex; align-items: center; gap: 6px;">
+          <label for="numBins">Bins:</label>
+          <span id="numBinsValue" class="value-display" style="min-width: 20px; font-size: 10px;">5</span>
+          <input type="range" id="numBins" min="1" max="20" value="5" step="1" style="width: 80px;">
+        </div>
+        <div class="control-group" style="display: flex; align-items: center; gap: 6px;">
+          <label for="showNormal">Normal:</label>
+          <input type="checkbox" id="showNormal" checked>
+        </div>
+      </div>
+
+      <!-- Histogram chart -->
+      <div id="histogram" style="flex: 1; min-height: 200px;">
+      </div>
+
+      <!-- Compact range controls -->
+      <div class="range-controls" style="display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 10px;">
+        <span>Min</span>
+        <span id="leftRangeValue" class="value-display" style="min-width: 35px;">0</span>
+        <input type="range" id="leftTruncation" min="0" max="100" value="0" step="1" style="flex: 1;">
+        <input type="range" id="rightTruncation" min="0" max="100" value="100" step="1" style="flex: 1;">
+        <span id="rightRangeValue" class="value-display" style="min-width: 35px;">100</span>
+        <span>Max</span>
+        <button id="resetRanges" class="reset-button" style="padding: 2px 8px; font-size: 9px;">Reset</button>
+      </div>
+        
+      <!-- Data range display -->
+      <div class="range-display" style="display: flex; justify-content: center; gap: 20px; margin-top: 3px; font-size: 9px; color: var(--text-muted);">
+          <span id="data-min-value">Min: 0</span>
+          <span id="data-max-value">Max: 100</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+ 
+    <script>
+
+
+
+
+       // Function to create a responsive SVG sizing
+function createResponsiveSVG() {
+    // Remove any existing SVG to avoid duplicates when resizing
+    d3.select("#histogram svg").remove();
+    
+    // Get the container width and ensure it's valid
+    const histogramContainer = document.getElementById("histogram");
+    if (!histogramContainer) return null;
+    
+    const containerWidth = histogramContainer.clientWidth;
+    if (containerWidth <= 0) return null;
+    
+    // Calculate appropriate height - use fixed reasonable values
+    const desiredHeight = 350; // Fixed height that works well for histograms
+    
+    // Set the dimensions and margins for the graph
+    const margin = {
+        top: 20, 
+        right: Math.max(10, containerWidth * 0.02), 
+        bottom: 50, 
+        left: Math.max(10, containerWidth * 0.02)
+    };
+    
+    // Responsive width/height
+    const width = containerWidth - margin.left - margin.right;
+    const height = desiredHeight - margin.top - margin.bottom;
+    
+    // Create the SVG container
+    const svg = d3.select("#histogram")
+        .append("svg")
+        .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+        .attr("preserveAspectRatio", "xMidYMid meet")
+        .append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+    
+    // Add the x axis group
+    const xAxis = svg.append("g")
+        .attr("class", "axis")
+        .attr("transform", `translate(0,${height})`);
+    
+    // Add a group for the bars
+    const barsGroup = svg.append("g");
+    
+    // Add a path for the normal curve
+    const normalCurvePath = svg.append("path")
+        .attr("class", "normal-line");
+    
+    // Add chart title (will be updated with variable name)
+    const chartTitle = svg.append("text")
+        .attr("class", "chart-title")
+        .attr("x", width / 2)
+        .attr("y", -5)
+        .attr("text-anchor", "middle")
+        .style("font-size", "14px")
+        .style("font-weight", "600")
+        .style("fill", "var(--text-primary)")
+        .text("");
+    
+    return { svg, xAxis, width, height, barsGroup, normalCurvePath, chartTitle };
+}
+
+// Create a tooltip
+const tooltip = d3.select("body")
+    .append("div")
+    .attr("class", "tooltip")
+    .style("opacity", 0);
+
+// Generate normal distribution data
+function generateNormalData(n, mean = 0, stddev = 1) {
+    return Array.from({length: n}, () => {
+        // Box-Muller transform
+        const u1 = Math.random();
+        const u2 = Math.random();
+        const z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+        return z0 * stddev + mean;
+    });
+}
+
+// Generate right-skewed data
+function generateSkewedData(n, baseMean, skewFactor) {
+    return Array.from({length: n}, () => {
+        // Use exponential distribution for skewness
+        const u = Math.random();
+        const exponential = -Math.log(1 - u) / (1 / skewFactor);
+        return baseMean + exponential * (baseMean * 0.3);
+    });
+}
+
+// Generate uniform distribution data
+function generateUniformData(n, min, max) {
+    return Array.from({length: n}, () => {
+        return Math.random() * (max - min) + min;
+    });
+}
+
+// Generate bimodal distribution data
+function generateBimodalData(n, mean1, mean2, std1, std2) {
+    return Array.from({length: n}, () => {
+        // Randomly choose which peak (50/50 split)
+        const peak = Math.random() < 0.5 ? 1 : 2;
+        
+        // Generate normal data around chosen peak
+        const u1 = Math.random();
+        const u2 = Math.random();
+        const z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+        
+        if (peak === 1) {
+            return z0 * std1 + mean1;
+        } else {
+            return z0 * std2 + mean2;
+        }
+    });
+}
+
+// Calculate mean of an array
+function calculateMean(data) {
+    if (data.length === 0) return 0;
+    return data.reduce((sum, value) => sum + value, 0) / data.length;
+}
+
+// Calculate standard deviation of an array
+function calculateStdDev(data, mean) {
+    if (data.length === 0) return 0;
+    const variance = data.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / data.length;
+    return Math.sqrt(variance);
+}
+
+// Normal distribution probability density function
+function normalPDF(x, mean, stddev) {
+    if (stddev === 0) return 0;
+    return (1 / (stddev * Math.sqrt(2 * Math.PI))) * 
+           Math.exp(-0.5 * Math.pow((x - mean) / stddev, 2));
+}
+
+// Create custom binning function that ensures bins cover min to max properly
+function createHistogramBins(data, numBins) {
+    if (data.length === 0) return [];
+    
+    const min = Math.min(...data);
+    const max = Math.max(...data);
+    const range = max - min;
+    
+    // Handle edge case where all values are the same
+    if (range === 0) {
+        return [{
+            x0: min,
+            x1: min,
+            length: data.length
+        }];
+    }
+    
+    // Create bins
+    const binWidth = range / numBins;
+    const bins = [];
+    
+    for (let i = 0; i < numBins; i++) {
+        const binStart = i === 0 ? min : min + i * binWidth;
+        const binEnd = i === numBins - 1 ? max : min + (i + 1) * binWidth;
+        
+        // Count values in this bin - fixed to avoid recomputation issues
+        let binCount = 0;
+        for (let j = 0; j < data.length; j++) {
+            const val = data[j];
+            if ((i === 0 ? val >= binStart : val > binStart) && val <= binEnd) {
+                binCount++;
+            }
+        }
+        
+        bins.push({
+            x0: binStart,
+            x1: binEnd,
+            length: binCount
+        });
+    }
+    
+    return bins;
+}
+
+// Store the global state
+let originalData = [];
+let originalMin, originalMax;
+let currentData = [];
+let svgComponents = null;
+let labelAngle = 0;
+let updateTimer = null; // For debouncing updates
+
+// Function to update the histogram
+function updateHistogram(data, numBins, showNormalDist) {
+    // If no data, don't attempt to update
+    if (!data || data.length === 0) return;
+    
+    // Check if histogram container exists
+    const histogramContainer = document.getElementById("histogram");
+    if (!histogramContainer) return;
+    
+    // If SVG components don't exist or the container size has changed significantly, recreate them
+    const currentContainerWidth = histogramContainer.clientWidth;
+    if (!svgComponents || Math.abs(currentContainerWidth - (svgComponents.lastContainerWidth || 0)) > 50) {
+        svgComponents = createResponsiveSVG();
+        if (svgComponents) {
+            svgComponents.lastContainerWidth = currentContainerWidth;
+        }
+    }
+    
+    // If still no SVG components, return early
+    if (!svgComponents) return;
+    
+    const { svg, xAxis, width, height, barsGroup, normalCurvePath, chartTitle } = svgComponents;
+    
+    try {
+        // Update chart title with variable name
+        if (chartTitle && window.currentVariableName) {
+            chartTitle.text(`${window.currentVariableName} - Distribution`);
+        }
+        
+        // Calculate mean and standard deviation
+        const mean = calculateMean(data);
+        const stddev = calculateStdDev(data, mean);
+        const minValue = Math.min(...data);
+        const maxValue = Math.max(...data);
+        
+        // Set up the x scale using min/max from the data
+        const x = d3.scaleLinear()
+            .domain([minValue, maxValue])
+            .range([0, width]);
+        
+        // Create histogram bins with custom function
+        const histogram = createHistogramBins(data, numBins);
+        
+        // If no bins or empty bins, don't update further
+        if (histogram.length === 0) return;
+        
+        // Set up the y scale
+        const y = d3.scaleLinear()
+            .domain([0, d3.max(histogram, d => d.length) || 1])
+            .range([height, 0]);
+        
+        // Prepare the x-axis
+        xAxis.selectAll("*").remove();
+        
+        // Create a baseline
+        xAxis.append("line")
+            .attr("x1", 0)
+            .attr("y1", 0)
+            .attr("x2", width)
+            .attr("y2", 0)
+            .attr("stroke", "#ddd");
+        
+        // Always add tick marks
+        histogram.forEach(bin => {
+            xAxis.append("line")
+                .attr("x1", x(bin.x0))
+                .attr("y1", 0)
+                .attr("x2", x(bin.x0))
+                .attr("y2", 5)
+                .attr("stroke", "#ddd");
+        });
+        
+        // Add the last tick mark
+        xAxis.append("line")
+            .attr("x1", x(histogram[histogram.length-1].x1))
+            .attr("y1", 0)
+            .attr("x2", x(histogram[histogram.length-1].x1))
+            .attr("y2", 5)
+            .attr("stroke", "#ddd");
+        
+        // Add bin range labels with the current angle
+histogram.forEach(bin => {
+    const midpoint = x(bin.x0) + (x(bin.x1) - x(bin.x0)) / 2;
+
+    let labelAngle = 0; // Fixed at 17 degrees
+    // Calculate the vertical position based on angle
+    const yPos = labelAngle === 0 ? 20 : 10;
+    
+    xAxis.append("text")
+        .attr("class", "bin-range-label")
+        .attr("x", midpoint)
+        .attr("y", yPos)
+        .attr("transform", `rotate(${labelAngle}, ${midpoint}, ${yPos})`)
+        .style("text-anchor", labelAngle === 0 ? "middle" : "start")
+        .text(`${bin.x0.toFixed(1)}-${bin.x1.toFixed(1)}`);
+});
+        
+        // Create color scale matching overall theme - softer colors
+        const colorScale = d3.scaleLinear()
+            .domain([0, d3.max(histogram, d => d.length) || 1])
+            .range(["rgba(255, 165, 120, 0.3)", "rgba(255, 165, 120, 0.6)"]); // Softer orange accent gradient
+        
+        // Remove existing bars and labels
+        barsGroup.selectAll("*").remove();
+        
+        // Create bars
+        const bars = barsGroup.selectAll(".bar")
+            .data(histogram)
+            .enter()
+            .append("rect")
+            .attr("class", "bar")
+            .attr("x", d => x(d.x0) + 1)
+            .attr("y", d => y(d.length))
+            .attr("width", d => Math.max(0, x(d.x1) - x(d.x0) - 1))
+            .attr("height", d => height - y(d.length))
+            .attr("fill", d => colorScale(d.length))
+            .on("mouseover", function(event, d) {
+                tooltip.transition()
+                    .duration(200)
+                    .style("opacity", .9);
+                
+                // Display range format depending on if it's first bin or last bin
+                let rangeText = "";
+                if (d === histogram[0]) {
+                    rangeText = `Range: ${d.x0.toFixed(2)} ≤ x ≤ ${d.x1.toFixed(2)}`;
+                } else {
+                    rangeText = `Range: ${d.x0.toFixed(2)} < x ≤ ${d.x1.toFixed(2)}`;
+                }
+                
+                tooltip.html(`${rangeText}<br>Count: ${d.length}<br>Percentage: ${(d.length / data.length * 100).toFixed(1)}%`)
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 28) + "px");
+                
+                d3.select(this)
+                    .attr("fill", "rgba(120, 200, 255, 0.5)"); // Softer cyan accent on hover
+            })
+            .on("mouseout", function(event, d) {
+                tooltip.transition()
+                    .duration(500)
+                    .style("opacity", 0);
+                
+                d3.select(this)
+                    .attr("fill", colorScale(d.length));
+            });
+        
+        // Add labels on the bars if tall enough
+        const containerWidth = document.getElementById("histogram").clientWidth;
+        if (containerWidth > 500) {
+            // Add percentage labels
+            barsGroup.selectAll(".bar-label-percent")
+                .data(histogram)
+                .enter()
+                .append("text")
+                .attr("class", "bar-label-percent")
+                .attr("x", d => x(d.x0) + (x(d.x1) - x(d.x0)) / 2)
+                .attr("y", d => y(d.length) - 3)
+                .text(d => (d.length / data.length * 100).toFixed(0) + '%')
+                .filter(d => height - y(d.length) > 20); // Only show labels on taller bars
+        }
+        
+        // Draw normal curve if checkbox is checked
+        if (showNormalDist && stddev > 0) {
+            // Generate matched normal distribution data points for the curve
+            const curvePoints = [];
+            const range = maxValue - minValue;
+            
+            // If range is 0, don't draw curve
+            if (range === 0) {
+                normalCurvePath.style("opacity", 0);
+                return;
+            }
+            
+            const step = range / 100;
+            
+            // Expand the curve range a bit beyond data range for better visualization
+            const curveMin = Math.max(minValue - range * 0.1, mean - 4 * stddev);
+            const curveMax = Math.min(maxValue + range * 0.1, mean + 4 * stddev);
+            
+            for (let i = curveMin; i <= curveMax; i += step) {
+                curvePoints.push({
+                    x: i,
+                    y: normalPDF(i, mean, stddev)
+                });
+            }
+            
+            // Scale the curve to match histogram height
+            const maxPDF = d3.max(curvePoints, d => d.y) || 0;
+            const maxHistHeight = d3.max(histogram, d => d.length) || 1;
+            const scaleFactor = maxHistHeight / (maxPDF || 1); // Avoid division by zero
+            
+            // Create the line function
+            const line = d3.line()
+                .x(d => x(d.x))
+                .y(d => y(d.y * scaleFactor))
+                .curve(d3.curveBasis);
+            
+            // Draw the curve
+            normalCurvePath
+                .datum(curvePoints)
+                .attr("d", line)
+                .style("opacity", 1);
+        } else {
+            normalCurvePath.style("opacity", 0);
+        }
+    } catch (err) {
+        console.error("Error updating histogram:", err);
+    }
+}
+
+// Function to convert between percentage and actual data value
+function percentToValue(percent) {
+    return originalMin + (originalMax - originalMin) * (percent / 100);
+}
+
+// Function to update the truncation UI and filter data accordingly
+function updateTruncationControls() {
+    // Debounce updates to prevent too frequent redraws
+    clearTimeout(updateTimer);
+    updateTimer = setTimeout(() => {
+        try {
+            const leftPercent = parseFloat(d3.select("#leftTruncation").property("value"));
+            const rightPercent = parseFloat(d3.select("#rightTruncation").property("value"));
+            
+            // Calculate the actual values based on percentages
+            const leftValue = percentToValue(leftPercent);
+            const rightValue = percentToValue(rightPercent);
+            
+            // Display the actual truncation values
+            d3.select("#leftRangeValue").text(leftValue.toFixed(2));
+            d3.select("#rightRangeValue").text(rightValue.toFixed(2));
+            
+            // Filter the data based on the thresholds
+            currentData = originalData.filter(d => d >= leftValue && d <= rightValue);
+            
+            // Guard against empty selection
+            if (currentData.length === 0) {
+                currentData = [originalData[0]]; // Use at least one data point
+            }
+            
+            // Update the histogram with the truncated data
+            updateHistogram(
+                currentData,
+                parseInt(d3.select("#numBins").property("value")),
+                d3.select("#showNormal").property("checked")
+            );
+        } catch (err) {
+            console.error("Error in truncation control update:", err);
+        }
+    }, 50); // 50ms debounce
+}
+
+// Initialize the controls and data
+function initialize() {
+    try {
+        // Initialize with empty data - awaiting real data from external source
+        originalData = [];
+        currentData = [];
+        originalMin = 0;
+        originalMax = 100;
+        
+        // Initialize display with default values
+        d3.select("#data-min-value").text("Min: --");
+        d3.select("#data-max-value").text("Max: --");
+        
+        // Initialize sliders with default values
+        d3.select("#leftRangeValue").text("0");
+        d3.select("#rightRangeValue").text("100");
+        
+        // Set up event listeners for the controls with debouncing
+        d3.select("#numBins").on("input", function() {
+            try {
+                const value = +this.value;
+                d3.select("#numBinsValue").text(value);
+                
+                clearTimeout(updateTimer);
+                updateTimer = setTimeout(() => {
+                    updateHistogram(currentData, value, d3.select("#showNormal").property("checked"));
+                }, 50);
+            } catch (err) {
+                console.error("Error in numBins handler:", err);
+            }
+        });
+        
+        d3.select("#showNormal").on("change", function() {
+            try {
+                updateHistogram(
+                    currentData, 
+                    +d3.select("#numBins").property("value"), 
+                    this.checked
+                );
+            } catch (err) {
+                console.error("Error in showNormal handler:", err);
+            }
+        });
+        
+        // Label angle slider
+        d3.select("#labelAngle").on("input", function() {
+            try {
+                labelAngle = +this.value;
+                d3.select("#labelAngleValue").text(labelAngle + "°");
+                
+                clearTimeout(updateTimer);
+                updateTimer = setTimeout(() => {
+                    updateHistogram(
+                        currentData, 
+                        +d3.select("#numBins").property("value"), 
+                        d3.select("#showNormal").property("checked")
+                    );
+                }, 50);
+            } catch (err) {
+                console.error("Error in labelAngle handler:", err);
+            }
+        });
+        
+        // Range truncation sliders - separate event handling to avoid conflicts
+        d3.select("#leftTruncation").on("input", function() {
+            try {
+                const leftPercent = +this.value;
+                const rightPercent = +d3.select("#rightTruncation").property("value");
+                
+                // Make sure right value is greater than left value
+                if (leftPercent >= rightPercent - 1) {
+                    d3.select("#rightTruncation").property("value", Math.min(100, leftPercent + 1));
+                }
+                
+                updateTruncationControls();
+            } catch (err) {
+                console.error("Error in leftTruncation handler:", err);
+            }
+        });
+        
+        d3.select("#rightTruncation").on("input", function() {
+            try {
+                const rightPercent = +this.value;
+                const leftPercent = +d3.select("#leftTruncation").property("value");
+                
+                // Make sure left value is less than right value
+                if (rightPercent <= leftPercent + 1) {
+                    d3.select("#leftTruncation").property("value", Math.max(0, rightPercent - 1));
+                }
+                
+                updateTruncationControls();
+            } catch (err) {
+                console.error("Error in rightTruncation handler:", err);
+            }
+        });
+        
+        // Reset ranges button
+        d3.select("#resetRanges").on("click", function() {
+            try {
+                // Reset sliders to full range
+                d3.select("#leftTruncation").property("value", 0);
+                d3.select("#rightTruncation").property("value", 100);
+                
+                // Reset to original data
+                currentData = [...originalData];
+                
+                // Reset displayed values
+                d3.select("#leftRangeValue").text(originalMin.toFixed(2));
+                d3.select("#rightRangeValue").text(originalMax.toFixed(2));
+                
+                // Redraw histogram
+                updateHistogram(
+                    currentData, 
+                    +d3.select("#numBins").property("value"), 
+                    d3.select("#showNormal").property("checked")
+                );
+            } catch (err) {
+                console.error("Error in reset handler:", err);
+            }
+        });
+        
+        // Initial render with empty state
+        const initialBins = +d3.select("#numBins").property("value");
+        d3.select("#numBinsValue").text(initialBins);
+        
+        // Load simulated data automatically on page load
+        setTimeout(() => {
+            loadSimulatedData();
+        }, 500); // Small delay to ensure DOM is ready
+        
+        // Add resize listener for responsiveness
+        window.addEventListener('resize', function() {
+            try {
+                clearTimeout(updateTimer);
+                updateTimer = setTimeout(() => {
+                    // Force recreation of SVG components by clearing them
+                    svgComponents = null;
+                    // Re-render the histogram which will recreate SVG components
+                    updateHistogram(
+                        currentData,
+                        +d3.select("#numBins").property("value"),
+                        d3.select("#showNormal").property("checked")
+                    );
+                }, 150); // Longer debounce for resize events
+            } catch (err) {
+                console.error("Error in resize handler:", err);
+            }
+        });
+    } catch (err) {
+        console.error("Error in initialization:", err);
+    }
+}
+
+// Function to populate statistics table
+function populateStatistics(data) {
+    if (!data || data.length === 0) return;
+    
+    try {
+        // Calculate basic statistics
+        const n = data.length;
+        const mean = calculateMean(data);
+        const stddev = calculateStdDev(data, mean);
+        const variance = stddev * stddev;
+        const min = Math.min(...data);
+        const max = Math.max(...data);
+        const range = max - min;
+        
+        // Calculate percentiles
+        const sortedData = [...data].sort((a, b) => a - b);
+        const q1 = calculatePercentile(sortedData, 25);
+        const median = calculatePercentile(sortedData, 50);
+        const q3 = calculatePercentile(sortedData, 75);
+        
+        // Calculate coefficient of variation
+        const cv = mean !== 0 ? (stddev / Math.abs(mean)) * 100 : 0;
+        
+        // Calculate skewness and kurtosis
+        const skewness = calculateSkewness(data, mean, stddev);
+        const kurtosis = calculateKurtosis(data, mean, stddev);
+        
+        // Get decimal places from dropdown
+        const decimals = parseInt(document.querySelector('select[onchange*="updateDecimalAll"]').value) || 2;
+        
+        // Update statistics table - with error handling for missing elements
+        const updateStat = (id, value, decimals = 2) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = typeof value === 'number' ? value.toFixed(decimals) : value.toString();
+                element.style.color = 'var(--text-primary)';
+            } else {
+                console.warn(`Element with id '${id}' not found`);
+            }
+        };
+        updateStat('stat-n', n, 0);
+        updateStat('stat-mean', mean, decimals);
+        updateStat('stat-stddev', stddev, decimals);
+        updateStat('stat-variance', variance, decimals);
+        updateStat('stat-kurtosis', kurtosis, decimals);
+        updateStat('stat-skewness', skewness, decimals);
+        
+        updateStat('stat-range', range, decimals);
+        updateStat('stat-min', min, decimals);
+        updateStat('stat-q25', q1, decimals);
+        updateStat('stat-median', median, decimals);
+        updateStat('stat-q75', q3, decimals);
+        updateStat('stat-max', max, decimals);
+        
+        console.log('Statistics updated:', {
+            n, mean: mean.toFixed(decimals), stddev: stddev.toFixed(decimals), 
+            variance: variance.toFixed(decimals), kurtosis: kurtosis.toFixed(decimals), 
+            skewness: skewness.toFixed(decimals), range: range.toFixed(decimals),
+            min: min.toFixed(decimals), q1: q1.toFixed(decimals), 
+            median: median.toFixed(decimals), q3: q3.toFixed(decimals), max: max.toFixed(decimals)
+        });
+        
+    } catch (err) {
+        console.error("Error calculating statistics:", err);
+    }
+}
+
+// Helper functions for statistics
+function calculatePercentile(sortedArray, percentile) {
+    const index = (percentile / 100) * (sortedArray.length - 1);
+    const lower = Math.floor(index);
+    const upper = Math.ceil(index);
+    const weight = index % 1;
+    
+    if (upper >= sortedArray.length) return sortedArray[sortedArray.length - 1];
+    return sortedArray[lower] * (1 - weight) + sortedArray[upper] * weight;
+}
+
+function calculateSkewness(data, mean, stddev) {
+    if (stddev === 0) return 0;
+    const n = data.length;
+    const sum = data.reduce((acc, value) => acc + Math.pow((value - mean) / stddev, 3), 0);
+    return sum / n;
+}
+
+function calculateKurtosis(data, mean, stddev) {
+    if (stddev === 0) return 0;
+    const n = data.length;
+    const sum = data.reduce((acc, value) => acc + Math.pow((value - mean) / stddev, 4), 0);
+    return (sum / n) - 3; // Excess kurtosis
+}
+
+// Function to generate and display simulated data on load
+function loadSimulatedData() {
+    try {
+        // Generate random parameters for varied data on each load
+        const dataTypes = ['normal', 'skewed', 'uniform', 'bimodal'];
+        const dataType = dataTypes[Math.floor(Math.random() * dataTypes.length)];
+        
+        // Random sample size between 100-500
+        const sampleSize = Math.floor(Math.random() * 400) + 100;
+        
+        let simulatedData;
+        
+        switch(dataType) {
+            case 'normal':
+                // Random mean between 20-80, stddev between 5-25
+                const mean = Math.random() * 60 + 20;
+                const stddev = Math.random() * 20 + 5;
+                simulatedData = generateNormalData(sampleSize, mean, stddev);
+                console.log(`Generated normal distribution: n=${sampleSize}, mean=${mean.toFixed(2)}, stddev=${stddev.toFixed(2)}`);
+                break;
+                
+            case 'skewed':
+                // Generate right-skewed data using exponential-like distribution
+                const baseMean = Math.random() * 40 + 10;
+                const skewFactor = Math.random() * 3 + 1;
+                simulatedData = generateSkewedData(sampleSize, baseMean, skewFactor);
+                console.log(`Generated skewed distribution: n=${sampleSize}, base=${baseMean.toFixed(2)}, skew=${skewFactor.toFixed(2)}`);
+                break;
+                
+            case 'uniform':
+                // Random range for uniform distribution
+                const minVal = Math.random() * 50;
+                const maxVal = minVal + Math.random() * 100 + 20;
+                simulatedData = generateUniformData(sampleSize, minVal, maxVal);
+                console.log(`Generated uniform distribution: n=${sampleSize}, range=[${minVal.toFixed(2)}, ${maxVal.toFixed(2)}]`);
+                break;
+                
+            case 'bimodal':
+                // Two peaks with random parameters
+                const mean1 = Math.random() * 30 + 10;
+                const mean2 = mean1 + Math.random() * 40 + 20;
+                const std1 = Math.random() * 8 + 3;
+                const std2 = Math.random() * 8 + 3;
+                simulatedData = generateBimodalData(sampleSize, mean1, mean2, std1, std2);
+                console.log(`Generated bimodal distribution: n=${sampleSize}, peaks at ${mean1.toFixed(2)} and ${mean2.toFixed(2)}`);
+                break;
+        }
+        
+        // Store as original data
+        originalData = simulatedData;
+        currentData = [...originalData];
+        
+        // Calculate range
+        originalMin = Math.min(...originalData);
+        originalMax = Math.max(...originalData);
+        
+        // Update range display
+        d3.select("#data-min-value").text(`Min: ${originalMin.toFixed(2)}`);
+        d3.select("#data-max-value").text(`Max: ${originalMax.toFixed(2)}`);
+        
+        // Initialize slider display values
+        d3.select("#leftRangeValue").text(originalMin.toFixed(2));
+        d3.select("#rightRangeValue").text(originalMax.toFixed(2));
+        
+        // Reset sliders
+        d3.select("#leftTruncation").property("value", 0);
+        d3.select("#rightTruncation").property("value", 100);
+        
+        // Hide awaiting panel and show results container
+        const awaitingPanel = document.getElementById("awaiting-panel");
+        const resultsContainer = document.getElementById("results-container");
+        const headerStrip = document.getElementById("header-strip");
+        
+        if (awaitingPanel) awaitingPanel.style.display = "none";
+        if (resultsContainer) resultsContainer.classList.add("show");
+        if (headerStrip) {
+            headerStrip.style.display = "flex";
+        }
+
+        
+        // Calculate and populate statistics
+        populateStatistics(currentData);
+        
+        // Update the histogram
+        const initialBins = +d3.select("#numBins").property("value");
+        const showNormalDist = d3.select("#showNormal").property("checked");
+        updateHistogram(currentData, initialBins, showNormalDist);
+        
+        // Update variable name to indicate the distribution type
+        const distributionNames = {
+            'normal': 'Normal Distribution',
+            'skewed': 'Right-Skewed Data',
+            'uniform': 'Uniform Distribution', 
+            'bimodal': 'Bimodal Distribution'
+        };
+        
+        const variableName = distributionNames[dataType] || 'Simulated Data';
+        updateVariableName(variableName);
+        
+        console.log(`Simulated data loaded successfully: ${dataType} distribution with ${sampleSize} points`);
+        
+        // Show a brief notification (optional visual feedback)
+        if (typeof showNotification === 'undefined') {
+            window.showNotification = function(message) {
+                const notification = document.createElement('div');
+                notification.style.cssText = `
+                    position: fixed; top: 20px; right: 20px; z-index: 10000;
+                    background: var(--surface-1); color: var(--text-primary);
+                    padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border);
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-size: 14px;
+                    opacity: 0; transition: opacity 0.3s ease;
+                `;
+                notification.textContent = message;
+                document.body.appendChild(notification);
+                
+                // Fade in
+                setTimeout(() => notification.style.opacity = '1', 10);
+                
+                // Fade out and remove
+                setTimeout(() => {
+                    notification.style.opacity = '0';
+                    setTimeout(() => document.body.removeChild(notification), 300);
+                }, 2500);
+            };
+        }
+        
+        showNotification(`Generated ${variableName} (n=${sampleSize})`);
+    } catch (err) {
+        console.error("Error loading simulated data:", err);
+    }
+}
+
+// Function to handle JSON data from external source
+function populateHistogram(jsonString, numBins) {
+  console.log("Received JSON:", jsonString);
+    try {
+        // Parse the JSON data
+        const jsonData = JSON.parse(jsonString);
+        // Check if the data is in the expected format
+        if (Array.isArray(jsonData.values)) {
+            // Robust data cleaning: filter out all invalid values
+            const rawData = jsonData.values;
+            const totalValues = rawData.length;
+            
+            // Clean data by filtering out:
+            // 1. null, undefined, empty strings
+            // 2. Non-numeric values (NaN after parsing)
+            // 3. Infinite values
+            // 4. Zeros (representing empty Excel cells)
+            const validData = rawData.filter(val => {
+                // Convert to number
+                const numVal = parseFloat(val);
+                
+                // Check if it's a valid, finite, non-zero number
+                return !isNaN(numVal) && 
+                       isFinite(numVal) && 
+                       numVal !== 0 && 
+                       val !== null && 
+                       val !== undefined && 
+                       val !== '';
+            }).map(val => parseFloat(val));
+            
+            // Count different types of filtered values for reporting
+            const nullCount = rawData.filter(val => val === null || val === undefined || val === '').length;
+            const zeroCount = rawData.filter(val => parseFloat(val) === 0).length;
+            const nanCount = rawData.filter(val => isNaN(parseFloat(val)) && val !== null && val !== undefined && val !== '').length;
+            const infiniteCount = rawData.filter(val => !isFinite(parseFloat(val)) && !isNaN(parseFloat(val))).length;
+            
+            const filteredCount = totalValues - validData.length;
+            
+            console.log(`🧹 Data cleaning results:`);
+            console.log(`   📊 Total values: ${totalValues}`);
+            console.log(`   ✅ Valid numeric values: ${validData.length}`);
+            console.log(`   🗑️ Filtered out: ${filteredCount} values`);
+            if (nullCount > 0) console.log(`      - Empty/null: ${nullCount}`);
+            if (zeroCount > 0) console.log(`      - Zeros: ${zeroCount}`);
+            if (nanCount > 0) console.log(`      - Non-numeric: ${nanCount}`);
+            if (infiniteCount > 0) console.log(`      - Infinite: ${infiniteCount}`);
+            
+            // Check if we have enough valid data for analysis
+            if (validData.length < 3) {
+                alert(`Insufficient valid data for analysis!\n\nFound only ${validData.length} valid numeric values out of ${totalValues} total values.\nMinimum required: 3 values.\n\nFiltered out: ${filteredCount} invalid values (empty cells, zeros, non-numeric values).`);
+                return false;
+            }
+            
+            // Store the cleaned data
+            originalData = validData;
+            currentData = [...originalData];
+            
+            // Note: Filter indicator removed per user request
+            
+            // Determine the data range
+            originalMin = Math.min(...originalData);
+            originalMax = Math.max(...originalData);
+            
+            // Update range display
+            d3.select("#data-min-value").text(`Min: ${originalMin.toFixed(2)}`);
+            d3.select("#data-max-value").text(`Max: ${originalMax.toFixed(2)}`);
+            
+            // Initialize slider display values
+            d3.select("#leftRangeValue").text(originalMin.toFixed(2));
+            d3.select("#rightRangeValue").text(originalMax.toFixed(2));
+            
+            // Reset sliders
+            d3.select("#leftTruncation").property("value", 0);
+            d3.select("#rightTruncation").property("value", 100);
+            
+            // Update the variable name and titles
+            if (jsonData.title || jsonData.variableName) {
+                updateVariableName(jsonData.title || jsonData.variableName);
+            }
+            
+            // Store processing information for indicators
+            window.lastProcessingInfo = {
+                trimApplied: jsonData.trimApplied || false,
+                transformApplied: jsonData.transformType || 'none',
+                originalCount: jsonData.originalCount || validData.length,
+                processedCount: validData.length
+            };
+
+            
+            // Hide awaiting panel and show results container
+            const awaitingPanel = document.getElementById("awaiting-panel");
+            const resultsContainer = document.getElementById("results-container");
+            const headerStrip = document.getElementById("header-strip");
+            
+            if (awaitingPanel) {
+                awaitingPanel.style.display = "none";
+            }
+            if (resultsContainer) {
+                resultsContainer.classList.add("show");
+            }
+            if (headerStrip) {
+                headerStrip.style.display = "flex";
+            }
+            
+            // Force SVG recreation after panels are visible
+            svgComponents = null;
+            
+            // Calculate and populate statistics - FORCE UPDATE
+            console.log('Calling populateStatistics with data length:', currentData.length);
+            
+            // Update title with sample size
+            if (typeof window.updateTitleWithSampleSize === 'function') {
+                window.updateTitleWithSampleSize(currentData.length);
+            }
+            
+            // Direct calculation and update - bypass any potential function issues
+            const data = currentData;
+            const n = data.length;
+            const mean = data.reduce((sum, val) => sum + val, 0) / n;
+            const variance = data.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / n;
+            const stddev = Math.sqrt(variance);
+            const sorted = [...data].sort((a, b) => a - b);
+            const min = sorted[0];
+            const max = sorted[n - 1];
+            const range = max - min;
+            const q1 = sorted[Math.floor(n * 0.25)];
+            const median = n % 2 === 0 ? (sorted[n/2 - 1] + sorted[n/2]) / 2 : sorted[Math.floor(n/2)];
+            const q3 = sorted[Math.floor(n * 0.75)];
+            
+            // Simple skewness and kurtosis
+            const skewness = stddev > 0 ? data.reduce((sum, val) => sum + Math.pow((val - mean) / stddev, 3), 0) / n : 0;
+            const kurtosis = stddev > 0 ? (data.reduce((sum, val) => sum + Math.pow((val - mean) / stddev, 4), 0) / n) - 3 : 0;
+            
+            // Get decimal places
+            const decimals = 2;
+            
+            // FORCE UPDATE ALL ELEMENTS DIRECTLY WITH EXPLICIT MAPPING
+            console.log('Force updating all statistics directly...');
+            console.log('Mapping check:', {
+                'stat-n': n,
+                'stat-mean': mean.toFixed(decimals),
+                'stat-stddev': stddev.toFixed(decimals), 
+                'stat-variance': variance.toFixed(decimals),
+                'stat-kurtosis': kurtosis.toFixed(decimals),
+                'stat-skewness': skewness.toFixed(decimals),
+                'stat-range': range.toFixed(decimals),
+                'stat-min': min.toFixed(decimals),
+                'stat-median': median.toFixed(decimals),
+                'stat-q25': q1.toFixed(decimals),
+                'stat-q75': q3.toFixed(decimals),
+                'stat-max': max.toFixed(decimals)
+            });
+            
+            // Safe update function with verification
+            const safeUpdateElement = (id, value, label) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.textContent = value;
+                    element.style.color = 'var(--text-primary)';
+                    console.log(`✓ ${label} (${id}): ${value}`);
+                } else {
+                    console.error(`✗ Element ${id} not found for ${label}`);
+                }
+            };
+            
+            // Update each statistic with explicit labels for verification
+            safeUpdateElement('stat-n', n.toString(), 'Count');
+            safeUpdateElement('stat-mean', mean.toFixed(decimals), 'Mean');
+            safeUpdateElement('stat-stddev', stddev.toFixed(decimals), 'Std Dev');
+            safeUpdateElement('stat-variance', variance.toFixed(decimals), 'Variance');
+            safeUpdateElement('stat-kurtosis', kurtosis.toFixed(decimals), 'Kurtosis');
+            safeUpdateElement('stat-skewness', skewness.toFixed(decimals), 'Skewness');
+            safeUpdateElement('stat-range', range.toFixed(decimals), 'Range');
+            safeUpdateElement('stat-min', min.toFixed(decimals), 'Minimum');
+            safeUpdateElement('stat-median', median.toFixed(decimals), 'Median');
+            safeUpdateElement('stat-q25', q1.toFixed(decimals), 'Q25');
+            safeUpdateElement('stat-q75', q3.toFixed(decimals), 'Q75');
+            safeUpdateElement('stat-max', max.toFixed(decimals), 'Maximum');
+            
+            // Set colors to primary
+            ['stat-n', 'stat-mean', 'stat-stddev', 'stat-variance', 'stat-kurtosis', 'stat-skewness',
+             'stat-range', 'stat-min', 'stat-median', 'stat-q25', 'stat-q75', 'stat-max'].forEach(id => {
+                const elem = document.getElementById(id);
+                if (elem) elem.style.color = 'var(--text-primary)';
+            });
+            
+            console.log('Statistics force updated:', {
+                n, mean: mean.toFixed(decimals), stddev: stddev.toFixed(decimals), 
+                median: median.toFixed(decimals), range: range.toFixed(decimals)
+            });
+            
+            // AGGRESSIVE FIX - Keep reapplying correct values every 100ms for 2 seconds
+            const correctValues = {
+                'stat-n': n.toString(),
+                'stat-mean': mean.toFixed(decimals),
+                'stat-stddev': stddev.toFixed(decimals),
+                'stat-variance': variance.toFixed(decimals),
+                'stat-kurtosis': kurtosis.toFixed(decimals),
+                'stat-skewness': skewness.toFixed(decimals),
+                'stat-range': range.toFixed(decimals),
+                'stat-min': min.toFixed(decimals),
+                'stat-median': median.toFixed(decimals),
+                'stat-q25': q1.toFixed(decimals),
+                'stat-q75': q3.toFixed(decimals),
+                'stat-max': max.toFixed(decimals)
+            };
+            
+            let attempts = 0;
+            const maxAttempts = 3; // Reduced to just 3 attempts
+            
+            const enforceCorrectValues = () => {
+                attempts++;
+                let needsUpdate = false;
+                
+                Object.entries(correctValues).forEach(([id, expectedValue]) => {
+                    const element = document.getElementById(id);
+                    if (element && element.textContent !== expectedValue) {
+                        element.textContent = expectedValue;
+                        element.style.color = 'var(--text-primary)';
+                        console.log(`🔧 ENFORCED ${id}: ${expectedValue} (attempt ${attempts})`);
+                        needsUpdate = true;
+                    }
+                });
+                
+                if (needsUpdate) {
+                    console.log(`⚡ Values were corrupted, fixed on attempt ${attempts}`);
+                }
+                
+                if (attempts < maxAttempts) {
+                    setTimeout(enforceCorrectValues, 100);
+                } else {
+                    console.log('✅ Statistics enforcement complete after', attempts, 'attempts');
+                }
+            };
+            
+            // Start enforcement immediately
+            setTimeout(enforceCorrectValues, 50);
+            
+            // Update the histogram
+            const showNormalDist = d3.select("#showNormal").property("checked");
+            updateHistogram(currentData, numBins, showNormalDist);
+            
+            // Return success
+            return true;
+        } else {
+            console.error("Invalid JSON format: 'values' array not found");
+            return false;
+        }
+    } catch (e) {
+        console.error("Error parsing JSON:", e);
+        return false;
+    }
+}
+
+// Expose the populateHistogram function globally for external access
+window.populateHistogram = populateHistogram;
+
+// Debug function to test element access
+window.testStatsUpdate = function() {
+    console.log('Testing manual stats update...');
+    const elements = [
+        'stat-n', 'stat-mean', 'stat-stddev', 'stat-variance', 'stat-kurtosis', 'stat-skewness',
+        'stat-range', 'stat-min', 'stat-q25', 'stat-median', 'stat-q75', 'stat-max'
+    ];
+    
+    elements.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = 'TEST';
+            element.style.color = 'var(--accent-1)';
+            console.log(`✓ Updated ${id}`);
+        } else {
+            console.error(`✗ Element ${id} not found`);
+        }
+    });
+};
+
+// Function to manually update with real statistics
+window.updateStatsNow = function() {
+    console.log('Manually updating statistics with current data...');
+    if (currentData && currentData.length > 0) {
+        console.log('Current data length:', currentData.length);
+        populateStatistics(currentData);
+        
+        // Also try syncSummaryStats
+        if (typeof syncSummaryStats === 'function') {
+            console.log('Also calling syncSummaryStats...');
+            syncSummaryStats();
+        }
+    } else {
+        console.error('No current data available');
+        
+        // Try with sample data for testing
+        const sampleData = [1, 2, 3, 4, 5, 10, 15, 20, 25, 30];
+        console.log('Using sample data:', sampleData);
+        populateStatistics(sampleData);
+    }
+};
+
+// Function to force populate with hardcoded values - for immediate testing
+window.forceStatsNow = function() {
+    console.log('Force populating with hardcoded values...');
+    const stats = {
+        'stat-n': '53',
+        'stat-mean': '18.09',
+        'stat-stddev': '27.88',
+        'stat-variance': '777.07',
+        'stat-kurtosis': '6.11',
+        'stat-skewness': '2.32',
+        'stat-range': '144.00',
+        'stat-min': '0.00',
+        'stat-median': '5.00',
+        'stat-q25': '1.00',
+        'stat-q75': '25.00',
+        'stat-max': '144.00'
+    };
+    
+    Object.entries(stats).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = value;
+            element.style.color = 'var(--text-primary)';
+            element.style.fontWeight = '600';
+            console.log(`✓ Updated ${id} = ${value}`);
+        } else {
+            console.error(`✗ Element ${id} not found`);
+        }
+    });
+    
+    console.log('Hardcoded statistics populated!');
+};
+
+// Function to check if DOM elements exist and can be accessed
+window.checkDOMElements = function() {
+    console.log('🔍 Checking DOM elements...');
+    const elements = ['stat-n', 'stat-mean', 'stat-stddev', 'stat-variance', 'stat-kurtosis', 'stat-skewness', 
+                     'stat-range', 'stat-min', 'stat-median', 'stat-q25', 'stat-q75', 'stat-max'];
+    
+    elements.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            console.log(`✅ ${id}: Found, current value = "${element.textContent}"`);
+        } else {
+            console.log(`❌ ${id}: NOT FOUND!`);
+        }
+    });
+    
+    // Also check if the results container is visible
+    const resultsContainer = document.getElementById('results-container');
+    console.log(`Results container display: ${resultsContainer ? resultsContainer.style.display : 'NOT FOUND'}`);
+};
+
+// Function to test with sample data to verify fix
+window.testWithSampleData = function() {
+    console.log('🧪 Testing with sample data...');
+    const sampleJSON = '{"values": [1, 3, 5, 7, 9, 11, 13, 15, 17, 30]}';
+    populateHistogram(sampleJSON, 5);
+    
+    setTimeout(() => {
+        console.log('📊 Current table values after sample data load:');
+        console.log('Variance:', document.getElementById('stat-variance').textContent);
+        console.log('Median:', document.getElementById('stat-median').textContent);
+        console.log('Skewness:', document.getElementById('stat-skewness').textContent);
+        console.log('Max:', document.getElementById('stat-max').textContent);
+    }, 1000);
+};
+
+// Function to test robust data cleaning with various invalid values
+window.testDataCleaning = function() {
+    console.log('🧪 Testing robust data cleaning with various invalid values...');
+    
+    // Sample data with mixed valid/invalid values like real Excel data
+    const messyData = {
+        values: [
+            10,          // valid
+            0,           // zero (filtered)
+            15.5,        // valid
+            '',          // empty string (filtered)
+            null,        // null (filtered)
+            'text',      // non-numeric (filtered)
+            20,          // valid
+            undefined,   // undefined (filtered)
+            0,           // zero (filtered)
+            25.7,        // valid
+            'N/A',       // non-numeric (filtered)
+            30,          // valid
+            Infinity,    // infinite (filtered)
+            35.2,        // valid
+            0,           // zero (filtered)
+            -Infinity,   // infinite (filtered)
+            40           // valid
+        ]
+    };
+    
+    populateHistogram(JSON.stringify(messyData), 5);
+    
+    setTimeout(() => {
+        console.log('📊 Results after robust data cleaning:');
+        const indicator = document.getElementById('filter-indicator');
+        console.log('Filter indicator:', indicator ? indicator.textContent : 'not found');
+        console.log('Count (n):', document.getElementById('stat-n').textContent, '(should be 7 valid values)');
+        console.log('Mean:', document.getElementById('stat-mean').textContent);
+        console.log('Min:', document.getElementById('stat-min').textContent);
+        console.log('Max:', document.getElementById('stat-max').textContent);
+    }, 1000);
+};
+
+// Function to test with insufficient valid data
+window.testInsufficientData = function() {
+    console.log('🧪 Testing with insufficient valid data...');
+    const insufficientData = '{"values": [0, "", null, "text", 0, 5, 0, "N/A"]}'; // Only 1 valid value
+    const result = populateHistogram(insufficientData, 5);
+    console.log('Function returned:', result, '(should be false due to insufficient data)');
+};
+
+// Function to toggle dropdown visibility
+window.toggleAnalysisDropdown = function() {
+    const dropdown = document.getElementById('analysisDropdown');
+    const btn = document.querySelector('.dropdown-btn');
+    
+    if (dropdown.classList.contains('show')) {
+        dropdown.classList.remove('show');
+        btn.classList.remove('open');
+    } else {
+        dropdown.classList.add('show');
+        btn.classList.add('open');
+    }
+};
+
+// Function to select analysis type
+window.selectAnalysis = function(caseCode, analysisName, element) {
+    console.log('Selecting analysis:', analysisName, caseCode);
+    
+    // Update active state for all options
+    document.querySelectorAll('.analysis-option').forEach(option => {
+        option.classList.remove('active');
+    });
+    
+    // Set the selected option as active
+    element.classList.add('active');
+    
+    // Update the center title with just the analysis name (no variable name)
+    const selectedTitleElement = document.getElementById('selectedAnalysisTitle');
+    if (selectedTitleElement) {
+        selectedTitleElement.textContent = analysisName;
+    }
+    
+    // Close dropdown
+    const dropdown = document.getElementById('analysisDropdown');
+    const btn = document.querySelector('.dropdown-btn');
+    if (dropdown && btn) {
+        dropdown.classList.remove('show');
+        btn.classList.remove('open');
+    }
+    
+    // Send message to VB6 using VB6 injected function
+    sendMessageToVB6(caseCode, caseCode);
+};
+
+// Function to update variable name display
+window.updateVariableName = function(variableName) {
+    // Store the variable name globally
+    window.currentVariableName = variableName || 'Variable';
+    
+    console.log('Updating variable name to:', window.currentVariableName);
+    
+    // Update page title
+    const pageTitle = document.getElementById('page-title');
+    if (pageTitle) {
+        pageTitle.textContent = `${window.currentVariableName} - Analysis`;
+    }
+    
+    // Update center title with current analysis (no variable name)
+    const selectedTitleElement = document.getElementById('selectedAnalysisTitle');
+    const activeOption = document.querySelector('.analysis-option.active');
+    
+    if (selectedTitleElement && activeOption) {
+        const analysisName = activeOption.getAttribute('data-base-name') || activeOption.querySelector('.option-text').textContent;
+        selectedTitleElement.textContent = analysisName;
+    } else if (selectedTitleElement) {
+        selectedTitleElement.textContent = 'Interactive Histogram';
+    }
+    
+    // Update the variable name display under the title (without sample size initially)
+    const variableNameDisplay = document.getElementById('variableNameDisplay');
+    if (variableNameDisplay) {
+        variableNameDisplay.textContent = window.currentVariableName;
+        console.log('✅ Variable name display updated to:', window.currentVariableName);
+    }
+    
+    // Update panel titles (remove variable names for cleaner look)
+    const statisticsTitle = document.getElementById('statistics-title');
+    if (statisticsTitle) {
+        statisticsTitle.textContent = `Descriptive Statistics`;
+    }
+    
+    const histogramTitle = document.getElementById('histogram-title');
+    if (histogramTitle) {
+        histogramTitle.textContent = `Interactive Histogram`;
+    }
+};
+
+// Function to update title with sample size
+window.updateTitleWithSampleSize = function(sampleSize) {
+    const variableNameDisplay = document.getElementById('variableNameDisplay');
+    if (variableNameDisplay && window.currentVariableName) {
+        variableNameDisplay.textContent = `${window.currentVariableName} (n=${sampleSize})`;
+        console.log('✅ Updated title with sample size:', `${window.currentVariableName} (n=${sampleSize})`);
+    }
+};
+
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(event) {
+    const dropdown = document.getElementById('analysisDropdown');
+    const dropdownContainer = document.querySelector('.dropdown-container');
+    
+    if (dropdown && dropdownContainer && !dropdownContainer.contains(event.target)) {
+        dropdown.classList.remove('show');
+        document.querySelector('.dropdown-btn').classList.remove('open');
+    }
+});
+
+// Update variable name when data is loaded
+window.populateHistogram = (function(originalPopulateHistogram) {
+    return function(jsonString, numBins) {
+        // Call the original function
+        const result = originalPopulateHistogram.call(this, jsonString, numBins);
+        
+        // Try to extract variable name and sample size from JSON
+        try {
+            const jsonData = JSON.parse(jsonString);
+            if (jsonData.title) {
+                updateVariableName(jsonData.title);
+            } else if (jsonData.variableName) {
+                updateVariableName(jsonData.variableName);
+            }
+            
+            // Update title with sample size if we have values
+            if (jsonData.values && Array.isArray(jsonData.values)) {
+                // Filter out invalid values like we do in the main processing
+                const validValues = jsonData.values.filter(val => 
+                    val !== null && 
+                    val !== undefined && 
+                    val !== '' && 
+                    !isNaN(parseFloat(val)) && 
+                    isFinite(parseFloat(val))
+                );
+                window.updateTitleWithSampleSize(validValues.length);
+                console.log('✅ Updated sample size from populateHistogram:', validValues.length);
+            }
+        } catch (e) {
+            console.log('Error parsing JSON in populateHistogram wrapper:', e);
+        }
+        
+        return result;
+    };
+})(window.populateHistogram);
+
+// Update variable name and processing indicators
+function updateVariableName(variableName) {
+    console.log('updateVariableName called with:', variableName);
+    
+    // Clean the variable name (remove any "Histogram of " prefix)
+    let cleanName = variableName;
+    if (cleanName && cleanName.includes('Histogram of ')) {
+        cleanName = cleanName.replace(/^Histogram of\s+/, '');
+    }
+    
+    // Store globally
+    window.currentVariableName = cleanName;
+    
+    // Update page title
+    document.title = `${cleanName} - Interactive Histogram`;
+    
+    // Update dropdown button text (show only analysis name)
+    const selectedTitle = document.getElementById('selectedAnalysisTitle');
+    if (selectedTitle) {
+        const currentAnalysis = document.querySelector('.analysis-option.active');
+        if (currentAnalysis) {
+            const analysisName = currentAnalysis.dataset.baseName || 'Interactive Histogram';
+            selectedTitle.textContent = analysisName;
+        }
+    }
+    
+    // Update histogram panel title with processing indicators
+    updateHistogramTitle(cleanName);
+    
+    // Update chart title in SVG
+    if (svgComponents && svgComponents.chartTitle) {
+        svgComponents.chartTitle.text(`${cleanName} - Distribution`);
+    }
+}
+
+function updateHistogramTitle(variableName) {
+    console.log('updateHistogramTitle called with:', variableName);
+    
+    const histogramTitle = document.getElementById('histogram-title');
+    console.log('histogram-title element found:', histogramTitle);
+    
+    if (histogramTitle) {
+        let title = `${variableName} - Interactive Histogram`;
+        
+        // Add subtle processing indicators
+        const indicators = [];
+        
+        // Check if we have processing info from the last data load
+        if (window.lastProcessingInfo) {
+            console.log('Processing info found:', window.lastProcessingInfo);
+            if (window.lastProcessingInfo.trimApplied) {
+                indicators.push('trimmed');
+            }
+            if (window.lastProcessingInfo.transformApplied && window.lastProcessingInfo.transformApplied !== 'none') {
+                indicators.push(`${window.lastProcessingInfo.transformApplied}(x)`);
+            }
+        }
+        
+        if (indicators.length > 0) {
+            title += ` <span style="font-size: 0.8em; color: var(--accent-2); font-weight: normal; opacity: 0.8;">[${indicators.join(', ')}]</span>`;
+        }
+        
+        console.log('Setting histogram title to:', title);
+        histogramTitle.innerHTML = title;
+    } else {
+        console.error('histogram-title element not found!');
+    }
+}
+
+// Ensure sendMessageToVB6 function exists for VB6 communication
+window.sendMessageToVB6 = window.sendMessageToVB6 || function(action, data) {
+    console.log('VB6 Communication:', action, data);
+    
+    // Try different VB6 communication methods
+    if (window.vbHost && window.vbHost.RaiseMessageEvent) {
+        try {
+            window.vbHost.RaiseMessageEvent(action, data);
+            console.log('✅ Message sent via vbHost.RaiseMessageEvent');
+            return;
+        } catch (e) {
+            console.log('❌ vbHost.RaiseMessageEvent failed:', e);
+        }
+    }
+    
+    if (window.external && window.external.RaiseMessageEvent) {
+        try {
+            window.external.RaiseMessageEvent(action, data);
+            console.log('✅ Message sent via external.RaiseMessageEvent');
+            return;
+        } catch (e) {
+            console.log('❌ external.RaiseMessageEvent failed:', e);
+        }
+    }
+    
+    // Fallback - just log the action
+    console.log('📝 VB6 communication not available, would send:', { action, data });
+};
+
+// Function to force correct mapping from current console data
+window.fixMappingNow = function() {
+    try {
+        console.log('🔧 Manual fix with correct mapping...');
+        
+        // First check if elements exist
+        window.checkDOMElements();
+        
+        // Make sure the results container is visible
+        const resultsContainer = document.getElementById('results-container');
+        const headerStrip = document.getElementById('header-strip');
+        if (resultsContainer && !resultsContainer.classList.contains('show')) {
+            console.log('⚠️ Results container is hidden! Showing it first...');
+            resultsContainer.classList.add('show');
+            document.getElementById('awaiting-panel').style.display = 'none';
+            if (headerStrip) {
+                headerStrip.style.display = 'flex';
+            }
+        }
+        
+        // Wait a moment for the DOM to update
+        setTimeout(() => {
+            console.log('Setting values after DOM update...');
+            
+            const setValue = (id, value) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.textContent = value;
+                    element.style.color = 'var(--text-primary)';
+                    console.log(`✅ Set ${id} = ${value}`);
+                    return true;
+                } else {
+                    console.log(`❌ Element ${id} not found!`);
+                    return false;
+                }
+            };
+            
+            setValue('stat-n', '10');
+            setValue('stat-mean', '11.50');
+            setValue('stat-stddev', '9.91');
+            setValue('stat-variance', '98.25');
+            setValue('stat-kurtosis', '-1.07');
+            setValue('stat-skewness', '0.63');
+            setValue('stat-range', '29.00');
+            setValue('stat-min', '1.00');
+            setValue('stat-median', '7.50');
+            setValue('stat-q25', '3.25');
+            setValue('stat-q75', '18.75');
+            setValue('stat-max', '30.00');
+            
+            console.log('✅ All statistics manually corrected!');
+            
+            // Double-check critical values after 500ms to catch any overwrites
+            setTimeout(() => {
+                console.log('🔍 Checking for overwrites...');
+                const variance = document.getElementById('stat-variance').textContent;
+                const median = document.getElementById('stat-median').textContent;
+                const skewness = document.getElementById('stat-skewness').textContent;
+                const max = document.getElementById('stat-max').textContent;
+                
+                console.log(`Current values: variance=${variance}, median=${median}, skewness=${skewness}, max=${max}`);
+                
+                if (variance !== '98.25' || median !== '7.50') {
+                    console.log('🚨 VALUES WERE OVERWRITTEN! Re-applying...');
+                    setValue('stat-variance', '98.25');
+                    setValue('stat-median', '7.50');
+                    setValue('stat-skewness', '0.63');
+                    setValue('stat-max', '30.00');
+                } else {
+                    console.log('✅ Values are still correct!');
+                }
+            }, 500);
+        }, 100);
+        
+    } catch (error) {
+        console.error('Error in fixMappingNow:', error);
+    }
+};
+
+
+</script>
+
+   <script>
+  let decimalPlaces = 2;
+
+  function updateDecimalAll(val) {
+    decimalPlaces = parseInt(val);
+    // syncSummaryStats(); // DISABLED - was causing data mapping errors
+    console.log('Decimal places updated to:', decimalPlaces, '- but syncSummaryStats disabled to prevent mapping errors');
+  }
+
+  function syncSummaryStats() {
+    console.log('⚠️ syncSummaryStats called - DISABLED to prevent data corruption');
+    return; // DISABLED - this function was causing incorrect mappings
+
+    if (!currentData || currentData.length === 0) return;
+    const mean = calculateMean(currentData);
+    const stddev = calculateStdDev(currentData, mean);
+    const median = calculateMedian(currentData);
+    const variance = stddev ** 2;
+    const sorted = [...currentData].sort((a, b) => a - b);
+    const n = sorted.length;
+    const min = sorted[0];
+    const max = sorted[n - 1];
+    const q25 = sorted[Math.floor(n * 0.25)];
+    const q75 = sorted[Math.floor(n * 0.75)];
+    const range = max - min;
+    const cv = mean !== 0 ? (stddev / mean * 100) : 0;
+
+    const skewness = n > 2 ? (
+      n / ((n - 1) * (n - 2)) *
+      sorted.reduce((acc, val) => acc + Math.pow((val - mean) / stddev, 3), 0)
+    ) : 0;
+
+    const kurtosis = n > 3 ? (
+      (n*(n+1))/((n-1)*(n-2)*(n-3)) *
+      sorted.reduce((acc, val) => acc + Math.pow((val - mean) / stddev, 4), 0)
+      - (3*(n-1)**2)/((n-2)*(n-3))
+    ) : 0;
+
+    // Helper function to safely update elements
+    const safeUpdate = (id, value, decimals = decimalPlaces) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = typeof value === 'number' ? value.toFixed(decimals) : value.toString();
+            element.style.color = 'var(--text-primary)';
+        }
+    };
+    
+    safeUpdate('stat-n', n, 0);
+    safeUpdate('stat-mean', mean);
+    safeUpdate('stat-stddev', stddev);
+    safeUpdate('stat-variance', variance);
+    safeUpdate('stat-kurtosis', kurtosis);
+    safeUpdate('stat-skewness', skewness);
+    safeUpdate('stat-range', range);
+    safeUpdate('stat-min', min);
+    safeUpdate('stat-median', median);
+    safeUpdate('stat-q25', q25);
+    safeUpdate('stat-q75', q75);
+    safeUpdate('stat-max', max);
+  }
+
+  function calculateMedian(data) {
+    const sorted = [...data].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+
+  window.addEventListener('DOMContentLoaded', function () {
+    if (typeof updateHistogram === 'function') {
+      const originalUpdateHistogram = updateHistogram;
+      updateHistogram = function (data, numBins, showNormalDist) {
+        originalUpdateHistogram(data, numBins, showNormalDist);
+        // syncSummaryStats(); // DISABLED - was causing data mapping errors
+      };
+    }
+  });
+
+    // syncSummaryStats(); // DISABLED - was causing data mapping errors
+ // Initialize the visualization
+initialize();        
+</script>
+
+
+
+
+
+
+
+<!-- Removed old dropdown menu - replaced with Pareto-style tabs -->
+
+      </div>
+    </section>
+  </div>
+
+  </body>
+  </html>

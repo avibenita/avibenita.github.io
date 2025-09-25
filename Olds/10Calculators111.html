@@ -1,0 +1,120 @@
+
+<!-- bridge for Wix Studio -->
+<!doctype html><html><head>
+ <!-- set a dynamic <base> so root-relative paths work everywhere -->
+<script>
+<script>
+(function () {
+  var b = document.createElement('base');
+  if (location.hostname.endsWith('github.io')) {
+    b.href = '/Statistical-Calculator/';   // project root on GitHub Pages
+  } else {
+    b.href = '/';                           // site root on custom domains
+  }
+  document.head.appendChild(b);
+})();
+</script>
+
+
+<link rel="stylesheet" href="assets/css/header.css"><!-- note: no leading slash -->
+
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html,body{margin:0}
+  iframe{border:0; width:100%; min-height:940px}
+</style>
+</head><body>
+   <div id="site-header"></div>
+  <iframe id="app" src="IframeWix.html"></iframe>
+  <script>
+    // Forward child -> Wix page code
+    window.addEventListener('message', (e) => { try { window.parent && window.parent.postMessage(e.data, '*'); } catch(_){} });
+  </script>
+
+<script>
+(function(){
+  // Candidate paths so this works from any subfolder and on file://
+  const headerCandidates = [
+    'partials/header.html',
+    '../partials/header.html',
+    '../../partials/header.html',
+    '/partials/header.html'
+  ];
+  const cssCandidates = [
+    '/assets/css/Header.css',
+    'assets/css/Header.css',
+    '../assets/css/Header.css',
+    '../../assets/css/Header.css'
+  ];
+  const jsCandidates = [
+    '/assets/js/header.js',
+    'assets/js/header.js',
+    '../assets/js/header.js',
+    '../../assets/js/header.js'
+  ];
+
+  function tryFetch(paths){
+    let i = 0;
+    return new Promise((resolve, reject)=>{
+      const next = ()=>{
+        if(i >= paths.length) return reject(new Error('All header paths failed'));
+        const url = paths[i++];
+        fetch(url, {credentials:'same-origin'}).then(r=>{
+          if(!r.ok) throw new Error('HTTP '+r.status+' @ '+url);
+          return r.text();
+        }).then(txt=>resolve({url, txt})).catch(()=>next());
+      };
+      next();
+    });
+  }
+
+  function ensureOneOfLinks(paths){
+    const hrefs = paths.map(p => p.replace(/^\//,''));
+    const has = Array.from(document.styleSheets).some(s => s.href && hrefs.some(p => s.href.includes(p)));
+    if(!has){
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = paths[0]; // first candidate
+      document.head.appendChild(link);
+    }
+  }
+
+  function ensureOneOfScripts(paths){
+    const srcs = paths.map(p => p.replace(/^\//,''));
+    const has = Array.from(document.scripts).some(s => s.src && srcs.some(p => s.src.includes(p)));
+    if(!has){
+      const s = document.createElement('script');
+      s.src = paths[0];
+      document.body.appendChild(s);
+    }
+  }
+
+  tryFetch(headerCandidates).then(({url, txt})=>{
+    const mount = document.getElementById('site-header') || document.body;
+    if (mount && mount.id === 'site-header') {
+      mount.innerHTML = txt;
+    } else {
+      document.body.insertAdjacentHTML('afterbegin', '<div id="site-header">'+txt+'</div>');
+    }
+    ensureOneOfLinks(cssCandidates);
+    ensureOneOfScripts(jsCandidates);
+    console.log('[header] loaded from', url);
+  }).catch(err=>console.warn('[header] failed:', err));
+})();
+</script>
+
+</body>
+<script>
+  fetch('header.html')
+    .then(r => r.text())
+    .then(html => {
+      document.getElementById('site-header').innerHTML = html;
+      const s = document.createElement('script');
+      s.src = 'assets/js/header.js';
+      document.body.appendChild(s);
+    })
+    .catch(err => console.warn('Header include failed:', err));
+</script>
+
+</html>

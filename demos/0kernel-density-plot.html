@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kernel Density Estimation</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.6.1/nouislider.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.6.1/nouislider.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --surface-0: #0c1624; /* page background */
+            --surface-1: #1a1f2e; /* cards / panels - warmer dark gray-blue */
+            --surface-2: #242938; /* chart / results boxes */
+            --surface-3: #2d3748; /* hover states */
+            --border: #2d3748; /* softer border color */
+            --accent-1: rgb(255,165,120); /* warm orange */
+            --accent-2: rgb(120,200,255); /* cyan blue */
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255,255,255,0.8);
+            --text-muted: rgba(255,255,255,0.6);
+            --panel-bg: var(--surface-1);
+            --panel-radius: 10px;
+            --panel-shadow: 0px 4px 20px rgba(0, 0, 0, 0.4);
+            --header-color: rgb(255,165,120);
+            --pad: 12px;
+            --panel-min-width: 280px;
+            --panel-max-width: 1100px;
+            --highlight-bg: rgba(255, 165, 120, 0.2);
+            --highlight-text: var(--accent-1);
+        }
+
+        body {
+            background-color: var(--surface-0);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            color: var(--text-primary);
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        html {
+            overflow-x: hidden;
+        }
+
+
+    .dropdown {
+      position: relative;
+    }
+
+    .main-container {
+    width: 100%;
+    height: calc(100vh - 60px); /* 60px = approximate height of header */
+    overflow: hidden; /* Changed from auto to hidden to remove scroll bar */
+    box-sizing: border-box;
+    padding-bottom: 20px;
+}
+
+        /* Panel styling to match input panel */
+        .wrap{ display:flex; justify-content:center; padding:clamp(6px,2vh,12px); }
+        .card{
+            width:min(980px, 100%);
+            background:var(--surface-1);
+            border-radius:var(--panel-radius);
+            box-shadow:var(--panel-shadow);
+            border: 1px solid var(--border);
+            overflow:hidden;
+            box-sizing: border-box;
+        }
+        .card-head{ 
+            background: transparent; 
+            color:var(--header-color); 
+            padding:12px 16px; 
+            font-weight:600; 
+            font-size:1.2rem; 
+            letter-spacing:.3px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-body{ 
+            padding:var(--pad); 
+            padding-right: calc(var(--pad) + 18px); 
+            height: auto; 
+            overflow: hidden; 
+            display: flex; 
+            flex-direction: column; 
+            box-sizing: border-box;
+        }
+        
+        .panel-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            margin: 20px;
+        }
+
+        .panel {
+            background-color: var(--surface-1);
+            border-radius: var(--panel-radius);
+            box-shadow: var(--panel-shadow);
+            border: 1px solid var(--border);
+            flex: 0 0 auto;
+            min-width: var(--panel-min-width);
+            max-width: var(--panel-max-width);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-heading {
+            background: transparent;
+            color: var(--header-color);
+            font-weight: 600;
+            padding: 12px 16px;
+            font-size: 1.2rem;
+            letter-spacing: .3px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-body {
+            padding: var(--pad);
+            background: var(--surface-2);
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            margin: 8px;
+        }
+
+        #container {
+            height: 400px;
+            width: 100%;
+            margin: 10px auto;
+            max-width: 100%;
+            background: transparent;
+            border-radius: 8px;
+        }
+
+        .chart-container {
+            width: 100%;
+            margin: 0 auto;
+            padding: 15px;
+            padding-right: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+        
+        .current-value {
+            text-align: center;
+            margin: 10px 0;
+            color: var(--text-primary);
+            font-size: 1.1em;
+            transition: background 0.3s ease;
+        }
+        
+        .controls {
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .slider-container {
+            width: 100%;
+            margin: 20px 0;
+        }
+        
+        label {
+            color: var(--text-primary);
+            margin-bottom: 5px;
+            display: block;
+        }
+        
+        #bandwidth-slider {
+            height: 10px;
+            margin: 20px 0;
+        }
+
+        /* nouislider custom styling */
+        .noUi-connect {
+            background: linear-gradient(135deg, var(--accent-1), #e67e22);
+        }
+
+        .noUi-target {
+            background: var(--surface-2);
+            border-color: var(--border);
+        }
+
+        .noUi-handle {
+            background: var(--accent-1);
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(255, 165, 120, 0.3);
+            cursor: pointer;
+            border: 2px solid var(--surface-0);
+        }
+
+        .noUi-handle:hover {
+            background: #e67e22;
+            transform: scale(1.1);
+        }
+        
+        .metrics-container {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin: 20px 0;
+            padding-right: 5px;
+        }
+        
+        .metric-box {
+            background-color: var(--surface-2);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            flex: 1;
+            margin: 5px;
+            min-width: 90px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .metric-box:hover {
+            background-color: var(--highlight-bg);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 165, 120, 0.2);
+        }
+        
+        .metric-value {
+            font-weight: 700;
+            font-size: 1.2em;
+            color: var(--accent-1);
+        }
+        
+        .input-group {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            margin: 10px 0;
+        }
+        
+        .input-field {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-right: 10px;
+            background-color: var(--surface-2);
+            color: var(--text-primary);
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, var(--accent-1), #e67e22);
+            color: var(--surface-0);
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .btn:hover {
+            background: #e67e22;
+            transform: scale(1.05);
+        }
+        
+        .kernel-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .kernel-option {
+            background-color: var(--surface-2);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+        
+        .kernel-option:hover {
+            background-color: var(--surface-3);
+            transform: translateY(-1px);
+        }
+        
+        .kernel-option.active {
+            background-color: var(--accent-1);
+            border-color: var(--accent-1);
+            color: var(--surface-0);
+        }
+        
+        /* Dropdown styling to match histogram and boxplot */
+
+        .dropdown-container { position: relative; }
+        .dropdown-content { 
+          display: none;
+          position: absolute;
+          top: 100%;
+          right: 0;
+          min-width: 250px;
+          z-index: 1000;
+          background: var(--surface-1);
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          box-shadow: var(--panel-shadow);
+          padding: 8px 0;
+          margin-top: 4px;
+        }
+        .dropdown-content.show { display: block; }
+        
+        /* Dropdown button with 3D effect and animated glow */
+        .dropdown-btn {
+          position: relative;
+          transition: all 0.3s ease;
+          animation: subtle-glow 3s ease-in-out infinite;
+          background: linear-gradient(145deg, #4a5568, #2d3748) !important;
+          border: 1px solid #4a5568 !important;
+          box-shadow: 
+            0 4px 8px rgba(0, 0, 0, 0.3),
+            inset 0 1px 0 rgba(255, 255, 255, 0.1),
+            inset 0 -1px 0 rgba(0, 0, 0, 0.2) !important;
+          text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+          border-radius: 8px !important;
+          font-weight: 600;
+          color: #e2e8f0 !important;
+          padding: 8px 12px;
+          cursor: pointer;
+          font-size: 12px;
+        }
+
+        @keyframes subtle-glow {
+          0%, 100% {
+            box-shadow: 
+              0 4px 8px rgba(0, 0, 0, 0.3),
+              0 0 5px rgba(255, 165, 120, 0.3),
+              inset 0 1px 0 rgba(255, 255, 255, 0.1),
+              inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+          }
+          50% {
+            box-shadow: 
+              0 4px 8px rgba(0, 0, 0, 0.3),
+              0 0 15px rgba(255, 165, 120, 0.5), 
+              0 0 25px rgba(255, 165, 120, 0.2),
+              inset 0 1px 0 rgba(255, 255, 255, 0.1),
+              inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+          }
+        }
+        
+        .dropdown-btn:hover { 
+          background: linear-gradient(145deg, #5a6578, #3d4758) !important;
+          box-shadow: 
+            0 6px 12px rgba(0, 0, 0, 0.4),
+            0 0 20px rgba(255, 165, 120, 0.6),
+            inset 0 1px 0 rgba(255, 255, 255, 0.15),
+            inset 0 -1px 0 rgba(0, 0, 0, 0.25) !important;
+          transform: translateY(-1px);
+          animation: none;
+        }
+        
+        .dropdown-btn:active {
+          background: linear-gradient(145deg, #2d3748, #4a5568) !important;
+          box-shadow: 
+            0 2px 4px rgba(0, 0, 0, 0.4),
+            inset 0 2px 4px rgba(0, 0, 0, 0.3),
+            inset 0 -1px 0 rgba(255, 255, 255, 0.05) !important;
+          transform: translateY(1px);
+        }
+
+        .dropdown-arrow { transition: transform 0.3s ease; }
+        .dropdown-btn.open .dropdown-arrow { transform: rotate(180deg); }
+        
+        /* Analysis option styling in dropdown */
+        .analysis-option {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 16px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          border-radius: 4px;
+          margin: 2px 8px;
+          color: var(--text-primary);
+        }
+        
+        .analysis-option:hover {
+          background: var(--surface-2);
+          color: var(--accent-1);
+        }
+        
+        .analysis-option.active {
+          background: var(--surface-2);
+          color: var(--accent-1);
+          font-weight: 600;
+        }
+        
+        .option-icon {
+          font-size: 16px;
+          width: 20px;
+          text-align: center;
+        }
+        
+        .option-text {
+          font-size: 14px;
+        }
+        
+        .dropdown-separator {
+          height: 1px;
+          background: var(--border);
+          margin: 8px 12px;
+        }
+
+        
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <section class="card" role="main">
+            <div class="card-head">
+                <div style="flex: 0 0 auto;">Results Panel</div>
+                <div style="flex: 1; text-align: center;">
+                    <div style="font-size: 1.4rem; font-weight: 700; color: var(--accent-1); margin-bottom: 4px;">Kernel Density Estimation</div>
+                    <div id="variableNameDisplay" style="font-size: 1rem; font-weight: 500; color: var(--text-secondary); font-style: italic;">Variable Name</div>
+                </div>
+                <div style="flex: 0 0 auto;">
+                        <div class="dropdown-container">
+                            <button class="dropdown-btn" onclick="toggleAnalysisDropdown()">
+                                Advanced Analysis Options
+                                <div class="dropdown-arrow" style="display: inline-block; margin-left: 8px;">▼</div>
+                            </button>
+                            
+                            <div class="dropdown-content" id="analysisDropdown">
+                                <div class="analysis-option" data-case="Case00" data-base-name="Interactive Histogram" onclick="selectAnalysis('Case00', 'Interactive Histogram', this)">
+                                    <div class="option-icon">📈</div>
+                                    <div class="option-text">Interactive Histogram</div>
+                                </div>
+                                <div class="analysis-option" data-case="Case10" data-base-name="Box Plot Analysis" onclick="selectAnalysis('Case10', 'Box Plot Analysis', this)">
+                                    <div class="option-icon">📦</div>
+                                    <div class="option-text">Box Plot Analysis</div>
+                                </div>
+                                <div class="analysis-option" data-case="Case20" data-base-name="Cumulative Distribution" onclick="selectAnalysis('Case20', 'Cumulative Distribution', this)">
+                                    <div class="option-icon">📈</div>
+                                    <div class="option-text">Cumulative Distribution</div>
+                                </div>
+                                <div class="analysis-option" data-case="Case30" data-base-name="Percentiles" onclick="selectAnalysis('Case30', 'Percentiles', this)">
+                                    <div class="option-icon">📊</div>
+                                    <div class="option-text">Percentiles</div>
+                                </div>
+                                <div class="analysis-option" data-case="Case40" data-base-name="Outliers Detection" onclick="selectAnalysis('Case40', 'Outliers Detection', this)">
+                                    <div class="option-icon">🎯</div>
+                                    <div class="option-text">Outliers Detection</div>
+                                </div>
+                                <div class="dropdown-separator"></div>
+                                <div class="analysis-option" data-case="Case50" data-base-name="Tests of Normality" onclick="selectAnalysis('Case50', 'Tests of Normality', this)">
+                                    <div class="option-icon">📊</div>
+                                    <div class="option-text">Tests of Normality</div>
+                                </div>
+                                <div class="analysis-option" data-case="Case60" data-base-name="PP-QQ Plots" onclick="selectAnalysis('Case60', 'PP-QQ Plots', this)">
+                                    <div class="option-icon">📈</div>
+                                    <div class="option-text">PP-QQ Plots</div>
+                                </div>
+                                <div class="analysis-option" data-case="Case70" data-base-name="Hypothesis Testing" onclick="selectAnalysis('Case70', 'Hypothesis Testing', this)">
+                                    <div class="option-icon">📊</div>
+                                    <div class="option-text">Hypothesis Testing</div>
+                                </div>
+                                <div class="analysis-option" data-case="Case90" data-base-name="Confidence Intervals" onclick="selectAnalysis('Case90', 'Confidence Intervals', this)">
+                                    <div class="option-icon">📊</div>
+                                    <div class="option-text">Confidence Intervals</div>
+                                </div>
+                                <div class="analysis-option active" data-case="Case100" data-base-name="Kernel Density" onclick="selectAnalysis('Case100', 'Kernel Density', this)">
+                                    <div class="option-icon">📈</div>
+                                    <div class="option-text">Kernel Density</div>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+                </div>
+            </div>
+            <div class="card-body">
+                    <div class="chart-container">
+                        <div class="current-value" id="current-value">
+                            Bandwidth: <span id="bandwidth-value">Automatic</span> | Kernel: <span id="kernel-type">Gaussian</span>
+                        </div>
+                        
+                        <div class="metrics-container">
+                            <div class="metric-box">
+                                <div>N</div>
+                                <div class="metric-value" id="count-value">0</div>
+                            </div>
+                            <div class="metric-box">
+                                <div>Min</div>
+                                <div class="metric-value" id="min-value">0</div>
+                            </div>
+                            <div class="metric-box">
+                                <div>Mean</div>
+                                <div class="metric-value" id="mean-value">0</div>
+                            </div>
+                            <div class="metric-box">
+                                <div>St. Dev</div>
+                                <div class="metric-value" id="std-value">0</div>
+                            </div>
+                            <div class="metric-box">
+                                <div>Mode</div>
+                                <div class="metric-value" id="mode-value">0</div>
+                            </div>
+                            <div class="metric-box">
+                                <div>Max</div>
+                                <div class="metric-value" id="max-value">0</div>
+                            </div>
+                        </div>
+                        
+                        <div id="container"></div>
+                        
+                        <div class="controls">
+                            <div class="kernel-options">
+                                <div class="kernel-option active" data-kernel="gaussian">Gaussian</div>
+                                <div class="kernel-option" data-kernel="epanechnikov">Epanechnikov</div>
+                                <div class="kernel-option" data-kernel="triangular">Triangular</div>
+                                <div class="kernel-option" data-kernel="uniform">Uniform</div>
+                            </div>
+                            
+                            <div class="slider-container">
+                                <label>Bandwidth adjustment (h): <span id="bandwidth-display">Automatic</span></label>
+                                <div id="bandwidth-slider"></div>
+                            </div>
+                            
+                            
+                        </div>
+                    </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // Global variables
+        let chart = null;
+        let originalData = [];
+        let kernelType = 'gaussian';
+        let bandwidthMultiplier = 1.0; // Default is automatic (Scott's rule * 1.0)
+        let updateTimeout = null; // For debouncing updates
+        
+        // Kernel functions
+        const kernels = {
+            gaussian: (u) => Math.exp(-0.5 * u * u) / Math.sqrt(2 * Math.PI),
+            epanechnikov: (u) => Math.abs(u) <= 1 ? 0.75 * (1 - u * u) : 0,
+            triangular: (u) => Math.abs(u) <= 1 ? (1 - Math.abs(u)) : 0,
+            uniform: (u) => Math.abs(u) <= 1 ? 0.5 : 0
+        };
+        
+        // Calculate statistics
+        function calculateStats(data) {
+            const min = Math.min(...data);
+            const max = Math.max(...data);
+            const mean = data.reduce((sum, val) => sum + val, 0) / data.length;
+            
+            // Standard deviation
+            const variance = data.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / data.length;
+            const stdDev = Math.sqrt(variance);
+            
+            return { min, max, mean, stdDev };
+        }
+        
+        // Estimate optimal bandwidth using Scott's rule
+        function getOptimalBandwidth(data) {
+            const n = data.length;
+            const stats = calculateStats(data);
+            // Scott's rule: h = 1.06 * σ * n^(-1/5)
+            return 1.06 * stats.stdDev * Math.pow(n, -0.2);
+        }
+        
+        // Calculate kernel density estimation (optimized for large datasets)
+        function calculateKDE(data, bandwidth, kernel, points = null) {
+            const stats = calculateStats(data);
+            const { min, max } = stats;
+            
+            // Dynamically adjust evaluation points based on data size
+            if (points === null) {
+                if (data.length < 1000) {
+                    points = 500;
+                } else if (data.length < 5000) {
+                    points = 300;
+                } else {
+                    points = 200;
+                }
+            }
+            
+            // Create evaluation points (x-values)
+            const range = max - min;
+            const padding = range * 0.1; // Add 10% padding on each side
+            const start = min - padding;
+            const end = max + padding;
+            const step = (end - start) / (points - 1);
+            
+            const kde = new Array(points);
+            const kernelFunc = kernels[kernel];
+            const invBandwidth = 1 / bandwidth;
+            
+            // Pre-calculate constants
+            const dataLength = data.length;
+            
+            // For very large datasets, use sampling for initial approximation
+            let workingData = data;
+            
+            if (dataLength > 10000) {
+                // Sample every nth point to reduce computation
+                const sampleSize = Math.min(5000, Math.max(1000, Math.floor(dataLength / 4)));
+                const sampleStep = Math.floor(dataLength / sampleSize);
+                workingData = [];
+                for (let i = 0; i < dataLength; i += sampleStep) {
+                    workingData.push(data[i]);
+                }
+                console.log(`Sampling ${workingData.length} points from ${dataLength} for performance`);
+            }
+            
+            // Calculate normalization factor based on working data
+            const normalizationFactor = 1 / (bandwidth * workingData.length);
+            
+            // Optimized nested loop with pre-calculated values
+            for (let i = 0; i < points; i++) {
+                const x = start + i * step;
+                let density = 0;
+                
+                // Inner loop optimized with fewer function calls
+                for (let j = 0, len = workingData.length; j < len; j++) {
+                    const u = (x - workingData[j]) * invBandwidth;
+                    density += kernelFunc(u);
+                }
+                
+                // Apply normalization (no sample correction needed since we normalized by working data length)
+                kde[i] = [x, density * normalizationFactor];
+            }
+            
+            // Debug output
+            const maxDensity = Math.max(...kde.map(point => point[1]));
+            const minDensity = Math.min(...kde.map(point => point[1]));
+            console.log(`KDE curve: ${kde.length} points, density range: ${minDensity.toExponential(3)} to ${maxDensity.toExponential(3)}`);
+            
+            return kde;
+        }
+        
+        // Calculate mode (highest density point)
+        function findMode(kdeData) {
+            let maxDensity = 0;
+            let mode = 0;
+            
+            kdeData.forEach(point => {
+                if (point[1] > maxDensity) {
+                    maxDensity = point[1];
+                    mode = point[0];
+                }
+            });
+            
+            return mode;
+        }
+        
+        // Create histogram data for background (optimized)
+        function createHistogram(data, bins = null) {
+            const stats = calculateStats(data);
+            const { min, max } = stats;
+            const range = max - min;
+            
+            // Adjust bins based on data size for performance
+            if (bins === null) {
+                if (data.length < 1000) {
+                    bins = 30;
+                } else if (data.length < 5000) {
+                    bins = 25;
+                } else {
+                    bins = 20;
+                }
+            }
+            
+            const binWidth = range / bins;
+            const invBinWidth = 1 / binWidth;
+            
+            // Initialize bins
+            const histogram = new Array(bins).fill(0);
+            
+            // Optimized bin counting with pre-calculated inverse
+            for (let i = 0, len = data.length; i < len; i++) {
+                const binIndex = Math.min(Math.floor((data[i] - min) * invBinWidth), bins - 1);
+                histogram[binIndex]++;
+            }
+            
+            // Quick max calculation
+            let maxBinCount = 0;
+            for (let i = 0; i < bins; i++) {
+                if (histogram[i] > maxBinCount) {
+                    maxBinCount = histogram[i];
+                }
+            }
+            
+            // Simplified scaling - avoid expensive KDE recalculation
+            const densityScale = 1 / (data.length * binWidth);
+            const targetHeight = 0.3; // Reduced target height so histogram doesn't dominate
+            const scaleFactor = targetHeight / (maxBinCount * densityScale);
+            
+            // Create histogram bars as [x, height, width] for Highcharts
+            const result = new Array(bins);
+            for (let i = 0; i < bins; i++) {
+                const x = min + i * binWidth;
+                const height = histogram[i] * densityScale * scaleFactor;
+                result[i] = [x, height, binWidth];
+            }
+            
+            return result;
+        }
+        
+        // Initialize the chart
+        function drawChart() {
+            if (chart) {
+                chart.destroy();
+            }
+            
+            console.log('Creating new Highcharts chart...');
+            chart = Highcharts.chart('container', {
+                chart: {
+                    type: 'area',
+                    zoomType: 'x',
+                    backgroundColor: 'transparent',
+                    style: {
+                        fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+                    }
+                },
+                title: { text: null },
+                xAxis: {
+                    title: { text: 'Value' },
+                    labels: {
+                        formatter: function() {
+                            return this.value.toLocaleString();
+                        }
+                    }
+                },
+                yAxis: {
+                    title: { text: 'Density' },
+                    labels: {
+                        formatter: function() {
+                            return this.value.toExponential(2);
+                        }
+                    },
+                    min: 0,
+                    startOnTick: false,
+                    endOnTick: false,
+                    maxPadding: 0.1
+                },
+                tooltip: {
+                    formatter: function() {
+                        if (this.series.name === 'KDE') {
+                            return `<b>Value: ${this.x.toLocaleString()}</b><br>Density: ${this.y.toExponential(4)}`;
+                        } else if (this.series.name === 'Data Points') {
+                            return `<b>Data point: ${this.x.toLocaleString()}</b>`;
+                        }
+                        return false;
+                    }
+                },
+                plotOptions: {
+                    area: {
+                        marker: { enabled: false },
+                        fillOpacity: 0.3,
+                        lineWidth: 3,
+                        threshold: 0
+                    },
+                    column: {
+                        grouping: false,
+                        pointPadding: 0,
+                        groupPadding: 0,
+                        borderWidth: 0,
+                        pointPlacement: 'between'
+                    },
+                    scatter: {
+                        marker: {
+                            symbol: 'line',
+                            lineWidth: 1,
+                            lineColor: 'rgb(120,200,255)',
+                            radius: 5
+                        }
+                    }
+                },
+                series: [{
+                    name: 'KDE',
+                    type: 'area',
+                    data: [],
+                    color: 'rgb(255,165,120)',
+                    fillColor: {
+                        linearGradient: {
+                            x1: 0,
+                            y1: 0,
+                            x2: 0,
+                            y2: 1
+                        },
+                        stops: [
+                            [0, 'rgba(255, 165, 120, 0.4)'],
+                            [1, 'rgba(255, 165, 120, 0.1)']
+                        ]
+                    },
+                    zIndex: 2
+                }, {
+                    name: 'Histogram',
+                    type: 'column',
+                    data: [],
+                    color: 'rgba(255, 165, 120, 0.2)',
+                    zIndex: 1,
+                    enableMouseTracking: false
+                }, {
+                    name: 'Data Points',
+                    type: 'scatter',
+                    data: [],
+                    color: 'rgb(120,200,255)',
+                    zIndex: 3
+                }]
+            });
+            
+            return chart;
+        }
+        
+        // Update chart and statistics display (optimized for large datasets)
+        function updateKDE() {
+            if (originalData.length === 0) return;
+            
+            console.log(`Processing ${originalData.length} data points...`);
+            const startTime = performance.now();
+            
+            // Show loading indicator for large datasets
+            if (originalData.length > 5000) {
+                const currentValueEl = document.getElementById('current-value');
+                if (currentValueEl) {
+                    currentValueEl.style.opacity = '0.5';
+                    currentValueEl.innerHTML = 'Processing large dataset...';
+                }
+            }
+            
+            const optimalBandwidth = getOptimalBandwidth(originalData);
+            const bandwidth = optimalBandwidth * bandwidthMultiplier;
+            
+            const stats = calculateStats(originalData);
+            const kdeData = calculateKDE(originalData, bandwidth, kernelType);
+            const mode = findMode(kdeData);
+            
+            // Update chart
+            if (!chart) {
+                chart = drawChart();
+            }
+            
+            if (!chart) {
+                console.error('Failed to create chart!');
+                return;
+            }
+            
+            // Batch all chart updates to minimize redraws
+            console.log(`Setting KDE data: ${kdeData.length} points, first few: `, kdeData.slice(0, 3));
+            
+            // Check if KDE data has valid values
+            const hasValidData = kdeData.some(point => point[1] > 0);
+            console.log(`KDE has valid data: ${hasValidData}`);
+            
+            if (chart.series && chart.series[0]) {
+                chart.series[0].setData(kdeData, false);
+                console.log('KDE data set successfully');
+            } else {
+                console.error('Chart series not available');
+            }
+            
+            // Add histogram as bars in background
+            const histogramData = createHistogram(originalData);
+            chart.series[1].setData(histogramData, false);
+            
+            // Optimize scatter data for large datasets
+            let scatterData;
+            if (originalData.length > 2000) {
+                // Sample scatter points for performance - show every nth point
+                const sampleRate = Math.ceil(originalData.length / 1000);
+                scatterData = [];
+                for (let i = 0; i < originalData.length; i += sampleRate) {
+                    scatterData.push([originalData[i], 0]);
+                }
+                console.log(`Showing ${scatterData.length} scatter points (sampled from ${originalData.length})`);
+            } else {
+                scatterData = originalData.map(value => [value, 0]);
+            }
+            chart.series[2].setData(scatterData, false);
+            
+            // Force proper Y-axis scaling for the KDE curve
+            const maxKDEDensity = Math.max(...kdeData.map(point => point[1]));
+            if (maxKDEDensity > 0) {
+                chart.yAxis[0].setExtremes(0, maxKDEDensity * 1.1, false);
+                console.log(`Set Y-axis max to: ${(maxKDEDensity * 1.1).toExponential(3)}`);
+            }
+            
+            // Single redraw after all updates
+            chart.redraw();
+            
+            // Update metrics display with cached calculations (with null checks)
+            const formatOptions = {maximumFractionDigits: 2};
+            const minEl = document.getElementById('min-value');
+            const meanEl = document.getElementById('mean-value');
+            const modeEl = document.getElementById('mode-value');
+            const maxEl = document.getElementById('max-value');
+            const stdEl = document.getElementById('std-value');
+            const bandwidthDisplayEl = document.getElementById('bandwidth-display');
+            const bandwidthValueEl = document.getElementById('bandwidth-value');
+            const kernelTypeEl = document.getElementById('kernel-type');
+            const countEl = document.getElementById('count-value');
+            
+            if (minEl) minEl.textContent = stats.min.toLocaleString(undefined, formatOptions);
+            if (meanEl) meanEl.textContent = stats.mean.toLocaleString(undefined, formatOptions);
+            if (modeEl) modeEl.textContent = mode.toLocaleString(undefined, formatOptions);
+            if (maxEl) maxEl.textContent = stats.max.toLocaleString(undefined, formatOptions);
+            if (stdEl) stdEl.textContent = stats.stdDev.toLocaleString(undefined, formatOptions);
+            if (countEl) countEl.textContent = originalData.length.toLocaleString();
+            
+            // Update bandwidth display
+            const bandwidthText = bandwidth.toLocaleString(undefined, formatOptions);
+            if (bandwidthDisplayEl) {
+                bandwidthDisplayEl.textContent = 
+                    bandwidthMultiplier === 1.0 ? 
+                    `Automatic (${bandwidthText})` : 
+                    `${bandwidthText} (${bandwidthMultiplier.toFixed(2)}x)`;
+            }
+                
+            if (bandwidthValueEl) {
+                bandwidthValueEl.textContent = 
+                    bandwidthMultiplier === 1.0 ? 
+                    'Automatic' : `${bandwidthMultiplier.toFixed(2)}x`;
+            }
+                
+            if (kernelTypeEl) {
+                kernelTypeEl.textContent = 
+                    kernelType.charAt(0).toUpperCase() + kernelType.slice(1);
+            }
+            
+            // Restore normal display and show completion time
+            const currentValueEl = document.getElementById('current-value');
+            if (currentValueEl) {
+                currentValueEl.style.opacity = '1';
+                currentValueEl.innerHTML = 
+                    `Bandwidth: <span id="bandwidth-value">${bandwidthMultiplier === 1.0 ? 'Automatic' : bandwidthMultiplier.toFixed(2) + 'x'}</span> | Kernel: <span id="kernel-type">${kernelType.charAt(0).toUpperCase() + kernelType.slice(1)}</span>`;
+            }
+            
+            const endTime = performance.now();
+            console.log(`KDE calculation completed in ${(endTime - startTime).toFixed(1)}ms`);
+        }
+        
+        // Set up bandwidth slider
+        function setupBandwidthSlider() {
+            const sliderElement = document.getElementById('bandwidth-slider');
+            
+            // Destroy slider if it already exists
+            if (sliderElement.noUiSlider) {
+                sliderElement.noUiSlider.destroy();
+            }
+            
+            // Create slider with range 0.1 to 3.0 times optimal bandwidth
+            noUiSlider.create(sliderElement, {
+                start: [1.0],
+                connect: true,
+                range: {
+                    'min': 0.1,
+                    '25%': 0.5,
+                    '50%': 1.0,
+                    '75%': 2.0,
+                    'max': 3.0
+                },
+                format: {
+                    to: function (value) {
+                        return value.toFixed(2);
+                    },
+                    from: function (value) {
+                        return Number(value);
+                    }
+                },
+                pips: {
+                    mode: 'values',
+                    values: [0.1, 0.5, 1.0, 2.0, 3.0],
+                    density: 5
+                }
+            });
+            
+            // Update when slider changes (with debouncing for performance)
+            sliderElement.noUiSlider.on('update', function (values, handle) {
+                bandwidthMultiplier = Number(values[handle]);
+                
+                // Clear existing timeout
+                if (updateTimeout) {
+                    clearTimeout(updateTimeout);
+                }
+                
+                // Debounce updates for large datasets
+                const debounceTime = originalData.length > 5000 ? 300 : 100;
+                updateTimeout = setTimeout(() => {
+                    updateKDE();
+                    updateTimeout = null;
+                }, debounceTime);
+            });
+        }
+        
+        // Set data and initialize
+        window.setDataAndInitialValueFromVB6 = function (jsonString) {
+            console.log("Received data:", jsonString);
+            
+            try {
+                const newData = JSON.parse(jsonString);
+                
+                if (!Array.isArray(newData) || newData.length === 0) {
+                    console.error("Invalid data format or empty array");
+                    return;
+                }
+                
+                console.log("Data parsed successfully, length:", newData.length);
+                originalData = newData;
+                
+                // Initialize chart if not already
+                if (!chart) {
+                    chart = drawChart();
+                }
+                
+                // Set up bandwidth slider based on data
+                setupBandwidthSlider();
+                
+                // Calculate and display KDE
+                updateKDE();
+                
+                console.log("Successfully loaded data with " + newData.length + " points");
+                
+            } catch (e) {
+                console.error("Error parsing or drawing:", e);
+                alert("Error processing data: " + e.message);
+            }
+        };
+        
+        // VB6 bridge function - can be called from host application to check if page is ready
+        window.isKernelDensityReady = function() {
+            return true;
+        };
+        
+        // Event handlers for kernel type selection
+        document.addEventListener('DOMContentLoaded', function() {
+            // Kernel type buttons
+            document.querySelectorAll('.kernel-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    document.querySelectorAll('.kernel-option').forEach(opt => opt.classList.remove('active'));
+                    this.classList.add('active');
+                    kernelType = this.dataset.kernel;
+                    updateKDE();
+                });
+            });
+            
+            // Reload button
+            document.querySelector('.fa-redo').addEventListener('click', function() {
+                // Reset to defaults
+                bandwidthMultiplier = 1.0;
+                kernelType = 'gaussian';
+                
+                // Update UI
+                document.querySelectorAll('.kernel-option').forEach(opt => {
+                    opt.classList.toggle('active', opt.dataset.kernel === 'gaussian');
+                });
+                
+                const slider = document.getElementById('bandwidth-slider').noUiSlider;
+                if (slider) {
+                    slider.set(1.0);
+                }
+                
+                updateKDE();
+            });
+        });
+
+        // Initialize with example data
+        (function loadExampleData() {
+            console.log("Initializing with example data...");
+            setTimeout(function() {
+                if (originalData.length === 0) {
+                    const example = [12282,23145,31256,45789,56234,67891,72345,83426,92341,103452,
+                                    110234,121074,135689,142367,156230,169845,178932,189553,201234,
+                                    213567,226789,245678,267890,289012,312345,336789,352844,367891,
+                                    389012,412345,447890,478901,512345,556789,600891];
+                                    
+                    console.log("Loading example data with", example.length, "points");
+                    setDataAndInitialValueFromVB6(JSON.stringify(example));
+                    console.log("Example data loaded");
+                }
+            }, 500);
+        })();
+    </script>
+
+<script>
+// Custom element removed - using original dropdown instead
+</script>
+<script>
+document.querySelectorAll('input[name="distribution"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    const dist = e.target.value;
+    console.log("Switching to distribution:", dist);
+
+    // Show loading
+    document.getElementById("loadingOverlay").style.display = "flex";
+
+    setTimeout(() => {
+      // Hide loading
+      document.getElementById("loadingOverlay").style.display = "none";
+
+      // Replace this with your real data logic or call to injectDataFromVB6()
+      console.log("Finished loading distribution:", dist);
+    }, 600);
+  });
+});
+
+// Function to toggle dropdown visibility
+window.toggleAnalysisDropdown = function() {
+    const dropdown = document.getElementById('analysisDropdown');
+    const btn = document.querySelector('.dropdown-btn');
+    
+    if (dropdown.classList.contains('show')) {
+        dropdown.classList.remove('show');
+        btn.classList.remove('open');
+    } else {
+        dropdown.classList.add('show');
+        btn.classList.add('open');
+    }
+};
+
+// Function to select analysis type
+window.selectAnalysis = function(caseCode, analysisName, element) {
+    console.log('Selecting analysis:', analysisName, caseCode);
+    
+    // Update active state for all options
+    document.querySelectorAll('.analysis-option').forEach(option => {
+        option.classList.remove('active');
+    });
+    
+    // Set the selected option as active
+    element.classList.add('active');
+    
+    // Close dropdown
+    const dropdown = document.getElementById('analysisDropdown');
+    const btn = document.querySelector('.dropdown-btn');
+    if (dropdown && btn) {
+        dropdown.classList.remove('show');
+        btn.classList.remove('open');
+    }
+    
+    // Send message to VB6 using VB6 injected function
+    sendMessageToVB6(caseCode, caseCode);
+};
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('.dropdown-container')) {
+        const dropdown = document.getElementById('analysisDropdown');
+        const btn = document.querySelector('.dropdown-btn');
+        if (dropdown && btn) {
+            dropdown.classList.remove('show');
+            btn.classList.remove('open');
+        }
+    }
+});
+</script>
+</body>
+</html>

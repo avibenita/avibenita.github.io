@@ -1,5 +1,5 @@
 cd/
-cd c:\Sites\avibenita.github.io\
+cd c:\Users\Avi Benita\OneDrive\Word\0_HTML-TemplateForSite\
 
-py -3 -m http.server 5500
+py -3 -m http.server 8000
 

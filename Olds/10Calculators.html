@@ -1,49 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<!-- bridge for Wix Studio -->
-<!doctype html><html><head>
- <!-- set a dynamic <base> so root-relative paths work everywhere -->
-<script>
-(function () {
-  var b = document.createElement('base');
-  // Always default to the *current directory* for local dev and custom domains
-  // file:// → current folder
-  // github.io → project root
-  // others (e.g., localhost) → current folder
-  if (location.hostname.endsWith('github.io')) {
-    b.href = '/Statistical-Calculator/';
-  } else {
-    b.href = new URL('./', location.href);
-    }
-    document.head.appendChild(b);
-})();
-</script>
+  <!-- Header CSS for local server -->
+  <link rel="stylesheet" href="../assets/css/Header.css">
 
-<link rel="stylesheet" href="/assets/css/Header.css">
+  <style>
+    html, body { margin: 0; }
+    iframe { border: 0; width: 100%; min-height: 940px; }
+  </style>
+  <title>Statistical Calculators Hub</title>
+</head>
 
+<body>
+  <div id="site-header"></div>
 
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-  html,body{margin:0}
-  iframe{border:0; width:100%; min-height:940px}
-</style>
-</head><body>
-   <div id="site-header"></div>
-  <iframe id="app" src="IframeWix.html"></iframe>
+  <!-- Set src via script to avoid <base> changing the intended folder -->
+  <iframe id="app" title="Calculators Hub"></iframe>
+
   <script>
-    // Forward child -> Wix page code
-    window.addEventListener('message', (e) => { try { window.parent && window.parent.postMessage(e.data, '*'); } catch(_){} });
+    // Ensure iframe points to the file next to this document, regardless of <base>
+    (function(){
+      var app = document.getElementById('app');
+      app.src = new URL('IframeWix.html', location.href).toString();
+    })();
+  </script>
+
+  <!-- Forward child -> Wix page code -->
+  <script>
+    window.addEventListener('message', (e) => {
+      try { window.parent && window.parent.postMessage(e.data, '*'); } catch (_){}
+    });
+  </script>
+
+  <!-- Load header from partials directory -->
+  <script>
+  (function(){
+    // Load header content
+    fetch('../partials/header.html')
+      .then(response => {
+        if (!response.ok) throw new Error('Header not found');
+        return response.text();
+      })
+      .then(html => {
+        const headerContainer = document.getElementById('site-header');
+        if (headerContainer) {
+          headerContainer.innerHTML = html;
+        }
+        
+        // Load header JavaScript
+        const script = document.createElement('script');
+        script.src = '../assets/js/header.js';
+        document.body.appendChild(script);
+        
+        console.log('[header] loaded successfully');
+      })
+      .catch(err => {
+        console.warn('[header] failed to load:', err);
+      });
+  })();
   </script>
 </body>
-<script>
-  fetch('header.html')
-    .then(r => r.text())
-    .then(html => {
-      document.getElementById('site-header').innerHTML = html;
-      const s = document.createElement('script');
-      s.src = 'assets/js/header.js';
-      document.body.appendChild(s);
-    })
-    .catch(err => console.warn('Header include failed:', err));
-</script>
-
 </html>

@@ -1,0 +1,393 @@
+SEQUENCE DIAGRAM: Column Change Trigger Flow
+==============================================
+
+Timeline (milliseconds):
+┌─────┬──────┬──────┬──────┬──────┬──────┬──────┬──────┐
+│ 0ms │ 50ms │100ms │150ms │200ms │250ms │300ms │500ms │
+└─────┴──────┴──────┴──────┴──────┴──────┴──────┴──────┘
+
+═════════════════════════════════════════════════════════════════════════════════════
+
+                        USER INTERACTION
+                        
+0ms  ┌─────────────────────────────────────────────────────────────┐
+     │ User clicks dropdown and selects new column                 │
+     │ Event: ddlVariable.onchange fires                           │
+     └────────────────────┬────────────────────────────────────────┘
+                          │
+                          ▼
+        ┌─────────────────────────────────────────────────────────┐
+5ms     │ EVENT HANDLER (InputsXL-OnePanel-ES5-ordo.html:1203)    │
+        │ • Get range from tbRange.value                          │
+        │ • Get selected column from ddlVariable.value            │
+        │ • Clear: S.rawValues = []                               │
+        │ • Clear: S.rawGroups = []                               │
+        │ • Show loading message                                  │
+        │ • Disable processing tabs                               │
+        │ ► sendToHost('GetVariableData', {...})                 │
+        └────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+        ┌─────────────────────────────────────────────────────────┐
+10ms    │ MESSAGE TO VB6 HOST                                     │
+        │ window.vbHost.RaiseMessageEvent(action, payload)       │
+        │                                                         │
+        │ Payload:                                                │
+        │ {                                                       │
+        │   action: "GetVariableData"                             │
+        │   payload: JSON {                                       │
+        │     range: "Sheet1!A1:D100",                            │
+        │     variable: "Age"                                     │
+        │   }                                                     │
+        │ }                                                       │
+        └────────────────────┬────────────────────────────────────┘
+                             │
+                             │ [VB6 PROCESSES...]
+                             │ Extracts data from Excel column
+                             │ Validates numeric values
+                             │ Returns JSON via callback
+                             │
+                             ▼
+        ┌─────────────────────────────────────────────────────────┐
+50ms    │ VB6 CALLBACK: populateFromVB6(jsonString)               │
+        │ (InputsXL-OnePanel-ES5-ordo.html:986)                  │
+        │                                                         │
+        │ • Parse JSON: var d = JSON.parse(jsonString)            │
+        │ • Extract raw values from d.values                      │
+        │ • Filter to numeric values only                         │
+        │ • Store in S.rawValues = [array]                        │
+        │ • Store groups in S.rawGroups = [array]                │
+        │ • Store total count: S.totalDataCount = count           │
+        │ • Store filter info                                     │
+        │ • Validate: Check if we have ≥5 numeric values         │
+        │                                                         │
+        │ If validation passes:                                   │
+        │ • enableTabs() - re-enable "Trim" & "Transform" tabs   │
+        │ • renderStats(S.valuesTrimmed)                         │
+        │ ► recalc()  ◄─── ENTRY POINT TO CALCULATION          │
+        └────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+        ┌─────────────────────────────────────────────────────────┐
+60ms    │ RECALCULATE: recalc() (Line 683)                        │
+        │                                                         │
+        │ 1. Get raw values: var vals = S.rawValues.slice(0)     │
+        │ 2. Filter by selected group if active                  │
+        │                                                         │
+        │ 3. Apply TRIM (min/max):                               │
+        │    • Get vmin, vmax from tbMin, tbMax inputs           │
+        │    • Filter: keep only values within [vmin, vmax]      │
+        │    • Store in: S.valuesTrimmed = [filtered]            │
+        │                                                         │
+        │ 4. Apply TRANSFORM (ln, sqrt, etc.):                  │
+        │    • Get transform type from radio buttons             │
+        │    • Map each value: x → fn(x)                         │
+        │    • Store in: S.values = [transformed]                │
+        │                                                         │
+        │ 5. Update statistics:                                   │
+        │    • renderStats(S.valuesTrimmed)                      │
+        │    • renderDatasetSummary()                            │
+        │    • syncSliderLabels()                                │
+        │    • updateTabIndicators()                             │
+        │    • statusDirty()                                     │
+        │                                                         │
+        │ ► autoSendResults()  ◄─── TRIGGERS HISTOGRAM UPDATE   │
+        └────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+        ┌─────────────────────────────────────────────────────────┐
+65ms    │ AUTO-SEND RESULTS: autoSendResults() (Line 629)         │
+        │                                                         │
+        │ • Check: if (!autoUpdateEnabled) return;              │
+        │   (auto-update must be enabled)                        │
+        │                                                         │
+        │ • Check: if (!S.rawValues.length) return;             │
+        │   (must have data)                                     │
+        │                                                         │
+        │ • If there's a pending timeout:                        │
+        │   clearTimeout(autoUpdateTimer)  [DEBOUNCE]            │
+        │   (cancel previous scheduled update)                   │
+        │                                                         │
+        │ • showUpdateIndicator()                                │
+        │   (show "Updating results..." banner)                  │
+        │                                                         │
+        │ • Schedule DEBOUNCED update:                           │
+        │   setTimeout(function() { ... }, 500)                  │
+        │                                                         │
+        │ After 500ms delay:                                     │
+        │                                                         │
+        │ Prepare processedData object:                          │
+        │ {                                                      │
+        │   variableName: "Age",                                 │
+        │   rawValues: [32, 45, 28, ...],  ← original data       │
+        │   trimmedValues: [32, 45, 28],   ← after trim          │
+        │   transformedValues: [3.46, 3.81, 3.33],  ← after xfm │
+        │   transformType: "ln",                                 │
+        │   trimRange: { min: 20, max: 80 },                    │
+        │   totalDataCount: 500,                                 │
+        │   trimApplied: true,                                   │
+        │   originalCount: 456,                                  │
+        │   keepModule: true                                    │
+        │ }                                                      │
+        │                                                         │
+        │ ► sendToHost('ShowResults', JSON.stringify(...))      │
+        └────────────────────┬────────────────────────────────────┘
+                             │
+                             │ [500ms DEBOUNCE DELAY]
+                             │
+                             ▼
+        ┌─────────────────────────────────────────────────────────┐
+505ms   │ SEND TO VB6 (via sendToHost)                            │
+        │                                                         │
+        │ window.vbHost.RaiseMessageEvent('ShowResults', JSON)  │
+        │                                                         │
+        │ VB6 receives 'ShowResults' event with processedData   │
+        │ and calls populateHistogram() in browser               │
+        └────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+        ┌─────────────────────────────────────────────────────────┐
+510ms   │ HISTOGRAM RECEIVES DATA                                 │
+        │ populateHistogram(jsonString, numBins)                 │
+        │ (0HistogramPlus.html:2170)                             │
+        │                                                         │
+        │ • Parse incoming data: var S = JSON.parse(jsonString) │
+        │ • Extract transformedValues (for visualization)       │
+        │ • Calculate histogram bins (using numBins param)      │
+        │ • Update Chart.js chart object                        │
+        │ • Recalculate KDE (kernel density)                    │
+        │ • Recalculate QQ-plot values                          │
+        │ • Update normality test results                        │
+        │ • Render all visualizations                           │
+        │                                                         │
+        │ RESULT: Histogram updates on screen!                   │
+        │         All related charts refresh                     │
+        └─────────────────────────────────────────────────────────┘
+                             │
+                             ▼
+        ┌─────────────────────────────────────────────────────────┐
+520ms   │ UI INDICATORS CLEAR                                     │
+        │ hideUpdateIndicator()                                   │
+        │ (remove "Updating results..." banner)                  │
+        └─────────────────────────────────────────────────────────┘
+
+
+═════════════════════════════════════════════════════════════════════════════════════
+
+CRITICAL CODE SECTIONS:
+═════════════════════════════════════════════════════════════════════════════════════
+
+1. COLUMN DROPDOWN CHANGE HANDLER
+   Location: InputsXL-OnePanel-ES5-ordo.html, Line 1203
+   
+   qs('ddlVariable').onchange = function() {
+     var r = qs('tbRange').value || '';
+     var v = this.value || '';
+     if(r && v) {
+       S.rawValues = [];
+       renderStats([]);
+       
+       var summaryEl = qs('summaryContent');
+       summaryEl.innerHTML = '<div>Loading data...</div>';
+       
+       disableTabs();
+       setActive('panel-summary');
+       statusDirty();
+       
+       sendToHost('GetVariableData', JSON.stringify({ range: r, variable: v }));
+     }
+   };
+   
+   KEY BEHAVIORS:
+   ✓ Clears old data immediately (S.rawValues = [])
+   ✓ Shows loading spinner
+   ✓ Disables processing tabs until new data arrives
+   ✓ Sends request to VB6 to extract column from Excel
+
+═════════════════════════════════════════════════════════════════════════════════════
+
+2. VB6 CALLBACK - DATA POPULATION
+   Location: InputsXL-OnePanel-ES5-ordo.html, Line 986
+   
+   window.populateFromVB6 = function(jsonString) {
+     try {
+       var d = JSON.parse(jsonString);
+       
+       S.totalDataCount = d.values.length;
+       S.isFiltered = d.filtered || false;
+       
+       var validData = [];
+       var rawData = d.values;
+       
+       // Filter to numeric values only
+       for(var i = 0; i < rawData.length; i++) {
+         var val = rawData[i];
+         var numVal = parseFloat(val);
+         if (!isNaN(numVal) && isFinite(numVal)) {
+           validData.push(numVal);
+         }
+       }
+       
+       S.rawValues = validData;
+       
+       // Validate: need at least 5 values
+       if(validData.length < 5) {
+         showValidationMessage('error', 'Insufficient data...');
+         disableTabs();
+         return false;
+       }
+       
+       // Success: enable processing
+       S.rawGroups = (d.groups && d.groups.length === d.values.length) ? d.groups : [];
+       enableTabs();
+       updateSlidersForNewData();
+       renderGroupLevels();
+       recalc();  ◄─── TRIGGERS HISTOGRAM UPDATE CHAIN
+       return true;
+     } catch(ex) {}
+     return false;
+   };
+   
+   KEY BEHAVIORS:
+   ✓ Validates that values are numeric
+   ✓ Stores total count (for display)
+   ✓ Checks minimum 5 valid values requirement
+   ✓ Enables processing tabs
+   ✓ Calls recalc() to start calculation chain
+
+═════════════════════════════════════════════════════════════════════════════════════
+
+3. AUTO-SEND RESULTS - HISTOGRAM TRIGGER
+   Location: InputsXL-OnePanel-ES5-ordo.html, Line 629
+   
+   var autoUpdateEnabled = true;
+   var autoUpdateTimer = null;
+   
+   function autoSendResults() {
+     if (!autoUpdateEnabled || !S.rawValues.length) return;
+     
+     if (autoUpdateTimer) clearTimeout(autoUpdateTimer);
+     
+     showUpdateIndicator();
+     
+     autoUpdateTimer = setTimeout(function() {
+       var selectedVar = qs('ddlVariable').value || 'Unknown';
+       var transformType = (document.querySelector('input[name="transform"]:checked')||{}).value || 'none';
+       var trimMin = parseNullable(qs('tbMin').value);
+       var trimMax = parseNullable(qs('tbMax').value);
+       
+       var isTrimApplied = trimMin !== null || trimMax !== null || 
+                          S.rawValues.length !== S.valuesTrimmed.length;
+       
+       var processedData = {
+         variableName: selectedVar,
+         rawValues: S.rawValues.slice(0),
+         trimmedValues: S.valuesTrimmed.slice(0),
+         transformedValues: S.values.slice(0),
+         transformType: transformType,
+         trimRange: { min: trimMin, max: trimMax },
+         totalDataCount: S.totalDataCount || S.rawValues.length,
+         trimApplied: isTrimApplied,
+         originalCount: S.rawValues.length,
+         keepModule: true
+       };
+       
+       sendToHost('ShowResults', JSON.stringify(processedData));
+       
+       setTimeout(hideUpdateIndicator, 800);
+     }, 500);  ◄─── 500ms DEBOUNCE DELAY
+   }
+   
+   KEY BEHAVIORS:
+   ✓ 500ms debounce prevents excessive histogram redraws
+   ✓ Packages three data arrays: raw, trimmed, transformed
+   ✓ Includes all metadata: transforms, trims, counts
+   ✓ Shows "Updating results..." indicator
+   ✓ Sends via sendToHost → VB6 → populateHistogram()
+
+═════════════════════════════════════════════════════════════════════════════════════
+
+GLOBAL STATE OBJECT (S):
+═════════════════════════════════════════════════════════════════════════════════════
+
+var S = {
+  rawValues: [],           // Original numeric values from Excel (filtered)
+  rawGroups: [],           // Optional group/category for each value
+  valuesTrimmed: [],       // After applying min/max trim
+  values: [],              // After applying transformation (ln, sqrt, etc.)
+  selectedGroup: "__ALL__", // Currently selected subgroup filter
+  totalDataCount: 0,       // Total data points before filtering (for display)
+  isFiltered: false,       // Whether Excel has AutoFilter applied
+  hiddenRows: 0,           // Count of hidden rows in Excel
+  visibleRows: 0           // Count of visible rows in Excel
+};
+
+DATA TRANSFORMATION PIPELINE:
+Excel Column
+    ↓ [VB6 extracts]
+d.values (all values including text/blanks)
+    ↓ [JavaScript filters numeric]
+S.rawValues [32, 45, 28, ...] (cleaned numeric)
+    ↓ [Apply min/max trim]
+S.valuesTrimmed [32, 45, 28, ...] (within range)
+    ↓ [Apply transformation function]
+S.values [3.46, 3.81, 3.33, ...] (ln applied)
+    ↓ [Send to Histogram]
+Visualization ← renderChart()
+
+
+═════════════════════════════════════════════════════════════════════════════════════
+
+DEBOUNCING EXPLANATION:
+═════════════════════════════════════════════════════════════════════════════════════
+
+Why 500ms debounce?
+
+Scenario: User moves trim slider from 10 to 50 (dragging continuously)
+
+WITHOUT debounce:
+├─ Slider at 15 → recalc() → autoSendResults() → Histogram redraws [~50ms]
+├─ Slider at 20 → recalc() → autoSendResults() → Histogram redraws [~50ms]
+├─ Slider at 25 → recalc() → autoSendResults() → Histogram redraws [~50ms]
+├─ ... (MANY MORE REDRAWS - slows down UI)
+└─ Result: Sluggish, janky interaction
+
+WITH 500ms debounce:
+├─ Slider at 15 → scheduleUpdate(500)
+├─ Slider at 20 → [cancel previous] → scheduleUpdate(500)
+├─ Slider at 25 → [cancel previous] → scheduleUpdate(500)
+├─ Slider at 30 → [cancel previous] → scheduleUpdate(500)
+├─ [No change for 500ms...]
+└─ Slider finally stops at 50
+   └─ autoUpdateTimer fires after 500ms → ONE histogram redraw
+   
+Result: Smooth interaction, ONE update with final values
+
+
+═════════════════════════════════════════════════════════════════════════════════════
+
+EVENTS THAT TRIGGER autoSendResults():
+═════════════════════════════════════════════════════════════════════════════════════
+
+1. Column Change (ddlVariable.onchange)
+   → populateFromVB6() → recalc() → autoSendResults()
+   
+2. Trim Slider Change (slMin/slMax.oninput)
+   → slidersChanged() → recalc() → autoSendResults()
+   
+3. Explicit Min/Max Input (tbMin/tbMax.oninput)
+   → explicitValuesChanged() → recalc() → autoSendResults()
+   
+4. Transform Selection Change (radio button.onchange)
+   → recalc() → autoSendResults()
+   
+5. Group Selection Change (ddlGroupValue.onchange)
+   → recalc() → autoSendResults()
+   
+6. Reset Button Click (btnResetTT.onclick)
+   → recalc() → autoSendResults()
+
+All paths converge on: recalc() → autoSendResults() → Histogram updates
+
+
+═════════════════════════════════════════════════════════════════════════════════════

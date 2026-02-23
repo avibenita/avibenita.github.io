@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Outliers Detection - Statistico</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
+  <link rel="stylesheet" href="../shared-header.css">
+  <script src="../shared-header.js"></script>
+  
+  <style>
+    :root {
+      --surface-0: #0c1624;
+      --surface-1: #1a1f2e;
+      --surface-2: #242938;
+      --border: #2d3748;
+      --accent-1: rgb(255,165,120);
+      --accent-2: rgb(120,200,255);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255,255,255,0.8);
+      --text-muted: rgba(255,255,255,0.6);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--surface-0);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text-primary);
+      overflow-x: hidden;
+    }
+
+    .results-container {
+      padding: 10px;
+      max-width: 100%;
+    }
+
+    /* Method Selection Panel */
+    .method-panel {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    .panel-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent-1);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .method-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .method-btn {
+      padding: 8px 10px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      text-align: center;
+    }
+
+    .method-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--accent-1);
+      transform: translateY(-1px);
+    }
+
+    .method-btn.active {
+      background: rgba(255, 165, 120, 0.15);
+      border-color: var(--accent-1);
+      box-shadow: 0 0 12px rgba(255, 165, 120, 0.3);
+    }
+
+    .method-btn i {
+      font-size: 16px;
+      color: var(--accent-2);
+    }
+
+    .method-btn .method-name {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .method-btn .method-desc {
+      font-size: 9px;
+      color: var(--text-muted);
+    }
+
+    /* Summary Panel */
+    .summary-panel {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+
+    .summary-content {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .summary-stat {
+      flex: 1;
+      text-align: center;
+      padding: 12px;
+      background: rgba(255, 165, 120, 0.1);
+      border-radius: 6px;
+      border: 1px solid rgba(255, 165, 120, 0.3);
+    }
+
+    .summary-stat.no-outliers {
+      background: rgba(120, 200, 255, 0.1);
+      border-color: rgba(120, 200, 255, 0.3);
+    }
+
+    .summary-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .summary-value {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--accent-1);
+    }
+
+    .summary-stat.no-outliers .summary-value {
+      color: var(--accent-2);
+    }
+
+    /* Comparison Table */
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    .comparison-table th {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 6px;
+      text-align: center;
+      color: var(--accent-2);
+      font-weight: 600;
+      border: 1px solid var(--border);
+    }
+
+    .comparison-table td {
+      padding: 6px;
+      text-align: center;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .comparison-table td:first-child {
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    /* Outliers Table and Chart Grid */
+    .results-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .results-panel {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .results-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .show-table-btn {
+      padding: 6px 14px;
+      background: linear-gradient(135deg, var(--accent-1), rgb(255,140,90));
+      border: none;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .show-table-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 12px rgba(255, 165, 120, 0.5);
+    }
+
+    .show-table-btn i {
+      font-size: 12px;
+    }
+
+    #outliersTableContainer {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0 10px;
+      max-height: 0;
+      opacity: 0;
+      transform: translateY(-15px);
+      transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+                  opacity 0.3s ease-out, 
+                  transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                  padding 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      margin-bottom: 0;
+      visibility: hidden;
+    }
+
+    #outliersTableContainer.visible {
+      max-height: 400px;
+      opacity: 1;
+      transform: translateY(0);
+      padding: 10px;
+      margin-bottom: 10px;
+      visibility: visible;
+    }
+
+    #outliersTableContent {
+      max-height: 100%;
+      overflow: visible;
+    }
+
+    .order-toggle {
+      display: flex;
+      gap: 6px;
+    }
+
+    .order-btn {
+      padding: 4px 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      color: var(--text-secondary);
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .order-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .order-btn.active {
+      background: rgba(255, 165, 120, 0.15);
+      border-color: var(--accent-1);
+      color: var(--accent-1);
+    }
+
+    /* Outliers Table */
+    .outliers-table-container {
+      max-height: 250px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      border-radius: 6px;
+    }
+
+    /* Webkit Scrollbar Styling */
+    .outliers-table-container::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .outliers-table-container::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+    }
+
+    .outliers-table-container::-webkit-scrollbar-thumb {
+      background: rgba(255, 165, 120, 0.5);
+      border-radius: 4px;
+    }
+
+    .outliers-table-container::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 165, 120, 0.7);
+    }
+
+    .outliers-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .outliers-table th {
+      position: sticky;
+      top: 0;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 8px;
+      text-align: left;
+      color: var(--accent-2);
+      font-weight: 600;
+      border: 1px solid var(--border);
+      z-index: 10;
+    }
+
+    .outliers-table td {
+      padding: 8px;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .outlier-badge {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .outlier-badge.lower {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+    }
+
+    .outlier-badge.upper {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+    }
+
+    .excel-address {
+      font-family: 'Courier New', monospace;
+      color: var(--accent-2);
+      font-weight: 600;
+    }
+
+    .no-outliers {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-muted);
+    }
+
+    .no-outliers i {
+      font-size: 48px;
+      color: var(--accent-2);
+      margin-bottom: 12px;
+    }
+
+    /* Chart Container */
+    .chart-container {
+      min-height: 280px;
+      max-height: 320px;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 6px;
+      padding: 6px;
+    }
+
+    @media (max-width: 900px) {
+      .method-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-height: 800px) {
+      .chart-container {
+        min-height: 240px;
+        max-height: 280px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <statistico-header view-name="Outliers Detection" module-name="Univariate Analysis"></statistico-header>
+  
+  <div class="results-container" id="results-container">
+    <!-- Method Selection -->
+    <div class="method-panel">
+      <div class="panel-title">
+        <i class="fa-solid fa-filter"></i>
+        Detection Method
+      </div>
+      <div class="method-grid">
+        <button class="method-btn active" onclick="selectMethod('iqr')" id="method-iqr">
+          <i class="fa-solid fa-chart-simple"></i>
+          <span class="method-name">IQR Method</span>
+          <span class="method-desc">1.5 × IQR</span>
+        </button>
+        <button class="method-btn" onclick="selectMethod('zscore')" id="method-zscore">
+          <i class="fa-solid fa-chart-line"></i>
+          <span class="method-name">Z-Score</span>
+          <span class="method-desc">|z| > 3</span>
+        </button>
+        <button class="method-btn" onclick="selectMethod('grubbs')" id="method-grubbs">
+          <i class="fa-solid fa-flask"></i>
+          <span class="method-name">Grubbs Test</span>
+          <span class="method-desc">Statistical</span>
+        </button>
+        <button class="method-btn" onclick="selectMethod('mad')" id="method-mad">
+          <i class="fa-solid fa-shield-halved"></i>
+          <span class="method-name">MAD</span>
+          <span class="method-desc">Robust</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="summary-panel">
+      <div class="summary-content">
+        <div id="summaryCard" class="summary-stat">
+          <div class="summary-label">Outliers Detected</div>
+          <div class="summary-value" id="outlierCount">—</div>
+        </div>
+        <div style="flex: 2;">
+          <div id="comparisonTable"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Grid -->
+    <div class="results-grid">
+      <!-- Visualization Chart - MOVED FIRST -->
+      <div class="results-panel">
+        <div class="results-panel-header">
+          <div class="panel-title">
+            <i class="fa-solid fa-chart-scatter"></i>
+            Visualization
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div class="order-toggle">
+              <button class="order-btn active" onclick="toggleOrder('index')" id="order-index">By Index</button>
+              <button class="order-btn" onclick="toggleOrder('value')" id="order-value">By Value</button>
+            </div>
+            <button class="show-table-btn" onclick="toggleOutliersTable()" id="toggleTableBtn">
+              <i class="fa-solid fa-eye"></i>
+              <span id="toggleTableText">Show Details</span>
+            </button>
+          </div>
+        </div>
+        <div id="outliersChart" class="chart-container"></div>
+      </div>
+
+      <!-- Detected Outliers Table - Hidden by default, controlled by Show Details button -->
+      <div id="outliersTableContainer">
+        <div class="results-panel-header">
+          <div class="panel-title">
+            <i class="fa-solid fa-table"></i>
+            Detected Outliers
+          </div>
+        </div>
+        <div id="outliersTableContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let originalData = [];
+    let varName = 'Variable';
+    let columnName = 'A';
+    let currentMethod = 'iqr';
+    let chartOrder = 'index';
+    let outlierResults = null;
+    let librariesLoaded = false;
+    let dataReady = false;
+
+    // Check libraries
+    function checkLibraries() {
+      const highchartsReady = typeof Highcharts !== 'undefined';
+      const jstatReady = typeof jStat !== 'undefined';
+      librariesLoaded = highchartsReady && jstatReady;
+      if (!librariesLoaded) {
+        console.log('⏳ Waiting for Highcharts/jStat...');
+      } else {
+        console.log('✅ All libraries loaded');
+      }
+      return librariesLoaded;
+    }
+
+    // Excel address converter
+    function getExcelAddress(rowIndex) {
+      return `${columnName}${rowIndex + 2}`;
+    }
+
+    // Select method
+    window.selectMethod = function(method) {
+      currentMethod = method;
+      document.querySelectorAll('.method-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(`method-${method}`).classList.add('active');
+      if (dataReady) {
+        detectOutliers();
+      }
+    };
+
+    // Toggle chart order
+    window.toggleOrder = function(order) {
+      chartOrder = order;
+      document.querySelectorAll('.order-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(`order-${order}`).classList.add('active');
+      if (outlierResults) {
+        createChart();
+      }
+    };
+
+    // Toggle outliers table visibility
+    window.toggleOutliersTable = function() {
+      console.log('🔄 Toggle button clicked');
+      const tableContainer = document.getElementById('outliersTableContainer');
+      const toggleBtn = document.getElementById('toggleTableBtn');
+      const toggleText = document.getElementById('toggleTableText');
+      const toggleIcon = toggleBtn.querySelector('i');
+      
+      console.log('Table container:', tableContainer);
+      console.log('Current visibility:', tableContainer.classList.contains('visible'));
+      
+      tableContainer.classList.toggle('visible');
+      
+      if (tableContainer.classList.contains('visible')) {
+        console.log('✅ Showing table');
+        toggleText.textContent = 'Hide Details';
+        toggleIcon.className = 'fa-solid fa-eye-slash';
+        
+        // Scroll the table into view more prominently
+        setTimeout(() => {
+          tableContainer.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center',
+            inline: 'nearest'
+          });
+        }, 150);
+      } else {
+        console.log('❌ Hiding table');
+        toggleText.textContent = 'Show Details';
+        toggleIcon.className = 'fa-solid fa-eye';
+      }
+    };
+
+    // IQR Method
+    function detectIQR(data) {
+      const sorted = [...data].sort((a, b) => a - b);
+      const n = sorted.length;
+      const q1 = sorted[Math.floor(n * 0.25)];
+      const q3 = sorted[Math.floor(n * 0.75)];
+      const iqr = q3 - q1;
+      const lowerBound = q1 - 1.5 * iqr;
+      const upperBound = q3 + 1.5 * iqr;
+      
+      const outliers = data.map((val, idx) => ({
+        value: val,
+        index: idx,
+        isOutlier: val < lowerBound || val > upperBound,
+        type: val < lowerBound ? 'lower' : (val > upperBound ? 'upper' : null)
+      })).filter(item => item.isOutlier);
+      
+      return { method: 'IQR Method (1.5 × IQR)', outliers, lowerBound, upperBound };
+    }
+
+    // Z-Score Method
+    function detectZScore(data) {
+      const mean = data.reduce((a, b) => a + b, 0) / data.length;
+      const variance = data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / data.length;
+      const stdDev = Math.sqrt(variance);
+      const threshold = 3;
+      const lowerBound = mean - threshold * stdDev;
+      const upperBound = mean + threshold * stdDev;
+      
+      const outliers = data.map((val, idx) => {
+        const zScore = (val - mean) / stdDev;
+        return {
+          value: val,
+          index: idx,
+          zScore,
+          isOutlier: Math.abs(zScore) > threshold,
+          type: zScore < -threshold ? 'lower' : (zScore > threshold ? 'upper' : null)
+        };
+      }).filter(item => item.isOutlier);
+      
+      return { method: 'Z-Score Method (|z| > 3)', outliers, lowerBound, upperBound };
+    }
+
+    // Grubbs Test
+    function detectGrubbs(data) {
+      const n = data.length;
+      const mean = data.reduce((a, b) => a + b, 0) / n;
+      const variance = data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / (n - 1);
+      const stdDev = Math.sqrt(variance);
+      
+      const deviations = data.map((val, idx) => ({
+        value: val,
+        index: idx,
+        deviation: Math.abs(val - mean)
+      }));
+      
+      const maxDeviation = Math.max(...deviations.map(d => d.deviation));
+      const suspectPoint = deviations.find(d => d.deviation === maxDeviation);
+      
+      const G = maxDeviation / stdDev;
+      const alpha = 0.05;
+      const df = n - 2;
+      const tCrit = jStat.studentt.inv(1 - alpha / (2 * n), df);
+      const G_crit = ((n - 1) / Math.sqrt(n)) * Math.sqrt((tCrit ** 2) / (df + tCrit ** 2));
+      
+      const isOutlier = G > G_crit;
+      const outliers = isOutlier ? [{
+        value: suspectPoint.value,
+        index: suspectPoint.index,
+        isOutlier: true,
+        type: suspectPoint.value < mean ? 'lower' : 'upper'
+      }] : [];
+      
+      const lowerBound = mean - 3 * stdDev;
+      const upperBound = mean + 3 * stdDev;
+      
+      return { method: 'Grubbs Test (α=0.05)', outliers, lowerBound, upperBound };
+    }
+
+    // MAD Method
+    function detectMAD(data) {
+      const sorted = [...data].sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      const absDeviations = data.map(val => Math.abs(val - median));
+      const mad = [...absDeviations].sort((a, b) => a - b)[Math.floor(absDeviations.length / 2)];
+      
+      const threshold = 3.5;
+      const modifiedZScores = data.map((val, idx) => ({
+        value: val,
+        index: idx,
+        modifiedZ: 0.6745 * (val - median) / mad,
+        isOutlier: Math.abs(0.6745 * (val - median) / mad) > threshold
+      }));
+      
+      const outliers = modifiedZScores.filter(item => item.isOutlier).map(item => ({
+        ...item,
+        type: item.modifiedZ < 0 ? 'lower' : 'upper'
+      }));
+      
+      const lowerBound = median - threshold * mad / 0.6745;
+      const upperBound = median + threshold * mad / 0.6745;
+      
+      return { method: 'MAD Method (Modified Z > 3.5)', outliers, lowerBound, upperBound };
+    }
+
+    // Detect outliers
+    function detectOutliers() {
+      if (!dataReady || originalData.length === 0) return;
+      
+      console.log('🔍 Detecting outliers with method:', currentMethod);
+      
+      switch(currentMethod) {
+        case 'iqr':
+          outlierResults = detectIQR(originalData);
+          break;
+        case 'zscore':
+          outlierResults = detectZScore(originalData);
+          break;
+        case 'grubbs':
+          outlierResults = detectGrubbs(originalData);
+          break;
+        case 'mad':
+          outlierResults = detectMAD(originalData);
+          break;
+      }
+      
+      displayResults();
+      createChart();
+    }
+
+    // Display results
+    function displayResults() {
+      const { outliers } = outlierResults;
+      const totalData = originalData.length;
+      const outlierCount = outliers.length;
+      const outlierPercent = ((outlierCount / totalData) * 100).toFixed(1);
+      
+      // Summary
+      const summaryCard = document.getElementById('summaryCard');
+      summaryCard.className = `summary-stat ${outlierCount === 0 ? 'no-outliers' : ''}`;
+      document.getElementById('outlierCount').textContent = 
+        `${outlierCount} / ${totalData} (${outlierPercent}%)`;
+      
+      // Comparison table
+      const calcStats = (data) => {
+        const sorted = [...data].sort((a, b) => a - b);
+        const n = sorted.length;
+        const mean = data.reduce((a, b) => a + b, 0) / n;
+        const variance = data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / n;
+        const stdDev = Math.sqrt(variance);
+        const q25 = sorted[Math.floor(n * 0.25)];
+        const q50 = sorted[Math.floor(n * 0.50)];
+        const q75 = sorted[Math.floor(n * 0.75)];
+        return { count: n, mean, stdDev, min: sorted[0], q25, q50, q75, max: sorted[n-1] };
+      };
+      
+      const originalStats = calcStats(originalData);
+      const outlierValues = new Set(outliers.map(o => o.value));
+      const cleanData = originalData.filter(val => !outlierValues.has(val));
+      const cleanStats = outlierCount > 0 ? calcStats(cleanData) : originalStats;
+      
+      document.getElementById('comparisonTable').innerHTML = `
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>Range</th>
+              <th>Count</th>
+              <th>Mean</th>
+              <th>Std</th>
+              <th>Min</th>
+              <th>Q25</th>
+              <th>Q50</th>
+              <th>Q75</th>
+              <th>Max</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Original</td>
+              <td>${originalStats.count}</td>
+              <td>${originalStats.mean.toFixed(1)}</td>
+              <td>${originalStats.stdDev.toFixed(1)}</td>
+              <td>${originalStats.min.toFixed(1)}</td>
+              <td>${originalStats.q25.toFixed(1)}</td>
+              <td>${originalStats.q50.toFixed(1)}</td>
+              <td>${originalStats.q75.toFixed(1)}</td>
+              <td>${originalStats.max.toFixed(1)}</td>
+            </tr>
+            <tr>
+              <td>Without Outliers</td>
+              <td>${cleanStats.count}</td>
+              <td>${cleanStats.mean.toFixed(1)}</td>
+              <td>${cleanStats.stdDev.toFixed(1)}</td>
+              <td>${cleanStats.min.toFixed(1)}</td>
+              <td>${cleanStats.q25.toFixed(1)}</td>
+              <td>${cleanStats.q50.toFixed(1)}</td>
+              <td>${cleanStats.q75.toFixed(1)}</td>
+              <td>${cleanStats.max.toFixed(1)}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+      
+      // Outliers table
+      if (outlierCount > 0) {
+        const sortedOutliers = [...outliers].sort((a, b) => a.index - b.index);
+        document.getElementById('outliersTableContent').innerHTML = `
+          <div class="outliers-table-container">
+            <table class="outliers-table">
+              <thead>
+                <tr>
+                  <th>Index</th>
+                  <th>Value</th>
+                  <th>Type</th>
+                  <th>Excel</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${sortedOutliers.map(o => `
+                  <tr>
+                    <td>${o.index}</td>
+                    <td>${o.value.toFixed(4)}</td>
+                    <td><span class="outlier-badge ${o.type}">${o.type}</span></td>
+                    <td class="excel-address">${getExcelAddress(o.index)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } else {
+        document.getElementById('outliersTableContent').innerHTML = `
+          <div class="no-outliers">
+            <i class="fa-solid fa-circle-check"></i>
+            <div>No outliers detected</div>
+          </div>
+        `;
+      }
+    }
+
+    // Create chart
+    function createChart() {
+      if (!outlierResults) return;
+      
+      const { outliers, lowerBound, upperBound } = outlierResults;
+      const outlierIndices = new Set(outliers.map(o => o.index));
+      
+      let normalPoints, outlierPoints, xAxisTitle;
+      
+      if (chartOrder === 'index') {
+        normalPoints = originalData.map((val, idx) => 
+          outlierIndices.has(idx) ? null : [idx, val]
+        ).filter(p => p !== null);
+        outlierPoints = outliers.map(o => [o.index, o.value]);
+        xAxisTitle = 'Observation Index';
+      } else {
+        const allData = originalData.map((val, idx) => ({ 
+          val, idx, isOutlier: outlierIndices.has(idx) 
+        })).sort((a, b) => a.val - b.val);
+        
+        normalPoints = [];
+        outlierPoints = [];
+        allData.forEach((item, sortedPosition) => {
+          if (item.isOutlier) {
+            outlierPoints.push([sortedPosition, item.val]);
+          } else {
+            normalPoints.push([sortedPosition, item.val]);
+          }
+        });
+        xAxisTitle = 'Sorted Position (by value)';
+      }
+      
+      Highcharts.chart('outliersChart', {
+        chart: {
+          type: 'scatter',
+          backgroundColor: 'transparent',
+          height: 280
+        },
+        title: null,
+        xAxis: {
+          title: { text: xAxisTitle, style: { color: '#fff', fontSize: '11px' } },
+          labels: { style: { color: '#fff', fontSize: '10px' } },
+          gridLineColor: '#2d3748'
+        },
+        yAxis: {
+          title: { text: 'Value', style: { color: '#fff', fontSize: '11px' } },
+          labels: { style: { color: '#fff', fontSize: '10px' } },
+          gridLineColor: '#2d3748',
+          plotLines: [
+            {
+              value: lowerBound,
+              color: '#e74c3c',
+              width: 2,
+              dashStyle: 'Dash',
+              label: { text: 'Lower Bound', style: { color: '#e74c3c', fontSize: '10px' } }
+            },
+            {
+              value: upperBound,
+              color: '#e74c3c',
+              width: 2,
+              dashStyle: 'Dash',
+              label: { text: 'Upper Bound', style: { color: '#e74c3c', fontSize: '10px' } }
+            }
+          ]
+        },
+        legend: {
+          enabled: true,
+          itemStyle: { color: '#fff', fontSize: '11px' }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          style: { color: '#fff' }
+        },
+        plotOptions: {
+          scatter: {
+            marker: { radius: 5 }
+          }
+        },
+        credits: { enabled: false },
+        series: [
+          {
+            name: 'Normal Points',
+            data: normalPoints,
+            color: '#4a90e2',
+            marker: { radius: 4 }
+          },
+          {
+            name: 'Outliers',
+            data: outlierPoints,
+            color: '#e74c3c',
+            marker: { radius: 6, symbol: 'diamond' }
+          }
+        ]
+      });
+    }
+
+    // Office.js initialization
+    Office.initialize = function (reason) {
+      console.log('✅ Outliers - Office.js initialized');
+      
+      Office.context.ui.addHandlerAsync(
+        Office.EventType.DialogParentMessageReceived,
+        onMessageReceived
+      );
+      
+      setTimeout(() => {
+        sendMessageToParent({ status: 'ready', view: 'outliers' });
+        console.log('📤 Sending ready signal to parent');
+      }, 500);
+      
+      // Try to load data from various sources (wait longer for parent response)
+      setTimeout(() => {
+        if (dataReady) {
+          console.log('✅ Data already loaded');
+          return;
+        }
+        
+        // Try localStorage first
+        try {
+          const storedData = localStorage.getItem('univariateResults');
+          if (storedData) {
+            const parsedData = JSON.parse(storedData);
+            console.log('📦 Loading data from localStorage');
+            handleDataReceived(parsedData);
+            if (dataReady) return;
+          }
+        } catch (e) {
+          console.error('❌ Error loading from localStorage:', e);
+        }
+        
+        // Fallback to sample data
+        console.log('⏰ No real data received after 3s, loading sample data...');
+        loadSampleData();
+      }, 3000);
+    };
+
+    // DOM loaded
+    window.addEventListener('DOMContentLoaded', function() {
+      console.log('🚀 DOM Content Loaded');
+      
+      const initHeader = () => {
+        if (typeof StatisticoHeader !== 'undefined') {
+          StatisticoHeader.init('outliers', 'Variable', 0);
+          console.log('✅ Shared header initialized');
+        } else {
+          setTimeout(initHeader, 100);
+        }
+      };
+      initHeader();
+      
+      let attempts = 0;
+      const maxAttempts = 50; // 5 seconds max wait
+      
+      const checkAndInit = () => {
+        attempts++;
+        
+        if (checkLibraries()) {
+          if (typeof Office === 'undefined') {
+            console.log('⚠️ Office.js not available - loading sample data');
+            setTimeout(() => {
+              if (!dataReady) loadSampleData();
+            }, 500);
+          }
+        } else if (attempts < maxAttempts) {
+          setTimeout(checkAndInit, 100);
+        } else {
+          console.warn('⚠️ Libraries failed to load after 5s, loading sample data anyway');
+          loadSampleData();
+        }
+      };
+      setTimeout(checkAndInit, 100);
+    });
+
+    // Message handler
+    function onMessageReceived(arg) {
+      try {
+        const message = JSON.parse(arg.message);
+        console.log('📩 Message received from parent:', message);
+        
+        // Handle data from taskpane (action: 'loadData')
+        if (message.action === 'loadData' && message.data) {
+          console.log('✅ Received data from taskpane:', message.data);
+          handleDataReceived(message.data);
+        } 
+        // Legacy: handle other formats
+        else if (message.type === 'data' || message.action === 'sendData') {
+          const dataToHandle = message.data || message;
+          console.log('📊 Handling data (legacy format):', dataToHandle);
+          handleDataReceived(dataToHandle);
+        } 
+        // Navigation request
+        else if (message.action === 'switchView') {
+          console.log('🔄 Switch view request:', message.view);
+        } 
+        // Fallback: treat entire message as data
+        else {
+          console.log('🔄 Unknown format, treating as data');
+          handleDataReceived(message);
+        }
+      } catch (e) {
+        console.error('❌ Error handling message:', e);
+      }
+    }
+
+    // Send message to parent
+    function sendMessageToParent(message) {
+      if (typeof Office !== 'undefined' && Office.context && Office.context.ui) {
+        Office.context.ui.messageParent(JSON.stringify(message));
+        console.log('📤 Sent to parent:', message);
+      }
+    }
+
+    // Load sample data
+    function loadSampleData() {
+      console.log('📊 Loading sample data...');
+      
+      if (!checkLibraries()) {
+        setTimeout(loadSampleData, 200);
+        return;
+      }
+      
+      // Generate data with some outliers
+      const sampleData = [];
+      for (let i = 0; i < 95; i++) {
+        const u1 = Math.random();
+        const u2 = Math.random();
+        const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        sampleData.push(50 + z * 10);
+      }
+      // Add some outliers
+      sampleData.push(5, 95, 100, 3, 92);
+      
+      originalData = sampleData;
+      varName = 'Sample Data';
+      columnName = 'A';
+      dataReady = true;
+      
+      const updateHeader = () => {
+        if (typeof StatisticoHeader !== 'undefined') {
+          StatisticoHeader.updateVariable(varName, originalData.length);
+          console.log('✅ Header updated');
+        } else {
+          setTimeout(updateHeader, 100);
+        }
+      };
+      updateHeader();
+      
+      detectOutliers();
+    }
+
+    // Handle data from parent
+    function handleDataReceived(data) {
+      try {
+        console.log('📊 Data received:', data);
+        
+        if (!checkLibraries()) {
+          setTimeout(() => handleDataReceived(data), 200);
+          return;
+        }
+        
+        // Robust data extraction - handle various formats
+        let rawData = data.values || data.trimmedValues || data.transformedValues || data.rawValues || data.data || [];
+        
+        // Handle nested values (e.g., data.values.values)
+        if (rawData.values && Array.isArray(rawData.values)) {
+          rawData = rawData.values;
+        }
+        
+        // Convert to numbers and filter out invalid values
+        originalData = rawData
+          .map(v => typeof v === 'string' ? parseFloat(v) : v)
+          .filter(v => !isNaN(v) && v != null);
+        
+        // Extract variable name from multiple possible fields
+        varName = data.variable || data.variableName || data.column || 'Variable';
+        columnName = varName.replace(/[^A-Za-z]/g, '') || 'A';
+        
+        console.log('✅ Data processed:', originalData.length, 'values from', rawData.length, 'raw values');
+        
+        // If no valid data, don't mark as ready (will load sample data)
+        if (originalData.length === 0) {
+          console.warn('⚠️ No valid data found, will load sample data');
+          return;
+        }
+        
+        dataReady = true;
+        
+        // Store data in localStorage for view navigation
+        try {
+          localStorage.setItem('univariateResults', JSON.stringify(data));
+          console.log('💾 Saved data to localStorage for navigation');
+        } catch (e) {
+          console.warn('⚠️ Could not save to localStorage:', e);
+        }
+        
+        const updateHeader = () => {
+          if (typeof StatisticoHeader !== 'undefined') {
+            StatisticoHeader.updateVariable(varName, originalData.length);
+          } else {
+            setTimeout(updateHeader, 100);
+          }
+        };
+        updateHeader();
+        
+        detectOutliers();
+      } catch (e) {
+        console.error('❌ Error handling data:', e);
+      }
+    }
+  </script>
+</body>
+</html>

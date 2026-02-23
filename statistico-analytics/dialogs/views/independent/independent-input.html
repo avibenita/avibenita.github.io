@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Independent Means Builder</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+  <style>
+    body{margin:0;background:#0b1220;color:#e5e7eb;font-family:Segoe UI,Arial,sans-serif;}
+    .wrap{padding:10px;}
+    .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+    .title{font-weight:800;font-size:14px;display:flex;gap:8px;align-items:center;}
+    .panel{border:1px solid #22304b;background:#111c33;border-radius:10px;padding:8px;margin-bottom:8px;}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    label{font-size:12px;color:#9fb0cc;display:block;margin-bottom:4px;}
+    select,input{width:100%;padding:8px;border-radius:8px;border:1px solid #2a3d5f;background:#0b1428;color:#e5e7eb;}
+    .row{display:flex;gap:8px;}
+    .btn{padding:8px 12px;border-radius:8px;border:1px solid #2e4268;background:#162948;color:#e5e7eb;cursor:pointer;}
+    .btn.primary{background:linear-gradient(135deg,#2563eb,#1d4ed8);border-color:#2f5fca;font-weight:700;}
+    .meta{font-size:12px;color:#9fb0cc;}
+    .checks{max-height:210px;overflow:auto;border:2px solid #2b5fd9;border-radius:12px;background:#f7f9fd;}
+    .checks table{width:100%;border-collapse:collapse;font-size:11px;color:#0f172a;}
+    .checks thead th{position:sticky;top:0;background:#e5e7eb;color:#4b5563;padding:5px 7px;border-bottom:1px solid #cbd5e1;text-align:left;text-transform:uppercase;letter-spacing:.25px;font-weight:800;}
+    .checks tbody td{padding:5px 7px;border-bottom:1px solid #dbe2ea;}
+    .checks tbody tr:last-child td{border-bottom:none;}
+    .checks tbody td.center{text-align:center;}
+    .checks tbody tr{cursor:grab;user-select:none;}
+    .checks tbody tr:hover{background:#f1f5f9;}
+    .checks tbody tr.selected{background:#dbeafe;font-weight:600;}
+    .checks tbody tr.disabled{opacity:0.4;cursor:not-allowed;background:#f8f9fa;}
+    .checks tbody tr.disabled:hover{background:#f8f9fa;}
+    .checks tbody tr.dragging{opacity:.45;}
+    .n-num{color:#1d4ed8;font-weight:700;}
+    .n-str{color:#16a34a;font-weight:700;}
+    .n-miss{color:#64748b;font-weight:700;}
+    .drag-h{color:#64748b;}
+    .radio-group{display:flex;gap:12px;margin-bottom:8px;}
+    .radio-option{flex:1;position:relative;}
+    .radio-option input[type="radio"]{position:absolute;opacity:0;cursor:pointer;}
+    .radio-label{display:block;padding:14px 16px;border:2px solid #2a3d5f;border-radius:10px;background:#0b1428;color:#9fb0cc;font-size:13px;font-weight:600;text-align:center;cursor:pointer;transition:all 0.2s;}
+    .radio-option input[type="radio"]:checked + .radio-label{border-color:#2563eb;background:#1e40af;color:#fff;box-shadow:0 0 0 3px rgba(37,99,235,0.2);}
+    .radio-label:hover{border-color:#3b82f6;background:#1e3a8a;}
+    .radio-label .radio-icon{font-size:16px;margin-bottom:4px;display:block;}
+    .radio-label .radio-text{font-size:12px;display:block;}
+    .bucket{border:2px solid #2b5fd9;border-radius:12px;padding:10px;background:#f7f9fd;min-height:60px;max-height:120px;overflow:auto;margin-top:8px;}
+    .bucket-title{font-size:12px;color:#4b5563;font-weight:700;margin-bottom:6px;}
+    .bucket-items{display:flex;gap:6px;flex-wrap:wrap;}
+    .bucket-pill{display:inline-flex;align-items:center;gap:6px;background:#1e3a8a;color:#dbeafe;padding:4px 7px;border-radius:999px;font-size:11px;}
+    .bucket-pill button{border:none;background:transparent;color:#fff;cursor:pointer;font-size:12px;}
+    .hint{font-size:10px;color:#6b7280;margin-top:4px;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="head">
+      <div class="title"><i class="fa-solid fa-not-equal"></i> Independent Means Builder</div>
+      <button class="btn" id="btnRefresh"><i class="fa-solid fa-rotate"></i> Refresh</button>
+    </div>
+
+    <div class="panel">
+      <div class="meta">Range: <strong id="rangeAddr">-</strong></div>
+      <div class="meta">Rows: <strong id="rowCount">0</strong> | Columns: <strong id="colCount">0</strong></div>
+    </div>
+
+    <div class="panel">
+      <label>Compare</label>
+      <div class="radio-group">
+        <div class="radio-option">
+          <input type="radio" name="dataMode" id="twoVars" value="two-vars" />
+          <label for="twoVars" class="radio-label">
+            <span class="radio-icon"><i class="fa-solid fa-code-compare"></i></span>
+            <span class="radio-text">2 Variables</span>
+          </label>
+        </div>
+        <div class="radio-option">
+          <input type="radio" name="dataMode" id="kPlus" value="k-plus" checked />
+          <label for="kPlus" class="radio-label">
+            <span class="radio-icon"><i class="fa-solid fa-layer-group"></i></span>
+            <span class="radio-text">3+ Groups</span>
+          </label>
+        </div>
+      </div>
+      <div class="grid">
+        <div>
+          <label>Primary framework</label>
+          <select id="frameworkMode">
+            <option value="parametric">Parametric (means)</option>
+            <option value="nonparametric">Nonparametric (ranks)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <label>Available variables</label>
+      <div id="interestChecks" class="checks"></div>
+      <div class="hint">Click to select variables, then they'll appear in the comparison bucket below.</div>
+      <div class="bucket">
+        <div class="bucket-title">Comparison bucket</div>
+        <div id="compareBucket" class="bucket-items"></div>
+      </div>
+      <div class="hint" id="bucketHint">For 2 variables: exactly 2. For more groups: at least 3.</div>
+    </div>
+
+    <div class="row">
+      <button class="btn" id="btnCancel">Cancel</button>
+      <button class="btn primary" id="btnRun">Open Independent Means Dashboard</button>
+    </div>
+  </div>
+
+  <script>
+    var STATE = { headers: [], rows: [], address: "", saved: null, selectedColumns: [], draggingCol: null };
+    function qs(id){ return document.getElementById(id); }
+    function send(action, data){
+      if (Office && Office.context && Office.context.ui && typeof Office.context.ui.messageParent === "function") {
+        Office.context.ui.messageParent(JSON.stringify({ action: action, data: data || null }));
+      }
+    }
+    function countKinds(headers, rows){
+      return headers.map(function(name, idx){
+        var numeric=0,string=0,missing=0;
+        rows.forEach(function(r){
+          var v=r[idx];
+          if(v===null||v===undefined||v===""){ missing++; return; }
+          var n=Number(String(v).replace(",","."));
+          if(isFinite(n)) numeric++; else string++;
+        });
+        return { name:name, numeric:numeric, string:string, missing:missing };
+      });
+    }
+    function renderInterestChecks(headers){
+      var host = qs("interestChecks");
+      if (!host) return;
+      var stats = countKinds(headers, STATE.rows || []);
+      var html = '<table><thead><tr><th>Variable</th><th class="center">N Numeric</th><th class="center">N String</th><th class="center">N Missing</th><th class="center"></th></tr></thead><tbody>';
+      stats.forEach(function(s){
+        var isSelected = STATE.selectedColumns.indexOf(s.name) >= 0;
+        var rowClass = isSelected ? ' class="disabled"' : '';
+        var draggable = isSelected ? 'false' : 'true';
+        html += '<tr draggable="' + draggable + '"' + rowClass + ' data-col="' + s.name + '">' +
+          '<td>' + s.name + '</td>' +
+          '<td class="center n-num">' + s.numeric + '</td>' +
+          '<td class="center n-str">' + s.string + '</td>' +
+          '<td class="center n-miss">' + s.missing + '</td>' +
+          '<td class="center drag-h"><i class="fa-solid fa-grip"></i></td>' +
+        '</tr>';
+      });
+      html += '</tbody></table>';
+      host.innerHTML = html;
+      host.querySelectorAll("tbody tr").forEach(function(tr){
+        var col = tr.getAttribute("data-col");
+        var isDisabled = tr.classList.contains("disabled");
+        
+        // Drag handlers
+        tr.addEventListener("dragstart", function(e){
+          if (isDisabled) {
+            e.preventDefault();
+            return;
+          }
+          tr.classList.add("dragging");
+          STATE.draggingCol = col;
+          if (e && e.dataTransfer) {
+            e.dataTransfer.effectAllowed = "copy";
+            e.dataTransfer.setData("text/plain", col || "");
+          }
+        });
+        tr.addEventListener("dragend", function(){ tr.classList.remove("dragging"); STATE.draggingCol = null; });
+        
+        // Click handlers - support multiselect with Ctrl/Cmd
+        tr.addEventListener("click", function(e){
+          if (isDisabled) return;
+          
+          // If clicking on drag handle, add to bucket
+          if (e && e.target && e.target.closest && e.target.closest(".drag-h")) {
+            addToBucket(col);
+            return;
+          }
+          
+          // Toggle selection for multiselect (Ctrl/Cmd+click or regular click)
+          if (e.ctrlKey || e.metaKey) {
+            tr.classList.toggle("selected");
+          } else {
+            // Clear other selections
+            host.querySelectorAll("tbody tr.selected").forEach(function(otherTr){
+              if (otherTr !== tr) otherTr.classList.remove("selected");
+            });
+            tr.classList.toggle("selected");
+          }
+          
+          // Add all selected rows to bucket when clicking "Add Selected" button or using shortcut
+          var selectedRows = Array.from(host.querySelectorAll("tbody tr.selected"));
+          if (selectedRows.length > 0 && !e.ctrlKey && !e.metaKey) {
+            // Single click without modifier - add immediately
+            selectedRows.forEach(function(selectedTr){
+              var selectedCol = selectedTr.getAttribute("data-col");
+              addToBucket(selectedCol);
+              selectedTr.classList.remove("selected");
+            });
+          }
+        });
+        
+        // Double-click to add (backward compatibility)
+        tr.addEventListener("dblclick", function(){ 
+          if (!isDisabled) {
+            addToBucket(col); 
+          }
+        });
+      });
+    }
+    function renderBucket(){
+      var bucket = qs("compareBucket");
+      if(!bucket) return;
+      bucket.innerHTML = "";
+      STATE.selectedColumns.forEach(function(col){
+        var pill = document.createElement("span");
+        pill.className = "bucket-pill";
+        pill.innerHTML = '<span>' + col + '</span><button data-col="' + col + '"><i class="fa-solid fa-xmark"></i></button>';
+        bucket.appendChild(pill);
+      });
+      bucket.querySelectorAll("button").forEach(function(btn){
+        btn.addEventListener("click", function(){ removeFromBucket(btn.getAttribute("data-col")); });
+      });
+      validateBucket();
+    }
+    function addToBucket(col){
+      if (!col) return;
+      var modeRadio = document.querySelector('input[name="dataMode"]:checked');
+      var mode = modeRadio ? modeRadio.value : 'k-plus';
+      if (STATE.selectedColumns.indexOf(col) >= 0) return;
+      if (mode === "two-vars" && STATE.selectedColumns.length >= 2) return;
+      STATE.selectedColumns.push(col);
+      renderBucket();
+      renderInterestChecks(STATE.headers); // Re-render to disable selected variables
+    }
+    function removeFromBucket(col){
+      STATE.selectedColumns = STATE.selectedColumns.filter(function(x){ return x !== col; });
+      renderBucket();
+      renderInterestChecks(STATE.headers); // Re-render to enable removed variables
+    }
+    function validateBucket(){
+      var modeRadio = document.querySelector('input[name="dataMode"]:checked');
+      var mode = modeRadio ? modeRadio.value : 'k-plus';
+      var ok = mode === "two-vars" ? STATE.selectedColumns.length === 2 : STATE.selectedColumns.length >= 3;
+      var hint = qs("bucketHint");
+      if (hint) hint.textContent = mode === "two-vars"
+        ? "For 2 variables: exactly 2 selected."
+        : "For more groups: select at least 3 numeric columns.";
+      var runBtn = qs("btnRun");
+      if (runBtn) runBtn.disabled = !ok;
+    }
+    function applyPayload(p){
+      STATE.headers = p.headers || []; STATE.rows = p.rows || []; STATE.address = p.address || ""; STATE.saved = p.savedModelSpec || {};
+      qs("rangeAddr").textContent = STATE.address || "Selection";
+      qs("rowCount").textContent = String(STATE.rows.length);
+      qs("colCount").textContent = String(STATE.headers.length);
+      // Per UX request: start each configuration session with an empty bucket.
+      STATE.selectedColumns = [];
+      renderInterestChecks(STATE.headers);
+      renderBucket();
+      if (STATE.saved) {
+        if (STATE.saved.compareMode === "two-vars") {
+          qs("twoVars").checked = true;
+        } else {
+          qs("kPlus").checked = true;
+        }
+        if (STATE.saved.primaryFramework) qs("frameworkMode").value = STATE.saved.primaryFramework;
+      }
+      validateBucket();
+    }
+    function run(){
+      var modeRadio = document.querySelector('input[name="dataMode"]:checked');
+      var mode = modeRadio ? modeRadio.value : 'k-plus';
+      var selected = STATE.selectedColumns && STATE.selectedColumns.length ? STATE.selectedColumns.slice() : [];
+      if (selected.length < 2) return;
+      var spec = {
+        analysisMode: "independent",
+        compareMode: mode,
+        mode: mode === "k-plus" ? "k-plus" : "two-column",
+        primaryFramework: qs("frameworkMode").value,
+        selectedColumns: selected,
+        hypothesis: "two-sided",
+        confidence: 0.95,
+        groupALabel: "A",
+        groupBLabel: "B"
+      };
+      if (mode === "two-vars") {
+        spec.groupA = selected[0];
+        spec.groupB = selected[1] || selected[0];
+      } else {
+        spec.kplusScheme = "selected-columns-as-groups";
+        spec.posthocMethod = spec.primaryFramework === "nonparametric" ? "dunn" : "games-howell";
+        spec.posthocCorrection = "holm";
+      }
+      send("independentModel", spec);
+    }
+    document.addEventListener("DOMContentLoaded", function(){
+      var bucket = qs("compareBucket");
+      var bucketPanel = document.querySelector(".bucket");
+      function allowDrop(e){
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+      }
+      function handleDrop(e){
+        e.preventDefault();
+        var col = "";
+        if (e.dataTransfer) col = e.dataTransfer.getData("text/plain") || "";
+        if (!col) col = STATE.draggingCol || "";
+        if (!col) {
+          var drag = document.querySelector("#interestChecks tr.dragging");
+          if (drag) col = drag.getAttribute("data-col") || "";
+        }
+        if (col) addToBucket(col);
+      }
+      if (bucket) {
+        bucket.addEventListener("dragover", allowDrop);
+        bucket.addEventListener("drop", handleDrop);
+      }
+      if (bucketPanel) {
+        bucketPanel.addEventListener("dragover", allowDrop);
+        bucketPanel.addEventListener("drop", handleDrop);
+      }
+      // Add event listeners for radio buttons
+      document.querySelectorAll('input[name="dataMode"]').forEach(function(radio){
+        radio.addEventListener('change', validateBucket);
+      });
+      qs("btnRefresh").addEventListener("click", function(){ send("requestData", null); });
+      qs("btnCancel").addEventListener("click", function(){ send("close", null); });
+      qs("btnRun").addEventListener("click", run);
+      Office.onReady(function(){
+        Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function(arg){
+          var msg = JSON.parse(arg.message || "{}");
+          if (msg.type === "INDEPENDENT_DATA" && msg.payload) applyPayload(msg.payload);
+        });
+        send("requestData", null);
+        send("ready", null);
+      });
+    });
+  </script>
+</body>
+</html>

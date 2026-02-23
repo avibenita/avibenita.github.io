@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title id="page-title">Logistic Regression Analysis</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <style>
+    :root{
+      --surface-0:#0c1624;
+      --surface-1:#1a1f2e;
+      --surface-2:#242938;
+      --border:#2d3748;
+      --accent-1:rgb(255,165,120);
+      --accent-2:rgb(120,200,255);
+      --text-primary:#fff;
+      --text-secondary:rgba(255,255,255,0.82);
+      --text-muted:rgba(255,255,255,0.62);
+      --panel-radius:10px;
+      --panel-shadow:0 4px 20px rgba(0,0,0,.4);
+      --header-color:var(--accent-1);
+    }
+
+    html, body { height:100%; margin:0; padding:0; }
+    body{
+      background:var(--surface-0);
+      color:var(--text-primary);
+      font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+      overflow-x:hidden;
+    }
+
+    .wrap{ display:flex; justify-content:center; padding:8px 12px 20px; }
+    .card{
+      width:min(1120px,100%);
+      background:var(--surface-1);
+      min-height:760px;
+      border-radius:var(--panel-radius);
+      box-shadow:var(--panel-shadow);
+      border:1px solid var(--border);
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+    }
+
+    .card-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      color:var(--header-color);
+      padding:10px 16px;
+      font-weight:600;
+      font-size:1.2rem;
+      letter-spacing:.3px;
+      gap:12px;
+    }
+
+    .header-right{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+
+    .card-body{ padding:12px; flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; }
+
+    .tabs{
+      display:flex;
+      gap:8px;
+      margin-bottom:14px;
+      flex-wrap:wrap;
+    }
+    .tab-btn{
+      border:1px solid rgba(255,255,255,.2);
+      background:rgba(255,255,255,.06);
+      color:var(--text-secondary);
+      border-radius:999px;
+      padding:6px 12px;
+      font-size:.83rem;
+      cursor:pointer;
+      transition:all .2s;
+    }
+    .tab-btn.active{
+      background:linear-gradient(145deg, rgba(255,165,120,.22), rgba(255,165,120,.1));
+      color:var(--text-primary);
+      border-color:rgba(255,165,120,.45);
+      box-shadow:0 0 0 1px rgba(255,165,120,.14) inset;
+    }
+    .tab-btn.ai-tab-action{
+      margin-left:auto;
+      background:linear-gradient(145deg, #7c3aed, #a855f7);
+      border-color:#9333ea;
+      color:#fff;
+      font-weight:700;
+    }
+
+    .tab-panel{ display:none; }
+    .tab-panel.active{ display:block; }
+
+    .stats-container{
+      display:flex;
+      gap:14px;
+      justify-content:space-between;
+      margin-bottom:16px;
+      flex-wrap:wrap;
+    }
+    .stat-panel{
+      flex:1;
+      min-width:280px;
+      background:rgba(255,255,255,.05);
+      border:1px solid var(--border);
+      border-radius:var(--panel-radius);
+      box-shadow:0 2px 4px rgba(0,0,0,.2);
+      overflow:hidden;
+    }
+    .results-top-cards{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:10px;
+      margin-bottom:10px;
+    }
+    .results-top-cards .stat-panel{
+      min-width:0;
+    }
+    .compact-card .stat-panel-heading{
+      font-size:.78rem;
+      padding:6px 8px;
+    }
+    .compact-card .stat-panel-body{ padding:6px 8px; }
+    .compact-card .stat-field{
+      margin:1px 0;
+      padding:1px 0;
+    }
+    .compact-card .stat-label{ font-size:.78rem; }
+    .compact-card .stat-value{
+      min-width:64px;
+      font-size:.8rem;
+      padding:3px 7px;
+    }
+    .stat-panel-heading{
+      background:linear-gradient(135deg, rgba(0,51,102,.82), rgba(0,102,204,.62));
+      color:#fff;
+      padding:8px 12px;
+      font-weight:700;
+      font-size:.9rem;
+      text-align:center;
+      text-transform:uppercase;
+      letter-spacing:.5px;
+      border-bottom:2px solid var(--accent-1);
+    }
+    .stat-panel-body{ padding:10px 12px; }
+    .stat-field{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+      margin:4px 0;
+      padding:3px 0;
+      border-bottom:1px solid rgba(255,255,255,.06);
+    }
+    .stat-field:last-child{ border-bottom:none; }
+    .stat-label{ font-weight:600; color:var(--text-secondary); font-size:.9rem; }
+    .stat-value{
+      background:linear-gradient(135deg, rgba(120,200,255,.16), rgba(120,200,255,.05));
+      border:1px solid rgba(120,200,255,.3);
+      border-radius:6px;
+      padding:5px 10px;
+      min-width:86px;
+      text-align:center;
+      color:var(--accent-2);
+      font-weight:700;
+      font-size:.92rem;
+    }
+
+    .table-container{
+      width:100%;
+      margin:12px auto 0;
+      overflow:auto;
+      max-height:430px;
+    }
+    .analysis-table{
+      width:100%;
+      border-collapse:collapse;
+      table-layout:fixed;
+    }
+    .analysis-table th{
+      background:linear-gradient(135deg, rgba(0,51,102,.9), rgba(0,102,204,.7));
+      color:#fff;
+      padding:8px 6px;
+      position:sticky;
+      top:0;
+      z-index:2;
+      font-weight:700;
+      text-align:center;
+      border:1px solid rgba(255,255,255,.3);
+      font-size:.74rem;
+      text-transform:uppercase;
+      letter-spacing:.3px;
+      min-width:72px;
+    }
+    .analysis-table th:first-child{
+      position:sticky;
+      left:0;
+      z-index:3;
+      text-align:left;
+      min-width:120px;
+      max-width:220px;
+    }
+    .analysis-table td{
+      background:rgba(255,255,255,.04);
+      color:var(--text-primary);
+      border:1px solid rgba(255,255,255,.15);
+      padding:6px 8px;
+      text-align:center;
+      font-size:.8rem;
+      white-space:nowrap;
+    }
+    .analysis-table td:first-child{
+      text-align:left;
+      position:sticky;
+      left:0;
+      z-index:1;
+      background:rgba(32,37,52,.95);
+      font-weight:600;
+    }
+
+    .section-note{
+      margin-top:10px;
+      padding:9px;
+      border-left:3px solid var(--accent-1);
+      border-radius:4px;
+      background:rgba(255,165,120,.1);
+      color:var(--text-muted);
+      font-size:.84rem;
+    }
+    .roc-curve-panel{
+      margin-top: 12px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid var(--border);
+      border-radius: var(--panel-radius);
+      padding: 12px;
+    }
+    .roc-curve-title{
+      font-size: .88rem;
+      font-weight: 700;
+      color: var(--accent-2);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .roc-svg-wrap{
+      width: 100%;
+      min-height: 280px;
+      background: rgba(12,22,36,.55);
+      border: 1px solid rgba(120,200,255,.18);
+      border-radius: 8px;
+      padding: 8px;
+    }
+    .roc-chart{
+      width: 100%;
+      height: 280px;
+      display: block;
+    }
+    .roc-empty{
+      color: var(--text-muted);
+      font-size: .85rem;
+      text-align: center;
+      padding: 18px 8px 8px;
+      font-style: italic;
+    }
+    .info-tip{
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      color: var(--text-muted);
+      border: 1px solid rgba(255,255,255,0.4);
+      font-size: 0.5rem;
+      margin-left: 6px;
+      margin-right: 6px;
+      cursor: help;
+      vertical-align: middle;
+      line-height: 1;
+      pointer-events: auto;
+    }
+    .info-tip:hover{
+      color: var(--accent-2);
+      border-color: rgba(120,200,255,0.7);
+      background: rgba(120,200,255,0.08);
+    }
+    .info-tip::after{
+      content: attr(title);
+      position: absolute;
+      left: 50%;
+      top: 145%;
+      min-width: 190px;
+      max-width: 260px;
+      white-space: normal;
+      text-transform: none;
+      letter-spacing: normal;
+      font-weight: 500;
+      font-size: 0.72rem;
+      line-height: 1.28;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: #eaf1ff;
+      background: rgba(6,10,18,0.98);
+      border: 1px solid rgba(120,200,255,0.6);
+      border-radius: 8px;
+      padding: 7px 8px;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.45);
+      opacity: 0;
+      transform: translate(-50%, -2px);
+      pointer-events: none;
+      transition: opacity .15s ease, transform .15s ease;
+      z-index: 50;
+    }
+    .info-tip:hover::after{
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+    @media (max-width: 1150px){
+      .results-top-cards{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+      }
+    }
+    @media (max-width: 760px){
+      .results-top-cards{
+        grid-template-columns:1fr;
+      }
+    }
+
+    .threshold-wrap{
+      margin-top:10px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:8px;
+      padding:10px;
+    }
+    .threshold-wrap label{
+      display:block;
+      font-weight:600;
+      color:var(--text-secondary);
+      margin-bottom:6px;
+      font-size:.88rem;
+    }
+    .threshold-inline{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    input[type="range"]{ width:260px; }
+
+    .ai-panel{
+      background:linear-gradient(135deg, rgba(124,58,237,.14), rgba(168,85,247,.06));
+      border:1px solid rgba(168,85,247,.35);
+      border-radius:10px;
+      padding:12px;
+    }
+    .ai-row{
+      border-bottom:1px solid rgba(255,255,255,.1);
+      padding:8px 0;
+      color:var(--text-secondary);
+      font-size:.9rem;
+    }
+    .ai-row:last-child{ border-bottom:none; }
+    .ai-key{ color:#e9d5ff; font-weight:700; margin-right:6px; }
+
+    .ai-interpret-btn:disabled{ opacity:.65; cursor:not-allowed; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="card" role="main">
+      <div class="card-head">
+        <span><i class="fa-solid fa-chart-line"></i> Logistic Regression Analysis</span>
+        <div class="header-right">
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="tabs" id="tabButtons">
+          <button class="tab-btn active" data-tab="results">Results</button>
+          <button class="tab-btn" data-tab="predictions">Predictions</button>
+          <button class="tab-btn" data-tab="diagnostics">Diagnostics</button>
+          <button class="tab-btn" data-tab="roc">ROC / AUC</button>
+          <button class="tab-btn" data-tab="descriptives">Descriptives</button>
+          <button class="tab-btn" data-tab="ai">AI Assessment</button>
+          <button class="tab-btn ai-tab-action ai-interpret-btn" id="aiInterpretBtn" onclick="requestLogisticAI()" style="display:none;">
+            <i class="fa-solid fa-robot"></i> AI Interpret
+          </button>
+        </div>
+
+        <section id="tab-results" class="tab-panel active">
+          <div class="stats-container results-top-cards">
+            <div class="stat-panel compact-card">
+              <div class="stat-panel-heading"><i class="fa-solid fa-info-circle"></i> Model Info</div>
+              <div class="stat-panel-body">
+                <div class="stat-field"><span class="stat-label">Observations:</span><span class="stat-value" id="obsCount">...</span></div>
+                <div class="stat-field"><span class="stat-label">Events:</span><span class="stat-value" id="eventCount">...</span></div>
+                <div class="stat-field"><span class="stat-label">Non-events:</span><span class="stat-value" id="noneventCount">...</span></div>
+                <div class="stat-field"><span class="stat-label">Predictors:</span><span class="stat-value" id="predictorCount">...</span></div>
+                <div class="stat-field"><span class="stat-label">Link <i class="fa-solid fa-circle-info info-tip" title="What it means: the model predicts event probability through log-odds. This is the standard link for binary outcomes."></i>:</span><span class="stat-value" id="linkType">Logit</span></div>
+                <div class="stat-field"><span class="stat-label">Intercept:</span><span class="stat-value" id="interceptFlag">...</span></div>
+              </div>
+            </div>
+
+            <div class="stat-panel compact-card">
+              <div class="stat-panel-heading"><i class="fa-solid fa-chart-bar"></i> Model Fit</div>
+              <div class="stat-panel-body">
+                <div class="stat-field"><span class="stat-label">-2 Log Likelihood <i class="fa-solid fa-circle-info info-tip" title="What it means: smaller values indicate a better fit to observed outcomes (use mainly to compare models on same data)."></i>:</span><span class="stat-value" id="n2ll">...</span></div>
+                <div class="stat-field"><span class="stat-label">Deviance <i class="fa-solid fa-circle-info info-tip" title="What it means: overall model error on the log-likelihood scale; lower is better."></i>:</span><span class="stat-value" id="deviance">...</span></div>
+                <div class="stat-field"><span class="stat-label">AIC <i class="fa-solid fa-circle-info info-tip" title="What it means: fit adjusted for complexity; lower AIC usually means a better practical model."></i>:</span><span class="stat-value" id="aic">...</span></div>
+                <div class="stat-field"><span class="stat-label">BIC <i class="fa-solid fa-circle-info info-tip" title="What it means: like AIC but stricter on extra variables; lower BIC favors simpler models."></i>:</span><span class="stat-value" id="bic">...</span></div>
+                <div class="stat-field"><span class="stat-label">McFadden R2 <i class="fa-solid fa-circle-info info-tip" title="What it means: improvement over intercept-only model; higher means predictors add useful signal."></i>:</span><span class="stat-value" id="mcfaddenR2">...</span></div>
+                <div class="stat-field"><span class="stat-label">Cox-Snell R2 <i class="fa-solid fa-circle-info info-tip" title="What it means: pseudo-R2 for relative fit quality; useful for comparing alternative models."></i>:</span><span class="stat-value" id="coxSnellR2">...</span></div>
+                <div class="stat-field"><span class="stat-label">Nagelkerke R2 <i class="fa-solid fa-circle-info info-tip" title="What it means: scaled pseudo-R2 (0 to 1 style); higher generally means better explanatory power."></i>:</span><span class="stat-value" id="nagelkerkeR2">...</span></div>
+              </div>
+            </div>
+
+            <div class="stat-panel compact-card">
+              <div class="stat-panel-heading"><i class="fa-solid fa-vial"></i> Global Tests</div>
+              <div class="stat-panel-body">
+                <div class="stat-field"><span class="stat-label">Likelihood Ratio <i class="fa-solid fa-circle-info info-tip" title="What it means: asks whether this model is better than no-predictor baseline. Large value + small p-value is good."></i>:</span><span class="stat-value" id="lrTest">...</span></div>
+                <div class="stat-field"><span class="stat-label">Wald Test <i class="fa-solid fa-circle-info info-tip" title="What it means: checks if effects are meaningfully different from zero. Small p-values suggest real signal."></i>:</span><span class="stat-value" id="waldTest">...</span></div>
+                <div class="stat-field"><span class="stat-label">Score Test <i class="fa-solid fa-circle-info info-tip" title="What it means: another global significance check; should align with LR/Wald conclusions."></i>:</span><span class="stat-value" id="scoreTest">...</span></div>
+                <div class="stat-field"><span class="stat-label">Overall p-value <i class="fa-solid fa-circle-info info-tip" title="What it means: if small (e.g., < 0.05), the model provides useful predictive information overall."></i>:</span><span class="stat-value" id="overallPValue">...</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="stat-panel" style="margin-top: 12px;">
+            <div class="stat-panel-heading"><i class="fa-solid fa-table"></i> Logistic Coefficients (Effects)</div>
+            <div class="stat-panel-body" style="padding:0;">
+              <div class="table-container" style="margin:0;">
+                <table class="analysis-table">
+                  <thead>
+                    <tr>
+                      <th>Variable</th>
+                      <th>Beta <i class="fa-solid fa-circle-info info-tip" title="What it means: positive Beta raises event odds, negative Beta lowers them."></i></th>
+                      <th>SE <i class="fa-solid fa-circle-info info-tip" title="What it means: uncertainty of Beta; smaller SE means more stable estimate."></i></th>
+                      <th>Wald z <i class="fa-solid fa-circle-info info-tip" title="What it means: effect strength relative to uncertainty; bigger |z| suggests stronger evidence."></i></th>
+                      <th>p-value</th>
+                      <th>OR <i class="fa-solid fa-circle-info info-tip" title="What it means: multiplicative change in odds (OR>1 increases odds, OR<1 decreases odds)."></i></th>
+                      <th>OR CI Lower <i class="fa-solid fa-circle-info info-tip" title="What it means: conservative lower estimate of the OR effect size."></i></th>
+                      <th>OR CI Upper <i class="fa-solid fa-circle-info info-tip" title="What it means: optimistic upper estimate of the OR effect size."></i></th>
+                      <th>Reference Category <i class="fa-solid fa-circle-info info-tip" title="What it means: all factor-category effects are interpreted relative to this baseline level."></i></th>
+                    </tr>
+                  </thead>
+                  <tbody id="coefTableBodyResults">
+                    <tr><td colspan="9" style="text-align:center; padding:20px; color:var(--text-muted); font-style:italic;"><i class="fa-solid fa-hourglass-half"></i> Awaiting coefficient results...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="stat-panel" style="margin-top: 12px;">
+            <div class="stat-panel-heading"><i class="fa-solid fa-bolt"></i> Top Effects (Quick View)</div>
+            <div class="stat-panel-body" style="padding:0;">
+              <div class="table-container" style="margin:0; max-height:260px;">
+                <table class="analysis-table">
+                  <thead>
+                    <tr>
+                      <th>Variable</th>
+                      <th>OR</th>
+                      <th>p-value</th>
+                      <th>Direction</th>
+                    </tr>
+                  </thead>
+                  <tbody id="topEffectsBody">
+                    <tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted); font-style:italic;"><i class="fa-solid fa-hourglass-half"></i> Awaiting coefficient effects...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="section-note">Executive view: model size, fit quality, and global significance tests for quick credibility checks.</div>
+        </section>
+
+        <section id="tab-coefficients" class="tab-panel">
+          <div class="stat-panel">
+            <div class="stat-panel-heading"><i class="fa-solid fa-table"></i> Logistic Coefficients (Effects)</div>
+            <div class="stat-panel-body" style="padding:0;">
+              <div class="table-container" style="margin:0;">
+                <table class="analysis-table">
+                  <thead>
+                    <tr>
+                      <th>Variable</th>
+                      <th>Beta <i class="fa-solid fa-circle-info info-tip" title="What it means: positive Beta raises event odds, negative Beta lowers them."></i></th>
+                      <th>SE <i class="fa-solid fa-circle-info info-tip" title="What it means: uncertainty of Beta; smaller SE means more stable estimate."></i></th>
+                      <th>Wald z <i class="fa-solid fa-circle-info info-tip" title="What it means: effect strength relative to uncertainty; bigger |z| suggests stronger evidence."></i></th>
+                      <th>p-value</th>
+                      <th>OR <i class="fa-solid fa-circle-info info-tip" title="What it means: multiplicative change in odds (OR>1 increases odds, OR<1 decreases odds)."></i></th>
+                      <th>OR CI Lower <i class="fa-solid fa-circle-info info-tip" title="What it means: conservative lower estimate of the OR effect size."></i></th>
+                      <th>OR CI Upper <i class="fa-solid fa-circle-info info-tip" title="What it means: optimistic upper estimate of the OR effect size."></i></th>
+                      <th>Reference Category <i class="fa-solid fa-circle-info info-tip" title="What it means: all factor-category effects are interpreted relative to this baseline level."></i></th>
+                    </tr>
+                  </thead>
+                  <tbody id="coefTableBody">
+                    <tr><td colspan="9" style="text-align:center; padding:20px; color:var(--text-muted); font-style:italic;"><i class="fa-solid fa-hourglass-half"></i> Awaiting coefficient results...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="section-note">Interpretation view: log-odds (`Beta`) and odds ratios (`OR = exp(Beta)`) with confidence intervals.</div>
+        </section>
+
+        <section id="tab-predictions" class="tab-panel">
+          <div class="stats-container">
+            <div class="stat-panel">
+              <div class="stat-panel-heading"><i class="fa-solid fa-check-double"></i> Classification Metrics</div>
+              <div class="stat-panel-body">
+                <div class="stat-field"><span class="stat-label">Accuracy:</span><span class="stat-value" id="acc">...</span></div>
+                <div class="stat-field"><span class="stat-label">Sensitivity <i class="fa-solid fa-circle-info info-tip" title="What it means: among true events, how many the model catches (misses fewer positives when high)."></i>:</span><span class="stat-value" id="sens">...</span></div>
+                <div class="stat-field"><span class="stat-label">Specificity <i class="fa-solid fa-circle-info info-tip" title="What it means: among true non-events, how many the model correctly rejects (fewer false alarms when high)."></i>:</span><span class="stat-value" id="spec">...</span></div>
+                <div class="stat-field"><span class="stat-label">Precision <i class="fa-solid fa-circle-info info-tip" title="What it means: when the model predicts event, how often it is actually correct."></i>:</span><span class="stat-value" id="prec">...</span></div>
+                <div class="stat-field"><span class="stat-label">F1 <i class="fa-solid fa-circle-info info-tip" title="What it means: single balance score between catching events and avoiding false positives."></i>:</span><span class="stat-value" id="f1">...</span></div>
+              </div>
+            </div>
+            <div class="stat-panel">
+              <div class="stat-panel-heading"><i class="fa-solid fa-table-cells"></i> Confusion Matrix</div>
+              <div class="stat-panel-body">
+                <div class="stat-field"><span class="stat-label">TP:</span><span class="stat-value" id="tp">...</span></div>
+                <div class="stat-field"><span class="stat-label">FP:</span><span class="stat-value" id="fp">...</span></div>
+                <div class="stat-field"><span class="stat-label">TN:</span><span class="stat-value" id="tn">...</span></div>
+                <div class="stat-field"><span class="stat-label">FN:</span><span class="stat-value" id="fn">...</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="threshold-wrap">
+            <label for="thresholdSlider">Threshold Control (cutoff between 0.30 and 0.70)</label>
+            <div class="threshold-inline">
+              <input type="range" id="thresholdSlider" min="0.30" max="0.70" step="0.01" value="0.50"/>
+              <span class="stat-value" id="thresholdValue">0.50</span>
+            </div>
+          </div>
+
+          <div class="stat-panel" style="margin-top:12px;">
+            <div class="stat-panel-heading"><i class="fa-solid fa-list"></i> Prediction Table</div>
+            <div class="stat-panel-body" style="padding:0;">
+              <div class="table-container" style="margin:0;">
+                <table class="analysis-table">
+                  <thead>
+                    <tr>
+                      <th>Observed</th>
+                      <th>Predicted Probability</th>
+                      <th>Predicted Class</th>
+                    </tr>
+                  </thead>
+                  <tbody id="predictionTableBody">
+                    <tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted); font-style:italic;"><i class="fa-solid fa-hourglass-half"></i> Awaiting predictions...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="tab-diagnostics" class="tab-panel">
+          <div class="stats-container">
+            <div class="stat-panel">
+              <div class="stat-panel-heading"><i class="fa-solid fa-wave-square"></i> Residual Diagnostics</div>
+              <div class="stat-panel-body">
+                <div class="stat-field"><span class="stat-label">Deviance Residual Mean <i class="fa-solid fa-circle-info info-tip" title="What it means: average prediction error direction; near zero suggests no global bias."></i>:</span><span class="stat-value" id="devResidMean">...</span></div>
+                <div class="stat-field"><span class="stat-label">Deviance Residual SD <i class="fa-solid fa-circle-info info-tip" title="What it means: spread of errors; very large spread may indicate unstable fit or outliers."></i>:</span><span class="stat-value" id="devResidSd">...</span></div>
+                <div class="stat-field"><span class="stat-label">Pearson Residual Mean <i class="fa-solid fa-circle-info info-tip" title="What it means: another average error check; near zero is desirable."></i>:</span><span class="stat-value" id="pearsonResidMean">...</span></div>
+                <div class="stat-field"><span class="stat-label">Pearson Residual SD <i class="fa-solid fa-circle-info info-tip" title="What it means: error variability on Pearson scale; high values suggest poor local fit."></i>:</span><span class="stat-value" id="pearsonResidSd">...</span></div>
+              </div>
+            </div>
+            <div class="stat-panel">
+              <div class="stat-panel-heading"><i class="fa-solid fa-bullseye"></i> Influence</div>
+              <div class="stat-panel-body">
+                <div class="stat-field"><span class="stat-label">Max Leverage (Hat) <i class="fa-solid fa-circle-info info-tip" title="What it means: highest potential influence point; high leverage rows can dominate estimates."></i>:</span><span class="stat-value" id="maxLeverage">...</span></div>
+                <div class="stat-field"><span class="stat-label">Max Cook's D <i class="fa-solid fa-circle-info info-tip" title="What it means: strongest single-row impact on fitted model; higher values deserve review."></i>:</span><span class="stat-value" id="maxCook">...</span></div>
+                <div class="stat-field"><span class="stat-label">Max |DFBETA| <i class="fa-solid fa-circle-info info-tip" title="What it means: largest single-row shift on a coefficient; high values indicate unstable effects."></i>:</span><span class="stat-value" id="maxDfbeta">...</span></div>
+                <div class="stat-field"><span class="stat-label">Potential Outliers:</span><span class="stat-value" id="outlierCount">...</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="section-note">Logistic diagnostics replace normal residual checks. Focus on deviance/Pearson residuals and influence signals.</div>
+        </section>
+
+        <section id="tab-roc" class="tab-panel">
+          <div class="stats-container">
+            <div class="stat-panel">
+              <div class="stat-panel-heading"><i class="fa-solid fa-chart-area"></i> Discrimination Metrics</div>
+              <div class="stat-panel-body">
+                <div class="stat-field"><span class="stat-label">AUC <i class="fa-solid fa-circle-info info-tip" title="What it means: ranking quality of event risk; 0.5 is random, closer to 1.0 is stronger discrimination."></i>:</span><span class="stat-value" id="auc">...</span></div>
+                <div class="stat-field"><span class="stat-label">Gini <i class="fa-solid fa-circle-info info-tip" title="What it means: alternate discrimination score derived from AUC; higher is better."></i>:</span><span class="stat-value" id="gini">...</span></div>
+                <div class="stat-field"><span class="stat-label">KS Statistic <i class="fa-solid fa-circle-info info-tip" title="What it means: best separation point between events and non-events; higher means cleaner separation."></i>:</span><span class="stat-value" id="ks">...</span></div>
+              </div>
+            </div>
+            <div class="stat-panel">
+              <div class="stat-panel-heading"><i class="fa-solid fa-arrows-up-to-line"></i> Lift / Gain</div>
+              <div class="stat-panel-body">
+                <div class="stat-field"><span class="stat-label">Top Decile Lift <i class="fa-solid fa-circle-info info-tip" title="What it means: how much better your top 10% ranked cases are versus random selection."></i>:</span><span class="stat-value" id="topDecileLift">...</span></div>
+                <div class="stat-field"><span class="stat-label">Gain @ 20% <i class="fa-solid fa-circle-info info-tip" title="What it means: percent of all events captured if you act on top 20% highest-risk cases."></i>:</span><span class="stat-value" id="gain20">...</span></div>
+                <div class="stat-field"><span class="stat-label">Gain @ 40% <i class="fa-solid fa-circle-info info-tip" title="What it means: percent of all events captured if you act on top 40% highest-risk cases."></i>:</span><span class="stat-value" id="gain40">...</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="roc-curve-panel">
+            <div class="roc-curve-title"><i class="fa-solid fa-chart-line"></i> Logistic ROC Curve</div>
+            <div class="roc-svg-wrap">
+              <div id="rocChart" class="roc-chart"></div>
+              <div id="rocEmptyMsg" class="roc-empty">ROC curve will render when prediction probabilities are available.</div>
+            </div>
+          </div>
+          <div class="section-note">Discrimination view: this replaces linear-only quality framing and highlights classification performance.</div>
+        </section>
+
+        <section id="tab-descriptives" class="tab-panel">
+          <div class="stat-panel">
+            <div class="stat-panel-heading"><i class="fa-solid fa-table-list"></i> Descriptive & Bivariate Checks</div>
+            <div class="stat-panel-body">
+              <div class="stat-field"><span class="stat-label">Separation Risk <i class="fa-solid fa-circle-info info-tip" title="What it means: model may overfit because some predictor levels perfectly split outcomes. Results can look too certain."></i>:</span><span class="stat-value" id="separationRisk">...</span></div>
+              <div class="stat-field"><span class="stat-label">Sparse Cells <i class="fa-solid fa-circle-info info-tip" title="What it means: some categories have too few rows, so coefficient estimates may be noisy or unstable."></i>:</span><span class="stat-value" id="sparseCells">...</span></div>
+              <div class="stat-field"><span class="stat-label">Missing Pattern:</span><span class="stat-value" id="missingPattern">...</span></div>
+            </div>
+          </div>
+          <div class="stat-panel" style="margin-top:12px;">
+            <div class="stat-panel-heading"><i class="fa-solid fa-table"></i> Outcome by Predictor Snapshot</div>
+            <div class="stat-panel-body" style="padding:0;">
+              <div class="table-container" style="margin:0;">
+                <table class="analysis-table">
+                  <thead>
+                    <tr>
+                      <th>Predictor</th>
+                      <th>Event Rate / Category</th>
+                      <th>Mean X by Outcome</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody id="descriptiveTableBody">
+                    <tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted); font-style:italic;"><i class="fa-solid fa-hourglass-half"></i> Awaiting descriptive output...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="tab-ai" class="tab-panel">
+          <div class="ai-panel">
+            <div class="ai-row"><span class="ai-key">Model Reliability:</span> <span id="aiReliability">Awaiting assessment...</span></div>
+            <div class="ai-row"><span class="ai-key">Main Drivers:</span> <span id="aiDrivers">Awaiting assessment...</span></div>
+            <div class="ai-row"><span class="ai-key">Prediction Accuracy:</span> <span id="aiAccuracy">Awaiting assessment...</span></div>
+            <div class="ai-row"><span class="ai-key">Data Risks:</span> <span id="aiRisks">Awaiting assessment...</span></div>
+            <div class="ai-row"><span class="ai-key">Recommendations:</span> <span id="aiRecs">Awaiting assessment...</span></div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    function sendToHost(cmd, data) {
+      try {
+        if (typeof vbHost !== "undefined" && vbHost && typeof vbHost.RaiseMessageEvent === "function") {
+          var dataStr = typeof data === "string" ? data : JSON.stringify(data || {});
+          vbHost.RaiseMessageEvent(cmd, dataStr);
+          return;
+        }
+
+        if (typeof Office !== "undefined" && Office.context && Office.context.ui && typeof Office.context.ui.messageParent === "function") {
+          Office.context.ui.messageParent(JSON.stringify({
+            action: "HOST_EVENT",
+            cmd: cmd,
+            data: data || {}
+          }));
+        }
+      } catch (e) {
+        console.error("Error sending to host:", e);
+      }
+    }
+
+    let logisticPayloadForAI = null;
+    let latestLogisticPredictions = [];
+
+    function setText(id, value, fallback) {
+      var el = document.getElementById(id);
+      if (el) el.innerText = (value !== undefined && value !== null && value !== "") ? value : (fallback || "N/A");
+    }
+
+    function switchTab(tabKey) {
+      document.querySelectorAll(".tab-btn").forEach(function(btn) {
+        btn.classList.toggle("active", btn.getAttribute("data-tab") === tabKey);
+      });
+      document.querySelectorAll(".tab-panel").forEach(function(panel) {
+        panel.classList.toggle("active", panel.id === "tab-" + tabKey);
+      });
+      if (tabKey === "roc" && latestLogisticPredictions.length > 0) {
+        renderRocCurveFromPredictions(latestLogisticPredictions);
+      }
+    }
+
+    function wireNavigation() {
+      document.querySelectorAll(".tab-btn[data-tab]").forEach(function(node) {
+        node.addEventListener("click", function(e) {
+          e.preventDefault();
+          var tab = this.getAttribute("data-tab");
+          switchTab(tab);
+        });
+      });
+    }
+
+    function updateHeaderBadges(stats) {
+      // intentionally left blank; badge strip removed per UX request
+    }
+
+    function parseMaybeNumber(value) {
+      if (value === undefined || value === null) return NaN;
+      var v = String(value).trim();
+      if (!v || v === "—" || v === "N/A") return NaN;
+      if (v.indexOf("<") === 0) v = v.slice(1);
+      if (v.indexOf("%") >= 0) v = v.replace("%", "");
+      // Handle locale decimal comma (e.g., "0,523")
+      if (v.indexOf(",") >= 0 && v.indexOf(".") < 0) v = v.replace(",", ".");
+      var n = Number(v);
+      return isFinite(n) ? n : NaN;
+    }
+
+    function extractPredictionPair(row) {
+      var observedRaw = row.Observed || row.observed || row.Actual || row.actual || row.Y || row.y || row.True || row.trueLabel;
+      var probRaw = row["Predicted Probability"] || row.Probability || row.predictedProbability || row.probability || row.prob || row.Pred || row.pred || row.Score || row.score || row.Phat || row.pHat;
+      var y = parseMaybeNumber(observedRaw);
+      var p = parseMaybeNumber(probRaw);
+      if (!isFinite(y) || !isFinite(p)) return null;
+      y = y >= 0.5 ? 1 : 0;
+      if (p > 1 && p <= 100) p = p / 100;
+      p = Math.max(0, Math.min(1, p));
+      return { y: y, p: p };
+    }
+
+    function renderRocHighchart(points, note) {
+      var chartContainer = document.getElementById("rocChart");
+      var empty = document.getElementById("rocEmptyMsg");
+      if (!chartContainer || typeof Highcharts === "undefined") return false;
+
+      var data = (points || []).map(function(pt) { return [pt.fpr, pt.tpr]; });
+      Highcharts.chart("rocChart", {
+        chart: {
+          type: "line",
+          backgroundColor: "transparent",
+          animation: false,
+          spacing: [10, 10, 10, 10]
+        },
+        title: { text: null },
+        credits: { enabled: false },
+        legend: { enabled: false },
+        xAxis: {
+          min: 0, max: 1,
+          title: { text: "False Positive Rate", style: { color: "rgba(255,255,255,0.65)" } },
+          labels: { style: { color: "rgba(255,255,255,0.65)" } },
+          gridLineColor: "rgba(255,255,255,0.08)",
+          lineColor: "rgba(255,255,255,0.25)"
+        },
+        yAxis: {
+          min: 0, max: 1,
+          title: { text: "True Positive Rate", style: { color: "rgba(255,255,255,0.65)" } },
+          labels: { style: { color: "rgba(255,255,255,0.65)" } },
+          gridLineColor: "rgba(255,255,255,0.08)",
+          lineColor: "rgba(255,255,255,0.25)"
+        },
+        tooltip: {
+          backgroundColor: "rgba(6,10,18,0.95)",
+          borderColor: "rgba(120,200,255,0.55)",
+          style: { color: "#eaf1ff" },
+          pointFormat: "FPR: <b>{point.x:.3f}</b><br/>TPR: <b>{point.y:.3f}</b>"
+        },
+        plotOptions: {
+          series: { marker: { enabled: false }, animation: false }
+        },
+        series: [
+          {
+            name: "Random Baseline",
+            type: "line",
+            data: [[0, 0], [1, 1]],
+            color: "rgba(255,255,255,0.28)",
+            dashStyle: "Dash",
+            lineWidth: 1,
+            enableMouseTracking: false
+          },
+          {
+            name: "ROC Curve",
+            data: data,
+            color: "rgba(120,200,255,1)",
+            lineWidth: 3
+          }
+        ]
+      });
+
+      if (empty) {
+        empty.style.display = note ? "block" : "none";
+        if (note) empty.innerText = note;
+      }
+      return true;
+    }
+
+    function renderApproxRocFromAuc(aucValue) {
+      var empty = document.getElementById("rocEmptyMsg");
+      if (!empty || !isFinite(aucValue)) return false;
+
+      var auc = Math.max(0.5, Math.min(0.999, aucValue));
+      // Parametric family tpr=fpr^alpha with AUC≈1/(alpha+1)
+      var alpha = (1 / auc) - 1;
+      var pts = [];
+      for (var i = 0; i <= 40; i++) {
+        var fpr = i / 40;
+        var tpr = Math.pow(fpr, alpha);
+        pts.push({ fpr: fpr, tpr: tpr });
+      }
+      return renderRocHighchart(pts, "ROC approximated from AUC because row-level prediction probabilities were not provided.");
+    }
+
+    function renderRocCurveFromPredictions(rows) {
+      var empty = document.getElementById("rocEmptyMsg");
+      if (!empty) return;
+
+      var pairs = (rows || []).map(extractPredictionPair).filter(Boolean);
+      var positives = pairs.filter(function(d) { return d.y === 1; }).length;
+      var negatives = pairs.length - positives;
+      if (pairs.length < 2 || positives === 0 || negatives === 0) {
+        var aucFromMetric = parseMaybeNumber((document.getElementById("auc") || {}).innerText);
+        if (!renderApproxRocFromAuc(aucFromMetric)) {
+          renderRocHighchart([{ fpr: 0, tpr: 0 }, { fpr: 1, tpr: 1 }], "ROC curve will render when prediction probabilities are available.");
+        }
+        return;
+      }
+
+      var thresholds = pairs.map(function(d) { return d.p; }).sort(function(a, b) { return b - a; });
+      thresholds = [1].concat(thresholds).concat([0]);
+
+      var rocPoints = [];
+      thresholds.forEach(function(t) {
+        var tp = 0, fp = 0;
+        pairs.forEach(function(d) {
+          var predPos = d.p >= t;
+          if (predPos && d.y === 1) tp++;
+          if (predPos && d.y === 0) fp++;
+        });
+        rocPoints.push({ fpr: fp / negatives, tpr: tp / positives });
+      });
+
+      rocPoints.sort(function(a, b) { return a.fpr - b.fpr; });
+      if (rocPoints[0].fpr !== 0 || rocPoints[0].tpr !== 0) rocPoints.unshift({ fpr: 0, tpr: 0 });
+      var last = rocPoints[rocPoints.length - 1];
+      if (last.fpr !== 1 || last.tpr !== 1) rocPoints.push({ fpr: 1, tpr: 1 });
+
+      renderRocHighchart(rocPoints, "");
+
+      // Update AUC/Gini if not yet provided by host payload.
+      var aucEl = document.getElementById("auc");
+      var giniEl = document.getElementById("gini");
+      var aucMissing = !aucEl || !aucEl.innerText || aucEl.innerText === "..." || aucEl.innerText === "N/A";
+      var giniMissing = !giniEl || !giniEl.innerText || giniEl.innerText === "..." || giniEl.innerText === "N/A";
+      if (aucMissing || giniMissing) {
+        var auc = 0;
+        for (var i = 1; i < rocPoints.length; i++) {
+          var x1 = rocPoints[i - 1].fpr, y1 = rocPoints[i - 1].tpr;
+          var x2 = rocPoints[i].fpr, y2 = rocPoints[i].tpr;
+          auc += ((y1 + y2) / 2) * (x2 - x1);
+        }
+        if (aucEl && aucMissing) aucEl.innerText = auc.toFixed(4);
+        if (giniEl && giniMissing) giniEl.innerText = (2 * auc - 1).toFixed(4);
+      }
+    }
+
+    function renderTopEffects(rows) {
+      var tbody = document.getElementById("topEffectsBody");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+
+      if (!rows || rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">No effects available</td></tr>';
+        return;
+      }
+
+      var ranked = rows
+        .filter(function(r) {
+          var name = String(r.Variable || r.variable || "").toLowerCase();
+          return name && name !== "intercept";
+        })
+        .map(function(r) {
+          var pNum = parseMaybeNumber(r.PValue || r.pValue || r.p);
+          var orNum = parseMaybeNumber(r.OR || r.or || r.OddsRatio);
+          return {
+            name: r.Variable || r.variable || "—",
+            or: r.OR || r.or || r.OddsRatio || "—",
+            p: r.PValue || r.pValue || r.p || "—",
+            pNum: pNum,
+            orNum: orNum
+          };
+        })
+        .sort(function(a, b) {
+          var ap = isFinite(a.pNum) ? a.pNum : Number.POSITIVE_INFINITY;
+          var bp = isFinite(b.pNum) ? b.pNum : Number.POSITIVE_INFINITY;
+          return ap - bp;
+        })
+        .slice(0, 5);
+
+      if (ranked.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">No non-intercept effects found</td></tr>';
+        return;
+      }
+
+      ranked.forEach(function(row) {
+        var direction = "Neutral";
+        if (isFinite(row.orNum)) {
+          direction = row.orNum > 1 ? "Risk (+)" : (row.orNum < 1 ? "Protective (-)" : "Neutral");
+        }
+
+        var tr = document.createElement("tr");
+        [row.name, row.or, row.p, direction].forEach(function(v) {
+          var td = document.createElement("td");
+          td.textContent = v;
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    }
+
+    window.populateLogisticResults = function(data) {
+      var stats = typeof data === "string" ? JSON.parse(data) : data;
+
+      setText("obsCount", stats.observations || stats.validObs, "...");
+      setText("eventCount", stats.events || stats.eventCount, "...");
+      setText("noneventCount", stats.nonEvents || stats.noneventCount, "...");
+      setText("predictorCount", stats.predictors || stats.numPredictors, "...");
+      setText("linkType", stats.link || "Logit", "Logit");
+      setText("interceptFlag", stats.includeIntercept ? "Yes" : "No", "...");
+
+      setText("n2ll", stats.neg2LogLikelihood || stats.n2ll, "...");
+      setText("deviance", stats.deviance, "...");
+      setText("aic", stats.aic || stats.AIC, "...");
+      setText("bic", stats.bic || stats.BIC, "...");
+      setText("mcfaddenR2", stats.mcfaddenR2 || stats.McFaddenR2, "...");
+      setText("coxSnellR2", stats.coxSnellR2 || stats.CoxSnellR2, "...");
+      setText("nagelkerkeR2", stats.nagelkerkeR2 || stats.NagelkerkeR2, "...");
+
+      setText("lrTest", stats.lrTest || stats.likelihoodRatio, "...");
+      setText("waldTest", stats.waldTest, "...");
+      setText("scoreTest", stats.scoreTest, "...");
+      setText("overallPValue", stats.overallPValue || stats.pValue, "...");
+
+      setText("auc", stats.auc || stats.AUC, "...");
+      setText("gini", stats.gini || stats.Gini, "...");
+      setText("ks", stats.ks || stats.KS, "...");
+      setText("topDecileLift", stats.topDecileLift, "...");
+      setText("gain20", stats.gain20, "...");
+      setText("gain40", stats.gain40, "...");
+      if ((!latestLogisticPredictions || latestLogisticPredictions.length === 0) && (stats.auc || stats.AUC)) {
+        renderApproxRocFromAuc(parseMaybeNumber(stats.auc || stats.AUC));
+      }
+
+      setText("acc", stats.accuracy || stats.Accuracy, "...");
+      setText("sens", stats.sensitivity || stats.Sensitivity, "...");
+      setText("spec", stats.specificity || stats.Specificity, "...");
+      setText("prec", stats.precision || stats.Precision, "...");
+      setText("f1", stats.f1 || stats.F1, "...");
+
+      setText("tp", stats.tp || stats.TP, "...");
+      setText("fp", stats.fp || stats.FP, "...");
+      setText("tn", stats.tn || stats.TN, "...");
+      setText("fn", stats.fn || stats.FN, "...");
+
+      updateHeaderBadges(stats);
+      logisticPayloadForAI = Object.assign({}, logisticPayloadForAI || {}, { stats: stats });
+      document.getElementById("aiInterpretBtn").style.display = "inline-block";
+    };
+
+    window.populateLogisticCoefficients = function(data) {
+      var rows = typeof data === "string" ? JSON.parse(data) : data;
+      function fillCoefficientsTable(tbodyId) {
+        var tbody = document.getElementById(tbodyId);
+        if (!tbody) return;
+        tbody.innerHTML = "";
+
+        if (!rows || rows.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:var(--text-muted);">No coefficient rows</td></tr>';
+          return;
+        }
+
+        rows.forEach(function(row) {
+          var tr = document.createElement("tr");
+          var values = [
+            row.Variable || row.variable || "—",
+            row.Beta || row.beta || row.Coefficient || "—",
+            row.SE || row.se || row.StdError || "—",
+            row.WaldZ || row.waldZ || row["Wald z"] || "—",
+            row.PValue || row.pValue || row.p || "—",
+            row.OR || row.or || row.OddsRatio || "—",
+            row.OR_CI_Lower || row.orCiLower || row.CI_Lower || "—",
+            row.OR_CI_Upper || row.orCiUpper || row.CI_Upper || "—",
+            row.Reference || row.referenceCategory || "—"
+          ];
+          values.forEach(function(v) {
+            var td = document.createElement("td");
+            td.textContent = v;
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+      }
+
+      fillCoefficientsTable("coefTableBody");
+      fillCoefficientsTable("coefTableBodyResults");
+
+      renderTopEffects(rows);
+
+      logisticPayloadForAI = Object.assign({}, logisticPayloadForAI || {}, { coefficients: rows });
+      document.getElementById("aiInterpretBtn").style.display = "inline-block";
+    };
+
+    window.populateLogisticPredictions = function(data) {
+      var rows = typeof data === "string" ? JSON.parse(data) : data;
+      latestLogisticPredictions = rows || [];
+      var tbody = document.getElementById("predictionTableBody");
+      tbody.innerHTML = "";
+
+      if (!rows || rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted);">No prediction rows</td></tr>';
+        return;
+      }
+
+      rows.forEach(function(row) {
+        var tr = document.createElement("tr");
+        [row.Observed || row.observed || "—", row.Probability || row.predictedProbability || "—", row.PredictedClass || row.predictedClass || "—"]
+          .forEach(function(v) {
+            var td = document.createElement("td");
+            td.textContent = v;
+            tr.appendChild(td);
+          });
+        tbody.appendChild(tr);
+      });
+
+      logisticPayloadForAI = Object.assign({}, logisticPayloadForAI || {}, { predictions: rows });
+      renderRocCurveFromPredictions(rows);
+    };
+
+    window.populateLogisticDiagnostics = function(data) {
+      var diag = typeof data === "string" ? JSON.parse(data) : data;
+
+      setText("devResidMean", diag.devianceResidualMean, "...");
+      setText("devResidSd", diag.devianceResidualSd, "...");
+      setText("pearsonResidMean", diag.pearsonResidualMean, "...");
+      setText("pearsonResidSd", diag.pearsonResidualSd, "...");
+      setText("maxLeverage", diag.maxLeverage, "...");
+      setText("maxCook", diag.maxCooksDistance || diag.maxCook, "...");
+      setText("maxDfbeta", diag.maxDfbeta, "...");
+      setText("outlierCount", diag.outlierCount, "...");
+
+      logisticPayloadForAI = Object.assign({}, logisticPayloadForAI || {}, { diagnostics: diag });
+    };
+
+    window.populateLogisticDescriptives = function(data) {
+      var desc = typeof data === "string" ? JSON.parse(data) : data;
+      setText("separationRisk", desc.separationRisk, "...");
+      setText("sparseCells", desc.sparseCells, "...");
+      setText("missingPattern", desc.missingPattern, "...");
+
+      var rows = desc.rows || [];
+      var tbody = document.getElementById("descriptiveTableBody");
+      tbody.innerHTML = "";
+
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">No descriptive rows</td></tr>';
+        return;
+      }
+
+      rows.forEach(function(row) {
+        var tr = document.createElement("tr");
+        [row.Predictor || row.predictor || "—", row.EventRate || row.eventRate || "—", row.MeanByOutcome || row.meanByOutcome || "—", row.Notes || row.notes || "—"]
+          .forEach(function(v) {
+            var td = document.createElement("td");
+            td.textContent = v;
+            tr.appendChild(td);
+          });
+        tbody.appendChild(tr);
+      });
+    };
+
+    window.populateLogisticAIAssessment = function(data) {
+      var ai = typeof data === "string" ? JSON.parse(data) : data;
+      setText("aiReliability", ai.modelReliability, "Awaiting assessment...");
+      setText("aiDrivers", ai.mainDrivers, "Awaiting assessment...");
+      setText("aiAccuracy", ai.predictionAccuracy, "Awaiting assessment...");
+      setText("aiRisks", ai.dataRisks, "Awaiting assessment...");
+      setText("aiRecs", ai.recommendations, "Awaiting assessment...");
+    };
+
+    function requestLogisticAI() {
+      if (!logisticPayloadForAI) {
+        alert("No logistic output available yet.");
+        return;
+      }
+
+      var btn = document.getElementById("aiInterpretBtn");
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+
+      sendToHost("analyzeLogisticWithAI", logisticPayloadForAI);
+
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-robot"></i> AI Interpret';
+      }, 2500);
+    }
+
+    window.resetResultsPanel = function() {
+      [
+        "obsCount","eventCount","noneventCount","predictorCount","interceptFlag",
+        "n2ll","deviance","aic","bic","mcfaddenR2","coxSnellR2","nagelkerkeR2",
+        "lrTest","waldTest","scoreTest","overallPValue",
+        "acc","sens","spec","prec","f1","tp","fp","tn","fn",
+        "devResidMean","devResidSd","pearsonResidMean","pearsonResidSd","maxLeverage","maxCook","maxDfbeta","outlierCount",
+        "auc","gini","ks","topDecileLift","gain20","gain40",
+        "separationRisk","sparseCells","missingPattern",
+      ].forEach(function(id) { setText(id, "...", "..."); });
+
+      document.getElementById("coefTableBody").innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:var(--text-muted); font-style:italic;"><i class="fa-solid fa-hourglass-half"></i> Awaiting coefficient results...</td></tr>';
+      document.getElementById("coefTableBodyResults").innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:var(--text-muted); font-style:italic;"><i class="fa-solid fa-hourglass-half"></i> Awaiting coefficient results...</td></tr>';
+      document.getElementById("predictionTableBody").innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted); font-style:italic;"><i class="fa-solid fa-hourglass-half"></i> Awaiting predictions...</td></tr>';
+      document.getElementById("descriptiveTableBody").innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted); font-style:italic;"><i class="fa-solid fa-hourglass-half"></i> Awaiting descriptive output...</td></tr>';
+      document.getElementById("topEffectsBody").innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted); font-style:italic;"><i class="fa-solid fa-hourglass-half"></i> Awaiting coefficient effects...</td></tr>';
+
+      document.getElementById("aiReliability").innerText = "Awaiting assessment...";
+      document.getElementById("aiDrivers").innerText = "Awaiting assessment...";
+      document.getElementById("aiAccuracy").innerText = "Awaiting assessment...";
+      document.getElementById("aiRisks").innerText = "Awaiting assessment...";
+      document.getElementById("aiRecs").innerText = "Awaiting assessment...";
+
+      document.getElementById("thresholdSlider").value = "0.50";
+      document.getElementById("thresholdValue").innerText = "0.50";
+      document.getElementById("aiInterpretBtn").style.display = "none";
+      logisticPayloadForAI = null;
+      latestLogisticPredictions = [];
+      var rocEmpty = document.getElementById("rocEmptyMsg");
+      renderRocHighchart([{ fpr: 0, tpr: 0 }, { fpr: 1, tpr: 1 }], "ROC curve will render when prediction probabilities are available.");
+      if (rocEmpty) rocEmpty.style.display = "block";
+      switchTab("results");
+    };
+
+    function handleParentMessage(message) {
+      if (!message || !message.type) return;
+
+      switch (message.type) {
+        case "LOGISTIC_RESULTS":
+          window.populateLogisticResults(message.payload || {});
+          break;
+        case "LOGISTIC_COEFFICIENTS":
+          window.populateLogisticCoefficients(message.payload || []);
+          break;
+        case "LOGISTIC_PREDICTIONS":
+          window.populateLogisticPredictions(message.payload || []);
+          break;
+        case "LOGISTIC_DIAGNOSTICS":
+          window.populateLogisticDiagnostics(message.payload || {});
+          break;
+        case "LOGISTIC_DESCRIPTIVES":
+          window.populateLogisticDescriptives(message.payload || {});
+          break;
+        case "LOGISTIC_AI":
+          window.populateLogisticAIAssessment(message.payload || {});
+          break;
+        case "LOGISTIC_BUNDLE":
+          if (message.payload) {
+            if (message.payload.results) window.populateLogisticResults(message.payload.results);
+            if (message.payload.coefficients) window.populateLogisticCoefficients(message.payload.coefficients);
+            if (message.payload.predictions) window.populateLogisticPredictions(message.payload.predictions);
+            if (message.payload.diagnostics) window.populateLogisticDiagnostics(message.payload.diagnostics);
+            if (message.payload.descriptives) window.populateLogisticDescriptives(message.payload.descriptives);
+            if (message.payload.ai) window.populateLogisticAIAssessment(message.payload.ai);
+          }
+          break;
+        case "RESET_RESULTS":
+          window.resetResultsPanel();
+          break;
+        case "SWITCH_TAB":
+          if (message.payload && message.payload.tab) switchTab(message.payload.tab);
+          break;
+        default:
+          break;
+      }
+    }
+
+    function wireOfficeDialogMessaging() {
+      if (typeof Office === "undefined") return;
+
+      Office.onReady(function() {
+        try {
+          if (Office.context && Office.context.ui && typeof Office.context.ui.messageParent === "function") {
+            Office.context.ui.messageParent(JSON.stringify({ action: "ready", module: "logistic" }));
+          }
+
+          Office.context.ui.addHandlerAsync(
+            Office.EventType.DialogParentMessageReceived,
+            function(arg) {
+              try {
+                var msg = JSON.parse(arg.message);
+                handleParentMessage(msg);
+              } catch (err) {
+                console.error("Failed to parse parent message:", err);
+              }
+            }
+          );
+        } catch (err) {
+          console.error("Failed to wire Office dialog messaging:", err);
+        }
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+      wireNavigation();
+      switchTab("results");
+      renderRocHighchart([{ fpr: 0, tpr: 0 }, { fpr: 1, tpr: 1 }], "ROC curve will render when prediction probabilities are available.");
+      wireOfficeDialogMessaging();
+
+      var threshold = document.getElementById("thresholdSlider");
+      threshold.addEventListener("input", function() {
+        var val = Number(this.value).toFixed(2);
+        document.getElementById("thresholdValue").innerText = val;
+        sendToHost("logisticThresholdChanged", { threshold: Number(val) });
+      });
+
+      sendToHost("logisticDashboardReady", {});
+    });
+  </script>
+</body>
+</html>

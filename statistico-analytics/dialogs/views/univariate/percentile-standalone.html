@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Percentile Calculator - Statistico</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="../shared-header.css">
+  <script src="../shared-header.js"></script>
+  
+  <style>
+    :root {
+      --surface-0: #0c1624;
+      --surface-1: #1a1f2e;
+      --surface-2: #242938;
+      --border: #6b7280; /* Much brighter border - easily visible */
+      --accent-1: rgb(255,165,120);
+      --accent-2: rgb(120,200,255);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255,255,255,0.8);
+      --text-muted: rgba(255,255,255,0.6);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--surface-0);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text-primary);
+      overflow-x: hidden;
+      overflow-y: auto;
+      max-height: 100vh;
+    }
+
+    .container {
+      padding: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .calculator-grid {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--surface-1);
+      border-radius: 10px;
+      box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+      border: 2px solid var(--border);
+      overflow: hidden;
+    }
+
+    .panel-heading {
+      background: linear-gradient(135deg, rgba(255, 165, 120, 0.1), rgba(120, 200, 255, 0.1));
+      color: var(--accent-1);
+      font-weight: 600;
+      padding: 12px 15px;
+      font-size: 15px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-body {
+      padding: 20px;
+    }
+
+    /* Method Selection */
+    .method-selection {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 25px;
+      justify-content: center;
+    }
+
+    .method-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: var(--text-secondary);
+    }
+
+    .method-option:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--accent-1);
+    }
+
+    .method-option.selected {
+      background: rgba(255, 165, 120, 0.15);
+      border-color: var(--accent-1);
+      color: var(--accent-1);
+    }
+
+    .method-option input[type="radio"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: var(--accent-1);
+    }
+
+    /* Section Title */
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+      text-align: center;
+      color: var(--text-primary);
+    }
+
+    /* Slider Container */
+    .percentile-input {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .slider-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .slider {
+      width: 100%;
+      height: 8px;
+      border-radius: 4px;
+      outline: none;
+      -webkit-appearance: none;
+      background: linear-gradient(to right, var(--accent-1) 50%, rgba(255, 255, 255, 0.1) 50%);
+    }
+
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent-1);
+      cursor: pointer;
+      border: 2px solid var(--text-primary);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .slider::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent-1);
+      cursor: pointer;
+      border: 2px solid var(--text-primary);
+    }
+
+    .slider-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 5px;
+    }
+
+    /* Numeric Input */
+    .numeric-input {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 10px;
+    }
+
+    .numeric-input input {
+      width: 80px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 1rem;
+      text-align: center;
+      background-color: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+    }
+
+    .numeric-input input:focus {
+      outline: none;
+      border-color: var(--accent-1);
+    }
+
+    /* Preset Buttons */
+    .preset-buttons {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .preset-button {
+      flex: 1;
+      padding: 8px 14px;
+      background-color: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .preset-button:hover {
+      background-color: var(--accent-1);
+      color: var(--surface-0);
+      border-color: var(--accent-1);
+    }
+
+    /* Arrow Separator */
+    .panel-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: pulse 2s infinite;
+    }
+
+    .arrow-icon {
+      font-size: 30px;
+      color: var(--accent-2);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+
+    /* Visualization */
+    .visual-output {
+      background-color: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+      height: 450px;
+    }
+
+    .distribution-view {
+      position: relative;
+      height: 100%;
+    }
+
+    .scale {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 50px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 15px 0;
+      font-size: 0.75rem;
+    }
+
+    .scale.left {
+      left: 0;
+      align-items: flex-start;
+      color: var(--text-muted);
+    }
+
+    .scale.right {
+      right: 0;
+      align-items: flex-end;
+      color: var(--accent-1);
+      font-weight: 600;
+    }
+
+    .scale-tick {
+      position: absolute;
+      width: 100%;
+    }
+
+    .scale-value {
+      position: absolute;
+    }
+
+    .left .scale-value {
+      left: 10px;
+    }
+
+    .right .scale-value {
+      right: 10px;
+    }
+
+    .distribution-bar {
+      width: 60%;
+      margin: 0 auto;
+      background: linear-gradient(180deg, var(--accent-1) 0%, var(--accent-2) 100%);
+      transition: height 0.3s ease;
+      position: absolute;
+      bottom: 0;
+      left: 20%;
+      border-radius: 4px 4px 0 0;
+    }
+
+    .percentile-arrow {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .arrow-text {
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      color: var(--surface-0);
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 1.3rem;
+      position: relative;
+      top: -60px; /* Default - will be adjusted by JS for high percentiles */
+      transition: top 0.3s ease;
+      box-shadow: 0 4px 12px rgba(255, 165, 120, 0.4);
+    }
+
+    /* Decimal Control */
+    .decimal-control {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 15px;
+      margin-top: 15px;
+      justify-content: center;
+    }
+
+    .decimal-control label {
+      color: var(--accent-1);
+      font-weight: 600;
+    }
+
+    .decimal-control select {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 1rem;
+      background-color: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+      cursor: pointer;
+    }
+
+    .decimal-control select:focus {
+      outline: none;
+      border-color: var(--accent-1);
+    }
+
+    /* Footer */
+    .statistico-footer {
+      font-size: 11px;
+      color: #7f8c8d;
+      text-align: center;
+      padding: 6px 0;
+      opacity: 0.8;
+      margin-top: 20px;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .calculator-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+      }
+      .panel-arrow {
+        transform: rotate(90deg);
+        margin: 10px 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <statistico-header view-name="Percentile Calculator" module-name="Univariate Analysis"></statistico-header>
+  
+  <div class="container">
+    <div class="calculator-grid">
+      <!-- Input Panel -->
+      <div class="panel">
+        <div class="panel-heading">
+          <i class="fas fa-sliders-h"></i> Percentile Input
+        </div>
+        <div class="panel-body">
+          <div class="method-selection">
+            <div class="method-option selected" data-method="sas">
+              <input type="radio" name="method" id="sas" checked />
+              <label for="sas">SAS Method</label>
+            </div>
+            <div class="method-option" data-method="excel-inclusive">
+              <input type="radio" name="method" id="excel-inclusive" />
+              <label for="excel-inclusive">Excel Inclusive</label>
+            </div>
+            <div class="method-option" data-method="excel-exclusive">
+              <input type="radio" name="method" id="excel-exclusive" />
+              <label for="excel-exclusive">Excel Exclusive</label>
+            </div>
+            <div class="method-option" data-method="nearest-rank">
+              <input type="radio" name="method" id="nearest-rank" />
+              <label for="nearest-rank">Nearest Rank</label>
+            </div>
+          </div>
+
+          <div class="section-title">Percentile Input (0–100%)</div>
+          
+          <div class="percentile-input">
+            <div class="slider-container">
+              <input type="range" min="0" max="100" value="50" class="slider" id="percentile-slider" />
+              <div class="slider-labels">
+                <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+              </div>
+            </div>
+
+            <div class="numeric-input">
+              <label for="percentile-value">Specific percentile:</label>
+              <input type="number" id="percentile-value" min="0" max="100" value="50" step="0.1" />
+              <span>%</span>
+            </div>
+
+            <div class="preset-buttons">
+              <button class="preset-button" data-value="25">P25</button>
+              <button class="preset-button" data-value="50">P50 (Median)</button>
+              <button class="preset-button" data-value="75">P75</button>
+              <button class="preset-button" data-value="90">P90</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Arrow Separator -->
+      <div class="panel-arrow">
+        <span class="arrow-icon">➜</span>
+      </div>
+
+      <!-- Output Panel -->
+      <div class="panel">
+        <div class="panel-heading">
+          <i class="fas fa-chart-bar"></i> Resulting Value (Interpolated)
+        </div>
+        <div class="panel-body">
+          <div class="visual-output">
+            <div class="distribution-view">
+              <div class="scale left">
+                <div class="scale-tick" style="top: 0%"><span class="scale-value">100%</span></div>
+                <div class="scale-tick" style="top: 25%"><span class="scale-value">75%</span></div>
+                <div class="scale-tick" style="top: 50%"><span class="scale-value">50%</span></div>
+                <div class="scale-tick" style="top: 75%"><span class="scale-value">25%</span></div>
+                <div class="scale-tick" style="top: 100%"><span class="scale-value">0% (min)</span></div>
+              </div>
+
+              <div id="percentile-arrow" class="percentile-arrow">
+                <div id="arrow-text" class="arrow-text">50.00</div>
+              </div>
+
+              <div id="distribution-bar" class="distribution-bar"></div>
+
+              <div class="scale right">
+                <div class="scale-tick" style="top: 0%"><span class="scale-value">100.00</span></div>
+                <div class="scale-tick" style="top: 25%"><span class="scale-value">75.00</span></div>
+                <div class="scale-tick" style="top: 50%"><span class="scale-value">50.00</span></div>
+                <div class="scale-tick" style="top: 75%"><span class="scale-value">25.00</span></div>
+                <div class="scale-tick" style="top: 100%"><span class="scale-value">0.00 (min)</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="decimal-control">
+            <label for="decimals">Decimals:</label>
+            <select id="decimals" onchange="updateVisualization()">
+              <option value="0">0</option>
+              <option value="1">1</option>
+              <option value="2" selected>2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="statistico-footer">
+    © 2026 Statistico Analytics™ · All rights reserved
+  </footer>
+
+  <script>
+    let originalData = [12, 15, 18, 22, 25, 27, 30, 32, 35, 38, 41, 45, 50, 55, 60, 65, 70, 75, 80, 90, 100];
+    let varName = 'Variable';
+    let currentMethod = 'sas';
+
+    // Office.js initialization
+    Office.initialize = function (reason) {
+      console.log('✅ Percentile Calculator - Office.js initialized:', reason);
+      
+      // Listen for messages from parent
+      if (Office.context && Office.context.ui) {
+        Office.context.ui.addHandlerAsync(
+          Office.EventType.DialogParentMessageReceived,
+          onMessageReceived
+        );
+      }
+      
+      // Send ready signal
+      setTimeout(() => {
+        sendMessageToParent({ status: 'ready', view: 'percentile' });
+        console.log('📤 Sending ready signal to parent');
+      }, 500);
+      
+      // Try localStorage or use sample data
+      setTimeout(() => {
+        try {
+          const storedData = localStorage.getItem('univariateResults');
+          if (storedData) {
+            const parsedData = JSON.parse(storedData);
+            console.log('📦 Loading data from localStorage');
+            handleDataReceived(parsedData);
+          }
+        } catch (e) {
+          console.error('❌ Error loading from localStorage:', e);
+        }
+      }, 2000);
+    };
+
+    // DOMContentLoaded fallback
+    window.addEventListener('DOMContentLoaded', function() {
+      console.log('🚀 DOM Content Loaded');
+      
+      // Initialize header
+      const initHeader = () => {
+        if (typeof StatisticoHeader !== 'undefined') {
+          StatisticoHeader.init('percentile', varName, originalData.length);
+          console.log('✅ Shared header initialized');
+        } else {
+          setTimeout(initHeader, 100);
+        }
+      };
+      initHeader();
+      
+      // Initialize visualization
+      updateVisualization();
+    });
+
+    // Message receiver
+    function onMessageReceived(arg) {
+      try {
+        const message = JSON.parse(arg.message);
+        console.log('📩 Message received from parent:', message);
+        
+        if (message.action === 'loadData' && message.data) {
+          console.log('✅ Received data from taskpane');
+          handleDataReceived(message.data);
+        }
+      } catch (e) {
+        console.error('❌ Error handling message:', e);
+      }
+    }
+
+    // Send message to parent
+    function sendMessageToParent(message) {
+      if (typeof Office !== 'undefined' && Office.context && Office.context.ui) {
+        Office.context.ui.messageParent(JSON.stringify(message));
+      }
+    }
+
+    // Handle data received
+    function handleDataReceived(data) {
+      try {
+        console.log('📊 Data received:', data);
+        
+        // Extract data from various possible fields
+        let rawData = data.values || data.trimmedValues || data.transformedValues || data.rawValues || data.data || [];
+        
+        // Handle nested values
+        if (rawData.values && Array.isArray(rawData.values)) {
+          rawData = rawData.values;
+        }
+        
+        // Convert to numbers and filter
+        originalData = rawData
+          .map(v => typeof v === 'string' ? parseFloat(v) : v)
+          .filter(v => !isNaN(v) && v != null);
+        
+        varName = data.variable || data.variableName || data.column || 'Variable';
+        
+        console.log('✅ Data processed:', originalData.length, 'values');
+        
+        if (originalData.length === 0) {
+          console.warn('⚠️ No valid data found');
+          return;
+        }
+        
+        // Store data for navigation
+        try {
+          localStorage.setItem('univariateResults', JSON.stringify(data));
+        } catch (e) {
+          console.warn('⚠️ Could not save to localStorage:', e);
+        }
+        
+        // Update header
+        const updateHeader = () => {
+          if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateVariable) {
+            StatisticoHeader.updateVariable(varName, originalData.length);
+            console.log('✅ Header updated');
+          } else {
+            setTimeout(updateHeader, 100);
+          }
+        };
+        updateHeader();
+        
+        updateVisualization();
+      } catch (e) {
+        console.error('❌ Error handling data:', e);
+      }
+    }
+
+    // Calculate percentile
+    function calculatePercentile(data, percentile, method) {
+      const sortedData = [...data].sort((a, b) => a - b);
+      const n = sortedData.length;
+      
+      if (percentile === 0) return sortedData[0];
+      if (percentile === 1) return sortedData[n - 1];
+      
+      switch (method) {
+        case 'excel-inclusive':
+          const k_inc = percentile * (n - 1) + 1;
+          const f_inc = Math.floor(k_inc);
+          const d_inc = k_inc - f_inc;
+          if (f_inc === 0) return sortedData[0];
+          if (f_inc >= n) return sortedData[n - 1];
+          return sortedData[f_inc - 1] + d_inc * (sortedData[f_inc] - sortedData[f_inc - 1]);
+          
+        case 'excel-exclusive':
+          const k_exc = percentile * (n + 1);
+          const f_exc = Math.floor(k_exc);
+          const d_exc = k_exc - f_exc;
+          if (f_exc === 0 || f_exc >= n) return sortedData[Math.max(0, Math.min(n - 1, f_exc - 1))];
+          return sortedData[f_exc - 1] + d_exc * (sortedData[f_exc] - sortedData[f_exc - 1]);
+          
+        case 'nearest-rank':
+          const index = Math.ceil(percentile * n) - 1;
+          return sortedData[Math.max(0, Math.min(n - 1, index))];
+          
+        case 'sas':
+        default:
+          const k_sas = percentile * (n + 1);
+          const f_sas = Math.floor(k_sas);
+          const d_sas = k_sas - f_sas;
+          if (f_sas === 0) return sortedData[0];
+          if (f_sas >= n) return sortedData[n - 1];
+          return sortedData[f_sas - 1] + d_sas * (sortedData[f_sas] - sortedData[f_sas - 1]);
+      }
+    }
+
+    // Update visualization
+    function updateVisualization() {
+      const percentileValue = parseFloat(document.getElementById('percentile-value').value);
+      updateSliderVisual();
+      
+      const resultValue = calculatePercentile(originalData, percentileValue / 100, currentMethod);
+      const decimals = parseInt(document.getElementById('decimals').value);
+      
+      // Update arrow text
+      document.getElementById('arrow-text').textContent = resultValue.toFixed(decimals);
+      
+      // Update right scale
+      const minValue = Math.min(...originalData);
+      const maxValue = Math.max(...originalData);
+      const range = maxValue - minValue;
+      
+      document.querySelector('.scale.right .scale-tick:nth-child(1) .scale-value').textContent = maxValue.toFixed(decimals);
+      document.querySelector('.scale.right .scale-tick:nth-child(2) .scale-value').textContent = (maxValue - range/4).toFixed(decimals);
+      document.querySelector('.scale.right .scale-tick:nth-child(3) .scale-value').textContent = (maxValue - range/2).toFixed(decimals);
+      document.querySelector('.scale.right .scale-tick:nth-child(4) .scale-value').textContent = (maxValue - 3*range/4).toFixed(decimals);
+      document.querySelector('.scale.right .scale-tick:nth-child(5) .scale-value').textContent = minValue.toFixed(decimals) + " (min)";
+      
+      // Update distribution bar
+      const barHeight = percentileValue;
+      const distributionBar = document.getElementById('distribution-bar');
+      distributionBar.style.height = barHeight + '%';
+      
+      // Position arrow with smart positioning
+      const percentileArrow = document.getElementById('percentile-arrow');
+      const arrowText = document.getElementById('arrow-text');
+      const topPosition = 100 - barHeight;
+      
+      percentileArrow.style.top = topPosition + '%';
+      
+      // Adjust arrow text position to keep it visible
+      // At high percentiles (>85%), reduce the offset to prevent it from going off-screen
+      if (percentileValue > 85) {
+        arrowText.style.top = '-40px';
+      } else {
+        arrowText.style.top = '-60px';
+      }
+    }
+
+    // Update slider visual
+    function updateSliderVisual() {
+      const slider = document.getElementById('percentile-slider');
+      const value = slider.value;
+      slider.style.background = `linear-gradient(to right, var(--accent-1) 0%, var(--accent-1) ${value}%, rgba(255, 255, 255, 0.1) ${value}%, rgba(255, 255, 255, 0.1) 100%)`;
+    }
+
+    // Event listeners
+    document.addEventListener('DOMContentLoaded', () => {
+      const slider = document.getElementById('percentile-slider');
+      const input = document.getElementById('percentile-value');
+      
+      slider.addEventListener('input', () => {
+        input.value = slider.value;
+        updateVisualization();
+      });
+      
+      input.addEventListener('input', () => {
+        let value = parseFloat(input.value);
+        if (isNaN(value)) value = 0;
+        value = Math.max(0, Math.min(100, value));
+        slider.value = value;
+        updateVisualization();
+      });
+      
+      // Preset buttons
+      document.querySelectorAll('.preset-button').forEach(button => {
+        button.addEventListener('click', () => {
+          const value = button.getAttribute('data-value');
+          slider.value = value;
+          input.value = value;
+          updateVisualization();
+        });
+      });
+      
+      // Method selection
+      document.querySelectorAll('.method-option').forEach(option => {
+        option.addEventListener('click', () => {
+          document.querySelectorAll('.method-option').forEach(opt => opt.classList.remove('selected'));
+          option.classList.add('selected');
+          currentMethod = option.getAttribute('data-method');
+          option.querySelector('input[type="radio"]').checked = true;
+          updateVisualization();
+        });
+      });
+    });
+
+    console.log('✅ Percentile Calculator script loaded');
+  </script>
+</body>
+</html>

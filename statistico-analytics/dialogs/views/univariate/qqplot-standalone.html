@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>QQ/PP Plot Analysis - Statistico</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
+  <link rel="stylesheet" href="../shared-header.css">
+  <script src="../shared-header.js"></script>
+  
+  <!-- Responsive Layout System -->
+  <link rel="stylesheet" href="./responsive-layout.css">
+  <script src="./responsive-layout.js"></script>
+  
+  <style>
+    :root {
+      --surface-0: #0c1624;
+      --surface-1: #1a1f2e;
+      --surface-2: #242938;
+      --border: #2d3748;
+      --accent-1: rgb(255,165,120);
+      --accent-2: rgb(120,200,255);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255,255,255,0.8);
+      --text-muted: rgba(255,255,255,0.6);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--surface-0);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text-primary);
+      overflow: hidden; /* Responsive layout handles overflow */
+    }
+
+    /* Override responsive panel for controls */
+    .controls-panel {
+      flex: 0 0 auto !important; /* Don't grow - fixed height */
+    }
+    
+    .controls-panel .responsive-panel-body {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      padding: 8px 12px !important; /* Compact controls */
+      flex: 0 0 auto !important; /* Don't grow */
+    }
+
+    .plot-type-group {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .radio-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .radio-option:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--accent-1);
+    }
+
+    .radio-option.active {
+      background: rgba(255, 165, 120, 0.15);
+      border-color: var(--accent-1);
+    }
+
+    .radio-option input[type="radio"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: var(--accent-1);
+    }
+
+    .radio-label {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .radio-label strong {
+      color: var(--text-primary);
+      font-size: 13px;
+    }
+
+    .radio-label small {
+      color: var(--text-muted);
+      font-size: 10px;
+    }
+
+    .distribution-select {
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 13px;
+      cursor: pointer;
+      min-width: 150px;
+    }
+
+    .distribution-select:focus {
+      outline: none;
+      border-color: var(--accent-1);
+    }
+
+    .distribution-select option {
+      background: var(--surface-1);
+      color: var(--text-primary);
+    }
+
+    /* Charts Grid - Will be stacked by universal CSS */
+    .charts-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 4px; /* Fixed gap instead of var */
+      flex: 1 1 auto;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* Chart Panel - work with responsive layout */
+    .chart-panel {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 150px; /* Ensure minimum visibility */
+      overflow: hidden;
+    }
+
+    .chart-panel .responsive-panel-heading {
+      background: linear-gradient(135deg, rgba(255, 165, 120, 0.1), rgba(120, 200, 255, 0.1));
+      padding: 6px 12px !important;
+      border-bottom: 1px solid var(--border);
+      flex: 0 0 auto !important; /* CRITICAL: Prevent header from growing */
+      min-height: 0;
+      height: auto;
+    }
+
+    .chart-panel .responsive-panel-heading h3 {
+      color: var(--accent-1);
+      font-size: 13px;
+      font-weight: 600;
+      margin: 0;
+      line-height: 1.3;
+      height: auto !important; /* Don't constrain h3 height */
+      max-height: none !important;
+      min-height: 0 !important;
+    }
+
+    .chart-panel .responsive-panel-body {
+      flex: 1;
+      padding: 4px !important;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .chart-panel .responsive-chart-container {
+      flex: 1 1 auto;
+      min-height: 150px !important; /* Ensure always visible */
+      max-height: 100%;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    /* Ensure Highcharts fills container properly */
+    .chart-panel .responsive-chart-container > div,
+    .chart-panel .responsive-chart-container .highcharts-container {
+      height: 100% !important;
+      width: 100% !important;
+    }
+
+    /* Ensure both charts are always visible */
+    #mainChartPanel,
+    #detrendedChartPanel {
+      display: flex !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      flex: 1 1 auto !important;
+      min-height: 150px !important;
+    }
+    
+    #qqplot-chart,
+    #detrended-chart {
+      display: block !important;
+      visibility: visible !important;
+      min-height: 150px !important;
+    }
+    
+    /* Compact mode */
+    @media (max-height: 800px) {
+      .chart-panel {
+        min-height: 140px !important;
+      }
+      .responsive-chart-container {
+        min-height: 120px !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <statistico-header view-name="QQ/PP Plot Analysis" module-name="Univariate Analysis"></statistico-header>
+  
+  <div class="responsive-container" id="results-container">
+    <!-- Controls Panel -->
+    <div class="responsive-panel controls-panel">
+      <div class="responsive-panel-body">
+        <div class="plot-type-group">
+          <label class="radio-option active" id="radioQQ">
+            <input type="radio" name="plotType" value="qq" checked onchange="switchPlotType('qq')">
+            <span class="radio-label">
+              <strong>QQ Plot</strong>
+              <small>Quantile-Quantile</small>
+            </span>
+          </label>
+          
+          <label class="radio-option" id="radioPP">
+            <input type="radio" name="plotType" value="pp" onchange="switchPlotType('pp')">
+            <span class="radio-label">
+              <strong>PP Plot</strong>
+              <small>Probability-Probability</small>
+            </span>
+          </label>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        
+        
+          <label for="distributionSelect" style="color: var(--text-muted); font-size: 12px; margin-right: 8px;">Distribution:</label>
+          <select id="distributionSelect" class="distribution-select" onchange="switchDistribution()">
+            <option value="normal" selected>Normal</option>
+            <option value="exponential">Exponential</option>
+            <option value="uniform">Uniform</option>
+            <option value="lognormal">Log-Normal</option>
+            <option value="gamma">Gamma</option>
+            <option value="weibull">Weibull</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts (will be stacked vertically) -->
+    <div class="charts-grid">
+      <!-- Main Chart Panel -->
+      <div class="responsive-panel chart-panel" id="mainChartPanel">
+        <div class="responsive-panel-heading panel-header">
+          <h3 id="chartTitle">QQ Plot - Normal Distribution</h3>
+        </div>
+        <div class="responsive-panel-body">
+          <div id="qqplot-chart" class="responsive-chart-container chart-container"></div>
+        </div>
+      </div>
+      
+      <!-- Detrended Chart Panel -->
+      <div class="responsive-panel chart-panel" id="detrendedChartPanel">
+        <div class="responsive-panel-heading panel-header">
+          <h3>Detrended Plot</h3>
+        </div>
+        <div class="responsive-panel-body">
+          <div id="detrended-chart" class="responsive-chart-container chart-container"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let originalData = [];
+    let varName = 'Variable';
+    let currentPlotType = 'qq';
+    let currentDistribution = 'normal';
+    let qqppChart = null;
+    let detrendedChart = null;
+    let librariesLoaded = false;
+    let dataReady = false;
+
+    // Check if all libraries are loaded
+    function checkLibraries() {
+      const highchartsReady = typeof Highcharts !== 'undefined';
+      const jstatReady = typeof jStat !== 'undefined';
+      librariesLoaded = highchartsReady && jstatReady;
+      
+      if (!librariesLoaded) {
+        console.log('⏳ Waiting for libraries... Highcharts:', highchartsReady, 'jStat:', jstatReady);
+      } else {
+        console.log('✅ All libraries loaded');
+      }
+      
+      return librariesLoaded;
+    }
+
+    // Try to render charts if everything is ready
+    function tryRenderCharts() {
+      if (librariesLoaded && dataReady && originalData.length > 0) {
+        console.log('🎨 All ready - creating charts...');
+        createQQPPPlots();
+      } else {
+        console.log('⏳ Not ready yet. Libraries:', librariesLoaded, 'Data:', dataReady, 'Length:', originalData.length);
+      }
+    }
+
+    // Office.js initialization
+    Office.initialize = function (reason) {
+      console.log('✅ QQ/PP Plot - Office.js initialized:', reason);
+      
+      // Listen for messages from parent
+      Office.context.ui.addHandlerAsync(
+        Office.EventType.DialogParentMessageReceived,
+        onMessageReceived
+      );
+      
+      // Send ready signal to parent (taskpane will respond with data)
+      setTimeout(() => {
+        sendMessageToParent({ status: 'ready', view: 'qqplot' });
+        console.log('📤 Sending ready signal to parent');
+      }, 500);
+      
+      // Try to load data from various sources (wait longer for parent response)
+      setTimeout(() => {
+        if (dataReady) {
+          console.log('✅ Data already loaded');
+          return;
+        }
+        
+        // Try localStorage first
+        try {
+          const storedData = localStorage.getItem('univariateResults');
+          if (storedData) {
+            const parsedData = JSON.parse(storedData);
+            console.log('📦 Loading data from localStorage');
+            handleDataReceived(parsedData);
+            if (dataReady) return;
+          }
+        } catch (e) {
+          console.error('❌ Error loading from localStorage:', e);
+        }
+        
+        // Fallback to sample data
+        console.log('⏰ No real data received after 3s, loading sample data...');
+        loadSampleData();
+      }, 3000);
+    };
+
+    // Fallback: If Office.js doesn't load (browser testing), load sample data
+    window.addEventListener('DOMContentLoaded', function() {
+      console.log('🚀 DOM Content Loaded');
+      
+      // Wait for StatisticoHeader to be available
+      const initHeader = () => {
+        if (typeof StatisticoHeader !== 'undefined') {
+          StatisticoHeader.init('qqplot', 'Variable', 0);
+          console.log('✅ Shared header initialized');
+        } else {
+          console.log('⏳ Waiting for StatisticoHeader...');
+          setTimeout(initHeader, 100);
+        }
+      };
+      initHeader();
+      
+      // Check if libraries are loaded (with timeout)
+      let attempts = 0;
+      const maxAttempts = 50; // 5 seconds max wait
+      
+      const checkAndInit = () => {
+        attempts++;
+        
+        if (checkLibraries()) {
+          // Libraries loaded - check if Office.js is available
+          if (typeof Office === 'undefined') {
+            console.log('⚠️ Office.js not available - loading sample data immediately');
+            setTimeout(() => {
+              if (!dataReady) loadSampleData();
+            }, 500);
+          }
+        } else if (attempts < maxAttempts) {
+          // Keep trying
+          setTimeout(checkAndInit, 100);
+        } else {
+          // Timeout - load sample data anyway
+          console.warn('⚠️ Libraries failed to load after 5s, loading sample data anyway');
+          loadSampleData();
+        }
+      };
+      setTimeout(checkAndInit, 100);
+    });
+
+    // Message receiver
+    function onMessageReceived(arg) {
+      try {
+        const message = JSON.parse(arg.message);
+        console.log('📩 Message received from parent:', message);
+        
+        // Handle data from taskpane (action: 'loadData')
+        if (message.action === 'loadData' && message.data) {
+          console.log('✅ Received data from taskpane:', message.data);
+          handleDataReceived(message.data);
+        } 
+        // Legacy: handle other formats
+        else if (message.type === 'data' || message.action === 'sendData') {
+          const dataToHandle = message.data || message;
+          console.log('📊 Handling data (legacy format):', dataToHandle);
+          handleDataReceived(dataToHandle);
+        } 
+        // Navigation request
+        else if (message.action === 'switchView') {
+          console.log('🔄 Switch view request:', message.view);
+        } 
+        // Fallback: treat entire message as data
+        else {
+          console.log('🔄 Unknown format, treating as data');
+          handleDataReceived(message);
+        }
+      } catch (e) {
+        console.error('❌ Error handling message:', e);
+      }
+    }
+
+    // Send message to parent window
+    function sendMessageToParent(message) {
+      if (typeof Office !== 'undefined' && Office.context && Office.context.ui) {
+        Office.context.ui.messageParent(JSON.stringify(message));
+        console.log('📤 Sent message to parent:', message);
+      }
+    }
+
+    // Load sample data for browser testing
+    function loadSampleData() {
+      console.log('📊 Loading sample data...');
+      
+      if (!checkLibraries()) {
+        console.log('⏳ Libraries not ready, retrying...');
+        setTimeout(loadSampleData, 200);
+        return;
+      }
+      
+      const sampleData = generateSampleData();
+      originalData = sampleData.values;
+      varName = 'Sample Data';
+      dataReady = true;
+      
+      // Update header when available
+      const updateHeader = () => {
+        if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateVariable) {
+          StatisticoHeader.updateVariable(varName, originalData.length);
+          console.log('✅ Header updated with sample data');
+        } else {
+          setTimeout(updateHeader, 100);
+        }
+      };
+      updateHeader();
+      
+      tryRenderCharts();
+    }
+
+    // Generate sample data (normal distribution)
+    function generateSampleData() {
+      const values = [];
+      for (let i = 0; i < 100; i++) {
+        const u1 = Math.random();
+        const u2 = Math.random();
+        const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        values.push(50 + z * 10);
+      }
+      return { values };
+    }
+
+    // Handle data received from parent
+    function handleDataReceived(data) {
+      try {
+        console.log('📊 Data received:', data);
+        
+        if (!checkLibraries()) {
+          console.log('⏳ Libraries not ready, waiting...');
+          setTimeout(() => handleDataReceived(data), 200);
+          return;
+        }
+        
+        // Robust data extraction - handle various formats
+        let rawData = data.values || data.trimmedValues || data.transformedValues || data.rawValues || data.data || [];
+        
+        // Handle nested values (e.g., data.values.values)
+        if (rawData.values && Array.isArray(rawData.values)) {
+          rawData = rawData.values;
+        }
+        
+        // Convert to numbers and filter out invalid values
+        originalData = rawData
+          .map(v => typeof v === 'string' ? parseFloat(v) : v)
+          .filter(v => !isNaN(v) && v != null);
+        
+        // Extract variable name from multiple possible fields
+        varName = data.variable || data.variableName || data.column || 'Variable';
+        
+        console.log('✅ Data processed:', originalData.length, 'values from', rawData.length, 'raw values');
+        
+        // If no valid data, don't mark as ready (will load sample data)
+        if (originalData.length === 0) {
+          console.warn('⚠️ No valid data found, will load sample data');
+          return;
+        }
+        
+        dataReady = true;
+        
+        // Store data in localStorage for view navigation
+        try {
+          localStorage.setItem('univariateResults', JSON.stringify(data));
+          console.log('💾 Saved data to localStorage for navigation');
+        } catch (e) {
+          console.warn('⚠️ Could not save to localStorage:', e);
+        }
+        
+        // Check if data was modified (trimmed or transformed)
+        const isTrimmed = data.trim && (data.trim.min > 0 || data.trim.max < 100);
+        const isTransformed = data.transform && data.transform !== 'none';
+        const displayN = (isTrimmed || isTransformed) ? originalData.length + '*' : originalData.length;
+        
+        // Update header when available
+        const updateHeader = () => {
+          if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateVariable) {
+            StatisticoHeader.updateVariable(varName, displayN);
+            console.log('✅ Header updated with n:', displayN);
+          } else {
+            setTimeout(updateHeader, 100);
+          }
+        };
+        updateHeader();
+        
+        tryRenderCharts();
+      } catch (e) {
+        console.error('❌ Error handling data:', e);
+      }
+    }
+
+    // Switch between QQ and PP plots
+    function switchPlotType(type) {
+      currentPlotType = type;
+      
+      document.getElementById('radioQQ').classList.toggle('active', type === 'qq');
+      document.getElementById('radioPP').classList.toggle('active', type === 'pp');
+      
+      updateChartTitle();
+      
+      // Only create charts if data is ready
+      if (dataReady && originalData.length > 0) {
+        createQQPPPlots();
+      }
+    }
+
+    // Switch distribution
+    function switchDistribution() {
+      currentDistribution = document.getElementById('distributionSelect').value;
+      updateChartTitle();
+      
+      // Only create charts if data is ready
+      if (dataReady && originalData.length > 0) {
+        createQQPPPlots();
+      }
+    }
+
+    // Update chart title
+    function updateChartTitle() {
+      const plotTypeLabel = currentPlotType.toUpperCase();
+      const distLabel = currentDistribution.charAt(0).toUpperCase() + currentDistribution.slice(1);
+      document.getElementById('chartTitle').textContent = `${plotTypeLabel} Plot - ${distLabel} Distribution`;
+    }
+
+    // Fit linear regression line
+    function fitLine(xData, yData) {
+      const n = xData.length;
+      const sumX = xData.reduce((a, b) => a + b, 0);
+      const sumY = yData.reduce((a, b) => a + b, 0);
+      const sumXY = xData.reduce((sum, x, i) => sum + x * yData[i], 0);
+      const sumXX = xData.reduce((sum, x) => sum + x * x, 0);
+      
+      const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+      const intercept = (sumY - slope * sumX) / n;
+      
+      return { slope, intercept };
+    }
+
+    // Calculate theoretical values
+    function getTheoreticalValues(sortedData, distribution, plotType, mean, std) {
+      const n = sortedData.length;
+      const theoretical = [];
+      const empirical = [];
+      
+      for (let i = 0; i < n; i++) {
+        const p = (i + 0.5) / n;
+        let theoreticalValue;
+        
+        if (plotType === 'qq') {
+          empirical.push(sortedData[i]);
+          
+          switch(distribution) {
+            case 'normal':
+              theoreticalValue = jStat.normal.inv(p, mean, std);
+              break;
+            case 'exponential':
+              const lambda = mean > 0 ? 1 / mean : 1;
+              theoreticalValue = jStat.exponential.inv(p, lambda);
+              break;
+            case 'uniform':
+              const dataMin = Math.min(...sortedData);
+              const dataMax = Math.max(...sortedData);
+              theoreticalValue = jStat.uniform.inv(p, dataMin, dataMax);
+              break;
+            case 'lognormal':
+              const logMean = Math.log(mean);
+              const logStd = Math.sqrt(Math.log(1 + (std * std) / (mean * mean)));
+              theoreticalValue = jStat.lognormal.inv(p, logMean, logStd);
+              break;
+            case 'gamma':
+              const shape = (mean * mean) / (std * std);
+              const scale = (std * std) / mean;
+              theoreticalValue = jStat.gamma.inv(p, shape, scale);
+              break;
+            case 'weibull':
+              // Weibull parameters using method of moments approximation
+              const cvWeibull = std / mean;
+              const kWeibull = Math.pow(cvWeibull, -1.086); // Shape parameter approximation
+              const lambdaWeibull = mean / jStat.gammafn(1 + 1 / kWeibull); // Scale parameter
+              theoreticalValue = jStat.weibull.inv(p, lambdaWeibull, kWeibull);
+              break;
+            default:
+              theoreticalValue = jStat.normal.inv(p, mean, std);
+          }
+          theoretical.push(theoreticalValue);
+          
+        } else {
+          empirical.push(p);
+          
+          switch(distribution) {
+            case 'normal':
+              theoreticalValue = jStat.normal.cdf(sortedData[i], mean, std);
+              break;
+            case 'exponential':
+              const lambda2 = mean > 0 ? 1 / mean : 1;
+              theoreticalValue = jStat.exponential.cdf(sortedData[i], lambda2);
+              break;
+            case 'uniform':
+              const dataMin2 = Math.min(...sortedData);
+              const dataMax2 = Math.max(...sortedData);
+              theoreticalValue = jStat.uniform.cdf(sortedData[i], dataMin2, dataMax2);
+              break;
+            case 'lognormal':
+              const logMean2 = Math.log(mean);
+              const logStd2 = Math.sqrt(Math.log(1 + (std * std) / (mean * mean)));
+              theoreticalValue = sortedData[i] > 0 ? jStat.lognormal.cdf(sortedData[i], logMean2, logStd2) : 0;
+              break;
+            case 'gamma':
+              const shape2 = (mean * mean) / (std * std);
+              const scale2 = (std * std) / mean;
+              theoreticalValue = sortedData[i] > 0 ? jStat.gamma.cdf(sortedData[i], shape2, scale2) : 0;
+              break;
+            case 'weibull':
+              // Weibull parameters using method of moments approximation
+              const cvWeibull2 = std / mean;
+              const kWeibull2 = Math.pow(cvWeibull2, -1.086); // Shape parameter approximation
+              const lambdaWeibull2 = mean / jStat.gammafn(1 + 1 / kWeibull2); // Scale parameter
+              theoreticalValue = sortedData[i] > 0 ? jStat.weibull.cdf(sortedData[i], lambdaWeibull2, kWeibull2) : 0;
+              break;
+            default:
+              theoreticalValue = jStat.normal.cdf(sortedData[i], mean, std);
+          }
+          theoretical.push(theoreticalValue);
+        }
+      }
+      
+      return { theoretical, empirical };
+    }
+
+    // Create QQ/PP plots
+    function createQQPPPlots() {
+      if (!originalData || originalData.length === 0) return;
+      
+      const sortedData = [...originalData].sort((a, b) => a - b);
+      const n = sortedData.length;
+      
+      const mean = sortedData.reduce((a, b) => a + b, 0) / n;
+      const std = Math.sqrt(sortedData.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / n);
+      
+      const { theoretical, empirical } = getTheoreticalValues(sortedData, currentDistribution, currentPlotType, mean, std);
+      const plotData = theoretical.map((t, i) => [t, empirical[i]]);
+      
+      // Fit line and calculate residuals
+      const { slope, intercept } = fitLine(theoretical, empirical);
+      const residuals = theoretical.map((t, i) => empirical[i] - (slope * t + intercept));
+      const residualMean = residuals.reduce((a, b) => a + b, 0) / residuals.length;
+      const centeredResiduals = residuals.map(r => r - residualMean);
+      const detrendedData = theoretical.map((t, i) => [t, centeredResiduals[i]]);
+      
+      let residualYAxisMax;
+      if (currentPlotType === 'pp') {
+        residualYAxisMax = 0.10;
+      } else {
+        const maxAbsResidual = Math.max(...centeredResiduals.map(Math.abs));
+        residualYAxisMax = maxAbsResidual * 1.1;
+      }
+      
+      const confidenceBand = 2 / Math.sqrt(n);
+      
+      const minVal = Math.min(...theoretical, ...empirical);
+      const maxVal = Math.max(...theoretical, ...empirical);
+      const referenceLine = [[minVal, minVal], [maxVal, maxVal]];
+      
+      const plotTypeLabel = currentPlotType.toUpperCase();
+      
+      // Destroy previous charts
+      if (qqppChart) qqppChart.destroy();
+      if (detrendedChart) detrendedChart.destroy();
+      
+      // Create main chart (EXACT same config as detrended chart for consistency)
+      qqppChart = Highcharts.chart('qqplot-chart', {
+        chart: {
+          backgroundColor: 'transparent',
+          height: null // Use container height (responsive)
+        },
+        title: null,
+        xAxis: {
+          title: { text: `Theoretical ${plotTypeLabel === 'QQ' ? 'Quantiles' : 'Probabilities'}`, style: { color: '#fff', fontSize: '11px' } },
+          labels: { style: { color: '#fff', fontSize: '10px' } },
+          gridLineColor: '#2d3748',
+          min: currentPlotType === 'pp' ? 0 : undefined,
+          max: currentPlotType === 'pp' ? 1 : undefined
+        },
+        yAxis: {
+          title: { text: `Sample ${plotTypeLabel === 'QQ' ? 'Quantiles' : 'Probabilities'}`, style: { color: '#fff', fontSize: '11px' } },
+          labels: { style: { color: '#fff', fontSize: '10px' } },
+          gridLineColor: '#2d3748',
+          min: currentPlotType === 'pp' ? 0 : undefined,
+          max: currentPlotType === 'pp' ? 1 : undefined
+        },
+        legend: { enabled: false },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          style: { color: '#fff' },
+          formatter: function() {
+            return '<b>Series 1</b><br/>x: ' + this.x.toFixed(3) + '<br/>y: ' + this.y.toFixed(3);
+          }
+        },
+        plotOptions: {
+          scatter: { marker: { radius: 3 } }
+        },
+        credits: { enabled: false },
+        series: [
+          {
+            type: 'scatter',
+            data: plotData,
+            color: '#4a90e2'
+          },
+          {
+            type: 'line',
+            data: referenceLine,
+            color: '#e74c3c',
+            dashStyle: 'Dash',
+            enableMouseTracking: false
+          }
+        ]
+      });
+      
+      // Force reflow of main chart after creation
+      setTimeout(() => {
+        if (qqppChart) {
+          qqppChart.reflow();
+        }
+      }, 100);
+      
+      // Create detrended chart
+      detrendedChart = Highcharts.chart('detrended-chart', {
+        chart: {
+          backgroundColor: 'transparent',
+          height: null // Use container height (responsive)
+        },
+        title: null,
+        xAxis: {
+          title: { text: `Theoretical ${plotTypeLabel === 'QQ' ? 'Quantiles' : 'Probabilities'}`, style: { color: '#fff', fontSize: '11px' } },
+          labels: { style: { color: '#fff', fontSize: '10px' } },
+          gridLineColor: '#2d3748',
+          min: currentPlotType === 'pp' ? 0 : undefined,
+          max: currentPlotType === 'pp' ? 1 : undefined
+        },
+        yAxis: {
+          title: { text: 'Residuals', style: { color: '#fff', fontSize: '11px' } },
+          labels: { style: { color: '#fff', fontSize: '10px' } },
+          gridLineColor: '#2d3748',
+          min: -residualYAxisMax,
+          max: residualYAxisMax,
+          plotBands: [{
+            from: -confidenceBand,
+            to: confidenceBand,
+            color: 'rgba(255, 165, 120, 0.1)'
+          }],
+          plotLines: [{
+            value: 0,
+            color: '#e74c3c',
+            width: 2,
+            dashStyle: 'Dash'
+          }]
+        },
+        legend: { enabled: false },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          style: { color: '#fff' },
+          formatter: function() {
+            return '<b>Series 1</b><br/>x: ' + this.x.toFixed(3) + '<br/>y: ' + this.y.toFixed(3);
+          }
+        },
+        plotOptions: {
+          scatter: { marker: { radius: 3 } }
+        },
+        credits: { enabled: false },
+        series: [{
+          type: 'scatter',
+          data: detrendedData,
+          color: '#9b59b6'
+        }]
+      });
+      
+      // Force reflow of detrended chart after creation
+      setTimeout(() => {
+        if (detrendedChart) {
+          detrendedChart.reflow();
+        }
+      }, 100);
+    }
+  </script>
+</body>
+</html>

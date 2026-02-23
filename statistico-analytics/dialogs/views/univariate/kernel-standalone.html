@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Kernel Density - Statistico</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://code.highcharts.com/highcharts-more.js"></script>
+  <link rel="stylesheet" href="../shared-header.css">
+  <script src="../shared-header.js"></script>
+  
+  <style>
+    :root {
+      --surface-0: #0c1624;
+      --surface-1: #1a1f2e;
+      --surface-2: #242938;
+      --border: #2d3748;
+      --accent-1: rgb(255,165,120);
+      --accent-2: rgb(120,200,255);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255,255,255,0.8);
+      --text-muted: rgba(255,255,255,0.6);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--surface-0);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text-primary);
+      overflow-x: hidden;
+    }
+
+    .results-container {
+      padding: 12px;
+      max-width: 100%;
+    }
+
+    /* Stats Cards Row */
+    .stats-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .stat-card {
+      flex: 1;
+      min-width: 100px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--accent-2);
+    }
+
+    /* Controls Panel */
+    .controls-panel {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .control-group label {
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .control-group select {
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 13px;
+      cursor: pointer;
+      min-width: 140px;
+    }
+
+    .control-group select:focus {
+      outline: none;
+      border-color: var(--accent-1);
+    }
+
+    .control-group select option {
+      background: var(--surface-1);
+      color: var(--text-primary);
+    }
+
+    .control-group input[type="range"] {
+      width: 120px;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.2);
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .control-group input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent-1);
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(255, 165, 120, 0.5);
+    }
+
+    .control-group input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent-1);
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 8px rgba(255, 165, 120, 0.5);
+    }
+
+    .bandwidth-value {
+      font-size: 13px;
+      color: var(--accent-2);
+      font-weight: 600;
+      min-width: 60px;
+      text-align: center;
+    }
+
+    .reset-button {
+      padding: 6px 12px;
+      background: linear-gradient(135deg, var(--accent-1), rgb(255,140,90));
+      border: none;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .reset-button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 12px rgba(255, 165, 120, 0.5);
+    }
+
+    /* Chart Container */
+    .chart-panel {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .chart-container {
+      min-height: 350px;
+      max-height: 400px;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 6px;
+      padding: 8px;
+    }
+
+    @media (max-height: 800px) {
+      .chart-container {
+        min-height: 300px;
+        max-height: 350px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <statistico-header view-name="Kernel Density" module-name="Univariate Analysis"></statistico-header>
+  
+  <div class="results-container" id="results-container">
+    <!-- Stats Cards -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">N</div>
+        <div class="stat-value" id="statN">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Min</div>
+        <div class="stat-value" id="statMin">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Mean</div>
+        <div class="stat-value" id="statMean">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">St. Dev</div>
+        <div class="stat-value" id="statStdDev">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Max</div>
+        <div class="stat-value" id="statMax">—</div>
+      </div>
+    </div>
+
+    <!-- Controls Panel -->
+    <div class="controls-panel">
+      <div class="control-group">
+        <label for="kernelType">Kernel:</label>
+        <select id="kernelType" onchange="updateKernelDensity()">
+          <option value="gaussian" selected>Gaussian</option>
+          <option value="epanechnikov">Epanechnikov</option>
+          <option value="triangular">Triangular</option>
+          <option value="uniform">Uniform</option>
+        </select>
+      </div>
+      
+      <div class="control-group">
+        <label for="bandwidth">Bandwidth:</label>
+        <span class="bandwidth-value" id="bandwidthValue">1.00x</span>
+        <input type="range" id="bandwidth" min="0.1" max="3" step="0.1" value="1" oninput="updateKernelDensity()">
+        <button class="reset-button" onclick="resetBandwidth()">
+          <i class="fa-solid fa-rotate-left"></i> Reset
+        </button>
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-panel">
+      <div id="kernelChart" class="chart-container"></div>
+    </div>
+  </div>
+
+  <script>
+    let originalData = [];
+    let varName = 'Variable';
+    let kernelChart = null;
+    let currentKernelType = 'gaussian';
+    let currentBandwidth = null;
+    let librariesLoaded = false;
+    let dataReady = false;
+
+    // Check if Highcharts is loaded
+    function checkLibraries() {
+      librariesLoaded = typeof Highcharts !== 'undefined';
+      if (!librariesLoaded) {
+        console.log('⏳ Waiting for Highcharts...');
+      } else {
+        console.log('✅ Highcharts loaded');
+      }
+      return librariesLoaded;
+    }
+
+    // Kernel functions
+    function gaussianKernel(u) {
+      return (1 / Math.sqrt(2 * Math.PI)) * Math.exp(-0.5 * u * u);
+    }
+
+    function epanechnikovKernel(u) {
+      return Math.abs(u) <= 1 ? 0.75 * (1 - u * u) : 0;
+    }
+
+    function triangularKernel(u) {
+      return Math.abs(u) <= 1 ? 1 - Math.abs(u) : 0;
+    }
+
+    function uniformKernel(u) {
+      return Math.abs(u) <= 1 ? 0.5 : 0;
+    }
+
+    function getKernelFunction(type) {
+      switch(type) {
+        case 'gaussian': return gaussianKernel;
+        case 'epanechnikov': return epanechnikovKernel;
+        case 'triangular': return triangularKernel;
+        case 'uniform': return uniformKernel;
+        default: return gaussianKernel;
+      }
+    }
+
+    // Calculate optimal bandwidth (Scott's rule)
+    function calculateOptimalBandwidth(data) {
+      const n = data.length;
+      const mean = data.reduce((a, b) => a + b, 0) / n;
+      const variance = data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / n;
+      const stdDev = Math.sqrt(variance);
+      return 1.06 * stdDev * Math.pow(n, -1/5);
+    }
+
+    // Calculate KDE
+    function calculateKDE(data, kernelType, bandwidthMultiplier = 1) {
+      const sortedData = [...data].sort((a, b) => a - b);
+      const min = sortedData[0];
+      const max = sortedData[sortedData.length - 1];
+      const range = max - min;
+      
+      const h = calculateOptimalBandwidth(sortedData) * bandwidthMultiplier;
+      currentBandwidth = h;
+      
+      const kernel = getKernelFunction(kernelType);
+      
+      const points = 200;
+      const start = min - range * 0.2;
+      const end = max + range * 0.2;
+      const step = (end - start) / points;
+      
+      const densityData = [];
+      
+      for (let i = 0; i <= points; i++) {
+        const x = start + i * step;
+        let density = 0;
+        
+        for (let j = 0; j < sortedData.length; j++) {
+          const u = (x - sortedData[j]) / h;
+          density += kernel(u);
+        }
+        
+        density = density / (sortedData.length * h);
+        densityData.push([x, density]);
+      }
+      
+      return { densityData, bandwidth: h };
+    }
+
+    // Update stats display
+    function updateStats(data) {
+      const n = data.length;
+      const sorted = [...data].sort((a, b) => a - b);
+      const mean = data.reduce((a, b) => a + b, 0) / n;
+      const variance = data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / (n - 1);
+      const stdDev = Math.sqrt(variance);
+      
+      document.getElementById('statN').textContent = n;
+      document.getElementById('statMin').textContent = sorted[0].toFixed(2);
+      document.getElementById('statMean').textContent = mean.toFixed(2);
+      document.getElementById('statStdDev').textContent = stdDev.toFixed(2);
+      document.getElementById('statMax').textContent = sorted[n - 1].toFixed(2);
+    }
+
+    // Create kernel density chart
+    function createKernelChart(animate = false) {
+      if (!librariesLoaded || !dataReady || originalData.length === 0) {
+        console.log('⏳ Not ready. Libraries:', librariesLoaded, 'Data:', dataReady);
+        return;
+      }
+      
+      console.log('🎨 Creating kernel density chart...');
+      
+      const kernelType = document.getElementById('kernelType').value;
+      const bandwidthMultiplier = parseFloat(document.getElementById('bandwidth').value);
+      
+      const { densityData, bandwidth } = calculateKDE(originalData, kernelType, bandwidthMultiplier);
+      
+      document.getElementById('bandwidthValue').textContent = bandwidth.toFixed(4);
+      
+      const rawDataPoints = originalData.map(val => [val, 0]);
+      
+      if (kernelChart) {
+        kernelChart.destroy();
+      }
+      
+      kernelChart = Highcharts.chart('kernelChart', {
+        chart: {
+          backgroundColor: 'transparent',
+          height: 340,
+          animation: animate
+        },
+        title: {
+          text: `Kernel Density Estimation (${kernelType.charAt(0).toUpperCase() + kernelType.slice(1)})`,
+          style: { color: '#fff', fontSize: '14px', fontWeight: 600 }
+        },
+        xAxis: {
+          title: { text: 'Value', style: { color: '#fff', fontSize: '11px' } },
+          labels: { style: { color: '#fff', fontSize: '10px' } },
+          gridLineColor: '#2d3748'
+        },
+        yAxis: {
+          title: { text: 'Density', style: { color: '#fff', fontSize: '11px' } },
+          labels: { style: { color: '#fff', fontSize: '10px' } },
+          gridLineColor: '#2d3748'
+        },
+        legend: {
+          enabled: true,
+          itemStyle: { color: '#fff', fontSize: '11px' }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          style: { color: '#fff' }
+        },
+        plotOptions: {
+          series: { animation: animate },
+          area: {
+            fillOpacity: 0.3,
+            lineWidth: 2,
+            marker: { enabled: false }
+          },
+          scatter: {
+            marker: { radius: 3 }
+          }
+        },
+        credits: { enabled: false },
+        series: [
+          {
+            name: 'Density',
+            type: 'area',
+            data: densityData,
+            color: '#4a90e2',
+            fillColor: {
+              linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
+              stops: [
+                [0, 'rgba(74, 144, 226, 0.3)'],
+                [1, 'rgba(74, 144, 226, 0.05)']
+              ]
+            }
+          },
+          {
+            name: 'Data Points (Rug)',
+            type: 'scatter',
+            data: rawDataPoints,
+            color: '#e74c3c',
+            marker: { radius: 2, symbol: 'circle' },
+            tooltip: {
+              pointFormat: 'Value: {point.x:.3f}'
+            }
+          }
+        ]
+      });
+      
+      console.log('✅ Chart created');
+    }
+
+    // Update kernel density
+    function updateKernelDensity() {
+      if (dataReady) {
+        createKernelChart(false);
+      }
+    }
+
+    // Reset bandwidth
+    function resetBandwidth() {
+      document.getElementById('bandwidth').value = 1;
+      updateKernelDensity();
+    }
+
+    // Office.js initialization
+    Office.initialize = function (reason) {
+      console.log('✅ Kernel Density - Office.js initialized');
+      
+      Office.context.ui.addHandlerAsync(
+        Office.EventType.DialogParentMessageReceived,
+        onMessageReceived
+      );
+      
+      setTimeout(() => {
+        sendMessageToParent({ status: 'ready', view: 'kernel' });
+        console.log('📤 Sending ready signal to parent');
+      }, 500);
+      
+      // Try to load data from various sources (wait longer for parent response)
+      setTimeout(() => {
+        if (dataReady) {
+          console.log('✅ Data already loaded');
+          return;
+        }
+        
+        // Try localStorage first
+        try {
+          const storedData = localStorage.getItem('univariateResults');
+          if (storedData) {
+            const parsedData = JSON.parse(storedData);
+            console.log('📦 Loading data from localStorage');
+            handleDataReceived(parsedData);
+            if (dataReady) return;
+          }
+        } catch (e) {
+          console.error('❌ Error loading from localStorage:', e);
+        }
+        
+        // Fallback to sample data
+        console.log('⏰ No real data received after 3s, loading sample data...');
+        loadSampleData();
+      }, 3000);
+    };
+
+    // DOM loaded
+    window.addEventListener('DOMContentLoaded', function() {
+      console.log('🚀 DOM Content Loaded');
+      
+      const initHeader = () => {
+        if (typeof StatisticoHeader !== 'undefined') {
+          StatisticoHeader.init('kernel', 'Variable', 0);
+          console.log('✅ Shared header initialized');
+        } else {
+          setTimeout(initHeader, 100);
+        }
+      };
+      initHeader();
+      
+      let attempts = 0;
+      const maxAttempts = 50; // 5 seconds max wait
+      
+      const checkAndInit = () => {
+        attempts++;
+        
+        if (checkLibraries()) {
+          if (typeof Office === 'undefined') {
+            console.log('⚠️ Office.js not available - loading sample data');
+            setTimeout(() => {
+              if (!dataReady) loadSampleData();
+            }, 500);
+          }
+        } else if (attempts < maxAttempts) {
+          setTimeout(checkAndInit, 100);
+        } else {
+          console.warn('⚠️ Libraries failed to load after 5s, loading sample data anyway');
+          loadSampleData();
+        }
+      };
+      setTimeout(checkAndInit, 100);
+    });
+
+    // Message handler
+    function onMessageReceived(arg) {
+      try {
+        const message = JSON.parse(arg.message);
+        console.log('📩 Message received from parent:', message);
+        
+        // Handle data from taskpane (action: 'loadData')
+        if (message.action === 'loadData' && message.data) {
+          console.log('✅ Received data from taskpane:', message.data);
+          handleDataReceived(message.data);
+        } 
+        // Legacy: handle other formats
+        else if (message.type === 'data' || message.action === 'sendData') {
+          const dataToHandle = message.data || message;
+          console.log('📊 Handling data (legacy format):', dataToHandle);
+          handleDataReceived(dataToHandle);
+        } 
+        // Navigation request
+        else if (message.action === 'switchView') {
+          console.log('🔄 Switch view request:', message.view);
+        } 
+        // Fallback: treat entire message as data
+        else {
+          console.log('🔄 Unknown format, treating as data');
+          handleDataReceived(message);
+        }
+      } catch (e) {
+        console.error('❌ Error handling message:', e);
+      }
+    }
+
+    // Send message to parent
+    function sendMessageToParent(message) {
+      if (typeof Office !== 'undefined' && Office.context && Office.context.ui) {
+        Office.context.ui.messageParent(JSON.stringify(message));
+        console.log('📤 Sent to parent:', message);
+      }
+    }
+
+    // Load sample data
+    function loadSampleData() {
+      console.log('📊 Loading sample data...');
+      
+      if (!checkLibraries()) {
+        setTimeout(loadSampleData, 200);
+        return;
+      }
+      
+      const sampleData = [];
+      for (let i = 0; i < 100; i++) {
+        const u1 = Math.random();
+        const u2 = Math.random();
+        const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        sampleData.push(50 + z * 10);
+      }
+      
+      originalData = sampleData;
+      varName = 'Sample Data';
+      dataReady = true;
+      
+      // Check if data was modified (trimmed or transformed)
+      const isTrimmed = (typeof data !== 'undefined' && data.trim) ? (data.trim.min > 0 || data.trim.max < 100) : false;
+      const isTransformed = (typeof data !== 'undefined' && data.transform) ? (data.transform !== 'none') : false;
+      const displayN = (isTrimmed || isTransformed) ? originalData.length + '*' : originalData.length;
+      
+      const updateHeader = () => {
+        if (typeof StatisticoHeader !== 'undefined') {
+          StatisticoHeader.updateVariable(varName, displayN);
+          console.log('✅ Header updated with n:', displayN);
+        } else {
+          setTimeout(updateHeader, 100);
+        }
+      };
+      updateHeader();
+      
+      updateStats(originalData);
+      createKernelChart(true);
+    }
+
+    // Handle data from parent
+    function handleDataReceived(data) {
+      try {
+        console.log('📊 Data received:', data);
+        
+        if (!checkLibraries()) {
+          setTimeout(() => handleDataReceived(data), 200);
+          return;
+        }
+        
+        // Robust data extraction - handle various formats
+        let rawData = data.values || data.trimmedValues || data.transformedValues || data.rawValues || data.data || [];
+        
+        // Handle nested values (e.g., data.values.values)
+        if (rawData.values && Array.isArray(rawData.values)) {
+          rawData = rawData.values;
+        }
+        
+        // Convert to numbers and filter out invalid values
+        originalData = rawData
+          .map(v => typeof v === 'string' ? parseFloat(v) : v)
+          .filter(v => !isNaN(v) && v != null);
+        
+        // Extract variable name from multiple possible fields
+        varName = data.variable || data.variableName || data.column || 'Variable';
+        
+        console.log('✅ Data processed:', originalData.length, 'values from', rawData.length, 'raw values');
+        
+        // If no valid data, don't mark as ready (will load sample data)
+        if (originalData.length === 0) {
+          console.warn('⚠️ No valid data found, will load sample data');
+          return;
+        }
+        
+        dataReady = true;
+        
+        // Store data in localStorage for view navigation
+        try {
+          localStorage.setItem('univariateResults', JSON.stringify(data));
+          console.log('💾 Saved data to localStorage for navigation');
+        } catch (e) {
+          console.warn('⚠️ Could not save to localStorage:', e);
+        }
+        
+        // Check if data was modified (trimmed or transformed)
+        const isTrimmed = data.trim && (data.trim.min > 0 || data.trim.max < 100);
+        const isTransformed = data.transform && data.transform !== 'none';
+        const displayN = (isTrimmed || isTransformed) ? originalData.length + '*' : originalData.length;
+        
+        const updateHeader = () => {
+          if (typeof StatisticoHeader !== 'undefined') {
+            StatisticoHeader.updateVariable(varName, displayN);
+          } else {
+            setTimeout(updateHeader, 100);
+          }
+        };
+        updateHeader();
+        
+        updateStats(originalData);
+        createKernelChart(true);
+      } catch (e) {
+        console.error('❌ Error handling data:', e);
+      }
+    }
+  </script>
+</body>
+</html>

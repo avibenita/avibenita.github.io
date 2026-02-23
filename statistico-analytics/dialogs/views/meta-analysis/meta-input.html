@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Configure Meta-Analysis</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+  <style>
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Segoe UI',Tahoma,sans-serif; background:#f8fafa; padding:20px; color:#1f2937; }
+    .dialog-header { background:linear-gradient(135deg,#14b8a6 0%,#0d9488 100%); color:white; padding:16px 20px; border-radius:8px 8px 0 0; margin:-20px -20px 20px -20px; }
+    .dialog-title { font-size:18px; font-weight:700; display:flex; align-items:center; gap:10px; }
+    .section { background:white; border-radius:8px; padding:16px; margin-bottom:16px; border:1px solid #e5e7eb; }
+    .section-title { font-size:14px; font-weight:700; color:#0d9488; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+    .radio-group { display:flex; flex-direction:column; gap:10px; }
+    .radio-option { display:flex; align-items:center; gap:8px; padding:10px; border:2px solid #e5e7eb; border-radius:6px; cursor:pointer; transition:all 0.2s; }
+    .radio-option:hover { border-color:#14b8a6; background:#f0fdfa; }
+    .radio-option input[type="radio"] { width:18px; height:18px; cursor:pointer; }
+    .radio-option label { cursor:pointer; flex:1; font-size:13px; }
+    .column-mappers { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-top:12px; }
+    .mapper { display:flex; flex-direction:column; gap:4px; }
+    .mapper label { font-size:12px; font-weight:600; color:#6b7280; }
+    .mapper select { padding:8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; background:white; }
+    .mapper select:focus { outline:none; border-color:#14b8a6; }
+    .actions { display:flex; gap:10px; justify-content:flex-end; margin-top:20px; }
+    .btn { padding:10px 20px; border:none; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer; transition:all 0.2s; }
+    .btn-primary { background:#14b8a6; color:white; }
+    .btn-primary:hover { background:#0d9488; }
+    .btn-secondary { background:#e5e7eb; color:#374151; }
+    .btn-secondary:hover { background:#d1d5db; }
+    .note { font-size:12px; color:#6b7280; margin-top:8px; padding:8px; background:#f9fafb; border-left:3px solid #14b8a6; border-radius:4px; }
+    #continuousMappersm, #binaryMappers, #directMappers { display:none; }
+  </style>
+</head>
+<body>
+  <div class="dialog-header">
+    <div class="dialog-title">
+      <i class="fa-solid fa-layer-group"></i>
+      Configure Meta-Analysis
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">
+      <i class="fa-solid fa-list-check"></i>
+      1. Effect Type
+    </div>
+    <div class="radio-group">
+      <div class="radio-option" onclick="selectEffectType('continuous')">
+        <input type="radio" name="effectType" id="typeContinuous" value="continuous">
+        <label for="typeContinuous">
+          <strong>Continuous Outcomes</strong> (Mean/SD/N for two groups)
+        </label>
+      </div>
+      <div class="radio-option" onclick="selectEffectType('binary')">
+        <input type="radio" name="effectType" id="typeBinary" value="binary">
+        <label for="typeBinary">
+          <strong>Binary Outcomes</strong> (2×2 table: a, b, c, d)
+        </label>
+      </div>
+      <div class="radio-option" onclick="selectEffectType('direct')">
+        <input type="radio" name="effectType" id="typeDirect" value="direct">
+        <label for="typeDirect">
+          <strong>Direct Effects</strong> (Effect + SE already calculated)
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">
+      <i class="fa-solid fa-columns"></i>
+      2. Column Mapping
+    </div>
+    <div class="note">Map your Excel columns to the required variables.</div>
+    
+    <div class="mapper" style="margin-top:12px;">
+      <label>Study Name Column</label>
+      <select id="studyCol"></select>
+    </div>
+
+    <!-- Continuous Mappers -->
+    <div id="continuousMappers">
+      <div class="column-mappers">
+        <div class="mapper">
+          <label>Group 1 Mean</label>
+          <select id="mean1Col"></select>
+        </div>
+        <div class="mapper">
+          <label>Group 1 SD</label>
+          <select id="sd1Col"></select>
+        </div>
+        <div class="mapper">
+          <label>Group 1 N</label>
+          <select id="n1Col"></select>
+        </div>
+        <div class="mapper">
+          <label>Group 2 Mean</label>
+          <select id="mean2Col"></select>
+        </div>
+        <div class="mapper">
+          <label>Group 2 SD</label>
+          <select id="sd2Col"></select>
+        </div>
+        <div class="mapper">
+          <label>Group 2 N</label>
+          <select id="n2Col"></select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Binary Mappers -->
+    <div id="binaryMappers">
+      <div class="column-mappers">
+        <div class="mapper">
+          <label>a (Treatment Events)</label>
+          <select id="aCol"></select>
+        </div>
+        <div class="mapper">
+          <label>b (Treatment Non-events)</label>
+          <select id="bCol"></select>
+        </div>
+        <div class="mapper">
+          <label>c (Control Events)</label>
+          <select id="cCol"></select>
+        </div>
+        <div class="mapper">
+          <label>d (Control Non-events)</label>
+          <select id="dCol"></select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Direct Mappers -->
+    <div id="directMappers">
+      <div class="column-mappers">
+        <div class="mapper">
+          <label>Effect Size</label>
+          <select id="effectCol"></select>
+        </div>
+        <div class="mapper">
+          <label>Standard Error (SE)</label>
+          <select id="seCol"></select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">
+      <i class="fa-solid fa-gears"></i>
+      3. Model Selection
+    </div>
+    <div class="radio-group">
+      <div class="radio-option" onclick="selectModel('fixed')">
+        <input type="radio" name="model" id="modelFixed" value="fixed">
+        <label for="modelFixed">
+          <strong>Fixed-Effects Model</strong> (assumes one true effect)
+        </label>
+      </div>
+      <div class="radio-option" onclick="selectModel('random')">
+        <input type="radio" name="model" id="modelRandom" value="random" checked>
+        <label for="modelRandom">
+          <strong>Random-Effects Model</strong> (DerSimonian-Laird, recommended)
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-secondary" onclick="cancel()">
+      <i class="fa-solid fa-times"></i> Cancel
+    </button>
+    <button class="btn btn-primary" onclick="save()">
+      <i class="fa-solid fa-check"></i> Run Analysis
+    </button>
+  </div>
+
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script>
+    let dataPayload = null;
+    let currentEffectType = "continuous";
+    let currentModel = "random";
+
+    Office.onReady(function(){
+      Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function(arg){
+        var msg = JSON.parse(arg.message || "{}");
+        if (msg.type === "META_DATA" && msg.payload) {
+          applyPayload(msg.payload);
+        }
+      });
+      send("requestData", null);
+      send("ready", null);
+    });
+
+    function send(action, data){
+      Office.context.ui.messageParent(JSON.stringify({action:action, data:data}));
+    }
+
+    function applyPayload(payload){
+      dataPayload = payload;
+      const headers = payload.headers || [];
+      
+      populateSelects(headers);
+      
+      if (payload.savedSpec){
+        restoreSpec(payload.savedSpec);
+      } else {
+        autoDetectColumns(headers);
+      }
+    }
+
+    function populateSelects(headers){
+      const selects = document.querySelectorAll("select");
+      selects.forEach(sel => {
+        sel.innerHTML = headers.map((h,i) => `<option value="${i}">${h}</option>`).join("");
+      });
+    }
+
+    function autoDetectColumns(headers){
+      // Auto-detect based on common column names
+      const lower = headers.map(h => h.toLowerCase());
+      
+      // Study column
+      const studyIdx = lower.findIndex(h => h.includes("study") || h.includes("name") || h.includes("author"));
+      if (studyIdx >= 0) document.getElementById("studyCol").value = studyIdx;
+      
+      // Continuous
+      const mean1Idx = lower.findIndex(h => h.includes("mean1") || h.includes("mean_t") || h.includes("m1"));
+      if (mean1Idx >= 0) document.getElementById("mean1Col").value = mean1Idx;
+      
+      const sd1Idx = lower.findIndex(h => h.includes("sd1") || h.includes("sd_t") || h.includes("s1"));
+      if (sd1Idx >= 0) document.getElementById("sd1Col").value = sd1Idx;
+      
+      const n1Idx = lower.findIndex(h => h.includes("n1") || h.includes("n_t"));
+      if (n1Idx >= 0) document.getElementById("n1Col").value = n1Idx;
+      
+      // Direct
+      const effectIdx = lower.findIndex(h => h.includes("effect") || h.includes("es") || h.includes("d") || h.includes("smd"));
+      if (effectIdx >= 0) document.getElementById("effectCol").value = effectIdx;
+      
+      const seIdx = lower.findIndex(h => h.includes("se") || h.includes("stderr"));
+      if (seIdx >= 0) document.getElementById("seCol").value = seIdx;
+      
+      // Default to continuous if we found continuous columns
+      if (mean1Idx >= 0) {
+        selectEffectType("continuous");
+      } else if (effectIdx >= 0 && seIdx >= 0) {
+        selectEffectType("direct");
+      } else {
+        selectEffectType("continuous");
+      }
+    }
+
+    function restoreSpec(spec){
+      if (spec.effectType) selectEffectType(spec.effectType);
+      if (spec.model) selectModel(spec.model);
+      
+      Object.keys(spec).forEach(key => {
+        const el = document.getElementById(key);
+        if (el) el.value = spec[key];
+      });
+    }
+
+    function selectEffectType(type){
+      currentEffectType = type;
+      document.querySelectorAll('input[name="effectType"]').forEach(r => r.checked = false);
+      document.getElementById("type" + type.charAt(0).toUpperCase() + type.slice(1)).checked = true;
+      
+      document.getElementById("continuousMappers").style.display = type === "continuous" ? "block" : "none";
+      document.getElementById("binaryMappers").style.display = type === "binary" ? "block" : "none";
+      document.getElementById("directMappers").style.display = type === "direct" ? "block" : "none";
+    }
+
+    function selectModel(model){
+      currentModel = model;
+      document.querySelectorAll('input[name="model"]').forEach(r => r.checked = false);
+      document.getElementById("model" + model.charAt(0).toUpperCase() + model.slice(1)).checked = true;
+    }
+
+    function save(){
+      const spec = {
+        effectType: currentEffectType,
+        model: currentModel,
+        studyCol: parseInt(document.getElementById("studyCol").value)
+      };
+      
+      if (currentEffectType === "continuous"){
+        spec.mean1Col = parseInt(document.getElementById("mean1Col").value);
+        spec.sd1Col = parseInt(document.getElementById("sd1Col").value);
+        spec.n1Col = parseInt(document.getElementById("n1Col").value);
+        spec.mean2Col = parseInt(document.getElementById("mean2Col").value);
+        spec.sd2Col = parseInt(document.getElementById("sd2Col").value);
+        spec.n2Col = parseInt(document.getElementById("n2Col").value);
+      } else if (currentEffectType === "binary"){
+        spec.aCol = parseInt(document.getElementById("aCol").value);
+        spec.bCol = parseInt(document.getElementById("bCol").value);
+        spec.cCol = parseInt(document.getElementById("cCol").value);
+        spec.dCol = parseInt(document.getElementById("dCol").value);
+      } else if (currentEffectType === "direct"){
+        spec.effectCol = parseInt(document.getElementById("effectCol").value);
+        spec.seCol = parseInt(document.getElementById("seCol").value);
+      }
+      
+      send("metaModel", {spec:spec});
+    }
+
+    function cancel(){
+      Office.context.ui.messageParent(JSON.stringify({action:"cancel"}));
+    }
+  </script>
+</body>
+</html>

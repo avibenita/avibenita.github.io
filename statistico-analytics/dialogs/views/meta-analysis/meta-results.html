@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Meta-Analysis Results</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <style>
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Segoe UI',Tahoma,sans-serif; background:#f8fafa; color:#1f2937; }
+    
+    .dashboard-header { background:linear-gradient(135deg,#14b8a6 0%,#0d9488 100%); color:white; padding:16px 24px; display:flex; justify-content:space-between; align-items:center; }
+    .dashboard-title { font-size:20px; font-weight:700; display:flex; align-items:center; gap:10px; }
+    .dashboard-actions { display:flex; gap:8px; }
+    .header-btn { padding:8px 12px; background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.3); color:white; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.2s; }
+    .header-btn:hover { background:rgba(255,255,255,0.3); }
+    
+    .tabs-container { background:white; border-bottom:2px solid #e5e7eb; padding:0 24px; display:flex; gap:4px; }
+    .tab-btn { padding:12px 20px; border:none; background:transparent; cursor:pointer; font-size:14px; font-weight:600; color:#6b7280; border-bottom:3px solid transparent; transition:all 0.2s; }
+    .tab-btn:hover { color:#14b8a6; }
+    .tab-btn.active { color:#14b8a6; border-bottom-color:#14b8a6; }
+    
+    .tab-panel { display:none; padding:20px 24px; }
+    .tab-panel.active { display:block; }
+    
+    .stat-panel { background:white; border-radius:8px; padding:16px; margin-bottom:16px; border:1px solid #e5e7eb; }
+    .stat-panel-heading { font-size:15px; font-weight:700; color:#0d9488; margin-bottom:12px; padding-bottom:8px; border-bottom:2px solid #e5e7eb; }
+    .stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
+    .stat-field { display:flex; flex-direction:column; gap:4px; }
+    .stat-label { font-size:12px; font-weight:600; color:#6b7280; }
+    .stat-value { font-size:16px; font-weight:700; color:#1f2937; }
+    
+    #forestPlot, #funnelPlot { min-height:400px; margin-top:12px; }
+    
+    .studies-table { width:100%; border-collapse:collapse; margin-top:12px; font-size:13px; }
+    .studies-table th { background:#f9fafb; padding:10px; text-align:left; font-weight:600; border-bottom:2px solid #e5e7eb; }
+    .studies-table td { padding:8px 10px; border-bottom:1px solid #f3f4f6; }
+    .studies-table tr:hover { background:#f9fafb; }
+    
+    .interpretation { background:#f0fdfa; border-left:4px solid #14b8a6; padding:12px; border-radius:4px; margin-top:16px; }
+    .interpretation-title { font-weight:700; color:#0d9488; margin-bottom:6px; }
+    .interpretation-text { font-size:13px; line-height:1.6; color:#374151; }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="dashboard-header">
+    <div class="dashboard-title">
+      <i class="fa-solid fa-layer-group"></i>
+      META-ANALYSIS RESULTS
+    </div>
+    <div class="dashboard-actions">
+      <button class="header-btn" onclick="exportResults()">
+        <i class="fa-solid fa-download"></i> Export
+      </button>
+      <button class="header-btn" onclick="closeDialog()">
+        <i class="fa-solid fa-times"></i> Close
+      </button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs-container">
+    <button class="tab-btn active" onclick="switchTab('summary')">
+      <i class="fa-solid fa-chart-bar"></i> Summary
+    </button>
+    <button class="tab-btn" onclick="switchTab('forest')">
+      <i class="fa-solid fa-chart-simple"></i> Forest Plot
+    </button>
+    <button class="tab-btn" onclick="switchTab('heterogeneity')">
+      <i class="fa-solid fa-chart-scatter"></i> Heterogeneity
+    </button>
+    <button class="tab-btn" onclick="switchTab('bias')">
+      <i class="fa-solid fa-triangle-exclamation"></i> Publication Bias
+    </button>
+    <button class="tab-btn" onclick="switchTab('studies')">
+      <i class="fa-solid fa-table"></i> Study Details
+    </button>
+  </div>
+
+  <!-- Tab Panels -->
+  <div id="tab-summary" class="tab-panel active">
+    <div class="stat-panel">
+      <div class="stat-panel-heading">Overall Effect</div>
+      <div class="stat-grid">
+        <div class="stat-field">
+          <span class="stat-label">Effect Size</span>
+          <span class="stat-value" id="pooledEffect">—</span>
+        </div>
+        <div class="stat-field">
+          <span class="stat-label">95% CI</span>
+          <span class="stat-value" id="pooledCI">—</span>
+        </div>
+        <div class="stat-field">
+          <span class="stat-label">Z-value</span>
+          <span class="stat-value" id="pooledZ">—</span>
+        </div>
+        <div class="stat-field">
+          <span class="stat-label">p-value</span>
+          <span class="stat-value" id="pooledP">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-panel">
+      <div class="stat-panel-heading">Study Information</div>
+      <div class="stat-grid">
+        <div class="stat-field">
+          <span class="stat-label">Number of Studies (k)</span>
+          <span class="stat-value" id="numStudies">—</span>
+        </div>
+        <div class="stat-field">
+          <span class="stat-label">Model</span>
+          <span class="stat-value" id="modelType">—</span>
+        </div>
+        <div class="stat-field">
+          <span class="stat-label">Effect Type</span>
+          <span class="stat-value" id="effectType">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="interpretation">
+      <div class="interpretation-title">
+        <i class="fa-solid fa-lightbulb"></i> Interpretation
+      </div>
+      <div class="interpretation-text" id="interpretationText">—</div>
+    </div>
+  </div>
+
+  <div id="tab-forest" class="tab-panel">
+    <div class="stat-panel">
+      <div class="stat-panel-heading">Forest Plot</div>
+      <div id="forestPlot"></div>
+    </div>
+  </div>
+
+  <div id="tab-heterogeneity" class="tab-panel">
+    <div class="stat-panel">
+      <div class="stat-panel-heading">Heterogeneity Statistics</div>
+      <div class="stat-grid">
+        <div class="stat-field">
+          <span class="stat-label">Q Statistic</span>
+          <span class="stat-value" id="qStat">—</span>
+        </div>
+        <div class="stat-field">
+          <span class="stat-label">df</span>
+          <span class="stat-value" id="qDf">—</span>
+        </div>
+        <div class="stat-field">
+          <span class="stat-label">p-value (Q)</span>
+          <span class="stat-value" id="qP">—</span>
+        </div>
+        <div class="stat-field">
+          <span class="stat-label">I² (%)</span>
+          <span class="stat-value" id="i2">—</span>
+        </div>
+        <div class="stat-field">
+          <span class="stat-label">H²</span>
+          <span class="stat-value" id="h2">—</span>
+        </div>
+        <div class="stat-field">
+          <span class="stat-label">τ² (tau-squared)</span>
+          <span class="stat-value" id="tau2">—</span>
+        </div>
+        <div class="stat-field">
+          <span class="stat-label">τ (tau)</span>
+          <span class="stat-value" id="tau">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="interpretation">
+      <div class="interpretation-title">
+        <i class="fa-solid fa-lightbulb"></i> Interpreting Heterogeneity
+      </div>
+      <div class="interpretation-text" id="hetInterpretation">—</div>
+    </div>
+  </div>
+
+  <div id="tab-bias" class="tab-panel">
+    <div class="stat-panel">
+      <div class="stat-panel-heading">Funnel Plot</div>
+      <div id="funnelPlot"></div>
+      <div style="margin-top:12px;font-size:12px;color:#6b7280;">
+        <strong>Note:</strong> Asymmetry in the funnel plot may indicate publication bias. Studies should be symmetrically distributed around the pooled effect.
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-studies" class="tab-panel">
+    <div class="stat-panel">
+      <div class="stat-panel-heading">Individual Study Results</div>
+      <table class="studies-table" id="studiesTable">
+        <thead>
+          <tr>
+            <th>Study</th>
+            <th>Effect (yi)</th>
+            <th>Variance (vi)</th>
+            <th>Weight</th>
+            <th>Weight %</th>
+          </tr>
+        </thead>
+        <tbody id="studiesTableBody">
+          <tr><td colspan="5">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script>
+    let metaBundle = null;
+
+    Office.onReady(function(){
+      Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function(arg){
+        var msg = JSON.parse(arg.message || "{}");
+        if (msg.type === "META_BUNDLE" && msg.payload) {
+          populateResults(msg.payload);
+        }
+      });
+      Office.context.ui.messageParent(JSON.stringify({action:"ready"}));
+    });
+
+    function populateResults(bundle){
+      metaBundle = bundle;
+      console.log("Meta bundle:", bundle);
+      
+      // Summary tab
+      document.getElementById("pooledEffect").textContent = bundle.pooled.effect.toFixed(3);
+      document.getElementById("pooledCI").textContent = `[${bundle.pooled.ciLower.toFixed(3)}, ${bundle.pooled.ciUpper.toFixed(3)}]`;
+      document.getElementById("pooledZ").textContent = bundle.pooled.z.toFixed(3);
+      document.getElementById("pooledP").textContent = bundle.pooled.p < 0.001 ? "< 0.001" : bundle.pooled.p.toFixed(3);
+      document.getElementById("numStudies").textContent = bundle.k;
+      document.getElementById("modelType").textContent = bundle.model === "random" ? "Random-Effects (DL)" : "Fixed-Effects";
+      document.getElementById("effectType").textContent = bundle.spec.effectType === "continuous" ? "SMD (Hedges' g)" : 
+                                                           bundle.spec.effectType === "binary" ? "Log Odds Ratio" : "Direct Effect";
+      
+      // Interpretation
+      const sig = bundle.pooled.p < 0.05;
+      const direction = bundle.pooled.effect > 0 ? "positive" : "negative";
+      let interpretation = `The ${bundle.model}-effects meta-analysis of ${bundle.k} studies shows a ${direction} pooled effect of ${bundle.pooled.effect.toFixed(3)} `;
+      interpretation += `(95% CI [${bundle.pooled.ciLower.toFixed(3)}, ${bundle.pooled.ciUpper.toFixed(3)}]). `;
+      interpretation += sig ? `This effect is <strong>statistically significant</strong> (p ${bundle.pooled.p < 0.001 ? "< 0.001" : "= " + bundle.pooled.p.toFixed(3)}).` 
+                            : `This effect is <strong>not statistically significant</strong> (p = ${bundle.pooled.p.toFixed(3)}).`;
+      document.getElementById("interpretationText").innerHTML = interpretation;
+      
+      // Heterogeneity tab
+      document.getElementById("qStat").textContent = bundle.heterogeneity.Q.toFixed(2);
+      document.getElementById("qDf").textContent = bundle.heterogeneity.df;
+      document.getElementById("qP").textContent = bundle.heterogeneity.pQ < 0.001 ? "< 0.001" : bundle.heterogeneity.pQ.toFixed(3);
+      document.getElementById("i2").textContent = bundle.heterogeneity.I2.toFixed(1) + "%";
+      document.getElementById("h2").textContent = bundle.heterogeneity.H2.toFixed(2);
+      document.getElementById("tau2").textContent = bundle.heterogeneity.tau2.toFixed(3);
+      document.getElementById("tau").textContent = bundle.heterogeneity.tau.toFixed(3);
+      
+      // Heterogeneity interpretation
+      const i2 = bundle.heterogeneity.I2;
+      let hetLevel = i2 < 25 ? "low" : i2 < 50 ? "moderate" : i2 < 75 ? "substantial" : "considerable";
+      let hetText = `<strong>I² = ${i2.toFixed(1)}%</strong> indicates <strong>${hetLevel} heterogeneity</strong>. `;
+      if (i2 < 25) {
+        hetText += "The studies are relatively homogeneous, suggesting a consistent effect across studies.";
+      } else if (i2 < 50) {
+        hetText += "There is moderate variability in effect sizes across studies. The random-effects model accounts for this.";
+      } else {
+        hetText += "There is substantial heterogeneity. Consider exploring moderators or subgroup analyses. The random-effects model is appropriate.";
+      }
+      hetText += ` The Q-statistic (Q = ${bundle.heterogeneity.Q.toFixed(2)}, df = ${bundle.heterogeneity.df}, p ${bundle.heterogeneity.pQ < 0.05 ? "< 0.05" : "≥ 0.05"}) `;
+      hetText += bundle.heterogeneity.pQ < 0.05 ? "is significant, confirming heterogeneity." : "is not significant.";
+      document.getElementById("hetInterpretation").innerHTML = hetText;
+      
+      // Studies table
+      const tbody = document.getElementById("studiesTableBody");
+      tbody.innerHTML = bundle.studies.map(s => `
+        <tr>
+          <td>${s.name}</td>
+          <td>${s.yi.toFixed(3)}</td>
+          <td>${s.vi.toFixed(4)}</td>
+          <td>${s.weight.toFixed(2)}</td>
+          <td>${s.weightPct.toFixed(1)}%</td>
+        </tr>
+      `).join("");
+      
+      // Render plots
+      renderForestPlot(bundle);
+      renderFunnelPlot(bundle);
+    }
+
+    function renderForestPlot(bundle){
+      const categories = bundle.studies.map(s => s.name);
+      const effects = bundle.studies.map(s => s.yi);
+      const ses = bundle.studies.map(s => Math.sqrt(s.vi));
+      const cis = bundle.studies.map((s, i) => {
+        const ci = 1.96 * ses[i];
+        return [s.yi - ci, s.yi + ci];
+      });
+      
+      Highcharts.chart("forestPlot", {
+        chart: { type: "scatter", height: Math.max(400, bundle.k * 40 + 100) },
+        title: { text: "Forest Plot", style: { fontSize: "16px", fontWeight: "700", color: "#0d9488" } },
+        xAxis: { title: { text: "Effect Size" }, plotLines: [{ value: 0, color: "#6b7280", width: 2, dashStyle: "Dash" }, 
+                          { value: bundle.pooled.effect, color: "#14b8a6", width: 3, label: { text: "Pooled", style: { color: "#14b8a6", fontWeight: "bold" } } }] },
+        yAxis: { categories: categories, title: { text: null }, reversed: true },
+        legend: { enabled: false },
+        tooltip: { formatter: function() { return `<b>${this.point.category}</b><br/>Effect: ${this.x.toFixed(3)}<br/>95% CI: [${cis[this.point.index][0].toFixed(3)}, ${cis[this.point.index][1].toFixed(3)}]`; } },
+        series: [{
+          name: "Study Effects",
+          data: effects.map((e, i) => ({ y: i, x: e, marker: { radius: 5 + bundle.studies[i].weightPct / 5, fillColor: "#14b8a6" } })),
+          color: "#14b8a6"
+        }],
+        plotOptions: {
+          scatter: {
+            marker: { symbol: "square" },
+            dataLabels: { enabled: false }
+          }
+        }
+      });
+      
+      // Add error bars manually (simple approach)
+      const chart = Highcharts.charts[Highcharts.charts.length - 1];
+      cis.forEach((ci, i) => {
+        chart.renderer.path(["M", chart.xAxis[0].toPixels(ci[0]), chart.yAxis[0].toPixels(i),
+                             "L", chart.xAxis[0].toPixels(ci[1]), chart.yAxis[0].toPixels(i)])
+          .attr({ "stroke-width": 2, stroke: "#94a3b8" }).add();
+      });
+    }
+
+    function renderFunnelPlot(bundle){
+      const effects = bundle.studies.map(s => s.yi);
+      const ses = bundle.studies.map(s => Math.sqrt(s.vi));
+      
+      Highcharts.chart("funnelPlot", {
+        chart: { type: "scatter", height: 400 },
+        title: { text: "Funnel Plot", style: { fontSize: "16px", fontWeight: "700", color: "#0d9488" } },
+        xAxis: { title: { text: "Effect Size" }, plotLines: [{ value: bundle.pooled.effect, color: "#14b8a6", width: 2 }] },
+        yAxis: { title: { text: "Standard Error" }, reversed: true },
+        legend: { enabled: false },
+        tooltip: { formatter: function() { return `<b>Study</b><br/>Effect: ${this.x.toFixed(3)}<br/>SE: ${this.y.toFixed(3)}`; } },
+        series: [{
+          name: "Studies",
+          data: effects.map((e, i) => [e, ses[i]]),
+          color: "#14b8a6",
+          marker: { radius: 5 }
+        }]
+      });
+    }
+
+    function switchTab(tabName){
+      document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach(panel => panel.classList.remove("active"));
+      
+      event.target.closest(".tab-btn").classList.add("active");
+      document.getElementById("tab-" + tabName).classList.add("active");
+    }
+
+    function exportResults(){
+      alert("Export feature coming soon!");
+    }
+
+    function closeDialog(){
+      Office.context.ui.messageParent(JSON.stringify({action:"close"}));
+    }
+  </script>
+</body>
+</html>

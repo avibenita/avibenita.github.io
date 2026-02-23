@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Independent Means - Statistico Analytics</title>
+
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="../../src/shared/css/taskpane-light.css">
+  <link rel="stylesheet" href="../../src/shared/css/data-input-panel.css">
+</head>
+<body>
+  <div class="taskpane-container">
+    <div class="module-header">
+      <div class="module-header-title">
+        <i class="fa-solid fa-not-equal"></i>
+        Independent Means
+      </div>
+      <button class="back-btn" onclick="goBack()">
+        <i class="fa-solid fa-arrow-left"></i>
+        Back
+      </button>
+    </div>
+
+    <div class="taskpane-content">
+      <div id="savedAnalysesContainer" style="margin-bottom: 16px;"></div>
+      <div id="dataInputPanelContainer"></div>
+      <div id="independentInputPanelContainer"></div>
+    </div>
+  </div>
+
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="../../src/shared/js/core/saved-analyses-manager.js"></script>
+  <script src="../../src/shared/js/components/DataInputPanel.js"></script>
+  <script src="independent-input-panel.js"></script>
+
+  <script>
+    function goBack() { window.location.href = "../hub.html"; }
+
+    Office.onReady((info) => {
+      if (info.host !== Office.HostType.Excel) return;
+
+      fetch("../../src/shared/components/saved-analyses-panel.html")
+        .then((r) => r.text())
+        .then((html) => {
+          document.getElementById("savedAnalysesContainer").innerHTML = html;
+          initSavedAnalysesPanel();
+        });
+
+      fetch("../../src/shared/components/data-input-panel.html")
+        .then((r) => r.text())
+        .then((html) => {
+          document.getElementById("dataInputPanelContainer").innerHTML = html;
+          initDataInputPanel();
+        });
+
+      fetch("independent-input-panel.html")
+        .then((r) => r.text())
+        .then((html) => {
+          document.getElementById("independentInputPanelContainer").innerHTML = html;
+        });
+    });
+
+    function toggleSavedAnalysesPanel() {
+      const body = document.getElementById("savedAnalysesBody");
+      const icon = document.getElementById("savedAnalysesToggleIcon");
+      if (!body || !icon) return;
+      if (body.style.display === "none") { body.style.display = "block"; icon.classList.add("open"); }
+      else { body.style.display = "none"; icon.classList.remove("open"); }
+    }
+
+    async function initSavedAnalysesPanel() {
+      const analyses = await SavedAnalysesManager.getAnalysesByModule("independent");
+      const listContainer = document.getElementById("savedAnalysesList");
+      const countSpan = document.getElementById("savedCount");
+      if (!listContainer || !countSpan) return;
+      countSpan.textContent = `(${analyses.length})`;
+      if (!analyses.length) {
+        listContainer.innerHTML = '<div class="no-analyses-message"><i class="fa-solid fa-info-circle"></i><p>No saved independent-means models yet.</p></div>';
+        return;
+      }
+      listContainer.innerHTML = "";
+      analyses.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
+      analyses.forEach((analysis) => {
+        const card = document.createElement("div");
+        card.className = "analysis-card";
+        card.innerHTML = `
+          <div class="analysis-card-header"><div class="analysis-name">${analysis.name}</div></div>
+          <div class="analysis-info"><div><strong>Mode:</strong> ${analysis.config?.mode || "two-column"}</div></div>
+          <div class="analysis-actions">
+            <button class="analysis-btn analysis-btn-load" onclick="loadSavedAnalysis('${analysis.id}')"><i class="fa-solid fa-folder-open"></i> Load</button>
+            <button class="analysis-btn analysis-btn-delete" onclick="deleteSavedAnalysis('${analysis.id}')"><i class="fa-solid fa-trash"></i></button>
+          </div>`;
+        listContainer.appendChild(card);
+      });
+    }
+
+    async function loadSavedAnalysis(analysisId) {
+      const analysis = await SavedAnalysesManager.loadAnalysisById(analysisId);
+      if (!analysis || analysis.module !== "independent") return;
+      sessionStorage.setItem("independentModelSpec", JSON.stringify(analysis.config || {}));
+      if (typeof updateButtonState === "function") updateButtonState();
+    }
+
+    async function deleteSavedAnalysis(analysisId) {
+      await SavedAnalysesManager.deleteAnalysis(analysisId);
+      await initSavedAnalysesPanel();
+    }
+  </script>
+</body>
+</html>

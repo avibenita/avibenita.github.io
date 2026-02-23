@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title id="page-title">Factor Analysis Module</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
+  <style>
+    :root{
+      --surface-0:#0c1624;
+      --surface-1:#1a1f2e;
+      --surface-2:#242938;
+      --border:#2d3748;
+      --accent-1:rgb(255,165,120);
+      --accent-2:rgb(120,200,255);
+      --text-primary:#fff;
+      --text-secondary:rgba(255,255,255,0.82);
+      --text-muted:rgba(255,255,255,0.62);
+      --success:#4ade80;
+      --warning:#fbbf24;
+      --danger:#fb7185;
+      --panel-radius:10px;
+      --panel-shadow:0 4px 20px rgba(0,0,0,.4);
+    }
+
+    :root[data-theme="light"]{
+      --surface-0:#f3f4f6;
+      --surface-1:#ffffff;
+      --surface-2:#f9fafb;
+      --border:#e5e7eb;
+      --accent-1:#2563eb;
+      --accent-2:#1d4ed8;
+      --text-primary:#111827;
+      --text-secondary:#4b5563;
+      --text-muted:#6b7280;
+      --panel-shadow:0px 4px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    html,body{height:100%;margin:0;padding:0;}
+    body{
+      background:var(--surface-0);
+      color:var(--text-primary);
+      font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+      overflow-x:hidden;
+    }
+    .wrap{ display:flex; justify-content:center; padding:8px 12px 20px; }
+    .card{
+      width:min(1600px,99%);
+      background:var(--surface-1);
+      min-height:760px;
+      border-radius:var(--panel-radius);
+      box-shadow:var(--panel-shadow);
+      border:1px solid var(--border);
+      overflow:visible;
+      display:flex;
+      flex-direction:column;
+    }
+
+    .hero-section {
+      background: linear-gradient(180deg, #0a1118 0%, #0c1620 100%);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding: 16px 20px;
+      margin: -1px -1px 0 -1px;
+      border-radius: var(--panel-radius) var(--panel-radius) 0 0;
+      box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45), inset 0 -1px 0 rgba(120, 200, 255, 0.08);
+      position: relative;
+      overflow: visible;
+    }
+    .hero-section::before{
+      content:"";
+      position:absolute;
+      top:0;
+      left:0;
+      right:0;
+      height:1px;
+      background:linear-gradient(90deg,transparent 0%, var(--accent-2) 20%, var(--accent-1) 50%, var(--accent-2) 80%, transparent 100%);
+      opacity:.35;
+    }
+    .hero-content{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      position:relative;
+      z-index:1;
+    }
+    .hero-title{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      font-size:1.28rem;
+      font-weight:800;
+      letter-spacing:.4px;
+      text-transform:uppercase;
+      color:var(--text-primary);
+    }
+    .hero-title i{
+      font-size:1.45rem;
+      color:var(--accent-2);
+    }
+    .hero-controls{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .theme-toggle-btn{
+      width:40px;
+      height:40px;
+      border-radius:50%;
+      border:2px solid rgba(120, 200, 255, 0.3);
+      background:rgba(0,0,0,.4);
+      color:var(--accent-2);
+      cursor:pointer;
+      transition:all .2s ease;
+    }
+    .theme-toggle-btn:hover{ transform:scale(1.05); }
+
+    .hero-action-btn{
+      border-radius:8px;
+      border:1px solid rgba(148,163,184,.45);
+      background:linear-gradient(145deg, rgba(148,163,184,.18), rgba(100,116,139,.16));
+      color:#ffffff;
+      padding:10px 16px;
+      font-size:12px;
+      font-weight:650;
+      text-transform:uppercase;
+      letter-spacing:.45px;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      box-shadow: 0 3px 8px rgba(2, 6, 23, 0.35), inset 0 1px 0 rgba(255, 255, 255, .12);
+    }
+    .hero-action-btn:hover{ box-shadow:0 5px 12px rgba(2, 6, 23, 0.45); transform:translateY(-1px); }
+    .save-model-btn{
+      background:linear-gradient(145deg, rgba(16,185,129,.24), rgba(5,150,105,.2));
+      border-color:rgba(16,185,129,.75);
+      color:#d1fae5;
+    }
+    .save-html-btn{
+      background:linear-gradient(145deg, rgba(59,130,246,.16), rgba(37,99,235,.14));
+      border-color:rgba(96,165,250,.7);
+      color:#dbeafe;
+    }
+    .ai-interpret-btn{
+      background:linear-gradient(145deg, #7c3aed, #a855f7);
+      border-color:#9333ea;
+      color:#fff;
+      font-weight:700;
+      display:none;
+    }
+
+    .tab-navigation{
+      display:flex;
+      align-items:flex-end;
+      gap:16px;
+      background:transparent;
+      padding:12px 0 0 0;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      overflow-x:auto;
+      scrollbar-width:none;
+      margin-top:10px;
+    }
+    .tab-navigation::-webkit-scrollbar{ display:none; }
+    .tab-button{
+      height:36px;
+      padding:0 4px;
+      background:transparent;
+      border:none;
+      color:rgba(255,255,255,.55);
+      font-size:12px;
+      font-weight:600;
+      cursor:pointer;
+      white-space:nowrap;
+      display:flex;
+      align-items:center;
+      gap:7px;
+      position:relative;
+      transition:color .18s ease, transform .18s ease;
+    }
+    .tab-button::before{
+      content:'';
+      position:absolute;
+      bottom:-9px;
+      left:0;
+      right:0;
+      height:2px;
+      border-radius:999px;
+      background:transparent;
+      opacity:0;
+      transition:opacity .18s ease, background .18s ease;
+    }
+    .tab-button:hover{ color:var(--text-primary); transform:translateY(-1px); }
+    .tab-button.active{
+      color:var(--text-primary);
+      font-weight:700;
+    }
+    .tab-button.active::before{
+      background:linear-gradient(90deg, var(--accent-1), var(--accent-2));
+      opacity:1;
+    }
+    .tab-button i{ font-size:12px; opacity:.55; }
+    .tab-button.active i{ opacity:.9; }
+
+    .tab-controls-right{
+      margin-left:auto;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding-bottom:8px;
+      white-space:nowrap;
+    }
+    .tab-decimal-label{
+      font-size:.78rem;
+      font-weight:700;
+      color:var(--text-secondary);
+      text-transform:uppercase;
+      letter-spacing:.4px;
+    }
+    .tab-decimal-select{
+      background:rgba(255,255,255,.08);
+      color:var(--text-primary);
+      border:1px solid rgba(255,255,255,.2);
+      border-radius:6px;
+      padding:5px 10px;
+      font-size:.8rem;
+      font-weight:600;
+    }
+
+    .view-container{
+      display:flex;
+      flex-direction:column;
+      height:100%;
+      margin-top:10px;
+      padding-top:10px;
+      background:radial-gradient(900px 360px at 25% 0%, rgba(61,169,255,.08), transparent 62%), linear-gradient(180deg, #0b121a, #070c12);
+      border-top:1px solid rgba(255,255,255,.06);
+    }
+    .card-body{
+      padding:12px;
+      flex:1;
+      min-height:0;
+      overflow-y:auto;
+      overflow-x:hidden;
+    }
+    .tab-panel{ display:none; }
+    .tab-panel.active{ display:block; }
+
+    .stats-container{
+      display:flex;
+      gap:12px;
+      justify-content:space-between;
+      margin-bottom:12px;
+      flex-wrap:wrap;
+    }
+    .stat-panel{
+      flex:1;
+      min-width:280px;
+      background:rgba(255,255,255,.05);
+      border:1px solid var(--border);
+      border-radius:var(--panel-radius);
+      box-shadow:0 2px 4px rgba(0,0,0,.2);
+      overflow:hidden;
+    }
+    .stat-panel-heading{
+      background:linear-gradient(135deg, rgba(0,51,102,.82), rgba(0,102,204,.62));
+      color:#fff;
+      padding:8px 12px;
+      font-weight:700;
+      font-size:.9rem;
+      text-align:center;
+      text-transform:uppercase;
+      letter-spacing:.5px;
+      border-bottom:2px solid var(--accent-1);
+    }
+    .stat-panel-body{ padding:10px 12px; }
+    .stat-field{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+      margin:4px 0;
+      padding:3px 0;
+      border-bottom:1px solid rgba(255,255,255,.06);
+    }
+    .stat-field:last-child{ border-bottom:none; }
+    .stat-label{ font-weight:600; color:var(--text-secondary); font-size:.86rem; }
+    .stat-value{
+      background:linear-gradient(135deg, rgba(120,200,255,.16), rgba(120,200,255,.05));
+      border:1px solid rgba(120,200,255,.3);
+      border-radius:6px;
+      padding:5px 10px;
+      min-width:92px;
+      text-align:center;
+      color:var(--accent-2);
+      font-weight:700;
+      font-size:.9rem;
+      font-variant-numeric:tabular-nums;
+    }
+    .metric-good { color: var(--success) !important; border-color: rgba(74, 222, 128, 0.55) !important; }
+    .metric-warning { color: var(--warning) !important; border-color: rgba(251, 191, 36, 0.55) !important; }
+    .metric-bad { color: var(--danger) !important; border-color: rgba(251, 113, 133, 0.55) !important; }
+
+    .table-container{
+      width:100%;
+      margin:12px auto 0;
+      overflow:auto;
+      max-height:430px;
+      border-radius:8px;
+    }
+    .analysis-table{
+      width:100%;
+      border-collapse:collapse;
+      table-layout:fixed;
+    }
+    .analysis-table th{
+      background:linear-gradient(135deg, rgba(0,51,102,.9), rgba(0,102,204,.7));
+      color:#fff;
+      padding:8px 6px;
+      position:sticky;
+      top:0;
+      z-index:2;
+      font-weight:700;
+      text-align:center;
+      border:1px solid rgba(255,255,255,.3);
+      font-size:.74rem;
+      text-transform:uppercase;
+      letter-spacing:.3px;
+      min-width:72px;
+    }
+    .analysis-table td{
+      background:rgba(255,255,255,.04);
+      color:var(--text-primary);
+      border:1px solid rgba(255,255,255,.15);
+      padding:6px 8px;
+      text-align:right;
+      font-size:.8rem;
+      white-space:nowrap;
+      font-variant-numeric:tabular-nums;
+    }
+    .analysis-table td:first-child{
+      text-align:left;
+      background:rgba(32,37,52,.95);
+      font-weight:600;
+      color:var(--accent-1);
+    }
+
+    .viz-card{
+      margin-top:12px;
+      background:rgba(255,255,255,.04);
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:10px;
+    }
+    .viz-title{
+      font-size:.88rem;
+      font-weight:700;
+      color:var(--accent-2);
+      margin-bottom:8px;
+    }
+    .heatmap-wrap{
+      overflow:auto;
+      max-height:340px;
+    }
+    .heatmap{
+      border-collapse:collapse;
+      font-size:.74rem;
+      min-width:100%;
+    }
+    .heatmap th,.heatmap td{
+      border:1px solid rgba(255,255,255,.14);
+      padding:6px 7px;
+      text-align:center;
+      white-space:nowrap;
+    }
+    .scree-wrap{
+      background:rgba(12,22,36,.55);
+      border:1px solid rgba(120,200,255,.18);
+      border-radius:8px;
+      padding:8px;
+      min-height:270px;
+    }
+    .scree-svg{ width:100%; height:260px; display:block; }
+    .scree-chart-container{ width:100%; height:260px; }
+    .section-note{
+      margin-top:10px;
+      padding:9px;
+      border-left:3px solid var(--accent-1);
+      border-radius:4px;
+      background:rgba(255,165,120,.1);
+      color:var(--text-muted);
+      font-size:.84rem;
+    }
+    .ai-panel{
+      background:linear-gradient(135deg, rgba(124,58,237,.14), rgba(168,85,247,.06));
+      border:1px solid rgba(168,85,247,.35);
+      border-radius:10px;
+      padding:12px;
+    }
+    .ai-row{
+      border-bottom:1px solid rgba(255,255,255,.1);
+      padding:8px 0;
+      color:var(--text-secondary);
+      font-size:.9rem;
+    }
+    .ai-row:last-child{ border-bottom:none; }
+    .ai-key{ color:#e9d5ff; font-weight:700; margin-right:6px; }
+
+    .hint-empty{
+      color:var(--text-muted);
+      font-style:italic;
+      text-align:center;
+      padding:16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="card" role="main">
+      <div class="hero-section">
+        <div class="hero-content">
+          <div class="hero-title">
+            <i class="fa-solid fa-shapes"></i>
+            <span>Factor Analysis Module</span>
+          </div>
+          <div class="hero-controls">
+            <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Dark/Light Theme">
+              <i class="fa-solid fa-moon" id="themeIcon"></i>
+            </button>
+            <button class="hero-action-btn save-model-btn" onclick="saveCurrentFactorModel()">
+              <i class="fa-solid fa-floppy-disk"></i> Save Model
+            </button>
+            <button class="hero-action-btn save-html-btn" onclick="exportFactorHtml()">
+              <i class="fa-solid fa-file-code"></i> Save HTML
+            </button>
+            <button class="hero-action-btn" onclick="goToScreePlot()" title="Jump to scree plot">
+              <i class="fa-solid fa-chart-line"></i> Scree Plot
+            </button>
+            <button class="hero-action-btn ai-interpret-btn" id="aiInterpretBtn" onclick="requestFactorAI()">
+              <i class="fa-solid fa-robot"></i> AI Interpret
+            </button>
+          </div>
+        </div>
+        <div class="tab-navigation">
+          <button class="tab-button active" data-tab="suitability"><i class="fa-solid fa-circle-check"></i> Suitability</button>
+          <button class="tab-button" data-tab="extraction"><i class="fa-solid fa-magnifying-glass-chart"></i> Extraction</button>
+          <button class="tab-button" data-tab="rotation"><i class="fa-solid fa-arrows-rotate"></i> Rotation</button>
+          <button class="tab-button" data-tab="diagnostics"><i class="fa-solid fa-stethoscope"></i> Diagnostics</button>
+          <button class="tab-button" data-tab="scores"><i class="fa-solid fa-chart-scatter"></i> Scores</button>
+          <button class="tab-button" data-tab="ai"><i class="fa-solid fa-brain"></i> AI Summary</button>
+          <div class="tab-controls-right">
+            <label class="tab-decimal-label" for="decimalSelect">Decimals:</label>
+            <select id="decimalSelect" class="tab-decimal-select" onchange="setDecimalPrecision()">
+              <option value="auto">Auto</option>
+              <option value="0">0</option>
+              <option value="1">1</option>
+              <option value="2" selected>2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="view-container">
+        <div class="card-body">
+          <section id="tab-suitability" class="tab-panel active">
+            <div class="stats-container">
+              <div class="stat-panel">
+                <div class="stat-panel-heading"><i class="fa-solid fa-shield-halved"></i> Precheck Metrics</div>
+                <div class="stat-panel-body">
+                  <div class="stat-field"><span class="stat-label">KMO:</span><span class="stat-value" id="kmoValue">...</span></div>
+                  <div class="stat-field"><span class="stat-label">Bartlett Chi-Square:</span><span class="stat-value" id="bartlettChi2">...</span></div>
+                  <div class="stat-field"><span class="stat-label">Bartlett p-value:</span><span class="stat-value" id="bartlettP">...</span></div>
+                  <div class="stat-field"><span class="stat-label">Determinant of R:</span><span class="stat-value" id="determinantR">...</span></div>
+                </div>
+              </div>
+              <div class="stat-panel">
+                <div class="stat-panel-heading"><i class="fa-solid fa-table-cells"></i> Data Summary</div>
+                <div class="stat-panel-body">
+                  <div class="stat-field"><span class="stat-label">Variables:</span><span class="stat-value" id="faVarCount">...</span></div>
+                  <div class="stat-field"><span class="stat-label">Cases:</span><span class="stat-value" id="faCaseCount">...</span></div>
+                  <div class="stat-field"><span class="stat-label">Missing Pattern:</span><span class="stat-value" id="faMissingPattern">...</span></div>
+                  <div class="stat-field"><span class="stat-label">Suitability Verdict:</span><span class="stat-value" id="faSuitabilityVerdict">...</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="viz-card">
+              <div class="viz-title">Correlation Matrix Heatmap</div>
+              <div id="corrHeatmap" class="heatmap-wrap">
+                <div class="hint-empty">Awaiting correlation matrix...</div>
+              </div>
+            </div>
+            <div class="section-note">Suitability protects against blind factor extraction. KMO and Bartlett should support latent-structure modeling.</div>
+          </section>
+
+          <section id="tab-extraction" class="tab-panel">
+            <div class="stats-container">
+              <div class="stat-panel">
+                <div class="stat-panel-heading"><i class="fa-solid fa-filter-circle-dollar"></i> Extraction Settings</div>
+                <div class="stat-panel-body">
+                  <div class="stat-field"><span class="stat-label">Method:</span><span class="stat-value" id="extractMethod">...</span></div>
+                  <div class="stat-field"><span class="stat-label">Retained Factors:</span><span class="stat-value" id="retainedFactors">...</span></div>
+                  <div class="stat-field"><span class="stat-label">Kaiser Criterion:</span><span class="stat-value" id="kaiserFlag">...</span></div>
+                  <div class="stat-field"><span class="stat-label">Cumulative Variance:</span><span class="stat-value" id="cumVariance">...</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="stats-container">
+              <div class="stat-panel" style="min-width:100%;">
+                <div class="stat-panel-heading"><i class="fa-solid fa-table"></i> Eigenvalues</div>
+                <div class="stat-panel-body" style="padding:0;">
+                  <div class="table-container" style="margin:0;">
+                    <table class="analysis-table">
+                      <thead>
+                        <tr><th>Component</th><th>Eigenvalue</th><th>% Variance</th><th>Cumulative %</th></tr>
+                      </thead>
+                      <tbody id="eigenTableBody">
+                        <tr><td colspan="4" class="hint-empty">Awaiting eigenvalue output...</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="viz-card">
+              <div class="viz-title">Scree Plot</div>
+              <div class="scree-wrap">
+                <div id="screeChart" class="scree-chart-container"></div>
+              </div>
+            </div>
+          </section>
+
+          <section id="tab-rotation" class="tab-panel">
+            <div class="stats-container">
+              <div class="stat-panel">
+                <div class="stat-panel-heading"><i class="fa-solid fa-compass-drafting"></i> Rotation Overview</div>
+                <div class="stat-panel-body">
+                  <div class="stat-field">
+                    <span class="stat-label">Apply Rotation:</span>
+                    <span class="stat-value" style="display:flex; align-items:center; gap:8px; justify-content:flex-end;">
+                      <select id="rotationApplySelect" style="min-width:180px; background:rgba(15,23,42,0.95); color:#cde6ff; border:1px solid rgba(120,200,255,0.35); border-radius:8px; padding:6px 8px;">
+                        <option value="Varimax">Varimax</option>
+                        <option value="Promax">Promax (Oblique)</option>
+                        <option value="Oblimin">Oblimin (Oblique)</option>
+                        <option value="None">None</option>
+                      </select>
+                      <button id="applyRotationBtn" class="hero-action-btn" style="padding:6px 10px; font-size:12px;">Apply</button>
+                    </span>
+                  </div>
+                  <div class="stat-field"><span class="stat-label">Rotation Method:</span><span class="stat-value" id="rotationMethod">...</span></div>
+                  <div class="stat-field"><span class="stat-label">Loading Cutoff:</span><span class="stat-value" id="loadingCutoff">...</span></div>
+                  <div class="stat-field"><span class="stat-label">Cross-loading Count:</span><span class="stat-value" id="crossLoadingCount">...</span></div>
+                  <div class="stat-field"><span class="stat-label">Factor Correlation Max:</span><span class="stat-value" id="phiMax">...</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="stat-panel">
+              <div class="stat-panel-heading"><i class="fa-solid fa-table-columns"></i> Rotated Loadings Matrix</div>
+              <div class="stat-panel-body" style="padding:0;">
+                <div class="table-container" style="margin:0;">
+                  <table class="analysis-table">
+                    <thead id="loadingsHead"></thead>
+                    <tbody id="loadingsBody">
+                      <tr><td class="hint-empty">Awaiting loading matrix...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="tab-diagnostics" class="tab-panel">
+            <div class="stats-container">
+              <div class="stat-panel">
+                <div class="stat-panel-heading"><i class="fa-solid fa-shield-heart"></i> Fit Diagnostics</div>
+                <div class="stat-panel-body">
+                  <div class="stat-field"><span class="stat-label">RMSR:</span><span class="stat-value" id="rmsrValue">...</span></div>
+                  <div class="stat-field"><span class="stat-label">Fit Index:</span><span class="stat-value" id="fitIndexValue">...</span></div>
+                  <div class="stat-field"><span class="stat-label">Heywood Cases:</span><span class="stat-value" id="heywoodCount">...</span></div>
+                  <div class="stat-field"><span class="stat-label">Mean Communality:</span><span class="stat-value" id="meanCommunality">...</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="stat-panel">
+              <div class="stat-panel-heading"><i class="fa-solid fa-table-list"></i> Communalities & Uniqueness</div>
+              <div class="stat-panel-body" style="padding:0;">
+                <div class="table-container" style="margin:0;">
+                  <table class="analysis-table">
+                    <thead><tr><th>Variable</th><th>Initial</th><th>Extracted</th><th>Uniqueness</th></tr></thead>
+                    <tbody id="communalityBody">
+                      <tr><td colspan="4" class="hint-empty">Awaiting communalities...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="tab-scores" class="tab-panel">
+            <div class="stats-container">
+              <div class="stat-panel">
+                <div class="stat-panel-heading"><i class="fa-solid fa-calculator"></i> Score Configuration</div>
+                <div class="stat-panel-body">
+                  <div class="stat-field"><span class="stat-label">Score Method:</span><span class="stat-value" id="scoreMethod">...</span></div>
+                  <div class="stat-field"><span class="stat-label">Score Dimensions:</span><span class="stat-value" id="scoreDims">...</span></div>
+                  <div class="stat-field"><span class="stat-label">Export Ready:</span><span class="stat-value" id="scoreExportReady">...</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="stat-panel">
+              <div class="stat-panel-heading"><i class="fa-solid fa-table-cells-large"></i> Case-wise Factor Scores</div>
+              <div class="stat-panel-body" style="padding:0;">
+                <div class="table-container" style="margin:0;">
+                  <table class="analysis-table">
+                    <thead id="scoresHead"></thead>
+                    <tbody id="scoresBody">
+                      <tr><td class="hint-empty">Awaiting factor scores...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="tab-ai" class="tab-panel">
+            <div class="ai-panel">
+              <div class="ai-row"><span class="ai-key">Structure Summary:</span> <span id="aiStructure">Awaiting assessment...</span></div>
+              <div class="ai-row"><span class="ai-key">Named Factors:</span> <span id="aiFactors">Awaiting assessment...</span></div>
+              <div class="ai-row"><span class="ai-key">Variance Story:</span> <span id="aiVariance">Awaiting assessment...</span></div>
+              <div class="ai-row"><span class="ai-key">Model Quality:</span> <span id="aiQuality">Awaiting assessment...</span></div>
+              <div class="ai-row"><span class="ai-key">Recommendations:</span> <span id="aiRecommendations">Awaiting assessment...</span></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    let factorPayloadForAI = null;
+    let globalDecimalPrecision = "auto";
+    let officeBridgeReady = false;
+
+    function sendToHost(cmd, data) {
+      try {
+        if (typeof Office !== "undefined" && Office.context && Office.context.ui && typeof Office.context.ui.messageParent === "function") {
+          Office.context.ui.messageParent(JSON.stringify({ action: "HOST_EVENT", cmd: cmd, data: data || {} }));
+          return;
+        }
+        if (typeof vbHost !== "undefined" && vbHost && typeof vbHost.RaiseMessageEvent === "function") {
+          var dataStr = typeof data === "string" ? data : JSON.stringify(data || {});
+          vbHost.RaiseMessageEvent(cmd, dataStr);
+        }
+      } catch (e) {
+        console.error("Error sending to host:", e);
+      }
+    }
+
+    function switchTab(tabKey) {
+      document.querySelectorAll(".tab-button").forEach(function(btn) {
+        btn.classList.toggle("active", btn.getAttribute("data-tab") === tabKey);
+      });
+      document.querySelectorAll(".tab-panel").forEach(function(panel) {
+        panel.classList.toggle("active", panel.id === "tab-" + tabKey);
+      });
+    }
+
+    function wireNavigation() {
+      document.querySelectorAll(".tab-button[data-tab]").forEach(function(node) {
+        node.addEventListener("click", function(e) {
+          e.preventDefault();
+          switchTab(this.getAttribute("data-tab"));
+        });
+      });
+    }
+
+    function parseMaybeNumber(value) {
+      if (value === undefined || value === null) return NaN;
+      var v = String(value).trim();
+      if (!v || v === "—" || v === "N/A") return NaN;
+      if (v.indexOf("<") === 0) v = v.slice(1);
+      if (v.indexOf("%") >= 0) v = v.replace("%", "");
+      if (v.indexOf(",") >= 0 && v.indexOf(".") < 0) v = v.replace(",", ".");
+      var n = Number(v);
+      return isFinite(n) ? n : NaN;
+    }
+
+    function formatNumber(val) {
+      var n = parseMaybeNumber(val);
+      if (!isFinite(n)) return val === undefined || val === null ? "N/A" : String(val);
+      if (globalDecimalPrecision === "auto") {
+        if (Math.abs(n) < 0.01 && n !== 0) return n.toExponential(3);
+        if (Math.abs(n) < 1 && n !== 0) return n.toFixed(4);
+        return n.toFixed(2);
+      }
+      return n.toFixed(parseInt(globalDecimalPrecision, 10));
+    }
+
+    function setDecimalPrecision() {
+      var select = document.getElementById("decimalSelect");
+      globalDecimalPrecision = select ? select.value : "auto";
+      if (window.lastFactorBundle) populateFactorBundle(window.lastFactorBundle);
+    }
+
+    function setText(id, value, fallback) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.innerText = (value !== undefined && value !== null && value !== "") ? value : (fallback || "N/A");
+    }
+
+    function setMetricClass(id, value, metricKind) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.classList.remove("metric-good", "metric-warning", "metric-bad");
+      var n = parseMaybeNumber(value);
+      if (!isFinite(n)) return;
+      if (metricKind === "kmo") {
+        if (n >= 0.8) el.classList.add("metric-good");
+        else if (n >= 0.6) el.classList.add("metric-warning");
+        else el.classList.add("metric-bad");
+      }
+      if (metricKind === "p") {
+        if (n < 0.05) el.classList.add("metric-good");
+        else el.classList.add("metric-warning");
+      }
+      if (metricKind === "fit") {
+        if (n <= 0.08) el.classList.add("metric-good");
+        else if (n <= 0.12) el.classList.add("metric-warning");
+        else el.classList.add("metric-bad");
+      }
+    }
+
+    function renderSimpleTableHead(headId, columns) {
+      var head = document.getElementById(headId);
+      if (!head) return;
+      var tr = document.createElement("tr");
+      columns.forEach(function(col) {
+        var th = document.createElement("th");
+        th.textContent = col;
+        tr.appendChild(th);
+      });
+      head.innerHTML = "";
+      head.appendChild(tr);
+    }
+
+    function renderSimpleTableBody(bodyId, rows, columns) {
+      var body = document.getElementById(bodyId);
+      if (!body) return;
+      body.innerHTML = "";
+      if (!rows || rows.length === 0) {
+        body.innerHTML = '<tr><td colspan="' + columns.length + '" class="hint-empty">No rows available</td></tr>';
+        return;
+      }
+      rows.forEach(function(row) {
+        var tr = document.createElement("tr");
+        columns.forEach(function(col) {
+          var td = document.createElement("td");
+          var raw = row[col];
+          if (raw === undefined || raw === null || raw === "") {
+            td.textContent = "—";
+          } else {
+            var parsed = parseMaybeNumber(raw);
+            if (isFinite(parsed) && (typeof raw === "number" || /^-?\d+([.,]\d+)?([eE]-?\d+)?$/.test(String(raw).trim()))) {
+              td.textContent = formatNumber(parsed);
+            } else {
+              td.textContent = raw;
+            }
+          }
+          tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      });
+    }
+
+    function renderHeatmap(matrix, labels) {
+      var host = document.getElementById("corrHeatmap");
+      if (!host) return;
+      if (!matrix || !matrix.length) {
+        host.innerHTML = '<div class="hint-empty">Awaiting correlation matrix...</div>';
+        return;
+      }
+      var cols = labels && labels.length ? labels : matrix.map(function(_, i){ return "V" + (i + 1); });
+      var html = '<table class="heatmap"><thead><tr><th></th>';
+      cols.forEach(function(c){ html += '<th>' + c + '</th>'; });
+      html += '</tr></thead><tbody>';
+      matrix.forEach(function(row, i){
+        html += '<tr><th>' + cols[i] + '</th>';
+        row.forEach(function(v){
+          var n = parseMaybeNumber(v);
+          var alpha = isFinite(n) ? Math.min(0.8, Math.abs(n)) : 0;
+          var bg = isFinite(n)
+            ? (n >= 0 ? "rgba(120,200,255," + alpha.toFixed(2) + ")" : "rgba(255,165,120," + alpha.toFixed(2) + ")")
+            : "transparent";
+          html += '<td style="background:' + bg + ';">' + formatNumber(n) + '</td>';
+        });
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      host.innerHTML = html;
+    }
+
+    function renderScree(eigenvalues) {
+      var target = document.getElementById("screeChart");
+      if (!target || typeof Highcharts === "undefined") return;
+      var vals = (eigenvalues || []).map(function(v){ return parseMaybeNumber(v); }).filter(function(v){ return isFinite(v); });
+      if (!vals.length) {
+        target.innerHTML = '<div class="hint-empty">Awaiting scree data...</div>';
+        return;
+      }
+      var categories = vals.map(function(_, i){ return "F" + (i + 1); });
+      Highcharts.chart("screeChart", {
+        chart: {
+          type: "line",
+          backgroundColor: "transparent",
+          animation: false,
+          spacing: [12, 10, 12, 10]
+        },
+        title: { text: null },
+        credits: { enabled: false },
+        legend: { enabled: false },
+        xAxis: {
+          categories: categories,
+          title: { text: "Component", style: { color: "rgba(255,255,255,0.85)" } },
+          labels: { style: { color: "rgba(255,255,255,0.78)" } },
+          lineColor: "rgba(255,255,255,0.22)",
+          tickColor: "rgba(255,255,255,0.22)"
+        },
+        yAxis: {
+          title: { text: "Eigenvalue", style: { color: "rgba(255,255,255,0.85)" } },
+          labels: { style: { color: "rgba(255,255,255,0.78)" } },
+          gridLineColor: "rgba(255,255,255,0.12)"
+        },
+        tooltip: {
+          shared: true,
+          pointFormat: "<b>{point.y:.3f}</b>"
+        },
+        plotOptions: {
+          series: {
+            marker: { enabled: true, radius: 3 },
+            dataLabels: {
+              enabled: true,
+              formatter: function() { return formatNumber(this.y); },
+              style: { color: "#bde6ff", textOutline: "none", fontSize: "10px" }
+            }
+          }
+        },
+        series: [{
+          name: "Eigenvalue",
+          data: vals,
+          color: "rgba(120,200,255,1)",
+          lineWidth: 3
+        }]
+      });
+    }
+
+    function goToScreePlot() {
+      switchTab("extraction");
+      var node = document.getElementById("screeChart");
+      if (node && typeof node.scrollIntoView === "function") {
+        node.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+
+    window.populateFactorSuitability = function(data) {
+      var d = typeof data === "string" ? JSON.parse(data) : data || {};
+      setText("kmoValue", formatNumber(d.kmo), "...");
+      setText("bartlettChi2", formatNumber(d.bartlettChi2), "...");
+      setText("bartlettP", d.bartlettP !== undefined ? formatNumber(d.bartlettP) : "...", "...");
+      setText("determinantR", formatNumber(d.determinantR), "...");
+      setText("faVarCount", d.variableCount, "...");
+      setText("faCaseCount", d.caseCount, "...");
+      setText("faMissingPattern", d.missingPattern, "...");
+      setText("faSuitabilityVerdict", d.verdict, "...");
+      setMetricClass("kmoValue", d.kmo, "kmo");
+      setMetricClass("bartlettP", d.bartlettP, "p");
+      renderHeatmap(d.correlationMatrix || [], d.variableLabels || []);
+      factorPayloadForAI = Object.assign({}, factorPayloadForAI || {}, { suitability: d });
+      document.getElementById("aiInterpretBtn").style.display = "inline-flex";
+    };
+
+    window.populateFactorExtraction = function(data) {
+      var d = typeof data === "string" ? JSON.parse(data) : data || {};
+      setText("extractMethod", d.method, "...");
+      setText("retainedFactors", d.retainedFactors, "...");
+      setText("kaiserFlag", d.kaiser ? "Yes" : "No", "...");
+      setText("cumVariance", isFinite(parseMaybeNumber(d.cumulativeVariance)) ? formatNumber(d.cumulativeVariance) + "%" : (d.cumulativeVariance || "..."), "...");
+      var rows = d.eigenTable || [];
+      var body = document.getElementById("eigenTableBody");
+      body.innerHTML = "";
+      if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="4" class="hint-empty">Awaiting eigenvalue output...</td></tr>';
+      } else {
+        rows.forEach(function(r, idx){
+          var tr = document.createElement("tr");
+          [r.component || (idx + 1), formatNumber(r.eigenvalue), formatNumber(r.variancePct), formatNumber(r.cumulativePct)].forEach(function(v){
+            var td = document.createElement("td");
+            td.textContent = v;
+            tr.appendChild(td);
+          });
+          body.appendChild(tr);
+        });
+      }
+      renderScree((d.eigenTable || []).map(function(r){ return r.eigenvalue; }));
+      factorPayloadForAI = Object.assign({}, factorPayloadForAI || {}, { extraction: d });
+    };
+
+    window.populateFactorRotation = function(data) {
+      var d = typeof data === "string" ? JSON.parse(data) : data || {};
+      setText("rotationMethod", d.rotationMethod, "...");
+      setText("loadingCutoff", formatNumber(d.loadingCutoff), "...");
+      setText("crossLoadingCount", d.crossLoadingCount, "...");
+      setText("phiMax", formatNumber(d.phiMax), "...");
+      var rotationSelect = document.getElementById("rotationApplySelect");
+      if (rotationSelect && d.rotationMethod) rotationSelect.value = d.rotationMethod;
+      var cols = d.columns || ["Variable", "Factor 1"];
+      renderSimpleTableHead("loadingsHead", cols);
+      renderSimpleTableBody("loadingsBody", d.rows || [], cols);
+      factorPayloadForAI = Object.assign({}, factorPayloadForAI || {}, { rotation: d });
+    };
+
+    function applyRotationFromResults() {
+      var rotationSelect = document.getElementById("rotationApplySelect");
+      if (!rotationSelect) return;
+      sendToHost("factorRotationChanged", { rotationMethod: rotationSelect.value });
+    }
+
+    window.populateFactorDiagnostics = function(data) {
+      var d = typeof data === "string" ? JSON.parse(data) : data || {};
+      setText("rmsrValue", formatNumber(d.rmsr), "...");
+      setText("fitIndexValue", formatNumber(d.fitIndex), "...");
+      setText("heywoodCount", d.heywoodCases, "...");
+      setText("meanCommunality", formatNumber(d.meanCommunality), "...");
+      setMetricClass("rmsrValue", d.rmsr, "fit");
+      var body = document.getElementById("communalityBody");
+      body.innerHTML = "";
+      var rows = d.communalities || [];
+      if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="4" class="hint-empty">Awaiting communalities...</td></tr>';
+      } else {
+        rows.forEach(function(r){
+          var tr = document.createElement("tr");
+          [r.variable || "—", formatNumber(r.initial), formatNumber(r.extracted), formatNumber(r.uniqueness)].forEach(function(v){
+            var td = document.createElement("td");
+            td.textContent = v;
+            tr.appendChild(td);
+          });
+          body.appendChild(tr);
+        });
+      }
+      factorPayloadForAI = Object.assign({}, factorPayloadForAI || {}, { diagnostics: d });
+    };
+
+    window.populateFactorScores = function(data) {
+      var d = typeof data === "string" ? JSON.parse(data) : data || {};
+      setText("scoreMethod", d.method, "...");
+      setText("scoreDims", d.dimensions, "...");
+      setText("scoreExportReady", d.exportReady ? "Yes" : "No", "...");
+      var cols = d.columns || ["Case", "Factor 1"];
+      renderSimpleTableHead("scoresHead", cols);
+      renderSimpleTableBody("scoresBody", d.rows || [], cols);
+      factorPayloadForAI = Object.assign({}, factorPayloadForAI || {}, { scores: d });
+    };
+
+    window.populateFactorSummary = function(data) {
+      var ai = typeof data === "string" ? JSON.parse(data) : data || {};
+      setText("aiStructure", ai.structureSummary, "Awaiting assessment...");
+      setText("aiFactors", ai.namedFactors, "Awaiting assessment...");
+      setText("aiVariance", ai.varianceStory, "Awaiting assessment...");
+      setText("aiQuality", ai.modelQuality, "Awaiting assessment...");
+      setText("aiRecommendations", ai.recommendations, "Awaiting assessment...");
+      factorPayloadForAI = Object.assign({}, factorPayloadForAI || {}, { ai: ai });
+    };
+
+    window.populateFactorBundle = function(data) {
+      var bundle = typeof data === "string" ? JSON.parse(data) : data || {};
+      window.lastFactorBundle = bundle;
+      if (bundle.suitability) window.populateFactorSuitability(bundle.suitability);
+      if (bundle.extraction) window.populateFactorExtraction(bundle.extraction);
+      if (bundle.rotation) window.populateFactorRotation(bundle.rotation);
+      if (bundle.diagnostics) window.populateFactorDiagnostics(bundle.diagnostics);
+      if (bundle.scores) window.populateFactorScores(bundle.scores);
+      if (bundle.ai) window.populateFactorSummary(bundle.ai);
+    };
+
+    function requestFactorAI() {
+      if (!factorPayloadForAI) {
+        alert("No factor analysis output available yet.");
+        return;
+      }
+      var btn = document.getElementById("aiInterpretBtn");
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+      sendToHost("analyzeFactorWithAI", factorPayloadForAI);
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-robot"></i> AI Interpret';
+      }, 2200);
+    }
+
+    function saveCurrentFactorModel() {
+      sendToHost("saveFactorModel", window.lastFactorBundle || {});
+    }
+
+    async function exportFactorHtml() {
+      try {
+        document.querySelectorAll(".tab-panel").forEach(function(panel) {
+          panel.classList.add("active");
+          panel.style.display = "block";
+        });
+        await new Promise(function(resolve){ setTimeout(resolve, 120); });
+
+        var clone = document.documentElement.cloneNode(true);
+        clone.querySelectorAll("script").forEach(function(script){ script.remove(); });
+        var html = "<!DOCTYPE html>\n" + clone.outerHTML;
+        var stamp = new Date().toISOString().replace(/[:.]/g, "-");
+        var name = "factor-analysis-snapshot-" + stamp + ".html";
+        var blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        alert("Saved: " + name);
+      } catch (e) {
+        console.error("Failed to export factor HTML:", e);
+        alert("Failed to export HTML: " + e.message);
+      }
+    }
+
+    function toggleTheme() {
+      var root = document.documentElement;
+      var icon = document.getElementById("themeIcon");
+      var isLight = root.getAttribute("data-theme") === "light";
+      if (isLight) {
+        root.removeAttribute("data-theme");
+        icon.className = "fa-solid fa-moon";
+        localStorage.setItem("factorTheme", "dark");
+      } else {
+        root.setAttribute("data-theme", "light");
+        icon.className = "fa-solid fa-sun";
+        localStorage.setItem("factorTheme", "light");
+      }
+    }
+
+    function loadSavedTheme() {
+      try {
+        var savedTheme = localStorage.getItem("factorTheme");
+        var icon = document.getElementById("themeIcon");
+        if (savedTheme === "light") {
+          document.documentElement.setAttribute("data-theme", "light");
+          if (icon) icon.className = "fa-solid fa-sun";
+        }
+      } catch (e) {}
+    }
+
+    window.resetResultsPanel = function() {
+      [
+        "kmoValue","bartlettChi2","bartlettP","determinantR","faVarCount","faCaseCount","faMissingPattern","faSuitabilityVerdict",
+        "extractMethod","retainedFactors","kaiserFlag","cumVariance",
+        "rotationMethod","loadingCutoff","crossLoadingCount","phiMax",
+        "rmsrValue","fitIndexValue","heywoodCount","meanCommunality",
+        "scoreMethod","scoreDims","scoreExportReady"
+      ].forEach(function(id){ setText(id, "...", "..."); });
+      document.getElementById("corrHeatmap").innerHTML = '<div class="hint-empty">Awaiting correlation matrix...</div>';
+      document.getElementById("eigenTableBody").innerHTML = '<tr><td colspan="4" class="hint-empty">Awaiting eigenvalue output...</td></tr>';
+      document.getElementById("loadingsHead").innerHTML = "";
+      document.getElementById("loadingsBody").innerHTML = '<tr><td class="hint-empty">Awaiting loading matrix...</td></tr>';
+      document.getElementById("communalityBody").innerHTML = '<tr><td colspan="4" class="hint-empty">Awaiting communalities...</td></tr>';
+      document.getElementById("scoresHead").innerHTML = "";
+      document.getElementById("scoresBody").innerHTML = '<tr><td class="hint-empty">Awaiting factor scores...</td></tr>';
+      setText("aiStructure", "Awaiting assessment...");
+      setText("aiFactors", "Awaiting assessment...");
+      setText("aiVariance", "Awaiting assessment...");
+      setText("aiQuality", "Awaiting assessment...");
+      setText("aiRecommendations", "Awaiting assessment...");
+      var screeNode = document.getElementById("screeChart");
+      if (screeNode) screeNode.innerHTML = '<div class="hint-empty">Awaiting scree data...</div>';
+      factorPayloadForAI = null;
+      window.lastFactorBundle = null;
+      document.getElementById("aiInterpretBtn").style.display = "none";
+      switchTab("suitability");
+    };
+
+    function wireOfficeDialogMessaging() {
+      if (!Office || !Office.context || !Office.context.ui || !Office.EventType) return;
+      try {
+        Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function(arg) {
+          try {
+            var message = JSON.parse(arg.message || "{}");
+            if (!message || !message.type) return;
+            switch (message.type) {
+              case "FACTOR_SUITABILITY": window.populateFactorSuitability(message.payload || {}); break;
+              case "FACTOR_EXTRACTION": window.populateFactorExtraction(message.payload || {}); break;
+              case "FACTOR_ROTATION": window.populateFactorRotation(message.payload || {}); break;
+              case "FACTOR_DIAGNOSTICS": window.populateFactorDiagnostics(message.payload || {}); break;
+              case "FACTOR_SCORES": window.populateFactorScores(message.payload || {}); break;
+              case "FACTOR_AI": window.populateFactorSummary(message.payload || {}); break;
+              case "FACTOR_BUNDLE": window.populateFactorBundle(message.payload || {}); break;
+              case "NAVIGATE_TAB":
+                if (message.payload && message.payload.tab) switchTab(message.payload.tab);
+                break;
+              case "RESET_RESULTS":
+                window.resetResultsPanel();
+                break;
+            }
+          } catch (e) {
+            console.error("Failed to parse parent message:", e);
+          }
+        });
+      } catch (err) {
+        console.error("Failed to wire Office dialog messaging:", err);
+      }
+    }
+
+    function initOfficeBridge() {
+      if (officeBridgeReady) return;
+      officeBridgeReady = true;
+      wireOfficeDialogMessaging();
+      // Initial ready ping + retry helps when host message channels warm up slowly.
+      sendToHost("factorDashboardReady", {});
+      setTimeout(function() { sendToHost("factorDashboardReady", {}); }, 400);
+      setTimeout(function() { sendToHost("factorDashboardReady", {}); }, 1200);
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+      wireNavigation();
+      loadSavedTheme();
+      switchTab("suitability");
+      setDecimalPrecision();
+      var applyRotationBtn = document.getElementById("applyRotationBtn");
+      if (applyRotationBtn) applyRotationBtn.addEventListener("click", applyRotationFromResults);
+      var rotationSelect = document.getElementById("rotationApplySelect");
+      if (rotationSelect) rotationSelect.addEventListener("change", applyRotationFromResults);
+      if (typeof Office !== "undefined" && typeof Office.onReady === "function") {
+        Office.onReady(function() {
+          initOfficeBridge();
+        });
+      } else {
+        // Standalone/browser preview fallback.
+        setTimeout(initOfficeBridge, 0);
+      }
+    });
+  </script>
+</body>
+</html>

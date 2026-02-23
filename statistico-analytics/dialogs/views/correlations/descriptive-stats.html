@@ -1,0 +1,1862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Descriptive Statistics</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts-more.js"></script>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/solid-gauge.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
+  <link rel="stylesheet" href="../shared-header.css">
+  <script src="../shared-header.js"></script>
+  <script src="../../shared/views/normality-view.js"></script>
+  <style>
+    /* Dark Theme (Default) */
+    :root{
+      --surface-0:#0c1624;
+      --surface-1:#1a1f2e;
+      --surface-2:#242938;
+      --border:#2d3748;
+      --accent-1:rgb(255,165,120);
+      --text-primary:#fff;
+      --text-secondary:rgba(255,255,255,0.85);
+    }
+    
+    /* Light Theme */
+    :root[data-theme="light"]{
+      --surface-0:#f3f4f6;
+      --surface-1:#ffffff;
+      --surface-2:#f9fafb;
+      --border:#e5e7eb;
+      --accent-1:#2563eb;
+      --text-primary:#111827;
+      --text-secondary:#4b5563;
+    }
+    
+    /* Light Theme Table Overrides */
+    :root[data-theme="light"] #stats-table {
+      color: var(--text-primary);
+    }
+    
+    :root[data-theme="light"] #stats-table thead th {
+      background: #2563eb;
+      color: #ffffff;
+    }
+    
+    :root[data-theme="light"] #stats-table tbody tr td {
+      color: var(--text-primary);
+      border-color: var(--border);
+    }
+    
+    :root[data-theme="light"] #stats-table tbody tr:nth-child(even) td {
+      background: #f3f4f6;
+    }
+    
+    :root[data-theme="light"] #stats-table tbody tr:hover td {
+      background: #dbeafe;
+    }
+    
+    :root[data-theme="light"] #stats-table tbody tr.selected td {
+      background: #bfdbfe;
+    }
+    
+    /* Force table rows to be visible (fix iframe rendering issue) */
+    #stats-table tbody {
+      display: table-row-group !important;
+    }
+    
+    #stats-table tbody tr {
+      display: table-row !important;
+      height: 36px !important;
+      min-height: 36px !important;
+    }
+    
+    #stats-table tbody tr td {
+      display: table-cell !important;
+      height: 36px !important;
+      min-height: 36px !important;
+      vertical-align: middle;
+    }
+    
+    html,body{height:100%;margin:0;padding:0;}
+    body{background:var(--surface-0);color:var(--text-primary);font-family:'Segoe UI', Tahoma, sans-serif;overflow-x:hidden;display:flex;flex-direction:column;min-height:100vh;}
+    .wrap{display:flex;justify-content:center;padding:12px;flex:1;min-height:0;box-sizing:border-box;}
+    .card{width:min(1120px,100%);background:var(--surface-1);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.35);overflow:hidden;height:100%;display:flex;flex-direction:column;}
+    .card-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;color:var(--accent-1);font-weight:700;letter-spacing:.2px;flex-shrink:0;}
+    .card-body{padding:10px;flex:1;overflow:hidden;display:flex;flex-direction:column;}
+    .card-body > #histogram-panel{margin-top:-15px;}
+    .control-group {display: flex;align-items: center;gap: 10px;}
+    .decimal-control {display: flex;align-items: center;gap: 5px;}
+    .decimal-control label {font-size: 14px;color: var(--text-secondary);font-weight: 500;}
+    .table-wrap{max-height:260px;overflow:auto;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);flex-shrink:0;}
+    #stats-table{width:100%;min-width:820px;border-collapse:collapse;table-layout:auto;}
+    #stats-table th,#stats-table td{padding:8px 10px;border:1px solid rgba(255,255,255,.18);box-sizing:border-box;text-align:right;font-size:11px;line-height:18px;height:36px;white-space:nowrap;}
+    #stats-table th:first-child,#stats-table td:first-child{text-align:left;min-width:140px;max-width:200px;overflow:hidden;text-overflow:ellipsis;}
+    #stats-table thead th{position:sticky;top:0;background:#003366cc;color:#fff;z-index:2;cursor:pointer;}
+    #stats-table tbody tr:nth-child(even) td{background:rgba(255,255,255,.05)}
+    #stats-table tbody tr:hover td{background:rgba(255,221,87,.18)}
+    #stats-table tbody tr.selected td{background:rgba(255,165,120,.3)}
+    input[type=range] {accent-color: var(--accent-1);}
+    
+    @media (max-width: 900px){
+      .flex-container{flex-direction:column;}
+      .chart-wrapper,.summary-container{width:100%;}
+      .table-wrap{max-height:260px;}
+    }
+    
+    /* Histogram and Chart Styles */
+    #histogram-panel { width: min(1000px,90%); margin-left: auto; margin-right: auto; display: none; transition: opacity 0.2s ease; }
+    .chart-container { height: 280px !important; padding: 4px !important; }
+    .flex-container { display: flex; gap: 20px; align-items: flex-start; }
+    .chart-wrapper { flex: 2; min-width: 0; }
+    .summary-container { flex: 1; min-width: 200px; }
+    .summary-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
+    .summary-table { width: 100%; border-collapse: collapse; }
+    .summary-table td { padding: 5px 0; border-bottom: 1px solid var(--border); }
+    .summary-table td:first-child { text-align: left; padding-right: 15px; }
+    .summary-table td:last-child { text-align: right; font-weight: normal; }
+    .normality-button { background: linear-gradient(to right, rgb(255,192,192), rgb(255,160,160)); color: black; border: none; border-radius: 6px; padding: 8px 16px; cursor: pointer; font-weight: bold; transition: all 0.3s ease; margin-top: auto; }
+    .normality-button:hover { background: linear-gradient(to right, rgb(255,160,160), rgb(255,192,192)); transform: translateY(-2px); }
+    
+    /* Modal Styles */
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); display: none; z-index: 1000; backdrop-filter: blur(3px); }
+    .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90%; max-width: 900px; max-height: 90vh; background-color: var(--surface-1); border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,.4); border: 1px solid var(--border); overflow-y: auto; }
+    .modal-header { background-color: var(--surface-0); padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .modal-title { color: var(--accent-1); font-size: 1.2rem; font-weight: 600; }
+    .close-btn { background: none; border: none; color: var(--text-secondary); font-size: 1.5rem; cursor: pointer; padding: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; }
+    .close-btn:hover { color: var(--text-primary); }
+    .modal-body { padding: 20px; }
+    
+    /* Gauge and Test Styles */
+    .gauge-container { text-align: center; padding: 10px; height: 140px; position: relative; }
+    .gauge-title { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 5px; }
+    .gauge { width: 100%; height: 110px; }
+    .test-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 20px; }
+    .test-card { background: grey; border-radius: 8px; padding: 20px; }
+    .test-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .test-name { font-size: clamp(12px, 1.5vw, 14px); font-weight: bold; }
+    .test-result { padding: 3px 8px; border-radius: 12px; font-size: 15px; font-weight: bold; }
+    .pass { background-color: ghostwhite; color: #2ecc71; }
+    .fail { background-color: ghostwhite; color: #e74c3c; }
+    .test-details { font-size: 15px; }
+    .detail-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+    .detail-label { color: rgba(255, 255, 255, 0.7); }
+    .detail-value { font-weight: 500; }
+    
+    /* D3 Chart Styles */
+    .histogram-bar { fill: #74b9ff; stroke: #0984e3; stroke-width: 1px; }
+    .histogram-bar:hover { fill: #0984e3; }
+    .normal-curve { fill: none; stroke: yellow; stroke-width: 2px; stroke-dasharray: 5, 5; }
+    .axis text { fill: white; font-size: 10px; }
+    .axis path, .axis line { stroke: #999; }
+    .grid line { stroke: #555; stroke-opacity: 0.7; shape-rendering: crispEdges; }
+    .grid path { stroke-width: 0; }
+    
+    /* Controls */
+    input[type="checkbox"] { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border: 2px solid #555; border-radius: 3px; outline: none; cursor: pointer; position: relative; }
+    input[type="checkbox"]:checked { background-color: #0984e3; border-color: #0984e3; }
+    input[type="checkbox"]:checked::after { content: '✓'; position: absolute; color: white; font-size: 12px; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+    
+    .tooltip { position: absolute; padding: 8px 12px; background: rgba(0, 0, 0, 0.8); color: #fff; border-radius: 4px; pointer-events: none; font-size: 12px; z-index: 100; max-width: 200px; }
+    
+    @keyframes pulseHighlight { 0% { background-color: rgba(255, 255, 0, 0.5); } 50% { background-color: rgba(255, 255, 0, 0); } 100% { background-color: rgba(255, 255, 0, 0.5); } }
+    .animated-critical { animation: pulseHighlight 0.8s ease-in-out; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="card">
+      <div class="card-head">
+        <div>Descriptive Statistics</div>
+        <div class="control-group">
+          <div class="decimal-control">
+            <label for="decimal-places">Decimals:</label>
+            <input type="range" id="decimal-places" min="0" max="4" value="2" style="width: 80px;">
+            <span id="decimal-value">2</span>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="table-wrap">
+          <table id="stats-table">
+            <colgroup>
+              <col style="min-width: 140px; max-width: 200px;">
+              <col style="min-width: 70px;">
+              <col style="min-width: 90px;">
+              <col style="min-width: 90px;">
+              <col style="min-width: 90px;">
+              <col style="min-width: 90px;">
+              <col style="min-width: 90px;">
+              <col style="min-width: 80px;">
+              <col style="min-width: 80px;">
+            </colgroup>
+            <thead>
+              <tr>
+                <th data-key="Variable" style="text-align:left">Variable <i class="fa fa-sort"></i></th>
+                <th data-key="N">N <i class="fa fa-sort"></i></th>
+                <th data-key="Mean">Mean <i class="fa fa-sort"></i></th>
+                <th data-key="StdDev">StdDev <i class="fa fa-sort"></i></th>
+                <th data-key="Min">Min <i class="fa fa-sort"></i></th>
+                <th data-key="Median">Median <i class="fa fa-sort"></i></th>
+                <th data-key="Max">Max <i class="fa fa-sort"></i></th>
+                <th data-key="Skew">Skew <i class="fa fa-sort"></i></th>
+                <th data-key="Kurt">Kurt <i class="fa fa-sort"></i></th>
+              </tr>
+            </thead>
+            <tbody id="stats-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Histogram panel (initially hidden) - back inside main card -->
+      <div id="histogram-panel" style="display: none;">
+        <div class="card-head">
+          <span id="histogram-title">Histogram</span>
+          <div class="control-group">
+            <label for="num-bins">Bins:</label>
+            <input type="range" id="num-bins" min="5" max="20" value="10" style="width: 100px;">
+            <span id="bins-value">10</span>
+            
+            <label for="show-normal" style="margin-left: 15px;">Show Normal:</label>
+            <input type="checkbox" id="show-normal" checked>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="flex-container">
+            <div class="chart-wrapper">
+              <div class="chart-container" id="histogram-container">
+                <!-- D3 histogram will be rendered here -->
+              </div>
+            </div>
+            <div class="summary-container">
+              <table class="summary-table" id="summary-table">
+                <!-- Summary statistics will be populated here -->
+              </table>
+              <button class="normality-button" onclick="openNormalityModal()">
+                Normality Tests
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Normality Tests Modal -->
+  <div class="modal-overlay" id="normality-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+      <div class="modal-title">Normality Tests - <span id="modal-variable-name">Variable</span> <span id="modal-sample-size">(n=—)</span></div>
+        <button class="close-btn" onclick="closeNormalityModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="gauge-container">
+          <div class="gauge-title">Overall Normality Score</div>
+          <div class="gauge" id="gauge-chart"></div>
+        </div>
+        
+        <div class="test-grid">
+          <!-- Test cards will be populated here -->
+          <div class="test-card" data-test="shapirowilk">
+            <div class="test-header">
+              <div class="test-name">Shapiro-Wilk</div>
+              <div class="test-result pass">—</div>
+            </div>
+            <div class="test-details">
+              <div class="detail-row">
+                <div class="detail-label">Statistic:</div>
+                <div class="detail-value">—</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">p-value:</div>
+                <div class="detail-value">—</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Critical:</div>
+                <div class="detail-value">—</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="test-card" data-test="andersondarling">
+            <div class="test-header">
+              <div class="test-name">Anderson-Darling</div>
+              <div class="test-result pass">—</div>
+            </div>
+            <div class="test-details">
+              <div class="detail-row">
+                <div class="detail-label">Statistic:</div>
+                <div class="detail-value">—</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">p-value:</div>
+                <div class="detail-value">—</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Critical:</div>
+                <div class="detail-value">—</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="test-card" data-test="kolmogorovsmirnov">
+            <div class="test-header">
+              <div class="test-name">Kolmogorov-Smirnov</div>
+              <div class="test-result pass">—</div>
+            </div>
+            <div class="test-details">
+              <div class="detail-row">
+                <div class="detail-label">Statistic:</div>
+                <div class="detail-value">—</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">p-value:</div>
+                <div class="detail-value">—</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Critical:</div>
+                <div class="detail-value">—</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="test-card" data-test="cramervonmises">
+            <div class="test-header">
+              <div class="test-name">Cramer-von Mises</div>
+              <div class="test-result pass">—</div>
+            </div>
+            <div class="test-details">
+              <div class="detail-row">
+                <div class="detail-label">Statistic:</div>
+                <div class="detail-value">—</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">p-value:</div>
+                <div class="detail-value">—</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Critical:</div>
+                <div class="detail-value">—</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="test-card" data-test="dagostinopearson">
+            <div class="test-header">
+              <div class="test-name">D'Agostino-Pearson</div>
+              <div class="test-result fail">—</div>
+            </div>
+            <div class="test-details">
+              <div class="detail-row">
+                <div class="detail-label">Statistic:</div>
+                <div class="detail-value">—</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">p-value:</div>
+                <div class="detail-value">—</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Critical:</div>
+                <div class="detail-value">—</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="test-card" data-test="jarquebera">
+            <div class="test-header">
+              <div class="test-name">Jarque-Bera</div>
+              <div class="test-result fail">—</div>
+            </div>
+            <div class="test-details">
+              <div class="detail-row">
+                <div class="detail-label">Statistic:</div>
+                <div class="detail-value">—</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">p-value:</div>
+                <div class="detail-value">—</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Critical:</div>
+                <div class="detail-value">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tooltip" class="tooltip" style="opacity: 0;"></div>
+  <script>
+    // IMPORTANT: Register VB6 callback functions IMMEDIATELY (before DOMContentLoaded)
+    console.log('🔧 Registering VB6 callback functions...');
+    
+    // Store results globally so they can be processed when page is ready
+    window._pendingNormalityResults = null;
+    
+    // VB6 callback function for normality test results
+    // VB6 calls: updateNormalityDashboard(resultsArray, variableName, sampleSize)
+    window.updateNormalityDashboard = function(resultsJSON, variableName, sampleSize) {
+      console.log('🎯 updateNormalityDashboard CALLED!');
+      console.log('   Type of resultsJSON:', typeof resultsJSON);
+      console.log('   Variable:', variableName);
+      console.log('   Sample size:', sampleSize);
+      console.log('   Raw results:', resultsJSON);
+      
+      try {
+        // Parse results if string
+        const results = typeof resultsJSON === 'string' ? JSON.parse(resultsJSON) : resultsJSON;
+        console.log('   Parsed results:', results);
+        
+        // Check if helper functions are loaded
+        if (typeof window.updateNormalityTestCards !== 'function') {
+          console.warn('⚠️ Helper functions not loaded yet, storing results for later...');
+          window._pendingNormalityResults = { results, variableName, sampleSize };
+          return;
+        }
+        
+        // Open modal if not already open
+        const modal = document.getElementById('normality-modal');
+        if (!modal) {
+          console.error('❌ Modal element not found! Storing for later...');
+          window._pendingNormalityResults = { results, variableName, sampleSize };
+          return;
+        }
+        
+        if (modal.style.display !== 'block') {
+          console.log('📖 Opening modal...');
+          document.getElementById('modal-variable-name').textContent = variableName;
+          modal.style.display = 'block';
+          document.body.style.overflow = 'hidden';
+          
+          // Initialize gauge
+          setTimeout(() => {
+            console.log('🎨 Initializing gauge and updating cards...');
+            window.initializeGaugeChart();
+            window.updateNormalityTestCards(results, 0.05);
+            window.calculateNormalityScore(results);
+          }, 100);
+        } else {
+          console.log('📝 Modal already open, updating...');
+          document.getElementById('modal-variable-name').textContent = variableName;
+          window.updateNormalityTestCards(results, 0.05);
+          window.calculateNormalityScore(results);
+        }
+        
+        console.log('✅ Normality dashboard updated successfully');
+      } catch (e) {
+        console.error('❌ Error in updateNormalityDashboard:', e);
+        console.error('   Stack:', e.stack);
+        alert('Error processing normality test data: ' + e.message);
+      }
+    };
+    
+    console.log('✅ updateNormalityDashboard registered on window object');
+    console.log('   Test: window.updateNormalityDashboard =', typeof window.updateNormalityDashboard);
+    
+    // Simple test function that VB6 can call to verify communication
+    window.testNormalityFunction = function() {
+      console.log('✅ TEST SUCCESSFUL - VB6 can call JavaScript functions!');
+      alert('Communication test successful!');
+      return 'SUCCESS';
+    };
+    
+    // Global variables
+    let VarNameSelected = "";
+    let data = [];
+    let sortConfig = { key: null, direction: 'ascending' };
+    let selectedRow = null;
+    let decimalPlaces = 2;
+    let numBins = 10;
+    let showNormal = true;
+
+    // Check if we're in an iframe
+    const isInIframe = window.self !== window.top;
+    
+    // Office.js integration
+    if (isInIframe) {
+      // Running in iframe - listen for postMessage
+      console.log('📊 Running in iframe, waiting for data via postMessage');
+      
+      window.addEventListener('message', function(event) {
+        console.log('📥 Received postMessage:', event.data);
+        if (event.data && event.data.type === 'CORRELATION_DATA') {
+          console.log('✅ Data received via postMessage');
+          handleCorrelationData(event.data.payload);
+        } else if (event.data && event.data.type === 'THEME_CHANGE') {
+          console.log('🎨 Theme change received:', event.data.theme);
+          applyTheme(event.data.theme);
+        }
+      });
+      
+      // Function to apply theme
+      function applyTheme(theme) {
+        const root = document.documentElement;
+        if (theme === 'light') {
+          root.setAttribute('data-theme', 'light');
+          console.log('☀️ Applied Light Theme to descriptive stats');
+        } else {
+          root.removeAttribute('data-theme');
+          console.log('🌙 Applied Dark Theme to descriptive stats');
+        }
+        
+        // Force table reflow to fix rendering issue
+        const table = document.getElementById('stats-table');
+        if (table) {
+          table.style.display = 'none';
+          table.offsetHeight; // Force reflow
+          table.style.display = '';
+        }
+      }
+      
+      // Also try sessionStorage as fallback
+      document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+          const storedCorrelationData = sessionStorage.getItem('correlationData');
+          if (storedCorrelationData) {
+            try {
+              const payload = JSON.parse(storedCorrelationData);
+              console.log('📦 Loaded descriptive stats data from sessionStorage:', payload);
+              handleCorrelationData(payload);
+            } catch (e) {
+              console.error('Error loading data from sessionStorage:', e);
+            }
+          }
+        }, 1000);
+      });
+    } else if (typeof Office !== 'undefined') {
+      Office.initialize = function() {
+        // Check if data was pre-loaded in sessionStorage (e.g., from regression dialog)
+        const storedCorrelationData = sessionStorage.getItem('correlationData');
+        if (storedCorrelationData) {
+          try {
+            const payload = JSON.parse(storedCorrelationData);
+            console.log('📦 Loaded descriptive stats data from sessionStorage:', payload);
+            
+            // If data came from regression model, log it
+            if (payload.source === 'regression-model' && payload.modelInfo) {
+              console.log('📊 Showing stats for regression model:', payload.modelInfo);
+            }
+            
+            // Handle the data
+            handleCorrelationData(payload);
+            
+            // Clear the sessionStorage after loading to prevent stale data
+            sessionStorage.removeItem('correlationData');
+          } catch (e) {
+            console.error('Error loading data from sessionStorage:', e);
+          }
+        }
+        
+        Office.context.ui.addHandlerAsync(
+          Office.EventType.DialogParentMessageReceived,
+          onMessageReceived
+        );
+        setTimeout(() => {
+          sendMessageToParent({ status: 'ready' });
+        }, 300);
+      };
+    }
+
+    function onMessageReceived(arg) {
+      try {
+        const message = JSON.parse(arg.message);
+        if (message.action === 'loadData' && message.data) {
+          handleOfficeData(message.data);
+        } else if (message.type === 'CORRELATION_DATA' && message.payload) {
+          handleCorrelationData(message.payload);
+        }
+      } catch (e) {
+        console.error('Error parsing message from parent:', e);
+      }
+    }
+
+    function handleCorrelationData(payload) {
+      console.log('📊 handleCorrelationData called with payload:', payload);
+      const headers = payload.headers || [];
+      const rows = payload.data || [];
+      console.log('📋 Headers:', headers);
+      console.log('📋 Rows count:', rows.length);
+      
+      window.rawData = rows;
+      window.variableNames = headers.slice();
+
+      if (headers.length > 0) {
+        console.log('✅ Calling updateDescriptiveStats with headers:', headers);
+        window.updateDescriptiveStats(headers);
+      } else {
+        console.warn('⚠️ No headers found in payload');
+      }
+
+      // Hide StatisticoHeader if it exists (not needed in iframe context)
+      if (typeof StatisticoHeader !== 'undefined') {
+        const headerContainer = document.getElementById('header-container');
+        if (headerContainer) {
+          headerContainer.style.display = 'none';
+        }
+      }
+    }
+
+    function sendMessageToParent(payload) {
+      try {
+        if (Office && Office.context && Office.context.ui) {
+          Office.context.ui.messageParent(JSON.stringify(payload));
+        }
+      } catch (e) {
+        console.warn('Unable to message parent:', e);
+      }
+    }
+
+    function handleOfficeData(viewData) {
+      if (Array.isArray(viewData.descriptiveTable) && viewData.descriptiveTable.length > 0) {
+        data = viewData.descriptiveTable.map(row => ({
+          Variable: row.Variable || row.name || 'Variable',
+          N: row.N,
+          Mean: row.Mean,
+          Median: row.Median,
+          StdDev: row.StdDev,
+          Min: row.Min,
+          Max: row.Max,
+          Skew: row.Skew,
+          Kurt: row.Kurt,
+          vector: Array.isArray(row.vector) ? row.vector : []
+        }));
+        selectedRow = null;
+        renderTable();
+        if (data[0]) {
+          handleRowClick(data[0]);
+        }
+        return;
+      }
+
+      const descriptive = viewData.descriptive || {};
+      const values = Array.isArray(viewData.values) ? viewData.values : (Array.isArray(viewData.rawData) ? viewData.rawData : []);
+      const row = {
+        Variable: viewData.column || 'Variable',
+        N: viewData.n || values.length,
+        Mean: descriptive.mean,
+        Median: descriptive.median,
+        StdDev: descriptive.stdDev,
+        Min: descriptive.min,
+        Max: descriptive.max,
+        Skew: descriptive.skewness,
+        Kurt: descriptive.kurtosis,
+        vector: values
+      };
+
+      data = [row];
+      selectedRow = null;
+      renderTable();
+      handleRowClick(row);
+
+      const isInIframe = window.self !== window.top;
+      if (!isInIframe && typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.updateVariable(row.Variable, row.N || 0);
+      }
+    }
+
+    function loadFromLocalStorage() {
+      try {
+        const stored = localStorage.getItem('univariateResults');
+        if (!stored) return false;
+        const parsed = JSON.parse(stored);
+        handleOfficeData(parsed);
+        return true;
+      } catch (e) {
+        console.warn('Unable to load from localStorage:', e);
+        return false;
+      }
+    }
+
+    // Helper: Convert column number to Excel letter (1=A, 2=B, 27=AA, etc.)
+    function columnNumberToLetter(colNum) {
+      let result = '';
+      while (colNum > 0) {
+        const modulo = (colNum - 1) % 26;
+        result = String.fromCharCode(65 + modulo) + result;
+        colNum = Math.floor((colNum - modulo) / 26);
+      }
+      return result;
+    }
+
+    function formatNumber(num) {
+      if (typeof num !== 'number' || !isFinite(num)) return '—';
+      return decimalPlaces === 0 ? Math.round(num).toString() : num.toFixed(decimalPlaces);
+    }
+
+    function getSortedData() {
+      const sortableData = [...data];
+      if (sortConfig.key) {
+        sortableData.sort((a, b) => {
+          let aVal = a[sortConfig.key];
+          let bVal = b[sortConfig.key];
+          
+          if (sortConfig.key === 'Variable') {
+            aVal = a.Variable || a.name;
+            bVal = b.Variable || b.name;
+          }
+          
+          if (typeof aVal === 'number' && typeof bVal === 'number') {
+            return sortConfig.direction === 'ascending' ? aVal - bVal : bVal - aVal;
+          } else {
+            const result = String(aVal).localeCompare(String(bVal), undefined, {numeric: true});
+            return sortConfig.direction === 'ascending' ? result : -result;
+          }
+        });
+      }
+      return sortableData;
+    }
+
+    function requestSort(key) {
+      let direction = 'ascending';
+      if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+        direction = 'descending';
+      }
+      sortConfig = { key, direction };
+      
+      document.querySelectorAll('th i').forEach(icon => {
+        icon.className = 'fa fa-sort';
+      });
+      
+      const th = document.querySelector(`th[data-key="${key}"] i`);
+      if (th) {
+        th.className = direction === 'ascending' ? 'fa fa-sort-up' : 'fa fa-sort-down';
+      }
+      
+      renderTable();
+    }
+
+    function renderTable() {
+      const sortedData = getSortedData();
+      const tbody = document.getElementById('stats-body');
+      tbody.innerHTML = '';
+      
+      sortedData.forEach((row, index) => {
+        const tr = document.createElement('tr');
+        
+        // Improved selection logic - compare the actual row objects or variable names
+        const currentVarName = row.Variable || row.name || '';
+        const selectedVarName = selectedRow ? (selectedRow.Variable || selectedRow.name || '') : '';
+        
+        if (selectedRow && currentVarName === selectedVarName && currentVarName !== '') {
+          tr.className = 'selected';
+        }
+        
+        const tdVariable = document.createElement('td');
+        tdVariable.textContent = currentVarName;
+        tdVariable.style.textAlign = 'left';
+        tr.appendChild(tdVariable);
+        
+        ['N', 'Mean', 'StdDev', 'Min', 'Median', 'Max', 'Skew', 'Kurt'].forEach(field => {
+          const td = document.createElement('td');
+          td.textContent = field === 'N' ? (row[field] || '—') : formatNumber(row[field]);
+          tr.appendChild(td);
+        });
+        
+        tr.addEventListener('click', () => { 
+          // Clear previous selection and set new one
+          selectedRow = row; 
+          VarNameSelected = currentVarName;
+          renderTable(); // Re-render to update selection styling
+          
+          // Show histogram without calling renderTable again
+          document.getElementById('histogram-title').textContent = `${VarNameSelected}`;
+          const panel = document.getElementById('histogram-panel');
+          panel.style.display = 'block';
+          void panel.offsetWidth;
+          panel.classList.add('active');
+          renderHistogram();
+          updateSummaryTable();
+          if (document.getElementById('normality-modal').style.display === 'block') {
+            refreshNormalityFromSelection();
+          }
+        });
+        tbody.appendChild(tr);
+      });
+      
+      // Force table reflow to fix rendering issue (especially in iframe context)
+      // This addresses the bug where table content doesn't show until zoom/resize
+      setTimeout(() => {
+        const table = document.getElementById('stats-table');
+        const tbody = document.getElementById('stats-body');
+        
+        if (table && tbody) {
+          // Multiple reflow techniques to ensure visibility
+          
+          // Technique 1: Force display recalculation
+          table.style.display = 'none';
+          table.offsetHeight; // Trigger reflow
+          table.style.display = '';
+          
+          // Technique 2: Force tbody to recalculate
+          tbody.style.display = 'none';
+          tbody.offsetHeight; // Trigger reflow
+          tbody.style.display = '';
+          
+          // Technique 3: Force all rows to be visible
+          const rows = tbody.querySelectorAll('tr');
+          rows.forEach(row => {
+            row.style.height = '36px';
+            row.style.display = 'table-row';
+          });
+          
+          console.log(`✅ Table reflow forced (${rows.length} rows rendered)`);
+        }
+      }, 100);
+    }
+
+    // Handle row click - select row and show histogram (used for auto-selection)
+    function handleRowClick(rowData) {
+      selectedRow = rowData;
+      VarNameSelected = rowData.Variable || rowData.name || '';
+      renderTable(); // Re-render to show selection
+      
+      document.getElementById('histogram-title').textContent = `${VarNameSelected}`;
+      
+      const panel = document.getElementById('histogram-panel');
+      panel.style.display = 'block';
+      void panel.offsetWidth;
+      panel.classList.add('active');
+      
+      renderHistogram();
+      updateSummaryTable();
+      if (document.getElementById('normality-modal').style.display === 'block') {
+        refreshNormalityFromSelection();
+      }
+    }
+
+    // Update summary table with selected row data
+    function updateSummaryTable() {
+      if (!selectedRow) return;
+      
+      const summaryTable = document.getElementById('summary-table');
+      summaryTable.innerHTML = '';
+      
+      const summaryFields = [
+        { label: 'N', value: selectedRow.N },
+        { label: 'Mean', value: formatNumber(selectedRow.Mean) },
+        { label: 'StdDev', value: formatNumber(selectedRow.StdDev) },
+        { label: 'Min', value: formatNumber(selectedRow.Min) },
+        { label: 'Median', value: formatNumber(selectedRow.Median) },
+        { label: 'Max', value: formatNumber(selectedRow.Max) },
+        { label: 'Skew', value: formatNumber(selectedRow.Skew) },
+        { label: 'Kurt', value: formatNumber(selectedRow.Kurt) }
+      ];
+      
+      summaryFields.forEach(field => {
+        const tr = document.createElement('tr');
+        tr.style.lineHeight = '1.2';
+        
+        const tdLabel = document.createElement('td');
+        tdLabel.textContent = field.label + ':';
+        tdLabel.style.fontWeight = 'bold';
+        tdLabel.style.fontSize = '12px';
+        
+        const tdValue = document.createElement('td');
+        tdValue.textContent = field.value;
+        tdValue.style.fontSize = '12px';
+        
+        tr.appendChild(tdLabel);
+        tr.appendChild(tdValue);
+        summaryTable.appendChild(tr);
+      });
+    }
+
+    // Generate histogram data from vector
+    function generateHistogramData(vector, bins) {
+      if (!vector || vector.length === 0) return [];
+      
+      const min = Math.min(...vector);
+      const max = Math.max(...vector);
+      const range = max - min;
+      const binWidth = range / bins;
+      
+      const histData = Array.from({ length: bins }, (_, i) => {
+        const start = min + i * binWidth;
+        const end = min + (i + 1) * binWidth;
+        return {
+          bin: `${start.toFixed(1)}-${end.toFixed(1)}`,
+          start: start,
+          end: end,
+          count: 0,
+          frequency: 0
+        };
+      });
+      
+      vector.forEach(value => {
+        const binIndex = Math.min(bins - 1, Math.floor((value - min) / binWidth));
+        histData[binIndex].count++;
+      });
+      
+      histData.forEach(bin => {
+        bin.frequency = bin.count / vector.length;
+      });
+      
+      return histData;
+    }
+
+    // Generate normal distribution data
+    function generateNormalCurve(mean, stdDev, min, max, points = 50) {
+      const range = max - min;
+      const step = range / points;
+      const result = [];
+      
+      for (let x = min - range * 0.1; x <= max + range * 0.1; x += step) {
+        const exponent = -Math.pow(x - mean, 2) / (2 * Math.pow(stdDev, 2));
+        const y = (1 / (stdDev * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
+        result.push({ x, y });
+      }
+      
+      return result;
+    }
+
+    // Render histogram using D3.js
+    function renderHistogram() {
+      if (!selectedRow || !selectedRow.vector) return;
+      
+      const container = document.getElementById('histogram-container');
+      const width = container.clientWidth;
+      const height = container.clientHeight * 0.8;
+      
+      d3.select('#histogram-container').selectAll('*').remove();
+      
+      const svg = d3.select('#histogram-container')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height);
+      
+      const margin = { top: 15, right: 25, bottom: 40, left: 40 };
+      const innerWidth = width - margin.left - margin.right;
+      const innerHeight = height - margin.top - margin.bottom;
+      
+      const g = svg.append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+      
+      const histData = generateHistogramData(selectedRow.vector, numBins);
+      
+      const x = d3.scaleBand()
+        .domain(histData.map(d => d.bin))
+        .range([0, innerWidth])
+        .padding(0.1);
+      
+      const maxCount = d3.max(histData, d => d.count);
+      const y = d3.scaleLinear()
+        .domain([0, maxCount + (maxCount * 0.1)])
+        .range([innerHeight, 0]);
+      
+      const xAxis = g.append('g')
+        .attr('class', 'axis')
+        .attr('transform', `translate(0,${innerHeight})`)
+        .call(d3.axisBottom(x).tickValues(x.domain().filter((d, i) => i % 2 === 0)))
+        .selectAll('text')
+        .style('text-anchor', 'end')
+        .attr('dx', '-.8em')
+        .attr('dy', '.15em')
+        .attr('font-size', '8px')
+        .attr('transform', 'rotate(-45)');
+      
+      const yAxis = g.append('g')
+        .attr('class', 'axis')
+        .call(d3.axisLeft(y).ticks(5));
+      
+      g.append('g')
+        .attr('class', 'grid')
+        .attr('transform', `translate(0,${innerHeight})`)
+        .call(d3.axisBottom(x).tickSize(-innerHeight).tickFormat(''));
+      
+      g.append('g')
+        .attr('class', 'grid')
+        .call(d3.axisLeft(y).ticks(5).tickSize(-innerWidth).tickFormat(''));
+      
+      g.selectAll('.histogram-bar')
+        .data(histData)
+        .enter().append('rect')
+        .attr('class', 'histogram-bar')
+        .attr('x', d => x(d.bin))
+        .attr('width', x.bandwidth())
+        .attr('y', d => y(d.count))
+        .attr('height', d => innerHeight - y(d.count));
+      
+      if (showNormal) {
+        const normalData = generateNormalCurve(selectedRow.Mean, selectedRow.StdDev, 
+          d3.min(selectedRow.vector), d3.max(selectedRow.vector));
+        
+        const maxNormalY = d3.max(normalData, d => d.y);
+        const normalScale = maxCount / maxNormalY * 0.8;
+        
+        const xScale = d3.scaleLinear()
+          .domain([d3.min(selectedRow.vector), d3.max(selectedRow.vector)])
+          .range([0, innerWidth]);
+        
+        const line = d3.line()
+          .x(d => xScale(d.x))
+          .y(d => y(d.y * normalScale))
+          .curve(d3.curveCardinal);
+        
+        g.append('path')
+          .datum(normalData)
+          .attr('class', 'normal-curve')
+          .attr('d', line);
+      }
+    }
+
+    // Modal functions
+    function openNormalityModal() {
+      if (!selectedRow) {
+        alert('Please select a variable first');
+        return;
+      }
+      
+      // Show modal first
+      document.getElementById('modal-variable-name').textContent = VarNameSelected;
+      const modalSample = document.getElementById('modal-sample-size');
+      if (modalSample) {
+        modalSample.textContent = `(n=${selectedRow.N || selectedRow.vector?.length || 0})`;
+      }
+      document.getElementById('normality-modal').style.display = 'block';
+      document.body.style.overflow = 'hidden';
+      
+      // Initialize gauge
+      setTimeout(() => {
+        initializeGaugeChart();
+      }, 100);
+      
+      refreshNormalityFromSelection();
+    }
+
+    function refreshNormalityFromSelection() {
+      if (!selectedRow) return;
+
+      const modalSample = document.getElementById('modal-sample-size');
+      if (modalSample) {
+        modalSample.textContent = `(n=${selectedRow.N || selectedRow.vector?.length || 0})`;
+      }
+      document.getElementById('modal-variable-name').textContent = VarNameSelected || (selectedRow.Variable || selectedRow.name || '');
+
+      if (selectedRow && Array.isArray(selectedRow.vector) && typeof shapiroWilkTest === 'function') {
+        const rawData = selectedRow.vector
+          .map(v => typeof v === 'number' ? v : parseFloat(v))
+          .filter(v => isFinite(v));
+        if (rawData.length < 3 || rawData.every(v => v === rawData[0])) {
+          resetNormalityCards();
+          updateGauge(0);
+          return;
+        }
+        const tests = buildNormalityResults(rawData);
+        updateNormalityTestCards(tests, 0.05);
+        calculateNormalityScore(tests);
+      } else {
+        console.warn('⚠️ Normality engine not available - loading sample data');
+        setTimeout(() => {
+          loadSampleNormalityData();
+        }, 100);
+      }
+    }
+
+    function resetNormalityCards() {
+      document.querySelectorAll('.test-card').forEach(card => {
+        const detailRows = card.querySelectorAll('.detail-value');
+        detailRows.forEach(detail => detail.textContent = '—');
+        const badge = card.querySelector('.test-result');
+        if (badge) {
+          badge.textContent = '—';
+          badge.classList.remove('pass', 'fail');
+        }
+      });
+    }
+
+    function buildNormalityResults(rawData) {
+      const sw = shapiroWilkTest(rawData);
+      const jb = jarqueBeraTest(rawData);
+      const ks = kolmogorovSmirnovTest(rawData);
+      const ad = andersonDarlingTest(rawData);
+
+      return [
+        { name: 'Shapiro-Wilk', stat: sw.statistic, pval: sw.pValue, crit: null },
+        { name: 'Anderson-Darling', stat: ad.statistic, pval: ad.pValue, crit: null },
+        { name: 'Kolmogorov-Smirnov', stat: ks.statistic, pval: ks.pValue, crit: null },
+        { name: 'Jarque-Bera', stat: jb.statistic, pval: jb.pValue, crit: null },
+        { name: "D'Agostino-Pearson", stat: null, pval: null, crit: null },
+        { name: 'Cramer-von Mises', stat: null, pval: null, crit: null }
+      ];
+    }
+
+    function closeNormalityModal() {
+      document.getElementById('normality-modal').style.display = 'none';
+      document.body.style.overflow = 'auto';
+    }
+
+    // Initialize gauge chart
+    function initializeGaugeChart() {
+      if (typeof Highcharts === 'undefined') return;
+      
+      window.gaugeChart = Highcharts.chart('gauge-chart', {
+        chart: {
+          type: 'solidgauge',
+          backgroundColor: 'transparent',
+          height: 120
+        },
+        title: null,
+        pane: {
+          center: ['50%', '85%'],
+          size: '140%',
+          startAngle: -90,
+          endAngle: 90,
+          background: {
+            backgroundColor: '#EEE',
+            innerRadius: '60%',
+            outerRadius: '100%',
+            shape: 'arc'
+          }
+        },
+        exporting: { enabled: false },
+        tooltip: { enabled: false },
+        yAxis: {
+          stops: [
+            [0.1, '#DF5353'],
+            [0.5, '#DDDF0D'],
+            [0.9, '#55BF3B']
+          ],
+          lineWidth: 0,
+          tickWidth: 0,
+          minorTickInterval: null,
+          tickAmount: 2,
+          min: 0,
+          max: 100,
+          labels: { y: 16 }
+        },
+        plotOptions: {
+          solidgauge: {
+            dataLabels: {
+              y: 5,
+              borderWidth: 0,
+              useHTML: true
+            }
+          }
+        },
+        series: [{
+          name: 'Normality',
+          data: [75],
+          dataLabels: {
+            format: '<div style="text-align:center"><span style="font-size:25px;color:white">{y}</span><br/><span style="font-size:12px;color:silver">Score</span></div>'
+          }
+        }]
+      });
+    }
+
+    // Load sample normality test data (ONLY used when VB6 is not available - for testing)
+    function loadSampleNormalityData() {
+      console.log('⚠️ Loading sample normality data (VB6 not available)');
+      
+      const tests = [
+        { name: 'Shapiro-Wilk', stat: 0.986, pval: 0.234, crit: 0.05 },
+        { name: 'Anderson-Darling', stat: 0.412, pval: 0.335, crit: 0.751 },
+        { name: 'Kolmogorov-Smirnov', stat: 0.052, pval: 0.173, crit: 0.124 },
+        { name: 'Cramer-von Mises', stat: 0.072, pval: 0.261, crit: 0.126 },
+        { name: "D'Agostino-Pearson", stat: 7.842, pval: 0.0198, crit: 0.05 },
+        { name: 'Jarque-Bera', stat: 8.126, pval: 0.0172, crit: 0.05 }
+      ];
+
+      // Use the same update functions as VB6 would
+      updateNormalityTestCards(tests, 0.05);
+      calculateNormalityScore(tests);
+      
+      console.log('✅ Sample normality data loaded');
+    }
+
+    function updateGauge(score) {
+      if (window.gaugeChart && window.gaugeChart.series && window.gaugeChart.series[0]) {
+        window.gaugeChart.series[0].points[0].update(score);
+      }
+    }
+
+    // VB6 callback function for normality test results (OLD SIGNATURE - kept for compatibility)
+    // VB6 will call this function with the actual normality test results
+    window.updateNormalityTestResults = function(resultsJSON, alpha, sampleSize, stdev, columnName) {
+      try {
+        console.log('📊 Received normality test results from VB6 for:', columnName);
+        
+        const results = typeof resultsJSON === 'string' ? JSON.parse(resultsJSON) : resultsJSON;
+        alpha = parseFloat(alpha) || 0.05;
+        sampleSize = sampleSize ? parseInt(sampleSize) : null;
+        
+        // Check if stdev is 0 - can't perform normality tests on constant data
+        const stdevValue = (stdev !== undefined && stdev !== null && stdev !== '') ? parseFloat(stdev) : null;
+        
+        if (stdevValue !== null && stdevValue === 0) {
+          console.warn('⚠️ Standard deviation is 0 - cannot perform normality tests');
+          alert('⚠️ Warning: Standard Deviation is 0\n\nNormality tests cannot be performed on data with zero variance. All values in this variable are identical.');
+          
+          // Set all test card values to NA
+          document.querySelectorAll('.test-card').forEach(card => {
+            card.querySelectorAll('.detail-value').forEach(d => d.textContent = 'NA');
+            const badge = card.querySelector('.test-result');
+            if (badge) {
+              badge.textContent = 'NA';
+              badge.classList.remove('pass', 'fail');
+              badge.style.backgroundColor = 'rgba(255, 165, 120, 0.2)';
+              badge.style.color = '#ffa578';
+            }
+          });
+          
+          // Reset gauge to 0
+          if (window.gaugeChart && window.gaugeChart.series && window.gaugeChart.series[0]) {
+            window.gaugeChart.series[0].points[0].update(0);
+          }
+          
+          return;
+        }
+        
+        // Update the modal with actual results
+        updateNormalityTestCards(results, alpha);
+        calculateNormalityScore(results);
+        
+        console.log('✅ Normality test results updated in modal');
+      } catch (e) {
+        console.error('❌ Error updating normality test results:', e);
+        alert('Error processing normality test data: ' + e.message);
+      }
+    };
+
+    // Helper function to normalize test names for matching
+    function normalizeTestName(name) {
+      return (name || "")
+        .normalize("NFKD")
+        .replace(/[^a-zA-Z0-9]/g, "")
+        .toLowerCase();
+    }
+
+    // Update test cards with actual results from VB6
+    function updateNormalityTestCards(results, alpha = 0.05) {
+      console.log('🧪 Updating test cards with', results.length, 'results');
+      
+      let passCount = 0;
+      let failCount = 0;
+      
+      results.forEach(testResult => {
+        const normalizedName = normalizeTestName(testResult.name);
+        const card = document.querySelector(`[data-test="${normalizedName}"]`);
+        
+        if (card) {
+          const detailRows = card.querySelectorAll('.detail-value');
+          if (detailRows.length >= 3) {
+            detailRows[0].textContent = testResult.stat !== null ? testResult.stat.toFixed(4) : '—';
+            detailRows[1].textContent = testResult.pval !== null ? testResult.pval.toFixed(4) : '—';
+            detailRows[2].textContent = testResult.crit !== null ? testResult.crit.toFixed(4) : '—';
+          }
+          
+          const badge = card.querySelector('.test-result');
+          if (badge) {
+            badge.style.backgroundColor = '';
+            badge.style.color = '';
+            if (testResult.pval !== null && testResult.pval >= alpha) {
+              badge.textContent = 'PASS';
+              badge.classList.remove('fail');
+              badge.classList.add('pass');
+              passCount++;
+            } else if (testResult.pval !== null) {
+              badge.textContent = 'FAIL';
+              badge.classList.remove('pass');
+              badge.classList.add('fail');
+              failCount++;
+            }
+          }
+        }
+      });
+      
+      console.log('✅ Test cards updated:', passCount, 'passed,', failCount, 'failed');
+    }
+
+    // Calculate overall normality score based on test results
+    function calculateNormalityScore(results) {
+      const weights = {
+        "Shapiro-Wilk": 1.0,
+        "Anderson-Darling": 0.9,
+        "Kolmogorov-Smirnov": 0.8,
+        "Cramer-von Mises": 0.7,
+        "D'Agostino-Pearson": 1.0,
+        "Jarque-Bera": 0.9
+      };
+      
+      let totalWeight = 0;
+      let weightedScore = 0;
+      
+      results.forEach(test => {
+        const p = test.pval;
+        const w = weights[test.name] || 1.0;
+        let score = 0;
+        
+        if (p === null || isNaN(p)) return;
+        
+        if (p < 0.001) {
+          score = 0;
+        } else if (p < 0.05) {
+          const logScale = Math.log10(p) - Math.log10(0.001);
+          const maxLogScale = Math.log10(0.05) - Math.log10(0.001);
+          score = 10 + (30 * logScale / maxLogScale);
+        } else if (p < 0.5) {
+          const logScale = Math.log10(p) - Math.log10(0.05);
+          const maxLogScale = Math.log10(0.5) - Math.log10(0.05);
+          score = 40 + (40 * logScale / maxLogScale);
+        } else {
+          score = 80 + (20 * (p - 0.5) / 0.5);
+        }
+        
+        weightedScore += score * w;
+        totalWeight += w;
+      });
+      
+      const finalScore = Math.round(totalWeight > 0 ? weightedScore / totalWeight : 50);
+      updateGauge(finalScore);
+      
+      console.log('📊 Normality score calculated:', finalScore);
+    }
+    
+    // Make helper functions available globally for the callback
+    window.updateNormalityTestCards = updateNormalityTestCards;
+    window.calculateNormalityScore = calculateNormalityScore;
+    window.initializeGaugeChart = initializeGaugeChart;
+    
+    console.log('✅ Helper functions registered on window object');
+    
+    // Process any pending results that arrived before page was ready
+    if (window._pendingNormalityResults) {
+      console.log('🔄 Processing pending normality results...');
+      const pending = window._pendingNormalityResults;
+      window._pendingNormalityResults = null;
+      setTimeout(() => {
+        window.updateNormalityDashboard(pending.results, pending.variableName, pending.sampleSize);
+      }, 200);
+    }
+
+    function injectDataFromVB6(jsonString) {
+      try {
+        data = JSON.parse(jsonString);
+        selectedRow = null;
+        renderTable();
+        
+        // Auto-select first row if data exists
+        if (data.length > 0) {
+          handleRowClick(data[0]);
+        }
+      } catch (e) {
+        console.error("Invalid JSON from VB6:", e.message);
+      }
+    }
+
+    window.renderDescriptives = function(payload) {
+      if (typeof payload === 'string') {
+        injectDataFromVB6(payload);
+      } else {
+        data = Array.isArray(payload) ? payload : [];
+        selectedRow = null;
+        renderTable();
+        
+        // Auto-select first row if data exists
+        if (data.length > 0) {
+          handleRowClick(data[0]);
+        }
+      }
+    };
+
+    // Send message to VB6
+    // Case400: Request normality tests for a specific variable
+    //   - VB6 will calculate normality tests and call back with updateNormalityTestResults()
+    function sendMessageToVB6(action, data = null) {
+      console.log('📤 Sending message to VB6:', action, data ? '(with data)' : '(no data)');
+      
+      try {
+        // Method 1: Try vbH() - expects TWO parameters: (action, data)
+        if (typeof vbH === 'function') {
+          vbH().RaiseMessageEvent(action, data || '');
+          console.log('✅ Message sent via vbH()');
+          return;
+        }
+      } catch (err) {
+        console.warn('⚠️ vbH() failed:', err.message);
+      }
+      
+      try {
+        // Method 2: Try window.external - expects ONE parameter: "action|data"
+        if (window.external && window.external.OrdoWebView1_JSMessage) {
+          const message = data ? `${action}|${data}` : action;
+          window.external.OrdoWebView1_JSMessage(message);
+          console.log('✅ Message sent via window.external');
+          return;
+        }
+      } catch (err) {
+        console.warn('⚠️ window.external failed:', err.message);
+      }
+      
+      console.error('❌ No VB6 communication method available!');
+      console.error('   Neither vbH() nor window.external worked.');
+      console.error('   Check VB6 initialization.');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('🚀 Descriptive Statistics Dashboard loaded');
+      console.log('📡 VB6 Communication ready - awaiting normality test requests (Case400)');
+      console.log('📝 VB6 should call updateNormalityTestResults() with test results');
+      
+      // Add event listeners to table headers for sorting
+      document.querySelectorAll('th[data-key]').forEach(th => {
+        th.addEventListener('click', () => {
+          requestSort(th.getAttribute('data-key'));
+        });
+      });
+
+      const decimalSlider = document.getElementById('decimal-places');
+      const decimalValue = document.getElementById('decimal-value');
+      
+      if (decimalSlider && decimalValue) {
+        decimalSlider.addEventListener('input', function() {
+          decimalPlaces = parseInt(this.value);
+          decimalValue.textContent = decimalPlaces;
+          renderTable();
+        });
+      }
+
+      // Add event listener for bins slider
+      const numBinsSlider = document.getElementById('num-bins');
+      const binsValue = document.getElementById('bins-value');
+      
+      if (numBinsSlider && binsValue) {
+        numBinsSlider.addEventListener('input', function() {
+          numBins = parseInt(this.value);
+          binsValue.textContent = numBins;
+          renderHistogram();
+        });
+      }
+      
+      // Add event listener for normal distribution checkbox
+      const showNormalCheckbox = document.getElementById('show-normal');
+      if (showNormalCheckbox) {
+        showNormalCheckbox.addEventListener('change', function() {
+          showNormal = this.checked;
+          console.log('Show Normal changed to:', showNormal);
+          if (selectedRow) {
+            renderHistogram();
+          }
+        });
+      }
+
+      // Close modal when clicking outside
+      document.addEventListener('click', function(event) {
+        const modal = document.getElementById('normality-modal');
+        if (event.target === modal) {
+          closeNormalityModal();
+        }
+      });
+
+      // Close modal with Escape key
+      document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+          closeNormalityModal();
+        }
+      });
+
+      // Add window resize event listener
+      window.addEventListener('resize', () => {
+        if (selectedRow) {
+          renderHistogram();
+        }
+      });
+
+      if (!window.__INJECTED_FROM_VB6__) {
+        // Generate sample vectors for histogram demonstration
+        const generateSampleVector = (mean, stdDev, n) => {
+          const vector = [];
+          for (let i = 0; i < n; i++) {
+            // Box-Muller transform for normal distribution
+            const u1 = Math.random();
+            const u2 = Math.random();
+            const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+            vector.push(mean + z0 * stdDev);
+          }
+          return vector;
+        };
+
+        renderDescriptives([
+          {
+            "Variable":"y","N":22,"Mean":0.64,"StdDev":0.49,"Min":0.00,"Median":1.00,"Max":1.00,"Skew":0.12,"Kurt":-0.85,
+            "vector": generateSampleVector(0.64, 0.49, 22)
+          },
+          {
+            "Variable":"x1","N":22,"Mean":2895.18,"StdDev":411.98,"Min":1850.00,"Median":2900.00,"Max":3900.00,"Skew":0.25,"Kurt":-0.42,
+            "vector": generateSampleVector(2895.18, 411.98, 22)
+          },
+          {
+            "Variable":"x2","N":10,"Mean":181.00,"StdDev":10.79,"Min":169.00,"Median":180.00,"Max":201.00,"Skew":0.15,"Kurt":-0.33,
+            "vector": generateSampleVector(181.00, 10.79, 10)
+          },
+          {
+            "Variable":"x3","N":22,"Mean":3.95,"StdDev":0.21,"Min":3.00,"Median":4.00,"Max":4.00,"Skew":-1.25,"Kurt":2.15,
+            "vector": generateSampleVector(3.95, 0.21, 22)
+          }
+        ]);
+      }
+    });
+
+    // Navigation is now handled by navigation-manager.js
+    // No need for local navigateToAnalysis function
+
+    // Dropdown functions (legacy, guarded)
+    function toggleDropdown() {
+      const menu = document.getElementById("dropdown-content");
+      if (menu) {
+        menu.classList.toggle("show");
+      }
+    }
+
+    // Close dropdown when clicking outside (legacy, guarded)
+    window.addEventListener('click', function(event) {
+      if (!event.target.matches('.dropbtn')) {
+        const menu = document.getElementById("dropdown-content");
+        if (menu) {
+          menu.classList.remove("show");
+        }
+      }
+    });
+
+    // Auto-load data from localStorage on page load
+    window.addEventListener('DOMContentLoaded', function() {
+      const params = new URLSearchParams(window.location.search);
+      const moduleOverride = params.get('module');
+      
+      // Only initialize header if NOT in iframe mode (standalone mode)
+      const isInIframe = window.self !== window.top;
+      if (!isInIframe && typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.init('descriptive-stats', 'Descriptive Statistics', 0, 'correlations');
+      } else if (isInIframe) {
+        console.log('📦 Running in iframe mode - header hidden');
+      }
+
+      console.log('🔄 Descriptive Statistics page loaded');
+      loadFromLocalStorage();
+      
+      // Check if we're in regression context (variables from regression model)
+      const regressionVariables = sessionStorage.getItem('regressionModelVariables');
+      const fromRegression = sessionStorage.getItem('loadFromRegression') === 'true';
+      
+      // Try to load from sessionStorage first
+      const storedData = sessionStorage.getItem('analysisData');
+      if (storedData) {
+        try {
+          const parsedData = JSON.parse(storedData);
+          const { data, headers, columnMapping, namedRange } = parsedData;
+          console.log('✅ Found data in sessionStorage');
+          console.log(`📊 Data: ${data.length} rows, ${headers.length} columns`);
+          
+          // Store in global variables for navigation
+          window.rawData = data;
+          window.variableNames = headers;
+          window.columnMapping = columnMapping || {}; // Excel column numbers for each variable
+          window.currentNamedRange = namedRange || ''; // Named range name like "LongLoan"
+          
+          if (columnMapping) {
+            console.log('📍 Column mapping received:', columnMapping);
+          }
+          if (namedRange) {
+            console.log('📗 Named range:', namedRange);
+          }
+          
+          // Function to get selected variables from InputsXL (SOURCE OF TRUTH)
+          const getSelectedFromInputsXL = () => {
+            try {
+              // Try getSelectedVariables() function first (most reliable)
+              if (window.parent && window.parent !== window && window.parent.getSelectedVariables) {
+                const parentSelected = window.parent.getSelectedVariables();
+                if (Array.isArray(parentSelected) && parentSelected.length > 0) {
+                  console.log('✅ Got selection from InputsXL.getSelectedVariables():', parentSelected);
+                  return parentSelected;
+                }
+              }
+              
+              // Try selectedVariables property
+              if (window.parent && window.parent !== window && window.parent.selectedVariables) {
+                const parentSelected = window.parent.selectedVariables;
+                if (Array.isArray(parentSelected) && parentSelected.length > 0) {
+                  console.log('✅ Got selection from InputsXL.selectedVariables:', parentSelected);
+                  return parentSelected;
+                }
+              }
+              
+              // Try top window as fallback
+              if (window.top && window.top !== window && window.top.selectedVariables) {
+                const topSelected = window.top.selectedVariables;
+                if (Array.isArray(topSelected) && topSelected.length > 0) {
+                  console.log('✅ Got selection from top.selectedVariables:', topSelected);
+                  return topSelected;
+                }
+              }
+            } catch (e) {
+              console.log('ℹ️ Could not access InputsXL panel:', e.message);
+            }
+            return null;
+          };
+          
+          // PRIORITY 1: Use regression variables if loaded from regression context
+          let variablesToShow = null;
+          
+          if (fromRegression && regressionVariables) {
+            try {
+              variablesToShow = JSON.parse(regressionVariables);
+              console.log('🎯 REGRESSION CONTEXT: Using variables from regression model:', variablesToShow);
+              // Clear the flag so it doesn't persist
+              sessionStorage.removeItem('loadFromRegression');
+            } catch (e) {
+              console.error('❌ Error parsing regression variables:', e);
+            }
+          }
+          
+          // PRIORITY 2: Try to get selected variables from InputsXL
+          if (!variablesToShow) {
+            variablesToShow = getSelectedFromInputsXL();
+          }
+          
+          if (variablesToShow && variablesToShow.length > 0) {
+            console.log('✅ Using selected variables:', variablesToShow);
+          } else {
+            console.log('ℹ️ No selection from InputsXL yet, will wait for auto-update');
+            variablesToShow = headers; // Use all for now
+          }
+          
+          console.log('📊 Showing statistics for', variablesToShow.length, 'variables:', variablesToShow);
+          
+          // Calculate descriptive statistics for selected variables only
+          const descriptiveStats = variablesToShow.map((varName, index) => {
+            const values = data
+              .map(row => row[varName])
+              .map(v => typeof v === 'number' ? v : parseFloat(v))
+              .filter(v => isFinite(v));
+            
+            if (values.length === 0) {
+              return null;
+            }
+            
+            // Sort for median calculation
+            const sorted = values.slice().sort((a, b) => a - b);
+            const n = values.length;
+            const mean = values.reduce((sum, v) => sum + v, 0) / n;
+            const median = n % 2 === 0 
+              ? (sorted[n/2 - 1] + sorted[n/2]) / 2 
+              : sorted[Math.floor(n/2)];
+            
+            // Calculate standard deviation
+            const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / n;
+            const stdDev = Math.sqrt(variance);
+            
+            // Calculate skewness
+            const skew = values.reduce((sum, v) => sum + Math.pow((v - mean) / stdDev, 3), 0) / n;
+            
+            // Calculate kurtosis
+            const kurt = values.reduce((sum, v) => sum + Math.pow((v - mean) / stdDev, 4), 0) / n - 3;
+            
+            // Calculate range address for VB6
+            // Use columnMapping if available (actual Excel column), otherwise calculate from array position
+            const columnIndex = window.columnMapping && window.columnMapping[varName] 
+              ? window.columnMapping[varName]  // Actual Excel column from VB6
+              : headers.indexOf(varName) + 1;   // Fallback: array position
+            const colLetter = columnNumberToLetter(columnIndex);
+            const rangeAddress = `${colLetter}2:${colLetter}${data.length + 1}`; // Assumes header in row 1, data starts row 2
+            
+            console.log(`📍 Variable "${varName}": Excel column ${colLetter} (${columnIndex}), Range: ${rangeAddress}`);
+            
+            return {
+              Variable: varName,
+              N: n,
+              Mean: mean,
+              StdDev: stdDev,
+              Min: Math.min(...values),
+              Median: median,
+              Max: Math.max(...values),
+              Skew: skew,
+              Kurt: kurt,
+              rangeAddress: rangeAddress,    // e.g., "B2:B101"
+              columnIndex: columnIndex,      // e.g., 2 for column B
+              vector: values
+            };
+          }).filter(stat => stat !== null);
+          
+          console.log('📈 Calculated descriptive statistics:', descriptiveStats);
+          
+          // Render the statistics
+          if (typeof renderDescriptives === 'function') {
+            renderDescriptives(descriptiveStats);
+            console.log('✅ Descriptive statistics rendered');
+          } else {
+            console.warn('⚠️ renderDescriptives function not found');
+          }
+        } catch (error) {
+          console.error('❌ Error loading from sessionStorage:', error);
+        }
+      } else {
+        console.log('ℹ️ No data in sessionStorage, waiting for VB6 or manual data');
+      }
+      
+      // Listen for selection changes from InputsXL panel via postMessage
+      window.addEventListener('message', function(event) {
+        if (event.data && event.data.type === 'inputsXL_selectionChanged') {
+          const selectedVariables = event.data.selectedVariables;
+          console.log('📡 Selection: ' + selectedVariables.length + ' vars');
+          
+          // Update descriptive stats with new selection
+          if (selectedVariables && selectedVariables.length > 0 && window.rawData) {
+            window.updateDescriptiveStats(selectedVariables);
+          }
+        }
+      });
+      
+      // FALLBACK: Listen for localStorage changes (for cross-iframe communication)
+      let lastSelectionTimestamp = null;
+      
+      window.addEventListener('storage', function(event) {
+        if (event.key === 'inputsXL_selectionChangeFlag') {
+          console.log('💾 Detected localStorage change from InputsXL');
+          checkForSelectionUpdate();
+        }
+      });
+      
+      // Poll for selection changes every 500ms
+      setInterval(function() {
+        checkForSelectionUpdate();
+      }, 500);
+      
+      function checkForSelectionUpdate() {
+        try {
+          const timestamp = localStorage.getItem('inputsXL_selectionTimestamp');
+          if (timestamp && timestamp !== lastSelectionTimestamp) {
+            const selectedVariables = JSON.parse(localStorage.getItem('inputsXL_selectedVariables') || '[]');
+            console.log('💾 Update: ' + selectedVariables.length + ' vars');
+            lastSelectionTimestamp = timestamp;
+            
+            // Update descriptive stats
+            if (selectedVariables && selectedVariables.length > 0 && window.rawData) {
+              window.updateDescriptiveStats(selectedVariables);
+            }
+          }
+        } catch (e) {
+          // Silently ignore localStorage errors
+        }
+      }
+      
+      // Initial check
+      setTimeout(checkForSelectionUpdate, 100);
+    });
+    
+    // Function to load descriptive stats for regression model variables
+    // Called when navigating from regression analysis
+    window.loadDescriptiveStatsForRegression = function(regressionVars) {
+      console.log('🎯 loadDescriptiveStatsForRegression called with:', regressionVars);
+      
+      // Store regression variables in sessionStorage
+      if (Array.isArray(regressionVars)) {
+        sessionStorage.setItem('regressionModelVariables', JSON.stringify(regressionVars));
+        sessionStorage.setItem('loadFromRegression', 'true');
+        console.log('✅ Regression variables saved to sessionStorage:', regressionVars);
+      } else if (typeof regressionVars === 'string') {
+        try {
+          const vars = JSON.parse(regressionVars);
+          sessionStorage.setItem('regressionModelVariables', JSON.stringify(vars));
+          sessionStorage.setItem('loadFromRegression', 'true');
+          console.log('✅ Regression variables saved to sessionStorage:', vars);
+        } catch (e) {
+          console.error('❌ Error parsing regression variables:', e);
+        }
+      }
+    };
+    
+    // VB6 can call this function to set regression variables before navigating
+    window.setRegressionVariables = function(variablesJSON) {
+      console.log('📥 VB6 setRegressionVariables called');
+      window.loadDescriptiveStatsForRegression(variablesJSON);
+    };
+    
+    // Function to update descriptive statistics with selected variables
+    // Called from InputsXL panel when variable selection changes
+    window.updateDescriptiveStats = function(selectedVariables) {
+      console.log('🔄 updateDescriptiveStats called with:', selectedVariables);
+      
+      if (!window.rawData || !Array.isArray(selectedVariables) || selectedVariables.length === 0) {
+        console.warn('⚠️ No data or no variables selected');
+        return;
+      }
+      
+      console.log('📊 Recalculating descriptive statistics for', selectedVariables.length, 'variables');
+      
+      // Calculate descriptive statistics for selected variables only
+      const descriptiveStats = selectedVariables.map(varName => {
+        const values = window.rawData
+          .map(row => row[varName])
+          .map(v => typeof v === 'number' ? v : parseFloat(v))
+          .filter(v => isFinite(v));
+        
+        if (values.length === 0) {
+          return null;
+        }
+        
+        // Sort for median calculation
+        const sorted = values.slice().sort((a, b) => a - b);
+        const n = values.length;
+        const mean = values.reduce((sum, v) => sum + v, 0) / n;
+        const median = n % 2 === 0 
+          ? (sorted[n/2 - 1] + sorted[n/2]) / 2 
+          : sorted[Math.floor(n/2)];
+        
+        // Calculate standard deviation
+        const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / n;
+        const stdDev = Math.sqrt(variance);
+        
+        // Calculate skewness
+        const skew = values.reduce((sum, v) => sum + Math.pow((v - mean) / stdDev, 3), 0) / n;
+        
+        // Calculate kurtosis
+        const kurt = values.reduce((sum, v) => sum + Math.pow((v - mean) / stdDev, 4), 0) / n - 3;
+        
+        // Calculate range address for VB6
+        // Use columnMapping if available (actual Excel column), otherwise calculate from array position
+        const columnIndex = window.columnMapping && window.columnMapping[varName]
+          ? window.columnMapping[varName]  // Actual Excel column from VB6
+          : window.variableNames.indexOf(varName) + 1;  // Fallback: array position
+        const colLetter = columnNumberToLetter(columnIndex);
+        const rangeAddress = `${colLetter}2:${colLetter}${window.rawData.length + 1}`;
+        
+        console.log(`📍 Variable "${varName}": Excel column ${colLetter} (${columnIndex}), Range: ${rangeAddress}`);
+        
+        return {
+          Variable: varName,
+          N: n,
+          Mean: mean,
+          StdDev: stdDev,
+          Min: Math.min(...values),
+          Median: median,
+          Max: Math.max(...values),
+          Skew: skew,
+          Kurt: kurt,
+          rangeAddress: rangeAddress,    // e.g., "B2:B101"
+          columnIndex: columnIndex,      // e.g., 2 for column B
+          vector: values
+        };
+      }).filter(stat => stat !== null);
+      
+      console.log('📈 Recalculated descriptive statistics:', descriptiveStats);
+      
+      // Render the statistics
+      if (typeof renderDescriptives === 'function') {
+        renderDescriptives(descriptiveStats);
+        console.log('✅ Descriptive statistics updated with selected variables');
+      } else {
+        console.warn('⚠️ renderDescriptives function not found');
+      }
+    };
+  </script>
+</body>
+</html>
+
+
+
+

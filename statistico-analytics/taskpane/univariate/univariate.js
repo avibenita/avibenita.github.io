@@ -23,17 +23,43 @@ let currentTransform = 'none';
  */
 function getDialogsBaseUrl() {
     const href = window.location.href;
+    const origin = window.location.origin;
+    const pathname = window.location.pathname;
+    
+    console.log('🔍 getDialogsBaseUrl called');
+    console.log('📍 Full href:', href);
+    console.log('📍 Origin:', origin);
+    console.log('📍 Pathname:', pathname);
     
     if (href.includes('/taskpane/')) {
         // Split on /taskpane/ to get the base path (preserves all path segments)
         const basePath = href.split('/taskpane/')[0];
         const baseUrl = `${basePath}/dialogs/views/`;
-        console.log('🔗 Dialog base URL:', baseUrl);
+        console.log('🔗 Dialog base URL (from taskpane):', baseUrl);
         return baseUrl;
     }
     
-    // Fallback: construct from origin
-    const baseUrl = `${window.location.origin}/dialogs/views/`;
+    // Check if we're on statistico.live and need to add statistico-analytics
+    if (origin.includes('statistico.live')) {
+        // If pathname doesn't include statistico-analytics, add it
+        if (!pathname.includes('statistico-analytics')) {
+            const baseUrl = `${origin}/statistico-analytics/dialogs/views/`;
+            console.log('🔗 Dialog base URL (statistico.live with statistico-analytics):', baseUrl);
+            return baseUrl;
+        }
+    }
+    
+    // Fallback: construct from origin and pathname
+    // Try to extract base path from pathname
+    if (pathname.includes('/taskpane/')) {
+        const basePath = pathname.split('/taskpane/')[0];
+        const baseUrl = `${origin}${basePath}/dialogs/views/`;
+        console.log('🔗 Dialog base URL (from pathname):', baseUrl);
+        return baseUrl;
+    }
+    
+    // Last resort fallback
+    const baseUrl = `${origin}/dialogs/views/`;
     console.log('🔗 Dialog base URL (fallback):', baseUrl);
     return baseUrl;
 }

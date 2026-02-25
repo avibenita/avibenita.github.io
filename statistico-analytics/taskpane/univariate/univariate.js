@@ -457,6 +457,22 @@ function applyTransform(data, transform) {
 /**
  * Calculate descriptive statistics
  */
+function getDialogsBaseUrl() {
+    const { origin, pathname, href } = window.location;
+
+    if (href.includes('127.0.0.1') || href.includes('localhost')) {
+        return 'http://127.0.0.1:8080/dialogs/views/';
+    }
+
+    const taskpaneMarker = '/taskpane/';
+    const taskpaneIndex = pathname.indexOf(taskpaneMarker);
+    if (taskpaneIndex !== -1) {
+        const basePath = pathname.slice(0, taskpaneIndex);
+        return `${origin}${basePath}/dialogs/views/`;
+    }
+
+    return `${origin}/dialogs/views/`;
+}
 function calculateStatistics(data, address, transform) {
     const n = data.length;
     const sorted = [...data].sort((a, b) => a - b);
@@ -720,7 +736,7 @@ function openResultsDialog(results) {
     lockTaskpaneUI();
     
     // Use standalone histogram instead of full results dialog
-    const dialogUrl = `${window.location.origin}/dialogs/views/univariate/histogram-standalone.html`;
+    const dialogUrl = `${getDialogsBaseUrl()}univariate/histogram-standalone.html`;
     
     Office.context.ui.displayDialogAsync(
         dialogUrl,

@@ -26,32 +26,26 @@ function getDialogsBaseUrl() {
     const href = window.location.href;
     const origin = window.location.origin;
     
-    // Check if we're on statistico.live and need to add metrics-institute
+    // Check if we're on statistico.live
     const isStatisticoLive = origin.includes('statistico.live');
     
+    // For statistico.live, always use the full path with metrics-institute
+    if (isStatisticoLive) {
+        const baseUrl = `${origin}/metrics-institute/statistico-analytics/dialogs/views/`;
+        console.log('🔗 Dialog base URL (statistico.live):', baseUrl);
+        return baseUrl;
+    }
+    
+    // For other domains (localhost, GitHub Pages, etc.)
     if (href.includes('/taskpane/')) {
         // Split on /taskpane/ to get the base path
-        let basePath = href.split('/taskpane/')[0];
-        
-        // If on statistico.live and metrics-institute is missing, add it
-        if (isStatisticoLive && !basePath.includes('metrics-institute')) {
-            // Insert metrics-institute after the domain
-            basePath = basePath.replace('https://statistico.live', 'https://statistico.live/metrics-institute');
-            console.log('🔧 Added metrics-institute to base path');
-        }
-        
+        const basePath = href.split('/taskpane/')[0];
         const baseUrl = `${basePath}/dialogs/views/`;
         console.log('🔗 Dialog base URL:', baseUrl);
         return baseUrl;
     }
     
-    // Fallback: construct from origin
-    if (isStatisticoLive && !href.includes('metrics-institute')) {
-        const baseUrl = `${origin}/metrics-institute/statistico-analytics/dialogs/views/`;
-        console.log('🔗 Dialog base URL (with metrics-institute):', baseUrl);
-        return baseUrl;
-    }
-    
+    // Fallback
     const baseUrl = `${origin}/dialogs/views/`;
     console.log('🔗 Dialog base URL (fallback):', baseUrl);
     return baseUrl;

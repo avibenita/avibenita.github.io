@@ -20,43 +20,38 @@ let currentTransform = 'none';
 /**
  * Resolve the base URL for dialog pages regardless of hosting path.
  * Handles GitHub Pages (statistico-analytics subfolder) and localhost.
+ * Matches the pattern used by other modules (correlations, dependent, etc.)
  */
 function getDialogsBaseUrl() {
-    const href = window.location.href;
-    const origin = window.location.origin;
-    const pathname = window.location.pathname;
+    const currentUrl = window.location.href;
     
     console.log('🔍 getDialogsBaseUrl called');
-    console.log('📍 Full href:', href);
-    console.log('📍 Origin:', origin);
-    console.log('📍 Pathname:', pathname);
+    console.log('📍 Current URL:', currentUrl);
     
-    // For statistico.live, always use the correct path structure
-    if (origin.includes('statistico.live')) {
-        const baseUrl = `${origin}/statistico-analytics/dialogs/views/`;
-        console.log('🔗 Dialog base URL (statistico.live):', baseUrl);
+    // Localhost/development
+    if (currentUrl.includes('127.0.0.1') || currentUrl.includes('localhost')) {
+        const baseUrl = 'http://127.0.0.1:8080/dialogs/views/';
+        console.log('🔗 Dialog base URL (localhost):', baseUrl);
         return baseUrl;
     }
     
-    // For other domains, try to extract from taskpane path
-    if (href.includes('/taskpane/')) {
-        // Split on /taskpane/ to get the base path (preserves all path segments)
-        const basePath = href.split('/taskpane/')[0];
+    // Extract base URL dynamically for production
+    if (currentUrl.includes('/taskpane/')) {
+        const basePath = currentUrl.split('/taskpane/')[0];
         const baseUrl = `${basePath}/dialogs/views/`;
         console.log('🔗 Dialog base URL (from taskpane):', baseUrl);
         return baseUrl;
     }
     
-    // Try pathname as fallback
-    if (pathname.includes('/taskpane/')) {
-        const basePath = pathname.split('/taskpane/')[0];
-        const baseUrl = `${origin}${basePath}/dialogs/views/`;
-        console.log('🔗 Dialog base URL (from pathname):', baseUrl);
+    // For statistico.live, ensure statistico-analytics is included
+    if (currentUrl.includes('statistico.live')) {
+        const baseUrl = `${window.location.origin}/statistico-analytics/dialogs/views/`;
+        console.log('🔗 Dialog base URL (statistico.live):', baseUrl);
         return baseUrl;
     }
     
-    // Last resort fallback
-    const baseUrl = `${origin}/dialogs/views/`;
+    // Fallback
+    const baseUrl = `${window.location.origin}/dialogs/views/`;
     console.log('🔗 Dialog base URL (fallback):', baseUrl);
     return baseUrl;
 }

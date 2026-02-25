@@ -20,19 +20,13 @@ let currentTransform = 'none';
 /**
  * Resolve the base URL for dialog pages regardless of hosting path.
  * Handles GitHub Pages (statistico-analytics subfolder) and localhost.
- * Matches the pattern used by other modules (correlations, dependent, etc.)
  */
 function getDialogsBaseUrl() {
     const { origin, pathname, href } = window.location;
-    
-    console.log('🔍 getDialogsBaseUrl called');
-    console.log('📍 Current URL:', href);
 
     // Localhost/development
     if (href.includes('127.0.0.1') || href.includes('localhost')) {
-        const baseUrl = 'http://127.0.0.1:8080/dialogs/views/';
-        console.log('🔗 Dialog base URL (localhost):', baseUrl);
-        return baseUrl;
+        return 'http://127.0.0.1:8080/dialogs/views/';
     }
 
     // Preserve optional subfolder prefixes (e.g. /statistico-analytics) before /taskpane/
@@ -40,15 +34,11 @@ function getDialogsBaseUrl() {
     const taskpaneIndex = pathname.indexOf(taskpaneMarker);
     if (taskpaneIndex !== -1) {
         const basePath = pathname.slice(0, taskpaneIndex);
-        const baseUrl = `${origin}${basePath}/dialogs/views/`;
-        console.log('🔗 Dialog base URL (from taskpane path):', baseUrl);
-        return baseUrl;
+        return `${origin}${basePath}/dialogs/views/`;
     }
 
-    // Fallback
-    const baseUrl = `${origin}/dialogs/views/`;
-    console.log('🔗 Dialog base URL (fallback):', baseUrl);
-    return baseUrl;
+    // Fallback for production roots
+    return `${origin}/dialogs/views/`;
 }
 
 // Initialize when Office is ready
@@ -574,11 +564,9 @@ let currentResults = null; // Store results globally for view switching
 function setResultsTheme(theme) {
     localStorage.setItem('resultsTheme', theme);
     
-    // Update UI only if elements exist (they may not be in all taskpanes)
-    const themeLight = document.getElementById('themeLight');
-    const themeDark = document.getElementById('themeDark');
-    if (themeLight) themeLight.classList.toggle('active', theme === 'light');
-    if (themeDark) themeDark.classList.toggle('active', theme === 'dark');
+    // Update UI
+    document.getElementById('themeLight').classList.toggle('active', theme === 'light');
+    document.getElementById('themeDark').classList.toggle('active', theme === 'dark');
 }
 
 // Initialize theme on load
@@ -757,14 +745,12 @@ function openResultsDialog(results) {
     
     // Use standalone histogram instead of full results dialog
     const dialogUrl = `${getDialogsBaseUrl()}univariate/histogram-standalone.html`;
-    console.log('📂 Opening histogram dialog:', dialogUrl);
     
     Office.context.ui.displayDialogAsync(
         dialogUrl,
         { height: 90, width: 95, displayInIframe: false },
         (asyncResult) => {
             if (asyncResult.status === Office.AsyncResultStatus.Failed) {
-                console.error('❌ Failed to open histogram:', asyncResult.error);
                 showStatus('error', 'Failed to open histogram: ' + asyncResult.error.message);
             } else {
                 resultsDialog = asyncResult.value;

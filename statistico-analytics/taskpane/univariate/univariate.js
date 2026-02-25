@@ -20,13 +20,30 @@ let currentTransform = 'none';
 /**
  * Resolve the base URL for dialog pages regardless of hosting path.
  * Handles GitHub Pages (statistico-analytics subfolder) and localhost.
+ * Ensures metrics-institute path segment is preserved when present.
  */
 function getDialogsBaseUrl() {
     const href = window.location.href;
     if (href.includes('/taskpane/')) {
-        const baseUrl = `${href.split('/taskpane/')[0]}/dialogs/views/`;
+        // Split on /taskpane/ to get the base path (preserves all path segments including metrics-institute)
+        const basePath = href.split('/taskpane/')[0];
+        const baseUrl = `${basePath}/dialogs/views/`;
         console.log('🔗 Dialog base URL:', baseUrl);
         return baseUrl;
+    }
+    // Fallback: construct from origin and current path
+    const pathname = window.location.pathname;
+    // If pathname includes metrics-institute, preserve it
+    if (pathname.includes('metrics-institute')) {
+        const pathParts = pathname.split('/').filter(p => p);
+        const metricsIndex = pathParts.indexOf('metrics-institute');
+        if (metricsIndex !== -1) {
+            // Include everything up to and including metrics-institute, then add statistico-analytics
+            const basePath = '/' + pathParts.slice(0, metricsIndex + 1).join('/') + '/statistico-analytics';
+            const baseUrl = `${window.location.origin}${basePath}/dialogs/views/`;
+            console.log('🔗 Dialog base URL (with metrics-institute):', baseUrl);
+            return baseUrl;
+        }
     }
     const baseUrl = `${window.location.origin}/dialogs/views/`;
     console.log('🔗 Dialog base URL (fallback):', baseUrl);

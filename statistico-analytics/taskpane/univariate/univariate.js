@@ -20,33 +20,20 @@ let currentTransform = 'none';
 /**
  * Resolve the base URL for dialog pages regardless of hosting path.
  * Handles GitHub Pages (statistico-analytics subfolder) and localhost.
- * Ensures metrics-institute path segment is included for statistico.live domain.
  */
 function getDialogsBaseUrl() {
     const href = window.location.href;
-    const origin = window.location.origin;
     
-    // Check if we're on statistico.live
-    const isStatisticoLive = origin.includes('statistico.live');
-    
-    // For statistico.live, always use the full path with metrics-institute
-    if (isStatisticoLive) {
-        const baseUrl = `${origin}/metrics-institute/statistico-analytics/dialogs/views/`;
-        console.log('🔗 Dialog base URL (statistico.live):', baseUrl);
-        return baseUrl;
-    }
-    
-    // For other domains (localhost, GitHub Pages, etc.)
     if (href.includes('/taskpane/')) {
-        // Split on /taskpane/ to get the base path
+        // Split on /taskpane/ to get the base path (preserves all path segments)
         const basePath = href.split('/taskpane/')[0];
         const baseUrl = `${basePath}/dialogs/views/`;
         console.log('🔗 Dialog base URL:', baseUrl);
         return baseUrl;
     }
     
-    // Fallback
-    const baseUrl = `${origin}/dialogs/views/`;
+    // Fallback: construct from origin
+    const baseUrl = `${window.location.origin}/dialogs/views/`;
     console.log('🔗 Dialog base URL (fallback):', baseUrl);
     return baseUrl;
 }

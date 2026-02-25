@@ -20,32 +20,39 @@ let currentTransform = 'none';
 /**
  * Resolve the base URL for dialog pages regardless of hosting path.
  * Handles GitHub Pages (statistico-analytics subfolder) and localhost.
- * Ensures metrics-institute path segment is preserved when present.
+ * Ensures metrics-institute path segment is included for statistico.live domain.
  */
 function getDialogsBaseUrl() {
     const href = window.location.href;
+    const origin = window.location.origin;
+    
+    // Check if we're on statistico.live and need to add metrics-institute
+    const isStatisticoLive = origin.includes('statistico.live');
+    
     if (href.includes('/taskpane/')) {
-        // Split on /taskpane/ to get the base path (preserves all path segments including metrics-institute)
-        const basePath = href.split('/taskpane/')[0];
+        // Split on /taskpane/ to get the base path
+        let basePath = href.split('/taskpane/')[0];
+        
+        // If on statistico.live and metrics-institute is missing, add it
+        if (isStatisticoLive && !basePath.includes('metrics-institute')) {
+            // Insert metrics-institute after the domain
+            basePath = basePath.replace('https://statistico.live', 'https://statistico.live/metrics-institute');
+            console.log('🔧 Added metrics-institute to base path');
+        }
+        
         const baseUrl = `${basePath}/dialogs/views/`;
         console.log('🔗 Dialog base URL:', baseUrl);
         return baseUrl;
     }
-    // Fallback: construct from origin and current path
-    const pathname = window.location.pathname;
-    // If pathname includes metrics-institute, preserve it
-    if (pathname.includes('metrics-institute')) {
-        const pathParts = pathname.split('/').filter(p => p);
-        const metricsIndex = pathParts.indexOf('metrics-institute');
-        if (metricsIndex !== -1) {
-            // Include everything up to and including metrics-institute, then add statistico-analytics
-            const basePath = '/' + pathParts.slice(0, metricsIndex + 1).join('/') + '/statistico-analytics';
-            const baseUrl = `${window.location.origin}${basePath}/dialogs/views/`;
-            console.log('🔗 Dialog base URL (with metrics-institute):', baseUrl);
-            return baseUrl;
-        }
+    
+    // Fallback: construct from origin
+    if (isStatisticoLive && !href.includes('metrics-institute')) {
+        const baseUrl = `${origin}/metrics-institute/statistico-analytics/dialogs/views/`;
+        console.log('🔗 Dialog base URL (with metrics-institute):', baseUrl);
+        return baseUrl;
     }
-    const baseUrl = `${window.location.origin}/dialogs/views/`;
+    
+    const baseUrl = `${origin}/dialogs/views/`;
     console.log('🔗 Dialog base URL (fallback):', baseUrl);
     return baseUrl;
 }

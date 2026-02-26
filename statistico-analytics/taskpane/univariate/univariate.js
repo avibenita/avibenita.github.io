@@ -556,9 +556,11 @@ let currentResults = null; // Store results globally for view switching
 function setResultsTheme(theme) {
     localStorage.setItem('resultsTheme', theme);
     
-    // Update UI
-    document.getElementById('themeLight').classList.toggle('active', theme === 'light');
-    document.getElementById('themeDark').classList.toggle('active', theme === 'dark');
+    // Update UI only if elements exist (they may not be present in every taskpane)
+    const themeLight = document.getElementById('themeLight');
+    const themeDark  = document.getElementById('themeDark');
+    if (themeLight) themeLight.classList.toggle('active', theme === 'light');
+    if (themeDark)  themeDark.classList.toggle('active', theme === 'dark');
 }
 
 // Initialize theme on load

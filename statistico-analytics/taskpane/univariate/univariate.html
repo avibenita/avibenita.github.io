@@ -3,11 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Univariate Analysis - Statistico Analytics</title>
+  <title>Univariate Analysis</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="../../src/shared/css/taskpane-light.css">
   <link rel="stylesheet" href="../../src/shared/css/data-input-panel.css">
+  <style>
+    .cfg-panel{margin-top:14px;padding:14px;background:#fff7ed;border-radius:8px;border:1px solid #fed7aa}
+    .cfg-title{font-weight:600;font-size:13px;color:#c2410c;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+    .cfg-row{margin-bottom:12px}
+    .cfg-label{font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;display:block}
+    .cfg-select,.cfg-input{width:100%;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;background:#fff;box-sizing:border-box}
+    .cfg-trim{display:flex;gap:8px;align-items:center}
+    .cfg-trim input{flex:1;padding:7px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;text-align:center}
+    .cfg-trim span{font-size:11px;color:#6b7280;white-space:nowrap}
+    .run-btn{width:100%;padding:13px;font-size:14px;font-weight:700;color:#fff;background:linear-gradient(135deg,#f97316,#ea580c);border:none;border-radius:8px;cursor:pointer;margin-top:4px;display:flex;align-items:center;justify-content:center;gap:8px}
+    .run-btn:disabled{background:#cbd5e1;cursor:not-allowed}
+    .cfg-summary{font-size:11px;color:#92400e;background:#fef3c7;border-radius:5px;padding:6px 8px;margin-bottom:10px}
+  </style>
 </head>
 <body>
   <div class="taskpane-container">
@@ -20,25 +33,279 @@
       </button>
     </div>
     <div class="taskpane-content">
-      <div id="dataInputPanelContainer"></div>
-      <div id="univariateInputPanelContainer"></div>
+
+      <!-- ── Data Input Panel (inline) ── -->
+      <div class="panel-section" id="dataInputPanel">
+        <div class="section-title">
+          <i class="fa-solid fa-table-cells-large"></i> Pick Range
+        </div>
+        <div style="padding:14px">
+          <div class="data-range-buttons" style="display:flex;gap:8px;position:relative">
+            <div style="flex:1;position:relative">
+              <button id="namedRangeBtn" class="range-btn" onclick="toggleNamedRangeDropdown()" style="width:100%">
+                <i class="fa-solid fa-bookmark"></i><span>Named Range</span>
+                <i class="fa-solid fa-chevron-down" style="margin-left:auto;font-size:10px"></i>
+              </button>
+              <div id="namedRangeDropdown" class="range-dropdown" style="display:none">
+                <select id="rangeSelector" onchange="loadFromNamedRange()" size="6">
+                  <option value="">-- Select Named Range --</option>
+                </select>
+              </div>
+            </div>
+            <button id="autoDetectBtn" class="range-btn" onclick="autoDetectRange()" style="flex:1">
+              <i class="fa-solid fa-magic"></i><span>Used Range</span>
+            </button>
+            <button id="useSelectionBtn" class="range-btn" onclick="useSelection()" style="flex:1" disabled>
+              <i class="fa-solid fa-hand-pointer"></i><span>Current XL Selection</span>
+            </button>
+          </div>
+          <div id="rangeDisplay" style="display:none">
+            <div style="font-weight:600;margin-bottom:4px">
+              <i id="rangeIcon" class="fa-solid fa-bookmark"></i> <span id="rangeTitle"></span>
+            </div>
+            <div><span id="rangeDetails"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Configuration Panel (inline, shown after range pick) ── -->
+      <div id="cfgPanel" class="cfg-panel" style="display:none">
+        <div class="cfg-title"><i class="fa-solid fa-sliders"></i> Analysis Configuration</div>
+        <div class="cfg-summary" id="cfgSummary">Range: — | Rows: 0 | Cols: 0</div>
+
+        <div class="cfg-row">
+          <label class="cfg-label">Column to Analyse</label>
+          <select id="cfgColumn" class="cfg-select"></select>
+        </div>
+
+        <div class="cfg-row">
+          <label class="cfg-label">Trim (%)</label>
+          <div class="cfg-trim">
+            <span>Lower</span>
+            <input type="number" id="cfgTrimMin" value="0" min="0" max="49" step="1" />
+            <span>Upper</span>
+            <input type="number" id="cfgTrimMax" value="100" min="51" max="100" step="1" />
+          </div>
+        </div>
+
+        <div class="cfg-row">
+          <label class="cfg-label">Transform</label>
+          <select id="cfgTransform" class="cfg-select">
+            <option value="">None</option>
+            <option value="ln">Natural Log (ln)</option>
+            <option value="log10">Log base 10</option>
+            <option value="sqrt">Square Root</option>
+            <option value="square">Square (x²)</option>
+            <option value="reciprocal">Reciprocal (1/x)</option>
+            <option value="z">Z-Score Standardise</option>
+            <option value="minmax">Min-Max Normalise</option>
+          </select>
+        </div>
+
+        <button id="runBtn" class="run-btn" onclick="runAnalysis()" disabled>
+          <i class="fa-solid fa-play"></i> Run Analysis
+        </button>
+      </div>
+
     </div>
   </div>
+
   <script src="../../src/shared/js/components/DataInputPanel.js"></script>
-  <script src="univariate-input-panel.js?v=2.0.0"></script>
   <script>
+    /* ── globals ── */
+    var _rangeData = null, _rangeAddr = '', _resultsDialog = null, _curResults = null;
+
     function goBack() { window.location.href = '../hub.html'; }
-    Office.onReady((info) => {
-      if (info.host !== Office.HostType.Excel) return;
-      fetch('../../src/shared/components/data-input-panel.html')
-        .then(r => r.text()).then(html => {
-          document.getElementById('dataInputPanelContainer').innerHTML = html;
-          initDataInputPanel();
-        });
-      fetch('univariate-input-panel.html?v=2.0.0')
-        .then(r => r.text()).then(html => {
-          document.getElementById('univariateInputPanelContainer').innerHTML = html;
-        });
+
+    /* ── called by DataInputPanel when data loads ── */
+    function onRangeDataLoaded(values, address) {
+      if (!values || values.length < 2) { hideCfg(); return; }
+      _rangeData = values;
+      _rangeAddr = address || '';
+      var headers = values[0] || [];
+      var rows    = values.slice(1);
+
+      /* populate column dropdown */
+      var sel = document.getElementById('cfgColumn');
+      sel.innerHTML = headers.map(function(h,i){
+        return '<option value="'+i+'">'+h+'</option>';
+      }).join('');
+
+      /* summary */
+      document.getElementById('cfgSummary').textContent =
+        'Range: ' + _rangeAddr + '  |  Rows: ' + rows.length + '  |  Cols: ' + headers.length;
+
+      document.getElementById('cfgPanel').style.display = 'block';
+      document.getElementById('runBtn').disabled = false;
+    }
+
+    function hideCfg() {
+      document.getElementById('cfgPanel').style.display = 'none';
+    }
+
+    /* ── URL helper ── */
+    function dialogsBase() {
+      var loc = window.location;
+      if (loc.href.indexOf('127.0.0.1') > -1 || loc.href.indexOf('localhost') > -1)
+        return 'http://127.0.0.1:8080/dialogs/views/';
+      var m = loc.pathname.indexOf('/taskpane/');
+      if (m > -1) return loc.origin + loc.pathname.slice(0,m) + '/dialogs/views/';
+      return loc.origin + '/dialogs/views/';
+    }
+
+    /* ── run analysis ── */
+    function runAnalysis() {
+      if (!_rangeData) return;
+      var colIdx   = parseInt(document.getElementById('cfgColumn').value, 10);
+      var colName  = document.getElementById('cfgColumn').options[colIdx].text;
+      var trimMin  = parseFloat(document.getElementById('cfgTrimMin').value)  || 0;
+      var trimMax  = parseFloat(document.getElementById('cfgTrimMax').value);
+      if (isNaN(trimMax)) trimMax = 100;
+      var transform = document.getElementById('cfgTransform').value;
+
+      var data = _rangeData.slice(1)
+        .map(function(row){ return row[colIdx]; })
+        .filter(function(v){ return v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v)); })
+        .map(parseFloat);
+
+      if (!data.length) { alert('No numeric data in selected column.'); return; }
+
+      /* trim */
+      if (trimMin > 0 || trimMax < 100) {
+        var sorted = data.slice().sort(function(a,b){return a-b;});
+        var lo = sorted[Math.floor((sorted.length-1)*trimMin/100)];
+        var hi = sorted[Math.floor((sorted.length-1)*trimMax/100)];
+        data = data.filter(function(v){ return v >= lo && v <= hi; });
+      }
+
+      /* transform */
+      data = applyTransform(data, transform);
+
+      var results = calcStats(data, _rangeAddr, colName, transform, trimMin, trimMax);
+      _curResults = results;
+      localStorage.setItem('univariateResults', JSON.stringify(results));
+
+      Office.context.ui.displayDialogAsync(
+        dialogsBase() + 'univariate/histogram-standalone.html',
+        { height: 90, width: 95, displayInIframe: false },
+        function(res) {
+          if (res.status === Office.AsyncResultStatus.Failed) {
+            alert('Could not open results: ' + res.error.message); return;
+          }
+          _resultsDialog = res.value;
+          var payload = JSON.stringify({
+            action: 'loadData',
+            data: { values: results.rawData, column: results.column,
+                    descriptive: results.descriptive, n: results.n }
+          });
+          setTimeout(function(){ if(_resultsDialog) _resultsDialog.messageChild(payload); }, 1000);
+
+          _resultsDialog.addEventHandler(Office.EventType.DialogMessageReceived, function(arg){
+            try {
+              var msg = JSON.parse(arg.message);
+              if (msg.status === 'ready') {
+                if(_resultsDialog) _resultsDialog.messageChild(payload);
+              } else if (msg.action === 'switchView') {
+                if(_resultsDialog){ _resultsDialog.close(); _resultsDialog = null; }
+                setTimeout(function(){
+                  openView(dialogsBase() + msg.view, _curResults);
+                }, 300);
+              } else if (msg.action === 'close' || msg.action === 'closeDialog') {
+                if(_resultsDialog){ _resultsDialog.close(); _resultsDialog = null; }
+              }
+            } catch(e){}
+          });
+          _resultsDialog.addEventHandler(Office.EventType.DialogEventReceived, function(){
+            _resultsDialog = null;
+          });
+        }
+      );
+    }
+
+    function openView(url, results) {
+      Office.context.ui.displayDialogAsync(url,
+        { height: 90, width: 95, displayInIframe: false },
+        function(res){
+          if (res.status === Office.AsyncResultStatus.Failed) return;
+          _resultsDialog = res.value;
+          var payload = JSON.stringify({
+            action: 'loadData',
+            data: { values: results.rawData, column: results.column,
+                    descriptive: results.descriptive, n: results.n }
+          });
+          setTimeout(function(){ if(_resultsDialog) _resultsDialog.messageChild(payload); }, 1000);
+          _resultsDialog.addEventHandler(Office.EventType.DialogMessageReceived, function(arg){
+            try {
+              var msg = JSON.parse(arg.message);
+              if (msg.status === 'ready') { if(_resultsDialog) _resultsDialog.messageChild(payload); }
+              else if (msg.action === 'switchView') {
+                if(_resultsDialog){ _resultsDialog.close(); _resultsDialog = null; }
+                setTimeout(function(){ openView(dialogsBase() + msg.view, _curResults); }, 300);
+              } else if (msg.action === 'close' || msg.action === 'closeDialog') {
+                if(_resultsDialog){ _resultsDialog.close(); _resultsDialog = null; }
+              }
+            } catch(e){}
+          });
+          _resultsDialog.addEventHandler(Office.EventType.DialogEventReceived, function(){
+            _resultsDialog = null;
+          });
+        }
+      );
+    }
+
+    /* ── transforms ── */
+    function applyTransform(data, t) {
+      if (!t) return data;
+      if (t==='ln')        return data.map(function(v){return Math.log(v);});
+      if (t==='log10')     return data.map(function(v){return Math.log10(v);});
+      if (t==='sqrt')      return data.map(function(v){return Math.sqrt(v);});
+      if (t==='square')    return data.map(function(v){return v*v;});
+      if (t==='reciprocal')return data.map(function(v){return 1/v;});
+      if (t==='z') {
+        var m=data.reduce(function(a,b){return a+b;},0)/data.length;
+        var sd=Math.sqrt(data.reduce(function(a,v){return a+(v-m)*(v-m);},0)/data.length);
+        return data.map(function(v){return (v-m)/sd;});
+      }
+      if (t==='minmax') {
+        var mn=Math.min.apply(null,data), mx=Math.max.apply(null,data);
+        return data.map(function(v){return (v-mn)/(mx-mn);});
+      }
+      return data;
+    }
+
+    /* ── statistics ── */
+    function calcStats(data, addr, col, transform, trimMin, trimMax) {
+      var n=data.length, sorted=data.slice().sort(function(a,b){return a-b;});
+      var sum=data.reduce(function(a,b){return a+b;},0), mean=sum/n;
+      var variance=data.reduce(function(a,v){return a+(v-mean)*(v-mean);},0)/(n-1);
+      var stdDev=Math.sqrt(variance);
+      var q1=quantile(sorted,0.25), median=quantile(sorted,0.5), q3=quantile(sorted,0.75);
+      var skew=skewness(data,mean,stdDev), kurt=kurtosis(data,mean,stdDev);
+      return {
+        dataSource:addr, column:col, transform:transform,
+        trim:{min:trimMin,max:trimMax}, n:n, values:data, rawData:data,
+        descriptive:{mean:mean,median:median,stdDev:stdDev,variance:variance,
+          min:sorted[0],max:sorted[n-1],range:sorted[n-1]-sorted[0],
+          q1:q1,q3:q3,iqr:q3-q1,skewness:skew,kurtosis:kurt}
+      };
+    }
+    function quantile(s,q){
+      var p=(s.length-1)*q, b=Math.floor(p), r=p-b;
+      return s[b+1]!==undefined ? s[b]+r*(s[b+1]-s[b]) : s[b];
+    }
+    function skewness(d,m,sd){
+      var n=d.length, m3=d.reduce(function(a,v){return a+Math.pow(v-m,3);},0)/n;
+      return m3/Math.pow(sd,3);
+    }
+    function kurtosis(d,m,sd){
+      var n=d.length, m4=d.reduce(function(a,v){return a+Math.pow(v-m,4);},0)/n;
+      return (m4/Math.pow(sd,4))-3;
+    }
+
+    Office.onReady(function(info){
+      if (info.host === Office.HostType.Excel) {
+        initDataInputPanel();
+      }
     });
   </script>
 </body>

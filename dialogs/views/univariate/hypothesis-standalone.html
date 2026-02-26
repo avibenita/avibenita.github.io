@@ -1,0 +1,3395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Hypothesis Testing - Statistico</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <link rel="stylesheet" href="../shared-header.css">
+  <script src="../shared-header.js"></script>
+  
+  <!-- AI Configuration -->
+  <script>
+    // API Key injected during deployment via GitHub Actions
+    // See .github/workflows/deploy.yml
+       window.AI_API_KEY = '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';
+    console.log('🔑 AI API Key set:', window.AI_API_KEY && window.AI_API_KEY !== 'YOUR_API_KEY_PLACEHOLDER' ? 'YES (***' + window.AI_API_KEY.slice(-4) + ')' : 'NO - Key not configured');
+  </script>
+  
+  <style>
+    /* AI Button Styles */
+    .ai-interpret-btn {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: transparent;
+      color: yellow;
+      border: none;
+      cursor: pointer;
+      font-weight: 900;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1px;
+      box-shadow: 0 4px 15px rgba(139, 92, 246, 0.5), 0 0 20px rgba(139, 92, 246, 0.3);
+      transition: all 0.3s ease;
+      animation: ai-pulse 3s ease-in-out infinite;
+      z-index: 10;
+    }
+
+    .ai-interpret-btn::before {
+      content: '';
+      position: absolute;
+      top: -6px;
+      left: -6px;
+      right: -6px;
+      bottom: -6px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #8b5cf6, #6366f1, #3b82f6);
+      opacity: 0.4;
+      animation: ai-glow 2.5s ease-in-out infinite;
+      z-index: -1;
+      filter: blur(12px);
+    }
+
+    .ai-interpret-btn::after {
+      content: '';
+      position: absolute;
+      top: -3px;
+      left: -3px;
+      right: -3px;
+      bottom: -3px;
+      border-radius: 50%;
+      border: 2px solid rgba(139, 92, 246, 0.5);
+      animation: ai-ring 3s ease-in-out infinite;
+      z-index: -1;
+    }
+
+    .ai-interpret-btn i {
+      font-size: 16px;
+      animation: ai-sparkle-rotate 4s ease-in-out infinite;
+    }
+
+    .ai-interpret-btn span {
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+    }
+
+    .ai-interpret-btn:hover {
+      transform: scale(1.15);
+      box-shadow: 0 6px 25px rgba(139, 92, 246, 0.7), 0 0 30px rgba(139, 92, 246, 0.5);
+      background: linear-gradient(135deg, #9d6eff 0%, #7c7fff 50%, #5b9cff 100%);
+    }
+
+    .ai-interpret-btn:hover::before {
+      opacity: 0.7;
+    }
+
+    .ai-interpret-btn:active {
+      transform: scale(1.0);
+    }
+
+    .ai-interpret-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      animation: none;
+    }
+
+    .ai-interpret-btn:disabled::before,
+    .ai-interpret-btn:disabled::after {
+      animation: none;
+    }
+
+    @keyframes ai-glow {
+      0%, 100% {
+        opacity: 0.4;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 0.7;
+        transform: scale(1.08);
+      }
+    }
+
+    @keyframes ai-pulse {
+      0%, 100% {
+        box-shadow: 0 4px 15px rgba(139, 92, 246, 0.5), 0 0 20px rgba(139, 92, 246, 0.3);
+      }
+      50% {
+        box-shadow: 0 4px 20px rgba(139, 92, 246, 0.7), 0 0 30px rgba(139, 92, 246, 0.5);
+      }
+    }
+
+    @keyframes ai-ring {
+      0%, 100% {
+        transform: scale(1);
+        opacity: 0.5;
+      }
+      50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+      }
+    }
+
+    @keyframes ai-sparkle-rotate {
+      0%, 100% {
+        transform: rotate(0deg);
+      }
+      25% {
+        transform: rotate(-10deg);
+      }
+      75% {
+        transform: rotate(10deg);
+      }
+    }
+
+    /* Custom Notification System (Office.js compatible) */
+    .notification-toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, var(--surface-1), var(--surface-2));
+      color: var(--text-primary);
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: 2px solid var(--accent-1);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      z-index: 100000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      max-width: 80%;
+      text-align: center;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .notification-toast.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .notification-toast.error {
+      border-color: #ff4444;
+      background: linear-gradient(135deg, #3a1a1a, #2a1515);
+    }
+
+    .notification-toast.success {
+      border-color: #44ff44;
+      background: linear-gradient(135deg, #1a3a1a, #152a15);
+    }
+
+    .notification-toast.info {
+      border-color: var(--accent-2);
+      background: linear-gradient(135deg, #1a2a3a, #152535);
+    }
+
+    /* Custom Dialog Modal */
+    .custom-dialog-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .custom-dialog-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .custom-dialog-content {
+      background: var(--surface-1);
+      border: 2px solid var(--accent-1);
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 500px;
+      max-height: 70vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    }
+
+    .custom-dialog-header {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--accent-1);
+      margin-bottom: 15px;
+    }
+
+    .custom-dialog-message {
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 20px;
+      white-space: pre-line;
+    }
+
+    .custom-dialog-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .custom-dialog-btn {
+      padding: 8px 20px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .custom-dialog-btn-primary {
+      background: linear-gradient(135deg, var(--accent-1), rgb(255,140,90));
+      color: white;
+    }
+
+    .custom-dialog-btn-primary:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 15px rgba(255,165,120,0.4);
+    }
+
+    /* Power Analysis Overlay */
+    .power-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 99998;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .power-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .power-dialog {
+      background: var(--surface-1);
+      border: 2px solid var(--accent-1);
+      border-radius: 12px;
+      width: 90%;
+      max-width: 850px;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    }
+
+    .power-dialog-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 16px;
+      border-bottom: 2px solid var(--border);
+      background: linear-gradient(135deg, var(--surface-2), var(--surface-1));
+    }
+
+    .power-dialog-header h2 {
+      font-size: 17px;
+      color: var(--accent-1);
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .power-close-btn {
+      background: linear-gradient(135deg, rgba(255,100,100,0.2), rgba(255,50,50,0.2));
+      border: 1px solid rgba(255,100,100,0.4);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .power-close-btn:hover {
+      background: linear-gradient(135deg, rgba(255,100,100,0.3), rgba(255,50,50,0.3));
+      transform: scale(1.05);
+    }
+
+    .power-loader {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      gap: 15px;
+    }
+
+    .power-loader .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255,165,120,0.2);
+      border-top-color: var(--accent-1);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    .power-loader span {
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .power-content {
+      padding: 12px 16px;
+    }
+
+    .power-content.hidden {
+      display: none;
+    }
+
+    .power-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .power-panel-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    .power-panel-card h3 {
+      color: var(--accent-2);
+      font-size: 13px;
+      margin: 0 0 10px 0;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+
+    .power-field {
+      margin-bottom: 10px;
+    }
+
+    .power-field:last-child {
+      margin-bottom: 0;
+    }
+
+    .power-field label {
+      display: block;
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    .power-stat {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,165,120,0.3);
+      border-radius: 4px;
+      padding: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--accent-1);
+      text-align: center;
+    }
+
+    .power-field input[type="number"] {
+      width: 100%;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 4px;
+      color: white;
+      padding: 6px;
+      font-size: 14px;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+
+    .power-field input[type="number"]:focus {
+      outline: none;
+      border-color: var(--accent-1);
+      box-shadow: 0 0 5px rgba(255,165,120,0.3);
+    }
+
+    .power-field button {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent-1), rgb(255,140,90));
+      border: none;
+      color: white;
+      padding: 7px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .power-field button:hover {
+      transform: scale(1.02);
+      box-shadow: 0 4px 15px rgba(255,165,120,0.4);
+    }
+
+    .power-field button:active {
+      transform: scale(0.98);
+    }
+
+    .power-footer-note {
+      background: rgba(120,200,255,0.1);
+      border: 1px solid rgba(120,200,255,0.3);
+      border-radius: 4px;
+      padding: 8px;
+      color: var(--accent-2);
+      font-size: 11px;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    @media (max-width: 768px) {
+      .power-columns {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+  
+  <style>
+    :root {
+      --surface-0: #0c1624;
+      --surface-1: #1a1f2e;
+      --surface-2: #242938;
+      --border: #2d3748;
+      --accent-1: rgb(255,165,120);
+      --accent-2: rgb(120,200,255);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255,255,255,0.8);
+      --text-muted: rgba(255,255,255,0.6);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background-color: var(--surface-0);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text-primary);
+      overflow-x: hidden;
+    }
+
+    .results-container {
+      padding: 12px 16px;
+      max-width: 100%;
+    }
+
+    /* Configuration Section */
+    .config-section {
+      margin-bottom: 16px;
+      padding: 16px;
+      background: rgba(20,25,35,0.5);
+      border: 2px solid rgba(255,165,120,0.3);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .section-header {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent-1);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .popsize-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      transition: opacity 0.3s ease;
+    }
+
+    .popsize-control.disabled {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    .popsize-control label {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .popsize-control input {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 4px;
+      color: white;
+      padding: 3px 6px;
+      width: 80px;
+      font-size: 11px;
+      text-align: center;
+    }
+
+    .config-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .config-panel {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+    }
+
+    .panel-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .radio-group {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .radio-label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    .radio-label input[type="radio"] {
+      cursor: pointer;
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent-2);
+    }
+
+    .radio-label.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* Hypothesis Section */
+    .hypothesis-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .h0-panel, .h1-panel {
+      background: rgba(20,25,35,0.6);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .h0-panel {
+      border: 2px solid rgba(255,165,120,0.5);
+      box-shadow: 0 2px 8px rgba(255,165,120,0.15);
+    }
+
+    .h1-panel {
+      border: 2px solid rgba(120,200,255,0.5);
+      box-shadow: 0 2px 8px rgba(120,200,255,0.15);
+    }
+
+    .h-label {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .h0-panel .h-label {
+      color: var(--accent-1);
+    }
+
+    .h1-panel .h-label {
+      color: var(--accent-2);
+    }
+
+    .h0-input {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 4px;
+      color: white;
+      padding: 6px 10px;
+      width: 90px;
+      font-size: 15px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .h1-options {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .run-button {
+      background: linear-gradient(135deg, var(--accent-1), rgb(255,140,90));
+      border: none;
+      color: white;
+      padding: 8px 22px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 auto;
+      transition: all 0.3s ease;
+    }
+
+    .run-button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 20px rgba(255,165,120,0.5);
+    }
+
+    /* Results Section */
+    .results-section {
+      margin-top: 16px;
+      padding: 16px;
+      background: linear-gradient(135deg, rgba(30,45,60,0.7), rgba(20,35,50,0.6));
+      border: 2px solid rgba(120,200,255,0.4);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(120,200,255,0.15);
+    }
+
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .results-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    /* Alpha Slider in Header */
+    .alpha-slider-control {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: linear-gradient(135deg, rgba(30,45,60,0.8), rgba(20,35,50,0.7));
+      border: 1px solid rgba(120,200,255,0.3);
+      border-radius: 6px;
+      padding: 4px 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    .alpha-slider-control label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .alpha-slider-control input[type="range"] {
+      width: 100px;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.2);
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .alpha-slider-control input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent-1);
+      cursor: pointer;
+    }
+
+    .alpha-slider-control input[type="range"]::-moz-range-thumb {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent-1);
+      cursor: pointer;
+      border: none;
+    }
+
+    .alpha-value {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent-1);
+      min-width: 35px;
+    }
+
+    .action-btn {
+      background: var(--accent-2);
+      border: none;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.3s ease;
+    }
+
+    .action-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 15px rgba(120,200,255,0.5);
+    }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .result-card {
+      background: rgba(20,25,35,0.6);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 5px;
+      padding: 6px 8px;
+      text-align: center;
+    }
+
+    .result-card.highlight {
+      border: 2px solid var(--accent-1);
+    }
+
+    .card-icon {
+      font-size: 9px;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    .card-label {
+      font-size: 8px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 3px;
+    }
+
+    .card-value {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent-1);
+    }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+      position: relative;
+    }
+
+    .stat-box {
+      background: linear-gradient(135deg, rgba(20,25,35,0.8), rgba(20,25,35,0.6));
+      border: 2px solid rgba(255,165,120,0.6);
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+      box-shadow: 0 3px 12px rgba(255,165,120,0.2);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .stat-box:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(255,165,120,0.4);
+      border-color: var(--accent-2);
+    }
+
+    .stat-box:active {
+      transform: translateY(0);
+    }
+
+    .stat-box::after {
+      content: '💡 Click for interpretation';
+      position: absolute;
+      bottom: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      color: var(--text-muted);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .stat-box:hover::after {
+      opacity: 1;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      font-weight: 600;
+    }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--accent-1);
+      text-shadow: 0 0 8px rgba(255,165,120,0.3);
+    }
+
+    /* Decision Card */
+    .decision-card {
+      background: linear-gradient(135deg, rgba(30,45,60,0.7), rgba(20,35,50,0.6));
+      border: 2px solid rgba(120,200,255,0.4);
+      border-radius: 12px;
+      padding: 8px;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(120,200,255,0.15);
+      position: relative;
+    }
+
+    .decision-label {
+      font-size: 9px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .decision-result {
+      color: white;
+      padding: 8px 16px;
+      border-radius: 5px;
+      font-size: 13px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(135deg, rgba(248,113,113,0.2), rgba(239,68,68,0.2));
+      border: 2px solid #f87171;
+    }
+
+    .decision-result.fail-to-reject {
+      background: linear-gradient(135deg, rgba(74,222,128,0.2), rgba(34,197,94,0.2));
+      border: 2px solid #4ade80;
+    }
+
+    /* Awaiting State */
+    .awaiting-state {
+      text-align: center;
+      padding: 30px 20px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .awaiting-state i {
+      font-size: 40px;
+      color: var(--accent-2);
+      margin-bottom: 12px;
+      opacity: 0.5;
+    }
+
+    /* Calculating State (Bootstrap) */
+    .calculating-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      border-radius: 6px;
+    }
+
+    .calculating-overlay.active {
+      display: flex;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(255,165,120,0.2);
+      border-top: 4px solid var(--accent-1);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .calculating-text {
+      margin-left: 15px;
+      color: var(--accent-1);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    /* Alpha Control (removed old button version) */
+    .alpha-control {
+      display: none;
+    }
+
+    /* Blink animation for diagnostic update */
+    @keyframes diagnostic-blink {
+      0%, 100% {
+        box-shadow: 0 4px 15px rgba(255,165,120,0.2);
+        transform: scale(1);
+      }
+      50% {
+        box-shadow: 0 0 25px rgba(255,165,120,0.6), 0 0 15px rgba(255,165,120,0.4);
+        transform: scale(1.02);
+      }
+    }
+
+    .stat-box.blink {
+      animation: diagnostic-blink 0.6s ease-in-out;
+    }
+
+    .decision-card.blink {
+      animation: diagnostic-blink 0.6s ease-in-out;
+    }
+
+    /* Bootstrap Mode Styling */
+    .stat-box.bootstrap-mode {
+      background: linear-gradient(135deg, rgba(255, 140, 0, 0.15), rgba(255, 90, 50, 0.15));
+      border: 2px solid rgb(255, 140, 60);
+      box-shadow: 0 4px 15px rgba(255, 140, 60, 0.3);
+    }
+
+    .stat-box.bootstrap-mode .stat-value {
+      color: rgb(255, 160, 90);
+      text-shadow: 0 0 10px rgba(255, 140, 60, 0.4);
+    }
+
+    .result-card.bootstrap-mode {
+      background: rgba(255, 140, 0, 0.1);
+      border: 1px solid rgb(255, 140, 60);
+    }
+
+    .result-card.bootstrap-mode.highlight {
+      border: 2px solid rgb(255, 140, 60);
+    }
+
+    .result-card.bootstrap-mode .card-value {
+      color: rgb(255, 160, 90);
+    }
+
+    .decision-card.bootstrap-mode {
+      background: rgba(255, 140, 0, 0.08);
+      border: 1px solid rgb(255, 140, 60);
+    }
+
+    .decision-card.bootstrap-mode .decision-result {
+      background: linear-gradient(135deg, rgba(248,113,113,0.25), rgba(239,68,68,0.25));
+      border: 2px solid #ff8c3c;
+    }
+
+    .decision-card.bootstrap-mode .decision-result.fail-to-reject {
+      background: linear-gradient(135deg, rgba(74,222,128,0.25), rgba(34,197,94,0.25));
+      border: 2px solid #ff8c3c;
+    }
+
+    .bootstrap-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: linear-gradient(135deg, rgba(255, 140, 0, 0.3), rgba(255, 90, 50, 0.3));
+      border: 1px solid rgb(255, 140, 60);
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      color: rgb(255, 160, 90);
+      margin-left: 8px;
+    }
+
+    .bootstrap-badge i {
+      font-size: 12px;
+      animation: spin-slow 3s linear infinite;
+    }
+
+    @keyframes spin-slow {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes diagnostic-blink-bootstrap {
+      0%, 100% {
+        box-shadow: 0 4px 15px rgba(255, 140, 60, 0.3);
+        transform: scale(1);
+      }
+      50% {
+        box-shadow: 0 0 25px rgba(255, 140, 60, 0.7), 0 0 15px rgba(255, 140, 60, 0.5);
+        transform: scale(1.02);
+      }
+    }
+
+    .stat-box.bootstrap-mode.blink {
+      animation: diagnostic-blink-bootstrap 0.6s ease-in-out;
+    }
+
+    .decision-card.bootstrap-mode.blink {
+      animation: diagnostic-blink-bootstrap 0.6s ease-in-out;
+    }
+
+    @media (max-width: 768px) {
+      .config-grid {
+        grid-template-columns: 1fr;
+      }
+      .hypothesis-row {
+        grid-template-columns: 1fr;
+      }
+      .results-grid {
+        grid-template-columns: 1fr;
+      }
+      .stats-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Modal/Popup Styles for Visualization */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 10000;
+      justify-content: center;
+      align-items: center;
+      backdrop-filter: blur(3px);
+    }
+
+    .modal-overlay.show {
+      display: flex !important;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .modal-content {
+      background: var(--surface-1);
+      border-radius: 12px;
+      width: 90%;
+      max-width: 1200px;
+      max-height: 85vh;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      border: 2px solid var(--border);
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateY(-20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .modal-header {
+      padding: 12px 16px;
+      background: linear-gradient(135deg, var(--surface-2), var(--surface-1));
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-radius: 12px 12px 0 0;
+    }
+
+    .modal-header span {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent-1);
+      display: flex;
+      align-items: center;
+    }
+
+    .modal-body {
+      padding: 12px 16px;
+      overflow-y: auto;
+      flex: 1;
+      scroll-behavior: smooth;
+    }
+
+    .modal-close-btn {
+      background: linear-gradient(135deg, rgba(255,100,100,0.2), rgba(255,50,50,0.2));
+      border: 1px solid rgba(255,100,100,0.4);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .modal-close-btn:hover {
+      background: linear-gradient(135deg, rgba(255,100,100,0.3), rgba(255,50,50,0.3));
+      transform: scale(1.05);
+    }
+
+    .modal-close-btn i {
+      font-size: 14px;
+    }
+
+    /* Chart specific styles */
+    #chart {
+      height: 380px;
+      background: var(--surface-2);
+      border-radius: 8px;
+      padding: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .chart-slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      background: var(--surface-2);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .chart-slider-row label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 100px;
+    }
+
+    .chart-slider-row .slider {
+      flex: 1;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.2);
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .chart-slider-row .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent-1);
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(255,165,120,0.5);
+    }
+
+    .chart-slider-row .slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent-1);
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(255,165,120,0.5);
+      border: none;
+    }
+
+    #alphaChartValue {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent-1);
+      min-width: 50px;
+      text-align: center;
+    }
+
+    .interpretation-toggle {
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    .interpretation-toggle-btn {
+      background: linear-gradient(135deg, rgba(120,200,255,0.2), rgba(120,200,255,0.1));
+      border: 1px solid var(--accent-2);
+      color: var(--accent-2);
+      padding: 6px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .interpretation-toggle-btn:hover {
+      background: linear-gradient(135deg, rgba(120,200,255,0.3), rgba(120,200,255,0.2));
+      transform: scale(1.02);
+    }
+
+    .interpretation-toggle-btn i {
+      transition: transform 0.3s ease;
+    }
+
+    .interpretation-toggle-btn.expanded i {
+      transform: rotate(180deg);
+    }
+
+    #chartExplanation {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease, margin-top 0.3s ease, padding 0.3s ease;
+      margin-top: 0;
+      padding: 0 16px;
+    }
+
+    #chartExplanation.show {
+      max-height: 500px;
+      margin-top: 12px;
+      padding: 12px 16px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <!-- Custom Notification System (Office.js compatible) -->
+  <div id="notificationToast" class="notification-toast"></div>
+  
+  <div id="customDialogOverlay" class="custom-dialog-overlay">
+    <div class="custom-dialog-content">
+      <div class="custom-dialog-header" id="dialogHeader">Notice</div>
+      <div class="custom-dialog-message" id="dialogMessage"></div>
+      <div class="custom-dialog-buttons">
+        <button class="custom-dialog-btn custom-dialog-btn-primary" onclick="closeCustomDialog()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <statistico-header view-name="Hypothesis Testing" module-name="Univariate Analysis"></statistico-header>
+  
+  <div class="results-container">
+    <!-- Configuration Section -->
+    <div class="config-section">
+      <div class="section-header">
+        Hypothesis Test Configuration
+        <div class="popsize-control">
+          <label>Pop. Size:</label>
+          <input type="text" id="pop-size" placeholder="∞" value="∞">
+        </div>
+      </div>
+
+      <!-- Single Row Configuration -->
+      <div style="display: flex; align-items: stretch; gap: 16px; flex-wrap: wrap; margin-bottom: 10px;">
+        <!-- METHOD Section - Enhanced Card -->
+        <div style="flex: 0 0 auto; min-width: 220px; background: rgba(20,25,35,0.6); border: 2px solid rgba(255,165,120,0.5); border-radius: 10px; overflow: hidden; box-shadow: 0 3px 10px rgba(255,165,120,0.2);">
+          <!-- Header with strong contrast -->
+          <div style="background: linear-gradient(135deg, rgba(255,165,120,0.3), rgba(255,140,90,0.2)); padding: 8px 14px; border-bottom: 2px solid rgba(255,165,120,0.4); display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-layer-group" style="color: var(--accent-1); font-size: 13px; filter: drop-shadow(0 0 3px rgba(255,165,120,0.5));"></i>
+            <div style="font-size: 10px; font-weight: 900; letter-spacing: 1.8px; color: var(--accent-1); text-transform: uppercase; text-shadow: 0 0 6px rgba(255,165,120,0.4);">METHOD</div>
+          </div>
+          <!-- Content with lighter background -->
+          <div style="background: linear-gradient(135deg, rgba(255,165,120,0.08), rgba(255,140,90,0.04)); padding: 12px 14px; display: flex; align-items: center; gap: 14px;">
+            <label class="radio-label" style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <input type="radio" name="method" value="classical" checked onchange="selectMethod('classical')" style="accent-color: var(--accent-1); width: 17px; height: 17px; cursor: pointer;">
+              <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">Classical</span>
+            </label>
+            <label class="radio-label" style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <input type="radio" name="method" value="bootstrap" onchange="selectMethod('bootstrap')" style="accent-color: var(--accent-1); width: 17px; height: 17px; cursor: pointer;">
+              <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">Bootstrap</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- PARAMETER Section - Enhanced Card -->
+        <div style="flex: 1 1 auto; min-width: 380px; background: rgba(20,25,35,0.6); border: 2px solid rgba(120,200,255,0.5); border-radius: 10px; overflow: hidden; box-shadow: 0 3px 10px rgba(120,200,255,0.2);">
+          <!-- Header with strong contrast -->
+          <div style="background: linear-gradient(135deg, rgba(120,200,255,0.3), rgba(100,180,255,0.2)); padding: 8px 14px; border-bottom: 2px solid rgba(120,200,255,0.4); display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-chart-line" style="color: var(--accent-2); font-size: 13px; filter: drop-shadow(0 0 3px rgba(120,200,255,0.5));"></i>
+            <div style="font-size: 10px; font-weight: 900; letter-spacing: 1.8px; color: var(--accent-2); text-transform: uppercase; text-shadow: 0 0 6px rgba(120,200,255,0.4);">TEST PARAMETER</div>
+          </div>
+          <!-- Content with lighter background -->
+          <div style="background: linear-gradient(135deg, rgba(120,200,255,0.08), rgba(100,180,255,0.04)); padding: 12px 14px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+            <label class="radio-label" style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <input type="radio" name="parameter" value="mean" checked onchange="selectParameter('mean')" style="accent-color: var(--accent-2); width: 17px; height: 17px; cursor: pointer;">
+              <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">Mean</span>
+            </label>
+            <label class="radio-label" style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <input type="radio" name="parameter" value="variance" onchange="selectParameter('variance')" style="accent-color: var(--accent-2); width: 17px; height: 17px; cursor: pointer;">
+              <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">Variance</span>
+            </label>
+            <label class="radio-label disabled" id="median-option" style="opacity: 0.4; cursor: not-allowed; display: flex; align-items: center; gap: 6px;">
+              <input type="radio" name="parameter" value="median" disabled onchange="selectParameter('median')" style="accent-color: var(--accent-2); width: 17px; height: 17px; cursor: not-allowed;">
+              <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">Median</span>
+            </label>
+            <label class="radio-label disabled" id="percentile-option" style="opacity: 0.4; cursor: not-allowed; display: flex; align-items: center; gap: 6px;">
+              <input type="radio" name="parameter" value="percentile" disabled onchange="selectParameter('percentile')" style="accent-color: var(--accent-2); width: 17px; height: 17px; cursor: not-allowed;">
+              <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">Percentile</span>
+            </label>
+            
+            <!-- Percentile Value Input (inside parameter frame, always visible) -->
+            <div id="percentile-value-inline" style="display: flex; align-items: center; gap: 6px; background: linear-gradient(135deg, rgba(120,200,255,0.15), rgba(120,200,255,0.08)); border: 2px solid rgba(120,200,255,0.5); border-radius: 6px; padding: 5px 10px; margin-left: 8px; opacity: 0.5; pointer-events: none;">
+              <i class="fa-solid fa-percent" style="color: var(--accent-2); font-size: 11px;"></i>
+              <input type="number" id="percentile-value-input" value="50" min="1" max="99" step="1" 
+                     style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; color: white; padding: 4px 8px; width: 55px; font-size: 12px; font-weight: 600; text-align: center;"
+                     oninput="updatePercentileDisplay(); setAwaitingState()">
+              <span style="color: var(--accent-2); font-size: 11px; font-weight: 700;">%</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Bootstrap Iterations -->
+        <div id="bootstrap-iterations-inline" style="display: none; align-items: center; gap: 8px;">
+          <label style="color: var(--text-secondary); font-size: 12px; font-weight: 600;">Iterations:</label>
+          <input type="number" id="bootstrap-iterations-input" value="500" min="100" max="10000" step="100" 
+                 style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: white; padding: 5px 10px; width: 80px; font-size: 12px;"
+                 oninput="setAwaitingState()">
+          <button onclick="refreshBootstrap()" 
+                  style="background: linear-gradient(135deg, var(--accent-1), rgb(255,140,90)); border: none; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(255,165,120,0.3);">
+            <i class="fa-solid fa-sync-alt"></i> Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- Hypotheses Row -->
+      <div class="hypothesis-row">
+        <!-- H0 Panel -->
+        <div class="h0-panel">
+          <div class="h-label">
+            <span>H₀: <span id="h0-param">mean</span> =</span>
+            <input type="number" id="h0-value" class="h0-input" value="0" step="any" oninput="updateH1Values()">
+          </div>
+        </div>
+
+        <!-- H1 Panel -->
+        <div class="h1-panel">
+          <div class="h-label">H₁: <span id="h1-param">mean</span></div>
+          <div class="h1-options">
+            <label class="radio-label">
+              <input type="radio" name="h1-type" value="less" onchange="setAwaitingState()">
+              <span>< <span id="h1-value-less">0</span></span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="h1-type" value="not-equal" checked onchange="setAwaitingState()">
+              <span>≠ <span id="h1-value-ne">0</span></span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="h1-type" value="greater" onchange="setAwaitingState()">
+              <span>> <span id="h1-value-greater">0</span></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Run Button -->
+      <button class="run-button" onclick="runTest()">
+        <i class="fa-solid fa-play"></i> Run the Test
+      </button>
+    </div>
+
+    <!-- Results Section -->
+    <div class="results-section" id="results-section" style="display: none;">
+      <div class="results-header">
+        <div class="section-header" style="margin: 0;">Hypothesis Test Results</div>
+        <div class="results-actions">
+          <div class="alpha-slider-control">
+            <label>α:</label>
+            <input type="range" id="alpha-slider" min="0.01" max="0.15" step="0.01" value="0.05" oninput="updateAlpha()">
+            <span class="alpha-value" id="alpha-value">0.05</span>
+          </div>
+          <button class="action-btn" onclick="openPowerAnalysis()">
+            <i class="fas fa-brain"></i> Power Analysis
+          </button>
+          <button class="action-btn" id="toggleVisualBtn" onclick="openVisualization()">
+            <i class="fa-solid fa-chart-area"></i> Visualize
+          </button>
+        </div>
+      </div>
+
+      <!-- Awaiting State (shown initially) -->
+      <div id="awaiting-results" class="awaiting-state">
+        <i class="fa-solid fa-flask"></i>
+        <p>Configure parameters and click "Run the Test" to see results.</p>
+      </div>
+
+      <!-- Actual Results (hidden initially) -->
+      <div id="actual-results" style="display: none; position: relative;">
+        <!-- Calculating Overlay (for Bootstrap) -->
+        <div id="calculating-overlay" class="calculating-overlay">
+          <div class="spinner"></div>
+          <div class="calculating-text">Calculating...</div>
+        </div>
+
+      <div class="results-grid">
+        <div class="result-card highlight">
+          <div class="card-icon"><i class="fa-solid fa-flask"></i> TEST PARAMETER</div>
+          <div class="card-value" id="result-parameter">Mean</div>
+        </div>
+        <div class="result-card">
+          <div class="card-icon"><i class="fa-solid fa-vial"></i> TEST TYPE</div>
+          <div class="card-label">One-Sample t-Test</div>
+          <div class="card-value" id="result-test-type" style="font-size: 14px;">—</div>
+        </div>
+        <div class="result-card">
+          <div class="card-icon"><i class="fa-solid fa-arrows-left-right"></i> TEST ORIENTATION</div>
+          <div class="card-value" id="result-orientation">Two-tailed</div>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-box" onclick="openVisualizationWithInterpretation()" title="Click to view detailed interpretation and visualization">
+          <div class="stat-label">Test Statistic</div>
+          <div class="stat-value" id="result-stat-value">—</div>
+        </div>
+        <div class="stat-box" onclick="openVisualizationWithInterpretation()" title="Click to view detailed interpretation and visualization">
+          <div class="stat-label">P-Value</div>
+          <div class="stat-value" id="result-pvalue">—</div>
+        </div>
+      </div>
+
+      <div class="decision-card">
+        <div class="decision-label">
+          <i class="fa-solid fa-gavel"></i> TEST DECISION
+        </div>
+        <div class="decision-result" id="decision-result">
+          <i class="fa-solid fa-xmark"></i> Reject H₀
+        </div>
+      </div>
+
+      <!-- AI Interpretation Button -->
+      <button id="aiInterpretBtn" class="ai-interpret-btn" title="AI Interpretation (Beta)" onclick="requestAIInterpretation()">
+        <i class="fas fa-lightbulb"></i>
+        <span>AI</span>
+      </button>
+      
+      </div> <!-- end actual-results -->
+    </div> <!-- end results-section -->
+  </div>
+
+  <!-- POWER ANALYSIS OVERLAY -->
+  <div id="powerOverlay" class="power-overlay">
+    <div class="power-dialog">
+      <div class="power-dialog-header">
+        <h2>
+          <i class="fas fa-bolt"></i> Power Analysis
+          <span id="powerMethodBadge" style="margin-left: 12px; font-size: 11px; padding: 3px 8px; border-radius: 4px; background: rgba(100,200,255,0.2); color: #88ccff; border: 1px solid rgba(100,200,255,0.3); font-weight: 500; display: none;">
+            <i class="fas fa-cloud"></i> Cloud
+          </span>
+        </h2>
+        <button id="powerCloseBtn" class="power-close-btn"><i class="fas fa-times"></i> Close</button>
+      </div>
+
+      <div id="powerOverlayLoader" class="power-loader">
+        <div class="spinner"></div>
+        <span>Calculating power analysis…</span>
+      </div>
+
+      <div id="powerOverlayContent" class="power-content hidden">
+        <div class="power-columns">
+          <div class="power-panel-card">
+            <h3>Observed Statistics</h3>
+            <div class="power-field">
+              <label>Observed Power</label>
+              <div class="power-stat" id="overlayPowerValue">--</div>
+            </div>
+            <div class="power-field">
+              <label>Effect Size</label>
+              <div class="power-stat" id="overlayEffectSize">--</div>
+            </div>
+            <div class="power-field">
+              <label>Sample Size</label>
+              <div class="power-stat" id="overlaySampleSize">--</div>
+            </div>
+          </div>
+
+          <div class="power-panel-card">
+            <h3>Target Power Scenario</h3>
+            <div class="power-field">
+              <label for="overlayTargetPower">Power to achieve</label>
+              <input type="number" id="overlayTargetPower" step="0.01" min="0.01" max="0.99" value="0.80" oninput="validateTargetPower()"/>
+              <button id="overlayRefreshBtn" type="button" onclick="refreshPowerAnalysis()">🔄 Refresh Power Analysis</button>
+            </div>
+            <div class="power-field">
+              <label id="requiredSampleLabel">Required Sample Size</label>
+              <div class="power-stat" id="overlayRequiredSample">--</div>
+            </div>
+            <div class="power-field">
+              <label>Alpha</label>
+              <div class="power-stat" id="overlayAlphaValue">--</div>
+            </div>
+            <div class="power-field" id="cohenDField">
+              <label>Cohen's d</label>
+              <div class="power-stat" id="overlayCohenD">--</div>
+            </div>
+            <div class="power-field" id="varianceRatioField" style="display: none;">
+              <label>Variance Ratio</label>
+              <div class="power-stat" id="overlayVarianceRatio">--</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="power-footer-note" id="overlayFooterNote">
+          Adjust the target power to see how many observations you need for your hypothesis test.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISUALIZATION MODAL POPUP -->
+  <div class="modal-overlay" id="visualModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span>
+          <i class="fa-solid fa-chart-line" style="margin-right: 10px;"></i>Hypothesis Test Visualization
+        </span>
+        <button id="closeVisualBtn" class="modal-close-btn" onclick="closeVisualization()">
+          <i class="fa-solid fa-times"></i> Close
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="chart-slider-row">
+          <label for="alphaChartSlider">
+            <i class="fa-solid fa-sliders-h"></i>
+            Alpha: <span id="alphaChartValue">0.05</span>
+          </label>
+          <input class="slider" id="alphaChartSlider" max="0.15" min="0.01" step="0.01" type="range" value="0.05" oninput="updateChartAlpha()"/>
+        </div>
+        <div id="chart"></div>
+        <div class="interpretation-toggle">
+          <button class="interpretation-toggle-btn" id="toggleInterpretationBtn" onclick="toggleInterpretation()">
+            <i class="fa-solid fa-chevron-down"></i>
+            <span id="toggleInterpretationText">Show Interpretation</span>
+          </button>
+        </div>
+        <div id="chartExplanation" style="background: var(--surface-2); border-radius: 8px; border: 1px solid var(--border); line-height: 1.5; font-size: 13px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ========================================
+    // CUSTOM NOTIFICATION SYSTEM (Office.js compatible)
+    // ========================================
+    
+    let notificationTimeout = null;
+
+    // Show toast notification (for simple messages)
+    function showNotification(message, type = 'info', duration = 3000) {
+      const toast = document.getElementById('notificationToast');
+      if (!toast) return;
+      
+      // Clear existing timeout
+      if (notificationTimeout) {
+        clearTimeout(notificationTimeout);
+      }
+      
+      // Set message and type
+      toast.textContent = message;
+      toast.className = 'notification-toast show ' + type;
+      
+      // Auto-hide after duration
+      notificationTimeout = setTimeout(() => {
+        toast.classList.remove('show');
+      }, duration);
+    }
+
+    // Show dialog modal (for longer messages or formatted content)
+    function showDialog(message, title = 'Notice') {
+      const overlay = document.getElementById('customDialogOverlay');
+      const header = document.getElementById('dialogHeader');
+      const messageEl = document.getElementById('dialogMessage');
+      
+      if (!overlay || !header || !messageEl) {
+        console.error('Dialog elements not found');
+        return;
+      }
+      
+      header.textContent = title;
+      messageEl.textContent = message;
+      overlay.classList.add('show');
+    }
+
+    // Close dialog modal
+    window.closeCustomDialog = function() {
+      const overlay = document.getElementById('customDialogOverlay');
+      if (overlay) {
+        overlay.classList.remove('show');
+      }
+    };
+
+    // Close dialog when clicking outside
+    document.addEventListener('DOMContentLoaded', function() {
+      const overlay = document.getElementById('customDialogOverlay');
+      if (overlay) {
+        overlay.addEventListener('click', function(e) {
+          if (e.target === this) {
+            closeCustomDialog();
+          }
+        });
+      }
+    });
+
+    // ========================================
+    // GLOBAL STATE
+    // ========================================
+    
+    let resultsData = null;
+    let currentMethod = 'classical';
+    let currentParameter = 'mean';
+    let currentH0 = 0;
+    let currentH1Type = 'not-equal';
+    let currentAlpha = 0.05;
+    let headerInitialized = false;
+    let librariesLoaded = false;
+    
+    // Initialize
+    window.addEventListener('DOMContentLoaded', function() {
+      console.log('✅ Hypothesis Testing loaded');
+      updatePopSizeState();  // Set initial pop size state
+      pollForDependencies();
+    });
+
+    function pollForDependencies() {
+      if (!headerInitialized && typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.init('hypothesis', 'Variable', 0);
+        headerInitialized = true;
+        console.log('✅ Shared header initialized');
+      }
+      
+      if (!librariesLoaded && typeof jStat !== 'undefined') {
+        librariesLoaded = true;
+        console.log('✅ jStat library loaded');
+      }
+      
+      if (headerInitialized && librariesLoaded) {
+        console.log('🎨 All dependencies ready.');
+        return;
+      }
+      
+      setTimeout(pollForDependencies, 100);
+    }
+
+    // Method selection
+    window.selectMethod = function(method) {
+      currentMethod = method;
+      console.log('Method changed to:', method);
+      
+      // Enable/disable median and percentile based on bootstrap
+      const medianOption = document.getElementById('median-option');
+      const percentileOption = document.getElementById('percentile-option');
+      const medianRadio = document.querySelector('input[name="parameter"][value="median"]');
+      const percentileRadio = document.querySelector('input[name="parameter"][value="percentile"]');
+      const bootstrapIterations = document.getElementById('bootstrap-iterations-inline');
+      const percentileInline = document.getElementById('percentile-value-inline');
+      
+      if (method === 'bootstrap') {
+        // Enable all parameters when Bootstrap is selected
+        medianOption.classList.remove('disabled');
+        medianOption.style.opacity = '1';
+        medianOption.style.cursor = 'pointer';
+        medianRadio.disabled = false;
+        medianRadio.style.cursor = 'pointer';
+        
+        percentileOption.classList.remove('disabled');
+        percentileOption.style.opacity = '1';
+        percentileOption.style.cursor = 'pointer';
+        percentileRadio.disabled = false;
+        percentileRadio.style.cursor = 'pointer';
+        
+        bootstrapIterations.style.display = 'flex';
+        
+        // Apply Bootstrap styling to results (if results are visible)
+        applyBootstrapStyling(true);
+      } else {
+        // Disable median and percentile for Classical
+        medianOption.classList.add('disabled');
+        medianOption.style.opacity = '0.4';
+        medianOption.style.cursor = 'not-allowed';
+        medianRadio.disabled = true;
+        medianRadio.style.cursor = 'not-allowed';
+        
+        percentileOption.classList.add('disabled');
+        percentileOption.style.opacity = '0.4';
+        percentileOption.style.cursor = 'not-allowed';
+        percentileRadio.disabled = true;
+        percentileRadio.style.cursor = 'not-allowed';
+        
+        bootstrapIterations.style.display = 'none';
+        
+        // Remove Bootstrap styling
+        applyBootstrapStyling(false);
+        
+        // Reset to mean if median or percentile was selected
+        if (currentParameter === 'median' || currentParameter === 'percentile') {
+          document.querySelector('input[name="parameter"][value="mean"]').checked = true;
+          selectParameter('mean');
+        }
+      }
+      
+      // Update percentile input state based on current parameter
+      updatePercentileInputState();
+      
+      // Set pop size state
+      updatePopSizeState();
+      
+      // Set results to awaiting state
+      setAwaitingState();
+    };
+
+    // Parameter selection
+    window.selectParameter = function(param) {
+      currentParameter = param;
+      console.log('Parameter changed to:', param);
+      
+      // Update H0 and H1 labels
+      document.getElementById('h0-param').textContent = param;
+      document.getElementById('h1-param').textContent = param;
+      
+      // Update result parameter display
+      updatePercentileDisplay();
+      
+      // Update percentile input state
+      updatePercentileInputState();
+      
+      updatePopSizeState();
+      setAwaitingState();
+    };
+
+    // Update percentile input state (always visible, but enabled/disabled based on selection)
+    function updatePercentileInputState() {
+      const percentileInline = document.getElementById('percentile-value-inline');
+      const percentileInput = document.getElementById('percentile-value-input');
+      
+      if (currentParameter === 'percentile') {
+        // Enable when percentile is selected
+        percentileInline.style.opacity = '1';
+        percentileInline.style.pointerEvents = 'auto';
+        percentileInput.disabled = false;
+      } else {
+        // Disable but keep visible when percentile is not selected
+        percentileInline.style.opacity = '0.5';
+        percentileInline.style.pointerEvents = 'none';
+        percentileInput.disabled = true;
+      }
+    }
+
+    // Update percentile display (e.g., "50th Percentile")
+    function updatePercentileDisplay() {
+      if (currentParameter === 'percentile') {
+        const percentileValue = parseInt(document.getElementById('percentile-value-input').value) || 50;
+        const suffix = getOrdinalSuffix(percentileValue);
+        document.getElementById('result-parameter').textContent = `${percentileValue}${suffix} Percentile`;
+      } else {
+        document.getElementById('result-parameter').textContent = currentParameter.charAt(0).toUpperCase() + currentParameter.slice(1);
+      }
+    }
+
+    // Get ordinal suffix (1st, 2nd, 3rd, 4th, etc.)
+    function getOrdinalSuffix(n) {
+      const s = ["th", "st", "nd", "rd"];
+      const v = n % 100;
+      return s[(v - 20) % 10] || s[v] || s[0];
+    }
+
+    // Update alpha from slider
+    window.updateAlpha = function() {
+      const slider = document.getElementById('alpha-slider');
+      currentAlpha = parseFloat(slider.value);
+      document.getElementById('alpha-value').textContent = currentAlpha.toFixed(2);
+      console.log('Alpha changed to:', currentAlpha);
+      
+      // If results are showing, recalculate
+      if (document.getElementById('actual-results').style.display !== 'none' && resultsData) {
+        const result = performHypothesisTest();
+        displayResults(result);
+        
+        // Add blink effect to diagnostic elements
+        const statBoxes = document.querySelectorAll('.stat-box');
+        const decisionCard = document.querySelector('.decision-card');
+        
+        statBoxes.forEach(box => {
+          box.classList.add('blink');
+          setTimeout(() => box.classList.remove('blink'), 600);
+        });
+        
+        if (decisionCard) {
+          decisionCard.classList.add('blink');
+          setTimeout(() => decisionCard.classList.remove('blink'), 600);
+        }
+      }
+    };
+
+    // Update pop size state (enable/disable)
+    function updatePopSizeState() {
+      const popSizeControl = document.querySelector('.popsize-control');
+      const popSizeInput = document.getElementById('pop-size');
+      
+      // Enable only for Classical + Mean
+      if (currentMethod === 'classical' && currentParameter === 'mean') {
+        popSizeControl.classList.remove('disabled');
+        popSizeInput.disabled = false;
+      } else {
+        popSizeControl.classList.add('disabled');
+        popSizeInput.disabled = true;
+      }
+    }
+
+    // Update H1 values when H0 changes
+    window.updateH1Values = function() {
+      const h0Value = document.getElementById('h0-value').value || '0';
+      document.getElementById('h1-value-less').textContent = h0Value;
+      document.getElementById('h1-value-ne').textContent = h0Value;
+      document.getElementById('h1-value-greater').textContent = h0Value;
+      setAwaitingState();
+    };
+
+    // Set awaiting state (hide results, show awaiting message)
+    function setAwaitingState() {
+      const resultsSection = document.getElementById('results-section');
+      if (resultsSection.style.display !== 'none') {
+        document.getElementById('awaiting-results').style.display = 'block';
+        document.getElementById('actual-results').style.display = 'none';
+      }
+    }
+
+    // Refresh bootstrap (re-run with new random seed)
+    window.refreshBootstrap = function() {
+      if (!resultsData || !resultsData.values || resultsData.values.length === 0) {
+        showNotification('No data available. Please load data first.', 'error');
+        return;
+      }
+      
+      // If results are showing, recalculate
+      if (document.getElementById('actual-results').style.display !== 'none') {
+        const overlay = document.getElementById('calculating-overlay');
+        overlay.classList.add('active');
+        
+        setTimeout(() => {
+          const result = performHypothesisTest();
+          displayResults(result);
+          overlay.classList.remove('active');
+          
+          // Add blink effect
+          const statBoxes = document.querySelectorAll('.stat-box');
+          const decisionCard = document.querySelector('.decision-card');
+          
+          statBoxes.forEach(box => {
+            box.classList.add('blink');
+            setTimeout(() => box.classList.remove('blink'), 600);
+          });
+          
+          if (decisionCard) {
+            decisionCard.classList.add('blink');
+            setTimeout(() => decisionCard.classList.remove('blink'), 600);
+          }
+        }, 50);
+      } else {
+        // No results yet, just set awaiting
+        setAwaitingState();
+      }
+    };
+
+    // Run test
+    window.runTest = function() {
+      currentH0 = parseFloat(document.getElementById('h0-value').value) || 0;
+      currentH1Type = document.querySelector('input[name="h1-type"]:checked').value;
+      
+      console.log('🧪 Running test:', {
+        method: currentMethod,
+        parameter: currentParameter,
+        h0: currentH0,
+        h1Type: currentH1Type
+      });
+      
+      if (!resultsData || !resultsData.values || resultsData.values.length === 0) {
+        showNotification('No data available. Please load data first.', 'error');
+        return;
+      }
+      
+      // Show results section and actual results immediately
+      document.getElementById('results-section').style.display = 'block';
+      document.getElementById('awaiting-results').style.display = 'none';
+      document.getElementById('actual-results').style.display = 'block';
+      
+      // If bootstrap, show calculating overlay
+      if (currentMethod === 'bootstrap') {
+        const overlay = document.getElementById('calculating-overlay');
+        overlay.classList.add('active');
+        
+        // Use setTimeout to allow UI to update before heavy calculation
+        setTimeout(() => {
+          const result = performHypothesisTest();
+          displayResults(result);
+          overlay.classList.remove('active');
+        }, 50);
+      } else {
+        // Classical - calculate immediately
+        const result = performHypothesisTest();
+        displayResults(result);
+      }
+    };
+
+    // Perform hypothesis test
+    function performHypothesisTest() {
+      const data = resultsData.values;
+      const n = data.length;
+      
+      let testStat, pValue, testType;
+      
+      if (currentMethod === 'classical') {
+        const mean = data.reduce((a, b) => a + b, 0) / n;
+        const variance = data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / (n - 1);
+        const stdev = Math.sqrt(variance);
+        
+        if (currentParameter === 'mean') {
+          // One-sample t-test
+          testStat = (mean - currentH0) / (stdev / Math.sqrt(n));
+          
+          if (currentH1Type === 'not-equal') {
+            pValue = 2 * (1 - jStat.studentt.cdf(Math.abs(testStat), n - 1));
+          } else if (currentH1Type === 'greater') {
+            pValue = 1 - jStat.studentt.cdf(testStat, n - 1);
+          } else { // less
+            pValue = jStat.studentt.cdf(testStat, n - 1);
+          }
+          
+          testType = 'One-Sample t-Test';
+        } else if (currentParameter === 'variance') {
+          // Chi-square test for variance
+          testStat = (n - 1) * variance / (currentH0 || 1);
+          
+          if (currentH1Type === 'not-equal') {
+            const pLower = jStat.chisquare.cdf(testStat, n - 1);
+            const pUpper = 1 - jStat.chisquare.cdf(testStat, n - 1);
+            pValue = 2 * Math.min(pLower, pUpper);
+          } else if (currentH1Type === 'greater') {
+            pValue = 1 - jStat.chisquare.cdf(testStat, n - 1);
+          } else { // less
+            pValue = jStat.chisquare.cdf(testStat, n - 1);
+          }
+          
+          testType = 'Chi-Square Test';
+        }
+      } else if (currentMethod === 'bootstrap') {
+        // Bootstrap hypothesis test (proper implementation with forced randomness)
+        const iterations = parseInt(document.getElementById('bootstrap-iterations-input').value) || 500;
+        
+        // Set test type based on parameter
+        if (currentParameter === 'percentile') {
+          const percentileValue = parseInt(document.getElementById('percentile-value-input').value) || 50;
+          testType = `Bootstrap Percentile Test`;
+        } else {
+          testType = `Bootstrap ${currentParameter.charAt(0).toUpperCase() + currentParameter.slice(1)} Test`;
+        }
+        
+        // Force new random seed by using timestamp
+        const randomSeed = Date.now() + Math.random() * 1000000;
+        console.log('🎲 Bootstrap random seed:', randomSeed);
+        
+        // Calculate observed sample statistic
+        let observedStat;
+        const mean = data.reduce((a, b) => a + b, 0) / n;
+        
+        if (currentParameter === 'mean') {
+          observedStat = mean;
+        } else if (currentParameter === 'median') {
+          const sorted = [...data].sort((a, b) => a - b);
+          const mid = Math.floor(sorted.length / 2);
+          observedStat = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+        } else if (currentParameter === 'variance') {
+          observedStat = data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / (n - 1);
+        } else if (currentParameter === 'percentile') {
+          const p = parseFloat(document.getElementById('percentile-value-input').value) / 100;
+          observedStat = calculatePercentile(data, p);
+        }
+        
+        // Calculate test statistic (difference from H0)
+        testStat = observedStat - currentH0;
+        
+        // Center data under null hypothesis
+        const shift = currentH0 - observedStat;
+        const centeredData = data.map(x => x + shift);
+        
+        // Bootstrap resampling from centered data (with true randomness)
+        let moreExtreme = 0;
+        const bootstrapTestStats = []; // Track for debugging
+        
+        for (let i = 0; i < iterations; i++) {
+          const resample = [];
+          // Use Math.random() with forced new values each iteration
+          for (let j = 0; j < n; j++) {
+            const randomIndex = Math.floor(Math.random() * n);
+            resample.push(centeredData[randomIndex]);
+          }
+          
+          let bootStat;
+          if (currentParameter === 'mean') {
+            bootStat = resample.reduce((a, b) => a + b, 0) / n;
+          } else if (currentParameter === 'median') {
+            const sorted = [...resample].sort((a, b) => a - b);
+            const mid = Math.floor(sorted.length / 2);
+            bootStat = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+          } else if (currentParameter === 'variance') {
+            const resampleMean = resample.reduce((a, b) => a + b, 0) / n;
+            bootStat = resample.reduce((acc, val) => acc + Math.pow(val - resampleMean, 2), 0) / (n - 1);
+          } else if (currentParameter === 'percentile') {
+            const p = parseFloat(document.getElementById('percentile-value-input').value) / 100;
+            bootStat = calculatePercentile(resample, p);
+          }
+          
+          // Calculate test statistic for this bootstrap sample
+          const bootTestStat = bootStat - currentH0;
+          bootstrapTestStats.push(bootTestStat);
+          
+          // Count more extreme
+          if (currentH1Type === 'not-equal') {
+            if (Math.abs(bootTestStat) >= Math.abs(testStat)) moreExtreme++;
+          } else if (currentH1Type === 'greater') {
+            if (bootTestStat >= testStat) moreExtreme++;
+          } else { // less
+            if (bootTestStat <= testStat) moreExtreme++;
+          }
+        }
+        
+        pValue = moreExtreme / iterations;
+        testStat = observedStat; // Display the observed statistic
+        
+        // Log statistics for verification
+        console.log('📊 Bootstrap results:', {
+          observedStat: observedStat.toFixed(4),
+          testStat: testStat.toFixed(4),
+          moreExtreme,
+          iterations,
+          pValue: pValue.toFixed(4),
+          bootStatsRange: `${Math.min(...bootstrapTestStats).toFixed(2)} to ${Math.max(...bootstrapTestStats).toFixed(2)}`
+        });
+      }
+      
+      const reject = pValue < currentAlpha;
+      
+      return {
+        testStat,
+        pValue,
+        testType,
+        reject,
+        orientation: currentH1Type === 'not-equal' ? 'Two-tailed' : (currentH1Type === 'greater' ? 'Right-tailed' : 'Left-tailed')
+      };
+    }
+
+    // Apply Bootstrap styling to result elements
+    function applyBootstrapStyling(enable) {
+      const statBoxes = document.querySelectorAll('.stat-box');
+      const resultCards = document.querySelectorAll('.result-card');
+      const decisionCard = document.querySelector('.decision-card');
+      const testTypeCard = document.querySelector('.result-card:nth-child(2)');
+      
+      if (enable) {
+        // Add Bootstrap styling classes
+        statBoxes.forEach(box => box.classList.add('bootstrap-mode'));
+        resultCards.forEach(card => card.classList.add('bootstrap-mode'));
+        if (decisionCard) decisionCard.classList.add('bootstrap-mode');
+        
+        // Add Bootstrap badge to test type card
+        if (testTypeCard && !testTypeCard.querySelector('.bootstrap-badge')) {
+          const testTypeValue = testTypeCard.querySelector('.card-value');
+          if (testTypeValue) {
+            const badge = document.createElement('span');
+            badge.className = 'bootstrap-badge';
+            badge.innerHTML = '<i class="fa-solid fa-rotate"></i> Bootstrap';
+            testTypeValue.appendChild(badge);
+          }
+        }
+        
+        console.log('✅ Bootstrap styling applied');
+      } else {
+        // Remove Bootstrap styling classes
+        statBoxes.forEach(box => box.classList.remove('bootstrap-mode'));
+        resultCards.forEach(card => card.classList.remove('bootstrap-mode'));
+        if (decisionCard) decisionCard.classList.remove('bootstrap-mode');
+        
+        // Remove Bootstrap badge
+        const badge = document.querySelector('.bootstrap-badge');
+        if (badge) badge.remove();
+        
+        console.log('✅ Bootstrap styling removed');
+      }
+    }
+
+    // Display results
+    function displayResults(result) {
+      // Store results globally for Power Analysis and AI buttons
+      window.currentTestResults = {
+        testType: result.testType,
+        orientation: result.orientation,
+        testStat: result.testStat,
+        pValue: result.pValue,
+        reject: result.reject,
+        decision: result.reject ? 'Reject H₀' : 'Fail to Reject H₀',
+        parameter: currentParameter,
+        method: currentMethod,
+        alpha: currentAlpha,
+        h0Value: currentH0,
+        n: resultsData ? resultsData.length : 0
+      };
+      
+      console.log('✅ Test results stored:', window.currentTestResults);
+      
+      document.getElementById('result-test-type').textContent = result.testType;
+      document.getElementById('result-orientation').textContent = result.orientation;
+      document.getElementById('result-stat-value').textContent = result.testStat.toFixed(4);
+      document.getElementById('result-pvalue').textContent = result.pValue.toFixed(4);
+      
+      const decisionEl = document.getElementById('decision-result');
+      if (result.reject) {
+        decisionEl.innerHTML = '<i class="fa-solid fa-xmark"></i> Reject H₀';
+        decisionEl.className = 'decision-result';
+      } else {
+        decisionEl.innerHTML = '<i class="fa-solid fa-check"></i> Fail to Reject H₀';
+        decisionEl.className = 'decision-result fail-to-reject';
+      }
+      
+      // Apply Bootstrap styling if in bootstrap mode
+      applyBootstrapStyling(currentMethod === 'bootstrap');
+      
+      // Show actual results, hide awaiting
+      document.getElementById('awaiting-results').style.display = 'none';
+      document.getElementById('actual-results').style.display = 'block';
+    }
+
+    // Office.js initialization
+    Office.initialize = function (reason) {
+      console.log('✅ Hypothesis Testing - Office.js initialized:', reason);
+      
+      Office.context.ui.addHandlerAsync(
+        Office.EventType.DialogParentMessageReceived,
+        onMessageReceived
+      );
+      
+      setTimeout(() => {
+        sendMessageToParent({ status: 'ready' });
+      }, 500);
+      
+      // Check localStorage for data
+      setTimeout(() => {
+        if (!resultsData) {
+          console.log('📦 Checking localStorage for univariateResults...');
+          const storedResults = localStorage.getItem('univariateResults');
+          if (storedResults) {
+            try {
+              const parsedData = JSON.parse(storedResults);
+              console.log('✅ Found data in localStorage');
+              handleDataReceived(parsedData);
+              return;
+            } catch (e) {
+              console.error('❌ Error parsing localStorage data:', e);
+            }
+          }
+        }
+      }, 1000);
+      
+      // Fallback to sample data
+      setTimeout(() => {
+        if (!resultsData) {
+          console.log('⚠️ No data received, loading sample data');
+          loadSampleData();
+        }
+      }, 5000);
+    };
+
+    function onMessageReceived(arg) {
+      try {
+        const message = JSON.parse(arg.message);
+        console.log('📩 Message from parent:', message);
+        if (message.action === 'loadData') {
+          handleDataReceived(message.data);
+        }
+      } catch (e) {
+        console.error('Error handling dialog message:', e);
+      }
+    }
+
+    function handleDataReceived(data) {
+      if (!librariesLoaded || !headerInitialized) {
+        console.warn('⚠️ Libraries or header not ready, deferring data handling.');
+        setTimeout(() => handleDataReceived(data), 100);
+        return;
+      }
+      
+      console.log('📊 Data received:', data);
+      
+      // Save to localStorage for view switching
+      try {
+        localStorage.setItem('univariateResults', JSON.stringify(data));
+        console.log('✅ Saved data to localStorage');
+      } catch (e) {
+        console.error('❌ Error saving to localStorage:', e);
+      }
+      
+      resultsData = {
+        values: data.values || data.data || [],
+        column: data.column || 'Variable',
+        n: data.n || (data.values ? data.values.length : 0)
+      };
+      
+      // Update header with variable name and sample size
+      const variableName = resultsData.column || 'Variable';
+      StatisticoHeader.updateVariable(variableName, resultsData.n);
+      console.log('✅ Header updated with data:', variableName, 'n=', resultsData.n);
+    }
+
+    function loadSampleData() {
+      console.log('📊 Loading sample data...');
+      const sampleData = [];
+      for (let i = 0; i < 100; i++) {
+        const u1 = Math.random();
+        const u2 = Math.random();
+        const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        sampleData.push(50 + z * 10);
+      }
+      handleDataReceived({
+        values: sampleData,
+        column: 'Sample Data',
+        n: sampleData.length
+      });
+    }
+
+    function sendMessageToParent(message) {
+      if (typeof Office !== 'undefined' && Office.context && Office.context.ui) {
+        Office.context.ui.messageParent(JSON.stringify(message));
+      }
+    }
+
+    // Calculate percentile from data
+    function calculatePercentile(data, p) {
+      if (!data || data.length === 0) return 0;
+      const sorted = [...data].sort((a, b) => a - b);
+      const index = (sorted.length - 1) * p;
+      const lower = Math.floor(index);
+      const upper = Math.ceil(index);
+      const weight = index - lower;
+      return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+    }
+
+    // ========================================
+    // VISUALIZATION FUNCTIONS
+    // ========================================
+    
+    window.openVisualization = function() {
+      const modal = document.getElementById('visualModal');
+      if (!modal) return;
+      
+      // Check if we have results to visualize
+      if (document.getElementById('actual-results').style.display === 'none') {
+        showNotification('Please run a hypothesis test first before visualizing.', 'error');
+        return;
+      }
+      
+      modal.classList.add('show');
+      setTimeout(() => updateChart(), 200); // Wait for animation to start
+    };
+
+    window.closeVisualization = function() {
+      const modal = document.getElementById('visualModal');
+      if (modal) {
+        modal.classList.remove('show');
+      }
+    };
+
+    window.toggleInterpretation = function() {
+      const explanation = document.getElementById('chartExplanation');
+      const btn = document.getElementById('toggleInterpretationBtn');
+      const btnText = document.getElementById('toggleInterpretationText');
+      
+      if (explanation.classList.contains('show')) {
+        explanation.classList.remove('show');
+        btn.classList.remove('expanded');
+        btnText.textContent = 'Show Interpretation';
+      } else {
+        explanation.classList.add('show');
+        btn.classList.add('expanded');
+        btnText.textContent = 'Hide Interpretation';
+      }
+    };
+
+    // Open visualization modal with interpretation expanded
+    window.openVisualizationWithInterpretation = function() {
+      // First, open the visualization modal
+      const modal = document.getElementById('visualModal');
+      if (!modal) return;
+      
+      // Check if we have results to visualize
+      if (document.getElementById('actual-results').style.display === 'none') {
+        showNotification('Please run a hypothesis test first before visualizing.', 'error');
+        return;
+      }
+      
+      // Open modal
+      modal.classList.add('show');
+      
+      // Update chart after a short delay to ensure modal is visible
+      setTimeout(() => {
+        updateChart();
+        
+        // Expand interpretation section after chart loads
+        setTimeout(() => {
+          const explanation = document.getElementById('chartExplanation');
+          const btn = document.getElementById('toggleInterpretationBtn');
+          const btnText = document.getElementById('toggleInterpretationText');
+          
+          if (explanation && !explanation.classList.contains('show')) {
+            explanation.classList.add('show');
+            btn.classList.add('expanded');
+            btnText.textContent = 'Hide Interpretation';
+          }
+          
+          // Smooth scroll to interpretation section
+          setTimeout(() => {
+            const toggleBtn = document.getElementById('toggleInterpretationBtn');
+            if (toggleBtn) {
+              toggleBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 300);
+        }, 500);
+      }, 100);
+    };
+
+    window.updateChartAlpha = function() {
+      const slider = document.getElementById('alphaChartSlider');
+      const alphaValue = parseFloat(slider.value);
+      document.getElementById('alphaChartValue').textContent = alphaValue.toFixed(2);
+      updateChart();
+    };
+
+    // Standard normal PDF
+    function normalPDF(x) {
+      return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+    }
+
+    // Inverse normal CDF (simple approximation)
+    function normalInv(p) {
+      if (p <= 0 || p >= 1) return 0;
+      const c = [2.515517, 0.802853, 0.010328];
+      const d = [1.432788, 0.189269, 0.001308];
+      const t = Math.sqrt(-2 * Math.log(Math.min(p, 1 - p)));
+      const z = t - ((c[2] * t + c[1]) * t + c[0]) / (((d[2] * t + d[1]) * t + d[0]) * t + 1);
+      return p < 0.5 ? -z : z;
+    }
+
+    function updateChart() {
+      if (typeof Plotly === 'undefined') {
+        console.error('Plotly not available');
+        return;
+      }
+
+      const slider = document.getElementById('alphaChartSlider');
+      const alpha = slider ? parseFloat(slider.value) : currentAlpha;
+      
+      // Get current test results
+      const testStat = parseFloat(document.getElementById('result-stat-value').textContent) || 0;
+      const pValue = parseFloat(document.getElementById('result-pvalue').textContent) || 0;
+      const orientation = document.getElementById('result-orientation').textContent || 'Two-tailed';
+      const testType = document.getElementById('result-test-type').textContent || '';
+      
+      // Calculate critical values for the given alpha
+      let critLeft, critRight;
+      if (orientation === 'Two-tailed') {
+        critLeft = normalInv(alpha / 2);
+        critRight = normalInv(1 - alpha / 2);
+      } else if (orientation === 'Left-tailed') {
+        critLeft = normalInv(alpha);
+        critRight = null;
+      } else { // Right-tailed
+        critLeft = null;
+        critRight = normalInv(1 - alpha);
+      }
+
+      // Generate distribution curve
+      const x = [];
+      const y = [];
+      for (let i = -4; i <= 4; i += 0.05) {
+        x.push(i);
+        y.push(normalPDF(i));
+      }
+
+      // Create traces
+      const traces = [];
+
+      // Main distribution curve
+      traces.push({
+        x: x,
+        y: y,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Distribution',
+        line: { color: 'rgb(120,200,255)', width: 3 },
+        fill: 'tozeroy',
+        fillcolor: 'rgba(120,200,255,0.1)'
+      });
+
+      // Rejection regions
+      if (orientation === 'Two-tailed') {
+        // Left rejection region
+        const xLeft = x.filter(v => v <= critLeft);
+        const yLeft = xLeft.map(v => normalPDF(v));
+        traces.push({
+          x: xLeft,
+          y: yLeft,
+          type: 'scatter',
+          mode: 'lines',
+          name: 'Rejection Region (Left)',
+          line: { width: 0 },
+          fill: 'tozeroy',
+          fillcolor: 'rgba(255,100,100,0.3)',
+          showlegend: false
+        });
+
+        // Right rejection region
+        const xRight = x.filter(v => v >= critRight);
+        const yRight = xRight.map(v => normalPDF(v));
+        traces.push({
+          x: xRight,
+          y: yRight,
+          type: 'scatter',
+          mode: 'lines',
+          name: 'Rejection Region (Right)',
+          line: { width: 0 },
+          fill: 'tozeroy',
+          fillcolor: 'rgba(255,100,100,0.3)',
+          showlegend: false
+        });
+      } else if (orientation === 'Left-tailed') {
+        const xLeft = x.filter(v => v <= critLeft);
+        const yLeft = xLeft.map(v => normalPDF(v));
+        traces.push({
+          x: xLeft,
+          y: yLeft,
+          type: 'scatter',
+          mode: 'lines',
+          name: 'Rejection Region',
+          line: { width: 0 },
+          fill: 'tozeroy',
+          fillcolor: 'rgba(255,100,100,0.3)',
+          showlegend: false
+        });
+      } else { // Right-tailed
+        const xRight = x.filter(v => v >= critRight);
+        const yRight = xRight.map(v => normalPDF(v));
+        traces.push({
+          x: xRight,
+          y: yRight,
+          type: 'scatter',
+          mode: 'lines',
+          name: 'Rejection Region',
+          line: { width: 0 },
+          fill: 'tozeroy',
+          fillcolor: 'rgba(255,100,100,0.3)',
+          showlegend: false
+        });
+      }
+
+      // Critical value lines
+      if (critLeft !== null) {
+        traces.push({
+          x: [critLeft, critLeft],
+          y: [0, normalPDF(critLeft)],
+          type: 'scatter',
+          mode: 'lines',
+          name: `Critical Left (${critLeft.toFixed(3)})`,
+          line: { color: 'rgb(255,165,120)', width: 2, dash: 'dash' }
+        });
+      }
+
+      if (critRight !== null) {
+        traces.push({
+          x: [critRight, critRight],
+          y: [0, normalPDF(critRight)],
+          type: 'scatter',
+          mode: 'lines',
+          name: `Critical Right (${critRight.toFixed(3)})`,
+          line: { color: 'rgb(255,165,120)', width: 2, dash: 'dash' }
+        });
+      }
+
+      // Test statistic line
+      if (testStat !== 0) {
+        traces.push({
+          x: [testStat, testStat],
+          y: [0, normalPDF(testStat)],
+          type: 'scatter',
+          mode: 'lines+markers',
+          name: `Test Statistic (${testStat.toFixed(3)})`,
+          line: { color: 'rgb(255,215,0)', width: 3 },
+          marker: { size: 10, color: 'rgb(255,215,0)' }
+        });
+      }
+
+      const layout = {
+        title: {
+          text: `${testType}<br><sub>Test Statistic: ${testStat.toFixed(4)} | P-Value: ${pValue.toFixed(4)} | α: ${alpha.toFixed(2)}</sub>`,
+          font: { color: 'white', size: 15 }
+        },
+        xaxis: {
+          title: 'Test Statistic',
+          gridcolor: 'rgba(255,255,255,0.1)',
+          color: 'white',
+          titlefont: { size: 12 }
+        },
+        yaxis: {
+          title: 'Probability Density',
+          gridcolor: 'rgba(255,255,255,0.1)',
+          color: 'white',
+          titlefont: { size: 12 }
+        },
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        legend: {
+          font: { color: 'white', size: 11 },
+          bgcolor: 'rgba(26,31,46,0.8)'
+        },
+        margin: { t: 70, b: 50, l: 55, r: 35 }
+      };
+
+      Plotly.newPlot('chart', traces, layout, { responsive: true });
+
+      // Update explanation
+      const explanation = document.getElementById('chartExplanation');
+      const reject = pValue < alpha;
+      const decision = reject ? '<strong style="color: rgb(255,100,100);">Reject H₀</strong>' : '<strong style="color: rgb(100,255,100);">Fail to Reject H₀</strong>';
+      
+      explanation.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="font-size: 14px; font-weight: 700; color: var(--accent-1); margin-bottom: 4px;">
+            <i class="fa-solid fa-info-circle"></i> Interpretation
+          </div>
+          <div style="display: grid; grid-template-columns: 140px 1fr; gap: 8px; font-size: 13px;">
+            <div style="color: var(--text-muted);">Test:</div>
+            <div>${orientation} ${testType}</div>
+            
+            <div style="color: var(--text-muted);">Alpha Level:</div>
+            <div>α = ${alpha.toFixed(2)} <span style="color: var(--accent-2);">(${(100 * (1 - alpha)).toFixed(0)}% confidence)</span></div>
+            
+            <div style="color: var(--text-muted);">Test Statistic:</div>
+            <div style="font-weight: 600; color: rgb(255,215,0);">${testStat.toFixed(4)}</div>
+            
+            <div style="color: var(--text-muted);">P-Value:</div>
+            <div style="font-weight: 600; color: var(--accent-2);">${pValue.toFixed(4)}</div>
+            
+            <div style="color: var(--text-muted);">Decision:</div>
+            <div style="font-size: 14px;">${decision}</div>
+          </div>
+          <div style="margin-top: 8px; padding: 10px; background: rgba(120,200,255,0.05); border-left: 3px solid var(--accent-2); border-radius: 4px; font-size: 12px; font-style: italic; color: var(--text-secondary);">
+            <i class="fa-solid fa-lightbulb" style="color: var(--accent-2); margin-right: 6px;"></i>
+            The shaded red areas represent the rejection region(s). If the test statistic (yellow line) falls within these regions, we reject the null hypothesis.
+          </div>
+        </div>
+      `;
+    }
+
+    // Close modal on escape key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        closeVisualization();
+      }
+    });
+
+    // Close modal when clicking outside
+    document.getElementById('visualModal')?.addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeVisualization();
+      }
+    });
+
+    // =================================================================
+    // AI INTERPRETATION (VB6-Style Robust & Reusable)
+    // =================================================================
+    
+    // AI Configuration
+    const AI_CONFIG = {
+      apiKey: window.AI_API_KEY || '',
+      endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.7,
+      maxTokens: 500,
+      timeout: 30000
+    };
+    
+    console.log('🤖 AI_CONFIG initialized');
+    console.log('   API Key present:', AI_CONFIG.apiKey ? 'YES (length: ' + AI_CONFIG.apiKey.length + ')' : 'NO');
+    console.log('   Endpoint:', AI_CONFIG.endpoint);
+
+    // Reusable AI Service Module (works with any statistical test)
+    const AIService = {
+      async sendRequest(prompt) {
+        if (!AI_CONFIG.apiKey) {
+          throw new Error('AI API key not configured');
+        }
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), AI_CONFIG.timeout);
+
+        try {
+          const response = await fetch(AI_CONFIG.endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${AI_CONFIG.apiKey}`
+            },
+            body: JSON.stringify({
+              model: AI_CONFIG.model,
+              messages: [{ role: 'user', content: prompt }],
+              temperature: AI_CONFIG.temperature,
+              max_tokens: AI_CONFIG.maxTokens
+            }),
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+          if (!response.ok) throw new Error(`API Error: ${response.status}`);
+          
+          const data = await response.json();
+          return data.choices[0].message.content;
+        } catch (error) {
+          if (error.name === 'AbortError') throw new Error('Request timeout');
+          throw error;
+        }
+      },
+
+      buildHypothesisPrompt(testData) {
+        const orientationMap = {
+          'Two-tailed': 'Two-Tailed Test',
+          'Right-tailed': 'One-Tailed Test (Right-Tailed)',
+          'Left-tailed': 'One-Tailed Test (Left-Tailed)'
+        };
+        const orientationText = orientationMap[testData.testOrientation] || testData.testOrientation;
+
+        return `You are a statistical expert. Interpret these hypothesis test results for a researcher. 
+Provide a clear, professional interpretation covering:
+0. Explain concisely how the test works
+1. What the test tells us (statistical significance)
+2. Practical significance (effect size interpretation)
+3. Key assumptions and limitations
+4. Recommended next steps
+
+Keep it concise (3-4 paragraphs) and accessible.
+
+TEST RESULTS:
+Test: ${testData.testName}
+Test Type: ${orientationText}
+Parameter: ${testData.testParameter}
+Sample Size: n=${testData.sampleSize}
+Test Statistic: ${testData.testStatistic}
+P-value: ${testData.pValue}
+Alpha: ${testData.alpha}
+Effect Size: ${testData.effectSize || 'N/A'}
+Decision: ${testData.decision}`;
+      },
+
+      showPopup(interpretation) {
+        const html = `<div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:100000;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;">
+          <div style="background:#fff;border-radius:20px;box-shadow:0 25px 70px rgba(15,23,42,0.25);max-width:900px;width:100%;max-height:calc(100vh - 80px);display:flex;flex-direction:column;overflow:hidden;">
+            <header style="background:linear-gradient(120deg,#7dd3fc 0%,#c084fc 60%,#a5b4fc 100%);padding:28px 40px;display:flex;align-items:center;justify-content:space-between;">
+              <h1 style="margin:0;font-size:30px;color:#0f172a;">🤖 AI Interpretation</h1>
+              <button onclick="closeAIPopup()" style="background:rgba(255,255,255,0.9);border:2px solid #0f172a;border-radius:8px;padding:8px 16px;color:#0f172a;font-weight:600;cursor:pointer;">✕ Close</button>
+            </header>
+            <section style="font-size:16px;line-height:1.8;color:#334155;overflow-y:auto;padding:36px 48px;flex:1;">${this.formatText(interpretation)}</section>
+            <footer style="background:linear-gradient(120deg,rgba(241,245,249,0.8),rgba(226,232,240,0.9));border-top:1px solid rgba(203,213,225,0.5);padding:20px 32px;font-size:14px;color:#475569;"><strong>Note:</strong> AI interpretations are decision aids. Confirm critical findings with domain experts.</footer>
+          </div>
+        </div>`;
+        
+        const existing = document.getElementById('ai-popup');
+        if (existing) existing.remove();
+        
+        const div = document.createElement('div');
+        div.id = 'ai-popup';
+        div.innerHTML = html;
+        document.body.appendChild(div);
+      },
+
+      formatText(text) {
+        return text.split(/\n\n+/).filter(p => p.trim())
+          .map(p => `<p style="margin:0 0 16px;">${this.escape(p.trim())}</p>`).join('');
+      },
+
+      escape(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+    };
+
+    window.closeAIPopup = () => document.getElementById('ai-popup')?.remove();
+
+    window.requestAIInterpretation = async function() {
+      if (!window.currentTestResults) {
+        showNotification('No test results available', 'error');
+        return;
+      }
+
+      try {
+        showNotification('🤖 Requesting AI...', 'info', 2000);
+
+        const testData = {
+          testParameter: window.currentTestResults.parameter || 'Unknown',
+          testName: window.currentTestResults.testType || 'Hypothesis Test',
+          testOrientation: window.currentTestResults.orientation || 'Two-tailed',
+          testStatistic: (window.currentTestResults.testStat || 0).toFixed(4),
+          pValue: (window.currentTestResults.pValue || 0).toFixed(4),
+          alpha: (window.currentTestResults.alpha || 0.05).toFixed(2),
+          sampleSize: window.currentTestResults.n || 0,
+          decision: window.currentTestResults.decision || 'Unknown',
+          effectSize: window.currentTestResults.effectSize || 'N/A'
+        };
+
+        const prompt = AIService.buildHypothesisPrompt(testData);
+        const interpretation = await AIService.sendRequest(prompt);
+        
+        AIService.showPopup(interpretation);
+        showNotification('✓ AI interpretation ready', 'success', 2000);
+
+      } catch (error) {
+        console.error('❌ AI error:', error);
+        showNotification('AI failed: ' + error.message, 'error', 5000);
+      }
+    };
+
+    // =================================================================
+    // POWER ANALYSIS (VB6-based implementation with Cloud Functions)
+    // =================================================================
+    let powerAnalysisCache = {
+      effectSize: 0,
+      observedPower: 0,
+      requiredSampleSize: 0,
+      cohenD: 0,
+      targetPower: 0.80,
+      method: 'cloud' // Only cloud-based power analysis
+    };
+
+    // Cloud Function URLs
+    const CLOUD_ENDPOINTS = {
+      tTest: 'https://us-central1-tukey-multple-comparisons.cloudfunctions.net/t_testOneSample',
+      varianceTest: 'https://variance-power-analysis-onesample-359524197306.us-central1.run.app/',
+      wilcoxon: 'https://us-central1-tukey-multple-comparisons.cloudfunctions.net/power-Wilconson',
+      signTest: 'https://us-central1-tukey-multple-comparisons.cloudfunctions.net/sign-test'
+    };
+
+    // Call VB6 cloud function for power analysis
+    async function callCloudPowerFunction(endpoint, params) {
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('🔍 CLOUD FUNCTION DEBUG');
+      console.log('═══════════════════════════════════════════════════════');
+      
+      try {
+        const url = new URL(endpoint);
+        
+        // Log parameters BEFORE adding to URL
+        console.log('📋 Input Parameters:', JSON.stringify(params, null, 2));
+        console.log('📋 Parameter Types:');
+        Object.keys(params).forEach(key => {
+          console.log(`   ${key}: ${typeof params[key]} = ${params[key]}`);
+        });
+        
+        Object.keys(params).forEach(key => {
+          url.searchParams.append(key, params[key]);
+        });
+
+        console.log('🌐 Full URL:', url.toString());
+        console.log('📤 Sending request...');
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+        const response = await fetch(url.toString(), {
+          method: 'GET',
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        console.log('📡 Response Status:', response.status, response.statusText);
+        console.log('📡 Response Headers:', Object.fromEntries(response.headers.entries()));
+
+        if (!response.ok) {
+          // Try to get error body for debugging
+          let errorBody = '';
+          try {
+            errorBody = await response.text();
+            console.error('❌ Error Response Body:', errorBody);
+          } catch (e) {
+            console.error('❌ Could not read error body');
+          }
+          
+          throw new Error(`HTTP ${response.status}: ${response.statusText}\nBody: ${errorBody.substring(0, 500)}`);
+        }
+
+        const data = await response.json();
+        console.log('✅ Success! Response Data:', JSON.stringify(data, null, 2));
+        console.log('═══════════════════════════════════════════════════════');
+        return { success: true, data };
+
+      } catch (error) {
+        console.log('═══════════════════════════════════════════════════════');
+        if (error.name === 'AbortError') {
+          console.warn('⚠️ Cloud function timeout (>10s)');
+          return { success: false, error: 'timeout', message: 'Request timeout (>10s)' };
+        } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+          console.warn('⚠️ Network error - offline or unreachable');
+          return { success: false, error: 'offline', message: 'Offline or service unreachable' };
+        } else {
+          console.error('❌ Cloud function error:', error);
+          console.error('❌ Error stack:', error.stack);
+          return { success: false, error: 'error', message: error.message };
+        }
+      }
+    }
+
+    window.openPowerAnalysis = async function() {
+      console.log('🔍 Power Analysis button clicked');
+      console.log('📊 currentTestResults:', window.currentTestResults);
+      console.log('📊 resultsData:', resultsData);
+      
+      if (!window.currentTestResults) {
+        console.warn('⚠️ No test results available');
+        showNotification('No test results available. Please run a test first.', 'error');
+        return;
+      }
+
+      try {
+        console.log('⚡ Power Analysis requested - opening modal');
+
+        // Get modal elements
+        const overlay = document.getElementById('powerOverlay');
+        const loader = document.getElementById('powerOverlayLoader');
+        const content = document.getElementById('powerOverlayContent');
+        
+        if (!overlay) {
+          console.error('❌ powerOverlay element not found!');
+          showNotification('Power Analysis modal not found', 'error');
+          return;
+        }
+
+        console.log('✅ Modal elements found, opening...');
+        
+        overlay.classList.add('open');
+        loader.style.display = 'flex';
+        content.classList.add('hidden');
+
+        // Calculate power analysis with async/await
+        setTimeout(async () => {
+          try {
+            await calculatePowerAnalysis();
+            loader.style.display = 'none';
+            content.classList.remove('hidden');
+            console.log('✅ Power analysis displayed');
+          } catch (calcError) {
+            console.error('❌ Error calculating power:', calcError);
+            showNotification('Error calculating power: ' + calcError.message, 'error');
+            closePowerAnalysis();
+          }
+        }, 300);
+
+      } catch (error) {
+        console.error('❌ Error opening power analysis:', error);
+        showNotification('Error opening power analysis: ' + error.message, 'error', 5000);
+      }
+    };
+
+    window.closePowerAnalysis = function() {
+      const overlay = document.getElementById('powerOverlay');
+      if (overlay) {
+        overlay.classList.remove('open');
+      }
+    };
+
+    // Close button handler
+    document.addEventListener('DOMContentLoaded', function() {
+      const closeBtn = document.getElementById('powerCloseBtn');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', closePowerAnalysis);
+      }
+
+      // Close when clicking outside
+      const overlay = document.getElementById('powerOverlay');
+      if (overlay) {
+        overlay.addEventListener('click', function(e) {
+          if (e.target === this) {
+            closePowerAnalysis();
+          }
+        });
+      }
+    });
+
+    async function calculatePowerAnalysis() {
+      const results = window.currentTestResults;
+      const parameter = results.parameter || 'mean';
+      const alpha = results.alpha || 0.05;
+      
+      // Get sample size from multiple sources
+      let n = results.n || 0;
+      
+      // Try resultsData.n (object property)
+      if (n === 0 && resultsData && resultsData.n) {
+        n = resultsData.n;
+        console.log('📊 Got n from resultsData.n:', n);
+      }
+      
+      // Try resultsData.values.length (array length)
+      if (n === 0 && resultsData && resultsData.values && resultsData.values.length) {
+        n = resultsData.values.length;
+        console.log('📊 Got n from resultsData.values.length:', n);
+      }
+      
+      // Try resultsData.length (direct array)
+      if (n === 0 && resultsData && Array.isArray(resultsData) && resultsData.length) {
+        n = resultsData.length;
+        console.log('📊 Got n from resultsData.length:', n);
+      }
+      
+      const orientation = results.orientation || 'Two-tailed';
+      
+      console.log('📊 Computing Power Analysis for:', parameter, 'n:', n);
+
+      if (n === 0 || !n) {
+        showNotification('No data available for power analysis', 'error');
+        closePowerAnalysis();
+        return;
+      }
+
+      if (parameter.toLowerCase() === 'mean') {
+        await calculateMeanPowerAnalysis(results, alpha, n, orientation);
+      } else if (parameter.toLowerCase() === 'variance') {
+        await calculateVariancePowerAnalysis(results, alpha, n, orientation);
+      } else {
+        showNotification('Power analysis not available for ' + parameter, 'error');
+        closePowerAnalysis();
+      }
+    }
+
+    async function calculateMeanPowerAnalysis(results, alpha, n, orientation) {
+      console.log('');
+      console.log('╔═══════════════════════════════════════════════════════╗');
+      console.log('║           MEAN POWER ANALYSIS CALCULATION             ║');
+      console.log('╚═══════════════════════════════════════════════════════╝');
+      
+      const testStat = results.testStat || 0;
+      const effectSize = Math.abs(testStat / Math.sqrt(n));
+      const cohenD = effectSize;
+      const targetPower = parseFloat(document.getElementById('overlayTargetPower').value) || 0.80;
+      
+      // Map orientation to tail type
+      const tailType = orientation === 'Two-tailed' ? 'two-sided' : 
+                      (orientation === 'Left-tailed' ? 'less' : 'greater');
+      
+      console.log('📊 Input Values:');
+      console.log('   Test Statistic:', testStat);
+      console.log('   Sample Size (n):', n);
+      console.log('   Alpha (α):', alpha);
+      console.log('   Orientation:', orientation);
+      console.log('   Target Power:', targetPower);
+      console.log('');
+      console.log('🔢 Calculated Values:');
+      console.log('   Effect Size (d) = |t| / √n');
+      console.log('   Effect Size (d) = |' + testStat + '| / √' + n);
+      console.log('   Effect Size (d) =', effectSize.toFixed(6));
+      console.log('   Cohen\'s d:', cohenD.toFixed(6));
+      console.log('   Tail Type:', tailType);
+      console.log('');
+      
+      // CLOUD-ONLY: Call VB6 cloud function (no local fallback)
+      console.log('🌐 Preparing cloud function calls...');
+      console.log('');
+      console.log('📋 VB6 Comparison (from PowerCloudFunctions.bas):');
+      console.log('   VB6 Function: GetPowerAndSampleSizeTtest()');
+      console.log('   VB6 Parameters:');
+      console.log('     - effect_size (Double)');
+      console.log('     - sample_size or target_power (Variant)');
+      console.log('     - significance_level (Double)');
+      console.log('     - tail_type (String): "two-sided", "less", or "greater"');
+      console.log('');
+      console.log('📋 Our Parameters for POWER calculation:');
+      const powerParams = {
+        effect_size: effectSize,
+        sample_size: n,
+        significance_level: alpha,
+        tail_type: tailType
+      };
+      console.log('   ', JSON.stringify(powerParams, null, 4));
+      console.log('');
+      console.log('📋 Our Parameters for SAMPLE SIZE calculation:');
+      const sampleParams = {
+        effect_size: effectSize,
+        target_power: targetPower,
+        significance_level: alpha,
+        tail_type: tailType
+      };
+      console.log('   ', JSON.stringify(sampleParams, null, 4));
+      console.log('');
+      console.log('🔗 Test URLs (copy & paste into browser):');
+      const testUrl1 = CLOUD_ENDPOINTS.tTest + 
+        `?effect_size=${effectSize}&sample_size=${n}&significance_level=${alpha}&tail_type=${tailType}`;
+      const testUrl2 = CLOUD_ENDPOINTS.tTest + 
+        `?effect_size=${effectSize}&target_power=${targetPower}&significance_level=${alpha}&tail_type=${tailType}`;
+      console.log('   Power URL:', testUrl1);
+      console.log('   Sample URL:', testUrl2);
+      console.log('');
+      console.log('🚀 Calling cloud functions now...');
+      console.log('');
+      
+      const powerResult = await callCloudPowerFunction(CLOUD_ENDPOINTS.tTest, powerParams);
+      
+      const sampleResult = await callCloudPowerFunction(CLOUD_ENDPOINTS.tTest, sampleParams);
+      
+      if (powerResult.success && sampleResult.success) {
+        // SUCCESS: Cloud function returned results
+        const observedPower = powerResult.data.power;
+        const requiredN = Math.ceil(sampleResult.data.required_sample_size);
+        
+        powerAnalysisCache = {
+          effectSize,
+          observedPower,
+          requiredSampleSize: requiredN,
+          cohenD,
+          targetPower,
+          alpha,
+          sampleSize: n,
+          method: 'cloud',
+          testType: 'mean'
+        };
+        
+        console.log('✅ Cloud calculation successful');
+        showNotification('✓ Power analysis completed', 'success', 2000);
+        displayPowerAnalysisResults();
+      } else {
+        // FAILURE: Cloud function failed - no fallback
+        console.error('❌ Cloud function failed:', powerResult.error || sampleResult.error);
+        
+        let errorTitle = 'Power Analysis Unavailable';
+        let errorMessage = '';
+        
+        if (powerResult.error === 'offline' || sampleResult.error === 'offline') {
+          errorMessage = '📡 You are offline or the service is unreachable.\n\n' +
+                        'Power analysis requires an internet connection to access the cloud calculation service.\n\n' +
+                        'Please check your connection and try again.';
+        } else if (powerResult.error === 'timeout' || sampleResult.error === 'timeout') {
+          errorMessage = '⏱️ The cloud service took too long to respond (>10s).\n\n' +
+                        'Please try again in a moment.';
+        } else {
+          errorMessage = '⚠️ The cloud calculation service returned an error:\n\n' +
+                        (powerResult.message || sampleResult.message) + '\n\n' +
+                        'This may be a temporary issue. Please try again in a moment.';
+        }
+        
+        showDialog(errorMessage, errorTitle);
+        closePowerAnalysis();
+      }
+    }
+
+    async function calculateVariancePowerAnalysis(results, alpha, n, orientation) {
+      console.log('');
+      console.log('╔═══════════════════════════════════════════════════════╗');
+      console.log('║         VARIANCE POWER ANALYSIS CALCULATION           ║');
+      console.log('╚═══════════════════════════════════════════════════════╝');
+      
+      const testStat = results.testStat || 0;
+      const df = n - 1;
+      const varianceRatio = Math.abs(testStat / df);
+      const effectSize = varianceRatio;
+      const targetPower = parseFloat(document.getElementById('overlayTargetPower').value) || 0.80;
+      
+      const tailType = orientation === 'Two-tailed' ? 'two-sided' : 
+                      (orientation === 'Left-tailed' ? 'less' : 'greater');
+      
+      console.log('📊 Input Values:');
+      console.log('   Test Statistic:', testStat);
+      console.log('   Sample Size (n):', n);
+      console.log('   Degrees of Freedom (df):', df);
+      console.log('   Alpha (α):', alpha);
+      console.log('   Orientation:', orientation);
+      console.log('   Target Power:', targetPower);
+      console.log('');
+      console.log('🔢 Calculated Values:');
+      console.log('   Variance Ratio = |χ²| / df');
+      console.log('   Variance Ratio = |' + testStat + '| / ' + df);
+      console.log('   Variance Ratio =', varianceRatio.toFixed(6));
+      console.log('   Effect Size:', effectSize.toFixed(6));
+      console.log('   Tail Type:', tailType);
+      console.log('');
+      
+      // CLOUD-ONLY: Call VB6 cloud function (no local fallback)
+      console.log('🌐 Preparing cloud function calls...');
+      console.log('');
+      console.log('📋 VB6 Comparison (from PowerCloudFunctions.bas):');
+      console.log('   VB6 Function: GetPowerAndSampleSizeVariainceTest()');
+      console.log('   VB6 Parameters:');
+      console.log('     - variance_ratio (Double)');
+      console.log('     - sample_size or target_power (Variant)');
+      console.log('     - significance_level (Variant)');
+      console.log('     - test_tail (String): "two-sided", "less", or "greater"');
+      console.log('');
+      console.log('📋 Our Parameters for POWER calculation:');
+      const powerParams = {
+        variance_ratio: varianceRatio,
+        sample_size: n,
+        significance_level: alpha,
+        test_tail: tailType
+      };
+      console.log('   ', JSON.stringify(powerParams, null, 4));
+      console.log('');
+      console.log('📋 Our Parameters for SAMPLE SIZE calculation:');
+      const sampleParams = {
+        variance_ratio: varianceRatio,
+        target_power: targetPower,
+        significance_level: alpha,
+        test_tail: tailType
+      };
+      console.log('   ', JSON.stringify(sampleParams, null, 4));
+      console.log('');
+      console.log('🔗 Test URLs (copy & paste into browser):');
+      const testUrl1 = CLOUD_ENDPOINTS.varianceTest + 
+        `?variance_ratio=${varianceRatio}&sample_size=${n}&significance_level=${alpha}&test_tail=${tailType}`;
+      const testUrl2 = CLOUD_ENDPOINTS.varianceTest + 
+        `?variance_ratio=${varianceRatio}&target_power=${targetPower}&significance_level=${alpha}&test_tail=${tailType}`;
+      console.log('   Power URL:', testUrl1);
+      console.log('   Sample URL:', testUrl2);
+      console.log('');
+      console.log('🚀 Calling cloud functions now...');
+      console.log('');
+      
+      const powerResult = await callCloudPowerFunction(CLOUD_ENDPOINTS.varianceTest, powerParams);
+      
+      const sampleResult = await callCloudPowerFunction(CLOUD_ENDPOINTS.varianceTest, sampleParams);
+      
+      if (powerResult.success && sampleResult.success) {
+        // SUCCESS: Cloud function returned results
+        const observedPower = powerResult.data.power;
+        const requiredN = Math.ceil(sampleResult.data.required_sample_size);
+        
+        powerAnalysisCache = {
+          effectSize,
+          observedPower,
+          requiredSampleSize: requiredN,
+          cohenD: 0,
+          varianceRatio: varianceRatio,
+          targetPower,
+          alpha,
+          sampleSize: n,
+          method: 'cloud',
+          testType: 'variance'
+        };
+        
+        console.log('✅ Cloud calculation successful');
+        showNotification('✓ Power analysis completed', 'success', 2000);
+        displayPowerAnalysisResults();
+      } else {
+        // FAILURE: Cloud function failed - no fallback
+        console.error('❌ Cloud function failed:', powerResult.error || sampleResult.error);
+        
+        let errorTitle = 'Power Analysis Unavailable';
+        let errorMessage = '';
+        
+        if (powerResult.error === 'offline' || sampleResult.error === 'offline') {
+          errorMessage = '📡 You are offline or the service is unreachable.\n\n' +
+                        'Power analysis requires an internet connection to access the cloud calculation service.\n\n' +
+                        'Please check your connection and try again.';
+        } else if (powerResult.error === 'timeout' || sampleResult.error === 'timeout') {
+          errorMessage = '⏱️ The cloud service took too long to respond (>10s).\n\n' +
+                        'Please try again in a moment.';
+        } else {
+          errorMessage = '⚠️ The cloud calculation service returned an error:\n\n' +
+                        (powerResult.message || sampleResult.message) + '\n\n' +
+                        'This may be a temporary issue. Please try again in a moment.';
+        }
+        
+        showDialog(errorMessage, errorTitle);
+        closePowerAnalysis();
+      }
+    }
+
+
+    function displayPowerAnalysisResults() {
+      const cache = powerAnalysisCache;
+      
+      // Helper to format numbers safely
+      function formatSafe(value, decimals) {
+        if (isNaN(value) || !isFinite(value)) return '--';
+        return value.toFixed(decimals);
+      }
+      
+      // Observed Statistics
+      const powerValue = isNaN(cache.observedPower) || !isFinite(cache.observedPower) ? '--' : 
+        (cache.observedPower * 100).toFixed(1) + '%';
+      document.getElementById('overlayPowerValue').textContent = powerValue;
+      
+      document.getElementById('overlayEffectSize').textContent = 
+        formatSafe(cache.effectSize, 4);
+      
+      document.getElementById('overlaySampleSize').textContent = 
+        cache.sampleSize || '--';
+
+      // Target Power Scenario
+      document.getElementById('overlayTargetPower').value = 
+        formatSafe(cache.targetPower, 2);
+      
+      const reqSampleEl = document.getElementById('overlayRequiredSample');
+      if (isNaN(cache.requiredSampleSize) || cache.requiredSampleSize === Infinity || cache.requiredSampleSize > 1000000 || cache.requiredSampleSize <= 0) {
+        reqSampleEl.textContent = 'Not Feasible';
+        reqSampleEl.style.color = '#ff4444';
+      } else {
+        reqSampleEl.textContent = Math.ceil(cache.requiredSampleSize).toLocaleString();
+        reqSampleEl.style.color = 'var(--accent-1)';
+      }
+
+      document.getElementById('overlayAlphaValue').textContent = 
+        formatSafe(cache.alpha, 3);
+      
+      // Show/hide effect size fields based on test type
+      const cohenDField = document.getElementById('cohenDField');
+      const varianceRatioField = document.getElementById('varianceRatioField');
+      
+      if (cache.testType === 'variance') {
+        // For variance tests, show variance ratio, hide Cohen's d
+        cohenDField.style.display = 'none';
+        varianceRatioField.style.display = 'block';
+        document.getElementById('overlayVarianceRatio').textContent = 
+          formatSafe(cache.varianceRatio, 4);
+      } else {
+        // For mean tests, show Cohen's d, hide variance ratio
+        cohenDField.style.display = 'block';
+        varianceRatioField.style.display = 'none';
+        document.getElementById('overlayCohenD').textContent = 
+          formatSafe(cache.cohenD, 4);
+      }
+
+      // Update footer note
+      const diff = cache.requiredSampleSize - cache.sampleSize;
+      const footer = document.getElementById('overlayFooterNote');
+      
+      if (isNaN(cache.requiredSampleSize) || cache.requiredSampleSize === Infinity || cache.requiredSampleSize > 1000000 || cache.requiredSampleSize <= 0) {
+        footer.textContent = 'Effect size is too small to detect with practical sample sizes.';
+        footer.style.borderColor = 'rgba(255,100,100,0.3)';
+        footer.style.background = 'rgba(255,100,100,0.1)';
+        footer.style.color = '#ff8888';
+      } else if (diff > 0) {
+        footer.textContent = `Need ${Math.ceil(diff).toLocaleString()} more observations to achieve ${(cache.targetPower * 100).toFixed(0)}% power.`;
+        footer.style.borderColor = 'rgba(255,165,120,0.3)';
+        footer.style.background = 'rgba(255,165,120,0.1)';
+        footer.style.color = 'var(--accent-1)';
+      } else {
+        footer.textContent = 'Current sample size is sufficient for the target power level.';
+        footer.style.borderColor = 'rgba(100,255,100,0.3)';
+        footer.style.background = 'rgba(100,255,100,0.1)';
+        footer.style.color = '#88ff88';
+      }
+
+      // Update method badge (always cloud)
+      const methodBadge = document.getElementById('powerMethodBadge');
+      if (methodBadge) {
+        methodBadge.innerHTML = '<i class="fas fa-cloud"></i> Cloud';
+        methodBadge.style.background = 'rgba(100,200,255,0.2)';
+        methodBadge.style.color = '#88ccff';
+        methodBadge.style.borderColor = 'rgba(100,200,255,0.3)';
+        methodBadge.style.display = 'inline-block';
+      }
+
+      console.log('✅ Power Analysis Results:', cache);
+    }
+
+    window.validateTargetPower = function() {
+      const input = document.getElementById('overlayTargetPower');
+      let value = parseFloat(input.value);
+      
+      if (isNaN(value) || value < 0.01) {
+        value = 0.01;
+      } else if (value > 0.99) {
+        value = 0.99;
+      }
+      
+      input.value = value.toFixed(2);
+    };
+
+    window.refreshPowerAnalysis = async function() {
+      console.log('🔄 Refreshing power analysis with new target power');
+      
+      // Show loader briefly
+      const loader = document.getElementById('powerOverlayLoader');
+      const content = document.getElementById('powerOverlayContent');
+      
+      content.classList.add('hidden');
+      loader.style.display = 'flex';
+      
+      setTimeout(async () => {
+        await calculatePowerAnalysis();
+        loader.style.display = 'none';
+        content.classList.remove('hidden');
+      }, 300);
+    };
+  </script>
+</body>
+</html>
+

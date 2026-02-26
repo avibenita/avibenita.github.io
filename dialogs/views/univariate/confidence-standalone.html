@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Confidence Intervals - Statistico</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="../shared-header.css">
+  <script src="../shared-header.js"></script>
+  
+  <style>
+    :root {
+      --surface-0: #0c1624;
+      --surface-1: #1a1f2e;
+      --surface-2: #242938;
+      --border: #2d3748;
+      --accent-1: rgb(255,165,120);
+      --accent-2: rgb(120,200,255);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255,255,255,0.8);
+      --text-muted: rgba(255,255,255,0.6);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--surface-0);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text-primary);
+      overflow-x: hidden;
+    }
+
+    .results-container {
+      padding: 10px;
+      max-width: 100%;
+    }
+
+    /* Config Panel */
+    .config-panel {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+
+    .config-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .config-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .config-section {
+      flex: 1;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+    }
+
+    .section-title {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .radio-group {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .radio-label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    .radio-label input[type="radio"] {
+      cursor: pointer;
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent-1);
+    }
+
+    .radio-label.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .inline-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: 15px;
+    }
+
+    .inline-control input[type="number"] {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 4px;
+      color: white;
+      padding: 4px 8px;
+      width: 70px;
+      font-size: 12px;
+    }
+
+    .inline-control label {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .refresh-btn {
+      padding: 4px 10px;
+      background: linear-gradient(135deg, var(--accent-1), rgb(255,140,90));
+      border: none;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .refresh-btn:hover {
+      transform: scale(1.05);
+    }
+
+    /* Alpha Control */
+    .alpha-control {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .alpha-control select {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 4px;
+      color: white;
+      padding: 5px 8px;
+      font-size: 12px;
+    }
+
+    .alpha-control input[type="range"] {
+      flex: 1;
+      height: 5px;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.2);
+      outline: none;
+    }
+
+    .alpha-control input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent-1);
+      cursor: pointer;
+    }
+
+    .alpha-display {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent-1);
+      min-width: 50px;
+      text-align: center;
+    }
+
+    /* Results Panel */
+    .results-panel {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+
+    .result-main {
+      text-align: center;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--accent-1);
+      margin: 10px 0;
+    }
+
+    .plus-minus {
+      color: var(--text-secondary);
+      margin: 0 8px;
+    }
+
+    /* Confidence Bar */
+    .confidence-bar-container {
+      position: relative;
+      height: 60px;
+      margin: 20px 0;
+      background: rgba(255,255,255,0.05);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .confidence-bar {
+      position: absolute;
+      height: 100%;
+      background: linear-gradient(90deg, rgba(120,200,255,0.2), rgba(120,200,255,0.4), rgba(120,200,255,0.2));
+      border: 2px solid var(--accent-2);
+      border-radius: 4px;
+      transition: all 0.4s ease;
+    }
+
+    .confidence-marker {
+      position: absolute;
+      width: 3px;
+      height: 100%;
+      background: var(--accent-1);
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .bar-label {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      font-weight: 600;
+      color: white;
+      background: rgba(0,0,0,0.7);
+      padding: 4px 8px;
+      border-radius: 3px;
+    }
+
+    .bar-label.left { left: 8px; }
+    .bar-label.right { right: 8px; }
+
+    .confidence-label {
+      position: absolute;
+      bottom: -22px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .confidence-label.lcl {
+      left: 0;
+      color: var(--accent-2);
+    }
+
+    .confidence-label.ucl {
+      right: 0;
+      color: var(--accent-2);
+    }
+
+    .confidence-label.mean {
+      left: 50%;
+      transform: translateX(-50%);
+      color: var(--accent-1);
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 15px;
+    }
+
+    .stat-box {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .stat-box .label {
+      font-size: 9px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+
+    .stat-box .value {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    @media (max-width: 768px) {
+      .config-row {
+        flex-direction: column;
+      }
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <statistico-header view-name="Confidence Intervals" module-name="Univariate Analysis"></statistico-header>
+  
+  <div class="results-container">
+    <!-- Configuration Panel -->
+    <div class="config-panel">
+      <!-- Row 1: Method & Parameter -->
+      <div class="config-row">
+        <div class="config-section">
+          <div class="section-title">Method</div>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="method" value="classical" checked onchange="selectMethod('classical')">
+              <span>Classical</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="method" value="bootstrap" onchange="selectMethod('bootstrap')">
+              <span>Bootstrap</span>
+            </label>
+            <div class="inline-control" id="bootstrap-iterations" style="display:none;">
+              <label>Iterations:</label>
+              <input type="number" id="iterations-input" value="500" min="100" max="10000" step="100">
+              <button class="refresh-btn" onclick="calculate()">
+                <i class="fa-solid fa-rotate-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="config-section">
+          <div class="section-title">Parameter</div>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="parameter" value="mean" checked onchange="selectParameter('mean')">
+              <span>Mean</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="parameter" value="stdev" onchange="selectParameter('stdev')">
+              <span>Stdev</span>
+            </label>
+            <label class="radio-label disabled" id="median-label">
+              <input type="radio" name="parameter" value="median" disabled onchange="selectParameter('median')">
+              <span>Median</span>
+            </label>
+            <label class="radio-label disabled" id="percentile-label">
+              <input type="radio" name="parameter" value="percentile" disabled onchange="selectParameter('percentile')">
+              <span>Percentile</span>
+            </label>
+            <div class="inline-control" id="percentile-control" style="display:none;">
+              <label>Value:</label>
+              <input type="number" id="percentile-value" value="50" min="1" max="99" step="1">
+              <span>%</span>
+              <button class="refresh-btn" onclick="calculate()">
+                <i class="fa-solid fa-rotate-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2: Alpha & Population Size -->
+      <div class="config-row">
+        <div class="config-section">
+          <div class="section-title">Confidence Level (α)</div>
+          <div class="alpha-control">
+            <select id="alpha-preset" onchange="setAlphaPreset()">
+              <option value="0.01">99%</option>
+              <option value="0.05" selected>95%</option>
+              <option value="0.10">90%</option>
+            </select>
+            <input type="range" id="alpha-slider" min="0.01" max="0.15" step="0.001" value="0.05" oninput="updateAlpha()">
+            <span class="alpha-display" id="alpha-display">0.050</span>
+          </div>
+        </div>
+
+        <div class="config-section" id="popsize-section">
+          <div class="section-title">Population Size (Optional)</div>
+          <div class="alpha-control">
+            <input type="number" id="population-size" placeholder="Unknown" min="1" style="flex:1;" onchange="calculate()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Panel -->
+    <div class="results-panel">
+      <div class="result-main">
+        <span id="point-estimate">—</span>
+        <span class="plus-minus" id="plus-minus-symbol">±</span>
+        <span id="margin-error">—</span>
+      </div>
+
+      <div class="confidence-bar-container">
+        <div class="confidence-bar" id="confidence-bar">
+          <div class="bar-label left" id="bar-label-left">−</div>
+          <div class="bar-label right" id="bar-label-right">+</div>
+        </div>
+        <div class="confidence-marker"></div>
+        <div class="confidence-label lcl" id="label-lcl">LCL</div>
+        <div class="confidence-label mean" id="label-mean">—</div>
+        <div class="confidence-label ucl" id="label-ucl">UCL</div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="label">Lower Limit</div>
+          <div class="value" id="stat-lcl">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="label">Point Estimate</div>
+          <div class="value" id="stat-center">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="label">Upper Limit</div>
+          <div class="value" id="stat-ucl">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="label">Sample Size</div>
+          <div class="value" id="stat-n">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="label">Confidence</div>
+          <div class="value" id="stat-confidence">95%</div>
+        </div>
+        <div class="stat-box">
+          <div class="label">Method</div>
+          <div class="value" id="stat-method">Classical</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let originalData = [];
+    let varName = 'Variable';
+    let currentMethod = 'classical';
+    let currentParameter = 'mean';
+    let currentAlpha = 0.05;
+    let dataReady = false;
+
+    // Statistical functions
+    function calculateMean(data) {
+      return data.reduce((sum, val) => sum + val, 0) / data.length;
+    }
+
+    function calculateStdev(data, mean) {
+      if (data.length < 2) return 0;
+      const variance = data.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (data.length - 1);
+      return Math.sqrt(variance);
+    }
+
+    function calculateMedian(data) {
+      const sorted = [...data].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    }
+
+    // T-distribution inverse
+    function getTValue(alpha, df) {
+      if (df > 30) {
+        return normalInv(1 - alpha);
+      }
+      const z = normalInv(1 - alpha);
+      const g1 = (z * z * z + z) / 4;
+      const g2 = (5 * z * z * z * z * z + 16 * z * z * z + 3 * z) / 96;
+      return z + g1 / df + g2 / (df * df);
+    }
+
+    function normalInv(p) {
+      if (p <= 0 || p >= 1) return 0;
+      const a1 = -3.969683028665376e+01;
+      const a2 =  2.209460984245205e+02;
+      const a3 = -2.759285104469687e+02;
+      const a4 =  1.383577518672690e+02;
+      const a5 = -3.066479806614716e+01;
+      const a6 =  2.506628277459239e+00;
+      const b1 = -5.447609879822406e+01;
+      const b2 =  1.615858368580409e+02;
+      const b3 = -1.556989798598866e+02;
+      const b4 =  6.680131188771972e+01;
+      const b5 = -1.328068155288572e+01;
+      
+      const q = p - 0.5;
+      const r = q * q;
+      return (((((a1 * r + a2) * r + a3) * r + a4) * r + a5) * r + a6) * q /
+             (((((b1 * r + b2) * r + b3) * r + b4) * r + b5) * r + 1);
+    }
+
+    // Chi-square inverse
+    function getChiSquareValue(p, df) {
+      if (p <= 0 || p >= 1) return df;
+      const z = normalInv(p);
+      const h = 2 / (9 * df);
+      const chiSq = df * Math.pow(1 - h + z * Math.sqrt(h), 3);
+      return Math.max(0.001, Math.min(chiSq, df * 10));
+    }
+
+    // Classical CI
+    function calculateClassical() {
+      const n = originalData.length;
+      const mean = calculateMean(originalData);
+      const stdev = calculateStdev(originalData, mean);
+      
+      if (currentParameter === 'mean') {
+        const popSize = parseInt(document.getElementById('population-size').value) || null;
+        let factor = 1;
+        if (popSize && popSize > n) {
+          factor = Math.sqrt((popSize - n) / (popSize - 1));
+        }
+        const tValue = getTValue(currentAlpha / 2, n - 1);
+        const margin = tValue * factor * stdev / Math.sqrt(n);
+        return {
+          center: mean,
+          margin: margin,
+          lcl: mean - margin,
+          ucl: mean + margin
+        };
+      } else {
+        const chiUpper = getChiSquareValue(currentAlpha / 2, n - 1);
+        const chiLower = getChiSquareValue(1 - currentAlpha / 2, n - 1);
+        const lcl = Math.sqrt(((n - 1) * stdev * stdev) / chiLower);
+        const ucl = Math.sqrt(((n - 1) * stdev * stdev) / chiUpper);
+        return {
+          center: stdev,
+          margin: null,
+          lcl: lcl,
+          ucl: ucl
+        };
+      }
+    }
+
+    // Bootstrap CI
+    function calculateBootstrap() {
+      const n = originalData.length;
+      const iterations = parseInt(document.getElementById('iterations-input').value) || 500;
+      const bootstrapStats = [];
+      
+      for (let i = 0; i < iterations; i++) {
+        const sample = [];
+        for (let j = 0; j < n; j++) {
+          sample.push(originalData[Math.floor(Math.random() * n)]);
+        }
+        
+        if (currentParameter === 'mean') {
+          bootstrapStats.push(calculateMean(sample));
+        } else if (currentParameter === 'stdev') {
+          const m = calculateMean(sample);
+          bootstrapStats.push(calculateStdev(sample, m));
+        } else if (currentParameter === 'median') {
+          bootstrapStats.push(calculateMedian(sample));
+        } else if (currentParameter === 'percentile') {
+          const p = parseFloat(document.getElementById('percentile-value').value) / 100;
+          bootstrapStats.push(calculatePercentile(sample, p));
+        }
+      }
+      
+      bootstrapStats.sort((a, b) => a - b);
+      const center = calculateMean(bootstrapStats);
+      const lclIndex = Math.floor(iterations * currentAlpha / 2);
+      const uclIndex = Math.floor(iterations * (1 - currentAlpha / 2));
+      
+      return {
+        center: center,
+        margin: null,
+        lcl: bootstrapStats[lclIndex],
+        ucl: bootstrapStats[uclIndex]
+      };
+    }
+
+    function calculatePercentile(data, p) {
+      const sorted = [...data].sort((a, b) => a - b);
+      const index = (sorted.length - 1) * p;
+      const lower = Math.floor(index);
+      const upper = Math.ceil(index);
+      const weight = index - lower;
+      return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+    }
+
+    // Calculate and display
+    function calculate() {
+      if (!dataReady || originalData.length === 0) return;
+      
+      const result = currentMethod === 'classical' ? calculateClassical() : calculateBootstrap();
+      displayResults(result);
+    }
+
+    function displayResults(result) {
+      document.getElementById('point-estimate').textContent = result.center.toFixed(3);
+      document.getElementById('stat-center').textContent = result.center.toFixed(3);
+      document.getElementById('stat-lcl').textContent = result.lcl.toFixed(3);
+      document.getElementById('stat-ucl').textContent = result.ucl.toFixed(3);
+      document.getElementById('label-mean').textContent = result.center.toFixed(3);
+      document.getElementById('label-lcl').textContent = 'LCL: ' + result.lcl.toFixed(3);
+      document.getElementById('label-ucl').textContent = 'UCL: ' + result.ucl.toFixed(3);
+      
+      if (result.margin !== null) {
+        document.getElementById('plus-minus-symbol').style.display = 'inline';
+        document.getElementById('margin-error').style.display = 'inline';
+        document.getElementById('margin-error').textContent = result.margin.toFixed(3);
+      } else {
+        document.getElementById('plus-minus-symbol').style.display = 'none';
+        document.getElementById('margin-error').style.display = 'none';
+      }
+      
+      updateConfidenceBar(result);
+    }
+
+    function updateConfidenceBar(result) {
+      const range = result.ucl - result.lcl;
+      
+      // Adaptive scaling (matching working version)
+      // Base multiplier + alpha adjustment for clear visual changes
+      const baseMultiplier = 0.9;
+      const alphaAdjustment = currentAlpha * 2.0;
+      const visualHalfRange = range * (baseMultiplier + alphaAdjustment);
+      
+      const visualMin = result.center - visualHalfRange;
+      const visualMax = result.center + visualHalfRange;
+      const totalRange = visualMax - visualMin;
+      
+      const lclPercent = ((result.lcl - visualMin) / totalRange) * 100;
+      const uclPercent = ((result.ucl - visualMin) / totalRange) * 100;
+      const width = Math.max(0, Math.min(100, uclPercent - lclPercent));
+      
+      const bar = document.getElementById('confidence-bar');
+      const leftPos = Math.max(0, Math.min(100 - width, lclPercent));
+      
+      // Force style update
+      bar.style.setProperty('left', leftPos + '%', 'important');
+      bar.style.setProperty('width', width + '%', 'important');
+      
+      // Force reflow
+      void bar.offsetWidth;
+      
+      // Update bar color based on method
+      if (currentMethod === 'bootstrap') {
+        bar.style.background = 'linear-gradient(90deg, rgba(255,165,120,0.2), rgba(255,165,120,0.4), rgba(255,165,120,0.2))';
+        bar.style.borderColor = 'rgb(255,165,120)';
+      } else {
+        bar.style.background = 'linear-gradient(90deg, rgba(120,200,255,0.2), rgba(120,200,255,0.4), rgba(120,200,255,0.2))';
+        bar.style.borderColor = 'rgb(120,200,255)';
+      }
+      
+      const deltaLeft = Math.abs(result.center - result.lcl);
+      const deltaRight = Math.abs(result.ucl - result.center);
+      document.getElementById('bar-label-left').textContent = '−' + deltaLeft.toFixed(2);
+      document.getElementById('bar-label-right').textContent = '+' + deltaRight.toFixed(2);
+      
+      console.log('📊 Bar updated:', {
+        width: width.toFixed(2) + '%',
+        left: leftPos.toFixed(2) + '%',
+        alpha: currentAlpha.toFixed(3)
+      });
+    }
+
+    // UI controls
+    window.selectMethod = function(method) {
+      currentMethod = method;
+      document.getElementById('bootstrap-iterations').style.display = method === 'bootstrap' ? 'flex' : 'none';
+      document.getElementById('popsize-section').style.opacity = method === 'classical' && currentParameter === 'mean' ? '1' : '0.5';
+      document.getElementById('stat-method').textContent = method === 'classical' ? 'Classical' : 'Bootstrap';
+      
+      if (method === 'bootstrap') {
+        document.getElementById('median-label').classList.remove('disabled');
+        document.getElementById('percentile-label').classList.remove('disabled');
+        document.querySelector('input[value="median"]').disabled = false;
+        document.querySelector('input[value="percentile"]').disabled = false;
+      } else {
+        document.getElementById('median-label').classList.add('disabled');
+        document.getElementById('percentile-label').classList.add('disabled');
+        document.querySelector('input[value="median"]').disabled = true;
+        document.querySelector('input[value="percentile"]').disabled = true;
+        // Hide percentile control
+        document.getElementById('percentile-control').style.display = 'none';
+        // Reset to mean if median/percentile selected
+        if (currentParameter === 'median' || currentParameter === 'percentile') {
+          document.querySelector('input[value="mean"]').checked = true;
+          currentParameter = 'mean';
+        }
+      }
+      
+      calculate();
+    };
+
+    window.selectParameter = function(param) {
+      currentParameter = param;
+      document.getElementById('popsize-section').style.opacity = currentMethod === 'classical' && param === 'mean' ? '1' : '0.5';
+      
+      // Show/hide percentile control
+      document.getElementById('percentile-control').style.display = param === 'percentile' ? 'flex' : 'none';
+      
+      calculate();
+    };
+
+    function updateAlpha() {
+      currentAlpha = parseFloat(document.getElementById('alpha-slider').value);
+      document.getElementById('alpha-display').textContent = currentAlpha.toFixed(3);
+      document.getElementById('stat-confidence').textContent = ((1 - currentAlpha) * 100).toFixed(1) + '%';
+      calculate();
+    }
+
+    function setAlphaPreset() {
+      currentAlpha = parseFloat(document.getElementById('alpha-preset').value);
+      document.getElementById('alpha-slider').value = currentAlpha;
+      document.getElementById('alpha-display').textContent = currentAlpha.toFixed(3);
+      document.getElementById('stat-confidence').textContent = ((1 - currentAlpha) * 100).toFixed(1) + '%';
+      calculate();
+    }
+
+    // Office.js initialization
+    Office.initialize = function (reason) {
+      console.log('✅ Confidence Intervals - Office.js initialized');
+      Office.context.ui.addHandlerAsync(
+        Office.EventType.DialogParentMessageReceived,
+        onMessageReceived
+      );
+      setTimeout(() => {
+        sendMessageToParent({ status: 'ready', view: 'confidence' });
+        console.log('📤 Sending ready signal to parent');
+      }, 500);
+      // Don't load sample data immediately - wait for real data from parent
+      // Only load sample data after 5 seconds if no data received
+      // Try to load data from various sources (wait longer for parent response)
+      setTimeout(() => {
+        if (dataReady) {
+          console.log('✅ Data already loaded');
+          return;
+        }
+        
+        // Try localStorage first
+        try {
+          const storedData = localStorage.getItem('univariateResults');
+          if (storedData) {
+            const parsedData = JSON.parse(storedData);
+            console.log('📦 Loading data from localStorage');
+            handleDataReceived(parsedData);
+            if (dataReady) return;
+          }
+        } catch (e) {
+          console.error('❌ Error loading from localStorage:', e);
+        }
+        
+        // Fallback to sample data
+        console.log('⏰ No real data received after 3s, loading sample data...');
+        loadSampleData();
+      }, 3000);
+    };
+
+    window.addEventListener('DOMContentLoaded', function() {
+      console.log('🚀 DOM Content Loaded');
+      const initHeader = () => {
+        if (typeof StatisticoHeader !== 'undefined') {
+          StatisticoHeader.init('confidence', 'Variable', 0);
+        } else {
+          setTimeout(initHeader, 100);
+        }
+      };
+      initHeader();
+      
+      // Only load sample data if Office.js is not available
+      if (typeof Office === 'undefined') {
+        setTimeout(() => {
+          if (!dataReady) {
+            console.log('⚠️ Office.js not available - loading sample data');
+            loadSampleData();
+          }
+        }, 500);
+      }
+    });
+
+    function onMessageReceived(arg) {
+      try {
+        const message = JSON.parse(arg.message);
+        console.log('📩 Message received from parent:', message);
+        
+        // Handle data from taskpane (action: 'loadData')
+        if (message.action === 'loadData' && message.data) {
+          console.log('✅ Received data from taskpane:', message.data);
+          handleDataReceived(message.data);
+        } 
+        // Legacy: handle other formats
+        else if (message.type === 'data' || message.action === 'sendData') {
+          const dataToHandle = message.data || message;
+          console.log('📊 Handling data (legacy format):', dataToHandle);
+          handleDataReceived(dataToHandle);
+        } 
+        // Navigation request
+        else if (message.action === 'switchView') {
+          console.log('🔄 Switch view request:', message.view);
+        } 
+        // Fallback: treat entire message as data
+        else {
+          console.log('🔄 Unknown format, treating as data');
+          handleDataReceived(message);
+        }
+      } catch (e) {
+        console.error('❌ Error handling message:', e);
+      }
+    }
+
+    function sendMessageToParent(message) {
+      if (typeof Office !== 'undefined' && Office.context && Office.context.ui) {
+        Office.context.ui.messageParent(JSON.stringify(message));
+      }
+    }
+
+    function loadSampleData() {
+      console.log('📊 Loading sample data...');
+      const sampleData = [];
+      for (let i = 0; i < 100; i++) {
+        const u1 = Math.random();
+        const u2 = Math.random();
+        const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        sampleData.push(50 + z * 10);
+      }
+      
+      originalData = sampleData;
+      varName = 'Sample Data';
+      dataReady = true;
+      
+      document.getElementById('stat-n').textContent = originalData.length;
+      
+      const updateHeader = () => {
+        if (typeof StatisticoHeader !== 'undefined') {
+          StatisticoHeader.updateVariable(varName, originalData.length);
+        } else {
+          setTimeout(updateHeader, 100);
+        }
+      };
+      updateHeader();
+      
+      calculate();
+    }
+
+    function handleDataReceived(data) {
+      try {
+        console.log('📊 Data received:', data);
+        
+        // Robust data extraction - handle various formats
+        let rawData = data.values || data.trimmedValues || data.transformedValues || data.rawValues || data.data || [];
+        
+        // Handle nested values (e.g., data.values.values)
+        if (rawData.values && Array.isArray(rawData.values)) {
+          rawData = rawData.values;
+        }
+        
+        // Convert to numbers and filter out invalid values
+        originalData = rawData
+          .map(v => typeof v === 'string' ? parseFloat(v) : v)
+          .filter(v => !isNaN(v) && v != null);
+        
+        // Extract variable name from multiple possible fields
+        varName = data.variable || data.variableName || data.column || 'Variable';
+        
+        console.log('✅ Data processed:', originalData.length, 'values from', rawData.length, 'raw values');
+        
+        // If no valid data, don't mark as ready (will load sample data)
+        if (originalData.length === 0) {
+          console.warn('⚠️ No valid data found, will load sample data');
+          return;
+        }
+        
+        dataReady = true;
+        
+        // Store data in localStorage for view navigation
+        try {
+          localStorage.setItem('univariateResults', JSON.stringify(data));
+          console.log('💾 Saved data to localStorage for navigation');
+        } catch (e) {
+          console.warn('⚠️ Could not save to localStorage:', e);
+        }
+        
+        document.getElementById('stat-n').textContent = originalData.length;
+        
+        const updateHeader = () => {
+          if (typeof StatisticoHeader !== 'undefined') {
+            StatisticoHeader.updateVariable(varName, originalData.length);
+          } else {
+            setTimeout(updateHeader, 100);
+          }
+        };
+        updateHeader();
+        
+        calculate();
+      } catch (e) {
+        console.error('Error:', e);
+      }
+    }
+  </script>
+</body>
+</html>

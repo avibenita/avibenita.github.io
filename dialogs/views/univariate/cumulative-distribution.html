@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cumulative Distribution Function</title>
+  
+  <!-- Office.js -->
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  
+  <!-- External libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.6.1/nouislider.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.6.1/nouislider.min.css">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+  
+  <!-- Shared header -->
+  <link rel="stylesheet" href="../shared-header.css">
+  <script src="../shared-header.js"></script>
+  
+  <style>
+    :root {
+      --surface-0: #0c1624;
+      --surface-1: #1a1f2e;
+      --surface-2: #242938;
+      --border: #2d3748;
+      --accent-1: rgb(255,165,120);
+      --accent-2: rgb(120,200,255);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255,255,255,0.8);
+      --text-muted: rgba(255,255,255,0.6);
+      --panel-radius: 10px;
+      --panel-shadow: 0px 4px 20px rgba(0, 0, 0, 0.4);
+    }
+    
+    body {
+      background-color: var(--surface-0);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      color: var(--text-primary);
+      overflow: hidden;
+      height: 100vh;
+    }
+    
+    .container {
+      padding: 4px 12px;
+      max-width: 1870px;
+      margin: 0 auto;
+      height: calc(100vh - 52px);
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .panel {
+      background-color: var(--surface-1);
+      border-radius: var(--panel-radius);
+      box-shadow: var(--panel-shadow);
+      border: 1px solid var(--border);
+      margin-bottom: 0;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    .panel-body {
+      padding: 5px 10px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    /* Quartiles Display - Ultra Compact */
+    .quartiles-container {
+      display: flex;
+      justify-content: center;
+      flex-wrap: nowrap;
+      gap: 8px;
+      margin: 0 0 5px 0;
+      flex-shrink: 0;
+    }
+    
+    .quartile-box {
+      background-color: var(--surface-2);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 5px 8px;
+      text-align: center;
+      flex: 1 1 auto;
+      min-width: 75px;
+      max-width: 130px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .quartile-box:hover {
+      background-color: rgba(255, 165, 120, 0.15);
+      border-color: var(--accent-1);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    .quartile-box div:first-child {
+      font-size: 0.7em;
+      color: var(--text-secondary);
+      margin-bottom: 2px;
+    }
+    
+    .quartile-value {
+      font-weight: 700;
+      font-size: 1em;
+      color: var(--accent-1);
+    }
+    
+    /* Distribution Controls - Ultra Compact */
+    .distribution-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin: 0 0 5px 0;
+      flex-wrap: nowrap;
+      flex-shrink: 0;
+    }
+    
+    .distribution-controls label {
+      margin: 0;
+      font-size: 0.75em;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .distribution-controls select {
+      padding: 4px 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-primary);
+      font-size: 0.75em;
+      cursor: pointer;
+      transition: border-color 0.3s ease;
+    }
+    
+    .distribution-controls select:hover,
+    .distribution-controls select:focus {
+      border-color: var(--accent-2);
+      outline: none;
+    }
+    
+    .distribution-controls button {
+      padding: 4px 10px;
+      background: linear-gradient(145deg, #4a5568, #2d3748);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-primary);
+      font-size: 0.75em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    
+    .distribution-controls button:hover {
+      background: linear-gradient(145deg, #5a6578, #3d4758);
+      transform: translateY(-1px);
+    }
+    
+    .distribution-controls button.active {
+      background: linear-gradient(145deg, var(--accent-2), rgba(120,200,255,0.8));
+      border-color: var(--accent-2);
+    }
+    
+    /* Chart Container - Ultra Compact */
+    #chart-container {
+      flex: 1;
+      width: 100%;
+      min-height: 350px;
+      max-height: calc(100vh - 320px);
+    }
+    
+    /* Slider Controls - Ultra Compact */
+    .slider-section {
+      margin: 4px 0 3px 0;
+      flex-shrink: 0;
+    }
+    
+    .slider-section label {
+      color: var(--text-secondary);
+      margin-bottom: 3px;
+      display: block;
+      font-weight: 500;
+      font-size: 0.75em;
+    }
+    
+    #value-slider {
+      height: 6px;
+      margin: 4px 0;
+    }
+    
+    .current-value {
+      font-size: 1em;
+      text-align: center;
+      margin: 4px 0;
+      padding: 4px 8px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      border-radius: 5px;
+      transition: all 0.3s ease;
+      flex-shrink: 0;
+    }
+    
+    .current-value span {
+      color: var(--accent-1);
+      font-weight: 700;
+    }
+    
+    /* Info Note - Ultra Compact */
+    .info-note {
+      font-size: 0.7em;
+      text-align: center;
+      margin: 4px auto 0;
+      padding: 4px 8px;
+      max-width: 900px;
+      color: var(--text-secondary);
+      background: rgba(255, 165, 120, 0.1);
+      border-left: 2px solid var(--accent-1);
+      border-radius: 3px;
+      line-height: 1.3;
+      flex-shrink: 0;
+    }
+    
+    .info-note i {
+      color: var(--accent-1);
+      margin-right: 3px;
+      font-size: 0.9em;
+    }
+    
+    /* noUiSlider custom styling */
+    .noUi-connect {
+      background: var(--accent-1);
+    }
+    
+    .noUi-target {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+    }
+    
+    .noUi-handle {
+      background: linear-gradient(135deg, rgba(255,165,120,0.9), rgba(255,165,120,0.7));
+      border-radius: 50%;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      cursor: pointer;
+      border: 1px solid rgba(255, 165, 120, 0.6);
+      width: 16px !important;
+      height: 16px !important;
+      top: -4px !important;
+      right: -8px !important;
+    }
+    
+    .noUi-handle:hover {
+      background: linear-gradient(135deg, rgba(255,165,120,1), rgba(255,165,120,0.85));
+      box-shadow: 0 2px 6px rgba(255, 165, 120, 0.4);
+    }
+    
+    .noUi-handle:before,
+    .noUi-handle:after {
+      display: none;
+    }
+    
+    /* Awaiting State - 1920x1080 Optimized */
+    .awaiting-panel {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+    }
+    
+    .awaiting-panel i {
+      font-size: 64px;
+      color: var(--accent-2);
+      margin-bottom: 20px;
+      opacity: 0.6;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    .awaiting-panel h3 {
+      font-size: 1.4em;
+      font-weight: 600;
+      margin: 0 0 10px 0;
+      color: var(--text-secondary);
+    }
+    
+    .awaiting-panel p {
+      font-size: 1em;
+      margin: 0;
+      color: var(--text-muted);
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 0.4; transform: scale(1); }
+      50% { opacity: 0.8; transform: scale(1.05); }
+    }
+  </style>
+</head>
+<body>
+  <statistico-header view-name="Cumulative Distribution" module-name="Univariate Analysis"></statistico-header>
+  
+  <div class="container">
+    <!-- Awaiting Data Panel -->
+    <div id="awaiting-panel" class="panel">
+      <div class="awaiting-panel">
+        <i class="fas fa-chart-area"></i>
+        <h3>Waiting for Data</h3>
+        <p>Select a column from Excel to visualize its cumulative distribution</p>
+      </div>
+    </div>
+    
+    <!-- Main Content (hidden until data arrives) -->
+    <div id="main-content" class="panel" style="display: none;">
+      <div class="panel-body">
+          <!-- Quartiles Display -->
+          <div class="quartiles-container">
+            <div class="quartile-box" onclick="jumpToPercentile(25)">
+              <div>Q1 (25%)</div>
+              <div class="quartile-value" id="q1-value">--</div>
+            </div>
+            <div class="quartile-box" onclick="jumpToPercentile(50)">
+              <div>Median (50%)</div>
+              <div class="quartile-value" id="median-value">--</div>
+            </div>
+            <div class="quartile-box">
+              <div>Average</div>
+              <div class="quartile-value" id="avg-value">--</div>
+            </div>
+            <div class="quartile-box" onclick="jumpToPercentile(75)">
+              <div>Q3 (75%)</div>
+              <div class="quartile-value" id="q3-value">--</div>
+            </div>
+            <div class="quartile-box" onclick="jumpToPercentile(95)">
+              <div>95th Percentile</div>
+              <div class="quartile-value" id="p95-value">--</div>
+            </div>
+          </div>
+          
+          <!-- Distribution Controls -->
+          <div class="distribution-controls">
+            <label>
+              <i class="fas fa-chart-area"></i> Theoretical Distribution:
+            </label>
+            <select id="distribution-select" onchange="onDistributionChange()">
+              <option value="none">None</option>
+              <option value="normal">Normal (Gaussian)</option>
+              <option value="lognormal">Log-Normal</option>
+              <option value="exponential">Exponential</option>
+              <option value="uniform">Uniform</option>
+            </select>
+            <button id="toggle-distribution" onclick="toggleTheoreticalDistribution()" style="display: none;">
+              <i class="fas fa-eye"></i>
+              <span id="toggle-dist-text">Show Overlay</span>
+            </button>
+          </div>
+          
+          <!-- Chart -->
+          <div id="chart-container"></div>
+          
+          <!-- Slider -->
+          <div class="slider-section">
+            <label>Move cursor to a specific x value:</label>
+            <div id="value-slider"></div>
+          </div>
+          
+          <!-- Current Value Display -->
+          <div class="current-value" id="current-value">
+            F(x) = <span id="probability">--</span> at x = <span id="x-value">--</span>
+          </div>
+          
+        <!-- Info Note -->
+        <div class="info-note">
+          <i class="fas fa-info-circle"></i>
+          <strong>Note:</strong> Percentile cards use linear interpolation. 
+          Cursor position uses CDF curve interpolation. Small differences are normal and reflect different statistical methods.
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    console.log('✅ Cumulative Distribution - Page loaded');
+    
+    let chart, originalData = [], sortedData = [], cdfData = [];
+    let currentDecimals = 0;
+    let valueSlider;
+    let theoreticalVisible = false;
+    let headerInitialized = false;
+    let librariesLoaded = false;
+    
+    // Initialize on DOM load
+    window.addEventListener('DOMContentLoaded', function() {
+      console.log('✅ DOM loaded');
+      pollForDependencies();
+    });
+    
+    function pollForDependencies() {
+      if (!headerInitialized && typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.init('cdf', 'Variable', 0);
+        headerInitialized = true;
+        console.log('✅ Shared header initialized');
+      }
+      
+      if (!librariesLoaded && typeof Highcharts !== 'undefined' && typeof noUiSlider !== 'undefined') {
+        librariesLoaded = true;
+        console.log('✅ External libraries loaded');
+      }
+      
+      if (headerInitialized && librariesLoaded) {
+        console.log('🎨 All dependencies ready');
+        return;
+      }
+      
+      setTimeout(pollForDependencies, 100);
+    }
+    
+    // Handle data from parent window
+    function handleDataReceived(data) {
+      console.log('📊 Data received:', data);
+      
+      try {
+        let values;
+        let variableName = null;
+        
+        // Extract values from different possible formats
+        if (Array.isArray(data)) {
+          values = data;
+        } else if (data.values) {
+          // Check if values is an array or needs to be extracted
+          if (Array.isArray(data.values)) {
+            values = data.values;
+          } else if (data.values.values) {
+            values = data.values.values;
+          }
+          
+          // Extract variable name
+          variableName = data.column || data.variableName || data.variable || data.colName;
+        } else if (data.trimmedValues) {
+          values = data.trimmedValues;
+          variableName = data.column || data.variableName;
+        } else if (data.transformedValues) {
+          values = data.transformedValues;
+          variableName = data.column || data.variableName;
+        } else if (data.rawValues) {
+          values = data.rawValues;
+          variableName = data.column || data.variableName;
+        } else {
+          console.error('❌ Invalid data format:', data);
+          return;
+        }
+        
+        if (!Array.isArray(values)) {
+          console.error('❌ Values is not an array:', values);
+          return;
+        }
+        
+        console.log(`📋 Raw values count: ${values.length}`);
+        
+        // Convert to numbers and filter out non-numeric values
+        values = values.map(v => {
+          if (typeof v === 'number') return v;
+          if (typeof v === 'string') {
+            const num = parseFloat(v);
+            return isNaN(num) ? null : num;
+          }
+          return null;
+        }).filter(v => v !== null && !isNaN(v));
+        
+        if (values.length === 0) {
+          console.error('❌ No valid numeric values after filtering');
+          return;
+        }
+        
+        console.log(`✅ Processing ${values.length} values`);
+        
+        // Update header if variable name provided
+        if (variableName && headerInitialized) {
+          console.log(`📝 Updating header with: ${variableName}, n=${values.length}`);
+          StatisticoHeader.updateVariable(variableName, values.length);
+        }
+        
+        // Process and visualize
+        processData(values);
+        hideAwaitingPanel();
+        
+      } catch (error) {
+        console.error('❌ Error processing data:', error);
+        console.error('Error details:', error.stack);
+      }
+    }
+    
+    function processData(values) {
+      originalData = values;
+      sortedData = [...values].sort((a, b) => a - b);
+      
+      // Calculate CDF
+      cdfData = sortedData.map((val, idx) => ({
+        x: val,
+        y: (idx + 1) / sortedData.length
+      }));
+      
+      // Calculate statistics
+      const n = sortedData.length;
+      const q1 = calculatePercentile(sortedData, 25);
+      const median = calculatePercentile(sortedData, 50);
+      const q3 = calculatePercentile(sortedData, 75);
+      const p95 = calculatePercentile(sortedData, 95);
+      const avg = sortedData.reduce((sum, val) => sum + val, 0) / n;
+      
+      // Determine decimal places for formatting
+      const range = sortedData[n - 1] - sortedData[0];
+      if (range < 1) currentDecimals = 4;
+      else if (range < 10) currentDecimals = 3;
+      else if (range < 100) currentDecimals = 2;
+      else currentDecimals = 1;
+      
+      // Update quartile boxes
+      document.getElementById('q1-value').textContent = q1.toFixed(currentDecimals);
+      document.getElementById('median-value').textContent = median.toFixed(currentDecimals);
+      document.getElementById('avg-value').textContent = avg.toFixed(currentDecimals);
+      document.getElementById('q3-value').textContent = q3.toFixed(currentDecimals);
+      document.getElementById('p95-value').textContent = p95.toFixed(currentDecimals);
+      
+      // Initialize chart and slider
+      initializeChart();
+      initializeSlider();
+    }
+    
+    function calculatePercentile(sortedArray, percentile) {
+      const n = sortedArray.length;
+      const pos = (percentile / 100) * (n - 1);
+      const lower = Math.floor(pos);
+      const upper = Math.ceil(pos);
+      const fraction = pos - lower;
+      
+      if (lower === upper) {
+        return sortedArray[lower];
+      }
+      return sortedArray[lower] * (1 - fraction) + sortedArray[upper] * fraction;
+    }
+    
+    function initializeChart() {
+      const minVal = sortedData[0];
+      const medianVal = calculatePercentile(sortedData, 50);
+      
+      chart = Highcharts.chart('chart-container', {
+        chart: {
+          type: 'line',
+          backgroundColor: 'transparent',
+          style: { fontFamily: 'Segoe UI, sans-serif' }
+        },
+        title: { text: null },
+        credits: { enabled: false },
+        xAxis: {
+          title: { text: 'Value', style: { color: '#ffffff' } },
+          labels: { style: { color: '#ffffff' } },
+          gridLineColor: '#2d3748',
+          plotBands: [{
+            id: 'shaded-area',
+            from: minVal,
+            to: medianVal,
+            color: 'rgba(255,165,120,0.15)',
+            zIndex: 0
+          }],
+          plotLines: [{
+            id: 'current-value-line',
+            value: medianVal,
+            color: 'rgba(255,165,120,0.8)',
+            width: 2,
+            dashStyle: 'Dash',
+            zIndex: 5
+          }]
+        },
+        yAxis: {
+          title: { text: 'Cumulative Probability', style: { color: '#ffffff' } },
+          labels: { 
+            style: { color: '#ffffff' },
+            format: '{value:.2f}'
+          },
+          min: 0,
+          max: 1,
+          gridLineColor: '#2d3748'
+        },
+        legend: {
+          itemStyle: { color: '#ffffff' },
+          itemHoverStyle: { color: '#78c8ff' }
+        },
+        plotOptions: {
+          line: {
+            marker: { enabled: false },
+            lineWidth: 3
+          }
+        },
+        series: [{
+          name: 'Empirical CDF',
+          data: cdfData.map(pt => [pt.x, pt.y]),
+          color: 'rgb(255,165,120)',
+          step: 'left'
+        }],
+        tooltip: {
+          useHTML: true,
+          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+          borderColor: '#78c8ff',
+          style: { color: '#ffffff' },
+          formatter: function() {
+            return `<b>x = ${this.x.toFixed(currentDecimals)}</b><br/>` +
+                   `F(x) = ${(this.y * 100).toFixed(2)}%`;
+          }
+        }
+      });
+    }
+    
+    function initializeSlider() {
+      const minVal = sortedData[0];
+      const maxVal = sortedData[sortedData.length - 1];
+      const medianVal = calculatePercentile(sortedData, 50);
+      
+      valueSlider = noUiSlider.create(document.getElementById('value-slider'), {
+        start: medianVal,
+        range: { min: minVal, max: maxVal },
+        step: (maxVal - minVal) / 1000,
+        tooltips: false
+      });
+      
+      valueSlider.on('update', function(values) {
+        const currentX = parseFloat(values[0]);
+        updateCurrentValue(currentX);
+      });
+    }
+    
+    function updateCurrentValue(xValue) {
+      // Find cumulative probability at this x value
+      let probability = 0;
+      
+      for (let i = 0; i < cdfData.length; i++) {
+        if (cdfData[i].x >= xValue) {
+          if (i === 0) {
+            probability = cdfData[i].y;
+          } else {
+            // Linear interpolation
+            const x0 = cdfData[i - 1].x;
+            const x1 = cdfData[i].x;
+            const y0 = cdfData[i - 1].y;
+            const y1 = cdfData[i].y;
+            probability = y0 + (y1 - y0) * (xValue - x0) / (x1 - x0);
+          }
+          break;
+        }
+      }
+      
+      // Update text display
+      document.getElementById('x-value').textContent = xValue.toFixed(currentDecimals);
+      document.getElementById('probability').textContent = (probability * 100).toFixed(2) + '%';
+      
+      // Update shaded area in chart
+      if (chart && chart.xAxis && chart.xAxis[0]) {
+        const minVal = sortedData[0];
+        
+        // Remove existing plot band and line
+        chart.xAxis[0].removePlotBand('shaded-area');
+        chart.xAxis[0].removePlotLine('current-value-line');
+        
+        // Add new plot band (shaded area to the left)
+        chart.xAxis[0].addPlotBand({
+          id: 'shaded-area',
+          from: minVal,
+          to: xValue,
+          color: 'rgba(255,165,120,0.2)',
+          zIndex: 0
+        });
+        
+        // Add vertical line at current position
+        chart.xAxis[0].addPlotLine({
+          id: 'current-value-line',
+          value: xValue,
+          color: 'rgba(255,165,120,0.9)',
+          width: 2,
+          dashStyle: 'Dash',
+          zIndex: 5,
+          label: {
+            text: `${(probability * 100).toFixed(1)}%`,
+            align: 'right',
+            style: {
+              color: 'rgb(255,165,120)',
+              fontWeight: 'bold',
+              fontSize: '11px'
+            },
+            y: -5
+          }
+        });
+      }
+    }
+    
+    function jumpToPercentile(percentile) {
+      const value = calculatePercentile(sortedData, percentile);
+      if (valueSlider) {
+        valueSlider.set(value);
+      }
+    }
+    
+    function onDistributionChange() {
+      const distType = document.getElementById('distribution-select').value;
+      const toggleBtn = document.getElementById('toggle-distribution');
+      
+      if (distType === 'none') {
+        toggleBtn.style.display = 'none';
+        removeTheoreticalDistribution();
+      } else {
+        toggleBtn.style.display = 'flex';
+        if (theoreticalVisible) {
+          addTheoreticalDistribution(distType);
+        }
+      }
+    }
+    
+    function toggleTheoreticalDistribution() {
+      theoreticalVisible = !theoreticalVisible;
+      const distType = document.getElementById('distribution-select').value;
+      const toggleBtn = document.getElementById('toggle-distribution');
+      const toggleText = document.getElementById('toggle-dist-text');
+      
+      if (theoreticalVisible) {
+        addTheoreticalDistribution(distType);
+        toggleText.textContent = 'Hide Overlay';
+        toggleBtn.classList.add('active');
+      } else {
+        removeTheoreticalDistribution();
+        toggleText.textContent = 'Show Overlay';
+        toggleBtn.classList.remove('active');
+      }
+    }
+    
+    function addTheoreticalDistribution(distType) {
+      if (!chart) return;
+      
+      const n = sortedData.length;
+      const mean = sortedData.reduce((sum, val) => sum + val, 0) / n;
+      const variance = sortedData.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / n;
+      const stdDev = Math.sqrt(variance);
+      
+      const minVal = sortedData[0];
+      const maxVal = sortedData[sortedData.length - 1];
+      const range = maxVal - minVal;
+      const points = [];
+      
+      for (let i = 0; i <= 100; i++) {
+        const x = minVal + (range * i / 100);
+        let y;
+        
+        if (distType === 'normal') {
+          y = normalCDF(x, mean, stdDev);
+        } else if (distType === 'uniform') {
+          y = (x - minVal) / range;
+        } else {
+          continue; // Skip other distributions for now
+        }
+        
+        points.push([x, y]);
+      }
+      
+      // Remove existing theoretical series
+      while (chart.series.length > 1) {
+        chart.series[1].remove(false);
+      }
+      
+      chart.addSeries({
+        name: distType.charAt(0).toUpperCase() + distType.slice(1) + ' CDF',
+        data: points,
+        color: 'rgb(120,200,255)',
+        dashStyle: 'Dash',
+        lineWidth: 2
+      }, true);
+    }
+    
+    function removeTheoreticalDistribution() {
+      if (!chart) return;
+      while (chart.series.length > 1) {
+        chart.series[1].remove(true);
+      }
+    }
+    
+    function normalCDF(x, mean, stdDev) {
+      const z = (x - mean) / stdDev;
+      return 0.5 * (1 + erf(z / Math.sqrt(2)));
+    }
+    
+    function erf(x) {
+      // Approximation of error function
+      const a1 =  0.254829592;
+      const a2 = -0.284496736;
+      const a3 =  1.421413741;
+      const a4 = -1.453152027;
+      const a5 =  1.061405429;
+      const p  =  0.3275911;
+      
+      const sign = x >= 0 ? 1 : -1;
+      x = Math.abs(x);
+      
+      const t = 1.0 / (1.0 + p * x);
+      const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+      
+      return sign * y;
+    }
+    
+    function hideAwaitingPanel() {
+      document.getElementById('awaiting-panel').style.display = 'none';
+      document.getElementById('main-content').style.display = 'block';
+    }
+    
+    // Office.js initialization
+    Office.initialize = function (reason) {
+      console.log('✅ Cumulative Distribution - Office.js initialized:', reason);
+      
+      // Listen for messages from parent
+      Office.context.ui.addHandlerAsync(
+        Office.EventType.DialogParentMessageReceived,
+        onMessageReceived
+      );
+      
+      // Request data from parent
+      setTimeout(() => {
+        sendMessageToParent({ status: 'ready', action: 'requestData' });
+      }, 500);
+      
+      // Fallback to sample data after 5 seconds if no real data arrives
+      setTimeout(() => {
+        if (originalData.length === 0) {
+          console.log('⚠️ No data received, loading sample data');
+          loadSampleData();
+        }
+      }, 5000);
+    };
+    
+    function onMessageReceived(arg) {
+      console.log('📨 Message received from parent (raw):', arg.message);
+      try {
+        const message = JSON.parse(arg.message);
+        console.log('📩 Parsed message:', message);
+        console.log('📩 Message type:', typeof message);
+        console.log('📩 Message keys:', Object.keys(message));
+        
+        if (message.action === 'loadData' && message.data) {
+          console.log('📊 Route 1: loadData action with data property');
+          handleDataReceived(message.data);
+        } else if (message.values) {
+          console.log('📊 Route 2: Direct values property');
+          handleDataReceived(message);
+        } else if (message.data) {
+          console.log('📊 Route 3: data property without action');
+          handleDataReceived(message.data);
+        } else {
+          console.log('📊 Route 4: Direct message');
+          handleDataReceived(message);
+        }
+      } catch (e) {
+        console.error('❌ Failed to parse message:', e);
+        console.error('Raw message:', arg.message);
+      }
+    }
+    
+    function sendMessageToParent(message) {
+      if (typeof Office !== 'undefined' && Office.context && Office.context.ui) {
+        try {
+          Office.context.ui.messageParent(JSON.stringify(message));
+          console.log('📤 Message sent to parent:', message);
+        } catch (e) {
+          console.error('❌ Failed to send message to parent:', e);
+        }
+      }
+    }
+    
+    function loadSampleData() {
+      console.log('📊 Loading sample data for demonstration');
+      const sampleData = Array.from({length: 100}, () => Math.random() * 100);
+      handleDataReceived({ 
+        values: sampleData, 
+        variableName: 'Sample Data (Demo)'
+      });
+    }
+  </script>
+</body>
+</html>

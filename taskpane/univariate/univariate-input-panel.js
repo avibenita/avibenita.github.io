@@ -25,8 +25,6 @@ function onRangeDataLoaded(values, address) {
   if (!values || values.length < 2) return showPanel(false);
   univariateRangeData = values;
   univariateRangeAddress = address || '';
-  sessionStorage.setItem('univariateRangeData', JSON.stringify(values));
-  sessionStorage.setItem('univariateRangeAddress', univariateRangeAddress);
   const headers = values[0] || [];
   const rows = values.slice(1);
   const r = document.getElementById('uniRange');
@@ -51,9 +49,6 @@ function updateButtonState() {
   const resetBtn = document.getElementById('resetUnivariateModelBtn');
   const openBtn = document.getElementById('openUnivariateBuilder');
   if (resetBtn) resetBtn.style.display = spec ? 'inline-flex' : 'none';
-  if (openBtn) openBtn.textContent = spec
-    ? ' Re-configure'
-    : ' Open Configuration';
   if (openBtn) openBtn.innerHTML = spec
     ? '<i class="fa-solid fa-up-right-from-square"></i> Re-configure'
     : '<i class="fa-solid fa-up-right-from-square"></i> Open Configuration';
@@ -83,12 +78,12 @@ function openUnivariateBuilder() {
           const message = JSON.parse(arg.message || '{}');
           if (message.action === 'ready' || message.action === 'requestData') {
             sendDialogData();
-          } else if (message.action === 'univariateModel') {
-            sessionStorage.setItem('univariateModelSpec', JSON.stringify(message.data || {}));
+          } else if (message.action === 'univariateResults') {
+            sessionStorage.setItem('univariateModelSpec', JSON.stringify(message.spec || {}));
             univariateDialog.close();
             univariateDialog = null;
             updateButtonState();
-            setTimeout(runUnivariateAnalysis, 380);
+            setTimeout(() => openResultsDialog(message.data), 380);
           } else if (message.action === 'close') {
             univariateDialog.close();
             univariateDialog = null;
@@ -111,105 +106,6 @@ function sendDialogData() {
     type: 'UNIVARIATE_DATA',
     payload: { headers, rows, address: univariateRangeAddress, savedSpec }
   }));
-}
-
-// ─── RUN ANALYSIS (after config dialog closes) ────────────────────────────────
-function runUnivariateAnalysis() {
-  const spec = JSON.parse(sessionStorage.getItem('univariateModelSpec') || 'null');
-  if (!spec || !univariateRangeData) return;
-
-  const { columnIndex, columnName, trimMin, trimMax, transform } = spec;
-
-  // Extract column data (skip header row)
-  let data = univariateRangeData.slice(1)
-    .map(row => row[columnIndex])
-    .filter(v => v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v)))
-    .map(v => parseFloat(v));
-
-  if (!data.length) return;
-
-  // Apply trim
-  if (trimMin > 0 || trimMax < 100) {
-    const sorted = [...data].sort((a, b) => a - b);
-    const minVal = sorted[Math.floor((sorted.length - 1) * trimMin / 100)];
-    const maxVal = sorted[Math.floor((sorted.length - 1) * trimMax / 100)];
-    data = data.filter(v => v >= minVal && v <= maxVal);
-  }
-
-  // Apply transform
-  data = applyTransform(data, transform);
-
-  const results = calculateStatistics(data, univariateRangeAddress, columnName, transform, trimMin, trimMax);
-  openResultsDialog(results);
-}
-
-// ─── TRANSFORM ────────────────────────────────────────────────────────────────
-function applyTransform(data, transform) {
-  switch (transform) {
-    case 'ln':       return data.map(v => Math.log(v));
-    case 'log10':    return data.map(v => Math.log10(v));
-    case 'sqrt':     return data.map(v => Math.sqrt(v));
-    case 'square':   return data.map(v => v * v);
-    case 'reciprocal': return data.map(v => 1 / v);
-    case 'z': {
-      const m = data.reduce((a, b) => a + b, 0) / data.length;
-      const sd = Math.sqrt(data.reduce((acc, v) => acc + (v - m) ** 2, 0) / data.length);
-      return data.map(v => (v - m) / sd);
-    }
-    case 'minmax': {
-      const mn = Math.min(...data), mx = Math.max(...data);
-      return data.map(v => (v - mn) / (mx - mn));
-    }
-    default: return data;
-  }
-}
-
-// ─── STATISTICS ───────────────────────────────────────────────────────────────
-function calculateStatistics(data, address, columnName, transform, trimMin, trimMax) {
-  const n = data.length;
-  const sorted = [...data].sort((a, b) => a - b);
-  const sum = data.reduce((a, b) => a + b, 0);
-  const mean = sum / n;
-  const variance = data.reduce((acc, v) => acc + (v - mean) ** 2, 0) / (n - 1);
-  const stdDev = Math.sqrt(variance);
-  const min = sorted[0];
-  const max = sorted[n - 1];
-  const q1 = quantile(sorted, 0.25);
-  const median = quantile(sorted, 0.5);
-  const q3 = quantile(sorted, 0.75);
-  const skewness = calcSkewness(data, mean, stdDev);
-  const kurtosis = calcKurtosis(data, mean, stdDev);
-  return {
-    dataSource: address,
-    column: columnName,
-    transform,
-    trim: { min: trimMin, max: trimMax },
-    n,
-    values: data,
-    rawData: data,
-    descriptive: { mean, median, stdDev, variance, min, max, range: max - min, q1, q3, iqr: q3 - q1, skewness, kurtosis }
-  };
-}
-
-function quantile(sorted, q) {
-  const pos = (sorted.length - 1) * q;
-  const base = Math.floor(pos);
-  const rest = pos - base;
-  return sorted[base + 1] !== undefined
-    ? sorted[base] + rest * (sorted[base + 1] - sorted[base])
-    : sorted[base];
-}
-
-function calcSkewness(data, mean, sd) {
-  const n = data.length;
-  const m3 = data.reduce((acc, v) => acc + (v - mean) ** 3, 0) / n;
-  return m3 / sd ** 3;
-}
-
-function calcKurtosis(data, mean, sd) {
-  const n = data.length;
-  const m4 = data.reduce((acc, v) => acc + (v - mean) ** 4, 0) / n;
-  return (m4 / sd ** 4) - 3;
 }
 
 // ─── RESULTS DIALOG ──────────────────────────────────────────────────────────

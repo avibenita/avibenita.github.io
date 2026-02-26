@@ -17,6 +17,30 @@ let trimMin = 0;
 let trimMax = 100;
 let currentTransform = 'none';
 
+/**
+ * Resolve the base URL for dialog pages regardless of hosting path.
+ * Handles GitHub Pages (statistico-analytics subfolder) and localhost.
+ */
+function getDialogsBaseUrl() {
+    const { origin, pathname, href } = window.location;
+
+    // Localhost/development
+    if (href.includes('127.0.0.1') || href.includes('localhost')) {
+        return 'http://127.0.0.1:8080/dialogs/views/';
+    }
+
+    // Preserve optional subfolder prefixes (e.g. /statistico-analytics) before /taskpane/
+    const taskpaneMarker = '/taskpane/';
+    const taskpaneIndex = pathname.indexOf(taskpaneMarker);
+    if (taskpaneIndex !== -1) {
+        const basePath = pathname.slice(0, taskpaneIndex);
+        return `${origin}${basePath}/dialogs/views/`;
+    }
+
+    // Fallback for production roots
+    return `${origin}/dialogs/views/`;
+}
+
 // Initialize when Office is ready
 Office.onReady(async (info) => {
     if (info.host === Office.HostType.Excel) {
@@ -539,10 +563,12 @@ let currentResults = null; // Store results globally for view switching
 // Theme management
 function setResultsTheme(theme) {
     localStorage.setItem('resultsTheme', theme);
-    
-    // Update UI
-    document.getElementById('themeLight').classList.toggle('active', theme === 'light');
-    document.getElementById('themeDark').classList.toggle('active', theme === 'dark');
+
+    // Update UI only if elements exist (they may not be present in every taskpane)
+    const themeLight = document.getElementById('themeLight');
+    const themeDark  = document.getElementById('themeDark');
+    if (themeLight) themeLight.classList.toggle('active', theme === 'light');
+    if (themeDark)  themeDark.classList.toggle('active', theme === 'dark');
 }
 
 // Initialize theme on load
@@ -621,7 +647,7 @@ function openNewView(dialogUrl, results) {
                     unlockTaskpaneUI();
                             }
                             setTimeout(() => {
-                                const newDialogUrl = `${window.location.origin}/dialogs/views/${message.view}`;
+                                const newDialogUrl = `${getDialogsBaseUrl()}${message.view}`;
                                 console.log('🟢 Opening new view (handler 2):', newDialogUrl);
                                 openNewView(newDialogUrl, currentResults);
                             }, 300);
@@ -720,7 +746,7 @@ function openResultsDialog(results) {
     lockTaskpaneUI();
     
     // Use standalone histogram instead of full results dialog
-    const dialogUrl = `${window.location.origin}/dialogs/views/univariate/histogram-standalone.html`;
+    const dialogUrl = `${getDialogsBaseUrl()}univariate/histogram-standalone.html`;
     
     Office.context.ui.displayDialogAsync(
         dialogUrl,
@@ -783,7 +809,7 @@ function openResultsDialog(results) {
                             
                             // Wait a bit before opening new dialog
                             setTimeout(() => {
-                                const newDialogUrl = `${window.location.origin}/dialogs/views/${message.view}`;
+                                const newDialogUrl = `${getDialogsBaseUrl()}${message.view}`;
                                 console.log('🟢 Opening new view:', newDialogUrl);
                                 console.log('📊 Current results available:', !!currentResults);
                                 openNewView(newDialogUrl, currentResults);
@@ -862,7 +888,7 @@ function quickTestBoxPlot() {
     const results = calculateStatistics(sampleData, 'Test Data', 'none');
     currentResults = results;
     
-    const dialogUrl = `${window.location.origin}/dialogs/views/univariate/boxplot-standalone.html`;
+    const dialogUrl = `${getDialogsBaseUrl()}univariate/boxplot-standalone.html`;
     openNewView(dialogUrl, results);
     showStatus('success', 'Test box plot opened!');
 }
@@ -885,7 +911,7 @@ function quickTestQQPlot() {
     const results = calculateStatistics(sampleData, 'Test Data', 'none');
     currentResults = results;
     
-    const dialogUrl = `${window.location.origin}/dialogs/views/univariate/qqplot-standalone.html`;
+    const dialogUrl = `${getDialogsBaseUrl()}univariate/qqplot-standalone.html`;
     openNewView(dialogUrl, results);
     showStatus('success', 'Test QQ/PP plot opened!');
 }
@@ -908,7 +934,7 @@ function quickTestKernel() {
     const results = calculateStatistics(sampleData, 'Test Data', 'none');
     currentResults = results;
     
-    const dialogUrl = `${window.location.origin}/dialogs/views/univariate/kernel-standalone.html`;
+    const dialogUrl = `${getDialogsBaseUrl()}univariate/kernel-standalone.html`;
     openNewView(dialogUrl, results);
     showStatus('success', 'Test Kernel Density opened!');
 }
@@ -933,7 +959,7 @@ function quickTestOutliers() {
     const results = calculateStatistics(sampleData, 'Test Data', 'none');
     currentResults = results;
     
-    const dialogUrl = `${window.location.origin}/dialogs/views/univariate/outliers-standalone.html`;
+    const dialogUrl = `${getDialogsBaseUrl()}univariate/outliers-standalone.html`;
     openNewView(dialogUrl, results);
     showStatus('success', 'Test Outliers Detection opened!');
 }
@@ -956,7 +982,7 @@ function quickTestConfidence() {
     const results = calculateStatistics(sampleData, 'Test Data', 'none');
     currentResults = results;
     
-    const dialogUrl = `${window.location.origin}/dialogs/views/univariate/confidence-standalone.html`;
+    const dialogUrl = `${getDialogsBaseUrl()}univariate/confidence-standalone.html`;
     openNewView(dialogUrl, results);
     showStatus('success', 'Test Confidence Intervals opened!');
 }
@@ -979,7 +1005,7 @@ function quickTestNormality() {
     const results = calculateStatistics(sampleData, 'Test Data', 'none');
     currentResults = results;
     
-    const dialogUrl = `${window.location.origin}/dialogs/views/univariate/normality-standalone.html`;
+    const dialogUrl = `${getDialogsBaseUrl()}univariate/normality-standalone.html`;
     openNewView(dialogUrl, results);
     showStatus('success', 'Test Normality Tests opened!');
 }
@@ -1002,7 +1028,7 @@ function quickTestHypothesis() {
     const results = calculateStatistics(sampleData, 'Test Data', 'none');
     currentResults = results;
     
-    const dialogUrl = `${window.location.origin}/dialogs/views/univariate/hypothesis-standalone.html`;
+    const dialogUrl = `${getDialogsBaseUrl()}univariate/hypothesis-standalone.html`;
     openNewView(dialogUrl, results);
     showStatus('success', 'Test Hypothesis Testing opened!');
 }

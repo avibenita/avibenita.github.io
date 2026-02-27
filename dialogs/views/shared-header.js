@@ -56,7 +56,13 @@ const StatisticoHeader = {
       return tag !== 'SCRIPT' && !node.classList.contains('laptop-frame');
     });
 
-    bodyChildren.forEach((node) => frame.appendChild(node));
+    bodyChildren.forEach((node) => {
+      // Mark content divs (non-custom-elements) as lf-content for universal fill
+      if (node.nodeType === 1 && node.tagName.indexOf('-') === -1) {
+        node.classList.add('lf-content');
+      }
+      frame.appendChild(node);
+    });
 
     const firstScript = document.body.querySelector('script');
     if (firstScript) {
@@ -207,6 +213,8 @@ const StatisticoHeader = {
       if (existingShell) existingShell.remove();
       const existingHeader = document.querySelector('.statistico-header');
       if (existingHeader) existingHeader.remove();
+      // Remove leftover <statistico-header> custom elements (they are empty after render)
+      document.querySelectorAll('statistico-header').forEach(el => el.remove());
       const mountRoot = document.querySelector('.laptop-frame') || document.body;
       mountRoot.insertAdjacentHTML('afterbegin', headerHTML);
     }

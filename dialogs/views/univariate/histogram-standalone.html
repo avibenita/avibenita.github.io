@@ -358,13 +358,14 @@
       color: var(--accent-2);
     }
 
-    /* Footer */
+    /* Footer — sits at the very bottom, never grows */
     .statistico-footer {
       font-size: 11px;
       color: #7f8c8d;
       text-align: center;
-      padding: 6px 0;
-      opacity: 0.8;
+      padding: 4px 0;
+      opacity: 0.7;
+      flex: 0 0 auto;
     }
   </style>
 </head>
@@ -490,10 +491,47 @@
       </div>
     </div>
 
+    <!-- Footer inside container so it shares the flex height correctly -->
+    <footer class="statistico-footer">
+      © 2026 Statistico Analytics™ · All rights reserved
+    </footer>
+
   </div>
 
-  <!-- JAVASCRIPT - EXACT COPY OF ORIGINAL LOGIC -->
+  <!-- JAVASCRIPT -->
   <script>
+    // ── fitLayout: same pattern as boxplot ────────────────────────────────────
+    // Measures frame → header → table-panel → sets explicit px heights on each
+    // container so Highcharts.reflow() always gets the right size.
+    function fitLayout() {
+      const frame   = document.querySelector('.laptop-frame') || document.body;
+      const shell   = document.querySelector('.statistico-shell');
+      const headerH = shell ? shell.offsetHeight : 88;
+      const availH  = (frame.clientHeight || window.innerHeight) - headerH;
+
+      // 1. Stretch the full results container
+      const container = document.getElementById('results-container');
+      if (!container || !container.classList.contains('show')) return;
+      container.style.height = availH + 'px';
+
+      // 2. Table panel: let it size itself, then give chart the rest
+      const tablePanel  = document.querySelector('.table-panel');
+      const footer      = container.querySelector('.statistico-footer');
+      const tablePanelH = tablePanel  ? tablePanel.offsetHeight  : 130;
+      const footerH     = footer      ? footer.offsetHeight      : 20;
+      const gap         = 10; // gap between panels
+      const chartPanelH = Math.max(160, availH - tablePanelH - footerH - gap * 2);
+
+      const chartPanel = document.getElementById('histogram-panel');
+      if (chartPanel) chartPanel.style.height = chartPanelH + 'px';
+
+      // 3. Reflow Highcharts — container now has correct pixel height
+      setTimeout(() => {
+        if (histogramChart) histogramChart.reflow();
+      }, 50);
+    }
+    window.addEventListener('resize', fitLayout);
+
     // Global variables
     let histogramChart = null;
     let originalData = [];
@@ -555,6 +593,7 @@
       // Initialize shared header
       StatisticoHeader.init('histogram', 'Variable', 0);
       console.log('✅ Shared header initialized');
+      setTimeout(fitLayout, 150); // initial size pass after header renders
       
       // Try immediately
       setTimeout(() => {
@@ -653,6 +692,7 @@
         const resultsContainer = document.getElementById('results-container');
         resultsContainer.classList.add('show');
         console.log('✅ Results container shown');
+        setTimeout(fitLayout, 80); // measure after container is visible
         
         // Create histogram
         console.log('🎨 Creating histogram...');
@@ -871,26 +911,10 @@
       // Determine if animation should be enabled
       const enableAnimation = !isSliderMoving;
       
-      // Create chart — compute available height from frame dimensions
+      // Create chart — height:null means Highcharts uses container height.
+      // fitLayout() sets the container heights first, then reflow() sizes the chart.
       const chartContainer = document.getElementById('histogram-chart');
-      const dynamicHeight = (() => {
-        // Prefer container's own clientHeight if already laid out
-        if (chartContainer && chartContainer.clientHeight > 50) {
-          return Math.max(220, chartContainer.clientHeight - 2);
-        }
-        // Fall back: measure from laptop-frame minus all fixed-height siblings
-        const frame      = document.querySelector('.laptop-frame') || document.body;
-        const shell      = document.querySelector('.statistico-shell');
-        const tablePanel = document.querySelector('.table-panel');
-        const chartHead  = document.querySelector('.chart-panel .panel-heading');
-        const controls   = document.querySelector('.chart-panel .controls');
-        const frameH  = frame.clientHeight  || window.innerHeight;
-        const shellH  = shell  ? shell.offsetHeight  : 88;
-        const tableH  = tablePanel ? tablePanel.offsetHeight : 110;
-        const headH   = chartHead  ? chartHead.offsetHeight  : 38;
-        const ctrlH   = controls   ? controls.offsetHeight   : 50;
-        return Math.max(220, frameH - shellH - tableH - headH - ctrlH - 50);
-      })();
+      const dynamicHeight = null; // controlled by fitLayout() + reflow()
 
       histogramChart = Highcharts.chart('histogram-chart', {
         chart: {
@@ -967,16 +991,8 @@
         credits: { enabled: false }
       });
 
-      // Reflow once layout has settled so the chart fills actual container height
-      setTimeout(() => {
-        if (histogramChart) {
-          const container = document.getElementById('histogram-chart');
-          const h = container ? container.clientHeight : 0;
-          if (h > 50 && Math.abs(h - histogramChart.chartHeight) > 20) {
-            histogramChart.setSize(null, h - 2, false);
-          }
-        }
-      }, 250);
+      // Let fitLayout() measure and size everything correctly
+      setTimeout(fitLayout, 100);
     }
 
     // Calculate optimal bins
@@ -1070,8 +1086,5 @@
     console.log('✅ Histogram view script loaded');
   </script>
 
-  <footer class="statistico-footer">
-    © 2026 Statistico Analytics™ · All rights reserved
-  </footer>
 </body>
 </html>

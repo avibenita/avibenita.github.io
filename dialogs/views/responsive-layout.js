@@ -29,6 +29,16 @@ const ResponsiveLayout = {
   },
 
   /**
+   * Measure usable viewport height for dialog content.
+   * If a laptop-frame wrapper exists, use it instead of window height.
+   */
+  getBaseViewportHeight() {
+    const frame = document.querySelector('.laptop-frame');
+    if (frame && frame.clientHeight) return frame.clientHeight;
+    return window.innerHeight;
+  },
+
+  /**
    * Initialize responsive layout
    * Call this on page load or after DOM ready
    */
@@ -62,7 +72,7 @@ const ResponsiveLayout = {
     document.documentElement.style.overflow = 'hidden';
     
     // Get actual viewport height
-    const vh = window.innerHeight;
+    const vh = this.getBaseViewportHeight();
     const measuredHeaderHeight = this.getHeaderHeight();
     const availableHeight = Math.max(120, vh - measuredHeaderHeight);
     
@@ -71,7 +81,7 @@ const ResponsiveLayout = {
     document.documentElement.style.setProperty('--available-height', `${availableHeight}px`);
     document.documentElement.style.setProperty('--header-height', `${measuredHeaderHeight}px`);
     
-    console.log(`📐 Viewport: ${window.innerWidth}x${vh}px, Header: ${measuredHeaderHeight}px, Available: ${availableHeight}px`);
+    console.log(`📐 Viewport(base): ${window.innerWidth}x${vh}px, Header: ${measuredHeaderHeight}px, Available: ${availableHeight}px`);
     
     // Force container to fit
     const container = document.querySelector('.responsive-container');
@@ -88,7 +98,7 @@ const ResponsiveLayout = {
    * Calculate optimal layout based on viewport and content
    */
   calculateOptimalLayout() {
-    const vh = window.innerHeight;
+    const vh = this.getBaseViewportHeight();
     const availableHeight = Math.max(120, vh - this.getHeaderHeight());
     
     const container = document.querySelector('.responsive-container');
@@ -241,7 +251,7 @@ const ResponsiveLayout = {
   forceFit() {
     console.log('🚨 FORCE FIT: Applying emergency layout constraints...');
     
-    const vh = window.innerHeight;
+    const vh = this.getBaseViewportHeight();
     const availableHeight = Math.max(120, vh - this.getHeaderHeight());
     
     // Moderately compact spacing (not ultra-compact to preserve visibility)

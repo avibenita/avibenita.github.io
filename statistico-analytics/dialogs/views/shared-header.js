@@ -1,10 +1,10 @@
 /**
  * Shared Header Component for Statistico Standalone Views
  * Provides shared navigation across standalone analysis views
- * VERSION: 2026-02-27-navtabs-under-header
+ * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-02-27-navtabs-under-header');
+console.log('📦 Loading shared-header.js VERSION 2026-02-27-laptop-frame');
 
 const StatisticoHeader = {
   currentView: 'histogram',
@@ -32,8 +32,38 @@ const StatisticoHeader = {
     } else {
       this.module = 'univariate';
     }
+
+    // Keep univariate result dialogs visually capped to a laptop-like viewport.
+    this.ensureLaptopFrame();
     
     this.render();
+  },
+
+  /**
+   * Wrap body content in a constrained centered frame for large monitors.
+   */
+  ensureLaptopFrame() {
+    if (this.module !== 'univariate') return;
+    if (document.querySelector('.laptop-frame')) return;
+
+    document.body.classList.add('statistico-dialog-sized');
+
+    const frame = document.createElement('div');
+    frame.className = 'laptop-frame';
+
+    const bodyChildren = Array.from(document.body.children).filter((node) => {
+      const tag = node.tagName;
+      return tag !== 'SCRIPT' && !node.classList.contains('laptop-frame');
+    });
+
+    bodyChildren.forEach((node) => frame.appendChild(node));
+
+    const firstScript = document.body.querySelector('script');
+    if (firstScript) {
+      document.body.insertBefore(frame, firstScript);
+    } else {
+      document.body.appendChild(frame);
+    }
   },
   
   /**
@@ -177,7 +207,8 @@ const StatisticoHeader = {
       if (existingShell) existingShell.remove();
       const existingHeader = document.querySelector('.statistico-header');
       if (existingHeader) existingHeader.remove();
-      document.body.insertAdjacentHTML('afterbegin', headerHTML);
+      const mountRoot = document.querySelector('.laptop-frame') || document.body;
+      mountRoot.insertAdjacentHTML('afterbegin', headerHTML);
     }
   },
   

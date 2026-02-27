@@ -3,263 +3,133 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Statistico Analytics</title>
-  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
+  <title>Analytics Hub</title>
+  
+  <!-- Office.js -->
+  <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+  
+  <!-- Light Minimal Taskpane CSS -->
   <link rel="stylesheet" href="../src/shared/css/taskpane-light.css" />
-  <link rel="stylesheet" href="../src/shared/css/data-input-panel.css" />
-  <style>
-    /* ── Univariate config panel ── */
-    .cfg-panel{margin-top:14px;padding:14px;background:#fff7ed;border-radius:8px;border:1px solid #fed7aa}
-    .cfg-title{font-weight:600;font-size:13px;color:#c2410c;margin-bottom:12px;display:flex;align-items:center;gap:6px}
-    .cfg-row{margin-bottom:12px}
-    .cfg-label{font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;display:block}
-    .cfg-select,.cfg-input{width:100%;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;background:#fff;box-sizing:border-box}
-    .cfg-trim{display:flex;gap:8px;align-items:center}
-    .cfg-trim input{flex:1;padding:7px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;text-align:center;box-sizing:border-box}
-    .cfg-trim span{font-size:11px;color:#6b7280;white-space:nowrap}
-    .run-btn{width:100%;padding:13px;font-size:14px;font-weight:700;color:#fff;background:linear-gradient(135deg,#f97316,#ea580c);border:none;border-radius:8px;cursor:pointer;margin-top:4px;display:flex;align-items:center;justify-content:center;gap:8px}
-    .run-btn:disabled{background:#cbd5e1;cursor:not-allowed}
-    .cfg-summary{font-size:11px;color:#92400e;background:#fef3c7;border-radius:5px;padding:6px 8px;margin-bottom:10px}
-  </style>
 </head>
 <body>
-
-<!-- ══════════════════════════════════════════════════════
-     VIEW 1 — MODULE HUB
-══════════════════════════════════════════════════════ -->
-<div id="hubView">
   <div class="hub-container">
+    <!-- Header -->
     <div class="hub-header">
-      <div class="hub-title"><i class="fa-solid fa-chart-line"></i> Statistico Analytics</div>
-      <div class="hub-subtitle">Select an analysis module</div>
+      <div class="hub-title">
+        <i class="fa-solid fa-chart-line"></i>
+        Statistico Analytics
+      </div>
+      <div class="hub-subtitle">Slect an analysis module</div>
     </div>
+
+    <!-- Module Grid -->
     <div class="modules-grid" id="modulesList">
-      <div class="loading"><div class="spinner-sm"></div><div>Loading…</div></div>
+      <div class="loading">
+        <div class="spinner-sm"></div>
+        <div>Loading modules...</div>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- ══════════════════════════════════════════════════════
-     VIEW 2 — UNIVARIATE ANALYSIS
-══════════════════════════════════════════════════════ -->
-<div id="univariateView" style="display:none">
-  <div class="taskpane-container">
-    <div class="module-header">
-      <div class="module-header-title"><i class="fa-solid fa-chart-simple"></i> Univariate</div>
-      <button class="back-btn" onclick="showHub()"><i class="fa-solid fa-arrow-left"></i> Back</button>
-    </div>
-    <div class="taskpane-content">
-
-      <!-- Data Input Panel (inline) -->
-      <div class="panel-section" id="dataInputPanel">
-        <div class="section-title"><i class="fa-solid fa-table-cells-large"></i> Pick Range</div>
-        <div style="padding:14px">
-          <div class="data-range-buttons" style="display:flex;gap:8px;position:relative">
-            <div style="flex:1;position:relative">
-              <button id="namedRangeBtn" class="range-btn" onclick="toggleNamedRangeDropdown()" style="width:100%">
-                <i class="fa-solid fa-bookmark"></i><span>Named Range</span>
-                <i class="fa-solid fa-chevron-down" style="margin-left:auto;font-size:10px"></i>
-              </button>
-              <div id="namedRangeDropdown" class="range-dropdown" style="display:none">
-                <select id="rangeSelector" onchange="loadFromNamedRange()" size="6">
-                  <option value="">-- Select Named Range --</option>
-                </select>
-              </div>
-            </div>
-            <button id="autoDetectBtn" class="range-btn" onclick="autoDetectRange()" style="flex:1">
-              <i class="fa-solid fa-magic"></i><span>Used Range</span>
-            </button>
-            <button id="useSelectionBtn" class="range-btn" onclick="useSelection()" style="flex:1" disabled>
-              <i class="fa-solid fa-hand-pointer"></i><span>Current XL Selection</span>
-            </button>
-          </div>
-          <div id="rangeDisplay" style="display:none">
-            <div style="font-weight:600;margin-bottom:4px">
-              <i id="rangeIcon" class="fa-solid fa-bookmark"></i> <span id="rangeTitle"></span>
-            </div>
-            <div><span id="rangeDetails"></span></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Configuration Panel -->
-      <div id="cfgPanel" class="cfg-panel" style="display:none">
-        <div class="cfg-title"><i class="fa-solid fa-sliders"></i> Analysis Configuration</div>
-        <div class="cfg-summary" id="cfgSummary">Range: — | Rows: 0 | Cols: 0</div>
-        <div class="cfg-row">
-          <label class="cfg-label">Column to Analyse</label>
-          <select id="cfgColumn" class="cfg-select"></select>
-        </div>
-        <div class="cfg-row">
-          <label class="cfg-label">Trim (%)</label>
-          <div class="cfg-trim">
-            <span>Lower</span><input type="number" id="cfgTrimMin" value="0" min="0" max="49" step="1"/>
-            <span>Upper</span><input type="number" id="cfgTrimMax" value="100" min="51" max="100" step="1"/>
-          </div>
-        </div>
-        <div class="cfg-row">
-          <label class="cfg-label">Transform</label>
-          <select id="cfgTransform" class="cfg-select">
-            <option value="">None</option>
-            <option value="ln">Natural Log (ln)</option>
-            <option value="log10">Log base 10</option>
-            <option value="sqrt">Square Root</option>
-            <option value="square">Square (x²)</option>
-            <option value="reciprocal">Reciprocal (1/x)</option>
-            <option value="z">Z-Score Standardise</option>
-            <option value="minmax">Min-Max Normalise</option>
-          </select>
-        </div>
-        <button id="runBtn" class="run-btn" onclick="runAnalysis()" disabled>
-          <i class="fa-solid fa-play"></i> Run Analysis
-        </button>
-      </div>
-
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════════
-     SCRIPTS
-══════════════════════════════════════════════════════ -->
-<script src="../src/shared/js/components/DataInputPanel.js"></script>
-<script>
-/* ── Hub ── */
-Office.onReady(function(info) {
-  if (info.host !== Office.HostType.Excel) return;
-  initHub();
-});
-
-function initHub() {
-  var modules = [
-    { id:'univariate',    icon:'fa-chart-simple',    name:'Univariate',         desc:'Descriptive stats, distribution, and normality' },
-    { id:'correlations',  icon:'fa-diagram-project', name:'Correlations',        desc:'Pearson, Spearman, and partial correlations' },
-    { id:'regression',    icon:'fa-chart-line',      name:'Regression',          desc:'OLS with diagnostics and predictions' },
-    { id:'anova',         icon:'fa-table-cells',     name:'ANOVA',               desc:'One-way, two-way, and factorial designs' },
-    { id:'logistic',      icon:'fa-percent',         name:'Logistic Regression', desc:'Binary and multinomial classification' },
-    { id:'factor',        icon:'fa-cubes',           name:'Factor Analysis',     desc:'EFA, PCA, and dimension reduction' },
-    { id:'independent',   icon:'fa-not-equal',       name:'Independent Means',   desc:'Two-group mean comparison with robust checks' },
-    { id:'dependent',     icon:'fa-repeat',          name:'Repeated Measures',   desc:'Paired samples and within-subject comparisons' },
-    { id:'meta-analysis', icon:'fa-layer-group',     name:'Meta-Analysis',       desc:'Evidence synthesis and effect size pooling' }
-  ];
-  document.getElementById('modulesList').innerHTML = modules.map(function(m) {
-    return '<div class="module-card" onclick="openModule(\''+m.id+'\')">'
-      + '<div class="module-icon"><i class="fa-solid '+m.icon+'"></i></div>'
-      + '<div class="module-name">'+m.name+'</div>'
-      + '<div class="module-description">'+m.desc+'</div></div>';
-  }).join('');
-}
-
-function openModule(id) {
-  if (id === 'univariate') { showUnivariate(); return; }
-  window.location.href = './'+id+'/'+id+'.html';
-}
-
-function showHub() {
-  document.getElementById('hubView').style.display = 'block';
-  document.getElementById('univariateView').style.display = 'none';
-}
-
-function showUnivariate() {
-  document.getElementById('hubView').style.display = 'none';
-  document.getElementById('univariateView').style.display = 'block';
-  initDataInputPanel();
-}
-
-/* ── Univariate: data loaded callback ── */
-var _rd = null, _ra = '', _rd2 = null, _cr = null;
-
-function onRangeDataLoaded(values, address) {
-  if (!values || values.length < 2) { document.getElementById('cfgPanel').style.display='none'; return; }
-  _rd = values; _ra = address || '';
-  var hdrs = values[0] || [], rows = values.slice(1);
-  var sel = document.getElementById('cfgColumn');
-  sel.innerHTML = hdrs.map(function(h,i){ return '<option value="'+i+'">'+h+'</option>'; }).join('');
-  document.getElementById('cfgSummary').textContent = 'Range: '+_ra+'  |  Rows: '+rows.length+'  |  Cols: '+hdrs.length;
-  document.getElementById('cfgPanel').style.display = 'block';
-  document.getElementById('runBtn').disabled = false;
-}
-
-/* ── URL helper ── */
-function dBase() {
-  var loc = window.location;
-  if (loc.href.indexOf('127.0.0.1') > -1 || loc.href.indexOf('localhost') > -1)
-    return 'http://127.0.0.1:8080/dialogs/views/';
-  var m = loc.pathname.indexOf('/taskpane/');
-  if (m > -1) return loc.origin + loc.pathname.slice(0,m) + '/dialogs/views/';
-  return loc.origin + '/dialogs/views/';
-}
-
-/* ── Run analysis ── */
-function runAnalysis() {
-  if (!_rd) return;
-  var ci = parseInt(document.getElementById('cfgColumn').value, 10);
-  var cn = document.getElementById('cfgColumn').options[ci].text;
-  var t0 = parseFloat(document.getElementById('cfgTrimMin').value) || 0;
-  var t1 = parseFloat(document.getElementById('cfgTrimMax').value); if (isNaN(t1)) t1=100;
-  var tr = document.getElementById('cfgTransform').value;
-
-  var data = _rd.slice(1).map(function(r){return r[ci];})
-    .filter(function(v){return v!==''&&v!==null&&v!==undefined&&!isNaN(parseFloat(v));})
-    .map(parseFloat);
-  if (!data.length) { alert('No numeric data in selected column.'); return; }
-
-  if (t0>0||t1<100) {
-    var s=data.slice().sort(function(a,b){return a-b;});
-    var lo=s[Math.floor((s.length-1)*t0/100)], hi=s[Math.floor((s.length-1)*t1/100)];
-    data=data.filter(function(v){return v>=lo&&v<=hi;});
-  }
-  data=xform(data,tr);
-  var res=stats(data,_ra,cn,tr,t0,t1);
-  _cr=res;
-  localStorage.setItem('univariateResults',JSON.stringify(res));
-  openDlg(dBase()+'univariate/histogram-standalone.html', res);
-}
-
-function openDlg(url, res) {
-  Office.context.ui.displayDialogAsync(url,{height:90,width:95,displayInIframe:false},function(ar){
-    if (ar.status===Office.AsyncResultStatus.Failed){alert('Cannot open dialog: '+ar.error.message);return;}
-    _rd2=ar.value;
-    var pl=JSON.stringify({action:'loadData',data:{values:res.rawData,column:res.column,descriptive:res.descriptive,n:res.n}});
-    setTimeout(function(){if(_rd2)_rd2.messageChild(pl);},1000);
-    _rd2.addEventHandler(Office.EventType.DialogMessageReceived,function(a){
-      try{var m=JSON.parse(a.message);
-        if(m.status==='ready'){if(_rd2)_rd2.messageChild(pl);}
-        else if(m.action==='switchView'){if(_rd2){_rd2.close();_rd2=null;}setTimeout(function(){openDlg(dBase()+m.view,_cr);},300);}
-        else if(m.action==='close'||m.action==='closeDialog'){if(_rd2){_rd2.close();_rd2=null;}}
-      }catch(e){}
+  <script>
+    Office.onReady((info) => {
+      if (info.host === Office.HostType.Excel) {
+        initializeHub();
+      } else {
+        showError('This add-in is designed for Excel only.');
+      }
     });
-    _rd2.addEventHandler(Office.EventType.DialogEventReceived,function(){_rd2=null;});
-  });
-}
 
-/* ── Transform ── */
-function xform(d,t){
-  if(!t)return d;
-  if(t==='ln')return d.map(function(v){return Math.log(v);});
-  if(t==='log10')return d.map(function(v){return Math.log10(v);});
-  if(t==='sqrt')return d.map(function(v){return Math.sqrt(v);});
-  if(t==='square')return d.map(function(v){return v*v;});
-  if(t==='reciprocal')return d.map(function(v){return 1/v;});
-  if(t==='z'){var m=d.reduce(function(a,b){return a+b;},0)/d.length;var sd=Math.sqrt(d.reduce(function(a,v){return a+(v-m)*(v-m);},0)/d.length);return d.map(function(v){return(v-m)/sd;});}
-  if(t==='minmax'){var mn=Math.min.apply(null,d),mx=Math.max.apply(null,d);return d.map(function(v){return(v-mn)/(mx-mn);});}
-  return d;
-}
+    function initializeHub() {
+      const container = document.getElementById('modulesList');
+      
+      const modules = [
+        {
+          id: 'univariate',
+          icon: 'fa-chart-simple',
+          name: 'Univariate',
+          description: 'Descriptive stats, distribution, and normality'
+        },
+        {
+          id: 'correlations',
+          icon: 'fa-diagram-project',
+          name: 'Correlations',
+          description: 'Pearson, Spearman, and partial correlations'
+        },
+        {
+          id: 'regression',
+          icon: 'fa-chart-line',
+          name: 'Regression',
+          description: 'OLS with diagnostics and predictions'
+        },
+        {
+          id: 'anova',
+          icon: 'fa-table-cells',
+          name: 'ANOVA',
+          description: 'One-way, two-way, and factorial designs'
+        },
+        {
+          id: 'logistic',
+          icon: 'fa-percent',
+          name: 'Logistic Regression',
+          description: 'Binary and multinomial classification'
+        },
+        {
+          id: 'factor',
+          icon: 'fa-cubes',
+          name: 'Factor Analysis',
+          description: 'EFA, PCA, and dimension reduction'
+        },
+        {
+          id: 'independent',
+          icon: 'fa-not-equal',
+          name: 'Independent Means',
+          description: 'Two-group mean comparison with robust checks'
+        },
+        {
+          id: 'dependent',
+          icon: 'fa-repeat',
+          name: 'Repeated Measures',
+          description: 'Paired samples and within-subject comparisons'
+        },
+        {
+          id: 'meta-analysis',
+          icon: 'fa-layer-group',
+          name: 'Meta-Analysis',
+          description: 'Evidence synthesis and effect size pooling'
+        }
+      ];
 
-/* ── Statistics ── */
-function stats(d,addr,col,tr,t0,t1){
-  var n=d.length,s=d.slice().sort(function(a,b){return a-b;});
-  var sum=d.reduce(function(a,b){return a+b;},0),mean=sum/n;
-  var v=d.reduce(function(a,x){return a+(x-mean)*(x-mean);},0)/(n-1),sd=Math.sqrt(v);
-  var q1=qtile(s,0.25),med=qtile(s,0.5),q3=qtile(s,0.75);
-  var sk=skew(d,mean,sd),ku=kurt(d,mean,sd);
-  return{dataSource:addr,column:col,transform:tr,trim:{min:t0,max:t1},n:n,values:d,rawData:d,
-    descriptive:{mean:mean,median:med,stdDev:sd,variance:v,min:s[0],max:s[n-1],range:s[n-1]-s[0],q1:q1,q3:q3,iqr:q3-q1,skewness:sk,kurtosis:ku}};
-}
-function qtile(s,q){var p=(s.length-1)*q,b=Math.floor(p),r=p-b;return s[b+1]!==undefined?s[b]+r*(s[b+1]-s[b]):s[b];}
-function skew(d,m,sd){var n=d.length,m3=d.reduce(function(a,v){return a+Math.pow(v-m,3);},0)/n;return m3/Math.pow(sd,3);}
-function kurt(d,m,sd){var n=d.length,m4=d.reduce(function(a,v){return a+Math.pow(v-m,4);},0)/n;return(m4/Math.pow(sd,4))-3;}
-</script>
+      container.innerHTML = modules.map(module => `
+        <div class="module-card" onclick="navigateToModule('${module.id}')">
+          <div class="module-icon">
+            <i class="fa-solid ${module.icon}"></i>
+          </div>
+          <div class="module-name">${module.name}</div>
+          <div class="module-description">${module.description}</div>
+        </div>
+      `).join('');
+    }
+
+    function navigateToModule(moduleName) {
+      console.log('📍 Navigating to:', moduleName);
+      window.location.href = `./${moduleName}/${moduleName}.html?v=20260227b`;
+    }
+
+    function showError(message) {
+      const container = document.getElementById('modulesList');
+      container.innerHTML = `
+        <div class="loading">
+          <i class="fa-solid fa-exclamation-triangle" style="color: #ef4444; font-size: 32px; margin-bottom: 12px;"></i>
+          <div style="color: #ef4444;">${message}</div>
+        </div>
+      `;
+    }
+
+    window.navigateToModule = navigateToModule;
+  </script>
 </body>
 </html>

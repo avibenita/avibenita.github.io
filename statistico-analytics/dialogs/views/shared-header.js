@@ -253,28 +253,47 @@ const StatisticoHeader = {
    */
   renderNavigation() {
     if (this.module === 'univariate') {
-      const tabs = this.getNavigationItems();
+      const views = this.getNavigationItems();
+      const coreTabs = [];
+      const advancedTabs = [];
+      let bucket = 'core';
+      views.forEach((view) => {
+        if (view.isSeparator || view.id === 'separator-core-advanced') {
+          bucket = 'advanced';
+          return;
+        }
+        if (view.isGroup) return;
+        (bucket === 'core' ? coreTabs : advancedTabs).push(view);
+      });
+
+      const renderTabButton = (view) => {
+        const isDisabled = !view.file;
+        const isActive = view.id === this.currentView;
+        return `
+          <button class="header-tab ${isActive ? 'active' : ''} ${isDisabled ? 'disabled' : ''}"
+                  role="tab"
+                  aria-selected="${isActive ? 'true' : 'false'}"
+                  ${isDisabled ? 'disabled' : ''}
+                  ${!isDisabled ? `onclick="StatisticoHeader.navigateTo('${view.file}')"` : ''}>
+            ${view.label}
+          </button>
+        `;
+      };
+
       return `
-        <div class="header-tabs" role="tablist" aria-label="Univariate views">
-          ${tabs.map(view => {
-            if (view.isSeparator) {
-              return '<span class="header-tab-separator" aria-hidden="true"></span>';
-            }
-            if (view.isGroup) {
-              return `<span class="header-tab-group">${view.label}</span>`;
-            }
-            const isDisabled = !view.file;
-            const isActive = view.id === this.currentView;
-            return `
-              <button class="header-tab ${isActive ? 'active' : ''} ${isDisabled ? 'disabled' : ''}"
-                      role="tab"
-                      aria-selected="${isActive ? 'true' : 'false'}"
-                      ${isDisabled ? 'disabled' : ''}
-                      ${!isDisabled ? `onclick="StatisticoHeader.navigateTo('${view.file}')"` : ''}>
-                ${view.label}
-              </button>
-            `;
-          }).join('')}
+        <div class="header-tabs-stack">
+          <div class="header-tabs-row">
+            <span class="header-tab-group header-tab-group--core">Core Descriptive</span>
+            <div class="header-tab-row-tabs" role="tablist" aria-label="Core descriptive views">
+              ${coreTabs.map(renderTabButton).join('')}
+            </div>
+          </div>
+          <div class="header-tabs-row">
+            <span class="header-tab-group header-tab-group--advanced">Advanced Diagnostics</span>
+            <div class="header-tab-row-tabs" role="tablist" aria-label="Advanced diagnostic views">
+              ${advancedTabs.map(renderTabButton).join('')}
+            </div>
+          </div>
         </div>
       `;
     }

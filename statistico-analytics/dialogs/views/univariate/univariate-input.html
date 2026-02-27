@@ -15,9 +15,18 @@
     .panel{border:1px solid #4a1d6d;background:#2d1344;border-radius:10px;padding:10px;margin-bottom:10px;}
     .panel-title{font-size:11px;font-weight:700;color:#c4b5fd;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
     label{font-size:12px;color:#c4b5fd;display:block;margin-bottom:4px;}
-    select{width:100%;padding:8px 10px;border-radius:8px;border:1px solid #6b21a8;background:#1e0d3b;color:#e5e7eb;font-size:13px;cursor:pointer;}
-    select:focus{outline:none;border-color:#f97316;}
     .meta{font-size:11px;color:#a78bfa;margin-bottom:6px;}
+    .hint{font-size:11px;color:#a78bfa;margin-bottom:8px;}
+    .var-table-wrap{max-height:240px;overflow:auto;border:1px solid #4a1d6d;border-radius:8px;}
+    .var-table{width:100%;border-collapse:collapse;font-size:12px;}
+    .var-table th,.var-table td{padding:8px;border-bottom:1px solid #4a1d6d;text-align:left;white-space:nowrap;}
+    .var-table thead th{position:sticky;top:0;background:#3b1a5a;color:#ddd6fe;z-index:1;}
+    .var-table .num{text-align:right;}
+    .var-row-disabled{opacity:.5;}
+    .radio-cell{text-align:center;width:56px;}
+    .radio-cell input[type="radio"]{transform:scale(1.1);accent-color:#f97316;cursor:pointer;}
+    .radio-cell input[type="radio"]:disabled{cursor:not-allowed;}
+    .select-note{margin-top:8px;font-size:11px;color:#f59e0b;}
     /* Trim */
     .trim-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
     .trim-label{font-size:12px;color:#c4b5fd;width:80px;flex-shrink:0;}
@@ -38,7 +47,8 @@
     .btn.primary:hover{background:linear-gradient(135deg,#fb923c,#f97316);}
     .btn.cancel{background:transparent;border-color:#4b5563;color:#9ca3af;}
     .btn.cancel:hover{border-color:#9ca3af;color:#e5e7eb;}
-    .col-preview{margin-top:6px;padding:6px 10px;background:#1e0d3b;border-radius:6px;font-size:11px;color:#a78bfa;}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    @media (max-width:780px){.two-col{grid-template-columns:1fr;}}
     .spinner{text-align:center;padding:20px;color:#a78bfa;}
   </style>
 </head>
@@ -63,63 +73,78 @@
       <!-- Column selection -->
       <div class="panel">
         <div class="panel-title"><i class="fa-solid fa-table-columns"></i> Column to Analyse</div>
-        <label for="columnSelect">Select variable</label>
-        <select id="columnSelect" onchange="onColumnChange()">
-          <option value="">— pick a column —</option>
-        </select>
-        <div id="colPreview" class="col-preview" style="display:none;"></div>
+        <div class="hint">Select exactly one variable (radio button). Variables with non-numeric data or fewer than 5 numeric values are disabled.</div>
+        <div class="var-table-wrap">
+          <table class="var-table">
+            <thead>
+              <tr>
+                <th class="radio-cell">Pick</th>
+                <th>Variable</th>
+                <th class="num">N Numeric</th>
+                <th class="num">Mean</th>
+                <th class="num">SD</th>
+                <th class="num">Min</th>
+                <th class="num">Max</th>
+              </tr>
+            </thead>
+            <tbody id="varsTbody"></tbody>
+          </table>
+        </div>
+        <div id="selectNote" class="select-note">Choose one valid variable to continue.</div>
       </div>
 
-      <!-- Trim -->
-      <div class="panel">
-        <div class="panel-title"><i class="fa-solid fa-scissors"></i> Trim</div>
-        <div class="trim-row">
-          <span class="trim-label">Left trim</span>
-          <input type="range" id="trimMin" class="trim-slider" min="0" max="49" value="0" step="1" oninput="onTrimChange()"/>
-          <span class="trim-val" id="trimMinVal">0%</span>
+      <div class="two-col">
+        <!-- Trim -->
+        <div class="panel">
+          <div class="panel-title"><i class="fa-solid fa-scissors"></i> Trim</div>
+          <div class="trim-row">
+            <span class="trim-label">Left trim</span>
+            <input type="range" id="trimMin" class="trim-slider" min="0" max="49" value="0" step="1" oninput="onTrimChange()"/>
+            <span class="trim-val" id="trimMinVal">0%</span>
+          </div>
+          <div class="trim-row">
+            <span class="trim-label">Right trim</span>
+            <input type="range" id="trimMax" class="trim-slider" min="51" max="100" value="100" step="1" oninput="onTrimChange()"/>
+            <span class="trim-val" id="trimMaxVal">100%</span>
+          </div>
         </div>
-        <div class="trim-row">
-          <span class="trim-label">Right trim</span>
-          <input type="range" id="trimMax" class="trim-slider" min="51" max="100" value="100" step="1" oninput="onTrimChange()"/>
-          <span class="trim-val" id="trimMaxVal">100%</span>
-        </div>
-      </div>
 
-      <!-- Transform -->
-      <div class="panel">
-        <div class="panel-title"><i class="fa-solid fa-wave-square"></i> Transform</div>
-        <div class="transform-grid">
-          <div class="transform-option">
-            <input type="radio" name="transform" id="t_none" value="none" checked />
-            <label for="t_none" class="transform-label">None</label>
-          </div>
-          <div class="transform-option">
-            <input type="radio" name="transform" id="t_ln" value="ln" />
-            <label for="t_ln" class="transform-label">ln(x)</label>
-          </div>
-          <div class="transform-option">
-            <input type="radio" name="transform" id="t_log10" value="log10" />
-            <label for="t_log10" class="transform-label">log₁₀(x)</label>
-          </div>
-          <div class="transform-option">
-            <input type="radio" name="transform" id="t_sqrt" value="sqrt" />
-            <label for="t_sqrt" class="transform-label">√x</label>
-          </div>
-          <div class="transform-option">
-            <input type="radio" name="transform" id="t_sq" value="square" />
-            <label for="t_sq" class="transform-label">x²</label>
-          </div>
-          <div class="transform-option">
-            <input type="radio" name="transform" id="t_rec" value="reciprocal" />
-            <label for="t_rec" class="transform-label">1/x</label>
-          </div>
-          <div class="transform-option">
-            <input type="radio" name="transform" id="t_z" value="z" />
-            <label for="t_z" class="transform-label">z-score</label>
-          </div>
-          <div class="transform-option">
-            <input type="radio" name="transform" id="t_mm" value="minmax" />
-            <label for="t_mm" class="transform-label">Min-Max</label>
+        <!-- Transform -->
+        <div class="panel">
+          <div class="panel-title"><i class="fa-solid fa-wave-square"></i> Transform</div>
+          <div class="transform-grid">
+            <div class="transform-option">
+              <input type="radio" name="transform" id="t_none" value="none" checked />
+              <label for="t_none" class="transform-label">None</label>
+            </div>
+            <div class="transform-option">
+              <input type="radio" name="transform" id="t_ln" value="ln" />
+              <label for="t_ln" class="transform-label">ln(x)</label>
+            </div>
+            <div class="transform-option">
+              <input type="radio" name="transform" id="t_log10" value="log10" />
+              <label for="t_log10" class="transform-label">log₁₀(x)</label>
+            </div>
+            <div class="transform-option">
+              <input type="radio" name="transform" id="t_sqrt" value="sqrt" />
+              <label for="t_sqrt" class="transform-label">√x</label>
+            </div>
+            <div class="transform-option">
+              <input type="radio" name="transform" id="t_sq" value="square" />
+              <label for="t_sq" class="transform-label">x²</label>
+            </div>
+            <div class="transform-option">
+              <input type="radio" name="transform" id="t_rec" value="reciprocal" />
+              <label for="t_rec" class="transform-label">1/x</label>
+            </div>
+            <div class="transform-option">
+              <input type="radio" name="transform" id="t_z" value="z" />
+              <label for="t_z" class="transform-label">z-score</label>
+            </div>
+            <div class="transform-option">
+              <input type="radio" name="transform" id="t_mm" value="minmax" />
+              <label for="t_mm" class="transform-label">Min-Max</label>
+            </div>
           </div>
         </div>
       </div>
@@ -136,7 +161,7 @@
   </div>
 
   <script>
-    let STATE = { headers: [], rows: [], address: '', savedSpec: null };
+    let STATE = { headers: [], rows: [], address: '', savedSpec: null, columnStats: [] };
 
     // ── Office init ──────────────────────────────────────────────────────────
     Office.onReady(() => {
@@ -164,64 +189,89 @@
       document.getElementById('rowCount').textContent  = STATE.rows.length;
       document.getElementById('colCount').textContent  = STATE.headers.length;
 
-      // Populate column dropdown
-      const sel = document.getElementById('columnSelect');
-      sel.innerHTML = '<option value="">— pick a column —</option>';
-      STATE.headers.forEach((h, i) => {
-        const opt = document.createElement('option');
-        opt.value = i;
-        opt.textContent = h || `Column ${i + 1}`;
-        sel.appendChild(opt);
-      });
+      buildColumnStats();
+      renderVariableTable();
 
       // Restore saved spec
       if (STATE.savedSpec) {
-        sel.value = String(STATE.savedSpec.columnIndex ?? '');
+        const savedIdx = STATE.savedSpec.columnIndex;
+        const savedRadio = document.querySelector(`input[name="selectedColumn"][value="${savedIdx}"]`);
+        if (savedRadio && !savedRadio.disabled) savedRadio.checked = true;
         document.getElementById('trimMin').value = STATE.savedSpec.trimMin ?? 0;
         document.getElementById('trimMax').value = STATE.savedSpec.trimMax ?? 100;
         const savedTransform = STATE.savedSpec.transform || 'none';
         const radio = document.querySelector(`input[name="transform"][value="${savedTransform}"]`);
         if (radio) radio.checked = true;
         onTrimChange();
-        onColumnChange();
       }
+      onVariableSelect();
 
       document.getElementById('loadingSpinner').style.display = 'none';
       document.getElementById('mainContent').style.display = 'block';
     }
 
-    // ── Column change ────────────────────────────────────────────────────────
-    function onColumnChange() {
-      const sel   = document.getElementById('columnSelect');
-      const idx   = parseInt(sel.value);
+    function buildColumnStats() {
+      STATE.columnStats = STATE.headers.map((h, idx) => {
+        const values = STATE.rows
+          .map(row => row[idx])
+          .filter(v => v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v)))
+          .map(v => parseFloat(v));
+        const n = values.length;
+        if (!n) {
+          return { idx, name: h || `Column ${idx + 1}`, n: 0, mean: null, sd: null, min: null, max: null, eligible: false };
+        }
+        const mean = values.reduce((a, b) => a + b, 0) / n;
+        const variance = n > 1 ? values.reduce((acc, v) => acc + (v - mean) ** 2, 0) / (n - 1) : 0;
+        return {
+          idx,
+          name: h || `Column ${idx + 1}`,
+          n,
+          mean,
+          sd: Math.sqrt(variance),
+          min: Math.min(...values),
+          max: Math.max(...values),
+          eligible: n >= 5
+        };
+      });
+    }
+
+    function fmtStat(v) {
+      return Number.isFinite(v) ? v.toFixed(2) : '—';
+    }
+
+    function renderVariableTable() {
+      const tbody = document.getElementById('varsTbody');
+      tbody.innerHTML = STATE.columnStats.map(s => `
+        <tr class="${s.eligible ? '' : 'var-row-disabled'}">
+          <td class="radio-cell">
+            <input type="radio" name="selectedColumn" value="${s.idx}" ${s.eligible ? '' : 'disabled'} onchange="onVariableSelect()"/>
+          </td>
+          <td>${s.name}</td>
+          <td class="num">${s.n}</td>
+          <td class="num">${fmtStat(s.mean)}</td>
+          <td class="num">${fmtStat(s.sd)}</td>
+          <td class="num">${fmtStat(s.min)}</td>
+          <td class="num">${fmtStat(s.max)}</td>
+        </tr>
+      `).join('');
+    }
+
+    // ── Variable change ──────────────────────────────────────────────────────
+    function onVariableSelect() {
+      const selected = document.querySelector('input[name="selectedColumn"]:checked');
       const runBtn = document.getElementById('runBtn');
-      const preview = document.getElementById('colPreview');
+      const note = document.getElementById('selectNote');
 
-      if (isNaN(idx)) {
+      if (!selected) {
         runBtn.disabled = true;
-        preview.style.display = 'none';
+        note.textContent = 'Choose one valid variable to continue.';
         return;
       }
-
-      const values = STATE.rows
-        .map(row => row[idx])
-        .filter(v => v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v)))
-        .map(v => parseFloat(v));
-
-      if (!values.length) {
-        runBtn.disabled = true;
-        preview.style.display = 'none';
-        return;
-      }
-
       runBtn.disabled = false;
-      const mn = Math.min(...values), mx = Math.max(...values);
-      const mean = values.reduce((a, b) => a + b, 0) / values.length;
-      preview.style.display = 'block';
-      preview.innerHTML =
-        `<strong>${values.length}</strong> numeric values &nbsp;|&nbsp; ` +
-        `Mean <strong>${mean.toFixed(2)}</strong> &nbsp;|&nbsp; ` +
-        `Range <strong>${mn.toFixed(2)}–${mx.toFixed(2)}</strong>`;
+      const stats = STATE.columnStats.find(s => s.idx === parseInt(selected.value, 10));
+      note.textContent = stats
+        ? `Selected: ${stats.name} (${stats.n} numeric values)`
+        : 'Choose one valid variable to continue.';
     }
 
     // ── Trim change ──────────────────────────────────────────────────────────
@@ -239,9 +289,9 @@
 
     // ── Run ──────────────────────────────────────────────────────────────────
     function runAnalysis() {
-      const sel = document.getElementById('columnSelect');
-      const idx = parseInt(sel.value);
-      if (isNaN(idx)) return;
+      const selected = document.querySelector('input[name="selectedColumn"]:checked');
+      if (!selected) return;
+      const idx = parseInt(selected.value, 10);
 
       const transform = document.querySelector('input[name="transform"]:checked')?.value || 'none';
       const trimMin   = parseInt(document.getElementById('trimMin').value);

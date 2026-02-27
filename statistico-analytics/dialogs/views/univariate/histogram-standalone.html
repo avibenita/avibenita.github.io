@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Histogram Analysis - Statistico</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- Office.js -->
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+  
+  <!-- Highcharts -->
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://code.highcharts.com/modules/histogram-bellcurve.js"></script>
+  
+  <!-- Shared Header -->
+  <link rel="stylesheet" href="../shared-header.css">
+  <script src="../shared-header.js"></script>
+  
+  <style>
+    /* EXACT COPY OF ORIGINAL HISTOGRAM STYLES */
+    :root {
+      --surface-0: #0c1624;
+      --surface-1: #1a1f2e;
+      --surface-2: #242938;
+      --border: #6b7280; /* Much brighter border - easily visible */
+      --accent-1: rgb(255,165,120);
+      --accent-2: rgb(120,200,255);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255,255,255,0.8);
+      --text-muted: rgba(255,255,255,0.6);
+      --panel-radius: 10px;
+      --panel-shadow: 0px 4px 20px rgba(0, 0, 0, 0.4);
+      --header-color: var(--accent-1);
+    }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      background-color: var(--surface-0);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      color: var(--text-primary);
+      overflow: hidden;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Scrollbar styling */
+    body::-webkit-scrollbar {
+      width: 12px;
+    }
+
+    body::-webkit-scrollbar-track {
+      background: rgba(255,255,255,0.08);
+      border-radius: 6px;
+    }
+
+    body::-webkit-scrollbar-thumb {
+      background: rgba(120,200,255,0.4);
+      border-radius: 6px;
+      border: 2px solid var(--surface-0);
+    }
+
+    body::-webkit-scrollbar-thumb:hover {
+      background: rgba(120,200,255,0.6);
+    }
+
+    /* Results container - Compact */
+    .results-container {
+      display: none;
+      margin: 8px 12px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .results-container.show {
+      display: flex !important;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* Panel styling - Compact */
+    .panel {
+      background-color: var(--surface-1);
+      border-radius: var(--panel-radius);
+      box-shadow: var(--panel-shadow), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+      border: 2px solid var(--border);
+      margin-bottom: 0;
+    }
+
+    .panel-heading {
+      background: transparent;
+      color: var(--header-color);
+      font-weight: 600;
+      padding: 8px 12px;
+      font-size: 1rem;
+      letter-spacing: .3px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-body {
+      padding: 8px 12px;
+    }
+
+    /* Table styling - EXACT match */
+    table {
+      width: 100%;
+      text-align: center;
+      background: var(--surface-2);
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-collapse: collapse;
+    }
+
+    table th {
+      padding: 4px 8px;
+      font-weight: 600;
+      font-size: 11px;
+      background: var(--surface-0);
+      color: var(--accent-1);
+    }
+
+    table th.highlight {
+      background: rgba(255, 165, 120, 0.3);
+      color: var(--text-primary);
+    }
+
+    table td {
+      padding: 5px 8px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    table td.highlight {
+      color: var(--accent-1);
+      font-weight: 700;
+      background: rgba(255,165,120,0.1);
+    }
+
+    /* Controls - EXACT match */
+    /* ONE ROW - ALL 4 CONTROLS */
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 12px;
+      flex-wrap: nowrap !important;      /* force same row */
+      align-items: center;    /* vertically aligned */
+      overflow-x: auto;      /* Allow horizontal scroll if needed */
+      overflow-y: hidden;
+    }
+
+    /* Smaller / shorter boxes */
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;      /* reduced */
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      min-height: 32px;       /* reduced from 42px */
+      flex-shrink: 0;        /* prevent shrinking */
+      white-space: nowrap;   /* prevent text wrapping */
+    }
+
+    /* Make labels less "tall" */
+    .control-group label {
+      color: var(--text-secondary);
+      font-size: 12px;        /* slightly smaller */
+      font-weight: 500;
+      white-space: nowrap;
+      min-width: auto;        /* important: stop forcing width */
+    }
+    
+    /* Data range label */
+    .range-control > label {
+      color: var(--text-muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+      white-space: nowrap;
+      min-width: auto;
+    }
+
+    /* Inputs shorter */
+    .control-group select,
+    .control-group input[type="number"] {
+      padding: 4px 10px;      /* reduced */
+      font-size: 12px;
+      height: 28px;           /* slimmer */
+      background: var(--surface-1);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      min-width: 140px;
+    }
+
+    .control-group input[type="range"] {
+      width: 100px;
+    }
+
+    .control-group input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    /* Chart container - Compact */
+    #histogram-chart {
+      min-height: 280px;
+      height: 100%;
+      width: 100%;
+      margin-top: 8px;
+      padding: 8px;
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      flex: 1;
+    }
+    
+    .chart-panel {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chart-panel .panel-body {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Range slider styling - EXACT match */
+    /* Make the 4th control flexible (it will take remaining width) */
+    .range-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;                /* IMPORTANT: this makes it fit in same row */
+      min-width: 320px;       /* prevents collapsing too much */
+      padding: 6px 10px;      /* reduced */
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 6px;
+      min-height: 32px;       /* reduced from 42px */
+      margin-top: 0;          /* remove the extra vertical spacing */
+      max-width: none;        /* remove 650px restriction */
+      flex-shrink: 0;        /* prevent shrinking */
+      white-space: nowrap;   /* prevent text wrapping */
+    }
+
+    .range-sliders {
+      position: relative;
+      flex: 1;
+      height: 16px;         /* was 20px */
+    }
+
+    .range-sliders input[type="range"] {
+      position: absolute;
+      width: 100%;
+      pointer-events: none;
+      -webkit-appearance: none;
+      background: transparent;
+    }
+
+    .range-sliders input[type="range"]::-webkit-slider-thumb {
+      pointer-events: all;
+      -webkit-appearance: none;
+      width: 14px;          /* slightly smaller thumb */
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent-2);
+      cursor: pointer;
+    }
+
+    .range-track {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 100%;
+      height: 3px;          /* thinner line */
+      background: rgba(255,255,255,0.2);
+      border-radius: 2px;
+    }
+
+    .range-active {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 3px;          /* thinner line */
+      background: var(--accent-1);
+      border-radius: 2px;
+    }
+
+    .value-display {
+      min-width: 40px;      /* slightly smaller */
+      font-size: 12px;
+      color: var(--accent-2);
+      font-weight: 600;
+      text-align: center;
+      display: inline-block;
+    }
+
+    .reset-button {
+      background: var(--accent-2);
+      color: white;
+      border: none;
+      padding: 3px 9px;     /* reduced */
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      height: 26px;         /* makes it align nicely */
+    }
+
+    .reset-button:hover {
+      opacity: 0.9;
+    }
+
+    /* Icon buttons */
+    .panel-heading i {
+      cursor: pointer;
+      margin-left: 10px;
+      transition: color 0.3s;
+    }
+
+    .panel-heading i:hover {
+      color: var(--accent-2);
+    }
+
+    /* Footer */
+    .statistico-footer {
+      font-size: 11px;
+      color: #7f8c8d;
+      text-align: center;
+      padding: 6px 0;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  
+  <!-- Shared Header will be inserted here by JavaScript -->
+
+  <!-- RESULTS CONTAINER - Initially hidden, shown when data loads -->
+  <div class="results-container" id="results-container">
+
+    <!-- STATISTICS PANEL - EXACT COPY -->
+    <div class="panel table-panel" id="statistics-panel">
+      <div class="panel-heading">
+        <span id="statistics-title">Variable - Descriptive Statistics</span>
+        <span style="margin-left: auto;">
+          <select id="decimalsSelect" onchange="updateDecimals(this.value)">
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </span>
+      </div>
+      <div class="panel-body" style="padding: 6px;">
+        <!-- First Table: Central Tendency & Distribution Shape -->
+        <table style="margin-bottom: 4px;">
+          <tr>
+            <th class="highlight">Count</th>
+            <th class="highlight">Average</th>
+            <th class="highlight">Std Dev</th>
+            <th>Variance</th>
+            <th>Kurtosis</th>
+            <th>Skewness</th>
+          </tr>
+          <tr>
+            <td id="stat-n" class="highlight">--</td>
+            <td id="stat-mean" class="highlight">--</td>
+            <td id="stat-stddev" class="highlight">--</td>
+            <td id="stat-variance">--</td>
+            <td id="stat-kurtosis">--</td>
+            <td id="stat-skewness">--</td>
+          </tr>
+        </table>
+
+        <!-- Second Table: Range & Quartiles -->
+        <table>
+          <tr>
+            <th>Range</th>
+            <th>Minimum</th>
+            <th>Q25</th>
+            <th class="highlight">Median</th>
+            <th>Q75</th>
+            <th>Maximum</th>
+          </tr>
+          <tr>
+            <td id="stat-range">--</td>
+            <td id="stat-min">--</td>
+            <td id="stat-q25">--</td>
+            <td id="stat-median" class="highlight">--</td>
+            <td id="stat-q75">--</td>
+            <td id="stat-max">--</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- HISTOGRAM PANEL - EXACT COPY -->
+    <div class="panel chart-panel" id="histogram-panel">
+      <div class="panel-heading">
+        <span id="histogram-title">Variable - Interactive Histogram</span>
+        <span style="margin-left: auto;">
+          <i class="fas fa-redo" title="Reload" onclick="createHistogram()"></i>
+          <i class="fas fa-times" title="Close" onclick="closeView()"></i>
+        </span>
+      </div>
+
+      <div class="panel-body" style="padding: 8px;">
+        <!-- Main Controls -->
+        <div class="controls">
+          <div class="control-group">
+            <label for="binningMethod">Binning Method:</label>
+            <select id="binningMethod" onchange="updateBinningMethod()">
+              <option value="manual">Manual</option>
+              <option value="sturges">Sturges</option>
+              <option value="scott">Scott</option>
+              <option value="fd">Freedman-Diaconis</option>
+            </select>
+          </div>
+
+          <div class="control-group" id="manualBinsControl">
+            <label for="numBins">Bins:</label>
+            <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+              <span id="numBinsValue" class="value-display">10</span>
+              <input type="range" id="numBins" min="1" max="50" value="10" step="1" oninput="updateBins()" style="flex: 1;">
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label for="showNormalCurve" style="cursor: pointer;">Normal Curve:</label>
+            <input type="checkbox" id="showNormalCurve" checked onchange="createHistogram()">
+          </div>
+
+          <!-- Data Range - now inside controls -->
+          <div class="range-control">
+            <label>Data Range:</label>
+            <span class="value-display" id="leftRangeValue">0</span>
+            <div class="range-sliders" style="flex: 1;">
+              <div class="range-track"></div>
+              <div class="range-active" id="activeRangeIndicator"></div>
+              <input type="range" id="leftTruncation" min="0" max="100" value="0" step="1" oninput="updateRangeSliders()">
+              <input type="range" id="rightTruncation" min="0" max="100" value="100" step="1" oninput="updateRangeSliders()">
+            </div>
+            <span class="value-display" id="rightRangeValue">100</span>
+            <button class="reset-button" onclick="resetRangeSliders()">Reset</button>
+            <span class="value-display" style="margin-left: 8px;">n=<span id="remainingN">--</span></span>
+          </div>
+        </div>
+
+        <!-- Chart -->
+        <div id="histogram-chart"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- JAVASCRIPT - EXACT COPY OF ORIGINAL LOGIC -->
+  <script>
+    // Global variables
+    let histogramChart = null;
+    let originalData = [];
+    let currentData = [];
+    let originalMin = 0;
+    let originalMax = 100;
+    let currentDecimals = 2;
+
+    // Office.js initialization
+    Office.initialize = function (reason) {
+      console.log('✅ Office.js initialized:', reason);
+      
+      // Listen for messages from parent
+      Office.context.ui.addHandlerAsync(
+        Office.EventType.DialogParentMessageReceived,
+        onMessageReceived
+      );
+      
+      // Send ready message to parent
+      setTimeout(() => {
+        sendMessageToParent({ status: 'ready' });
+      }, 500);
+      
+      // Check localStorage for data
+      setTimeout(() => {
+        if (!histogramChart) {
+          console.log('📦 Checking localStorage for univariateResults...');
+          const storedResults = localStorage.getItem('univariateResults');
+          if (storedResults) {
+            try {
+              const parsedData = JSON.parse(storedResults);
+              console.log('✅ Found data in localStorage');
+              console.log('📊 HISTOGRAM - Column from localStorage:', parsedData.column);
+              console.log('📊 HISTOGRAM - Trim:', parsedData.trim, 'Transform:', parsedData.transform);
+              handleDataReceived(parsedData);
+              return;
+            } catch (e) {
+              console.error('❌ Error parsing localStorage data:', e);
+            }
+          } else {
+            console.log('⚠️ No localStorage data found');
+          }
+        }
+      }, 1000);
+      
+      // Fallback to sample data
+      setTimeout(() => {
+        if (!histogramChart) {
+          console.log('⏰ No data received from parent or localStorage, loading sample data...');
+          loadSampleData();
+        }
+      }, 5000);
+    };
+    
+    // Fallback: If Office.js doesn't load (browser testing), load sample data anyway
+    window.addEventListener('DOMContentLoaded', function() {
+      console.log('🚀 DOM Content Loaded');
+      
+      // Initialize shared header
+      StatisticoHeader.init('histogram', 'Variable', 0);
+      console.log('✅ Shared header initialized');
+      
+      // Try immediately
+      setTimeout(() => {
+        console.log('⏰ Checking Office.js availability...');
+        console.log('typeof Office:', typeof Office);
+        
+        // Check if Office.js loaded
+        if (typeof Office === 'undefined' || !Office.context) {
+          console.log('⚠️ Office.js not available - loading sample data for browser testing');
+          loadSampleData();
+        } else {
+          console.log('✅ Office.js is available');
+        }
+      }, 100);
+      
+      // Backup fallback - just load data after 1 second regardless
+      setTimeout(() => {
+        const resultsContainer = document.getElementById('results-container');
+        if (!resultsContainer.classList.contains('show')) {
+          console.log('🔄 Force loading sample data (backup)');
+          loadSampleData();
+        }
+      }, 1000);
+    });
+
+    // Handle messages from parent window
+    function onMessageReceived(arg) {
+      console.log('📨 Message received:', arg);
+      const message = JSON.parse(arg.message);
+      
+      if (message.action === 'loadData') {
+        handleDataReceived(message.data);
+      }
+    }
+
+    // Send message to parent window
+    function sendMessageToParent(message) {
+      if (typeof Office !== 'undefined' && Office.context && Office.context.ui) {
+        Office.context.ui.messageParent(JSON.stringify(message));
+        console.log('📤 Sent message to parent:', message);
+      }
+    }
+
+    // Handle data received
+    function handleDataReceived(data) {
+      try {
+        console.log('📊 Data received:', data);
+        
+        // Save to localStorage for view switching
+        try {
+          localStorage.setItem('univariateResults', JSON.stringify(data));
+          console.log('✅ Saved data to localStorage');
+        } catch (e) {
+          console.error('❌ Error saving to localStorage:', e);
+        }
+        
+        originalData = data.values || data.data || [];
+        currentData = [...originalData];
+        console.log('✅ Data arrays set, length:', originalData.length);
+        
+        // Always recalculate stats from actual data to ensure they're numeric
+        const calculatedStats = calculateDescriptiveStats(originalData);
+        populateStatistics(calculatedStats);
+        console.log('✅ Statistics populated from actual data');
+        
+        // Update variable name
+        const varName = data.column || data.variableName || 'Variable';
+        document.getElementById('statistics-title').textContent = `${varName} - Descriptive Statistics`;
+        document.getElementById('histogram-title').textContent = `${varName} - Interactive Histogram`;
+        console.log('✅ Titles updated');
+        
+        // Check if data was modified (trimmed or transformed)
+        const isTrimmed = data.trim && (data.trim.min > 0 || data.trim.max < 100);
+        const isTransformed = data.transform && data.transform !== 'none';
+        const isModified = isTrimmed || isTransformed;
+        
+        console.log('🔍 Modification check:', { isTrimmed, isTransformed, trim: data.trim, transform: data.transform });
+        
+        const displayN = isModified ? originalData.length + '*' : originalData.length;
+        
+        // Update shared header with modified n indicator
+        StatisticoHeader.updateVariable(varName, displayN);
+        console.log('✅ Header updated with n:', displayN, 'isModified:', isModified);
+        
+        // Initialize range
+        originalMin = Math.min(...originalData);
+        originalMax = Math.max(...originalData);
+        console.log('✅ Range initialized:', originalMin, '-', originalMax);
+        
+        // Show results
+        const resultsContainer = document.getElementById('results-container');
+        resultsContainer.classList.add('show');
+        console.log('✅ Results container shown');
+        
+        // Create histogram
+        console.log('🎨 Creating histogram...');
+        createHistogram();
+        console.log('✅ Histogram created');
+      } catch (error) {
+        console.error('❌ Error in handleDataReceived:', error);
+        alert('Error handling data: ' + error.message);
+      }
+    }
+
+    // Load sample data for testing
+    function loadSampleData() {
+      try {
+        console.log('📊 Loading sample data for testing...');
+        
+        // Generate realistic sample data (Horsepower-like)
+        const sampleData = [];
+        for (let i = 0; i < 369; i++) {
+          const u1 = Math.random();
+          const u2 = Math.random();
+          const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+          sampleData.push(201.17 + z * 60.64);
+        }
+        
+        console.log('✅ Generated', sampleData.length, 'data points');
+        
+        // Calculate descriptive stats
+        const descriptive = calculateDescriptiveStats(sampleData);
+        console.log('✅ Calculated descriptive stats:', descriptive);
+        
+        handleDataReceived({
+          values: sampleData,
+          descriptive: descriptive,
+          column: 'Horsepower',
+          n: sampleData.length
+        });
+        
+        console.log('✅ Sample data loaded successfully');
+      } catch (error) {
+        console.error('❌ Error loading sample data:', error);
+        alert('Error loading sample data: ' + error.message);
+      }
+    }
+
+    // Calculate descriptive statistics
+    function calculateDescriptiveStats(data) {
+      const n = data.length;
+      const sorted = [...data].sort((a, b) => a - b);
+      const mean = data.reduce((a, b) => a + b, 0) / n;
+      const variance = data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / (n - 1);
+      const stdDev = Math.sqrt(variance);
+      
+      const q1 = sorted[Math.floor(n * 0.25)];
+      const median = sorted[Math.floor(n * 0.5)];
+      const q3 = sorted[Math.floor(n * 0.75)];
+      
+      // Kurtosis
+      const m4 = data.reduce((acc, val) => acc + Math.pow((val - mean) / stdDev, 4), 0) / n;
+      const kurtosis = m4 - 3;
+      
+      // Skewness
+      const m3 = data.reduce((acc, val) => acc + Math.pow((val - mean) / stdDev, 3), 0) / n;
+      const skewness = m3;
+      
+      return {
+        n: n,
+        mean: mean,
+        stdDev: stdDev,
+        variance: variance,
+        kurtosis: kurtosis,
+        skewness: skewness,
+        range: sorted[n - 1] - sorted[0],
+        min: sorted[0],
+        q1: q1,
+        median: median,
+        q3: q3,
+        max: sorted[n - 1]
+      };
+    }
+
+    // Populate statistics table
+    function populateStatistics(stats) {
+      const d = currentDecimals;
+      document.getElementById('stat-n').textContent = stats.n;
+      document.getElementById('stat-mean').textContent = stats.mean.toFixed(d);
+      document.getElementById('stat-stddev').textContent = stats.stdDev.toFixed(d);
+      document.getElementById('stat-variance').textContent = stats.variance.toFixed(d);
+      document.getElementById('stat-kurtosis').textContent = stats.kurtosis.toFixed(d);
+      document.getElementById('stat-skewness').textContent = stats.skewness.toFixed(d);
+      document.getElementById('stat-range').textContent = stats.range.toFixed(d);
+      document.getElementById('stat-min').textContent = stats.min.toFixed(d);
+      document.getElementById('stat-q25').textContent = stats.q1.toFixed(d);
+      document.getElementById('stat-median').textContent = stats.median.toFixed(d);
+      document.getElementById('stat-q75').textContent = stats.q3.toFixed(d);
+      document.getElementById('stat-max').textContent = stats.max.toFixed(d);
+    }
+
+    // Update decimals
+    function updateDecimals(value) {
+      currentDecimals = parseInt(value);
+      const stats = calculateDescriptiveStats(currentData);
+      populateStatistics(stats);
+    }
+
+    // Update binning method
+    function updateBinningMethod() {
+      const method = document.getElementById('binningMethod').value;
+      document.getElementById('manualBinsControl').style.display = 
+        method === 'manual' ? 'flex' : 'none';
+      createHistogram();
+    }
+
+    // Update bins slider
+    function updateBins() {
+      const value = document.getElementById('numBins').value;
+      document.getElementById('numBinsValue').textContent = value;
+      
+      // Set slider moving flag to disable animation
+      isSliderMoving = true;
+      
+      // Clear existing timeout
+      if (sliderTimeout) {
+        clearTimeout(sliderTimeout);
+      }
+      
+      // Re-enable animation after slider stops moving for 300ms
+      sliderTimeout = setTimeout(() => {
+        isSliderMoving = false;
+      }, 300);
+      
+      createHistogram();
+    }
+
+    // Create histogram - EXACT COPY of original logic
+    // Flag to control animation during slider moves
+    let isSliderMoving = false;
+    let sliderTimeout = null;
+
+    function createHistogram() {
+      const numBinsInput = document.getElementById('numBins');
+      const showNormal = document.getElementById('showNormalCurve').checked;
+      
+      let numBins = parseInt(numBinsInput.value);
+      const method = document.getElementById('binningMethod').value;
+      
+      // Calculate bins based on method
+      if (method !== 'manual') {
+        numBins = calculateOptimalBins(method, currentData);
+        numBinsInput.value = numBins;
+        document.getElementById('numBinsValue').textContent = numBins;
+      }
+      
+      const min = Math.min(...currentData);
+      const max = Math.max(...currentData);
+      const binWidth = (max - min) / numBins;
+      
+      // Calculate histogram bins with bin centers for alignment
+      const histogramData = [];
+      const categories = [];
+      
+      for (let i = 0; i < numBins; i++) {
+        const binStart = min + i * binWidth;
+        const binEnd = binStart + binWidth;
+        
+        categories.push(`${binStart.toFixed(0)}-${binEnd.toFixed(0)}`);
+        
+        const count = currentData.filter(v => v >= binStart && (i === numBins - 1 ? v <= binEnd : v < binEnd)).length;
+        
+        // Use index for x-coordinate to align with categories
+        histogramData.push({
+          x: i,
+          y: count
+        });
+      }
+      
+      const series = [{
+        name: 'Frequency',
+        type: 'column',
+        data: histogramData,
+        color: '#4a90e2',
+        borderColor: '#2a5f9e',
+        borderWidth: 1
+      }];
+      
+      // Add normal curve if checked
+      if (showNormal) {
+        const mean = currentData.reduce((a, b) => a + b, 0) / currentData.length;
+        const stdDev = Math.sqrt(currentData.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / currentData.length);
+        
+        const normalData = [];
+        const numPoints = 100;
+        for (let i = 0; i <= numPoints; i++) {
+          const x = min + (i / numPoints) * (max - min);
+          const y = (1 / (stdDev * Math.sqrt(2 * Math.PI))) * 
+                    Math.exp(-0.5 * Math.pow((x - mean) / stdDev, 2));
+          
+          // Map x-value to category index position
+          const categoryIndex = ((x - min) / (max - min)) * (numBins - 1);
+          
+          // Scale to match histogram frequency (not density)
+          normalData.push([categoryIndex, y * currentData.length * binWidth]);
+        }
+        
+        series.push({
+          name: 'Normal Distribution',
+          type: 'spline',
+          data: normalData,
+          color: '#ffa578',
+          lineWidth: 3,
+          marker: { enabled: false },
+          yAxis: 0 // Use same y-axis as histogram
+        });
+      }
+      
+      // Determine if animation should be enabled
+      const enableAnimation = !isSliderMoving;
+      
+      // Create chart
+      histogramChart = Highcharts.chart('histogram-chart', {
+        chart: {
+          backgroundColor: '#242938',
+          style: { fontFamily: 'Segoe UI' },
+          animation: enableAnimation ? { duration: 500 } : false,
+          spacingTop: 5,
+          spacingBottom: 5,
+          spacingLeft: 5,
+          spacingRight: 5,
+          height: 280
+        },
+        title: {
+          text: 'Distribution',
+          style: { color: '#ffffff', fontSize: '13px' },
+          margin: 8
+        },
+        xAxis: {
+          categories: categories,
+          title: {
+            text: 'Value Range',
+            style: { color: '#78c8ff', fontSize: '11px' },
+            margin: 8
+          },
+          labels: {
+            rotation: -45,
+            style: { color: '#ffffff', fontSize: '10px' }
+          },
+          gridLineColor: '#2d3748'
+        },
+        yAxis: {
+          title: {
+            text: 'Frequency',
+            style: { color: '#78c8ff', fontSize: '11px' },
+            margin: 8
+          },
+          labels: { style: { color: '#ffffff', fontSize: '10px' } },
+          gridLineColor: '#2d3748'
+        },
+        legend: {
+          itemStyle: { color: '#ffffff', fontSize: '11px' },
+          padding: 4,
+          itemMarginBottom: 4
+        },
+        plotOptions: {
+          column: {
+            groupPadding: 0,
+            pointPadding: 0,
+            borderWidth: 1,
+            animation: enableAnimation ? { duration: 400 } : false
+          },
+          spline: {
+            animation: enableAnimation ? { duration: 600 } : false
+          },
+          series: {
+            animation: enableAnimation
+          }
+        },
+        tooltip: {
+          shared: true,
+          backgroundColor: 'rgba(26, 31, 46, 0.95)',
+          style: { color: '#ffffff' },
+          borderColor: '#2d3748',
+          formatter: function() {
+            let tooltip = '<b>' + this.x + '</b><br/>';
+            this.points.forEach(point => {
+              tooltip += '<span style="color:' + point.color + '">\u25CF</span> ' + 
+                         point.series.name + ': <b>' + point.y.toFixed(2) + '</b><br/>';
+            });
+            return tooltip;
+          }
+        },
+        series: series,
+        credits: { enabled: false }
+      });
+    }
+
+    // Calculate optimal bins
+    function calculateOptimalBins(method, data) {
+      const n = data.length;
+      
+      switch(method) {
+        case 'sturges':
+          return Math.ceil(Math.log2(n) + 1);
+        case 'scott':
+          const sorted = [...data].sort((a, b) => a - b);
+          const stdDev = Math.sqrt(data.reduce((sum, v) => sum + Math.pow(v - data.reduce((a,b)=>a+b,0)/n, 2), 0) / n);
+          const binWidth = 3.49 * stdDev / Math.pow(n, 1/3);
+          return Math.ceil((sorted[n-1] - sorted[0]) / binWidth);
+        case 'fd':
+          const sortedFD = [...data].sort((a, b) => a - b);
+          const q1 = sortedFD[Math.floor(n * 0.25)];
+          const q3 = sortedFD[Math.floor(n * 0.75)];
+          const iqr = q3 - q1;
+          const binWidthFD = 2 * iqr / Math.pow(n, 1/3);
+          return Math.ceil((sortedFD[n-1] - sortedFD[0]) / binWidthFD);
+        default:
+          return 10;
+      }
+    }
+
+    // Range sliders - with animation control
+    function updateRangeSliders() {
+      const leftSlider = document.getElementById('leftTruncation');
+      const rightSlider = document.getElementById('rightTruncation');
+      
+      let leftVal = parseInt(leftSlider.value);
+      let rightVal = parseInt(rightSlider.value);
+      
+      // Prevent crossing
+      if (leftVal >= rightVal) {
+        leftSlider.value = rightVal - 1;
+        leftVal = rightVal - 1;
+      }
+      
+      // Update active indicator
+      const activeIndicator = document.getElementById('activeRangeIndicator');
+      activeIndicator.style.left = leftVal + '%';
+      activeIndicator.style.right = (100 - rightVal) + '%';
+      
+      // Calculate actual values
+      const range = originalMax - originalMin;
+      const leftValue = originalMin + (leftVal / 100) * range;
+      const rightValue = originalMin + (rightVal / 100) * range;
+      
+      document.getElementById('leftRangeValue').textContent = leftValue.toFixed(0);
+      document.getElementById('rightRangeValue').textContent = rightValue.toFixed(0);
+      
+      // Filter data
+      currentData = originalData.filter(v => v >= leftValue && v <= rightValue);
+      document.getElementById('remainingN').textContent = currentData.length;
+      
+      // Set slider moving flag to disable animation
+      isSliderMoving = true;
+      
+      // Clear existing timeout
+      if (sliderTimeout) {
+        clearTimeout(sliderTimeout);
+      }
+      
+      // Re-enable animation after slider stops moving for 300ms
+      sliderTimeout = setTimeout(() => {
+        isSliderMoving = false;
+        console.log('✅ Slider stopped, animations re-enabled');
+      }, 300);
+      
+      // Update stats and chart (without animation)
+      const stats = calculateDescriptiveStats(currentData);
+      populateStatistics(stats);
+      createHistogram();
+    }
+
+    // Reset range sliders
+    function resetRangeSliders() {
+      document.getElementById('leftTruncation').value = 0;
+      document.getElementById('rightTruncation').value = 100;
+      currentData = [...originalData];
+      updateRangeSliders();
+    }
+
+    // Close view
+    function closeView() {
+      sendMessageToParent({ action: 'close' });
+    }
+
+    console.log('✅ Histogram view script loaded');
+  </script>
+
+  <footer class="statistico-footer">
+    © 2026 Statistico Analytics™ · All rights reserved
+  </footer>
+</body>
+</html>

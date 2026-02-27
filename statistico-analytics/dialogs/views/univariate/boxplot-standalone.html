@@ -19,10 +19,6 @@
   <link rel="stylesheet" href="../shared-header.css">
   <script src="../shared-header.js"></script>
   
-  <!-- Responsive Layout System -->
-  <link rel="stylesheet" href="../responsive-layout.css">
-  <script src="../responsive-layout.js"></script>
-
   <style>
     :root {
       --surface-0: #0c1624;
@@ -36,27 +32,52 @@
       --text-muted: rgba(255,255,255,0.6);
     }
 
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
     body {
       background-color: var(--surface-0);
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       margin: 0;
       padding: 0;
       color: var(--text-primary);
+    }
+
+    /* ── Self-contained layout (no responsive-layout.css dependency) ── */
+    .statistico-shell {
+      flex: 0 0 auto !important;
+    }
+
+    .responsive-container {
+      flex: 1 1 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 6px 12px !important;
+      gap: 4px;
       overflow: hidden;
     }
 
-    /* Override responsive layout padding */
-    .responsive-container {
-      padding: 6px 12px !important;
-      gap: 4px;
-    }
-
     .responsive-panel {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
       padding: 0 !important;
       margin-bottom: 0 !important;
     }
 
     .responsive-panel-body {
+      flex: 1 1 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
       padding: 0 !important;
     }
 
@@ -190,6 +211,31 @@
   </div>
 
   <script>
+    // ── Height fitter ──────────────────────────────────────────────────────────
+    function fitLayout() {
+      const shell = document.querySelector('.statistico-shell');
+      const headerH = shell ? shell.offsetHeight : 52;
+      const availH = window.innerHeight - headerH;
+
+      const container = document.querySelector('.responsive-container');
+      if (container) container.style.height = availH + 'px';
+
+      // Split charts grid evenly
+      const panels = document.querySelectorAll('.chart-panel');
+      if (panels.length) {
+        const padding = 6 + 6; // top + bottom padding
+        const gaps   = 4 * (panels.length - 1);
+        const panelH = Math.floor((availH - padding - gaps) / panels.length);
+        panels.forEach(p => { p.style.height = panelH + 'px'; });
+      }
+
+      // Reflow charts
+      setTimeout(() => {
+        Highcharts.charts.forEach(c => c && c.reflow && c.reflow());
+      }, 50);
+    }
+    window.addEventListener('resize', fitLayout);
+
     let originalData = [];
     let currentVariableName = 'Variable';
     let currentSampleSize = 0;
@@ -248,6 +294,7 @@
       // Initialize shared header
       StatisticoHeader.init('boxplot', 'Variable', 0);
       console.log('✅ Shared header initialized');
+      setTimeout(fitLayout, 120);
       
       // Check localStorage FIRST before loading sample data
       setTimeout(() => {
@@ -355,6 +402,7 @@
         // Hide awaiting, show results
         document.getElementById('awaitingPanel').style.display = 'none';
         document.getElementById('results-container').classList.add('show');
+        setTimeout(fitLayout, 150);
         
       } catch (error) {
         console.error('❌ Error handling data:', error);

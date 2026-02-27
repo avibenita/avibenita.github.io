@@ -83,6 +83,7 @@
       display: flex !important;
       flex-direction: column;
       gap: 10px;
+      overflow: hidden;      /* clip chart overflow within laptop-frame */
     }
 
     /* Panel styling - Compact */
@@ -870,11 +871,26 @@
       // Determine if animation should be enabled
       const enableAnimation = !isSliderMoving;
       
-      // Create chart
+      // Create chart — compute available height from frame dimensions
       const chartContainer = document.getElementById('histogram-chart');
-      const dynamicHeight = chartContainer && chartContainer.clientHeight
-        ? Math.max(220, chartContainer.clientHeight - 2)
-        : 320;
+      const dynamicHeight = (() => {
+        // Prefer container's own clientHeight if already laid out
+        if (chartContainer && chartContainer.clientHeight > 50) {
+          return Math.max(220, chartContainer.clientHeight - 2);
+        }
+        // Fall back: measure from laptop-frame minus all fixed-height siblings
+        const frame      = document.querySelector('.laptop-frame') || document.body;
+        const shell      = document.querySelector('.statistico-shell');
+        const tablePanel = document.querySelector('.table-panel');
+        const chartHead  = document.querySelector('.chart-panel .panel-heading');
+        const controls   = document.querySelector('.chart-panel .controls');
+        const frameH  = frame.clientHeight  || window.innerHeight;
+        const shellH  = shell  ? shell.offsetHeight  : 88;
+        const tableH  = tablePanel ? tablePanel.offsetHeight : 110;
+        const headH   = chartHead  ? chartHead.offsetHeight  : 38;
+        const ctrlH   = controls   ? controls.offsetHeight   : 50;
+        return Math.max(220, frameH - shellH - tableH - headH - ctrlH - 50);
+      })();
 
       histogramChart = Highcharts.chart('histogram-chart', {
         chart: {
@@ -950,6 +966,17 @@
         series: series,
         credits: { enabled: false }
       });
+
+      // Reflow once layout has settled so the chart fills actual container height
+      setTimeout(() => {
+        if (histogramChart) {
+          const container = document.getElementById('histogram-chart');
+          const h = container ? container.clientHeight : 0;
+          if (h > 50 && Math.abs(h - histogramChart.chartHeight) > 20) {
+            histogramChart.setSize(null, h - 2, false);
+          }
+        }
+      }, 250);
     }
 
     // Calculate optimal bins

@@ -345,14 +345,32 @@ const StatisticoHeader = {
     console.log('🔄 Refreshing view...');
     window.location.reload();
   },
+
+  resolveDialogUrl(filename) {
+    if (!filename) return window.location.href;
+    if (filename.startsWith('http')) return filename;
+    const { origin, pathname } = window.location;
+    const marker = '/dialogs/views/';
+    const idx = pathname.indexOf(marker);
+    if (idx !== -1) {
+      const rootPath = pathname.slice(0, idx);
+      return `${origin}${rootPath}${marker}${filename}`;
+    }
+    return `./${filename}`;
+  },
   
   /**
    * Navigate to another view
    */
   navigateTo(filename) {
     console.log('🔄 [v2026-02-05-003] Navigating to:', filename);
-    
-    // Close dropdown after selection
+    // Univariate behaves like Independent tabs: navigate in the same dialog window.
+    if (this.module === 'univariate') {
+      window.location.href = this.resolveDialogUrl(filename);
+      return;
+    }
+
+    // Close dropdown after selection (for correlations dropdown mode)
     this.toggleDropdown();
     
     try {

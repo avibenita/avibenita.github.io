@@ -5,6 +5,7 @@ let univariateRangeAddress = '';
 let univariateDialog = null;
 let univariateResultsDialog = null;
 let univariateCurrentResults = null;
+let pendingUnivariateViewUrl = null;
 const RESULT_DIALOG_OPTIONS = { height: 84, width: 82, displayInIframe: false };
 
 // ─── URL RESOLVER ────────────────────────────────────────────────────────────
@@ -109,6 +110,19 @@ function sendDialogData() {
   }));
 }
 
+function queueResultsViewSwitch(viewPath) {
+  pendingUnivariateViewUrl = `${getDialogsBaseUrl()}${viewPath}`;
+  if (univariateResultsDialog) {
+    try { univariateResultsDialog.close(); } catch (_e) {}
+    return;
+  }
+  if (pendingUnivariateViewUrl && univariateCurrentResults) {
+    const target = pendingUnivariateViewUrl;
+    pendingUnivariateViewUrl = null;
+    openNewView(target, univariateCurrentResults);
+  }
+}
+
 // ─── RESULTS DIALOG ──────────────────────────────────────────────────────────
 function openResultsDialog(results) {
   univariateCurrentResults = results;
@@ -149,11 +163,9 @@ function openResultsDialog(results) {
             sendData();
           } else if (message.action === 'switchView') {
             if (dialog !== univariateResultsDialog) return;
-            const targetUrl = `${getDialogsBaseUrl()}${message.view}`;
-            if (dialog) dialog.close();
-            univariateResultsDialog = null;
-            setTimeout(() => openNewView(targetUrl, univariateCurrentResults), 300);
+            queueResultsViewSwitch(message.view);
           } else if (message.action === 'close' || message.action === 'closeDialog') {
+            pendingUnivariateViewUrl = null;
             if (dialog === univariateResultsDialog) {
               dialog.close();
               univariateResultsDialog = null;
@@ -165,6 +177,11 @@ function openResultsDialog(results) {
       dialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
         if (dialog === univariateResultsDialog) {
           univariateResultsDialog = null;
+        }
+        if (pendingUnivariateViewUrl && !univariateResultsDialog && univariateCurrentResults) {
+          const target = pendingUnivariateViewUrl;
+          pendingUnivariateViewUrl = null;
+          setTimeout(() => openNewView(target, univariateCurrentResults), 120);
         }
       });
     }
@@ -205,11 +222,9 @@ function openNewView(dialogUrl, results) {
             sendData();
           } else if (message.action === 'switchView') {
             if (dialog !== univariateResultsDialog) return;
-            const targetUrl = `${getDialogsBaseUrl()}${message.view}`;
-            if (dialog) dialog.close();
-            univariateResultsDialog = null;
-            setTimeout(() => openNewView(targetUrl, univariateCurrentResults), 300);
+            queueResultsViewSwitch(message.view);
           } else if (message.action === 'close' || message.action === 'closeDialog') {
+            pendingUnivariateViewUrl = null;
             if (dialog === univariateResultsDialog) {
               dialog.close();
               univariateResultsDialog = null;
@@ -221,6 +236,11 @@ function openNewView(dialogUrl, results) {
       dialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
         if (dialog === univariateResultsDialog) {
           univariateResultsDialog = null;
+        }
+        if (pendingUnivariateViewUrl && !univariateResultsDialog && univariateCurrentResults) {
+          const target = pendingUnivariateViewUrl;
+          pendingUnivariateViewUrl = null;
+          setTimeout(() => openNewView(target, univariateCurrentResults), 120);
         }
       });
     }

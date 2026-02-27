@@ -1,6 +1,6 @@
 /**
  * Shared Header Component for Statistico Standalone Views
- * Provides navigation dropdown to other analysis views
+ * Provides shared navigation across standalone analysis views
  * VERSION: 2026-02-06-taylor
  */
 
@@ -152,15 +152,9 @@ const StatisticoHeader = {
           </div>
         </div>
         
-        <!-- Right: Dropdown Menu -->
+        <!-- Right: Navigation -->
         <div class="header-right">
-          <button class="dropdown-btn" onclick="StatisticoHeader.toggleDropdown()">
-            <span>Advanced Analysis Options</span>
-            <i class="fa-solid fa-chevron-down"></i>
-          </button>
-          <div class="dropdown-content" id="dropdownMenu">
-            ${this.renderDropdownItems()}
-          </div>
+          ${this.renderNavigation()}
         </div>
       </div>
     `;
@@ -180,9 +174,9 @@ const StatisticoHeader = {
   },
   
   /**
-   * Render dropdown menu items
+   * Build navigation entries for current module
    */
-  renderDropdownItems() {
+  getNavigationItems() {
     const univariateViews = [
       { id: 'histogram', label: 'Interactive Histogram', file: 'univariate/histogram-standalone.html' },
       { id: 'descriptive-stats', label: 'Descriptive Statistics', file: 'univariate/descriptive-stats.html' },
@@ -210,7 +204,51 @@ const StatisticoHeader = {
       { id: 'correlation-tests', label: 'Correlation Tests', file: null, isDisabled: true }
     ];
     
-    const views = this.module === 'correlations' ? correlationViews : univariateViews;
+    return this.module === 'correlations' ? correlationViews : univariateViews;
+  },
+
+  /**
+   * Render right-side navigation.
+   * Univariate uses tab navigation, correlations keeps dropdown behavior.
+   */
+  renderNavigation() {
+    if (this.module === 'univariate') {
+      const tabs = this.getNavigationItems().filter(v => v.id !== 'separator');
+      return `
+        <div class="header-tabs" role="tablist" aria-label="Univariate views">
+          ${tabs.map(view => {
+            const isDisabled = !view.file;
+            const isActive = view.id === this.currentView;
+            return `
+              <button class="header-tab ${isActive ? 'active' : ''} ${isDisabled ? 'disabled' : ''}"
+                      role="tab"
+                      aria-selected="${isActive ? 'true' : 'false'}"
+                      ${isDisabled ? 'disabled' : ''}
+                      ${!isDisabled ? `onclick="StatisticoHeader.navigateTo('${view.file}')"` : ''}>
+                ${view.label}
+              </button>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    return `
+      <button class="dropdown-btn" onclick="StatisticoHeader.toggleDropdown()">
+        <span>Advanced Analysis Options</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </button>
+      <div class="dropdown-content" id="dropdownMenu">
+        ${this.renderDropdownItems()}
+      </div>
+    `;
+  },
+
+  /**
+   * Render dropdown menu items (kept for correlations and legacy).
+   */
+  renderDropdownItems() {
+    const views = this.getNavigationItems();
     
     return views.map(view => {
       if (view.id === 'separator') {
@@ -236,6 +274,7 @@ const StatisticoHeader = {
    */
   toggleDropdown() {
     const dropdown = document.getElementById('dropdownMenu');
+    if (!dropdown) return;
     dropdown.classList.toggle('show');
     
     // Close when clicking outside
@@ -252,6 +291,7 @@ const StatisticoHeader = {
   closeDropdownOnClickOutside(e) {
     const dropdown = document.getElementById('dropdownMenu');
     const button = document.querySelector('.dropdown-btn');
+    if (!dropdown || !button) return;
     
     if (!dropdown.contains(e.target) && !button.contains(e.target)) {
       dropdown.classList.remove('show');

@@ -559,6 +559,7 @@ function calculateKurtosis(data, mean, stdDev) {
  */
 let resultsDialog = null;
 let currentResults = null; // Store results globally for view switching
+const RESULT_DIALOG_OPTIONS = { height: 84, width: 82, displayInIframe: false };
 
 // Theme management
 function setResultsTheme(theme) {
@@ -585,7 +586,7 @@ function openNewView(dialogUrl, results) {
     
     Office.context.ui.displayDialogAsync(
         dialogUrl,
-        { height: 90, width: 95, displayInIframe: false },
+        RESULT_DIALOG_OPTIONS,
         (asyncResult) => {
             console.log('📬 displayDialogAsync callback triggered');
             console.log('Status:', asyncResult.status);
@@ -750,7 +751,7 @@ function openResultsDialog(results) {
     
     Office.context.ui.displayDialogAsync(
         dialogUrl,
-        { height: 90, width: 95, displayInIframe: false },
+        RESULT_DIALOG_OPTIONS,
         (asyncResult) => {
             if (asyncResult.status === Office.AsyncResultStatus.Failed) {
                 showStatus('error', 'Failed to open histogram: ' + asyncResult.error.message);

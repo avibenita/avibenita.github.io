@@ -5,6 +5,7 @@ let univariateRangeAddress = '';
 let univariateDialog = null;
 let univariateResultsDialog = null;
 let univariateCurrentResults = null;
+const RESULT_DIALOG_OPTIONS = { height: 84, width: 82, displayInIframe: false };
 
 // ─── URL RESOLVER ────────────────────────────────────────────────────────────
 function getDialogsBaseUrl() {
@@ -117,7 +118,7 @@ function openResultsDialog(results) {
   const dialogUrl = `${getDialogsBaseUrl()}univariate/histogram-standalone.html`;
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    { height: 90, width: 95, displayInIframe: false },
+    RESULT_DIALOG_OPTIONS,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error('Failed to open histogram:', asyncResult.error.message);
@@ -166,7 +167,7 @@ function openResultsDialog(results) {
 function openNewView(dialogUrl, results) {
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    { height: 90, width: 95, displayInIframe: false },
+    RESULT_DIALOG_OPTIONS,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       univariateResultsDialog = asyncResult.value;

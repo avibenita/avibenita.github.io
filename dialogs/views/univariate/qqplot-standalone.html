@@ -218,6 +218,71 @@
         min-height: 120px !important;
       }
     }
+
+    /* ── Self-contained layout (does NOT depend on responsive-layout.css) ── */
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header row must not grow */
+    .statistico-shell {
+      flex: 0 0 auto !important;
+    }
+
+    /* Main content area fills remaining height */
+    .responsive-container {
+      flex: 1 1 0;
+      min-height: 0;
+      display: flex !important;
+      flex-direction: column;
+      gap: 6px;
+      padding: 6px 8px;
+      overflow: hidden;
+    }
+
+    /* Panel card */
+    .responsive-panel {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Panel title row — never grows */
+    .responsive-panel-heading {
+      flex: 0 0 auto !important;
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .responsive-panel-heading h3 {
+      margin: 0;
+      font-size: 13px;
+      color: var(--accent-1);
+    }
+
+    /* Panel body fills remaining card space */
+    .responsive-panel-body {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+      padding: 4px !important;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Chart div fills panel body */
+    .responsive-chart-container {
+      flex: 1 1 0;
+      min-height: 0;
+      width: 100%;
+      height: 100%;
+    }
   </style>
 </head>
 <body>
@@ -284,6 +349,51 @@
   </div>
 
   <script>
+    // ── Height fitter (self-contained, no external deps) ─────────────────────
+    function fitLayout() {
+      const shell = document.querySelector('.statistico-shell');
+      const headerH = shell ? shell.offsetHeight : 52;
+      const viewH = window.innerHeight;
+      const availH = viewH - headerH;
+
+      const container = document.getElementById('results-container');
+      if (container) container.style.height = availH + 'px';
+
+      // Controls panel height (fixed)
+      const controlsPanel = document.querySelector('.controls-panel');
+      const controlsH = controlsPanel ? controlsPanel.offsetHeight : 56;
+
+      // Charts grid fills remainder
+      const chartsGrid = document.querySelector('.charts-grid');
+      if (chartsGrid) {
+        const chartsH = Math.max(availH - controlsH - 18, 200); // 18 = gap+padding
+        chartsGrid.style.height = chartsH + 'px';
+
+        // Split evenly between the two chart panels
+        const panels = chartsGrid.querySelectorAll('.chart-panel');
+        const panelH = Math.floor((chartsH - 4) / Math.max(panels.length, 1)); // 4 = gap
+        panels.forEach(p => {
+          p.style.height = panelH + 'px';
+          const heading = p.querySelector('.responsive-panel-heading');
+          const body    = p.querySelector('.responsive-panel-body');
+          if (heading && body) {
+            const bodyH = panelH - heading.offsetHeight;
+            body.style.height = bodyH + 'px';
+            const chartDiv = body.querySelector('.responsive-chart-container');
+            if (chartDiv) chartDiv.style.height = bodyH + 'px';
+          }
+        });
+      }
+
+      // Reflow Highcharts
+      setTimeout(() => {
+        if (qqppChart)      qqppChart.reflow();
+        if (detrendedChart) detrendedChart.reflow();
+      }, 50);
+    }
+
+    window.addEventListener('resize', fitLayout);
+
     let originalData = [];
     let varName = 'Variable';
     let currentPlotType = 'qq';
@@ -369,6 +479,8 @@
         if (typeof StatisticoHeader !== 'undefined') {
           StatisticoHeader.init('qqplot', 'Variable', 0);
           console.log('✅ Shared header initialized');
+          // Run layout fit after header renders
+          setTimeout(fitLayout, 120);
         } else {
           console.log('⏳ Waiting for StatisticoHeader...');
           setTimeout(initHeader, 100);
@@ -837,10 +949,11 @@
       
       // Force reflow of detrended chart after creation
       setTimeout(() => {
-        if (detrendedChart) {
-          detrendedChart.reflow();
-        }
+        if (detrendedChart) detrendedChart.reflow();
       }, 100);
+
+      // Fit layout to ensure charts don't stretch
+      setTimeout(fitLayout, 200);
     }
   </script>
 </body>

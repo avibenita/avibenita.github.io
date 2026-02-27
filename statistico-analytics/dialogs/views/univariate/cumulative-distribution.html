@@ -396,6 +396,23 @@
   </div>
   
   <script>
+    // ── fitLayout: fill dialog width+height (boxplot pattern) ────────────────
+    function fitLayout() {
+      const frame   = document.querySelector('.laptop-frame') || document.body;
+      const shell   = document.querySelector('.statistico-shell');
+      const headerH = shell ? shell.offsetHeight : 88;
+      const availH  = (frame.clientHeight || window.innerHeight) - headerH;
+      const container = document.querySelector('.results-container') || document.querySelector('.container');
+      if (container) container.style.height = availH + 'px';
+      setTimeout(() => {
+        if (typeof Highcharts !== 'undefined')
+          Highcharts.charts.forEach(c => c && c.reflow && c.reflow());
+        if (typeof Plotly !== 'undefined')
+          document.querySelectorAll('.plotly-graph-div').forEach(el => { try { Plotly.relayout(el, {}); } catch(e) {} });
+      }, 50);
+    }
+    window.addEventListener('resize', fitLayout);
+
     console.log('✅ Cumulative Distribution - Page loaded');
     
     let chart, originalData = [], sortedData = [], cdfData = [];
@@ -414,6 +431,7 @@
     function pollForDependencies() {
       if (!headerInitialized && typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.init('cdf', 'Variable', 0);
+          setTimeout(fitLayout, 150);
         headerInitialized = true;
         console.log('✅ Shared header initialized');
       }
@@ -541,6 +559,7 @@
       // Initialize chart and slider
       initializeChart();
       initializeSlider();
+      setTimeout(fitLayout, 100);
     }
     
     function calculatePercentile(sortedArray, percentile) {

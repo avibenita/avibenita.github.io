@@ -147,10 +147,12 @@ function openResultsDialog(results) {
           if (message.status === 'ready') {
             sendData();
           } else if (message.action === 'switchView') {
-            if (univariateResultsDialog) { univariateResultsDialog.close(); univariateResultsDialog = null; }
+            const previousDialog = univariateResultsDialog;
             setTimeout(() => {
-              openNewView(`${getDialogsBaseUrl()}${message.view}`, univariateCurrentResults);
-            }, 300);
+              openNewView(`${getDialogsBaseUrl()}${message.view}`, univariateCurrentResults, () => {
+                if (previousDialog) previousDialog.close();
+              });
+            }, 120);
           } else if (message.action === 'close' || message.action === 'closeDialog') {
             if (univariateResultsDialog) { univariateResultsDialog.close(); univariateResultsDialog = null; }
           }
@@ -164,13 +166,17 @@ function openResultsDialog(results) {
   );
 }
 
-function openNewView(dialogUrl, results) {
+function openNewView(dialogUrl, results, onOpened) {
   Office.context.ui.displayDialogAsync(
     dialogUrl,
     RESULT_DIALOG_OPTIONS,
     (asyncResult) => {
-      if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
+      if (asyncResult.status === Office.AsyncResultStatus.Failed) {
+        console.error('Failed to switch univariate view:', asyncResult.error && asyncResult.error.message);
+        return;
+      }
       univariateResultsDialog = asyncResult.value;
+      if (typeof onOpened === 'function') onOpened();
 
       const sendData = () => {
         if (!univariateResultsDialog) return;
@@ -193,8 +199,12 @@ function openNewView(dialogUrl, results) {
           if (message.status === 'ready') {
             sendData();
           } else if (message.action === 'switchView') {
-            if (univariateResultsDialog) { univariateResultsDialog.close(); univariateResultsDialog = null; }
-            setTimeout(() => openNewView(`${getDialogsBaseUrl()}${message.view}`, univariateCurrentResults), 300);
+            const previousDialog = univariateResultsDialog;
+            setTimeout(() => {
+              openNewView(`${getDialogsBaseUrl()}${message.view}`, univariateCurrentResults, () => {
+                if (previousDialog) previousDialog.close();
+              });
+            }, 120);
           } else if (message.action === 'close' || message.action === 'closeDialog') {
             if (univariateResultsDialog) { univariateResultsDialog.close(); univariateResultsDialog = null; }
           }

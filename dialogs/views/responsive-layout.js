@@ -10,13 +10,24 @@
 const ResponsiveLayout = {
   // Configuration
   config: {
-    headerHeight: 52, // statistico-header height
+    headerHeight: 52, // fallback only; actual height is measured dynamically
     minChartHeight: 180,
     debugMode: false,
     adjustmentAttempts: 0,
     maxAdjustmentAttempts: 3 // Prevent infinite loops
   },
   
+  /**
+   * Measure actual header height (supports single-row and two-row shared headers).
+   */
+  getHeaderHeight() {
+    const shell = document.querySelector('.statistico-shell');
+    if (shell && shell.offsetHeight) return shell.offsetHeight;
+    const header = document.querySelector('.statistico-header');
+    if (header && header.offsetHeight) return header.offsetHeight;
+    return this.config.headerHeight;
+  },
+
   /**
    * Initialize responsive layout
    * Call this on page load or after DOM ready
@@ -52,14 +63,15 @@ const ResponsiveLayout = {
     
     // Get actual viewport height
     const vh = window.innerHeight;
-    const availableHeight = vh - this.config.headerHeight;
+    const measuredHeaderHeight = this.getHeaderHeight();
+    const availableHeight = Math.max(120, vh - measuredHeaderHeight);
     
     // Set CSS variables for use throughout the app
     document.documentElement.style.setProperty('--vh', `${vh}px`);
     document.documentElement.style.setProperty('--available-height', `${availableHeight}px`);
-    document.documentElement.style.setProperty('--header-height', `${this.config.headerHeight}px`);
+    document.documentElement.style.setProperty('--header-height', `${measuredHeaderHeight}px`);
     
-    console.log(`📐 Viewport: ${window.innerWidth}x${vh}px, Available: ${availableHeight}px`);
+    console.log(`📐 Viewport: ${window.innerWidth}x${vh}px, Header: ${measuredHeaderHeight}px, Available: ${availableHeight}px`);
     
     // Force container to fit
     const container = document.querySelector('.responsive-container');
@@ -77,7 +89,7 @@ const ResponsiveLayout = {
    */
   calculateOptimalLayout() {
     const vh = window.innerHeight;
-    const availableHeight = vh - this.config.headerHeight;
+    const availableHeight = Math.max(120, vh - this.getHeaderHeight());
     
     const container = document.querySelector('.responsive-container');
     if (!container) return;
@@ -230,7 +242,7 @@ const ResponsiveLayout = {
     console.log('🚨 FORCE FIT: Applying emergency layout constraints...');
     
     const vh = window.innerHeight;
-    const availableHeight = vh - this.config.headerHeight;
+    const availableHeight = Math.max(120, vh - this.getHeaderHeight());
     
     // Moderately compact spacing (not ultra-compact to preserve visibility)
     const style = document.createElement('style');

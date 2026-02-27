@@ -1,10 +1,10 @@
 /**
  * Shared Header Component for Statistico Standalone Views
  * Provides shared navigation across standalone analysis views
- * VERSION: 2026-02-06-taylor
+ * VERSION: 2026-02-27-navtabs-under-header
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-02-06-taylor');
+console.log('📦 Loading shared-header.js VERSION 2026-02-27-navtabs-under-header');
 
 const StatisticoHeader = {
   currentView: 'histogram',
@@ -83,9 +83,9 @@ const StatisticoHeader = {
       `;
       notice.innerHTML = '<i class="fa-solid fa-exclamation-triangle" style="margin-right: 6px;"></i>* Data has been trimmed or transformed';
       
-      const header = document.querySelector('.statistico-header');
-      if (header && header.parentNode) {
-        header.parentNode.insertBefore(notice, header.nextSibling);
+      const headerTarget = document.querySelector('.statistico-shell') || document.querySelector('.statistico-header');
+      if (headerTarget && headerTarget.parentNode) {
+        headerTarget.parentNode.insertBefore(notice, headerTarget.nextSibling);
       }
     }
     notice.style.display = 'block';
@@ -130,9 +130,8 @@ const StatisticoHeader = {
       'correlations': 'Correlations'
     };
     
-    const headerHTML = `
+    const topHeader = `
       <div class="statistico-header">
-        <!-- Left: Logo + Module -->
         <div class="header-left">
           <div class="header-logo">
             <i class="fa-solid fa-chart-line"></i>
@@ -142,8 +141,6 @@ const StatisticoHeader = {
             <div class="header-module-name">${moduleNames[this.module] || 'Analysis'}</div>
           </div>
         </div>
-        
-        <!-- Center: View Name + Variable -->
         <div class="header-center">
           <div class="header-view-name">${viewTitles[this.currentView] || 'Analysis'}</div>
           <div class="header-variable">
@@ -151,13 +148,24 @@ const StatisticoHeader = {
             <span id="headerSampleSize">(n=${this.sampleSize})</span>
           </div>
         </div>
-        
-        <!-- Right: Navigation -->
         <div class="header-right">
-          ${this.renderNavigation()}
+          ${this.module === 'univariate' ? '' : this.renderNavigation()}
         </div>
       </div>
     `;
+
+    const headerHTML = this.module === 'univariate'
+      ? `
+        <div class="statistico-shell">
+          ${topHeader}
+          <div class="statistico-navrow">
+            <div class="navrow-tabs" role="tablist" aria-label="Univariate workflow views">
+              ${this.renderNavigation()}
+            </div>
+          </div>
+        </div>
+      `
+      : topHeader;
     
     // Insert into header-container if it exists, otherwise at beginning of body
     const headerContainer = document.getElementById('header-container');
@@ -165,10 +173,10 @@ const StatisticoHeader = {
       headerContainer.innerHTML = headerHTML;
     } else {
       // Remove any existing header first
+      const existingShell = document.querySelector('.statistico-shell');
+      if (existingShell) existingShell.remove();
       const existingHeader = document.querySelector('.statistico-header');
-      if (existingHeader) {
-        existingHeader.remove();
-      }
+      if (existingHeader) existingHeader.remove();
       document.body.insertAdjacentHTML('afterbegin', headerHTML);
     }
   },

@@ -124,11 +124,12 @@ function openResultsDialog(results) {
         console.error('Failed to open histogram:', asyncResult.error.message);
         return;
       }
-      univariateResultsDialog = asyncResult.value;
+      const dialog = asyncResult.value;
+      univariateResultsDialog = dialog;
 
       const sendData = () => {
-        if (!univariateResultsDialog) return;
-        univariateResultsDialog.messageChild(JSON.stringify({
+        if (!dialog) return;
+        dialog.messageChild(JSON.stringify({
           action: 'loadData',
           data: {
             values: results.rawData,
@@ -141,32 +142,36 @@ function openResultsDialog(results) {
 
       setTimeout(sendData, 1000);
 
-      univariateResultsDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
+      dialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
         try {
           const message = JSON.parse(arg.message);
           if (message.status === 'ready') {
             sendData();
           } else if (message.action === 'switchView') {
-            const previousDialog = univariateResultsDialog;
-            setTimeout(() => {
-              openNewView(`${getDialogsBaseUrl()}${message.view}`, univariateCurrentResults, () => {
-                if (previousDialog) previousDialog.close();
-              });
-            }, 120);
+            if (dialog !== univariateResultsDialog) return;
+            const targetUrl = `${getDialogsBaseUrl()}${message.view}`;
+            if (dialog) dialog.close();
+            univariateResultsDialog = null;
+            setTimeout(() => openNewView(targetUrl, univariateCurrentResults), 300);
           } else if (message.action === 'close' || message.action === 'closeDialog') {
-            if (univariateResultsDialog) { univariateResultsDialog.close(); univariateResultsDialog = null; }
+            if (dialog === univariateResultsDialog) {
+              dialog.close();
+              univariateResultsDialog = null;
+            }
           }
         } catch (_e) {}
       });
 
-      univariateResultsDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
-        univariateResultsDialog = null;
+      dialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
+        if (dialog === univariateResultsDialog) {
+          univariateResultsDialog = null;
+        }
       });
     }
   );
 }
 
-function openNewView(dialogUrl, results, onOpened) {
+function openNewView(dialogUrl, results) {
   Office.context.ui.displayDialogAsync(
     dialogUrl,
     RESULT_DIALOG_OPTIONS,
@@ -175,12 +180,12 @@ function openNewView(dialogUrl, results, onOpened) {
         console.error('Failed to switch univariate view:', asyncResult.error && asyncResult.error.message);
         return;
       }
-      univariateResultsDialog = asyncResult.value;
-      if (typeof onOpened === 'function') onOpened();
+      const dialog = asyncResult.value;
+      univariateResultsDialog = dialog;
 
       const sendData = () => {
-        if (!univariateResultsDialog) return;
-        univariateResultsDialog.messageChild(JSON.stringify({
+        if (!dialog) return;
+        dialog.messageChild(JSON.stringify({
           action: 'loadData',
           data: {
             values: results.rawData,
@@ -193,26 +198,30 @@ function openNewView(dialogUrl, results, onOpened) {
 
       setTimeout(sendData, 1000);
 
-      univariateResultsDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
+      dialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
         try {
           const message = JSON.parse(arg.message);
           if (message.status === 'ready') {
             sendData();
           } else if (message.action === 'switchView') {
-            const previousDialog = univariateResultsDialog;
-            setTimeout(() => {
-              openNewView(`${getDialogsBaseUrl()}${message.view}`, univariateCurrentResults, () => {
-                if (previousDialog) previousDialog.close();
-              });
-            }, 120);
+            if (dialog !== univariateResultsDialog) return;
+            const targetUrl = `${getDialogsBaseUrl()}${message.view}`;
+            if (dialog) dialog.close();
+            univariateResultsDialog = null;
+            setTimeout(() => openNewView(targetUrl, univariateCurrentResults), 300);
           } else if (message.action === 'close' || message.action === 'closeDialog') {
-            if (univariateResultsDialog) { univariateResultsDialog.close(); univariateResultsDialog = null; }
+            if (dialog === univariateResultsDialog) {
+              dialog.close();
+              univariateResultsDialog = null;
+            }
           }
         } catch (_e) {}
       });
 
-      univariateResultsDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
-        univariateResultsDialog = null;
+      dialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
+        if (dialog === univariateResultsDialog) {
+          univariateResultsDialog = null;
+        }
       });
     }
   );

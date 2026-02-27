@@ -379,23 +379,16 @@
 
     /* Chart Container */
     .chart-container {
-      min-height: 280px;
-      max-height: 320px;
+      height: 100%;          /* fill .results-panel; no min/max clamp */
       background: rgba(255, 255, 255, 0.02);
       border-radius: 6px;
       padding: 6px;
+      box-sizing: border-box;
     }
 
     @media (max-width: 900px) {
       .method-grid {
         grid-template-columns: repeat(2, 1fr);
-      }
-    }
-
-    @media (max-height: 800px) {
-      .chart-container {
-        min-height: 240px;
-        max-height: 280px;
       }
     }
   </style>
@@ -489,17 +482,27 @@
       const shell   = document.querySelector('.statistico-shell');
       const headerH = shell ? shell.offsetHeight : 88;
       const availH  = (frame.clientHeight || window.innerHeight) - headerH;
-      const container = document.querySelector('.results-container') || document.querySelector('.container');
-      const frameW = frame.clientWidth || window.innerWidth;
+      const frameW  = frame.clientWidth || window.innerWidth;
+
+      const container = document.getElementById('results-container') || document.querySelector('.results-container');
       if (container) {
         container.style.height = availH + 'px';
-        container.style.width  = frameW + 'px';  // explicit: bypasses flex-cache width issue
+        container.style.width  = frameW + 'px';
+
+        // Propagate: container (padding 10px*2=20) → method → summary → chart
+        const methodPanel  = container.querySelector('.method-panel');
+        const summaryPanel = container.querySelector('.summary-panel');
+        // offsetHeight excludes margin; method & summary each have mb:10
+        const methodH  = methodPanel  ? methodPanel.offsetHeight  + 10 : 0;
+        const summaryH = summaryPanel ? summaryPanel.offsetHeight + 10 : 0;
+        // results-panel overhead = panel-header(~40px) + panel-padding(10px*2) + results-grid-gap(10px)
+        const chartH = Math.max(150, availH - methodH - summaryH - 20 - 70);
+        const outliersChart = document.getElementById('outliersChart');
+        if (outliersChart) outliersChart.style.height = chartH + 'px';
       }
       setTimeout(() => {
         if (typeof Highcharts !== 'undefined')
           Highcharts.charts.forEach(c => c && c.reflow && c.reflow());
-        if (typeof Plotly !== 'undefined')
-          document.querySelectorAll('.plotly-graph-div').forEach(el => { try { Plotly.relayout(el, {}); } catch(e) {} });
       }, 50);
     }
     window.addEventListener('resize', fitLayout);
@@ -860,7 +863,7 @@
         chart: {
           type: 'scatter',
           backgroundColor: 'transparent',
-          height: 280
+          height: null        // use container height (controlled by fitLayout)
         },
         title: null,
         xAxis: {
@@ -918,6 +921,7 @@
           }
         ]
       });
+      setTimeout(fitLayout, 80); // re-measure now chart exists
     }
 
     // Office.js initialization

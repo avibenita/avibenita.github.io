@@ -177,12 +177,11 @@
       border-color: var(--accent-2);
     }
     
-    /* Chart Container - Ultra Compact */
+    /* Chart Container — fills remaining flex space, no clamp */
     #chart-container {
       flex: 1;
       width: 100%;
-      min-height: 350px;
-      max-height: calc(100vh - 320px);
+      min-height: 0;         /* allow shrinking below content size */
     }
     
     /* Slider Controls - Ultra Compact */
@@ -402,17 +401,38 @@
       const shell   = document.querySelector('.statistico-shell');
       const headerH = shell ? shell.offsetHeight : 88;
       const availH  = (frame.clientHeight || window.innerHeight) - headerH;
-      const container = document.querySelector('.results-container') || document.querySelector('.container');
-      const frameW = frame.clientWidth || window.innerWidth;
+      const frameW  = frame.clientWidth || window.innerWidth;
+
+      const container = document.querySelector('.container');
       if (container) {
         container.style.height = availH + 'px';
-        container.style.width  = frameW + 'px';  // explicit: bypasses flex-cache width issue
+        container.style.width  = frameW + 'px';
       }
+
+      // When main content is visible, explicitly size the chart container
+      // Structure: .container → #main-content.panel → .panel-body (flex column)
+      //   → .quartiles-container (fixed) → .distribution-controls (fixed)
+      //   → #chart-container (flex:1 — should fill rest) → .slider-section → .current-value
+      const mainContent = document.getElementById('main-content');
+      if (mainContent && mainContent.style.display !== 'none') {
+        const panelBody  = mainContent.querySelector('.panel-body');
+        const quartiles  = panelBody ? panelBody.querySelector('.quartiles-container') : null;
+        const distCtrls  = panelBody ? panelBody.querySelector('.distribution-controls') : null;
+        const slider     = panelBody ? panelBody.querySelector('.slider-section') : null;
+        const currVal    = panelBody ? panelBody.querySelector('.current-value') : null;
+        const usedH = (quartiles ? quartiles.offsetHeight : 55)
+                    + (distCtrls ? distCtrls.offsetHeight : 35)
+                    + (slider    ? slider.offsetHeight    : 50)
+                    + (currVal   ? currVal.offsetHeight   : 30);
+        // 60 = .container padding (4px*2) + .panel border/margin + .panel-body padding (5px*2) + element gaps
+        const chartH = Math.max(200, availH - usedH - 60);
+        const chartContainer = document.getElementById('chart-container');
+        if (chartContainer) chartContainer.style.height = chartH + 'px';
+      }
+
       setTimeout(() => {
         if (typeof Highcharts !== 'undefined')
           Highcharts.charts.forEach(c => c && c.reflow && c.reflow());
-        if (typeof Plotly !== 'undefined')
-          document.querySelectorAll('.plotly-graph-div').forEach(el => { try { Plotly.relayout(el, {}); } catch(e) {} });
       }, 50);
     }
     window.addEventListener('resize', fitLayout);

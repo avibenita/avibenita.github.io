@@ -190,18 +190,11 @@
     }
 
     .chart-container {
-      min-height: 350px;
-      max-height: 400px;
+      height: 100%;          /* fill .chart-panel; no min/max clamp */
       background: rgba(255, 255, 255, 0.02);
       border-radius: 6px;
       padding: 8px;
-    }
-
-    @media (max-height: 800px) {
-      .chart-container {
-        min-height: 300px;
-        max-height: 350px;
-      }
+      box-sizing: border-box;
     }
   </style>
 </head>
@@ -267,17 +260,32 @@
       const shell   = document.querySelector('.statistico-shell');
       const headerH = shell ? shell.offsetHeight : 88;
       const availH  = (frame.clientHeight || window.innerHeight) - headerH;
-      const container = document.querySelector('.results-container') || document.querySelector('.container');
-      const frameW = frame.clientWidth || window.innerWidth;
+      const frameW  = frame.clientWidth || window.innerWidth;
+
+      const container = document.getElementById('results-container') || document.querySelector('.results-container');
       if (container) {
         container.style.height = availH + 'px';
-        container.style.width  = frameW + 'px';  // explicit: bypasses flex-cache width issue
+        container.style.width  = frameW + 'px';
+
+        // Propagate: container (padding 12px*2=24) → stats row → controls → chart panel
+        const statsRow  = container.querySelector('.stats-row');
+        const ctrlPanel = container.querySelector('.controls-panel');
+        // offsetHeight excludes margin — stats has mb:12, controls has mb:12
+        const statsH    = statsRow  ? statsRow.offsetHeight  + 12 : 0;
+        const ctrlH     = ctrlPanel ? ctrlPanel.offsetHeight + 12 : 0;
+        const chartPanelH = Math.max(150, availH - statsH - ctrlH - 24); // 24 = container padding
+
+        const chartPanel = container.querySelector('.chart-panel');
+        if (chartPanel) {
+          chartPanel.style.height = chartPanelH + 'px';
+          // chart-container fills chart-panel minus its own padding (12px*2=24)
+          const chartContainer = chartPanel.querySelector('.chart-container');
+          if (chartContainer) chartContainer.style.height = Math.max(100, chartPanelH - 24) + 'px';
+        }
       }
       setTimeout(() => {
         if (typeof Highcharts !== 'undefined')
           Highcharts.charts.forEach(c => c && c.reflow && c.reflow());
-        if (typeof Plotly !== 'undefined')
-          document.querySelectorAll('.plotly-graph-div').forEach(el => { try { Plotly.relayout(el, {}); } catch(e) {} });
       }, 50);
     }
     window.addEventListener('resize', fitLayout);
@@ -412,7 +420,7 @@
       kernelChart = Highcharts.chart('kernelChart', {
         chart: {
           backgroundColor: 'transparent',
-          height: 340,
+          height: null,        // use container height (controlled by fitLayout)
           animation: animate
         },
         title: {
@@ -477,6 +485,7 @@
       });
       
       console.log('✅ Chart created');
+      setTimeout(fitLayout, 80); // re-measure now chart exists
     }
 
     // Update kernel density

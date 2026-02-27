@@ -217,18 +217,19 @@ const StatisticoHeader = {
    */
   getNavigationItems() {
     const univariateViews = [
+      { id: 'group-core', label: 'Core Descriptive', file: null, isGroup: true },
       { id: 'histogram', label: 'Interactive Histogram', file: 'univariate/histogram-standalone.html' },
-      { id: 'descriptive-stats', label: 'Descriptive Statistics', file: 'univariate/descriptive-stats.html' },
       { id: 'boxplot', label: 'Box Plot Analysis', file: 'univariate/boxplot-standalone.html' },
       { id: 'cdf', label: 'Cumulative Distribution', file: 'univariate/cumulative-distribution.html' },
       { id: 'percentile', label: 'Percentiles', file: 'univariate/percentile-standalone.html' },
+      { id: 'kernel', label: 'Kernel Density', file: 'univariate/kernel-standalone.html' },
+      { id: 'separator-core-advanced', label: '---', file: null, isSeparator: true },
+      { id: 'group-advanced', label: 'Advanced Diagnostics', file: null, isGroup: true },
       { id: 'outliers', label: 'Outliers Detection', file: 'univariate/outliers-standalone.html' },
-      { id: 'separator', label: '---', file: null },
       { id: 'normality', label: 'Tests of Normality', file: 'univariate/normality-standalone.html' },
       { id: 'qqplot', label: 'PP-QQ Plots', file: 'univariate/qqplot-standalone.html' },
       { id: 'hypothesis', label: 'Hypothesis Testing', file: 'univariate/hypothesis-standalone.html' },
-      { id: 'confidence', label: 'Confidence Intervals', file: 'univariate/confidence-standalone.html' },
-      { id: 'kernel', label: 'Kernel Density', file: 'univariate/kernel-standalone.html' }
+      { id: 'confidence', label: 'Confidence Intervals', file: 'univariate/confidence-standalone.html' }
     ];
 
     const correlationViews = [
@@ -252,10 +253,16 @@ const StatisticoHeader = {
    */
   renderNavigation() {
     if (this.module === 'univariate') {
-      const tabs = this.getNavigationItems().filter(v => v.id !== 'separator');
+      const tabs = this.getNavigationItems();
       return `
         <div class="header-tabs" role="tablist" aria-label="Univariate views">
           ${tabs.map(view => {
+            if (view.isSeparator) {
+              return '<span class="header-tab-separator" aria-hidden="true"></span>';
+            }
+            if (view.isGroup) {
+              return `<span class="header-tab-group">${view.label}</span>`;
+            }
             const isDisabled = !view.file;
             const isActive = view.id === this.currentView;
             return `

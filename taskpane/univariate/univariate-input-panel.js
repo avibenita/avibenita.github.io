@@ -66,11 +66,7 @@ function openUnivariateBuilder() {
   const dialogUrl = `${getDialogsBaseUrl()}univariate/univariate-input.html?v=${Date.now()}`;
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    {
-  width: 85,
-  height: 88,
-  displayInIframe: true
-},
+    { height: 80, width: 30, displayInIframe: false },
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error('Failed to open univariate config dialog:', asyncResult.error.message);

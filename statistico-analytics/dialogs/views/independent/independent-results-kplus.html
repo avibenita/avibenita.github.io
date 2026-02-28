@@ -40,7 +40,7 @@
     #tab-explore{overflow-y:hidden;}
     #tab-explore>.stat-panel{flex:1;min-height:0;display:flex;flex-direction:column;}
     #tab-explore>.stat-panel>.stat-panel-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto;}
-    .hist-grid{display:grid;flex:1;min-height:0;}
+    .hist-grid{display:grid;flex:1;min-height:0;grid-template-rows:1fr;}
     #desc-histogram-panel{flex:1;min-height:0;display:flex;flex-direction:column;}
     #histogram-container-kplus{flex:1;min-height:120px;margin-top:0;}
     /* Card background (fills blank area in text-only tabs) */
@@ -1481,10 +1481,14 @@
       renderDescriptiveTable();
       
       document.getElementById('desc-histogram-title').textContent = row.Variable;
-      document.getElementById('desc-histogram-panel').style.display = 'block';
+      // Must be 'flex' to preserve the flex chain for vertical fill
+      document.getElementById('desc-histogram-panel').style.display = 'flex';
       
-      renderDescHistogram();
-      updateDescSummary();
+      // Defer until browser has laid out the newly-visible flex container
+      requestAnimationFrame(() => {
+        renderDescHistogram();
+        updateDescSummary();
+      });
     }
     
     function updateDescSummary() {
@@ -2392,7 +2396,11 @@ ${JSON.stringify(payload, null, 2)}`;
       document.body.removeChild(textarea);
     }
 
-    window.addEventListener('resize', () => { if (window._kplusChart) window._kplusChart.reflow(); });
+    window.addEventListener('resize', () => {
+      if (window._kplusChart) window._kplusChart.reflow();
+      const hp = document.getElementById('desc-histogram-panel');
+      if (hp && hp.style.display !== 'none') requestAnimationFrame(() => renderDescHistogram());
+    });
     
   </script>
 </body>

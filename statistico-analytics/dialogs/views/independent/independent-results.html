@@ -41,7 +41,7 @@
     #tab-explore{overflow-y:hidden;}
     #tab-explore>.stat-panel{flex:1;min-height:0;display:flex;flex-direction:column;}
     #tab-explore>.stat-panel>.stat-panel-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto;}
-    .hist-grid{display:grid;flex:1;min-height:0;}
+    .hist-grid{display:grid;flex:1;min-height:0;grid-template-rows:1fr;}
     #desc-histogram-panel{flex:1;min-height:0;display:flex;flex-direction:column;}
     #histogram-container-two{flex:1;min-height:120px;margin-top:0;}
     /* Card background (fills blank area in text-only tabs) */
@@ -962,13 +962,16 @@
       setText('expFramework', primaryFramework === 'nonparametric' ? 'Non-parametric (ranks)' : 'Parametric (means)');
     }
     
+    let _lastDescGrp = null;  // store for resize re-render
     function selectDescRow(grp) {
+      _lastDescGrp = grp;
       const panel = document.getElementById('desc-histogram-panel');
       const title = document.getElementById('desc-histogram-title');
       const summaryTable = document.getElementById('desc-summary-table');
       const normalityInfo = document.getElementById('normalityInfo');
       
-      if (panel) panel.style.display = 'block';
+      // Must be 'flex' to preserve the flex chain for vertical fill
+      if (panel) panel.style.display = 'flex';
       if (title) title.textContent = grp.name;
       
       // Update summary table
@@ -1013,8 +1016,8 @@
         normalityInfo.innerHTML = assessment;
       }
       
-      // Render histogram (placeholder - would need raw data)
-      renderDescHistogram(grp);
+      // Defer until browser has laid out the newly-visible flex container
+      requestAnimationFrame(() => renderDescHistogram(grp));
     }
     
     function renderDescHistogram(grp) {
@@ -1364,7 +1367,12 @@
       });
       window._indepChart = indepChart;
     }
-    window.addEventListener('resize', () => { if (window._indepChart) window._indepChart.reflow(); });
+    window.addEventListener('resize', () => {
+      if (window._indepChart) window._indepChart.reflow();
+      const hp = document.getElementById('desc-histogram-panel');
+      if (hp && hp.style.display !== 'none' && _lastDescGrp)
+        requestAnimationFrame(() => renderDescHistogram(_lastDescGrp));
+    });
 
     async function generateAISummary() {
       console.log('🤖 AI Summary button clicked');

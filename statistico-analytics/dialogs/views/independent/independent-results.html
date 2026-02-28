@@ -1373,39 +1373,39 @@
       });
       window._indepChart = indepChart;
     }
-    // ── Explicit pixel-height layout (same pattern as univariate views) ─────────
+    // ── Layout engine: boxplot pattern — BCR-based, no CSS-sum guessing ──────────
     function fitIndependentLayout() {
       const frameH = document.body.clientHeight;
-      const frameW = document.body.clientWidth;
+      // ① Size the view-container to whatever is left below the fixed headers
       let fixedH = 0;
       ['.hero-section', '.tab-navigation', '.settings-bar'].forEach(sel => {
         const el = document.querySelector(sel);
         if (el) fixedH += el.offsetHeight;
       });
-      const availH = Math.max(200, frameH - fixedH);
-
-      // Size view-container + active tab (height only – width stays natural/100%)
-      const vc = document.querySelector('.view-container');
-      if (vc) vc.style.height = availH + 'px';
+      const availH = Math.max(120, frameH - fixedH);
+      const vc  = document.querySelector('.view-container');
       const tab = document.querySelector('.tab-panel.active');
+      if (vc)  vc.style.height  = availH + 'px';
       if (tab) tab.style.height = availH + 'px';
 
-      // If histogram is visible → size the D3 container explicitly
+      // ② Size the D3 histogram container using BCR — immune to CSS margin/padding/grid surprises
       const histPanel = document.getElementById('desc-histogram-panel');
       const histCont  = document.getElementById('histogram-container-two');
       if (histPanel && histPanel.style.display !== 'none' && histCont) {
-        const spHead  = document.querySelector('#tab-explore .stat-panel-heading');
-        const spBar   = document.querySelector('#tab-explore .stat-panel > div:nth-child(2)');
-        const tableW  = document.querySelector('.desc-table-wrap');
-        const htitle  = histPanel.children[0];
-        const aboveH  = (spHead  ? spHead.offsetHeight  : 0)
-                      + (spBar   ? spBar.offsetHeight   : 0)
-                      + (tableW  ? tableW.offsetHeight  : 0)
-                      + (htitle  ? htitle.offsetHeight  : 0) + 28;
-        histCont.style.height = Math.max(150, availH - aboveH) + 'px';
+        const titleBar = histPanel.children[0];     // the row with "Histogram: X" + button
+        if (titleBar) {
+          // bottom of the title bar in viewport coords = start of the chart area
+          const titleBottom = titleBar.getBoundingClientRect().bottom;
+          // Available pixels from title-bar-bottom to dialog bottom, minus a small gap
+          const histH = Math.max(120, frameH - titleBottom - 12);
+          histCont.style.height = histH + 'px';
+          // Also size the grid so 1fr resolves correctly
+          const grid = histPanel.querySelector('.hist-grid');
+          if (grid) grid.style.height = histH + 'px';
+        }
       }
 
-      // Reflow Highcharts chart if visible
+      // ③ Reflow any Highcharts chart on the active tab
       if (window._indepChart) window._indepChart.reflow();
     }
 

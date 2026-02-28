@@ -35,14 +35,19 @@
     .tab-button.active::before{content:'';position:absolute;left:12px;right:12px;bottom:-7px;height:3px;border-radius:99px;background:linear-gradient(90deg,var(--accent-1),rgba(120,200,255,.35));}
     .tab-controls-right{margin-left:auto;display:inline-flex;align-items:center;gap:8px;padding-left:6px;}
     .tab-decimal-select{height:36px;padding:0 10px;border-radius:10px;border:1px solid rgba(148,163,184,.45);background:rgba(15,23,42,.82);color:#fff;font-weight:700;}
-    /* view-container + tab panels: sized explicitly by fitIndependentLayout() */
-    .view-container{overflow:hidden;padding:10px 14px;}
+    /* view-container + tab panels: sized by fitIndependentLayout() */
+    .view-container{overflow:hidden;padding:8px 10px;}
     .tab-panel{display:none;} .tab-panel.active{display:block;overflow-y:auto;}
-    /* Explore tab */
-    #tab-explore{overflow-y:auto;}
-    #desc-histogram-panel{display:flex;flex-direction:column;}
-    .hist-grid{display:grid;grid-template-columns:2fr 1fr;gap:16px;grid-template-rows:1fr;}
-    /* Card background fills text-only tabs */
+    /* ── Explore tab: 3-panel flex column ──────────────────────────────── */
+    #tab-explore{display:flex;flex-direction:column;gap:7px;overflow:hidden;box-sizing:border-box;}
+    .xp{background:var(--surface-1);border:1px solid var(--border);border-radius:8px;overflow:hidden;flex:0 0 auto;}
+    .xp--grow{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
+    .xp-hdr{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:rgba(255,255,255,.05);border-bottom:1px solid var(--border);flex:0 0 auto;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+    .xp-hdr-meta{font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted);display:flex;gap:12px;flex-wrap:wrap;}
+    .xp-body{padding:0;overflow:hidden;}
+    .xp-body--grow{flex:1 1 0;min-height:0;display:flex;flex-direction:column;padding:0;}
+    .hist-grid{display:grid;grid-template-columns:2fr 1fr;gap:0;flex:1 1 0;min-height:0;}
+    #histogram-container-two{min-height:0;}
     .card{background:var(--surface-0);}
     #tab-results{overflow-y:auto;}
     .stats-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;}
@@ -320,63 +325,60 @@
           </div>
         </section>
         <section id="tab-explore" class="tab-panel active">
-          <!-- Descriptive Statistics with integrated summary info -->
-          <div class="stat-panel">
-            <div class="stat-panel-heading">Descriptive Statistics</div>
-            <div style="padding:6px 10px;background:rgba(255,165,120,.08);border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:8px;font-size:11px;align-items:center;">
-              <span style="color:var(--text-secondary);"><strong>Variables:</strong> <span id="expVarCount" style="color:var(--accent-2);font-weight:700;">2</span></span>
-              <span style="color:var(--text-secondary);"><strong>Total N:</strong> <span id="expTotalN" style="color:var(--accent-2);font-weight:700;">...</span></span>
-              <span style="color:var(--text-secondary);"><strong>Overall x̄:</strong> <span id="expOverallMean" style="color:var(--accent-2);font-weight:700;">...</span></span>
-              <span style="color:var(--text-secondary);"><strong>Framework:</strong> <span id="expFramework" style="color:var(--accent-2);font-weight:700;">...</span></span>
-            </div>
-            <div class="stat-panel-body">
-              <div class="desc-table-wrap">
-                <table id="desc-stats-table">
-                  <colgroup>
-                    <col style="min-width: 140px; max-width: 200px;">
-                    <col style="min-width: 70px;">
-                    <col style="min-width: 90px;">
-                    <col style="min-width: 90px;">
-                    <col style="min-width: 90px;">
-                    <col style="min-width: 90px;">
-                    <col style="min-width: 90px;">
-                    <col style="min-width: 80px;">
-                    <col style="min-width: 80px;">
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      <th style="text-align:left;cursor:pointer">Variable</th>
-                      <th>N</th>
-                      <th>Mean</th>
-                      <th>StdDev</th>
-                      <th>Min</th>
-                      <th>Median</th>
-                      <th>Max</th>
-                      <th>Skew</th>
-                      <th>Kurt</th>
-                    </tr>
-                  </thead>
-                  <tbody id="desc-stats-body"></tbody>
-                </table>
+
+          <!-- ── Panel 2: Descriptive Statistics Table ──────────────────── -->
+          <div class="xp" id="xp-desc-table">
+            <div class="xp-hdr">
+              <span style="color:var(--accent-1)">Descriptive Statistics</span>
+              <div class="xp-hdr-meta">
+                <span>Variables: <strong id="expVarCount" style="color:var(--accent-2)">2</strong></span>
+                <span>Total N: <strong id="expTotalN" style="color:var(--accent-2)">…</strong></span>
+                <span>Overall x̄: <strong id="expOverallMean" style="color:var(--accent-2)">…</strong></span>
+                <span>Framework: <strong id="expFramework" style="color:var(--accent-2)">…</strong></span>
               </div>
-              
-              <div style="display:none;" id="desc-histogram-panel">
-                <div style="font-weight:700;margin:16px 0 8px;color:var(--accent-1);display:flex;justify-content:space-between;align-items:center;">
-                  <span>Distribution: <span id="desc-histogram-title">Select a variable</span></span>
-                </div>
-                <div class="hist-grid" style="grid-template-columns:2fr 1fr;gap:16px;">
-                  <div id="histogram-container-two"></div>
-                  <div>
-                    <div class="desc-summary-stats" id="desc-summary-table"></div>
-                    <div style="margin-top:12px;padding:8px;background:rgba(255,165,120,.08);border:1px solid rgba(255,165,120,.3);border-radius:6px;">
-                      <div style="font-size:10px;font-weight:700;color:var(--accent-1);margin-bottom:6px;">Normality Assessment</div>
-                      <div id="normalityInfo" style="font-size:10px;color:var(--text-secondary);line-height:1.6;"></div>
-                    </div>
+            </div>
+            <div class="xp-body" style="overflow-x:auto;">
+              <table id="desc-stats-table" class="desc-table-wrap" style="width:100%;min-width:820px;border-collapse:collapse;table-layout:auto;">
+                <colgroup>
+                  <col style="min-width:140px;max-width:200px;">
+                  <col style="min-width:70px;"><col style="min-width:90px;"><col style="min-width:90px;">
+                  <col style="min-width:90px;"><col style="min-width:90px;"><col style="min-width:90px;">
+                  <col style="min-width:80px;"><col style="min-width:80px;">
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th style="text-align:left;cursor:pointer">Variable</th>
+                    <th>N</th><th>Mean</th><th>StdDev</th>
+                    <th>Min</th><th>Median</th><th>Max</th>
+                    <th>Skew</th><th>Kurt</th>
+                  </tr>
+                </thead>
+                <tbody id="desc-stats-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- ── Panel 3: Histogram (grows to fill remaining height) ────── -->
+          <div class="xp xp--grow" id="desc-histogram-panel" style="display:none;">
+            <div class="xp-hdr">
+              <span style="color:var(--accent-1);font-weight:800;">
+                Distribution: <span id="desc-histogram-title">—</span>
+              </span>
+            </div>
+            <div class="xp-body--grow" id="xp-hist-body">
+              <div class="hist-grid">
+                <div id="histogram-container-two"></div>
+                <div style="overflow-y:auto;padding:8px 10px;">
+                  <div id="desc-summary-table" class="desc-summary-stats"></div>
+                  <div style="margin-top:12px;padding:8px;background:rgba(255,165,120,.08);border:1px solid rgba(255,165,120,.3);border-radius:6px;">
+                    <div style="font-size:10px;font-weight:700;color:var(--accent-1);margin-bottom:6px;">Normality Assessment</div>
+                    <div id="normalityInfo" style="font-size:10px;color:var(--text-secondary);line-height:1.6;"></div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
+
         </section>
         <section id="tab-assumptions" class="tab-panel">
           <div class="stats-container"><div class="stat-panel"><div class="stat-panel-heading">Diagnostics</div><div class="stat-panel-body">
@@ -1373,39 +1375,34 @@
       });
       window._indepChart = indepChart;
     }
-    // ── Layout engine: boxplot pattern — BCR-based, no CSS-sum guessing ──────────
+    // ── Layout engine: BCR-based — immune to CSS margin/padding/grid surprises ───
     function fitIndependentLayout() {
       const frameH = document.body.clientHeight;
-      // ① Size the view-container to whatever is left below the fixed headers
+      // ① Give the view-container (and active tab) an explicit pixel height
       let fixedH = 0;
       ['.hero-section', '.tab-navigation', '.settings-bar'].forEach(sel => {
         const el = document.querySelector(sel);
         if (el) fixedH += el.offsetHeight;
       });
-      const availH = Math.max(120, frameH - fixedH);
+      const availH = Math.max(120, frameH - fixedH - 8);
       const vc  = document.querySelector('.view-container');
       const tab = document.querySelector('.tab-panel.active');
       if (vc)  vc.style.height  = availH + 'px';
       if (tab) tab.style.height = availH + 'px';
 
-      // ② Size the D3 histogram container using BCR — immune to CSS margin/padding/grid surprises
+      // ② Size the histogram container via BCR on its panel body
       const histPanel = document.getElementById('desc-histogram-panel');
+      const histBody  = document.getElementById('xp-hist-body');
       const histCont  = document.getElementById('histogram-container-two');
-      if (histPanel && histPanel.style.display !== 'none' && histCont) {
-        const titleBar = histPanel.children[0];     // the row with "Histogram: X" + button
-        if (titleBar) {
-          // bottom of the title bar in viewport coords = start of the chart area
-          const titleBottom = titleBar.getBoundingClientRect().bottom;
-          // Available pixels from title-bar-bottom to dialog bottom, minus a small gap
-          const histH = Math.max(120, frameH - titleBottom - 12);
-          histCont.style.height = histH + 'px';
-          // Also size the grid so 1fr resolves correctly
-          const grid = histPanel.querySelector('.hist-grid');
-          if (grid) grid.style.height = histH + 'px';
-        }
+      if (histPanel && histPanel.style.display !== 'none' && histBody && histCont) {
+        const rect  = histBody.getBoundingClientRect();
+        const histH = Math.max(100, rect.height - 4);
+        histCont.style.height = histH + 'px';
+        const grid = histBody.querySelector('.hist-grid');
+        if (grid) grid.style.height = histH + 'px';
       }
 
-      // ③ Reflow any Highcharts chart on the active tab
+      // ③ Reflow Highcharts on active tab
       if (window._indepChart) window._indepChart.reflow();
     }
 

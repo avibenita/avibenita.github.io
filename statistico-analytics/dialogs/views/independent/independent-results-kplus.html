@@ -34,18 +34,15 @@
     .tab-button.active::before{content:'';position:absolute;left:9px;right:9px;bottom:-6px;height:3px;border-radius:99px;background:linear-gradient(90deg,var(--accent-1),rgba(120,200,255,.35));}
     .tab-controls-right{margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding-left:6px;}
     .tab-decimal-select{height:30px;padding:0 8px;border-radius:8px;border:1px solid rgba(148,163,184,.45);background:rgba(15,23,42,.82);color:#fff;font-size:11px;font-weight:700;}
-    .view-container{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding:10px 12px;}
-    .tab-panel{display:none;} .tab-panel.active{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;}
-    /* Cascade flex-grow into explore tab content */
-    #tab-explore{overflow-y:hidden;}
-    #tab-explore>.stat-panel{flex:1;min-height:0;display:flex;flex-direction:column;}
-    #tab-explore>.stat-panel>.stat-panel-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto;}
-    .hist-grid{display:grid;flex:1;min-height:0;grid-template-rows:1fr;}
-    #desc-histogram-panel{flex:1;min-height:0;display:flex;flex-direction:column;}
-    #histogram-container-kplus{flex:1;min-height:120px;margin-top:0;}
-    /* Card background (fills blank area in text-only tabs) */
+    /* view-container + tab panels: sized explicitly by fitIndependentLayout() */
+    .view-container{overflow:hidden;padding:10px 12px;}
+    .tab-panel{display:none;} .tab-panel.active{display:block;overflow-y:auto;}
+    /* Explore tab */
+    #tab-explore{overflow-y:auto;}
+    #desc-histogram-panel{display:flex;flex-direction:column;}
+    .hist-grid{display:grid;grid-template-columns:2fr 1fr;gap:16px;grid-template-rows:1fr;}
+    /* Card background fills text-only tabs */
     .card{background:var(--surface-0);}
-    /* Results tab: make chart panel grow */
     #tab-results{overflow-y:auto;}
     .stats-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;}
     .stat-panel{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
@@ -1041,7 +1038,8 @@
           });
         }
         
-        // Pre-size container so Highcharts reads correct clientHeight
+        // Size layout first so .view-container has explicit height, then size chart
+        fitIndependentLayout && fitIndependentLayout();
         const _gcEl = document.getElementById('groupChartContainer');
         const _vcH  = document.querySelector('.view-container')?.clientHeight || 500;
         if (_gcEl) _gcEl.style.height = Math.max(260, Math.floor(_vcH * 0.55)) + 'px';
@@ -1479,16 +1477,12 @@
     function selectDescRow(row) {
       descSelectedRow = row;
       renderDescriptiveTable();
-      
       document.getElementById('desc-histogram-title').textContent = row.Variable;
-      // Must be 'flex' to preserve the flex chain for vertical fill
       document.getElementById('desc-histogram-panel').style.display = 'flex';
-      
-      // Defer until browser has laid out the newly-visible flex container
-      requestAnimationFrame(() => {
-        renderDescHistogram();
-        updateDescSummary();
-      });
+      // fitIndependentLayout sets explicit px height on the container BEFORE D3 reads it
+      fitIndependentLayout();
+      renderDescHistogram();
+      updateDescSummary();
     }
     
     function updateDescSummary() {
@@ -2396,11 +2390,48 @@ ${JSON.stringify(payload, null, 2)}`;
       document.body.removeChild(textarea);
     }
 
-    window.addEventListener('resize', () => {
+    // ── Explicit pixel-height layout (same pattern as univariate views) ─────────
+    function fitIndependentLayout() {
+      const frameH = document.body.clientHeight;
+      const frameW = document.body.clientWidth;
+      let fixedH = 0;
+      ['.hero-section', '.tab-navigation', '.settings-bar'].forEach(sel => {
+        const el = document.querySelector(sel);
+        if (el) fixedH += el.offsetHeight;
+      });
+      const availH = Math.max(200, frameH - fixedH);
+
+      // Size view-container + active tab
+      const vc = document.querySelector('.view-container');
+      if (vc) { vc.style.height = availH + 'px'; vc.style.width = frameW + 'px'; }
+      const tab = document.querySelector('.tab-panel.active');
+      if (tab) { tab.style.height = availH + 'px'; tab.style.width = frameW + 'px'; }
+
+      // If histogram is visible → size the D3 container explicitly
+      const histPanel = document.getElementById('desc-histogram-panel');
+      const histCont  = document.getElementById('histogram-container-kplus');
+      if (histPanel && histPanel.style.display !== 'none' && histCont) {
+        const spHead  = document.querySelector('#tab-explore .stat-panel-heading');
+        const spBar   = document.querySelector('#tab-explore .stat-panel > div:nth-child(2)');
+        const tableW  = document.querySelector('.desc-table-wrap');
+        const htitle  = histPanel.children[0];
+        const aboveH  = (spHead  ? spHead.offsetHeight  : 0)
+                      + (spBar   ? spBar.offsetHeight   : 0)
+                      + (tableW  ? tableW.offsetHeight  : 0)
+                      + (htitle  ? htitle.offsetHeight  : 0) + 28;
+        histCont.style.height = Math.max(150, availH - aboveH) + 'px';
+      }
+
+      // Reflow Highcharts chart if visible
       if (window._kplusChart) window._kplusChart.reflow();
+    }
+
+    window.addEventListener('resize', () => {
+      fitIndependentLayout();
       const hp = document.getElementById('desc-histogram-panel');
-      if (hp && hp.style.display !== 'none') requestAnimationFrame(() => renderDescHistogram());
+      if (hp && hp.style.display !== 'none') renderDescHistogram();
     });
+    requestAnimationFrame(fitIndependentLayout);
     
   </script>
 </body>

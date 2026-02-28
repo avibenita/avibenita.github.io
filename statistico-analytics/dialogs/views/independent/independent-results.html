@@ -35,20 +35,23 @@
     .tab-controls-right{margin-left:auto;display:inline-flex;align-items:center;gap:8px;padding-left:6px;}
     .tab-decimal-select{height:36px;padding:0 10px;border-radius:10px;border:1px solid rgba(148,163,184,.45);background:rgba(15,23,42,.82);color:#fff;font-weight:700;}
     /* view-container + tab panels: sized by fitIndependentLayout() */
-    .view-container{overflow:hidden;padding:8px 10px;}
-    .tab-panel{display:none;} .tab-panel.active{display:block;overflow-y:auto;}
+    .view-container{overflow:hidden;padding:6px 8px;}
+    .tab-panel{display:none;}
+    .tab-panel.active{display:flex;flex-direction:column;overflow:hidden;}
     /* ── Explore tab: 3-panel flex column ──────────────────────────────── */
-    #tab-explore{display:flex;flex-direction:column;gap:7px;overflow:hidden;box-sizing:border-box;}
-    .xp{background:var(--surface-1);border:1px solid var(--border);border-radius:8px;overflow:hidden;flex:0 0 auto;}
-    .xp--grow{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
-    .xp-hdr{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:rgba(255,255,255,.05);border-bottom:1px solid var(--border);flex:0 0 auto;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
-    .xp-hdr-meta{font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted);display:flex;gap:12px;flex-wrap:wrap;}
+    #tab-explore{display:flex;flex-direction:column;gap:8px;overflow:hidden;box-sizing:border-box;}
+    .xp{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;overflow:hidden;flex:0 0 auto;}
+    .xp--grow{flex:1 1 0;min-height:0;display:flex;flex-direction:column;border-radius:10px;}
+    .xp-hdr{display:flex;justify-content:space-between;align-items:center;padding:9px 16px;background:rgba(255,255,255,.06);border-bottom:1px solid var(--border);flex:0 0 auto;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+    .xp-hdr-meta{font-size:11px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted);display:flex;gap:14px;flex-wrap:wrap;}
     .xp-body{padding:0;overflow:hidden;}
     .xp-body--grow{flex:1 1 0;min-height:0;display:flex;flex-direction:column;padding:0;}
     .hist-grid{display:grid;grid-template-columns:2fr 1fr;gap:0;flex:1 1 0;min-height:0;}
     #histogram-container-two{min-height:0;}
+    #desc-stats-table th{font-size:12px;padding:7px 6px;}
+    #desc-stats-table td{font-size:12px;padding:6px;}
     .card{background:var(--surface-0);}
-    #tab-results{overflow-y:auto;}
+    #tab-results,#tab-assumptions,#tab-posthoc,#tab-effects,#tab-power,#tab-report{overflow-y:auto;}
     .stats-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;}
     .stat-panel{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
     .stat-panel.secondary{opacity:0.7;transform:scale(0.95);border-color:rgba(45,55,72,0.4);}
@@ -1097,15 +1100,15 @@
         title: { text: null },
         xAxis: {
           categories: cats,
-          labels: { style: { color: '#9ba8b5', fontSize: '10px' }, rotation: -45 },
+          labels: { style: { color: '#9ba8b5', fontSize: '11px' }, rotation: -45 },
           plotLines,
           gridLineColor: 'rgba(255,255,255,.07)',
           lineColor:     'rgba(255,255,255,.2)',
           tickColor:     'rgba(255,255,255,.2)'
         },
         yAxis: {
-          title: { text: 'Expected count', style: { color: '#9ba8b5', fontSize: '10px' } },
-          labels: { style: { color: '#9ba8b5', fontSize: '10px' } },
+          title: { text: 'Expected count', style: { color: '#9ba8b5', fontSize: '11px' } },
+          labels: { style: { color: '#9ba8b5', fontSize: '11px' } },
           gridLineColor: 'rgba(255,255,255,.1)',
           min: 0
         },
@@ -1255,36 +1258,36 @@
       });
       window._indepChart = indepChart;
     }
-    // ── Layout engine: BCR-based — immune to CSS margin/padding/grid surprises ───
+    // ── Layout engine ─────────────────────────────────────────────────────────
     function fitIndependentLayout() {
-      const frameH = document.body.clientHeight;
-      // ① Give the view-container (and active tab) an explicit pixel height
-      let fixedH = 0;
-      ['.hero-section', '.tab-navigation', '.settings-bar'].forEach(sel => {
-        const el = document.querySelector(sel);
-        if (el) fixedH += el.offsetHeight;
-      });
-      const availH = Math.max(120, frameH - fixedH - 8);
-      const vc  = document.querySelector('.view-container');
-      const tab = document.querySelector('.tab-panel.active');
-      if (vc)  vc.style.height  = availH + 'px';
-      if (tab) tab.style.height = availH + 'px';
+      const H = document.body.clientHeight;
 
-      // ② Size the histogram container via BCR on its panel body
+      // ① Size view-container
+      const vc = document.querySelector('.view-container');
+      if (vc) {
+        vc.style.height = Math.max(80, H - vc.getBoundingClientRect().top - 6) + 'px';
+      }
+
+      // ② Size active tab (fills vc content area; vc padding 6px × 2 = 12px)
+      const tab = document.querySelector('.tab-panel.active');
+      if (tab && vc) {
+        tab.style.height = Math.max(60, vc.clientHeight - 12) + 'px';
+      }
+
+      // ③ Histogram container: anchor to dialog bottom from container's current top
       const histPanel = document.getElementById('desc-histogram-panel');
-      const histBody  = document.getElementById('xp-hist-body');
       const histCont  = document.getElementById('histogram-container-two');
-      if (histPanel && histPanel.style.display !== 'none' && histBody && histCont) {
-        const rect  = histBody.getBoundingClientRect();
-        const histH = Math.max(100, rect.height - 4);
+      if (histPanel && histPanel.style.display !== 'none' && histCont) {
+        const top   = histCont.getBoundingClientRect().top;
+        const histH = Math.max(100, H - top - 10);
         histCont.style.height = histH + 'px';
-        const grid = histBody.querySelector('.hist-grid');
+        const grid = histPanel.querySelector('.hist-grid');
         if (grid) grid.style.height = histH + 'px';
       }
 
-      // ③ Reflow Highcharts (histogram + any results chart)
-      if (_descHistChart)       _descHistChart.reflow();
-      if (window._indepChart)   window._indepChart.reflow();
+      // ④ Reflow Highcharts
+      if (_descHistChart)     _descHistChart.reflow();
+      if (window._indepChart) window._indepChart.reflow();
     }
 
     window.addEventListener('resize', () => {

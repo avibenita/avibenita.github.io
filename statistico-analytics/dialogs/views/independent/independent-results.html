@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Independent Means Results (2 Variables)</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <script src="https://code.highcharts.com/highcharts-more.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
@@ -1020,234 +1019,115 @@
         normalityInfo.innerHTML = assessment;
       }
       
-      // rAF lets the browser reflow the newly-visible flex panel before D3 reads heights
+      // rAF: browser layout pass → BCR is accurate → size + render
       requestAnimationFrame(() => {
         fitIndependentLayout();
         renderDescHistogram(grp);
       });
     }
     
+    // Highcharts histogram — recreated on new data, reflowed on resize (stable, no flicker)
+    let _descHistChart = null;
+
     function renderDescHistogram(grp) {
-      if (typeof d3 === 'undefined') return;
-      
+      if (!grp) return;
       const container = document.getElementById('histogram-container-two');
       if (!container) return;
-      
-      const width  = container.clientWidth  || 600;
-      const height = container.clientHeight > 80 ? container.clientHeight : 240;
-      
-      d3.select('#histogram-container-two').selectAll('*').remove();
-      
-      const svg = d3.select('#histogram-container-two')
-        .append('svg')
-        .attr('width', width)
-        .attr('height', height);
-      
-      const margin = { top: 20, right: 25, bottom: 40, left: 50 };
-      const innerWidth = width - margin.left - margin.right;
-      const innerHeight = height - margin.top - margin.bottom;
-      
-      const g = svg.append('g')
-        .attr('transform', `translate(${margin.left},${margin.top})`);
-      
-      // Get stats
-      const mean = parseMaybeNumber(grp.mean);
-      const sd = parseMaybeNumber(grp.sd);
-      const min = parseMaybeNumber(grp.min);
-      const max = parseMaybeNumber(grp.max);
+
+      const mean   = parseMaybeNumber(grp.mean);
+      const sd     = parseMaybeNumber(grp.sd);
+      const minV   = parseMaybeNumber(grp.min);
+      const maxV   = parseMaybeNumber(grp.max);
       const median = parseMaybeNumber(grp.median);
-      const n = grp.n || 0;
-      
-      if (!isFinite(mean) || !isFinite(sd) || sd <= 0 || !isFinite(min) || !isFinite(max)) {
-        g.append('text')
-          .attr('x', innerWidth / 2)
-          .attr('y', innerHeight / 2)
-          .attr('text-anchor', 'middle')
-          .attr('fill', '#999')
-          .style('font-size', '12px')
-          .text('Insufficient data for distribution visualization');
+      const n      = grp.n || 0;
+
+      if (!isFinite(mean) || !isFinite(sd) || sd <= 0 || !isFinite(minV) || !isFinite(maxV)) {
+        container.innerHTML = '<div style="color:#999;padding:20px;text-align:center;font-size:12px;">Insufficient data for distribution visualization</div>';
         return;
       }
-      
-      // Create simulated histogram bins using normal distribution
-      const xMin = Math.min(min, mean - 3.5 * sd);
-      const xMax = Math.max(max, mean + 3.5 * sd);
-      
+
+      // Bin range: extend ±3.5σ beyond data range
+      const xMin   = Math.min(minV, mean - 3.5 * sd);
+      const xMax   = Math.max(maxV, mean + 3.5 * sd);
       if (!isFinite(xMin) || !isFinite(xMax) || xMin >= xMax) return;
-      
-      const xScale = d3.scaleLinear()
-        .domain([xMin, xMax])
-        .range([0, innerWidth]);
-      
-      // Generate histogram bins (simulated from normal distribution)
+
       const numBins = 12;
-      const binWidth = (xMax - xMin) / numBins;
-      const histBins = [];
-      
+      const bw      = (xMax - xMin) / numBins;
+      const cdf     = z => 0.5 * (1 + Math.tanh(z * Math.sqrt(2 / Math.PI) * 0.7));
+
+      const cats = [], counts = [], normalPts = [];
       for (let i = 0; i < numBins; i++) {
-        const binStart = xMin + i * binWidth;
-        const binEnd = binStart + binWidth;
-        
-        // Calculate expected frequency in this bin using normal CDF
-        const zStart = (binStart - mean) / sd;
-        const zEnd = (binEnd - mean) / sd;
-        
-        // Approximate CDF using error function approximation
-        const cdf = (z) => 0.5 * (1 + Math.tanh(z * Math.sqrt(2 / Math.PI) * 0.7));
-        const prob = cdf(zEnd) - cdf(zStart);
+        const s  = xMin + i * bw, e = s + bw;
+        const prob = cdf((e - mean) / sd) - cdf((s - mean) / sd);
         const expectedCount = prob * n;
-        
-        if (isFinite(expectedCount)) {
-          histBins.push({
-            x: binStart,
-            width: binWidth,
-            height: expectedCount
-          });
+        cats.push(s.toFixed(1));
+        counts.push(isFinite(expectedCount) ? +expectedCount.toFixed(3) : 0);
+
+        // Normal curve (PDF × bw × n) at bin midpoint
+        const mid     = s + bw / 2;
+        const density = Math.exp(-0.5 * Math.pow((mid - mean) / sd, 2)) / (sd * Math.sqrt(2 * Math.PI));
+        normalPts.push(+(density * bw * n).toFixed(4));
+      }
+
+      // Destroy previous and create fresh (only on data change — resize uses reflow)
+      if (_descHistChart) { _descHistChart.destroy(); _descHistChart = null; }
+
+      // Mean & median plotBands
+      const plotLines = [
+        { value: cats.findIndex(c => parseFloat(c) >= mean), color: '#fbbf24',
+          width: 2, dashStyle: 'Dash',
+          label: { text: 'μ', style: { color: '#fbbf24', fontSize: '11px' } } }
+      ];
+      if (isFinite(median) && Math.abs(median - mean) > 0.5 * bw) {
+        plotLines.push({
+          value: cats.findIndex(c => parseFloat(c) >= median), color: '#4ade80',
+          width: 2, dashStyle: 'ShortDot',
+          label: { text: 'M', style: { color: '#4ade80', fontSize: '11px' } }
+        });
+      }
+
+      _descHistChart = Highcharts.chart('histogram-container-two', {
+        chart: {
+          type: 'column',
+          backgroundColor: 'transparent',
+          animation: false,
+          style: { fontFamily: 'inherit' },
+          margin: [20, 20, 55, 45]
+        },
+        title: { text: null },
+        xAxis: {
+          categories: cats,
+          labels: { style: { color: '#9ba8b5', fontSize: '10px' }, rotation: -45 },
+          plotLines,
+          gridLineColor: 'rgba(255,255,255,.07)',
+          lineColor:     'rgba(255,255,255,.2)',
+          tickColor:     'rgba(255,255,255,.2)'
+        },
+        yAxis: {
+          title: { text: 'Expected count', style: { color: '#9ba8b5', fontSize: '10px' } },
+          labels: { style: { color: '#9ba8b5', fontSize: '10px' } },
+          gridLineColor: 'rgba(255,255,255,.1)',
+          min: 0
+        },
+        plotOptions: {
+          column: { pointPadding: 0, groupPadding: 0.02, borderWidth: 0,
+                    color: 'rgba(100,180,255,.75)' }
+        },
+        series: [
+          { name: 'Expected count', type: 'column', data: counts },
+          { name: 'Normal',         type: 'spline',  data: normalPts,
+            color: '#FFE066', dashStyle: 'Dash', marker: { enabled: false }, lineWidth: 2 }
+        ],
+        legend:  { enabled: false },
+        credits: { enabled: false },
+        tooltip: {
+          formatter() {
+            return this.series.name === 'Expected count'
+              ? `Bin ≥ ${cats[this.point.index]}: <b>${this.y.toFixed(1)}</b>`
+              : `Expected: <b>${this.y.toFixed(2)}</b>`;
+          }
         }
-      }
-      
-      if (histBins.length === 0) return;
-      
-      const yMax = d3.max(histBins, d => d.height);
-      if (!isFinite(yMax) || yMax <= 0) return;
-      
-      const yScale = d3.scaleLinear()
-        .domain([0, yMax * 1.15])
-        .range([innerHeight, 0]);
-      
-      // Add grid
-      g.append('g')
-        .attr('class', 'grid')
-        .attr('opacity', 0.1)
-        .call(d3.axisLeft(yScale)
-          .tickSize(-innerWidth)
-          .tickFormat(''));
-      
-      // Draw histogram bars
-      g.selectAll('.histogram-bar')
-        .data(histBins)
-        .enter()
-        .append('rect')
-        .attr('class', 'histogram-bar')
-        .attr('x', d => xScale(d.x))
-        .attr('y', d => yScale(d.height))
-        .attr('width', d => Math.max(0, xScale(d.x + d.width) - xScale(d.x) - 1))
-        .attr('height', d => Math.max(0, innerHeight - yScale(d.height)))
-        .attr('fill', '#74b9ff')
-        .attr('stroke', '#0984e3')
-        .attr('stroke-width', 1);
-      
-      // Generate smooth normal curve points for overlay
-      const curvePoints = [];
-      const numPoints = 100;
-      for (let i = 0; i <= numPoints; i++) {
-        const x = xMin + (xMax - xMin) * i / numPoints;
-        const z = (x - mean) / sd;
-        const density = Math.exp(-0.5 * z * z) / (sd * Math.sqrt(2 * Math.PI));
-        // Scale to match histogram height
-        const scaledHeight = density * n * binWidth;
-        if (isFinite(scaledHeight)) {
-          curvePoints.push({ x, y: scaledHeight });
-        }
-      }
-      
-      if (curvePoints.length > 0) {
-        // Draw normal curve overlay
-        const line = d3.line()
-          .x(d => xScale(d.x))
-          .y(d => yScale(d.y))
-          .curve(d3.curveBasis);
-        
-        g.append('path')
-          .datum(curvePoints)
-          .attr('fill', 'none')
-          .attr('stroke', '#ffd700')
-          .attr('stroke-width', 2.5)
-          .attr('d', line);
-      }
-      
-      // Mark mean
-      g.append('line')
-        .attr('x1', xScale(mean))
-        .attr('x2', xScale(mean))
-        .attr('y1', 0)
-        .attr('y2', innerHeight)
-        .attr('stroke', '#fbbf24')
-        .attr('stroke-width', 2)
-        .attr('stroke-dasharray', '5,5');
-      
-      g.append('text')
-        .attr('x', xScale(mean))
-        .attr('y', -5)
-        .attr('text-anchor', 'middle')
-        .attr('fill', '#fbbf24')
-        .style('font-size', '11px')
-        .style('font-weight', 'bold')
-        .text('μ');
-      
-      // Mark median if different from mean
-      if (isFinite(median) && Math.abs(median - mean) > 0.01) {
-        g.append('line')
-          .attr('x1', xScale(median))
-          .attr('x2', xScale(median))
-          .attr('y1', 0)
-          .attr('y2', innerHeight)
-          .attr('stroke', '#4ade80')
-          .attr('stroke-width', 2)
-          .attr('stroke-dasharray', '3,3');
-        
-        g.append('text')
-          .attr('x', xScale(median))
-          .attr('y', -5)
-          .attr('text-anchor', 'middle')
-          .attr('fill', '#4ade80')
-          .style('font-size', '11px')
-          .style('font-weight', 'bold')
-          .text('M');
-      }
-      
-      // X axis
-      g.append('g')
-        .attr('class', 'axis')
-        .attr('transform', `translate(0,${innerHeight})`)
-        .call(d3.axisBottom(xScale).ticks(6))
-        .selectAll('text')
-        .attr('fill', 'white');
-      
-      // Y axis
-      g.append('g')
-        .attr('class', 'axis')
-        .call(d3.axisLeft(yScale).ticks(5))
-        .selectAll('text')
-        .attr('fill', 'white');
-      
-      // Labels
-      g.append('text')
-        .attr('x', innerWidth / 2)
-        .attr('y', innerHeight + 35)
-        .attr('text-anchor', 'middle')
-        .attr('fill', 'white')
-        .style('font-size', '11px')
-        .text('Value');
-      
-      g.append('text')
-        .attr('x', -innerHeight / 2)
-        .attr('y', -35)
-        .attr('text-anchor', 'middle')
-        .attr('transform', 'rotate(-90)')
-        .attr('fill', 'white')
-        .style('font-size', '11px')
-        .text('Frequency');
-      
-      // Add annotation
-      g.append('text')
-        .attr('x', innerWidth / 2)
-        .attr('y', 15)
-        .attr('text-anchor', 'middle')
-        .attr('fill', 'rgba(255,255,255,0.5)')
-        .style('font-size', '10px')
-        .style('font-style', 'italic')
-        .text('Expected distribution from normal model (μ, σ)');
+      });
     }
     
     function updateGroupChart() {
@@ -1402,16 +1282,14 @@
         if (grid) grid.style.height = histH + 'px';
       }
 
-      // ③ Reflow Highcharts on active tab
-      if (window._indepChart) window._indepChart.reflow();
+      // ③ Reflow Highcharts (histogram + any results chart)
+      if (_descHistChart)       _descHistChart.reflow();
+      if (window._indepChart)   window._indepChart.reflow();
     }
 
     window.addEventListener('resize', () => {
-      requestAnimationFrame(() => {
-        fitIndependentLayout();
-        const hp = document.getElementById('desc-histogram-panel');
-        if (hp && hp.style.display !== 'none' && _lastDescGrp) renderDescHistogram(_lastDescGrp);
-      });
+      // Highcharts reflow() handles resize — no re-render needed
+      requestAnimationFrame(fitIndependentLayout);
     });
     requestAnimationFrame(fitIndependentLayout);
 

@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Independent Means Results (More Than 2 Groups)</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <script src="https://code.highcharts.com/highcharts-more.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
@@ -1492,10 +1491,10 @@
       renderDescriptiveTable();
       document.getElementById('desc-histogram-title').textContent = row.Variable;
       document.getElementById('desc-histogram-panel').style.display = 'flex';
-      // rAF lets the browser reflow the newly-visible flex panel before D3 reads heights
+      // rAF: browser does one layout pass so BCR is accurate, then we size + render
       requestAnimationFrame(() => {
-        fitIndependentLayout();   // sets histCont.style.height with correct measurements
-        renderDescHistogram();    // D3 reads container.clientHeight = correct value
+        fitIndependentLayout();   // sizes histCont via BCR
+        renderDescHistogram();    // Highcharts reads container pixel height
         updateDescSummary();
       });
     }
@@ -1517,112 +1516,87 @@
       `;
     }
     
+    // Highcharts histogram — recreated on new data, reflowed on resize (stable, no flicker)
+    let _descHistChart = null;
+
     function renderDescHistogram() {
       if (!descSelectedRow || !descSelectedRow.vector) return;
-      
       const container = document.getElementById('histogram-container-kplus');
       if (!container) return;
-      
-      const width  = container.clientWidth  || 600;
-      const height = container.clientHeight > 80 ? container.clientHeight : 280;
-      
-      d3.select('#histogram-container-kplus').selectAll('*').remove();
-      
-      const svg = d3.select('#histogram-container-kplus')
-        .append('svg')
-        .attr('width', width)
-        .attr('height', height);
-      
-      const margin = { top: 15, right: 25, bottom: 40, left: 40 };
-      const innerWidth = width - margin.left - margin.right;
-      const innerHeight = height - margin.top - margin.bottom;
-      
-      const g = svg.append('g')
-        .attr('transform', `translate(${margin.left},${margin.top})`);
-      
+
+      const values  = descSelectedRow.vector;
+      const mean    = descSelectedRow.Mean;
+      const stdDev  = descSelectedRow.StdDev;
+      const n       = values.length;
       const numBins = 10;
-      const values = descSelectedRow.vector;
-      const min = Math.min(...values);
-      const max = Math.max(...values);
-      const range = max - min;
-      const binWidth = range / numBins;
-      
-      const histData = Array.from({ length: numBins }, (_, i) => {
-        const start = min + i * binWidth;
-        const end = min + (i + 1) * binWidth;
-        const bin = `${start.toFixed(1)}-${end.toFixed(1)}`;
-        let count = 0;
-        values.forEach(v => {
-          if (v >= start && (i === numBins - 1 ? v <= end : v < end)) count++;
-        });
-        return { bin, start, end, count };
-      });
-      
-      const x = d3.scaleBand()
-        .domain(histData.map(d => d.bin))
-        .range([0, innerWidth])
-        .padding(0.1);
-      
-      const maxCount = d3.max(histData, d => d.count);
-      const y = d3.scaleLinear()
-        .domain([0, maxCount + (maxCount * 0.1)])
-        .range([innerHeight, 0]);
-      
-      g.append('g')
-        .attr('class', 'axis')
-        .attr('transform', `translate(0,${innerHeight})`)
-        .call(d3.axisBottom(x).tickValues(x.domain().filter((d, i) => i % 2 === 0)))
-        .selectAll('text')
-        .style('text-anchor', 'end')
-        .attr('dx', '-.8em')
-        .attr('dy', '.15em')
-        .attr('font-size', '8px')
-        .attr('transform', 'rotate(-45)');
-      
-      g.append('g')
-        .attr('class', 'axis')
-        .call(d3.axisLeft(y).ticks(5));
-      
-      g.append('g')
-        .attr('class', 'grid')
-        .call(d3.axisLeft(y).ticks(5).tickSize(-innerWidth).tickFormat(''));
-      
-      g.selectAll('.histogram-bar')
-        .data(histData)
-        .enter().append('rect')
-        .attr('class', 'histogram-bar')
-        .attr('x', d => x(d.bin))
-        .attr('width', x.bandwidth())
-        .attr('y', d => y(d.count))
-        .attr('height', d => innerHeight - y(d.count));
-      
-      // Add normal curve
-      const mean = descSelectedRow.Mean;
-      const stdDev = descSelectedRow.StdDev;
-      const normalData = [];
-      const step = range / 50;
-      for (let x_val = min - range * 0.1; x_val <= max + range * 0.1; x_val += step) {
-        const exponent = -Math.pow(x_val - mean, 2) / (2 * Math.pow(stdDev, 2));
-        const y_val = (1 / (stdDev * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
-        normalData.push({ x: x_val, y: y_val });
+      const minV    = Math.min(...values);
+      const maxV    = Math.max(...values);
+      const range   = (maxV - minV) || 1;
+      const bw      = range / numBins;
+
+      // Build bins
+      const cats = [], counts = [];
+      for (let i = 0; i < numBins; i++) {
+        const s = minV + i * bw, e = minV + (i + 1) * bw;
+        cats.push(s.toFixed(1));
+        let c = 0;
+        values.forEach(v => { if (v >= s && (i === numBins - 1 ? v <= e : v < e)) c++; });
+        counts.push(c);
       }
-      
-      const maxNormalY = d3.max(normalData, d => d.y);
-      const normalScale = maxCount / maxNormalY * 0.8;
-      
-      const xScale = d3.scaleLinear()
-        .domain([min, max])
-        .range([0, innerWidth]);
-      
-      const line = d3.line()
-        .x(d => xScale(d.x))
-        .y(d => y(d.y * normalScale))
-        .curve(d3.curveCardinal);
-      
-      g.append('path')
-        .datum(normalData)
-        .attr('class', 'normal-curve')
-        .attr('d', line);
+
+      // Normal curve scaled to count axis
+      const normalPts = cats.map((_, i) => {
+        const mid     = minV + (i + 0.5) * bw;
+        const density = (1 / (stdDev * Math.sqrt(2 * Math.PI))) *
+                        Math.exp(-0.5 * Math.pow((mid - mean) / stdDev, 2));
+        return +(density * bw * n).toFixed(4);
+      });
+
+      // Destroy previous chart (data change), then create fresh
+      if (_descHistChart) { _descHistChart.destroy(); _descHistChart = null; }
+
+      _descHistChart = Highcharts.chart('histogram-container-kplus', {
+        chart: {
+          type: 'column',
+          backgroundColor: 'transparent',
+          animation: false,
+          style: { fontFamily: 'inherit' },
+          margin: [20, 20, 55, 45]
+        },
+        title: { text: null },
+        xAxis: {
+          categories: cats,
+          labels: { style: { color: '#9ba8b5', fontSize: '10px' }, rotation: -45 },
+          gridLineColor: 'rgba(255,255,255,.07)',
+          lineColor:     'rgba(255,255,255,.2)',
+          tickColor:     'rgba(255,255,255,.2)'
+        },
+        yAxis: {
+          title: { text: 'Count', style: { color: '#9ba8b5', fontSize: '10px' } },
+          labels: { style: { color: '#9ba8b5', fontSize: '10px' } },
+          gridLineColor: 'rgba(255,255,255,.1)',
+          min: 0
+        },
+        plotOptions: {
+          column: { pointPadding: 0, groupPadding: 0.02, borderWidth: 0,
+                    color: 'rgba(100,180,255,.75)' }
+        },
+        series: [
+          { name: 'Count',  type: 'column', data: counts },
+          { name: 'Normal', type: 'spline', data: normalPts,
+            color: '#FFE066', dashStyle: 'Dash', marker: { enabled: false }, lineWidth: 2 }
+        ],
+        legend:  { enabled: false },
+        credits: { enabled: false },
+        tooltip: {
+          formatter() {
+            const lbl = this.series.name === 'Count'
+              ? `Bin ≥ ${cats[this.point.index]}: <b>${this.y}</b>`
+              : `Expected: <b>${this.y.toFixed(2)}</b>`;
+            return lbl;
+          }
+        }
+      });
     }
     
     function openNormalityModal() {
@@ -2438,16 +2412,14 @@ ${JSON.stringify(payload, null, 2)}`;
         if (grid) grid.style.height = histH + 'px';
       }
 
-      // ③ Reflow Highcharts on active tab
+      // ③ Reflow Highcharts charts (both the main results chart and the histogram)
+      if (_descHistChart)     _descHistChart.reflow();
       if (window._kplusChart) window._kplusChart.reflow();
     }
 
     window.addEventListener('resize', () => {
-      requestAnimationFrame(() => {
-        fitIndependentLayout();
-        const hp = document.getElementById('desc-histogram-panel');
-        if (hp && hp.style.display !== 'none') renderDescHistogram();
-      });
+      // Highcharts reflow() is called inside fitIndependentLayout — no re-render needed
+      requestAnimationFrame(fitIndependentLayout);
     });
     requestAnimationFrame(fitIndependentLayout);
     

@@ -1479,10 +1479,12 @@
       renderDescriptiveTable();
       document.getElementById('desc-histogram-title').textContent = row.Variable;
       document.getElementById('desc-histogram-panel').style.display = 'flex';
-      // fitIndependentLayout sets explicit px height on the container BEFORE D3 reads it
-      fitIndependentLayout();
-      renderDescHistogram();
-      updateDescSummary();
+      // rAF lets the browser reflow the newly-visible flex panel before D3 reads heights
+      requestAnimationFrame(() => {
+        fitIndependentLayout();   // sets histCont.style.height with correct measurements
+        renderDescHistogram();    // D3 reads container.clientHeight = correct value
+        updateDescSummary();
+      });
     }
     
     function updateDescSummary() {
@@ -1823,6 +1825,12 @@
       setText("repAnova", "ANOVA: F(" + Math.round(ob.anovaDf1) + ", " + Math.round(ob.anovaDf2) + ") = " + fmt(ob.anovaF) + ", p " + fmtP(ob.anovaP) + ".");
       setText("repKw", "Kruskal-Wallis: H(" + Math.round(ob.kwDf) + ") = " + fmt(ob.kwH) + ", p " + fmtP(ob.kwP) + ".");
       setText("repCons", rep.consistency);
+      // Re-run layout AFTER all DOM has been populated (settings-bar now has correct height)
+      requestAnimationFrame(() => {
+        fitIndependentLayout();
+        const hp = document.getElementById('desc-histogram-panel');
+        if (hp && hp.style.display !== 'none') renderDescHistogram();
+      });
     }
     function saveCurrentModel(){ sendToHost("saveIndependentModel", lastBundle||{}); }
     function exportHtml(){
@@ -2401,11 +2409,11 @@ ${JSON.stringify(payload, null, 2)}`;
       });
       const availH = Math.max(200, frameH - fixedH);
 
-      // Size view-container + active tab
+      // Size view-container + active tab (height only – width stays natural/100%)
       const vc = document.querySelector('.view-container');
-      if (vc) { vc.style.height = availH + 'px'; vc.style.width = frameW + 'px'; }
+      if (vc) vc.style.height = availH + 'px';
       const tab = document.querySelector('.tab-panel.active');
-      if (tab) { tab.style.height = availH + 'px'; tab.style.width = frameW + 'px'; }
+      if (tab) tab.style.height = availH + 'px';
 
       // If histogram is visible → size the D3 container explicitly
       const histPanel = document.getElementById('desc-histogram-panel');
@@ -2427,9 +2435,11 @@ ${JSON.stringify(payload, null, 2)}`;
     }
 
     window.addEventListener('resize', () => {
-      fitIndependentLayout();
-      const hp = document.getElementById('desc-histogram-panel');
-      if (hp && hp.style.display !== 'none') renderDescHistogram();
+      requestAnimationFrame(() => {
+        fitIndependentLayout();
+        const hp = document.getElementById('desc-histogram-panel');
+        if (hp && hp.style.display !== 'none') renderDescHistogram();
+      });
     });
     requestAnimationFrame(fitIndependentLayout);
     

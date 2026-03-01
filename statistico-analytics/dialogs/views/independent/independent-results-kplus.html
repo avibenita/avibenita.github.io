@@ -250,7 +250,7 @@
           <!-- Post-hoc controls (visible only for k+ groups) -->
           <div id="setPosthocWrap" style="display:none;flex:0 0 auto;">
             <label for="setPosthocMethod">Post-hoc</label>
-            <select id="setPosthocMethod">
+            <select id="setPosthocMethod" onchange="notifySettingsChanged()">
               <option value="games-howell">Games-Howell</option>
               <option value="tukey">Tukey HSD</option>
               <option value="dunn">Dunn</option>
@@ -260,7 +260,7 @@
 
           <div id="setCorrectionWrap" style="display:none;flex:0 0 auto;">
             <label for="setPosthocCorrection">p Correction</label>
-            <select id="setPosthocCorrection">
+            <select id="setPosthocCorrection" onchange="notifySettingsChanged()">
               <option value="holm">Holm</option>
               <option value="bh">Benjamini-Hochberg</option>
               <option value="bonferroni">Bonferroni</option>
@@ -809,7 +809,7 @@
       var current = sel.value;
       sel.innerHTML = options.map(function(o){ return '<option value="' + o.v + '">' + o.t + '</option>'; }).join("");
       var keep = options.some(function(o){ return o.v === current; });
-      sel.value = keep ? current : options[0].v;
+      if (keep) { sel.value = current; } else { sel.selectedIndex = 0; }
     }
     function setFrameworkButtons(mode){
       primaryFramework = mode === "nonparametric" ? "nonparametric" : "parametric";
@@ -1906,11 +1906,17 @@
       currentHypothesis = orientation;
       var radio = document.querySelector('input[name="h1Orientation"][value="' + orientation + '"]');
       if (radio) radio.checked = true;
-      const phm = document.getElementById("setPosthocMethod"); if (phm) phm.value = s.posthocMethod || "games-howell";
-      const phc = document.getElementById("setPosthocCorrection"); if (phc) phc.value = s.posthocCorrection || "holm";
       renderCompareStatsRow(s, e);
       refreshSettingsVisibility();
-      updatePosthocOptions();
+      updatePosthocOptions(); // sets correct options for current framework first
+      // Now restore saved values — only if they exist in the current option list
+      const phm = document.getElementById("setPosthocMethod");
+      if (phm && s.posthocMethod) {
+        const validOpts = Array.from(phm.options).map(function(o){ return o.value; });
+        if (validOpts.indexOf(s.posthocMethod) >= 0) phm.value = s.posthocMethod;
+        // else leave updatePosthocOptions' default (selectedIndex 0)
+      }
+      const phc = document.getElementById("setPosthocCorrection"); if (phc) phc.value = s.posthocCorrection || "holm";
       const ksum = e.kplusSummary || {};
       const ob = r.omnibus || {};
       const groupCount = isFinite(parseMaybeNumber(ksum.variableCount)) 

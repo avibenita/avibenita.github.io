@@ -251,10 +251,14 @@
           <div id="setPosthocWrap" style="display:none;flex:0 0 auto;">
             <label for="setPosthocMethod">Post-hoc</label>
             <select id="setPosthocMethod" onchange="notifySettingsChanged()">
-              <option value="games-howell">Games-Howell</option>
-              <option value="tukey">Tukey HSD</option>
-              <option value="dunn">Dunn</option>
-              <option value="conover">Conover</option>
+              <optgroup label="── Parametric ──">
+                <option value="games-howell" selected>Games-Howell</option>
+                <option value="tukey">Tukey HSD</option>
+              </optgroup>
+              <optgroup label="── Non-parametric ──">
+                <option value="dunn">Dunn</option>
+                <option value="conover">Conover</option>
+              </optgroup>
             </select>
           </div>
 
@@ -797,17 +801,10 @@
       var sel = document.getElementById("setPosthocMethod");
       if (!sel) return;
       var isNonParam = primaryFramework === "nonparametric" || currentPrimaryTest === "kruskal";
-      var opts = isNonParam
-        ? [{ v: "dunn", t: "Dunn" }, { v: "conover", t: "Conover" }]
-        : [{ v: "games-howell", t: "Games-Howell" }, { v: "tukey", t: "Tukey HSD" }];
-      var current = sel.value;
-      var keep = opts.some(function(o){ return o.v === current; });
-      // Rebuild via DOM constructor — most reliable in WebView2
-      while (sel.options.length) sel.remove(0);
-      opts.forEach(function(o, i){
-        var selected = keep ? (o.v === current) : (i === 0);
-        sel.add(new Option(o.t, o.v, selected, selected));
-      });
+      // Never rebuild the option list — just validate and default the selected value.
+      // All 4 options always live in the HTML; we just steer the default.
+      var validVals = isNonParam ? ["dunn","conover"] : ["games-howell","tukey"];
+      if (validVals.indexOf(sel.value) < 0) sel.value = validVals[0];
     }
     function setFrameworkButtons(mode){
       primaryFramework = mode === "nonparametric" ? "nonparametric" : "parametric";

@@ -660,6 +660,8 @@ function buildIndependentBundle(headers, rows, spec) {
     explore: {
       n1, n2, mean1: mean(g1), mean2: mean(g2), med1: median(g1), med2: median(g2),
       sd1: sd(g1), sd2: sd(g2), iqr1: quantile(g1, 0.75) - quantile(g1, 0.25), iqr2: quantile(g2, 0.75) - quantile(g2, 0.25),
+      min1: g1.length ? Math.min.apply(null, g1) : NaN, max1: g1.length ? Math.max.apply(null, g1) : NaN,
+      min2: g2.length ? Math.min.apply(null, g2) : NaN, max2: g2.length ? Math.max.apply(null, g2) : NaN,
       selectedColumnStats,
       kplusSummary
     },

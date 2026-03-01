@@ -905,26 +905,50 @@
         return '...';
       }
       
+      // Helper: extract a numeric vector for a named column from raw range data
+      function extractVector(colName) {
+        if (!window.independentRangeData || !colName) return null;
+        const headers = window.independentRangeData[0] || [];
+        const colIdx  = headers.indexOf(colName);
+        if (colIdx === -1) return null;
+        return window.independentRangeData.slice(1)
+          .map(r => parseFloat(r[colIdx]))
+          .filter(v => isFinite(v));
+      }
+
+      // Helper: compute summary stats from a vector (mirrors k-plus approach)
+      function statsFromVector(vec) {
+        if (!vec || vec.length === 0) return {};
+        const sorted = vec.slice().sort((a, b) => a - b);
+        const n    = vec.length;
+        const mean = vec.reduce((s, v) => s + v, 0) / n;
+        const sd   = Math.sqrt(vec.reduce((s, v) => s + (v - mean) ** 2, 0) / n);
+        const med  = n % 2 === 0
+          ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2
+          : sorted[Math.floor(n / 2)];
+        return { n, mean, sd, min: sorted[0], median: med, max: sorted[n - 1], vector: vec };
+      }
+
+      // Build per-group objects, enriched with real vector stats when raw data is available
+      function buildGroup(colName, fallback) {
+        const vec = extractVector(colName);
+        if (vec && vec.length > 0) {
+          const st = statsFromVector(vec);
+          return { name: colName, ...st };
+        }
+        return { ...fallback, vector: null };
+      }
+
       // Create rows for each group
       const groups = [
-        {
-          name: groupAName,
-          n: e.n1 || 0,
-          mean: e.mean1,
-          sd: e.sd1,
-          min: e.min1,
-          median: e.med1,
-          max: e.max1
-        },
-        {
-          name: groupBName,
-          n: e.n2 || 0,
-          mean: e.mean2,
-          sd: e.sd2,
-          min: e.min2,
-          median: e.med2,
-          max: e.max2
-        }
+        buildGroup(groupAName, {
+          name: groupAName, n: e.n1 || 0, mean: e.mean1, sd: e.sd1,
+          min: e.min1, median: e.med1, max: e.max1
+        }),
+        buildGroup(groupBName, {
+          name: groupBName, n: e.n2 || 0, mean: e.mean2, sd: e.sd2,
+          min: e.min2, median: e.med2, max: e.max2
+        })
       ];
       
       let descSelectedRow = null;
@@ -975,6 +999,13 @@
       setText('expTotalN', totalN);
       setText('expOverallMean', fmt(overallMean));
       setText('expFramework', primaryFramework === 'nonparametric' ? 'Non-parametric (ranks)' : 'Parametric (means)');
+
+      // Auto-select first group row (k-plus pattern — shows histogram on load)
+      if (groups.length > 0) {
+        const firstRow = document.querySelector('#desc-stats-body tr');
+        if (firstRow) firstRow.classList.add('selected');
+        selectDescRow(groups[0]);
+      }
     }
     
     let _lastDescGrp = null;  // store for resize re-render
@@ -1045,57 +1076,83 @@
       const container = document.getElementById('histogram-container-two');
       if (!container) return;
 
+      // ── Prefer real vector (k-plus pattern) ──────────────────────────────
+      const values = Array.isArray(grp.vector) && grp.vector.length > 1 ? grp.vector : null;
+
       const mean   = parseMaybeNumber(grp.mean);
       const sd     = parseMaybeNumber(grp.sd);
-      const minV   = parseMaybeNumber(grp.min);
-      const maxV   = parseMaybeNumber(grp.max);
-      const median = parseMaybeNumber(grp.median);
       const n      = grp.n || 0;
 
-      if (!isFinite(mean) || !isFinite(sd) || sd <= 0 || !isFinite(minV) || !isFinite(maxV)) {
+      if (!isFinite(mean) || !isFinite(sd) || sd <= 0) {
         container.innerHTML = '<div style="color:#999;padding:20px;text-align:center;font-size:12px;">Insufficient data for distribution visualization</div>';
         return;
       }
 
-      // Bin range: extend ±3.5σ beyond data range
-      const xMin   = Math.min(minV, mean - 3.5 * sd);
-      const xMax   = Math.max(maxV, mean + 3.5 * sd);
-      if (!isFinite(xMin) || !isFinite(xMax) || xMin >= xMax) return;
-
-      const numBins = 12;
-      const bw      = (xMax - xMin) / numBins;
-      const cdf     = z => 0.5 * (1 + Math.tanh(z * Math.sqrt(2 / Math.PI) * 0.7));
-
+      const numBins = 10;
       const cats = [], counts = [], normalPts = [];
-      for (let i = 0; i < numBins; i++) {
-        const s  = xMin + i * bw, e = s + bw;
-        const prob = cdf((e - mean) / sd) - cdf((s - mean) / sd);
-        const expectedCount = prob * n;
-        cats.push(s.toFixed(1));
-        counts.push(isFinite(expectedCount) ? +expectedCount.toFixed(3) : 0);
 
-        // Normal curve (PDF × bw × n) at bin midpoint
-        const mid     = s + bw / 2;
-        const density = Math.exp(-0.5 * Math.pow((mid - mean) / sd, 2)) / (sd * Math.sqrt(2 * Math.PI));
-        normalPts.push(+(density * bw * n).toFixed(4));
+      if (values) {
+        // Real data path — actual counts (same as k-plus)
+        const minV  = Math.min(...values);
+        const maxV  = Math.max(...values);
+        const range = (maxV - minV) || 1;
+        const bw    = range / numBins;
+        for (let i = 0; i < numBins; i++) {
+          const s = minV + i * bw, e = minV + (i + 1) * bw;
+          cats.push(s.toFixed(1));
+          let c = 0;
+          values.forEach(v => { if (v >= s && (i === numBins - 1 ? v <= e : v < e)) c++; });
+          counts.push(c);
+          const mid     = s + bw / 2;
+          const density = (1 / (sd * Math.sqrt(2 * Math.PI))) *
+                          Math.exp(-0.5 * Math.pow((mid - mean) / sd, 2));
+          normalPts.push(+(density * bw * values.length).toFixed(4));
+        }
+      } else {
+        // Fallback: expected-count approximation from summary stats only
+        const minV = isFinite(parseMaybeNumber(grp.min)) ? parseMaybeNumber(grp.min) : mean - 3.5 * sd;
+        const maxV = isFinite(parseMaybeNumber(grp.max)) ? parseMaybeNumber(grp.max) : mean + 3.5 * sd;
+        const xMin = Math.min(minV, mean - 3.5 * sd);
+        const xMax = Math.max(maxV, mean + 3.5 * sd);
+        if (!isFinite(xMin) || !isFinite(xMax) || xMin >= xMax) return;
+        const bw  = (xMax - xMin) / numBins;
+        const cdf = z => 0.5 * (1 + Math.tanh(z * Math.sqrt(2 / Math.PI) * 0.7));
+        for (let i = 0; i < numBins; i++) {
+          const s = xMin + i * bw, e = s + bw;
+          cats.push(s.toFixed(1));
+          const prob = cdf((e - mean) / sd) - cdf((s - mean) / sd);
+          counts.push(isFinite(prob * n) ? +(prob * n).toFixed(3) : 0);
+          const mid     = s + bw / 2;
+          const density = Math.exp(-0.5 * Math.pow((mid - mean) / sd, 2)) / (sd * Math.sqrt(2 * Math.PI));
+          normalPts.push(+(density * bw * n).toFixed(4));
+        }
       }
 
       // Destroy previous and create fresh (only on data change — resize uses reflow)
       if (_descHistChart) { _descHistChart.destroy(); _descHistChart = null; }
 
-      // Mean & median plotBands
+      // Mean plotLine (index-based on cats array)
+      const meanIdx = cats.findIndex(c => parseFloat(c) >= mean);
       const plotLines = [
-        { value: cats.findIndex(c => parseFloat(c) >= mean), color: '#fbbf24',
+        { value: meanIdx >= 0 ? meanIdx : 0, color: '#fbbf24',
           width: 2, dashStyle: 'Dash',
           label: { text: 'μ', style: { color: '#fbbf24', fontSize: '11px' } } }
       ];
-      if (isFinite(median) && Math.abs(median - mean) > 0.5 * bw) {
-        plotLines.push({
-          value: cats.findIndex(c => parseFloat(c) >= median), color: '#4ade80',
-          width: 2, dashStyle: 'ShortDot',
-          label: { text: 'M', style: { color: '#4ade80', fontSize: '11px' } }
-        });
+      // Median plotLine when real data available
+      const median = parseMaybeNumber(grp.median);
+      if (values && isFinite(median)) {
+        const medIdx = cats.findIndex(c => parseFloat(c) >= median);
+        if (medIdx >= 0 && Math.abs(medIdx - meanIdx) > 0) {
+          plotLines.push({
+            value: medIdx, color: '#4ade80',
+            width: 2, dashStyle: 'ShortDot',
+            label: { text: 'M', style: { color: '#4ade80', fontSize: '11px' } }
+          });
+        }
       }
+
+      const yLabel = values ? 'Count' : 'Expected count';
+      const seriesName = values ? 'Count' : 'Expected count';
 
       _descHistChart = Highcharts.chart('histogram-container-two', {
         chart: {
@@ -1115,7 +1172,7 @@
           tickColor:     'rgba(255,255,255,.2)'
         },
         yAxis: {
-          title: { text: 'Expected count', style: { color: '#9ba8b5', fontSize: '11px' } },
+          title: { text: yLabel, style: { color: '#9ba8b5', fontSize: '11px' } },
           labels: { style: { color: '#9ba8b5', fontSize: '11px' } },
           gridLineColor: 'rgba(255,255,255,.1)',
           min: 0
@@ -1125,8 +1182,8 @@
                     color: 'rgba(100,180,255,.75)' }
         },
         series: [
-          { name: 'Expected count', type: 'column', data: counts },
-          { name: 'Normal',         type: 'spline',  data: normalPts,
+          { name: seriesName, type: 'column', data: counts },
+          { name: 'Normal',   type: 'spline', data: normalPts,
             color: '#FFE066', dashStyle: 'Dash', marker: { enabled: false }, lineWidth: 2 }
         ],
         legend:  { enabled: false },
@@ -1500,7 +1557,10 @@
       Office.onReady(function(){
         Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function(arg){
           const msg = JSON.parse(arg.message||"{}");
-          if(msg.type==="INDEPENDENT_BUNDLE") populateBundle(msg.payload||{});
+          if(msg.type==="INDEPENDENT_BUNDLE"){
+            if (msg.rawData) window.independentRangeData = msg.rawData;
+            populateBundle(msg.payload||{});
+          }
         });
         sendToHost("independentDashboardReady",{});
         setTimeout(()=>sendToHost("independentDashboardReady",{}),500);

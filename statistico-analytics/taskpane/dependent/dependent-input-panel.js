@@ -187,29 +187,24 @@ function computeRepeatedMeasuresANOVA(headers, rows, selectedColumns, primaryFra
   console.log("Primary Framework:", primaryFramework);
   console.log("Post-hoc Method:", posthocMethod, "Correction:", posthocCorrection);
   
-  // Extract data for each timepoint
   const k = selectedColumns.length;
-  const groupData = selectedColumns.map(colName => {
-    const idx = headers.indexOf(colName);
-    const values = [];
-    rows.forEach(r => {
-      const v = parseNum(r[idx]);
-      if (isFinite(v)) values.push(v);
-    });
-    return values;
-  });
-  
-  // Find complete cases (rows with valid data in all columns)
+  const colIndices = selectedColumns.map(colName => headers.indexOf(colName));
+
+  // ── Step 1: Listwise deletion — keep only rows valid at ALL selected timepoints ──
   const completeCases = [];
-  for (let i = 0; i < rows.length; i++) {
-    const rowValues = selectedColumns.map(colName => parseNum(rows[i][headers.indexOf(colName)]));
+  const totalRows = rows.length;
+  for (let i = 0; i < totalRows; i++) {
+    const rowValues = colIndices.map(idx => parseNum(rows[i][idx]));
     if (rowValues.every(v => isFinite(v))) {
       completeCases.push(rowValues);
     }
   }
+
+  // ── Step 2: Build per-timepoint vectors from complete cases only ──
+  // This ensures every timepoint reports the SAME n (complete-case n), not a larger column n.
+  const groupData = selectedColumns.map((_, j) => completeCases.map(row => row[j]));
   
   const n = completeCases.length;
-  const totalRows = rows.length;
   const missingCount = totalRows - n;
   const missingPct = totalRows > 0 ? (missingCount / totalRows * 100) : 0;
   
@@ -1073,32 +1068,29 @@ function buildDependentBundle(headers, rows, spec) {
     : headers.slice();
   console.log("selectedColumns:", selectedColumns);
   
-  const selectedColumnStats = selectedColumns.map((name) => {
-    const idx = headers.indexOf(name);
-    const values = [];
-    rows.forEach((r) => {
-      const v = parseNum(r[idx]);
-      if (isFinite(v)) values.push(v);
-    });
-    return {
-      name,
-      label: name,
-      n: values.length,
-      missing: rows.length - values.length,
-      mean: values.length ? mean(values) : NaN,
-      sd: values.length ? sd(values) : NaN,
-      stdDev: values.length ? sd(values) : NaN,
-      median: values.length ? median(values) : NaN,
-      iqr: NaN // TODO: calculate IQR if needed
-    };
-  });
-  
   // For k-plus mode, perform repeated measures ANOVA
   if (compareMode === "k-plus" && selectedColumns.length >= 3) {
     console.log("Computing k-plus (3+ timepoints) analysis");
     const posthocMethod = spec.posthocMethod || "paired";
     const posthocCorrection = spec.posthocCorrection || "holm";
     const rmResults = computeRepeatedMeasuresANOVA(headers, rows, selectedColumns, primaryFramework, posthocMethod, posthocCorrection);
+
+    // ── Build selectedColumnStats from complete-case group descriptives only ──
+    // groupDescriptives is already computed from complete cases inside computeRepeatedMeasuresANOVA
+    const gdList = (rmResults.omnibus && Array.isArray(rmResults.omnibus.groupDescriptives))
+      ? rmResults.omnibus.groupDescriptives : [];
+    const selectedColumnStats = gdList.map(gd => ({
+      name:    gd.name,
+      label:   gd.name,
+      n:       gd.n,
+      missing: rows.length - gd.n,
+      mean:    gd.mean,
+      sd:      gd.sd,
+      stdDev:  gd.sd,
+      median:  gd.median,
+      iqr:     NaN
+    }));
+
     return {
       setup: {
         mode,
@@ -1114,6 +1106,9 @@ function buildDependentBundle(headers, rows, spec) {
       },
       explore: {
         selectedColumnStats,
+        totalRows:  rows.length,
+        missingCount: rmResults.missingCount,
+        missingPct:   rmResults.missingPct,
         correlationMatrix: rmResults.correlationMatrix,
         kplusSummary: {
           variableCount: selectedColumns.length,
@@ -1135,21 +1130,23 @@ function buildDependentBundle(headers, rows, spec) {
     };
   }
   
-  // Two-variable mode (original code)
+  // Two-variable mode (paired) — use complete pairs only (listwise deletion)
   let t1 = [], t2 = [];
   let completePairs = 0;
   let totalRows = rows.length;
-  
+
   if (compareMode === "two-vars") {
     const aIdx = headers.indexOf(spec.groupA || selectedColumns[0] || headers[0]);
     const bIdx = headers.indexOf(spec.groupB || selectedColumns[1] || selectedColumns[0] || headers[1] || headers[0]);
     rows.forEach(r => {
       const a = parseNum(r[aIdx]);
       const b = parseNum(r[bIdx]);
-      if (isFinite(a)) t1.push(a);
-      if (isFinite(b)) t2.push(b);
-      // Count complete pairs
-      if (isFinite(a) && isFinite(b)) completePairs++;
+      // Only include rows where BOTH values are valid (paired analysis requires matched pairs)
+      if (isFinite(a) && isFinite(b)) {
+        t1.push(a);
+        t2.push(b);
+        completePairs++;
+      }
     });
   }
   
@@ -1192,7 +1189,13 @@ function buildDependentBundle(headers, rows, spec) {
       sd1: sd(t1), sd2: sd(t2),
       min1: t1.length ? Math.min.apply(null, t1) : NaN, max1: t1.length ? Math.max.apply(null, t1) : NaN,
       min2: t2.length ? Math.min.apply(null, t2) : NaN, max2: t2.length ? Math.max.apply(null, t2) : NaN,
-      selectedColumnStats
+      // selectedColumnStats for two-vars — derived from complete pairs only
+      selectedColumnStats: [
+        { name: spec.groupALabel || selectedColumns[0] || "Time 1", label: spec.groupALabel || selectedColumns[0] || "Time 1",
+          n: t1.length, missing: totalRows - t1.length, mean: mean(t1), sd: sd(t1), stdDev: sd(t1), median: median(t1), iqr: NaN },
+        { name: spec.groupBLabel || selectedColumns[1] || "Time 2", label: spec.groupBLabel || selectedColumns[1] || "Time 2",
+          n: t2.length, missing: totalRows - t2.length, mean: mean(t2), sd: sd(t2), stdDev: sd(t2), median: median(t2), iqr: NaN }
+      ]
     },
     assumptions: {
       normalityA: n1 >= 8 ? "Check normality of differences" : "Sample too small",

@@ -526,6 +526,11 @@
                     </tbody>
                   </table>
                 </div>
+                <div style="margin-top:10px;padding:8px 12px;background:rgba(255,255,255,.04);border-left:3px solid #26a69a;border-radius:0 6px 6px 0;font-size:13px;color:var(--text-secondary);line-height:1.6;">
+                  <span style="color:#80cbc4;font-weight:700;">ℹ</span>
+                  The H statistic approximates a χ² distribution for large samples (df = k − 1).
+                  &nbsp;·&nbsp; <span id="kwTieNote">Tie correction: —</span>
+                </div>
               </div>
             </div>
 
@@ -535,7 +540,7 @@
                 <div class="stat-panel-body" style="padding:10px;">
                   <div class="table-container" style="margin:0;max-height:none;">
                     <table class="analysis-table">
-                      <thead><tr><th>Group</th><th>n</th><th>Mean Rank</th><th>Median</th></tr></thead>
+                      <thead><tr><th>Group</th><th>n</th><th>Mean Rank</th><th>Median</th><th>IQR</th></tr></thead>
                       <tbody id="rankDescBody">
                         <tr><td colspan="4" style="text-align:center;opacity:.6;">No data</td></tr>
                       </tbody>
@@ -757,8 +762,13 @@
       var h0 = document.getElementById("h0Text");
       var h1Row = document.getElementById("h1Row");
       if (!h0 || !h1Row) return;
-      h0.textContent = "All groups are equal";
-      h1Row.innerHTML = '<span style="color:#1f2937;font-weight:800;">At least one group differs.</span>';
+      if (primaryFramework === "nonparametric") {
+        h0.textContent = "Distributions are identical across groups";
+        h1Row.innerHTML = '<span style="color:#1f2937;font-weight:800;">At least one distribution differs.</span>';
+      } else {
+        h0.textContent = "All group means are equal";
+        h1Row.innerHTML = '<span style="color:#1f2937;font-weight:800;">At least one group mean differs.</span>';
+      }
     }
     function refreshSettingsVisibility(){
       const setDisplay = (id, show) => { const el = document.getElementById(id); if (el) el.style.display = show ? "flex" : "none"; };
@@ -942,8 +952,15 @@
         if (!paramPrimary) {
           const kwBody = document.getElementById("kwSummaryBody");
           if (kwBody) {
+            var epsSq = isFinite(parseMaybeNumber(ob.epsilonSquared)) ? parseMaybeNumber(ob.epsilonSquared).toFixed(3) : '—';
             kwBody.innerHTML = '<tr><td>Between groups</td><td>' + fmt(ob.kwH) + '</td><td>'
-              + Math.round(ob.kwDf) + '</td><td>' + fmtP(ob.kwP) + '</td><td>' + fmt(ob.epsilonSquared) + '</td></tr>';
+              + Math.round(ob.kwDf) + '</td><td>' + fmtP(ob.kwP) + '</td><td>' + epsSq + '</td></tr>';
+            var tieNote = document.getElementById("kwTieNote");
+            if (tieNote) {
+              var tieApplied = ob.tieCorrection === true || ob.tieCorrection === "yes" || ob.tieCorrectionApplied === true;
+              tieNote.textContent = 'Tie correction: ' + (tieApplied ? 'Applied' : 'Not applied');
+              tieNote.style.color = tieApplied ? '#80cbc4' : 'rgba(255,255,255,.5)';
+            }
           }
           const rankBody = document.getElementById("rankDescBody");
           if (rankBody) {
@@ -953,8 +970,10 @@
             const mrMap = ob.meanRanks || {};
             rankBody.innerHTML = rColStats.length
               ? rColStats.map(function(cs){
+                  var iqr = (isFinite(parseMaybeNumber(cs.q3)) && isFinite(parseMaybeNumber(cs.q1)))
+                    ? fmt(parseMaybeNumber(cs.q3) - parseMaybeNumber(cs.q1)) : '—';
                   return '<tr><td>' + (cs.name||'') + '</td><td>' + Math.round(parseMaybeNumber(cs.n))
-                    + '</td><td>' + fmt(mrMap[cs.name]) + '</td><td>' + fmt(cs.median) + '</td></tr>';
+                    + '</td><td>' + fmt(mrMap[cs.name]) + '</td><td>' + fmt(cs.median) + '</td><td>' + iqr + '</td></tr>';
                 }).join('')
               : '<tr><td colspan="4" style="text-align:center;opacity:.6;">No data</td></tr>';
           }

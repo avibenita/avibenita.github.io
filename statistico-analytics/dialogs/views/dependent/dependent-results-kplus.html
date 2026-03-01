@@ -858,12 +858,30 @@
             <div class="xp-hdr">
               <span style="color:var(--accent-1)">Descriptive Statistics</span>
               <div class="xp-hdr-meta">
-                <span>Variables: <strong id="expVarCount" style="color:var(--accent-2)">…</strong></span>
-                <span>Complete Cases: <strong id="expTotalN" style="color:var(--accent-2)">…</strong></span>
+                <span>Timepoints: <strong id="expVarCount" style="color:var(--accent-2)">…</strong></span>
+                <span>Complete Rows (n): <strong id="expTotalN" style="color:var(--accent-2)">…</strong></span>
                 <span>Overall x̄: <strong id="expOverallMean" style="color:var(--accent-2)">…</strong></span>
                 <span>Framework: <strong id="expFramework" style="color:var(--accent-2)">…</strong></span>
               </div>
             </div>
+            <!-- Always-visible complete-cases notice -->
+            <div id="completeCasesNotice" style="padding:8px 16px;background:rgba(100,180,255,.07);border-bottom:1px solid rgba(100,180,255,.18);font-size:13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <span style="color:var(--accent-2);font-weight:700;white-space:nowrap;">
+                <i class="fa-solid fa-filter"></i> Complete Cases Only
+              </span>
+              <span style="color:var(--text-secondary);">
+                Statistics below are computed on
+                <strong id="completeN" style="color:var(--accent-2);">…</strong>
+                rows that have valid values at <em>all</em> selected timepoints
+                (<strong id="totalNHint" style="color:var(--text-secondary);font-weight:600;">…</strong> total rows in sheet).
+              </span>
+              <span id="excludedNotice" style="display:none;white-space:nowrap;">
+                <strong style="color:#fbbf24;"><i class="fa-solid fa-triangle-exclamation"></i>
+                  <span id="excludedCount">0</span> rows excluded</strong>
+                <span style="color:var(--text-muted);">(missing data at ≥1 timepoint — listwise deletion)</span>
+              </span>
+            </div>
+            <!-- Legacy missing-data warning (kept for backward compat, hidden when new notice active) -->
             <div id="missingDataWarning" style="display:none;padding:8px 16px;background:rgba(251,191,36,.12);border-left:3px solid #fbbf24;font-size:13px;">
               <strong style="color:#fbbf24;"><i class="fa-solid fa-triangle-exclamation"></i> Missing Data:</strong>
               <span style="color:var(--text-secondary);"> <span id="missingCount" style="font-weight:700;">0</span> rows (<span id="missingPct">0</span>%) excluded due to incomplete timepoint data. RM-ANOVA requires <strong>complete cases</strong> (valid data at all timepoints).</span>
@@ -879,7 +897,7 @@
                 <thead>
                   <tr>
                     <th data-key="Variable" style="text-align:left">Variable <i class="fa fa-sort"></i></th>
-                    <th data-key="N">N <i class="fa fa-sort"></i></th>
+                    <th data-key="N" title="Rows with valid data at ALL timepoints (complete cases / listwise deletion)">N <i class="fa fa-sort"></i><br><span style="font-size:10px;font-weight:400;opacity:0.7;">(complete)</span></th>
                     <th data-key="Mean">Mean <i class="fa fa-sort"></i></th>
                     <th data-key="StdDev">StdDev <i class="fa fa-sort"></i></th>
                     <th data-key="Min">Min <i class="fa fa-sort"></i></th>
@@ -2482,12 +2500,40 @@
     
     function populateDescriptiveStats(headers, rows) {
       if (!Array.isArray(headers) || !Array.isArray(rows)) return;
-      
+
+      // ── Listwise deletion: keep only rows with valid data at ALL selected timepoints ──
+      const totalRows = rows.length;
+      const completeRows = rows.filter(row =>
+        headers.every(col => {
+          const v = typeof row[col] === 'number' ? row[col] : parseFloat(row[col]);
+          return isFinite(v);
+        })
+      );
+      const excludedRows = totalRows - completeRows.length;
+
+      // ── Update the always-visible notice ──
+      const elCompleteN   = document.getElementById('completeN');
+      const elTotalNHint  = document.getElementById('totalNHint');
+      const elExcNotice   = document.getElementById('excludedNotice');
+      const elExcCount    = document.getElementById('excludedCount');
+      if (elCompleteN)  elCompleteN.textContent  = completeRows.length;
+      if (elTotalNHint) elTotalNHint.textContent  = totalRows;
+      if (elExcNotice) {
+        if (excludedRows > 0) {
+          if (elExcCount) elExcCount.textContent = excludedRows;
+          elExcNotice.style.display = 'inline-flex';
+          elExcNotice.style.gap = '6px';
+          elExcNotice.style.alignItems = 'center';
+        } else {
+          elExcNotice.style.display = 'none';
+        }
+      }
+
+      // ── Compute stats on complete-case rows only ──
       descData = headers.map(varName => {
-        const values = rows
-          .map(row => row[varName])
-          .map(v => typeof v === 'number' ? v : parseFloat(v))
-          .filter(v => isFinite(v));
+        const values = completeRows
+          .map(row => typeof row[varName] === 'number' ? row[varName] : parseFloat(row[varName]));
+        // All values are guaranteed finite by the listwise filter above
         
         if (values.length === 0) return null;
         
@@ -2500,8 +2546,8 @@
         
         const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / n;
         const stdDev = Math.sqrt(variance);
-        const skew = values.reduce((sum, v) => sum + Math.pow((v - mean) / stdDev, 3), 0) / n;
-        const kurt = values.reduce((sum, v) => sum + Math.pow((v - mean) / stdDev, 4), 0) / n - 3;
+        const skew = stdDev > 0 ? values.reduce((sum, v) => sum + Math.pow((v - mean) / stdDev, 3), 0) / n : 0;
+        const kurt = stdDev > 0 ? values.reduce((sum, v) => sum + Math.pow((v - mean) / stdDev, 4), 0) / n - 3 : 0;
         
         return {
           Variable: varName,

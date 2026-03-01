@@ -1190,6 +1190,8 @@ function buildDependentBundle(headers, rows, spec) {
       mean1: mean(t1), mean2: mean(t2),
       med1: median(t1), med2: median(t2),
       sd1: sd(t1), sd2: sd(t2),
+      min1: t1.length ? Math.min.apply(null, t1) : NaN, max1: t1.length ? Math.max.apply(null, t1) : NaN,
+      min2: t2.length ? Math.min.apply(null, t2) : NaN, max2: t2.length ? Math.max.apply(null, t2) : NaN,
       selectedColumnStats
     },
     assumptions: {

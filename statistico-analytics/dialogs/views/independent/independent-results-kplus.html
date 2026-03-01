@@ -612,8 +612,8 @@
                       <th style="cursor:pointer;" onclick="sortPosthocTable('statistic')">Statistic ↕</th>
                       <th style="cursor:pointer;" onclick="sortPosthocTable('rawp')">Raw p ↕</th>
                       <th style="cursor:pointer;" onclick="sortPosthocTable('adjp')">Adj p ↕</th>
-                      <th style="cursor:pointer;" onclick="sortPosthocTable('estimate')">Estimate ↕</th>
-                      <th style="cursor:pointer;" onclick="sortPosthocTable('ci')">95% CI ↕</th>
+                      <th style="cursor:pointer;" onclick="sortPosthocTable('estimate')" title="Rank-biserial correlation r (non-parametric) or mean difference (parametric)">Effect Est. ↕</th>
+                      <th style="cursor:pointer;" onclick="sortPosthocTable('ci')" title="95% confidence interval (available when host sends SE)">95% CI ↕</th>
                       <th style="text-align:center;">Sig</th>
                     </tr>
                   </thead>
@@ -625,6 +625,7 @@
               
               <div style="margin-top:12px;padding:10px 14px;background:rgba(120,200,255,.08);border-radius:4px;font-size:13px;color:var(--text-secondary);">
                 <strong>Note:</strong> <span id="posthocMethodNote">...</span>
+                <span id="posthocEstimateNote" style="margin-left:10px;opacity:.75;"></span>
               </div>
             </div>
           </div>
@@ -1342,6 +1343,7 @@
       // Update method note
       const method = posthoc.method || "Games-Howell";
       const correction = posthoc.correction || "Holm";
+      const isNP = primaryFramework === "nonparametric";
       if (noteEl) {
         let methodDesc = "";
         if (method === "gameshowell" || method === "Games-Howell") {
@@ -1354,6 +1356,13 @@
           methodDesc = method + " test";
         }
         noteEl.textContent = methodDesc + " | p-value correction: " + correction;
+      }
+      // Explain the Effect Est. column
+      const estNoteEl = document.getElementById("posthocEstimateNote");
+      if (estNoteEl) {
+        estNoteEl.textContent = isNP
+          ? "│ Effect Est. = rank-biserial correlation r (range −1 to +1)"
+          : "│ Effect Est. = mean difference (group A − group B)";
       }
       
       const rows = posthoc.rows || [];
@@ -1607,21 +1616,21 @@
         
         // 95% CI
         td = document.createElement("td");
+        td.style.fontFamily = "monospace";
         if (isFinite(r.ciLower) && isFinite(r.ciUpper)) {
           td.textContent = "[" + fmt(r.ciLower) + ", " + fmt(r.ciUpper) + "]";
         } else {
-          td.textContent = "—";
+          td.innerHTML = '<span title="CI requires standard error from host (not available for U-statistic)" style="display:inline-block;padding:2px 7px;border-radius:4px;background:rgba(100,116,139,.18);color:#94a3b8;font-size:12px;font-family:sans-serif;letter-spacing:.3px;">n/a</span>';
         }
-        td.style.fontFamily = "monospace";
         tr.appendChild(td);
         
-        // Significance indicator
+        // Significance indicator — pill badge
         td = document.createElement("td");
         td.style.textAlign = "center";
         if (r.significant) {
-          td.innerHTML = '<span style="color:#4ade80;font-weight:800;font-size:14px;">✔</span>';
+          td.innerHTML = '<span style="display:inline-block;padding:3px 10px;border-radius:20px;background:rgba(74,222,128,.18);border:1px solid rgba(74,222,128,.5);color:#4ade80;font-size:12px;font-weight:800;letter-spacing:.5px;">★ SIG</span>';
         } else {
-          td.innerHTML = '<span style="color:#64748b;font-weight:400;font-size:14px;">✖</span>';
+          td.innerHTML = '<span style="display:inline-block;padding:3px 10px;border-radius:20px;background:rgba(100,116,139,.12);border:1px solid rgba(100,116,139,.3);color:#94a3b8;font-size:12px;font-weight:700;letter-spacing:.5px;">ns</span>';
         }
         tr.appendChild(td);
         
@@ -1903,14 +1912,10 @@
       if (radio) radio.checked = true;
       renderCompareStatsRow(s, e);
       refreshSettingsVisibility();
-      updatePosthocOptions(); // sets correct options for current framework first
-      // Now restore saved values — only if they exist in the current option list
+      // Restore saved method if present, then let updatePosthocOptions correct cross-framework mismatches
       const phm = document.getElementById("setPosthocMethod");
-      if (phm && s.posthocMethod) {
-        const validOpts = Array.from(phm.options).map(function(o){ return o.value; });
-        if (validOpts.indexOf(s.posthocMethod) >= 0) phm.value = s.posthocMethod;
-        // else leave updatePosthocOptions' default (selectedIndex 0)
-      }
+      if (phm && s.posthocMethod) phm.value = s.posthocMethod;
+      updatePosthocOptions(); // resets to Dunn/GH if saved value is wrong for active framework
       const phc = document.getElementById("setPosthocCorrection"); if (phc) phc.value = s.posthocCorrection || "holm";
       const ksum = e.kplusSummary || {};
       const ob = r.omnibus || {};

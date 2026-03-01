@@ -797,19 +797,17 @@
       var sel = document.getElementById("setPosthocMethod");
       if (!sel) return;
       var isNonParam = primaryFramework === "nonparametric" || currentPrimaryTest === "kruskal";
-      var options = isNonParam
-        ? [
-            { v: "dunn", t: "Dunn" },
-            { v: "conover", t: "Conover" }
-          ]
-        : [
-            { v: "games-howell", t: "Games-Howell" },
-            { v: "tukey", t: "Tukey HSD" }
-          ];
+      var opts = isNonParam
+        ? [{ v: "dunn", t: "Dunn" }, { v: "conover", t: "Conover" }]
+        : [{ v: "games-howell", t: "Games-Howell" }, { v: "tukey", t: "Tukey HSD" }];
       var current = sel.value;
-      sel.innerHTML = options.map(function(o){ return '<option value="' + o.v + '">' + o.t + '</option>'; }).join("");
-      var keep = options.some(function(o){ return o.v === current; });
-      if (keep) { sel.value = current; } else { sel.selectedIndex = 0; }
+      var keep = opts.some(function(o){ return o.v === current; });
+      // Rebuild via DOM constructor — most reliable in WebView2
+      while (sel.options.length) sel.remove(0);
+      opts.forEach(function(o, i){
+        var selected = keep ? (o.v === current) : (i === 0);
+        sel.add(new Option(o.t, o.v, selected, selected));
+      });
     }
     function setFrameworkButtons(mode){
       primaryFramework = mode === "nonparametric" ? "nonparametric" : "parametric";

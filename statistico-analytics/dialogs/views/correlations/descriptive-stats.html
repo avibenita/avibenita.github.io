@@ -82,11 +82,12 @@
     
     html,body{height:100%;margin:0;padding:0;}
     body{background:var(--surface-0);color:var(--text-primary);font-family:'Segoe UI', Tahoma, sans-serif;overflow-x:hidden;display:flex;flex-direction:column;min-height:100vh;}
-    .wrap{display:flex;justify-content:stretch;padding:12px;flex:1;min-height:0;box-sizing:border-box;}
-    .card{width:100%;background:var(--surface-1);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.35);overflow:hidden;height:100%;display:flex;flex-direction:column;}
-    .card-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;color:var(--accent-1);font-weight:700;letter-spacing:.2px;flex-shrink:0;}
-    .card-body{padding:10px;flex:1;overflow:hidden;display:flex;flex-direction:column;}
-    .card-body > #histogram-panel{margin-top:-15px;}
+    .wrap{display:flex;flex-direction:column;gap:10px;padding:10px;flex:1;min-height:0;overflow-y:auto;box-sizing:border-box;}
+    .card{width:100%;background:var(--surface-1);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.35);overflow:hidden;display:flex;flex-direction:column;}
+    #stats-card{flex:0 0 auto;}
+    #histogram-panel{flex:1 1 0;min-height:360px;display:none;}
+    .card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;color:var(--accent-1);font-weight:700;letter-spacing:.2px;flex-shrink:0;border-bottom:1px solid var(--border);}
+    .card-body{padding:10px;flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;}
     .control-group {display: flex;align-items: center;gap: 10px;}
     .decimal-control {display: flex;align-items: center;gap: 5px;}
     .decimal-control label {font-size: 14px;color: var(--text-secondary);font-weight: 500;}
@@ -107,11 +108,11 @@
     }
     
     /* Histogram and Chart Styles */
-    #histogram-panel { width: 100%; display: none; transition: opacity 0.2s ease; }
-    .chart-container { height: 280px !important; padding: 4px !important; }
-    .flex-container { display: flex; gap: 20px; align-items: flex-start; }
-    .chart-wrapper { flex: 2; min-width: 0; }
-    .summary-container { flex: 1; min-width: 200px; }
+    .hist-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .chart-container { flex: 1; min-height: 0; height: 100% !important; padding: 4px !important; }
+    .flex-container { display: flex; gap: 20px; flex: 1; min-height: 0; align-items: stretch; }
+    .chart-wrapper { flex: 2; min-width: 0; display: flex; flex-direction: column; }
+    .summary-container { flex: 0 0 220px; display: flex; flex-direction: column; justify-content: space-between; }
     .summary-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
     .summary-table { width: 100%; border-collapse: collapse; }
     .summary-table td { padding: 5px 0; border-bottom: 1px solid var(--border); }
@@ -159,7 +160,8 @@
 </head>
 <body>
   <div class="wrap">
-    <section class="card">
+    <!-- Panel 1: Stats table -->
+    <section class="card" id="stats-card">
       <div class="card-head">
         <div>Descriptive Statistics</div>
         <div class="control-group">
@@ -201,35 +203,28 @@
           </table>
         </div>
       </div>
+    </section>
 
-      <!-- Histogram panel (initially hidden) - back inside main card -->
-      <div id="histogram-panel" style="display: none;">
-        <div class="card-head">
-          <span id="histogram-title">Histogram</span>
-          <div class="control-group">
-            <label for="num-bins">Bins:</label>
-            <input type="range" id="num-bins" min="5" max="20" value="10" style="width: 100px;">
-            <span id="bins-value">10</span>
-            
-            <label for="show-normal" style="margin-left: 15px;">Show Normal:</label>
-            <input type="checkbox" id="show-normal" checked>
-          </div>
+    <!-- Panel 2: Histogram (separate card, initially hidden) -->
+    <section class="card" id="histogram-panel">
+      <div class="card-head">
+        <span id="histogram-title" style="font-size:14px;">Histogram</span>
+        <div class="control-group">
+          <label for="num-bins">Bins:</label>
+          <input type="range" id="num-bins" min="5" max="20" value="10" style="width: 100px;">
+          <span id="bins-value">10</span>
+          <label for="show-normal" style="margin-left: 15px;">Show Normal:</label>
+          <input type="checkbox" id="show-normal" checked>
         </div>
-        <div class="card-body">
-          <div class="flex-container">
-            <div class="chart-wrapper">
-              <div class="chart-container" id="histogram-container">
-                <!-- D3 histogram will be rendered here -->
-              </div>
-            </div>
-            <div class="summary-container">
-              <table class="summary-table" id="summary-table">
-                <!-- Summary statistics will be populated here -->
-              </table>
-              <button class="normality-button" onclick="openNormalityModal()">
-                Normality Tests
-              </button>
-            </div>
+      </div>
+      <div class="card-body hist-body">
+        <div class="flex-container">
+          <div class="chart-wrapper">
+            <div class="chart-container" id="histogram-container"></div>
+          </div>
+          <div class="summary-container">
+            <table class="summary-table" id="summary-table"></table>
+            <button class="normality-button" onclick="openNormalityModal()">Normality Tests</button>
           </div>
         </div>
       </div>
@@ -749,11 +744,11 @@
           // Show histogram without calling renderTable again
           document.getElementById('histogram-title').textContent = `${VarNameSelected}`;
           const panel = document.getElementById('histogram-panel');
-          panel.style.display = 'block';
-          void panel.offsetWidth;
+          panel.style.display = 'flex';
           panel.classList.add('active');
-          renderHistogram();
           updateSummaryTable();
+          // Let the browser compute the panel's dimensions before rendering
+          requestAnimationFrame(() => renderHistogram());
           if (document.getElementById('normality-modal').style.display === 'block') {
             refreshNormalityFromSelection();
           }
@@ -801,12 +796,10 @@
       document.getElementById('histogram-title').textContent = `${VarNameSelected}`;
       
       const panel = document.getElementById('histogram-panel');
-      panel.style.display = 'block';
-      void panel.offsetWidth;
+      panel.style.display = 'flex';
       panel.classList.add('active');
-      
-      renderHistogram();
       updateSummaryTable();
+      requestAnimationFrame(() => renderHistogram());
       if (document.getElementById('normality-modal').style.display === 'block') {
         refreshNormalityFromSelection();
       }
@@ -948,7 +941,13 @@
       // Destroy existing chart to avoid duplicates
       if (window._histogramChart) {
         try { window._histogramChart.destroy(); } catch(e) {}
+        window._histogramChart = null;
       }
+
+      // Ensure the container has explicit height from its flex parent
+      const container = document.getElementById('histogram-container');
+      const parentHeight = container.parentElement ? container.parentElement.clientHeight : 0;
+      if (parentHeight > 0) container.style.height = parentHeight + 'px';
 
       window._histogramChart = Highcharts.chart('histogram-container', {
         chart: {
@@ -989,6 +988,8 @@
         series: series,
         credits: { enabled: false }
       });
+      // Ensure chart fills its container after layout settles
+      setTimeout(() => { if (window._histogramChart) window._histogramChart.reflow(); }, 50);
     }
 
     // Modal functions
@@ -1446,11 +1447,9 @@
         }
       });
 
-      // Add window resize event listener
+      // Reflow chart on resize (lightweight — no full re-render)
       window.addEventListener('resize', () => {
-        if (selectedRow) {
-          renderHistogram();
-        }
+        if (window._histogramChart) window._histogramChart.reflow();
       });
 
       if (!window.__INJECTED_FROM_VB6__) {

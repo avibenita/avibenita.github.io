@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-02-27-laptop-frame');
+console.log('📦 Loading shared-header.js VERSION 2026-03-02-corr-tabs');
 
 const StatisticoHeader = {
   currentView: 'histogram',
@@ -184,24 +184,20 @@ const StatisticoHeader = {
             <span id="headerSampleSize">(n=${this.sampleSize})</span>
           </div>
         </div>
-        <div class="header-right">
-          ${this.module === 'univariate' ? '' : this.renderNavigation()}
-        </div>
+        <div class="header-right"></div>
       </div>
     `;
 
-    const headerHTML = this.module === 'univariate'
-      ? `
-        <div class="statistico-shell">
-          ${topHeader}
-          <div class="statistico-navrow">
-            <div class="navrow-tabs" role="tablist" aria-label="Univariate workflow views">
-              ${this.renderNavigation()}
-            </div>
+    const headerHTML = `
+      <div class="statistico-shell">
+        ${topHeader}
+        <div class="statistico-navrow">
+          <div class="navrow-tabs" role="tablist" aria-label="${this.module === 'univariate' ? 'Univariate workflow views' : 'Correlations views'}">
+            ${this.renderNavigation()}
           </div>
         </div>
-      `
-      : topHeader;
+      </div>
+    `;
     
     // Insert into header-container if it exists, otherwise at beginning of body
     const headerContainer = document.getElementById('header-container');
@@ -306,13 +302,26 @@ const StatisticoHeader = {
       `;
     }
 
+    // Correlations module — render as a single row of tabs
+    const views = this.getNavigationItems();
+    const renderTabButton = (view) => {
+      if (view.id === 'separator' || view.isSeparator) return '';
+      const isDisabled = !view.file || view.isDisabled;
+      const isActive = view.id === this.currentView;
+      return `
+        <button class="header-tab ${isActive ? 'active' : ''} ${isDisabled ? 'disabled' : ''}"
+                role="tab"
+                aria-selected="${isActive ? 'true' : 'false'}"
+                ${isDisabled ? 'disabled' : ''}
+                ${!isDisabled ? `onclick="StatisticoHeader.navigateTo('${view.file}')"` : ''}>
+          ${view.label}${isDisabled ? ' <span style="opacity:0.5;font-size:10px;">(Soon)</span>' : ''}
+        </button>
+      `;
+    };
+
     return `
-      <button class="dropdown-btn" onclick="StatisticoHeader.toggleDropdown()">
-        <span>Advanced Analysis Options</span>
-        <i class="fa-solid fa-chevron-down"></i>
-      </button>
-      <div class="dropdown-content" id="dropdownMenu">
-        ${this.renderDropdownItems()}
+      <div class="header-tab-row-tabs" role="tablist" aria-label="Correlations views">
+        ${views.map(renderTabButton).join('')}
       </div>
     `;
   },
@@ -404,9 +413,6 @@ const StatisticoHeader = {
       return;
     }
 
-    // Close dropdown after selection (for correlations dropdown mode)
-    this.toggleDropdown();
-    
     try {
       
       // Check if Office is available

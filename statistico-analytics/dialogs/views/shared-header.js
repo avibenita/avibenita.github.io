@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-02-004');
+console.log('📦 Loading shared-header.js VERSION 2026-03-02-006');
 
 const StatisticoHeader = {
   currentView: 'histogram',
@@ -177,7 +177,7 @@ const StatisticoHeader = {
           </div>
         </div>
         <div class="header-center">
-          <div class="header-view-name">${viewTitles[this.currentView] || 'Analysis'}</div>
+          <div class="header-view-name" id="headerViewName">${viewTitles[this.currentView] || 'Analysis'}</div>
           <div class="header-variable">
             <span id="headerVariableName">${this.variableName}</span>
             <span id="headerSampleSize">(n=${this.sampleSize})</span>
@@ -216,6 +216,8 @@ const StatisticoHeader = {
 
     // Trigger subtle module-name reveal animation
     this.revealModuleName();
+    // Trigger view-name slide-in animation
+    this.revealViewName();
 
     // Inject "All rights reserved" footer at the bottom of the frame (once)
     if (!document.querySelector('.statistico-footer')) {
@@ -236,6 +238,17 @@ const StatisticoHeader = {
     el.classList.remove('is-revealing');
     void el.offsetWidth; // force reflow to restart the animation
     el.classList.add('is-revealing');
+  },
+
+  /**
+   * Trigger the view-name slide-from-left animation (re-triggereable)
+   */
+  revealViewName() {
+    const el = document.getElementById('headerViewName');
+    if (!el) return;
+    el.classList.remove('is-sliding-in');
+    void el.offsetWidth; // force reflow
+    el.classList.add('is-sliding-in');
   },
 
   /**

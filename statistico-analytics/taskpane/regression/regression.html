@@ -3,310 +3,565 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Regression Analysis - Statistico Analytics</title>
-  
-  <!-- Font Awesome -->
+  <title>Regression Analysis – Statistico Analytics</title>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
-  
-  <!-- Shared Styles -->
-  <link rel="stylesheet" href="../../src/shared/css/taskpane-light.css">
-  <link rel="stylesheet" href="../../src/shared/css/data-input-panel.css">
-</head>
 
+  <style>
+    /* ── Reset & base ─────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 13px;
+      color: #1f2937;
+      background: #f3f4f6;
+    }
+
+    /* ── Module header ────────────────────────────────────── */
+    .module-header {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px;
+      background: #fff;
+      border-bottom: 2px solid #e5e7eb;
+    }
+    .module-header-title {
+      display: flex; align-items: center; gap: 7px;
+      font-weight: 700; font-size: 14px; color: #1f2937;
+    }
+    .module-header-title i { color: #2563eb; }
+    .back-btn {
+      display: flex; align-items: center; gap: 5px;
+      padding: 4px 10px;
+      background: none; border: 1px solid #e5e7eb; border-radius: 6px;
+      font-size: 12px; color: #6b7280; cursor: pointer;
+      transition: background .15s;
+    }
+    .back-btn:hover { background: #f9fafb; color: #374151; }
+
+    /* ── Main content ─────────────────────────────────────── */
+    .taskpane-content {
+      padding: 12px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+
+    /* ── Section card ─────────────────────────────────────── */
+    .section-card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .section-label {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 12px;
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .6px; color: #6b7280;
+      background: #f9fafb;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .section-body { padding: 10px 12px; }
+
+    /* ── Saved models row ────────────────────────────────── */
+    .saved-row { display: flex; gap: 6px; align-items: center; }
+    .saved-select {
+      flex: 1; min-width: 0;
+      padding: 7px 10px;
+      font-size: 12px; color: #1f2937;
+      border: 1px solid #d1d5db; border-radius: 6px;
+      background: #fff; cursor: pointer;
+    }
+    .saved-select:focus { outline: 2px solid #2563eb; border-color: #2563eb; }
+    .reset-btn {
+      flex-shrink: 0; width: 30px; height: 30px;
+      display: flex; align-items: center; justify-content: center;
+      border: 1px solid #fca5a5; border-radius: 6px;
+      background: #fff; color: #ef4444;
+      font-size: 13px; cursor: pointer; transition: background .15s;
+    }
+    .reset-btn:hover:not(:disabled) { background: #fef2f2; }
+    .reset-btn:disabled { opacity: .3; cursor: default; }
+
+    /* ── Segmented radio row ────────────────────────────── */
+    .radio-row {
+      display: flex; gap: 3px;
+      background: #f3f4f6; border-radius: 7px; padding: 3px;
+    }
+    .radio-row label {
+      flex: 1;
+      display: flex; align-items: center; justify-content: center; gap: 4px;
+      padding: 6px 3px;
+      border-radius: 5px;
+      font-size: 11.5px; color: #6b7280;
+      cursor: pointer; user-select: none;
+      transition: all .15s;
+    }
+    .radio-row input[type=radio] { display: none; }
+    .radio-row label.active {
+      background: #fff; color: #2563eb; font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0,0,0,.1);
+    }
+
+    /* ── Named range list ───────────────────────────────── */
+    .named-list {
+      margin-top: 8px;
+      border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden;
+    }
+    .named-list select {
+      width: 100%; border: none;
+      padding: 6px 8px; font-size: 12px;
+      background: #fff; color: #1f2937;
+    }
+    .named-list select:focus { outline: none; }
+
+    /* ── Range address badge ────────────────────────────── */
+    .range-badge {
+      display: none;
+      margin-top: 8px; padding: 6px 10px;
+      background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px;
+      font-size: 11px; color: #166534; font-family: 'Consolas', monospace;
+      word-break: break-all;
+    }
+    .range-badge.error {
+      background: #fff7ed; border-color: #fed7aa; color: #9a3412;
+    }
+
+    /* ── Configure / Run button ─────────────────────────── */
+    .configure-btn {
+      width: 100%;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 12px;
+      font-size: 14px; font-weight: 600; color: #fff;
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      border: none; border-radius: 8px;
+      cursor: pointer; transition: all .2s;
+    }
+    .configure-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(37,99,235,.35);
+    }
+    .configure-btn:disabled { background: #cbd5e1; cursor: not-allowed; transform: none; box-shadow: none; }
+    .configure-btn.run-mode { background: linear-gradient(135deg, #059669 0%, #047857 100%); }
+    .configure-btn.run-mode:hover:not(:disabled) { box-shadow: 0 4px 12px rgba(5,150,105,.35); }
+
+    /* ── Hint text ──────────────────────────────────────── */
+    .hint { font-size: 11px; color: #9ca3af; text-align: center; }
+  </style>
+</head>
 <body>
-  <div class="taskpane-container">
-    <!-- Header -->
-    <div class="module-header">
-      <div class="module-header-title">
-        <i class="fa-solid fa-chart-line"></i>
-        Regression Analysis
-      </div>
-      <button class="back-btn" onclick="goBack()">
-        <i class="fa-solid fa-arrow-left"></i>
-        Back
-      </button>
+
+  <!-- Header -->
+  <div class="module-header">
+    <div class="module-header-title">
+      <i class="fa-solid fa-chart-line"></i>
+      Regression Analysis
     </div>
-    
-    <!-- Main Content -->
-    <div class="taskpane-content">
-      
-      <!-- Saved Analyses Panel -->
-      <div id="savedAnalysesContainer" style="margin-bottom: 16px;"></div>
-      
-      <!-- Shared Data Range Selection Component -->
-      <div id="dataInputPanelContainer"></div>
-      
-      <!-- Regression-Specific Column Selection Component -->
-      <div id="regressionInputPanelContainer"></div>
-      
-    </div>
+    <button class="back-btn" onclick="goBack()">
+      <i class="fa-solid fa-arrow-left"></i> Back
+    </button>
   </div>
-  
+
+  <div class="taskpane-content">
+
+    <!-- ① Saved Models ─────────────────────────────────── -->
+    <div class="section-card">
+      <div class="section-label">
+        <i class="fa-solid fa-folder-open"></i> Saved Models
+      </div>
+      <div class="section-body">
+        <div class="saved-row">
+          <select id="savedModelSelect" class="saved-select" onchange="onSavedModelChange()">
+            <option value="">— New model (configure from scratch) —</option>
+          </select>
+          <button class="reset-btn" id="resetModelBtn" onclick="resetSavedModel()" disabled title="Clear selection">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ② Pick Range ────────────────────────────────────── -->
+    <div class="section-card">
+      <div class="section-label">
+        <i class="fa-solid fa-table-cells-large"></i> Pick Range
+      </div>
+      <div class="section-body">
+
+        <!-- 3 radio buttons as a segmented control -->
+        <div class="radio-row">
+          <label id="lblNamed" class="active" onclick="setRangeMode('named')">
+            <input type="radio" name="rm" value="named" checked>
+            <i class="fa-solid fa-bookmark"></i> Named
+          </label>
+          <label id="lblUsed" onclick="setRangeMode('used')">
+            <input type="radio" name="rm" value="used">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Used Range
+          </label>
+          <label id="lblSelection" onclick="setRangeMode('selection')">
+            <input type="radio" name="rm" value="selection">
+            <i class="fa-solid fa-hand-pointer"></i> XL Selection
+          </label>
+        </div>
+
+        <!-- Named range dropdown list -->
+        <div class="named-list" id="namedRangePanel">
+          <select id="namedRangeSelect" size="4" onchange="loadFromNamedRange()">
+            <option value="">— Select a named range —</option>
+          </select>
+        </div>
+
+        <!-- Range address / status -->
+        <div class="range-badge" id="rangeBadge">
+          <i class="fa-solid fa-check-circle"></i> <span id="rangeBadgeText"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ③ Configure / Run button ─────────────────────────── -->
+    <button class="configure-btn" id="configureBtn" disabled onclick="onConfigureClick()">
+      <i class="fa-solid fa-sliders" id="cfgIcon"></i>
+      <span id="cfgLabel">Configure Analysis</span>
+    </button>
+    <p class="hint" id="hintText">Select a data range to continue</p>
+
+  </div><!-- /taskpane-content -->
+
   <!-- Scripts -->
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  
-  <!-- Saved Analyses Manager -->
   <script src="../../src/shared/js/core/saved-analyses-manager.js"></script>
-  
-  <!-- Shared Data Input Panel -->
-  <script src="../../src/shared/js/components/DataInputPanel.js"></script>
-  
-  <!-- Regression Input Panel Logic -->
-  <script src="regression-input-panel.js"></script>
-  
+
   <script>
-    // Go back to hub
-    function goBack() {
-      window.location.href = '../hub.html';
+    // ================================================================
+    // STATE
+    // ================================================================
+    let rangeData        = null;   // 2-D array including header row
+    let rangeAddress     = '';
+    let rangeMode        = 'named'; // 'named' | 'used' | 'selection'
+    let selectedModelId  = '';      // '' = new model
+    let savedModels      = [];
+    let activeDialog     = null;
+
+    // ================================================================
+    // NAVIGATION
+    // ================================================================
+    function goBack() { window.location.href = '../hub.html'; }
+
+    // ================================================================
+    // RANGE MODE (segmented control)
+    // ================================================================
+    function setRangeMode(mode) {
+      rangeMode = mode;
+      document.getElementById('lblNamed')    .classList.toggle('active', mode === 'named');
+      document.getElementById('lblUsed')     .classList.toggle('active', mode === 'used');
+      document.getElementById('lblSelection').classList.toggle('active', mode === 'selection');
+      document.querySelector(`input[value="${mode}"]`).checked = true;
+
+      // Named-range list visibility
+      document.getElementById('namedRangePanel').style.display = (mode === 'named') ? 'block' : 'none';
+
+      // Trigger load for non-named modes
+      if (mode === 'used')      autoDetectRange();
+      else if (mode === 'selection') useSelection();
     }
-    
-    // Initialize when Office is ready
-    Office.onReady((info) => {
+
+    // ================================================================
+    // NAMED RANGES
+    // ================================================================
+    async function loadNamedRanges() {
+      try {
+        await Excel.run(async (ctx) => {
+          const names = ctx.workbook.names.load('items');
+          await ctx.sync();
+          const sel = document.getElementById('namedRangeSelect');
+          sel.innerHTML = '<option value="">— Select a named range —</option>';
+          names.items.forEach(n => {
+            const o = document.createElement('option');
+            o.value = o.textContent = n.name;
+            sel.appendChild(o);
+          });
+        });
+      } catch(e) { console.warn('Named ranges unavailable:', e); }
+    }
+
+    async function loadFromNamedRange() {
+      const name = document.getElementById('namedRangeSelect').value;
+      if (!name) return;
+      showRangeLoading();
+      try {
+        await Excel.run(async (ctx) => {
+          const rng = ctx.workbook.names.getItem(name).getRange();
+          rng.load(['values','address']);
+          await ctx.sync();
+          applyRangeData(rng.values, rng.address);
+        });
+      } catch(e) { showRangeError('Could not load: ' + e.message); }
+    }
+
+    // ================================================================
+    // USED RANGE
+    // ================================================================
+    async function autoDetectRange() {
+      showRangeLoading();
+      try {
+        await Excel.run(async (ctx) => {
+          const rng = ctx.workbook.worksheets.getActiveWorksheet().getUsedRange();
+          rng.load(['values','address']);
+          await ctx.sync();
+          applyRangeData(rng.values, rng.address);
+        });
+      } catch(e) { showRangeError('Could not detect used range'); }
+    }
+
+    // ================================================================
+    // XL SELECTION
+    // ================================================================
+    async function useSelection() {
+      showRangeLoading();
+      try {
+        await Excel.run(async (ctx) => {
+          const rng = ctx.workbook.getSelectedRange();
+          rng.load(['values','address']);
+          await ctx.sync();
+          if (!rng.values || rng.values.length < 2)
+            return showRangeError('Selection too small — needs a header row + data');
+          applyRangeData(rng.values, rng.address);
+        });
+      } catch(e) { showRangeError('Could not read selection'); }
+    }
+
+    async function watchSelection() {
+      try {
+        await Excel.run(async (ctx) => {
+          ctx.workbook.onSelectionChanged.add(async () => {
+            if (rangeMode === 'selection') await useSelection();
+          });
+          await ctx.sync();
+        });
+      } catch(e) {}
+    }
+
+    // ================================================================
+    // RANGE HELPERS
+    // ================================================================
+    function applyRangeData(values, address) {
+      if (!values || values.length < 2)
+        return showRangeError('Need at least 2 rows (header + 1 data row)');
+      rangeData    = values;
+      rangeAddress = address || '';
+      const cols   = (values[0] || []).length;
+      const rows   = values.length - 1;
+      showRangeBadge(`${address}  –  ${rows} rows × ${cols} cols`, false);
+      updateConfigureBtn();
+    }
+
+    function showRangeLoading() {
+      showRangeBadge('Loading…', false);
+    }
+
+    function showRangeError(msg) {
+      rangeData = null;
+      showRangeBadge(msg, true);
+      updateConfigureBtn();
+    }
+
+    function showRangeBadge(text, isError) {
+      const badge = document.getElementById('rangeBadge');
+      const txt   = document.getElementById('rangeBadgeText');
+      badge.className = 'range-badge' + (isError ? ' error' : '');
+      badge.style.display = 'block';
+      txt.textContent = text;
+    }
+
+    // ================================================================
+    // SAVED MODELS
+    // ================================================================
+    async function loadSavedModels() {
+      try {
+        savedModels = await SavedAnalysesManager.getAnalysesByModule('regression');
+        savedModels.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        const sel = document.getElementById('savedModelSelect');
+        sel.innerHTML = '<option value="">— New model (configure from scratch) —</option>';
+        savedModels.forEach(m => {
+          const xCount = (m.config?.xn?.length || 0) + (m.config?.xc?.length || 0);
+          const o = document.createElement('option');
+          o.value = m.id;
+          o.textContent = `${m.name}  (${m.config?.y || 'Y'} ~ ${xCount} pred.)`;
+          sel.appendChild(o);
+        });
+      } catch(e) { console.warn('Could not load saved models:', e); }
+    }
+
+    function onSavedModelChange() {
+      selectedModelId = document.getElementById('savedModelSelect').value;
+      document.getElementById('resetModelBtn').disabled = !selectedModelId;
+      updateConfigureBtn();
+
+      // Auto-launch results if range is already selected
+      if (selectedModelId && rangeData) {
+        const m = savedModels.find(m => m.id === selectedModelId);
+        if (m) {
+          sessionStorage.setItem('regressionModelSpec', JSON.stringify(m.config));
+          openRegressionCoefficientsDialog();
+        }
+      }
+    }
+
+    function resetSavedModel() {
+      document.getElementById('savedModelSelect').value = '';
+      selectedModelId = '';
+      document.getElementById('resetModelBtn').disabled = true;
+      sessionStorage.removeItem('regressionModelSpec');
+      updateConfigureBtn();
+    }
+
+    // ================================================================
+    // CONFIGURE BUTTON STATE
+    // ================================================================
+    function updateConfigureBtn() {
+      const btn   = document.getElementById('configureBtn');
+      const lbl   = document.getElementById('cfgLabel');
+      const icon  = document.getElementById('cfgIcon');
+      const hint  = document.getElementById('hintText');
+      const hasSaved = !!selectedModelId;
+      const hasRange = !!rangeData;
+
+      btn.disabled = !hasRange;
+
+      if (hasSaved) {
+        btn.classList.add('run-mode');
+        icon.className = 'fa-solid fa-play';
+        lbl.textContent = 'Run Saved Model';
+        const m = savedModels.find(m => m.id === selectedModelId);
+        hint.textContent = m ? m.name : '';
+      } else {
+        btn.classList.remove('run-mode');
+        icon.className = 'fa-solid fa-sliders';
+        lbl.textContent = 'Configure Analysis';
+        hint.textContent = hasRange ? 'Ready — click to open the model builder' : 'Select a data range to continue';
+      }
+    }
+
+    function onConfigureClick() {
+      if (!rangeData) return;
+      if (selectedModelId) {
+        const m = savedModels.find(m => m.id === selectedModelId);
+        if (m) sessionStorage.setItem('regressionModelSpec', JSON.stringify(m.config));
+        openRegressionCoefficientsDialog();
+      } else {
+        openModelBuilder();
+      }
+    }
+
+    // ================================================================
+    // DIALOGS
+    // ================================================================
+    function getDialogsBaseUrl() {
+      const href = window.location.href;
+      if (href.includes('/taskpane/')) return `${href.split('/taskpane/')[0]}/dialogs/views/`;
+      return `${window.location.origin}/dialogs/views/`;
+    }
+
+    function openModelBuilder() {
+      if (!rangeData) return;
+      const url = `${getDialogsBaseUrl()}regression/regression-input.html`;
+      Office.context.ui.displayDialogAsync(url, { height: 90, width: 30, displayInIframe: false }, (res) => {
+        if (res.status === Office.AsyncResultStatus.Failed) {
+          alert('Could not open dialog: ' + res.error.message); return;
+        }
+        activeDialog = res.value;
+        setTimeout(() => sendBuilderData(), 600);
+
+        activeDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
+          try {
+            const msg = JSON.parse(arg.message);
+            if (msg.action === 'ready' || msg.action === 'requestData') {
+              sendBuilderData();
+            } else if (msg.action === 'regressionModel') {
+              const spec = msg.payload || msg.data || {};
+              sessionStorage.setItem('regressionModelSpec', JSON.stringify(spec));
+              activeDialog.close(); activeDialog = null;
+              setTimeout(() => openRegressionCoefficientsDialog(), 500);
+            } else if (msg.action === 'close') {
+              activeDialog.close(); activeDialog = null;
+            }
+          } catch(e) {}
+        });
+        activeDialog.addEventHandler(Office.EventType.DialogEventReceived, () => { activeDialog = null; });
+      });
+    }
+
+    function openRegressionCoefficientsDialog() {
+      const url = `${getDialogsBaseUrl()}regression/regression-coefficients.html`;
+      Office.context.ui.displayDialogAsync(url, { height: 90, width: 70, displayInIframe: false }, (res) => {
+        if (res.status === Office.AsyncResultStatus.Failed) {
+          alert('Could not open dialog: ' + res.error.message); return;
+        }
+        activeDialog = res.value;
+
+        activeDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
+          try {
+            const msg = JSON.parse(arg.message);
+            if (msg.action === 'ready' || msg.action === 'requestData') sendRegressionResults();
+            else if (msg.action === 'SAVE_ANALYSIS') handleSaveFromDialog(msg.data);
+            else if (msg.action === 'close') {
+              activeDialog.close(); activeDialog = null; loadSavedModels();
+            }
+          } catch(e) {}
+        });
+        activeDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
+          activeDialog = null; loadSavedModels();
+        });
+        setTimeout(() => sendRegressionResults(), 1200);
+      });
+    }
+
+    function sendBuilderData() {
+      if (!activeDialog || !rangeData) return;
+      const savedSpec = sessionStorage.getItem('regressionModelSpec');
+      activeDialog.messageChild(JSON.stringify({
+        type: 'REGRESSION_DATA',
+        payload: {
+          headers: rangeData[0] || [],
+          rows: rangeData.slice(1),
+          address: rangeAddress,
+          savedModelSpec: savedSpec ? JSON.parse(savedSpec) : null
+        }
+      }));
+    }
+
+    function sendRegressionResults() {
+      if (!activeDialog || !rangeData) return;
+      const modelSpec = JSON.parse(sessionStorage.getItem('regressionModelSpec') || '{}');
+      activeDialog.messageChild(JSON.stringify({
+        type: 'REGRESSION_RESULTS',
+        payload: {
+          headers: rangeData[0] || [],
+          rows: rangeData.slice(1),
+          address: rangeAddress,
+          modelSpec
+        }
+      }));
+    }
+
+    async function handleSaveFromDialog(analysisData) {
+      try {
+        if (typeof SavedAnalysesManager !== 'undefined') {
+          await SavedAnalysesManager.saveAnalysis(analysisData);
+          await loadSavedModels();
+        }
+      } catch(e) { console.error('Save failed:', e); }
+    }
+
+    // ================================================================
+    // INIT
+    // ================================================================
+    Office.onReady(async (info) => {
       if (info.host === Office.HostType.Excel) {
-        console.log('Regression Analysis Module Loaded');
-        
-        // Load saved analyses panel HTML
-        fetch('../../src/shared/components/saved-analyses-panel.html')
-          .then(response => response.text())
-          .then(html => {
-            document.getElementById('savedAnalysesContainer').innerHTML = html;
-            // Initialize saved analyses
-            initSavedAnalysesPanel();
-          })
-          .catch(error => console.error('Error loading saved analyses panel:', error));
-        
-        // Load shared data input panel HTML
-        fetch('../../src/shared/components/data-input-panel.html')
-          .then(response => response.text())
-          .then(html => {
-            document.getElementById('dataInputPanelContainer').innerHTML = html;
-            // Initialize the shared data input panel
-            initDataInputPanel();
-          })
-          .catch(error => console.error('Error loading data input panel:', error));
-        
-        // Load regression input panel HTML
-        fetch('regression-input-panel.html')
-          .then(response => response.text())
-          .then(html => {
-            document.getElementById('regressionInputPanelContainer').innerHTML = html;
-          })
-          .catch(error => console.error('Error loading regression input panel:', error));
+        await loadNamedRanges();
+        await loadSavedModels();
+        await watchSelection();
+        updateConfigureBtn();
       }
     });
-    
-    // ====================================================================
-    // SAVED ANALYSES PANEL FUNCTIONS
-    // ====================================================================
-    
-    function toggleSavedAnalysesPanel() {
-      const body = document.getElementById('savedAnalysesBody');
-      const icon = document.getElementById('savedAnalysesToggleIcon');
-      
-      if (body.style.display === 'none') {
-        body.style.display = 'block';
-        icon.classList.add('open');
-      } else {
-        body.style.display = 'none';
-        icon.classList.remove('open');
-      }
-    }
-    
-    async function initSavedAnalysesPanel() {
-      try {
-        await refreshSavedAnalysesList();
-      } catch (error) {
-        console.error('Error initializing saved analyses panel:', error);
-      }
-    }
-    
-    async function refreshSavedAnalysesList() {
-      try {
-        const analyses = await SavedAnalysesManager.getAnalysesByModule('regression');
-        const listContainer = document.getElementById('savedAnalysesList');
-        const countSpan = document.getElementById('savedCount');
-        
-        // Update count
-        countSpan.textContent = `(${analyses.length})`;
-        
-        // Clear list
-        listContainer.innerHTML = '';
-        
-        if (analyses.length === 0) {
-          listContainer.innerHTML = `
-            <div class="no-analyses-message">
-              <i class="fa-solid fa-info-circle"></i>
-              <p>No saved models yet. Run a regression and click "Save Model" to get started.</p>
-            </div>
-          `;
-          return;
-        }
-        
-        // Sort: starred first, then by date
-        analyses.sort((a, b) => {
-          if (a.starred && !b.starred) return -1;
-          if (!a.starred && b.starred) return 1;
-          return new Date(b.timestamp) - new Date(a.timestamp);
-        });
-        
-        // Create cards for each analysis
-        analyses.forEach(analysis => {
-          const card = createAnalysisCard(analysis);
-          listContainer.appendChild(card);
-        });
-        
-      } catch (error) {
-        console.error('Error refreshing saved analyses:', error);
-      }
-    }
-    
-    function createAnalysisCard(analysis) {
-      const card = document.createElement('div');
-      card.className = `analysis-card${analysis.starred ? ' starred' : ''}`;
-      
-      const timestamp = new Date(analysis.timestamp).toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-      
-      const xVars = [...(analysis.config.xn || []), ...(analysis.config.xc || [])];
-      const xVarsText = xVars.length > 0 ? xVars.slice(0, 3).join(', ') + (xVars.length > 3 ? '...' : '') : 'None';
-      
-      card.innerHTML = `
-        <div class="analysis-card-header">
-          <div class="analysis-name">
-            ${analysis.starred ? '<i class="fa-solid fa-star star-icon"></i>' : ''}
-            ${analysis.name}
-          </div>
-        </div>
-        
-        <div class="analysis-info">
-          <div><strong>Y:</strong> ${analysis.config.y || 'Not set'}</div>
-          <div><strong>X:</strong> ${xVarsText}</div>
-        </div>
-        
-        ${analysis.lastResults ? `
-          <div class="analysis-stats">
-            <div class="analysis-stat">
-              <span class="analysis-stat-label">R²</span>
-              <span class="analysis-stat-value">${analysis.lastResults.rSquared.toFixed(3)}</span>
-            </div>
-            <div class="analysis-stat">
-              <span class="analysis-stat-label">n</span>
-              <span class="analysis-stat-value">${analysis.lastResults.observations}</span>
-            </div>
-            <div class="analysis-stat">
-              <span class="analysis-stat-label">RMSE</span>
-              <span class="analysis-stat-value">${analysis.lastResults.rmse.toFixed(2)}</span>
-            </div>
-          </div>
-        ` : ''}
-        
-        <div class="analysis-actions">
-          <button class="analysis-btn analysis-btn-load" onclick="loadSavedAnalysis('${analysis.id}')">
-            <i class="fa-solid fa-folder-open"></i> Load
-          </button>
-          <button class="analysis-btn analysis-btn-run" onclick="runSavedAnalysis('${analysis.id}')">
-            <i class="fa-solid fa-play"></i> Run
-          </button>
-          <button class="analysis-btn analysis-btn-delete" onclick="deleteSavedAnalysis('${analysis.id}')">
-            <i class="fa-solid fa-trash"></i>
-          </button>
-        </div>
-        
-        <div class="analysis-timestamp">
-          <i class="fa-solid fa-clock"></i> ${timestamp}
-        </div>
-      `;
-      
-      return card;
-    }
-    
-    async function loadSavedAnalysis(analysisId) {
-      try {
-        const analysis = await SavedAnalysesManager.loadAnalysisById(analysisId);
-        if (!analysis || analysis.module !== 'regression') {
-          console.error('Invalid analysis');
-          return;
-        }
-        
-        console.log('📂 Loading saved analysis:', analysis.name);
-        console.log('  Config:', analysis.config);
-        
-        // Save the model spec to sessionStorage so the model builder can restore it
-        sessionStorage.setItem('regressionModelSpec', JSON.stringify(analysis.config));
-        
-        // Open the model builder with the saved configuration
-        if (typeof openModelBuilder === 'function') {
-          openModelBuilder();
-        } else {
-          console.warn('⚠️ openModelBuilder function not available. Model config saved to sessionStorage.');
-          console.log('💡 The model builder will restore this config when opened.');
-        }
-        
-      } catch (error) {
-        console.error('Error loading analysis:', error);
-      }
-    }
-    
-    async function runSavedAnalysis(analysisId) {
-      try {
-        const analysis = await SavedAnalysesManager.loadAnalysisById(analysisId);
-        if (!analysis || analysis.module !== 'regression') {
-          console.error('Invalid analysis');
-          return;
-        }
-        
-        console.log('▶️ Running saved analysis:', analysis.name);
-        console.log('📊 Model config:', analysis.config);
-        
-        // Save the model spec to sessionStorage
-        sessionStorage.setItem('regressionModelSpec', JSON.stringify(analysis.config));
-        
-        // Check if we have the data range available
-        if (!regressionRangeData || regressionRangeData.length < 2) {
-          console.warn('⚠️ No data range selected. Please select a data range first.');
-          console.log('💡 Use "Load" button to open model builder and select data, then run from there.');
-          return;
-        }
-        
-        // Directly open the results dialog to run the regression
-        if (typeof openRegressionCoefficientsDialog === 'function') {
-          console.log('🚀 Opening regression results dialog...');
-          openRegressionCoefficientsDialog();
-        } else {
-          console.warn('⚠️ openRegressionCoefficientsDialog function not available');
-          console.log('💡 Try using the "Load" button instead to open the model builder.');
-        }
-        
-      } catch (error) {
-        console.error('Error running analysis:', error);
-      }
-    }
-    
-    async function deleteSavedAnalysis(analysisId) {
-      try {
-        const analysis = await SavedAnalysesManager.loadAnalysisById(analysisId);
-        if (!analysis) return;
-        
-        // Simple confirmation via console and direct delete
-        // In a production app, you'd want a custom confirmation UI
-        console.log(`🗑️ Deleting model: "${analysis.name}"`);
-        
-        await SavedAnalysesManager.deleteAnalysis(analysisId);
-        console.log('✅ Model deleted successfully');
-        
-        // Refresh the list
-        await refreshSavedAnalysesList();
-        
-      } catch (error) {
-        console.error('Error deleting analysis:', error);
-      }
-    }
   </script>
-  
 </body>
 </html>

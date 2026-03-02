@@ -172,8 +172,8 @@ const StatisticoHeader = {
             <i class="fa-solid fa-chart-line"></i>
           </div>
           <div class="header-module">
-            <div class="header-brand">Statistico</div>
-            <div class="header-module-name">${moduleNames[this.module] || 'Analysis'}</div>
+            <div class="header-brand">Statistico-Analytics</div>
+            <div class="header-module-name" id="headerModuleName">${moduleNames[this.module] || 'Analysis'}</div>
           </div>
         </div>
         <div class="header-center">
@@ -214,6 +214,9 @@ const StatisticoHeader = {
       mountRoot.insertAdjacentHTML('afterbegin', headerHTML);
     }
 
+    // Trigger subtle module-name reveal animation
+    this.revealModuleName();
+
     // Inject "All rights reserved" footer at the bottom of the frame (once)
     if (!document.querySelector('.statistico-footer')) {
       const footer = document.createElement('div');
@@ -224,6 +227,17 @@ const StatisticoHeader = {
     }
   },
   
+  /**
+   * Trigger the module-name reveal animation (re-triggereable)
+   */
+  revealModuleName() {
+    const el = document.getElementById('headerModuleName');
+    if (!el) return;
+    el.classList.remove('is-revealing');
+    void el.offsetWidth; // force reflow to restart the animation
+    el.classList.add('is-revealing');
+  },
+
   /**
    * Build navigation entries for current module
    */

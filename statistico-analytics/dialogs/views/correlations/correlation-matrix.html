@@ -22,8 +22,8 @@
   <script src="https://d3js.org/d3.v7.min.js"></script>
 
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260302-001">
-  <script src="../shared-header.js?v=20260302-001"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260302-002">
+  <script src="../shared-header.js?v=20260302-002"></script>
 
   <style>
     /* ── Variables ── */
@@ -1066,6 +1066,8 @@
     window.addEventListener('message', function(event) {
       if (event.data && event.data.type === 'CORRELATION_DATA') {
         correlationData = event.data.payload;
+        // Persist so other correlation views can read it via sessionStorage
+        try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch(e) {}
         renderMatrix();
       } else if (event.data && event.data.type === 'THEME_CHANGE') {
         applyTheme(event.data.theme);
@@ -1096,12 +1098,12 @@
         StatisticoHeader.init('correlation-matrix', 'Correlation Analysis', 0, 'correlations');
       }
 
-      // Check sessionStorage pre-load (e.g. from regression dialog)
+      // Check sessionStorage pre-load (e.g. after same-window tab navigation)
       const stored = sessionStorage.getItem('correlationData');
       if (stored) {
         try {
           correlationData = JSON.parse(stored);
-          sessionStorage.removeItem('correlationData');
+          // Do NOT remove — keep in sessionStorage for further tab navigations
           renderMatrix();
         } catch(e) {}
       }
@@ -1113,6 +1115,8 @@
             const msg = JSON.parse(arg.message);
             if (msg.type === 'CORRELATION_DATA' && msg.payload) {
               correlationData = msg.payload;
+              // Persist for same-window navigation to other correlation views
+              try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch(e) {}
               renderMatrix();
             }
           } catch(e) { console.error('Error parsing message:', e); }

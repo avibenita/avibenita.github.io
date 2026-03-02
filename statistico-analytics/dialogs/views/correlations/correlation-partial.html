@@ -15,8 +15,8 @@
   <script src="https://cdn.jsdelivr.net/npm/jstat@1.9.6/dist/jstat.min.js"></script>
   
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css">
-  <script src="../shared-header.js"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260302-002">
+  <script src="../shared-header.js?v=20260302-002"></script>
 
   <style>
     :root{
@@ -551,6 +551,27 @@
       if (typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.init('partial-correlations', 'Partial Correlations', 0, 'correlations');
       }
+
+      // Load from sessionStorage (same-window tab navigation)
+      const stored = sessionStorage.getItem('correlationData');
+      if (stored) {
+        try {
+          const payload = JSON.parse(stored);
+          correlationData = payload;
+          const { headers, data } = payload;
+          variableNames = headers;
+          const { correlationMatrix, nMatrix } = calculateCorrelationMatrixFromData(data, headers);
+          precomputedCorrelationMatrix = correlationMatrix;
+          precomputedNMatrix = nMatrix;
+          if (typeof StatisticoHeader !== 'undefined') {
+            StatisticoHeader.sampleSize = data ? data.length : 0;
+            StatisticoHeader.variableName = `${headers.length} Variables`;
+            StatisticoHeader.render();
+          }
+          initializeInterface();
+          setTimeout(() => generatePartialCorrelationMatrix(), 150);
+        } catch(e) { console.warn('Error reading correlationData from sessionStorage:', e); }
+      }
       
       // Listen for messages from parent
       Office.context.ui.addHandlerAsync(
@@ -574,6 +595,7 @@
 
         if (message.type === 'CORRELATION_DATA' && message.payload) {
           correlationData = message.payload;
+          try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch(e) {}
           console.log('Correlation data received:', correlationData);
           
           // Extract data
@@ -1066,3 +1088,4 @@
   </script>
 </body>
 </html>
+

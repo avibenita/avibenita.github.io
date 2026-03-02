@@ -10,8 +10,8 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/solid-gauge.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
-  <link rel="stylesheet" href="../shared-header.css">
-  <script src="../shared-header.js"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260302-002">
+  <script src="../shared-header.js?v=20260302-002"></script>
   <script src="../../shared/views/normality-view.js"></script>
   <style>
     /* Dark Theme (Default) */
@@ -530,23 +530,15 @@
       });
     } else if (typeof Office !== 'undefined') {
       Office.initialize = function() {
-        // Check if data was pre-loaded in sessionStorage (e.g., from regression dialog)
+        // Check if data was pre-loaded in sessionStorage (e.g., from tab navigation or regression dialog)
         const storedCorrelationData = sessionStorage.getItem('correlationData');
         if (storedCorrelationData) {
           try {
             const payload = JSON.parse(storedCorrelationData);
             console.log('📦 Loaded descriptive stats data from sessionStorage:', payload);
-            
-            // If data came from regression model, log it
-            if (payload.source === 'regression-model' && payload.modelInfo) {
-              console.log('📊 Showing stats for regression model:', payload.modelInfo);
-            }
-            
-            // Handle the data
+            // Handle the data — shows ALL variables from correlation analysis
             handleCorrelationData(payload);
-            
-            // Clear the sessionStorage after loading to prevent stale data
-            sessionStorage.removeItem('correlationData');
+            // Keep data in sessionStorage for back-navigation to correlation-matrix
           } catch (e) {
             console.error('Error loading data from sessionStorage:', e);
           }
@@ -1536,7 +1528,20 @@
       }
 
       console.log('🔄 Descriptive Statistics page loaded');
-      loadFromLocalStorage();
+
+      // PRIMARY: Check for correlationData passed via same-window tab navigation
+      const navCorrelData = sessionStorage.getItem('correlationData');
+      if (navCorrelData) {
+        try {
+          const payload = JSON.parse(navCorrelData);
+          console.log('📦 Loaded ALL-variable correlation data from sessionStorage (tab navigation)');
+          handleCorrelationData(payload);
+          // Keep in sessionStorage for back-navigation — do NOT remove
+        } catch(e) { console.warn('Error loading correlationData from sessionStorage:', e); }
+        // Skip other loading methods — correlation data takes priority
+      } else {
+        loadFromLocalStorage();
+      }
       
       // Check if we're in regression context (variables from regression model)
       const regressionVariables = sessionStorage.getItem('regressionModelVariables');

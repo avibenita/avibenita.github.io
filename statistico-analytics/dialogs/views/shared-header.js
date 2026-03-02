@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-02-corr-tabs');
+console.log('📦 Loading shared-header.js VERSION 2026-03-02-same-window');
 
 const StatisticoHeader = {
   currentView: 'histogram',
@@ -43,7 +43,6 @@ const StatisticoHeader = {
    * Wrap body content in a constrained centered frame for large monitors.
    */
   ensureLaptopFrame() {
-    if (this.module !== 'univariate') return;
     if (document.querySelector('.laptop-frame')) return;
 
     document.body.classList.add('statistico-dialog-sized');
@@ -403,55 +402,13 @@ const StatisticoHeader = {
    * Navigate to another view
    */
   navigateTo(filename) {
-    console.log('🔄 [v2026-02-05-003] Navigating to:', filename);
-    // Univariate behaves like Independent tabs: navigate in the same dialog window.
-    if (this.module === 'univariate') {
-      window.location.href = this.resolveDialogUrl(filename);
-      return;
+    console.log('🔄 Navigating to:', filename);
+    // All modules navigate within the same dialog window (no new dialog opened).
+    // Save correlation data to sessionStorage so the destination page can read it.
+    if (window.correlationData) {
+      try { sessionStorage.setItem('correlationData', JSON.stringify(window.correlationData)); } catch(e) {}
     }
-
-    try {
-      
-      // Check if Office is available
-      const isOfficeAvailable = typeof Office !== 'undefined' && 
-                                Office.context && 
-                                Office.context.ui;
-      
-      console.log('Office available:', isOfficeAvailable);
-      
-      if (isOfficeAvailable) {
-        // Office context - send message to parent
-        const currentData = localStorage.getItem('univariateResults');
-        if (currentData) {
-          console.log('✅ Data preserved for new view');
-        }
-        
-        const message = {
-          action: 'switchView',
-          view: filename
-        };
-        
-        console.log('📤 Sending message to parent:', message);
-        Office.context.ui.messageParent(JSON.stringify(message));
-        console.log('✅ Message sent successfully');
-      } else {
-        // Browser mode - direct navigation
-        console.log('⚠️ Browser mode - navigating directly');
-        const newUrl = filename.startsWith('http') ? filename : `./${filename}`;
-        console.log('Navigating to:', newUrl);
-        window.location.href = newUrl;
-      }
-    } catch (error) {
-      console.error('❌ Navigation error:', error);
-      // Fallback to direct navigation
-      try {
-        const newUrl = filename.startsWith('http') ? filename : `./${filename}`;
-        window.location.href = newUrl;
-      } catch (fallbackError) {
-        console.error('❌ Fallback navigation failed:', fallbackError);
-        alert(`Navigation failed. Please manually navigate to: ${filename}`);
-      }
-    }
+    window.location.href = this.resolveDialogUrl(filename);
   }
 };
 

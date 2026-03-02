@@ -20,8 +20,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/solid-gauge.js"></script>
   
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260302-001">
-  <script src="../shared-header.js?v=20260302-001"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260302-002">
+  <script src="../shared-header.js?v=20260302-002"></script>
 
   <style>
     :root {
@@ -479,6 +479,17 @@
     // Office.js initialization
     Office.onReady(() => {
       console.log('✅ Office.js ready for Reliability Analysis');
+
+      // Load from sessionStorage (same-window tab navigation)
+      const storedCorr = sessionStorage.getItem('correlationData');
+      if (storedCorr) {
+        try {
+          const data = JSON.parse(storedCorr);
+          originalRawData = data.data;
+          const dataArrays = data.data.map(row => data.headers.map(h => row[h]));
+          runReliabilityAnalysis(dataArrays, data.headers);
+        } catch(e) { console.warn('Error reading correlationData from sessionStorage:', e); }
+      }
       
       // Send ready message
       Office.context.ui.messageParent(JSON.stringify({ action: 'ready' }));
@@ -493,6 +504,7 @@
             
             if (message.type === 'CORRELATION_DATA' && message.payload) {
               const data = message.payload;
+              try { sessionStorage.setItem('correlationData', JSON.stringify(data)); } catch(e) {}
               console.log('📊 Reliability data received:', data);
               
               // Store original data
@@ -513,7 +525,7 @@
       
       // Try localStorage as fallback
       setTimeout(() => {
-        checkLocalStorage();
+        if (!storedCorr) checkLocalStorage();
       }, 500);
     });
 
@@ -1133,3 +1145,4 @@
   </script>
 </body>
 </html>
+

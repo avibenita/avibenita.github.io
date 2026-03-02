@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-02-same-window');
+console.log('📦 Loading shared-header.js VERSION 2026-03-02-004');
 
 const StatisticoHeader = {
   currentView: 'histogram',
@@ -212,6 +212,15 @@ const StatisticoHeader = {
       document.querySelectorAll('statistico-header').forEach(el => el.remove());
       const mountRoot = document.querySelector('.laptop-frame') || document.body;
       mountRoot.insertAdjacentHTML('afterbegin', headerHTML);
+    }
+
+    // Inject "All rights reserved" footer at the bottom of the frame (once)
+    if (!document.querySelector('.statistico-footer')) {
+      const footer = document.createElement('div');
+      footer.className = 'statistico-footer';
+      footer.innerHTML = `&copy; ${new Date().getFullYear()} Statistico &mdash; All rights reserved.`;
+      const frame = document.querySelector('.laptop-frame') || document.body;
+      frame.appendChild(footer);
     }
   },
   

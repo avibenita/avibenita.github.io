@@ -4,14 +4,13 @@
   <meta charset="utf-8" />
   <title>Descriptive Statistics</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts-more.js"></script>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/solid-gauge.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
-  <link rel="stylesheet" href="../shared-header.css?v=20260302-002">
-  <script src="../shared-header.js?v=20260302-002"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260302-004">
+  <script src="../shared-header.js?v=20260302-004"></script>
   <script src="../../shared/views/normality-view.js"></script>
   <style>
     /* Dark Theme (Default) */
@@ -83,8 +82,8 @@
     
     html,body{height:100%;margin:0;padding:0;}
     body{background:var(--surface-0);color:var(--text-primary);font-family:'Segoe UI', Tahoma, sans-serif;overflow-x:hidden;display:flex;flex-direction:column;min-height:100vh;}
-    .wrap{display:flex;justify-content:center;padding:12px;flex:1;min-height:0;box-sizing:border-box;}
-    .card{width:min(1120px,100%);background:var(--surface-1);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.35);overflow:hidden;height:100%;display:flex;flex-direction:column;}
+    .wrap{display:flex;justify-content:stretch;padding:12px;flex:1;min-height:0;box-sizing:border-box;}
+    .card{width:100%;background:var(--surface-1);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.35);overflow:hidden;height:100%;display:flex;flex-direction:column;}
     .card-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;color:var(--accent-1);font-weight:700;letter-spacing:.2px;flex-shrink:0;}
     .card-body{padding:10px;flex:1;overflow:hidden;display:flex;flex-direction:column;}
     .card-body > #histogram-panel{margin-top:-15px;}
@@ -108,7 +107,7 @@
     }
     
     /* Histogram and Chart Styles */
-    #histogram-panel { width: min(1000px,90%); margin-left: auto; margin-right: auto; display: none; transition: opacity 0.2s ease; }
+    #histogram-panel { width: 100%; display: none; transition: opacity 0.2s ease; }
     .chart-container { height: 280px !important; padding: 4px !important; }
     .flex-container { display: flex; gap: 20px; align-items: flex-start; }
     .chart-wrapper { flex: 2; min-width: 0; }
@@ -146,14 +145,6 @@
     .detail-label { color: rgba(255, 255, 255, 0.7); }
     .detail-value { font-weight: 500; }
     
-    /* D3 Chart Styles */
-    .histogram-bar { fill: #74b9ff; stroke: #0984e3; stroke-width: 1px; }
-    .histogram-bar:hover { fill: #0984e3; }
-    .normal-curve { fill: none; stroke: yellow; stroke-width: 2px; stroke-dasharray: 5, 5; }
-    .axis text { fill: white; font-size: 10px; }
-    .axis path, .axis line { stroke: #999; }
-    .grid line { stroke: #555; stroke-opacity: 0.7; shape-rendering: crispEdges; }
-    .grid path { stroke-width: 0; }
     
     /* Controls */
     input[type="checkbox"] { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border: 2px solid #555; border-radius: 3px; outline: none; cursor: pointer; position: relative; }
@@ -906,94 +897,98 @@
       return result;
     }
 
-    // Render histogram using D3.js
+    // Render histogram using Highcharts
     function renderHistogram() {
       if (!selectedRow || !selectedRow.vector) return;
-      
-      const container = document.getElementById('histogram-container');
-      const width = container.clientWidth;
-      const height = container.clientHeight * 0.8;
-      
-      d3.select('#histogram-container').selectAll('*').remove();
-      
-      const svg = d3.select('#histogram-container')
-        .append('svg')
-        .attr('width', width)
-        .attr('height', height);
-      
-      const margin = { top: 15, right: 25, bottom: 40, left: 40 };
-      const innerWidth = width - margin.left - margin.right;
-      const innerHeight = height - margin.top - margin.bottom;
-      
-      const g = svg.append('g')
-        .attr('transform', `translate(${margin.left},${margin.top})`);
-      
+
       const histData = generateHistogramData(selectedRow.vector, numBins);
-      
-      const x = d3.scaleBand()
-        .domain(histData.map(d => d.bin))
-        .range([0, innerWidth])
-        .padding(0.1);
-      
-      const maxCount = d3.max(histData, d => d.count);
-      const y = d3.scaleLinear()
-        .domain([0, maxCount + (maxCount * 0.1)])
-        .range([innerHeight, 0]);
-      
-      const xAxis = g.append('g')
-        .attr('class', 'axis')
-        .attr('transform', `translate(0,${innerHeight})`)
-        .call(d3.axisBottom(x).tickValues(x.domain().filter((d, i) => i % 2 === 0)))
-        .selectAll('text')
-        .style('text-anchor', 'end')
-        .attr('dx', '-.8em')
-        .attr('dy', '.15em')
-        .attr('font-size', '8px')
-        .attr('transform', 'rotate(-45)');
-      
-      const yAxis = g.append('g')
-        .attr('class', 'axis')
-        .call(d3.axisLeft(y).ticks(5));
-      
-      g.append('g')
-        .attr('class', 'grid')
-        .attr('transform', `translate(0,${innerHeight})`)
-        .call(d3.axisBottom(x).tickSize(-innerHeight).tickFormat(''));
-      
-      g.append('g')
-        .attr('class', 'grid')
-        .call(d3.axisLeft(y).ticks(5).tickSize(-innerWidth).tickFormat(''));
-      
-      g.selectAll('.histogram-bar')
-        .data(histData)
-        .enter().append('rect')
-        .attr('class', 'histogram-bar')
-        .attr('x', d => x(d.bin))
-        .attr('width', x.bandwidth())
-        .attr('y', d => y(d.count))
-        .attr('height', d => innerHeight - y(d.count));
-      
+      const categories = histData.map(d => d.bin);
+      const counts = histData.map(d => d.count);
+
+      const series = [
+        {
+          name: 'Count',
+          type: 'column',
+          data: counts,
+          color: '#74b9ff',
+          borderColor: '#0984e3',
+          borderWidth: 1,
+          pointPadding: 0.02,
+          groupPadding: 0,
+          zIndex: 1
+        }
+      ];
+
       if (showNormal) {
-        const normalData = generateNormalCurve(selectedRow.Mean, selectedRow.StdDev, 
-          d3.min(selectedRow.vector), d3.max(selectedRow.vector));
-        
-        const maxNormalY = d3.max(normalData, d => d.y);
-        const normalScale = maxCount / maxNormalY * 0.8;
-        
-        const xScale = d3.scaleLinear()
-          .domain([d3.min(selectedRow.vector), d3.max(selectedRow.vector)])
-          .range([0, innerWidth]);
-        
-        const line = d3.line()
-          .x(d => xScale(d.x))
-          .y(d => y(d.y * normalScale))
-          .curve(d3.curveCardinal);
-        
-        g.append('path')
-          .datum(normalData)
-          .attr('class', 'normal-curve')
-          .attr('d', line);
+        const mean = selectedRow.Mean;
+        const stdDev = selectedRow.StdDev;
+        const n = selectedRow.N || selectedRow.vector.length;
+        const min = Math.min(...selectedRow.vector);
+        const max = Math.max(...selectedRow.vector);
+        const binWidth = (max - min) / numBins;
+        // Scale density to match bar heights
+        const normalPoints = histData.map(d => {
+          const mid = (d.start + d.end) / 2;
+          const density = (1 / (stdDev * Math.sqrt(2 * Math.PI))) *
+            Math.exp(-Math.pow(mid - mean, 2) / (2 * Math.pow(stdDev, 2)));
+          return parseFloat((density * n * binWidth).toFixed(4));
+        });
+        series.push({
+          name: 'Normal',
+          type: 'spline',
+          data: normalPoints,
+          color: '#ffd32a',
+          dashStyle: 'Dash',
+          lineWidth: 2,
+          marker: { enabled: false },
+          zIndex: 2
+        });
       }
+
+      // Destroy existing chart to avoid duplicates
+      if (window._histogramChart) {
+        try { window._histogramChart.destroy(); } catch(e) {}
+      }
+
+      window._histogramChart = Highcharts.chart('histogram-container', {
+        chart: {
+          backgroundColor: 'transparent',
+          animation: false,
+          style: { fontFamily: "'Segoe UI', Tahoma, sans-serif" }
+        },
+        title: { text: null },
+        xAxis: {
+          categories: categories,
+          labels: {
+            style: { color: 'rgba(255,255,255,0.7)', fontSize: '9px' },
+            rotation: -40
+          },
+          lineColor: '#555',
+          tickColor: '#555'
+        },
+        yAxis: {
+          title: { text: 'Count', style: { color: 'rgba(255,255,255,0.5)', fontSize: '11px' } },
+          labels: { style: { color: 'rgba(255,255,255,0.7)', fontSize: '10px' } },
+          gridLineColor: 'rgba(255,255,255,0.08)'
+        },
+        legend: {
+          enabled: true,
+          itemStyle: { color: 'rgba(255,255,255,0.8)', fontSize: '11px' },
+          itemHoverStyle: { color: '#fff' }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          style: { color: '#fff' },
+          formatter: function() {
+            return `<b>${this.x}</b><br/>${this.series.name}: <b>${this.y}</b>`;
+          }
+        },
+        plotOptions: {
+          column: { groupPadding: 0, pointPadding: 0.03, borderRadius: 2 }
+        },
+        series: series,
+        credits: { enabled: false }
+      });
     }
 
     // Modal functions

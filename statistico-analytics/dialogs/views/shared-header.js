@@ -209,6 +209,9 @@ const StatisticoHeader = {
     const headerContainer = document.getElementById('header-container');
     if (headerContainer) {
       headerContainer.innerHTML = headerHTML;
+      // header-container is only a thin mount-point — must not grow like lf-content
+      headerContainer.classList.remove('lf-content');
+      headerContainer.style.flex = '0 0 auto';
     } else {
       // Remove any existing header first
       const existingShell = document.querySelector('.statistico-shell');

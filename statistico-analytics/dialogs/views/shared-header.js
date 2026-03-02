@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-02-007');
+console.log('📦 Loading shared-header.js VERSION 2026-03-02-008');
 
 const StatisticoHeader = {
   currentView: 'histogram',

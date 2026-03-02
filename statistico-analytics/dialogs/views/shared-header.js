@@ -4,20 +4,20 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-02-006');
+console.log('📦 Loading shared-header.js VERSION 2026-03-02-007');
 
 const StatisticoHeader = {
   currentView: 'histogram',
   variableName: 'Variable',
   sampleSize: 0,
-  module: 'univariate', // 'univariate' or 'correlations'
+  module: 'univariate', // 'univariate' | 'correlations' | 'regression'
   
   /**
    * Initialize the header
    * @param {string} viewName - Current view name (histogram, boxplot, correlation-matrix, etc.)
    * @param {string} variableName - Variable name to display
    * @param {number} sampleSize - Sample size
-   * @param {string} module - Module name ('univariate' or 'correlations')
+   * @param {string} module - Module name ('univariate' | 'correlations' | 'regression')
    */
   init(viewName, variableName = 'Variable', sampleSize = 0, module = null) {
     this.currentView = viewName;
@@ -27,6 +27,8 @@ const StatisticoHeader = {
     // Auto-detect module from view name if not specified
     if (module) {
       this.module = module;
+    } else if (viewName.includes('regression')) {
+      this.module = 'regression';
     } else if (viewName.includes('correlation') || viewName.includes('network')) {
       this.module = 'correlations';
     } else {
@@ -157,12 +159,17 @@ const StatisticoHeader = {
       'reliability': 'Reliability Coefficients',
       'taylor-diagram': 'Taylor Diagram',
       'rolling-correlations': 'Rolling Correlations',
-      'correlation-tests': 'Correlation Tests'
+      'correlation-tests': 'Correlation Tests',
+      // Regression views
+      'regression-input': 'Model Setup',
+      'regression-results': 'Regression Results',
+      'regression-residuals': 'Residual Diagnostics'
     };
 
     const moduleNames = {
       'univariate': 'Univariate',
-      'correlations': 'Correlations'
+      'correlations': 'Correlations',
+      'regression': 'Regression'
     };
     
     const topHeader = `
@@ -191,7 +198,7 @@ const StatisticoHeader = {
       <div class="statistico-shell">
         ${topHeader}
         <div class="statistico-navrow">
-          <div class="navrow-tabs" role="tablist" aria-label="${this.module === 'univariate' ? 'Univariate workflow views' : 'Correlations views'}">
+          <div class="navrow-tabs" role="tablist" aria-label="${this.module === 'univariate' ? 'Univariate workflow views' : this.module === 'correlations' ? 'Correlations views' : 'Regression views'}">
             ${this.renderNavigation()}
           </div>
         </div>
@@ -279,8 +286,15 @@ const StatisticoHeader = {
       { id: 'partial-correlations', label: 'Partial Correlations', file: 'correlations/correlation-partial.html' },
       { id: 'reliability', label: 'Reliability Coefficients', file: 'correlations/correlation-reliability.html' }
     ];
+
+    const regressionViews = [
+      { id: 'regression-input',     label: 'Model Setup',          file: 'regression/regression-input.html' },
+      { id: 'regression-results',   label: 'Regression Results',   file: 'regression/regression-coefficients.html' },
+      { id: 'regression-residuals', label: 'Residual Diagnostics', file: 'regression/regression-residuals.html' }
+    ];
     
-    return this.module === 'correlations' ? correlationViews : univariateViews;
+    return this.module === 'correlations' ? correlationViews :
+           this.module === 'regression'   ? regressionViews  : univariateViews;
   },
 
   /**
@@ -334,7 +348,7 @@ const StatisticoHeader = {
       `;
     }
 
-    // Correlations module — render as a single row of tabs
+    // Correlations & Regression modules — render as a single row of tabs
     const views = this.getNavigationItems();
     const renderTabButton = (view) => {
       if (view.id === 'separator' || view.isSeparator) return '';
@@ -440,9 +454,12 @@ const StatisticoHeader = {
   navigateTo(filename) {
     console.log('🔄 Navigating to:', filename);
     // All modules navigate within the same dialog window (no new dialog opened).
-    // Save correlation data to sessionStorage so the destination page can read it.
+    // Persist module data in sessionStorage so the destination page can restore it.
     if (window.correlationData) {
       try { sessionStorage.setItem('correlationData', JSON.stringify(window.correlationData)); } catch(e) {}
+    }
+    if (window.regressionData) {
+      try { sessionStorage.setItem('regressionNavData', JSON.stringify(window.regressionData)); } catch(e) {}
     }
     window.location.href = this.resolveDialogUrl(filename);
   }

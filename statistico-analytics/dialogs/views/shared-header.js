@@ -242,10 +242,7 @@ const StatisticoHeader = {
       { id: 'taylor-diagram', label: 'Taylor Diagram', file: 'correlations/correlation-taylor.html' },
       { id: 'descriptive-stats', label: 'Descriptive Statistics', file: 'correlations/descriptive-stats.html' },
       { id: 'partial-correlations', label: 'Partial Correlations', file: 'correlations/correlation-partial.html' },
-      { id: 'reliability', label: 'Reliability Coefficients', file: 'correlations/correlation-reliability.html' },
-      { id: 'separator', label: '---', file: null },
-      { id: 'rolling-correlations', label: 'Rolling Correlations', file: null, isDisabled: true },
-      { id: 'correlation-tests', label: 'Correlation Tests', file: null, isDisabled: true }
+      { id: 'reliability', label: 'Reliability Coefficients', file: 'correlations/correlation-reliability.html' }
     ];
     
     return this.module === 'correlations' ? correlationViews : univariateViews;

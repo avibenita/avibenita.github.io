@@ -36,6 +36,10 @@
       --surface-0:#0b0f16;--surface-1:#141820;--surface-2:#1d2230;
       --border:rgba(255,255,255,.1);--text-primary:#fff;--text-secondary:rgba(255,255,255,.7);
     }
+    /* Hide nav row on the config page – no navigable results yet */
+    .statistico-navrow { display: none !important; }
+    /* Hide the (n=0) sample-size tag in header on config page */
+    .header-sample-size { display: none !important; }
     
     .wrap{ 
       display:flex;
@@ -111,24 +115,50 @@
       flex-direction: column;
     }
     
-    /* Panel 3: Model Assignment - Fixed height */
+    /* Panel 3: Model Assignment - expands to fill remaining space */
     .model-panel {
-      flex: 0 0 210px;
+      flex: 1 1 0;
+      min-height: 0;
       background: var(--surface-2);
       border-bottom: 2px solid var(--border);
       overflow: hidden;
       display: flex;
       flex-direction: column;
     }
-    
-    .model-panel .tabs {
+
+    /* Always-visible zone layout (replaces tabs) */
+    .zones-container {
+      flex: 1 1 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      overflow: hidden;
+    }
+
+    .zone-wrapper {
+      display: flex;
+      flex-direction: column;
+      border-bottom: 1px solid var(--border);
+    }
+    .zone-wrapper:last-child { border-bottom: none; }
+
+    /* Y row stays compact – single-variable row */
+    .y-wrapper { flex: 0 0 auto; }
+    /* Numeric and categorical grow equally */
+    .xn-wrapper, .xc-wrapper { flex: 1 1 0; min-height: 60px; overflow: hidden; }
+
+    .zone-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      padding: 4px 10px;
       flex-shrink: 0;
     }
-    
-    .model-panel .tab-panel {
-      flex: 1;
-      min-height: 0;
-    }
+    .zone-label.y-label  { background: rgba(255,165,120,0.15); color: var(--accent-1); }
+    .zone-label.xn-label { background: rgba(79,195,247,0.12);  color: var(--accent-2); }
+    .zone-label.xc-label { background: rgba(129,199,132,0.12); color: var(--accent-3); }
     
     /* Fields */
     input[type=text], select{
@@ -340,31 +370,18 @@
       font-weight: 700;
     }
     
-    /* Tab Content */
-    .tab-panel {
-      display: none;
-      flex: 1;
+    /* Drop zones: always visible inside .zone-wrapper */
+    .drop-zone-panel {
+      flex: 1 1 0;
       min-height: 0;
-      padding: 6px;
-      overflow-y: auto;
-    }
-    
-    .tab-panel.active {
       display: flex;
       flex-direction: column;
+      padding: 5px 6px;
+      overflow-y: auto;
     }
-    
-    #panelY {
-      background: rgba(255, 165, 120, 0.05);
-    }
-    
-    #panelXn {
-      background: rgba(79, 195, 247, 0.05);
-    }
-    
-    #panelXc {
-      background: rgba(129, 199, 132, 0.05);
-    }
+    .y-wrapper  .drop-zone-panel { background: rgba(255,165,120,0.04); }
+    .xn-wrapper .drop-zone-panel { background: rgba(79,195,247,0.04);  }
+    .xc-wrapper .drop-zone-panel { background: rgba(129,199,132,0.04); }
     
     .drop-zone {
       background: var(--surface-0);
@@ -390,9 +407,10 @@
       font-weight: 600;
       text-transform: none;
     }
-    .y-zone { align-self: flex-start; }
-    .xn-zone { align-self: center; }
-    .xc-zone { align-self: flex-end; }
+    /* Y zone: compact single row */
+    .y-zone { align-self: stretch; min-height: 40px; max-height: 56px; flex-shrink: 0; }
+    /* X zones: fill available panel height */
+    .xn-zone, .xc-zone { align-self: stretch; flex: 1 1 0; min-height: 50px; }
     
     .drop-zone.y-zone {
       background: rgba(255, 165, 120, 0.08);
@@ -915,50 +933,49 @@
               <div class="model-equation-header" id="modelEquation">Model: Y = β0 + …</div>
             </div>
               
-              <!-- Tabs -->
-              <div class="tabs">
-                <button class="y-tab active" data-tab="y">
-                  <span id="badgeY">Y (Response)</span>
-                </button>
-                <button class="xn-tab" data-tab="xn">
-                  <span id="badgeXn">X (numeric)</span>
-                </button>
-                <button class="xc-tab" data-tab="xc">
-                  <span id="badgeXc">X (Categ.)</span>
-                </button>
-              </div>
-              
-            <!-- Tab Panels -->
-              
-              <!-- Y Panel -->
-              <div class="tab-panel active" id="panelY">
+              <!-- Always-visible zone layout (no tabs) -->
+            <div class="zones-container">
 
-                <div class="drop-zone y-zone" data-zone="y" id="zoneY">
-                  <div class="drop-zone-placeholder">
-                    Drag a numeric variable here
+              <!-- Y (Response) – compact single row -->
+              <div class="zone-wrapper y-wrapper">
+                <div class="zone-label y-label">
+                  <i class="fa-solid fa-crosshairs"></i> Y — Response
+                  <span id="badgeY" style="margin-left:6px;font-size:10px;opacity:.75;"></span>
+                </div>
+                <div class="drop-zone-panel">
+                  <div class="drop-zone y-zone" data-zone="y" id="zoneY">
+                    <div class="drop-zone-placeholder">Drag a numeric variable here</div>
                   </div>
                 </div>
               </div>
-              
-              <!-- Xn Panel -->
-              <div class="tab-panel" id="panelXn">
 
-                <div class="drop-zone xn-zone" data-zone="xn" id="zoneXn">
-                  <div class="drop-zone-placeholder">
-                    Drag numeric variables here
+              <!-- X Numeric – grows to fill -->
+              <div class="zone-wrapper xn-wrapper">
+                <div class="zone-label xn-label">
+                  <i class="fa-solid fa-hashtag"></i> X — Numeric predictors
+                  <span id="badgeXn" style="margin-left:6px;font-size:10px;opacity:.75;"></span>
+                </div>
+                <div class="drop-zone-panel">
+                  <div class="drop-zone xn-zone" data-zone="xn" id="zoneXn">
+                    <div class="drop-zone-placeholder">Drag numeric variables here</div>
                   </div>
                 </div>
               </div>
-              
-              <!-- Xc Panel -->
-              <div class="tab-panel" id="panelXc">
 
-                <div class="drop-zone xc-zone" data-zone="xc" id="zoneXc">
-                  <div class="drop-zone-placeholder">
-                    Drag categorical variables here
+              <!-- X Categorical – grows to fill -->
+              <div class="zone-wrapper xc-wrapper">
+                <div class="zone-label xc-label">
+                  <i class="fa-solid fa-tags"></i> X — Categorical predictors
+                  <span id="badgeXc" style="margin-left:6px;font-size:10px;opacity:.75;"></span>
+                </div>
+                <div class="drop-zone-panel">
+                  <div class="drop-zone xc-zone" data-zone="xc" id="zoneXc">
+                    <div class="drop-zone-placeholder">Drag categorical variables here</div>
                   </div>
                 </div>
               </div>
+
+            </div>
               
           </div>
           
@@ -2214,35 +2231,13 @@
     }
     
     // ============================================================================
-    // TAB SWITCHING
+    // TAB SWITCHING – no-op (tabs replaced by always-visible zone layout)
     // ============================================================================
-    function switchTab(tabName) {
-      // Update tab buttons
-      var tabButtons = document.querySelectorAll('.tabs button');
-      for (var i = 0; i < tabButtons.length; i++) {
-        tabButtons[i].classList.remove('active');
-      }
-      document.querySelector('[data-tab="' + tabName + '"]').classList.add('active');
-      
-      // Update tab panels
-      var panels = document.querySelectorAll('.tab-panel');
-      for (var j = 0; j < panels.length; j++) {
-        panels[j].classList.remove('active');
-      }
-      qs('panel' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.add('active');
-    }
-    
+    function switchTab(tabName) { /* zones are always visible */ }
+
     // ============================================================================
     // EVENT HANDLERS
     // ============================================================================
-    
-    // Tab switching
-    var tabButtons = document.querySelectorAll('.tabs button');
-    for (var i = 0; i < tabButtons.length; i++) {
-      tabButtons[i].addEventListener('click', function() {
-        switchTab(this.dataset.tab);
-      });
-    }
     
     var refreshBtn = qs('btnRefreshData');
     if (refreshBtn) {

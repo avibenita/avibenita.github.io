@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-03-011');
+console.log('📦 Loading shared-header.js VERSION 2026-03-03-012');
 
 const StatisticoHeader = {
   currentView: 'histogram',
@@ -372,7 +372,6 @@ const StatisticoHeader = {
     ];
 
     const regressionViews = [
-      { id: 'regression-input',     label: 'Model Setup',          file: 'regression/regression-input.html' },
       { id: 'regression-results',   label: 'Regression Results',   file: 'regression/regression-coefficients.html' },
       { id: 'regression-residuals', label: 'Residual Diagnostics', file: 'regression/regression-residuals.html' }
     ];

@@ -421,16 +421,33 @@
         sel.innerHTML = '<option value="">— New model (configure from scratch) —</option>';
         savedModels.forEach(m => {
           const xCount = (m.config?.xn?.length || 0) + (m.config?.xc?.length || 0);
+          const ts = m.timestamp ? new Date(m.timestamp).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
           const o = document.createElement('option');
           o.value = m.id;
-          o.textContent = `${m.name}  (${m.config?.y || 'Y'} ~ ${xCount} pred.)`;
+          o.textContent = `${m.name}${ts ? '  (' + ts + ')' : ''}`;
           sel.appendChild(o);
         });
+        // Restore previously selected model (survives dialog close / reload)
+        const saved = sessionStorage.getItem('activeModelId');
+        if (saved && savedModels.find(m => m.id === saved)) {
+          sel.value = saved;
+          selectedModelId = saved;
+        } else {
+          sel.value = '';
+          selectedModelId = '';
+        }
+        // Sync UI state (delete hint, reset btn, configure btn)
+        document.getElementById('resetModelBtn').disabled = !selectedModelId;
+        document.getElementById('deleteHint').classList.toggle('visible', !!selectedModelId);
+        updateConfigureBtn();
       } catch(e) { console.warn('Could not load saved models:', e); }
     }
 
     function onSavedModelChange() {
       selectedModelId = document.getElementById('savedModelSelect').value;
+      // Persist selection so it survives dialog close / page refresh
+      if (selectedModelId) sessionStorage.setItem('activeModelId', selectedModelId);
+      else                  sessionStorage.removeItem('activeModelId');
       document.getElementById('resetModelBtn').disabled = !selectedModelId;
       // Show delete hint when a real model is selected
       document.getElementById('deleteHint').classList.toggle('visible', !!selectedModelId);
@@ -449,6 +466,7 @@
     function resetSavedModel() {
       document.getElementById('savedModelSelect').value = '';
       selectedModelId = '';
+      sessionStorage.removeItem('activeModelId');
       document.getElementById('resetModelBtn').disabled = true;
       document.getElementById('deleteHint').classList.remove('visible');
       sessionStorage.removeItem('regressionModelSpec');

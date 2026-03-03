@@ -4,14 +4,50 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-02-008');
+console.log('📦 Loading shared-header.js VERSION 2026-03-03-009');
 
 const StatisticoHeader = {
   currentView: 'histogram',
   variableName: 'Variable',
   sampleSize: 0,
   module: 'univariate', // 'univariate' | 'correlations' | 'regression'
-  
+
+  /* ── Theme helpers ──────────────────────────────────────────── */
+  /**
+   * Read persisted theme preference (default: dark)
+   */
+  getTheme() {
+    try { return localStorage.getItem('statistico-theme') || 'dark'; } catch(e) { return 'dark'; }
+  },
+
+  /**
+   * Apply theme to the document and update the toggle button state.
+   * @param {'dark'|'light'} theme
+   */
+  applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    try { localStorage.setItem('statistico-theme', theme); } catch(e) {}
+    // Update button label/icon if it exists
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) {
+      const icon  = btn.querySelector('.toggle-icon');
+      const label = btn.querySelector('.toggle-label');
+      if (icon)  icon.textContent  = theme === 'light' ? '☀️' : '🌙';
+      if (label) label.textContent = theme === 'light' ? 'Light' : 'Dark';
+    }
+    // Fire an event so individual pages can react (e.g. reflow Highcharts)
+    document.dispatchEvent(new CustomEvent('statistico-theme-changed', { detail: { theme } }));
+  },
+
+  /**
+   * Toggle between light and dark themes.
+   */
+  toggleTheme() {
+    const next = this.getTheme() === 'dark' ? 'light' : 'dark';
+    this.applyTheme(next);
+  },
+  /* ────────────────────────────────────────────────────────────── */
+
   /**
    * Initialize the header
    * @param {string} viewName - Current view name (histogram, boxplot, correlation-matrix, etc.)
@@ -34,6 +70,9 @@ const StatisticoHeader = {
     } else {
       this.module = 'univariate';
     }
+
+    // Apply persisted theme before rendering (avoids flash of wrong theme)
+    this.applyTheme(this.getTheme());
 
     // Keep univariate result dialogs visually capped to a laptop-like viewport.
     this.ensureLaptopFrame();
@@ -172,6 +211,10 @@ const StatisticoHeader = {
       'regression': 'Regression'
     };
     
+    const currentTheme = this.getTheme();
+    const themeIcon    = currentTheme === 'light' ? '☀️' : '🌙';
+    const themeLabel   = currentTheme === 'light' ? 'Light' : 'Dark';
+
     const topHeader = `
       <div class="statistico-header">
         <div class="header-left">
@@ -190,7 +233,16 @@ const StatisticoHeader = {
             <span id="headerSampleSize">(n=${this.sampleSize})</span>
           </div>
         </div>
-        <div class="header-right"></div>
+        <div class="header-right">
+          <button id="themeToggleBtn"
+                  class="theme-toggle-btn"
+                  onclick="StatisticoHeader.toggleTheme()"
+                  title="Toggle light / dark theme">
+            <span class="toggle-icon">${themeIcon}</span>
+            <div class="toggle-track"><div class="toggle-thumb"></div></div>
+            <span class="toggle-label">${themeLabel}</span>
+          </button>
+        </div>
       </div>
     `;
 

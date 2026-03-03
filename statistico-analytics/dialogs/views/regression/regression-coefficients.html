@@ -2174,6 +2174,87 @@
       padding: 20px;
       min-height: 400px;
     }
+
+    /* ── Depth Selector ────────────────────────────────────── */
+    .depth-selector {
+      display: flex; align-items: center; gap: 4px;
+      background: rgba(0,0,0,.25);
+      border: 1px solid rgba(120,200,255,.25);
+      border-radius: 7px;
+      padding: 3px 4px;
+    }
+    .depth-btn {
+      padding: 4px 10px;
+      font-size: 11px; font-weight: 600;
+      border: none; border-radius: 5px;
+      cursor: pointer;
+      transition: all .15s;
+      background: transparent;
+      color: var(--text-muted);
+    }
+    .depth-btn:hover { color: var(--text-secondary); background: rgba(255,255,255,.07); }
+    .depth-btn.active {
+      color: #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,.3);
+    }
+    .depth-btn[data-depth="insight"].active  { background: #16a34a; }
+    .depth-btn[data-depth="analyst"].active  { background: #d97706; }
+    .depth-btn[data-depth="technical"].active{ background: #7c3aed; }
+    :root[data-theme="light"] .depth-selector {
+      background: #fff; border-color: #e5e7eb;
+    }
+    :root[data-theme="light"] .depth-btn      { color: #6b7280; }
+    :root[data-theme="light"] .depth-btn:hover{ background: #f9fafb; color: #111; }
+
+    /* ── Conclusion Card (Insight mode) ─────────────────────── */
+    .conclusion-card {
+      display: none;
+      margin-bottom: 14px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1.5px solid rgba(255,165,120,.4);
+      animation: depthFadeIn .3s ease-out;
+    }
+    .conclusion-card.visible { display: block; }
+    .conclusion-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 14px;
+      background: rgba(255,165,120,.12);
+      font-size: .72rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .4px;
+      color: var(--accent-1);
+    }
+    .conclusion-body { padding: 12px 14px; }
+    .conclusion-verdict {
+      font-size: 1rem; font-weight: 700;
+      color: var(--text-primary);
+      margin: 0 0 6px 0;
+    }
+    .conclusion-detail {
+      font-size: .82rem; color: var(--text-secondary);
+      line-height: 1.55; margin: 0;
+    }
+    .conclusion-badge {
+      display: inline-block;
+      padding: 2px 8px; border-radius: 99px;
+      font-size: .7rem; font-weight: 700;
+      margin-left: 6px; vertical-align: middle;
+    }
+    .badge-sig   { background: rgba(74,222,128,.2);  color: #4ade80; }
+    .badge-ns    { background: rgba(251,113,133,.2); color: #fb7185; }
+    .badge-weak  { background: rgba(251,191,36,.2);  color: #fbbf24; }
+    .badge-mod   { background: rgba(120,200,255,.2); color: var(--accent-2); }
+    .badge-str   { background: rgba(74,222,128,.2);  color: #4ade80; }
+
+    /* ── Depth-gated visibility ──────────────────────────────── */
+    [data-show-from="analyst"],
+    [data-show-from="technical"] { transition: opacity .25s ease, max-height .25s ease; }
+    .depth-hidden { display: none !important; }
+
+    @keyframes depthFadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
@@ -2210,6 +2291,12 @@
             <i class="fa-solid fa-brain"></i> AI
           </button>
           <div class="tab-controls-right">
+            <!-- Depth selector -->
+            <div class="depth-selector" title="Analysis depth">
+              <button class="depth-btn active" data-depth="insight"  onclick="setDepth('insight')" >🟢 Insight</button>
+              <button class="depth-btn"        data-depth="analyst"  onclick="setDepth('analyst')" >🟡 Analyst</button>
+              <button class="depth-btn"        data-depth="technical"onclick="setDepth('technical')">🔴 Technical</button>
+            </div>
             <label class="tab-decimal-label" for="decimalSelect">
               <i class="fa-solid fa-hashtag"></i> Decimals:
             </label>
@@ -2245,16 +2332,26 @@
       <div class="card-body">
         <!-- Tab: Results -->
         <div id="tab-results" class="tab-content active">
+
+        <!-- ① Conclusion card – Insight mode only -->
+        <div class="conclusion-card" id="conclusionCard">
+          <div class="conclusion-header"><i class="fa-solid fa-lightbulb"></i> Model Conclusion</div>
+          <div class="conclusion-body">
+            <p class="conclusion-verdict" id="conclusionVerdict">Awaiting results…</p>
+            <p class="conclusion-detail"  id="conclusionDetail"></p>
+          </div>
+        </div>
+
         <div class="kpi-strip" id="kpiStrip">
-          <div class="kpi-card"><div class="kpi-label">R²</div><div id="kpiRSquared" class="kpi-value">...</div></div>
-          <div class="kpi-card"><div class="kpi-label">Adj R²</div><div id="kpiAdjRSquared" class="kpi-value">...</div></div>
-          <div class="kpi-card"><div class="kpi-label">RMSE</div><div id="kpiRMSE" class="kpi-value">...</div></div>
-          <div class="kpi-card"><div class="kpi-label">F-test p</div><div id="kpiFPValue" class="kpi-value">...</div></div>
-          <div class="kpi-card"><div class="kpi-label">n</div><div id="kpiN" class="kpi-value">...</div></div>
+          <div class="kpi-card"                        ><div class="kpi-label">R²</div>       <div id="kpiRSquared"    class="kpi-value">...</div></div>
+          <div class="kpi-card" data-show-from="analyst"><div class="kpi-label">Adj R²</div>   <div id="kpiAdjRSquared" class="kpi-value">...</div></div>
+          <div class="kpi-card" data-show-from="analyst"><div class="kpi-label">RMSE</div>     <div id="kpiRMSE"        class="kpi-value">...</div></div>
+          <div class="kpi-card"                        ><div class="kpi-label">F-test p</div>  <div id="kpiFPValue"     class="kpi-value">...</div></div>
+          <div class="kpi-card"                        ><div class="kpi-label">n</div>          <div id="kpiN"           class="kpi-value">...</div></div>
         </div>
         <!-- Stats Panels -->
         <div class="stats-container">
-          <div class="stat-panel">
+          <div class="stat-panel" data-show-from="analyst">
             <div class="stat-panel-heading"><i class="fa-solid fa-info-circle"></i> Sample Info</div>
             <div class="stat-panel-body">
               <div class="stat-field">
@@ -2280,7 +2377,7 @@
             </div>
           </div>
 
-          <div class="stat-panel">
+          <div class="stat-panel" data-show-from="analyst">
             <div class="stat-panel-heading"><i class="fa-solid fa-chart-bar"></i> Model Fit</div>
             <div class="stat-panel-body">
               <div class="stat-field">
@@ -2312,7 +2409,7 @@
             </div>
           </div>
 
-          <div class="stat-panel">
+          <div class="stat-panel" data-show-from="analyst">
             <div class="stat-panel-heading"><i class="fa-solid fa-calculator"></i> F-Test</div>
             <div class="stat-panel-body">
               <div class="stat-field">
@@ -2341,7 +2438,7 @@
         </div>
 
         <!-- ANOVA Table Panel -->
-        <div class="stat-panel" style="min-width: 100%; margin-top: 16px;">
+        <div class="stat-panel" data-show-from="analyst" style="min-width: 100%; margin-top: 16px;">
           <div class="stat-panel-heading heading-with-actions">
             <span><i class="fa-solid fa-chart-pie"></i> ANOVA</span>
             <button class="collapse-toggle" id="toggleAnovaBtn" onclick="toggleSection('anovaPanelBody','toggleAnovaBtn')"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
@@ -2379,17 +2476,17 @@
           </div>
           <div class="stat-panel-body collapsible-content" id="coefficientsBody" style="padding: 0;">
             <div class="table-container" style="margin: 0; border: none; border-radius: 0;">
-              <table class="regression-table">
+              <table class="regression-table" id="coefficientsTable">
                 <thead>
                   <tr>
                     <th><i class="fa-solid fa-tag"></i> Variable</th>
                     <th>Coefficient</th>
-                    <th>Std. Error</th>
-                    <th>t-value</th>
+                    <th data-col-depth="analyst">Std. Error</th>
+                    <th data-col-depth="analyst">t-value</th>
                     <th>P-value</th>
                     <th>95% CI Lower</th>
                     <th>95% CI Upper</th>
-                    <th>VIF <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Variance Inflation Factor. Values &gt; 5 suggest moderate multicollinearity; &gt; 10 suggests high multicollinearity.</span></span></th>
+                    <th data-col-depth="analyst">VIF <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Variance Inflation Factor. Values &gt; 5 suggest moderate multicollinearity; &gt; 10 suggests high multicollinearity.</span></span></th>
                   </tr>
                 </thead>
                 <tbody id="dataTableBody">
@@ -2405,7 +2502,7 @@
         </div>
         
         <!-- Regression Equation Display -->
-        <div class="stat-panel" style="min-width: 100%; margin-top: 16px;">
+        <div class="stat-panel" data-show-from="technical" style="min-width: 100%; margin-top: 16px;">
           <div class="stat-panel-heading"><i class="fa-solid fa-function"></i> Regression Equation</div>
           <div class="stat-panel-body">
             <div id="regressionEquation" style="font-family: 'Courier New', monospace; font-size: 0.8rem; color: var(--text-primary); background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; overflow-x: auto; white-space: nowrap;">
@@ -2824,6 +2921,85 @@
       }
     }
     
+    // ================================================================
+    // DEPTH ARCHITECTURE  (Insight / Analyst / Technical)
+    // ================================================================
+    window._analysisDepth = 'insight'; // default
+
+    const DEPTH_RANK = { insight: 0, analyst: 1, technical: 2 };
+
+    function setDepth(depth) {
+      window._analysisDepth = depth;
+      // Update button states
+      document.querySelectorAll('.depth-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.depth === depth);
+      });
+      applyDepth(depth);
+    }
+
+    function applyDepth(depth) {
+      const rank = DEPTH_RANK[depth] ?? 0;
+
+      // ── Panels with data-show-from ──────────────────────────────
+      document.querySelectorAll('[data-show-from]').forEach(el => {
+        const requiredRank = DEPTH_RANK[el.dataset.showFrom] ?? 0;
+        el.classList.toggle('depth-hidden', rank < requiredRank);
+        // animate in when becoming visible
+        if (rank >= requiredRank) {
+          el.style.animation = 'none';
+          requestAnimationFrame(() => { el.style.animation = ''; });
+        }
+      });
+
+      // ── Coefficient table columns ───────────────────────────────
+      document.querySelectorAll('[data-col-depth]').forEach(el => {
+        const colRank = DEPTH_RANK[el.dataset.colDepth] ?? 0;
+        el.classList.toggle('depth-hidden', rank < colRank);
+      });
+
+      // ── Conclusion card: only in Insight mode ───────────────────
+      const card = document.getElementById('conclusionCard');
+      if (card) card.classList.toggle('visible', depth === 'insight');
+
+      // ── Interpretation panel: always visible in insight ─────────
+      const ipanel = document.getElementById('interpretationPanel');
+      if (ipanel) ipanel.classList.toggle('depth-hidden', depth !== 'insight');
+    }
+
+    // Build the plain-language conclusion card from results
+    function buildConclusionCard(results) {
+      const verdict  = document.getElementById('conclusionVerdict');
+      const detail   = document.getElementById('conclusionDetail');
+      if (!verdict || !detail || !results) return;
+
+      const sig   = results.F_pvalue;
+      const r2    = results.R2;
+      const n     = results.n;
+      const fStat = results.F_stat;
+
+      // Significance badge
+      const isSig  = sig < 0.05;
+      const sigBadge = isSig
+        ? `<span class="conclusion-badge badge-sig">Significant ✓</span>`
+        : `<span class="conclusion-badge badge-ns">Not Significant ✗</span>`;
+
+      // R² strength label
+      let r2Label = 'weak';
+      let r2Badge = `<span class="conclusion-badge badge-weak">Weak</span>`;
+      if (r2 >= 0.6) { r2Label = 'strong';   r2Badge = `<span class="conclusion-badge badge-str">Strong</span>`; }
+      else if (r2 >= 0.3) { r2Label = 'moderate'; r2Badge = `<span class="conclusion-badge badge-mod">Moderate</span>`; }
+
+      verdict.innerHTML = isSig
+        ? `The model is statistically significant (p = ${sig < 0.0001 ? '< 0.0001' : sig.toFixed(3)}) ${sigBadge}`
+        : `The model is not statistically significant (p = ${sig < 0.0001 ? '< 0.0001' : sig.toFixed(3)}) ${sigBadge}`;
+
+      detail.innerHTML =
+        `It explains <strong>${(r2 * 100).toFixed(1)}%</strong> of the variance in the outcome ${r2Badge} — ` +
+        `${r2Label} explanatory power. ` +
+        `Based on <strong>${n}</strong> observations ` +
+        `(F = ${fStat !== undefined ? fStat.toFixed(2) : '—'}).`;
+    }
+
     // Tab Management
     function switchTab(tabName) {
       console.log('🔄 Switching to tab:', tabName);
@@ -3646,11 +3822,13 @@
     let receivedRegressionData = null;
     let receivedModelSpec = null;
     
-    // Initialize shared header
+    // Initialize shared header + apply default depth
     document.addEventListener('DOMContentLoaded', () => {
       if (typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.init('regression-results', '', 0, 'regression');
       }
+      // Apply Insight depth immediately so layout is correct before results arrive
+      applyDepth('insight');
     });
 
     // Initialize Office.js
@@ -4134,12 +4312,12 @@
           row.innerHTML = `
             <td><strong class="${varClass}">${varName}</strong></td>
             <td class="coef-cell">${formatCoef(coef)}${sigIndicator}</td>
-            <td>${formatSE(results.std_errors[i])}</td>
-            <td>${results.t_values[i].toFixed(2)}</td>
+            <td data-col-depth="analyst">${formatSE(results.std_errors[i])}</td>
+            <td data-col-depth="analyst">${results.t_values[i].toFixed(2)}</td>
             <td class="${results.p_values[i] < 0.05 ? 'pvalue-good' : (results.p_values[i] < 0.1 ? 'pvalue-warning' : 'pvalue-bad')}">${results.p_values[i] < 0.0001 ? '< 0.0001' : results.p_values[i].toFixed(4)}</td>
             <td class="ci-cell">${formatCoef(results.CI_lower[i])}</td>
             <td class="ci-cell">${formatCoef(results.CI_upper[i])}</td>
-            <td>${i === 0 && results.includeIntercept ? '—' : (results.VIF[i - (results.includeIntercept ? 1 : 0)]?.toFixed(2) || '—')}</td>
+            <td data-col-depth="analyst">${i === 0 && results.includeIntercept ? '—' : (results.VIF[i - (results.includeIntercept ? 1 : 0)]?.toFixed(2) || '—')}</td>
           `;
           
           tbody.appendChild(row);
@@ -4172,6 +4350,10 @@
       }
       
       console.log('✅ Results displayed in UI');
+
+      // Build the Insight-mode conclusion card, then apply current depth
+      buildConclusionCard(results);
+      applyDepth(window._analysisDepth || 'insight');
     }
 
     // Function to trigger VB6 regression

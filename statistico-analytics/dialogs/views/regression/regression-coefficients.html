@@ -2220,8 +2220,8 @@
     /* ── Conclusion Card (Insight mode) ─────────────────────── */
     .conclusion-card {
       display: none;
-      margin-bottom: 14px;
-      border-radius: 8px;
+      margin-bottom: 20px;
+      border-radius: 10px;
       overflow: hidden;
       border: 1.5px solid rgba(255,165,120,.4);
       animation: depthFadeIn .3s ease-out;
@@ -2229,22 +2229,43 @@
     .conclusion-card.visible { display: block; }
     .conclusion-header {
       display: flex; align-items: center; gap: 8px;
-      padding: 8px 14px;
-      background: rgba(255,165,120,.12);
-      font-size: .72rem; font-weight: 700;
-      text-transform: uppercase; letter-spacing: .4px;
+      padding: 10px 18px;
+      background: rgba(255,165,120,.15);
+      font-size: .75rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .6px;
       color: var(--accent-1);
+      border-bottom: 1px solid rgba(255,165,120,.25);
     }
-    .conclusion-body { padding: 12px 14px; }
+    .conclusion-body { padding: 18px 22px 16px; }
     .conclusion-verdict {
-      font-size: 1rem; font-weight: 700;
+      font-size: 1.15rem; font-weight: 700;
       color: var(--text-primary);
-      margin: 0 0 6px 0;
+      margin: 0 0 8px 0;
+      line-height: 1.4;
     }
     .conclusion-detail {
-      font-size: .82rem; color: var(--text-secondary);
-      line-height: 1.55; margin: 0;
+      font-size: .88rem; color: var(--text-secondary);
+      line-height: 1.6; margin: 0 0 14px 0;
     }
+    /* Micro-tags row */
+    .conclusion-microtags {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      margin-top: 2px;
+    }
+    .microtag {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 99px;
+      font-size: .72rem; font-weight: 700;
+      border: 1px solid;
+    }
+    .microtag-sig    { color: #4ade80; border-color: rgba(74,222,128,.4);  background: rgba(74,222,128,.08);  }
+    .microtag-ns     { color: #fb7185; border-color: rgba(251,113,133,.4); background: rgba(251,113,133,.08); }
+    .microtag-weak   { color: #fbbf24; border-color: rgba(251,191,36,.4);  background: rgba(251,191,36,.08);  }
+    .microtag-mod    { color: var(--accent-2); border-color: rgba(120,200,255,.4); background: rgba(120,200,255,.08); }
+    .microtag-strong { color: #4ade80; border-color: rgba(74,222,128,.4);  background: rgba(74,222,128,.08);  }
+    .microtag-small  { color: #a78bfa; border-color: rgba(167,139,250,.4); background: rgba(167,139,250,.08); }
+    .microtag-medium { color: var(--text-muted); border-color: var(--border); background: rgba(255,255,255,.04); }
+    .microtag-large  { color: #4ade80; border-color: rgba(74,222,128,.4);  background: rgba(74,222,128,.08);  }
     .conclusion-badge {
       display: inline-block;
       padding: 2px 8px; border-radius: 99px;
@@ -2400,10 +2421,12 @@
           <div class="conclusion-body">
             <p class="conclusion-verdict" id="conclusionVerdict">Awaiting results…</p>
             <p class="conclusion-detail"  id="conclusionDetail"></p>
+            <!-- Micro-tags: compact signal line -->
+            <div class="conclusion-microtags" id="conclusionMicrotags"></div>
           </div>
         </div>
 
-        <div class="kpi-strip" id="kpiStrip">
+        <div class="kpi-strip" id="kpiStrip" data-show-from="analyst">
           <div class="kpi-card" style="border-top:3px solid var(--accent-2);"                        ><div class="kpi-label">R²</div>       <div id="kpiRSquared"    class="kpi-value">...</div></div>
           <div class="kpi-card" data-show-from="analyst" style="border-top:3px solid var(--accent-2);" ><div class="kpi-label">Adj R²</div>   <div id="kpiAdjRSquared" class="kpi-value">...</div></div>
           <div class="kpi-card" data-show-from="analyst" style="border-top:3px solid var(--warning);"  ><div class="kpi-label">RMSE</div>     <div id="kpiRMSE"        class="kpi-value">...</div></div>
@@ -2493,7 +2516,7 @@
           </div>
         </div>
 
-        <div class="insight-panel" id="interpretationPanel">
+        <div class="insight-panel" id="interpretationPanel" data-show-from="analyst">
           <h3 class="insight-title"><i class="fa-solid fa-lightbulb"></i> Interpretation</h3>
           <p class="insight-text" id="interpretationText">Run a regression to generate a concise model interpretation.</p>
         </div>
@@ -3053,6 +3076,7 @@
     function buildConclusionCard(results) {
       const verdict  = document.getElementById('conclusionVerdict');
       const detail   = document.getElementById('conclusionDetail');
+      const microtags = document.getElementById('conclusionMicrotags');
       if (!verdict || !detail || !results) return;
 
       const sig   = results.F_pvalue;
@@ -3060,27 +3084,48 @@
       const n     = results.n;
       const fStat = results.F_stat;
 
-      // Significance badge
-      const isSig  = sig < 0.05;
+      // ── Significance ──────────────────────────────────────────
+      const isSig = sig < 0.05;
+      const sigText = sig < 0.0001 ? '< 0.0001' : sig.toFixed(3);
       const sigBadge = isSig
         ? `<span class="conclusion-badge badge-sig">Significant ✓</span>`
         : `<span class="conclusion-badge badge-ns">Not Significant ✗</span>`;
 
-      // R² strength label
-      let r2Label = 'weak';
-      let r2Badge = `<span class="conclusion-badge badge-weak">Weak</span>`;
-      if (r2 >= 0.6) { r2Label = 'strong';   r2Badge = `<span class="conclusion-badge badge-str">Strong</span>`; }
-      else if (r2 >= 0.3) { r2Label = 'moderate'; r2Badge = `<span class="conclusion-badge badge-mod">Moderate</span>`; }
-
       verdict.innerHTML = isSig
-        ? `The model is statistically significant (p = ${sig < 0.0001 ? '< 0.0001' : sig.toFixed(3)}) ${sigBadge}`
-        : `The model is not statistically significant (p = ${sig < 0.0001 ? '< 0.0001' : sig.toFixed(3)}) ${sigBadge}`;
+        ? `The model is statistically significant (p = ${sigText}) ${sigBadge}`
+        : `The model is not statistically significant (p = ${sigText}) ${sigBadge}`;
+
+      // ── R² strength (clean sentence, no badge inline) ─────────
+      let r2Strength = 'weak';
+      if (r2 >= 0.6)      r2Strength = 'strong';
+      else if (r2 >= 0.3) r2Strength = 'moderate';
 
       detail.innerHTML =
-        `It explains <strong>${(r2 * 100).toFixed(1)}%</strong> of the variance in the outcome ${r2Badge} — ` +
-        `${r2Label} explanatory power. ` +
-        `Based on <strong>${n}</strong> observations ` +
-        `(F = ${fStat !== undefined ? fStat.toFixed(2) : '—'}).`;
+        `Explains <strong>${(r2 * 100).toFixed(1)}%</strong> of the variance — ` +
+        `<strong>${r2Strength}</strong> explanatory power. ` +
+        `Based on <strong>${n}</strong> observations.`;
+
+      // ── Micro-tags ────────────────────────────────────────────
+      const tags = [];
+
+      // Fit tag
+      if (r2Strength === 'strong')        tags.push({ cls: 'microtag-strong', icon: '📈', label: 'Strong Fit' });
+      else if (r2Strength === 'moderate') tags.push({ cls: 'microtag-mod',    icon: '📊', label: 'Moderate Fit' });
+      else                                tags.push({ cls: 'microtag-weak',   icon: '📉', label: 'Weak Fit' });
+
+      // Significance tag
+      tags.push(isSig
+        ? { cls: 'microtag-sig', icon: '✓', label: 'Significant' }
+        : { cls: 'microtag-ns',  icon: '✗', label: 'Not Significant' });
+
+      // Sample size tag
+      if (n < 30)       tags.push({ cls: 'microtag-small',  icon: '⚠', label: 'Small Sample' });
+      else if (n < 100) tags.push({ cls: 'microtag-medium', icon: 'n', label: 'Medium Sample' });
+      else              tags.push({ cls: 'microtag-large',  icon: 'n', label: 'Large Sample' });
+
+      microtags.innerHTML = tags
+        .map(t => `<span class="microtag ${t.cls}">${t.icon} ${t.label}</span>`)
+        .join('');
     }
 
     // Tab Management

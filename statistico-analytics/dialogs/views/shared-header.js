@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-03-009');
+console.log('📦 Loading shared-header.js VERSION 2026-03-03-011');
 
 const StatisticoHeader = {
   currentView: 'histogram',
@@ -22,11 +22,40 @@ const StatisticoHeader = {
 
   /**
    * Apply theme to the document and update the toggle button state.
+   * Injects CSS custom-property values directly onto <html> style so they
+   * always win over any per-page :root { } block, regardless of order.
    * @param {'dark'|'light'} theme
    */
   applyTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
+    const root = document.documentElement;
+    root.setAttribute('data-theme', theme);
+
+    /* ── Inject CSS variables directly so they beat page-level :root {} ── */
+    if (theme === 'light') {
+      root.style.setProperty('--surface-0',      '#f8fafa');
+      root.style.setProperty('--surface-1',      '#ffffff');
+      root.style.setProperty('--surface-2',      '#f0fdf9');
+      root.style.setProperty('--border',         '#e5e7eb');
+      root.style.setProperty('--accent-1',       '#0d9488');
+      root.style.setProperty('--accent-2',       '#0ea5e9');
+      root.style.setProperty('--text-primary',   '#111827');
+      root.style.setProperty('--text-secondary', '#4b5563');
+      root.style.setProperty('--text-muted',     '#6b7280');
+      root.style.setProperty('--panel-shadow',   '0 2px 10px rgba(0,0,0,.08)');
+      root.style.setProperty('--success',        '#16a34a');
+      root.style.setProperty('--warning',        '#d97706');
+      root.style.setProperty('--danger',         '#dc2626');
+      root.style.setProperty('--header-color',   '#0d9488');
+    } else {
+      /* Remove inline overrides — let the per-page :root {} take over */
+      ['--surface-0','--surface-1','--surface-2','--border',
+       '--accent-1','--accent-2','--text-primary','--text-secondary',
+       '--text-muted','--panel-shadow','--success','--warning','--danger',
+       '--header-color'].forEach(v => root.style.removeProperty(v));
+    }
+
     try { localStorage.setItem('statistico-theme', theme); } catch(e) {}
+
     // Update button label/icon if it exists
     const btn = document.getElementById('themeToggleBtn');
     if (btn) {

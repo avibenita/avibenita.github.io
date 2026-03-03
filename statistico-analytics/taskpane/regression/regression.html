@@ -9,6 +9,7 @@
   <style>
     /* ── Reset & base ─────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --orange: #f97316; --orange-dark: #ea580c; --orange-light: #fff7ed; --orange-border: #fed7aa; }
     body {
       font-family: 'Segoe UI', Arial, sans-serif;
       font-size: 13px;
@@ -22,13 +23,13 @@
       display: flex; align-items: center; justify-content: space-between;
       padding: 10px 14px;
       background: #fff;
-      border-bottom: 2px solid #e5e7eb;
+      border-bottom: 2px solid var(--orange-border);
     }
     .module-header-title {
       display: flex; align-items: center; gap: 7px;
-      font-weight: 700; font-size: 14px; color: #1f2937;
+      font-weight: 700; font-size: 14px; color: var(--orange-dark);
     }
-    .module-header-title i { color: #2563eb; }
+    .module-header-title i { color: var(--orange); }
     .back-btn {
       display: flex; align-items: center; gap: 5px;
       padding: 4px 10px;
@@ -36,7 +37,7 @@
       font-size: 12px; color: #6b7280; cursor: pointer;
       transition: background .15s;
     }
-    .back-btn:hover { background: #f9fafb; color: #374151; }
+    .back-btn:hover { background: var(--orange-light); color: var(--orange-dark); border-color: var(--orange-border); }
 
     /* ── Main content ─────────────────────────────────────── */
     .taskpane-content {
@@ -51,15 +52,19 @@
       border-radius: 10px;
       overflow: hidden;
       box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      transition: border-color .2s;
     }
+    .section-card:focus-within { border-color: var(--orange-border); }
     .section-label {
       display: flex; align-items: center; gap: 6px;
       padding: 7px 12px;
       font-size: 10px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: .6px; color: #6b7280;
-      background: #f9fafb;
-      border-bottom: 1px solid #e5e7eb;
+      text-transform: uppercase; letter-spacing: .6px;
+      color: var(--orange-dark);
+      background: var(--orange-light);
+      border-bottom: 1px solid var(--orange-border);
     }
+    .section-label i { color: var(--orange); }
     .section-body { padding: 12px; }
 
     /* ── Saved models row ────────────────────────────────── */
@@ -71,7 +76,7 @@
       border: 1px solid #d1d5db; border-radius: 6px;
       background: #fff; cursor: pointer;
     }
-    .saved-select:focus { outline: 2px solid #2563eb; border-color: #2563eb; }
+    .saved-select:focus { outline: 2px solid var(--orange); border-color: var(--orange); }
     .reset-btn {
       flex-shrink: 0; width: 30px; height: 30px;
       display: flex; align-items: center; justify-content: center;
@@ -81,6 +86,26 @@
     }
     .reset-btn:hover:not(:disabled) { background: #fef2f2; }
     .reset-btn:disabled { opacity: .3; cursor: default; }
+
+    /* Delete model hint ─────────────────────────────────── */
+    .delete-hint {
+      display: none;
+      margin-top: 8px;
+      padding: 7px 10px;
+      background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px;
+      font-size: 11px; color: #92400e;
+      align-items: center; justify-content: space-between; gap: 8px;
+    }
+    .delete-hint.visible { display: flex; }
+    .delete-btn {
+      flex-shrink: 0;
+      display: flex; align-items: center; gap: 4px;
+      padding: 3px 9px;
+      background: #ef4444; color: #fff; border: none; border-radius: 5px;
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      transition: background .15s;
+    }
+    .delete-btn:hover { background: #dc2626; }
 
     /* ── Segmented radio row ────────────────────────────── */
     .radio-row {
@@ -98,9 +123,10 @@
     }
     .radio-row input[type=radio] { display: none; }
     .radio-row label.active {
-      background: #fff; color: #2563eb; font-weight: 600;
+      background: #fff; color: var(--orange-dark); font-weight: 600;
       box-shadow: 0 1px 3px rgba(0,0,0,.1);
     }
+    .radio-row label.active i { color: var(--orange); }
 
     /* ── Named range list ───────────────────────────────── */
     .named-list {
@@ -122,6 +148,7 @@
       font-size: 11px; color: #166534; font-family: 'Consolas', monospace;
       word-break: break-all;
     }
+    .range-badge i { color: #16a34a; }
     .range-badge.error {
       background: #fff7ed; border-color: #fed7aa; color: #9a3412;
     }
@@ -134,7 +161,6 @@
       background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
       border: none; border-radius: 8px;
       cursor: pointer; transition: all .2s;
-      /* narrower — auto width centred in its container */
       width: auto; align-self: center;
       min-width: 180px; max-width: 260px;
       box-shadow: 0 2px 8px rgba(249,115,22,.3);
@@ -176,8 +202,15 @@
           <select id="savedModelSelect" class="saved-select" onchange="onSavedModelChange()">
             <option value="">— New model (configure from scratch) —</option>
           </select>
-          <button class="reset-btn" id="resetModelBtn" onclick="resetSavedModel()" disabled title="Clear selection">
+          <button class="reset-btn" id="resetModelBtn" onclick="resetSavedModel()" disabled title="Deselect model">
             <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <!-- Delete hint: appears when a saved model is selected -->
+        <div class="delete-hint" id="deleteHint">
+          <span><i class="fa-solid fa-triangle-exclamation"></i> Remove this saved model?</span>
+          <button class="delete-btn" onclick="deleteSavedModel()">
+            <i class="fa-solid fa-trash"></i> Delete
           </button>
         </div>
       </div>
@@ -190,14 +223,14 @@
       </div>
       <div class="section-body">
 
-        <!-- 3 radio buttons as a segmented control -->
+        <!-- 3 radio buttons as a segmented control – Used Range active by default -->
         <div class="radio-row">
-          <label id="lblNamed" class="active" onclick="setRangeMode('named')">
-            <input type="radio" name="rm" value="named" checked>
+          <label id="lblNamed" onclick="setRangeMode('named')">
+            <input type="radio" name="rm" value="named">
             <i class="fa-solid fa-bookmark"></i> Named
           </label>
-          <label id="lblUsed" onclick="setRangeMode('used')">
-            <input type="radio" name="rm" value="used">
+          <label id="lblUsed" class="active" onclick="setRangeMode('used')">
+            <input type="radio" name="rm" value="used" checked>
             <i class="fa-solid fa-wand-magic-sparkles"></i> Used Range
           </label>
           <label id="lblSelection" onclick="setRangeMode('selection')">
@@ -206,8 +239,8 @@
           </label>
         </div>
 
-        <!-- Named range dropdown list -->
-        <div class="named-list" id="namedRangePanel">
+        <!-- Named range dropdown list (hidden by default since Used Range is active) -->
+        <div class="named-list" id="namedRangePanel" style="display:none;">
           <select id="namedRangeSelect" size="4" onchange="loadFromNamedRange()">
             <option value="">— Select a named range —</option>
           </select>
@@ -241,7 +274,7 @@
     // ================================================================
     let rangeData        = null;   // 2-D array including header row
     let rangeAddress     = '';
-    let rangeMode        = 'named'; // 'named' | 'used' | 'selection'
+    let rangeMode        = 'used'; // default to Used Range
     let selectedModelId  = '';      // '' = new model
     let savedModels      = [];
     let activeDialog     = null;
@@ -399,6 +432,8 @@
     function onSavedModelChange() {
       selectedModelId = document.getElementById('savedModelSelect').value;
       document.getElementById('resetModelBtn').disabled = !selectedModelId;
+      // Show delete hint when a real model is selected
+      document.getElementById('deleteHint').classList.toggle('visible', !!selectedModelId);
       updateConfigureBtn();
 
       // Auto-launch results if range is already selected
@@ -415,8 +450,23 @@
       document.getElementById('savedModelSelect').value = '';
       selectedModelId = '';
       document.getElementById('resetModelBtn').disabled = true;
+      document.getElementById('deleteHint').classList.remove('visible');
       sessionStorage.removeItem('regressionModelSpec');
       updateConfigureBtn();
+    }
+
+    async function deleteSavedModel() {
+      if (!selectedModelId) return;
+      const m = savedModels.find(m => m.id === selectedModelId);
+      const name = m ? m.name : 'this model';
+      if (!confirm(`Permanently delete "${name}"?`)) return;
+      try {
+        if (typeof SavedAnalysesManager !== 'undefined') {
+          await SavedAnalysesManager.deleteAnalysis(selectedModelId);
+        }
+      } catch(e) { console.warn('Delete failed:', e); }
+      resetSavedModel();
+      await loadSavedModels();
     }
 
     // ================================================================
@@ -565,6 +615,8 @@
         await loadNamedRanges();
         await loadSavedModels();
         await watchSelection();
+        // Auto-detect used range on load (Used Range is the default mode)
+        await autoDetectRange();
         updateConfigureBtn();
       }
     });

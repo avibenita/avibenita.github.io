@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
@@ -22,6 +22,32 @@
       --panel-shadow:0 4px 20px rgba(0,0,0,.4);
       --header-color:var(--accent-1);
     }
+    /* ג”€ג”€ Light Theme ג”€ג”€ */
+    :root[data-theme="light"] {
+      --surface-0: #eef0f4;
+      --surface-1: #ffffff;
+      --surface-2: #f3f4f6;
+      --border: #cbd5e1;
+      --accent-1: #2563eb;
+      --accent-2: #1d4ed8;
+      --text-primary: #111827;
+      --text-secondary: #1f2937;
+      --text-muted: #374151;
+    }
+
+    /* Light theme: override hardcoded dark-only values */
+    :root[data-theme="light"] body { background: var(--surface-0); }
+    :root[data-theme="light"] .panel,
+    :root[data-theme="light"] .card,
+    :root[data-theme="light"] .stat-panel { background: var(--surface-1); border-color: var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    :root[data-theme="light"] .panel-heading,
+    :root[data-theme="light"] .card-header { background: var(--surface-2); color: var(--accent-1); }
+    :root[data-theme="light"] table { background: var(--surface-1); }
+    :root[data-theme="light"] thead th { background: linear-gradient(135deg, var(--surface-2), #dde3ef) !important; color: var(--text-primary) !important; border-color: var(--border) !important; }
+    :root[data-theme="light"] tbody tr:nth-child(even) { background: rgba(0,0,0,0.03); }
+    :root[data-theme="light"] tbody tr:hover { background: rgba(37,99,235,0.06); }
+    :root[data-theme="light"] td, :root[data-theme="light"] th { border-color: var(--border); color: var(--text-primary); }
+    :root[data-theme="light"] .results-container { background: var(--surface-0); }
 
     html, body { height:100%; margin:0; padding:0; }
     body{
@@ -1143,7 +1169,10 @@
     };
 
     function handleParentMessage(message) {
-      if (!message || !message.type) return;
+      if (!message || !message.type) {
+        if (message && message.theme) { applyTheme(message.theme); } return;
+      }
+      if (message.theme) { applyTheme(message.theme); return; }
 
       switch (message.type) {
         case "LOGISTIC_RESULTS":
@@ -1226,6 +1255,35 @@
 
       sendToHost("logisticDashboardReady", {});
     });
-  </script>
+  
+    // ג”€ג”€ Light / Dark theme support ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
+    function applyTheme(theme) {
+      if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+      else document.documentElement.removeAttribute('data-theme');
+      document.dispatchEvent(new CustomEvent('statistico-theme-changed', { detail: { theme } }));
+    }
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.type === 'THEME_CHANGE') applyTheme(event.data.theme);
+    });
+    // Redraw Highcharts charts on theme change
+    document.addEventListener('statistico-theme-changed', function() {
+      if (typeof Highcharts !== 'undefined' && Highcharts.charts) {
+        Highcharts.charts.forEach(function(c) { if (c) {
+          var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+          var bg = isLight ? '#ffffff' : '#1a1f2e';
+          var tc = isLight ? '#111827' : '#ffffff';
+          var at = isLight ? '#374151' : '#aaaaaa';
+          var gl = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)';
+          var tt = isLight ? '#ffffff' : '#1a1f2e';
+          c.update({ chart: { backgroundColor: 'transparent' },
+            tooltip: { backgroundColor: tt, style: { color: tc } },
+            xAxis: { labels: { style: { color: at } }, gridLineColor: gl, lineColor: gl, tickColor: gl },
+            yAxis: { labels: { style: { color: at } }, gridLineColor: gl },
+            legend: { itemStyle: { color: tc }, itemHoverStyle: { color: tc } },
+            title: { style: { color: tc } }, subtitle: { style: { color: at } }
+          }, true);
+        }});
+      }
+    });</script>
 </body>
 </html>

@@ -540,6 +540,72 @@
       width: 100%;
     }
 
+    /* Distribution panel inside Overview */
+    .dist-panel {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.3);
+    }
+    .dist-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .dist-body {
+      display: flex;
+      gap: 16px;
+      align-items: stretch;
+      min-height: 220px;
+    }
+    .dist-chart-wrap {
+      flex: 1 1 0;
+      min-width: 0;
+      height: 220px;
+    }
+    .dist-stats-wrap {
+      flex: 0 0 200px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+    .dist-summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+    .dist-summary-table td {
+      padding: 5px 2px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+    .dist-summary-table td:first-child {
+      text-align: left;
+      padding-right: 10px;
+      color: var(--text-muted);
+      font-size: 11.5px;
+    }
+    .dist-summary-table td:last-child {
+      text-align: right;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .dist-summary-table tr.dist-section-head td {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      color: var(--accent-2);
+      border-bottom: 2px solid var(--border);
+      padding-top: 10px;
+    }
+    .dist-summary-table tr.dist-section-head:first-child td {
+      padding-top: 4px;
+    }
+
     /* Outliers Table */
     .outliers-panel {
       background: var(--surface-1);
@@ -838,9 +904,6 @@
           <button class="tab-btn" onclick="switchTab('plots')">
             <i class="fa-solid fa-chart-line"></i> Diagnostic Plots
           </button>
-          <button class="tab-btn" onclick="switchTab('distribution')">
-            <i class="fa-solid fa-chart-column"></i> Distribution
-          </button>
           <button class="tab-btn" onclick="switchTab('influential')">
             <i class="fa-solid fa-triangle-exclamation"></i> Influential Obs
           </button>
@@ -875,6 +938,25 @@
         </h2>
         <div class="tests-grid" id="testsGrid">
           <!-- Tests will be populated here -->
+        </div>
+      </div>
+
+      <!-- Residual Distribution (chart + stats sidebar) -->
+      <div class="dist-panel">
+        <div class="dist-header">
+          <div class="histogram-title">
+            <i class="fa-solid fa-chart-column"></i>
+            Residual Distribution
+          </div>
+          <div class="histogram-badge" id="outliersBadge"><!-- populated --></div>
+        </div>
+        <div class="dist-body">
+          <div class="dist-chart-wrap">
+            <div id="histogramChart" style="height:100%;width:100%;"></div>
+          </div>
+          <div class="dist-stats-wrap">
+            <table class="dist-summary-table" id="distSummaryTable"></table>
+          </div>
         </div>
       </div>
       </div>
@@ -933,22 +1015,6 @@
       </div>
       </div>
 
-      <!-- Tab: Distribution -->
-      <div id="tab-distribution" class="tab-content">
-      <!-- Outliers Histogram -->
-      <div class="histogram-panel">
-        <div class="histogram-header">
-          <div class="histogram-title">
-            <i class="fa-solid fa-chart-column"></i>
-            Residual Extremes Distribution
-          </div>
-          <div class="histogram-badge" id="outliersBadge">
-            <!-- Populated dynamically -->
-          </div>
-        </div>
-        <div id="histogramChart" class="histogram-chart"></div>
-      </div>
-      </div>
 
       <!-- Tab: Influential Observations -->
       <div id="tab-influential" class="tab-content">
@@ -1842,74 +1908,129 @@
     }
 
     function displayOutliersHistogram(standardized) {
+      const n = standardized.length;
       const outlierCount = standardized.filter(s => Math.abs(s) > 2).length;
-      const severeCount = standardized.filter(s => Math.abs(s) > 3).length;
-      
-      // Update badge
-      document.getElementById('outliersBadge').textContent = 
-        `Outliers: ${outlierCount} (${(outlierCount/standardized.length*100).toFixed(1)}%) | Severe: ${severeCount} (${(severeCount/standardized.length*100).toFixed(1)}%)`;
+      const severeCount  = standardized.filter(s => Math.abs(s) > 3).length;
 
-      // Create histogram bins
-      const bins = [];
+      // Update badge
+      document.getElementById('outliersBadge').textContent =
+        `Outliers: ${outlierCount} (${(outlierCount/n*100).toFixed(1)}%) | Severe: ${severeCount} (${(severeCount/n*100).toFixed(1)}%)`;
+
+      // ── Descriptive stats ────────────────────────────────────────────
+      const mean = standardized.reduce((a,b)=>a+b,0) / n;
+      const variance = standardized.reduce((a,b)=>a+Math.pow(b-mean,2),0) / n;
+      const sd   = Math.sqrt(variance);
+      const sorted = [...standardized].sort((a,b)=>a-b);
+      const median = n % 2 === 0
+        ? (sorted[n/2-1] + sorted[n/2]) / 2
+        : sorted[Math.floor(n/2)];
+      const m3 = standardized.reduce((a,b)=>a+Math.pow(b-mean,3),0) / n;
+      const m4 = standardized.reduce((a,b)=>a+Math.pow(b-mean,4),0) / n;
+      const skew = m3 / Math.pow(sd,3);
+      const kurt = m4 / Math.pow(sd,4) - 3; // excess kurtosis
+
+      // Populate sidebar table
+      const fmt = v => (isNaN(v)||!isFinite(v)) ? '—' : v.toFixed(4);
+      document.getElementById('distSummaryTable').innerHTML = `
+        <tr class="dist-section-head"><td colspan="2">Location</td></tr>
+        <tr><td>Mean</td><td>${fmt(mean)}</td></tr>
+        <tr><td>Median</td><td>${fmt(median)}</td></tr>
+        <tr class="dist-section-head"><td colspan="2">Spread</td></tr>
+        <tr><td>Std Dev</td><td>${fmt(sd)}</td></tr>
+        <tr><td>Min</td><td>${fmt(sorted[0])}</td></tr>
+        <tr><td>Max</td><td>${fmt(sorted[n-1])}</td></tr>
+        <tr class="dist-section-head"><td colspan="2">Shape</td></tr>
+        <tr><td>Skewness</td><td>${fmt(skew)}</td></tr>
+        <tr><td>Excess Kurt.</td><td>${fmt(kurt)}</td></tr>
+        <tr class="dist-section-head"><td colspan="2">Outliers</td></tr>
+        <tr><td>|z| &gt; 2</td><td>${outlierCount} (${(outlierCount/n*100).toFixed(1)}%)</td></tr>
+        <tr><td>|z| &gt; 3</td><td>${severeCount} (${(severeCount/n*100).toFixed(1)}%)</td></tr>
+        <tr><td>N</td><td>${n}</td></tr>
+      `;
+
+      // ── Histogram bins ───────────────────────────────────────────────
       const binWidth = 0.5;
       const minBin = -4;
       const maxBin = 4;
-      
+      const bins = [];
       for (let bin = minBin; bin < maxBin; bin += binWidth) {
+        const mid = bin + binWidth / 2;
         const count = standardized.filter(s => s >= bin && s < bin + binWidth).length;
         bins.push({
-          x: bin + binWidth/2,
+          x: mid,
           y: count,
-          color: Math.abs(bin + binWidth/2) >= 3 ? '#ef4444' : 
-                 Math.abs(bin + binWidth/2) >= 2 ? '#f59e0b' : '#3b82f6'
+          color: Math.abs(mid) >= 3 ? '#ef4444' : Math.abs(mid) >= 2 ? '#f59e0b' : '#3b82f6'
         });
       }
 
-      // Create Highcharts histogram
-      Highcharts.chart('histogramChart', {
+      // ── Normal curve (scaled to bar heights) ────────────────────────
+      const xRange = [];
+      for (let x = minBin; x <= maxBin; x += 0.05) xRange.push(x);
+      const normalCurve = xRange.map(x => {
+        const density = (1 / (sd * Math.sqrt(2 * Math.PI))) *
+          Math.exp(-0.5 * Math.pow((x - mean) / sd, 2));
+        return [parseFloat(x.toFixed(3)), parseFloat((density * n * binWidth).toFixed(4))];
+      });
+
+      // ── Chart ────────────────────────────────────────────────────────
+      const theme = chartTheme();
+      if (window._residualHistChart) {
+        try { window._residualHistChart.destroy(); } catch(e) {}
+      }
+      window._residualHistChart = Highcharts.chart('histogramChart', {
         chart: {
           type: 'column',
           backgroundColor: 'transparent',
-          style: { fontFamily: 'inherit' }
+          style: { fontFamily: 'inherit' },
+          animation: false
         },
         title: { text: null },
         xAxis: {
-          title: { text: 'Standardized Residuals', style: { color: chartTheme().textColor } },
-          gridLineColor: chartTheme().gridLine,
-          labels: { style: { color: chartTheme().axisText } },
+          title: { text: 'Standardized Residuals', style: { color: theme.textColor } },
+          gridLineColor: theme.gridLine,
+          labels: { style: { color: theme.axisText } },
           plotLines: [
-            { value: -3, color: '#ef4444', width: 1, dashStyle: 'Dash', label: { text: '-3', style: { color: '#ef4444' } } },
-            { value: -2, color: '#f59e0b', width: 1, dashStyle: 'Dash', label: { text: '-2', style: { color: '#f59e0b' } } },
-            { value: 0, color: 'rgba(255,255,255,0.3)', width: 1 },
-            { value: 2, color: '#f59e0b', width: 1, dashStyle: 'Dash', label: { text: '+2', style: { color: '#f59e0b' } } },
-            { value: 3, color: '#ef4444', width: 1, dashStyle: 'Dash', label: { text: '+3', style: { color: '#ef4444' } } }
+            { value: -3, color: '#ef4444', width: 1, dashStyle: 'Dash', label: { text: '-3', style: { color: '#ef4444', fontSize: '10px' } } },
+            { value: -2, color: '#f59e0b', width: 1, dashStyle: 'Dash', label: { text: '-2', style: { color: '#f59e0b', fontSize: '10px' } } },
+            { value:  2, color: '#f59e0b', width: 1, dashStyle: 'Dash', label: { text: '+2', style: { color: '#f59e0b', fontSize: '10px' } } },
+            { value:  3, color: '#ef4444', width: 1, dashStyle: 'Dash', label: { text: '+3', style: { color: '#ef4444', fontSize: '10px' } } }
           ]
         },
         yAxis: {
-          title: { text: 'Frequency', style: { color: chartTheme().textColor } },
-          gridLineColor: chartTheme().gridLine,
-          labels: { style: { color: chartTheme().axisText } }
+          title: { text: 'Frequency', style: { color: theme.textColor } },
+          gridLineColor: theme.gridLine,
+          labels: { style: { color: theme.axisText } }
         },
-        legend: { enabled: false },
+        legend: {
+          enabled: true,
+          itemStyle: { color: theme.axisText, fontSize: '11px' },
+          itemHoverStyle: { color: theme.textColor }
+        },
         plotOptions: {
-          column: {
-            pointPadding: 0,
-            borderWidth: 0,
-            groupPadding: 0,
-            shadow: false
-          }
+          column: { pointPadding: 0, borderWidth: 0, groupPadding: 0, shadow: false }
         },
-        series: [{
-          name: 'Frequency',
-          data: bins.map(b => ({
-            x: b.x,
-            y: b.y,
-            color: b.color
-          })),
-          pointWidth: 20
-        }],
+        series: [
+          {
+            name: 'Frequency',
+            type: 'column',
+            data: bins.map(b => ({ x: b.x, y: b.y, color: b.color })),
+            pointWidth: 18,
+            zIndex: 1
+          },
+          {
+            name: 'Normal',
+            type: 'spline',
+            data: normalCurve,
+            color: '#a78bfa',
+            lineWidth: 2,
+            dashStyle: 'Dash',
+            marker: { enabled: false },
+            zIndex: 2
+          }
+        ],
         tooltip: {
           formatter: function() {
+            if (this.series.type === 'spline') return false;
             return `<b>${this.y}</b> observations<br/>Residual: ${this.x.toFixed(2)}`;
           }
         },

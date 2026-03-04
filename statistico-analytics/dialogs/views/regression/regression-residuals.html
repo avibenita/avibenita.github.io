@@ -1918,16 +1918,20 @@
 
       // ── Descriptive stats ────────────────────────────────────────────
       const mean = standardized.reduce((a,b)=>a+b,0) / n;
-      const variance = standardized.reduce((a,b)=>a+Math.pow(b-mean,2),0) / n;
+      const variance = standardized.reduce((a,b)=>a+Math.pow(b-mean,2),0) / (n - 1);
       const sd   = Math.sqrt(variance);
       const sorted = [...standardized].sort((a,b)=>a-b);
       const median = n % 2 === 0
         ? (sorted[n/2-1] + sorted[n/2]) / 2
         : sorted[Math.floor(n/2)];
-      const m3 = standardized.reduce((a,b)=>a+Math.pow(b-mean,3),0) / n;
-      const m4 = standardized.reduce((a,b)=>a+Math.pow(b-mean,4),0) / n;
-      const skew = m3 / Math.pow(sd,3);
-      const kurt = m4 / Math.pow(sd,4) - 3; // excess kurtosis
+      // Fisher's G1 skewness (matches SPSS)
+      const skew = n >= 3 && sd > 0
+        ? (n / ((n - 1) * (n - 2))) * standardized.reduce((a,b)=>a+Math.pow((b-mean)/sd,3),0)
+        : 0;
+      // Fisher's G2 kurtosis (matches SPSS)
+      const kurt = n >= 4 && sd > 0
+        ? ((n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3))) * standardized.reduce((a,b)=>a+Math.pow((b-mean)/sd,4),0) - (3 * Math.pow(n - 1, 2)) / ((n - 2) * (n - 3))
+        : 0;
 
       // Populate sidebar table
       const fmt = v => (isNaN(v)||!isFinite(v)) ? '—' : v.toFixed(4);

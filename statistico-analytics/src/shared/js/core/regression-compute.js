@@ -206,64 +206,79 @@ function matrixInverse(matrix) {
 // ============================================================================
 
 function tCDF(t, df) {
-    // Approximation of Student's t CDF
+    // CDF of Student's t via regularized incomplete beta: I_x(df/2, 0.5)
     const x = df / (df + t * t);
-    return 1 - 0.5 * incompleteBeta(df / 2, 0.5, x);
+    return 1 - 0.5 * regularizedIncompleteBeta(df / 2, 0.5, x);
 }
 
 function tInverse(p, df) {
-    // Approximation of t critical value
-    // Uses Newton-Raphson method for better accuracy
-    let t = 2; // Initial guess
-    for (let i = 0; i < 10; i++) {
+    // Inverse t CDF via Newton-Raphson on tCDF
+    let t = 2;
+    for (let i = 0; i < 50; i++) {
         const cdf = tCDF(t, df);
         const pdf = Math.pow(1 + t * t / df, -(df + 1) / 2);
-        t = t - (cdf - (1 - p)) / pdf;
+        const delta = (cdf - (1 - p)) / pdf;
+        t -= delta;
+        if (Math.abs(delta) < 1e-10) break;
     }
     return Math.abs(t);
 }
 
 function fCDF(f, df1, df2) {
-    // Approximation of F CDF
+    // CDF of F-distribution via regularized incomplete beta: I_x(df2/2, df1/2)
     const x = df2 / (df2 + df1 * f);
-    return 1 - incompleteBeta(df2 / 2, df1 / 2, x);
+    return 1 - regularizedIncompleteBeta(df2 / 2, df1 / 2, x);
 }
 
-function incompleteBeta(a, b, x) {
-    // Simple approximation of incomplete beta function
+function regularizedIncompleteBeta(a, b, x) {
     if (x <= 0) return 0;
     if (x >= 1) return 1;
-    
-    // Use continued fraction approximation
-    const EPSILON = 1e-10;
-    const MAXITER = 100;
-    
-    let result = Math.exp(
-        a * Math.log(x) + 
-        b * Math.log(1 - x) - 
-        logBeta(a, b)
-    );
-    
-    let term = 1;
-    let sum = 1;
-    
-    for (let i = 0; i < MAXITER; i++) {
-        term *= (a + i) * x / (a + b + i);
-        sum += term;
-        if (Math.abs(term) < EPSILON) break;
+    // Use symmetry relation when x > (a+1)/(a+b+2) for faster convergence
+    if (x > (a + 1) / (a + b + 2)) {
+        return 1 - regularizedIncompleteBeta(b, a, 1 - x);
     }
-    
-    return result * sum / a;
+    const lbeta = lgammaReg(a) + lgammaReg(b) - lgammaReg(a + b);
+    const front = Math.exp(Math.log(x) * a + Math.log(1 - x) * b - lbeta) / a;
+    return front * betaCF(a, b, x);
 }
 
-function logBeta(a, b) {
-    return logGamma(a) + logGamma(b) - logGamma(a + b);
+function betaCF(a, b, x) {
+    // Lentz continued fraction for regularized incomplete beta
+    const MAXIT = 300, EPS = 3e-12, FPMIN = 1e-30;
+    const qab = a + b, qap = a + 1, qam = a - 1;
+    let c = 1, d = 1 - qab * x / qap;
+    if (Math.abs(d) < FPMIN) d = FPMIN;
+    d = 1 / d;
+    let h = d;
+    for (let m = 1; m <= MAXIT; m++) {
+        const m2 = 2 * m;
+        let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+        d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN;
+        c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+        d = 1 / d; h *= d * c;
+        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+        d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN;
+        c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+        d = 1 / d;
+        const del = d * c;
+        h *= del;
+        if (Math.abs(del - 1) < EPS) break;
+    }
+    return h;
 }
 
-function logGamma(z) {
-    // Stirling's approximation
-    if (z < 1) return logGamma(z + 1) - Math.log(z);
-    return (z - 0.5) * Math.log(z) - z + 0.5 * Math.log(2 * Math.PI);
+function lgammaReg(z) {
+    // Lanczos approximation for log-gamma
+    const g = 7;
+    const c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+        771.32342877765313, -176.61502916214059, 12.507343278686905,
+        -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+    if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - lgammaReg(1 - z);
+    z -= 1;
+    let x = c[0];
+    for (let i = 1; i < g + 2; i++) x += c[i] / (z + i);
+    const t = z + g + 0.5;
+    return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
 }
 
 // Export for use in browser or Node.js

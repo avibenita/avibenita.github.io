@@ -633,11 +633,14 @@ const StatisticoHeader = {
         <div class="sh-data-modal-header">
           <span><i class="fa-solid fa-eye" style="margin-right:7px;color:#67e8f9;"></i>Input Dataset</span>
           <div class="sh-data-modal-header-right">
-            <label class="sh-data-modal-toggle" title="Show only rows used in analysis (non-blank)">
-              <input type="checkbox" id="sh-show-all-toggle" onchange="StatisticoHeader._applyDataModalFilter()">
-              <span class="sh-toggle-track"><span class="sh-toggle-thumb"></span></span>
-              <span class="sh-toggle-label">Show all rows</span>
-            </label>
+            <div class="sh-row-filter" title="Filter which rows are shown">
+              <button class="sh-row-filter-btn sh-active" id="sh-btn-used" onclick="StatisticoHeader._setDataModalFilter(false)">
+                <i class="fa-solid fa-check-circle"></i> Used obs
+              </button>
+              <button class="sh-row-filter-btn" id="sh-btn-all" onclick="StatisticoHeader._setDataModalFilter(true)">
+                <i class="fa-solid fa-list"></i> All rows
+              </button>
+            </div>
             <button class="sh-data-modal-close" onclick="StatisticoHeader._closeDataModal()">&times;</button>
           </div>
         </div>
@@ -662,7 +665,6 @@ const StatisticoHeader = {
 
     this._dataModalFull = data;
     this._renderDataModal(false);
-    document.getElementById('sh-show-all-toggle').checked = false;
     document.getElementById('sh-data-modal-overlay').classList.remove('sh-hidden');
   },
 
@@ -676,32 +678,58 @@ const StatisticoHeader = {
     this._renderDataModal(showAll);
   },
 
+  _setDataModalFilter(showAll) {
+    const btnUsed = document.getElementById('sh-btn-used');
+    const btnAll  = document.getElementById('sh-btn-all');
+    if (btnUsed) btnUsed.classList.toggle('sh-active', !showAll);
+    if (btnAll)  btnAll.classList.toggle('sh-active',  showAll);
+    this._renderDataModal(showAll);
+  },
+
   _renderDataModal(showAll) {
     const data = this._dataModalFull;
     if (!data) return;
     const { headers, rows } = data;
 
-    // "Used" rows = rows where at least one cell is non-empty/non-null
-    const usedRows = showAll ? rows : rows.filter(row =>
-      row.some(v => v !== null && v !== undefined && v !== '')
-    );
+    // A row is "used" (complete) when every cell has a real value
+    const isComplete = row => row.every(v => v !== null && v !== undefined && v !== '' && v !== '—' && v !== '\u2014');
 
-    const label = document.querySelector('.sh-toggle-label');
-    if (label) label.textContent = showAll ? 'Show all rows' : `Used rows (${usedRows.length} / ${rows.length})`;
+    let html = '';
 
-    let html = `<div class="sh-data-modal-meta">${usedRows.length} row${usedRows.length !== 1 ? 's' : ''} × ${headers.length} column${headers.length !== 1 ? 's' : ''}</div>`;
-    html += '<div class="sh-data-modal-table-wrap"><table class="sh-data-modal-table"><thead><tr><th>#</th>';
-    headers.forEach(h => { html += `<th>${h ?? ''}</th>`; });
-    html += '</tr></thead><tbody>';
-    usedRows.forEach((row, i) => {
-      html += `<tr><td class="sh-row-num">${i + 1}</td>`;
-      headers.forEach((_, ci) => {
-        const v = row[ci];
-        const empty = v === null || v === undefined || v === '';
-        html += `<td${empty ? ' class="sh-cell-empty"' : ''}>${empty ? '—' : v}</td>`;
+    if (showAll) {
+      // Show all rows; highlight incomplete ones
+      const usedCount = rows.filter(isComplete).length;
+      html += `<div class="sh-data-modal-meta">${rows.length} total rows &nbsp;·&nbsp; <span style="color:#4ade80;">${usedCount} used</span> &nbsp;·&nbsp; <span style="color:rgba(255,255,255,.35);">${rows.length - usedCount} excluded (missing values)</span></div>`;
+      html += '<div class="sh-data-modal-table-wrap"><table class="sh-data-modal-table"><thead><tr><th>#</th>';
+      headers.forEach(h => { html += `<th>${h ?? ''}</th>`; });
+      html += '</tr></thead><tbody>';
+      rows.forEach((row, i) => {
+        const complete = isComplete(row);
+        html += `<tr class="${complete ? '' : 'sh-row-excluded'}"><td class="sh-row-num">${i + 1}</td>`;
+        headers.forEach((_, ci) => {
+          const v = row[ci];
+          const empty = v === null || v === undefined || v === '' || v === '—' || v === '\u2014';
+          html += `<td${empty ? ' class="sh-cell-empty"' : ''}>${empty ? '—' : v}</td>`;
+        });
+        html += '</tr>';
       });
-      html += '</tr>';
-    });
+    } else {
+      // Show only complete rows
+      const usedRows = rows.filter(isComplete);
+      html += `<div class="sh-data-modal-meta">${usedRows.length} used rows × ${headers.length} columns &nbsp;<span style="opacity:.5;font-size:10px;">(rows with missing values excluded)</span></div>`;
+      html += '<div class="sh-data-modal-table-wrap"><table class="sh-data-modal-table"><thead><tr><th>#</th>';
+      headers.forEach(h => { html += `<th>${h ?? ''}</th>`; });
+      html += '</tr></thead><tbody>';
+      usedRows.forEach((row, i) => {
+        html += `<tr><td class="sh-row-num">${i + 1}</td>`;
+        headers.forEach((_, ci) => {
+          const v = row[ci];
+          html += `<td>${v ?? ''}</td>`;
+        });
+        html += '</tr>';
+      });
+    }
+
     html += '</tbody></table></div>';
     document.getElementById('sh-data-modal-body').innerHTML = html;
   }

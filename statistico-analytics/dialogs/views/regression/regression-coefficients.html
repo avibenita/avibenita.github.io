@@ -3850,7 +3850,22 @@
         StatisticoHeader.init('regression-results', '', 0, 'regression');
         // Register shared action buttons (View Data / Model / HTML)
         StatisticoHeader.registerActions({
-          getData:    () => receivedRegressionData ? { headers: receivedRegressionData.headers, rows: receivedRegressionData.rows } : null,
+          getData: () => {
+            if (!receivedRegressionData || !receivedModelSpec) return null;
+            const { headers, rows } = receivedRegressionData;
+            const { y, xn = [], xc = [] } = receivedModelSpec;
+            // Only include columns that are part of the model
+            const usedCols = [y, ...xn, ...xc];
+            const usedIndices = usedCols.map(col => headers.indexOf(col)).filter(i => i !== -1);
+            const filteredHeaders = usedIndices.map(i => headers[i]);
+            const filteredRows = rows.map(row => usedIndices.map(i => row[i]));
+            return {
+              headers: filteredHeaders,
+              rows: filteredRows,
+              // Column role metadata for colour-coding
+              columnRoles: filteredHeaders.map(h => h === y ? 'y' : xn.includes(h) ? 'xn' : 'xc')
+            };
+          },
           saveModel:  () => saveCurrentRegressionAnalysis(),
           exportHtml: () => exportResultsAsHtml(),
           moduleName: 'Save regression model to workbook'

@@ -689,19 +689,26 @@ const StatisticoHeader = {
   _renderDataModal(showAll) {
     const data = this._dataModalFull;
     if (!data) return;
-    const { headers, rows } = data;
+    const { headers, rows, columnRoles } = data;
 
     // A row is "used" (complete) when every cell has a real value
     const isComplete = row => row.every(v => v !== null && v !== undefined && v !== '' && v !== '—' && v !== '\u2014');
 
+    // Column header HTML with role badge
+    const roleLabel = { y: 'Y', xn: 'Xn', xc: 'Xc' };
+    const renderTh = (h, i) => {
+      const role = columnRoles ? columnRoles[i] : null;
+      const badge = role ? `<span class="sh-col-role sh-col-${role}">${roleLabel[role]}</span>` : '';
+      return `<th>${badge}${h ?? ''}</th>`;
+    };
+
     let html = '';
 
     if (showAll) {
-      // Show all rows; highlight incomplete ones
       const usedCount = rows.filter(isComplete).length;
       html += `<div class="sh-data-modal-meta">${rows.length} total rows &nbsp;·&nbsp; <span style="color:#4ade80;">${usedCount} used</span> &nbsp;·&nbsp; <span style="color:rgba(255,255,255,.35);">${rows.length - usedCount} excluded (missing values)</span></div>`;
       html += '<div class="sh-data-modal-table-wrap"><table class="sh-data-modal-table"><thead><tr><th>#</th>';
-      headers.forEach(h => { html += `<th>${h ?? ''}</th>`; });
+      headers.forEach((h, i) => { html += renderTh(h, i); });
       html += '</tr></thead><tbody>';
       rows.forEach((row, i) => {
         const complete = isComplete(row);
@@ -714,11 +721,10 @@ const StatisticoHeader = {
         html += '</tr>';
       });
     } else {
-      // Show only complete rows
       const usedRows = rows.filter(isComplete);
       html += `<div class="sh-data-modal-meta">${usedRows.length} used rows × ${headers.length} columns &nbsp;<span style="opacity:.5;font-size:10px;">(rows with missing values excluded)</span></div>`;
       html += '<div class="sh-data-modal-table-wrap"><table class="sh-data-modal-table"><thead><tr><th>#</th>';
-      headers.forEach(h => { html += `<th>${h ?? ''}</th>`; });
+      headers.forEach((h, i) => { html += renderTh(h, i); });
       html += '</tr></thead><tbody>';
       usedRows.forEach((row, i) => {
         html += `<tr><td class="sh-row-num">${i + 1}</td>`;

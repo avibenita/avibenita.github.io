@@ -21,7 +21,8 @@ function onRangeDataLoaded(values, address) {
   console.log('Correlation: Range data received', values.length, 'rows');
   
   if (!values || values.length < 2) {
-    showError('Please select a range with at least a header row and one data row');
+    const panel = document.getElementById('correlationPanel');
+    if (panel) panel.style.display = 'none';
     return;
   }
   
@@ -39,11 +40,11 @@ function onRangeDataLoaded(values, address) {
   document.getElementById('corrRows').textContent = dataRows.length;
   document.getElementById('corrCols').textContent = headers.length;
   
-  // Enable button
+  // Show panel and enable button
+  const panel = document.getElementById('correlationPanel');
+  if (panel) panel.style.display = 'block';
   const btn = document.getElementById('openCorrelationConfig');
-  if (btn) {
-    btn.disabled = false;
-  }
+  if (btn) btn.disabled = false;
 }
 
 /**

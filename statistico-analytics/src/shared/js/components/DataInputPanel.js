@@ -34,7 +34,7 @@ async function initDataInputPanel() {
   
   // Initial selection check
   onSelectionChanged();
-  
+
   console.log('Data Input Panel initialized');
 }
 

@@ -46,6 +46,8 @@
     <!-- Main Content -->
     <div class="taskpane-content">
       <div class="controls-container">
+        <!-- Saved Analyses Panel -->
+        <div id="savedAnalysesContainer"></div>
         <!-- Shared Data Range Selection Component -->
         <div id="dataInputPanelContainer"></div>
         <!-- Correlation-Specific Column Selection Component -->
@@ -56,6 +58,9 @@
   
   <!-- Scripts -->
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  
+  <!-- Saved Analyses Manager -->
+  <script src="../../src/shared/js/core/saved-analyses-manager.js"></script>
   
   <!-- Shared Data Input Panel -->
   <script src="../../src/shared/js/components/DataInputPanel.js"></script>
@@ -74,13 +79,21 @@
       if (info.host === Office.HostType.Excel) {
         console.log('Correlation Analysis Module Loaded');
         
+        // Load saved analyses panel HTML
+        fetch('../../src/shared/components/saved-analyses-panel.html')
+          .then(response => response.text())
+          .then(html => {
+            document.getElementById('savedAnalysesContainer').innerHTML = html;
+            initSavedAnalysesPanel();
+          })
+          .catch(error => console.error('Error loading saved analyses panel:', error));
+        
         // Load shared data input panel HTML
         fetch('../../src/shared/components/data-input-panel.html')
           .then(response => response.text())
           .then(html => {
             document.getElementById('dataInputPanelContainer').innerHTML = html;
-            // Initialize the shared data input panel
-            initDataInputPanel();
+            initDataInputPanel().then(() => autoDetectRange());
           })
           .catch(error => console.error('Error loading data input panel:', error));
         
@@ -93,6 +106,86 @@
           .catch(error => console.error('Error loading correlation input panel:', error));
       }
     });
+    
+    // ====================================================================
+    // SAVED ANALYSES PANEL FUNCTIONS
+    // ====================================================================
+    
+    function toggleSavedAnalysesPanel() {
+      const body = document.getElementById('savedAnalysesBody');
+      const icon = document.getElementById('savedAnalysesToggleIcon');
+      if (body.style.display === 'none') {
+        body.style.display = 'block';
+        icon.classList.add('open');
+      } else {
+        body.style.display = 'none';
+        icon.classList.remove('open');
+      }
+    }
+    
+    async function initSavedAnalysesPanel() {
+      try { await refreshSavedAnalysesList(); } catch (e) { console.error(e); }
+    }
+    
+    async function refreshSavedAnalysesList() {
+      const analyses = await SavedAnalysesManager.getAnalysesByModule('correlations');
+      const listContainer = document.getElementById('savedAnalysesList');
+      const countSpan = document.getElementById('savedCount');
+      countSpan.textContent = `(${analyses.length})`;
+      listContainer.innerHTML = '';
+      if (analyses.length === 0) {
+        listContainer.innerHTML = '<div class="no-analyses-message"><i class="fa-solid fa-info-circle"></i><p>No saved analyses yet. Run a correlation and save to get started.</p></div>';
+        return;
+      }
+      analyses.sort((a, b) => {
+        if (a.starred && !b.starred) return -1;
+        if (!a.starred && b.starred) return 1;
+        return new Date(b.timestamp) - new Date(a.timestamp);
+      });
+      analyses.forEach(analysis => listContainer.appendChild(createAnalysisCard(analysis)));
+    }
+    
+    function createAnalysisCard(analysis) {
+      const card = document.createElement('div');
+      card.className = `analysis-card${analysis.starred ? ' starred' : ''}`;
+      const ts = new Date(analysis.timestamp).toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      const vars = analysis.config.variables || [];
+      const varsText = vars.length ? vars.slice(0,3).join(', ') + (vars.length > 3 ? '...' : '') : 'All variables';
+      card.innerHTML = `
+        <div class="analysis-card-header">
+          <div class="analysis-name">${analysis.starred ? '<i class="fa-solid fa-star star-icon"></i>' : ''}${analysis.name}</div>
+        </div>
+        <div class="analysis-info">
+          <div><strong>Variables:</strong> ${varsText}</div>
+          <div><strong>Method:</strong> ${analysis.config.method || 'Pearson'}</div>
+        </div>
+        <div class="analysis-actions">
+          <button class="analysis-btn analysis-btn-load" onclick="loadSavedAnalysis('${analysis.id}')"><i class="fa-solid fa-folder-open"></i> Load</button>
+          <button class="analysis-btn analysis-btn-run" onclick="runSavedAnalysis('${analysis.id}')"><i class="fa-solid fa-play"></i> Run</button>
+          <button class="analysis-btn analysis-btn-delete" onclick="deleteSavedAnalysis('${analysis.id}')"><i class="fa-solid fa-trash"></i></button>
+        </div>
+        <div class="analysis-timestamp"><i class="fa-solid fa-clock"></i> ${ts}</div>`;
+      return card;
+    }
+    
+    async function loadSavedAnalysis(analysisId) {
+      const analysis = await SavedAnalysesManager.loadAnalysisById(analysisId);
+      if (!analysis || analysis.module !== 'correlations') return;
+      sessionStorage.setItem('correlationModelSpec', JSON.stringify(analysis.config));
+      if (typeof openCorrelationConfig === 'function') openCorrelationConfig();
+    }
+    
+    async function runSavedAnalysis(analysisId) {
+      const analysis = await SavedAnalysesManager.loadAnalysisById(analysisId);
+      if (!analysis || analysis.module !== 'correlations') return;
+      sessionStorage.setItem('correlationModelSpec', JSON.stringify(analysis.config));
+      if (typeof openCorrelationConfig === 'function') openCorrelationConfig();
+    }
+    
+    async function deleteSavedAnalysis(analysisId) {
+      await SavedAnalysesManager.deleteAnalysis(analysisId);
+      await refreshSavedAnalysesList();
+    }
   </script>
   
 </body>

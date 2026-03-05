@@ -4,7 +4,7 @@
  * VERSION: 2026-03-05-action-buttons
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-05-action-buttons');
+console.log('📦 Loading shared-header.js VERSION 2026-03-05-b');
 
 const StatisticoHeader = {
   currentView: 'histogram',

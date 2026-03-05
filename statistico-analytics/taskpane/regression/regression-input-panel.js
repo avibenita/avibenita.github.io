@@ -116,7 +116,7 @@ function openModelBuilder() {
 function openRegressionCoefficientsDialog() {
   console.log('🪟 Opening Regression Coefficients dialog');
   
-  const dialogUrl = `${getDialogsBaseUrl()}regression/regression-coefficients.html`;
+  const dialogUrl = `${getDialogsBaseUrl()}regression/regression-coefficients.html?cb=${Date.now()}`;
 
   if (!Office || !Office.context || !Office.context.ui) {
     console.error('Office dialog API not available');

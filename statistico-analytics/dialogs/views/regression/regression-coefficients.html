@@ -1104,6 +1104,51 @@
       padding-bottom: 0;
       white-space: nowrap;
     }
+    /* ── Obs filter bar (Correlations / Descriptive tabs) ── */
+    .tab-obs-filter-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      background: rgba(255,255,255,.04);
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .tab-obs-info {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+    .tab-obs-info strong { color: var(--text-primary); }
+    .tab-obs-btns {
+      display: flex;
+      gap: 6px;
+    }
+    .tab-obs-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.06);
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+      white-space: nowrap;
+    }
+    .tab-obs-btn:hover {
+      background: rgba(255,255,255,.12);
+      color: var(--text-primary);
+    }
+    .tab-obs-btn.active {
+      background: var(--accent-1, #e8763a);
+      border-color: var(--accent-1, #e8763a);
+      color: #fff;
+    }
     .tab-decimal-label {
       font-size: 0.78rem;
       font-weight: 700;
@@ -4597,6 +4642,37 @@
     }
     
     // Load Correlations Tab Content  
+    // Helper: determine if a row is "used" (all model-variable cells are non-empty)
+    function _isUsedRow(row, indices) {
+      return indices.every(idx => {
+        const v = row[idx];
+        return v !== null && v !== undefined && v !== '' && v !== '—';
+      });
+    }
+
+    // Helper: build the filteredData array for iframes (rows → object format)
+    function _buildIframeData(rows, filteredHeaders, indices, usedOnly) {
+      return rows
+        .filter(row => !usedOnly || _isUsedRow(row, indices))
+        .map(row => {
+          const rowObj = {};
+          filteredHeaders.forEach((header, i) => { rowObj[header] = row[indices[i]]; });
+          return rowObj;
+        });
+    }
+
+    // Helper: send data + theme to an iframe
+    function _sendDataToIframe(iframe, filteredHeaders, filteredData, address) {
+      iframe.contentWindow.postMessage({
+        type: 'CORRELATION_DATA',
+        payload: { headers: filteredHeaders, data: filteredData, address, source: 'regression-model' }
+      }, '*');
+      const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+      setTimeout(() => {
+        iframe.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: currentTheme }, '*');
+      }, 100);
+    }
+
     function loadCorrelationsTab() {
       if (!receivedRegressionData || !receivedModelSpec) {
         document.getElementById('correlationsPanel').innerHTML = `
@@ -4612,51 +4688,51 @@
       const panel = document.getElementById('correlationsPanel');
       const baseUrl = window.location.href.split('/regression/')[0];
       const iframeUrl = `${baseUrl}/correlations/correlation-matrix.html`;
-      console.log('Loading iframe:', iframeUrl);
-      
-      const iframe = document.createElement('iframe');
-      iframe.style.cssText = 'width: 100%; height: 80vh; border: none; background: transparent;';
-      iframe.src = iframeUrl;
-      
-      // Prepare correlation data
+
+      // Prepare column info
       const { headers, rows, address } = receivedRegressionData;
-      const { y, xn = [] } = receivedModelSpec;
-      const indices = [y, ...xn].map(varName => headers.indexOf(varName)).filter(idx => idx !== -1);
-      const filteredHeaders = indices.map(idx => headers[idx]);
-      const filteredData = rows.map(row => {
-        const rowObj = {};
-        filteredHeaders.forEach((header, i) => {
-          rowObj[header] = row[indices[i]];
-        });
-        return rowObj;
-      });
-      
-      // Send data to iframe when it loads
+      const { y, xn = [], xc = [] } = receivedModelSpec;
+      const modelVars = [y, ...xn, ...xc];
+      const indices = modelVars.map(v => headers.indexOf(v)).filter(i => i !== -1);
+      const filteredHeaders = indices.map(i => headers[i]);
+
+      const usedCount = rows.filter(row => _isUsedRow(row, indices)).length;
+      const totalCount = rows.length;
+
+      let usedOnly = true; // default: show used obs
+
+      // Build wrapper with filter bar + iframe
+      panel.innerHTML = `
+        <div class="tab-obs-filter-bar">
+          <span class="tab-obs-info" id="corrObsInfo">Showing <strong>${usedCount}</strong> used obs of ${totalCount} total</span>
+          <div class="tab-obs-btns">
+            <button id="corrBtnUsed" class="tab-obs-btn active" onclick="setCorrFilter(true)">
+              <i class="fa-solid fa-check"></i> Used obs
+            </button>
+            <button id="corrBtnAll" class="tab-obs-btn" onclick="setCorrFilter(false)">
+              <i class="fa-solid fa-bars"></i> All rows
+            </button>
+          </div>
+        </div>
+        <iframe id="corrIframe" style="width:100%;height:78vh;border:none;background:transparent;" src="${iframeUrl}"></iframe>
+      `;
+
+      const iframe = document.getElementById('corrIframe');
       iframe.onload = function() {
-        console.log('📤 Sending data to correlations iframe');
-        iframe.contentWindow.postMessage({
-          type: 'CORRELATION_DATA',
-          payload: {
-            headers: filteredHeaders,
-            data: filteredData,
-            address: address,
-            source: 'regression-model'
-          }
-        }, '*');
-        
-        // Send current theme to iframe
-        const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
-        setTimeout(() => {
-          iframe.contentWindow.postMessage({
-            type: 'THEME_CHANGE',
-            theme: currentTheme
-          }, '*');
-          console.log(`🎨 Sent theme '${currentTheme}' to correlations iframe`);
-        }, 100);
+        const data = _buildIframeData(rows, filteredHeaders, indices, usedOnly);
+        _sendDataToIframe(iframe, filteredHeaders, data, address);
       };
-      
-      panel.innerHTML = '';
-      panel.appendChild(iframe);
+
+      window.setCorrFilter = function(useUsedOnly) {
+        usedOnly = useUsedOnly;
+        document.getElementById('corrBtnUsed').classList.toggle('active', usedOnly);
+        document.getElementById('corrBtnAll').classList.toggle('active', !usedOnly);
+        const shownCount = usedOnly ? usedCount : totalCount;
+        document.getElementById('corrObsInfo').innerHTML = `Showing <strong>${shownCount}</strong> ${usedOnly ? 'used obs' : 'all rows'} of ${totalCount} total`;
+        const data = _buildIframeData(rows, filteredHeaders, indices, usedOnly);
+        if (iframe.contentWindow) _sendDataToIframe(iframe, filteredHeaders, data, address);
+      };
+
       window.correlationsLoaded = true;
     }
     
@@ -4676,51 +4752,51 @@
       const panel = document.getElementById('descriptivePanel');
       const baseUrl = window.location.href.split('/regression/')[0];
       const iframeUrl = `${baseUrl}/correlations/descriptive-stats.html`;
-      console.log('Loading iframe:', iframeUrl);
-      
-      const iframe = document.createElement('iframe');
-      iframe.style.cssText = 'width: 100%; height: 80vh; border: none; background: transparent;';
-      iframe.src = iframeUrl;
-      
-      // Prepare data (same format as correlations)
+
+      // Prepare column info
       const { headers, rows, address } = receivedRegressionData;
-      const { y, xn = [] } = receivedModelSpec;
-      const indices = [y, ...xn].map(varName => headers.indexOf(varName)).filter(idx => idx !== -1);
-      const filteredHeaders = indices.map(idx => headers[idx]);
-      const filteredData = rows.map(row => {
-        const rowObj = {};
-        filteredHeaders.forEach((header, i) => {
-          rowObj[header] = row[indices[i]];
-        });
-        return rowObj;
-      });
-      
-      // Send data to iframe when it loads
+      const { y, xn = [], xc = [] } = receivedModelSpec;
+      const modelVars = [y, ...xn, ...xc];
+      const indices = modelVars.map(v => headers.indexOf(v)).filter(i => i !== -1);
+      const filteredHeaders = indices.map(i => headers[i]);
+
+      const usedCount = rows.filter(row => _isUsedRow(row, indices)).length;
+      const totalCount = rows.length;
+
+      let usedOnly = true; // default: show used obs
+
+      // Build wrapper with filter bar + iframe
+      panel.innerHTML = `
+        <div class="tab-obs-filter-bar">
+          <span class="tab-obs-info" id="descObsInfo">Showing <strong>${usedCount}</strong> used obs of ${totalCount} total</span>
+          <div class="tab-obs-btns">
+            <button id="descBtnUsed" class="tab-obs-btn active" onclick="setDescFilter(true)">
+              <i class="fa-solid fa-check"></i> Used obs
+            </button>
+            <button id="descBtnAll" class="tab-obs-btn" onclick="setDescFilter(false)">
+              <i class="fa-solid fa-bars"></i> All rows
+            </button>
+          </div>
+        </div>
+        <iframe id="descIframe" style="width:100%;height:78vh;border:none;background:transparent;" src="${iframeUrl}"></iframe>
+      `;
+
+      const iframe = document.getElementById('descIframe');
       iframe.onload = function() {
-        console.log('📤 Sending data to descriptive stats iframe');
-        iframe.contentWindow.postMessage({
-          type: 'CORRELATION_DATA', // Descriptive stats uses same message type
-          payload: {
-            headers: filteredHeaders,
-            data: filteredData,
-            address: address,
-            source: 'regression-model'
-          }
-        }, '*');
-        
-        // Send current theme to iframe
-        const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
-        setTimeout(() => {
-          iframe.contentWindow.postMessage({
-            type: 'THEME_CHANGE',
-            theme: currentTheme
-          }, '*');
-          console.log(`🎨 Sent theme '${currentTheme}' to descriptive stats iframe`);
-        }, 100);
+        const data = _buildIframeData(rows, filteredHeaders, indices, usedOnly);
+        _sendDataToIframe(iframe, filteredHeaders, data, address);
       };
-      
-      panel.innerHTML = '';
-      panel.appendChild(iframe);
+
+      window.setDescFilter = function(useUsedOnly) {
+        usedOnly = useUsedOnly;
+        document.getElementById('descBtnUsed').classList.toggle('active', usedOnly);
+        document.getElementById('descBtnAll').classList.toggle('active', !usedOnly);
+        const shownCount = usedOnly ? usedCount : totalCount;
+        document.getElementById('descObsInfo').innerHTML = `Showing <strong>${shownCount}</strong> ${usedOnly ? 'used obs' : 'all rows'} of ${totalCount} total`;
+        const data = _buildIframeData(rows, filteredHeaders, indices, usedOnly);
+        if (iframe.contentWindow) _sendDataToIframe(iframe, filteredHeaders, data, address);
+      };
+
       window.descriptiveLoaded = true;
     }
     

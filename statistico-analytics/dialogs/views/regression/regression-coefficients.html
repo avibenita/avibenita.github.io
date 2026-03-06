@@ -4661,16 +4661,20 @@
         });
     }
 
-    // Helper: send data + theme to an iframe
-    function _sendDataToIframe(iframe, filteredHeaders, filteredData, address) {
-      iframe.contentWindow.postMessage({
-        type: 'CORRELATION_DATA',
-        payload: { headers: filteredHeaders, data: filteredData, address, source: 'regression-model' }
-      }, '*');
-      const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
-      setTimeout(() => {
-        iframe.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: currentTheme }, '*');
-      }, 100);
+    // Helper: send data + theme to an iframe (with small delay to ensure inner page listener is ready)
+    function _sendDataToIframe(iframe, filteredHeaders, filteredData, address, delayMs = 200) {
+      const doSend = () => {
+        iframe.contentWindow.postMessage({
+          type: 'CORRELATION_DATA',
+          payload: { headers: filteredHeaders, data: filteredData, address, source: 'regression-model' }
+        }, '*');
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+        setTimeout(() => {
+          iframe.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: currentTheme }, '*');
+        }, 100);
+      };
+      if (delayMs > 0) setTimeout(doSend, delayMs);
+      else doSend();
     }
 
     function loadCorrelationsTab() {
@@ -4687,7 +4691,7 @@
       console.log('📊 Loading correlations tab...');
       const panel = document.getElementById('correlationsPanel');
       const baseUrl = window.location.href.split('/regression/')[0];
-      const iframeUrl = `${baseUrl}/correlations/correlation-matrix.html`;
+      const iframeUrl = `${baseUrl}/correlations/correlation-matrix.html?cb=${Date.now()}`;
 
       // Prepare column info
       const { headers, rows, address } = receivedRegressionData;
@@ -4730,7 +4734,7 @@
         const shownCount = usedOnly ? usedCount : totalCount;
         document.getElementById('corrObsInfo').innerHTML = `Showing <strong>${shownCount}</strong> ${usedOnly ? 'used obs' : 'all rows'} of ${totalCount} total`;
         const data = _buildIframeData(rows, filteredHeaders, indices, usedOnly);
-        if (iframe.contentWindow) _sendDataToIframe(iframe, filteredHeaders, data, address);
+        if (iframe.contentWindow) _sendDataToIframe(iframe, filteredHeaders, data, address, 0);
       };
 
       window.correlationsLoaded = true;
@@ -4751,7 +4755,7 @@
       console.log('📊 Loading descriptive stats tab...');
       const panel = document.getElementById('descriptivePanel');
       const baseUrl = window.location.href.split('/regression/')[0];
-      const iframeUrl = `${baseUrl}/correlations/descriptive-stats.html`;
+      const iframeUrl = `${baseUrl}/correlations/descriptive-stats.html?cb=${Date.now()}`;
 
       // Prepare column info
       const { headers, rows, address } = receivedRegressionData;
@@ -4794,7 +4798,7 @@
         const shownCount = usedOnly ? usedCount : totalCount;
         document.getElementById('descObsInfo').innerHTML = `Showing <strong>${shownCount}</strong> ${usedOnly ? 'used obs' : 'all rows'} of ${totalCount} total`;
         const data = _buildIframeData(rows, filteredHeaders, indices, usedOnly);
-        if (iframe.contentWindow) _sendDataToIframe(iframe, filteredHeaders, data, address);
+        if (iframe.contentWindow) _sendDataToIframe(iframe, filteredHeaders, data, address, 0);
       };
 
       window.descriptiveLoaded = true;

@@ -1,0 +1,341 @@
+/*
+ * shared-sidebar.css  – v2026-0306
+ * Reusable collapsible sidebar navigation for Statistico-Analytics dialogs.
+ *
+ * Usage:
+ *  1. Add: <link rel="stylesheet" href="../shared-sidebar.css?v=2026-0306">
+ *     (adjust relative path as needed)
+ *  2. Wrap page in:  <div class="sb-page">
+ *                      <nav class="sb-nav" id="sidebarNav"> … </nav>
+ *                      <div class="sb-content"> … </div>
+ *                    </div>
+ *  3. Inside <nav> use:
+ *       .sb-header         – logo/title row + collapse button
+ *       .sb-group          – collapsible section
+ *       .sb-group-title    – uppercase section heading
+ *       .sb-item           – nav button   (.active, .sub for sub-items)
+ *       .sb-divider        – horizontal rule between groups
+ *       .sb-bottom         – sticky footer area inside sidebar
+ *  4. Call  sbToggle()  for the collapse button.
+ *  5. Call  sbActivate(el)  to mark an item active.
+ *
+ * The sidebar keeps the Statistico dark theme but inherits the cleaner,
+ * grouped look from ADDIN_COMPARISON.html.
+ */
+
+/* ─────────────────────────────────────────────
+   Page shell
+   ───────────────────────────────────────────── */
+.sb-page {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ─────────────────────────────────────────────
+   Sidebar container
+   ───────────────────────────────────────────── */
+.sb-nav {
+  --sb-w:           190px;
+  --sb-w-collapsed: 48px;
+  --sb-bg-top:      #121b30;
+  --sb-bg-bot:      #0a1120;
+  --sb-border:      rgba(255,255,255,.08);
+  --sb-accent:      #4ea3ff;           /* active rail colour */
+  --sb-accent-bg:   rgba(78,163,255,.22);
+  --sb-text:        #b8c4d8;
+  --sb-text-active: #ffffff;
+  --sb-group-color: #7fa7d9;
+
+  width: var(--sb-w);
+  min-width: var(--sb-w);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--sb-bg-top) 0%, var(--sb-bg-bot) 100%);
+  border-right: 1px solid var(--sb-border);
+  overflow: hidden;
+  height: 100%;
+  transition: width .25s ease, min-width .25s ease;
+  position: relative;
+  z-index: 10;
+}
+
+.sb-nav.collapsed {
+  width: var(--sb-w-collapsed);
+  min-width: var(--sb-w-collapsed);
+}
+
+/* ─────────────────────────────────────────────
+   Sidebar header (logo / title / collapse btn)
+   ───────────────────────────────────────────── */
+.sb-header {
+  display: flex;
+  align-items: center;
+  padding: 16px 14px;
+  border-bottom: 1px solid var(--sb-border);
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.sb-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #2b3a5f, #1a2744);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.sb-title-block {
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+}
+.sb-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ff9f63;          /* orange brand colour */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sb-subtitle {
+  font-size: 11px;
+  color: #9aa8bf;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Hide title block when collapsed, keep logo */
+.sb-nav.collapsed .sb-title-block { display: none; }
+
+.sb-toggle-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.5);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+  transition: background .18s, color .18s, transform .25s;
+  /* keep button right-aligned when title hidden */
+  margin-left: auto;
+}
+.sb-toggle-btn:hover { background: rgba(255,255,255,.14); color: #fff; }
+.sb-nav.collapsed .sb-toggle-btn { transform: rotate(180deg); }
+
+/* ─────────────────────────────────────────────
+   Scrollable nav body
+   ───────────────────────────────────────────── */
+.sb-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sb-body::-webkit-scrollbar { width: 4px; }
+.sb-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 2px; }
+
+/* ─────────────────────────────────────────────
+   Group label
+   ───────────────────────────────────────────── */
+.sb-group {
+  margin-bottom: 4px;
+}
+
+.sb-group-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--sb-group-color);
+  padding: 10px 12px 5px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Hide group titles when collapsed */
+.sb-nav.collapsed .sb-group-title { opacity: 0; pointer-events: none; height: 0; padding: 0; margin: 0; }
+
+/* ─────────────────────────────────────────────
+   Nav items
+   ───────────────────────────────────────────── */
+.sb-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 9px 13px;
+  margin: 2px 4px;
+  border-radius: 8px;
+  color: var(--sb-text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  gap: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: background .18s, color .18s;
+  border: none;
+  background: transparent;
+  width: calc(100% - 8px);
+  text-align: left;
+}
+
+.sb-item:hover {
+  background: rgba(255,255,255,.05);
+  color: var(--sb-text-active);
+}
+
+/* Active state – gradient highlight + left rail */
+.sb-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background .18s;
+}
+
+.sb-item.active {
+  background: linear-gradient(90deg, var(--sb-accent-bg), rgba(78,163,255,.05));
+  color: var(--sb-text-active);
+  font-weight: 600;
+}
+.sb-item.active::before { background: var(--sb-accent); }
+
+/* Icon inside item */
+.sb-item-icon {
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 13px;
+  opacity: .8;
+  transition: opacity .18s;
+}
+.sb-item.active .sb-item-icon { opacity: 1; }
+
+/* Label span – hidden when collapsed */
+.sb-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sb-nav.collapsed .sb-item-label { display: none; }
+.sb-nav.collapsed .sb-item { padding: 9px 0; justify-content: center; margin: 2px 4px; }
+
+/* Sub-items (indented) */
+.sb-item.sub {
+  padding-left: 32px;
+  font-size: 12px;
+}
+.sb-nav.collapsed .sb-item.sub { padding-left: 0; }
+
+/* ─────────────────────────────────────────────
+   Divider
+   ───────────────────────────────────────────── */
+.sb-divider {
+  height: 1px;
+  background: var(--sb-border);
+  margin: 6px 8px;
+  flex-shrink: 0;
+}
+
+/* ─────────────────────────────────────────────
+   Sticky bottom footer (decimals, AI btn, etc.)
+   ───────────────────────────────────────────── */
+.sb-bottom {
+  border-top: 1px solid var(--sb-border);
+  padding: 10px 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.sb-bottom-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: 6px;
+}
+
+.sb-bottom-icon {
+  font-size: 11px;
+  color: #9aa8bf;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+}
+.sb-bottom-label {
+  font-size: 11px;
+  color: #9aa8bf;
+  white-space: nowrap;
+  flex: 1;
+}
+.sb-nav.collapsed .sb-bottom-label { display: none; }
+
+.sb-bottom-select {
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.14);
+  color: #e2e8f0;
+  border-radius: 5px;
+  padding: 2px 5px;
+  font-size: 11px;
+  cursor: pointer;
+  width: 54px;
+}
+.sb-nav.collapsed .sb-bottom-select { width: 32px; font-size: 10px; }
+
+/* Bottom action button (e.g. AI Interpret) */
+.sb-bottom-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: none;
+  background: rgba(255,255,255,.06);
+  color: #b8c4d8;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background .18s, color .18s;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.sb-bottom-btn:hover { background: rgba(255,255,255,.12); color: #fff; }
+.sb-nav.collapsed .sb-bottom-btn { justify-content: center; padding: 7px 0; }
+.sb-nav.collapsed .sb-bottom-btn .sb-item-label { display: none; }
+
+/* ─────────────────────────────────────────────
+   Main content area (sibling of sb-nav)
+   ───────────────────────────────────────────── */
+.sb-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}

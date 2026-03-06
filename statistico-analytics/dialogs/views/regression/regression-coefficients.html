@@ -2295,13 +2295,10 @@
       <!-- ── Sidebar Navigation ── -->
       <nav class="sb-nav" id="sidebarNav">
 
-        <!-- Header: logo / title / collapse -->
+        <!-- Header: Menu title + collapse toggle -->
         <div class="sb-header">
-          <div class="sb-logo">S</div>
-          <div class="sb-title-block">
-            <div class="sb-title">Statistico</div>
-            <div class="sb-subtitle">Regression</div>
-          </div>
+          <i class="fa-solid fa-bars-staggered sb-menu-icon"></i>
+          <span class="sb-menu-title">Menu</span>
           <button class="sb-toggle-btn" onclick="toggleSidebar()" title="Collapse / expand">
             <i class="fa-solid fa-chevron-left"></i>
           </button>
@@ -2317,21 +2314,24 @@
               <i class="fa-solid fa-table-cells sb-item-icon"></i>
               <span class="sb-item-label">Overview</span>
             </button>
+            <!-- Sub: Detailed Results (sets analyst depth) -->
+            <button class="sb-item sb-item-sub" onclick="switchTab('results'); setDepth('analyst')" data-tab="results" id="detailedResultsBtn">
+              <i class="fa-solid fa-list-ul sb-item-icon"></i>
+              <span class="sb-item-label">Detailed Results</span>
+            </button>
             <button class="sb-item" onclick="switchTab('predictions')" data-tab="predictions">
               <i class="fa-solid fa-wand-magic-sparkles sb-item-icon"></i>
               <span class="sb-item-label">Predictions</span>
             </button>
-
-            <!-- Diagnostics sub-items (indented under Model) -->
-            <button class="sb-item sub" onclick="switchTab('residuals')" data-tab="residuals">
+            <button class="sb-item" onclick="switchTab('residuals')" data-tab="residuals">
               <i class="fa-solid fa-gauge-high sb-item-icon"></i>
               <span class="sb-item-label">Residual Overview</span>
             </button>
-            <button class="sb-item sub" onclick="switchTab('res-plots')" data-tab="res-plots">
+            <button class="sb-item" onclick="switchTab('res-plots')" data-tab="res-plots">
               <i class="fa-solid fa-chart-line sb-item-icon"></i>
               <span class="sb-item-label">Residual Plots</span>
             </button>
-            <button class="sb-item sub" onclick="switchTab('res-influential')" data-tab="res-influential">
+            <button class="sb-item" onclick="switchTab('res-influential')" data-tab="res-influential">
               <i class="fa-solid fa-triangle-exclamation sb-item-icon"></i>
               <span class="sb-item-label">Influential Cases</span>
             </button>
@@ -3050,6 +3050,19 @@
         btn.classList.toggle('active', btn.dataset.depth === depth);
       });
       applyDepth(depth);
+      // Sync "Detailed Results" sidebar item
+      _syncDetailedResultsActive(null);
+    }
+
+    // Keep "Detailed Results" nav item highlighted only when
+    // the results tab is active AND depth = analyst
+    function _syncDetailedResultsActive(currentTab) {
+      const btn = document.getElementById('detailedResultsBtn');
+      if (!btn) return;
+      const onResultsTab = currentTab === 'results' ||
+        (currentTab === null && document.getElementById('tab-results')?.classList.contains('active'));
+      const isAnalyst = window._analysisDepth === 'analyst';
+      btn.classList.toggle('active', onResultsTab && isAnalyst);
     }
 
     // ── Equation popup ────────────────────────────────────────
@@ -3165,10 +3178,14 @@
       // Update nav items (sb-item = new shared sidebar class)
       document.querySelectorAll('.sb-item').forEach(btn => {
         btn.classList.remove('active');
+        // "Detailed Results" (sb-item-sub) is active when results tab + analyst depth
+        if (btn.id === 'detailedResultsBtn') return;
         if (btn.dataset.tab === tabName) {
           btn.classList.add('active');
         }
       });
+      // Keep "Detailed Results" active only when on results+analyst
+      _syncDetailedResultsActive(tabName);
       
       // Hide all tab content, show the selected one
       document.querySelectorAll('.tab-content').forEach(content => {

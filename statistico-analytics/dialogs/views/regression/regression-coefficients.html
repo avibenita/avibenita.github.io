@@ -66,19 +66,29 @@
     html,body{height:100%;margin:0;padding:0;}
     body{background:var(--surface-0);color:var(--text-primary);font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;overflow-x:hidden;}
 
-    .wrap{ display:flex; justify-content:stretch; padding:0; }
-    .card{
+    /* ── Sidebar + main layout ── */
+    .wrap { flex-direction: row !important; align-items: stretch; }
+    .card {
       width:100%; background:var(--surface-1);
       border-radius:0; box-shadow:none;
       border:none; overflow:visible;
-      display:flex; flex-direction:column;
+      display:flex; flex-direction:row;
       animation:panelFadeIn .3s ease-out;
+      min-height: 100vh;
+    }
+
+    /* The right-side main content column */
+    .card-main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
     }
     @keyframes panelFadeIn {
       from { opacity: 0; transform: translateY(6px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    /* Slim toolbar that replaces the old hero section */
+    /* Slim toolbar: only depth toggle + sub-toolbar */
     .hero-section {
       background: var(--surface-1);
       border-bottom: 1px solid var(--border);
@@ -93,7 +103,7 @@
       align-items: stretch;
       gap: 0;
     }
-    /* Single toolbar row: content tabs | depth toggle */
+    /* Single toolbar row: depth toggle only (tabs moved to sidebar) */
     .hero-row-1 {
       display: flex;
       align-items: center;
@@ -1080,22 +1090,58 @@
     }
 
     /* Tab Navigation - slim bar inside toolbar */
+    /* ── Sidebar layout ── */
+    .wrap { flex-direction: row !important; align-items: stretch; }
+    .card { flex-direction: row !important; min-height: 100vh; }
+
+    /* Sidebar nav */
     .tab-navigation {
+      --sidebar-w: 168px;
+      --sidebar-collapsed-w: 48px;
+      width: var(--sidebar-w);
+      min-width: var(--sidebar-w);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      background: rgba(0,0,0,.28);
+      border-right: 1px solid rgba(255,255,255,.07);
+      padding: 8px 6px 8px 6px;
+      overflow: hidden;
+      transition: width .25s ease, min-width .25s ease;
+      position: relative;
+    }
+    .tab-navigation.collapsed {
+      width: var(--sidebar-collapsed-w);
+      min-width: var(--sidebar-collapsed-w);
+    }
+
+    /* Toggle button at top of sidebar */
+    .sidebar-toggle {
       display: flex;
       align-items: center;
-      gap: 4px;
-      background: transparent;
-      padding: 4px 0;
-      border-bottom: none;
-      overflow-x: auto;
-      scrollbar-width: none;
-      margin-top: 0;
-      flex: 0 1 auto;
-      min-width: 0;
+      justify-content: flex-end;
+      padding: 2px 2px 8px 2px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      margin-bottom: 4px;
+      flex-shrink: 0;
     }
-    .tab-navigation::-webkit-scrollbar {
-      display: none;
+    .sidebar-toggle-btn {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color: rgba(255,255,255,.5);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px;
+      transition: background .18s, color .18s, transform .25s;
+      flex-shrink: 0;
     }
+    .sidebar-toggle-btn:hover { background: rgba(255,255,255,.14); color: #fff; }
+    .tab-navigation.collapsed .sidebar-toggle-btn { transform: rotate(180deg); }
+
+    .tab-navigation::-webkit-scrollbar { display: none; }
     .tab-controls-right {
       margin-left: auto;
       display: inline-flex;
@@ -1170,65 +1216,66 @@
     }
     
     .tab-button {
-      height: 36px;
-      padding: 0 4px;
+      height: 38px;
+      padding: 0 10px;
       background: transparent;
       border: none;
-      color: rgba(255, 255, 255, 0.55);
+      color: rgba(255,255,255,.5);
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
-      border-radius: 0;
-      transition: color .18s ease, transform .18s ease;
+      border-radius: 7px;
+      transition: background .18s, color .18s;
       position: relative;
       white-space: nowrap;
       display: flex;
       align-items: center;
-      gap: 7px;
-      position: relative;
-      box-shadow: none;
+      gap: 9px;
+      width: 100%;
+      overflow: hidden;
+      flex-shrink: 0;
     }
-    
-    .tab-button::before {
+    /* Hide label text when collapsed */
+    .tab-navigation.collapsed .tab-button .tab-label { display: none; }
+
+    .tab-button::before { display: none; } /* remove underline indicator */
+
+    /* Active left-bar indicator */
+    .tab-button::after {
       content: '';
       position: absolute;
-      bottom: -9px;
-      left: 0;
-      right: 0;
-      height: 2px;
-      border-radius: 999px;
-      background: transparent;
+      left: 0; top: 20%; bottom: 20%;
+      width: 3px;
+      border-radius: 0 3px 3px 0;
+      background: linear-gradient(180deg, var(--accent-1), var(--accent-2));
       opacity: 0;
-      transition: opacity .18s ease, background .18s ease;
+      transition: opacity .18s;
     }
-    
+
     .tab-button:hover {
+      background: rgba(255,255,255,.07);
       color: var(--text-primary);
-      transform: translateY(-1px);
+      transform: none;
     }
-    
+
     .tab-button.active {
-      background: transparent;
+      background: rgba(255,255,255,.1);
       color: var(--text-primary);
       font-weight: 700;
       border-color: transparent;
       box-shadow: none;
-      transform: translateY(0);
     }
-    
-    .tab-button.active::before {
-      background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
-      opacity: 1;
-    }
-    
+    .tab-button.active::after { opacity: 1; }
+
     .tab-button i {
-      font-size: 12px;
-      opacity: .55;
-      transition: opacity .18s ease;
+      font-size: 13px;
+      opacity: .7;
+      transition: opacity .18s;
+      flex-shrink: 0;
+      width: 16px;
+      text-align: center;
     }
-    
-    .tab-button.active i {
-      opacity: .9;
+    .tab-button.active i { opacity: 1; }
     }
     
     .tab-content {
@@ -2285,37 +2332,46 @@
 
   <div class="wrap">
     <section class="card" role="main">
-      <!-- Single toolbar row: content tabs | depth toggle (results-only) -->
-      <div class="hero-section">
-        <div class="hero-row-1">
-          <div class="tab-navigation">
-            <button class="tab-button active" onclick="switchTab('results')" data-tab="results">
-              <i class="fa-solid fa-table"></i> Results
-            </button>
-            <button class="tab-button" onclick="switchTab('predictions')" data-tab="predictions">
-              <i class="fa-solid fa-wand-magic-sparkles"></i> Predictions
-            </button>
-            <button class="tab-button" id="ancovaTabButton" onclick="switchTab('ancova')" data-tab="ancova" style="display:none;">
-              <i class="fa-solid fa-layer-group"></i> ANCOVA
-            </button>
-            <button class="tab-button" onclick="switchTab('correlations')" data-tab="correlations">
-              <i class="fa-solid fa-project-diagram"></i> Correlations
-            </button>
-            <button class="tab-button" onclick="switchTab('descriptive')" data-tab="descriptive">
-              <i class="fa-solid fa-chart-bar"></i> Descriptive Stats
-            </button>
-            <button class="tab-button" onclick="switchTab('ai-assessment')" data-tab="ai-assessment">
-              <i class="fa-solid fa-brain"></i> AI
-            </button>
-          </div>
-          <!-- Depth toggle: shown only on Results tab -->
-          <div class="depth-selector" id="depthSelectorRow2" title="Analysis depth">
-            <button class="depth-btn active" data-depth="insight" onclick="setDepth('insight')">🟢 Insight</button>
-            <button class="depth-btn"        data-depth="analyst" onclick="setDepth('analyst')">🟡 Analyst</button>
-          </div>
+
+      <!-- ── Sidebar Navigation ── -->
+      <nav class="tab-navigation" id="sidebarNav">
+        <div class="sidebar-toggle">
+          <button class="sidebar-toggle-btn" onclick="toggleSidebar()" title="Collapse / expand menu">
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
         </div>
-        <div class="hero-row-2" id="resultsSubToolbar"></div>
-      </div>
+        <button class="tab-button active" onclick="switchTab('results')" data-tab="results">
+          <i class="fa-solid fa-table"></i> <span class="tab-label">Results</span>
+        </button>
+        <button class="tab-button" onclick="switchTab('predictions')" data-tab="predictions">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> <span class="tab-label">Predictions</span>
+        </button>
+        <button class="tab-button" id="ancovaTabButton" onclick="switchTab('ancova')" data-tab="ancova" style="display:none;">
+          <i class="fa-solid fa-layer-group"></i> <span class="tab-label">ANCOVA</span>
+        </button>
+        <button class="tab-button" onclick="switchTab('correlations')" data-tab="correlations">
+          <i class="fa-solid fa-project-diagram"></i> <span class="tab-label">Correlations</span>
+        </button>
+        <button class="tab-button" onclick="switchTab('descriptive')" data-tab="descriptive">
+          <i class="fa-solid fa-chart-bar"></i> <span class="tab-label">Descriptive</span>
+        </button>
+        <button class="tab-button" onclick="switchTab('ai-assessment')" data-tab="ai-assessment">
+          <i class="fa-solid fa-brain"></i> <span class="tab-label">AI</span>
+        </button>
+      </nav>
+
+      <!-- ── Main Content Area ── -->
+      <div class="card-main">
+        <!-- Single toolbar row: depth toggle (results-only) -->
+        <div class="hero-section">
+          <div class="hero-row-1">
+            <div class="depth-selector" id="depthSelectorRow2" title="Analysis depth">
+              <button class="depth-btn active" data-depth="insight" onclick="setDepth('insight')">🟢 Insight</button>
+              <button class="depth-btn"        data-depth="analyst" onclick="setDepth('analyst')">🟡 Analyst</button>
+            </div>
+          </div>
+          <div class="hero-row-2" id="resultsSubToolbar"></div>
+        </div>
 
       <!-- Action buttons injected into the navrow at runtime (Decimals + AI) -->
       <div id="navrowActionsTemplate" style="display:none;">
@@ -2896,6 +2952,7 @@
 
       </div>
       <!-- End of view-container -->
+      </div><!-- End of card-main -->
     </section>
   </div>
 
@@ -3055,6 +3112,12 @@
         .join('');
     }
 
+    // Sidebar collapse/expand
+    function toggleSidebar() {
+      const nav = document.getElementById('sidebarNav');
+      nav.classList.toggle('collapsed');
+    }
+
     // Tab Management
     function switchTab(tabName) {
       console.log('🔄 Switching to tab:', tabName);
@@ -3073,10 +3136,13 @@
       });
       document.getElementById(`tab-${tabName}`).classList.add('active');
       
-      // Show/hide the depth-toggle only when Results tab is active
+      // Show/hide the depth-toggle and hero-section only when Results tab is active
       const depthSel = document.getElementById('depthSelectorRow2');
+      const heroSec = document.querySelector('.hero-section');
       if (depthSel) {
-        depthSel.style.display = tabName === 'results' ? '' : 'none';
+        const show = tabName === 'results';
+        depthSel.style.display = show ? '' : 'none';
+        if (heroSec) heroSec.style.display = show ? '' : 'none';
       }
       
       // Lazy load tab content if not already loaded

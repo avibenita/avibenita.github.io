@@ -3854,16 +3854,18 @@
             if (!receivedRegressionData || !receivedModelSpec) return null;
             const { headers, rows } = receivedRegressionData;
             const { y, xn = [], xc = [] } = receivedModelSpec;
-            // Only include columns that are part of the model
-            const usedCols = [y, ...xn, ...xc];
+            // Sort xn/xc by column position (same order as the regression computation)
+            const xnS = [...xn].sort((a, b) => headers.indexOf(a) - headers.indexOf(b));
+            const xcS = [...xc].sort((a, b) => headers.indexOf(a) - headers.indexOf(b));
+            // Only include columns that are part of the model, in Y → Xn → Xc order
+            const usedCols = [y, ...xnS, ...xcS];
             const usedIndices = usedCols.map(col => headers.indexOf(col)).filter(i => i !== -1);
             const filteredHeaders = usedIndices.map(i => headers[i]);
             const filteredRows = rows.map(row => usedIndices.map(i => row[i]));
             return {
               headers: filteredHeaders,
               rows: filteredRows,
-              // Column role metadata for colour-coding
-              columnRoles: filteredHeaders.map(h => h === y ? 'y' : xn.includes(h) ? 'xn' : 'xc')
+              columnRoles: filteredHeaders.map(h => h === y ? 'y' : xnS.includes(h) ? 'xn' : 'xc')
             };
           },
           saveModel:  () => saveCurrentRegressionAnalysis(),
@@ -3996,8 +3998,14 @@
       
       // Build X matrix and Y vector from the data
       const yIndex = headers.indexOf(y);
-      const xnIndices = xn.map(varName => headers.indexOf(varName));
-      const xcIndices = xc.map(varName => headers.indexOf(varName));
+      
+      // Sort xn and xc by their column position in the spreadsheet
+      // This ensures coefficient order matches the natural left-to-right column order
+      // (consistent with SPSS and other packages that use column order)
+      const xnSorted = [...xn].sort((a, b) => headers.indexOf(a) - headers.indexOf(b));
+      const xcSorted = [...xc].sort((a, b) => headers.indexOf(a) - headers.indexOf(b));
+      const xnIndices = xnSorted.map(varName => headers.indexOf(varName));
+      const xcIndices = xcSorted.map(varName => headers.indexOf(varName));
       
       console.log('🔍 Index lookup results:', {
         yIndex,
@@ -4014,9 +4022,9 @@
       
       // Step 1: Identify unique categories for each categorical variable
       const categoricalInfo = [];
-      for (let i = 0; i < xc.length; i++) {
+      for (let i = 0; i < xcSorted.length; i++) {
         const xcIdx = xcIndices[i];
-        const varName = xc[i];
+        const varName = xcSorted[i];
         const categories = getUniqueCategories(rows, xcIdx);
         
         console.log(`📊 Categorical variable "${varName}":`, categories);
@@ -4038,7 +4046,7 @@
       console.log('🎯 Categorical dummy coding:', categoricalInfo);
       
       // Build variable names list (for display)
-      const variableNames = [...xn]; // Start with numeric variables
+      const variableNames = [...xnSorted]; // Start with numeric variables (column order)
       for (const catInfo of categoricalInfo) {
         variableNames.push(...catInfo.dummyNames);
       }

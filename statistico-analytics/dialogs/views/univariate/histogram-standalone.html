@@ -1151,25 +1151,64 @@
       }
     });
 
-    /* ── Register View Data button in shared header ── */
+    /* ── Register header action buttons (View Data / Save / HTML) ── */
     function registerHeaderActions(data) {
       if (typeof StatisticoHeader === 'undefined') return;
-      const varName = data.column || data.variableName || 'Variable';
-      const values  = data.values || data.data || [];
-      const range   = data.dataSource || null;   // Excel address e.g. "Sheet1!A1:A26"
 
-      // Single-column: wrap each value as a 1-element array row
+      const varName  = data.column || data.variableName || 'Variable';
+      const values   = data.values || data.data || [];
+      const range    = data.dataSource || null;
+
+      // Detect trim / transform modifications
+      const isTrimmed    = data.trim && (data.trim.min > 0 || data.trim.max < 100);
+      const isTransformed = data.transform && data.transform !== 'none';
+      const noteParts = [];
+      if (isTrimmed)     noteParts.push(`Trimmed ${data.trim.min}–${data.trim.max}%`);
+      if (isTransformed) noteParts.push(`Transform: ${data.transform}`);
+      const notice = noteParts.length ? `Values shown after: ${noteParts.join(', ')}` : null;
+
+      // Single-column rows
       const allRows = values.map(v => [v === null || v === undefined ? null : v]);
 
       StatisticoHeader.registerActions({
         getData: () => ({
           headers:     [varName],
           allRows,
-          usedRows:    allRows,   // univariate: values are already cleaned (no missing)
+          usedRows:    allRows,   // values are already the processed set
           fullRange:   range,
           usedRange:   range,
-          columnRoles: null
-        })
+          columnRoles: null,
+          notice       // amber banner when trim/transform was applied
+        }),
+
+        saveModel: () => {
+          // Copy processed values as TSV to clipboard
+          let tsv = `${varName}\n`;
+          values.forEach(v => { tsv += (v === null || v === undefined ? '' : v) + '\n'; });
+          if (noteParts.length) tsv += `\n# ${noteParts.join(', ')}\n`;
+          navigator.clipboard.writeText(tsv).then(() => {
+            const toast = document.createElement('div');
+            toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);' +
+              'background:#16a34a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;' +
+              'font-weight:700;z-index:99999;box-shadow:0 4px 16px rgba(0,0,0,.4);pointer-events:none;';
+            toast.innerHTML = `<i class="fa-solid fa-check"></i> ${varName} (${values.length} values) copied — paste into Excel`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+          }).catch(() => alert('Failed to copy to clipboard'));
+        },
+        moduleName: `Copy ${varName} values to clipboard`,
+
+        exportHtml: () => {
+          try {
+            const ts   = new Date().toISOString().slice(0,19).replace(/[-T:]/g,'');
+            const name = varName.replace(/[^a-zA-Z0-9_]/g,'_').slice(0,30);
+            const blob = new Blob(['<!DOCTYPE html>\n' + document.documentElement.outerHTML], { type: 'text/html' });
+            const url  = URL.createObjectURL(blob);
+            const a    = Object.assign(document.createElement('a'), { href: url, download: `Histogram_${name}_${ts}.html` });
+            document.body.appendChild(a); a.click();
+            setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+          } catch(e) { alert('Export failed: ' + e.message); }
+        }
       });
     }
     window.registerHeaderActions = registerHeaderActions;</script>

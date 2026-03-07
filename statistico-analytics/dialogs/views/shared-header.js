@@ -685,7 +685,7 @@ const StatisticoHeader = {
   },
 
   _populateDataModal(result, mode) {
-    const { usedRows, allRows, headers, usedRange, fullRange, columnRoles } = result;
+    const { usedRows, allRows, headers, usedRange, fullRange, columnRoles, notice } = result;
     const isUsed    = mode === 'used';
     const rows      = isUsed ? usedRows : allRows;
     const range     = isUsed ? (usedRange || fullRange) : fullRange;
@@ -707,16 +707,22 @@ const StatisticoHeader = {
     if (btnUsed) { btnUsed.classList.toggle('hdp-mode-btn--active', isUsed);  btnUsed.classList.toggle('hdp-mode-btn--used', isUsed); }
     if (btnAll)  { btnAll.classList.toggle('hdp-mode-btn--active', !isUsed);  btnAll.classList.toggle('hdp-mode-btn--all', !isUsed); }
 
-    // Range bar
+    // Range bar + optional config notice
     const rb = el('hdpRangeBar');
     if (rb) {
-      rb.innerHTML = range
+      const rangeHtml = range
         ? `<i class="fa-solid fa-table-cells-large"></i>
            <span class="hdp-range-label">${isUsed ? 'Used range' : 'Full range'}:</span>
            <span class="hdp-range">${range}</span>
            ${otherRange && otherRange !== range
              ? `<span class="hdp-range-secondary">&nbsp;&middot;&nbsp;${isUsed ? 'full range' : 'used range'}: <strong>${otherRange}</strong></span>`
              : ''}`
+        : '';
+      const noticeHtml = notice
+        ? `<span class="hdp-notice"><i class="fa-solid fa-triangle-exclamation"></i> ${notice}</span>`
+        : '';
+      rb.innerHTML = rangeHtml || noticeHtml
+        ? `<div class="hdp-range-row">${rangeHtml}</div>${noticeHtml}`
         : '';
     }
 

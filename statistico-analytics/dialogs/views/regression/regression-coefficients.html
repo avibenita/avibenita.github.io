@@ -25,8 +25,8 @@
   <script src="../../../src/shared/js/core/saved-analyses-manager.js"></script>
 
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260307d" />
-  <script src="../shared-header.js?v=20260307d"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260307e" />
+  <script src="../shared-header.js?v=20260307e"></script>
 
   <!-- Shared Sidebar -->
   <link rel="stylesheet" href="../shared-sidebar.css?v=2026-0307b" />
@@ -4024,39 +4024,46 @@
     // Office.js integration for Excel Add-in
     let receivedRegressionData = null;
     let receivedModelSpec = null;
+    let _usedModelRows = null;  // rows actually used in the regression (no missing values)
     
     // Initialize shared header + apply default depth
     document.addEventListener('DOMContentLoaded', () => {
       if (typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.init('regression-results', '', 0, 'regression');
-        // Register shared action buttons (View Data / Model / HTML)
-        StatisticoHeader.registerActions({
-          getData: () => {
-            if (!receivedRegressionData || !receivedModelSpec) return null;
-            const { headers, rows } = receivedRegressionData;
-            const { y, xn = [], xc = [] } = receivedModelSpec;
-            // Sort xn/xc by column position (same order as the regression computation)
-            const xnS = [...xn].sort((a, b) => headers.indexOf(a) - headers.indexOf(b));
-            const xcS = [...xc].sort((a, b) => headers.indexOf(a) - headers.indexOf(b));
-            // Only include columns that are part of the model, in Y → Xn → Xc order
-            const usedCols = [y, ...xnS, ...xcS];
-            const usedIndices = usedCols.map(col => headers.indexOf(col)).filter(i => i !== -1);
-            const filteredHeaders = usedIndices.map(i => headers[i]);
-            const filteredRows = rows.map(row => usedIndices.map(i => row[i]));
-            return {
-              headers: filteredHeaders,
-              rows: filteredRows,
-              columnRoles: filteredHeaders.map(h => h === y ? 'y' : xnS.includes(h) ? 'xn' : 'xc')
-            };
-          },
-          saveModel:  () => saveCurrentRegressionAnalysis(),
-          exportHtml: () => exportResultsAsHtml(),
-          moduleName: 'Save regression model to workbook'
-        });
+        registerHeaderActions();
       }
       // Apply Insight depth immediately so layout is correct before results arrive
       applyDepth('insight');
     });
+
+    function registerHeaderActions() {
+      if (typeof StatisticoHeader === 'undefined') return;
+      StatisticoHeader.registerActions({
+        getData: () => {
+          if (!receivedRegressionData || !receivedModelSpec) return null;
+          const { headers, rows, address } = receivedRegressionData;
+          const { y, xn = [], xc = [] } = receivedModelSpec;
+          // Sort xn/xc by column position
+          const xnS = [...xn].sort((a, b) => headers.indexOf(a) - headers.indexOf(b));
+          const xcS = [...xc].sort((a, b) => headers.indexOf(a) - headers.indexOf(b));
+          // Only the model columns, Y → Xn → Xc order
+          const usedCols    = [y, ...xnS, ...xcS];
+          const usedIndices = usedCols.map(col => headers.indexOf(col)).filter(i => i !== -1);
+          const modelHeaders    = usedIndices.map(i => headers[i]);
+          const columnRoles     = modelHeaders.map(h => h === y ? 'y' : xnS.includes(h) ? 'xn' : 'xc');
+          // All rows (model columns only)
+          const allRows  = rows.map(row => usedIndices.map(i => row[i]));
+          // Used rows (no missing — captured during computation)
+          const usedRows = _usedModelRows
+            ? _usedModelRows.map(row => usedIndices.map(i => row[i]))
+            : allRows;
+          return { headers: modelHeaders, usedRows, allRows, range: address, columnRoles };
+        },
+        saveModel:  () => saveCurrentRegressionAnalysis(),
+        exportHtml: () => exportResultsAsHtml(),
+        moduleName: 'Save regression model to workbook'
+      });
+    }
 
     // Initialize Office.js
     if (typeof Office !== 'undefined') {
@@ -4230,6 +4237,7 @@
       // Step 2: Build X matrix and Y vector together with synchronized filtering
       const xMatrix = [];
       const yVector = [];
+      const usedOriginalRows = [];  // track which original rows were used
       
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
@@ -4271,8 +4279,12 @@
         if (validRow) {
           xMatrix.push(xRow);
           yVector.push(yVal);
+          usedOriginalRows.push(row);
         }
       }
+
+      // Store used rows so the View Data toggle can access them
+      _usedModelRows = usedOriginalRows;
       
       // Store variable names globally for display
       window.regressionVariableNames = variableNames;
@@ -4421,6 +4433,8 @@
         StatisticoHeader.sampleSize = results.n || 0;
         const sampleSizeEl = document.getElementById('headerSampleSize');
         if (sampleSizeEl) sampleSizeEl.textContent = `(n=${results.n || 0})`;
+        // Re-register actions so View Data now has real data available
+        registerHeaderActions();
       }
       document.getElementById('numNumericVars').textContent = xnVars.length;
       document.getElementById('numCategoricalVars').textContent = xcVars.length;

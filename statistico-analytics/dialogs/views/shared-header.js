@@ -552,39 +552,162 @@ const StatisticoHeader = {
 
   /**
    * Build the HTML string for action buttons in the header-right area.
+   * Groups: [View] | [Model, HTML] | [Theme toggle]  — separated by dividers.
    * @private
    */
   _renderActionButtons({ getData, saveModel, exportHtml, moduleName = 'Save model' } = {}) {
+    const hasView  = !!getData;
+    const hasSaves = !!(saveModel || exportHtml);
+
     let html = '';
-    if (getData) {
-      html += `<button class="header-action-btn header-action-btn--data"
-                       onclick="StatisticoHeader._pendingActions.getData()"
-                       title="View raw data for current model">
-                 <i class="fa-solid fa-table-cells"></i> View Data
-               </button>`;
+
+    // ── View group ──────────────────────────────────────────────
+    if (hasView) {
+      html += `<div class="header-action-group">
+        <button class="header-action-btn header-action-btn--data"
+                id="headerViewDataBtn"
+                onclick="StatisticoHeader._toggleViewData()"
+                title="Toggle between used observations and all observations">
+          <i class="fa-solid fa-eye"></i> View Data
+        </button>
+      </div>`;
     }
-    if (saveModel) {
-      html += `<button class="header-action-btn header-action-btn--save"
-                       onclick="StatisticoHeader._pendingActions.saveModel()"
-                       title="${moduleName}">
-                 <i class="fa-solid fa-floppy-disk"></i> Model
-               </button>`;
+
+    // ── Divider between View and Saves ──────────────────────────
+    if (hasView && hasSaves) {
+      html += `<div class="header-action-sep"></div>`;
     }
-    if (exportHtml) {
-      html += `<button class="header-action-btn header-action-btn--html"
-                       onclick="StatisticoHeader._pendingActions.exportHtml()"
-                       title="Export complete report as standalone HTML file">
-                 <i class="fa-solid fa-file-code"></i> HTML
-               </button>`;
+
+    // ── Save group ──────────────────────────────────────────────
+    if (hasSaves) {
+      html += `<div class="header-action-group">`;
+      if (saveModel) {
+        html += `<button class="header-action-btn header-action-btn--save"
+                         onclick="StatisticoHeader._pendingActions.saveModel()"
+                         title="${moduleName}">
+                   <i class="fa-solid fa-floppy-disk"></i> Model
+                 </button>`;
+      }
+      if (exportHtml) {
+        html += `<button class="header-action-btn header-action-btn--html"
+                         onclick="StatisticoHeader._pendingActions.exportHtml()"
+                         title="Export complete report as standalone HTML file">
+                   <i class="fa-solid fa-file-code"></i> HTML
+                 </button>`;
+      }
+      html += `</div>`;
     }
+
+    // ── Divider before Theme toggle ─────────────────────────────
+    if (hasView || hasSaves) {
+      html += `<div class="header-action-sep"></div>`;
+    }
+
     return html;
+  },
+
+  /** Toggle View Data panel (used obs ↔ all obs) */
+  _viewDataMode: 'used',   // 'used' | 'all'
+
+  _toggleViewData() {
+    const actions = this._pendingActions;
+    if (!actions || !actions.getData) return;
+
+    const result = actions.getData();
+    if (!result) { console.warn('No data available yet'); return; }
+
+    const { usedRows, allRows, headers, range, columnRoles } = result;
+
+    // Flip mode
+    this._viewDataMode = this._viewDataMode === 'used' ? 'all' : 'used';
+    const isUsed = this._viewDataMode === 'used';
+    const rows   = isUsed ? usedRows : allRows;
+
+    // Update button label
+    const btn = document.getElementById('headerViewDataBtn');
+    if (btn) {
+      btn.classList.toggle('header-action-btn--data-active', !isUsed);
+      btn.innerHTML = `<i class="fa-solid fa-eye${isUsed ? '' : '-slash'}"></i> ${isUsed ? 'View Data' : 'All Obs'}`;
+      btn.title = isUsed
+        ? 'Showing used observations — click for all rows'
+        : 'Showing all rows — click for used observations only';
+    }
+
+    // Build or update the data panel
+    this._showDataPanel({ headers, rows, range, columnRoles, isUsed });
+  },
+
+  _showDataPanel({ headers, rows, range, columnRoles, isUsed }) {
+    // Remove existing panel
+    const existing = document.getElementById('headerDataPanel');
+    if (existing) existing.remove();
+
+    const panel = document.createElement('div');
+    panel.id = 'headerDataPanel';
+    panel.className = 'header-data-panel';
+
+    const usedLabel = isUsed ? 'Used observations' : 'All observations';
+    const rangeLabel = range ? ` &nbsp;·&nbsp; <span class="hdp-range">${range}</span>` : '';
+
+    // Build table head
+    const thCells = headers.map((h, i) => {
+      const role = columnRoles ? columnRoles[i] : null;
+      const cls  = role === 'y' ? 'hdp-y' : role === 'xn' ? 'hdp-xn' : role === 'xc' ? 'hdp-xc' : '';
+      return `<th class="${cls}">${h}</th>`;
+    }).join('');
+
+    // Build table rows (cap display at 200 for perf)
+    const displayRows = rows.slice(0, 200);
+    const trRows = displayRows.map((row, ri) => {
+      const tds = row.map((v, ci) => {
+        const role = columnRoles ? columnRoles[ci] : null;
+        const cls  = role === 'y' ? 'hdp-y' : role === 'xn' ? 'hdp-xn' : role === 'xc' ? 'hdp-xc' : '';
+        return `<td class="${cls}">${v === null || v === undefined ? '' : v}</td>`;
+      }).join('');
+      return `<tr>${tds}</tr>`;
+    }).join('');
+
+    const moreNote = rows.length > 200
+      ? `<div class="hdp-note">Showing first 200 of ${rows.length} rows</div>` : '';
+
+    panel.innerHTML = `
+      <div class="hdp-header">
+        <span class="hdp-title"><i class="fa-solid fa-eye"></i> ${usedLabel}${rangeLabel} &nbsp;<span class="hdp-count">(${rows.length} rows × ${headers.length} cols)</span></span>
+        <button class="hdp-close" onclick="document.getElementById('headerDataPanel').remove(); StatisticoHeader._resetViewBtn();" title="Close">&times;</button>
+      </div>
+      <div class="hdp-body">
+        <table class="hdp-table">
+          <thead><tr>${thCells}</tr></thead>
+          <tbody>${trRows}</tbody>
+        </table>
+        ${moreNote}
+      </div>
+    `;
+
+    // Attach below the header shell
+    const shell = document.querySelector('.statistico-shell');
+    if (shell && shell.parentNode) {
+      shell.parentNode.insertBefore(panel, shell.nextSibling);
+    } else {
+      document.body.appendChild(panel);
+    }
+  },
+
+  _resetViewBtn() {
+    this._viewDataMode = 'used';
+    const btn = document.getElementById('headerViewDataBtn');
+    if (btn) {
+      btn.classList.remove('header-action-btn--data-active');
+      btn.innerHTML = `<i class="fa-solid fa-eye"></i> View Data`;
+      btn.title = 'Toggle between used observations and all observations';
+    }
   },
 
   /**
    * Register action buttons (View Data / Model / HTML) into the header top bar,
    * to the left of the theme toggle. Call this right after StatisticoHeader.init().
    * @param {object} opts
-   *   getData    {function}  called when "View Data" is clicked
+   *   getData    {function}  returns { headers, usedRows, allRows, range, columnRoles }
    *   saveModel  {function}  called when "Model" is clicked
    *   exportHtml {function}  called when "HTML" is clicked
    *   moduleName {string}    tooltip for Model button (optional)

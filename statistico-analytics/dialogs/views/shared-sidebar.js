@@ -62,7 +62,7 @@
     extraction:          'fa-magnifying-glass-chart',
     rotation:            'fa-arrows-rotate',
     diagnostics:         'fa-stethoscope',
-    scores:              'fa-chart-scatter',
+    scores:              'fa-circle-dot',
     roc:                 'fa-chart-area',
     summary:             'fa-chart-bar',
     forest:              'fa-chart-simple',
@@ -307,8 +307,9 @@
 
           if (href) {
             // Cross-page nav: navigate like the header does
+            const isActivePage = t.active === true ? ' active' : '';
             return `
-              <button class="sb-item${subCls}" data-href="${esc(href)}"
+              <button class="sb-item${subCls}${isActivePage}" data-href="${esc(href)}"
                       onclick="StatisticoSidebar._navigate('${esc(href)}')">
                 <i class="fa-solid ${ico} sb-item-icon"></i>
                 <span class="sb-item-label">${esc(label)}</span>
@@ -321,16 +322,9 @@
               <span class="sb-item-label">${esc(label)}</span>
             </button>`;
         }).join('');
-        return `
-          <div class="sb-group">
-            <div class="sb-group-title">${esc(g.title)}</div>
-            ${itemsHtml}
-          </div>`;
+        // No group title — flat list, no category headers
+        return itemsHtml;
       }).join('');
-
-      const hasSaved = false; // Saved models belong in taskpane, not sidebar
-
-      const savedHtml = '';
 
       return `
         <div class="sb-header">
@@ -340,25 +334,22 @@
             <i class="fa-solid fa-chevron-left"></i>
           </button>
         </div>
+        <div class="sb-decimals-row">
+          <i class="fa-solid fa-hashtag sb-bottom-icon"></i>
+          <span class="sb-bottom-label">Decimals</span>
+          <select id="decimalSelectSb" class="sb-bottom-select"
+                  onchange="StatisticoSidebar._onDecimal(this.value)">
+            <option value="auto">Auto</option>
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </div>
         <div class="sb-body">
           ${groupsHtml}
-        </div>
-        <div class="sb-bottom">
-          ${savedHtml}
-          <div class="sb-bottom-row">
-            <i class="fa-solid fa-hashtag sb-bottom-icon"></i>
-            <span class="sb-bottom-label">Decimals</span>
-            <select id="decimalSelectSb" class="sb-bottom-select"
-                    onchange="StatisticoSidebar._onDecimal(this.value)">
-              <option value="auto">Auto</option>
-              <option value="0">0</option>
-              <option value="1">1</option>
-              <option value="2" selected>2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-            </select>
-          </div>
         </div>`;
     },
 

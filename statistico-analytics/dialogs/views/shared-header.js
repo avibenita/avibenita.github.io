@@ -96,6 +96,10 @@ const StatisticoHeader = {
       this.module = 'regression';
     } else if (viewName.includes('correlation') || viewName.includes('network')) {
       this.module = 'correlations';
+    } else if (viewName.includes('independent')) {
+      this.module = 'independent';
+    } else if (viewName.includes('dependent')) {
+      this.module = 'dependent';
     } else {
       this.module = 'univariate';
     }
@@ -231,13 +235,21 @@ const StatisticoHeader = {
       // Regression views
       'regression-input': 'Model Setup',
       'regression-results': 'Regression Results',
-      'regression-residuals': 'Residual Diagnostics'
+      'regression-residuals': 'Residual Diagnostics',
+      // Independent means views
+      'independent-results': 'Independent Means (2 Groups)',
+      'independent-results-kplus': 'Independent Means (K+ Groups)',
+      // Dependent means views
+      'dependent-results': 'Dependent Means',
+      'dependent-results-kplus': 'Dependent Means (K+ Groups)'
     };
 
     const moduleNames = {
       'univariate': 'Univariate',
       'correlations': 'Correlations',
-      'regression': 'Regression'
+      'regression': 'Regression',
+      'independent': 'Independent Means',
+      'dependent': 'Dependent Means'
     };
     
     const currentTheme = this.getTheme();
@@ -282,7 +294,7 @@ const StatisticoHeader = {
       <div class="statistico-shell">
         ${topHeader}
         <div class="statistico-navrow">
-          <div class="navrow-tabs" role="tablist" aria-label="${this.module === 'univariate' ? 'Univariate workflow views' : this.module === 'correlations' ? 'Correlations views' : 'Regression views'}" style="width:100%;">
+          <div class="navrow-tabs" role="tablist" aria-label="${this.module === 'univariate' ? 'Univariate workflow views' : this.module === 'correlations' ? 'Correlations views' : this.module === 'independent' ? 'Independent Means views' : 'Regression views'}" style="width:100%;">
             ${this.renderNavigation()}
           </div>
         </div>
@@ -378,9 +390,15 @@ const StatisticoHeader = {
       { id: 'regression-results',   label: 'Regression Results',   file: 'regression/regression-coefficients.html' },
       { id: 'regression-residuals', label: 'Residual Diagnostics', file: 'regression/regression-residuals.html' }
     ];
+
+    const independentViews = [
+      { id: 'independent-results',       label: '2 Groups',   file: 'independent/independent-results.html' },
+      { id: 'independent-results-kplus', label: 'K+ Groups',  file: 'independent/independent-results-kplus.html' }
+    ];
     
     return this.module === 'correlations' ? correlationViews :
-           this.module === 'regression'   ? regressionViews  : univariateViews;
+           this.module === 'regression'   ? regressionViews  :
+           this.module === 'independent'  ? independentViews : univariateViews;
   },
 
   /**

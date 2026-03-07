@@ -22,8 +22,4260 @@
   <script src="https://d3js.org/d3.v7.min.js"></script>
 
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260307c">
-  <script src="../shared-header.js?v=20260307c"></script>
+  <link rel="stylesheet" href="../ "shared-header.$(<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>Correlation Analysis</title>
+
+  <!-- Office.js -->
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
+
+  <!-- Highcharts + jStat + Regression for scatter plots -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/exporting.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/export-data.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/regression/2.0.1/regression.min.js"></script>
+
+  <!-- D3.js for Network visualization -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+
+  <!-- Shared Header -->
+  <link rel="stylesheet" href="../shared-header.css?v=20260307d">
+  <script src="../shared-header.js?v=20260307d"></script>
+
+  <style>
+    /* ── Variables ── */
+    :root {
+      --surface-0: #0c1624;
+      --surface-1: #1a1f2e;
+      --surface-2: #242938;
+      --border: #2d3748;
+      --accent-1: rgb(255,165,120);
+      --accent-2: rgb(120,200,255);
+      --text-primary: #fff;
+      --text-secondary: rgba(255,255,255,0.8);
+      --text-muted: rgba(255,255,255,0.5);
+    }
+
+    /* ── Light Theme ── */
+    :root[data-theme="light"] {
+      --surface-0: #eef0f4;
+      --surface-1: #ffffff;
+      --surface-2: #f3f4f6;
+      --border: #cbd5e1;
+      --accent-1: #2563eb;
+      --accent-2: #1d4ed8;
+      --text-primary: #111827;
+      --text-secondary: #1f2937;
+      --text-muted: #374151;
+    }
+
+    /* ── Light Theme overrides for hardcoded dark values ── */
+    :root[data-theme="light"] .controls { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    :root[data-theme="light"] .control-group { background: rgba(0,0,0,0.03); }
+    :root[data-theme="light"] .radio-bar { background: rgba(0,0,0,0.07); border-color: rgba(0,0,0,0.1); }
+    :root[data-theme="light"] .radio-bar label:hover { background: rgba(37,99,235,0.1); color: var(--accent-1); }
+    :root[data-theme="light"] .radio-bar label:has(input:checked) { background: var(--accent-1); color: #fff; box-shadow: 0 2px 6px rgba(37,99,235,0.35); }
+    :root[data-theme="light"] .view-toggle { background: rgba(0,0,0,0.07); border-color: rgba(0,0,0,0.1); }
+    :root[data-theme="light"] .view-toggle button:hover { background: rgba(37,99,235,0.1); color: var(--accent-1); }
+    :root[data-theme="light"] .view-toggle button.active { background: var(--accent-1); color: #fff; box-shadow: 0 2px 6px rgba(37,99,235,0.35); }
+    :root[data-theme="light"] thead th { background: linear-gradient(135deg, var(--surface-2), #dde3ef); }
+    :root[data-theme="light"] .heatmap-table thead th { background: linear-gradient(135deg, var(--surface-2), #dde3ef); }
+    :root[data-theme="light"] tbody tr:nth-child(even) { background: rgba(0,0,0,0.03); }
+    :root[data-theme="light"] tbody tr:nth-child(even) td:first-child { background: rgba(0,0,0,0.03); }
+    :root[data-theme="light"] tbody tr:hover { background: rgba(37,99,235,0.06); }
+    :root[data-theme="light"] tbody tr:hover td:first-child { background: rgba(37,99,235,0.06); }
+    :root[data-theme="light"] .explore-table tbody tr:nth-child(even) { background: rgba(0,0,0,0.03); }
+    :root[data-theme="light"] .checkbox-label:hover { background: rgba(37,99,235,0.08); color: var(--accent-1); }
+    :root[data-theme="light"] .scatter-overlay { background: rgba(0,0,0,0.45); }
+    :root[data-theme="light"] .scatter-modal { box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+    :root[data-theme="light"] .scatter-stat-box { background: rgba(0,0,0,0.04); }
+    :root[data-theme="light"] .explore-section { background: rgba(0,0,0,0.03); }
+    :root[data-theme="light"] .explore-tip { background: rgba(0,0,0,0.04); }
+    :root[data-theme="light"] .explore-controls { background: rgba(0,0,0,0.04); }
+    :root[data-theme="light"] .explore-table th { border-right-color: rgba(0,0,0,0.1); }
+
+    /* ── Header action buttons in navrow ── */
+    .navrow-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .statistico-navrow .navrow-tabs { width: auto; flex: 0 1 auto; }
+    .hero-action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(148,163,184,.45);
+      background: linear-gradient(145deg, rgba(148,163,184,.18), rgba(100,116,139,.16));
+      color: #fff;
+      font-size: 12px;
+      font-weight: 650;
+      cursor: pointer;
+      position: relative;
+      transition: background .18s, border-color .18s, transform .15s;
+    }
+    .hero-action-btn:hover { background: linear-gradient(145deg, rgba(148,163,184,.3), rgba(100,116,139,.28)); transform: translateY(-1px); }
+    :root[data-theme="light"] .hero-action-btn { color: #1f2937; border-color: rgba(0,0,0,.18); background: linear-gradient(145deg, rgba(0,0,0,.06), rgba(0,0,0,.04)); }
+
+    /* ── Reset / Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: var(--surface-0);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Main container ── */
+    .container {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Loading ── */
+    #loadingMessage {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+    }
+
+    #loadingMessage i {
+      font-size: 48px;
+      color: var(--accent-1);
+      animation: spin 1s linear infinite;
+    }
+
+    #loadingMessage p {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* ── Main content (tabs area) ── */
+    #mainContent {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Main content area ── */
+    .tab-panels-wrap {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      background: var(--surface-0);
+    }
+
+    .tab-panel {
+      display: none;
+      height: 100%;
+      overflow-y: auto;
+    }
+
+    .tab-panel.active { display: block; }
+
+    /* ── Shared tab inner padding ── */
+    .tab-inner {
+      padding: 16px 20px 20px;
+    }
+
+    /* ══════════════════════════════════════════════
+       MATRIX TAB — controls
+    ══════════════════════════════════════════════ */
+    .controls {
+      background: var(--surface-1);
+      padding: 10px 16px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Each group gets its own bordered pill */
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 7px 14px;
+    }
+
+    .control-group label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* Radio Bar — sits inside the bordered .control-group pill */
+    .radio-bar {
+      display: flex;
+      gap: 3px;
+      background: rgba(0,0,0,0.25);
+      padding: 3px;
+      border-radius: 7px;
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .radio-bar label {
+      padding: 5px 13px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all .2s;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .radio-bar label:hover { background: rgba(255,165,120,0.12); color: var(--accent-1); }
+
+    .radio-bar input[type="radio"] { display: none; }
+
+    .radio-bar label:has(input:checked) {
+      background: var(--accent-1);
+      color: var(--surface-0);
+      font-weight: 700;
+      box-shadow: 0 2px 6px rgba(255,165,120,0.35);
+    }
+
+    /* View toggle — sits inside the bordered .control-group pill */
+    .view-toggle {
+      display: flex;
+      gap: 3px;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 7px;
+      padding: 3px;
+    }
+
+    .view-toggle button {
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .view-toggle button:hover { background: rgba(255,165,120,0.12); color: var(--accent-1); }
+
+    .view-toggle button.active {
+      background: var(--accent-1);
+      color: var(--surface-0);
+      box-shadow: 0 2px 6px rgba(255,165,120,0.35);
+    }
+
+    /* Slider — inherits .control-group border/pill, no extra needed */
+    .slider-container { gap: 10px; }
+
+    .slider-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    input[type="range"] {
+      width: 140px;
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--surface-2) 0%, var(--accent-1) 100%);
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(255,165,120,0.4);
+      transition: transform .2s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      cursor: pointer;
+      border: none;
+    }
+
+    .slider-value {
+      font-size: 13px;
+      color: var(--accent-1);
+      font-weight: 700;
+      min-width: 36px;
+      text-align: right;
+    }
+
+    /* Checkboxes */
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      padding: 3px 6px;
+      border-radius: 5px;
+      transition: background .2s;
+      white-space: nowrap;
+    }
+
+    .checkbox-label:hover { background: rgba(255,165,120,0.1); color: var(--accent-1); }
+
+    .checkbox-label input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      cursor: pointer;
+      accent-color: var(--accent-1);
+    }
+
+    .checkbox-label:has(input:checked) { color: var(--accent-1); font-weight: 700; }
+
+    /* ── Correlation Table ── */
+    .table-container {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: auto;
+      max-height: calc(100vh - 240px);
+      background:
+        linear-gradient(90deg, var(--surface-1) 30%, rgba(26,31,46,0)),
+        linear-gradient(90deg, rgba(26,31,46,0), var(--surface-1) 70%) 100% 0,
+        radial-gradient(farthest-side at 0 50%, rgba(0,0,0,.3), rgba(0,0,0,0)),
+        radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,.3), rgba(0,0,0,0)) 100% 0;
+      background-repeat: no-repeat;
+      background-color: var(--surface-1);
+      background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
+      background-attachment: local, local, scroll, scroll;
+      scroll-behavior: smooth;
+    }
+
+    .table-container::-webkit-scrollbar { height: 10px; width: 10px; }
+    .table-container::-webkit-scrollbar-track { background: var(--surface-2); border-radius: 5px; }
+    .table-container::-webkit-scrollbar-thumb {
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      border-radius: 5px;
+      border: 2px solid var(--surface-2);
+    }
+
+    #tableContainerTop {
+      overflow-x: auto;
+      overflow-y: hidden;
+      height: 12px;
+      margin-bottom: 6px;
+    }
+
+    #tableContainerTop::-webkit-scrollbar { height: 10px; }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      background: var(--surface-1);
+    }
+
+    thead { position: sticky; top: 0; z-index: 10; }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: linear-gradient(135deg, var(--surface-2), #2d3545);
+      padding: 15px 18px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--accent-2);
+      border-bottom: 2px solid var(--accent-2);
+      border-right: 1px solid var(--border);
+      white-space: nowrap;
+      letter-spacing: 0.1px;
+    }
+
+    thead th:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 11;
+      text-align: left;
+      min-width: 120px;
+    }
+
+    tbody tr:nth-child(even) { background: rgba(36,41,56,0.5); }
+    tbody tr:hover { background: rgba(255,165,120,0.06); }
+
+    tbody td {
+      padding: 14px 18px;
+      text-align: center;
+      font-size: 15px;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody td:first-child {
+      position: sticky;
+      left: 0;
+      background: inherit;
+      font-weight: 700;
+      text-align: left;
+      color: var(--accent-2);
+      z-index: 2;
+      min-width: 150px;
+      font-size: 15px;
+    }
+
+    tbody tr:nth-child(even) td:first-child { background: rgba(36,41,56,0.5); }
+    tbody tr:hover td:first-child { background: rgba(255,165,120,0.06); }
+
+    .corr-value {
+      font-weight: 700;
+      font-size: 16px;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      cursor: pointer;
+    }
+
+    .p-value {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .n-value {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-style: italic;
+      margin-top: 2px;
+    }
+
+    .diagonal-cell { background: transparent !important; position: relative; }
+    .diagonal-cell .corr-value { color: var(--accent-2); text-decoration: none; cursor: default; }
+    .diagonal-cell::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(120,200,255,0.25);
+      pointer-events: none;
+    }
+
+    .threshold-highlight {
+      background: linear-gradient(135deg, rgba(255,165,120,0.2), rgba(120,200,255,0.2)) !important;
+      animation: pulse-highlight 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-highlight {
+      0%, 100% { box-shadow: inset 0 0 8px rgba(255,165,120,0.3); }
+      50%       { box-shadow: inset 0 0 14px rgba(255,165,120,0.5); }
+    }
+
+    .scroll-hint {
+      background: linear-gradient(135deg, rgba(255,165,120,0.1), rgba(120,200,255,0.1));
+      padding: 9px 14px;
+      border-radius: 6px;
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      border: 1px solid rgba(255,165,120,0.2);
+    }
+
+    .scroll-hint i { color: var(--accent-1); margin-right: 6px; }
+
+    /* Heatmap */
+    .heatmap-container {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: auto;
+      max-height: calc(100vh - 240px);
+      background: var(--surface-1);
+    }
+
+    .heatmap-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+
+    .heatmap-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: linear-gradient(135deg, var(--surface-2), #2d3545);
+      padding: 15px 18px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--accent-1);
+      border-bottom: 2px solid var(--accent-1);
+      border-right: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .heatmap-table thead th:first-child {
+      position: sticky; left: 0; z-index: 11; text-align: left; min-width: 150px;
+    }
+
+    .heatmap-table tbody td {
+      padding: 14px 18px;
+      text-align: center;
+      font-size: 15px;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      color: #0c1624;
+      font-weight: 700;
+    }
+
+    .heatmap-table tbody td:first-child {
+      position: sticky; left: 0;
+      background: var(--surface-1);
+      color: var(--accent-2);
+      font-weight: 700;
+      text-align: left;
+      z-index: 2;
+      min-width: 150px;
+    }
+
+    .heatmap-cell.threshold-highlight {
+      outline: 2px solid rgba(255,165,120,0.9);
+      outline-offset: -2px;
+      box-shadow: inset 0 0 8px rgba(255,165,120,0.5);
+    }
+
+    /* ══════════════════════════════════════════════
+       SCATTER MODAL
+    ══════════════════════════════════════════════ */
+    .scatter-modal {
+      display: none;
+      position: fixed;
+      z-index: 9999;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .scatter-modal-content {
+      background: var(--surface-1);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      width: 90%;
+      max-width: 900px;
+      max-height: 90vh;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .scatter-modal-header {
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      color: var(--accent-1);
+      font-weight: 600;
+    }
+
+    .scatter-modal-body { padding: 10px 14px 12px; overflow: auto; }
+    .scatter-close { cursor: pointer; font-size: 20px; color: var(--text-secondary); }
+
+    .scatter-chart {
+      width: 100%;
+      height: 300px;
+      background: rgba(0,0,0,0.15);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      position: relative;
+    }
+
+    .scatter-stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .scatter-stat {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      text-align: center;
+    }
+
+    .scatter-stat-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent-1);
+    }
+
+    .scatter-stat-value.adjusted::after {
+      content: "*";
+      margin-left: 4px;
+      color: var(--accent-2);
+      font-weight: 700;
+    }
+
+    .scatter-stat-label { font-size: 11px; color: var(--text-muted); }
+
+    .scatter-controls {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(180px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .scatter-panel {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+    }
+
+    .scatter-panel-title {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--accent-1);
+      font-size: 12px;
+    }
+
+    .scatter-slider { margin-bottom: 7px; width: 100%; min-width: 0; }
+
+    .scatter-slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-bottom: 3px;
+    }
+
+    .scatter-slider input[type="range"] { width: 100%; }
+
+    .scatter-buttons { display: flex; flex-wrap: wrap; gap: 5px; }
+
+    .fit-equation {
+      margin-top: 7px;
+      padding: 5px 8px;
+      border-radius: 5px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 11px;
+      text-align: center;
+      min-height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      word-break: break-word;
+    }
+
+    .scatter-btn {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 4px 7px;
+      border-radius: 5px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .scatter-btn.active {
+      color: var(--surface-0);
+      background: var(--accent-1);
+      border-color: var(--accent-1);
+      font-weight: 600;
+    }
+
+    .scatter-axis-toggle { display: flex; gap: 5px; margin-bottom: 6px; }
+    .scatter-axis-toggle .scatter-btn { flex: 1; }
+
+    .axis-grid { display: flex; flex-direction: column; gap: 6px; }
+    .axis-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    @media (max-width: 900px) { .scatter-controls { grid-template-columns: 1fr; } .axis-row { grid-template-columns: 1fr; } }
+
+    /* ══════════════════════════════════════════════
+       NETWORK TAB
+    ══════════════════════════════════════════════ */
+    .network-inner {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .network-controls {
+      flex: 0 0 auto;
+      padding: 10px 20px;
+      background: var(--surface-1);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .network-canvas {
+      flex: 1;
+      min-height: 350px;
+      position: relative;
+      background: var(--surface-0);
+      overflow: hidden;
+    }
+
+    #networkSVG {
+      width: 100%;
+      height: 100%;
+      min-height: 350px;
+      display: block;
+    }
+
+    .network-legend {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      background: rgba(12,22,36,0.88);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 4px;
+    }
+
+    .legend-item:last-child { margin-bottom: 0; }
+
+    .legend-line {
+      width: 24px;
+      height: 3px;
+      border-radius: 2px;
+    }
+
+    /* ══════════════════════════════════════════════
+       EXPLORE TAB
+    ══════════════════════════════════════════════ */
+    .explore-notice {
+      margin-bottom: 12px;
+      padding: 9px 14px;
+      background: rgba(79,195,247,.1);
+      border-left: 3px solid #4fc3f7;
+      font-size: 13px;
+      border-radius: 4px;
+      color: var(--text-secondary);
+    }
+
+    .explore-notice strong { color: #4fc3f7; }
+
+    .explore-table-wrap {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: auto;
+    }
+
+    .explore-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .explore-table thead th {
+      background: linear-gradient(135deg, #1e3a5f, #2a5080);
+      color: #fff;
+      padding: 10px 12px;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      font-weight: 700;
+      font-size: 13px;
+      border-bottom: 2px solid rgba(255,165,120,0.4);
+      border-right: 1px solid rgba(255,255,255,0.1);
+      white-space: nowrap;
+      text-align: center;
+    }
+
+    .explore-table thead th:first-child { text-align: left; min-width: 120px; }
+
+    .explore-table tbody tr:nth-child(even) { background: rgba(36,41,56,0.4); }
+    .explore-table tbody tr:hover { background: rgba(255,165,120,0.07); }
+
+    .explore-table tbody td {
+      padding: 9px 12px;
+      border-bottom: 1px solid rgba(255,255,255,.07);
+      border-right: 1px solid rgba(255,255,255,.05);
+      font-size: 13px;
+      text-align: center;
+      color: var(--text-secondary);
+    }
+
+    .explore-table tbody td:first-child {
+      text-align: left;
+      font-weight: 700;
+      color: var(--accent-2);
+    }
+
+    .explore-table tbody td.missing-warn { color: #fbbf24; font-weight: 600; }
+
+    /* ══════════════════════════════════════════════
+       COMING SOON (Partial / Reliability)
+    ══════════════════════════════════════════════ */
+    .coming-soon-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 400px;
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    .coming-soon-container i { color: var(--accent-2); margin-bottom: 18px; }
+    .coming-soon-container h2 { color: var(--accent-1); margin-bottom: 10px; font-size: 1.5rem; }
+    .coming-soon-container > p { color: var(--text-secondary); margin-bottom: 18px; font-size: 14px; }
+
+    .coming-soon-detail {
+      background: var(--surface-2);
+      padding: 18px 24px;
+      border-radius: 8px;
+      max-width: 560px;
+    }
+
+    .coming-soon-detail p { color: var(--text-muted); font-size: 13px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+
+<!-- Shared Header Mount Point -->
+<div id="header-container"></div>
+
+<!-- ══════════════════════════════════════════════
+     SCATTER MODAL (fixed, outside tab system)
+══════════════════════════════════════════════ -->
+<div id="scatterModal" class="scatter-modal" role="dialog" aria-hidden="true">
+  <div class="scatter-modal-content">
+    <div class="scatter-modal-header">
+      <span id="scatterTitle">Scatter Plot</span>
+      <span class="scatter-close" onclick="closeScatterModal()">&times;</span>
+    </div>
+    <div class="scatter-modal-body">
+      <div class="scatter-stats">
+        <div class="scatter-stat"><div class="scatter-stat-value" id="scatterN">--</div><div class="scatter-stat-label">Observations</div></div>
+        <div class="scatter-stat"><div class="scatter-stat-value" id="scatterR">--</div><div class="scatter-stat-label">Correlation (R)</div></div>
+        <div class="scatter-stat"><div class="scatter-stat-value" id="scatterP">--</div><div class="scatter-stat-label">p-value</div></div>
+        <div class="scatter-stat"><div class="scatter-stat-value" id="scatterR2">--</div><div class="scatter-stat-label">R²</div></div>
+      </div>
+      <div id="scatterChart" class="scatter-chart"></div>
+      <div class="scatter-controls">
+        <div class="scatter-panel">
+          <div class="scatter-panel-title"><i class="fas fa-sliders-h"></i>Axis Controls</div>
+          <div class="axis-grid">
+            <div class="axis-row">
+              <div class="scatter-slider">
+                <div class="scatter-slider-header"><span>X Min</span><span id="xMinVal">--</span></div>
+                <input type="range" id="xMinRange" oninput="updateAxisRange('x','min', this.value)">
+              </div>
+              <div class="scatter-slider">
+                <div class="scatter-slider-header"><span>X Max</span><span id="xMaxVal">--</span></div>
+                <input type="range" id="xMaxRange" oninput="updateAxisRange('x','max', this.value)">
+              </div>
+            </div>
+            <div class="axis-row">
+              <div class="scatter-slider">
+                <div class="scatter-slider-header"><span>Y Min</span><span id="yMinVal">--</span></div>
+                <input type="range" id="yMinRange" oninput="updateAxisRange('y','min', this.value)">
+              </div>
+              <div class="scatter-slider">
+                <div class="scatter-slider-header"><span>Y Max</span><span id="yMaxVal">--</span></div>
+                <input type="range" id="yMaxRange" oninput="updateAxisRange('y','max', this.value)">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="scatter-panel">
+          <div class="scatter-panel-title"><i class="fas fa-wave-square"></i>Curve Fitting</div>
+          <div class="scatter-buttons">
+            <button class="scatter-btn active" id="fit-none" onclick="applyFit('none')">None</button>
+            <button class="scatter-btn" id="fit-linear" onclick="applyFit('linear')">Linear</button>
+            <button class="scatter-btn" id="fit-polynomial" onclick="applyFit('polynomial')">Polynomial</button>
+            <button class="scatter-btn" id="fit-exponential" onclick="applyFit('exponential')">Exponential</button>
+            <button class="scatter-btn" id="fit-logarithmic" onclick="applyFit('logarithmic')">Logarithmic</button>
+            <button class="scatter-btn" id="fit-power" onclick="applyFit('power')">Power</button>
+          </div>
+          <div class="fit-equation" id="fitEquation">Equation: —</div>
+        </div>
+        <div class="scatter-panel">
+          <div class="scatter-panel-title"><i class="fas fa-exchange-alt"></i>Axis Transformations</div>
+          <div class="scatter-axis-toggle">
+            <button class="scatter-btn active" id="transform-x-tab" onclick="setTransformAxis('x')">X-Axis</button>
+            <button class="scatter-btn" id="transform-y-tab" onclick="setTransformAxis('y')">Y-Axis</button>
+          </div>
+          <div class="scatter-buttons">
+            <button class="scatter-btn active" id="transform-none" onclick="applyTransformation('none')">None</button>
+            <button class="scatter-btn" id="transform-ln" onclick="applyTransformation('ln')">ln</button>
+            <button class="scatter-btn" id="transform-inverse" onclick="applyTransformation('inverse')">1/x</button>
+            <button class="scatter-btn" id="transform-sqrt" onclick="applyTransformation('sqrt')">√</button>
+            <button class="scatter-btn" id="transform-square" onclick="applyTransformation('square')">x²</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MAIN CONTAINER
+══════════════════════════════════════════════ -->
+<div class="container" id="mainContainer">
+
+  <!-- Loading state -->
+  <div id="loadingMessage">
+    <i class="fa-solid fa-spinner"></i>
+    <p>Loading correlation data...</p>
+  </div>
+
+  <!-- Main content — shown after data arrives -->
+  <div id="mainContent" style="display:none;">
+
+    <!-- Content panels -->
+    <div class="tab-panels-wrap">
+
+      <!-- ── Matrix Content ── -->
+      <div id="tab-matrix" class="tab-panel active" style="display:block;">
+        <div class="tab-inner">
+          <div class="controls">
+            <div class="control-group">
+              <label>Correlation Type:</label>
+              <div class="radio-bar">
+                <label><input type="radio" name="corrType" value="Pearson" checked onchange="recalculate()"><span>Pearson</span></label>
+                <label><input type="radio" name="corrType" value="Spearman" onchange="recalculate()"><span>Spearman</span></label>
+                <label><input type="radio" name="corrType" value="Kendall" onchange="recalculate()"><span>Kendall</span></label>
+                <label><input type="radio" name="corrType" value="Biweight" onchange="recalculate()"><span>Biweight</span></label>
+              </div>
+            </div>
+            <div class="control-group">
+              <label>View:</label>
+              <div class="view-toggle">
+                <button type="button" id="viewTableBtn" class="active" onclick="setMatrixView('table')">Table</button>
+                <button type="button" id="viewHeatmapBtn" onclick="setMatrixView('heatmap')">Heatmap</button>
+              </div>
+            </div>
+            <div class="control-group slider-container">
+              <span class="slider-label">Highlight r ≥</span>
+              <input type="range" id="thresholdSlider" min="0" max="1" step="0.05" value="0" oninput="updateThreshold(this.value)">
+              <span class="slider-value" id="thresholdValue">0.00</span>
+            </div>
+            <div class="control-group">
+              <label class="checkbox-label"><input type="checkbox" id="showPValue" checked onchange="toggleDisplay()"><span>p-value</span></label>
+              <label class="checkbox-label"><input type="checkbox" id="showN" checked onchange="toggleDisplay()"><span>N</span></label>
+            </div>
+          </div>
+
+          <!-- Table View -->
+          <div id="resultsContainer" style="display:none;">
+            <div class="scroll-hint">
+              <i class="fa-solid fa-arrows-left-right"></i>
+              Click any cell to view scatter plot &nbsp;|&nbsp; Scroll horizontally for all variables
+            </div>
+            <div class="table-container" id="tableContainerTop" style="height:12px;">
+              <div id="tableScrollTop" style="height:1px;"></div>
+            </div>
+            <div class="table-container" id="tableContainer">
+              <table id="correlationTable">
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Heatmap View -->
+          <div id="heatmapContainer" style="display:none;">
+            <div class="heatmap-container">
+              <table id="heatmapTable" class="heatmap-table">
+                <thead id="heatmapHead"></thead>
+                <tbody id="heatmapBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div><!-- /tab-matrix -->
+
+      <!-- ── Network Tab ── -->
+      <div id="tab-network" class="tab-panel">
+        <div class="network-inner">
+          <div class="network-controls">
+            <div class="control-group slider-container">
+              <span class="slider-label">Show edges |r| ≥</span>
+              <input type="range" id="networkThresholdSlider" min="0" max="1" step="0.05" value="0.3" oninput="updateNetworkThreshold(this.value)">
+              <span class="slider-value" id="networkThresholdValue">0.30</span>
+            </div>
+            <div class="control-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="showNetCorrValues" checked onchange="toggleNetworkCorrValues()">
+                <span>Show r values</span>
+              </label>
+            </div>
+            <div class="control-group" style="margin-left:auto;">
+              <span style="font-size:12px;color:var(--text-muted);">Drag nodes to rearrange &nbsp;|&nbsp; Scroll to zoom</span>
+            </div>
+          </div>
+          <div class="network-canvas" id="networkCanvas">
+            <svg id="networkSVG"></svg>
+          </div>
+          <div class="network-legend">
+            <div class="legend-item"><div class="legend-line" style="background:rgba(120,200,255,0.8);"></div><span>Positive r</span></div>
+            <div class="legend-item"><div class="legend-line" style="background:rgba(255,165,120,0.8);"></div><span>Negative r</span></div>
+            <div class="legend-item" style="margin-top:4px;color:var(--text-muted);font-size:10px;"><span>Line width ∝ |r|</span></div>
+          </div>
+        </div>
+      </div><!-- /tab-network -->
+
+      <!-- ── Explore Tab ── -->
+      <div id="tab-explore" class="tab-panel">
+        <div class="tab-inner">
+          <div id="exploreContent">
+            <p style="color:var(--text-muted);padding:40px;text-align:center;">
+              Loading descriptive statistics…
+            </p>
+          </div>
+        </div>
+      </div><!-- /tab-explore -->
+
+      <!-- ── Partial Tab (Coming Soon) ── -->
+      <div id="tab-partial" class="tab-panel">
+        <div class="coming-soon-container">
+          <i class="fas fa-code-branch fa-3x"></i>
+          <h2>Partial Correlations</h2>
+          <p>Control for confounding variables to reveal true relationships.</p>
+          <div class="coming-soon-detail">
+            <p>Calculate partial and semi-partial correlations to understand the unique contribution
+               of each variable while controlling for others. Helps separate direct effects from
+               shared variance.</p>
+          </div>
+        </div>
+      </div><!-- /tab-partial -->
+
+      <!-- ── Reliability Tab (Coming Soon) ── -->
+      <div id="tab-reliability" class="tab-panel">
+        <div class="coming-soon-container">
+          <i class="fas fa-check-double fa-3x"></i>
+          <h2>Reliability Analysis</h2>
+          <p>Assess internal consistency and reliability of your measures.</p>
+          <div class="coming-soon-detail">
+            <p>Calculate Cronbach's α, McDonald's ω, split-half reliability, and item-total correlations
+               for scale validation. Essential for psychometric and survey research.</p>
+          </div>
+        </div>
+      </div><!-- /tab-reliability -->
+
+    </div><!-- /tab-panels-wrap -->
+  </div><!-- /#mainContent -->
+
+</div><!-- /#mainContainer -->
+
+<script>
+  /* ════════════════════════════════════════════
+     STATE
+  ════════════════════════════════════════════ */
+  let correlationData  = null;
+  let currentType      = 'Pearson';
+  let currentView      = 'table';
+  let currentMatrix    = null;
+  let currentHeaders   = null;
+  let scatterPointsCache = new Map();
+
+  let scatterState = {
+    rawPoints: [], xVar: '', yVar: '',
+    xTransform: 'none', yTransform: 'none',
+    fitType: 'none', activeTransformAxis: 'x',
+    chart: null,
+    xRange: null, yRange: null,
+    xRangeFull: null, yRangeFull: null
+  };
+
+  // Network state
+  let networkSimulation  = null;
+  let networkThreshold   = 0.3;
+  let showNetCorrValues  = true;
+  window.networkRendered = false;
+
+  /* ════════════════════════════════════════════
+     INITIALIZATION
+  ════════════════════════════════════════════ */
+  const isInIframe = window.self !== window.top;
+
+  if (isInIframe) {
+    // Running embedded — listen for postMessage
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.type === 'CORRELATION_DATA') {
+        correlationData = event.data.payload;
+        // Persist so other correlation views can read it via sessionStorage
+        try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch(e) {}
+        renderMatrix();
+      } else if (event.data && event.data.type === 'THEME_CHANGE') {
+        applyTheme(event.data.theme);
+      }
+    });
+
+    // Fallback: sessionStorage
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(function() {
+        if (!correlationData) {
+          const stored = sessionStorage.getItem('correlationData');
+          if (stored) {
+            try { correlationData = JSON.parse(stored); renderMatrix(); } catch(e) {}
+          }
+        }
+      }, 1000);
+    });
+
+    function applyTheme(theme) {
+      if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+      else document.documentElement.removeAttribute('data-theme');
+    }
+
+  } else {
+    // Standalone Office dialog
+    Office.onReady(function() {
+      if (!isInIframe && typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.init('correlation-matrix', 'Correlation Analysis', 0, 'correlations');
+        injectNavActions();
+      }
+
+      // Check sessionStorage pre-load (e.g. after same-window tab navigation)
+      const stored = sessionStorage.getItem('correlationData');
+      if (stored) {
+        try {
+          correlationData = JSON.parse(stored);
+          // Do NOT remove — keep in sessionStorage for further tab navigations
+          renderMatrix();
+        } catch(e) {}
+      }
+
+      Office.context.ui.addHandlerAsync(
+        Office.EventType.DialogParentMessageReceived,
+        function(arg) {
+          try {
+            const msg = JSON.parse(arg.message);
+            if (msg.type === 'CORRELATION_DATA' && msg.payload) {
+              correlationData = msg.payload;
+              // Persist for same-window navigation to other correlation views
+              try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch(e) {}
+              renderMatrix();
+            }
+          } catch(e) { console.error('Error parsing message:', e); }
+        }
+      );
+
+      Office.context.ui.messageParent(JSON.stringify({ action: 'ready' }));
+    });
+  }
+
+  /* ════════════════════════════════════════════
+     TAB SWITCHING
+  ════════════════════════════════════════════ */
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    document.querySelectorAll('.tab-panel').forEach(panel => {
+      panel.classList.remove('active');
+    });
+    const panel = document.getElementById('tab-' + tab);
+    if (panel) panel.classList.add('active');
+
+    // Lazy-init network on first visit
+    if (tab === 'network' && !window.networkRendered && correlationData) {
+      setTimeout(renderNetwork, 100);
+    }
+
+    // Reflow scatter chart if matrix tab re-activated
+    if (tab === 'matrix' && scatterState.chart) {
+      setTimeout(() => { if (scatterState.chart) scatterState.chart.reflow(); }, 50);
+    }
+  }
+
+  /* ════════════════════════════════════════════
+     RENDER MATRIX (entry point after data arrives)
+  ════════════════════════════════════════════ */
+  function renderMatrix() {
+    if (!correlationData || !correlationData.headers || correlationData.headers.length === 0) {
+      document.getElementById('loadingMessage').innerHTML =
+        '<i class="fa-solid fa-exclamation-triangle" style="font-size:48px;color:#fbbf24;"></i>' +
+        '<p>No correlation data available.</p>';
+      return;
+    }
+
+    // Update shared header
+    if (!isInIframe && typeof StatisticoHeader !== 'undefined') {
+      StatisticoHeader.sampleSize = correlationData.data ? correlationData.data.length : 0;
+      StatisticoHeader.variableName = correlationData.headers.length + ' Variables';
+      StatisticoHeader.render();
+      injectNavActions();
+    }
+
+    // Transition: hide loading, show main content
+    document.getElementById('loadingMessage').style.display = 'none';
+    const mc = document.getElementById('mainContent');
+    mc.style.display   = 'flex';
+    mc.style.flex      = '1';
+    mc.style.minHeight = '0';
+    mc.style.flexDirection = 'column';
+
+    // Build all tabs
+    buildCorrelationMatrix();
+    setMatrixView(currentView);
+    buildExploreTab();
+  }
+
+  /* ════════════════════════════════════════════
+     MATRIX TAB — build table + heatmap
+  ════════════════════════════════════════════ */
+  function buildCorrelationMatrix() {
+    const { headers, data } = correlationData;
+    const matrix = calculateCorrelationMatrix(data, headers, currentType);
+    currentMatrix  = matrix;
+    currentHeaders = headers;
+
+    const thead = document.getElementById('tableHead');
+    const tbody  = document.getElementById('tableBody');
+    thead.innerHTML = '';
+    tbody.innerHTML  = '';
+
+    // Header row
+    const hr = document.createElement('tr');
+    const corner = document.createElement('th'); corner.textContent = 'Variable'; hr.appendChild(corner);
+    headers.forEach(col => { const th = document.createElement('th'); th.textContent = col; hr.appendChild(th); });
+    thead.appendChild(hr);
+
+    // Data rows
+    headers.forEach((rowCol, i) => {
+      const row = document.createElement('tr');
+      const rowTh = document.createElement('td'); rowTh.textContent = rowCol; row.appendChild(rowTh);
+
+      headers.forEach((colCol, j) => {
+        const td = document.createElement('td');
+        const corrData = matrix[i][j];
+        const isDiag = (i === j);
+        if (isDiag) td.classList.add('diagonal-cell');
+
+        const corrValue = document.createElement('div');
+        corrValue.className = 'corr-value';
+        corrValue.textContent = corrData.r.toFixed(3);
+        corrValue.setAttribute('data-corr', corrData.r);
+        if (!isDiag) corrValue.addEventListener('click', () => openScatterModal(rowCol, colCol, corrData.r));
+        td.appendChild(corrValue);
+
+        if (!isDiag && corrData.p !== null) {
+          const pv = document.createElement('div'); pv.className = 'p-value';
+          pv.textContent = 'p = ' + corrData.p.toFixed(4); td.appendChild(pv);
+        }
+        if (!isDiag) {
+          const nv = document.createElement('div'); nv.className = 'n-value';
+          nv.textContent = 'N = ' + corrData.n; td.appendChild(nv);
+        }
+        row.appendChild(td);
+      });
+      tbody.appendChild(row);
+    });
+
+    buildHeatmapMatrix(headers, matrix);
+    syncTopScroll();
+    toggleDisplay();
+    applyThresholdFilter();
+
+    // Show results container
+    document.getElementById('resultsContainer').style.display = 'block';
+  }
+
+  function syncTopScroll() {
+    const tc  = document.getElementById('tableContainer');
+    const top = document.getElementById('tableContainerTop');
+    const ts  = document.getElementById('tableScrollTop');
+    if (!tc || !top || !ts) return;
+    ts.style.width = tc.scrollWidth + 'px';
+    top.scrollLeft = tc.scrollLeft;
+    if (!tc._syncAttached) {
+      tc.addEventListener('scroll',  () => { top.scrollLeft = tc.scrollLeft; });
+      top.addEventListener('scroll', () => { tc.scrollLeft  = top.scrollLeft; });
+      window.addEventListener('resize', () => { ts.style.width = tc.scrollWidth + 'px'; });
+      tc._syncAttached = true;
+    }
+  }
+
+  function setMatrixView(view) {
+    currentView = view;
+    const results = document.getElementById('resultsContainer');
+    const heatmap = document.getElementById('heatmapContainer');
+    const tBtn    = document.getElementById('viewTableBtn');
+    const hBtn    = document.getElementById('viewHeatmapBtn');
+
+    if (view === 'heatmap') {
+      results.style.display = 'none';
+      heatmap.style.display = 'block';
+    } else {
+      results.style.display = 'block';
+      heatmap.style.display = 'none';
+    }
+
+    tBtn.classList.toggle('active', view === 'table');
+    hBtn.classList.toggle('active', view === 'heatmap');
+
+    if (currentHeaders && currentMatrix && view === 'heatmap') {
+      buildHeatmapMatrix(currentHeaders, currentMatrix);
+      applyThresholdFilter();
+    }
+  }
+
+  function buildHeatmapMatrix(headers, matrix) {
+    const head = document.getElementById('heatmapHead');
+    const body = document.getElementById('heatmapBody');
+    if (!head || !body) return;
+    head.innerHTML = ''; body.innerHTML = '';
+
+    const hr = document.createElement('tr');
+    const corner = document.createElement('th'); corner.textContent = 'Variable'; hr.appendChild(corner);
+    headers.forEach(col => { const th = document.createElement('th'); th.textContent = col; hr.appendChild(th); });
+    head.appendChild(hr);
+
+    headers.forEach((rowCol, i) => {
+      const row = document.createElement('tr');
+      const rowTh = document.createElement('td'); rowTh.textContent = rowCol; row.appendChild(rowTh);
+      headers.forEach((colCol, j) => {
+        const td = document.createElement('td');
+        const val = matrix[i][j].r;
+        td.classList.add('heatmap-cell');
+        if (i === j) td.classList.add('diagonal-cell');
+        td.setAttribute('data-corr', val);
+        td.textContent = val.toFixed(2);
+        td.style.background = getHeatmapColor(val);
+        td.style.color       = getHeatmapTextColor(val);
+        row.appendChild(td);
+      });
+      body.appendChild(row);
+    });
+  }
+
+  function getHeatmapColor(v) {
+    v = Math.max(-1, Math.min(1, v));
+    const intensity = Math.abs(v);
+    const lightness = 20 + (1 - intensity) * 55;
+    return v >= 0 ? `hsl(24,85%,${lightness}%)` : `hsl(200,75%,${lightness}%)`;
+  }
+
+  function getHeatmapTextColor(v) { return Math.abs(v) > 0.45 ? '#0c1624' : '#e7edf8'; }
+
+  function recalculate() {
+    const sel = document.querySelector('input[name="corrType"]:checked');
+    currentType = sel ? sel.value : 'Pearson';
+    buildCorrelationMatrix();
+    // Re-render network with new type if it was shown
+    if (window.networkRendered && correlationData) {
+      const matrix = calculateCorrelationMatrix(correlationData.data, correlationData.headers, currentType);
+      drawNetwork(correlationData.headers, matrix);
+    }
+  }
+
+  function toggleDisplay() {
+    const showP = document.getElementById('showPValue').checked;
+    const showN = document.getElementById('showN').checked;
+    document.querySelectorAll('.p-value').forEach(el => el.style.display = showP ? 'block' : 'none');
+    document.querySelectorAll('.n-value').forEach(el => el.style.display = showN ? 'block' : 'none');
+  }
+
+  function updateThreshold(value) {
+    document.getElementById('thresholdValue').textContent = parseFloat(value).toFixed(2);
+    applyThresholdFilter();
+  }
+
+  function applyThresholdFilter() {
+    const threshold = parseFloat(document.getElementById('thresholdSlider').value);
+    document.querySelectorAll('tbody td').forEach(cell => {
+      const cvEl = cell.querySelector('.corr-value');
+      if (cvEl) {
+        const cv = parseFloat(cvEl.getAttribute('data-corr'));
+        const isDiag = cell.classList.contains('diagonal-cell');
+        const isPerfect = Math.abs(Math.abs(cv) - 1.0) < 0.001;
+        cell.classList.toggle('threshold-highlight',
+          Math.abs(cv) >= threshold && !isDiag && !isPerfect && threshold > 0);
+      }
+    });
+    document.querySelectorAll('.heatmap-cell').forEach(cell => {
+      const cv = parseFloat(cell.getAttribute('data-corr'));
+      const isDiag = cell.classList.contains('diagonal-cell');
+      const isPerfect = Math.abs(Math.abs(cv) - 1.0) < 0.001;
+      cell.classList.toggle('threshold-highlight',
+        Math.abs(cv) >= threshold && !isDiag && !isPerfect && threshold > 0);
+    });
+  }
+
+  /* ════════════════════════════════════════════
+     NETWORK TAB
+  ════════════════════════════════════════════ */
+  function renderNetwork() {
+    if (!correlationData) return;
+    window.networkRendered = true;
+    const matrix = calculateCorrelationMatrix(correlationData.data, correlationData.headers, currentType);
+    drawNetwork(correlationData.headers, matrix);
+  }
+
+  function drawNetwork(varNames, matrix) {
+    if (typeof d3 === 'undefined') {
+      document.getElementById('networkCanvas').innerHTML =
+        '<p style="color:var(--text-muted);padding:40px;text-align:center;">D3.js not loaded — network unavailable.</p>';
+      return;
+    }
+
+    const container = document.getElementById('networkCanvas');
+    const W = container.clientWidth  || 600;
+    const H = Math.max(container.clientHeight || 450, 380);
+
+    d3.select('#networkSVG').selectAll('*').remove();
+
+    const svg = d3.select('#networkSVG').attr('width', W).attr('height', H);
+
+    // Build nodes and links
+    const nodes = varNames.map(name => ({ id: name }));
+    const links = [];
+    for (let i = 0; i < varNames.length; i++) {
+      for (let j = i + 1; j < varNames.length; j++) {
+        const r = matrix[i][j].r;
+        if (r !== null && Math.abs(r) >= networkThreshold) {
+          links.push({ source: varNames[i], target: varNames[j], value: r });
+        }
+      }
+    }
+
+    if (networkSimulation) networkSimulation.stop();
+
+    networkSimulation = d3.forceSimulation(nodes)
+      .force('link',      d3.forceLink(links).id(d => d.id).distance(d => 160 * (1 - Math.abs(d.value))))
+      .force('charge',    d3.forceManyBody().strength(-400))
+      .force('center',    d3.forceCenter(W / 2, H / 2))
+      .force('collision', d3.forceCollide().radius(38));
+
+    const g = svg.append('g');
+
+    // Zoom
+    svg.call(d3.zoom().scaleExtent([0.25, 4]).on('zoom', e => g.attr('transform', e.transform)));
+
+    // Links
+    const link = g.append('g').selectAll('line').data(links).enter().append('line')
+      .attr('stroke', d => d.value >= 0 ? 'rgba(120,200,255,0.75)' : 'rgba(255,165,120,0.75)')
+      .attr('stroke-width', d => Math.max(1, Math.abs(d.value) * 6))
+      .attr('stroke-opacity', 0.75);
+
+    // Link labels
+    const linkLabels = g.append('g').selectAll('text').data(links).enter().append('text')
+      .attr('font-size', 10)
+      .attr('fill', 'rgba(255,255,255,0.72)')
+      .attr('text-anchor', 'middle')
+      .attr('pointer-events', 'none')
+      .text(d => d.value.toFixed(2))
+      .style('display', showNetCorrValues ? null : 'none');
+
+    // Node circles
+    const node = g.append('g').selectAll('circle').data(nodes).enter().append('circle')
+      .attr('r', 22)
+      .attr('fill', 'rgba(255,165,120,0.85)')
+      .attr('stroke', 'rgba(255,165,120,0.35)')
+      .attr('stroke-width', 2.5)
+      .style('cursor', 'pointer')
+      .call(d3.drag()
+        .on('start', (e, d) => { if (!e.active) networkSimulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+        .on('drag',  (e, d) => { d.fx = e.x; d.fy = e.y; })
+        .on('end',   (e, d) => { if (!e.active) networkSimulation.alphaTarget(0); d.fx = null; d.fy = null; })
+      );
+
+    // Node labels
+    const nodeLabels = g.append('g').selectAll('text').data(nodes).enter().append('text')
+      .attr('font-size', 11)
+      .attr('font-weight', 700)
+      .attr('fill', '#fff')
+      .attr('text-anchor', 'middle')
+      .attr('pointer-events', 'none')
+      .text(d => d.id.length > 9 ? d.id.substring(0, 8) + '…' : d.id)
+      .attr('dy', 36);
+
+    networkSimulation.on('tick', () => {
+      link
+        .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+      linkLabels
+        .attr('x', d => (d.source.x + d.target.x) / 2)
+        .attr('y', d => (d.source.y + d.target.y) / 2);
+      node
+        .attr('cx', d => d.x)
+        .attr('cy', d => d.y);
+      nodeLabels
+        .attr('x', d => d.x)
+        .attr('y', d => d.y);
+    });
+
+    window.networkElements = { link, linkLabels };
+  }
+
+  function updateNetworkThreshold(value) {
+    networkThreshold = parseFloat(value);
+    document.getElementById('networkThresholdValue').textContent = parseFloat(value).toFixed(2);
+    if (correlationData && window.networkRendered) {
+      const matrix = calculateCorrelationMatrix(correlationData.data, correlationData.headers, currentType);
+      drawNetwork(correlationData.headers, matrix);
+    }
+  }
+
+  function toggleNetworkCorrValues() {
+    showNetCorrValues = document.getElementById('showNetCorrValues').checked;
+    if (window.networkElements) {
+      window.networkElements.linkLabels.style('display', showNetCorrValues ? null : 'none');
+    }
+  }
+
+  /* ════════════════════════════════════════════
+     EXPLORE TAB — descriptive statistics
+  ════════════════════════════════════════════ */
+  function buildExploreTab() {
+    if (!correlationData || !correlationData.headers || !correlationData.data) return;
+
+    const headers = correlationData.headers;
+    const data    = correlationData.data;
+    const total   = data.length;
+
+    const stats = headers.map(varName => {
+      const values = data
+        .map(row => row[varName])
+        .filter(v => typeof v === 'number' && isFinite(v));
+
+      const n       = values.length;
+      const missing = total - n;
+
+      if (n === 0) return { name: varName, n: 0, missing, mean: null, sd: null, min: null, max: null, median: null, skew: null };
+
+      const sum    = values.reduce((a, b) => a + b, 0);
+      const mean   = sum / n;
+      const sorted = values.slice().sort((a, b) => a - b);
+      const min    = sorted[0];
+      const max    = sorted[n - 1];
+      const median = n % 2 === 0 ? (sorted[n/2 - 1] + sorted[n/2]) / 2 : sorted[Math.floor(n/2)];
+
+      const variance = n > 1 ? values.reduce((acc, v) => acc + (v - mean) ** 2, 0) / (n - 1) : 0;
+      const sd       = Math.sqrt(variance);
+
+      let skew = null;
+      if (n >= 3 && sd > 0) {
+        const cubeSum = values.reduce((acc, v) => acc + ((v - mean) / sd) ** 3, 0);
+        skew = (n / ((n - 1) * (n - 2))) * cubeSum;
+      }
+
+      return { name: varName, n, missing, mean, sd, min, max, median, skew };
+    });
+
+    const hasMissing = stats.some(s => s.missing > 0);
+    const fmt = (v, d = 3) => (v == null || !isFinite(v)) ? '—' : Number(v).toFixed(d);
+
+    let html = `
+      <div class="explore-notice">
+        <strong><i class="fa-solid fa-circle-info"></i> Per-Variable Statistics</strong> —
+        N shown is the count of valid (non-missing) observations for each variable individually
+        (listwise deletion is used when computing the correlation matrix).
+        ${hasMissing ? '<br><span style="color:#fbbf24;"><i class="fa-solid fa-triangle-exclamation"></i> Missing values detected — see "Missing" column below.</span>' : ''}
+      </div>
+      <div class="explore-table-wrap">
+        <table class="explore-table">
+          <thead>
+            <tr>
+              <th>Variable</th>
+              <th>N</th>
+              <th>Missing</th>
+              <th>Mean</th>
+              <th>Std Dev</th>
+              <th>Median</th>
+              <th>Min</th>
+              <th>Max</th>
+              <th>Skewness</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${stats.map(s => `
+              <tr>
+                <td>${escapeHTML(s.name)}</td>
+                <td>${s.n}</td>
+                <td class="${s.missing > 0 ? 'missing-warn' : ''}">${s.missing > 0 ? '⚠ ' + s.missing : s.missing}</td>
+                <td>${fmt(s.mean)}</td>
+                <td>${fmt(s.sd)}</td>
+                <td>${fmt(s.median)}</td>
+                <td>${fmt(s.min)}</td>
+                <td>${fmt(s.max)}</td>
+                <td>${fmt(s.skew)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>`;
+
+    document.getElementById('exploreContent').innerHTML = html;
+  }
+
+  /* ════════════════════════════════════════════
+     SCATTER MODAL
+  ════════════════════════════════════════════ */
+  function openScatterModal(rowVar, colVar, rValue) {
+    if (!correlationData || !correlationData.data) return;
+
+    const modal    = document.getElementById('scatterModal');
+    const titleEl  = document.getElementById('scatterTitle');
+    const cacheKey = rowVar + '__' + colVar;
+
+    let points = scatterPointsCache.get(cacheKey);
+    if (!points) {
+      points = correlationData.data
+        .map(row => [row[rowVar], row[colVar]])
+        .filter(([x, y]) => typeof x === 'number' && typeof y === 'number' && isFinite(x) && isFinite(y));
+      scatterPointsCache.set(cacheKey, points);
+    }
+
+    titleEl.textContent = 'Scatter Plot: ' + rowVar + ' vs ' + colVar;
+
+    scatterState.rawPoints = points;
+    scatterState.xVar      = rowVar;
+    scatterState.yVar      = colVar;
+    scatterState.xTransform = 'none';
+    scatterState.yTransform = 'none';
+    scatterState.fitType    = 'none';
+    scatterState.activeTransformAxis = 'x';
+    scatterState.chart = null;
+    scatterState.xRange = null;
+    scatterState.yRange = null;
+
+    resetScatterControls();
+    refreshScatter();
+
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeScatterModal() {
+    const modal = document.getElementById('scatterModal');
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  function resetScatterControls() {
+    document.getElementById('fit-none').classList.add('active');
+    ['fit-linear','fit-polynomial','fit-exponential','fit-logarithmic','fit-power'].forEach(id => document.getElementById(id).classList.remove('active'));
+    setTransformAxis('x');
+    ['transform-none','transform-ln','transform-inverse','transform-sqrt','transform-square'].forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById('transform-none').classList.add('active');
+  }
+
+  function transformValue(value, type) {
+    if (!isFinite(value)) return null;
+    switch (type) {
+      case 'ln':      return value > 0 ? Math.log(value) : null;
+      case 'inverse': return value !== 0 ? 1 / value : null;
+      case 'sqrt':    return value >= 0 ? Math.sqrt(value) : null;
+      case 'square':  return value * value;
+      default:        return value;
+    }
+  }
+
+  function getTransformedPoints() {
+    return scatterState.rawPoints
+      .map(([x, y]) => [transformValue(x, scatterState.xTransform), transformValue(y, scatterState.yTransform)])
+      .filter(([x, y]) => x !== null && y !== null && isFinite(x) && isFinite(y));
+  }
+
+  function getVisiblePoints() {
+    const pts = getTransformedPoints();
+    if (!scatterState.xRange || !scatterState.yRange) return pts;
+    const xMin = Math.min(scatterState.xRange.min, scatterState.xRange.max);
+    const xMax = Math.max(scatterState.xRange.min, scatterState.xRange.max);
+    const yMin = Math.min(scatterState.yRange.min, scatterState.yRange.max);
+    const yMax = Math.max(scatterState.yRange.min, scatterState.yRange.max);
+    return pts.filter(([x, y]) => x >= xMin && x <= xMax && y >= yMin && y <= yMax);
+  }
+
+  function refreshScatter() {
+    const pts = getTransformedPoints();
+    renderScatterChart(pts);
+    initAxisControls(pts);
+    const vis = getVisiblePoints();
+    updateScatterStats(vis);
+    applyFit(scatterState.fitType, vis);
+  }
+
+  function updateScatterStats(points) {
+    const n  = points.length;
+    const xs = points.map(p => p[0]);
+    const ys = points.map(p => p[1]);
+    const r  = calculatePearson(xs, ys);
+    const r2 = r * r;
+    const p  = calculatePValue(r, n);
+
+    setScatterStatValue('scatterN', n);
+    setScatterStatValue('scatterR',  isFinite(r)  ? r.toFixed(4)         : '--');
+    setScatterStatValue('scatterP',  isFinite(p)  ? p.toExponential(2)   : '--');
+    setScatterStatValue('scatterR2', isFinite(r2) ? r2.toFixed(4)        : '--');
+  }
+
+  function setScatterStatValue(id, value) {
+    const el = document.getElementById(id);
+    el.textContent = value;
+    el.classList.toggle('adjusted', isScatterAdjusted());
+  }
+
+  function isScatterAdjusted() {
+    return hasAxisOverrides() || scatterState.xTransform !== 'none' || scatterState.yTransform !== 'none' || scatterState.fitType !== 'none';
+  }
+
+  function hasAxisOverrides() {
+    if (!scatterState.xRange || !scatterState.yRange || !scatterState.xRangeFull || !scatterState.yRangeFull) return false;
+    const eps = 1e-9;
+    return Math.abs(scatterState.xRange.min - scatterState.xRangeFull.min) > eps ||
+           Math.abs(scatterState.xRange.max - scatterState.xRangeFull.max) > eps ||
+           Math.abs(scatterState.yRange.min - scatterState.yRangeFull.min) > eps ||
+           Math.abs(scatterState.yRange.max - scatterState.yRangeFull.max) > eps;
+  }
+
+  function calculatePearson(x, y) {
+    if (x.length < 2) return NaN;
+    const mX = x.reduce((a, b) => a + b, 0) / x.length;
+    const mY = y.reduce((a, b) => a + b, 0) / y.length;
+    let num = 0, denX = 0, denY = 0;
+    for (let i = 0; i < x.length; i++) { const dx = x[i]-mX, dy = y[i]-mY; num += dx*dy; denX += dx*dx; denY += dy*dy; }
+    return (denX === 0 || denY === 0) ? NaN : num / Math.sqrt(denX * denY);
+  }
+
+  function calculatePValue(r, n) {
+    if (!isFinite(r) || n < 3 || typeof jStat === 'undefined') return NaN;
+    const t = r * Math.sqrt((n-2) / (1 - r*r));
+    return 2 * (1 - jStat.studentt.cdf(Math.abs(t), n-2));
+  }
+
+  function renderScatterChart(points) {
+    const series = [{ type: 'scatter', name: 'Observations', data: points, color: 'rgba(255,165,120,0.75)', marker: { radius: 4 } }];
+
+    if (!scatterState.chart) {
+      scatterState.chart = Highcharts.chart('scatterChart', {
+        chart: { type: 'scatter', backgroundColor: 'transparent', zoomType: 'xy' },
+        title: { text: '' },
+        xAxis: { title: { text: scatterState.xVar }, gridLineColor: 'rgba(255,255,255,0.08)' },
+        yAxis: { title: { text: scatterState.yVar }, gridLineColor: 'rgba(255,255,255,0.08)' },
+        legend: { itemStyle: { color: '#fff' } },
+        credits: { enabled: false },
+        series
+      });
+    } else {
+      while (scatterState.chart.series.length) scatterState.chart.series[0].remove(false);
+      series.forEach(s => scatterState.chart.addSeries(s, false));
+      scatterState.chart.xAxis[0].setTitle({ text: scatterState.xVar });
+      scatterState.chart.yAxis[0].setTitle({ text: scatterState.yVar });
+      scatterState.chart.redraw();
+    }
+  }
+
+  function initAxisControls(points) {
+    if (!points.length) return;
+    const xs = points.map(p => p[0]), ys = points.map(p => p[1]);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    scatterState.xRange     = { min: minX, max: maxX };
+    scatterState.yRange     = { min: minY, max: maxY };
+    scatterState.xRangeFull = { min: minX, max: maxX };
+    scatterState.yRangeFull = { min: minY, max: maxY };
+    setupAxisRange('xMinRange', 'xMinVal', minX, maxX, minX);
+    setupAxisRange('xMaxRange', 'xMaxVal', minX, maxX, maxX);
+    setupAxisRange('yMinRange', 'yMinVal', minY, maxY, minY);
+    setupAxisRange('yMaxRange', 'yMaxVal', minY, maxY, maxY);
+    updateChartExtremes();
+  }
+
+  function setupAxisRange(id, labelId, min, max, value) {
+    const input = document.getElementById(id);
+    input.min = min; input.max = max; input.step = (max - min) / 100 || 1; input.value = value;
+    document.getElementById(labelId).textContent = Number(value).toFixed(2);
+  }
+
+  function updateAxisRange(axis, which, value) {
+    const val = parseFloat(value);
+    if (axis === 'x') { scatterState.xRange[which] = val; document.getElementById(which==='min' ? 'xMinVal' : 'xMaxVal').textContent = val.toFixed(2); }
+    else               { scatterState.yRange[which] = val; document.getElementById(which==='min' ? 'yMinVal' : 'yMaxVal').textContent = val.toFixed(2); }
+    const vis = getVisiblePoints();
+    updateScatterStats(vis);
+    applyFit(scatterState.fitType, vis);
+    updateScatterAdjustmentIndicator();
+    updateChartExtremes();
+  }
+
+  function updateChartExtremes() {
+    if (!scatterState.chart) return;
+    const { min: xMin, max: xMax } = scatterState.xRange;
+    const { min: yMin, max: yMax } = scatterState.yRange;
+    scatterState.chart.xAxis[0].setExtremes(Math.min(xMin, xMax), Math.max(xMin, xMax), false);
+    scatterState.chart.yAxis[0].setExtremes(Math.min(yMin, yMax), Math.max(yMin, yMax), false);
+    scatterState.chart.redraw();
+  }
+
+  function applyFit(type, pointsOverride = null) {
+    scatterState.fitType = type;
+    ['fit-none','fit-linear','fit-polynomial','fit-exponential','fit-logarithmic','fit-power'].forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById('fit-' + type).classList.add('active');
+    updateScatterAdjustmentIndicator();
+    if (!scatterState.chart) return;
+    const pts       = pointsOverride || getVisiblePoints();
+    const fitResult = buildFitSeries(pts, type);
+    const existing  = scatterState.chart.series.find(s => s.name === 'Fit');
+    if (existing) existing.remove(false);
+    if (fitResult && fitResult.series) scatterState.chart.addSeries(fitResult.series, false);
+    updateFitEquation(type, fitResult ? fitResult.equation : null);
+    scatterState.chart.redraw();
+  }
+
+  function buildFitSeries(points, type) {
+    if (type === 'none' || points.length < 2 || typeof regression === 'undefined') return null;
+    let model;
+    if (type === 'linear')      model = regression.linear(points);
+    if (type === 'polynomial')  model = regression.polynomial(points, { order: 2 });
+    if (type === 'exponential') model = regression.exponential(points);
+    if (type === 'logarithmic') model = regression.logarithmic(points);
+    if (type === 'power')       model = regression.power(points);
+    if (!model || !model.predict) return null;
+
+    const xs = points.map(p => p[0]);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const line = [];
+    for (let i = 0; i <= 50; i++) {
+      const x = minX + (maxX - minX) * (i / 50);
+      const y = model.predict(x)[1];
+      if (isFinite(y)) line.push([x, y]);
+    }
+    return { series: { name: 'Fit', type: 'line', data: line, color: 'rgba(120,200,255,0.9)', marker: { enabled: false }, lineWidth: 2 }, equation: model.string || null };
+  }
+
+  function updateFitEquation(type, equation) {
+    const el = document.getElementById('fitEquation');
+    if (!el) return;
+    el.textContent = (type === 'none' || !equation) ? 'Equation: —' : 'Equation: ' + equation;
+  }
+
+  function setTransformAxis(axis) {
+    scatterState.activeTransformAxis = axis;
+    document.getElementById('transform-x-tab').classList.toggle('active', axis === 'x');
+    document.getElementById('transform-y-tab').classList.toggle('active', axis === 'y');
+    updateTransformButtons();
+  }
+
+  function applyTransformation(type) {
+    if (scatterState.activeTransformAxis === 'x') scatterState.xTransform = type;
+    else scatterState.yTransform = type;
+    updateTransformButtons();
+    updateScatterAdjustmentIndicator();
+    refreshScatter();
+  }
+
+  function updateScatterAdjustmentIndicator() {
+    ['scatterN','scatterR','scatterP','scatterR2'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('adjusted', isScatterAdjusted());
+    });
+  }
+
+  function updateTransformButtons() {
+    const activeType = scatterState.activeTransformAxis === 'x' ? scatterState.xTransform : scatterState.yTransform;
+    ['transform-none','transform-ln','transform-inverse','transform-sqrt','transform-square'].forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById('transform-' + activeType).classList.add('active');
+  }
+
+  /* ════════════════════════════════════════════
+     CORRELATION CALCULATIONS
+  ════════════════════════════════════════════ */
+  function calculateCorrelationMatrix(data, headers, type) {
+    const n = headers.length;
+    const matrix = Array(n).fill(null).map(() => Array(n));
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        const col1 = data.map(row => row[headers[i]]);
+        const col2 = data.map(row => row[headers[j]]);
+        if (i === j) {
+          matrix[i][j] = { r: 1, p: 0, n: col1.filter(v => typeof v === 'number' && !isNaN(v)).length };
+        } else if (type === 'Spearman') {
+          matrix[i][j] = calculateSpearmanCorrelation(col1, col2);
+        } else if (type === 'Kendall') {
+          matrix[i][j] = calculateKendallCorrelation(col1, col2);
+        } else if (type === 'Biweight') {
+          matrix[i][j] = calculateBiweightMidcorrelation(col1, col2);
+        } else {
+          matrix[i][j] = calculatePearsonCorrelation(col1, col2);
+        }
+      }
+    }
+    return matrix;
+  }
+
+  function calculatePearsonCorrelation(x, y) {
+    const pairs = x.map((xi, i) => [xi, y[i]]).filter(([xi, yi]) => typeof xi==='number' && typeof yi==='number' && !isNaN(xi) && !isNaN(yi));
+    const n = pairs.length;
+    if (n < 2) return { r: 0, p: null, n: 0 };
+    const xV = pairs.map(p => p[0]), yV = pairs.map(p => p[1]);
+    const mX = xV.reduce((a,b)=>a+b,0)/n, mY = yV.reduce((a,b)=>a+b,0)/n;
+    let num=0, denX=0, denY=0;
+    for (let i=0; i<n; i++) { const dx=xV[i]-mX, dy=yV[i]-mY; num+=dx*dy; denX+=dx*dx; denY+=dy*dy; }
+    const r = (denX===0||denY===0) ? 0 : num/Math.sqrt(denX*denY);
+    const t = r * Math.sqrt(n-2) / Math.sqrt(1-r*r);
+    const p = 2 * (1 - tDistCDF(Math.abs(t), n-2));
+    return { r, p, n };
+  }
+
+  function calculateSpearmanCorrelation(x, y) {
+    const pairs = x.map((xi, i) => [xi, y[i]]).filter(([xi, yi]) => typeof xi==='number' && typeof yi==='number' && !isNaN(xi) && !isNaN(yi));
+    const n = pairs.length;
+    if (n < 2) return { r: 0, p: null, n: 0 };
+    return calculatePearsonCorrelation(getRanks(pairs.map(p=>p[0])), getRanks(pairs.map(p=>p[1])));
+  }
+
+  function calculateKendallCorrelation(x, y) {
+    const pairs = x.map((xi, i) => [xi, y[i]]).filter(([xi, yi]) => typeof xi==='number' && typeof yi==='number' && !isNaN(xi) && !isNaN(yi));
+    const n = pairs.length;
+    if (n < 2) return { r: 0, p: null, n: 0 };
+    let concordant = 0, discordant = 0;
+    for (let i=0; i<n-1; i++) for (let j=i+1; j<n; j++) { const dx=pairs[j][0]-pairs[i][0], dy=pairs[j][1]-pairs[i][1]; if (dx*dy>0) concordant++; else if (dx*dy<0) discordant++; }
+    const tau = (concordant - discordant) / (n*(n-1)/2);
+    const z   = tau * Math.sqrt(n*(n-1) / (2*(2*n+5)/9));
+    const p   = 2 * (1 - normalCDF(Math.abs(z)));
+    return { r: tau, p, n };
+  }
+
+  function calculateBiweightMidcorrelation(x, y) {
+    const pairs = x.map((xi, i) => [xi, y[i]]).filter(([xi, yi]) => typeof xi==='number' && typeof yi==='number' && isFinite(xi) && isFinite(yi));
+    const n = pairs.length;
+    if (n < 2) return { r: 0, p: null, n: 0 };
+    const xs = pairs.map(p=>p[0]), ys = pairs.map(p=>p[1]);
+    const medX = arrMedian(xs), medY = arrMedian(ys);
+    const madX = arrMad(xs, medX), madY = arrMad(ys, medY);
+    if (madX===0 || madY===0) return { r: 0, p: null, n };
+    const wX = xs.map(v => { const u=(v-medX)/(9*madX); return Math.abs(u)<1 ? (1-u*u)**2 : 0; });
+    const wY = ys.map(v => { const u=(v-medY)/(9*madY); return Math.abs(u)<1 ? (1-u*u)**2 : 0; });
+    const xP = xs.map((v,i) => (v-medX)*wX[i]), yP = ys.map((v,i) => (v-medY)*wY[i]);
+    const num  = xP.reduce((s,v,i) => s+v*yP[i], 0);
+    const denX = Math.sqrt(xP.reduce((s,v) => s+v*v, 0));
+    const denY = Math.sqrt(yP.reduce((s,v) => s+v*v, 0));
+    const r = (denX===0||denY===0) ? 0 : num/(denX*denY);
+    const t = r * Math.sqrt(n-2) / Math.sqrt(1-r*r);
+    const p = 2 * (1 - tDistCDF(Math.abs(t), n-2));
+    return { r, p, n };
+  }
+
+  function getRanks(arr) {
+    const sorted = arr.map((val, idx) => ({ val, idx })).sort((a,b) => a.val-b.val);
+    const ranks = new Array(arr.length);
+    for (let i=0; i<sorted.length; i++) {
+      let j = i;
+      while (j < sorted.length-1 && sorted[j].val === sorted[j+1].val) j++;
+      const avgRank = (i + j + 2) / 2;
+      for (let k=i; k<=j; k++) ranks[sorted[k].idx] = avgRank;
+      i = j;
+    }
+    return ranks;
+  }
+
+  function arrMedian(arr) {
+    const s = arr.slice().sort((a,b)=>a-b), m = Math.floor(s.length/2);
+    return s.length%2 === 0 ? (s[m-1]+s[m])/2 : s[m];
+  }
+
+  function arrMad(arr, med) { return arrMedian(arr.map(v => Math.abs(v - med))); }
+
+  function tDistCDF(t, df) {
+    // Two-sided t-CDF via regularized incomplete beta: I_x(df/2, 0.5)
+    const x = df / (df + t * t);
+    return 1 - 0.5 * regularizedIncompleteBeta(df / 2, 0.5, x);
+  }
+
+  function regularizedIncompleteBeta(a, b, x) {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    // Use continued fraction (Lentz method) for numeric accuracy
+    const lbeta = lgamma(a) + lgamma(b) - lgamma(a + b);
+    const front = Math.exp(Math.log(x) * a + Math.log(1 - x) * b - lbeta) / a;
+    return front * betaCF(a, b, x);
+  }
+
+  function betaCF(a, b, x) {
+    // Lentz continued fraction for I_x(a,b)
+    const MAXIT = 200, EPS = 3e-7, FPMIN = 1e-30;
+    const qab = a + b, qap = a + 1, qam = a - 1;
+    let c = 1, d = 1 - qab * x / qap;
+    if (Math.abs(d) < FPMIN) d = FPMIN;
+    d = 1 / d;
+    let h = d;
+    for (let m = 1; m <= MAXIT; m++) {
+      let m2 = 2 * m;
+      let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+      d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN;
+      c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+      d = 1 / d; h *= d * c;
+      aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+      d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN;
+      c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+      d = 1 / d;
+      const del = d * c;
+      h *= del;
+      if (Math.abs(del - 1) < EPS) break;
+    }
+    return h;
+  }
+
+  function lgamma(z) {
+    // Lanczos approximation
+    const g = 7;
+    const c = [0.99999999999980993,676.5203681218851,-1259.1392167224028,
+      771.32342877765313,-176.61502916214059,12.507343278686905,
+      -0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+    if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - lgamma(1 - z);
+    z -= 1;
+    let x = c[0];
+    for (let i = 1; i < g + 2; i++) x += c[i] / (z + i);
+    const t = z + g + 0.5;
+    return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+  }
+
+  function normalCDF(x) { return 0.5 * (1 + erf(x / Math.sqrt(2))); }
+
+  function erf(x) {
+    const sign = x>=0 ? 1 : -1; x = Math.abs(x);
+    const a1=0.254829592, a2=-0.284496736, a3=1.421413741, a4=-1.453152027, a5=1.061405429, p=0.3275911;
+    const t = 1/(1+p*x);
+    return sign * (1 - (((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x));
+  }
+
+  /* ════════════════════════════════════════════
+     UTILITIES
+  ════════════════════════════════════════════ */
+  function escapeHTML(str) {
+    return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  console.log('✅ Correlation results dialog loaded (tabs: Matrix | Network | Explore | Partial | Reliability)');
+
+  /* ── Inject action buttons into the shared navrow ── */
+  function injectNavActions() {
+    const navrow = document.querySelector('.statistico-navrow');
+    if (!navrow) return;
+    if (navrow.querySelector('.navrow-actions')) return; // already injected
+    const actions = document.createElement('div');
+    actions.className = 'navrow-actions';
+    actions.innerHTML = `
+      <button class="hero-action-btn" onclick="exportHtml()" title="Export complete correlation report as standalone HTML file">
+        <i class="fa-solid fa-floppy-disk"></i> Save HTML
+      </button>
+    `;
+    navrow.appendChild(actions);
+  }
+  window.injectNavActions = injectNavActions;
+
+  /* ── Export as standalone HTML ── */
+  function exportHtml() {
+    try {
+      const ts   = new Date().toISOString().slice(0,19).replace(/[-T:]/g, '');
+      const name = (correlationData && correlationData.headers ? correlationData.headers.join('_').slice(0,30) : 'correlations');
+      const fileName = `Correlation_${name}_${ts}.html`;
+      const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+      const blob = new Blob([html], { type: 'text/html' });
+      const url  = URL.createObjectURL(blob);
+      const a    = Object.assign(document.createElement('a'), { href: url, download: fileName });
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+    } catch(e) {
+      alert('Failed to export HTML: ' + e.message);
+    }
+  }
+  window.exportHtml = exportHtml;
+</script>
+</body>
+</html>
+.Groups[1].Value)?v=20260307d" ">
+  <script src="../ "shared-header.$(<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>Correlation Analysis</title>
+
+  <!-- Office.js -->
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
+
+  <!-- Highcharts + jStat + Regression for scatter plots -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/exporting.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/export-data.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/regression/2.0.1/regression.min.js"></script>
+
+  <!-- D3.js for Network visualization -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+
+  <!-- Shared Header -->
+  <link rel="stylesheet" href="../shared-header.css?v=20260307d">
+  <script src="../shared-header.js?v=20260307d"></script>
+
+  <style>
+    /* ── Variables ── */
+    :root {
+      --surface-0: #0c1624;
+      --surface-1: #1a1f2e;
+      --surface-2: #242938;
+      --border: #2d3748;
+      --accent-1: rgb(255,165,120);
+      --accent-2: rgb(120,200,255);
+      --text-primary: #fff;
+      --text-secondary: rgba(255,255,255,0.8);
+      --text-muted: rgba(255,255,255,0.5);
+    }
+
+    /* ── Light Theme ── */
+    :root[data-theme="light"] {
+      --surface-0: #eef0f4;
+      --surface-1: #ffffff;
+      --surface-2: #f3f4f6;
+      --border: #cbd5e1;
+      --accent-1: #2563eb;
+      --accent-2: #1d4ed8;
+      --text-primary: #111827;
+      --text-secondary: #1f2937;
+      --text-muted: #374151;
+    }
+
+    /* ── Light Theme overrides for hardcoded dark values ── */
+    :root[data-theme="light"] .controls { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    :root[data-theme="light"] .control-group { background: rgba(0,0,0,0.03); }
+    :root[data-theme="light"] .radio-bar { background: rgba(0,0,0,0.07); border-color: rgba(0,0,0,0.1); }
+    :root[data-theme="light"] .radio-bar label:hover { background: rgba(37,99,235,0.1); color: var(--accent-1); }
+    :root[data-theme="light"] .radio-bar label:has(input:checked) { background: var(--accent-1); color: #fff; box-shadow: 0 2px 6px rgba(37,99,235,0.35); }
+    :root[data-theme="light"] .view-toggle { background: rgba(0,0,0,0.07); border-color: rgba(0,0,0,0.1); }
+    :root[data-theme="light"] .view-toggle button:hover { background: rgba(37,99,235,0.1); color: var(--accent-1); }
+    :root[data-theme="light"] .view-toggle button.active { background: var(--accent-1); color: #fff; box-shadow: 0 2px 6px rgba(37,99,235,0.35); }
+    :root[data-theme="light"] thead th { background: linear-gradient(135deg, var(--surface-2), #dde3ef); }
+    :root[data-theme="light"] .heatmap-table thead th { background: linear-gradient(135deg, var(--surface-2), #dde3ef); }
+    :root[data-theme="light"] tbody tr:nth-child(even) { background: rgba(0,0,0,0.03); }
+    :root[data-theme="light"] tbody tr:nth-child(even) td:first-child { background: rgba(0,0,0,0.03); }
+    :root[data-theme="light"] tbody tr:hover { background: rgba(37,99,235,0.06); }
+    :root[data-theme="light"] tbody tr:hover td:first-child { background: rgba(37,99,235,0.06); }
+    :root[data-theme="light"] .explore-table tbody tr:nth-child(even) { background: rgba(0,0,0,0.03); }
+    :root[data-theme="light"] .checkbox-label:hover { background: rgba(37,99,235,0.08); color: var(--accent-1); }
+    :root[data-theme="light"] .scatter-overlay { background: rgba(0,0,0,0.45); }
+    :root[data-theme="light"] .scatter-modal { box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+    :root[data-theme="light"] .scatter-stat-box { background: rgba(0,0,0,0.04); }
+    :root[data-theme="light"] .explore-section { background: rgba(0,0,0,0.03); }
+    :root[data-theme="light"] .explore-tip { background: rgba(0,0,0,0.04); }
+    :root[data-theme="light"] .explore-controls { background: rgba(0,0,0,0.04); }
+    :root[data-theme="light"] .explore-table th { border-right-color: rgba(0,0,0,0.1); }
+
+    /* ── Header action buttons in navrow ── */
+    .navrow-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .statistico-navrow .navrow-tabs { width: auto; flex: 0 1 auto; }
+    .hero-action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(148,163,184,.45);
+      background: linear-gradient(145deg, rgba(148,163,184,.18), rgba(100,116,139,.16));
+      color: #fff;
+      font-size: 12px;
+      font-weight: 650;
+      cursor: pointer;
+      position: relative;
+      transition: background .18s, border-color .18s, transform .15s;
+    }
+    .hero-action-btn:hover { background: linear-gradient(145deg, rgba(148,163,184,.3), rgba(100,116,139,.28)); transform: translateY(-1px); }
+    :root[data-theme="light"] .hero-action-btn { color: #1f2937; border-color: rgba(0,0,0,.18); background: linear-gradient(145deg, rgba(0,0,0,.06), rgba(0,0,0,.04)); }
+
+    /* ── Reset / Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: var(--surface-0);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Main container ── */
+    .container {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Loading ── */
+    #loadingMessage {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+    }
+
+    #loadingMessage i {
+      font-size: 48px;
+      color: var(--accent-1);
+      animation: spin 1s linear infinite;
+    }
+
+    #loadingMessage p {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* ── Main content (tabs area) ── */
+    #mainContent {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Main content area ── */
+    .tab-panels-wrap {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      background: var(--surface-0);
+    }
+
+    .tab-panel {
+      display: none;
+      height: 100%;
+      overflow-y: auto;
+    }
+
+    .tab-panel.active { display: block; }
+
+    /* ── Shared tab inner padding ── */
+    .tab-inner {
+      padding: 16px 20px 20px;
+    }
+
+    /* ══════════════════════════════════════════════
+       MATRIX TAB — controls
+    ══════════════════════════════════════════════ */
+    .controls {
+      background: var(--surface-1);
+      padding: 10px 16px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Each group gets its own bordered pill */
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 7px 14px;
+    }
+
+    .control-group label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* Radio Bar — sits inside the bordered .control-group pill */
+    .radio-bar {
+      display: flex;
+      gap: 3px;
+      background: rgba(0,0,0,0.25);
+      padding: 3px;
+      border-radius: 7px;
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .radio-bar label {
+      padding: 5px 13px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all .2s;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .radio-bar label:hover { background: rgba(255,165,120,0.12); color: var(--accent-1); }
+
+    .radio-bar input[type="radio"] { display: none; }
+
+    .radio-bar label:has(input:checked) {
+      background: var(--accent-1);
+      color: var(--surface-0);
+      font-weight: 700;
+      box-shadow: 0 2px 6px rgba(255,165,120,0.35);
+    }
+
+    /* View toggle — sits inside the bordered .control-group pill */
+    .view-toggle {
+      display: flex;
+      gap: 3px;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 7px;
+      padding: 3px;
+    }
+
+    .view-toggle button {
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .view-toggle button:hover { background: rgba(255,165,120,0.12); color: var(--accent-1); }
+
+    .view-toggle button.active {
+      background: var(--accent-1);
+      color: var(--surface-0);
+      box-shadow: 0 2px 6px rgba(255,165,120,0.35);
+    }
+
+    /* Slider — inherits .control-group border/pill, no extra needed */
+    .slider-container { gap: 10px; }
+
+    .slider-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    input[type="range"] {
+      width: 140px;
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--surface-2) 0%, var(--accent-1) 100%);
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(255,165,120,0.4);
+      transition: transform .2s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      cursor: pointer;
+      border: none;
+    }
+
+    .slider-value {
+      font-size: 13px;
+      color: var(--accent-1);
+      font-weight: 700;
+      min-width: 36px;
+      text-align: right;
+    }
+
+    /* Checkboxes */
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      padding: 3px 6px;
+      border-radius: 5px;
+      transition: background .2s;
+      white-space: nowrap;
+    }
+
+    .checkbox-label:hover { background: rgba(255,165,120,0.1); color: var(--accent-1); }
+
+    .checkbox-label input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      cursor: pointer;
+      accent-color: var(--accent-1);
+    }
+
+    .checkbox-label:has(input:checked) { color: var(--accent-1); font-weight: 700; }
+
+    /* ── Correlation Table ── */
+    .table-container {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: auto;
+      max-height: calc(100vh - 240px);
+      background:
+        linear-gradient(90deg, var(--surface-1) 30%, rgba(26,31,46,0)),
+        linear-gradient(90deg, rgba(26,31,46,0), var(--surface-1) 70%) 100% 0,
+        radial-gradient(farthest-side at 0 50%, rgba(0,0,0,.3), rgba(0,0,0,0)),
+        radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,.3), rgba(0,0,0,0)) 100% 0;
+      background-repeat: no-repeat;
+      background-color: var(--surface-1);
+      background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
+      background-attachment: local, local, scroll, scroll;
+      scroll-behavior: smooth;
+    }
+
+    .table-container::-webkit-scrollbar { height: 10px; width: 10px; }
+    .table-container::-webkit-scrollbar-track { background: var(--surface-2); border-radius: 5px; }
+    .table-container::-webkit-scrollbar-thumb {
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      border-radius: 5px;
+      border: 2px solid var(--surface-2);
+    }
+
+    #tableContainerTop {
+      overflow-x: auto;
+      overflow-y: hidden;
+      height: 12px;
+      margin-bottom: 6px;
+    }
+
+    #tableContainerTop::-webkit-scrollbar { height: 10px; }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      background: var(--surface-1);
+    }
+
+    thead { position: sticky; top: 0; z-index: 10; }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: linear-gradient(135deg, var(--surface-2), #2d3545);
+      padding: 15px 18px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--accent-2);
+      border-bottom: 2px solid var(--accent-2);
+      border-right: 1px solid var(--border);
+      white-space: nowrap;
+      letter-spacing: 0.1px;
+    }
+
+    thead th:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 11;
+      text-align: left;
+      min-width: 120px;
+    }
+
+    tbody tr:nth-child(even) { background: rgba(36,41,56,0.5); }
+    tbody tr:hover { background: rgba(255,165,120,0.06); }
+
+    tbody td {
+      padding: 14px 18px;
+      text-align: center;
+      font-size: 15px;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody td:first-child {
+      position: sticky;
+      left: 0;
+      background: inherit;
+      font-weight: 700;
+      text-align: left;
+      color: var(--accent-2);
+      z-index: 2;
+      min-width: 150px;
+      font-size: 15px;
+    }
+
+    tbody tr:nth-child(even) td:first-child { background: rgba(36,41,56,0.5); }
+    tbody tr:hover td:first-child { background: rgba(255,165,120,0.06); }
+
+    .corr-value {
+      font-weight: 700;
+      font-size: 16px;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      cursor: pointer;
+    }
+
+    .p-value {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .n-value {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-style: italic;
+      margin-top: 2px;
+    }
+
+    .diagonal-cell { background: transparent !important; position: relative; }
+    .diagonal-cell .corr-value { color: var(--accent-2); text-decoration: none; cursor: default; }
+    .diagonal-cell::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(120,200,255,0.25);
+      pointer-events: none;
+    }
+
+    .threshold-highlight {
+      background: linear-gradient(135deg, rgba(255,165,120,0.2), rgba(120,200,255,0.2)) !important;
+      animation: pulse-highlight 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-highlight {
+      0%, 100% { box-shadow: inset 0 0 8px rgba(255,165,120,0.3); }
+      50%       { box-shadow: inset 0 0 14px rgba(255,165,120,0.5); }
+    }
+
+    .scroll-hint {
+      background: linear-gradient(135deg, rgba(255,165,120,0.1), rgba(120,200,255,0.1));
+      padding: 9px 14px;
+      border-radius: 6px;
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      border: 1px solid rgba(255,165,120,0.2);
+    }
+
+    .scroll-hint i { color: var(--accent-1); margin-right: 6px; }
+
+    /* Heatmap */
+    .heatmap-container {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: auto;
+      max-height: calc(100vh - 240px);
+      background: var(--surface-1);
+    }
+
+    .heatmap-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+
+    .heatmap-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: linear-gradient(135deg, var(--surface-2), #2d3545);
+      padding: 15px 18px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--accent-1);
+      border-bottom: 2px solid var(--accent-1);
+      border-right: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .heatmap-table thead th:first-child {
+      position: sticky; left: 0; z-index: 11; text-align: left; min-width: 150px;
+    }
+
+    .heatmap-table tbody td {
+      padding: 14px 18px;
+      text-align: center;
+      font-size: 15px;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      color: #0c1624;
+      font-weight: 700;
+    }
+
+    .heatmap-table tbody td:first-child {
+      position: sticky; left: 0;
+      background: var(--surface-1);
+      color: var(--accent-2);
+      font-weight: 700;
+      text-align: left;
+      z-index: 2;
+      min-width: 150px;
+    }
+
+    .heatmap-cell.threshold-highlight {
+      outline: 2px solid rgba(255,165,120,0.9);
+      outline-offset: -2px;
+      box-shadow: inset 0 0 8px rgba(255,165,120,0.5);
+    }
+
+    /* ══════════════════════════════════════════════
+       SCATTER MODAL
+    ══════════════════════════════════════════════ */
+    .scatter-modal {
+      display: none;
+      position: fixed;
+      z-index: 9999;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .scatter-modal-content {
+      background: var(--surface-1);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      width: 90%;
+      max-width: 900px;
+      max-height: 90vh;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .scatter-modal-header {
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      color: var(--accent-1);
+      font-weight: 600;
+    }
+
+    .scatter-modal-body { padding: 10px 14px 12px; overflow: auto; }
+    .scatter-close { cursor: pointer; font-size: 20px; color: var(--text-secondary); }
+
+    .scatter-chart {
+      width: 100%;
+      height: 300px;
+      background: rgba(0,0,0,0.15);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      position: relative;
+    }
+
+    .scatter-stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .scatter-stat {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      text-align: center;
+    }
+
+    .scatter-stat-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent-1);
+    }
+
+    .scatter-stat-value.adjusted::after {
+      content: "*";
+      margin-left: 4px;
+      color: var(--accent-2);
+      font-weight: 700;
+    }
+
+    .scatter-stat-label { font-size: 11px; color: var(--text-muted); }
+
+    .scatter-controls {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(180px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .scatter-panel {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+    }
+
+    .scatter-panel-title {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--accent-1);
+      font-size: 12px;
+    }
+
+    .scatter-slider { margin-bottom: 7px; width: 100%; min-width: 0; }
+
+    .scatter-slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-bottom: 3px;
+    }
+
+    .scatter-slider input[type="range"] { width: 100%; }
+
+    .scatter-buttons { display: flex; flex-wrap: wrap; gap: 5px; }
+
+    .fit-equation {
+      margin-top: 7px;
+      padding: 5px 8px;
+      border-radius: 5px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 11px;
+      text-align: center;
+      min-height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      word-break: break-word;
+    }
+
+    .scatter-btn {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 4px 7px;
+      border-radius: 5px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .scatter-btn.active {
+      color: var(--surface-0);
+      background: var(--accent-1);
+      border-color: var(--accent-1);
+      font-weight: 600;
+    }
+
+    .scatter-axis-toggle { display: flex; gap: 5px; margin-bottom: 6px; }
+    .scatter-axis-toggle .scatter-btn { flex: 1; }
+
+    .axis-grid { display: flex; flex-direction: column; gap: 6px; }
+    .axis-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    @media (max-width: 900px) { .scatter-controls { grid-template-columns: 1fr; } .axis-row { grid-template-columns: 1fr; } }
+
+    /* ══════════════════════════════════════════════
+       NETWORK TAB
+    ══════════════════════════════════════════════ */
+    .network-inner {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .network-controls {
+      flex: 0 0 auto;
+      padding: 10px 20px;
+      background: var(--surface-1);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .network-canvas {
+      flex: 1;
+      min-height: 350px;
+      position: relative;
+      background: var(--surface-0);
+      overflow: hidden;
+    }
+
+    #networkSVG {
+      width: 100%;
+      height: 100%;
+      min-height: 350px;
+      display: block;
+    }
+
+    .network-legend {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      background: rgba(12,22,36,0.88);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 4px;
+    }
+
+    .legend-item:last-child { margin-bottom: 0; }
+
+    .legend-line {
+      width: 24px;
+      height: 3px;
+      border-radius: 2px;
+    }
+
+    /* ══════════════════════════════════════════════
+       EXPLORE TAB
+    ══════════════════════════════════════════════ */
+    .explore-notice {
+      margin-bottom: 12px;
+      padding: 9px 14px;
+      background: rgba(79,195,247,.1);
+      border-left: 3px solid #4fc3f7;
+      font-size: 13px;
+      border-radius: 4px;
+      color: var(--text-secondary);
+    }
+
+    .explore-notice strong { color: #4fc3f7; }
+
+    .explore-table-wrap {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: auto;
+    }
+
+    .explore-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .explore-table thead th {
+      background: linear-gradient(135deg, #1e3a5f, #2a5080);
+      color: #fff;
+      padding: 10px 12px;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      font-weight: 700;
+      font-size: 13px;
+      border-bottom: 2px solid rgba(255,165,120,0.4);
+      border-right: 1px solid rgba(255,255,255,0.1);
+      white-space: nowrap;
+      text-align: center;
+    }
+
+    .explore-table thead th:first-child { text-align: left; min-width: 120px; }
+
+    .explore-table tbody tr:nth-child(even) { background: rgba(36,41,56,0.4); }
+    .explore-table tbody tr:hover { background: rgba(255,165,120,0.07); }
+
+    .explore-table tbody td {
+      padding: 9px 12px;
+      border-bottom: 1px solid rgba(255,255,255,.07);
+      border-right: 1px solid rgba(255,255,255,.05);
+      font-size: 13px;
+      text-align: center;
+      color: var(--text-secondary);
+    }
+
+    .explore-table tbody td:first-child {
+      text-align: left;
+      font-weight: 700;
+      color: var(--accent-2);
+    }
+
+    .explore-table tbody td.missing-warn { color: #fbbf24; font-weight: 600; }
+
+    /* ══════════════════════════════════════════════
+       COMING SOON (Partial / Reliability)
+    ══════════════════════════════════════════════ */
+    .coming-soon-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 400px;
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    .coming-soon-container i { color: var(--accent-2); margin-bottom: 18px; }
+    .coming-soon-container h2 { color: var(--accent-1); margin-bottom: 10px; font-size: 1.5rem; }
+    .coming-soon-container > p { color: var(--text-secondary); margin-bottom: 18px; font-size: 14px; }
+
+    .coming-soon-detail {
+      background: var(--surface-2);
+      padding: 18px 24px;
+      border-radius: 8px;
+      max-width: 560px;
+    }
+
+    .coming-soon-detail p { color: var(--text-muted); font-size: 13px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+
+<!-- Shared Header Mount Point -->
+<div id="header-container"></div>
+
+<!-- ══════════════════════════════════════════════
+     SCATTER MODAL (fixed, outside tab system)
+══════════════════════════════════════════════ -->
+<div id="scatterModal" class="scatter-modal" role="dialog" aria-hidden="true">
+  <div class="scatter-modal-content">
+    <div class="scatter-modal-header">
+      <span id="scatterTitle">Scatter Plot</span>
+      <span class="scatter-close" onclick="closeScatterModal()">&times;</span>
+    </div>
+    <div class="scatter-modal-body">
+      <div class="scatter-stats">
+        <div class="scatter-stat"><div class="scatter-stat-value" id="scatterN">--</div><div class="scatter-stat-label">Observations</div></div>
+        <div class="scatter-stat"><div class="scatter-stat-value" id="scatterR">--</div><div class="scatter-stat-label">Correlation (R)</div></div>
+        <div class="scatter-stat"><div class="scatter-stat-value" id="scatterP">--</div><div class="scatter-stat-label">p-value</div></div>
+        <div class="scatter-stat"><div class="scatter-stat-value" id="scatterR2">--</div><div class="scatter-stat-label">R²</div></div>
+      </div>
+      <div id="scatterChart" class="scatter-chart"></div>
+      <div class="scatter-controls">
+        <div class="scatter-panel">
+          <div class="scatter-panel-title"><i class="fas fa-sliders-h"></i>Axis Controls</div>
+          <div class="axis-grid">
+            <div class="axis-row">
+              <div class="scatter-slider">
+                <div class="scatter-slider-header"><span>X Min</span><span id="xMinVal">--</span></div>
+                <input type="range" id="xMinRange" oninput="updateAxisRange('x','min', this.value)">
+              </div>
+              <div class="scatter-slider">
+                <div class="scatter-slider-header"><span>X Max</span><span id="xMaxVal">--</span></div>
+                <input type="range" id="xMaxRange" oninput="updateAxisRange('x','max', this.value)">
+              </div>
+            </div>
+            <div class="axis-row">
+              <div class="scatter-slider">
+                <div class="scatter-slider-header"><span>Y Min</span><span id="yMinVal">--</span></div>
+                <input type="range" id="yMinRange" oninput="updateAxisRange('y','min', this.value)">
+              </div>
+              <div class="scatter-slider">
+                <div class="scatter-slider-header"><span>Y Max</span><span id="yMaxVal">--</span></div>
+                <input type="range" id="yMaxRange" oninput="updateAxisRange('y','max', this.value)">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="scatter-panel">
+          <div class="scatter-panel-title"><i class="fas fa-wave-square"></i>Curve Fitting</div>
+          <div class="scatter-buttons">
+            <button class="scatter-btn active" id="fit-none" onclick="applyFit('none')">None</button>
+            <button class="scatter-btn" id="fit-linear" onclick="applyFit('linear')">Linear</button>
+            <button class="scatter-btn" id="fit-polynomial" onclick="applyFit('polynomial')">Polynomial</button>
+            <button class="scatter-btn" id="fit-exponential" onclick="applyFit('exponential')">Exponential</button>
+            <button class="scatter-btn" id="fit-logarithmic" onclick="applyFit('logarithmic')">Logarithmic</button>
+            <button class="scatter-btn" id="fit-power" onclick="applyFit('power')">Power</button>
+          </div>
+          <div class="fit-equation" id="fitEquation">Equation: —</div>
+        </div>
+        <div class="scatter-panel">
+          <div class="scatter-panel-title"><i class="fas fa-exchange-alt"></i>Axis Transformations</div>
+          <div class="scatter-axis-toggle">
+            <button class="scatter-btn active" id="transform-x-tab" onclick="setTransformAxis('x')">X-Axis</button>
+            <button class="scatter-btn" id="transform-y-tab" onclick="setTransformAxis('y')">Y-Axis</button>
+          </div>
+          <div class="scatter-buttons">
+            <button class="scatter-btn active" id="transform-none" onclick="applyTransformation('none')">None</button>
+            <button class="scatter-btn" id="transform-ln" onclick="applyTransformation('ln')">ln</button>
+            <button class="scatter-btn" id="transform-inverse" onclick="applyTransformation('inverse')">1/x</button>
+            <button class="scatter-btn" id="transform-sqrt" onclick="applyTransformation('sqrt')">√</button>
+            <button class="scatter-btn" id="transform-square" onclick="applyTransformation('square')">x²</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MAIN CONTAINER
+══════════════════════════════════════════════ -->
+<div class="container" id="mainContainer">
+
+  <!-- Loading state -->
+  <div id="loadingMessage">
+    <i class="fa-solid fa-spinner"></i>
+    <p>Loading correlation data...</p>
+  </div>
+
+  <!-- Main content — shown after data arrives -->
+  <div id="mainContent" style="display:none;">
+
+    <!-- Content panels -->
+    <div class="tab-panels-wrap">
+
+      <!-- ── Matrix Content ── -->
+      <div id="tab-matrix" class="tab-panel active" style="display:block;">
+        <div class="tab-inner">
+          <div class="controls">
+            <div class="control-group">
+              <label>Correlation Type:</label>
+              <div class="radio-bar">
+                <label><input type="radio" name="corrType" value="Pearson" checked onchange="recalculate()"><span>Pearson</span></label>
+                <label><input type="radio" name="corrType" value="Spearman" onchange="recalculate()"><span>Spearman</span></label>
+                <label><input type="radio" name="corrType" value="Kendall" onchange="recalculate()"><span>Kendall</span></label>
+                <label><input type="radio" name="corrType" value="Biweight" onchange="recalculate()"><span>Biweight</span></label>
+              </div>
+            </div>
+            <div class="control-group">
+              <label>View:</label>
+              <div class="view-toggle">
+                <button type="button" id="viewTableBtn" class="active" onclick="setMatrixView('table')">Table</button>
+                <button type="button" id="viewHeatmapBtn" onclick="setMatrixView('heatmap')">Heatmap</button>
+              </div>
+            </div>
+            <div class="control-group slider-container">
+              <span class="slider-label">Highlight r ≥</span>
+              <input type="range" id="thresholdSlider" min="0" max="1" step="0.05" value="0" oninput="updateThreshold(this.value)">
+              <span class="slider-value" id="thresholdValue">0.00</span>
+            </div>
+            <div class="control-group">
+              <label class="checkbox-label"><input type="checkbox" id="showPValue" checked onchange="toggleDisplay()"><span>p-value</span></label>
+              <label class="checkbox-label"><input type="checkbox" id="showN" checked onchange="toggleDisplay()"><span>N</span></label>
+            </div>
+          </div>
+
+          <!-- Table View -->
+          <div id="resultsContainer" style="display:none;">
+            <div class="scroll-hint">
+              <i class="fa-solid fa-arrows-left-right"></i>
+              Click any cell to view scatter plot &nbsp;|&nbsp; Scroll horizontally for all variables
+            </div>
+            <div class="table-container" id="tableContainerTop" style="height:12px;">
+              <div id="tableScrollTop" style="height:1px;"></div>
+            </div>
+            <div class="table-container" id="tableContainer">
+              <table id="correlationTable">
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Heatmap View -->
+          <div id="heatmapContainer" style="display:none;">
+            <div class="heatmap-container">
+              <table id="heatmapTable" class="heatmap-table">
+                <thead id="heatmapHead"></thead>
+                <tbody id="heatmapBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div><!-- /tab-matrix -->
+
+      <!-- ── Network Tab ── -->
+      <div id="tab-network" class="tab-panel">
+        <div class="network-inner">
+          <div class="network-controls">
+            <div class="control-group slider-container">
+              <span class="slider-label">Show edges |r| ≥</span>
+              <input type="range" id="networkThresholdSlider" min="0" max="1" step="0.05" value="0.3" oninput="updateNetworkThreshold(this.value)">
+              <span class="slider-value" id="networkThresholdValue">0.30</span>
+            </div>
+            <div class="control-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="showNetCorrValues" checked onchange="toggleNetworkCorrValues()">
+                <span>Show r values</span>
+              </label>
+            </div>
+            <div class="control-group" style="margin-left:auto;">
+              <span style="font-size:12px;color:var(--text-muted);">Drag nodes to rearrange &nbsp;|&nbsp; Scroll to zoom</span>
+            </div>
+          </div>
+          <div class="network-canvas" id="networkCanvas">
+            <svg id="networkSVG"></svg>
+          </div>
+          <div class="network-legend">
+            <div class="legend-item"><div class="legend-line" style="background:rgba(120,200,255,0.8);"></div><span>Positive r</span></div>
+            <div class="legend-item"><div class="legend-line" style="background:rgba(255,165,120,0.8);"></div><span>Negative r</span></div>
+            <div class="legend-item" style="margin-top:4px;color:var(--text-muted);font-size:10px;"><span>Line width ∝ |r|</span></div>
+          </div>
+        </div>
+      </div><!-- /tab-network -->
+
+      <!-- ── Explore Tab ── -->
+      <div id="tab-explore" class="tab-panel">
+        <div class="tab-inner">
+          <div id="exploreContent">
+            <p style="color:var(--text-muted);padding:40px;text-align:center;">
+              Loading descriptive statistics…
+            </p>
+          </div>
+        </div>
+      </div><!-- /tab-explore -->
+
+      <!-- ── Partial Tab (Coming Soon) ── -->
+      <div id="tab-partial" class="tab-panel">
+        <div class="coming-soon-container">
+          <i class="fas fa-code-branch fa-3x"></i>
+          <h2>Partial Correlations</h2>
+          <p>Control for confounding variables to reveal true relationships.</p>
+          <div class="coming-soon-detail">
+            <p>Calculate partial and semi-partial correlations to understand the unique contribution
+               of each variable while controlling for others. Helps separate direct effects from
+               shared variance.</p>
+          </div>
+        </div>
+      </div><!-- /tab-partial -->
+
+      <!-- ── Reliability Tab (Coming Soon) ── -->
+      <div id="tab-reliability" class="tab-panel">
+        <div class="coming-soon-container">
+          <i class="fas fa-check-double fa-3x"></i>
+          <h2>Reliability Analysis</h2>
+          <p>Assess internal consistency and reliability of your measures.</p>
+          <div class="coming-soon-detail">
+            <p>Calculate Cronbach's α, McDonald's ω, split-half reliability, and item-total correlations
+               for scale validation. Essential for psychometric and survey research.</p>
+          </div>
+        </div>
+      </div><!-- /tab-reliability -->
+
+    </div><!-- /tab-panels-wrap -->
+  </div><!-- /#mainContent -->
+
+</div><!-- /#mainContainer -->
+
+<script>
+  /* ════════════════════════════════════════════
+     STATE
+  ════════════════════════════════════════════ */
+  let correlationData  = null;
+  let currentType      = 'Pearson';
+  let currentView      = 'table';
+  let currentMatrix    = null;
+  let currentHeaders   = null;
+  let scatterPointsCache = new Map();
+
+  let scatterState = {
+    rawPoints: [], xVar: '', yVar: '',
+    xTransform: 'none', yTransform: 'none',
+    fitType: 'none', activeTransformAxis: 'x',
+    chart: null,
+    xRange: null, yRange: null,
+    xRangeFull: null, yRangeFull: null
+  };
+
+  // Network state
+  let networkSimulation  = null;
+  let networkThreshold   = 0.3;
+  let showNetCorrValues  = true;
+  window.networkRendered = false;
+
+  /* ════════════════════════════════════════════
+     INITIALIZATION
+  ════════════════════════════════════════════ */
+  const isInIframe = window.self !== window.top;
+
+  if (isInIframe) {
+    // Running embedded — listen for postMessage
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.type === 'CORRELATION_DATA') {
+        correlationData = event.data.payload;
+        // Persist so other correlation views can read it via sessionStorage
+        try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch(e) {}
+        renderMatrix();
+      } else if (event.data && event.data.type === 'THEME_CHANGE') {
+        applyTheme(event.data.theme);
+      }
+    });
+
+    // Fallback: sessionStorage
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(function() {
+        if (!correlationData) {
+          const stored = sessionStorage.getItem('correlationData');
+          if (stored) {
+            try { correlationData = JSON.parse(stored); renderMatrix(); } catch(e) {}
+          }
+        }
+      }, 1000);
+    });
+
+    function applyTheme(theme) {
+      if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+      else document.documentElement.removeAttribute('data-theme');
+    }
+
+  } else {
+    // Standalone Office dialog
+    Office.onReady(function() {
+      if (!isInIframe && typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.init('correlation-matrix', 'Correlation Analysis', 0, 'correlations');
+        injectNavActions();
+      }
+
+      // Check sessionStorage pre-load (e.g. after same-window tab navigation)
+      const stored = sessionStorage.getItem('correlationData');
+      if (stored) {
+        try {
+          correlationData = JSON.parse(stored);
+          // Do NOT remove — keep in sessionStorage for further tab navigations
+          renderMatrix();
+        } catch(e) {}
+      }
+
+      Office.context.ui.addHandlerAsync(
+        Office.EventType.DialogParentMessageReceived,
+        function(arg) {
+          try {
+            const msg = JSON.parse(arg.message);
+            if (msg.type === 'CORRELATION_DATA' && msg.payload) {
+              correlationData = msg.payload;
+              // Persist for same-window navigation to other correlation views
+              try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch(e) {}
+              renderMatrix();
+            }
+          } catch(e) { console.error('Error parsing message:', e); }
+        }
+      );
+
+      Office.context.ui.messageParent(JSON.stringify({ action: 'ready' }));
+    });
+  }
+
+  /* ════════════════════════════════════════════
+     TAB SWITCHING
+  ════════════════════════════════════════════ */
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    document.querySelectorAll('.tab-panel').forEach(panel => {
+      panel.classList.remove('active');
+    });
+    const panel = document.getElementById('tab-' + tab);
+    if (panel) panel.classList.add('active');
+
+    // Lazy-init network on first visit
+    if (tab === 'network' && !window.networkRendered && correlationData) {
+      setTimeout(renderNetwork, 100);
+    }
+
+    // Reflow scatter chart if matrix tab re-activated
+    if (tab === 'matrix' && scatterState.chart) {
+      setTimeout(() => { if (scatterState.chart) scatterState.chart.reflow(); }, 50);
+    }
+  }
+
+  /* ════════════════════════════════════════════
+     RENDER MATRIX (entry point after data arrives)
+  ════════════════════════════════════════════ */
+  function renderMatrix() {
+    if (!correlationData || !correlationData.headers || correlationData.headers.length === 0) {
+      document.getElementById('loadingMessage').innerHTML =
+        '<i class="fa-solid fa-exclamation-triangle" style="font-size:48px;color:#fbbf24;"></i>' +
+        '<p>No correlation data available.</p>';
+      return;
+    }
+
+    // Update shared header
+    if (!isInIframe && typeof StatisticoHeader !== 'undefined') {
+      StatisticoHeader.sampleSize = correlationData.data ? correlationData.data.length : 0;
+      StatisticoHeader.variableName = correlationData.headers.length + ' Variables';
+      StatisticoHeader.render();
+      injectNavActions();
+    }
+
+    // Transition: hide loading, show main content
+    document.getElementById('loadingMessage').style.display = 'none';
+    const mc = document.getElementById('mainContent');
+    mc.style.display   = 'flex';
+    mc.style.flex      = '1';
+    mc.style.minHeight = '0';
+    mc.style.flexDirection = 'column';
+
+    // Build all tabs
+    buildCorrelationMatrix();
+    setMatrixView(currentView);
+    buildExploreTab();
+  }
+
+  /* ════════════════════════════════════════════
+     MATRIX TAB — build table + heatmap
+  ════════════════════════════════════════════ */
+  function buildCorrelationMatrix() {
+    const { headers, data } = correlationData;
+    const matrix = calculateCorrelationMatrix(data, headers, currentType);
+    currentMatrix  = matrix;
+    currentHeaders = headers;
+
+    const thead = document.getElementById('tableHead');
+    const tbody  = document.getElementById('tableBody');
+    thead.innerHTML = '';
+    tbody.innerHTML  = '';
+
+    // Header row
+    const hr = document.createElement('tr');
+    const corner = document.createElement('th'); corner.textContent = 'Variable'; hr.appendChild(corner);
+    headers.forEach(col => { const th = document.createElement('th'); th.textContent = col; hr.appendChild(th); });
+    thead.appendChild(hr);
+
+    // Data rows
+    headers.forEach((rowCol, i) => {
+      const row = document.createElement('tr');
+      const rowTh = document.createElement('td'); rowTh.textContent = rowCol; row.appendChild(rowTh);
+
+      headers.forEach((colCol, j) => {
+        const td = document.createElement('td');
+        const corrData = matrix[i][j];
+        const isDiag = (i === j);
+        if (isDiag) td.classList.add('diagonal-cell');
+
+        const corrValue = document.createElement('div');
+        corrValue.className = 'corr-value';
+        corrValue.textContent = corrData.r.toFixed(3);
+        corrValue.setAttribute('data-corr', corrData.r);
+        if (!isDiag) corrValue.addEventListener('click', () => openScatterModal(rowCol, colCol, corrData.r));
+        td.appendChild(corrValue);
+
+        if (!isDiag && corrData.p !== null) {
+          const pv = document.createElement('div'); pv.className = 'p-value';
+          pv.textContent = 'p = ' + corrData.p.toFixed(4); td.appendChild(pv);
+        }
+        if (!isDiag) {
+          const nv = document.createElement('div'); nv.className = 'n-value';
+          nv.textContent = 'N = ' + corrData.n; td.appendChild(nv);
+        }
+        row.appendChild(td);
+      });
+      tbody.appendChild(row);
+    });
+
+    buildHeatmapMatrix(headers, matrix);
+    syncTopScroll();
+    toggleDisplay();
+    applyThresholdFilter();
+
+    // Show results container
+    document.getElementById('resultsContainer').style.display = 'block';
+  }
+
+  function syncTopScroll() {
+    const tc  = document.getElementById('tableContainer');
+    const top = document.getElementById('tableContainerTop');
+    const ts  = document.getElementById('tableScrollTop');
+    if (!tc || !top || !ts) return;
+    ts.style.width = tc.scrollWidth + 'px';
+    top.scrollLeft = tc.scrollLeft;
+    if (!tc._syncAttached) {
+      tc.addEventListener('scroll',  () => { top.scrollLeft = tc.scrollLeft; });
+      top.addEventListener('scroll', () => { tc.scrollLeft  = top.scrollLeft; });
+      window.addEventListener('resize', () => { ts.style.width = tc.scrollWidth + 'px'; });
+      tc._syncAttached = true;
+    }
+  }
+
+  function setMatrixView(view) {
+    currentView = view;
+    const results = document.getElementById('resultsContainer');
+    const heatmap = document.getElementById('heatmapContainer');
+    const tBtn    = document.getElementById('viewTableBtn');
+    const hBtn    = document.getElementById('viewHeatmapBtn');
+
+    if (view === 'heatmap') {
+      results.style.display = 'none';
+      heatmap.style.display = 'block';
+    } else {
+      results.style.display = 'block';
+      heatmap.style.display = 'none';
+    }
+
+    tBtn.classList.toggle('active', view === 'table');
+    hBtn.classList.toggle('active', view === 'heatmap');
+
+    if (currentHeaders && currentMatrix && view === 'heatmap') {
+      buildHeatmapMatrix(currentHeaders, currentMatrix);
+      applyThresholdFilter();
+    }
+  }
+
+  function buildHeatmapMatrix(headers, matrix) {
+    const head = document.getElementById('heatmapHead');
+    const body = document.getElementById('heatmapBody');
+    if (!head || !body) return;
+    head.innerHTML = ''; body.innerHTML = '';
+
+    const hr = document.createElement('tr');
+    const corner = document.createElement('th'); corner.textContent = 'Variable'; hr.appendChild(corner);
+    headers.forEach(col => { const th = document.createElement('th'); th.textContent = col; hr.appendChild(th); });
+    head.appendChild(hr);
+
+    headers.forEach((rowCol, i) => {
+      const row = document.createElement('tr');
+      const rowTh = document.createElement('td'); rowTh.textContent = rowCol; row.appendChild(rowTh);
+      headers.forEach((colCol, j) => {
+        const td = document.createElement('td');
+        const val = matrix[i][j].r;
+        td.classList.add('heatmap-cell');
+        if (i === j) td.classList.add('diagonal-cell');
+        td.setAttribute('data-corr', val);
+        td.textContent = val.toFixed(2);
+        td.style.background = getHeatmapColor(val);
+        td.style.color       = getHeatmapTextColor(val);
+        row.appendChild(td);
+      });
+      body.appendChild(row);
+    });
+  }
+
+  function getHeatmapColor(v) {
+    v = Math.max(-1, Math.min(1, v));
+    const intensity = Math.abs(v);
+    const lightness = 20 + (1 - intensity) * 55;
+    return v >= 0 ? `hsl(24,85%,${lightness}%)` : `hsl(200,75%,${lightness}%)`;
+  }
+
+  function getHeatmapTextColor(v) { return Math.abs(v) > 0.45 ? '#0c1624' : '#e7edf8'; }
+
+  function recalculate() {
+    const sel = document.querySelector('input[name="corrType"]:checked');
+    currentType = sel ? sel.value : 'Pearson';
+    buildCorrelationMatrix();
+    // Re-render network with new type if it was shown
+    if (window.networkRendered && correlationData) {
+      const matrix = calculateCorrelationMatrix(correlationData.data, correlationData.headers, currentType);
+      drawNetwork(correlationData.headers, matrix);
+    }
+  }
+
+  function toggleDisplay() {
+    const showP = document.getElementById('showPValue').checked;
+    const showN = document.getElementById('showN').checked;
+    document.querySelectorAll('.p-value').forEach(el => el.style.display = showP ? 'block' : 'none');
+    document.querySelectorAll('.n-value').forEach(el => el.style.display = showN ? 'block' : 'none');
+  }
+
+  function updateThreshold(value) {
+    document.getElementById('thresholdValue').textContent = parseFloat(value).toFixed(2);
+    applyThresholdFilter();
+  }
+
+  function applyThresholdFilter() {
+    const threshold = parseFloat(document.getElementById('thresholdSlider').value);
+    document.querySelectorAll('tbody td').forEach(cell => {
+      const cvEl = cell.querySelector('.corr-value');
+      if (cvEl) {
+        const cv = parseFloat(cvEl.getAttribute('data-corr'));
+        const isDiag = cell.classList.contains('diagonal-cell');
+        const isPerfect = Math.abs(Math.abs(cv) - 1.0) < 0.001;
+        cell.classList.toggle('threshold-highlight',
+          Math.abs(cv) >= threshold && !isDiag && !isPerfect && threshold > 0);
+      }
+    });
+    document.querySelectorAll('.heatmap-cell').forEach(cell => {
+      const cv = parseFloat(cell.getAttribute('data-corr'));
+      const isDiag = cell.classList.contains('diagonal-cell');
+      const isPerfect = Math.abs(Math.abs(cv) - 1.0) < 0.001;
+      cell.classList.toggle('threshold-highlight',
+        Math.abs(cv) >= threshold && !isDiag && !isPerfect && threshold > 0);
+    });
+  }
+
+  /* ════════════════════════════════════════════
+     NETWORK TAB
+  ════════════════════════════════════════════ */
+  function renderNetwork() {
+    if (!correlationData) return;
+    window.networkRendered = true;
+    const matrix = calculateCorrelationMatrix(correlationData.data, correlationData.headers, currentType);
+    drawNetwork(correlationData.headers, matrix);
+  }
+
+  function drawNetwork(varNames, matrix) {
+    if (typeof d3 === 'undefined') {
+      document.getElementById('networkCanvas').innerHTML =
+        '<p style="color:var(--text-muted);padding:40px;text-align:center;">D3.js not loaded — network unavailable.</p>';
+      return;
+    }
+
+    const container = document.getElementById('networkCanvas');
+    const W = container.clientWidth  || 600;
+    const H = Math.max(container.clientHeight || 450, 380);
+
+    d3.select('#networkSVG').selectAll('*').remove();
+
+    const svg = d3.select('#networkSVG').attr('width', W).attr('height', H);
+
+    // Build nodes and links
+    const nodes = varNames.map(name => ({ id: name }));
+    const links = [];
+    for (let i = 0; i < varNames.length; i++) {
+      for (let j = i + 1; j < varNames.length; j++) {
+        const r = matrix[i][j].r;
+        if (r !== null && Math.abs(r) >= networkThreshold) {
+          links.push({ source: varNames[i], target: varNames[j], value: r });
+        }
+      }
+    }
+
+    if (networkSimulation) networkSimulation.stop();
+
+    networkSimulation = d3.forceSimulation(nodes)
+      .force('link',      d3.forceLink(links).id(d => d.id).distance(d => 160 * (1 - Math.abs(d.value))))
+      .force('charge',    d3.forceManyBody().strength(-400))
+      .force('center',    d3.forceCenter(W / 2, H / 2))
+      .force('collision', d3.forceCollide().radius(38));
+
+    const g = svg.append('g');
+
+    // Zoom
+    svg.call(d3.zoom().scaleExtent([0.25, 4]).on('zoom', e => g.attr('transform', e.transform)));
+
+    // Links
+    const link = g.append('g').selectAll('line').data(links).enter().append('line')
+      .attr('stroke', d => d.value >= 0 ? 'rgba(120,200,255,0.75)' : 'rgba(255,165,120,0.75)')
+      .attr('stroke-width', d => Math.max(1, Math.abs(d.value) * 6))
+      .attr('stroke-opacity', 0.75);
+
+    // Link labels
+    const linkLabels = g.append('g').selectAll('text').data(links).enter().append('text')
+      .attr('font-size', 10)
+      .attr('fill', 'rgba(255,255,255,0.72)')
+      .attr('text-anchor', 'middle')
+      .attr('pointer-events', 'none')
+      .text(d => d.value.toFixed(2))
+      .style('display', showNetCorrValues ? null : 'none');
+
+    // Node circles
+    const node = g.append('g').selectAll('circle').data(nodes).enter().append('circle')
+      .attr('r', 22)
+      .attr('fill', 'rgba(255,165,120,0.85)')
+      .attr('stroke', 'rgba(255,165,120,0.35)')
+      .attr('stroke-width', 2.5)
+      .style('cursor', 'pointer')
+      .call(d3.drag()
+        .on('start', (e, d) => { if (!e.active) networkSimulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+        .on('drag',  (e, d) => { d.fx = e.x; d.fy = e.y; })
+        .on('end',   (e, d) => { if (!e.active) networkSimulation.alphaTarget(0); d.fx = null; d.fy = null; })
+      );
+
+    // Node labels
+    const nodeLabels = g.append('g').selectAll('text').data(nodes).enter().append('text')
+      .attr('font-size', 11)
+      .attr('font-weight', 700)
+      .attr('fill', '#fff')
+      .attr('text-anchor', 'middle')
+      .attr('pointer-events', 'none')
+      .text(d => d.id.length > 9 ? d.id.substring(0, 8) + '…' : d.id)
+      .attr('dy', 36);
+
+    networkSimulation.on('tick', () => {
+      link
+        .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+      linkLabels
+        .attr('x', d => (d.source.x + d.target.x) / 2)
+        .attr('y', d => (d.source.y + d.target.y) / 2);
+      node
+        .attr('cx', d => d.x)
+        .attr('cy', d => d.y);
+      nodeLabels
+        .attr('x', d => d.x)
+        .attr('y', d => d.y);
+    });
+
+    window.networkElements = { link, linkLabels };
+  }
+
+  function updateNetworkThreshold(value) {
+    networkThreshold = parseFloat(value);
+    document.getElementById('networkThresholdValue').textContent = parseFloat(value).toFixed(2);
+    if (correlationData && window.networkRendered) {
+      const matrix = calculateCorrelationMatrix(correlationData.data, correlationData.headers, currentType);
+      drawNetwork(correlationData.headers, matrix);
+    }
+  }
+
+  function toggleNetworkCorrValues() {
+    showNetCorrValues = document.getElementById('showNetCorrValues').checked;
+    if (window.networkElements) {
+      window.networkElements.linkLabels.style('display', showNetCorrValues ? null : 'none');
+    }
+  }
+
+  /* ════════════════════════════════════════════
+     EXPLORE TAB — descriptive statistics
+  ════════════════════════════════════════════ */
+  function buildExploreTab() {
+    if (!correlationData || !correlationData.headers || !correlationData.data) return;
+
+    const headers = correlationData.headers;
+    const data    = correlationData.data;
+    const total   = data.length;
+
+    const stats = headers.map(varName => {
+      const values = data
+        .map(row => row[varName])
+        .filter(v => typeof v === 'number' && isFinite(v));
+
+      const n       = values.length;
+      const missing = total - n;
+
+      if (n === 0) return { name: varName, n: 0, missing, mean: null, sd: null, min: null, max: null, median: null, skew: null };
+
+      const sum    = values.reduce((a, b) => a + b, 0);
+      const mean   = sum / n;
+      const sorted = values.slice().sort((a, b) => a - b);
+      const min    = sorted[0];
+      const max    = sorted[n - 1];
+      const median = n % 2 === 0 ? (sorted[n/2 - 1] + sorted[n/2]) / 2 : sorted[Math.floor(n/2)];
+
+      const variance = n > 1 ? values.reduce((acc, v) => acc + (v - mean) ** 2, 0) / (n - 1) : 0;
+      const sd       = Math.sqrt(variance);
+
+      let skew = null;
+      if (n >= 3 && sd > 0) {
+        const cubeSum = values.reduce((acc, v) => acc + ((v - mean) / sd) ** 3, 0);
+        skew = (n / ((n - 1) * (n - 2))) * cubeSum;
+      }
+
+      return { name: varName, n, missing, mean, sd, min, max, median, skew };
+    });
+
+    const hasMissing = stats.some(s => s.missing > 0);
+    const fmt = (v, d = 3) => (v == null || !isFinite(v)) ? '—' : Number(v).toFixed(d);
+
+    let html = `
+      <div class="explore-notice">
+        <strong><i class="fa-solid fa-circle-info"></i> Per-Variable Statistics</strong> —
+        N shown is the count of valid (non-missing) observations for each variable individually
+        (listwise deletion is used when computing the correlation matrix).
+        ${hasMissing ? '<br><span style="color:#fbbf24;"><i class="fa-solid fa-triangle-exclamation"></i> Missing values detected — see "Missing" column below.</span>' : ''}
+      </div>
+      <div class="explore-table-wrap">
+        <table class="explore-table">
+          <thead>
+            <tr>
+              <th>Variable</th>
+              <th>N</th>
+              <th>Missing</th>
+              <th>Mean</th>
+              <th>Std Dev</th>
+              <th>Median</th>
+              <th>Min</th>
+              <th>Max</th>
+              <th>Skewness</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${stats.map(s => `
+              <tr>
+                <td>${escapeHTML(s.name)}</td>
+                <td>${s.n}</td>
+                <td class="${s.missing > 0 ? 'missing-warn' : ''}">${s.missing > 0 ? '⚠ ' + s.missing : s.missing}</td>
+                <td>${fmt(s.mean)}</td>
+                <td>${fmt(s.sd)}</td>
+                <td>${fmt(s.median)}</td>
+                <td>${fmt(s.min)}</td>
+                <td>${fmt(s.max)}</td>
+                <td>${fmt(s.skew)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>`;
+
+    document.getElementById('exploreContent').innerHTML = html;
+  }
+
+  /* ════════════════════════════════════════════
+     SCATTER MODAL
+  ════════════════════════════════════════════ */
+  function openScatterModal(rowVar, colVar, rValue) {
+    if (!correlationData || !correlationData.data) return;
+
+    const modal    = document.getElementById('scatterModal');
+    const titleEl  = document.getElementById('scatterTitle');
+    const cacheKey = rowVar + '__' + colVar;
+
+    let points = scatterPointsCache.get(cacheKey);
+    if (!points) {
+      points = correlationData.data
+        .map(row => [row[rowVar], row[colVar]])
+        .filter(([x, y]) => typeof x === 'number' && typeof y === 'number' && isFinite(x) && isFinite(y));
+      scatterPointsCache.set(cacheKey, points);
+    }
+
+    titleEl.textContent = 'Scatter Plot: ' + rowVar + ' vs ' + colVar;
+
+    scatterState.rawPoints = points;
+    scatterState.xVar      = rowVar;
+    scatterState.yVar      = colVar;
+    scatterState.xTransform = 'none';
+    scatterState.yTransform = 'none';
+    scatterState.fitType    = 'none';
+    scatterState.activeTransformAxis = 'x';
+    scatterState.chart = null;
+    scatterState.xRange = null;
+    scatterState.yRange = null;
+
+    resetScatterControls();
+    refreshScatter();
+
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeScatterModal() {
+    const modal = document.getElementById('scatterModal');
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  function resetScatterControls() {
+    document.getElementById('fit-none').classList.add('active');
+    ['fit-linear','fit-polynomial','fit-exponential','fit-logarithmic','fit-power'].forEach(id => document.getElementById(id).classList.remove('active'));
+    setTransformAxis('x');
+    ['transform-none','transform-ln','transform-inverse','transform-sqrt','transform-square'].forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById('transform-none').classList.add('active');
+  }
+
+  function transformValue(value, type) {
+    if (!isFinite(value)) return null;
+    switch (type) {
+      case 'ln':      return value > 0 ? Math.log(value) : null;
+      case 'inverse': return value !== 0 ? 1 / value : null;
+      case 'sqrt':    return value >= 0 ? Math.sqrt(value) : null;
+      case 'square':  return value * value;
+      default:        return value;
+    }
+  }
+
+  function getTransformedPoints() {
+    return scatterState.rawPoints
+      .map(([x, y]) => [transformValue(x, scatterState.xTransform), transformValue(y, scatterState.yTransform)])
+      .filter(([x, y]) => x !== null && y !== null && isFinite(x) && isFinite(y));
+  }
+
+  function getVisiblePoints() {
+    const pts = getTransformedPoints();
+    if (!scatterState.xRange || !scatterState.yRange) return pts;
+    const xMin = Math.min(scatterState.xRange.min, scatterState.xRange.max);
+    const xMax = Math.max(scatterState.xRange.min, scatterState.xRange.max);
+    const yMin = Math.min(scatterState.yRange.min, scatterState.yRange.max);
+    const yMax = Math.max(scatterState.yRange.min, scatterState.yRange.max);
+    return pts.filter(([x, y]) => x >= xMin && x <= xMax && y >= yMin && y <= yMax);
+  }
+
+  function refreshScatter() {
+    const pts = getTransformedPoints();
+    renderScatterChart(pts);
+    initAxisControls(pts);
+    const vis = getVisiblePoints();
+    updateScatterStats(vis);
+    applyFit(scatterState.fitType, vis);
+  }
+
+  function updateScatterStats(points) {
+    const n  = points.length;
+    const xs = points.map(p => p[0]);
+    const ys = points.map(p => p[1]);
+    const r  = calculatePearson(xs, ys);
+    const r2 = r * r;
+    const p  = calculatePValue(r, n);
+
+    setScatterStatValue('scatterN', n);
+    setScatterStatValue('scatterR',  isFinite(r)  ? r.toFixed(4)         : '--');
+    setScatterStatValue('scatterP',  isFinite(p)  ? p.toExponential(2)   : '--');
+    setScatterStatValue('scatterR2', isFinite(r2) ? r2.toFixed(4)        : '--');
+  }
+
+  function setScatterStatValue(id, value) {
+    const el = document.getElementById(id);
+    el.textContent = value;
+    el.classList.toggle('adjusted', isScatterAdjusted());
+  }
+
+  function isScatterAdjusted() {
+    return hasAxisOverrides() || scatterState.xTransform !== 'none' || scatterState.yTransform !== 'none' || scatterState.fitType !== 'none';
+  }
+
+  function hasAxisOverrides() {
+    if (!scatterState.xRange || !scatterState.yRange || !scatterState.xRangeFull || !scatterState.yRangeFull) return false;
+    const eps = 1e-9;
+    return Math.abs(scatterState.xRange.min - scatterState.xRangeFull.min) > eps ||
+           Math.abs(scatterState.xRange.max - scatterState.xRangeFull.max) > eps ||
+           Math.abs(scatterState.yRange.min - scatterState.yRangeFull.min) > eps ||
+           Math.abs(scatterState.yRange.max - scatterState.yRangeFull.max) > eps;
+  }
+
+  function calculatePearson(x, y) {
+    if (x.length < 2) return NaN;
+    const mX = x.reduce((a, b) => a + b, 0) / x.length;
+    const mY = y.reduce((a, b) => a + b, 0) / y.length;
+    let num = 0, denX = 0, denY = 0;
+    for (let i = 0; i < x.length; i++) { const dx = x[i]-mX, dy = y[i]-mY; num += dx*dy; denX += dx*dx; denY += dy*dy; }
+    return (denX === 0 || denY === 0) ? NaN : num / Math.sqrt(denX * denY);
+  }
+
+  function calculatePValue(r, n) {
+    if (!isFinite(r) || n < 3 || typeof jStat === 'undefined') return NaN;
+    const t = r * Math.sqrt((n-2) / (1 - r*r));
+    return 2 * (1 - jStat.studentt.cdf(Math.abs(t), n-2));
+  }
+
+  function renderScatterChart(points) {
+    const series = [{ type: 'scatter', name: 'Observations', data: points, color: 'rgba(255,165,120,0.75)', marker: { radius: 4 } }];
+
+    if (!scatterState.chart) {
+      scatterState.chart = Highcharts.chart('scatterChart', {
+        chart: { type: 'scatter', backgroundColor: 'transparent', zoomType: 'xy' },
+        title: { text: '' },
+        xAxis: { title: { text: scatterState.xVar }, gridLineColor: 'rgba(255,255,255,0.08)' },
+        yAxis: { title: { text: scatterState.yVar }, gridLineColor: 'rgba(255,255,255,0.08)' },
+        legend: { itemStyle: { color: '#fff' } },
+        credits: { enabled: false },
+        series
+      });
+    } else {
+      while (scatterState.chart.series.length) scatterState.chart.series[0].remove(false);
+      series.forEach(s => scatterState.chart.addSeries(s, false));
+      scatterState.chart.xAxis[0].setTitle({ text: scatterState.xVar });
+      scatterState.chart.yAxis[0].setTitle({ text: scatterState.yVar });
+      scatterState.chart.redraw();
+    }
+  }
+
+  function initAxisControls(points) {
+    if (!points.length) return;
+    const xs = points.map(p => p[0]), ys = points.map(p => p[1]);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    scatterState.xRange     = { min: minX, max: maxX };
+    scatterState.yRange     = { min: minY, max: maxY };
+    scatterState.xRangeFull = { min: minX, max: maxX };
+    scatterState.yRangeFull = { min: minY, max: maxY };
+    setupAxisRange('xMinRange', 'xMinVal', minX, maxX, minX);
+    setupAxisRange('xMaxRange', 'xMaxVal', minX, maxX, maxX);
+    setupAxisRange('yMinRange', 'yMinVal', minY, maxY, minY);
+    setupAxisRange('yMaxRange', 'yMaxVal', minY, maxY, maxY);
+    updateChartExtremes();
+  }
+
+  function setupAxisRange(id, labelId, min, max, value) {
+    const input = document.getElementById(id);
+    input.min = min; input.max = max; input.step = (max - min) / 100 || 1; input.value = value;
+    document.getElementById(labelId).textContent = Number(value).toFixed(2);
+  }
+
+  function updateAxisRange(axis, which, value) {
+    const val = parseFloat(value);
+    if (axis === 'x') { scatterState.xRange[which] = val; document.getElementById(which==='min' ? 'xMinVal' : 'xMaxVal').textContent = val.toFixed(2); }
+    else               { scatterState.yRange[which] = val; document.getElementById(which==='min' ? 'yMinVal' : 'yMaxVal').textContent = val.toFixed(2); }
+    const vis = getVisiblePoints();
+    updateScatterStats(vis);
+    applyFit(scatterState.fitType, vis);
+    updateScatterAdjustmentIndicator();
+    updateChartExtremes();
+  }
+
+  function updateChartExtremes() {
+    if (!scatterState.chart) return;
+    const { min: xMin, max: xMax } = scatterState.xRange;
+    const { min: yMin, max: yMax } = scatterState.yRange;
+    scatterState.chart.xAxis[0].setExtremes(Math.min(xMin, xMax), Math.max(xMin, xMax), false);
+    scatterState.chart.yAxis[0].setExtremes(Math.min(yMin, yMax), Math.max(yMin, yMax), false);
+    scatterState.chart.redraw();
+  }
+
+  function applyFit(type, pointsOverride = null) {
+    scatterState.fitType = type;
+    ['fit-none','fit-linear','fit-polynomial','fit-exponential','fit-logarithmic','fit-power'].forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById('fit-' + type).classList.add('active');
+    updateScatterAdjustmentIndicator();
+    if (!scatterState.chart) return;
+    const pts       = pointsOverride || getVisiblePoints();
+    const fitResult = buildFitSeries(pts, type);
+    const existing  = scatterState.chart.series.find(s => s.name === 'Fit');
+    if (existing) existing.remove(false);
+    if (fitResult && fitResult.series) scatterState.chart.addSeries(fitResult.series, false);
+    updateFitEquation(type, fitResult ? fitResult.equation : null);
+    scatterState.chart.redraw();
+  }
+
+  function buildFitSeries(points, type) {
+    if (type === 'none' || points.length < 2 || typeof regression === 'undefined') return null;
+    let model;
+    if (type === 'linear')      model = regression.linear(points);
+    if (type === 'polynomial')  model = regression.polynomial(points, { order: 2 });
+    if (type === 'exponential') model = regression.exponential(points);
+    if (type === 'logarithmic') model = regression.logarithmic(points);
+    if (type === 'power')       model = regression.power(points);
+    if (!model || !model.predict) return null;
+
+    const xs = points.map(p => p[0]);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const line = [];
+    for (let i = 0; i <= 50; i++) {
+      const x = minX + (maxX - minX) * (i / 50);
+      const y = model.predict(x)[1];
+      if (isFinite(y)) line.push([x, y]);
+    }
+    return { series: { name: 'Fit', type: 'line', data: line, color: 'rgba(120,200,255,0.9)', marker: { enabled: false }, lineWidth: 2 }, equation: model.string || null };
+  }
+
+  function updateFitEquation(type, equation) {
+    const el = document.getElementById('fitEquation');
+    if (!el) return;
+    el.textContent = (type === 'none' || !equation) ? 'Equation: —' : 'Equation: ' + equation;
+  }
+
+  function setTransformAxis(axis) {
+    scatterState.activeTransformAxis = axis;
+    document.getElementById('transform-x-tab').classList.toggle('active', axis === 'x');
+    document.getElementById('transform-y-tab').classList.toggle('active', axis === 'y');
+    updateTransformButtons();
+  }
+
+  function applyTransformation(type) {
+    if (scatterState.activeTransformAxis === 'x') scatterState.xTransform = type;
+    else scatterState.yTransform = type;
+    updateTransformButtons();
+    updateScatterAdjustmentIndicator();
+    refreshScatter();
+  }
+
+  function updateScatterAdjustmentIndicator() {
+    ['scatterN','scatterR','scatterP','scatterR2'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('adjusted', isScatterAdjusted());
+    });
+  }
+
+  function updateTransformButtons() {
+    const activeType = scatterState.activeTransformAxis === 'x' ? scatterState.xTransform : scatterState.yTransform;
+    ['transform-none','transform-ln','transform-inverse','transform-sqrt','transform-square'].forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById('transform-' + activeType).classList.add('active');
+  }
+
+  /* ════════════════════════════════════════════
+     CORRELATION CALCULATIONS
+  ════════════════════════════════════════════ */
+  function calculateCorrelationMatrix(data, headers, type) {
+    const n = headers.length;
+    const matrix = Array(n).fill(null).map(() => Array(n));
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        const col1 = data.map(row => row[headers[i]]);
+        const col2 = data.map(row => row[headers[j]]);
+        if (i === j) {
+          matrix[i][j] = { r: 1, p: 0, n: col1.filter(v => typeof v === 'number' && !isNaN(v)).length };
+        } else if (type === 'Spearman') {
+          matrix[i][j] = calculateSpearmanCorrelation(col1, col2);
+        } else if (type === 'Kendall') {
+          matrix[i][j] = calculateKendallCorrelation(col1, col2);
+        } else if (type === 'Biweight') {
+          matrix[i][j] = calculateBiweightMidcorrelation(col1, col2);
+        } else {
+          matrix[i][j] = calculatePearsonCorrelation(col1, col2);
+        }
+      }
+    }
+    return matrix;
+  }
+
+  function calculatePearsonCorrelation(x, y) {
+    const pairs = x.map((xi, i) => [xi, y[i]]).filter(([xi, yi]) => typeof xi==='number' && typeof yi==='number' && !isNaN(xi) && !isNaN(yi));
+    const n = pairs.length;
+    if (n < 2) return { r: 0, p: null, n: 0 };
+    const xV = pairs.map(p => p[0]), yV = pairs.map(p => p[1]);
+    const mX = xV.reduce((a,b)=>a+b,0)/n, mY = yV.reduce((a,b)=>a+b,0)/n;
+    let num=0, denX=0, denY=0;
+    for (let i=0; i<n; i++) { const dx=xV[i]-mX, dy=yV[i]-mY; num+=dx*dy; denX+=dx*dx; denY+=dy*dy; }
+    const r = (denX===0||denY===0) ? 0 : num/Math.sqrt(denX*denY);
+    const t = r * Math.sqrt(n-2) / Math.sqrt(1-r*r);
+    const p = 2 * (1 - tDistCDF(Math.abs(t), n-2));
+    return { r, p, n };
+  }
+
+  function calculateSpearmanCorrelation(x, y) {
+    const pairs = x.map((xi, i) => [xi, y[i]]).filter(([xi, yi]) => typeof xi==='number' && typeof yi==='number' && !isNaN(xi) && !isNaN(yi));
+    const n = pairs.length;
+    if (n < 2) return { r: 0, p: null, n: 0 };
+    return calculatePearsonCorrelation(getRanks(pairs.map(p=>p[0])), getRanks(pairs.map(p=>p[1])));
+  }
+
+  function calculateKendallCorrelation(x, y) {
+    const pairs = x.map((xi, i) => [xi, y[i]]).filter(([xi, yi]) => typeof xi==='number' && typeof yi==='number' && !isNaN(xi) && !isNaN(yi));
+    const n = pairs.length;
+    if (n < 2) return { r: 0, p: null, n: 0 };
+    let concordant = 0, discordant = 0;
+    for (let i=0; i<n-1; i++) for (let j=i+1; j<n; j++) { const dx=pairs[j][0]-pairs[i][0], dy=pairs[j][1]-pairs[i][1]; if (dx*dy>0) concordant++; else if (dx*dy<0) discordant++; }
+    const tau = (concordant - discordant) / (n*(n-1)/2);
+    const z   = tau * Math.sqrt(n*(n-1) / (2*(2*n+5)/9));
+    const p   = 2 * (1 - normalCDF(Math.abs(z)));
+    return { r: tau, p, n };
+  }
+
+  function calculateBiweightMidcorrelation(x, y) {
+    const pairs = x.map((xi, i) => [xi, y[i]]).filter(([xi, yi]) => typeof xi==='number' && typeof yi==='number' && isFinite(xi) && isFinite(yi));
+    const n = pairs.length;
+    if (n < 2) return { r: 0, p: null, n: 0 };
+    const xs = pairs.map(p=>p[0]), ys = pairs.map(p=>p[1]);
+    const medX = arrMedian(xs), medY = arrMedian(ys);
+    const madX = arrMad(xs, medX), madY = arrMad(ys, medY);
+    if (madX===0 || madY===0) return { r: 0, p: null, n };
+    const wX = xs.map(v => { const u=(v-medX)/(9*madX); return Math.abs(u)<1 ? (1-u*u)**2 : 0; });
+    const wY = ys.map(v => { const u=(v-medY)/(9*madY); return Math.abs(u)<1 ? (1-u*u)**2 : 0; });
+    const xP = xs.map((v,i) => (v-medX)*wX[i]), yP = ys.map((v,i) => (v-medY)*wY[i]);
+    const num  = xP.reduce((s,v,i) => s+v*yP[i], 0);
+    const denX = Math.sqrt(xP.reduce((s,v) => s+v*v, 0));
+    const denY = Math.sqrt(yP.reduce((s,v) => s+v*v, 0));
+    const r = (denX===0||denY===0) ? 0 : num/(denX*denY);
+    const t = r * Math.sqrt(n-2) / Math.sqrt(1-r*r);
+    const p = 2 * (1 - tDistCDF(Math.abs(t), n-2));
+    return { r, p, n };
+  }
+
+  function getRanks(arr) {
+    const sorted = arr.map((val, idx) => ({ val, idx })).sort((a,b) => a.val-b.val);
+    const ranks = new Array(arr.length);
+    for (let i=0; i<sorted.length; i++) {
+      let j = i;
+      while (j < sorted.length-1 && sorted[j].val === sorted[j+1].val) j++;
+      const avgRank = (i + j + 2) / 2;
+      for (let k=i; k<=j; k++) ranks[sorted[k].idx] = avgRank;
+      i = j;
+    }
+    return ranks;
+  }
+
+  function arrMedian(arr) {
+    const s = arr.slice().sort((a,b)=>a-b), m = Math.floor(s.length/2);
+    return s.length%2 === 0 ? (s[m-1]+s[m])/2 : s[m];
+  }
+
+  function arrMad(arr, med) { return arrMedian(arr.map(v => Math.abs(v - med))); }
+
+  function tDistCDF(t, df) {
+    // Two-sided t-CDF via regularized incomplete beta: I_x(df/2, 0.5)
+    const x = df / (df + t * t);
+    return 1 - 0.5 * regularizedIncompleteBeta(df / 2, 0.5, x);
+  }
+
+  function regularizedIncompleteBeta(a, b, x) {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    // Use continued fraction (Lentz method) for numeric accuracy
+    const lbeta = lgamma(a) + lgamma(b) - lgamma(a + b);
+    const front = Math.exp(Math.log(x) * a + Math.log(1 - x) * b - lbeta) / a;
+    return front * betaCF(a, b, x);
+  }
+
+  function betaCF(a, b, x) {
+    // Lentz continued fraction for I_x(a,b)
+    const MAXIT = 200, EPS = 3e-7, FPMIN = 1e-30;
+    const qab = a + b, qap = a + 1, qam = a - 1;
+    let c = 1, d = 1 - qab * x / qap;
+    if (Math.abs(d) < FPMIN) d = FPMIN;
+    d = 1 / d;
+    let h = d;
+    for (let m = 1; m <= MAXIT; m++) {
+      let m2 = 2 * m;
+      let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+      d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN;
+      c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+      d = 1 / d; h *= d * c;
+      aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+      d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN;
+      c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+      d = 1 / d;
+      const del = d * c;
+      h *= del;
+      if (Math.abs(del - 1) < EPS) break;
+    }
+    return h;
+  }
+
+  function lgamma(z) {
+    // Lanczos approximation
+    const g = 7;
+    const c = [0.99999999999980993,676.5203681218851,-1259.1392167224028,
+      771.32342877765313,-176.61502916214059,12.507343278686905,
+      -0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+    if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - lgamma(1 - z);
+    z -= 1;
+    let x = c[0];
+    for (let i = 1; i < g + 2; i++) x += c[i] / (z + i);
+    const t = z + g + 0.5;
+    return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+  }
+
+  function normalCDF(x) { return 0.5 * (1 + erf(x / Math.sqrt(2))); }
+
+  function erf(x) {
+    const sign = x>=0 ? 1 : -1; x = Math.abs(x);
+    const a1=0.254829592, a2=-0.284496736, a3=1.421413741, a4=-1.453152027, a5=1.061405429, p=0.3275911;
+    const t = 1/(1+p*x);
+    return sign * (1 - (((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x));
+  }
+
+  /* ════════════════════════════════════════════
+     UTILITIES
+  ════════════════════════════════════════════ */
+  function escapeHTML(str) {
+    return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  console.log('✅ Correlation results dialog loaded (tabs: Matrix | Network | Explore | Partial | Reliability)');
+
+  /* ── Inject action buttons into the shared navrow ── */
+  function injectNavActions() {
+    const navrow = document.querySelector('.statistico-navrow');
+    if (!navrow) return;
+    if (navrow.querySelector('.navrow-actions')) return; // already injected
+    const actions = document.createElement('div');
+    actions.className = 'navrow-actions';
+    actions.innerHTML = `
+      <button class="hero-action-btn" onclick="exportHtml()" title="Export complete correlation report as standalone HTML file">
+        <i class="fa-solid fa-floppy-disk"></i> Save HTML
+      </button>
+    `;
+    navrow.appendChild(actions);
+  }
+  window.injectNavActions = injectNavActions;
+
+  /* ── Export as standalone HTML ── */
+  function exportHtml() {
+    try {
+      const ts   = new Date().toISOString().slice(0,19).replace(/[-T:]/g, '');
+      const name = (correlationData && correlationData.headers ? correlationData.headers.join('_').slice(0,30) : 'correlations');
+      const fileName = `Correlation_${name}_${ts}.html`;
+      const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+      const blob = new Blob([html], { type: 'text/html' });
+      const url  = URL.createObjectURL(blob);
+      const a    = Object.assign(document.createElement('a'), { href: url, download: fileName });
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+    } catch(e) {
+      alert('Failed to export HTML: ' + e.message);
+    }
+  }
+  window.exportHtml = exportHtml;
+</script>
+</body>
+</html>
+.Groups[1].Value)?v=20260307d" "></script>
 
   <style>
     /* ── Variables ── */

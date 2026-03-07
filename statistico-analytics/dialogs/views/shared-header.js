@@ -244,6 +244,8 @@ const StatisticoHeader = {
     const themeIcon    = currentTheme === 'light' ? '☀️' : '🌙';
     const themeLabel   = currentTheme === 'light' ? 'Light' : 'Dark';
 
+    const actionButtonsHtml = this._pendingActions ? this._renderActionButtons(this._pendingActions) : '';
+
     const topHeader = `
       <div class="statistico-header">
         <div class="header-left">
@@ -263,6 +265,7 @@ const StatisticoHeader = {
           </div>
         </div>
         <div class="header-right">
+          ${actionButtonsHtml}
           <button id="themeToggleBtn"
                   class="theme-toggle-btn"
                   onclick="StatisticoHeader.toggleTheme()"
@@ -279,7 +282,7 @@ const StatisticoHeader = {
       <div class="statistico-shell">
         ${topHeader}
         <div class="statistico-navrow">
-          <div class="navrow-tabs" role="tablist" aria-label="${this.module === 'univariate' ? 'Univariate workflow views' : this.module === 'correlations' ? 'Correlations views' : 'Regression views'}">
+          <div class="navrow-tabs" role="tablist" aria-label="${this.module === 'univariate' ? 'Univariate workflow views' : this.module === 'correlations' ? 'Correlations views' : 'Regression views'}" style="width:100%;">
             ${this.renderNavigation()}
           </div>
         </div>
@@ -548,43 +551,49 @@ const StatisticoHeader = {
   },
 
   /**
-   * Register action buttons (Save Model + HTML) into the navrow.
-   * Call this right after StatisticoHeader.init().
-   * @param {object} opts
-   *   saveModel  {function}  called when "Save Model" is clicked
-   *   exportHtml {function}  called when "HTML" is clicked
-   *   moduleName {string}    tooltip for Save Model button (optional)
+   * Build the HTML string for action buttons in the header-right area.
+   * @private
    */
-  registerActions({ saveModel, exportHtml, moduleName = 'Save model' } = {}) {
-    // Remove any previously injected actions (safe to call multiple times)
-    document.querySelectorAll('.navrow-actions').forEach(el => el.remove());
-
-    const navrow = document.querySelector('.statistico-navrow');
-    if (!navrow) return;
-
-    const wrap = document.createElement('div');
-    wrap.className = 'navrow-actions';
-    wrap.style.cssText = 'display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0;white-space:nowrap;';
-
+  _renderActionButtons({ getData, saveModel, exportHtml, moduleName = 'Save model' } = {}) {
+    let html = '';
+    if (getData) {
+      html += `<button class="header-action-btn header-action-btn--data"
+                       onclick="StatisticoHeader._pendingActions.getData()"
+                       title="View raw data for current model">
+                 <i class="fa-solid fa-table-cells"></i> View Data
+               </button>`;
+    }
     if (saveModel) {
-      const btn = document.createElement('button');
-      btn.className = 'navrow-action-btn navrow-action-btn--save';
-      btn.title = moduleName;
-      btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Model';
-      btn.onclick = saveModel;
-      wrap.appendChild(btn);
+      html += `<button class="header-action-btn header-action-btn--save"
+                       onclick="StatisticoHeader._pendingActions.saveModel()"
+                       title="${moduleName}">
+                 <i class="fa-solid fa-floppy-disk"></i> Model
+               </button>`;
     }
-
     if (exportHtml) {
-      const btn = document.createElement('button');
-      btn.className = 'navrow-action-btn navrow-action-btn--html';
-      btn.title = 'Export complete report as standalone HTML file';
-      btn.innerHTML = '<i class="fa-solid fa-file-code"></i> HTML';
-      btn.onclick = exportHtml;
-      wrap.appendChild(btn);
+      html += `<button class="header-action-btn header-action-btn--html"
+                       onclick="StatisticoHeader._pendingActions.exportHtml()"
+                       title="Export complete report as standalone HTML file">
+                 <i class="fa-solid fa-file-code"></i> HTML
+               </button>`;
     }
+    return html;
+  },
 
-    navrow.appendChild(wrap);
+  /**
+   * Register action buttons (View Data / Model / HTML) into the header top bar,
+   * to the left of the theme toggle. Call this right after StatisticoHeader.init().
+   * @param {object} opts
+   *   getData    {function}  called when "View Data" is clicked
+   *   saveModel  {function}  called when "Model" is clicked
+   *   exportHtml {function}  called when "HTML" is clicked
+   *   moduleName {string}    tooltip for Model button (optional)
+   */
+  registerActions({ getData, saveModel, exportHtml, moduleName = 'Save model' } = {}) {
+    // Store config so render() can include them on re-renders too
+    this._pendingActions = { getData, saveModel, exportHtml, moduleName };
+    // Re-render to inject buttons into the top bar
+    this.render();
   }
 };
 

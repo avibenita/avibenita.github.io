@@ -1,10 +1,10 @@
 /**
  * Shared Header Component for Statistico Standalone Views
  * Provides shared navigation across standalone analysis views
- * VERSION: 2026-03-05-action-buttons
+ * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-05-b');
+console.log('📦 Loading shared-header.js VERSION 2026-03-03-012');
 
 const StatisticoHeader = {
   currentView: 'histogram',
@@ -431,13 +431,7 @@ const StatisticoHeader = {
       `;
     }
 
-    // Regression module — sidebar handles all navigation, no header tabs needed
-    if (this.module === 'regression') return '';
-
-    // Correlations module — sidebar handles navigation too; no header tabs
-    if (this.module === 'correlations') return '';
-
-    // Correlations module — render as a single row of tabs
+    // Correlations & Regression modules — render as a single row of tabs
     const views = this.getNavigationItems();
     const renderTabButton = (view) => {
       if (view.id === 'separator' || view.isSeparator) return '';
@@ -551,199 +545,6 @@ const StatisticoHeader = {
       try { sessionStorage.setItem('regressionNavData', JSON.stringify(window.regressionData)); } catch(e) {}
     }
     window.location.href = this.resolveDialogUrl(filename);
-  },
-
-  // ================================================================
-  // ACTION BUTTONS  (View Data / Model / HTML)
-  // Injected into the right side of the header-right area so they
-  // appear on EVERY result dialog without per-page wiring.
-  // Call StatisticoHeader.registerActions({ getData, saveModel, exportHtml })
-  // from each page after StatisticoHeader.init().
-  // ================================================================
-
-  /**
-   * Register page-level action callbacks and render the three buttons.
-   * @param {object} cfg
-   *   cfg.getData()      → returns { headers: string[], rows: any[][] } or null
-   *   cfg.saveModel()    → saves the model (async ok)
-   *   cfg.exportHtml()   → exports HTML report (async ok)
-   *   cfg.moduleName     → optional label override for the Model button tooltip
-   */
-  registerActions(cfg = {}) {
-    this._actionCfg = cfg;
-
-    // Inject action buttons into header-right
-    const right = document.querySelector('.header-right');
-    if (!right) return;
-
-    // Remove any previously injected action group
-    const old = right.querySelector('.sh-action-group');
-    if (old) old.remove();
-
-    const group = document.createElement('div');
-    group.className = 'sh-action-group';
-    group.innerHTML = `
-      <button class="sh-action-btn sh-view-data" title="View the input data used in this analysis"
-              onclick="StatisticoHeader._openDataModal()">
-        <i class="fa-solid fa-eye"></i> View Data
-      </button>
-      <span class="sh-action-divider"></span>
-      <button class="sh-action-btn sh-model" title="${cfg.moduleName || 'Save model configuration'}"
-              onclick="StatisticoHeader._doSaveModel()">
-        <i class="fa-solid fa-floppy-disk"></i> Model
-      </button>
-      <button class="sh-action-btn sh-html" title="Export complete report as standalone HTML file"
-              onclick="StatisticoHeader._doExportHtml()">
-        <i class="fa-solid fa-floppy-disk"></i> HTML
-      </button>
-    `;
-
-    // Insert before the theme toggle button
-    const themeBtn = right.querySelector('#themeToggleBtn');
-    if (themeBtn) right.insertBefore(group, themeBtn);
-    else right.appendChild(group);
-
-    // Ensure data modal overlay exists in DOM
-    this._ensureDataModal();
-  },
-
-  _doSaveModel() {
-    if (this._actionCfg && typeof this._actionCfg.saveModel === 'function') {
-      this._actionCfg.saveModel();
-    }
-  },
-
-  _doExportHtml() {
-    if (this._actionCfg && typeof this._actionCfg.exportHtml === 'function') {
-      this._actionCfg.exportHtml();
-    } else {
-      // Default: snapshot the current page as a standalone HTML file
-      const blob = new Blob([document.documentElement.outerHTML], { type: 'text/html' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      const title = document.title.replace(/[^a-z0-9]/gi, '-').toLowerCase() || 'report';
-      a.download = `${title}.html`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 500);
-    }
-  },
-
-  // ── Data modal ──────────────────────────────────────────────────
-  _ensureDataModal() {
-    if (document.getElementById('sh-data-modal-overlay')) return;
-    const overlay = document.createElement('div');
-    overlay.id = 'sh-data-modal-overlay';
-    overlay.className = 'sh-data-modal-overlay sh-hidden';
-    overlay.innerHTML = `
-      <div class="sh-data-modal" role="dialog" aria-modal="true" aria-label="Input Dataset">
-        <div class="sh-data-modal-header">
-          <span><i class="fa-solid fa-eye" style="margin-right:7px;color:#67e8f9;"></i>Input Dataset</span>
-          <div class="sh-data-modal-header-right">
-            <div class="sh-row-filter" title="Filter which rows are shown">
-              <button class="sh-row-filter-btn sh-active" id="sh-btn-used" onclick="StatisticoHeader._setDataModalFilter(false)">
-                <i class="fa-solid fa-check-circle"></i> Used obs
-              </button>
-              <button class="sh-row-filter-btn" id="sh-btn-all" onclick="StatisticoHeader._setDataModalFilter(true)">
-                <i class="fa-solid fa-list"></i> All rows
-              </button>
-            </div>
-            <button class="sh-data-modal-close" onclick="StatisticoHeader._closeDataModal()">&times;</button>
-          </div>
-        </div>
-        <div class="sh-data-modal-body" id="sh-data-modal-body"></div>
-      </div>
-    `;
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) this._closeDataModal(); });
-    const frame = document.querySelector('.laptop-frame') || document.body;
-    frame.appendChild(overlay);
-  },
-
-  _openDataModal() {
-    this._ensureDataModal();
-    const cfg = this._actionCfg || {};
-    let data = null;
-    if (typeof cfg.getData === 'function') data = cfg.getData();
-
-    if (!data || !data.headers) {
-      alert('No data available yet — please run the analysis first.');
-      return;
-    }
-
-    this._dataModalFull = data;
-    this._renderDataModal(false);
-    document.getElementById('sh-data-modal-overlay').classList.remove('sh-hidden');
-  },
-
-  _closeDataModal() {
-    const el = document.getElementById('sh-data-modal-overlay');
-    if (el) el.classList.add('sh-hidden');
-  },
-
-  _applyDataModalFilter() {
-    const showAll = document.getElementById('sh-show-all-toggle').checked;
-    this._renderDataModal(showAll);
-  },
-
-  _setDataModalFilter(showAll) {
-    const btnUsed = document.getElementById('sh-btn-used');
-    const btnAll  = document.getElementById('sh-btn-all');
-    if (btnUsed) btnUsed.classList.toggle('sh-active', !showAll);
-    if (btnAll)  btnAll.classList.toggle('sh-active',  showAll);
-    this._renderDataModal(showAll);
-  },
-
-  _renderDataModal(showAll) {
-    const data = this._dataModalFull;
-    if (!data) return;
-    const { headers, rows, columnRoles } = data;
-
-    // A row is "used" (complete) when every cell has a real value
-    const isComplete = row => row.every(v => v !== null && v !== undefined && v !== '' && v !== '—' && v !== '\u2014');
-
-    // Column header HTML with role badge
-    const roleLabel = { y: 'Y', xn: 'Xn', xc: 'Xc' };
-    const renderTh = (h, i) => {
-      const role = columnRoles ? columnRoles[i] : null;
-      const badge = role ? `<span class="sh-col-role sh-col-${role}">${roleLabel[role]}</span>` : '';
-      return `<th>${badge}${h ?? ''}</th>`;
-    };
-
-    let html = '';
-
-    if (showAll) {
-      const usedCount = rows.filter(isComplete).length;
-      html += `<div class="sh-data-modal-meta">${rows.length} total rows &nbsp;·&nbsp; <span style="color:#4ade80;">${usedCount} used</span> &nbsp;·&nbsp; <span style="color:rgba(255,255,255,.35);">${rows.length - usedCount} excluded (missing values)</span></div>`;
-      html += '<div class="sh-data-modal-table-wrap"><table class="sh-data-modal-table"><thead><tr><th>#</th>';
-      headers.forEach((h, i) => { html += renderTh(h, i); });
-      html += '</tr></thead><tbody>';
-      rows.forEach((row, i) => {
-        const complete = isComplete(row);
-        html += `<tr class="${complete ? '' : 'sh-row-excluded'}"><td class="sh-row-num">${i + 1}</td>`;
-        headers.forEach((_, ci) => {
-          const v = row[ci];
-          const empty = v === null || v === undefined || v === '' || v === '—' || v === '\u2014';
-          html += `<td${empty ? ' class="sh-cell-empty"' : ''}>${empty ? '—' : v}</td>`;
-        });
-        html += '</tr>';
-      });
-    } else {
-      const usedRows = rows.filter(isComplete);
-      html += `<div class="sh-data-modal-meta">${usedRows.length} used rows × ${headers.length} columns &nbsp;<span style="opacity:.5;font-size:10px;">(rows with missing values excluded)</span></div>`;
-      html += '<div class="sh-data-modal-table-wrap"><table class="sh-data-modal-table"><thead><tr><th>#</th>';
-      headers.forEach((h, i) => { html += renderTh(h, i); });
-      html += '</tr></thead><tbody>';
-      usedRows.forEach((row, i) => {
-        html += `<tr><td class="sh-row-num">${i + 1}</td>`;
-        headers.forEach((_, ci) => {
-          const v = row[ci];
-          html += `<td>${v ?? ''}</td>`;
-        });
-        html += '</tr>';
-      });
-    }
-
-    html += '</tbody></table></div>';
-    document.getElementById('sh-data-modal-body').innerHTML = html;
   }
 };
 

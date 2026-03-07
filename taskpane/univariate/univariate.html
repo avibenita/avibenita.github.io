@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Univariate Analysis - Statistico Analytics</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="../../src/shared/css/taskpane-light.css">
   <link rel="stylesheet" href="../../src/shared/css/data-input-panel.css">
@@ -39,15 +40,12 @@
 
     <div class="taskpane-content">
       <div class="controls-container">
-        <div id="savedAnalysesContainer"></div>
         <div id="dataInputPanelContainer"></div>
         <div id="univariateInputPanelContainer"></div>
       </div>
     </div>
   </div>
 
-  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  <script src="../../src/shared/js/core/saved-analyses-manager.js"></script>
   <script src="../../src/shared/js/components/DataInputPanel.js"></script>
   <script src="univariate-input-panel.js"></script>
 
@@ -57,18 +55,11 @@
     Office.onReady((info) => {
       if (info.host !== Office.HostType.Excel) return;
 
-      fetch('../../src/shared/components/saved-analyses-panel.html')
-        .then(r => r.text())
-        .then(html => {
-          document.getElementById('savedAnalysesContainer').innerHTML = html;
-          initSavedAnalysesPanel();
-        });
-
       fetch('../../src/shared/components/data-input-panel.html')
         .then(r => r.text())
         .then(html => {
           document.getElementById('dataInputPanelContainer').innerHTML = html;
-          initDataInputPanel().then(() => autoDetectRange());
+          initDataInputPanel();
         });
 
       fetch('univariate-input-panel.html')
@@ -77,63 +68,6 @@
           document.getElementById('univariateInputPanelContainer').innerHTML = html;
         });
     });
-
-    function toggleSavedAnalysesPanel() {
-      const body = document.getElementById('savedAnalysesBody');
-      const icon = document.getElementById('savedAnalysesToggleIcon');
-      if (!body || !icon) return;
-      if (body.style.display === 'none') { body.style.display = 'block'; icon.classList.add('open'); }
-      else { body.style.display = 'none'; icon.classList.remove('open'); }
-    }
-
-    async function initSavedAnalysesPanel() {
-      const analyses = await SavedAnalysesManager.getAnalysesByModule('univariate');
-      const listContainer = document.getElementById('savedAnalysesList');
-      const countSpan = document.getElementById('savedCount');
-      if (!listContainer || !countSpan) return;
-      countSpan.textContent = `(${analyses.length})`;
-      listContainer.innerHTML = '';
-      if (!analyses.length) {
-        listContainer.innerHTML = '<div class="no-analyses-message"><i class="fa-solid fa-info-circle"></i><p>No saved univariate analyses yet.</p></div>';
-        return;
-      }
-      analyses.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      analyses.forEach(analysis => {
-        const card = document.createElement('div');
-        card.className = 'analysis-card';
-        const ts = new Date(analysis.timestamp).toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
-        card.innerHTML = `
-          <div class="analysis-card-header"><div class="analysis-name">${analysis.name}</div></div>
-          <div class="analysis-info"><div><strong>Column:</strong> ${analysis.config?.column || 'Not set'}</div></div>
-          <div class="analysis-actions">
-            <button class="analysis-btn analysis-btn-load" onclick="loadSavedAnalysis('${analysis.id}')"><i class="fa-solid fa-folder-open"></i> Load</button>
-            <button class="analysis-btn analysis-btn-run" onclick="runSavedAnalysis('${analysis.id}')"><i class="fa-solid fa-play"></i> Run</button>
-            <button class="analysis-btn analysis-btn-delete" onclick="deleteSavedAnalysis('${analysis.id}')"><i class="fa-solid fa-trash"></i></button>
-          </div>
-          <div class="analysis-timestamp"><i class="fa-solid fa-clock"></i> ${ts}</div>`;
-        listContainer.appendChild(card);
-      });
-    }
-
-    async function loadSavedAnalysis(analysisId) {
-      const analysis = await SavedAnalysesManager.loadAnalysisById(analysisId);
-      if (!analysis || analysis.module !== 'univariate') return;
-      sessionStorage.setItem('univariateModelSpec', JSON.stringify(analysis.config || {}));
-      if (typeof updateButtonState === 'function') updateButtonState();
-    }
-
-    async function runSavedAnalysis(analysisId) {
-      const analysis = await SavedAnalysesManager.loadAnalysisById(analysisId);
-      if (!analysis || analysis.module !== 'univariate') return;
-      sessionStorage.setItem('univariateModelSpec', JSON.stringify(analysis.config || {}));
-      if (typeof updateButtonState === 'function') updateButtonState();
-      if (typeof openUnivariateBuilder === 'function') openUnivariateBuilder();
-    }
-
-    async function deleteSavedAnalysis(analysisId) {
-      await SavedAnalysesManager.deleteAnalysis(analysisId);
-      await initSavedAnalysesPanel();
-    }
   </script>
 </body>
 </html>

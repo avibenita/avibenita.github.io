@@ -606,124 +606,163 @@ const StatisticoHeader = {
     return html;
   },
 
-  /** Open/close the View Data panel. Toggle between used/all is inside the panel itself. */
+  /** Open/close the View Data modal (like the Repeated Measures module). */
   _viewDataMode: 'used',   // 'used' | 'all'
 
   _toggleViewData() {
-    // If panel is already open, close it
-    const existing = document.getElementById('headerDataPanel');
-    if (existing) {
-      existing.remove();
-      this._resetViewBtn();
-      return;
-    }
+    // If modal is already open, close it
+    const existing = document.getElementById('hdpModal');
+    if (existing) { existing.remove(); this._resetViewBtn(); return; }
 
     const actions = this._pendingActions;
     if (!actions || !actions.getData) return;
     const result = actions.getData();
     if (!result) { console.warn('No data available yet'); return; }
 
-    // Open with 'used' mode on first open
     this._viewDataMode = 'used';
     this._lastDataResult = result;
 
-    // Mark button as active (panel open)
+    // Mark button active
     const btn = document.getElementById('headerViewDataBtn');
-    if (btn) {
-      btn.classList.add('header-action-btn--data-active');
-      btn.title = 'Click to close data panel';
-    }
+    if (btn) btn.classList.add('header-action-btn--data-active');
 
-    this._showDataPanel(result, 'used');
+    this._buildDataModal(result, 'used');
   },
 
-  /** Called by the toggle inside the panel */
+  /** Toggle between used / all inside the modal */
   _switchDataMode(mode) {
     if (!this._lastDataResult) return;
     this._viewDataMode = mode;
-    this._showDataPanel(this._lastDataResult, mode);
+    this._populateDataModal(this._lastDataResult, mode);
   },
 
-  _showDataPanel(result, mode) {
-    const { usedRows, allRows, headers, usedRange, fullRange, columnRoles } = result;
-
-    // Remove existing panel
-    const existing = document.getElementById('headerDataPanel');
-    if (existing) existing.remove();
-
-    const isUsed = mode === 'used';
-    const rows   = isUsed ? usedRows : allRows;
-    const range  = isUsed ? (usedRange || fullRange) : fullRange;
-    const otherRange = isUsed ? fullRange : usedRange;
-
-    const panel = document.createElement('div');
-    panel.id = 'headerDataPanel';
-    panel.className = 'header-data-panel';
-
-    // Range display
-    const rangeHtml = range
-      ? `<span class="hdp-range-label">${isUsed ? 'Used' : 'Full'} range:</span><span class="hdp-range">${range}</span>`
-      : '';
-    const secondaryHint = (otherRange && otherRange !== range)
-      ? `<span class="hdp-range-hint">·&nbsp;${isUsed ? 'full' : 'used'}: <span class="hdp-range hdp-range--secondary">${otherRange}</span></span>`
-      : '';
-
-    // Build table
-    const thCells = headers.map((h, i) => {
-      const role = columnRoles ? columnRoles[i] : null;
-      const cls  = role === 'y' ? 'hdp-y' : role === 'xn' ? 'hdp-xn' : role === 'xc' ? 'hdp-xc' : '';
-      return `<th class="${cls}">${h}</th>`;
-    }).join('');
-
-    const displayRows = rows.slice(0, 200);
-    const trRows = displayRows.map((row) => {
-      const tds = row.map((v, ci) => {
-        const role = columnRoles ? columnRoles[ci] : null;
-        const cls  = role === 'y' ? 'hdp-y' : role === 'xn' ? 'hdp-xn' : role === 'xc' ? 'hdp-xc' : '';
-        return `<td class="${cls}">${v === null || v === undefined ? '' : v}</td>`;
-      }).join('');
-      return `<tr>${tds}</tr>`;
-    }).join('');
-
-    const moreNote = rows.length > 200
-      ? `<div class="hdp-note">Showing first 200 of ${rows.length} rows</div>` : '';
-
-    panel.innerHTML = `
-      <div class="hdp-header">
-        <div class="hdp-header-left">
-          <div class="hdp-toggle">
-            <button class="hdp-toggle-btn ${isUsed ? 'hdp-toggle-btn--active' : ''}"
-                    onclick="StatisticoHeader._switchDataMode('used')">
-              Used obs
-            </button>
-            <button class="hdp-toggle-btn ${!isUsed ? 'hdp-toggle-btn--active' : ''}"
-                    onclick="StatisticoHeader._switchDataMode('all')">
-              All obs
-            </button>
-          </div>
-          <span class="hdp-count">${rows.length} rows &times; ${headers.length} cols</span>
-          <span class="hdp-range-row">${rangeHtml}${secondaryHint}</span>
+  /** Build the modal overlay once, then fill it */
+  _buildDataModal(result, mode) {
+    const modal = document.createElement('div');
+    modal.id = 'hdpModal';
+    modal.className = 'hdp-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.innerHTML = `
+      <div class="hdp-modal-content">
+        <div class="hdp-modal-header">
+          <span id="hdpModalTitle"><i class="fa-solid fa-table"></i> Data Viewer</span>
+          <span class="hdp-modal-close"
+                onclick="document.getElementById('hdpModal').remove(); StatisticoHeader._resetViewBtn();"
+                title="Close">&times;</span>
         </div>
-        <button class="hdp-close"
-                onclick="document.getElementById('headerDataPanel').remove(); StatisticoHeader._resetViewBtn();"
-                title="Close">&times;</button>
-      </div>
-      <div class="hdp-body">
-        <table class="hdp-table">
-          <thead><tr>${thCells}</tr></thead>
-          <tbody>${trRows}</tbody>
-        </table>
-        ${moreNote}
+        <div class="hdp-modal-body">
+          <div class="hdp-stats-bar">
+            <div class="hdp-stat"><div class="hdp-stat-value" id="hdpStatN">--</div><div class="hdp-stat-label">Rows Shown</div></div>
+            <div class="hdp-stat"><div class="hdp-stat-value" id="hdpStatCols">--</div><div class="hdp-stat-label">Variables</div></div>
+            <div class="hdp-stat"><div class="hdp-stat-value" id="hdpStatExcluded">--</div><div class="hdp-stat-label">Excluded (Missing)</div></div>
+            <div class="hdp-stat hdp-stat--right">
+              <div class="hdp-mode-toggle">
+                <button class="hdp-mode-btn" id="hdpBtnUsed" onclick="StatisticoHeader._switchDataMode('used')">Used obs</button>
+                <button class="hdp-mode-btn" id="hdpBtnAll"  onclick="StatisticoHeader._switchDataMode('all')">All obs</button>
+              </div>
+              <button class="hdp-copy-btn" onclick="StatisticoHeader._copyModalData()" title="Copy to clipboard">
+                <i class="fa-solid fa-copy"></i> Copy
+              </button>
+            </div>
+          </div>
+          <div class="hdp-range-bar" id="hdpRangeBar"></div>
+          <div class="hdp-table-wrap">
+            <table class="hdp-modal-table" id="hdpTable">
+              <thead><tr id="hdpThead"></tr></thead>
+              <tbody id="hdpTbody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     `;
+    document.body.appendChild(modal);
+    this._populateDataModal(result, mode);
+    // Close on backdrop click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) { modal.remove(); this._resetViewBtn(); }
+    });
+  },
 
-    // Attach below the header shell
-    const shell = document.querySelector('.statistico-shell');
-    if (shell && shell.parentNode) {
-      shell.parentNode.insertBefore(panel, shell.nextSibling);
-    } else {
-      document.body.appendChild(panel);
+  _populateDataModal(result, mode) {
+    const { usedRows, allRows, headers, usedRange, fullRange, columnRoles } = result;
+    const isUsed    = mode === 'used';
+    const rows      = isUsed ? usedRows : allRows;
+    const range     = isUsed ? (usedRange || fullRange) : fullRange;
+    const otherRange = isUsed ? fullRange : usedRange;
+    const excluded  = (allRows || []).length - (usedRows || []).length;
+
+    // Stats bar
+    const el = (id) => document.getElementById(id);
+    if (el('hdpStatN'))        el('hdpStatN').textContent        = rows.length;
+    if (el('hdpStatCols'))     el('hdpStatCols').textContent     = headers.length;
+    if (el('hdpStatExcluded')) el('hdpStatExcluded').textContent = Math.max(0, excluded);
+
+    // Modal title
+    const title = el('hdpModalTitle');
+    if (title) title.innerHTML = `<i class="fa-solid fa-table"></i> ${isUsed ? 'Used Observations' : 'All Observations'}`;
+
+    // Toggle buttons
+    const btnUsed = el('hdpBtnUsed'); const btnAll = el('hdpBtnAll');
+    if (btnUsed) { btnUsed.classList.toggle('hdp-mode-btn--active', isUsed);  btnUsed.classList.toggle('hdp-mode-btn--used', isUsed); }
+    if (btnAll)  { btnAll.classList.toggle('hdp-mode-btn--active', !isUsed);  btnAll.classList.toggle('hdp-mode-btn--all', !isUsed); }
+
+    // Range bar
+    const rb = el('hdpRangeBar');
+    if (rb) {
+      rb.innerHTML = range
+        ? `<i class="fa-solid fa-table-cells-large"></i>
+           <span class="hdp-range-label">${isUsed ? 'Used range' : 'Full range'}:</span>
+           <span class="hdp-range">${range}</span>
+           ${otherRange && otherRange !== range
+             ? `<span class="hdp-range-secondary">&nbsp;&middot;&nbsp;${isUsed ? 'full range' : 'used range'}: <strong>${otherRange}</strong></span>`
+             : ''}`
+        : '';
     }
+
+    // Table header
+    const thead = el('hdpThead');
+    if (thead) {
+      thead.innerHTML = '<th class="hdp-th-num">#</th>' +
+        headers.map((h, i) => {
+          const role = columnRoles ? columnRoles[i] : null;
+          const cls  = role === 'y' ? ' hdp-col-y' : role === 'xn' ? ' hdp-col-xn' : role === 'xc' ? ' hdp-col-xc' : '';
+          return `<th class="hdp-th${cls}">${h}</th>`;
+        }).join('');
+    }
+
+    // Table body
+    const tbody = el('hdpTbody');
+    if (tbody) {
+      const cap = 500;
+      const display = rows.slice(0, cap);
+      tbody.innerHTML = display.map((row, ri) => {
+        const tds = row.map((v, ci) => {
+          const role = columnRoles ? columnRoles[ci] : null;
+          const cls  = role === 'y' ? ' hdp-col-y' : role === 'xn' ? ' hdp-col-xn' : role === 'xc' ? ' hdp-col-xc' : '';
+          const val  = (v === null || v === undefined || v === '') ? '<span class="hdp-missing">—</span>' : v;
+          return `<td class="hdp-td${cls}">${val}</td>`;
+        }).join('');
+        return `<tr class="hdp-tr"><td class="hdp-td hdp-td-num">${ri + 1}</td>${tds}</tr>`;
+      }).join('');
+      if (rows.length > cap) {
+        tbody.innerHTML += `<tr><td class="hdp-more" colspan="${headers.length + 1}">Showing first ${cap} of ${rows.length} rows</td></tr>`;
+      }
+    }
+
+    this._currentModalRows    = rows;
+    this._currentModalHeaders = headers;
+  },
+
+  _copyModalData() {
+    const rows = this._currentModalRows; const h = this._currentModalHeaders;
+    if (!rows || !h) return;
+    let text = 'Row\t' + h.join('\t') + '\n';
+    rows.forEach((row, i) => { text += (i + 1) + '\t' + row.map(v => v == null ? '' : v).join('\t') + '\n'; });
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.querySelector('.hdp-copy-btn');
+      if (btn) { btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!'; setTimeout(() => { btn.innerHTML = '<i class="fa-solid fa-copy"></i> Copy'; }, 2000); }
+    }).catch(() => alert('Failed to copy to clipboard'));
   },
 
   _resetViewBtn() {
@@ -738,18 +777,11 @@ const StatisticoHeader = {
   },
 
   /**
-   * Register action buttons (View Data / Model / HTML) into the header top bar,
-   * to the left of the theme toggle. Call this right after StatisticoHeader.init().
-   * @param {object} opts
-   *   getData    {function}  returns { headers, usedRows, allRows, range, columnRoles }
-   *   saveModel  {function}  called when "Model" is clicked
-   *   exportHtml {function}  called when "HTML" is clicked
-   *   moduleName {string}    tooltip for Model button (optional)
+   * Register action buttons (View Data / Model / HTML) into the header top bar.
+   * Call this right after StatisticoHeader.init().
    */
   registerActions({ getData, saveModel, exportHtml, moduleName = 'Save model' } = {}) {
-    // Store config so render() can include them on re-renders too
     this._pendingActions = { getData, saveModel, exportHtml, moduleName };
-    // Re-render to inject buttons into the top bar
     this.render();
   }
 };

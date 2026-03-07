@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-07-013 (independent module support)');
+console.log('📦 Loading shared-header.js VERSION 2026-03-07-014 (hide navrow for independent/dependent)');
 
 const StatisticoHeader = {
   currentView: 'histogram',
@@ -290,14 +290,19 @@ const StatisticoHeader = {
       </div>
     `;
 
+    // Independent and dependent modules use their own internal tab navigation;
+    // hide the shared-header navrow so it doesn't show a duplicate "2 Groups / K+ Groups" bar.
+    const hideNavrow = (this.module === 'independent' || this.module === 'dependent');
+
     const headerHTML = `
       <div class="statistico-shell">
         ${topHeader}
+        ${hideNavrow ? '' : `
         <div class="statistico-navrow">
-          <div class="navrow-tabs" role="tablist" aria-label="${this.module === 'univariate' ? 'Univariate workflow views' : this.module === 'correlations' ? 'Correlations views' : this.module === 'independent' ? 'Independent Means views' : 'Regression views'}" style="width:100%;">
+          <div class="navrow-tabs" role="tablist" aria-label="${this.module === 'univariate' ? 'Univariate workflow views' : this.module === 'correlations' ? 'Correlations views' : 'Regression views'}" style="width:100%;">
             ${this.renderNavigation()}
           </div>
-        </div>
+        </div>`}
       </div>
     `;
     

@@ -434,6 +434,9 @@ const StatisticoHeader = {
     // Regression module — sidebar handles all navigation, no header tabs needed
     if (this.module === 'regression') return '';
 
+    // Correlations module — sidebar handles navigation too; no header tabs
+    if (this.module === 'correlations') return '';
+
     // Correlations module — render as a single row of tabs
     const views = this.getNavigationItems();
     const renderTabButton = (view) => {

@@ -221,16 +221,29 @@
       // Sidebar is FIRST child of card (left column)
       card.insertBefore(nav, card.firstChild);
 
-      // Ensure card-main is a flex sibling
+      // Ensure card-main wraps everything else
       let cardMain = card.querySelector(':scope > .card-main');
       if (!cardMain) {
         cardMain = document.createElement('div');
         cardMain.className = 'card-main';
-        // Move all non-sidebar card children into card-main
         Array.from(card.children).forEach(el => {
           if (!el.classList.contains('sb-nav')) cardMain.appendChild(el);
         });
         card.appendChild(cardMain);
+      }
+
+      // Ensure card-body wraps the tab panels (but NOT hero-section / settings-bar)
+      let cardBody = cardMain.querySelector(':scope > .card-body');
+      if (!cardBody) {
+        cardBody = document.createElement('div');
+        cardBody.className = 'card-body';
+        const tabPanels = Array.from(cardMain.children).filter(el =>
+          !el.classList.contains('hero-section') &&
+          !el.classList.contains('settings-bar') &&
+          !el.classList.contains('card-body')
+        );
+        tabPanels.forEach(el => cardBody.appendChild(el));
+        cardMain.appendChild(cardBody);
       }
     },
 
@@ -287,9 +300,20 @@
         const itemsHtml = g.tabs.map(t => {
           const tab   = typeof t === 'string' ? t : t.tab;
           const label = typeof t === 'string' ? tab : (t.label || tab);
-          const ico   = t.icon || icon(tab);
-          const active  = tab === activeTab ? ' active' : '';
+          const ico   = t.icon || icon(tab || 'default');
+          const href  = t.href || null;   // cross-page navigation
+          const active  = tab && tab === activeTab ? ' active' : '';
           const subCls  = t.sub ? ' sb-item-sub' : '';
+
+          if (href) {
+            // Cross-page nav: navigate like the header does
+            return `
+              <button class="sb-item${subCls}" data-href="${esc(href)}"
+                      onclick="StatisticoSidebar._navigate('${esc(href)}')">
+                <i class="fa-solid ${ico} sb-item-icon"></i>
+                <span class="sb-item-label">${esc(label)}</span>
+              </button>`;
+          }
           return `
             <button class="sb-item${active}${subCls}" data-tab="${esc(tab)}"
                     onclick="StatisticoSidebar._click('${esc(tab)}')">
@@ -304,22 +328,9 @@
           </div>`;
       }).join('');
 
-      const hasSaved = !!cfg.moduleName;
+      const hasSaved = false; // Saved models belong in taskpane, not sidebar
 
-      const savedHtml = hasSaved ? `
-        <div class="sb-bottom-section" id="sbSavedSection">
-          <button class="sb-bottom-btn" onclick="StatisticoSidebar._toggleSavedPanel()" id="sbSavedBtn">
-            <i class="fa-solid fa-bookmark sb-bottom-icon"></i>
-            <span class="sb-item-label">Saved Models</span>
-            <i class="fa-solid fa-chevron-down sb-saved-caret" id="sbSavedCaret"
-               style="margin-left:auto;font-size:9px;opacity:.5;transition:transform .2s;"></i>
-          </button>
-          <div class="sb-saved-panel" id="sbSavedPanel" style="display:none;">
-            <div class="sb-saved-list" id="sbSavedList">
-              <div class="sb-saved-empty">Loading…</div>
-            </div>
-          </div>
-        </div>` : '';
+      const savedHtml = '';
 
       return `
         <div class="sb-header">
@@ -354,6 +365,27 @@
     /* ── Tab switch ────────────────────────────────────────────────────── */
     _click(tab) {
       window.switchTab(tab);
+    },
+
+    /* ── Cross-page navigation ─────────────────────────────────────────── */
+    _navigate(href) {
+      if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.navigateTo) {
+        StatisticoHeader.navigateTo(href);
+      } else {
+        // Persist data and navigate
+        if (window.correlationData) {
+          try { sessionStorage.setItem('correlationData', JSON.stringify(window.correlationData)); } catch(e) {}
+        }
+        // Resolve URL relative to dialogs/views/
+        const { origin, pathname } = window.location;
+        const marker = '/dialogs/views/';
+        const idx = pathname.indexOf(marker);
+        if (idx !== -1) {
+          window.location.href = `${origin}${pathname.slice(0, idx)}${marker}${href}`;
+        } else {
+          window.location.href = `./${href.split('/').pop()}`;
+        }
+      }
     },
 
     _applySwitch(tab) {

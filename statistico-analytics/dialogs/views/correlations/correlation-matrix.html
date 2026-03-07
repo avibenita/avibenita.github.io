@@ -2103,10 +2103,67 @@
         };
       },
       exportHtml: () => exportHtml(),
-      moduleName: 'Export correlation report as HTML'
+      saveModel:  () => saveCorrelationMatrix(),
+      moduleName: 'Copy correlation matrix to clipboard (paste into Excel)'
     });
   }
   window.registerHeaderActions = registerHeaderActions;
+
+  /* ── Copy correlation matrix to clipboard (for pasting into Excel) ── */
+  function saveCorrelationMatrix() {
+    if (!currentMatrix || !currentHeaders) {
+      alert('No correlation matrix available. Please run the analysis first.');
+      return;
+    }
+    const type = currentType || 'Pearson';
+    const n    = currentHeaders.length;
+
+    // Build TSV: header row + r values + blank + p-values section
+    let tsv = `${type} Correlation Matrix\t` + currentHeaders.join('\t') + '\n';
+    for (let i = 0; i < n; i++) {
+      tsv += currentHeaders[i];
+      for (let j = 0; j < n; j++) {
+        const cell = currentMatrix[i][j];
+        tsv += '\t' + (cell && cell.r !== undefined ? cell.r.toFixed(4) : '');
+      }
+      tsv += '\n';
+    }
+
+    // Append n per pair
+    tsv += '\nN (pairwise)\t' + currentHeaders.join('\t') + '\n';
+    for (let i = 0; i < n; i++) {
+      tsv += currentHeaders[i];
+      for (let j = 0; j < n; j++) {
+        const cell = currentMatrix[i][j];
+        tsv += '\t' + (cell && cell.n !== undefined ? cell.n : '');
+      }
+      tsv += '\n';
+    }
+
+    // Append p-values
+    tsv += '\np-values\t' + currentHeaders.join('\t') + '\n';
+    for (let i = 0; i < n; i++) {
+      tsv += currentHeaders[i];
+      for (let j = 0; j < n; j++) {
+        const cell = currentMatrix[i][j];
+        const p = cell && cell.p !== undefined ? cell.p : null;
+        tsv += '\t' + (p === null ? '' : i === j ? '' : p.toFixed(4));
+      }
+      tsv += '\n';
+    }
+
+    navigator.clipboard.writeText(tsv).then(() => {
+      // Show a brief toast
+      const toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#16a34a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;z-index:99999;box-shadow:0 4px 16px rgba(0,0,0,.4);pointer-events:none;';
+      toast.innerHTML = '<i class="fa-solid fa-check"></i> Matrix copied! Paste into Excel with Ctrl+V';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }).catch(() => {
+      alert('Failed to copy to clipboard. Please try again.');
+    });
+  }
+  window.saveCorrelationMatrix = saveCorrelationMatrix;
 
   /* ── Export as standalone HTML ── */
   function exportHtml() {

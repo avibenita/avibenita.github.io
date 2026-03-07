@@ -607,7 +607,7 @@ const StatisticoHeader = {
   },
 
   /** Open/close the View Data modal (like the Repeated Measures module). */
-  _viewDataMode: 'used',   // 'used' | 'all'
+  _viewDataMode: 'all',   // 'used' | 'all'  — default: show all records
 
   _toggleViewData() {
     // If modal is already open, close it
@@ -619,7 +619,7 @@ const StatisticoHeader = {
     const result = actions.getData();
     if (!result) { console.warn('No data available yet'); return; }
 
-    this._viewDataMode = 'used';
+    this._viewDataMode = 'all';   // always open on All obs
     this._lastDataResult = result;
 
     // Mark button active
@@ -766,7 +766,7 @@ const StatisticoHeader = {
   },
 
   _resetViewBtn() {
-    this._viewDataMode = 'used';
+    this._viewDataMode = 'all';
     this._lastDataResult = null;
     const btn = document.getElementById('headerViewDataBtn');
     if (btn) {

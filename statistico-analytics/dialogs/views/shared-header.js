@@ -606,71 +606,75 @@ const StatisticoHeader = {
     return html;
   },
 
-  /** Toggle View Data panel (used obs ↔ all obs) */
+  /** Open/close the View Data panel. Toggle between used/all is inside the panel itself. */
   _viewDataMode: 'used',   // 'used' | 'all'
 
   _toggleViewData() {
+    // If panel is already open, close it
+    const existing = document.getElementById('headerDataPanel');
+    if (existing) {
+      existing.remove();
+      this._resetViewBtn();
+      return;
+    }
+
     const actions = this._pendingActions;
     if (!actions || !actions.getData) return;
-
     const result = actions.getData();
     if (!result) { console.warn('No data available yet'); return; }
 
-    const { usedRows, allRows, headers, usedRange, fullRange, columnRoles } = result;
+    // Open with 'used' mode on first open
+    this._viewDataMode = 'used';
+    this._lastDataResult = result;
 
-    // Flip mode (first click opens with 'used', subsequent clicks toggle)
-    const panelExists = !!document.getElementById('headerDataPanel');
-    if (!panelExists) {
-      this._viewDataMode = 'used';
-    } else {
-      this._viewDataMode = this._viewDataMode === 'used' ? 'all' : 'used';
-    }
-    const isUsed = this._viewDataMode === 'used';
-    const rows   = isUsed ? usedRows : allRows;
-    const range  = isUsed ? (usedRange || fullRange) : fullRange;
-
-    // Update button label
+    // Mark button as active (panel open)
     const btn = document.getElementById('headerViewDataBtn');
     if (btn) {
-      btn.classList.toggle('header-action-btn--data-active', !isUsed);
-      btn.innerHTML = `<i class="fa-solid fa-eye${isUsed ? '' : '-slash'}"></i> ${isUsed ? 'View Data' : 'All Obs'}`;
-      btn.title = isUsed
-        ? 'Showing used observations — click to see all rows'
-        : 'Showing all rows — click to return to used observations';
+      btn.classList.add('header-action-btn--data-active');
+      btn.title = 'Click to close data panel';
     }
 
-    // Build or update the data panel
-    this._showDataPanel({ headers, rows, range, fullRange, usedRange, columnRoles, isUsed });
+    this._showDataPanel(result, 'used');
   },
 
-  _showDataPanel({ headers, rows, range, fullRange, usedRange, columnRoles, isUsed }) {
+  /** Called by the toggle inside the panel */
+  _switchDataMode(mode) {
+    if (!this._lastDataResult) return;
+    this._viewDataMode = mode;
+    this._showDataPanel(this._lastDataResult, mode);
+  },
+
+  _showDataPanel(result, mode) {
+    const { usedRows, allRows, headers, usedRange, fullRange, columnRoles } = result;
+
     // Remove existing panel
     const existing = document.getElementById('headerDataPanel');
     if (existing) existing.remove();
+
+    const isUsed = mode === 'used';
+    const rows   = isUsed ? usedRows : allRows;
+    const range  = isUsed ? (usedRange || fullRange) : fullRange;
+    const otherRange = isUsed ? fullRange : usedRange;
 
     const panel = document.createElement('div');
     panel.id = 'headerDataPanel';
     panel.className = 'header-data-panel';
 
-    const modeLabel = isUsed ? 'Used observations' : 'All observations';
+    // Range display
     const rangeHtml = range
-      ? `<span class="hdp-range-label">${isUsed ? 'Used range' : 'Full range'}:</span> <span class="hdp-range">${range}</span>`
+      ? `<span class="hdp-range-label">${isUsed ? 'Used' : 'Full'} range:</span><span class="hdp-range">${range}</span>`
       : '';
-    // Show the other range as a secondary hint
-    const otherRange = isUsed ? fullRange : usedRange;
-    const otherLabel = isUsed ? 'full' : 'used';
     const secondaryHint = (otherRange && otherRange !== range)
-      ? `<span class="hdp-range-hint">&nbsp;·&nbsp;${otherLabel}: <span class="hdp-range hdp-range--secondary">${otherRange}</span></span>`
+      ? `<span class="hdp-range-hint">·&nbsp;${isUsed ? 'full' : 'used'}: <span class="hdp-range hdp-range--secondary">${otherRange}</span></span>`
       : '';
 
-    // Build table head
+    // Build table
     const thCells = headers.map((h, i) => {
       const role = columnRoles ? columnRoles[i] : null;
       const cls  = role === 'y' ? 'hdp-y' : role === 'xn' ? 'hdp-xn' : role === 'xc' ? 'hdp-xc' : '';
       return `<th class="${cls}">${h}</th>`;
     }).join('');
 
-    // Build table rows (cap at 200 for performance)
     const displayRows = rows.slice(0, 200);
     const trRows = displayRows.map((row) => {
       const tds = row.map((v, ci) => {
@@ -687,7 +691,16 @@ const StatisticoHeader = {
     panel.innerHTML = `
       <div class="hdp-header">
         <div class="hdp-header-left">
-          <span class="hdp-mode-badge ${isUsed ? 'hdp-mode-used' : 'hdp-mode-all'}">${modeLabel}</span>
+          <div class="hdp-toggle">
+            <button class="hdp-toggle-btn ${isUsed ? 'hdp-toggle-btn--active' : ''}"
+                    onclick="StatisticoHeader._switchDataMode('used')">
+              Used obs
+            </button>
+            <button class="hdp-toggle-btn ${!isUsed ? 'hdp-toggle-btn--active' : ''}"
+                    onclick="StatisticoHeader._switchDataMode('all')">
+              All obs
+            </button>
+          </div>
           <span class="hdp-count">${rows.length} rows &times; ${headers.length} cols</span>
           <span class="hdp-range-row">${rangeHtml}${secondaryHint}</span>
         </div>
@@ -715,11 +728,12 @@ const StatisticoHeader = {
 
   _resetViewBtn() {
     this._viewDataMode = 'used';
+    this._lastDataResult = null;
     const btn = document.getElementById('headerViewDataBtn');
     if (btn) {
       btn.classList.remove('header-action-btn--data-active');
       btn.innerHTML = `<i class="fa-solid fa-eye"></i> View Data`;
-      btn.title = 'Toggle between used observations and all observations';
+      btn.title = 'View model data';
     }
   },
 

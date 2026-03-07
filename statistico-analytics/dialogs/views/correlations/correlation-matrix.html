@@ -77,6 +77,34 @@
     :root[data-theme="light"] .explore-controls { background: rgba(0,0,0,0.04); }
     :root[data-theme="light"] .explore-table th { border-right-color: rgba(0,0,0,0.1); }
 
+    /* ── Header action buttons in navrow ── */
+    .navrow-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .statistico-navrow .navrow-tabs { width: auto; flex: 0 1 auto; }
+    .hero-action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(148,163,184,.45);
+      background: linear-gradient(145deg, rgba(148,163,184,.18), rgba(100,116,139,.16));
+      color: #fff;
+      font-size: 12px;
+      font-weight: 650;
+      cursor: pointer;
+      position: relative;
+      transition: background .18s, border-color .18s, transform .15s;
+    }
+    .hero-action-btn:hover { background: linear-gradient(145deg, rgba(148,163,184,.3), rgba(100,116,139,.28)); transform: translateY(-1px); }
+    :root[data-theme="light"] .hero-action-btn { color: #1f2937; border-color: rgba(0,0,0,.18); background: linear-gradient(145deg, rgba(0,0,0,.06), rgba(0,0,0,.04)); }
+
     /* ── Reset / Base ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -847,6 +875,9 @@
 </head>
 <body>
 
+<!-- Shared Header Mount Point -->
+<div id="header-container"></div>
+
 <!-- ══════════════════════════════════════════════
      SCATTER MODAL (fixed, outside tab system)
 ══════════════════════════════════════════════ -->
@@ -1138,6 +1169,19 @@
     Office.onReady(function() {
       if (!isInIframe && typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.init('correlation-matrix', 'Correlation Analysis', 0, 'correlations');
+
+        // Inject action buttons into the navrow
+        const navrow = document.querySelector('.statistico-navrow');
+        if (navrow) {
+          const actions = document.createElement('div');
+          actions.className = 'navrow-actions';
+          actions.innerHTML = `
+            <button class="hero-action-btn" onclick="exportHtml()" title="Export complete correlation report as standalone HTML file">
+              <i class="fa-solid fa-floppy-disk"></i> Save HTML
+            </button>
+          `;
+          navrow.appendChild(actions);
+        }
       }
 
       // Check sessionStorage pre-load (e.g. after same-window tab navigation)
@@ -2053,6 +2097,25 @@
   }
 
   console.log('✅ Correlation results dialog loaded (tabs: Matrix | Network | Explore | Partial | Reliability)');
+
+  /* ── Export as standalone HTML ── */
+  function exportHtml() {
+    try {
+      const ts   = new Date().toISOString().slice(0,19).replace(/[-T:]/g, '');
+      const name = (correlationData && correlationData.headers ? correlationData.headers.join('_').slice(0,30) : 'correlations');
+      const fileName = `Correlation_${name}_${ts}.html`;
+      const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+      const blob = new Blob([html], { type: 'text/html' });
+      const url  = URL.createObjectURL(blob);
+      const a    = Object.assign(document.createElement('a'), { href: url, download: fileName });
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+    } catch(e) {
+      alert('Failed to export HTML: ' + e.message);
+    }
+  }
+  window.exportHtml = exportHtml;
 </script>
 </body>
 </html>

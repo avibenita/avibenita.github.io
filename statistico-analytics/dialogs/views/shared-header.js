@@ -545,6 +545,46 @@ const StatisticoHeader = {
       try { sessionStorage.setItem('regressionNavData', JSON.stringify(window.regressionData)); } catch(e) {}
     }
     window.location.href = this.resolveDialogUrl(filename);
+  },
+
+  /**
+   * Register action buttons (Save Model + HTML) into the navrow.
+   * Call this right after StatisticoHeader.init().
+   * @param {object} opts
+   *   saveModel  {function}  called when "Save Model" is clicked
+   *   exportHtml {function}  called when "HTML" is clicked
+   *   moduleName {string}    tooltip for Save Model button (optional)
+   */
+  registerActions({ saveModel, exportHtml, moduleName = 'Save model' } = {}) {
+    // Remove any previously injected actions (safe to call multiple times)
+    document.querySelectorAll('.navrow-actions').forEach(el => el.remove());
+
+    const navrow = document.querySelector('.statistico-navrow');
+    if (!navrow) return;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'navrow-actions';
+    wrap.style.cssText = 'display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0;white-space:nowrap;';
+
+    if (saveModel) {
+      const btn = document.createElement('button');
+      btn.className = 'navrow-action-btn navrow-action-btn--save';
+      btn.title = moduleName;
+      btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Model';
+      btn.onclick = saveModel;
+      wrap.appendChild(btn);
+    }
+
+    if (exportHtml) {
+      const btn = document.createElement('button');
+      btn.className = 'navrow-action-btn navrow-action-btn--html';
+      btn.title = 'Export complete report as standalone HTML file';
+      btn.innerHTML = '<i class="fa-solid fa-file-code"></i> HTML';
+      btn.onclick = exportHtml;
+      wrap.appendChild(btn);
+    }
+
+    navrow.appendChild(wrap);
   }
 };
 

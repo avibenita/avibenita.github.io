@@ -616,12 +616,18 @@ const StatisticoHeader = {
     const result = actions.getData();
     if (!result) { console.warn('No data available yet'); return; }
 
-    const { usedRows, allRows, headers, range, columnRoles } = result;
+    const { usedRows, allRows, headers, usedRange, fullRange, columnRoles } = result;
 
-    // Flip mode
-    this._viewDataMode = this._viewDataMode === 'used' ? 'all' : 'used';
+    // Flip mode (first click opens with 'used', subsequent clicks toggle)
+    const panelExists = !!document.getElementById('headerDataPanel');
+    if (!panelExists) {
+      this._viewDataMode = 'used';
+    } else {
+      this._viewDataMode = this._viewDataMode === 'used' ? 'all' : 'used';
+    }
     const isUsed = this._viewDataMode === 'used';
     const rows   = isUsed ? usedRows : allRows;
+    const range  = isUsed ? (usedRange || fullRange) : fullRange;
 
     // Update button label
     const btn = document.getElementById('headerViewDataBtn');
@@ -629,15 +635,15 @@ const StatisticoHeader = {
       btn.classList.toggle('header-action-btn--data-active', !isUsed);
       btn.innerHTML = `<i class="fa-solid fa-eye${isUsed ? '' : '-slash'}"></i> ${isUsed ? 'View Data' : 'All Obs'}`;
       btn.title = isUsed
-        ? 'Showing used observations — click for all rows'
-        : 'Showing all rows — click for used observations only';
+        ? 'Showing used observations — click to see all rows'
+        : 'Showing all rows — click to return to used observations';
     }
 
     // Build or update the data panel
-    this._showDataPanel({ headers, rows, range, columnRoles, isUsed });
+    this._showDataPanel({ headers, rows, range, fullRange, usedRange, columnRoles, isUsed });
   },
 
-  _showDataPanel({ headers, rows, range, columnRoles, isUsed }) {
+  _showDataPanel({ headers, rows, range, fullRange, usedRange, columnRoles, isUsed }) {
     // Remove existing panel
     const existing = document.getElementById('headerDataPanel');
     if (existing) existing.remove();
@@ -646,8 +652,16 @@ const StatisticoHeader = {
     panel.id = 'headerDataPanel';
     panel.className = 'header-data-panel';
 
-    const usedLabel = isUsed ? 'Used observations' : 'All observations';
-    const rangeLabel = range ? ` &nbsp;·&nbsp; <span class="hdp-range">${range}</span>` : '';
+    const modeLabel = isUsed ? 'Used observations' : 'All observations';
+    const rangeHtml = range
+      ? `<span class="hdp-range-label">${isUsed ? 'Used range' : 'Full range'}:</span> <span class="hdp-range">${range}</span>`
+      : '';
+    // Show the other range as a secondary hint
+    const otherRange = isUsed ? fullRange : usedRange;
+    const otherLabel = isUsed ? 'full' : 'used';
+    const secondaryHint = (otherRange && otherRange !== range)
+      ? `<span class="hdp-range-hint">&nbsp;·&nbsp;${otherLabel}: <span class="hdp-range hdp-range--secondary">${otherRange}</span></span>`
+      : '';
 
     // Build table head
     const thCells = headers.map((h, i) => {
@@ -656,9 +670,9 @@ const StatisticoHeader = {
       return `<th class="${cls}">${h}</th>`;
     }).join('');
 
-    // Build table rows (cap display at 200 for perf)
+    // Build table rows (cap at 200 for performance)
     const displayRows = rows.slice(0, 200);
-    const trRows = displayRows.map((row, ri) => {
+    const trRows = displayRows.map((row) => {
       const tds = row.map((v, ci) => {
         const role = columnRoles ? columnRoles[ci] : null;
         const cls  = role === 'y' ? 'hdp-y' : role === 'xn' ? 'hdp-xn' : role === 'xc' ? 'hdp-xc' : '';
@@ -672,8 +686,14 @@ const StatisticoHeader = {
 
     panel.innerHTML = `
       <div class="hdp-header">
-        <span class="hdp-title"><i class="fa-solid fa-eye"></i> ${usedLabel}${rangeLabel} &nbsp;<span class="hdp-count">(${rows.length} rows × ${headers.length} cols)</span></span>
-        <button class="hdp-close" onclick="document.getElementById('headerDataPanel').remove(); StatisticoHeader._resetViewBtn();" title="Close">&times;</button>
+        <div class="hdp-header-left">
+          <span class="hdp-mode-badge ${isUsed ? 'hdp-mode-used' : 'hdp-mode-all'}">${modeLabel}</span>
+          <span class="hdp-count">${rows.length} rows &times; ${headers.length} cols</span>
+          <span class="hdp-range-row">${rangeHtml}${secondaryHint}</span>
+        </div>
+        <button class="hdp-close"
+                onclick="document.getElementById('headerDataPanel').remove(); StatisticoHeader._resetViewBtn();"
+                title="Close">&times;</button>
       </div>
       <div class="hdp-body">
         <table class="hdp-table">

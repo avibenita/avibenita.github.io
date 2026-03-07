@@ -25,11 +25,8 @@
   <script src="../../../src/shared/js/core/saved-analyses-manager.js"></script>
 
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260307e" />
-  <script src="../shared-header.js?v=20260307e"></script>
-
-  <!-- Shared Sidebar -->
-  <link rel="stylesheet" href="../shared-sidebar.css?v=2026-0307b" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260307f" />
+  <script src="../shared-header.js?v=20260307f"></script>
 
   <style>
     /* Dark Theme (Default) */
@@ -4024,7 +4021,8 @@
     // Office.js integration for Excel Add-in
     let receivedRegressionData = null;
     let receivedModelSpec = null;
-    let _usedModelRows = null;  // rows actually used in the regression (no missing values)
+    let _usedModelRows = null;       // rows actually used in the regression (no missing values)
+    let _usedModelRowIndices = null; // original row indices (0-based into rows[]) of used rows
     
     // Initialize shared header + apply default depth
     document.addEventListener('DOMContentLoaded', () => {
@@ -4049,15 +4047,33 @@
           // Only the model columns, Y → Xn → Xc order
           const usedCols    = [y, ...xnS, ...xcS];
           const usedIndices = usedCols.map(col => headers.indexOf(col)).filter(i => i !== -1);
-          const modelHeaders    = usedIndices.map(i => headers[i]);
-          const columnRoles     = modelHeaders.map(h => h === y ? 'y' : xnS.includes(h) ? 'xn' : 'xc');
+          const modelHeaders = usedIndices.map(i => headers[i]);
+          const columnRoles  = modelHeaders.map(h => h === y ? 'y' : xnS.includes(h) ? 'xn' : 'xc');
           // All rows (model columns only)
           const allRows  = rows.map(row => usedIndices.map(i => row[i]));
           // Used rows (no missing — captured during computation)
           const usedRows = _usedModelRows
             ? _usedModelRows.map(row => usedIndices.map(i => row[i]))
             : allRows;
-          return { headers: modelHeaders, usedRows, allRows, range: address, columnRoles };
+          // Compute the Excel sub-range for used rows
+          // address format: "Sheet1!A1:I26"  — row 1 is header, data starts at row 2
+          let usedRange = address;
+          if (address && _usedModelRowIndices && _usedModelRowIndices.length > 0) {
+            const rangeMatch = address.match(/^(.*!)?([A-Za-z]+)(\d+):([A-Za-z]+)(\d+)$/);
+            if (rangeMatch) {
+              const sheet    = rangeMatch[1] || '';          // "Sheet1!" or ""
+              const colStart = rangeMatch[2];               // "A"
+              const headerRow = parseInt(rangeMatch[3], 10); // 1
+              const colEnd   = rangeMatch[4];               // "I"
+              const dataStartRow = headerRow + 1;           // first data row number
+              // Map 0-based row indices to actual Excel row numbers
+              const firstUsedRow = dataStartRow + _usedModelRowIndices[0];
+              const lastUsedRow  = dataStartRow + _usedModelRowIndices[_usedModelRowIndices.length - 1];
+              usedRange = `${sheet}${colStart}${firstUsedRow}:${colEnd}${lastUsedRow}`;
+            }
+          }
+          return { headers: modelHeaders, usedRows, allRows,
+                   usedRange, fullRange: address, columnRoles };
         },
         saveModel:  () => saveCurrentRegressionAnalysis(),
         exportHtml: () => exportResultsAsHtml(),
@@ -4237,7 +4253,8 @@
       // Step 2: Build X matrix and Y vector together with synchronized filtering
       const xMatrix = [];
       const yVector = [];
-      const usedOriginalRows = [];  // track which original rows were used
+      const usedOriginalRows = [];        // track which original rows were used
+      const usedOriginalRowIndices = [];  // 0-based index into rows[]
       
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
@@ -4280,11 +4297,13 @@
           xMatrix.push(xRow);
           yVector.push(yVal);
           usedOriginalRows.push(row);
+          usedOriginalRowIndices.push(i);
         }
       }
 
-      // Store used rows so the View Data toggle can access them
-      _usedModelRows = usedOriginalRows;
+      // Store used rows + their indices so View Data can compute the actual sub-range
+      _usedModelRows       = usedOriginalRows;
+      _usedModelRowIndices = usedOriginalRowIndices;
       
       // Store variable names globally for display
       window.regressionVariableNames = variableNames;

@@ -293,9 +293,9 @@ const StatisticoHeader = {
       </div>
     `;
 
-    // Independent, dependent, logistic and factor modules use their own internal tab navigation;
+    // Independent, dependent, logistic, factor and regression modules use their own sidebar navigation;
     // hide the shared-header navrow so it doesn't show a duplicate tab bar.
-    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor');
+    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'regression');
 
     const headerHTML = `
       <div class="statistico-shell">

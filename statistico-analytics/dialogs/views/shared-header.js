@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-08-018 (factor module)');
+console.log('📦 Loading shared-header.js VERSION 2026-03-08-019 (toggle not cropped)');
 
 const StatisticoHeader = {
   currentView: 'histogram',

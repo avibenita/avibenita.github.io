@@ -36,8 +36,8 @@
   </script>
   
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260303-012">
-  <script src="../shared-header.js?v=20260303-012"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260308n">
+  <script src="../shared-header.js?v=20260308n"></script>
 
   <style>
     :root{
@@ -694,10 +694,77 @@
         font-size: 11px;
       }
     }
+  <!-- Layout CSS -->
+  <style>
+    html,body{height:100%;margin:0;padding:0;overflow:hidden;}
+    body{background:var(--surface-0);color:var(--text-primary);font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;overflow:hidden;display:flex;flex-direction:column;}
+    .sb-layout{display:flex;flex-direction:row;flex:1;min-height:0;overflow:hidden;}
+    .right-col{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}
   </style>
 </head>
 <body>
-  <!-- Shared Header will be inserted here by JavaScript -->
+  <!-- ── Sidebar Navigation ── -->
+  <nav class="sb-nav" id="sidebarNav">
+    <div class="sb-logo">
+      <div class="sb-logo-icon"><i class="fa-solid fa-chart-scatter"></i></div>
+      <div class="sb-logo-text">
+        <span class="sb-logo-name">Statistico</span>
+        <span class="sb-logo-sub">Correlations</span>
+      </div>
+    </div>
+    <div class="sb-header">
+      <i class="fa-solid fa-bars-staggered sb-menu-icon"></i>
+      <span class="sb-menu-title">Menu</span>
+      <button class="sb-toggle-btn" onclick="StatisticoHeader.toggleSidebar()" title="Collapse / expand">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+    </div>
+    <div class="sb-body">
+      <div class="sb-group">
+        <div class="sb-group-title">Analysis</div>
+        <div class="sb-items-rail">
+          <button class="sb-item active" onclick="switchToViewAndTitle('matrixView','Correlation Matrix')" data-view="matrixView">
+            <i class="fa-solid fa-table-cells sb-item-icon"></i>
+            <span class="sb-item-label">Matrix</span>
+          </button>
+          <button class="sb-item" onclick="switchToViewAndTitle('networkView','Correlation Network')" data-view="networkView">
+            <i class="fa-solid fa-circle-nodes sb-item-icon"></i>
+            <span class="sb-item-label">Network</span>
+          </button>
+          <button class="sb-item" onclick="switchToViewAndTitle('partialView','Partial Correlations')" data-view="partialView">
+            <i class="fa-solid fa-filter sb-item-icon"></i>
+            <span class="sb-item-label">Partial</span>
+          </button>
+          <button class="sb-item" onclick="switchToViewAndTitle('reliabilityView','Reliability Coefficients')" data-view="reliabilityView">
+            <i class="fa-solid fa-check-double sb-item-icon"></i>
+            <span class="sb-item-label">Reliability</span>
+          </button>
+          <button class="sb-item" onclick="switchToViewAndTitle('rollingView','Rolling Correlations')" data-view="rollingView">
+            <i class="fa-solid fa-chart-line sb-item-icon"></i>
+            <span class="sb-item-label">Rolling</span>
+          </button>
+          <button class="sb-item" onclick="switchToViewAndTitle('testsView','Correlation Tests')" data-view="testsView">
+            <i class="fa-solid fa-vial sb-item-icon"></i>
+            <span class="sb-item-label">Tests</span>
+          </button>
+        </div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-group-title">Navigate</div>
+        <div class="sb-items-rail">
+          <button class="sb-item" onclick="StatisticoHeader.navigateTo('correlations/descriptive-stats.html')" data-view="descriptiveView">
+            <i class="fa-solid fa-list-ol sb-item-icon"></i>
+            <span class="sb-item-label">Descriptives</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Right column: shared header + content ── -->
+  <div class="right-col">
+    <div id="header-container"></div>
+    <div style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;">
 
   <!-- Matrix View -->
   <div id="matrixView" class="view-section active">
@@ -756,7 +823,7 @@
     <div id="resultsContainer" style="display:none;">
       <div class="scroll-hint">
         <i class="fa-solid fa-arrows-left-right"></i>
-        Scroll horizontally to view all variables � First column stays fixed
+        Scroll horizontally to view all variables � First column stays fixed
       </div>
       
       <div class="table-container">
@@ -893,26 +960,12 @@
       if (targetView) {
         targetView.classList.add('active');
         currentView = viewId;
-        console.log('? Switched to:', viewId);
+        console.log('✅ Switched to:', viewId);
 
-        // Update header to reflect current view
-        if (typeof StatisticoHeader !== 'undefined') {
-          const viewNames = {
-            'matrixView': 'correlation-matrix',
-            'networkView': 'correlation-network',
-            'partialView': 'partial-correlations',
-            'reliabilityView': 'reliability',
-            'rollingView': 'rolling-correlations',
-            'testsView': 'correlation-tests'
-          };
-          StatisticoHeader.currentView = viewNames[viewId] || 'correlation-matrix';
-          
-          // Re-render dropdown to update active state
-          const dropdownContent = document.getElementById('dropdownMenu');
-          if (dropdownContent) {
-            dropdownContent.innerHTML = StatisticoHeader.getDropdownViews();
-          }
-        }
+        // Update sidebar active state
+        document.querySelectorAll('.sb-item').forEach(btn => btn.classList.remove('active'));
+        const activeBtn = document.querySelector(`.sb-item[data-view="${viewId}"]`);
+        if (activeBtn) activeBtn.classList.add('active');
 
         // Special handling for network view
         if (viewId === 'networkView' && !window.networkRendered && correlationData) {
@@ -921,23 +974,32 @@
       }
     }
 
+    function switchToViewAndTitle(viewId, title) {
+      switchToView(viewId);
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.updateTitle(title);
+      }
+    }
+
     // Legacy functions for backward compatibility
     function switchToMatrixView() {
-      switchToView('matrixView');
+      switchToViewAndTitle('matrixView', 'Correlation Matrix');
     }
 
     function switchToNetworkView() {
-      switchToView('networkView');
+      switchToViewAndTitle('networkView', 'Correlation Network');
     }
 
     // Initialize Office.js
     Office.onReady(function(info) {
       console.log('Office initialized in correlation dialog', info);
-      console.log('?? window.switchDialogView is defined:', typeof window.switchDialogView === 'function');
       
       // Initialize shared header
       if (typeof StatisticoHeader !== 'undefined') {
-        StatisticoHeader.init('correlation-matrix', 'Correlation Matrix', 0, 'correlations');
+        StatisticoHeader.init('correlation-matrix', '', 0, 'correlations');
+        StatisticoHeader.registerActions({});
+        StatisticoHeader.initSidebarPage();
+        StatisticoHeader.updateTitle('Correlation Matrix');
       }
       
       // Listen for messages from parent
@@ -1209,7 +1271,7 @@
         headers.forEach((colHeader, j) => {
           const cell = matrix[i][j];
           if (i === j) {
-            bodyHTML += '<td class="diagonal-cell"><div class="corr-value">1.000</div><div class="corr-details">�</div></td>';
+            bodyHTML += '<td class="diagonal-cell"><div class="corr-value">1.000</div><div class="corr-details">�</div></td>';
           } else if (cell.r !== null) {
             const rDisplay = cell.r.toFixed(3);
             const pDisplay = cell.p < 0.0001 ? 'p < 0.0001' : `p = ${cell.p.toFixed(4)}`;
@@ -1221,7 +1283,7 @@
               </div>
             </td>`;
           } else {
-            bodyHTML += '<td><div class="corr-value">�</div><div class="corr-details">N/A</div></td>';
+            bodyHTML += '<td><div class="corr-value">�</div><div class="corr-details">N/A</div></td>';
           }
         });
         bodyHTML += '</tr>';
@@ -1268,7 +1330,7 @@
         if (corrSpan) {
           const corrText = corrSpan.textContent.trim();
           // Skip diagonal and missing values
-          if (corrText !== '1.000' && corrText !== '�' && corrText !== 'N/A') {
+          if (corrText !== '1.000' && corrText !== '�' && corrText !== 'N/A') {
             const corrValue = parseFloat(corrText);
             // Highlight if |r| >= threshold and < 0.999 (exclude near-perfect correlations from highlight for clarity)
             if (!isNaN(corrValue) && Math.abs(corrValue) >= threshold && Math.abs(corrValue) < 0.999) {
@@ -1535,6 +1597,8 @@
         }});
       }
     });</script>
+  </div><!-- end right-col inner -->
+  </div><!-- end right-col -->
 </body>
 </html>
 

@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-08-023 (standardize-sidebar)');
+console.log('📦 Loading shared-header.js VERSION 2026-03-08-024 (sidebar-correlations-univariate)');
 
 const StatisticoHeader = {
   currentView: 'histogram',
@@ -301,9 +301,8 @@ const StatisticoHeader = {
       </div>
     `;
 
-    // Independent, dependent, logistic, factor and regression modules use their own sidebar navigation;
-    // hide the shared-header navrow so it doesn't show a duplicate tab bar.
-    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'regression');
+    // All sidebar-based modules hide the shared-header navrow to avoid duplicate navigation.
+    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate');
 
     const headerHTML = `
       <div class="statistico-shell">

@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-07-015 (dependent module support)');
+console.log('📦 Loading shared-header.js VERSION 2026-03-07-016 (glass buttons)');
 
 const StatisticoHeader = {
   currentView: 'histogram',

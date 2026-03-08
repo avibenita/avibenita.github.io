@@ -150,6 +150,14 @@ const StatisticoHeader = {
   },
   
   /**
+   * Update the header center title (view name shown in the dark bar)
+   */
+  updateTitle(title) {
+    const el = document.getElementById('headerViewName');
+    if (el) el.textContent = title;
+  },
+
+  /**
    * Update variable name and sample size
    */
   updateVariable(variableName, sampleSize) {

@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-07-016 (glass buttons)');
+console.log('📦 Loading shared-header.js VERSION 2026-03-08-017 (logistic module)');
 
 const StatisticoHeader = {
   currentView: 'histogram',
@@ -96,6 +96,8 @@ const StatisticoHeader = {
       this.module = 'regression';
     } else if (viewName.includes('correlation') || viewName.includes('network')) {
       this.module = 'correlations';
+    } else if (viewName.includes('logistic')) {
+      this.module = 'logistic';
     } else if (viewName.includes('independent')) {
       this.module = 'independent';
     } else if (viewName.includes('dependent')) {
@@ -236,6 +238,9 @@ const StatisticoHeader = {
       'regression-input': 'Model Setup',
       'regression-results': 'Regression Results',
       'regression-residuals': 'Residual Diagnostics',
+      // Logistic regression views
+      'logistic-results': 'Logistic Regression',
+
       // Independent means views
       'independent-results': 'Independent Means (2 Groups)',
       'independent-results-kplus': 'Independent Means (K+ Groups)',
@@ -249,7 +254,8 @@ const StatisticoHeader = {
       'correlations': 'Correlations',
       'regression': 'Regression',
       'independent': 'Independent Means',
-      'dependent': 'Dependent Means'
+      'dependent': 'Dependent Means',
+      'logistic': 'Logistic Regression'
     };
     
     const currentTheme = this.getTheme();
@@ -290,9 +296,9 @@ const StatisticoHeader = {
       </div>
     `;
 
-    // Independent and dependent modules use their own internal tab navigation;
-    // hide the shared-header navrow so it doesn't show a duplicate "2 Groups / K+ Groups" bar.
-    const hideNavrow = (this.module === 'independent' || this.module === 'dependent');
+    // Independent, dependent and logistic modules use their own internal tab navigation;
+    // hide the shared-header navrow so it doesn't show a duplicate tab bar.
+    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic');
 
     const headerHTML = `
       <div class="statistico-shell">

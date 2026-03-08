@@ -7,6 +7,8 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   <script src="https://code.highcharts.com/highcharts.js"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260308a"/>
+  <script src="../shared-header.js?v=20260308a"></script>
   <style>
     :root{
       --surface-0:#0c1624;
@@ -396,14 +398,9 @@
   </style>
 </head>
 <body>
+  <div id="header-container"></div>
   <div class="wrap">
     <section class="card" role="main">
-      <div class="card-head">
-        <span><i class="fa-solid fa-chart-line"></i> Logistic Regression Analysis</span>
-        <div class="header-right">
-        </div>
-      </div>
-
       <div class="card-body">
         <div class="tabs" id="tabButtons">
           <button class="tab-btn active" data-tab="results">Results</button>
@@ -738,7 +735,7 @@
     function parseMaybeNumber(value) {
       if (value === undefined || value === null) return NaN;
       var v = String(value).trim();
-      if (!v || v === "—" || v === "N/A") return NaN;
+      if (!v || v === "ï¿½" || v === "N/A") return NaN;
       if (v.indexOf("<") === 0) v = v.slice(1);
       if (v.indexOf("%") >= 0) v = v.replace("%", "");
       // Handle locale decimal comma (e.g., "0,523")
@@ -912,9 +909,9 @@
           var pNum = parseMaybeNumber(r.PValue || r.pValue || r.p);
           var orNum = parseMaybeNumber(r.OR || r.or || r.OddsRatio);
           return {
-            name: r.Variable || r.variable || "—",
-            or: r.OR || r.or || r.OddsRatio || "—",
-            p: r.PValue || r.pValue || r.p || "—",
+            name: r.Variable || r.variable || "ï¿½",
+            or: r.OR || r.or || r.OddsRatio || "ï¿½",
+            p: r.PValue || r.pValue || r.p || "ï¿½",
             pNum: pNum,
             orNum: orNum
           };
@@ -994,6 +991,12 @@
       updateHeaderBadges(stats);
       logisticPayloadForAI = Object.assign({}, logisticPayloadForAI || {}, { stats: stats });
       document.getElementById("aiInterpretBtn").style.display = "inline-block";
+
+      if (typeof StatisticoHeader !== 'undefined') {
+        var outcomeLabel = stats.outcomeVariable || stats.outcomeColumn || stats.yColumn || stats.outcome || 'Outcome';
+        var n = stats.observations || stats.validObs || 0;
+        StatisticoHeader.updateVariable(outcomeLabel, n);
+      }
     };
 
     window.populateLogisticCoefficients = function(data) {
@@ -1011,15 +1014,15 @@
         rows.forEach(function(row) {
           var tr = document.createElement("tr");
           var values = [
-            row.Variable || row.variable || "—",
-            row.Beta || row.beta || row.Coefficient || "—",
-            row.SE || row.se || row.StdError || "—",
-            row.WaldZ || row.waldZ || row["Wald z"] || "—",
-            row.PValue || row.pValue || row.p || "—",
-            row.OR || row.or || row.OddsRatio || "—",
-            row.OR_CI_Lower || row.orCiLower || row.CI_Lower || "—",
-            row.OR_CI_Upper || row.orCiUpper || row.CI_Upper || "—",
-            row.Reference || row.referenceCategory || "—"
+            row.Variable || row.variable || "ï¿½",
+            row.Beta || row.beta || row.Coefficient || "ï¿½",
+            row.SE || row.se || row.StdError || "ï¿½",
+            row.WaldZ || row.waldZ || row["Wald z"] || "ï¿½",
+            row.PValue || row.pValue || row.p || "ï¿½",
+            row.OR || row.or || row.OddsRatio || "ï¿½",
+            row.OR_CI_Lower || row.orCiLower || row.CI_Lower || "ï¿½",
+            row.OR_CI_Upper || row.orCiUpper || row.CI_Upper || "ï¿½",
+            row.Reference || row.referenceCategory || "ï¿½"
           ];
           values.forEach(function(v) {
             var td = document.createElement("td");
@@ -1052,7 +1055,7 @@
 
       rows.forEach(function(row) {
         var tr = document.createElement("tr");
-        [row.Observed || row.observed || "—", row.Probability || row.predictedProbability || "—", row.PredictedClass || row.predictedClass || "—"]
+        [row.Observed || row.observed || "ï¿½", row.Probability || row.predictedProbability || "ï¿½", row.PredictedClass || row.predictedClass || "ï¿½"]
           .forEach(function(v) {
             var td = document.createElement("td");
             td.textContent = v;
@@ -1097,7 +1100,7 @@
 
       rows.forEach(function(row) {
         var tr = document.createElement("tr");
-        [row.Predictor || row.predictor || "—", row.EventRate || row.eventRate || "—", row.MeanByOutcome || row.meanByOutcome || "—", row.Notes || row.notes || "—"]
+        [row.Predictor || row.predictor || "ï¿½", row.EventRate || row.eventRate || "ï¿½", row.MeanByOutcome || row.meanByOutcome || "ï¿½", row.Notes || row.notes || "ï¿½"]
           .forEach(function(v) {
             var td = document.createElement("td");
             td.textContent = v;
@@ -1206,6 +1209,9 @@
         case "RESET_RESULTS":
           window.resetResultsPanel();
           break;
+        case "RANGE_DATA":
+          if (message.payload) window.logisticRangeData = message.payload;
+          break;
         case "SWITCH_TAB":
           if (message.payload && message.payload.tab) switchTab(message.payload.tab);
           break;
@@ -1241,6 +1247,20 @@
     }
 
     document.addEventListener("DOMContentLoaded", function() {
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.init('logistic-results', '', 0, 'logistic');
+        StatisticoHeader.registerActions({
+          getData: function() {
+            if (!window.logisticRangeData) return null;
+            var headers = window.logisticRangeData[0] || [];
+            var rows    = window.logisticRangeData.slice(1);
+            return { headers: headers, allRows: rows, usedRows: rows, fullRange: 'A:Z', usedRange: 'A:Z' };
+          },
+          saveModel:  function() { sendToHost('saveLogisticModel', {}); },
+          exportHtml: function() { sendToHost('exportLogisticHtml', {}); },
+          moduleName: 'Save logistic regression model'
+        });
+      }
       wireNavigation();
       switchTab("results");
       renderRocHighchart([{ fpr: 0, tpr: 0 }, { fpr: 1, tpr: 1 }], "ROC curve will render when prediction probabilities are available.");

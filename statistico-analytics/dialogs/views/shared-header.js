@@ -272,15 +272,6 @@ const StatisticoHeader = {
 
     const topHeader = `
       <div class="statistico-header">
-        <div class="header-left">
-          <div class="header-logo">
-            <i class="fa-solid fa-chart-line"></i>
-          </div>
-          <div class="header-module">
-            <div class="header-brand">Statistico-Analytics</div>
-            <div class="header-module-name" id="headerModuleName">${moduleNames[this.module] || 'Analysis'}</div>
-          </div>
-        </div>
         <div class="header-center">
           <div class="header-view-name" id="headerViewName">${viewTitles[this.currentView] || 'Analysis'}</div>
           <div class="header-variable">

@@ -7,6 +7,8 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="../shared-header.css?v=20260308a"/>
+  <script src="../shared-header.js?v=20260308a"></script>
   <style>
     :root{
       --surface-0:#0c1624;
@@ -419,33 +421,10 @@
   </style>
 </head>
 <body>
+  <div id="header-container"></div>
   <div class="wrap">
     <section class="card" role="main">
-      <div class="hero-section">
-        <div class="hero-content">
-          <div class="hero-title">
-            <i class="fa-solid fa-shapes"></i>
-            <span>Factor Analysis Module</span>
-          </div>
-          <div class="hero-controls">
-            <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Dark/Light Theme">
-              <i class="fa-solid fa-moon" id="themeIcon"></i>
-            </button>
-            <button class="hero-action-btn save-model-btn" onclick="saveCurrentFactorModel()">
-              <i class="fa-solid fa-floppy-disk"></i> Save Model
-            </button>
-            <button class="hero-action-btn save-html-btn" onclick="exportFactorHtml()">
-              <i class="fa-solid fa-file-code"></i> Save HTML
-            </button>
-            <button class="hero-action-btn" onclick="goToScreePlot()" title="Jump to scree plot">
-              <i class="fa-solid fa-chart-line"></i> Scree Plot
-            </button>
-            <button class="hero-action-btn ai-interpret-btn" id="aiInterpretBtn" onclick="requestFactorAI()">
-              <i class="fa-solid fa-robot"></i> AI Interpret
-            </button>
-          </div>
-        </div>
-        <div class="tab-navigation">
+      <div class="tab-navigation">
           <button class="tab-button active" data-tab="suitability"><i class="fa-solid fa-circle-check"></i> Suitability</button>
           <button class="tab-button" data-tab="extraction"><i class="fa-solid fa-magnifying-glass-chart"></i> Extraction</button>
           <button class="tab-button" data-tab="rotation"><i class="fa-solid fa-arrows-rotate"></i> Rotation</button>
@@ -464,7 +443,6 @@
             </select>
           </div>
         </div>
-      </div>
 
       <div class="view-container">
         <div class="card-body">
@@ -881,6 +859,13 @@
       renderHeatmap(d.correlationMatrix || [], d.variableLabels || []);
       factorPayloadForAI = Object.assign({}, factorPayloadForAI || {}, { suitability: d });
       document.getElementById("aiInterpretBtn").style.display = "inline-flex";
+
+      if (typeof StatisticoHeader !== 'undefined') {
+        var labels = d.variableLabels || [];
+        var label  = labels.length > 0 ? labels.join(' / ').slice(0, 60) : 'Variables';
+        var n      = d.caseCount || 0;
+        StatisticoHeader.updateVariable(label, n);
+      }
     };
 
     window.populateFactorExtraction = function(data) {
@@ -1110,6 +1095,9 @@
               case "RESET_RESULTS":
                 window.resetResultsPanel();
                 break;
+              case "RANGE_DATA":
+                if (message.payload) window.factorRangeData = message.payload;
+                break;
             }
           } catch (e) {
             console.error("Failed to parse parent message:", e);
@@ -1131,6 +1119,20 @@
     }
 
     document.addEventListener("DOMContentLoaded", function() {
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.init('factor-analysis', '', 0, 'factor');
+        StatisticoHeader.registerActions({
+          getData: function() {
+            if (!window.factorRangeData) return null;
+            var headers = window.factorRangeData[0] || [];
+            var rows    = window.factorRangeData.slice(1);
+            return { headers: headers, allRows: rows, usedRows: rows, fullRange: 'A:Z', usedRange: 'A:Z' };
+          },
+          saveModel:  function() { saveCurrentFactorModel(); },
+          exportHtml: function() { exportFactorHtml(); },
+          moduleName: 'Save factor analysis model'
+        });
+      }
       wireNavigation();
       loadSavedTheme();
       switchTab("suitability");

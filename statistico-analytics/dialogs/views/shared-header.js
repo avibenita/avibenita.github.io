@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-08-017 (logistic module)');
+console.log('📦 Loading shared-header.js VERSION 2026-03-08-018 (factor module)');
 
 const StatisticoHeader = {
   currentView: 'histogram',
@@ -98,6 +98,8 @@ const StatisticoHeader = {
       this.module = 'correlations';
     } else if (viewName.includes('logistic')) {
       this.module = 'logistic';
+    } else if (viewName.includes('factor')) {
+      this.module = 'factor';
     } else if (viewName.includes('independent')) {
       this.module = 'independent';
     } else if (viewName.includes('dependent')) {
@@ -241,6 +243,9 @@ const StatisticoHeader = {
       // Logistic regression views
       'logistic-results': 'Logistic Regression',
 
+      // Factor analysis views
+      'factor-analysis': 'Factor Analysis',
+
       // Independent means views
       'independent-results': 'Independent Means (2 Groups)',
       'independent-results-kplus': 'Independent Means (K+ Groups)',
@@ -255,7 +260,8 @@ const StatisticoHeader = {
       'regression': 'Regression',
       'independent': 'Independent Means',
       'dependent': 'Dependent Means',
-      'logistic': 'Logistic Regression'
+      'logistic': 'Logistic Regression',
+      'factor': 'Factor Analysis'
     };
     
     const currentTheme = this.getTheme();
@@ -296,9 +302,9 @@ const StatisticoHeader = {
       </div>
     `;
 
-    // Independent, dependent and logistic modules use their own internal tab navigation;
+    // Independent, dependent, logistic and factor modules use their own internal tab navigation;
     // hide the shared-header navrow so it doesn't show a duplicate tab bar.
-    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic');
+    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor');
 
     const headerHTML = `
       <div class="statistico-shell">

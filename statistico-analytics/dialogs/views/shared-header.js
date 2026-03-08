@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-08-020 (sb-nav sidebar CSS)');
+console.log('📦 Loading shared-header.js VERSION 2026-03-08-021 (sb-nav redesign)');
 
 const StatisticoHeader = {
   currentView: 'histogram',

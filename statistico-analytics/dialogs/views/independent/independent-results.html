@@ -10,8 +10,8 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260308l" />
-  <script src="../shared-header.js?v=20260308l"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260308m" />
+  <script src="../shared-header.js?v=20260308m"></script>
 
   <script>
     // AI API Key configuration (Groq)
@@ -205,24 +205,71 @@
   </style>
 </head>
 <body>
-  <div id="header-container"></div>
-  <div class="wrap">
-    <section class="card">
-      <div class="hero-section">
-        <div class="tab-navigation">
-          <button class="tab-button active" data-tab="explore"><i class="fa-solid fa-chart-column"></i> Explore</button>
-          <button class="tab-button" data-tab="assumptions"><i class="fa-solid fa-shield-halved"></i> Assumptions</button>
-          <button class="tab-button" data-tab="results"><i class="fa-solid fa-square-poll-vertical"></i> Results</button>
-          <button class="tab-button" data-tab="effects"><i class="fa-solid fa-wave-square"></i> Effects</button>
-          <button class="tab-button" data-tab="power"><i class="fa-solid fa-bolt"></i> Power</button>
-          <button class="tab-button" data-tab="report"><i class="fa-solid fa-file-lines"></i> Report</button>
-          <div class="tab-controls-right">
-            <label for="decimalSelect">Decimals:</label>
-            <select id="decimalSelect" class="tab-decimal-select" onchange="setDecimalPrecision()">
-              <option value="auto">Auto</option><option value="0">0</option><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option>
-            </select>
-          </div>
+  <!-- ── Sidebar Navigation ── -->
+  <nav class="sb-nav" id="sidebarNav">
+    <div class="sb-logo">
+      <div class="sb-logo-icon"><i class="fa-solid fa-equals"></i></div>
+      <div class="sb-logo-text">
+        <span class="sb-logo-name">Statistico</span>
+        <span class="sb-logo-sub">Independent</span>
+      </div>
+    </div>
+    <div class="sb-header">
+      <i class="fa-solid fa-bars-staggered sb-menu-icon"></i>
+      <span class="sb-menu-title">Menu</span>
+      <button class="sb-toggle-btn" onclick="StatisticoHeader.toggleSidebar()" title="Collapse / expand">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+    </div>
+    <div class="sb-body">
+      <div class="sb-group">
+        <div class="sb-group-title">Analysis</div>
+        <div class="sb-items-rail">
+          <button class="sb-item active" onclick="switchTab('explore')" data-tab="explore">
+            <i class="fa-solid fa-chart-column sb-item-icon"></i>
+            <span class="sb-item-label">Explore</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('assumptions')" data-tab="assumptions">
+            <i class="fa-solid fa-shield-halved sb-item-icon"></i>
+            <span class="sb-item-label">Assumptions</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('results')" data-tab="results">
+            <i class="fa-solid fa-square-poll-vertical sb-item-icon"></i>
+            <span class="sb-item-label">Results</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('effects')" data-tab="effects">
+            <i class="fa-solid fa-wave-square sb-item-icon"></i>
+            <span class="sb-item-label">Effects</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('power')" data-tab="power">
+            <i class="fa-solid fa-bolt sb-item-icon"></i>
+            <span class="sb-item-label">Power</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('report')" data-tab="report">
+            <i class="fa-solid fa-file-lines sb-item-icon"></i>
+            <span class="sb-item-label">Report</span>
+          </button>
         </div>
+      </div>
+    </div>
+    <div class="sb-bottom">
+      <div class="sb-bottom-row">
+        <i class="fa-solid fa-hashtag sb-bottom-icon"></i>
+        <span class="sb-bottom-label">Decimals:</span>
+        <select id="decimalSelect" class="sb-bottom-select" onchange="setDecimalPrecision()">
+          <option value="auto">Auto</option><option value="0">0</option><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option>
+        </select>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Right column: shared header + content ── -->
+  <div class="right-col">
+    <div id="header-container"></div>
+    <div class="wrap">
+      <section class="card">
+        <div class="hero-section">
+          <!-- tab-navigation removed: sidebar handles navigation -->
 
         <div class="settings-bar">
   <div class="settings-panel-title">Test Configuration Panel</div>
@@ -499,7 +546,22 @@
     function fmtP(v){ const n=parseMaybeNumber(v); if(!isFinite(n)) return v==null?"...":String(v); if(n < 0.001) return "< 0.001"; return globalDecimalPrecision === "auto" ? n.toFixed(4) : n.toFixed(Math.max(3, parseInt(globalDecimalPrecision,10))); }
     function setDecimalPrecision(){ globalDecimalPrecision=(document.getElementById("decimalSelect")||{value:"auto"}).value; if(lastBundle) populateBundle(lastBundle); }
     function setText(id,val){ const el=document.getElementById(id); if(el) el.textContent = (val!==undefined&&val!==null&&val!=="")?val:"..."; }
-    function switchTab(tab){ console.log('switchTab ?', tab); document.querySelectorAll(".tab-button").forEach(b=>b.classList.toggle("active",b.getAttribute("data-tab")===tab)); document.querySelectorAll(".tab-panel").forEach(p=>p.classList.toggle("active",p.id==="tab-"+tab)); requestAnimationFrame(fitIndependentLayout); }
+    function switchTab(tab){
+      const tabTitles = {
+        'explore':     'Explore',
+        'assumptions': 'Assumptions',
+        'results':     'Results',
+        'effects':     'Effects',
+        'power':       'Power',
+        'report':      'Report'
+      };
+      if (tabTitles[tab] && typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.updateTitle(tabTitles[tab]);
+      }
+      document.querySelectorAll(".sb-item[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+      document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === "tab-" + tab));
+      requestAnimationFrame(fitIndependentLayout);
+    }
     function sendToHost(cmd,data){ if(Office&&Office.context&&Office.context.ui&&Office.context.ui.messageParent) Office.context.ui.messageParent(JSON.stringify({action:"HOST_EVENT",cmd:cmd,data:data||{}})); }
     function fillSelect(id, options, selected){
       const el = document.getElementById(id);
@@ -1551,9 +1613,12 @@
           exportHtml: () => exportHtml(),
           moduleName: 'Save independent means model'
         });
+        StatisticoHeader.initSidebarPage();
+        StatisticoHeader.updateTitle('Explore');
       }
 
-      document.querySelectorAll(".tab-button").forEach(btn=>btn.addEventListener("click",()=>switchTab(btn.getAttribute("data-tab"))));
+      // Sidebar navigation — tab switching handled by sidebar onclick handlers
+      // (old .tab-button listeners removed)
       ["setAlpha","setPosthocMethod","setPosthocCorrection","setPrimaryTest"].forEach(function(id){
         const el = document.getElementById(id);
         if (el) el.addEventListener("change", function(){
@@ -1625,5 +1690,6 @@
       <div class="modal-body" id="aiSummaryContent"></div>
     </div>
   </div>
+  </div><!-- /right-col -->
 </body>
 </html>

@@ -10,8 +10,8 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
 
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260308l" />
-  <script src="../shared-header.js?v=20260308l"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260308m" />
+  <script src="../shared-header.js?v=20260308m"></script>
 
   <script>
     // AI API Key configuration (Groq)
@@ -734,26 +734,79 @@
   </style>
 </head>
 <body>
-  <div id="header-container"></div>
-  <div class="wrap">
-    <section class="card">
-      <div class="hero-section">
-        <div class="tab-navigation">
-          <button class="tab-button active" data-tab="explore"><i class="fa-solid fa-chart-column"></i> Explore</button>
-          <button class="tab-button" data-tab="trajectories"><i class="fa-solid fa-chart-line"></i> Trajectories</button>
-          <button class="tab-button" data-tab="assumptions"><i class="fa-solid fa-shield-halved"></i> Assumptions</button>
-          <button class="tab-button" data-tab="results"><i class="fa-solid fa-square-poll-vertical"></i> Results</button>
-          <button class="tab-button" data-tab="posthoc"><i class="fa-solid fa-table-cells"></i> Post-hoc</button>
-          <button class="tab-button" data-tab="effects"><i class="fa-solid fa-wave-square"></i> Effects</button>
-          <button class="tab-button" data-tab="power"><i class="fa-solid fa-bolt"></i> Power</button>
-          <button class="tab-button" data-tab="ai-interpretation"><i class="fa-solid fa-brain"></i> AI Interpretation</button>
-          <div class="tab-controls-right">
-            <label for="decimalSelect" style="font-size:13px;color:rgba(255,255,255,.70);font-weight:700;">Decimals</label>
-            <select id="decimalSelect" class="tab-decimal-select" onchange="setDecimalPrecision()">
-              <option value="auto">Auto</option><option value="0">0</option><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option>
-            </select>
-          </div>
+  <!-- ── Sidebar Navigation ── -->
+  <nav class="sb-nav" id="sidebarNav">
+    <div class="sb-logo">
+      <div class="sb-logo-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+      <div class="sb-logo-text">
+        <span class="sb-logo-name">Statistico</span>
+        <span class="sb-logo-sub">Repeated Measures</span>
+      </div>
+    </div>
+    <div class="sb-header">
+      <i class="fa-solid fa-bars-staggered sb-menu-icon"></i>
+      <span class="sb-menu-title">Menu</span>
+      <button class="sb-toggle-btn" onclick="StatisticoHeader.toggleSidebar()" title="Collapse / expand">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+    </div>
+    <div class="sb-body">
+      <div class="sb-group">
+        <div class="sb-group-title">Analysis</div>
+        <div class="sb-items-rail">
+          <button class="sb-item active" onclick="switchTab('explore')" data-tab="explore">
+            <i class="fa-solid fa-chart-column sb-item-icon"></i>
+            <span class="sb-item-label">Explore</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('trajectories')" data-tab="trajectories">
+            <i class="fa-solid fa-chart-line sb-item-icon"></i>
+            <span class="sb-item-label">Trajectories</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('assumptions')" data-tab="assumptions">
+            <i class="fa-solid fa-shield-halved sb-item-icon"></i>
+            <span class="sb-item-label">Assumptions</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('results')" data-tab="results">
+            <i class="fa-solid fa-square-poll-vertical sb-item-icon"></i>
+            <span class="sb-item-label">Results</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('posthoc')" data-tab="posthoc">
+            <i class="fa-solid fa-table-cells sb-item-icon"></i>
+            <span class="sb-item-label">Post-hoc</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('effects')" data-tab="effects">
+            <i class="fa-solid fa-wave-square sb-item-icon"></i>
+            <span class="sb-item-label">Effects</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('power')" data-tab="power">
+            <i class="fa-solid fa-bolt sb-item-icon"></i>
+            <span class="sb-item-label">Power</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('ai-interpretation')" data-tab="ai-interpretation">
+            <i class="fa-solid fa-brain sb-item-icon"></i>
+            <span class="sb-item-label">AI Interpretation</span>
+          </button>
         </div>
+      </div>
+    </div>
+    <div class="sb-bottom">
+      <div class="sb-bottom-row">
+        <i class="fa-solid fa-hashtag sb-bottom-icon"></i>
+        <span class="sb-bottom-label">Decimals:</span>
+        <select id="decimalSelect" class="sb-bottom-select" onchange="setDecimalPrecision()">
+          <option value="auto">Auto</option><option value="0">0</option><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option>
+        </select>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Right column: shared header + content ── -->
+  <div class="right-col">
+    <div id="header-container"></div>
+    <div class="wrap">
+      <section class="card">
+        <div class="hero-section">
+          <!-- tab-navigation removed: sidebar handles navigation -->
 
         <div class="settings-bar">
   <div class="settings-panel-title">Test Configuration Panel (>2 Timepoints)</div>
@@ -1538,12 +1591,22 @@
     let activeTab = "explore";
     function switchTab(tab){
       if (!tab || tab === activeTab) return;
-      const prevBtn = document.querySelector('.tab-button[data-tab="' + activeTab + '"]');
-      const nextBtn = document.querySelector('.tab-button[data-tab="' + tab + '"]');
+      const tabTitles = {
+        'explore':           'Explore',
+        'trajectories':      'Trajectories',
+        'assumptions':       'Assumptions',
+        'results':           'Results',
+        'posthoc':           'Post-hoc',
+        'effects':           'Effects',
+        'power':             'Power',
+        'ai-interpretation': 'AI Interpretation'
+      };
+      if (tabTitles[tab] && typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.updateTitle(tabTitles[tab]);
+      }
+      document.querySelectorAll(".sb-item[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
       const prevPanel = document.getElementById("tab-" + activeTab);
       const nextPanel = document.getElementById("tab-" + tab);
-      if (prevBtn) prevBtn.classList.remove("active");
-      if (nextBtn) nextBtn.classList.add("active");
       if (prevPanel) prevPanel.classList.remove("active");
       if (nextPanel) nextPanel.classList.add("active");
       activeTab = tab;
@@ -3520,8 +3583,11 @@
           exportHtml: () => exportHtml(),
           moduleName: 'Save dependent means model'
         });
+        StatisticoHeader.initSidebarPage();
+        StatisticoHeader.updateTitle('Explore');
       }
-      document.querySelectorAll(".tab-button").forEach(btn=>btn.addEventListener("click",()=>switchTab(btn.getAttribute("data-tab"))));
+      // Sidebar navigation — tab switching handled by sidebar onclick handlers
+      // (old .tab-button listeners removed)
       ["setAlpha","setPosthocMethod","setPosthocCorrection","setPrimaryTest"].forEach(function(id){
         const el = document.getElementById(id);
         if (el) el.addEventListener("change", function(){
@@ -5988,5 +6054,6 @@ TONE: Professional, precise, but accessible to researchers in applied fields.`
     </div>
   </div>
   
+  </div><!-- /right-col -->
 </body>
 </html>

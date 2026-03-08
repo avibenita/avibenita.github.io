@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-08-021 (sb-nav redesign)');
+console.log('📦 Loading shared-header.js VERSION 2026-03-08-023 (standardize-sidebar)');
 
 const StatisticoHeader = {
   currentView: 'histogram',
@@ -823,6 +823,46 @@ const StatisticoHeader = {
   registerActions({ getData, saveModel, exportHtml, moduleName = 'Save model' } = {}) {
     this._pendingActions = { getData, saveModel, exportHtml, moduleName };
     this.render();
+  },
+
+  /* ─────────────────────────────────────────────────────────────────
+     Shared Sidebar Utilities
+     Used by modules that include a vertical .sb-nav sidebar.
+     Call StatisticoHeader.initSidebarPage() once after init().
+  ───────────────────────────────────────────────────────────────── */
+
+  /**
+   * Mark the body as a sidebar-layout page so shared CSS rules apply.
+   * Also adds the .sb-layout div around the sidebar + right column if
+   * the page uses the standard:
+   *   <body>
+   *     <div id="header-container"></div>
+   *     <nav class="sb-nav" id="sidebarNav">…</nav>
+   *     <div class="right-col">…</div>
+   *   </body>
+   */
+  initSidebarPage() {
+    document.body.classList.add('sb-page');
+
+    // If the page hasn't wrapped in sb-layout yet, do it now.
+    const nav = document.getElementById('sidebarNav');
+    const rightCol = document.querySelector('.right-col');
+    if (nav && rightCol && !document.querySelector('.sb-layout')) {
+      const layout = document.createElement('div');
+      layout.className = 'sb-layout lf-content';
+      nav.parentNode.insertBefore(layout, nav);
+      layout.appendChild(nav);
+      layout.appendChild(rightCol);
+    }
+  },
+
+  /**
+   * Toggle the sidebar collapsed/expanded state.
+   * Pages can wire this to the sb-toggle-btn onclick.
+   */
+  toggleSidebar() {
+    const nav = document.getElementById('sidebarNav');
+    if (nav) nav.classList.toggle('collapsed');
   }
 };
 

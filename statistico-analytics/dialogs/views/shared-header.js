@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-07-014 (hide navrow for independent/dependent)');
+console.log('📦 Loading shared-header.js VERSION 2026-03-07-015 (dependent module support)');
 
 const StatisticoHeader = {
   currentView: 'histogram',
@@ -239,9 +239,9 @@ const StatisticoHeader = {
       // Independent means views
       'independent-results': 'Independent Means (2 Groups)',
       'independent-results-kplus': 'Independent Means (K+ Groups)',
-      // Dependent means views
-      'dependent-results': 'Dependent Means',
-      'dependent-results-kplus': 'Dependent Means (K+ Groups)'
+      // Dependent means / repeated measures views
+      'dependent-results': 'Dependent Means (Paired)',
+      'dependent-results-kplus': 'Repeated Measures (3+ Timepoints)'
     };
 
     const moduleNames = {

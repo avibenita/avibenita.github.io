@@ -8,6 +8,11 @@
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <script src="https://code.highcharts.com/highcharts-more.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
+
+  <!-- Shared Header -->
+  <link rel="stylesheet" href="../shared-header.css?v=20260307k" />
+  <script src="../shared-header.js?v=20260307k"></script>
+
   <script>
     // AI API Key configuration (Groq)
     window.AI_API_KEY = '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';
@@ -181,23 +186,10 @@
   </style>
 </head>
 <body>
+  <div id="header-container"></div>
   <div class="wrap">
     <section class="card">
       <div class="hero-section">
-        <div class="hero-content">
-          <div class="hero-title"><span>Paired Samples Module</span></div>
-          <div class="hero-controls">
-            <button class="hero-action-btn" onclick="generateAISummary()" title="Generate AI statistical summary from all results" id="aiSummaryBtn">
-              <i class="fa-solid fa-brain"></i> AI Summary
-            </button>
-            <button class="hero-action-btn" onclick="saveCurrentModel()" title="Save model configuration to Excel workbook">
-              <i class="fa-solid fa-floppy-disk"></i> Model
-            </button>
-            <button class="hero-action-btn" onclick="exportHtml()" title="Export complete report as standalone HTML file">
-              <i class="fa-solid fa-floppy-disk"></i> HTML
-            </button>
-          </div>
-        </div>
         <div class="tab-navigation">
           <button class="tab-button active" data-tab="explore"><i class="fa-solid fa-chart-column"></i> Explore</button>
           <button class="tab-button" data-tab="assumptions"><i class="fa-solid fa-shield-halved"></i> Assumptions</button>
@@ -350,10 +342,10 @@
               <span style="color:var(--accent-1)">Descriptive Statistics</span>
               <div class="xp-hdr-meta">
                 <span>Variables: <strong id="expVarCount" style="color:var(--accent-2)">2</strong></span>
-                <span>Total N: <strong id="expTotalN" style="color:var(--accent-2)">…</strong></span>
-                <span>Complete Pairs: <strong id="expCompletePairs" style="color:var(--accent-2)">…</strong></span>
-                <span>Overall x?: <strong id="expOverallMean" style="color:var(--accent-2)">…</strong></span>
-                <span>Framework: <strong id="expFramework" style="color:var(--accent-2)">…</strong></span>
+                <span>Total N: <strong id="expTotalN" style="color:var(--accent-2)">ï¿½</strong></span>
+                <span>Complete Pairs: <strong id="expCompletePairs" style="color:var(--accent-2)">ï¿½</strong></span>
+                <span>Overall x?: <strong id="expOverallMean" style="color:var(--accent-2)">ï¿½</strong></span>
+                <span>Framework: <strong id="expFramework" style="color:var(--accent-2)">ï¿½</strong></span>
               </div>
             </div>
             <div id="missingDataWarning" style="display:none;padding:8px 16px;background:rgba(251,191,36,.12);border-left:3px solid #fbbf24;font-size:13px;">
@@ -385,7 +377,7 @@
           <div class="xp xp--grow" id="desc-histogram-panel" style="display:none;">
             <div class="xp-hdr">
               <span style="color:var(--accent-1);font-weight:800;">
-                Distribution: <span id="desc-histogram-title">—</span>
+                Distribution: <span id="desc-histogram-title">ï¿½</span>
               </span>
             </div>
             <div class="xp-body--grow" id="xp-hist-body">
@@ -858,6 +850,12 @@
       refreshSettingsVisibility();
       setText("setupMode", s.mode); setText("setupHypothesis", s.hypothesis); setText("setupConfidence", (s.confidence?fmt(100*s.confidence):"...")+"%");
       setText("expN", `${e.n1||0} / ${e.n2||0}`); setText("expMean", `${fmt(e.mean1)} / ${fmt(e.mean2)}`); setText("expMed", `${fmt(e.med1)} / ${fmt(e.med2)}`); setText("expSd", `${fmt(e.sd1)} / ${fmt(e.sd2)}`); setText("expIqr", `${fmt(e.iqr1)} / ${fmt(e.iqr2)}`);
+      // Update shared header variable line
+      if (typeof StatisticoHeader !== 'undefined') {
+        const varName = `${s.groupA || 'Time 1'} vs ${s.groupB || 'Time 2'}`;
+        const totalN = (e.n1 || 0);
+        StatisticoHeader.updateVariable(varName, totalN);
+      }
       
       // Display missing data warning
       const totalRows = parseMaybeNumber(e.totalRows) || 0;
@@ -982,8 +980,8 @@
           fmt(grp.min),
           fmt(grp.median),
           fmt(grp.max),
-          isFinite(grp.skew) ? fmt(grp.skew) : '—',
-          isFinite(grp.kurt) ? fmt(grp.kurt) : '—'
+          isFinite(grp.skew) ? fmt(grp.skew) : 'ï¿½',
+          isFinite(grp.kurt) ? fmt(grp.kurt) : 'ï¿½'
         ];
         
         cells.forEach(function(val, cellIdx) {
@@ -1053,24 +1051,24 @@
         
         if (n < 20) {
           assessment = `<strong>? Small sample (n=${n})</strong><br/>` +
-                      `• Normality tests have low power<br/>` +
-                      `• Visual inspection recommended<br/>` +
-                      `• Consider non-parametric tests`;
+                      `ï¿½ Normality tests have low power<br/>` +
+                      `ï¿½ Visual inspection recommended<br/>` +
+                      `ï¿½ Consider non-parametric tests`;
         } else if (n < 30) {
           assessment = `<strong>? Moderate sample (n=${n})</strong><br/>` +
-                      `• Visual inspection important<br/>` +
-                      `• Check for outliers and skewness<br/>` +
-                      `• Parametric tests reasonably robust`;
+                      `ï¿½ Visual inspection important<br/>` +
+                      `ï¿½ Check for outliers and skewness<br/>` +
+                      `ï¿½ Parametric tests reasonably robust`;
         } else if (n < 50) {
           assessment = `<strong>? Good sample size (n=${n})</strong><br/>` +
-                      `• Central Limit Theorem applies<br/>` +
-                      `• Parametric tests robust to mild violations<br/>` +
-                      `• Check for extreme outliers`;
+                      `ï¿½ Central Limit Theorem applies<br/>` +
+                      `ï¿½ Parametric tests robust to mild violations<br/>` +
+                      `ï¿½ Check for extreme outliers`;
         } else {
           assessment = `<strong>? Large sample (n=${n})</strong><br/>` +
-                      `• Parametric tests very robust<br/>` +
-                      `• Normality assumption less critical<br/>` +
-                      `• Focus on homogeneity of variance`;
+                      `ï¿½ Parametric tests very robust<br/>` +
+                      `ï¿½ Normality assumption less critical<br/>` +
+                      `ï¿½ Focus on homogeneity of variance`;
         }
         
         normalityInfo.innerHTML = assessment;
@@ -1102,7 +1100,7 @@
       const cats = [], counts = [], normalPts = [];
 
       if (values) {
-        // Real data path — actual counts
+        // Real data path ï¿½ actual counts
         const minV  = Math.min(...values);
         const maxV  = Math.max(...values);
         const range = (maxV - minV) || 1;
@@ -1506,6 +1504,22 @@
     }
 
     document.addEventListener("DOMContentLoaded", function(){
+      // Initialize shared header
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.init('dependent-results', '', 0, 'dependent');
+        StatisticoHeader.registerActions({
+          getData: () => {
+            if (!window.dependentRangeData || !window.dependentRangeData.length) return null;
+            const headers = window.dependentRangeData[0] || [];
+            const allRows = window.dependentRangeData.slice(1).map(r => headers.map((_, i) => r[i] ?? ''));
+            const s = (lastBundle && lastBundle.setup) || {};
+            return { headers, allRows, usedRows: allRows, address: s.address || '' };
+          },
+          saveModel:  () => saveCurrentModel(),
+          exportHtml: () => exportHtml(),
+          moduleName: 'Save dependent means model'
+        });
+      }
       document.querySelectorAll(".tab-button").forEach(btn=>btn.addEventListener("click",()=>switchTab(btn.getAttribute("data-tab"))));
       ["setAlpha","setPosthocMethod","setPosthocCorrection","setPrimaryTest"].forEach(function(id){
         const el = document.getElementById(id);
@@ -1587,7 +1601,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <div class="modal-title">?? AI Statistical Summary</div>
-        <button class="modal-close" onclick="closeAISummaryModal()">ª</button>
+        <button class="modal-close" onclick="closeAISummaryModal()">ï¿½</button>
       </div>
       <div class="modal-body" id="aiSummaryContent"></div>
     </div>

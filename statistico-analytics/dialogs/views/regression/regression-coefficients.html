@@ -25,8 +25,8 @@
   <script src="../../../src/shared/js/core/saved-analyses-manager.js"></script>
 
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260308j" />
-  <script src="../shared-header.js?v=20260308j"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260308k" />
+  <script src="../shared-header.js?v=20260308k"></script>
 
   <style>
     /* Dark Theme (Default) */
@@ -2342,28 +2342,28 @@
           <div class="sb-group">
             <div class="sb-group-title">Model</div>
             <div class="sb-items-rail">
-              <button class="sb-item active" onclick="switchTab('results')" data-tab="results">
+              <button class="sb-item active" onclick="sbGoOverview()" data-tab="results-overview" id="overviewBtn">
                 <i class="fa-solid fa-table-cells-large sb-item-icon" style="color:#18223a"></i>
                 <span class="sb-item-label">Overview</span>
               </button>
-              <button class="sb-item sb-item-sub" onclick="switchTab('results'); setDepth('analyst')" data-tab="results" id="detailedResultsBtn">
-                <i class="fa-solid fa-list sb-item-icon" style="color:#2e3d5e"></i>
+              <button class="sb-item" onclick="sbGoDetailed()" data-tab="results-detail" id="detailedResultsBtn">
+                <i class="fa-solid fa-list sb-item-icon" style="color:#18223a"></i>
                 <span class="sb-item-label">Detailed Results</span>
               </button>
               <button class="sb-item" onclick="switchTab('predictions')" data-tab="predictions">
-                <i class="fa-solid fa-wand-magic-sparkles sb-item-icon" style="color:#38bdf8"></i>
+                <i class="fa-solid fa-wand-magic-sparkles sb-item-icon" style="color:#18223a"></i>
                 <span class="sb-item-label">Predictions</span>
               </button>
               <button class="sb-item" onclick="switchTab('residuals')" data-tab="residuals">
-                <i class="fa-solid fa-gauge-high sb-item-icon" style="color:#2dd4bf"></i>
+                <i class="fa-solid fa-gauge-high sb-item-icon" style="color:#18223a"></i>
                 <span class="sb-item-label">Residual Overview</span>
               </button>
               <button class="sb-item" onclick="switchTab('res-plots')" data-tab="res-plots">
-                <i class="fa-solid fa-chart-scatter sb-item-icon" style="color:#2dd4bf"></i>
+                <i class="fa-solid fa-chart-line sb-item-icon" style="color:#18223a"></i>
                 <span class="sb-item-label">Residual Plots</span>
               </button>
               <button class="sb-item" onclick="switchTab('res-influential')" data-tab="res-influential">
-                <i class="fa-solid fa-triangle-exclamation sb-item-icon" style="color:#fb923c"></i>
+                <i class="fa-solid fa-triangle-exclamation sb-item-icon" style="color:#18223a"></i>
                 <span class="sb-item-label">Influential Cases</span>
               </button>
             </div>
@@ -2374,11 +2374,11 @@
             <div class="sb-group-title">Data Support</div>
             <div class="sb-items-rail">
               <button class="sb-item" onclick="switchTab('correlations')" data-tab="correlations">
-                <i class="fa-solid fa-code-branch sb-item-icon" style="color:#818cf8"></i>
+                <i class="fa-solid fa-code-branch sb-item-icon" style="color:#18223a"></i>
                 <span class="sb-item-label">Correlations</span>
               </button>
               <button class="sb-item" onclick="switchTab('descriptive')" data-tab="descriptive">
-                <i class="fa-solid fa-chart-bar sb-item-icon" style="color:#60a5fa"></i>
+                <i class="fa-solid fa-chart-bar sb-item-icon" style="color:#18223a"></i>
                 <span class="sb-item-label">Descriptive Stats</span>
               </button>
             </div>
@@ -2389,7 +2389,7 @@
             <div class="sb-group-title">Interpretation</div>
             <div class="sb-items-rail">
               <button class="sb-item" onclick="switchTab('ai-assessment')" data-tab="ai-assessment">
-                <i class="fa-solid fa-brain sb-item-icon" style="color:#4ade80"></i>
+                <i class="fa-solid fa-brain sb-item-icon" style="color:#18223a"></i>
                 <span class="sb-item-label">AI Insights</span>
               </button>
             </div>
@@ -2397,7 +2397,7 @@
 
           <!-- Hidden: ANCOVA tab (shown programmatically) -->
           <button class="sb-item" id="ancovaTabButton" onclick="switchTab('ancova')" data-tab="ancova" style="display:none;">
-            <i class="fa-solid fa-layer-group sb-item-icon" style="color:#f472b6"></i>
+            <i class="fa-solid fa-layer-group sb-item-icon" style="color:#18223a"></i>
             <span class="sb-item-label">ANCOVA</span>
           </button>
 
@@ -3099,19 +3099,24 @@
         btn.classList.toggle('active', btn.dataset.depth === depth);
       });
       applyDepth(depth);
-      // Sync "Detailed Results" sidebar item
-      _syncDetailedResultsActive(null);
+    }
+
+    // Navigate to Overview (results tab, insight depth)
+    function sbGoOverview() {
+      switchTab('results-overview');
+      setDepth('insight');
+    }
+
+    // Navigate to Detailed Results (results tab, analyst depth)
+    function sbGoDetailed() {
+      switchTab('results-detail');
+      setDepth('analyst');
     }
 
     // Keep "Detailed Results" nav item highlighted only when
     // the results tab is active AND depth = analyst
     function _syncDetailedResultsActive(currentTab) {
-      const btn = document.getElementById('detailedResultsBtn');
-      if (!btn) return;
-      const onResultsTab = currentTab === 'results' ||
-        (currentTab === null && document.getElementById('tab-results')?.classList.contains('active'));
-      const isAnalyst = window._analysisDepth === 'analyst';
-      btn.classList.toggle('active', onResultsTab && isAnalyst);
+      // No-op: active state is now fully driven by switchTab's data-tab matching
     }
 
     // ── Equation popup ────────────────────────────────────────
@@ -3224,23 +3229,19 @@
     function switchTab(tabName) {
       console.log('🔄 Switching to tab:', tabName);
       
-      // Update nav items (sb-item = new shared sidebar class)
-      document.querySelectorAll('.sb-item').forEach(btn => {
+      // Update nav items — all items are mutually exclusive
+      document.querySelectorAll('.sb-item[data-tab]').forEach(btn => {
         btn.classList.remove('active');
-        // "Detailed Results" (sb-item-sub) is active when results tab + analyst depth
-        if (btn.id === 'detailedResultsBtn') return;
-        if (btn.dataset.tab === tabName) {
-          btn.classList.add('active');
-        }
+        if (btn.dataset.tab === tabName) btn.classList.add('active');
       });
-      // Keep "Detailed Results" active only when on results+analyst
-      _syncDetailedResultsActive(tabName);
       
       // Hide all tab content, show the selected one
+      // 'results-overview' and 'results-detail' both map to tab-results
+      const realTabName = (tabName === 'results-overview' || tabName === 'results-detail') ? 'results' : tabName;
       document.querySelectorAll('.tab-content').forEach(content => {
         content.classList.remove('active');
       });
-      const targetTab = document.getElementById(`tab-${tabName}`);
+      const targetTab = document.getElementById(`tab-${realTabName}`);
       if (targetTab) targetTab.classList.add('active');
 
       // Scroll the main content area back to top
@@ -3253,7 +3254,7 @@
       const depthSel = document.getElementById('depthSelectorRow2');
       const heroSec = document.querySelector('.hero-section');
       if (depthSel) {
-        const show = tabName === 'results';
+        const show = (tabName === 'results-overview' || tabName === 'results-detail');
         depthSel.style.display = show ? '' : 'none';
         if (heroSec) heroSec.style.display = show ? '' : 'none';
       }

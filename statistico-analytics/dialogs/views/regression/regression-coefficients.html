@@ -25,8 +25,8 @@
   <script src="../../../src/shared/js/core/saved-analyses-manager.js"></script>
 
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260309c" />
-  <script src="../shared-header.js?v=20260309c"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260309e" />
+  <script src="../shared-header.js?v=20260309e"></script>
 
   <style>
     /* Dark Theme (Default) */
@@ -2350,6 +2350,10 @@
                 <i class="fa-solid fa-list sb-item-icon" style="color:#18223a"></i>
                 <span class="sb-item-label">Detailed Results</span>
               </button>
+              <button class="sb-item" id="interactionsTabButton" onclick="switchTab('interactions')" data-tab="interactions" style="display:none;">
+                <i class="fa-solid fa-arrows-split-up-and-left sb-item-icon" style="color:#18223a"></i>
+                <span class="sb-item-label">Interactions</span>
+              </button>
               <button class="sb-item" onclick="switchTab('predictions')" data-tab="predictions">
                 <i class="fa-solid fa-wand-magic-sparkles sb-item-icon" style="color:#18223a"></i>
                 <span class="sb-item-label">Predictions</span>
@@ -2819,6 +2823,96 @@
           </div>
         </div>
 
+        <!-- Tab: Interactions -->
+        <div id="tab-interactions" class="tab-content">
+          <div class="tab-panel" id="interactionsPanel">
+
+            <div class="section-card" style="margin-bottom:16px;">
+              <div class="section-header">
+                <i class="fa-solid fa-arrows-split-up-and-left"></i>
+                <span>Interaction Terms — Coefficients</span>
+              </div>
+              <p style="color:var(--text-muted);font-size:12px;margin:0 0 12px 0;line-height:1.5;">
+                Each interaction term tests whether the effect of one predictor depends on another. 
+                Coefficients below are the OLS estimates for the product terms; the base model coefficients appear in Detailed Results.
+              </p>
+              <div class="table-responsive">
+                <table class="results-table" id="interactionCoeffTable">
+                  <thead>
+                    <tr>
+                      <th>Term</th>
+                      <th>β</th>
+                      <th>SE</th>
+                      <th>t</th>
+                      <th>p-value</th>
+                      <th>Sig.</th>
+                      <th>95% CI (lower)</th>
+                      <th>95% CI (upper)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="interactionCoeffBody">
+                    <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">Run a model with interaction terms to see results</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Partial F-test block -->
+            <div class="section-card" style="margin-bottom:16px;">
+              <div class="section-header">
+                <i class="fa-solid fa-flask"></i>
+                <span>Partial F-Test — Interaction Block</span>
+              </div>
+              <p style="color:var(--text-muted);font-size:12px;margin:0 0 12px 0;line-height:1.5;">
+                Tests whether the interaction terms as a block improve model fit over the main-effects-only model. 
+                A significant F confirms that moderation is present.
+              </p>
+              <div id="interactionPartialFContainer">
+                <div style="color:var(--text-muted);font-style:italic;padding:10px 0;font-size:12px;">
+                  No interaction terms in current model.
+                </div>
+              </div>
+            </div>
+
+            <!-- Estimated Marginal Means block -->
+            <div class="section-card" style="margin-bottom:16px;" id="emmSection">
+              <div class="section-header">
+                <i class="fa-solid fa-chart-column"></i>
+                <span>Estimated Marginal Means (EMMeans)</span>
+              </div>
+              <p style="color:var(--text-muted);font-size:12px;margin:0 0 12px 0;line-height:1.5;">
+                Adjusted group means for categorical predictors, holding all numeric covariates at their observed means. 
+                Pairwise contrasts are Bonferroni-corrected.
+              </p>
+              <div id="emmContainer">
+                <div style="color:var(--text-muted);font-style:italic;padding:10px 0;font-size:12px;">
+                  EMMeans are shown when the model contains at least one categorical predictor.
+                </div>
+              </div>
+            </div>
+
+            <!-- Interaction Plot block -->
+            <div class="section-card" id="interactionPlotSection">
+              <div class="section-header">
+                <i class="fa-solid fa-chart-line"></i>
+                <span>Interaction Plot</span>
+              </div>
+              <p style="color:var(--text-muted);font-size:12px;margin:0 0 12px 0;line-height:1.5;">
+                Select an interaction term to visualize. For Factor × Covariate interactions the plot shows predicted 
+                outcome vs. covariate with separate lines per group.
+              </p>
+              <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <label style="font-size:12px;color:var(--text-secondary);white-space:nowrap;">Interaction to plot:</label>
+                <select id="interactionPlotSelect" style="font-size:12px;padding:4px 8px;min-width:200px;" onchange="renderInteractionPlot()">
+                  <option value="">-- Select --</option>
+                </select>
+              </div>
+              <div id="interactionPlotContainer" style="height:380px;"></div>
+            </div>
+
+          </div>
+        </div>
+
         <!-- Tab: ANCOVA -->
         <div id="tab-ancova" class="tab-content">
           <div class="ancova-container">
@@ -3233,6 +3327,7 @@
       const tabTitles = {
         'results-overview':  'Overview',
         'results-detail':    'Detailed Results',
+        'interactions':      'Interactions',
         'predictions':       'Predictions',
         'residuals':         'Residual Overview',
         'res-plots':         'Residual Plots',
@@ -3295,6 +3390,12 @@
       } else if (tabName === 'ancova' && !window.ancovaLoaded) {
         initializeANCOVA();
         window.ancovaLoaded = true;
+      } else if (tabName === 'interactions') {
+        // Interaction plot may need re-render when tab becomes visible (Highcharts sizing)
+        setTimeout(() => {
+          const sel = document.getElementById('interactionPlotSelect');
+          if (sel && sel.value !== '') renderInteractionPlot();
+        }, 50);
       }
     }
 
@@ -3329,8 +3430,8 @@
       
       // Re-render results if they exist
       if (window.regressionResults && receivedModelSpec) {
-        const { y, xn = [], xc = [] } = receivedModelSpec;
-        displayRegressionResults(window.regressionResults, y, xn, xc);
+        const { y, xn = [], xc = [], interactions = [] } = receivedModelSpec;
+        displayRegressionResults(window.regressionResults, y, xn, xc, interactions, window.globalInteractionColumnNames || [], window.globalInteractionInfo || []);
       }
     }
     
@@ -4253,7 +4354,7 @@
       console.log('🔄 Processing regression data...');
       
       const { headers, rows, address } = receivedRegressionData;
-      const { y, xn = [], xc = [], intercept } = receivedModelSpec;
+      const { y, xn = [], xc = [], interactions = [], intercept } = receivedModelSpec;
       
       console.log('📋 Model specification:', {
         y,
@@ -4317,6 +4418,45 @@
       for (const catInfo of categoricalInfo) {
         variableNames.push(...catInfo.dummyNames);
       }
+      // Interaction term names
+      const interactionNames = (interactions || []).map(ix => `${ix.var1} × ${ix.var2}`);
+      variableNames.push(...interactionNames);
+      
+      // Pre-compute interaction info for row building
+      // Each interaction produces one or more columns
+      const interactionInfo = (interactions || []).map(ix => {
+        const v1 = ix.var1, v2 = ix.var2;
+        const v1IsNumeric = xnSorted.indexOf(v1) >= 0;
+        const v2IsNumeric = xnSorted.indexOf(v2) >= 0;
+        const v1Cat = categoricalInfo.find(c => c.name === v1);
+        const v2Cat = categoricalInfo.find(c => c.name === v2);
+        const v1Idx = headers.indexOf(v1);
+        const v2Idx = headers.indexOf(v2);
+        return { v1, v2, v1IsNumeric, v2IsNumeric, v1Cat, v2Cat, v1Idx, v2Idx };
+      });
+      
+      // Expand variableNames for multi-column interactions (cat×num, cat×cat)
+      // Remove the single-name placeholders we added and add proper expanded names
+      // We'll rebuild interactionColumnNames from interactionInfo
+      const interactionColumnNames = [];
+      for (const ixi of interactionInfo) {
+        if (ixi.v1IsNumeric && ixi.v2IsNumeric) {
+          // num × num → 1 column
+          interactionColumnNames.push(`${ixi.v1} × ${ixi.v2}`);
+        } else if (ixi.v1IsNumeric && ixi.v2Cat) {
+          // num × cat → (k2-1) columns
+          ixi.v2Cat.dummyNames.forEach(d => interactionColumnNames.push(`${ixi.v1} × ${d}`));
+        } else if (ixi.v1Cat && ixi.v2IsNumeric) {
+          // cat × num → (k1-1) columns
+          ixi.v1Cat.dummyNames.forEach(d => interactionColumnNames.push(`${d} × ${ixi.v2}`));
+        } else if (ixi.v1Cat && ixi.v2Cat) {
+          // cat × cat → (k1-1)*(k2-1) columns
+          ixi.v1Cat.dummyNames.forEach(d1 => ixi.v2Cat.dummyNames.forEach(d2 => interactionColumnNames.push(`${d1} × ${d2}`)));
+        }
+      }
+      // Replace the simple interaction names with expanded ones in variableNames
+      // (remove the simple ones we pushed, then add expanded)
+      variableNames.splice(variableNames.length - interactionNames.length, interactionNames.length, ...interactionColumnNames);
       
       console.log('📋 Final variable names:', variableNames);
       
@@ -4364,6 +4504,26 @@
         
         // Only add if all values are valid
         if (validRow) {
+          // Append interaction product columns
+          for (const ixi of interactionInfo) {
+            if (ixi.v1IsNumeric && ixi.v2IsNumeric) {
+              const v1Val = parseFloat(row[ixi.v1Idx]);
+              const v2Val = parseFloat(row[ixi.v2Idx]);
+              xRow.push(v1Val * v2Val);
+            } else if (ixi.v1IsNumeric && ixi.v2Cat) {
+              const v1Val = parseFloat(row[ixi.v1Idx]);
+              const dums = createDummyVariables(row[ixi.v2Cat.index], ixi.v2Cat.categories, ixi.v2Cat.name);
+              dums.forEach(d => xRow.push(v1Val * d));
+            } else if (ixi.v1Cat && ixi.v2IsNumeric) {
+              const v2Val = parseFloat(row[ixi.v2Idx]);
+              const dums = createDummyVariables(row[ixi.v1Cat.index], ixi.v1Cat.categories, ixi.v1Cat.name);
+              dums.forEach(d => xRow.push(d * v2Val));
+            } else if (ixi.v1Cat && ixi.v2Cat) {
+              const dums1 = createDummyVariables(row[ixi.v1Cat.index], ixi.v1Cat.categories, ixi.v1Cat.name);
+              const dums2 = createDummyVariables(row[ixi.v2Cat.index], ixi.v2Cat.categories, ixi.v2Cat.name);
+              dums1.forEach(d1 => dums2.forEach(d2 => xRow.push(d1 * d2)));
+            }
+          }
           xMatrix.push(xRow);
           yVector.push(yVal);
           usedOriginalRows.push(row);
@@ -4438,6 +4598,9 @@
         window.globalYVar = y;
         window.globalXnVars = xn;
         window.globalXcVars = xc;
+        window.globalInteractions = interactions || [];
+        window.globalInteractionInfo = interactionInfo;
+        window.globalInteractionColumnNames = interactionColumnNames;
         window.globalRawHeaders = headers;
         window.globalRawRows = rows;
         window.globalIncludeIntercept = intercept;
@@ -4476,7 +4639,7 @@
         console.log('✅ All tab data pre-stored in sessionStorage');
         
         // Display results in the UI
-        displayRegressionResults(results, y, xn, xc);
+        displayRegressionResults(results, y, xn, xc, interactions, interactionColumnNames, interactionInfo);
         
         // Hide loading overlay after successful computation
         const loadingOverlay = document.getElementById('loadingOverlay');
@@ -4504,7 +4667,7 @@
     }
     
     // Display regression results in the UI
-    function displayRegressionResults(results, yVarName, xnVars, xcVars) {
+    function displayRegressionResults(results, yVarName, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo) {
       console.log('📊 Displaying regression results...');
       
       // Get the proper variable names (with dummy coding)
@@ -4536,6 +4699,16 @@
         const hasANCOVA = xnVars.length > 0 && xcVars.length > 0;
         ancovaTabButton.style.display = hasANCOVA ? 'inline-flex' : 'none';
         console.log(`🎯 ANCOVA tab ${hasANCOVA ? 'shown' : 'hidden'} (${xnVars.length} continuous, ${xcVars.length} categorical)`);
+      }
+      
+      // Show/hide Interactions tab based on whether model has interaction terms
+      const interactionsTabButton = document.getElementById('interactionsTabButton');
+      if (interactionsTabButton) {
+        const hasInteractions = (interactions || []).length > 0;
+        interactionsTabButton.style.display = hasInteractions ? 'inline-flex' : 'none';
+        if (hasInteractions) {
+          renderInteractionsTab(results, variableNames, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo, yVar, rows, headers);
+        }
       }
       
       // Populate Model Fit panel
@@ -6557,6 +6730,350 @@
      * Initialize ANCOVA tab
      * Computes and displays ANCOVA results when model has both categorical and continuous predictors
      */
+    // ============================================================================
+    // INTERACTIONS TAB RENDERING
+    // ============================================================================
+
+    function renderInteractionsTab(results, variableNames, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo, yVar, rows, headers) {
+      if (!interactions || interactions.length === 0) return;
+
+      // The coefficient array from OLS is [ intercept?, ...mainEffects, ...interactionCols ]
+      // Number of main effect columns = variableNames.length - interactionColumnNames.length
+      const nInteractionCols = interactionColumnNames.length;
+      const totalCoeffs = results.coefficients.length;
+      const interactionStartIdx = totalCoeffs - nInteractionCols; // index into coefficients[] (includes intercept offset)
+
+      // ── Coefficient Table ──
+      const tbody = document.getElementById('interactionCoeffBody');
+      if (tbody) {
+        tbody.innerHTML = '';
+        for (let i = 0; i < nInteractionCols; i++) {
+          const coeffIdx = interactionStartIdx + i;
+          const b   = results.coefficients[coeffIdx];
+          const se  = results.std_errors[coeffIdx];
+          const t   = results.t_values[coeffIdx];
+          const p   = results.p_values[coeffIdx];
+          const cil = results.CI_lower[coeffIdx];
+          const ciu = results.CI_upper[coeffIdx];
+          const sig = p < 0.001 ? '***' : p < 0.01 ? '**' : p < 0.05 ? '*' : p < 0.1 ? '†' : '';
+          const pFmt = p < 0.0001 ? '< .0001' : p.toFixed(4);
+          const pClass = p < 0.05 ? 'style="color:var(--success);font-weight:600;"' : p < 0.1 ? 'style="color:var(--warning);"' : '';
+          tbody.innerHTML += `<tr>
+            <td style="font-weight:600;color:var(--accent-2);">${interactionColumnNames[i]}</td>
+            <td>${b.toFixed(4)}</td>
+            <td>${se.toFixed(4)}</td>
+            <td>${t.toFixed(3)}</td>
+            <td ${pClass}>${pFmt}</td>
+            <td style="font-weight:700;color:var(--accent-2);">${sig}</td>
+            <td>${cil.toFixed(4)}</td>
+            <td>${ciu.toFixed(4)}</td>
+          </tr>`;
+        }
+      }
+
+      // ── Partial F-Test: interaction block vs. main-effects-only ──
+      // Refit main-effects model without interactions
+      try {
+        const nMainCols = variableNames.length - nInteractionCols;
+        const xMainMatrix = window.regressionData.xMatrix.map(row => row.slice(0, nMainCols));
+        const mainResults = computeOLS(xMainMatrix, window.regressionData.yVector, results.includeIntercept, 0.05);
+        // Partial F = [(SSR_restricted - SSR_full) / q] / [SSR_full / (n-k_full)]
+        const q   = nInteractionCols;
+        const n   = results.n;
+        const kF  = results.k;
+        const ssrFull = results.SSR;
+        const ssrRestricted = mainResults.SSR;
+        const partialF = q > 0 ? ((ssrRestricted - ssrFull) / q) / (ssrFull / (n - kF)) : 0;
+        const pPartial = q > 0 ? 1 - fCDF(Math.max(partialF, 0), q, n - kF) : 1;
+        const pfSig = pPartial < 0.001 ? '***' : pPartial < 0.01 ? '**' : pPartial < 0.05 ? '*' : pPartial < 0.1 ? '†' : 'ns';
+        const pfClass = pPartial < 0.05 ? 'color:var(--success);font-weight:700;' : pPartial < 0.1 ? 'color:var(--warning);' : 'color:var(--text-muted);';
+        const pfDiv = document.getElementById('interactionPartialFContainer');
+        if (pfDiv) {
+          const r2Full = results.R2.toFixed(4);
+          const r2Main = mainResults.R2.toFixed(4);
+          const r2Change = (results.R2 - mainResults.R2).toFixed(4);
+          pfDiv.innerHTML = `
+            <table class="results-table" style="margin-bottom:12px;">
+              <thead><tr><th>Model comparison</th><th>R²</th><th>ΔR²</th><th>F-change</th><th>df1</th><th>df2</th><th>p (F-change)</th><th>Sig.</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>Main effects only</td><td>${r2Main}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                </tr>
+                <tr style="background:rgba(167,139,250,0.06);">
+                  <td style="font-weight:600;">+ Interactions</td>
+                  <td>${r2Full}</td>
+                  <td style="font-weight:600;color:var(--accent-2);">${r2Change > 0 ? '+' : ''}${r2Change}</td>
+                  <td>${partialF.toFixed(3)}</td>
+                  <td>${q}</td>
+                  <td>${n - kF}</td>
+                  <td style="${pfClass}">${pPartial < 0.0001 ? '< .0001' : pPartial.toFixed(4)}</td>
+                  <td style="${pfClass};font-size:13px;">${pfSig}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p style="font-size:11px;color:var(--text-muted);margin:4px 0 0 0;">
+              The interaction block explains an additional <strong>ΔR² = ${r2Change}</strong> of variance.
+              ${pPartial < 0.05 ? 'The improvement is statistically significant — moderation is present.' : 'The improvement is not statistically significant at α = 0.05.'}
+            </p>`;
+        }
+      } catch(e) {
+        console.warn('⚠️ Partial F computation failed:', e.message);
+      }
+
+      // ── EMMeans: shown when model has at least one categorical predictor ──
+      const emmContainer = document.getElementById('emmContainer');
+      if (emmContainer && xcVars && xcVars.length > 0) {
+        const categoricalInfo = xcVars.map(varName => {
+          const cats = [...new Set(rows.map(r => r[headers.indexOf(varName)]).filter(v => v !== null && v !== undefined && v !== ''))].sort();
+          return { name: varName, categories: cats, index: headers.indexOf(varName) };
+        });
+
+        // For each categorical predictor compute EMMeans (covariates at mean)
+        const xnMeans = xnVars.map(v => {
+          const vals = rows.map(r => parseFloat(r[headers.indexOf(v)])).filter(x => !isNaN(x));
+          return vals.reduce((a, b) => a + b, 0) / vals.length;
+        });
+
+        let emmHTML = '';
+        for (const catInfo of categoricalInfo) {
+          emmHTML += `<h4 style="font-size:12px;font-weight:700;color:var(--accent-1);margin:12px 0 6px 0;">${catInfo.name}</h4>`;
+          emmHTML += `<table class="results-table" style="margin-bottom:12px;">
+            <thead><tr><th>Group</th><th>Adj. Mean</th><th>SE</th><th>95% CI lower</th><th>95% CI upper</th><th>n</th></tr></thead>
+            <tbody>`;
+
+          const beta = results.coefficients;
+          const intercept = results.includeIntercept;
+          const interceptAdj = intercept ? beta[0] : 0;
+
+          // Build predicted mean for each category with covariates at mean
+          const variableNamesMain = variableNames.slice(0, variableNames.length - nInteractionCols);
+          const nObs = results.n;
+          const MSE = results.MSE;
+
+          catInfo.categories.forEach(cat => {
+            // Build an X row for this category + covariate means
+            const xRow = [];
+            xnVars.forEach((v, i) => xRow.push(xnMeans[i]));
+            // Dummy code this category
+            const dummies = catInfo.categories.slice(1).map(c => cat === c ? 1 : 0);
+            xRow.push(...dummies);
+
+            const startCoeff = intercept ? 1 : 0;
+            // Map xRow to coefficient positions
+            let pred = interceptAdj;
+            let xRowIdx = 0;
+            // Numeric covariates come first
+            xnVars.forEach((v, i) => {
+              pred += xRow[xRowIdx] * beta[startCoeff + xRowIdx];
+              xRowIdx++;
+            });
+            // Categorical dummy columns follow (for this variable)
+            dummies.forEach((d, di) => {
+              // Find dummy column index in variableNames
+              const dummyName = `${catInfo.name}_${catInfo.categories[di + 1]}`;
+              const dIdx = variableNamesMain.indexOf(dummyName);
+              if (dIdx >= 0) pred += d * beta[startCoeff + dIdx];
+            });
+
+            const nCat = rows.filter(r => String(r[catInfo.index]) === String(cat)).length;
+            // SE approximation using hat matrix diagonal (simplified: SE ≈ sqrt(MSE / nCat))
+            const se = Math.sqrt(MSE / Math.max(nCat, 1));
+            const tCrit = 1.96;
+            emmHTML += `<tr>
+              <td style="font-weight:600;">${cat}</td>
+              <td>${pred.toFixed(3)}</td>
+              <td>${se.toFixed(3)}</td>
+              <td>${(pred - tCrit * se).toFixed(3)}</td>
+              <td>${(pred + tCrit * se).toFixed(3)}</td>
+              <td>${nCat}</td>
+            </tr>`;
+          });
+
+          // Pairwise Bonferroni contrasts
+          if (catInfo.categories.length >= 2) {
+            emmHTML += `</tbody></table>`;
+            emmHTML += `<div style="font-size:11px;color:var(--text-secondary);margin:4px 0 8px 0;font-weight:600;">Pairwise Contrasts (Bonferroni)</div>`;
+            emmHTML += `<table class="results-table" style="margin-bottom:8px;">
+              <thead><tr><th>Comparison</th><th>Difference</th><th>SE</th><th>p (Bonferroni)</th><th>Sig.</th></tr></thead><tbody>`;
+            const pairs = [];
+            for (let a = 0; a < catInfo.categories.length; a++) {
+              for (let b = a + 1; b < catInfo.categories.length; b++) {
+                pairs.push([catInfo.categories[a], catInfo.categories[b]]);
+              }
+            }
+            const nPairs = pairs.length;
+            pairs.forEach(([g1, g2]) => {
+              const n1 = rows.filter(r => String(r[catInfo.index]) === String(g1)).length;
+              const n2 = rows.filter(r => String(r[catInfo.index]) === String(g2)).length;
+              const m1 = rows.filter(r => String(r[catInfo.index]) === String(g1)).map(r => parseFloat(r[headers.indexOf(yVar)])).filter(x => !isNaN(x)).reduce((a, b) => a + b, 0) / n1;
+              const m2 = rows.filter(r => String(r[catInfo.index]) === String(g2)).map(r => parseFloat(r[headers.indexOf(yVar)])).filter(x => !isNaN(x)).reduce((a, b) => a + b, 0) / n2;
+              const diff = m1 - m2;
+              const se = Math.sqrt(MSE * (1/n1 + 1/n2));
+              const t = diff / se;
+              const rawP = 2 * (1 - tCDF(Math.abs(t), results.df));
+              const adjP = Math.min(rawP * nPairs, 1);
+              const sig = adjP < 0.001 ? '***' : adjP < 0.01 ? '**' : adjP < 0.05 ? '*' : 'ns';
+              const pClass = adjP < 0.05 ? 'color:var(--success);font-weight:600;' : 'color:var(--text-muted);';
+              emmHTML += `<tr>
+                <td>${g1} vs ${g2}</td>
+                <td>${diff.toFixed(3)}</td>
+                <td>${se.toFixed(3)}</td>
+                <td style="${pClass}">${adjP < 0.0001 ? '< .0001' : adjP.toFixed(4)}</td>
+                <td style="${pClass}">${sig}</td>
+              </tr>`;
+            });
+            emmHTML += `</tbody></table>`;
+          } else {
+            emmHTML += `</tbody></table>`;
+          }
+        }
+        emmContainer.innerHTML = emmHTML;
+      }
+
+      // ── Populate Interaction Plot select ──
+      const plotSelect = document.getElementById('interactionPlotSelect');
+      if (plotSelect) {
+        plotSelect.innerHTML = '<option value="">-- Select --</option>';
+        interactions.forEach((ix, i) => {
+          const opt = document.createElement('option');
+          opt.value = i;
+          opt.textContent = `${ix.var1} × ${ix.var2}`;
+          plotSelect.appendChild(opt);
+        });
+        // Store for later use by renderInteractionPlot
+        window._interactionTabData = { results, variableNames, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo, yVar, rows, headers };
+      }
+    }
+
+    // Render interaction plot for the selected term
+    function renderInteractionPlot() {
+      const data = window._interactionTabData;
+      if (!data) return;
+      const { results, xnVars, xcVars, interactions, interactionInfo, yVar, rows, headers } = data;
+      const selIdx = parseInt(document.getElementById('interactionPlotSelect').value);
+      if (isNaN(selIdx) || selIdx < 0) return;
+      const ix = interactions[selIdx];
+      const ixi = interactionInfo[selIdx];
+      const container = document.getElementById('interactionPlotContainer');
+      if (!container) return;
+
+      if (ixi.v1IsNumeric && ixi.v2Cat) {
+        // Numeric × Categorical: predicted Y vs v1 for each category of v2
+        _renderNumCatInteractionPlot(container, ix, ixi, results, xnVars, xcVars, rows, headers, yVar);
+      } else if (ixi.v1Cat && ixi.v2IsNumeric) {
+        const ixFlip = { v1: ix.v2, v2: ix.v1, v1IsNumeric: true, v2IsNumeric: false, v1Cat: null, v2Cat: ixi.v1Cat, v1Idx: ixi.v2Idx, v2Idx: ixi.v1Idx };
+        _renderNumCatInteractionPlot(container, {var1: ix.v2, var2: ix.v1}, ixFlip, results, xnVars, xcVars, rows, headers, yVar);
+      } else if (ixi.v1IsNumeric && ixi.v2IsNumeric) {
+        _renderNumNumInteractionPlot(container, ix, ixi, results, xnVars, xcVars, rows, headers, yVar);
+      } else {
+        container.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center;">Visualization for Categorical × Categorical interactions coming soon.</div>';
+      }
+    }
+
+    function _renderNumCatInteractionPlot(container, ix, ixi, results, xnVars, xcVars, rows, headers, yVar) {
+      const numVar = ix.var1;
+      const catVar = ix.var2 || (ixi.v2Cat && ixi.v2Cat.name);
+      const catInfo = ixi.v2Cat || ixi.v1Cat;
+      if (!catInfo) return;
+      const numIdx = headers.indexOf(numVar);
+      const numVals = rows.map(r => parseFloat(r[numIdx])).filter(x => !isNaN(x));
+      const xMin = Math.min(...numVals), xMax = Math.max(...numVals);
+      const xPoints = Array.from({length: 40}, (_, i) => xMin + (xMax - xMin) * i / 39);
+
+      // Compute covariate means for other variables
+      const covMeans = {};
+      xnVars.forEach(v => {
+        const vals = rows.map(r => parseFloat(r[headers.indexOf(v)])).filter(x => !isNaN(x));
+        covMeans[v] = vals.reduce((a, b) => a + b, 0) / vals.length;
+      });
+
+      // For each category, compute predicted Y across xPoints
+      const series = catInfo.categories.map(cat => {
+        const seriesData = xPoints.map(xv => {
+          const numCovVals = xnVars.map(v => v === numVar ? xv : covMeans[v]);
+          const catDummies = catInfo.categories.slice(1).map(c => cat === c ? 1 : 0);
+          let pred = results.includeIntercept ? results.coefficients[0] : 0;
+          let coeffOff = results.includeIntercept ? 1 : 0;
+          xnVars.forEach((v, i) => { pred += numCovVals[i] * results.coefficients[coeffOff + i]; });
+          coeffOff += xnVars.length;
+          // categorical dummies
+          const varNamesMain = (window.regressionVariableNames || []).slice(0, (window.regressionVariableNames || []).length - (window.globalInteractionColumnNames || []).length);
+          catInfo.dummyNames.forEach((dn, di) => {
+            const dIdx = varNamesMain.indexOf(dn);
+            if (dIdx >= 0) pred += catDummies[di] * results.coefficients[results.includeIntercept ? dIdx + 1 : dIdx];
+          });
+          // interaction product
+          catDummies.forEach((d, di) => { pred += (xv * d) * results.coefficients[results.coefficients.length - (window.globalInteractionColumnNames || []).length + di]; });
+          return [parseFloat(xv.toFixed(3)), parseFloat(pred.toFixed(4))];
+        });
+        return { name: cat, data: seriesData };
+      });
+
+      Highcharts.chart(container, {
+        chart: { backgroundColor: 'transparent', type: 'line', animation: false },
+        title: { text: `${numVar} × ${catVar}`, style: { color: 'var(--text-primary)', fontSize: '13px' } },
+        subtitle: { text: 'Predicted ' + yVar + ' (other covariates at mean)', style: { color: 'var(--text-muted)', fontSize: '11px' } },
+        xAxis: { title: { text: numVar, style: { color: 'var(--text-secondary)' } }, labels: { style: { color: 'var(--text-secondary)' } }, gridLineColor: 'var(--border)' },
+        yAxis: { title: { text: 'Predicted ' + yVar, style: { color: 'var(--text-secondary)' } }, labels: { style: { color: 'var(--text-secondary)' } }, gridLineColor: 'var(--border)' },
+        legend: { itemStyle: { color: 'var(--text-secondary)' } },
+        tooltip: { shared: false, formatter: function() { return `<b>${this.series.name}</b><br>${numVar}: ${this.x.toFixed(2)}<br>Predicted: ${this.y.toFixed(3)}`; } },
+        series: series,
+        credits: { enabled: false }
+      });
+    }
+
+    function _renderNumNumInteractionPlot(container, ix, ixi, results, xnVars, xcVars, rows, headers, yVar) {
+      // Three lines: v2 at mean-1SD, mean, mean+1SD
+      const v2Vals = rows.map(r => parseFloat(r[ixi.v2Idx])).filter(x => !isNaN(x));
+      const v2Mean = v2Vals.reduce((a, b) => a + b, 0) / v2Vals.length;
+      const v2Sd = Math.sqrt(v2Vals.reduce((a, b) => a + (b - v2Mean) ** 2, 0) / v2Vals.length);
+      const v2Levels = [v2Mean - v2Sd, v2Mean, v2Mean + v2Sd];
+      const v2Labels = ['-1 SD', 'Mean', '+1 SD'];
+
+      const v1Vals = rows.map(r => parseFloat(r[ixi.v1Idx])).filter(x => !isNaN(x));
+      const xMin = Math.min(...v1Vals), xMax = Math.max(...v1Vals);
+      const xPoints = Array.from({length: 40}, (_, i) => xMin + (xMax - xMin) * i / 39);
+
+      const covMeans = {};
+      xnVars.forEach(v => {
+        const vals = rows.map(r => parseFloat(r[headers.indexOf(v)])).filter(x => !isNaN(x));
+        covMeans[v] = vals.reduce((a, b) => a + b, 0) / vals.length;
+      });
+
+      const nIntCols = (window.globalInteractionColumnNames || []).length;
+      const intCoeffIdx = results.coefficients.length - nIntCols; // index of first interaction coeff
+
+      const series = v2Levels.map((v2Val, li) => ({
+        name: `${ix.var2} = ${v2Labels[li]} (${v2Val.toFixed(2)})`,
+        data: xPoints.map(xv => {
+          let pred = results.includeIntercept ? results.coefficients[0] : 0;
+          let off = results.includeIntercept ? 1 : 0;
+          xnVars.forEach((v, i) => {
+            const val = v === ix.var1 ? xv : v === ix.var2 ? v2Val : covMeans[v];
+            pred += val * results.coefficients[off + i];
+          });
+          // Find the specific interaction coefficient for this term
+          const ixColNames = window.globalInteractionColumnNames || [];
+          const colName = `${ix.var1} × ${ix.var2}`;
+          const colIdx = ixColNames.indexOf(colName);
+          if (colIdx >= 0) pred += xv * v2Val * results.coefficients[intCoeffIdx + colIdx];
+          return [parseFloat(xv.toFixed(3)), parseFloat(pred.toFixed(4))];
+        })
+      }));
+
+      Highcharts.chart(container, {
+        chart: { backgroundColor: 'transparent', type: 'line', animation: false },
+        title: { text: `${ix.var1} × ${ix.var2}`, style: { color: 'var(--text-primary)', fontSize: '13px' } },
+        subtitle: { text: 'Predicted ' + yVar + ' at three levels of ' + ix.var2, style: { color: 'var(--text-muted)', fontSize: '11px' } },
+        xAxis: { title: { text: ix.var1, style: { color: 'var(--text-secondary)' } }, labels: { style: { color: 'var(--text-secondary)' } }, gridLineColor: 'var(--border)' },
+        yAxis: { title: { text: 'Predicted ' + yVar, style: { color: 'var(--text-secondary)' } }, labels: { style: { color: 'var(--text-secondary)' } }, gridLineColor: 'var(--border)' },
+        legend: { itemStyle: { color: 'var(--text-secondary)' } },
+        tooltip: { formatter: function() { return `<b>${this.series.name}</b><br>${ix.var1}: ${this.x.toFixed(2)}<br>Predicted: ${this.y.toFixed(3)}`; } },
+        series: series,
+        credits: { enabled: false }
+      });
+    }
+
     function initializeANCOVA() {
       console.log('🎯 Initializing ANCOVA module...');
 

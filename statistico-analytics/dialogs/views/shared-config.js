@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    shared-config.js  –  Theme toggle + utilities for config dialogs
-   VERSION: 2026-03-09-002
+   VERSION: 2026-03-09-003
    ═══════════════════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -24,7 +24,7 @@
   }
 
   function getSaved() {
-    try { return localStorage.getItem(STORAGE_KEY) || 'dark'; } catch (_) { return 'dark'; }
+    try { return localStorage.getItem(STORAGE_KEY) || 'light'; } catch (_) { return 'light'; }
   }
 
   function saveTheme(t) {

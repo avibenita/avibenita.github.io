@@ -1916,9 +1916,13 @@
       flex-shrink: 0;
       color: inherit;
     }
-    .sb-item-parent.expanded .sb-arrow {
-      transform: rotate(90deg);
-      opacity: 0.85;
+    .sb-item-parent.disabled {
+      opacity: 0.38;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .sb-item-parent.disabled .sb-arrow {
+      display: none;
     }
 
     /* Collapsible sub-items rail */
@@ -2639,9 +2643,9 @@
                 <i class="fa-solid fa-list sb-item-icon" style="color:#18223a"></i>
                 <span class="sb-item-label">Detailed Results</span>
               </button>
-              <!-- Interactions expandable item (visible only when model has interaction terms) -->
-              <div id="interactionsGroupNav" style="display:none;">
-                <button class="sb-item-parent" id="interactionsParentBtn" onclick="toggleInteractionsNav()" aria-expanded="false">
+              <!-- Interactions expandable item (disabled until model has interaction terms) -->
+              <div id="interactionsGroupNav">
+                <button class="sb-item-parent disabled" id="interactionsParentBtn" onclick="toggleInteractionsNav()" aria-expanded="false" title="Add interaction terms in the model to enable this section">
                   <i class="fa-solid fa-arrows-split-up-and-left sb-item-icon"></i>
                   <span class="sb-item-label">Interactions</span>
                   <i class="fa-solid fa-chevron-right sb-arrow"></i>
@@ -5205,13 +5209,22 @@
         console.log(`🎯 ANCOVA group ${hasANCOVA ? 'shown' : 'hidden'} (${xnVars.length} continuous, ${xcVars.length} categorical)`);
       }
       
-      // Show/hide Interactions tab based on whether model has interaction terms
-      // Show/hide Interactions sub-menu based on whether model has interaction terms
+      // Enable/disable Interactions item based on whether model has interaction terms
       const interactionsGroupNav = document.getElementById('interactionsGroupNav');
+      const interactionsParentBtn = document.getElementById('interactionsParentBtn');
       const interactionsTabButton = document.getElementById('interactionsTabButton'); // legacy hidden btn
       const hasInteractions = (interactions || []).length > 0;
-      if (interactionsGroupNav) interactionsGroupNav.style.display = hasInteractions ? '' : 'none';
+      if (interactionsParentBtn) {
+        interactionsParentBtn.classList.toggle('disabled', !hasInteractions);
+        interactionsParentBtn.title = hasInteractions
+          ? 'Click to expand interaction results'
+          : 'Add interaction terms in the model to enable this section';
+      }
       if (interactionsTabButton) interactionsTabButton.style.display = 'none'; // always hide legacy btn
+      if (!hasInteractions) {
+        // Collapse and close sub-items when no interactions
+        toggleInteractionsNav(false);
+      }
       if (hasInteractions) {
         // Show interactions nav collapsed — user clicks to expand
         renderInteractionsTab(results, varNames, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo, yVarName, window.regressionRows || [], window.regressionHeaders || []);

@@ -6,137 +6,156 @@
   <title>Univariate Configuration</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0;}
-    body{background:#1a0a2e;color:#e5e7eb;font-family:Segoe UI,Arial,sans-serif;font-size:13px;}
-    .wrap{padding:10px;}
-    .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #4a1d6d;}
-    .title{font-weight:800;font-size:15px;display:flex;gap:8px;align-items:center;color:#f97316;}
-    .panel{border:1px solid #4a1d6d;background:#2d1344;border-radius:10px;padding:10px;margin-bottom:10px;}
-    .panel-title{font-size:11px;font-weight:700;color:#c4b5fd;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
-    label{font-size:12px;color:#c4b5fd;display:block;margin-bottom:4px;}
-    select{width:100%;padding:8px 10px;border-radius:8px;border:1px solid #6b21a8;background:#1e0d3b;color:#e5e7eb;font-size:13px;cursor:pointer;}
-    select:focus{outline:none;border-color:#f97316;}
-    .meta{font-size:11px;color:#a78bfa;margin-bottom:6px;}
-    /* Trim */
-    .trim-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
-    .trim-label{font-size:12px;color:#c4b5fd;width:80px;flex-shrink:0;}
-    .trim-slider{flex:1;accent-color:#f97316;}
-    .trim-val{font-size:12px;color:#f97316;font-weight:700;width:40px;text-align:right;}
-    /* Transform */
-    .transform-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
-    .transform-option{position:relative;}
-    .transform-option input[type="radio"]{position:absolute;opacity:0;cursor:pointer;width:100%;height:100%;}
-    .transform-label{display:block;padding:8px 10px;border:1.5px solid #6b21a8;border-radius:8px;background:#1e0d3b;color:#c4b5fd;font-size:12px;font-weight:600;text-align:center;cursor:pointer;transition:all 0.15s;}
-    .transform-option input[type="radio"]:checked + .transform-label{border-color:#f97316;background:#7c2d12;color:#fff;box-shadow:0 0 0 2px rgba(249,115,22,0.3);}
-    .transform-label:hover{border-color:#f97316;background:#431407;}
-    /* Buttons */
-    .actions{display:flex;gap:8px;margin-top:10px;}
-    .btn{padding:10px 14px;border-radius:8px;border:1px solid #6b21a8;background:#4c1d95;color:#e5e7eb;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;}
-    .btn:hover{background:#5b21b6;}
-    .btn.primary{background:linear-gradient(135deg,#f97316,#ea580c);border-color:#ea580c;font-weight:800;}
-    .btn.primary:hover{background:linear-gradient(135deg,#fb923c,#f97316);}
-    .btn.cancel{background:transparent;border-color:#4b5563;color:#9ca3af;}
-    .btn.cancel:hover{border-color:#9ca3af;color:#e5e7eb;}
-    .col-preview{margin-top:6px;padding:6px 10px;background:#1e0d3b;border-radius:6px;font-size:11px;color:#a78bfa;}
-    .spinner{text-align:center;padding:20px;color:#a78bfa;}
-  </style>
+  <link rel="stylesheet" href="../shared-config.css?v=20260309a"/>
+  <script src="../shared-config.js?v=20260309a"></script>
 </head>
 <body>
-  <div class="wrap">
-    <div class="head">
-      <div class="title"><i class="fa-solid fa-chart-simple"></i> Univariate Configuration</div>
-    </div>
+  <div class="cfg-shell">
 
-    <div id="loadingSpinner" class="spinner">
+    <!-- Header -->
+    <header class="cfg-header">
+      <div class="cfg-header-icon"><i class="fa-solid fa-chart-simple"></i></div>
+      <span class="cfg-header-title">Univariate Configuration</span>
+      <span class="cfg-meta-badge" id="metaBadge">—</span>
+      <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Toggle theme">
+        <i class="fa-solid fa-sun"></i>
+      </button>
+    </header>
+
+    <!-- Spinner -->
+    <div id="loadingSpinner" class="cfg-spinner">
       <i class="fa-solid fa-spinner fa-spin"></i> Loading data…
     </div>
 
-    <div id="mainContent" style="display:none;">
+    <!-- Main content (hidden until data arrives) -->
+    <div id="mainContent" style="display:none; display:none; flex:1; flex-direction:column; overflow:hidden;">
 
-      <!-- Range meta -->
-      <div class="panel">
-        <div class="meta">Range: <strong id="rangeAddr">—</strong></div>
-        <div class="meta">Rows: <strong id="rowCount">0</strong> &nbsp;|&nbsp; Columns: <strong id="colCount">0</strong></div>
-      </div>
+      <!-- Scrollable body -->
+      <div class="cfg-body">
 
-      <!-- Column selection -->
-      <div class="panel">
-        <div class="panel-title"><i class="fa-solid fa-table-columns"></i> Column to Analyse</div>
-        <label for="columnSelect">Select variable</label>
-        <select id="columnSelect" onchange="onColumnChange()">
-          <option value="">— pick a column —</option>
-        </select>
-        <div id="colPreview" class="col-preview" style="display:none;"></div>
-      </div>
-
-      <!-- Trim -->
-      <div class="panel">
-        <div class="panel-title"><i class="fa-solid fa-scissors"></i> Trim</div>
-        <div class="trim-row">
-          <span class="trim-label">Left trim</span>
-          <input type="range" id="trimMin" class="trim-slider" min="0" max="49" value="0" step="1" oninput="onTrimChange()"/>
-          <span class="trim-val" id="trimMinVal">0%</span>
-        </div>
-        <div class="trim-row">
-          <span class="trim-label">Right trim</span>
-          <input type="range" id="trimMax" class="trim-slider" min="51" max="100" value="100" step="1" oninput="onTrimChange()"/>
-          <span class="trim-val" id="trimMaxVal">100%</span>
-        </div>
-      </div>
-
-      <!-- Transform -->
-      <div class="panel">
-        <div class="panel-title"><i class="fa-solid fa-wave-square"></i> Transform</div>
-        <div class="transform-grid">
-          <div class="transform-option">
-            <input type="radio" name="transform" id="t_none" value="none" checked />
-            <label for="t_none" class="transform-label">None</label>
-          </div>
-          <div class="transform-option">
-            <input type="radio" name="transform" id="t_ln" value="ln" />
-            <label for="t_ln" class="transform-label">ln(x)</label>
-          </div>
-          <div class="transform-option">
-            <input type="radio" name="transform" id="t_log10" value="log10" />
-            <label for="t_log10" class="transform-label">log₁₀(x)</label>
-          </div>
-          <div class="transform-option">
-            <input type="radio" name="transform" id="t_sqrt" value="sqrt" />
-            <label for="t_sqrt" class="transform-label">√x</label>
-          </div>
-          <div class="transform-option">
-            <input type="radio" name="transform" id="t_sq" value="square" />
-            <label for="t_sq" class="transform-label">x²</label>
-          </div>
-          <div class="transform-option">
-            <input type="radio" name="transform" id="t_rec" value="reciprocal" />
-            <label for="t_rec" class="transform-label">1/x</label>
-          </div>
-          <div class="transform-option">
-            <input type="radio" name="transform" id="t_z" value="z" />
-            <label for="t_z" class="transform-label">z-score</label>
-          </div>
-          <div class="transform-option">
-            <input type="radio" name="transform" id="t_mm" value="minmax" />
-            <label for="t_mm" class="transform-label">Min-Max</label>
+        <!-- Range info -->
+        <div class="cfg-panel">
+          <div class="cfg-panel-body">
+            <div class="cfg-range-strip">
+              <div class="cfg-range-item">Range: <strong id="rangeAddr">—</strong></div>
+              <div class="cfg-range-item">Rows: <strong id="rowCount">0</strong></div>
+              <div class="cfg-range-item">Columns: <strong id="colCount">0</strong></div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Actions -->
-      <div class="actions">
-        <button class="btn cancel" onclick="cancel()"><i class="fa-solid fa-times"></i> Cancel</button>
-        <button class="btn primary" id="runBtn" onclick="runAnalysis()" disabled>
+        <!-- Variable picker -->
+        <div class="cfg-panel">
+          <div class="cfg-panel-head">
+            <i class="fa-solid fa-table-columns"></i> Column to Analyse
+          </div>
+          <div class="cfg-panel-body" style="padding-bottom:8px;">
+            <div class="cfg-hint" style="margin-bottom:8px;">Select exactly one variable. Disabled rows have &lt;5 numeric values.</div>
+            <div class="cfg-tbl-wrap">
+              <div class="cfg-tbl-scroll">
+                <table class="cfg-tbl">
+                  <thead>
+                    <tr>
+                      <th class="radio-cell">Pick</th>
+                      <th>Variable</th>
+                      <th class="right">N Num</th>
+                      <th class="right">Mean</th>
+                      <th class="right">SD</th>
+                      <th class="right">Min</th>
+                      <th class="right">Max</th>
+                    </tr>
+                  </thead>
+                  <tbody id="varsTbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="selectNote" class="cfg-note">Choose one valid variable to continue.</div>
+          </div>
+        </div>
+
+        <!-- Trim + Transform side by side -->
+        <div class="cfg-2col">
+
+          <div class="cfg-panel">
+            <div class="cfg-panel-head"><i class="fa-solid fa-scissors"></i> Trim</div>
+            <div class="cfg-panel-body">
+              <div class="cfg-slider-row">
+                <span class="cfg-slider-label">Left trim</span>
+                <input type="range" id="trimMin" class="cfg-slider" min="0" max="49" value="0" step="1" oninput="onTrimChange()"/>
+                <span class="cfg-slider-val" id="trimMinVal">0%</span>
+              </div>
+              <div class="cfg-slider-row">
+                <span class="cfg-slider-label">Right trim</span>
+                <input type="range" id="trimMax" class="cfg-slider" min="51" max="100" value="100" step="1" oninput="onTrimChange()"/>
+                <span class="cfg-slider-val" id="trimMaxVal">100%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="cfg-panel">
+            <div class="cfg-panel-head"><i class="fa-solid fa-wave-square"></i> Transform</div>
+            <div class="cfg-panel-body">
+              <div class="cfg-transform-grid">
+                <div class="cfg-transform-option">
+                  <input type="radio" name="transform" id="t_none" value="none" checked />
+                  <label for="t_none" class="cfg-transform-label">None</label>
+                </div>
+                <div class="cfg-transform-option">
+                  <input type="radio" name="transform" id="t_ln" value="ln" />
+                  <label for="t_ln" class="cfg-transform-label">ln(x)</label>
+                </div>
+                <div class="cfg-transform-option">
+                  <input type="radio" name="transform" id="t_log10" value="log10" />
+                  <label for="t_log10" class="cfg-transform-label">log₁₀(x)</label>
+                </div>
+                <div class="cfg-transform-option">
+                  <input type="radio" name="transform" id="t_sqrt" value="sqrt" />
+                  <label for="t_sqrt" class="cfg-transform-label">√x</label>
+                </div>
+                <div class="cfg-transform-option">
+                  <input type="radio" name="transform" id="t_sq" value="square" />
+                  <label for="t_sq" class="cfg-transform-label">x²</label>
+                </div>
+                <div class="cfg-transform-option">
+                  <input type="radio" name="transform" id="t_rec" value="reciprocal" />
+                  <label for="t_rec" class="cfg-transform-label">1/x</label>
+                </div>
+                <div class="cfg-transform-option">
+                  <input type="radio" name="transform" id="t_z" value="z" />
+                  <label for="t_z" class="cfg-transform-label">z-score</label>
+                </div>
+                <div class="cfg-transform-option">
+                  <input type="radio" name="transform" id="t_mm" value="minmax" />
+                  <label for="t_mm" class="cfg-transform-label">Min-Max</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /cfg-2col -->
+
+      </div><!-- /cfg-body -->
+
+      <!-- Footer -->
+      <div class="cfg-footer">
+        <button class="cfg-btn cancel" onclick="cancel()"><i class="fa-solid fa-times"></i> Cancel</button>
+        <button class="cfg-btn run" id="runBtn" onclick="runAnalysis()" disabled>
           <i class="fa-solid fa-play"></i> Run Full Analysis
         </button>
       </div>
 
     </div><!-- /mainContent -->
-  </div>
+
+  </div><!-- /cfg-shell -->
 
   <script>
-    let STATE = { headers: [], rows: [], address: '', savedSpec: null };
+    let STATE = { headers: [], rows: [], address: '', savedSpec: null, columnStats: [] };
+
+    // Show mainContent as flex once loaded
+    function showMain() {
+      const el = document.getElementById('mainContent');
+      el.style.display = 'flex';
+    }
 
     // ── Office init ──────────────────────────────────────────────────────────
     Office.onReady(() => {
@@ -155,205 +174,162 @@
     }
 
     function applyPayload(p) {
-      STATE.headers = p.headers || [];
-      STATE.rows    = p.rows    || [];
-      STATE.address = p.address || '';
+      STATE.headers   = p.headers   || [];
+      STATE.rows      = p.rows      || [];
+      STATE.address   = p.address   || '';
       STATE.savedSpec = p.savedSpec || null;
 
       document.getElementById('rangeAddr').textContent = STATE.address || 'Selection';
       document.getElementById('rowCount').textContent  = STATE.rows.length;
       document.getElementById('colCount').textContent  = STATE.headers.length;
+      document.getElementById('metaBadge').textContent =
+        STATE.address ? STATE.address : `${STATE.rows.length} rows`;
 
-      // Populate column dropdown
-      const sel = document.getElementById('columnSelect');
-      sel.innerHTML = '<option value="">— pick a column —</option>';
-      STATE.headers.forEach((h, i) => {
-        const opt = document.createElement('option');
-        opt.value = i;
-        opt.textContent = h || `Column ${i + 1}`;
-        sel.appendChild(opt);
-      });
+      buildColumnStats();
+      renderVariableTable();
 
-      // Restore saved spec
       if (STATE.savedSpec) {
-        sel.value = String(STATE.savedSpec.columnIndex ?? '');
+        const savedIdx   = STATE.savedSpec.columnIndex;
+        const savedRadio = document.querySelector(`input[name="selectedColumn"][value="${savedIdx}"]`);
+        if (savedRadio && !savedRadio.disabled) savedRadio.checked = true;
         document.getElementById('trimMin').value = STATE.savedSpec.trimMin ?? 0;
         document.getElementById('trimMax').value = STATE.savedSpec.trimMax ?? 100;
-        const savedTransform = STATE.savedSpec.transform || 'none';
-        const radio = document.querySelector(`input[name="transform"][value="${savedTransform}"]`);
+        const radio = document.querySelector(`input[name="transform"][value="${STATE.savedSpec.transform || 'none'}"]`);
         if (radio) radio.checked = true;
         onTrimChange();
-        onColumnChange();
       }
+      onVariableSelect();
 
       document.getElementById('loadingSpinner').style.display = 'none';
-      document.getElementById('mainContent').style.display = 'block';
+      showMain();
     }
 
-    // ── Column change ────────────────────────────────────────────────────────
-    function onColumnChange() {
-      const sel   = document.getElementById('columnSelect');
-      const idx   = parseInt(sel.value);
-      const runBtn = document.getElementById('runBtn');
-      const preview = document.getElementById('colPreview');
-
-      if (isNaN(idx)) {
-        runBtn.disabled = true;
-        preview.style.display = 'none';
-        return;
-      }
-
-      const values = STATE.rows
-        .map(row => row[idx])
-        .filter(v => v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v)))
-        .map(v => parseFloat(v));
-
-      if (!values.length) {
-        runBtn.disabled = true;
-        preview.style.display = 'none';
-        return;
-      }
-
-      runBtn.disabled = false;
-      const mn = Math.min(...values), mx = Math.max(...values);
-      const mean = values.reduce((a, b) => a + b, 0) / values.length;
-      preview.style.display = 'block';
-      preview.innerHTML =
-        `<strong>${values.length}</strong> numeric values &nbsp;|&nbsp; ` +
-        `Mean <strong>${mean.toFixed(2)}</strong> &nbsp;|&nbsp; ` +
-        `Range <strong>${mn.toFixed(2)}–${mx.toFixed(2)}</strong>`;
+    function buildColumnStats() {
+      STATE.columnStats = STATE.headers.map((h, idx) => {
+        const values = STATE.rows
+          .map(row => row[idx])
+          .filter(v => v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v)))
+          .map(v => parseFloat(v));
+        const n = values.length;
+        if (!n) return { idx, name: h || `Col ${idx+1}`, n:0, mean:null, sd:null, min:null, max:null, eligible:false };
+        const mean = values.reduce((a,b)=>a+b,0)/n;
+        const variance = n>1 ? values.reduce((acc,v)=>acc+(v-mean)**2,0)/(n-1) : 0;
+        return { idx, name:h||`Col ${idx+1}`, n, mean, sd:Math.sqrt(variance),
+                 min:Math.min(...values), max:Math.max(...values), eligible:n>=5 };
+      });
     }
 
-    // ── Trim change ──────────────────────────────────────────────────────────
+    function fmt(v) { return Number.isFinite(v) ? v.toFixed(2) : '—'; }
+
+    function renderVariableTable() {
+      document.getElementById('varsTbody').innerHTML = STATE.columnStats.map(s => `
+        <tr class="${s.eligible ? '' : 'disabled'}">
+          <td class="radio-cell">
+            <input type="radio" name="selectedColumn" value="${s.idx}"
+              ${s.eligible ? '' : 'disabled'} onchange="onVariableSelect()"/>
+          </td>
+          <td>${s.name}</td>
+          <td class="right">${s.n}</td>
+          <td class="right">${fmt(s.mean)}</td>
+          <td class="right">${fmt(s.sd)}</td>
+          <td class="right">${fmt(s.min)}</td>
+          <td class="right">${fmt(s.max)}</td>
+        </tr>`).join('');
+    }
+
+    function onVariableSelect() {
+      const sel  = document.querySelector('input[name="selectedColumn"]:checked');
+      const btn  = document.getElementById('runBtn');
+      const note = document.getElementById('selectNote');
+      if (!sel) { btn.disabled=true; note.textContent='Choose one valid variable to continue.'; return; }
+      btn.disabled = false;
+      const stats = STATE.columnStats.find(s => s.idx === parseInt(sel.value, 10));
+      note.textContent = stats ? `Selected: ${stats.name} (${stats.n} numeric values)` : '';
+    }
+
     function onTrimChange() {
       const minV = document.getElementById('trimMin').value;
       const maxV = document.getElementById('trimMax').value;
       document.getElementById('trimMinVal').textContent = `${minV}%`;
       document.getElementById('trimMaxVal').textContent = `${maxV}%`;
-      // Enforce min < max
       if (parseInt(minV) >= parseInt(maxV)) {
-        document.getElementById('trimMax').value = parseInt(minV) + 1;
-        document.getElementById('trimMaxVal').textContent = `${parseInt(minV) + 1}%`;
+        document.getElementById('trimMax').value = parseInt(minV)+1;
+        document.getElementById('trimMaxVal').textContent = `${parseInt(minV)+1}%`;
       }
     }
 
-    // ── Run ──────────────────────────────────────────────────────────────────
     function runAnalysis() {
-      const sel = document.getElementById('columnSelect');
-      const idx = parseInt(sel.value);
-      if (isNaN(idx)) return;
-
+      const sel = document.querySelector('input[name="selectedColumn"]:checked');
+      if (!sel) return;
+      const idx       = parseInt(sel.value, 10);
       const transform = document.querySelector('input[name="transform"]:checked')?.value || 'none';
       const trimMin   = parseInt(document.getElementById('trimMin').value);
       const trimMax   = parseInt(document.getElementById('trimMax').value);
-      const colName   = STATE.headers[idx] || `Column ${idx + 1}`;
+      const colName   = STATE.headers[idx] || `Column ${idx+1}`;
 
-      // Extract numeric column data
       let data = STATE.rows
-        .map(row => row[idx])
-        .filter(v => v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v)))
+        .map(r => r[idx])
+        .filter(v => v!=='' && v!==null && v!==undefined && !isNaN(parseFloat(v)))
         .map(v => parseFloat(v));
-
       if (!data.length) return;
 
-      // Apply trim
       if (trimMin > 0 || trimMax < 100) {
-        const sorted = [...data].sort((a, b) => a - b);
-        const minVal = sorted[Math.floor((sorted.length - 1) * trimMin / 100)];
-        const maxVal = sorted[Math.floor((sorted.length - 1) * trimMax / 100)];
-        data = data.filter(v => v >= minVal && v <= maxVal);
+        const sorted = [...data].sort((a,b)=>a-b);
+        const minVal = sorted[Math.floor((sorted.length-1)*trimMin/100)];
+        const maxVal = sorted[Math.floor((sorted.length-1)*trimMax/100)];
+        data = data.filter(v => v>=minVal && v<=maxVal);
       }
-
-      // Apply transform
       data = applyTransform(data, transform);
-
-      // Compute statistics
       const results = calculateStatistics(data, STATE.address, colName, transform, trimMin, trimMax);
-
-      // Send computed results + spec back to taskpane
-      send({
-        action: 'univariateResults',
-        spec: { columnIndex: idx, columnName: colName, trimMin, trimMax, transform },
-        data: results
-      });
+      send({ action:'univariateResults', spec:{columnIndex:idx,columnName:colName,trimMin,trimMax,transform}, data:results });
     }
 
-    // ── Transform ─────────────────────────────────────────────────────────────
-    function applyTransform(data, transform) {
-      switch (transform) {
-        case 'ln':         return data.map(v => Math.log(v));
-        case 'log10':      return data.map(v => Math.log10(v));
-        case 'sqrt':       return data.map(v => Math.sqrt(v));
-        case 'square':     return data.map(v => v * v);
-        case 'reciprocal': return data.map(v => 1 / v);
+    function applyTransform(data, t) {
+      switch(t){
+        case 'ln':         return data.map(v=>Math.log(v));
+        case 'log10':      return data.map(v=>Math.log10(v));
+        case 'sqrt':       return data.map(v=>Math.sqrt(v));
+        case 'square':     return data.map(v=>v*v);
+        case 'reciprocal': return data.map(v=>1/v);
         case 'z': {
-          const m  = data.reduce((a, b) => a + b, 0) / data.length;
-          const sd = Math.sqrt(data.reduce((acc, v) => acc + (v - m) ** 2, 0) / data.length);
-          return data.map(v => (v - m) / sd);
+          const m=data.reduce((a,b)=>a+b,0)/data.length;
+          const sd=Math.sqrt(data.reduce((acc,v)=>acc+(v-m)**2,0)/data.length);
+          return data.map(v=>(v-m)/sd);
         }
         case 'minmax': {
-          const mn = Math.min(...data), mx = Math.max(...data);
-          return data.map(v => (v - mn) / (mx - mn));
+          const mn=Math.min(...data),mx=Math.max(...data);
+          return data.map(v=>(v-mn)/(mx-mn));
         }
         default: return data;
       }
     }
 
-    // ── Statistics ────────────────────────────────────────────────────────────
     function calculateStatistics(data, address, columnName, transform, trimMin, trimMax) {
       const n      = data.length;
-      const sorted = [...data].sort((a, b) => a - b);
-      const sum    = data.reduce((a, b) => a + b, 0);
-      const mean   = sum / n;
-      const variance = data.reduce((acc, v) => acc + (v - mean) ** 2, 0) / (n - 1);
-      const stdDev   = Math.sqrt(variance);
-      const min    = sorted[0];
-      const max    = sorted[n - 1];
-      const q1     = quantile(sorted, 0.25);
-      const median = quantile(sorted, 0.5);
-      const q3     = quantile(sorted, 0.75);
-      const skewness = calcSkewness(data, mean, stdDev);
-      const kurtosis = calcKurtosis(data, mean, stdDev);
+      const sorted = [...data].sort((a,b)=>a-b);
+      const mean   = data.reduce((a,b)=>a+b,0)/n;
+      const variance = data.reduce((acc,v)=>acc+(v-mean)**2,0)/(n-1);
+      const stdDev = Math.sqrt(variance);
+      const q1     = quantile(sorted,0.25);
+      const median = quantile(sorted,0.5);
+      const q3     = quantile(sorted,0.75);
       return {
-        dataSource: address,
-        column: columnName,
-        transform,
-        trim: { min: trimMin, max: trimMax },
-        n,
-        values: data,
-        rawData: data,
-        descriptive: { mean, median, stdDev, variance, min, max, range: max - min, q1, q3, iqr: q3 - q1, skewness, kurtosis }
+        dataSource:address, column:columnName, transform,
+        trim:{min:trimMin,max:trimMax}, n,
+        values:data, rawData:data,
+        descriptive:{mean,median,stdDev,variance,min:sorted[0],max:sorted[n-1],
+          range:sorted[n-1]-sorted[0],q1,q3,iqr:q3-q1,
+          skewness:calcSkewness(data,mean,stdDev),
+          kurtosis:calcKurtosis(data,mean,stdDev)}
       };
     }
 
-    function quantile(sorted, q) {
-      const pos  = (sorted.length - 1) * q;
-      const base = Math.floor(pos);
-      const rest = pos - base;
-      return sorted[base + 1] !== undefined
-        ? sorted[base] + rest * (sorted[base + 1] - sorted[base])
-        : sorted[base];
-    }
+    function quantile(s,q){ const p=(s.length-1)*q,b=Math.floor(p),r=p-b; return s[b+1]!==undefined?s[b]+r*(s[b+1]-s[b]):s[b]; }
+    function calcSkewness(d,m,sd){ const n=d.length; return (d.reduce((a,v)=>a+(v-m)**3,0)/n)/sd**3; }
+    function calcKurtosis(d,m,sd){ const n=d.length; return (d.reduce((a,v)=>a+(v-m)**4,0)/n)/sd**4-3; }
 
-    function calcSkewness(data, mean, sd) {
-      const n  = data.length;
-      const m3 = data.reduce((acc, v) => acc + (v - mean) ** 3, 0) / n;
-      return m3 / sd ** 3;
-    }
-
-    function calcKurtosis(data, mean, sd) {
-      const n  = data.length;
-      const m4 = data.reduce((acc, v) => acc + (v - mean) ** 4, 0) / n;
-      return (m4 / sd ** 4) - 3;
-    }
-
-    // ── Cancel ───────────────────────────────────────────────────────────────
     function cancel() { send({ action: 'close' }); }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-    function send(msg) {
-      Office.context.ui.messageParent(JSON.stringify(msg));
-    }
+    function send(msg) { Office.context.ui.messageParent(JSON.stringify(msg)); }
   </script>
 </body>
 </html>

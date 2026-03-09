@@ -1,34 +1,34 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    shared-config.js  –  Theme toggle + utilities for config dialogs
-   VERSION: 2026-03-09-001
+   VERSION: 2026-03-09-002
    ═══════════════════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
 
   const STORAGE_KEY = 'statistico-config-theme';
 
-  // Apply saved theme immediately (before DOM paint to avoid flash)
+  // ── Apply theme to <html> and sync button visuals ──────────────────────
   function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
-    // Update button icon if present
+
     const btn = document.getElementById('cfgThemeToggle');
-    if (btn) {
-      const icon = btn.querySelector('i');
-      if (icon) {
-        icon.className = theme === 'light'
-          ? 'fa-solid fa-moon'
-          : 'fa-solid fa-sun';
-      }
-      btn.title = theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode';
-    }
+    if (!btn) return;
+
+    const icon  = btn.querySelector('.cfg-toggle-icon');
+    const label = btn.querySelector('.cfg-toggle-label');
+
+    if (icon)  icon.textContent  = theme === 'light' ? '☀️' : '🌙';
+    if (label) label.textContent = theme === 'light' ? 'Light' : 'Dark';
+
+    btn.title = theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode';
   }
 
   function getSaved() {
-    try { return localStorage.getItem(STORAGE_KEY) || 'dark'; } catch(_) { return 'dark'; }
+    try { return localStorage.getItem(STORAGE_KEY) || 'dark'; } catch (_) { return 'dark'; }
   }
 
   function saveTheme(t) {
-    try { localStorage.setItem(STORAGE_KEY, t); } catch(_) {}
+    try { localStorage.setItem(STORAGE_KEY, t); } catch (_) {}
   }
 
   function toggleTheme() {
@@ -38,10 +38,10 @@
     applyTheme(next);
   }
 
-  // Init: apply saved theme right away
+  // Apply saved theme immediately (prevents flash)
   applyTheme(getSaved());
 
-  // Re-apply once DOM is ready (for button icon sync)
+  // Re-sync once DOM is ready (so button icon reflects state)
   document.addEventListener('DOMContentLoaded', function () {
     applyTheme(getSaved());
     const btn = document.getElementById('cfgThemeToggle');

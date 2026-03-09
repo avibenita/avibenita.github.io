@@ -1863,24 +1863,74 @@
     .ancova-var-chip.chip-factor  { border-left: 3px solid var(--accent-2); }
     .ancova-var-chip.chip-cov     { border-left: 3px solid var(--success); }
 
-    /* Sidebar Interactions group — mirrors ANCOVA group style */
-    #interactionsGroupNav .sb-group-title {
-      font-size: 9px;
-      font-weight: 800;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      padding: 10px 12px 4px;
-      line-height: 1;
-    }
-
-    #interactionsGroupNav .sb-items-rail {
-      padding-left: 10px;
-      border-left: 2px solid rgba(120,200,255,0.3);
-      margin: 0 8px 8px 14px;
-    }
-
-    #interactionsGroupNav .sb-item {
+    /* Interactions expandable parent button */
+    .sb-item-parent {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px 10px;
       border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      gap: 0;
+      transition: background 0.15s, color 0.15s;
+      text-align: left;
+      position: relative;
+    }
+    .sb-item-parent:hover {
+      background: rgba(120,200,255,0.08);
+      color: var(--text-primary);
+    }
+    .sb-item-parent.expanded {
+      color: var(--accent-2);
+      background: rgba(167,139,250,0.08);
+    }
+    .sb-item-parent .sb-item-icon {
+      flex-shrink: 0;
+      width: 18px;
+      text-align: center;
+      font-size: 11px;
+      margin-right: 7px;
+      color: #18223a;
+    }
+    .sb-item-parent .sb-item-label {
+      flex: 1;
+    }
+    .sb-arrow {
+      font-size: 9px;
+      margin-left: auto;
+      padding-left: 6px;
+      opacity: 0.6;
+      transition: transform 0.2s ease;
+      flex-shrink: 0;
+    }
+    .sb-item-parent.expanded .sb-arrow {
+      transform: rotate(90deg);
+      opacity: 1;
+      color: var(--accent-2);
+    }
+
+    /* Collapsible sub-items rail */
+    .sb-subitems {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.22s ease;
+    }
+    .sb-subitems.open {
+      max-height: 300px;
+    }
+    .sb-subitems-rail {
+      padding-left: 10px;
+      border-left: 2px solid rgba(167,139,250,0.3);
+      margin: 2px 8px 6px 20px;
+    }
+    .sb-subitems-rail .sb-item {
+      border-radius: 6px;
+      font-size: 11px;
     }
 
     /* Sidebar ANCOVA group */
@@ -2479,40 +2529,40 @@
                 <i class="fa-solid fa-list sb-item-icon" style="color:#18223a"></i>
                 <span class="sb-item-label">Detailed Results</span>
               </button>
-              <button class="sb-item" id="interactionsTabButton" onclick="switchTab('ix-coefficients')" data-tab="ix-coefficients" style="display:none;">
-                <i class="fa-solid fa-arrows-split-up-and-left sb-item-icon" style="color:#18223a"></i>
-                <span class="sb-item-label">Interactions</span>
-              </button>
-              <!-- Interactions sub-group (visible only when model has interaction terms) -->
-              <div class="sb-group" id="interactionsGroupNav" style="display:none;">
-                <div class="sb-group-title" style="color:var(--accent-2);display:flex;align-items:center;gap:6px;">
-                  <i class="fa-solid fa-arrows-split-up-and-left" style="font-size:9px;"></i> Interactions
-                </div>
-                <div class="sb-items-rail">
-                  <button class="sb-item" onclick="switchTab('ix-summary')" data-tab="ix-summary">
-                    <i class="fa-solid fa-layer-group sb-item-icon" style="color:#18223a"></i>
-                    <span class="sb-item-label">Summary</span>
-                  </button>
-                  <button class="sb-item" onclick="switchTab('ix-plot')" data-tab="ix-plot">
-                    <i class="fa-solid fa-chart-line sb-item-icon" style="color:#18223a"></i>
-                    <span class="sb-item-label">Plot</span>
-                  </button>
-                  <button class="sb-item" onclick="switchTab('ix-slopes')" data-tab="ix-slopes">
-                    <i class="fa-solid fa-angles-right sb-item-icon" style="color:#18223a"></i>
-                    <span class="sb-item-label">Simple Slopes</span>
-                  </button>
-                  <button class="sb-item" onclick="switchTab('ix-emmeans')" data-tab="ix-emmeans">
-                    <i class="fa-solid fa-chart-column sb-item-icon" style="color:#18223a"></i>
-                    <span class="sb-item-label">Adjusted Means</span>
-                  </button>
-                  <button class="sb-item" onclick="switchTab('ix-coefficients')" data-tab="ix-coefficients">
-                    <i class="fa-solid fa-sigma sb-item-icon" style="color:#18223a"></i>
-                    <span class="sb-item-label">Effects</span>
-                  </button>
-                  <button class="sb-item" onclick="switchTab('ix-partial-f')" data-tab="ix-partial-f">
-                    <i class="fa-solid fa-flask sb-item-icon" style="color:#18223a"></i>
-                    <span class="sb-item-label">Model Comparison</span>
-                  </button>
+              <!-- Interactions expandable item (visible only when model has interaction terms) -->
+              <div id="interactionsGroupNav" style="display:none;">
+                <button class="sb-item-parent" id="interactionsParentBtn" onclick="toggleInteractionsNav()" aria-expanded="false">
+                  <i class="fa-solid fa-arrows-split-up-and-left sb-item-icon"></i>
+                  <span class="sb-item-label">Interactions</span>
+                  <i class="fa-solid fa-chevron-right sb-arrow"></i>
+                </button>
+                <div class="sb-subitems" id="interactionsSubItems">
+                  <div class="sb-subitems-rail">
+                    <button class="sb-item" onclick="switchTab('ix-summary')" data-tab="ix-summary">
+                      <i class="fa-solid fa-layer-group sb-item-icon" style="color:#18223a"></i>
+                      <span class="sb-item-label">Summary</span>
+                    </button>
+                    <button class="sb-item" onclick="switchTab('ix-plot')" data-tab="ix-plot">
+                      <i class="fa-solid fa-chart-line sb-item-icon" style="color:#18223a"></i>
+                      <span class="sb-item-label">Plot</span>
+                    </button>
+                    <button class="sb-item" onclick="switchTab('ix-slopes')" data-tab="ix-slopes">
+                      <i class="fa-solid fa-angles-right sb-item-icon" style="color:#18223a"></i>
+                      <span class="sb-item-label">Simple Slopes</span>
+                    </button>
+                    <button class="sb-item" onclick="switchTab('ix-emmeans')" data-tab="ix-emmeans">
+                      <i class="fa-solid fa-chart-column sb-item-icon" style="color:#18223a"></i>
+                      <span class="sb-item-label">Adjusted Means</span>
+                    </button>
+                    <button class="sb-item" onclick="switchTab('ix-coefficients')" data-tab="ix-coefficients">
+                      <i class="fa-solid fa-sigma sb-item-icon" style="color:#18223a"></i>
+                      <span class="sb-item-label">Effects</span>
+                    </button>
+                    <button class="sb-item" onclick="switchTab('ix-partial-f')" data-tab="ix-partial-f">
+                      <i class="fa-solid fa-flask sb-item-icon" style="color:#18223a"></i>
+                      <span class="sb-item-label">Model Comparison</span>
+                    </button>
+                  </div>
                 </div>
               </div>
               <button class="sb-item" onclick="switchTab('predictions')" data-tab="predictions">
@@ -3616,6 +3666,17 @@
       nav.classList.toggle('collapsed');
     }
 
+    // Toggle Interactions expandable nav item
+    function toggleInteractionsNav(expand) {
+      const btn   = document.getElementById('interactionsParentBtn');
+      const panel = document.getElementById('interactionsSubItems');
+      if (!btn || !panel) return;
+      const shouldExpand = (expand !== undefined) ? expand : !btn.classList.contains('expanded');
+      btn.classList.toggle('expanded', shouldExpand);
+      panel.classList.toggle('open', shouldExpand);
+      btn.setAttribute('aria-expanded', shouldExpand);
+    }
+
     // Tab Management
     function switchTab(tabName) {
       console.log('🔄 Switching to tab:', tabName);
@@ -3654,6 +3715,11 @@
         btn.classList.remove('active');
         if (btn.dataset.tab === tabName) btn.classList.add('active');
       });
+
+      // Auto-expand interactions nav when any ix-* tab is activated
+      if (tabName.startsWith('ix-')) {
+        toggleInteractionsNav(true);
+      }
       
       // Hide all tab content, show the selected one
       // 'results-overview' and 'results-detail' both map to tab-results
@@ -5037,6 +5103,8 @@
       if (interactionsGroupNav) interactionsGroupNav.style.display = hasInteractions ? '' : 'none';
       if (interactionsTabButton) interactionsTabButton.style.display = 'none'; // always hide legacy btn
       if (hasInteractions) {
+        // Auto-expand the interactions nav when results arrive
+        toggleInteractionsNav(true);
         renderInteractionsTab(results, varNames, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo, yVarName, window.regressionRows || [], window.regressionHeaders || []);
         // Auto-navigate to interaction summary
         setTimeout(() => switchTab('ix-summary'), 80);

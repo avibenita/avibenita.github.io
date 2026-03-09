@@ -25,8 +25,8 @@
   <script src="../../../src/shared/js/core/saved-analyses-manager.js"></script>
 
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260309f" />
-  <script src="../shared-header.js?v=20260309f"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260309g" />
+  <script src="../shared-header.js?v=20260309g"></script>
 
   <style>
     /* Dark Theme (Default) */
@@ -1863,6 +1863,26 @@
     .ancova-var-chip.chip-factor  { border-left: 3px solid var(--accent-2); }
     .ancova-var-chip.chip-cov     { border-left: 3px solid var(--success); }
 
+    /* Sidebar Interactions group — mirrors ANCOVA group style */
+    #interactionsGroupNav .sb-group-title {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 10px 12px 4px;
+      line-height: 1;
+    }
+
+    #interactionsGroupNav .sb-items-rail {
+      padding-left: 10px;
+      border-left: 2px solid rgba(120,200,255,0.3);
+      margin: 0 8px 8px 14px;
+    }
+
+    #interactionsGroupNav .sb-item {
+      border-radius: 6px;
+    }
+
     /* Sidebar ANCOVA group */
     #ancovaGroupNav .sb-group-title {
       font-size: 9px;
@@ -2459,10 +2479,34 @@
                 <i class="fa-solid fa-list sb-item-icon" style="color:#18223a"></i>
                 <span class="sb-item-label">Detailed Results</span>
               </button>
-              <button class="sb-item" id="interactionsTabButton" onclick="switchTab('interactions')" data-tab="interactions" style="display:none;">
+              <button class="sb-item" id="interactionsTabButton" onclick="switchTab('ix-coefficients')" data-tab="ix-coefficients" style="display:none;">
                 <i class="fa-solid fa-arrows-split-up-and-left sb-item-icon" style="color:#18223a"></i>
                 <span class="sb-item-label">Interactions</span>
               </button>
+              <!-- Interactions sub-group (visible only when model has interaction terms) -->
+              <div class="sb-group" id="interactionsGroupNav" style="display:none;">
+                <div class="sb-group-title" style="color:var(--accent-2);display:flex;align-items:center;gap:6px;">
+                  <i class="fa-solid fa-arrows-split-up-and-left" style="font-size:9px;"></i> Interactions
+                </div>
+                <div class="sb-items-rail">
+                  <button class="sb-item" onclick="switchTab('ix-coefficients')" data-tab="ix-coefficients">
+                    <i class="fa-solid fa-sigma sb-item-icon" style="color:#18223a"></i>
+                    <span class="sb-item-label">Coefficients</span>
+                  </button>
+                  <button class="sb-item" onclick="switchTab('ix-partial-f')" data-tab="ix-partial-f">
+                    <i class="fa-solid fa-flask sb-item-icon" style="color:#18223a"></i>
+                    <span class="sb-item-label">Partial F-Test</span>
+                  </button>
+                  <button class="sb-item" onclick="switchTab('ix-emmeans')" data-tab="ix-emmeans">
+                    <i class="fa-solid fa-chart-column sb-item-icon" style="color:#18223a"></i>
+                    <span class="sb-item-label">EMMeans</span>
+                  </button>
+                  <button class="sb-item" onclick="switchTab('ix-plot')" data-tab="ix-plot">
+                    <i class="fa-solid fa-chart-line sb-item-icon" style="color:#18223a"></i>
+                    <span class="sb-item-label">Interaction Plot</span>
+                  </button>
+                </div>
+              </div>
               <button class="sb-item" onclick="switchTab('predictions')" data-tab="predictions">
                 <i class="fa-solid fa-wand-magic-sparkles sb-item-icon" style="color:#18223a"></i>
                 <span class="sb-item-label">Predictions</span>
@@ -2956,92 +3000,92 @@
         </div>
 
         <!-- Tab: Interactions -->
-        <div id="tab-interactions" class="tab-content">
-          <div class="tab-panel" id="interactionsPanel">
-
-            <div class="section-card" style="margin-bottom:16px;">
-              <div class="section-header">
-                <i class="fa-solid fa-arrows-split-up-and-left"></i>
-                <span>Interaction Terms — Coefficients</span>
-              </div>
-              <p style="color:var(--text-muted);font-size:12px;margin:0 0 12px 0;line-height:1.5;">
-                Each interaction term tests whether the effect of one predictor depends on another. 
-                Coefficients below are the OLS estimates for the product terms; the base model coefficients appear in Detailed Results.
-              </p>
-              <div class="table-responsive">
-                <table class="results-table" id="interactionCoeffTable">
-                  <thead>
-                    <tr>
-                      <th>Term</th>
-                      <th>β</th>
-                      <th>SE</th>
-                      <th>t</th>
-                      <th>p-value</th>
-                      <th>Sig.</th>
-                      <th>95% CI (lower)</th>
-                      <th>95% CI (upper)</th>
-                    </tr>
-                  </thead>
-                  <tbody id="interactionCoeffBody">
-                    <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">Run a model with interaction terms to see results</td></tr>
-                  </tbody>
-                </table>
-              </div>
+        <!-- Tab: Interactions – Coefficients -->
+        <div id="tab-ix-coefficients" class="tab-content">
+          <div class="tab-panel ancova-sub-panel">
+            <div class="ancova-sub-header">
+              <i class="fa-solid fa-sigma" style="color:var(--accent-2);"></i>
+              <span>Interaction Coefficients</span>
             </div>
-
-            <!-- Partial F-test block -->
-            <div class="section-card" style="margin-bottom:16px;">
-              <div class="section-header">
-                <i class="fa-solid fa-flask"></i>
-                <span>Partial F-Test — Interaction Block</span>
-              </div>
-              <p style="color:var(--text-muted);font-size:12px;margin:0 0 12px 0;line-height:1.5;">
-                Tests whether the interaction terms as a block improve model fit over the main-effects-only model. 
-                A significant F confirms that moderation is present.
-              </p>
-              <div id="interactionPartialFContainer">
-                <div style="color:var(--text-muted);font-style:italic;padding:10px 0;font-size:12px;">
-                  No interaction terms in current model.
-                </div>
-              </div>
+            <p class="ancova-sub-desc">
+              OLS estimates for each interaction product term. A significant coefficient means the effect of one predictor
+              depends on the level of the other (moderation). Base main-effect coefficients appear in Detailed Results.
+            </p>
+            <div class="table-responsive">
+              <table class="results-table" id="interactionCoeffTable">
+                <thead>
+                  <tr>
+                    <th>Term</th>
+                    <th>β</th>
+                    <th>SE</th>
+                    <th>t</th>
+                    <th>p-value</th>
+                    <th>Sig.</th>
+                    <th>95% CI (lower)</th>
+                    <th>95% CI (upper)</th>
+                  </tr>
+                </thead>
+                <tbody id="interactionCoeffBody">
+                  <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">Run a model with interaction terms to see results</td></tr>
+                </tbody>
+              </table>
             </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:8px;font-style:italic;">† p&lt;.10 &nbsp; * p&lt;.05 &nbsp; ** p&lt;.01 &nbsp; *** p&lt;.001</div>
+          </div>
+        </div>
 
-            <!-- Estimated Marginal Means block -->
-            <div class="section-card" style="margin-bottom:16px;" id="emmSection">
-              <div class="section-header">
-                <i class="fa-solid fa-chart-column"></i>
-                <span>Estimated Marginal Means (EMMeans)</span>
-              </div>
-              <p style="color:var(--text-muted);font-size:12px;margin:0 0 12px 0;line-height:1.5;">
-                Adjusted group means for categorical predictors, holding all numeric covariates at their observed means. 
-                Pairwise contrasts are Bonferroni-corrected.
-              </p>
-              <div id="emmContainer">
-                <div style="color:var(--text-muted);font-style:italic;padding:10px 0;font-size:12px;">
-                  EMMeans are shown when the model contains at least one categorical predictor.
-                </div>
-              </div>
+        <!-- Tab: Interactions – Partial F-Test -->
+        <div id="tab-ix-partial-f" class="tab-content">
+          <div class="tab-panel ancova-sub-panel">
+            <div class="ancova-sub-header">
+              <i class="fa-solid fa-flask" style="color:var(--accent-2);"></i>
+              <span>Partial F-Test — Interaction Block</span>
             </div>
-
-            <!-- Interaction Plot block -->
-            <div class="section-card" id="interactionPlotSection">
-              <div class="section-header">
-                <i class="fa-solid fa-chart-line"></i>
-                <span>Interaction Plot</span>
-              </div>
-              <p style="color:var(--text-muted);font-size:12px;margin:0 0 12px 0;line-height:1.5;">
-                Select an interaction term to visualize. For Factor × Covariate interactions the plot shows predicted 
-                outcome vs. covariate with separate lines per group.
-              </p>
-              <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <label style="font-size:12px;color:var(--text-secondary);white-space:nowrap;">Interaction to plot:</label>
-                <select id="interactionPlotSelect" style="font-size:12px;padding:4px 8px;min-width:200px;" onchange="renderInteractionPlot()">
-                  <option value="">-- Select --</option>
-                </select>
-              </div>
-              <div id="interactionPlotContainer" style="height:380px;"></div>
+            <p class="ancova-sub-desc">
+              Tests whether the interaction terms as a block significantly improve model fit over the main-effects-only model.
+              A significant F (p &lt; .05) confirms that moderation is present and the interactions should be retained.
+            </p>
+            <div id="interactionPartialFContainer">
+              <div style="color:var(--text-muted);font-style:italic;padding:10px 0;font-size:12px;">No interaction terms in current model.</div>
             </div>
+          </div>
+        </div>
 
+        <!-- Tab: Interactions – EMMeans -->
+        <div id="tab-ix-emmeans" class="tab-content">
+          <div class="tab-panel ancova-sub-panel">
+            <div class="ancova-sub-header">
+              <i class="fa-solid fa-chart-column" style="color:var(--accent-2);"></i>
+              <span>Estimated Marginal Means (EMMeans)</span>
+            </div>
+            <p class="ancova-sub-desc">
+              Adjusted group means for each categorical predictor, holding all numeric covariates at their observed grand means.
+              Pairwise contrasts are Bonferroni-corrected for familywise error.
+            </p>
+            <div id="emmContainer">
+              <div style="color:var(--text-muted);font-style:italic;padding:10px 0;font-size:12px;">EMMeans are shown when the model contains at least one categorical predictor.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Interactions – Plot -->
+        <div id="tab-ix-plot" class="tab-content">
+          <div class="tab-panel ancova-sub-panel">
+            <div class="ancova-sub-header">
+              <i class="fa-solid fa-chart-line" style="color:var(--accent-2);"></i>
+              <span>Interaction Plot</span>
+            </div>
+            <p class="ancova-sub-desc">
+              Select an interaction term to visualize. For Numeric × Categorical interactions the plot shows predicted outcome
+              vs. covariate with one line per group. For Numeric × Numeric, lines are drawn at −1 SD, Mean, and +1 SD of the moderator.
+            </p>
+            <div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <label style="font-size:12px;color:var(--text-secondary);white-space:nowrap;">Interaction to plot:</label>
+              <select id="interactionPlotSelect" style="font-size:12px;padding:4px 8px;min-width:220px;" onchange="renderInteractionPlot()">
+                <option value="">-- Select --</option>
+              </select>
+            </div>
+            <div id="interactionPlotContainer" style="height:400px;"></div>
           </div>
         </div>
 
@@ -3494,6 +3538,10 @@
         'results-overview':  'Overview',
         'results-detail':    'Detailed Results',
         'interactions':      'Interactions',
+        'ix-coefficients':   'Interactions \u2013 Coefficients',
+        'ix-partial-f':      'Interactions \u2013 Partial F-Test',
+        'ix-emmeans':        'Interactions \u2013 EMMeans',
+        'ix-plot':           'Interactions \u2013 Plot',
         'predictions':       'Predictions',
         'residuals':         'Residual Overview',
         'res-plots':         'Residual Plots',
@@ -3570,11 +3618,18 @@
         }
         renderANCOVASubTab(tabName);
       } else if (tabName === 'interactions') {
-        // Interaction plot may need re-render when tab becomes visible (Highcharts sizing)
-        setTimeout(() => {
-          const sel = document.getElementById('interactionPlotSelect');
-          if (sel && sel.value !== '') renderInteractionPlot();
-        }, 50);
+        // legacy – redirect to first sub-tab
+        switchTab('ix-coefficients');
+        return;
+      } else if (['ix-coefficients','ix-partial-f','ix-emmeans','ix-plot'].includes(tabName)) {
+        // Interaction sub-tabs: data already rendered by renderInteractionsTab at result time.
+        // For the plot tab, re-render in case Highcharts needs the visible container.
+        if (tabName === 'ix-plot') {
+          setTimeout(() => {
+            const sel = document.getElementById('interactionPlotSelect');
+            if (sel && sel.value !== '') renderInteractionPlot();
+          }, 50);
+        }
       }
     }
 
@@ -4881,13 +4936,14 @@
       }
       
       // Show/hide Interactions tab based on whether model has interaction terms
-      const interactionsTabButton = document.getElementById('interactionsTabButton');
-      if (interactionsTabButton) {
-        const hasInteractions = (interactions || []).length > 0;
-        interactionsTabButton.style.display = hasInteractions ? 'inline-flex' : 'none';
-        if (hasInteractions) {
-          renderInteractionsTab(results, variableNames, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo, yVar, rows, headers);
-        }
+      // Show/hide Interactions sub-menu based on whether model has interaction terms
+      const interactionsGroupNav = document.getElementById('interactionsGroupNav');
+      const interactionsTabButton = document.getElementById('interactionsTabButton'); // legacy hidden btn
+      const hasInteractions = (interactions || []).length > 0;
+      if (interactionsGroupNav) interactionsGroupNav.style.display = hasInteractions ? '' : 'none';
+      if (interactionsTabButton) interactionsTabButton.style.display = 'none'; // always hide legacy btn
+      if (hasInteractions) {
+        renderInteractionsTab(results, variableNames, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo, yVar, rows, headers);
       }
       
       // Populate Model Fit panel

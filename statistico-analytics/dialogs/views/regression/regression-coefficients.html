@@ -2075,6 +2075,34 @@
       padding: 0 2px;
     }
 
+    /* CI Bands toggle button */
+    .ci-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 20px;
+      border: 1px solid rgba(120,200,255,0.3);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.18s;
+      white-space: nowrap;
+    }
+    .ci-toggle-btn:hover {
+      border-color: rgba(120,200,255,0.6);
+      color: var(--accent-2);
+      background: rgba(120,200,255,0.06);
+    }
+    .ci-toggle-btn.active {
+      background: rgba(120,200,255,0.14);
+      border-color: var(--accent-2);
+      color: var(--accent-2);
+    }
+    .ci-toggle-btn i { font-size: 10px; }
+
     .table-responsive {
       overflow-x: auto;
     }
@@ -3202,6 +3230,9 @@
                     <option value="">-- select interaction --</option>
                   </select>
                 </span>
+                <button class="ci-toggle-btn" id="ciToggleBtnSum" onclick="toggleCIBands()" style="margin-left:8px;" title="Toggle 95% confidence bands">
+                  <i class="fa-solid fa-layer-group"></i> CI Bands
+                </button>
               </div>
               <div id="ixSumPlotContainer" style="height:320px;"></div>
             </div>
@@ -3335,6 +3366,10 @@
               <select id="interactionPlotSelect" style="font-size:12px;padding:4px 8px;min-width:220px;" onchange="renderInteractionPlot()">
                 <option value="">-- Select --</option>
               </select>
+              <button class="ci-toggle-btn" id="ciToggleBtn" onclick="toggleCIBands()" title="Toggle 95% confidence bands around predictions">
+                <i class="fa-solid fa-layer-group"></i> CI Bands
+              </button>
+              <span style="font-size:10.5px;color:var(--text-muted);font-style:italic;">95% confidence ribbon around predicted lines</span>
             </div>
             <div id="interactionPlotContainer" style="height:400px;"></div>
           </div>
@@ -7759,6 +7794,29 @@
       }
     }
 
+    // Toggle CI bands on/off and re-render both plots
+    function toggleCIBands() {
+      window._showCIBands = !window._showCIBands;
+      // Sync both button states
+      ['ciToggleBtn','ciToggleBtnSum'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.classList.toggle('active', window._showCIBands);
+      });
+      // Re-render whichever plot is visible
+      const plotTab = document.getElementById('tab-ix-plot');
+      const sumTab  = document.getElementById('tab-ix-summary');
+      if (plotTab && plotTab.classList.contains('active')) renderInteractionPlot();
+      if (sumTab  && sumTab.classList.contains('active'))  renderInteractionSummaryPlot();
+    }
+
+    // ── Shared SE(ŷ) approximation ──────────────────────────────────────────────
+    // Uses: SE(ŷ) ≈ sqrt(MSE) * sqrt(h)  where h = 1/n + (x-xbar)²/Sxx  (OLS hat diagonal approx)
+    // For multi-predictor models we use a simpler conservative bound: SE ≈ RMSE * scale
+    function _predSE(xv, xMean, xSS, mse, n) {
+      const leverage = 1 / n + Math.pow(xv - xMean, 2) / Math.max(xSS, 1e-10);
+      return Math.sqrt(mse * leverage);
+    }
+
     function _renderNumCatInteractionPlot(container, ix, ixi, results, xnVars, xcVars, rows, headers, yVar) {
       const numVar = ix.var1;
       const catVar = ix.var2 || (ixi.v2Cat && ixi.v2Cat.name);
@@ -7776,37 +7834,79 @@
         covMeans[v] = vals.reduce((a, b) => a + b, 0) / vals.length;
       });
 
-      // For each category, compute predicted Y across xPoints
-      const series = catInfo.categories.map(cat => {
-        const seriesData = xPoints.map(xv => {
+      // Stats for SE approximation
+      const n = numVals.length;
+      const xMean = numVals.reduce((a, b) => a + b, 0) / n;
+      const xSS = numVals.reduce((a, b) => a + (b - xMean) ** 2, 0);
+      const mse = results.MSE || (results.SSR / results.df) || 1;
+      const showCI = !!window._showCIBands;
+
+      // Palette — one colour per category
+      const palette = ['#78c8ff','#ffa578','#4ade80','#fbbf24','#a78bfa','#fb7185','#34d399','#f472b6'];
+
+      // Build series: one line per category + optional arearange
+      const series = [];
+      catInfo.categories.forEach((cat, ci) => {
+        const color = palette[ci % palette.length];
+        const lineData = xPoints.map(xv => {
           const numCovVals = xnVars.map(v => v === numVar ? xv : covMeans[v]);
           const catDummies = catInfo.categories.slice(1).map(c => cat === c ? 1 : 0);
           let pred = results.includeIntercept ? results.coefficients[0] : 0;
           let coeffOff = results.includeIntercept ? 1 : 0;
           xnVars.forEach((v, i) => { pred += numCovVals[i] * results.coefficients[coeffOff + i]; });
           coeffOff += xnVars.length;
-          // categorical dummies
           const varNamesMain = (window.regressionVariableNames || []).slice(0, (window.regressionVariableNames || []).length - (window.globalInteractionColumnNames || []).length);
           catInfo.dummyNames.forEach((dn, di) => {
             const dIdx = varNamesMain.indexOf(dn);
             if (dIdx >= 0) pred += catDummies[di] * results.coefficients[results.includeIntercept ? dIdx + 1 : dIdx];
           });
-          // interaction product
           catDummies.forEach((d, di) => { pred += (xv * d) * results.coefficients[results.coefficients.length - (window.globalInteractionColumnNames || []).length + di]; });
           return [parseFloat(xv.toFixed(3)), parseFloat(pred.toFixed(4))];
         });
-        return { name: cat, data: seriesData };
+
+        // Friendly label
+        const label = ci === 0
+          ? `${cat} (ref)`
+          : cat;
+
+        series.push({ name: label, type: 'line', data: lineData, color, zIndex: 2,
+          marker: { enabled: false }, lineWidth: 2 });
+
+        if (showCI) {
+          const bandData = lineData.map(([xv, pred]) => {
+            const se = _predSE(xv, xMean, xSS, mse, n);
+            return [xv, parseFloat((pred - 1.96 * se).toFixed(4)), parseFloat((pred + 1.96 * se).toFixed(4))];
+          });
+          series.push({
+            name: `${label} 95% CI`,
+            type: 'arearange',
+            data: bandData,
+            color,
+            fillOpacity: 0.12,
+            lineWidth: 0,
+            zIndex: 1,
+            enableMouseTracking: false,
+            showInLegend: false,
+            marker: { enabled: false }
+          });
+        }
       });
 
       Highcharts.chart(container, {
-        chart: { backgroundColor: 'transparent', type: 'line', animation: false },
-        title: { text: `${numVar} × ${catVar}`, style: { color: 'var(--text-primary)', fontSize: '13px' } },
-        subtitle: { text: 'Predicted ' + yVar + ' (other covariates at mean)', style: { color: 'var(--text-muted)', fontSize: '11px' } },
-        xAxis: { title: { text: numVar, style: { color: 'var(--text-secondary)' } }, labels: { style: { color: 'var(--text-secondary)' } }, gridLineColor: 'var(--border)' },
-        yAxis: { title: { text: 'Predicted ' + yVar, style: { color: 'var(--text-secondary)' } }, labels: { style: { color: 'var(--text-secondary)' } }, gridLineColor: 'var(--border)' },
-        legend: { itemStyle: { color: 'var(--text-secondary)' } },
-        tooltip: { shared: false, formatter: function() { return `<b>${this.series.name}</b><br>${numVar}: ${this.x.toFixed(2)}<br>Predicted: ${this.y.toFixed(3)}`; } },
-        series: series,
+        chart: { backgroundColor: 'transparent', animation: false },
+        title: { text: `${numVar} \u00D7 ${catVar}`, style: { color: 'var(--text-primary)', fontSize: '13px' } },
+        subtitle: {
+          text: 'Predicted ' + yVar + ' (other covariates at mean)' + (showCI ? ' · shaded = 95% CI' : ''),
+          style: { color: 'var(--text-muted)', fontSize: '11px' }
+        },
+        xAxis: { title: { text: numVar, style: { color: 'var(--text-secondary)' } }, labels: { style: { color: 'var(--text-secondary)' } }, gridLineColor: 'rgba(255,255,255,0.06)' },
+        yAxis: { title: { text: 'Predicted ' + yVar, style: { color: 'var(--text-secondary)' } }, labels: { style: { color: 'var(--text-secondary)' } }, gridLineColor: 'rgba(255,255,255,0.06)' },
+        legend: { itemStyle: { color: 'var(--text-secondary)', fontSize: '11px' } },
+        tooltip: { shared: false, formatter: function() {
+          if (this.series.type === 'arearange') return false;
+          return `<b>${this.series.name}</b><br>${numVar}: ${this.x.toFixed(2)}<br>Predicted: ${this.y.toFixed(3)}`;
+        }},
+        series,
         credits: { enabled: false }
       });
     }
@@ -7817,7 +7917,11 @@
       const v2Mean = v2Vals.reduce((a, b) => a + b, 0) / v2Vals.length;
       const v2Sd = Math.sqrt(v2Vals.reduce((a, b) => a + (b - v2Mean) ** 2, 0) / v2Vals.length);
       const v2Levels = [v2Mean - v2Sd, v2Mean, v2Mean + v2Sd];
-      const v2Labels = ['-1 SD', 'Mean', '+1 SD'];
+      const v2Labels = [
+        `Low ${ix.var2} (\u22121\u202FSD)`,
+        `Average ${ix.var2}`,
+        `High ${ix.var2} (+1\u202FSD)`
+      ];
 
       const v1Vals = rows.map(r => parseFloat(r[ixi.v1Idx])).filter(x => !isNaN(x));
       const xMin = Math.min(...v1Vals), xMax = Math.max(...v1Vals);
@@ -7829,36 +7933,73 @@
         covMeans[v] = vals.reduce((a, b) => a + b, 0) / vals.length;
       });
 
-      const nIntCols = (window.globalInteractionColumnNames || []).length;
-      const intCoeffIdx = results.coefficients.length - nIntCols; // index of first interaction coeff
+      // Stats for SE approximation on v1 axis
+      const n = v1Vals.length;
+      const xMean = v1Vals.reduce((a, b) => a + b, 0) / n;
+      const xSS = v1Vals.reduce((a, b) => a + (b - xMean) ** 2, 0);
+      const mse = results.MSE || (results.SSR / results.df) || 1;
+      const showCI = !!window._showCIBands;
 
-      const series = v2Levels.map((v2Val, li) => ({
-        name: `${ix.var2} = ${v2Labels[li]} (${v2Val.toFixed(2)})`,
-        data: xPoints.map(xv => {
+      const nIntCols = (window.globalInteractionColumnNames || []).length;
+      const intCoeffIdx = results.coefficients.length - nIntCols;
+
+      const palette = ['#78c8ff','#fbbf24','#fb7185'];
+      const series = [];
+
+      v2Levels.forEach((v2Val, li) => {
+        const color = palette[li];
+        const lineData = xPoints.map(xv => {
           let pred = results.includeIntercept ? results.coefficients[0] : 0;
           let off = results.includeIntercept ? 1 : 0;
           xnVars.forEach((v, i) => {
             const val = v === ix.var1 ? xv : v === ix.var2 ? v2Val : covMeans[v];
             pred += val * results.coefficients[off + i];
           });
-          // Find the specific interaction coefficient for this term
           const ixColNames = window.globalInteractionColumnNames || [];
-          const colName = `${ix.var1} × ${ix.var2}`;
+          const colName = `${ix.var1} \u00D7 ${ix.var2}`;
           const colIdx = ixColNames.indexOf(colName);
           if (colIdx >= 0) pred += xv * v2Val * results.coefficients[intCoeffIdx + colIdx];
           return [parseFloat(xv.toFixed(3)), parseFloat(pred.toFixed(4))];
-        })
-      }));
+        });
+
+        series.push({ name: v2Labels[li], type: 'line', data: lineData, color, zIndex: 2,
+          marker: { enabled: false }, lineWidth: 2 });
+
+        if (showCI) {
+          const bandData = lineData.map(([xv, pred]) => {
+            const se = _predSE(xv, xMean, xSS, mse, n);
+            return [xv, parseFloat((pred - 1.96 * se).toFixed(4)), parseFloat((pred + 1.96 * se).toFixed(4))];
+          });
+          series.push({
+            name: `${v2Labels[li]} 95% CI`,
+            type: 'arearange',
+            data: bandData,
+            color,
+            fillOpacity: 0.12,
+            lineWidth: 0,
+            zIndex: 1,
+            enableMouseTracking: false,
+            showInLegend: false,
+            marker: { enabled: false }
+          });
+        }
+      });
 
       Highcharts.chart(container, {
-        chart: { backgroundColor: 'transparent', type: 'line', animation: false },
-        title: { text: `${ix.var1} × ${ix.var2}`, style: { color: 'var(--text-primary)', fontSize: '13px' } },
-        subtitle: { text: 'Predicted ' + yVar + ' at three levels of ' + ix.var2, style: { color: 'var(--text-muted)', fontSize: '11px' } },
-        xAxis: { title: { text: ix.var1, style: { color: 'var(--text-secondary)' } }, labels: { style: { color: 'var(--text-secondary)' } }, gridLineColor: 'var(--border)' },
-        yAxis: { title: { text: 'Predicted ' + yVar, style: { color: 'var(--text-secondary)' } }, labels: { style: { color: 'var(--text-secondary)' } }, gridLineColor: 'var(--border)' },
-        legend: { itemStyle: { color: 'var(--text-secondary)' } },
-        tooltip: { formatter: function() { return `<b>${this.series.name}</b><br>${ix.var1}: ${this.x.toFixed(2)}<br>Predicted: ${this.y.toFixed(3)}`; } },
-        series: series,
+        chart: { backgroundColor: 'transparent', animation: false },
+        title: { text: `${ix.var1} \u00D7 ${ix.var2}`, style: { color: 'var(--text-primary)', fontSize: '13px' } },
+        subtitle: {
+          text: 'Predicted ' + yVar + ' at three levels of ' + ix.var2 + (showCI ? ' · shaded = 95% CI' : ''),
+          style: { color: 'var(--text-muted)', fontSize: '11px' }
+        },
+        xAxis: { title: { text: ix.var1, style: { color: 'var(--text-secondary)' } }, labels: { style: { color: 'var(--text-secondary)' } }, gridLineColor: 'rgba(255,255,255,0.06)' },
+        yAxis: { title: { text: 'Predicted ' + yVar, style: { color: 'var(--text-secondary)' } }, labels: { style: { color: 'var(--text-secondary)' } }, gridLineColor: 'rgba(255,255,255,0.06)' },
+        legend: { itemStyle: { color: 'var(--text-secondary)', fontSize: '11px' } },
+        tooltip: { formatter: function() {
+          if (this.series.type === 'arearange') return false;
+          return `<b>${this.series.name}</b><br>${ix.var1}: ${this.x.toFixed(2)}<br>Predicted: ${this.y.toFixed(3)}`;
+        }},
+        series,
         credits: { enabled: false }
       });
     }

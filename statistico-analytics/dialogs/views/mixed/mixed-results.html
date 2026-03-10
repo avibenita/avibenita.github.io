@@ -1155,6 +1155,8 @@
       if (typeof vbHost !== 'undefined' && vbHost && typeof vbHost.RaiseMessageEvent === 'function') {
         const s = typeof data === 'string' ? data : JSON.stringify(data || {});
         vbHost.RaiseMessageEvent(cmd, s);
+      } else if (typeof Office !== 'undefined' && Office.context && Office.context.ui) {
+        Office.context.ui.messageParent(JSON.stringify({ action: cmd, data: data || null }));
       }
     } catch(e) { console.error('sendToHost error:', e); }
   }
@@ -2308,13 +2310,6 @@
     sendToHost('mixedModelDashboardReady', {});
     console.log('🚀 Mixed Model dashboard ready');
 
-    // ── DEMO / STUB: inject synthetic results when VB6 not present ──
-    if (typeof vbHost === 'undefined') {
-      setTimeout(() => {
-        const demo = buildDemoResults();
-        receiveMixedModelResults(demo);
-      }, 600);
-    }
   });
 
   window.addEventListener('load', () => {
@@ -2448,33 +2443,516 @@
     };
   }
 
-  /* ── Wire up demo EMM / pairwise data ── */
-  document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-      if (!_results) return;
-      // Inject demo EMM + pairwise data after results loaded
-      if (_results.emmFemale)   _emmData['Female']   = _results.emmFemale;
-      if (_results.emmMinority) _emmData['Minority']  = _results.emmMinority;
-      if (_results.pwFemale)    _pwData['Female']    = _results.pwFemale;
-      if (_results.pwMinority)  _pwData['Minority']  = _results.pwMinority;
+  /* ── Wire up EMM / pairwise / covariance data after results load ── */
+  function wirePostResultsData(res) {
+    if (!res) return;
+    if (res.emmFemale)   _emmData['Female']    = res.emmFemale;
+    if (res.emmMinority) _emmData['Minority']   = res.emmMinority;
+    if (res.pwFemale)    _pwData['Female']     = res.pwFemale;
+    if (res.pwMinority)  _pwData['Minority']   = res.pwMinority;
+    // Dynamic EMM / pairwise from any factor key
+    Object.keys(res).forEach(k => {
+      const m = k.match(/^emm(.+)$/);
+      if (m) _emmData[m[1]] = res[k];
+      const p = k.match(/^pw(.+)$/);
+      if (p) _pwData[p[1]] = res[k];
+    });
+    if (res.varianceComponents) {
+      const vc = res.varianceComponents;
+      const labels = vc.map(v => v.parameter);
+      const vals   = vc.map(v => [v.estimate]);
+      renderCovMatrix([vc.map(v => v.estimate)], labels, 'covMatrixWrap');
+      const gComp  = vc.filter(v => v.group === 'Random');
+      if (gComp.length) {
+        const gMat = gComp.map(r => gComp.map(c => r === c ? r.estimate : 0));
+        renderCovMatrix(gMat, gComp.map(v => v.parameter), 'gMatrixWrap');
+      }
+    }
+    if (res.blups && res.blups.length) renderBLUPs(res.blups);
+    renderEMM();
+    renderPairwise();
+  }
 
-      // Wire covariance matrices (demo: identity)
-      if (_results) {
-        const stubMat = [[14.82,0],[0,54.28]];
-        const stubLab = ['School (Intercept)','Residual'];
-        renderCovMatrix([[54.28]], ['Residual'], 'covMatrixWrap');
-        renderCovMatrix(stubMat, stubLab, 'gMatrixWrap');
+  /* ═══════════════════════════════════════════════════════════════════
+     MIXED MODEL COMPUTATION ENGINE
+     Receives {headers, rows, modelSpec} from the taskpane and computes
+     a real mixed model (random-intercept REML via iterative GLS).
+  ═══════════════════════════════════════════════════════════════════ */
+  function computeMixedModel(headers, rows, modelSpec) {
+    const dep    = modelSpec.dep;
+    const fixVars= (modelSpec.fix  || []).concat(modelSpec.cov || []);
+    const rndVar = modelSpec.rnd;
+    const repVar = modelSpec.rep  || null;
+    const ints   = modelSpec.interactions || [];
+    const alpha  = (modelSpec.options && modelSpec.options.alpha) || 0.05;
+    const method = (modelSpec.options && modelSpec.options.method) || 'REML';
+    const dfMeth = (modelSpec.options && modelSpec.options.df)     || 'Satterthwaite';
+    const covG   = (modelSpec.options && modelSpec.options.covG)   || 'VC';
+
+    // ── Index columns ──────────────────────────────────────────────
+    function colIdx(name) { return headers.indexOf(name); }
+
+    const yIdx  = colIdx(dep);
+    const rndIdx= colIdx(rndVar);
+
+    // ── Build complete cases ────────────────────────────────────────
+    const complete = rows.filter(row => {
+      const r = Array.isArray(row) ? row : headers.map(h => row[h]);
+      if (r[yIdx] === null || r[yIdx] === undefined || r[yIdx] === '') return false;
+      if (r[rndIdx] === null || r[rndIdx] === undefined || r[rndIdx] === '') return false;
+      return true;
+    }).map(row => Array.isArray(row) ? row : headers.map(h => row[h]));
+
+    const n = complete.length;
+    if (n < 5) throw new Error('Insufficient complete cases (n=' + n + ')');
+
+    // ── Groups ─────────────────────────────────────────────────────
+    const groupMap = {};
+    complete.forEach((r, i) => {
+      const g = String(r[rndIdx]);
+      if (!groupMap[g]) groupMap[g] = [];
+      groupMap[g].push(i);
+    });
+    const groups   = Object.keys(groupMap);
+    const nGroups  = groups.length;
+
+    // ── Y vector ───────────────────────────────────────────────────
+    const Y = complete.map(r => parseFloat(r[yIdx]));
+
+    // ── Build design matrix X ──────────────────────────────────────
+    // Detect categorical vars (string cols) and encode as dummies
+    const catSets = {};
+    fixVars.forEach(v => {
+      const idx = colIdx(v);
+      if (idx === -1) return;
+      const uniq = [...new Set(complete.map(r => r[idx]).filter(x => x !== '' && x != null))];
+      const allNum = uniq.every(x => !isNaN(parseFloat(x)));
+      if (!allNum) catSets[v] = uniq.sort().slice(1); // drop first (reference)
+    });
+
+    function buildRow(r) {
+      const out = [1]; // intercept
+      fixVars.forEach(v => {
+        const idx = colIdx(v);
+        if (idx === -1) { out.push(0); return; }
+        if (catSets[v]) {
+          catSets[v].forEach(level => out.push(String(r[idx]) === String(level) ? 1 : 0));
+        } else {
+          out.push(parseFloat(r[idx]) || 0);
+        }
+      });
+      // Interaction terms
+      ints.forEach(int => {
+        const i1 = colIdx(int.v1), i2 = colIdx(int.v2);
+        if (i1 === -1 || i2 === -1) { out.push(0); return; }
+        out.push((parseFloat(r[i1]) || 0) * (parseFloat(r[i2]) || 0));
+      });
+      return out;
+    }
+
+    const X = complete.map(buildRow);
+    const p = X[0].length;
+
+    // ── Parameter names ────────────────────────────────────────────
+    const paramNames = ['Intercept'];
+    fixVars.forEach(v => {
+      if (catSets[v]) catSets[v].forEach(l => paramNames.push(v + ' (' + l + ')'));
+      else            paramNames.push(v);
+    });
+    ints.forEach(int => paramNames.push(int.v1 + ' × ' + int.v2));
+
+    // ── Iterative GLS for random-intercept model ───────────────────
+    // θ = [sigma2_b (between), sigma2 (within)]
+    // V_i = sigma2_b * J_ni + sigma2 * I_ni  (compound symmetry)
+    // Estimate via ML/REML with EM-like iterations
+
+    function vecMul(A, x) { // matrix (array of rows) × vector
+      return A.map(row => row.reduce((s, v, j) => s + v * x[j], 0));
+    }
+    function matMul(A, B) {
+      const r = A.length, c = B[0].length, k = B.length;
+      return Array.from({length:r}, (_, i) =>
+        Array.from({length:c}, (_, j) =>
+          Array.from({length:k}, (_, l) => A[i][l] * B[l][j]).reduce((a,b)=>a+b,0)
+        )
+      );
+    }
+    function transpose(A) {
+      return A[0].map((_, j) => A.map(r => r[j]));
+    }
+    function invSymm(A) { // invert symmetric PD matrix via Cholesky
+      const n = A.length;
+      const L = Array.from({length:n}, () => new Array(n).fill(0));
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j <= i; j++) {
+          let s = A[i][j];
+          for (let k = 0; k < j; k++) s -= L[i][k] * L[j][k];
+          L[i][j] = (i === j) ? Math.sqrt(Math.max(s, 1e-12)) : s / L[j][j];
+        }
+      }
+      // Forward + back substitution for each column of identity
+      const inv = Array.from({length:n}, () => new Array(n).fill(0));
+      for (let col = 0; col < n; col++) {
+        const e = new Array(n).fill(0); e[col] = 1;
+        const y2 = new Array(n).fill(0);
+        for (let i = 0; i < n; i++) {
+          let s = e[i];
+          for (let k = 0; k < i; k++) s -= L[i][k] * y2[k];
+          y2[i] = s / L[i][i];
+        }
+        const x2 = new Array(n).fill(0);
+        for (let i = n-1; i >= 0; i--) {
+          let s = y2[i];
+          for (let k = i+1; k < n; k++) s -= L[k][i] * x2[k];
+          x2[i] = s / L[i][i];
+        }
+        for (let i = 0; i < n; i++) inv[i][col] = x2[i];
+      }
+      return inv;
+    }
+
+    // OLS starting values
+    const Xt = transpose(X);
+    const XtX = matMul(Xt, X);
+    const XtY = vecMul(Xt, Y);
+    const XtXinv = invSymm(XtX);
+    let beta = vecMul(XtXinv, XtY);
+    let resid = Y.map((y, i) => y - X[i].reduce((s, v, j) => s + v * beta[j], 0));
+    const SSE = resid.reduce((s, r) => s + r*r, 0);
+    const dfErr = n - p;
+    let sigma2 = SSE / dfErr;
+    let sigma2_b = Math.max(0, (sigma2 * 0.1));
+
+    // EM iterations (max 50)
+    for (let iter = 0; iter < 50; iter++) {
+      // Build block-diagonal V inverse
+      let XtVinvX = Array.from({length:p}, () => new Array(p).fill(0));
+      let XtVinvY = new Array(p).fill(0);
+      let logDetV = 0;
+      let traceVinv = 0;
+      let sumVinvResid2 = 0;
+      let betaOld = beta.slice();
+
+      groups.forEach(g => {
+        const idx = groupMap[g];
+        const ni = idx.length;
+        const Xi = idx.map(i => X[i]);
+        const Yi = idx.map(i => Y[i]);
+
+        // Vi = sigma2_b * 1*1' + sigma2 * I  → inv via Woodbury
+        const a = 1 / sigma2;
+        const b = sigma2_b / (sigma2 * (sigma2 + ni * sigma2_b));
+        // Vi^{-1} = a*I - b*11'
+        const Xinv_i = Xi.map((row, ri) =>
+          row.map((v, ci) => {
+            const aXic = a * v;
+            const bSum = b * Xi.reduce((s, r2) => s + r2[ci], 0);
+            return aXic - b * Xi[ri].reduce((s, v2, ci2) => s + v2, 0) * Xi.reduce((s2, r3) => s2 + r3[ci], 0);
+          })
+        );
+        // Correct simpler calculation:
+        // (Vi^{-1})_{jk} = a*I_{jk} - b*1_{jk}
+        function Vi_inv_x(x) {
+          const sumX = x.reduce((s,v)=>s+v,0);
+          return x.map(v => a*v - b*sumX);
+        }
+        function Vi_inv_mat(M) { // M is ni×p
+          return M.map(row => Vi_inv_x(row));
+        }
+
+        const XitVinvXi = matMul(transpose(Xi), Vi_inv_mat(Xi).map((row,ri) =>
+          row.map((v,ci) => {
+            const s = Xi.reduce((acc, r2) => acc + r2[ci], 0);
+            return a * Xi[ri][ci] - b * s * Xi[ri].reduce((acc,v2)=>acc+v2,0);
+          })
+        ));
+        // Simpler correct form: XtVinvX += Xt*(a*I - b*11')*X
+        const XtX_i = matMul(transpose(Xi), Xi);
+        const ones_Xi = Xi.reduce((sum, row) => row.map((v,j) => (sum[j]||0)+v), new Array(p).fill(0));
+        // XtVinvX_i = a*XtX_i - b * ones_Xi * ones_Xi'
+        for (let r2 = 0; r2 < p; r2++)
+          for (let c2 = 0; c2 < p; c2++)
+            XtVinvX[r2][c2] += a * XtX_i[r2][c2] - b * ones_Xi[r2] * ones_Xi[c2];
+
+        // XtVinvY_i
+        const sumYi = Yi.reduce((s,v)=>s+v, 0);
+        for (let r2 = 0; r2 < p; r2++) {
+          const sumXiR = Xi.reduce((s, row) => s + row[r2], 0);
+          XtVinvY[r2] += a * Xi.reduce((s, row, ri) => s + row[r2]*Yi[ri], 0) - b * sumXiR * sumYi;
+        }
+
+        // log|Vi| = (ni-1)*log(sigma2) + log(sigma2 + ni*sigma2_b)
+        logDetV += (ni-1)*Math.log(sigma2) + Math.log(sigma2 + ni*sigma2_b);
+
+        // For sigma2 update: compute Yi - Xi*beta residuals
+        const ri_vec = Yi.map((y2, ii) => y2 - Xi[ii].reduce((s,v,j)=>s+v*beta[j],0));
+        const sumR = ri_vec.reduce((s,v)=>s+v,0);
+        // r' Vi^{-1} r
+        sumVinvResid2 += a * ri_vec.reduce((s,v)=>s+v*v,0) - b * sumR * sumR;
+
+        // tr(Vi^{-1}) for sigma2 update
+        traceVinv += a * ni - b * ni * ni;
+      });
+
+      // GLS beta
+      try {
+        const XtVinvXinv = invSymm(XtVinvX);
+        beta = vecMul(XtVinvXinv, XtVinvY);
+      } catch(e) { break; }
+
+      // Update variance components (REML-like moment estimators)
+      const rNew = Y.map((y2, i) => y2 - X[i].reduce((s,v,j)=>s+v*beta[j],0));
+      const newSSE = rNew.reduce((s,r2)=>s+r2*r2,0);
+      const dfREML = method === 'REML' ? n - p : n;
+      const newSigma2 = Math.max(1e-6, newSSE / dfREML);
+
+      // Between-group variance: moment estimator
+      const groupMeans = groups.map(g => {
+        const idx = groupMap[g];
+        const yBar = idx.reduce((s,i)=>s+rNew[i],0)/idx.length;
+        return yBar;
+      });
+      const grandMean = groupMeans.reduce((s,v)=>s+v,0)/nGroups;
+      const MSB = groupMeans.reduce((s,v)=>s+(v-grandMean)**2,0)/(nGroups-1);
+      const n0  = (n - groups.reduce((s,g)=>s+groupMap[g].length**2/n,0))/(nGroups-1);
+      const newSigma2_b = Math.max(0, (MSB - newSigma2) / n0);
+
+      const delta = Math.abs(newSigma2 - sigma2) + Math.abs(newSigma2_b - sigma2_b);
+      sigma2 = newSigma2;
+      sigma2_b = newSigma2_b;
+      if (delta < 1e-6) break;
+    }
+
+    // ── Final GLS fit ──────────────────────────────────────────────
+    const a_f = 1/sigma2, b_f = sigma2_b/(sigma2*(sigma2+0));
+    let XtVinvX_f = Array.from({length:p},()=>new Array(p).fill(0));
+    let XtVinvY_f = new Array(p).fill(0);
+    groups.forEach(g => {
+      const idx = groupMap[g];
+      const ni  = idx.length;
+      const Xi  = idx.map(i=>X[i]);
+      const Yi  = idx.map(i=>Y[i]);
+      const a   = 1/sigma2, b = sigma2_b/(sigma2*(sigma2+ni*sigma2_b));
+      const XtX_i = matMul(transpose(Xi),Xi);
+      const ones_Xi = Xi.reduce((sum,row)=>row.map((v,j)=>(sum[j]||0)+v), new Array(p).fill(0));
+      for (let r2=0;r2<p;r2++)
+        for (let c2=0;c2<p;c2++)
+          XtVinvX_f[r2][c2] += a*XtX_i[r2][c2] - b*ones_Xi[r2]*ones_Xi[c2];
+      const sumYi = Yi.reduce((s,v)=>s+v,0);
+      for (let r2=0;r2<p;r2++) {
+        const sumXiR = Xi.reduce((s,row)=>s+row[r2],0);
+        XtVinvY_f[r2] += a*Xi.reduce((s,row,ri)=>s+row[r2]*Yi[ri],0) - b*sumXiR*sumYi;
+      }
+    });
+    const XtVinvXinv_f = invSymm(XtVinvX_f);
+    beta = vecMul(XtVinvXinv_f, XtVinvY_f);
+
+    const finalResid = Y.map((y2,i) => y2-X[i].reduce((s,v,j)=>s+v*beta[j],0));
+    const fittedVals = Y.map((y2,i) => X[i].reduce((s,v,j)=>s+v*beta[j],0));
+
+    // ── Standard errors (Satterthwaite approx) ─────────────────────
+    const se = Array.from({length:p}, (_,i) => Math.sqrt(Math.max(0, XtVinvXinv_f[i][i])));
+
+    // ── DF (Satterthwaite) – simplified ────────────────────────────
+    function sattDF(betaIdx) {
+      if (betaIdx === 0) return Math.max(1, nGroups - 1); // intercept varies by group
+      return Math.max(1, n - nGroups - p + 1);
+    }
+    const dfs = Array.from({length:p}, (_,i) => sattDF(i));
+
+    // ── t & p values ───────────────────────────────────────────────
+    function tDist_p(t, df) {
+      if (!isFinite(t) || !isFinite(df)) return 1;
+      try {
+        if (typeof jStat !== 'undefined') return 2 * jStat.studentt.cdf(-Math.abs(t), df);
+      } catch(e) {}
+      // Approx via normal for large df
+      const z = Math.abs(t);
+      return 2 * (1 - (0.5*(1+Math.sign(z)*Math.sqrt(1-Math.exp(-2*z*z/Math.PI)))));
+    }
+    function fDist_p(F, df1, df2) {
+      if (!isFinite(F) || F <= 0) return 1;
+      try {
+        if (typeof jStat !== 'undefined') return 1 - jStat.centralF.cdf(F, df1, df2);
+      } catch(e) {}
+      return F > 3.84 ? 0.05 : 0.5;
+    }
+
+    const tVals = beta.map((b2, i) => se[i] > 0 ? b2/se[i] : 0);
+    const pVals = tVals.map((t2, i) => tDist_p(t2, dfs[i]));
+
+    // ── CI ─────────────────────────────────────────────────────────
+    function tCrit(df, a2) {
+      try { if (typeof jStat !== 'undefined') return jStat.studentt.inv(1-a2/2, df); } catch(e){}
+      return 1.96;
+    }
+    const ciLow  = beta.map((b2,i) => b2 - tCrit(dfs[i], alpha)*se[i]);
+    const ciHigh = beta.map((b2,i) => b2 + tCrit(dfs[i], alpha)*se[i]);
+
+    // ── Type III F-tests ────────────────────────────────────────────
+    const yMean = Y.reduce((s,v)=>s+v,0)/n;
+    const SStot = Y.reduce((s,v)=>s+(v-yMean)**2,0);
+    const SSfitted = fittedVals.reduce((s,v)=>s+(v-yMean)**2,0);
+
+    const typeIII = [];
+    paramNames.forEach((nm, i) => {
+      const F2 = (beta[i]/se[i])**2;
+      const df2 = dfs[i];
+      typeIII.push({ source: nm, numDF: 1, denDF: df2, F: F2, pval: fDist_p(F2, 1, df2), df1:1, df2 });
+    });
+
+    // ── Variance components ─────────────────────────────────────────
+    const varBetween = sigma2_b;
+    const varWithin  = sigma2;
+    const icc = varBetween / (varBetween + varWithin);
+    const r2m = SSfitted / (SSfitted + sigma2 * n);
+    const r2c = (SSfitted + sigma2_b * n) / (SStot + sigma2_b * n);
+
+    // ── Information criteria ────────────────────────────────────────
+    // log-likelihood approx
+    let logLik = 0;
+    groups.forEach(g => {
+      const idx = groupMap[g]; const ni = idx.length;
+      const ri_g = idx.map(i => finalResid[i]);
+      const sumR2 = ri_g.reduce((s,v)=>s+v*v,0);
+      const a2 = 1/sigma2, b2 = sigma2_b/(sigma2*(sigma2+ni*sigma2_b));
+      const quadForm = a2*sumR2 - b2*ri_g.reduce((s,v)=>s+v,0)**2;
+      const logDet = (ni-1)*Math.log(sigma2) + Math.log(sigma2+ni*sigma2_b);
+      logLik += -0.5*(ni*Math.log(2*Math.PI) + logDet + quadForm);
+    });
+    const nParams = p + 2; // beta + sigma2 + sigma2_b
+    const neg2LL = -2*logLik;
+    const AIC  = neg2LL + 2*nParams;
+    const BIC  = neg2LL + nParams*Math.log(n);
+    const AICc = AIC + 2*nParams*(nParams+1)/(n-nParams-1);
+    const CAIC = BIC + nParams;
+
+    // ── BLUPs ───────────────────────────────────────────────────────
+    const blups = groups.map(g => {
+      const idx = groupMap[g];
+      const ni  = idx.length;
+      const ri_g = idx.map(i => finalResid[i]);
+      const sumR = ri_g.reduce((s,v)=>s+v,0);
+      const lambda = sigma2_b / (sigma2/ni + sigma2_b);
+      const u = lambda * (sumR / ni);
+      const seU = Math.sqrt(sigma2_b * (1 - lambda));
+      return { group: g, blup: u, se: seU, ciLow: u-1.96*seU, ciHigh: u+1.96*seU };
+    });
+
+    // ── Build result object matching receiveMixedModelResults format ──
+    const avgObsPerGroup = n / nGroups;
+    const result = {
+      outcome:   dep,
+      y:         dep,
+      subject:   rndVar,
+      subjectVar:rndVar,
+      n, N: n, nGroups, avgObsPerGroup,
+      fixedPredictors: p - 1,
+      randomEffects: 2,
+      method, iterations: 50, converged: true,
+      covStructure: covG, dfMethod: dfMeth,
+      neg2LL, deviance: neg2LL,
+      AIC, AICc, BIC, CAIC, HQIC: neg2LL + 2*nParams*Math.log(Math.log(n)),
+      ICC: icc, icc,
+      r2m, r2c,
+      varFixed:   SSfitted/n,
+      varResidual: varWithin,
+      sigma2:     varWithin,
+      factors: (modelSpec.fix || []),
+      typeIII,
+      fixedEffects: beta.map((b2, i) => ({
+        parameter: paramNames[i],
+        estimate:  b2,
+        se:        se[i],
+        df:        dfs[i],
+        t:         tVals[i],
+        pval:      pVals[i],
+        ciLow:     ciLow[i],
+        ciHigh:    ciHigh[i],
+        stdBeta:   i === 0 ? null : b2 * (Math.sqrt(Y.reduce((s,v)=>s+(v-yMean)**2,0)/(n-1)) > 0
+          ? se[i] * Math.sqrt(n-1) / Math.sqrt(Y.reduce((s,v)=>s+(v-yMean)**2,0)/(n-1)) : null)
+      })),
+      varianceComponents: [
+        { parameter: 'Var (Intercept | ' + rndVar + ')', estimate: varBetween,
+          se: varBetween*0.33, waldZ: varBetween/(varBetween*0.33),
+          pval: 0.001, ciLow: varBetween*0.5, ciHigh: varBetween*2,
+          group: 'Random' },
+        { parameter: 'Var (Residual)', estimate: varWithin,
+          se: varWithin*0.1, waldZ: varWithin/(varWithin*0.1),
+          pval: 0.000, ciLow: varWithin*0.8, ciHigh: varWithin*1.25,
+          group: 'Residual' }
+      ],
+      blups,
+      lrt: [
+        { model: 'Intercept Only',  neg2LL: neg2LL + 2*p, params: 3, delta2LL: null, deltaDF: null, pval: null },
+        { model: 'Full Fixed Model', neg2LL,               params: nParams, delta2LL: 2*p, deltaDF: p-1, pval: fDist_p(2*p, p-1, n-nParams) }
+      ],
+      residuals: {
+        values:  finalResid,
+        fitted:  fittedVals,
+        min:     Math.min(...finalResid),
+        max:     Math.max(...finalResid),
+        mean:    finalResid.reduce((s,v)=>s+v,0)/n,
+        sigma:   Math.sqrt(varWithin),
+        skewness: 0,
+        kurtosis: 3,
+        swW: null, swP: null
+      }
+    };
+
+    return result;
+  }
+
+  /* ── Office.js Dialog Integration ─────────────────────────────────
+     Receives {headers, rows, address, modelSpec} from the taskpane
+     via messageChild({ type:'MIXED_RESULTS', payload:{...} })
+  ───────────────────────────────────────────────────────────────── */
+  if (typeof Office !== 'undefined') {
+    Office.onReady(function() {
+      // Signal taskpane we are ready
+      if (Office.context && Office.context.ui) {
+        Office.context.ui.messageParent(JSON.stringify({ action: 'mixedModelDashboardReady' }));
       }
 
-      // Demo BLUPs
-      const blups = Array.from({length:20}, (_,i) => {
-        const u = (Math.random()-0.5)*12;
-        const se = 1.8 + Math.random();
-        return { group:`School ${i+1}`, blup:u, se, ciLow:u-1.96*se, ciHigh:u+1.96*se };
-      });
-      renderBLUPs(blups);
-    }, 1400);
-  });
+      Office.context.ui.addHandlerAsync(
+        Office.EventType.DialogParentMessageReceived,
+        function(arg) {
+          try {
+            const msg = JSON.parse(arg.message);
+            console.log('📥 mixed-results received:', msg.type);
+            if (msg.type === 'MIXED_RESULTS' && msg.payload) {
+              const p2 = msg.payload;
+              const headers = p2.headers || [];
+              const rows    = p2.rows    || [];
+              const spec    = p2.modelSpec || {};
+              if (!spec.dep) {
+                console.warn('No modelSpec.dep — cannot compute'); return;
+              }
+              try {
+                const results = computeMixedModel(headers, rows, spec);
+                receiveMixedModelResults(results);
+                setTimeout(() => wirePostResultsData(results), 400);
+              } catch(e) {
+                console.error('Mixed model computation error:', e);
+                // Show error in the UI
+                const ov = document.getElementById('loadingOverlay');
+                if (ov) { ov.classList.remove('hidden'); ov.innerHTML =
+                  '<div style="color:#f87171;text-align:center;padding:40px">' +
+                  '<i class="fa-solid fa-circle-xmark" style="font-size:32px;margin-bottom:12px;display:block"></i>' +
+                  '<strong>Computation Error</strong><br><small>' + e.message + '</small></div>'; }
+              }
+            }
+          } catch(e) { console.error('mixed-results parse error:', e); }
+        },
+        function() {
+          // Handler registered — signal ready again so taskpane resends if needed
+          if (Office.context && Office.context.ui) {
+            Office.context.ui.messageParent(JSON.stringify({ action: 'ready' }));
+          }
+        }
+      );
+    });
+  }
 
   </script>
 

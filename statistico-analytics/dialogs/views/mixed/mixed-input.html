@@ -1281,10 +1281,10 @@ window.populateVariableSelectionTable = function(varStats) {
   }
 };
 
-// Alternative entry: full row data (same as regression)
-window.loadMixedModelData = function(jsonString) {
+// Alternative entry: full row data (same as regression taskpane sends)
+window.loadMixedModelData = function(payload) {
   try {
-    var data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+    var data = typeof payload === 'string' ? JSON.parse(payload) : payload;
     if (!data || !data.headers || !data.rows) { showToast('Invalid data format', 'error'); return; }
 
     var headers = data.headers;
@@ -1308,6 +1308,12 @@ window.loadMixedModelData = function(jsonString) {
     });
 
     if (data.address) qs('metaBadge').textContent = data.address;
+
+    // Restore saved model spec if provided
+    if (data.savedModelSpec) {
+      try { sessionStorage.setItem('mixedModelSpec', JSON.stringify(data.savedModelSpec)); } catch(e) {}
+    }
+
     window.populateVariableSelectionTable(stats);
   } catch(e) {
     console.error('[mixed-input] loadMixedModelData error:', e);
@@ -1316,34 +1322,46 @@ window.loadMixedModelData = function(jsonString) {
 };
 
 // ============================================================================
-// DEMO MODE  (no VB6 host — auto-loads sample variables)
+// OFFICE DIALOG INITIALIZATION  (receives data from taskpane via messageChild)
 // ============================================================================
-(function demoInit() {
-  // Only run if after a small delay nothing has called populateVariableSelectionTable
-  setTimeout(function() {
-    if (STATE.variables.length === 0) {
-      console.log('[mixed-input] No data from host — loading demo variables');
-      window.populateVariableSelectionTable({
-        Score:       { count:120, numeric:120, string:0,  missing:0, categories:[], rangeAddress:'C2:C121' },
-        Treatment:   { count:120, numeric:0,   string:120,missing:0, categories:['Control','DrugA','DrugB'], rangeAddress:'D2:D121' },
-        Age:         { count:117, numeric:117, string:0,  missing:3, categories:[], rangeAddress:'E2:E121' },
-        Gender:      { count:120, numeric:0,   string:120,missing:0, categories:['M','F'], rangeAddress:'F2:F121' },
-        Time:        { count:120, numeric:120, string:0,  missing:0, categories:[], rangeAddress:'G2:G121' },
-        PatientID:   { count:120, numeric:0,   string:120,missing:0, categories:[], rangeAddress:'B2:B121' },
-        Dose:        { count:120, numeric:120, string:0,  missing:0, categories:[], rangeAddress:'H2:H121' }
-      });
+function onMessageFromParent(arg) {
+  try {
+    var message = JSON.parse(arg.message);
+    if (message.type === 'MIXED_DATA' && message.payload) {
+      window.loadMixedModelData(message.payload);
+    } else if (message.action === 'loadData' && message.data) {
+      window.loadMixedModelData(message.data);
     }
-  }, 800);
-})();
+  } catch(e) {
+    console.error('[mixed-input] Error parsing message from parent:', e);
+  }
+}
+
+function requestDataFromParent() {
+  sendToHost('requestData', null);
+}
+
+if (typeof Office !== 'undefined') {
+  Office.onReady(function() {
+    Office.context.ui.addHandlerAsync(
+      Office.EventType.DialogParentMessageReceived,
+      onMessageFromParent
+    );
+    requestDataFromParent();
+    sendToHost('ready', null);
+
+    var cancelBtn = qs('btnCancel');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', function() { sendToHost('cancel', null); });
+    }
+  });
+}
 
 // ============================================================================
-// INIT — wire zones immediately (for demo path)
+// INIT — wire drop zones on DOM ready
 // ============================================================================
 document.addEventListener('DOMContentLoaded', function() {
-  // Drop-zone wiring will also be called after data loads.
-  // Wire now in case of immediate demo auto-load.
   document.querySelectorAll('.mx-zone-body').forEach(wireDropZone);
-  qs('cfgThemeToggle').addEventListener('click', toggleTheme);
 });
 
 </script>

@@ -1,0 +1,2482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+  <meta http-equiv="Pragma" content="no-cache"/>
+  <meta http-equiv="Expires" content="0"/>
+  <title id="page-title">Linear Mixed Model</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://code.highcharts.com/highcharts-more.js"></script>
+  <script src="https://code.highcharts.com/modules/exporting.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
+
+  <!-- Shared Header -->
+  <link rel="stylesheet" href="../shared-header.css?v=20260310a"/>
+  <script src="../shared-header.js?v=20260310a"></script>
+
+  <style>
+    /* ── Design tokens ── */
+    :root {
+      --surface-0: #0c1624;
+      --surface-1: #1a1f2e;
+      --surface-2: #242938;
+      --border:    #2d3748;
+      --accent-1:  #a78bfa;   /* purple – mixed model brand colour */
+      --accent-2:  #7c3aed;
+      --accent-3:  #c4b5fd;
+      --success:   #4ade80;
+      --warning:   #fbbf24;
+      --danger:    #fb7185;
+      --text-primary:   #fff;
+      --text-secondary: rgba(255,255,255,.80);
+      --text-muted:     rgba(255,255,255,.55);
+      --panel-radius: 10px;
+      --panel-shadow: 0 4px 20px rgba(0,0,0,.4);
+      --header-color: var(--accent-1);
+    }
+    :root[data-theme="light"] {
+      --surface-0: #eef0f4;
+      --surface-1: #ffffff;
+      --surface-2: #f3f4f6;
+      --border:    #cbd5e1;
+      --accent-1:  #7c3aed;
+      --accent-2:  #6d28d9;
+      --accent-3:  #a78bfa;
+      --text-primary:   #111827;
+      --text-secondary: #1f2937;
+      --text-muted:     #374151;
+      --success: #16a34a;
+      --warning: #d97706;
+      --danger:  #dc2626;
+    }
+
+    html,body { height:100%; margin:0; padding:0; overflow:hidden; }
+    body {
+      background: var(--surface-0);
+      color: var(--text-primary);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Layout ── */
+    .sb-layout  { display:flex; flex-direction:row; flex:1; min-height:0; overflow:hidden; }
+    .right-col  { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+    .wrap       { flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; }
+    .card       { width:100%; background:var(--surface-1); border-radius:0; box-shadow:none; border:none;
+                  overflow:hidden; display:flex; flex-direction:column; flex:1; min-height:0;
+                  animation: panelFadeIn .3s ease-out; }
+    .card-main  { flex:1; min-width:0; display:flex; flex-direction:column; height:100%; overflow:hidden; }
+    @keyframes panelFadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+    /* ── Hero toolbar ── */
+    .hero-section {
+      background: var(--surface-1);
+      border-bottom: 1px solid var(--border);
+      padding: 0 12px;
+      display: flex; flex-direction: column; align-items: stretch; flex-shrink:0;
+    }
+    .hero-row-1 {
+      display:flex; align-items:center; gap:6px; flex-wrap:nowrap; min-height:44px;
+    }
+    .depth-selector { margin-left:auto; display:flex; gap:4px; }
+    .depth-btn {
+      padding:5px 12px; border-radius:6px; border:1px solid var(--border);
+      background:var(--surface-2); color:var(--text-secondary);
+      font-size:12px; font-weight:600; cursor:pointer; transition:all .2s;
+    }
+    .depth-btn.active {
+      background: rgba(167,139,250,.18); border-color: rgba(167,139,250,.6);
+      color: var(--accent-3);
+    }
+
+    /* ── View container ── */
+    .view-container {
+      display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden;
+      background: radial-gradient(900px 360px at 25% 0%, rgba(124,58,237,.06), transparent 62%),
+                  linear-gradient(180deg, #0b121a, #070c12);
+      border-top: 1px solid rgba(255,255,255,.06);
+    }
+    :root[data-theme="light"] .view-container {
+      background: #f8f9fc;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── Tab content ── */
+    .tab-content { display:none; }
+    .tab-content.active {
+      display:flex; flex-direction:column; flex:1; min-height:0;
+      overflow-y:auto; padding:16px 18px;
+      animation: fadeIn .2s ease;
+    }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+
+    /* ── KPI strip ── */
+    .kpi-strip {
+      display:flex; justify-content:center; gap:14px; flex-wrap:wrap;
+      margin:0 0 16px; padding-bottom:16px; border-bottom:2px solid var(--border);
+    }
+    .kpi-card {
+      background: linear-gradient(145deg,rgba(167,139,250,.14),rgba(167,139,250,.05));
+      border:1px solid rgba(167,139,250,.35); border-radius:10px;
+      padding:16px 28px; min-width:140px; max-width:200px; text-align:center;
+      box-shadow: 0 2px 12px rgba(0,0,0,.25);
+      transition: transform .18s, box-shadow .18s;
+    }
+    .kpi-card:hover { transform:translateY(-3px); box-shadow:0 6px 20px rgba(167,139,250,.22); }
+    .kpi-label { font-size:.72rem; color:var(--text-muted); text-transform:uppercase;
+                 letter-spacing:.7px; margin-bottom:6px; font-weight:600; }
+    .kpi-value { font-size:1.6rem; font-weight:800; color:var(--accent-3);
+                 font-variant-numeric:tabular-nums; line-height:1; }
+
+    /* ── Stat panels ── */
+    .stats-row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+    .stat-panel {
+      flex:1; min-width:200px;
+      background:rgba(255,255,255,.03); border:1px solid var(--border);
+      border-top:3px solid rgba(167,139,250,.5); border-radius:6px; padding:0;
+      box-shadow:0 2px 6px rgba(0,0,0,.25); transition:transform .2s,box-shadow .2s;
+    }
+    .stat-panel:hover { transform:translateY(-2px); box-shadow:0 6px 14px rgba(0,0,0,.3); }
+    .stat-panel-heading {
+      background:var(--surface-2); color:var(--text-primary);
+      padding:6px 10px; border-radius:3px 3px 0 0;
+      font-weight:700; font-size:.72rem; text-align:center;
+      text-transform:uppercase; letter-spacing:.4px; border-bottom:1px solid var(--border);
+    }
+    .heading-with-actions { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    .stat-panel-body { padding:5px 8px; }
+    .stat-field {
+      display:flex; justify-content:space-between; align-items:center;
+      margin:2px 0; padding:1px 0; border-bottom:1px solid rgba(255,255,255,.03);
+    }
+    .stat-field:last-child { border-bottom:none; }
+    .stat-label  { font-weight:600; color:var(--text-secondary); font-size:.82rem; }
+    .stat-value  {
+      background: linear-gradient(135deg,rgba(167,139,250,.15),rgba(167,139,250,.05));
+      border:1px solid rgba(167,139,250,.3); border-radius:4px;
+      padding:3px 8px; min-width:60px; text-align:center;
+      color:var(--accent-3); font-weight:700; font-size:.85rem;
+      font-variant-numeric:tabular-nums;
+    }
+    .metric-good    { color:var(--success) !important; border-color:rgba(74,222,128,.55) !important; }
+    .metric-warning { color:var(--warning) !important; border-color:rgba(251,191,36,.55) !important; }
+    .metric-bad     { color:var(--danger)  !important; border-color:rgba(251,113,133,.55) !important; }
+
+    /* ── Collapse toggle ── */
+    .collapse-toggle {
+      background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.32);
+      color:#fff; padding:2px 8px; border-radius:4px; cursor:pointer;
+      font-size:.62rem; font-weight:600; transition:background .2s;
+    }
+    .collapse-toggle:hover { background:rgba(255,255,255,.24); }
+    .collapsible-content { max-height:3000px; overflow:hidden; transition:max-height .24s ease,opacity .2s ease; opacity:1; }
+    .collapsible-content.is-collapsed { max-height:0; opacity:0; }
+
+    /* ── Mixed Model tables ── */
+    .mm-table-wrap { width:100%; overflow-x:auto; margin-top:4px; }
+    .mm-table {
+      width:100%; border-collapse:collapse; table-layout:auto;
+      border:0; font-size:.82rem;
+    }
+    .mm-table thead th {
+      background: linear-gradient(135deg,rgba(124,58,237,.5),rgba(109,40,217,.35));
+      color:#fff; padding:9px 12px; position:sticky; top:0; z-index:2;
+      font-weight:700; text-align:center; white-space:nowrap;
+      border:1px solid rgba(255,255,255,.2); font-size:.8rem;
+      text-transform:uppercase; letter-spacing:.2px;
+    }
+    .mm-table thead th:first-child { text-align:left; }
+    .mm-table tbody td {
+      background:rgba(255,255,255,.03); color:var(--text-primary);
+      border:1px solid rgba(255,255,255,.1); padding:7px 12px;
+      text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums;
+    }
+    .mm-table tbody td:first-child { text-align:left; font-weight:600; color:var(--accent-3); }
+    .mm-table tbody tr:hover td { background:rgba(167,139,250,.1); }
+    .mm-table tbody tr:nth-child(even) td { background:rgba(255,255,255,.018); }
+    .mm-table td.pval-good    { color:var(--success); font-weight:700; }
+    .mm-table td.pval-warning { color:var(--warning); font-weight:700; }
+    .mm-table td.pval-bad     { color:var(--danger);  font-weight:700; }
+    .mm-table td.coef-cell    { color:var(--accent-3); font-weight:700; }
+
+    /* Section header rows */
+    .mm-table tbody .mm-section-hdr td {
+      background: rgba(167,139,250,.08) !important;
+      color: var(--accent-3); font-size:.72rem; font-weight:700;
+      text-transform:uppercase; letter-spacing:.5px;
+      padding:5px 12px !important; text-align:left !important;
+      border-top:1px solid rgba(167,139,250,.2);
+    }
+
+    /* ── Section panel (full-width collapsible block) ── */
+    .mm-section {
+      background:rgba(255,255,255,.03); border:1px solid var(--border);
+      border-top:3px solid rgba(167,139,250,.5); border-radius:6px;
+      overflow:hidden; margin-bottom:14px; box-shadow:0 2px 6px rgba(0,0,0,.2);
+    }
+    .mm-section-header {
+      display:flex; justify-content:space-between; align-items:center;
+      background:var(--surface-2); padding:7px 12px;
+      font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.4px;
+      color:var(--accent-3); border-bottom:1px solid var(--border);
+    }
+    .mm-section-body { padding:0; }
+    .mm-section-body.padded { padding:10px 14px; }
+
+    /* ── Conclusion / insight card ── */
+    .conclusion-card {
+      display:none; margin-bottom:16px; border-radius:10px; overflow:hidden;
+      border:1.5px solid rgba(167,139,250,.4); animation:fadeIn .3s ease-out;
+    }
+    .conclusion-card.visible { display:block; }
+    .conclusion-header {
+      display:flex; align-items:center; gap:8px; padding:9px 16px;
+      background:rgba(167,139,250,.12); font-size:.75rem; font-weight:700;
+      text-transform:uppercase; letter-spacing:.6px; color:var(--accent-1);
+      border-bottom:1px solid rgba(167,139,250,.25);
+    }
+    .conclusion-body { padding:14px 20px 12px; }
+    .conclusion-verdict { font-size:1.1rem; font-weight:700; color:var(--text-primary); margin:0 0 6px; }
+    .conclusion-detail  { font-size:.86rem; color:var(--text-secondary); line-height:1.6; margin:0 0 10px; }
+    .conclusion-microtags { display:flex; flex-wrap:wrap; gap:5px; }
+    .microtag {
+      display:inline-flex; align-items:center; gap:4px;
+      padding:3px 10px; border-radius:99px; font-size:.72rem; font-weight:700; border:1px solid;
+    }
+    .microtag-sig    { color:#4ade80; border-color:rgba(74,222,128,.4);  background:rgba(74,222,128,.08);  }
+    .microtag-ns     { color:#fb7185; border-color:rgba(251,113,133,.4); background:rgba(251,113,133,.08); }
+    .microtag-mod    { color:var(--accent-3); border-color:rgba(167,139,250,.4); background:rgba(167,139,250,.08); }
+    .microtag-strong { color:#4ade80; border-color:rgba(74,222,128,.4);  background:rgba(74,222,128,.08);  }
+    .microtag-weak   { color:#fbbf24; border-color:rgba(251,191,36,.4);  background:rgba(251,191,36,.08);  }
+
+    /* ── Insight / info boxes ── */
+    .insight-panel {
+      margin:0 0 8px; border:1px solid rgba(167,139,250,.35);
+      border-left:4px solid var(--accent-1); border-radius:6px;
+      background:rgba(167,139,250,.08); padding:8px 10px;
+    }
+    .insight-title { margin:0 0 5px; color:var(--accent-1); font-size:.72rem; font-weight:700;
+                     text-transform:uppercase; letter-spacing:.35px; }
+    .insight-text  { margin:0; color:var(--text-secondary); font-size:.75rem; line-height:1.45; }
+
+    /* ── EMM (Estimated Marginal Means) plot area ── */
+    .emm-chart-wrap { height:280px; width:100%; margin-top:12px; }
+
+    /* ── Covariance structure selector ── */
+    .cov-selector-row {
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+      padding:8px 12px; background:rgba(0,0,0,.2); border-radius:8px; margin-bottom:12px;
+    }
+    .cov-selector-row label { font-size:.78rem; font-weight:600; color:var(--text-secondary); }
+    .cov-select {
+      background:var(--surface-2); color:var(--text-primary);
+      border:1px solid var(--border); border-radius:6px;
+      padding:5px 10px; font-size:.82rem; cursor:pointer;
+    }
+    .cov-select:focus { outline:none; border-color:var(--accent-1); }
+
+    /* ── Metric help tooltips ── */
+    .metric-help { position:relative; display:inline-flex; align-items:center;
+                   margin-left:5px; color:var(--text-muted); cursor:help; font-size:.65rem; }
+    .metric-tip {
+      position:fixed; left:0; top:0; transform:none;
+      width:min(270px,calc(100vw - 16px));
+      background:var(--surface-0); border:1px solid var(--border); border-radius:6px;
+      color:var(--text-secondary); font-size:.72rem; font-weight:400; line-height:1.35;
+      text-transform:none; letter-spacing:0; padding:8px 10px;
+      box-shadow:var(--panel-shadow); opacity:0; visibility:hidden;
+      pointer-events:none; transition:opacity .18s ease; z-index:9999;
+    }
+    .metric-help:hover .metric-tip, .metric-tip.is-visible { opacity:1; visibility:visible; }
+
+    /* ── Sidebar overrides for purple brand ── */
+    .sb-nav {
+      --sb-accent:    #a78bfa;
+      --sb-accent-bg: rgba(167,139,250,.18);
+    }
+
+    /* ── Scrollbar ── */
+    .tab-content::-webkit-scrollbar { width:6px; }
+    .tab-content::-webkit-scrollbar-track { background:rgba(255,255,255,.04); }
+    .tab-content::-webkit-scrollbar-thumb { background:rgba(167,139,250,.5); border-radius:4px; }
+    .tab-content { scrollbar-width:thin; scrollbar-color:rgba(167,139,250,.5) rgba(255,255,255,.04); }
+
+    /* ── Random effects variance component badge ── */
+    .vc-badge {
+      display:inline-block; padding:2px 8px; border-radius:99px;
+      font-size:.7rem; font-weight:700; margin-left:6px; vertical-align:middle;
+    }
+    .vc-large  { background:rgba(74,222,128,.2);  color:#4ade80; }
+    .vc-medium { background:rgba(167,139,250,.2); color:var(--accent-3); }
+    .vc-small  { background:rgba(251,191,36,.2);  color:#fbbf24; }
+
+    /* ── Awaiting state ── */
+    .awaiting-state {
+      text-align:center; padding:60px 20px; color:var(--text-muted);
+    }
+    .awaiting-state i { font-size:3rem; margin-bottom:14px; display:block; }
+
+    /* ── Loading overlay ── */
+    .loading-overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,.6);
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      z-index:9999; transition:opacity .3s;
+    }
+    .loading-overlay.hidden { opacity:0; pointer-events:none; }
+    .loading-spinner { width:56px; height:56px; border:4px solid rgba(167,139,250,.2);
+                       border-top-color:#a78bfa; border-radius:50%; animation:spin .8s linear infinite; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    .loading-text { margin-top:18px; color:#e5e7eb; font-size:1rem; font-weight:500; }
+
+    /* ── Residuals workspace ── */
+    .res-workspace { padding:12px 14px; overflow-y:auto; }
+
+    /* ── Profile likelihood chart ── */
+    .profile-chart-wrap { height:240px; width:100%; }
+
+    /* ── Contrast row ── */
+    .contrast-row {
+      display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+      padding:8px 0; border-bottom:1px solid rgba(255,255,255,.06);
+    }
+    .contrast-row:last-child { border-bottom:none; }
+    .contrast-tag {
+      padding:3px 10px; border-radius:99px; font-size:.72rem; font-weight:700;
+      background:rgba(167,139,250,.12); border:1px solid rgba(167,139,250,.3); color:var(--accent-3);
+    }
+
+    /* ── ICC bar ── */
+    .icc-bar-track { background:rgba(255,255,255,.08); border-radius:99px; height:10px; flex:1; overflow:hidden; }
+    .icc-bar-fill  { height:100%; border-radius:99px; background:linear-gradient(90deg,var(--accent-1),var(--accent-3)); transition:width .5s ease; }
+
+    /* ── Tab section grid helpers ── */
+    .two-col-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    @media(max-width:900px) { .two-col-grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+
+  <div class="sb-layout">
+
+    <!-- ── Sidebar Navigation ── -->
+    <nav class="sb-nav" id="sidebarNav">
+
+      <div class="sb-logo">
+        <div class="sb-logo-icon"><i class="fa-solid fa-layer-group"></i></div>
+        <div class="sb-logo-text">
+          <span class="sb-logo-name">Statistico</span>
+          <span class="sb-logo-sub">Mixed Model</span>
+        </div>
+      </div>
+
+      <div class="sb-header">
+        <i class="fa-solid fa-bars-staggered sb-menu-icon"></i>
+        <span class="sb-menu-title">Menu</span>
+        <button class="sb-toggle-btn" onclick="toggleSidebar()" title="Collapse / expand">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+      </div>
+
+      <div class="sb-body">
+
+        <!-- Group: Model Summary -->
+        <div class="sb-group">
+          <div class="sb-group-title">Model</div>
+          <div class="sb-items-rail">
+            <button class="sb-item active" onclick="switchTab('overview')" data-tab="overview" id="overviewBtn">
+              <i class="fa-solid fa-table-cells-large sb-item-icon"></i>
+              <span class="sb-item-label">Overview</span>
+            </button>
+            <button class="sb-item" onclick="switchTab('model-fit')" data-tab="model-fit">
+              <i class="fa-solid fa-chart-bar sb-item-icon"></i>
+              <span class="sb-item-label">Model Fit</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Group: Effects -->
+        <div class="sb-group">
+          <div class="sb-group-title">Effects</div>
+          <div class="sb-items-rail">
+            <button class="sb-item" onclick="switchTab('fixed-effects')" data-tab="fixed-effects">
+              <i class="fa-solid fa-lock sb-item-icon"></i>
+              <span class="sb-item-label">Fixed Effects</span>
+            </button>
+            <button class="sb-item" onclick="switchTab('random-effects')" data-tab="random-effects">
+              <i class="fa-solid fa-dice sb-item-icon"></i>
+              <span class="sb-item-label">Random Effects</span>
+            </button>
+            <button class="sb-item" onclick="switchTab('covariance')" data-tab="covariance">
+              <i class="fa-solid fa-border-all sb-item-icon"></i>
+              <span class="sb-item-label">Covariance</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Group: Estimates -->
+        <div class="sb-group">
+          <div class="sb-group-title">Estimates</div>
+          <div class="sb-items-rail">
+            <button class="sb-item" onclick="switchTab('emm')" data-tab="emm">
+              <i class="fa-solid fa-chart-line sb-item-icon"></i>
+              <span class="sb-item-label">Estimated Marginal Means</span>
+            </button>
+            <button class="sb-item" onclick="switchTab('pairwise')" data-tab="pairwise">
+              <i class="fa-solid fa-arrows-left-right sb-item-icon"></i>
+              <span class="sb-item-label">Pairwise Contrasts</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Group: Diagnostics -->
+        <div class="sb-group">
+          <div class="sb-group-title">Diagnostics</div>
+          <div class="sb-items-rail">
+            <button class="sb-item" onclick="switchTab('residuals')" data-tab="residuals">
+              <i class="fa-solid fa-gauge-high sb-item-icon"></i>
+              <span class="sb-item-label">Residuals</span>
+            </button>
+            <button class="sb-item" onclick="switchTab('influential')" data-tab="influential">
+              <i class="fa-solid fa-triangle-exclamation sb-item-icon"></i>
+              <span class="sb-item-label">Influential Cases</span>
+            </button>
+          </div>
+        </div>
+
+      </div><!-- /sb-body -->
+
+      <!-- Bottom: Decimals + AI -->
+      <div class="sb-bottom">
+        <div class="sb-bottom-row">
+          <i class="fa-solid fa-hashtag sb-bottom-icon"></i>
+          <span class="sb-bottom-label">Decimals</span>
+          <select id="decimalSelect" class="sb-bottom-select" onchange="updateDecimalPrecision()" title="Decimal precision">
+            <option value="auto">Auto</option>
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3" selected>3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </div>
+        <button class="sb-bottom-btn ai-interpret-btn" id="aiBtn" onclick="requestMixedModelAI()" style="display:none;">
+          <i class="fa-solid fa-robot sb-bottom-icon"></i>
+          <span class="sb-item-label">AI Interpret</span>
+        </button>
+      </div>
+
+    </nav><!-- /sb-nav -->
+
+    <!-- ── Right column ── -->
+    <div class="right-col">
+
+      <!-- Shared header mount point -->
+      <div id="header-container"></div>
+
+      <!-- Loading overlay -->
+      <div class="loading-overlay hidden" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loadingText">Fitting mixed model...</div>
+      </div>
+
+      <div class="wrap">
+        <section class="card" role="main">
+          <div class="card-main">
+
+            <!-- Toolbar -->
+            <div class="hero-section">
+              <div class="hero-row-1">
+                <div class="depth-selector" id="depthSel">
+                  <button class="depth-btn active" data-depth="insight" onclick="setDepth('insight')">🟢 Insight</button>
+                  <button class="depth-btn"        data-depth="analyst" onclick="setDepth('analyst')">🟡 Analyst</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab content area -->
+            <div class="view-container">
+              <div class="card-body" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
+
+                <!-- ══════════════════════════════════════════════════════
+                     TAB: OVERVIEW
+                ══════════════════════════════════════════════════════ -->
+                <div id="tab-overview" class="tab-content active">
+
+                  <!-- Conclusion card (Insight mode) -->
+                  <div class="conclusion-card" id="conclusionCard">
+                    <div class="conclusion-header"><i class="fa-solid fa-lightbulb"></i> Model Conclusion</div>
+                    <div class="conclusion-body">
+                      <p class="conclusion-verdict" id="conclusionVerdict">Awaiting results…</p>
+                      <p class="conclusion-detail"  id="conclusionDetail"></p>
+                      <div class="conclusion-microtags" id="conclusionTags"></div>
+                    </div>
+                  </div>
+
+                  <!-- KPI strip -->
+                  <div class="kpi-strip" id="kpiStrip">
+                    <div class="kpi-card" style="border-top:3px solid var(--accent-1);">
+                      <div class="kpi-label">-2LL</div>
+                      <div class="kpi-value" id="kpi2LL">…</div>
+                    </div>
+                    <div class="kpi-card" style="border-top:3px solid var(--accent-1);">
+                      <div class="kpi-label">AIC</div>
+                      <div class="kpi-value" id="kpiAIC">…</div>
+                    </div>
+                    <div class="kpi-card" style="border-top:3px solid var(--accent-1);">
+                      <div class="kpi-label">BIC</div>
+                      <div class="kpi-value" id="kpiBIC">…</div>
+                    </div>
+                    <div class="kpi-card" style="border-top:3px solid var(--warning);">
+                      <div class="kpi-label">ICC</div>
+                      <div class="kpi-value" id="kpiICC">…</div>
+                    </div>
+                    <div class="kpi-card" style="border-top:3px solid var(--text-muted);">
+                      <div class="kpi-label">n / Groups</div>
+                      <div class="kpi-value" id="kpiN">…</div>
+                    </div>
+                  </div>
+
+                  <!-- Stats panels row -->
+                  <div class="stats-row">
+
+                    <div class="stat-panel">
+                      <div class="stat-panel-heading"><i class="fa-solid fa-info-circle"></i> Sample Information</div>
+                      <div class="stat-panel-body">
+                        <div class="stat-field"><span class="stat-label">Total Observations:</span>     <span class="stat-value" id="sN">…</span></div>
+                        <div class="stat-field"><span class="stat-label">Number of Groups:</span>        <span class="stat-value" id="sGroups">…</span></div>
+                        <div class="stat-field"><span class="stat-label">Avg Obs per Group:</span>       <span class="stat-value" id="sOPG">…</span></div>
+                        <div class="stat-field"><span class="stat-label">Fixed Predictors:</span>        <span class="stat-value" id="sFP">…</span></div>
+                        <div class="stat-field"><span class="stat-label">Random Effects:</span>          <span class="stat-value" id="sRE">…</span></div>
+                      </div>
+                    </div>
+
+                    <div class="stat-panel">
+                      <div class="stat-panel-heading"><i class="fa-solid fa-chart-bar"></i> Model Fit (Information Criteria)</div>
+                      <div class="stat-panel-body">
+                        <div class="stat-field">
+                          <span class="stat-label">−2 Log Likelihood:
+                            <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
+                              <span class="metric-tip">Deviance. Lower values indicate better fit. Compare nested models via likelihood ratio test (Δ−2LL ~ χ²).</span>
+                            </span>
+                          </span>
+                          <span class="stat-value" id="s2LL">…</span>
+                        </div>
+                        <div class="stat-field">
+                          <span class="stat-label">AIC:
+                            <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
+                              <span class="metric-tip">Akaike Information Criterion. Balances fit and number of parameters. Lower is better.</span>
+                            </span>
+                          </span>
+                          <span class="stat-value" id="sAIC">…</span>
+                        </div>
+                        <div class="stat-field">
+                          <span class="stat-label">AICc:</span>
+                          <span class="stat-value" id="sAICc">…</span>
+                        </div>
+                        <div class="stat-field">
+                          <span class="stat-label">BIC:</span>
+                          <span class="stat-value" id="sBIC">…</span>
+                        </div>
+                        <div class="stat-field">
+                          <span class="stat-label">CAIC:</span>
+                          <span class="stat-value" id="sCAIC">…</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="stat-panel" data-show-from="analyst">
+                      <div class="stat-panel-heading"><i class="fa-solid fa-calculator"></i> Estimation</div>
+                      <div class="stat-panel-body">
+                        <div class="stat-field"><span class="stat-label">Method:</span>             <span class="stat-value" id="sMethod">…</span></div>
+                        <div class="stat-field"><span class="stat-label">Iterations:</span>          <span class="stat-value" id="sIter">…</span></div>
+                        <div class="stat-field"><span class="stat-label">Converged:</span>            <span class="stat-value" id="sConv">…</span></div>
+                        <div class="stat-field"><span class="stat-label">Covariance Structure:</span> <span class="stat-value" id="sCovStruct">…</span></div>
+                        <div class="stat-field"><span class="stat-label">DF Method:</span>            <span class="stat-value" id="sDFMethod">…</span></div>
+                      </div>
+                    </div>
+
+                  </div><!-- /stats-row -->
+
+                  <!-- ICC panel -->
+                  <div class="mm-section">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-layer-group"></i> Intraclass Correlation Coefficient (ICC)</span>
+                      <button class="collapse-toggle" onclick="toggleSection('iccBody','iccToggle')" id="iccToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                    </div>
+                    <div class="mm-section-body padded collapsible-content" id="iccBody">
+                      <div class="insight-panel">
+                        <p class="insight-title"><i class="fa-solid fa-circle-info"></i> What ICC tells you</p>
+                        <p class="insight-text" id="iccInterpret">The ICC quantifies the proportion of total variance attributable to between-group differences. ICC ≥ 0.10 justifies a multilevel approach; ICC ≥ 0.30 indicates substantial clustering.</p>
+                      </div>
+                      <div id="iccTableContainer">
+                        <div class="awaiting-state"><i class="fa-solid fa-hourglass-half"></i><p>Awaiting model results…</p></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Type III Tests of Fixed Effects (overview snippet) -->
+                  <div class="mm-section">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-lock"></i> Type III Tests of Fixed Effects</span>
+                      <button class="collapse-toggle" onclick="toggleSection('ovFixedBody','ovFixedToggle')" id="ovFixedToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                    </div>
+                    <div class="mm-section-body collapsible-content" id="ovFixedBody">
+                      <div class="mm-table-wrap">
+                        <table class="mm-table" id="ovFixedTable">
+                          <thead><tr>
+                            <th>Source</th><th>Numerator DF</th><th>Denominator DF</th>
+                            <th>F</th><th>Sig.</th><th>η²<sub>p</sub></th>
+                          </tr></thead>
+                          <tbody id="ovFixedBody_rows">
+                            <tr><td colspan="6" class="awaiting-state" style="padding:20px;text-align:center;font-style:italic;">Awaiting results…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <div class="mm-table-wrap" style="margin-top:6px;">
+                        <span class="table-footnote" id="ovFixedFootnote">a. Dependent Variable: —</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div><!-- /tab-overview -->
+
+
+                <!-- ══════════════════════════════════════════════════════
+                     TAB: MODEL FIT
+                ══════════════════════════════════════════════════════ -->
+                <div id="tab-model-fit" class="tab-content">
+
+                  <!-- Information Criteria table -->
+                  <div class="mm-section">
+                    <div class="mm-section-header"><span><i class="fa-solid fa-chart-bar"></i> Information Criteria</span></div>
+                    <div class="mm-section-body">
+                      <div class="mm-table-wrap">
+                        <table class="mm-table">
+                          <thead><tr>
+                            <th>Criterion</th><th>Value</th><th>Description</th>
+                          </tr></thead>
+                          <tbody id="fitICtable">
+                            <tr><td colspan="3" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Awaiting results…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <p class="table-footnote" style="margin:6px 12px 10px;">Smaller values indicate a better-fitting model. AIC and BIC penalise for number of parameters.</p>
+                    </div>
+                  </div>
+
+                  <!-- Model comparison / LRT -->
+                  <div class="mm-section" data-show-from="analyst">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-code-compare"></i> Likelihood Ratio Test (vs. Intercept-Only)</span>
+                      <button class="collapse-toggle" onclick="toggleSection('lrtBody','lrtToggle')" id="lrtToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                    </div>
+                    <div class="mm-section-body padded collapsible-content" id="lrtBody">
+                      <div class="mm-table-wrap">
+                        <table class="mm-table">
+                          <thead><tr>
+                            <th>Model</th><th>−2LL</th><th>Params</th><th>Δ−2LL</th><th>Δdf</th><th>χ² Sig.</th>
+                          </tr></thead>
+                          <tbody id="lrtTableBody">
+                            <tr><td colspan="6" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Awaiting results…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Pseudo R² / variance explained -->
+                  <div class="mm-section">
+                    <div class="mm-section-header"><span><i class="fa-solid fa-percent"></i> Variance Explained (Pseudo R²)</span></div>
+                    <div class="mm-section-body padded">
+                      <div class="two-col-grid">
+                        <div class="stat-panel" style="min-width:unset;">
+                          <div class="stat-panel-heading">Marginal R² (Fixed only)</div>
+                          <div class="stat-panel-body">
+                            <div class="stat-field">
+                              <span class="stat-label">R²<sub>m</sub>:</span>
+                              <span class="stat-value" id="r2m">…</span>
+                            </div>
+                            <div class="stat-field">
+                              <span class="stat-label">Variance (Fixed):</span>
+                              <span class="stat-value" id="varFixed">…</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="stat-panel" style="min-width:unset;">
+                          <div class="stat-panel-heading">Conditional R² (Fixed + Random)</div>
+                          <div class="stat-panel-body">
+                            <div class="stat-field">
+                              <span class="stat-label">R²<sub>c</sub>:</span>
+                              <span class="stat-value" id="r2c">…</span>
+                            </div>
+                            <div class="stat-field">
+                              <span class="stat-label">Variance (Residual):</span>
+                              <span class="stat-value" id="varResid">…</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="insight-panel" style="margin-top:12px;">
+                        <p class="insight-title"><i class="fa-solid fa-lightbulb"></i> Nakagawa &amp; Schielzeth (2013)</p>
+                        <p class="insight-text">R²<sub>m</sub> is the variance explained by fixed effects alone. R²<sub>c</sub> includes both fixed and random effects. The difference (R²<sub>c</sub> − R²<sub>m</sub>) is the variance explained by clustering.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                </div><!-- /tab-model-fit -->
+
+
+                <!-- ══════════════════════════════════════════════════════
+                     TAB: FIXED EFFECTS
+                ══════════════════════════════════════════════════════ -->
+                <div id="tab-fixed-effects" class="tab-content">
+
+                  <!-- Type III omnibus tests -->
+                  <div class="mm-section">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-table"></i> Type III Tests of Fixed Effects</span>
+                      <button class="collapse-toggle" onclick="toggleSection('fe3Body','fe3Toggle')" id="fe3Toggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                    </div>
+                    <div class="mm-section-body collapsible-content" id="fe3Body">
+                      <div class="mm-table-wrap">
+                        <table class="mm-table" id="fe3Table">
+                          <thead><tr>
+                            <th>Source</th>
+                            <th>Num. DF</th><th>Den. DF</th>
+                            <th>F</th><th>Sig.</th>
+                            <th data-show-from="analyst">η²<sub>p</sub>
+                              <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
+                                <span class="metric-tip">Partial eta-squared: effect size. Small ≈ .01, Medium ≈ .06, Large ≈ .14</span>
+                              </span>
+                            </th>
+                            <th data-show-from="analyst">ω²<sub>p</sub>
+                              <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
+                                <span class="metric-tip">Partial omega-squared: bias-corrected effect size, preferred for smaller samples.</span>
+                              </span>
+                            </th>
+                          </tr></thead>
+                          <tbody id="fe3Rows">
+                            <tr><td colspan="7" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Awaiting results…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Fixed effect coefficient estimates (SPSS "Estimates of Fixed Effects") -->
+                  <div class="mm-section">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-table-list"></i> Estimates of Fixed Effects</span>
+                      <button class="collapse-toggle" onclick="toggleSection('feCoefBody','feCoefToggle')" id="feCoefToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                    </div>
+                    <div class="mm-section-body collapsible-content" id="feCoefBody">
+                      <div class="mm-table-wrap">
+                        <table class="mm-table" id="feCoefTable">
+                          <thead><tr>
+                            <th>Parameter</th>
+                            <th>Estimate</th>
+                            <th>Std. Error</th>
+                            <th>df</th>
+                            <th>t</th>
+                            <th>Sig.</th>
+                            <th>95% CI Lower</th>
+                            <th>95% CI Upper</th>
+                            <th data-show-from="analyst">Std. β</th>
+                          </tr></thead>
+                          <tbody id="feCoefRows">
+                            <tr><td colspan="9" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Awaiting results…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <p class="table-footnote" id="feCoefFootnote">a. Dependent Variable: — &nbsp;|&nbsp; Satterthwaite DF approximation</p>
+                    </div>
+                  </div>
+
+                  <!-- Forest plot of fixed effects -->
+                  <div class="mm-section" data-show-from="analyst">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-chart-gantt"></i> Forest Plot — Fixed Effect Estimates (95% CI)</span>
+                      <button class="collapse-toggle" onclick="toggleSection('feForestBody','feForestToggle')" id="feForestToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                    </div>
+                    <div class="mm-section-body padded collapsible-content" id="feForestBody">
+                      <div id="feForestChart" style="height:320px;width:100%;"></div>
+                    </div>
+                  </div>
+
+                </div><!-- /tab-fixed-effects -->
+
+
+                <!-- ══════════════════════════════════════════════════════
+                     TAB: RANDOM EFFECTS
+                ══════════════════════════════════════════════════════ -->
+                <div id="tab-random-effects" class="tab-content">
+
+                  <!-- Variance Components -->
+                  <div class="mm-section">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-dice"></i> Estimates of Covariance Parameters (Variance Components)</span>
+                      <button class="collapse-toggle" onclick="toggleSection('vcBody','vcToggle')" id="vcToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                    </div>
+                    <div class="mm-section-body collapsible-content" id="vcBody">
+                      <div class="mm-table-wrap">
+                        <table class="mm-table" id="vcTable">
+                          <thead><tr>
+                            <th>Parameter</th>
+                            <th>Estimate</th>
+                            <th>Std. Error</th>
+                            <th>Wald Z</th>
+                            <th>Sig.</th>
+                            <th>95% CI Lower</th>
+                            <th>95% CI Upper</th>
+                            <th data-show-from="analyst">% Total Variance</th>
+                          </tr></thead>
+                          <tbody id="vcRows">
+                            <tr><td colspan="8" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Awaiting results…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Variance decomposition visual -->
+                  <div class="mm-section">
+                    <div class="mm-section-header"><span><i class="fa-solid fa-chart-pie"></i> Variance Decomposition</span></div>
+                    <div class="mm-section-body padded">
+                      <div id="varianceDecompChart" style="height:260px;width:100%;"></div>
+                    </div>
+                  </div>
+
+                  <!-- Random effect BLUPs / shrinkage estimates -->
+                  <div class="mm-section" data-show-from="analyst">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-list-ol"></i> Best Linear Unbiased Predictions (BLUPs) — Group Intercepts</span>
+                      <button class="collapse-toggle" onclick="toggleSection('blupBody','blupToggle')" id="blupToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                    </div>
+                    <div class="mm-section-body collapsible-content" id="blupBody">
+                      <div class="mm-table-wrap">
+                        <table class="mm-table" id="blupTable">
+                          <thead><tr>
+                            <th>Group</th>
+                            <th>BLUP (u<sub>j</sub>)</th>
+                            <th>Std. Error</th>
+                            <th>95% CI Lower</th>
+                            <th>95% CI Upper</th>
+                          </tr></thead>
+                          <tbody id="blupRows">
+                            <tr><td colspan="5" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Awaiting results…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Caterpillar plot of BLUPs -->
+                  <div class="mm-section" data-show-from="analyst">
+                    <div class="mm-section-header"><span><i class="fa-solid fa-spider"></i> Caterpillar Plot — Group Random Intercepts</span></div>
+                    <div class="mm-section-body padded">
+                      <div id="caterpillarChart" style="height:320px;width:100%;"></div>
+                    </div>
+                  </div>
+
+                </div><!-- /tab-random-effects -->
+
+
+                <!-- ══════════════════════════════════════════════════════
+                     TAB: COVARIANCE
+                ══════════════════════════════════════════════════════ -->
+                <div id="tab-covariance" class="tab-content">
+
+                  <div class="cov-selector-row">
+                    <label><i class="fa-solid fa-border-all"></i> Residual Covariance Structure:</label>
+                    <select class="cov-select" id="covStructSelect" onchange="updateCovStructure()">
+                      <option value="vc"   selected>Variance Components (VC) — default</option>
+                      <option value="cs">Compound Symmetry (CS)</option>
+                      <option value="ar1">First-Order Autoregressive (AR1)</option>
+                      <option value="toep">Toeplitz (TOEP)</option>
+                      <option value="un">Unstructured (UN)</option>
+                      <option value="diag">Diagonal</option>
+                    </select>
+                    <button class="depth-btn" onclick="refitWithCovStructure()" style="margin-left:8px;">
+                      <i class="fa-solid fa-rotate"></i> Refit
+                    </button>
+                  </div>
+
+                  <!-- Covariance matrix display -->
+                  <div class="mm-section">
+                    <div class="mm-section-header"><span><i class="fa-solid fa-border-all"></i> Estimated Residual Covariance Matrix (Σ)</span></div>
+                    <div class="mm-section-body">
+                      <div class="mm-table-wrap" id="covMatrixWrap">
+                        <div class="awaiting-state" style="padding:30px;text-align:center;"><i class="fa-solid fa-hourglass-half"></i><p>Awaiting results…</p></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- G-matrix (random effects covariance) -->
+                  <div class="mm-section">
+                    <div class="mm-section-header"><span><i class="fa-solid fa-border-all"></i> G-Matrix — Random Effects Covariance</span></div>
+                    <div class="mm-section-body">
+                      <div class="mm-table-wrap" id="gMatrixWrap">
+                        <div class="awaiting-state" style="padding:30px;text-align:center;"><i class="fa-solid fa-hourglass-half"></i><p>Awaiting results…</p></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Covariance fit comparison -->
+                  <div class="mm-section" data-show-from="analyst">
+                    <div class="mm-section-header"><span><i class="fa-solid fa-code-compare"></i> Covariance Structure Comparison (AIC)</span></div>
+                    <div class="mm-section-body padded">
+                      <div id="covCompChart" style="height:260px;width:100%;"></div>
+                    </div>
+                  </div>
+
+                </div><!-- /tab-covariance -->
+
+
+                <!-- ══════════════════════════════════════════════════════
+                     TAB: ESTIMATED MARGINAL MEANS
+                ══════════════════════════════════════════════════════ -->
+                <div id="tab-emm" class="tab-content">
+
+                  <!-- Factor selector -->
+                  <div class="cov-selector-row">
+                    <label><i class="fa-solid fa-tags"></i> Factor:</label>
+                    <select class="cov-select" id="emmFactorSelect" onchange="renderEMM()">
+                      <option value="">— Select factor —</option>
+                    </select>
+                  </div>
+
+                  <!-- EMM table -->
+                  <div class="mm-section">
+                    <div class="mm-section-header"><span><i class="fa-solid fa-table"></i> Estimated Marginal Means</span></div>
+                    <div class="mm-section-body">
+                      <div class="mm-table-wrap">
+                        <table class="mm-table" id="emmTable">
+                          <thead><tr>
+                            <th>Level</th>
+                            <th>Mean</th>
+                            <th>Std. Error</th>
+                            <th>df</th>
+                            <th>95% CI Lower</th>
+                            <th>95% CI Upper</th>
+                          </tr></thead>
+                          <tbody id="emmRows">
+                            <tr><td colspan="6" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Select a factor above…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- EMM profile plot -->
+                  <div class="mm-section">
+                    <div class="mm-section-header"><span><i class="fa-solid fa-chart-line"></i> Profile Plot — Estimated Marginal Means (± 95% CI)</span></div>
+                    <div class="mm-section-body padded">
+                      <div id="emmChart" style="height:300px;width:100%;"></div>
+                    </div>
+                  </div>
+
+                </div><!-- /tab-emm -->
+
+
+                <!-- ══════════════════════════════════════════════════════
+                     TAB: PAIRWISE CONTRASTS
+                ══════════════════════════════════════════════════════ -->
+                <div id="tab-pairwise" class="tab-content">
+
+                  <div class="cov-selector-row">
+                    <label><i class="fa-solid fa-tags"></i> Factor:</label>
+                    <select class="cov-select" id="pwFactorSelect" onchange="renderPairwise()">
+                      <option value="">— Select factor —</option>
+                    </select>
+                    <label style="margin-left:12px;"><i class="fa-solid fa-sliders"></i> Adjustment:</label>
+                    <select class="cov-select" id="pwAdjSelect" onchange="renderPairwise()">
+                      <option value="none">None (LSD)</option>
+                      <option value="bonferroni" selected>Bonferroni</option>
+                      <option value="sidak">Šidák</option>
+                      <option value="tukey">Tukey</option>
+                      <option value="fdr">FDR (Benjamini-Hochberg)</option>
+                    </select>
+                  </div>
+
+                  <!-- Pairwise contrasts table -->
+                  <div class="mm-section">
+                    <div class="mm-section-header"><span><i class="fa-solid fa-arrows-left-right"></i> Pairwise Comparisons</span></div>
+                    <div class="mm-section-body">
+                      <div class="mm-table-wrap">
+                        <table class="mm-table" id="pwTable">
+                          <thead><tr>
+                            <th>(I) Level</th><th>(J) Level</th>
+                            <th>Mean Diff (I−J)</th>
+                            <th>Std. Error</th><th>df</th>
+                            <th>t</th><th>Sig.</th>
+                            <th>Adj. Sig.</th>
+                            <th>95% CI Lower</th><th>95% CI Upper</th>
+                            <th data-show-from="analyst">Cohen's d</th>
+                          </tr></thead>
+                          <tbody id="pwRows">
+                            <tr><td colspan="11" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Select a factor above…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Compact significance matrix -->
+                  <div class="mm-section" data-show-from="analyst">
+                    <div class="mm-section-header"><span><i class="fa-solid fa-border-all"></i> Significance Matrix</span></div>
+                    <div class="mm-section-body padded">
+                      <div id="pwSigMatrix" style="overflow-x:auto;">
+                        <div style="text-align:center;padding:20px;color:var(--text-muted);font-style:italic;">Select a factor above…</div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div><!-- /tab-pairwise -->
+
+
+                <!-- ══════════════════════════════════════════════════════
+                     TAB: RESIDUALS
+                ══════════════════════════════════════════════════════ -->
+                <div id="tab-residuals" class="tab-content">
+                  <div class="res-workspace" id="residualsPanel">
+                    <div class="awaiting-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading residual diagnostics…</p></div>
+                  </div>
+                </div>
+
+
+                <!-- ══════════════════════════════════════════════════════
+                     TAB: INFLUENTIAL CASES
+                ══════════════════════════════════════════════════════ -->
+                <div id="tab-influential" class="tab-content">
+                  <div class="res-workspace" id="influentialPanel">
+                    <div class="awaiting-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading influential case diagnostics…</p></div>
+                  </div>
+                </div>
+
+
+              </div><!-- /card-body -->
+            </div><!-- /view-container -->
+
+          </div><!-- /card-main -->
+        </section>
+      </div><!-- /wrap -->
+    </div><!-- /right-col -->
+  </div><!-- /sb-layout -->
+
+
+  <!-- ════════════════════════════════════════════════════════════
+       SHARED HEADER INIT
+  ════════════════════════════════════════════════════════════ -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.init('mixed-model', 'Outcome', 0, 'regression');
+      }
+    });
+  </script>
+
+
+  <!-- ════════════════════════════════════════════════════════════
+       CORE JAVASCRIPT
+  ════════════════════════════════════════════════════════════ -->
+  <script>
+  'use strict';
+
+  /* ── State ──────────────────────────────────────────────────── */
+  let _depth = 'insight';
+  let _decimals = 'auto';
+  let _results = null;        // full parsed model results
+  let _modelSpec = null;      // {y, fixed, random, subject, covStructure}
+  let _emmData = {};          // cached EMM by factor name
+  let _pwData  = {};          // cached pairwise data
+
+  /* ─────────────────────────────────────────────────────────────
+     UTILITY
+  ───────────────────────────────────────────────────────────── */
+  function fmt(val, dp) {
+    if (val === null || val === undefined || (typeof val === 'number' && isNaN(val))) return '—';
+    const n = typeof val === 'number' ? val : parseFloat(val);
+    if (isNaN(n)) return String(val);
+    const d = (dp !== undefined) ? dp
+            : (_decimals === 'auto' ? null : parseInt(_decimals));
+    if (d === null) {
+      if (Math.abs(n) < 0.0001 && n !== 0) return n.toExponential(3);
+      if (Math.abs(n) < 1)  return n.toFixed(4);
+      return n.toFixed(3);
+    }
+    return n.toFixed(d);
+  }
+
+  function fmtP(p) {
+    if (p === null || p === undefined) return '—';
+    const v = parseFloat(p);
+    if (isNaN(v)) return String(p);
+    if (v < 0.0001) return '< .0001';
+    if (v < 0.001)  return v.toFixed(4);
+    return v.toFixed(3);
+  }
+
+  function pClass(p) {
+    const v = parseFloat(p);
+    if (isNaN(v)) return '';
+    return v < .05 ? 'pval-good' : v < .10 ? 'pval-warning' : 'pval-bad';
+  }
+
+  function sigStars(p) {
+    const v = parseFloat(p);
+    if (isNaN(v)) return '';
+    if (v < .001) return '***';
+    if (v < .01)  return '**';
+    if (v < .05)  return '*';
+    if (v < .10)  return '†';
+    return '';
+  }
+
+  function etaSquaredPartial(F, dfNum, dfDen) {
+    if (!F || !dfNum || !dfDen) return NaN;
+    return (F * dfNum) / (F * dfNum + dfDen);
+  }
+
+  function omegaSquaredPartial(F, dfNum, dfDen) {
+    if (!F || !dfNum || !dfDen) return NaN;
+    return (dfNum * (F - 1)) / (dfNum * (F - 1) + dfDen + 1);
+  }
+
+  /* ── VB6 communication ─────────────────────────────────────── */
+  function sendToHost(cmd, data) {
+    try {
+      if (typeof vbHost !== 'undefined' && vbHost && typeof vbHost.RaiseMessageEvent === 'function') {
+        const s = typeof data === 'string' ? data : JSON.stringify(data || {});
+        vbHost.RaiseMessageEvent(cmd, s);
+      }
+    } catch(e) { console.error('sendToHost error:', e); }
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     MESSAGE FROM VB6
+     VB6 calls window.messageFromVB6(case, payload)
+  ───────────────────────────────────────────────────────────── */
+  window.messageFromVB6 = function(caseId, payload) {
+    console.log('📥 messageFromVB6 case:', caseId);
+    try {
+      const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
+
+      switch (String(caseId)) {
+        // Case 700: Full model results
+        case '700':
+          receiveMixedModelResults(data);
+          break;
+        // Case 701: model spec (before results)
+        case '701':
+          _modelSpec = data;
+          break;
+        // Case 702: EMM for a specific factor
+        case '702':
+          if (data.factor) _emmData[data.factor] = data;
+          renderEMM();
+          break;
+        // Case 703: Pairwise contrasts
+        case '703':
+          if (data.factor) _pwData[data.factor] = data;
+          renderPairwise();
+          break;
+        // Case 704: BLUPs
+        case '704':
+          renderBLUPs(data.blups || []);
+          break;
+        default:
+          console.warn('Unknown case:', caseId);
+      }
+    } catch(e) {
+      console.error('messageFromVB6 error:', e, payload);
+    }
+  };
+
+  /* ─────────────────────────────────────────────────────────────
+     MAIN ENTRY — receive and render full model results
+  ───────────────────────────────────────────────────────────── */
+  function receiveMixedModelResults(d) {
+    _results = d;
+    hideLoading();
+
+    // populate everything
+    renderKPIs(d);
+    renderSampleInfo(d);
+    renderFitInfo(d);
+    renderEstimationInfo(d);
+    renderICTable(d);
+    renderLRT(d);
+    renderPseudoR2(d);
+    renderOverviewFixed(d);
+    renderFE3Table(d);
+    renderFECoefTable(d);
+    renderVCTable(d);
+    renderICC(d);
+    renderConclusionCard(d);
+    renderForestPlot(d);
+    renderVarianceDecomp(d);
+    buildFactorSelectors(d);
+    applyDepth(_depth);
+
+    // Notify VB6 that rendering is complete
+    sendToHost('mixedModelRendered', { status: 'ok' });
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     KPI STRIP
+  ───────────────────────────────────────────────────────────── */
+  function renderKPIs(d) {
+    setText('kpi2LL',  fmt(d.neg2LL   ?? d.deviance));
+    setText('kpiAIC',  fmt(d.AIC));
+    setText('kpiBIC',  fmt(d.BIC));
+    const icc = d.ICC ?? d.icc;
+    setText('kpiICC',  icc !== undefined ? `${(icc * 100).toFixed(1)}%` : '—');
+    const ng = d.nGroups ?? d.numGroups ?? '—';
+    const n  = d.n ?? d.N ?? '—';
+    setText('kpiN', `${n} / ${ng}`);
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     SAMPLE INFO
+  ───────────────────────────────────────────────────────────── */
+  function renderSampleInfo(d) {
+    setText('sN',       d.n ?? d.N ?? '—');
+    setText('sGroups',  d.nGroups ?? d.numGroups ?? '—');
+    const n = parseFloat(d.n ?? d.N);
+    const g = parseFloat(d.nGroups ?? d.numGroups);
+    setText('sOPG', (!isNaN(n) && !isNaN(g) && g > 0) ? fmt(n / g, 1) : '—');
+    const fp = d.fixedPredictors ?? (d.fixedEffects ? d.fixedEffects.length - 1 : '—');
+    setText('sFP', fp);
+    const re = d.randomEffects ?? (d.varianceComponents ? d.varianceComponents.length : '—');
+    setText('sRE', re);
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     FIT / INFORMATION CRITERIA
+  ───────────────────────────────────────────────────────────── */
+  function renderFitInfo(d) {
+    setText('s2LL',  fmt(d.neg2LL   ?? d.deviance));
+    setText('sAIC',  fmt(d.AIC));
+    setText('sAICc', fmt(d.AICc));
+    setText('sBIC',  fmt(d.BIC));
+    setText('sCAIC', fmt(d.CAIC));
+  }
+
+  function renderEstimationInfo(d) {
+    setText('sMethod',    d.method ?? 'REML');
+    setText('sIter',      d.iterations ?? '—');
+    setText('sConv',      d.converged !== undefined ? (d.converged ? 'Yes ✓' : 'No ✗') : '—');
+    setText('sCovStruct', d.covStructure ?? d.covarianceStructure ?? 'VC');
+    setText('sDFMethod',  d.dfMethod ?? 'Satterthwaite');
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     INFORMATION CRITERIA TABLE (Model Fit tab)
+  ───────────────────────────────────────────────────────────── */
+  function renderICTable(d) {
+    const rows = [
+      { name: '−2 Log Likelihood',   val: d.neg2LL ?? d.deviance, desc: 'Deviance; basis for LRT' },
+      { name: 'AIC',                 val: d.AIC,                  desc: 'Akaike: −2LL + 2p' },
+      { name: 'AICc',                val: d.AICc,                 desc: 'AIC corrected for small samples' },
+      { name: 'BIC (SBIC)',          val: d.BIC,                  desc: 'Bayesian: −2LL + p·ln(n)' },
+      { name: 'CAIC',                val: d.CAIC,                 desc: 'Consistent AIC: −2LL + p·(ln(n)+1)' },
+      { name: 'HQIC',                val: d.HQIC,                 desc: 'Hannan-Quinn: −2LL + 2p·ln(ln(n))' },
+    ];
+    const tbody = document.getElementById('fitICtable');
+    if (!tbody) return;
+    tbody.innerHTML = rows.map(r => {
+      const v = r.val !== undefined && r.val !== null ? fmt(r.val) : '—';
+      return `<tr><td>${r.name}</td><td>${v}</td><td style="font-size:.78rem;color:var(--text-muted);">${r.desc}</td></tr>`;
+    }).join('');
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     LIKELIHOOD RATIO TEST
+  ───────────────────────────────────────────────────────────── */
+  function renderLRT(d) {
+    const tbody = document.getElementById('lrtTableBody');
+    if (!tbody) return;
+    if (!d.lrt) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--text-muted);font-style:italic;">LRT data not provided.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = d.lrt.map(r => `
+      <tr>
+        <td>${r.model ?? '—'}</td>
+        <td>${fmt(r.neg2LL)}</td>
+        <td>${r.params ?? '—'}</td>
+        <td>${fmt(r.delta2LL)}</td>
+        <td>${r.deltaDF ?? '—'}</td>
+        <td class="${pClass(r.pval)}">${fmtP(r.pval)} ${sigStars(r.pval)}</td>
+      </tr>`).join('');
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     PSEUDO R²
+  ───────────────────────────────────────────────────────────── */
+  function renderPseudoR2(d) {
+    setText('r2m',    d.r2m !== undefined ? `${(d.r2m * 100).toFixed(2)}%` : '—');
+    setText('r2c',    d.r2c !== undefined ? `${(d.r2c * 100).toFixed(2)}%` : '—');
+    setText('varFixed', fmt(d.varFixed ?? d.sigmaFixed));
+    setText('varResid', fmt(d.varResidual ?? d.sigma2));
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     OVERVIEW — Fixed effects snapshot
+  ───────────────────────────────────────────────────────────── */
+  function renderOverviewFixed(d) {
+    const rows = buildFE3Rows(d);
+    const tbody = document.getElementById('ovFixedBody_rows');
+    if (tbody) tbody.innerHTML = rows;
+    setText('ovFixedFootnote', `a. Dependent Variable: ${d.outcome ?? d.y ?? '—'}`);
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     TYPE III FIXED EFFECTS OMNIBUS
+  ───────────────────────────────────────────────────────────── */
+  function buildFE3Rows(d) {
+    if (!d.typeIII || !d.typeIII.length) {
+      return `<tr><td colspan="7" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">No Type III data available.</td></tr>`;
+    }
+    return d.typeIII.map(r => {
+      const F = parseFloat(r.F ?? r.f ?? r.Fvalue);
+      const dfN = parseFloat(r.numDF ?? r.df1);
+      const dfD = parseFloat(r.denDF ?? r.df2);
+      const eta2  = etaSquaredPartial(F, dfN, dfD);
+      const omega2 = omegaSquaredPartial(F, dfN, dfD);
+      const etaTxt  = !isNaN(eta2)  ? fmt(eta2)  : '—';
+      const omTxt   = !isNaN(omega2)? fmt(omega2) : '—';
+      const pval = r.pval ?? r.p ?? r.sig ?? r.Sig;
+      return `
+        <tr>
+          <td>${r.source ?? r.effect ?? r.Source ?? '—'}</td>
+          <td>${fmt(dfN, 0)}</td>
+          <td>${fmt(dfD, 1)}</td>
+          <td>${fmt(F)}</td>
+          <td class="${pClass(pval)}">${fmtP(pval)} ${sigStars(pval)}</td>
+          <td data-show-from="analyst">${etaTxt}</td>
+          <td data-show-from="analyst">${omTxt}</td>
+        </tr>`;
+    }).join('');
+  }
+
+  function renderFE3Table(d) {
+    const tbody = document.getElementById('fe3Rows');
+    if (tbody) tbody.innerHTML = buildFE3Rows(d);
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     FIXED EFFECT ESTIMATES
+  ───────────────────────────────────────────────────────────── */
+  function renderFECoefTable(d) {
+    const tbody = document.getElementById('feCoefRows');
+    if (!tbody) return;
+    const coefs = d.fixedEffects ?? d.coefficients ?? [];
+    if (!coefs.length) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">No coefficient data available.</td></tr>`;
+      return;
+    }
+
+    let lastGroup = null;
+    let html = '';
+    coefs.forEach(r => {
+      // Group header for categorical levels
+      const group = r.group ?? r.effect ?? null;
+      if (group && group !== lastGroup) {
+        html += `<tr class="mm-section-hdr"><td colspan="9">${group}</td></tr>`;
+        lastGroup = group;
+      }
+      const pval = r.pval ?? r.p ?? r.Sig ?? r.sig;
+      const beta = r.stdBeta ?? r.beta ?? null;
+      html += `
+        <tr>
+          <td class="coef-cell">${r.parameter ?? r.name ?? r.term ?? '—'}</td>
+          <td class="coef-cell">${fmt(r.estimate ?? r.coef)}</td>
+          <td>${fmt(r.se ?? r.stderr)}</td>
+          <td>${fmt(r.df ?? r.DF, 1)}</td>
+          <td>${fmt(r.t ?? r.tval)}</td>
+          <td class="${pClass(pval)}">${fmtP(pval)} ${sigStars(pval)}</td>
+          <td>${fmt(r.ciLow ?? r.lower95 ?? r.CI_L)}</td>
+          <td>${fmt(r.ciHigh ?? r.upper95 ?? r.CI_U)}</td>
+          <td data-show-from="analyst">${beta !== null ? fmt(beta) : '—'}</td>
+        </tr>`;
+    });
+    tbody.innerHTML = html;
+    setText('feCoefFootnote', `a. Dependent Variable: ${d.outcome ?? d.y ?? '—'} | DF method: ${d.dfMethod ?? 'Satterthwaite'}`);
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     VARIANCE COMPONENTS
+  ───────────────────────────────────────────────────────────── */
+  function renderVCTable(d) {
+    const tbody = document.getElementById('vcRows');
+    if (!tbody) return;
+    const vc = d.varianceComponents ?? d.randomEffects ?? [];
+    if (!vc.length) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">No variance component data available.</td></tr>`;
+      return;
+    }
+    const totalVar = vc.reduce((s, r) => s + parseFloat(r.estimate ?? 0), 0);
+    let lastGroup = null;
+    let html = '';
+    vc.forEach(r => {
+      const group = r.group ?? r.effect ?? null;
+      if (group && group !== lastGroup) {
+        html += `<tr class="mm-section-hdr"><td colspan="8">${group}</td></tr>`;
+        lastGroup = group;
+      }
+      const est = parseFloat(r.estimate ?? r.variance);
+      const pct = !isNaN(est) && totalVar > 0 ? ((est / totalVar) * 100).toFixed(1) + '%' : '—';
+      const waldZ = r.waldZ ?? r.z;
+      const pval  = r.pval  ?? r.p ?? r.sig;
+      const badge = !isNaN(est) && totalVar > 0
+        ? (est/totalVar > .30 ? 'vc-large' : est/totalVar > .10 ? 'vc-medium' : 'vc-small')
+        : '';
+      html += `
+        <tr>
+          <td>${r.parameter ?? r.name ?? '—'} ${badge ? `<span class="vc-badge ${badge}">${pct}</span>` : ''}</td>
+          <td class="coef-cell">${fmt(est)}</td>
+          <td>${fmt(r.se ?? r.stderr)}</td>
+          <td>${fmt(waldZ)}</td>
+          <td class="${pClass(pval)}">${fmtP(pval)} ${sigStars(pval)}</td>
+          <td>${fmt(r.ciLow ?? r.lower95)}</td>
+          <td>${fmt(r.ciHigh ?? r.upper95)}</td>
+          <td data-show-from="analyst">${pct}</td>
+        </tr>`;
+    });
+    tbody.innerHTML = html;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     ICC
+  ───────────────────────────────────────────────────────────── */
+  function renderICC(d) {
+    const icc = d.ICC ?? d.icc;
+    const container = document.getElementById('iccTableContainer');
+    if (!container) return;
+
+    if (icc === undefined || icc === null) {
+      container.innerHTML = `<div style="color:var(--text-muted);font-style:italic;padding:10px;">ICC not available in model output.</div>`;
+      return;
+    }
+    const iccVal = parseFloat(icc);
+    const pct = (iccVal * 100).toFixed(2) + '%';
+    let msg;
+    if (iccVal < .05)  msg = { cls:'pval-bad', text:'Negligible clustering — a standard OLS model may be adequate.' };
+    else if (iccVal < .10) msg = { cls:'pval-warning', text:'Modest clustering — multilevel model advisable.' };
+    else if (iccVal < .30) msg = { cls:'pval-good', text:'Moderate clustering — multilevel model is justified.' };
+    else msg = { cls:'pval-good', text:'Substantial clustering — multilevel model is strongly recommended.' };
+
+    container.innerHTML = `
+      <table class="mm-table" style="margin-bottom:12px;">
+        <thead><tr>
+          <th>Grouping Variable</th><th>ICC</th><th>% Between-Group Variance</th><th>Interpretation</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td>${d.subjectVar ?? d.groupVar ?? d.subject ?? '—'}</td>
+            <td class="${msg.cls}">${fmt(iccVal, 4)}</td>
+            <td>${pct}</td>
+            <td class="${msg.cls}" style="font-size:.78rem;">${msg.text}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px;">
+        <span style="font-size:.78rem;color:var(--text-secondary);white-space:nowrap;">Between-group variance:</span>
+        <div class="icc-bar-track"><div class="icc-bar-fill" style="width:${Math.min(100,iccVal*100).toFixed(1)}%;"></div></div>
+        <span style="font-size:.78rem;font-weight:700;color:var(--accent-3);">${pct}</span>
+      </div>`;
+
+    // update interpretive text
+    setText('iccInterpret', msg.text);
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     CONCLUSION CARD
+  ───────────────────────────────────────────────────────────── */
+  function renderConclusionCard(d) {
+    const card = document.getElementById('conclusionCard');
+    if (!card) return;
+
+    // Best-fitting p-value: use overall model LRT or smallest fixed effect p
+    const smallestP = (d.typeIII || []).reduce((mn, r) => {
+      const p = parseFloat(r.pval ?? r.p ?? 1);
+      return p < mn ? p : mn;
+    }, 1);
+
+    const hasSig = smallestP < .05;
+    const icc = parseFloat(d.ICC ?? d.icc ?? 0);
+    const method = d.method ?? 'REML';
+
+    setText('conclusionVerdict',
+      hasSig ? `Significant fixed effects detected (p = ${fmtP(smallestP)})`
+             : `No significant fixed effects detected (smallest p = ${fmtP(smallestP)})`);
+
+    setText('conclusionDetail',
+      `Model fitted via ${method}. ICC = ${(icc*100).toFixed(1)}% of variance attributable to group-level clustering. ` +
+      `AIC = ${fmt(d.AIC)}, BIC = ${fmt(d.BIC)}, based on n = ${d.n ?? '—'} observations in ${d.nGroups ?? '—'} groups.`);
+
+    const tags = [];
+    if (hasSig)      tags.push({ cls:'microtag-sig',    icon:'✓', label:'Significant' });
+    else             tags.push({ cls:'microtag-ns',     icon:'✗', label:'Non-significant' });
+    if (icc >= .30)  tags.push({ cls:'microtag-strong', icon:'📊', label:`ICC ${(icc*100).toFixed(0)}% — Strong Clustering` });
+    else if (icc >= .10) tags.push({ cls:'microtag-mod', icon:'📊', label:`ICC ${(icc*100).toFixed(0)}% — Moderate Clustering` });
+    else             tags.push({ cls:'microtag-weak',   icon:'📊', label:`ICC ${(icc*100).toFixed(0)}% — Weak Clustering` });
+    if (d.converged === false) tags.push({ cls:'microtag-ns', icon:'⚠', label:'Did Not Converge' });
+
+    const tagsEl = document.getElementById('conclusionTags');
+    if (tagsEl) {
+      tagsEl.innerHTML = tags.map(t =>
+        `<span class="microtag ${t.cls}">${t.icon} ${t.label}</span>`).join('');
+    }
+    card.classList.add('visible');
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     FOREST PLOT (Highcharts)
+  ───────────────────────────────────────────────────────────── */
+  function renderForestPlot(d) {
+    const el = document.getElementById('feForestChart');
+    if (!el || typeof Highcharts === 'undefined') return;
+    const coefs = (d.fixedEffects ?? d.coefficients ?? []).filter(r => r.parameter !== 'Intercept');
+    if (!coefs.length) return;
+
+    const cats = coefs.map(r => r.parameter ?? r.name ?? '—');
+    const points = coefs.map((r, i) => ({
+      x: i,
+      y: parseFloat(r.estimate ?? r.coef ?? 0),
+      low: parseFloat(r.ciLow ?? r.lower95 ?? 0),
+      high: parseFloat(r.ciHigh ?? r.upper95 ?? 0),
+      color: parseFloat(r.pval ?? r.p ?? 1) < .05 ? '#4ade80' : '#a78bfa'
+    }));
+
+    Highcharts.chart(el, {
+      chart: { type:'scatter', backgroundColor:'transparent', height:320 },
+      title: { text:'' },
+      xAxis: { categories: cats, labels:{ style:{color:'rgba(255,255,255,.7)',fontSize:'11px'} } },
+      yAxis: {
+        title:{ text:'Estimate', style:{color:'rgba(255,255,255,.6)'} },
+        plotLines:[{value:0,color:'rgba(255,255,255,.3)',width:1,dashStyle:'Dash'}],
+        labels:{ style:{color:'rgba(255,255,255,.6)'} },
+        gridLineColor:'rgba(255,255,255,.07)'
+      },
+      series: [
+        {
+          name:'95% CI',
+          type:'errorbar',
+          data: points.map(p => [p.x, p.low, p.high]),
+          color:'rgba(167,139,250,.6)',
+          stemColor:'rgba(167,139,250,.4)',
+          whiskerColor:'rgba(167,139,250,.8)',
+          whiskerLength:'60%',
+          stemWidth:1.5
+        },
+        {
+          name:'Estimate',
+          type:'scatter',
+          data: points.map(p => ({ x:p.x, y:p.y, color:p.color })),
+          marker:{ radius:6, symbol:'circle' },
+          dataLabels:{ enabled:false }
+        }
+      ],
+      legend:{ itemStyle:{color:'rgba(255,255,255,.7)'} },
+      tooltip: {
+        formatter() {
+          const idx = this.x ?? this.point.x;
+          const r = coefs[idx];
+          if (!r) return '';
+          return `<b>${r.parameter ?? r.name}</b><br/>Estimate: ${fmt(r.estimate ?? r.coef)}<br/>95% CI: [${fmt(r.ciLow ?? r.lower95)}, ${fmt(r.ciHigh ?? r.upper95)}]<br/>p = ${fmtP(r.pval ?? r.p)}`;
+        }
+      },
+      exporting:{ enabled:false },
+      credits:{ enabled:false }
+    });
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     VARIANCE DECOMPOSITION DONUT
+  ───────────────────────────────────────────────────────────── */
+  function renderVarianceDecomp(d) {
+    const el = document.getElementById('varianceDecompChart');
+    if (!el || typeof Highcharts === 'undefined') return;
+    const vc = d.varianceComponents ?? d.randomEffects ?? [];
+    if (!vc.length) return;
+
+    const slices = vc.map((r, i) => ({
+      name: r.parameter ?? r.name ?? `VC${i+1}`,
+      y: Math.abs(parseFloat(r.estimate ?? r.variance ?? 0))
+    }));
+    const colors = ['#a78bfa','#7c3aed','#4ade80','#fbbf24','#fb7185','#38bdf8'];
+
+    Highcharts.chart(el, {
+      chart:{ type:'pie', backgroundColor:'transparent', height:260 },
+      title:{ text:'' },
+      series:[{
+        name:'Variance',
+        data: slices.map((s,i) => ({ ...s, color: colors[i % colors.length] })),
+        innerSize:'55%',
+        dataLabels:{ color:'rgba(255,255,255,.8)', style:{fontSize:'11px'} }
+      }],
+      legend:{ enabled:true, itemStyle:{color:'rgba(255,255,255,.7)'} },
+      tooltip:{ pointFormat:'<b>{series.name}</b>: {point.y:.4f} ({point.percentage:.1f}%)' },
+      exporting:{ enabled:false },
+      credits:{ enabled:false }
+    });
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     BLUPs TABLE
+  ───────────────────────────────────────────────────────────── */
+  function renderBLUPs(blups) {
+    const tbody = document.getElementById('blupRows');
+    if (!tbody) return;
+    if (!blups.length) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:16px;font-style:italic;color:var(--text-muted);">No BLUPs available.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = blups.map(r => `
+      <tr>
+        <td>${r.group ?? r.label ?? '—'}</td>
+        <td class="coef-cell">${fmt(r.blup ?? r.estimate)}</td>
+        <td>${fmt(r.se ?? r.stderr)}</td>
+        <td>${fmt(r.ciLow ?? r.lower)}</td>
+        <td>${fmt(r.ciHigh ?? r.upper)}</td>
+      </tr>`).join('');
+    renderCaterpillarPlot(blups);
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     CATERPILLAR PLOT
+  ───────────────────────────────────────────────────────────── */
+  function renderCaterpillarPlot(blups) {
+    const el = document.getElementById('caterpillarChart');
+    if (!el || typeof Highcharts === 'undefined') return;
+
+    const sorted = [...blups].sort((a,b) => parseFloat(a.blup ?? a.estimate) - parseFloat(b.blup ?? b.estimate));
+    const cats = sorted.map(r => String(r.group ?? r.label ?? '—'));
+    const vals = sorted.map(r => parseFloat(r.blup ?? r.estimate ?? 0));
+    const errLow  = sorted.map(r => parseFloat(r.blup ?? r.estimate ?? 0) - parseFloat(r.ciLow  ?? r.lower ?? 0));
+    const errHigh = sorted.map(r => parseFloat(r.ciHigh ?? r.upper ?? 0)  - parseFloat(r.blup ?? r.estimate ?? 0));
+    const colors  = sorted.map(r => parseFloat(r.blup ?? r.estimate ?? 0) >= 0 ? '#4ade80' : '#fb7185');
+
+    Highcharts.chart(el, {
+      chart:{ type:'scatter', backgroundColor:'transparent', height:320 },
+      title:{ text:'' },
+      xAxis:{ categories:cats, labels:{ style:{color:'rgba(255,255,255,.7)',fontSize:'10px'} } },
+      yAxis:{
+        title:{ text:'BLUP (u_j)', style:{color:'rgba(255,255,255,.6)'} },
+        plotLines:[{value:0,color:'rgba(255,255,255,.3)',width:1,dashStyle:'Dash'}],
+        labels:{ style:{color:'rgba(255,255,255,.6)'} },
+        gridLineColor:'rgba(255,255,255,.07)'
+      },
+      series:[
+        {
+          name:'95% CI',
+          type:'errorbar',
+          data: vals.map((v,i) => [i, v - errLow[i], v + errHigh[i]]),
+          color:'rgba(167,139,250,.5)',
+          stemWidth:1, whiskerLength:'50%'
+        },
+        {
+          name:'BLUP',
+          type:'scatter',
+          data: vals.map((v,i) => ({ x:i, y:v, color:colors[i] })),
+          marker:{ radius:5, symbol:'circle' }
+        }
+      ],
+      legend:{ itemStyle:{color:'rgba(255,255,255,.7)'} },
+      tooltip:{ formatter() { return `<b>Group: ${cats[this.x ?? this.point.x]}</b><br/>BLUP: ${fmt(this.y)}`; } },
+      exporting:{ enabled:false },
+      credits:{ enabled:false }
+    });
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     COVARIANCE MATRICES
+  ───────────────────────────────────────────────────────────── */
+  function renderCovMatrix(matrix, labels, containerId) {
+    const wrap = document.getElementById(containerId);
+    if (!wrap || !matrix || !matrix.length) return;
+
+    const n = matrix.length;
+    let html = `<table class="mm-table"><thead><tr><th></th>${labels.map(l => `<th>${l}</th>`).join('')}</tr></thead><tbody>`;
+    matrix.forEach((row, i) => {
+      html += `<tr><td>${labels[i]}</td>`;
+      row.forEach((val, j) => {
+        const v = parseFloat(val);
+        const cls = i === j ? 'coef-cell' : '';
+        html += `<td class="${cls}">${fmt(v)}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  }
+
+  function updateCovStructure() {
+    const val = document.getElementById('covStructSelect')?.value;
+    if (_results && _results.covMatrices) {
+      const m = _results.covMatrices[val] ?? _results.covMatrices['vc'];
+      if (m) renderCovMatrix(m.matrix, m.labels, 'covMatrixWrap');
+    }
+  }
+
+  function refitWithCovStructure() {
+    const val = document.getElementById('covStructSelect')?.value;
+    showLoading(`Refitting with ${val.toUpperCase()} covariance structure…`);
+    sendToHost('refitCovStructure', { covStructure: val });
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     EMM
+  ───────────────────────────────────────────────────────────── */
+  function buildFactorSelectors(d) {
+    const factors = d.factors ?? d.categoricalVars ?? [];
+    ['emmFactorSelect','pwFactorSelect'].forEach(id => {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      sel.innerHTML = '<option value="">— Select factor —</option>' +
+        factors.map(f => `<option value="${f}">${f}</option>`).join('');
+    });
+  }
+
+  function renderEMM() {
+    const factor = document.getElementById('emmFactorSelect')?.value;
+    const tbody = document.getElementById('emmRows');
+    if (!tbody) return;
+
+    if (!factor) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Select a factor above…</td></tr>`;
+      return;
+    }
+
+    // Request from VB6 if not cached
+    if (!_emmData[factor]) {
+      sendToHost('requestEMM', { factor });
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Computing…</td></tr>`;
+      return;
+    }
+
+    const emm = _emmData[factor];
+    tbody.innerHTML = (emm.levels ?? []).map(r => `
+      <tr>
+        <td>${r.level ?? r.label ?? '—'}</td>
+        <td class="coef-cell">${fmt(r.mean ?? r.emmean)}</td>
+        <td>${fmt(r.se ?? r.stderr)}</td>
+        <td>${fmt(r.df, 1)}</td>
+        <td>${fmt(r.ciLow ?? r.lower)}</td>
+        <td>${fmt(r.ciHigh ?? r.upper)}</td>
+      </tr>`).join('');
+
+    renderEMMChart(emm);
+  }
+
+  function renderEMMChart(emm) {
+    const el = document.getElementById('emmChart');
+    if (!el || typeof Highcharts === 'undefined') return;
+    const levels = emm.levels ?? [];
+    if (!levels.length) return;
+
+    const cats = levels.map(r => String(r.level ?? r.label));
+    const means = levels.map(r => parseFloat(r.mean ?? r.emmean ?? 0));
+    const lows  = levels.map(r => parseFloat(r.ciLow ?? r.lower ?? 0));
+    const highs = levels.map(r => parseFloat(r.ciHigh ?? r.upper ?? 0));
+
+    Highcharts.chart(el, {
+      chart:{ type:'column', backgroundColor:'transparent', height:300 },
+      title:{ text:'' },
+      xAxis:{ categories:cats, labels:{ style:{color:'rgba(255,255,255,.75)'} } },
+      yAxis:{
+        title:{ text:'Estimated Marginal Mean', style:{color:'rgba(255,255,255,.6)'} },
+        labels:{ style:{color:'rgba(255,255,255,.6)'} },
+        gridLineColor:'rgba(255,255,255,.07)'
+      },
+      series:[
+        {
+          name:'95% CI',
+          type:'errorbar',
+          data: means.map((m,i) => [i, lows[i], highs[i]]),
+          color:'rgba(167,139,250,.8)',
+          stemWidth:2, whiskerLength:'60%'
+        },
+        {
+          name:'EMM',
+          type:'column',
+          data: means,
+          color:'rgba(167,139,250,.6)',
+          borderRadius:4
+        }
+      ],
+      legend:{ itemStyle:{color:'rgba(255,255,255,.7)'} },
+      tooltip:{ formatter() {
+        const i = this.point.x ?? this.x;
+        return `<b>${cats[i]}</b><br/>EMM: ${fmt(means[i])}<br/>95% CI: [${fmt(lows[i])}, ${fmt(highs[i])}]`;
+      }},
+      exporting:{ enabled:false },
+      credits:{ enabled:false }
+    });
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     PAIRWISE CONTRASTS
+  ───────────────────────────────────────────────────────────── */
+  function renderPairwise() {
+    const factor = document.getElementById('pwFactorSelect')?.value;
+    const adj    = document.getElementById('pwAdjSelect')?.value ?? 'bonferroni';
+    const tbody  = document.getElementById('pwRows');
+    if (!tbody) return;
+
+    if (!factor) {
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Select a factor above…</td></tr>`;
+      renderPWSigMatrix(null, null);
+      return;
+    }
+
+    if (!_pwData[factor]) {
+      sendToHost('requestPairwise', { factor, adjustment: adj });
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Computing…</td></tr>`;
+      return;
+    }
+
+    const pw = _pwData[factor];
+    const comparisons = pw.comparisons ?? [];
+
+    // Apply multiple comparisons adjustment client-side if VB6 didn't
+    const pVals = comparisons.map(r => parseFloat(r.pval ?? r.p ?? 1));
+    const adjPVals = applyPAdjust(pVals, adj);
+
+    tbody.innerHTML = comparisons.map((r, i) => {
+      const d = fmt(r.cohensD ?? r.d ?? r.effectSize);
+      return `
+        <tr>
+          <td>${r.levelI ?? r.groupI ?? '—'}</td>
+          <td>${r.levelJ ?? r.groupJ ?? '—'}</td>
+          <td class="coef-cell">${fmt(r.meanDiff ?? r.diff)}</td>
+          <td>${fmt(r.se ?? r.stderr)}</td>
+          <td>${fmt(r.df, 1)}</td>
+          <td>${fmt(r.t ?? r.tval)}</td>
+          <td class="${pClass(r.pval ?? r.p)}">${fmtP(r.pval ?? r.p)} ${sigStars(r.pval ?? r.p)}</td>
+          <td class="${pClass(adjPVals[i])}">${fmtP(adjPVals[i])} ${sigStars(adjPVals[i])}</td>
+          <td>${fmt(r.ciLow ?? r.lower)}</td>
+          <td>${fmt(r.ciHigh ?? r.upper)}</td>
+          <td data-show-from="analyst">${d}</td>
+        </tr>`;
+    }).join('');
+
+    // Build significance matrix
+    const levels = [...new Set(comparisons.flatMap(r => [r.levelI ?? r.groupI, r.levelJ ?? r.groupJ]))];
+    renderPWSigMatrix(levels, comparisons, adjPVals);
+  }
+
+  function applyPAdjust(pVals, method) {
+    if (!pVals.length) return [];
+    const m = pVals.length;
+    switch (method) {
+      case 'bonferroni': return pVals.map(p => Math.min(1, p * m));
+      case 'sidak':      return pVals.map(p => Math.min(1, 1 - Math.pow(1 - p, m)));
+      case 'fdr': {
+        const idx = [...Array(m).keys()].sort((a,b) => pVals[a] - pVals[b]);
+        const adj = new Array(m);
+        for (let k = 0; k < m; k++) {
+          adj[idx[k]] = Math.min(1, pVals[idx[k]] * m / (k + 1));
+        }
+        // ensure monotonicity
+        for (let k = m - 2; k >= 0; k--) adj[idx[k]] = Math.min(adj[idx[k]], adj[idx[k+1]]);
+        return adj;
+      }
+      default: return pVals; // none / LSD / Tukey (Tukey requires special tables)
+    }
+  }
+
+  function renderPWSigMatrix(levels, comparisons, adjP) {
+    const el = document.getElementById('pwSigMatrix');
+    if (!el) return;
+    if (!levels || !levels.length) {
+      el.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-muted);font-style:italic;">Select a factor above…</div>`;
+      return;
+    }
+
+    const n = levels.length;
+    const pLookup = {};
+    if (comparisons && adjP) {
+      comparisons.forEach((r, i) => {
+        const key1 = `${r.levelI}__${r.levelJ}`;
+        const key2 = `${r.levelJ}__${r.levelI}`;
+        pLookup[key1] = adjP[i];
+        pLookup[key2] = adjP[i];
+      });
+    }
+
+    let html = `<table class="mm-table" style="font-size:.78rem;">
+      <thead><tr><th></th>${levels.map(l => `<th>${l}</th>`).join('')}</tr></thead><tbody>`;
+    levels.forEach((li, i) => {
+      html += `<tr><td style="font-weight:700;">${li}</td>`;
+      levels.forEach((lj, j) => {
+        if (i === j) {
+          html += `<td style="background:rgba(167,139,250,.08);text-align:center;">—</td>`;
+        } else if (j < i) {
+          const p = pLookup[`${li}__${lj}`];
+          const cls  = pClass(p);
+          const star = p !== undefined ? sigStars(p) : '';
+          html += `<td class="${cls}" style="text-align:center;">${p !== undefined ? fmtP(p) : '—'} ${star}</td>`;
+        } else {
+          html += `<td style="text-align:center;color:var(--text-muted);">•</td>`;
+        }
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     RESIDUALS TAB
+  ───────────────────────────────────────────────────────────── */
+  function loadResidualsTab() {
+    const panel = document.getElementById('residualsPanel');
+    if (!panel || !_results) return;
+
+    const res = _results.residuals ?? {};
+    const sigma2 = _results.sigma2 ?? _results.varResidual ?? NaN;
+
+    panel.innerHTML = `
+      <div class="mm-section" style="margin-bottom:14px;">
+        <div class="mm-section-header"><span><i class="fa-solid fa-circle-check"></i> Residual Summary</span></div>
+        <div class="mm-section-body padded">
+          <div class="stats-row">
+            <div class="stat-panel" style="min-width:unset;flex:1;">
+              <div class="stat-panel-heading">Residual Statistics</div>
+              <div class="stat-panel-body">
+                <div class="stat-field"><span class="stat-label">σ² (Residual):</span>    <span class="stat-value">${fmt(sigma2)}</span></div>
+                <div class="stat-field"><span class="stat-label">σ (Std. Dev):</span>     <span class="stat-value">${fmt(Math.sqrt(sigma2))}</span></div>
+                <div class="stat-field"><span class="stat-label">Min Residual:</span>      <span class="stat-value">${fmt(res.min)}</span></div>
+                <div class="stat-field"><span class="stat-label">Max Residual:</span>      <span class="stat-value">${fmt(res.max)}</span></div>
+                <div class="stat-field"><span class="stat-label">Mean Residual:</span>     <span class="stat-value">${fmt(res.mean)}</span></div>
+              </div>
+            </div>
+            <div class="stat-panel" style="min-width:unset;flex:1;">
+              <div class="stat-panel-heading">Normality Tests</div>
+              <div class="stat-panel-body">
+                <div class="stat-field"><span class="stat-label">Shapiro-Wilk W:</span>   <span class="stat-value">${fmt(res.swW)}</span></div>
+                <div class="stat-field"><span class="stat-label">S-W p-value:</span>      <span class="stat-value ${pClass(res.swP)}">${fmtP(res.swP)}</span></div>
+                <div class="stat-field"><span class="stat-label">Skewness:</span>          <span class="stat-value">${fmt(res.skewness)}</span></div>
+                <div class="stat-field"><span class="stat-label">Kurtosis:</span>          <span class="stat-value">${fmt(res.kurtosis)}</span></div>
+              </div>
+            </div>
+            <div class="stat-panel" style="min-width:unset;flex:1;">
+              <div class="stat-panel-heading">Homoscedasticity</div>
+              <div class="stat-panel-body">
+                <div class="stat-field"><span class="stat-label">Bartlett χ²:</span>      <span class="stat-value">${fmt(res.bartlettChi)}</span></div>
+                <div class="stat-field"><span class="stat-label">Bartlett p:</span>        <span class="stat-value ${pClass(res.bartlettP)}">${fmtP(res.bartlettP)}</span></div>
+                <div class="stat-field"><span class="stat-label">Levene F:</span>          <span class="stat-value">${fmt(res.leveneF)}</span></div>
+                <div class="stat-field"><span class="stat-label">Levene p:</span>          <span class="stat-value ${pClass(res.leveneP)}">${fmtP(res.leveneP)}</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Plot grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div class="mm-section">
+          <div class="mm-section-header"><span><i class="fa-solid fa-chart-scatter"></i> Residuals vs Fitted</span></div>
+          <div class="mm-section-body padded"><div id="resVsFittedChart" style="height:240px;"></div></div>
+        </div>
+        <div class="mm-section">
+          <div class="mm-section-header"><span><i class="fa-solid fa-chart-line"></i> Normal Q-Q Plot</span></div>
+          <div class="mm-section-body padded"><div id="qqChart" style="height:240px;"></div></div>
+        </div>
+        <div class="mm-section">
+          <div class="mm-section-header"><span><i class="fa-solid fa-chart-bar"></i> Residual Histogram</span></div>
+          <div class="mm-section-body padded"><div id="resHistChart" style="height:240px;"></div></div>
+        </div>
+        <div class="mm-section">
+          <div class="mm-section-header"><span><i class="fa-solid fa-chart-scatter"></i> Scale-Location</span></div>
+          <div class="mm-section-body padded"><div id="scaleLocChart" style="height:240px;"></div></div>
+        </div>
+      </div>
+    `;
+
+    setTimeout(() => {
+      if (typeof Highcharts !== 'undefined' && _results.residuals?.fitted) {
+        renderResidualCharts(_results.residuals);
+      }
+    }, 80);
+  }
+
+  function renderResidualCharts(res) {
+    const fitted   = res.fitted   ?? [];
+    const residuals = res.values   ?? [];
+    const stdRes   = res.stdValues ?? residuals.map(r => r / (res.sigma ?? 1));
+
+    const commonCfg = (id, title, xTitle, yTitle, series) => {
+      Highcharts.chart(id, {
+        chart:{ backgroundColor:'transparent', height:240, animation:false },
+        title:{ text:title, style:{color:'rgba(255,255,255,.7)',fontSize:'11px'} },
+        xAxis:{ title:{text:xTitle,style:{color:'rgba(255,255,255,.5)',fontSize:'10px'}}, labels:{style:{color:'rgba(255,255,255,.55)',fontSize:'10px'}}, gridLineColor:'rgba(255,255,255,.06)' },
+        yAxis:{ title:{text:yTitle,style:{color:'rgba(255,255,255,.5)',fontSize:'10px'}}, labels:{style:{color:'rgba(255,255,255,.55)',fontSize:'10px'}}, gridLineColor:'rgba(255,255,255,.06)', plotLines:[{value:0,color:'rgba(255,255,255,.3)',width:1,dashStyle:'Dash'}] },
+        legend:{ enabled:false },
+        exporting:{ enabled:false },
+        credits:{ enabled:false },
+        plotOptions:{ scatter:{ marker:{radius:3,fillColor:'rgba(167,139,250,.7)'} } },
+        series
+      });
+    };
+
+    // Residuals vs Fitted
+    commonCfg('resVsFittedChart','Residuals vs Fitted','Fitted Values','Residuals',[{
+      type:'scatter',
+      data: fitted.map((f,i) => [f, residuals[i]])
+    }]);
+
+    // Q-Q
+    const sorted = [...residuals].sort((a,b)=>a-b);
+    const n = sorted.length;
+    const theoretical = sorted.map((_,i) => {
+      const p = (i + 0.5) / n;
+      try { return jStat.normal.inv(p, 0, 1); } catch(e) { return 0; }
+    });
+    commonCfg('qqChart','Normal Q-Q','Theoretical Quantiles','Sample Quantiles',[
+      { type:'scatter', data: theoretical.map((t,i) => [t, sorted[i]]) },
+      { type:'line', data:[[theoretical[0], theoretical[0] * (sorted[n-1]-sorted[0])/(theoretical[n-1]-theoretical[0]) + sorted[0]], [theoretical[n-1], sorted[n-1]]], color:'rgba(255,165,120,.6)', dashStyle:'Dash', enableMouseTracking:false }
+    ]);
+
+    // Histogram
+    const bins = 20;
+    const min = Math.min(...residuals), max = Math.max(...residuals);
+    const bw  = (max - min) / bins;
+    const counts = new Array(bins).fill(0);
+    residuals.forEach(r => { const bi = Math.min(bins-1, Math.floor((r-min)/bw)); counts[bi]++; });
+    Highcharts.chart('resHistChart', {
+      chart:{ type:'column', backgroundColor:'transparent', height:240, animation:false },
+      title:{ text:'Residual Distribution', style:{color:'rgba(255,255,255,.7)',fontSize:'11px'} },
+      xAxis:{ categories: counts.map((_,i) => fmt(min + i*bw + bw/2, 2)), tickInterval:4, labels:{style:{color:'rgba(255,255,255,.55)',fontSize:'10px'}} },
+      yAxis:{ title:{text:'Frequency',style:{color:'rgba(255,255,255,.5)',fontSize:'10px'}}, labels:{style:{color:'rgba(255,255,255,.55)',fontSize:'10px'}}, gridLineColor:'rgba(255,255,255,.06)' },
+      series:[{ name:'Count', data:counts, color:'rgba(167,139,250,.65)', pointPadding:0, groupPadding:0, borderRadius:2 }],
+      legend:{ enabled:false }, exporting:{ enabled:false }, credits:{ enabled:false }
+    });
+
+    // Scale-Location
+    commonCfg('scaleLocChart','Scale-Location','Fitted Values','√|Standardised Residuals|',[{
+      type:'scatter',
+      data: fitted.map((f,i) => [f, Math.sqrt(Math.abs(stdRes[i]))])
+    }]);
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     INFLUENTIAL CASES TAB
+  ───────────────────────────────────────────────────────────── */
+  function loadInfluentialTab() {
+    const panel = document.getElementById('influentialPanel');
+    if (!panel || !_results) return;
+
+    const cases = _results.influentialCases ?? [];
+    if (!cases.length) {
+      panel.innerHTML = `<div class="awaiting-state"><i class="fa-solid fa-check-circle" style="color:var(--success);"></i><p>No influential cases detected based on default thresholds.</p></div>`;
+      return;
+    }
+
+    panel.innerHTML = `
+      <div class="mm-section">
+        <div class="mm-section-header"><span><i class="fa-solid fa-triangle-exclamation"></i> Influential Observations (${cases.length} flagged)</span></div>
+        <div class="mm-section-body">
+          <div class="mm-table-wrap">
+            <table class="mm-table">
+              <thead><tr>
+                <th>Obs #</th><th>Std. Residual</th><th>Leverage (h<sub>ii</sub>)</th>
+                <th>Cook's D</th><th>DFFITS</th><th>Flag</th>
+              </tr></thead>
+              <tbody>
+                ${cases.map(r => `
+                  <tr>
+                    <td>${r.obs ?? r.id ?? '—'}</td>
+                    <td class="${Math.abs(parseFloat(r.stdRes ?? 0)) > 3 ? 'pval-bad' : ''}">${fmt(r.stdRes)}</td>
+                    <td class="${parseFloat(r.leverage ?? 0) > 0.5 ? 'pval-warning' : ''}">${fmt(r.leverage)}</td>
+                    <td class="${parseFloat(r.cooksD ?? 0) > 1 ? 'pval-bad' : parseFloat(r.cooksD ?? 0) > 0.5 ? 'pval-warning' : ''}">${fmt(r.cooksD)}</td>
+                    <td>${fmt(r.dffits)}</td>
+                    <td>${(r.flags ?? []).join(', ') || '—'}</td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+          <p class="table-footnote" style="margin:6px 12px 10px;">Flagged when: |Std. Residual| > 3, Leverage > 0.5, Cook's D > 1, or |DFFITS| > 2√(p/n).</p>
+        </div>
+      </div>`;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     DEPTH (Insight / Analyst)
+  ───────────────────────────────────────────────────────────── */
+  const DEPTH_RANK = { insight:0, analyst:1 };
+
+  window.setDepth = function(depth) {
+    _depth = depth;
+    document.querySelectorAll('.depth-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.depth === depth));
+    applyDepth(depth);
+  };
+
+  function applyDepth(depth) {
+    const rank = DEPTH_RANK[depth] ?? 0;
+    document.querySelectorAll('[data-show-from]').forEach(el => {
+      const req = DEPTH_RANK[el.dataset.showFrom] ?? 0;
+      el.classList.toggle('depth-hidden', rank < req);
+    });
+    document.querySelectorAll('[data-col-depth]').forEach(el => {
+      const req = DEPTH_RANK[el.dataset.colDepth] ?? 0;
+      el.classList.toggle('depth-hidden', rank < req);
+    });
+    const card = document.getElementById('conclusionCard');
+    if (card) card.classList.toggle('visible', depth === 'insight');
+  }
+
+  // Inject depth-hidden style once
+  const _dhs = document.createElement('style');
+  _dhs.textContent = '.depth-hidden { display:none !important; }';
+  document.head.appendChild(_dhs);
+
+  /* ─────────────────────────────────────────────────────────────
+     TAB SWITCHING
+  ───────────────────────────────────────────────────────────── */
+  const TAB_TITLES = {
+    'overview':       'Overview',
+    'model-fit':      'Model Fit',
+    'fixed-effects':  'Fixed Effects',
+    'random-effects': 'Random Effects',
+    'covariance':     'Covariance Structure',
+    'emm':            'Estimated Marginal Means',
+    'pairwise':       'Pairwise Contrasts',
+    'residuals':      'Residual Diagnostics',
+    'influential':    'Influential Cases',
+  };
+
+  window.switchTab = function(name) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    const tab = document.getElementById(`tab-${name}`);
+    if (tab) tab.classList.add('active');
+
+    document.querySelectorAll('.sb-item[data-tab]').forEach(b =>
+      b.classList.toggle('active', b.dataset.tab === name));
+
+    if (typeof StatisticoHeader !== 'undefined' && TAB_TITLES[name]) {
+      StatisticoHeader.updateTitle(TAB_TITLES[name]);
+    }
+
+    // Hide depth selector except on overview
+    const depthSel = document.getElementById('depthSel');
+    const heroSec  = document.querySelector('.hero-section');
+    const showDepth = (name === 'overview');
+    if (depthSel) depthSel.style.display = showDepth ? '' : 'none';
+    if (heroSec)  heroSec.style.display  = showDepth ? '' : 'none';
+
+    // Lazy-load heavy tabs
+    if (name === 'residuals'   && !window._residualsLoaded) { loadResidualsTab(); window._residualsLoaded = true; }
+    if (name === 'influential' && !window._influentialLoaded) { loadInfluentialTab(); window._influentialLoaded = true; }
+    if (name === 'covariance'  && _results) { updateCovStructure(); renderCovCompChart(); }
+
+    const cardBody = document.querySelector('.card-body');
+    if (cardBody) cardBody.scrollTop = 0;
+  };
+
+  /* ─────────────────────────────────────────────────────────────
+     COVARIANCE COMPARISON CHART
+  ───────────────────────────────────────────────────────────── */
+  function renderCovCompChart() {
+    const el = document.getElementById('covCompChart');
+    if (!el || !_results?.covComparison || typeof Highcharts === 'undefined') return;
+    const comp = _results.covComparison;
+    const structs = Object.keys(comp);
+    const aics    = structs.map(s => parseFloat(comp[s].AIC ?? Infinity));
+
+    Highcharts.chart(el, {
+      chart:{ type:'bar', backgroundColor:'transparent', height:260 },
+      title:{ text:'' },
+      xAxis:{ categories:structs, labels:{style:{color:'rgba(255,255,255,.7)'}} },
+      yAxis:{ title:{text:'AIC',style:{color:'rgba(255,255,255,.6)'}}, labels:{style:{color:'rgba(255,255,255,.6)'}}, gridLineColor:'rgba(255,255,255,.07)' },
+      series:[{
+        name:'AIC',
+        data: aics.map((v,i) => ({ y:v, color: i === aics.indexOf(Math.min(...aics)) ? '#4ade80' : 'rgba(167,139,250,.6)' }))
+      }],
+      legend:{ enabled:false },
+      tooltip:{ pointFormat:'AIC: <b>{point.y:.2f}</b>' },
+      exporting:{ enabled:false }, credits:{ enabled:false }
+    });
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     AI INTERPRET
+  ───────────────────────────────────────────────────────────── */
+  window.requestMixedModelAI = function() {
+    if (!_results) return;
+    sendToHost('requestMixedModelAI', {
+      aic: _results.AIC,
+      bic: _results.BIC,
+      neg2LL: _results.neg2LL,
+      icc: _results.ICC ?? _results.icc,
+      typeIII: _results.typeIII,
+      fixedEffects: _results.fixedEffects,
+      varianceComponents: _results.varianceComponents,
+      r2m: _results.r2m,
+      r2c: _results.r2c,
+    });
+  };
+
+  /* ─────────────────────────────────────────────────────────────
+     DECIMAL PRECISION
+  ───────────────────────────────────────────────────────────── */
+  window.updateDecimalPrecision = function() {
+    _decimals = document.getElementById('decimalSelect')?.value ?? 'auto';
+    if (_results) receiveMixedModelResults(_results);
+  };
+
+  /* ─────────────────────────────────────────────────────────────
+     SIDEBAR COLLAPSE
+  ───────────────────────────────────────────────────────────── */
+  window.toggleSidebar = function() {
+    const nav = document.getElementById('sidebarNav');
+    if (nav) nav.classList.toggle('collapsed');
+  };
+
+  /* ─────────────────────────────────────────────────────────────
+     COLLAPSE SECTIONS
+  ───────────────────────────────────────────────────────────── */
+  window.toggleSection = function(bodyId, btnId) {
+    const body = document.getElementById(bodyId);
+    const btn  = document.getElementById(btnId);
+    if (!body || !btn) return;
+    const col = body.classList.toggle('is-collapsed');
+    btn.innerHTML = col
+      ? '<i class="fa-solid fa-chevron-down"></i> Expand'
+      : '<i class="fa-solid fa-chevron-up"></i> Collapse';
+  };
+
+  /* ─────────────────────────────────────────────────────────────
+     METRIC TOOLTIPS
+  ───────────────────────────────────────────────────────────── */
+  function initTooltips() {
+    document.querySelectorAll('.metric-help').forEach(el => {
+      const tip = el.querySelector('.metric-tip');
+      if (!tip) return;
+      const pos = () => {
+        const r = el.getBoundingClientRect();
+        const tw = 270, th = 80;
+        let left = r.left + r.width/2 - tw/2;
+        left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+        let top = r.top - th - 10;
+        if (top < 8) top = r.bottom + 10;
+        tip.style.left = `${left}px`;
+        tip.style.top  = `${top}px`;
+      };
+      el.addEventListener('mouseenter', () => { tip.classList.add('is-visible'); pos(); });
+      el.addEventListener('mouseleave', () => tip.classList.remove('is-visible'));
+    });
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     HELPERS
+  ───────────────────────────────────────────────────────────── */
+  function setText(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val ?? '—';
+  }
+
+  function showLoading(msg) {
+    const ov = document.getElementById('loadingOverlay');
+    const tx = document.getElementById('loadingText');
+    if (ov) ov.classList.remove('hidden');
+    if (tx && msg) tx.textContent = msg;
+  }
+
+  function hideLoading() {
+    const ov = document.getElementById('loadingOverlay');
+    if (ov) ov.classList.add('hidden');
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     INIT
+  ───────────────────────────────────────────────────────────── */
+  document.addEventListener('DOMContentLoaded', () => {
+    initTooltips();
+    applyDepth(_depth);
+    sendToHost('mixedModelDashboardReady', {});
+    console.log('🚀 Mixed Model dashboard ready');
+
+    // ── DEMO / STUB: inject synthetic results when VB6 not present ──
+    if (typeof vbHost === 'undefined') {
+      setTimeout(() => {
+        const demo = buildDemoResults();
+        receiveMixedModelResults(demo);
+      }, 600);
+    }
+  });
+
+  window.addEventListener('load', () => {
+    sendToHost('mixedModelDashboardReady', {});
+  });
+
+  /* ─────────────────────────────────────────────────────────────
+     DEMO DATA (used when no VB6 host is present)
+  ───────────────────────────────────────────────────────────── */
+  function buildDemoResults() {
+    // Simulates a 2-level mixed model: students (n=180) in schools (n=20)
+    // Outcome: Math Score; Fixed: Ses, Female, Minority; Random: intercept per School
+    const n = 180, ng = 20;
+
+    return {
+      outcome:   'MathScore',
+      y:         'MathScore',
+      subject:   'School',
+      subjectVar:'School',
+      n,
+      N:         n,
+      nGroups:   ng,
+      method:    'REML',
+      iterations: 23,
+      converged:  true,
+      covStructure: 'VC',
+      dfMethod:   'Satterthwaite',
+
+      // Information criteria
+      neg2LL: 1284.42,
+      deviance: 1284.42,
+      AIC:   1296.42,
+      AICc:  1297.01,
+      BIC:   1316.58,
+      CAIC:  1322.58,
+      HQIC:  1304.37,
+
+      // ICC
+      ICC:  0.178,
+      icc:  0.178,
+
+      // Pseudo R²
+      r2m:       0.247,
+      r2c:       0.382,
+      varFixed:  18.34,
+      varResidual: 54.28,
+      sigma2:    54.28,
+
+      // Factors
+      factors: ['Female', 'Minority'],
+
+      // Type III
+      typeIII: [
+        { source:'Intercept',  numDF:1, denDF:19.0, F:2461.3, pval:0.000, df1:1, df2:19.0 },
+        { source:'SES',        numDF:1, denDF:176.4, F:34.81, pval:0.000 },
+        { source:'Female',     numDF:1, denDF:177.2, F:2.14,  pval:0.145 },
+        { source:'Minority',   numDF:1, denDF:174.8, F:9.67,  pval:0.002 },
+      ],
+
+      // Fixed effects
+      fixedEffects: [
+        { parameter:'Intercept', estimate:46.81, se:1.014, df:19.1, t:46.16, pval:0.000, ciLow:44.69, ciHigh:48.93, stdBeta:null },
+        { parameter:'SES',       estimate: 2.19, se:0.371, df:176.4, t:5.90, pval:0.000, ciLow: 1.46, ciHigh: 2.92, stdBeta: 0.321 },
+        { parameter:'Female',    estimate:-0.48, se:0.328, df:177.2, t:-1.46,pval:0.145, ciLow:-1.13, ciHigh: 0.17, stdBeta:-0.071 },
+        { parameter:'Minority',  estimate:-2.88, se:0.926, df:174.8, t:-3.11,pval:0.002, ciLow:-4.71, ciHigh:-1.05, stdBeta:-0.198 },
+      ],
+
+      // Variance components
+      varianceComponents: [
+        { parameter:'Var (Intercept | School)', estimate:14.82, se:4.91,  waldZ:3.02, pval:0.003, ciLow: 7.44, ciHigh:29.52, group:'Random' },
+        { parameter:'Var (Residual)',           estimate:54.28, se:5.73,  waldZ:9.47, pval:0.000, ciLow:44.12, ciHigh:66.82, group:'Residual' },
+      ],
+
+      // BLUPs (20 school intercepts)
+      // Note: BLUPs would normally be received via Case 704
+      // EMM data (would normally come via Case 702)
+      // For Female factor
+      emmFemale: {
+        factor:'Female',
+        levels:[
+          { level:'Male',   mean:47.54, se:0.921, df:19.1, ciLow:45.61, ciHigh:49.47 },
+          { level:'Female', mean:47.06, se:0.948, df:19.1, ciLow:45.08, ciHigh:49.04 },
+        ]
+      },
+      emmMinority: {
+        factor:'Minority',
+        levels:[
+          { level:'Non-minority', mean:48.26, se:0.892, df:19.0, ciLow:46.39, ciHigh:50.13 },
+          { level:'Minority',     mean:45.38, se:1.224, df:20.4, ciLow:42.84, ciHigh:47.92 },
+        ]
+      },
+
+      // Pairwise contrasts (Female)
+      pwFemale: {
+        factor:'Female',
+        comparisons:[
+          { levelI:'Male', levelJ:'Female', meanDiff:0.48, se:0.328, df:177.2, t:1.46, pval:0.145, ciLow:-0.17, ciHigh:1.13, cohensD:0.22 }
+        ]
+      },
+      pwMinority: {
+        factor:'Minority',
+        comparisons:[
+          { levelI:'Non-minority', levelJ:'Minority', meanDiff:2.88, se:0.926, df:174.8, t:3.11, pval:0.002, ciLow:1.05, ciHigh:4.71, cohensD:0.47 }
+        ]
+      },
+
+      // LRT
+      lrt: [
+        { model:'Intercept Only',  neg2LL:1318.76, params:3, delta2LL:null, deltaDF:null, pval:null },
+        { model:'Full Fixed Model',neg2LL:1284.42, params:6, delta2LL:34.34, deltaDF:3,   pval:0.000 },
+      ],
+
+      // Residual diagnostics (stubbed)
+      residuals: {
+        min:  -12.4,
+        max:   14.1,
+        mean:  -0.01,
+        sigma:  7.37,
+        skewness: 0.12,
+        kurtosis: 2.94,
+        swW: 0.9934,
+        swP:  0.462,
+        bartlettChi: 18.42,
+        bartlettP:   0.142,
+        leveneF:  1.24,
+        leveneP:  0.197,
+        // Build synthetic residuals array
+        fitted:   Array.from({length:n}, (_,i) => 40 + Math.random()*20),
+        values:   Array.from({length:n}, () => (Math.random()-0.5)*15),
+      },
+    };
+  }
+
+  /* ── Wire up demo EMM / pairwise data ── */
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+      if (!_results) return;
+      // Inject demo EMM + pairwise data after results loaded
+      if (_results.emmFemale)   _emmData['Female']   = _results.emmFemale;
+      if (_results.emmMinority) _emmData['Minority']  = _results.emmMinority;
+      if (_results.pwFemale)    _pwData['Female']    = _results.pwFemale;
+      if (_results.pwMinority)  _pwData['Minority']  = _results.pwMinority;
+
+      // Wire covariance matrices (demo: identity)
+      if (_results) {
+        const stubMat = [[14.82,0],[0,54.28]];
+        const stubLab = ['School (Intercept)','Residual'];
+        renderCovMatrix([[54.28]], ['Residual'], 'covMatrixWrap');
+        renderCovMatrix(stubMat, stubLab, 'gMatrixWrap');
+      }
+
+      // Demo BLUPs
+      const blups = Array.from({length:20}, (_,i) => {
+        const u = (Math.random()-0.5)*12;
+        const se = 1.8 + Math.random();
+        return { group:`School ${i+1}`, blup:u, se, ciLow:u-1.96*se, ciHigh:u+1.96*se };
+      });
+      renderBLUPs(blups);
+    }, 1400);
+  });
+
+  </script>
+
+</body>
+</html>

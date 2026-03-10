@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Linear Mixed Model — Configuration</title>
+
+  <!-- Shared config design system -->
+  <link rel="stylesheet" href="../shared-config.css" />
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <style>
+    /* ═══════════════════════════════════════════════════════════
+       mixed-input.html  — page-specific overrides
+       ═══════════════════════════════════════════════════════════ */
+
+    /* ── Accent palette for mixed model zones ─────────────────── */
+    :root {
+      --mx-dep:   #f97316;   /* orange   – Dependent */
+      --mx-fix:   #4fc3f7;   /* sky      – Fixed Factors */
+      --mx-cov:   #a78bfa;   /* violet   – Covariates */
+      --mx-rnd:   #4ade80;   /* green    – Random / Subject */
+      --mx-rep:   #f472b6;   /* pink     – Repeated Measure */
+    }
+
+    /* ── Three-column layout ──────────────────────────────────── */
+    .mx-layout {
+      display: flex;
+      gap: 10px;
+      flex: 1 1 0;
+      min-height: 0;
+      padding: 10px;
+      overflow: hidden;
+    }
+
+    /* Left: variable list */
+    .mx-vars-col {
+      flex: 0 0 220px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    /* Centre: model zones */
+    .mx-model-col {
+      flex: 1 1 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+      overflow-y: auto;
+    }
+
+    /* Right: options panel */
+    .mx-opts-col {
+      flex: 0 0 210px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+      overflow-y: auto;
+    }
+
+    /* ── Variable list box ────────────────────────────────────── */
+    .mx-vars-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--cfg-text2);
+      padding: 0 2px 4px 2px;
+      border-bottom: 1px solid var(--cfg-border);
+    }
+
+    .mx-vars-box {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow-y: auto;
+      border: 1px solid var(--cfg-border);
+      border-radius: 8px;
+      background: var(--cfg-surface);
+    }
+
+    .mx-var-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      cursor: grab;
+      border-bottom: 1px solid var(--cfg-border);
+      transition: background .12s;
+      user-select: none;
+    }
+    .mx-var-row:last-child { border-bottom: none; }
+    .mx-var-row:hover { background: var(--cfg-tbl-hover); }
+    .mx-var-row.dragging { opacity: .4; }
+    .mx-var-row.used { opacity: .38; cursor: not-allowed; pointer-events: none; }
+
+    .mx-var-icon {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .mx-var-icon.num { background: rgba(79,195,247,.2);  color: #4fc3f7; }
+    .mx-var-icon.str { background: rgba(74,222,128,.2);  color: #4ade80; }
+
+    .mx-var-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--cfg-text);
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .mx-var-meta {
+      font-size: 10px;
+      color: var(--cfg-text3);
+      white-space: nowrap;
+    }
+
+    /* ── Zone card ────────────────────────────────────────────── */
+    .mx-zone-card {
+      border: 1px solid var(--cfg-border);
+      border-radius: 8px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .mx-zone-head {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      border-bottom: 1px solid var(--cfg-border);
+    }
+
+    .mx-zone-head .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .mx-zone-head .zone-label { flex: 1; }
+    .mx-zone-head .zone-hint  { font-size: 10px; font-weight: 400; opacity: .7; text-transform: none; letter-spacing: 0; }
+
+    /* Colour per zone */
+    .zone-dep  .mx-zone-head { background: rgba(249,115,22,.08); color: var(--mx-dep); border-bottom-color: rgba(249,115,22,.25); }
+    .zone-dep  .mx-zone-head .dot { background: var(--mx-dep); }
+    .zone-fix  .mx-zone-head { background: rgba(79,195,247,.08);  color: var(--mx-fix); border-bottom-color: rgba(79,195,247,.25); }
+    .zone-fix  .mx-zone-head .dot { background: var(--mx-fix); }
+    .zone-cov  .mx-zone-head { background: rgba(167,139,250,.08); color: var(--mx-cov); border-bottom-color: rgba(167,139,250,.25); }
+    .zone-cov  .mx-zone-head .dot { background: var(--mx-cov); }
+    .zone-rnd  .mx-zone-head { background: rgba(74,222,128,.08);  color: var(--mx-rnd); border-bottom-color: rgba(74,222,128,.25); }
+    .zone-rnd  .mx-zone-head .dot { background: var(--mx-rnd); }
+    .zone-rep  .mx-zone-head { background: rgba(244,114,182,.08); color: var(--mx-rep); border-bottom-color: rgba(244,114,182,.25); }
+    .zone-rep  .mx-zone-head .dot { background: var(--mx-rep); }
+
+    /* Drop area inside zone */
+    .mx-zone-body {
+      padding: 6px;
+      background: var(--cfg-surface);
+      min-height: 46px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-content: flex-start;
+      transition: background .2s;
+    }
+
+    .mx-zone-body.drag-over { background: rgba(255,255,255,.06); }
+
+    /* Zone-coloured drag-over highlight */
+    .zone-dep  .mx-zone-body.drag-over { background: rgba(249,115,22,.1); }
+    .zone-fix  .mx-zone-body.drag-over { background: rgba(79,195,247,.1); }
+    .zone-cov  .mx-zone-body.drag-over { background: rgba(167,139,250,.1); }
+    .zone-rnd  .mx-zone-body.drag-over { background: rgba(74,222,128,.1); }
+    .zone-rep  .mx-zone-body.drag-over { background: rgba(244,114,182,.1); }
+
+    .mx-zone-placeholder {
+      width: 100%;
+      text-align: center;
+      font-size: 11px;
+      font-style: italic;
+      color: var(--cfg-text3);
+      padding: 8px 0;
+    }
+
+    /* Chips inside zones */
+    .mx-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 6px 3px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid;
+      white-space: nowrap;
+    }
+    .zone-dep  .mx-chip { background: rgba(249,115,22,.15);  border-color: rgba(249,115,22,.4);  color: var(--mx-dep); }
+    .zone-fix  .mx-chip { background: rgba(79,195,247,.15);  border-color: rgba(79,195,247,.4);  color: var(--mx-fix); }
+    .zone-cov  .mx-chip { background: rgba(167,139,250,.15); border-color: rgba(167,139,250,.4); color: var(--mx-cov); }
+    .zone-rnd  .mx-chip { background: rgba(74,222,128,.15);  border-color: rgba(74,222,128,.4);  color: var(--mx-rnd); }
+    .zone-rep  .mx-chip { background: rgba(244,114,182,.15); border-color: rgba(244,114,182,.4); color: var(--mx-rep); }
+
+    .mx-chip-x {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0 1px;
+      opacity: .7;
+      font-size: 12px;
+      color: inherit;
+      line-height: 1;
+    }
+    .mx-chip-x:hover { opacity: 1; }
+
+    /* ── Options column ───────────────────────────────────────── */
+    .opt-section {
+      border: 1px solid var(--cfg-border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .opt-section-head {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 10px;
+      background: var(--cfg-surface2);
+      border-bottom: 1px solid var(--cfg-border);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--cfg-text2);
+    }
+    .opt-section-head i { color: var(--cfg-run-from); font-size: 11px; }
+
+    .opt-section-body {
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: var(--cfg-surface);
+    }
+
+    .opt-row {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .opt-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--cfg-text2);
+    }
+
+    .opt-select, .opt-input {
+      width: 100%;
+      background: var(--cfg-input-bg);
+      color: var(--cfg-input-text);
+      border: 1px solid var(--cfg-border);
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 12px;
+      font-family: var(--cfg-font);
+      cursor: pointer;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .opt-select:focus, .opt-input:focus {
+      border-color: var(--cfg-run-from);
+      box-shadow: 0 0 0 2px rgba(249,115,22,.2);
+    }
+
+    .opt-check-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .opt-check-row input[type=checkbox] {
+      width: 14px; height: 14px;
+      accent-color: var(--cfg-check-acc);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .opt-check-row label {
+      font-size: 12px;
+      color: var(--cfg-text);
+      cursor: pointer;
+    }
+
+    /* ── Interaction builder ──────────────────────────────────── */
+    .int-builder {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .int-builder select {
+      flex: 1;
+      background: var(--cfg-input-bg);
+      color: var(--cfg-input-text);
+      border: 1px solid var(--cfg-border);
+      border-radius: 6px;
+      padding: 4px 6px;
+      font-size: 11px;
+      font-family: var(--cfg-font);
+      outline: none;
+    }
+    .int-builder select:focus { border-color: var(--cfg-run-from); }
+
+    .int-builder .btn-add-int {
+      padding: 4px 8px;
+      background: rgba(249,115,22,.15);
+      border: 1px solid rgba(249,115,22,.4);
+      border-radius: 6px;
+      color: var(--cfg-run-from);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+      transition: background .15s;
+    }
+    .int-builder .btn-add-int:hover { background: rgba(249,115,22,.25); }
+
+    .int-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      min-height: 20px;
+    }
+
+    .int-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 7px 2px 8px;
+      background: rgba(249,115,22,.1);
+      border: 1px solid rgba(249,115,22,.3);
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--cfg-run-from);
+    }
+    .int-chip-x {
+      background: none; border: none;
+      cursor: pointer; color: inherit;
+      padding: 0; font-size: 11px; opacity: .7;
+    }
+    .int-chip-x:hover { opacity: 1; }
+
+    /* ── Model equation display ───────────────────────────────── */
+    .mx-equation {
+      background: var(--cfg-surface2);
+      border: 1px dashed var(--cfg-border);
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 11px;
+      color: var(--cfg-text2);
+      font-style: italic;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
+    /* ── Random-slope table ───────────────────────────────────── */
+    .rnd-slope-row {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+    }
+    .rnd-slope-row input[type=checkbox] {
+      accent-color: var(--mx-rnd);
+      width: 14px; height: 14px;
+    }
+    .rnd-slope-row label { color: var(--cfg-text); cursor: pointer; }
+
+    /* ── Validation error banner ──────────────────────────────── */
+    .val-banner {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(239,68,68,.12);
+      border: 1px solid rgba(239,68,68,.35);
+      border-radius: 6px;
+      font-size: 12px;
+      color: #f87171;
+      margin: 0 10px 4px 10px;
+    }
+    .val-banner.show { display: flex; }
+    .val-banner i { flex-shrink: 0; }
+
+    /* ── Spinner ──────────────────────────────────────────────── */
+    .cfg-spinner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex: 1;
+      font-size: 14px;
+      color: var(--cfg-text2);
+    }
+
+    /* ── Responsive ───────────────────────────────────────────── */
+    @media (max-width: 720px) {
+      .mx-layout { flex-direction: column; overflow-y: auto; }
+      .mx-vars-col { flex: 0 0 auto; }
+      .mx-opts-col  { flex: 0 0 auto; }
+    }
+  </style>
+</head>
+
+<body>
+<div class="cfg-shell">
+
+  <!-- ── Header ───────────────────────────────────────────────────────── -->
+  <header class="cfg-header">
+    <div class="cfg-header-icon">
+      <i class="fa-solid fa-layer-group"></i>
+    </div>
+    <span class="cfg-header-title">Linear Mixed Model</span>
+    <span class="cfg-meta-badge" id="metaBadge"></span>
+    <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Toggle theme">
+      <span class="cfg-toggle-icon">&#x1F319;</span>
+      <div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div>
+      <span class="cfg-toggle-label">Dark</span>
+    </button>
+  </header>
+
+  <!-- ── Spinner ──────────────────────────────────────────────────────── -->
+  <div id="loadingSpinner" class="cfg-spinner">
+    <i class="fa-solid fa-spinner fa-spin"></i> Loading data&hellip;
+  </div>
+
+  <!-- ── Main content ─────────────────────────────────────────────────── -->
+  <div id="mainContent" style="display:none;flex:1;min-height:0;flex-direction:column;overflow:hidden;">
+
+    <!-- Validation banner -->
+    <div class="val-banner" id="valBanner">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      <span id="valMsg">Please assign a dependent variable and at least one effect.</span>
+    </div>
+
+    <!-- Three-column layout -->
+    <div class="mx-layout">
+
+      <!-- ── LEFT: variable list ──────────────────────────────── -->
+      <div class="mx-vars-col">
+        <div class="mx-vars-title">
+          <i class="fa-solid fa-database" style="color:var(--cfg-run-from);margin-right:4px;"></i>
+          Available Variables
+        </div>
+        <div class="mx-vars-box" id="varsList">
+          <div style="padding:16px;text-align:center;font-size:12px;color:var(--cfg-text3);font-style:italic;">
+            No data loaded yet.
+          </div>
+        </div>
+      </div>
+
+      <!-- ── CENTRE: model specification ─────────────────────── -->
+      <div class="mx-model-col">
+
+        <!-- Model equation -->
+        <div class="mx-equation" id="modelEquation">
+          Y = (fixed effects) + (random effects) + ε
+        </div>
+
+        <!-- Zone 1: Dependent variable -->
+        <div class="mx-zone-card zone-dep">
+          <div class="mx-zone-head">
+            <div class="dot"></div>
+            <span class="zone-label">Dependent Variable</span>
+            <span class="zone-hint">(one numeric variable)</span>
+          </div>
+          <div class="mx-zone-body" id="zoneDep" data-zone="dep" data-max="1">
+            <div class="mx-zone-placeholder" id="phDep">Drag a numeric variable here</div>
+          </div>
+        </div>
+
+        <!-- Zone 2: Fixed Factors -->
+        <div class="mx-zone-card zone-fix">
+          <div class="mx-zone-head">
+            <div class="dot"></div>
+            <span class="zone-label">Fixed Factors</span>
+            <span class="zone-hint">(categorical predictors)</span>
+          </div>
+          <div class="mx-zone-body" id="zoneFix" data-zone="fix">
+            <div class="mx-zone-placeholder" id="phFix">Drag categorical variables here</div>
+          </div>
+        </div>
+
+        <!-- Zone 3: Covariates -->
+        <div class="mx-zone-card zone-cov">
+          <div class="mx-zone-head">
+            <div class="dot"></div>
+            <span class="zone-label">Covariates</span>
+            <span class="zone-hint">(continuous predictors)</span>
+          </div>
+          <div class="mx-zone-body" id="zoneCov" data-zone="cov">
+            <div class="mx-zone-placeholder" id="phCov">Drag numeric variables here</div>
+          </div>
+        </div>
+
+        <!-- Zone 4: Subject (Random grouping factor) -->
+        <div class="mx-zone-card zone-rnd">
+          <div class="mx-zone-head">
+            <div class="dot"></div>
+            <span class="zone-label">Subject / Grouping Factor</span>
+            <span class="zone-hint">(random intercept groups)</span>
+          </div>
+          <div class="mx-zone-body" id="zoneRnd" data-zone="rnd">
+            <div class="mx-zone-placeholder" id="phRnd">Drag grouping variable here (e.g. PatientID, School)</div>
+          </div>
+        </div>
+
+        <!-- Zone 5: Repeated Measure -->
+        <div class="mx-zone-card zone-rep">
+          <div class="mx-zone-head">
+            <div class="dot"></div>
+            <span class="zone-label">Repeated Measure</span>
+            <span class="zone-hint">(time / occasion variable — optional)</span>
+          </div>
+          <div class="mx-zone-body" id="zoneRep" data-zone="rep" data-max="1">
+            <div class="mx-zone-placeholder" id="phRep">Drag time / wave variable here (optional)</div>
+          </div>
+        </div>
+
+        <!-- Interaction builder (fixed effects) -->
+        <div class="opt-section">
+          <div class="opt-section-head">
+            <i class="fa-solid fa-arrows-split-up-and-left"></i>
+            Fixed-Effect Interactions
+          </div>
+          <div class="opt-section-body">
+            <div class="int-builder">
+              <select id="intVar1"><option value="">— Term 1 —</option></select>
+              <span style="color:var(--cfg-text3);font-size:12px;">×</span>
+              <select id="intVar2"><option value="">— Term 2 —</option></select>
+              <button class="btn-add-int" id="btnAddInt">
+                <i class="fa-solid fa-plus"></i> Add
+              </button>
+            </div>
+            <div class="int-chips" id="intChips">
+              <span style="font-size:11px;color:var(--cfg-text3);font-style:italic;">No interactions specified</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Random slope builder -->
+        <div class="opt-section" id="rndSlopeSection" style="display:none;">
+          <div class="opt-section-head">
+            <i class="fa-solid fa-chart-line" style="color:var(--mx-rnd);"></i>
+            Random Slopes
+            <span style="font-size:10px;font-weight:400;opacity:.7;margin-left:4px;">(vary by subject)</span>
+          </div>
+          <div class="opt-section-body" id="rndSlopeBody">
+            <!-- Filled dynamically when covariates are added -->
+          </div>
+        </div>
+
+      </div><!-- /mx-model-col -->
+
+      <!-- ── RIGHT: options ──────────────────────────────────── -->
+      <div class="mx-opts-col">
+
+        <!-- Estimation -->
+        <div class="opt-section">
+          <div class="opt-section-head">
+            <i class="fa-solid fa-calculator"></i>
+            Estimation
+          </div>
+          <div class="opt-section-body">
+            <div class="opt-row">
+              <div class="opt-label">Method</div>
+              <select class="opt-select" id="optMethod">
+                <option value="REML" selected>REML (Restricted ML)</option>
+                <option value="ML">ML (Maximum Likelihood)</option>
+              </select>
+            </div>
+            <div class="opt-row">
+              <div class="opt-label">Degrees of Freedom</div>
+              <select class="opt-select" id="optDF">
+                <option value="satterthwaite" selected>Satterthwaite</option>
+                <option value="kenward-roger">Kenward-Roger</option>
+                <option value="between-within">Between-Within</option>
+                <option value="residual">Residual</option>
+              </select>
+            </div>
+            <div class="opt-row">
+              <div class="opt-label">Significance level (α)</div>
+              <select class="opt-select" id="optAlpha">
+                <option value="0.05" selected>0.05</option>
+                <option value="0.01">0.01</option>
+                <option value="0.10">0.10</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Covariance Structure -->
+        <div class="opt-section">
+          <div class="opt-section-head">
+            <i class="fa-solid fa-table-cells"></i>
+            Covariance Structure
+          </div>
+          <div class="opt-section-body">
+            <div class="opt-row">
+              <div class="opt-label">Random Effects (G)</div>
+              <select class="opt-select" id="optCovG">
+                <option value="VC" selected>Variance Components (VC)</option>
+                <option value="UN">Unstructured (UN)</option>
+                <option value="CS">Compound Symmetry (CS)</option>
+                <option value="CSH">Heterogeneous CS (CSH)</option>
+                <option value="DIAG">Diagonal</option>
+              </select>
+            </div>
+            <div class="opt-row">
+              <div class="opt-label">Repeated / Residual (R)</div>
+              <select class="opt-select" id="optCovR">
+                <option value="none" selected>None (default)</option>
+                <option value="CS">Compound Symmetry (CS)</option>
+                <option value="AR1">AR(1)</option>
+                <option value="TOEP">Toeplitz</option>
+                <option value="UN">Unstructured (UN)</option>
+                <option value="HF">Huynh-Feldt</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Output Options -->
+        <div class="opt-section">
+          <div class="opt-section-head">
+            <i class="fa-solid fa-list-check"></i>
+            Output
+          </div>
+          <div class="opt-section-body">
+            <div class="opt-check-row">
+              <input type="checkbox" id="chkTypeIII" checked />
+              <label for="chkTypeIII">Type III Fixed Effects</label>
+            </div>
+            <div class="opt-check-row">
+              <input type="checkbox" id="chkCoeffs" checked />
+              <label for="chkCoeffs">Fixed Effect Coefficients</label>
+            </div>
+            <div class="opt-check-row">
+              <input type="checkbox" id="chkVarComp" checked />
+              <label for="chkVarComp">Variance Components</label>
+            </div>
+            <div class="opt-check-row">
+              <input type="checkbox" id="chkEMM" checked />
+              <label for="chkEMM">Estimated Marginal Means</label>
+            </div>
+            <div class="opt-check-row">
+              <input type="checkbox" id="chkPairwise" />
+              <label for="chkPairwise">Pairwise Contrasts</label>
+            </div>
+            <div class="opt-check-row">
+              <input type="checkbox" id="chkBLUP" />
+              <label for="chkBLUP">BLUPs (Random Predictions)</label>
+            </div>
+            <div class="opt-check-row">
+              <input type="checkbox" id="chkResid" checked />
+              <label for="chkResid">Residual Diagnostics</label>
+            </div>
+            <div class="opt-check-row">
+              <input type="checkbox" id="chkIC" checked />
+              <label for="chkIC">Information Criteria (AIC/BIC)</label>
+            </div>
+            <div class="opt-check-row">
+              <input type="checkbox" id="chkPseudoR2" checked />
+              <label for="chkPseudoR2">Pseudo R² (marginal &amp; conditional)</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- P-value Adjustment -->
+        <div class="opt-section" id="pAdjSection" style="display:none;">
+          <div class="opt-section-head">
+            <i class="fa-solid fa-filter"></i>
+            P-value Adjustment
+          </div>
+          <div class="opt-section-body">
+            <div class="opt-row">
+              <div class="opt-label">Pairwise Method</div>
+              <select class="opt-select" id="optPAdj">
+                <option value="bonferroni" selected>Bonferroni</option>
+                <option value="holm">Holm</option>
+                <option value="bh">Benjamini-Hochberg</option>
+                <option value="by">Benjamini-Yekutieli</option>
+                <option value="none">None</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /mx-opts-col -->
+    </div><!-- /mx-layout -->
+
+    <!-- ── Footer ───────────────────────────────────────────── -->
+    <div class="cfg-footer">
+      <button class="cfg-btn cancel" id="btnCancel">
+        <i class="fa-solid fa-times"></i> Cancel
+      </button>
+      <button class="cfg-btn run" id="btnRun" disabled>
+        <i class="fa-solid fa-play"></i> Run Mixed Model
+      </button>
+    </div>
+
+  </div><!-- /mainContent -->
+</div><!-- /cfg-shell -->
+
+<!-- ── Toast container ─────────────────────────────────────────────────── -->
+<div id="toastContainer" style="
+  position:fixed;top:14px;right:14px;z-index:99999;
+  display:flex;flex-direction:column;gap:8px;max-width:360px;
+"></div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     JAVASCRIPT
+     ════════════════════════════════════════════════════════════════ -->
+<script>
+
+// ============================================================================
+// STATE
+// ============================================================================
+var STATE = {
+  variables: [],         // [{name, numeric, string, missing, categories, rangeAddress}]
+  variableStats: {},
+  assignments: {
+    dep:  null,          // single var name
+    fix:  [],            // factor names
+    cov:  [],            // covariate names
+    rnd:  null,          // grouping factor name
+    rep:  null,          // repeated measure name
+    interactions: [],    // [{v1, v2}]
+    randomSlopes: []     // covariate names that also get random slopes
+  }
+};
+
+// ============================================================================
+// UTILITIES
+// ============================================================================
+function qs(id){ return document.getElementById(id); }
+
+function sendToHost(cmd, data) {
+  try {
+    if (typeof Office !== 'undefined' && Office && Office.context && Office.context.ui) {
+      var payload = { action: cmd, data: data || null };
+      Office.context.ui.messageParent(JSON.stringify(payload));
+      console.log('[mixed-input] sent:', cmd);
+    } else {
+      console.log('[mixed-input] (no Office) would send:', cmd, data);
+    }
+  } catch(e) {
+    console.error('[mixed-input] sendToHost error:', e);
+  }
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+function showToast(msg, type, duration) {
+  type     = type     || 'info';
+  duration = duration || 4000;
+  var icons = { success:'fa-check-circle', error:'fa-exclamation-circle',
+                warning:'fa-exclamation-triangle', info:'fa-info-circle' };
+  var titles= { success:'Success', error:'Error', warning:'Warning', info:'Info' };
+  var colors= { success:'#16a34a', error:'#dc2626', warning:'#d97706', info:'#0284c7' };
+  var bgs   = { success:'#dcfce7', error:'#fee2e2', warning:'#fef3c7', info:'#e0f2fe' };
+
+  var t = document.createElement('div');
+  t.style.cssText = [
+    'background:'+ bgs[type],
+    'border:2px solid '+ colors[type],
+    'border-radius:8px',
+    'padding:10px 14px',
+    'display:flex',
+    'align-items:flex-start',
+    'gap:10px',
+    'box-shadow:0 4px 16px rgba(0,0,0,.25)',
+    'animation:slideIn .3s ease'
+  ].join(';');
+  t.innerHTML =
+    '<i class="fa-solid '+ icons[type] +'" style="color:'+ colors[type] +';margin-top:1px;font-size:15px;flex-shrink:0"></i>' +
+    '<div style="flex:1"><div style="font-weight:700;color:#111;font-size:13px">'+ titles[type] +'</div>' +
+    '<div style="color:#333;font-size:12px;line-height:1.4">'+ msg +'</div></div>' +
+    '<button onclick="this.parentNode.remove()" style="background:none;border:none;cursor:pointer;color:#555;font-size:16px;padding:0;line-height:1">&times;</button>';
+  qs('toastContainer').appendChild(t);
+  setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); }, duration);
+}
+
+// ============================================================================
+// THEME
+// ============================================================================
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  var toggle = qs('cfgThemeToggle');
+  if (!toggle) return;
+  var icon  = toggle.querySelector('.cfg-toggle-icon');
+  var label = toggle.querySelector('.cfg-toggle-label');
+  if (theme === 'light') {
+    if (icon)  icon.textContent  = '☀️';
+    if (label) label.textContent = 'Light';
+  } else {
+    if (icon)  icon.textContent  = '🌙';
+    if (label) label.textContent = 'Dark';
+  }
+}
+
+function toggleTheme() {
+  var cur = document.documentElement.getAttribute('data-theme') || 'dark';
+  var next = cur === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+  try { localStorage.setItem('statistico-theme', next); } catch(e){}
+}
+
+(function() {
+  try {
+    var saved = localStorage.getItem('statistico-theme');
+    if (saved) applyTheme(saved);
+  } catch(e) {}
+})();
+
+// ============================================================================
+// VARIABLE RENDERING
+// ============================================================================
+function renderVarsList() {
+  var box = qs('varsList');
+  if (!box) return;
+
+  // Figure out which names are used
+  var used = getUsedNames();
+
+  if (STATE.variables.length === 0) {
+    box.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;color:var(--cfg-text3);font-style:italic;">No data loaded.</div>';
+    return;
+  }
+
+  box.innerHTML = '';
+  STATE.variables.forEach(function(v) {
+    var isUsed = used.indexOf(v.name) !== -1;
+    var isNum  = v.numeric > v.string;
+    var row = document.createElement('div');
+    row.className = 'mx-var-row' + (isUsed ? ' used' : '');
+    row.setAttribute('draggable', isUsed ? 'false' : 'true');
+    row.setAttribute('data-var', v.name);
+    row.setAttribute('data-numeric', isNum ? '1' : '0');
+
+    row.innerHTML =
+      '<div class="mx-var-icon '+ (isNum ? 'num' : 'str') +'">' + (isNum ? 'N' : 'S') + '</div>' +
+      '<span class="mx-var-name" title="'+ escHtml(v.name) +'">'+ escHtml(v.name) +'</span>' +
+      '<span class="mx-var-meta">n='+ (v.validCount||0) +'</span>';
+
+    row.addEventListener('dragstart', onVarDragStart);
+    box.appendChild(row);
+  });
+}
+
+function getUsedNames() {
+  var out = [];
+  if (STATE.assignments.dep)  out.push(STATE.assignments.dep);
+  if (STATE.assignments.rnd)  out.push(STATE.assignments.rnd);
+  if (STATE.assignments.rep)  out.push(STATE.assignments.rep);
+  STATE.assignments.fix.forEach(function(n){ out.push(n); });
+  STATE.assignments.cov.forEach(function(n){ out.push(n); });
+  return out;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ============================================================================
+// DRAG  &  DROP
+// ============================================================================
+var _dragging = null; // { name, numeric }
+
+function onVarDragStart(e) {
+  var row = e.currentTarget;
+  _dragging = { name: row.getAttribute('data-var'), numeric: row.getAttribute('data-numeric') === '1' };
+  row.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', _dragging.name);
+}
+
+document.addEventListener('dragend', function() {
+  document.querySelectorAll('.mx-var-row.dragging').forEach(function(el){ el.classList.remove('dragging'); });
+  _dragging = null;
+});
+
+function wireDropZone(el) {
+  el.addEventListener('dragover',  function(e){ e.preventDefault(); e.dataTransfer.dropEffect='move'; });
+  el.addEventListener('dragenter', function(){ this.classList.add('drag-over'); });
+  el.addEventListener('dragleave', function(e){
+    if (!this.contains(e.relatedTarget)) this.classList.remove('drag-over');
+  });
+  el.addEventListener('drop', function(e){
+    e.preventDefault();
+    this.classList.remove('drag-over');
+    if (!_dragging) return;
+    handleDrop(this.getAttribute('data-zone'), _dragging.name, _dragging.numeric);
+  });
+}
+
+function handleDrop(zone, name, isNumeric) {
+  var a = STATE.assignments;
+
+  // Validate zone constraints
+  if (zone === 'dep') {
+    if (!isNumeric) { showToast('Dependent variable must be numeric.', 'warning'); return; }
+    if (a.dep) { returnToList(a.dep); }
+    a.dep = name;
+  } else if (zone === 'fix') {
+    if (a.fix.indexOf(name) !== -1) return;
+    if (isNumeric) { showToast('Fixed Factors should be categorical. Use Covariates for numeric predictors.', 'warning'); }
+    a.fix.push(name);
+  } else if (zone === 'cov') {
+    if (a.cov.indexOf(name) !== -1) return;
+    if (!isNumeric) { showToast('Covariates should be numeric. Use Fixed Factors for categorical predictors.', 'warning'); }
+    a.cov.push(name);
+  } else if (zone === 'rnd') {
+    if (a.rnd) { returnToList(a.rnd); }
+    a.rnd = name;
+  } else if (zone === 'rep') {
+    if (a.rep) { returnToList(a.rep); }
+    a.rep = name;
+  }
+
+  refreshAllZones();
+  refreshInteractionSelectors();
+  refreshRandomSlopeSection();
+  refreshRunButton();
+  updateEquation();
+}
+
+function returnToList(name) {
+  // Remove from all assignments
+  var a = STATE.assignments;
+  if (a.dep === name) a.dep = null;
+  if (a.rnd === name) a.rnd = null;
+  if (a.rep === name) a.rep = null;
+  a.fix = a.fix.filter(function(n){ return n !== name; });
+  a.cov = a.cov.filter(function(n){ return n !== name; });
+  // Remove interactions involving this var
+  a.interactions = a.interactions.filter(function(i){ return i.v1 !== name && i.v2 !== name; });
+  // Remove random slopes
+  a.randomSlopes = a.randomSlopes.filter(function(n){ return n !== name; });
+}
+
+// ============================================================================
+// ZONE RENDERING
+// ============================================================================
+function refreshAllZones() {
+  renderZone('dep', STATE.assignments.dep ? [STATE.assignments.dep] : [], qs('phDep'));
+  renderZone('fix', STATE.assignments.fix, qs('phFix'));
+  renderZone('cov', STATE.assignments.cov, qs('phCov'));
+  renderZone('rnd', STATE.assignments.rnd ? [STATE.assignments.rnd] : [], qs('phRnd'));
+  renderZone('rep', STATE.assignments.rep ? [STATE.assignments.rep] : [], qs('phRep'));
+  renderVarsList();
+  refreshIntChips();
+}
+
+function renderZone(zone, names, phEl) {
+  var body = qs('zone' + zone.charAt(0).toUpperCase() + zone.slice(1));
+  if (!body) return;
+
+  // Remove existing chips
+  Array.from(body.querySelectorAll('.mx-chip')).forEach(function(c){ c.remove(); });
+
+  if (names.length === 0) {
+    if (phEl) phEl.style.display = '';
+    return;
+  }
+  if (phEl) phEl.style.display = 'none';
+
+  names.forEach(function(name) {
+    var chip = document.createElement('span');
+    chip.className = 'mx-chip';
+    chip.innerHTML = escHtml(name) +
+      '<button class="mx-chip-x" data-zone="'+ zone +'" data-var="'+ escHtml(name) +'" title="Remove">×</button>';
+    chip.querySelector('.mx-chip-x').addEventListener('click', function() {
+      returnToList(this.getAttribute('data-var'));
+      refreshAllZones();
+      refreshInteractionSelectors();
+      refreshRandomSlopeSection();
+      refreshRunButton();
+      updateEquation();
+    });
+    body.appendChild(chip);
+  });
+}
+
+// ============================================================================
+// INTERACTION BUILDER
+// ============================================================================
+function refreshInteractionSelectors() {
+  var allFixed = STATE.assignments.fix.concat(STATE.assignments.cov);
+  ['intVar1','intVar2'].forEach(function(id) {
+    var sel = qs(id);
+    var cur = sel.value;
+    sel.innerHTML = '<option value="">— Term —</option>';
+    allFixed.forEach(function(n) {
+      var opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      if (n === cur) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  });
+}
+
+function refreshIntChips() {
+  var box = qs('intChips');
+  if (!box) return;
+  box.innerHTML = '';
+  var ints = STATE.assignments.interactions;
+  if (ints.length === 0) {
+    box.innerHTML = '<span style="font-size:11px;color:var(--cfg-text3);font-style:italic;">No interactions specified</span>';
+    return;
+  }
+  ints.forEach(function(int, idx) {
+    var chip = document.createElement('span');
+    chip.className = 'int-chip';
+    chip.innerHTML = escHtml(int.v1) + ' × ' + escHtml(int.v2) +
+      '<button class="int-chip-x" data-idx="'+ idx +'" title="Remove">×</button>';
+    chip.querySelector('.int-chip-x').addEventListener('click', function() {
+      STATE.assignments.interactions.splice(parseInt(this.getAttribute('data-idx')), 1);
+      refreshIntChips();
+      updateEquation();
+    });
+    box.appendChild(chip);
+  });
+}
+
+qs('btnAddInt').addEventListener('click', function() {
+  var v1 = qs('intVar1').value;
+  var v2 = qs('intVar2').value;
+  if (!v1 || !v2) { showToast('Select two terms to build an interaction.', 'warning'); return; }
+  if (v1 === v2)  { showToast('Cannot interact a term with itself.', 'warning'); return; }
+  var exists = STATE.assignments.interactions.some(function(i){
+    return (i.v1===v1&&i.v2===v2)||(i.v1===v2&&i.v2===v1);
+  });
+  if (exists) { showToast('This interaction already exists.', 'warning'); return; }
+  STATE.assignments.interactions.push({v1:v1, v2:v2});
+  refreshIntChips();
+  updateEquation();
+});
+
+// ============================================================================
+// RANDOM SLOPE SECTION
+// ============================================================================
+function refreshRandomSlopeSection() {
+  var sec = qs('rndSlopeSection');
+  var body= qs('rndSlopeBody');
+  if (!sec || !body) return;
+
+  var covs = STATE.assignments.cov;
+  var hasSubject = !!STATE.assignments.rnd;
+
+  if (covs.length === 0 || !hasSubject) {
+    sec.style.display = 'none';
+    STATE.assignments.randomSlopes = [];
+    return;
+  }
+
+  sec.style.display = '';
+  body.innerHTML = '';
+
+  covs.forEach(function(cov) {
+    var row = document.createElement('div');
+    row.className = 'rnd-slope-row';
+    var id = 'rndSlope_' + cov.replace(/\W/g,'_');
+    var checked = STATE.assignments.randomSlopes.indexOf(cov) !== -1;
+    row.innerHTML =
+      '<input type="checkbox" id="'+ id +'" data-cov="'+ escHtml(cov) +'"'+ (checked?' checked':'') +' />' +
+      '<label for="'+ id +'">'+ escHtml(cov) +'</label>';
+    row.querySelector('input').addEventListener('change', function() {
+      var c = this.getAttribute('data-cov');
+      if (this.checked) {
+        if (STATE.assignments.randomSlopes.indexOf(c) === -1)
+          STATE.assignments.randomSlopes.push(c);
+      } else {
+        STATE.assignments.randomSlopes = STATE.assignments.randomSlopes.filter(function(x){ return x!==c; });
+      }
+      updateEquation();
+    });
+    body.appendChild(row);
+  });
+}
+
+// ============================================================================
+// P-VALUE ADJUSTMENT  VISIBILITY
+// ============================================================================
+qs('chkPairwise').addEventListener('change', function() {
+  qs('pAdjSection').style.display = this.checked ? '' : 'none';
+});
+
+// ============================================================================
+// MODEL EQUATION
+// ============================================================================
+function updateEquation() {
+  var a = STATE.assignments;
+  var dep  = a.dep || 'Y';
+  var fixTerms = [];
+  a.fix.forEach(function(f){ fixTerms.push(escHtml(f)); });
+  a.cov.forEach(function(c){ fixTerms.push(escHtml(c)); });
+  a.interactions.forEach(function(i){ fixTerms.push(escHtml(i.v1)+' × '+escHtml(i.v2)); });
+
+  var rndTerms = [];
+  if (a.rnd) {
+    var slopes = a.randomSlopes.length > 0 ? a.randomSlopes.map(function(r){ return escHtml(r); }).join(' + ') : '1';
+    rndTerms.push('(' + slopes + ' | ' + escHtml(a.rnd) + ')');
+  }
+  if (a.rep) { rndTerms.push('(' + escHtml(a.rep) + ')'); }
+
+  var parts = [];
+  if (fixTerms.length)  parts.push(fixTerms.join(' + '));
+  if (rndTerms.length)  parts.push(rndTerms.join(' + '));
+
+  var eq = escHtml(dep) + ' = ' + (parts.length ? parts.join(' + ') : '…') + ' + ε';
+  qs('modelEquation').innerHTML = eq;
+}
+
+// ============================================================================
+// RUN BUTTON
+// ============================================================================
+function refreshRunButton() {
+  var a = STATE.assignments;
+  var ok = !!a.dep && (a.fix.length > 0 || a.cov.length > 0) && !!a.rnd;
+  qs('btnRun').disabled = !ok;
+
+  // Validation banner
+  var msgs = [];
+  if (!a.dep)  msgs.push('Dependent variable required');
+  if (!a.rnd)  msgs.push('Subject / grouping factor required');
+  if (a.fix.length === 0 && a.cov.length === 0) msgs.push('At least one fixed factor or covariate required');
+
+  var banner = qs('valBanner');
+  if (msgs.length && (a.dep || a.rnd || a.fix.length || a.cov.length)) {
+    banner.classList.add('show');
+    qs('valMsg').textContent = msgs.join(' · ');
+  } else {
+    banner.classList.remove('show');
+  }
+}
+
+// ============================================================================
+// RUN  &  CANCEL
+// ============================================================================
+qs('btnRun').addEventListener('click', function() {
+  var a = STATE.assignments;
+  if (!a.dep || !a.rnd || (a.fix.length === 0 && a.cov.length === 0)) {
+    showToast('Model incomplete. Assign: Dependent variable, Grouping factor, and at least one Fixed Factor or Covariate.', 'error', 6000);
+    return;
+  }
+
+  // Build ranges map
+  var ranges = {};
+  function addRange(name) {
+    if (STATE.variableStats[name]) ranges[name] = STATE.variableStats[name].rangeAddress || '';
+  }
+  if (a.dep) addRange(a.dep);
+  if (a.rnd) addRange(a.rnd);
+  if (a.rep) addRange(a.rep);
+  a.fix.forEach(addRange);
+  a.cov.forEach(addRange);
+
+  var modelSpec = {
+    dep:           a.dep,
+    fix:           a.fix,
+    cov:           a.cov,
+    rnd:           a.rnd,
+    rep:           a.rep || null,
+    interactions:  a.interactions,
+    randomSlopes:  a.randomSlopes,
+    ranges:        ranges,
+    options: {
+      method:       qs('optMethod').value,
+      df:           qs('optDF').value,
+      alpha:        parseFloat(qs('optAlpha').value),
+      covG:         qs('optCovG').value,
+      covR:         qs('optCovR').value,
+      typeIII:      qs('chkTypeIII').checked,
+      coefficients: qs('chkCoeffs').checked,
+      varComp:      qs('chkVarComp').checked,
+      emm:          qs('chkEMM').checked,
+      pairwise:     qs('chkPairwise').checked,
+      pAdj:         qs('chkPairwise').checked ? qs('optPAdj').value : 'none',
+      blup:         qs('chkBLUP').checked,
+      residuals:    qs('chkResid').checked,
+      ic:           qs('chkIC').checked,
+      pseudoR2:     qs('chkPseudoR2').checked
+    }
+  };
+
+  console.log('[mixed-input] Model spec:', modelSpec);
+  sendToHost('mixedModel', modelSpec);
+
+  showToast(
+    'Mixed Model Analysis Started<br>' +
+    '<strong>Dep:</strong> ' + escHtml(a.dep) + '&nbsp;&nbsp;' +
+    '<strong>Subject:</strong> ' + escHtml(a.rnd) + '<br>' +
+    '<strong>Fixed:</strong> ' + (a.fix.join(', ')||'—') + '<br>' +
+    '<strong>Covariates:</strong> ' + (a.cov.join(', ')||'—'),
+    'success', 5000
+  );
+});
+
+qs('btnCancel').addEventListener('click', function() {
+  sendToHost('cancel', null);
+});
+
+// ============================================================================
+// THEME TOGGLE
+// ============================================================================
+qs('cfgThemeToggle').addEventListener('click', toggleTheme);
+
+// ============================================================================
+// DATA LOADING  (called by VB6 / Office host)
+// ============================================================================
+
+// Primary entry point: VB6 calls window.populateVariableSelectionTable(varStats)
+window.populateVariableSelectionTable = function(varStats) {
+  console.log('[mixed-input] populateVariableSelectionTable:', varStats);
+  try {
+    STATE.variableStats = varStats;
+    STATE.variables = [];
+    for (var name in varStats) {
+      if (!varStats.hasOwnProperty(name)) continue;
+      var s = varStats[name];
+      STATE.variables.push({
+        name:       name,
+        validCount: s.count   || 0,
+        numeric:    s.numeric || 0,
+        string:     s.string  || 0,
+        missing:    s.missing || 0,
+        categories: s.categories || [],
+        rangeAddress: s.rangeAddress || ''
+      });
+    }
+    STATE.assignments = { dep:null, fix:[], cov:[], rnd:null, rep:null, interactions:[], randomSlopes:[] };
+
+    // Show UI
+    qs('loadingSpinner').style.display = 'none';
+    qs('mainContent').style.display   = 'flex';
+
+    // Range badge
+    var nVars = STATE.variables.length;
+    var nObs  = STATE.variables.length > 0 ? (STATE.variables[0].validCount || 0) : 0;
+    qs('metaBadge').textContent = nVars + ' vars · n = ' + nObs;
+
+    refreshAllZones();
+    refreshRunButton();
+    updateEquation();
+
+    // Wire drop zones now that UI is visible
+    document.querySelectorAll('.mx-zone-body').forEach(wireDropZone);
+
+  } catch(e) {
+    console.error('[mixed-input] error:', e);
+    showToast('Error loading variables: ' + e.message, 'error');
+  }
+};
+
+// Alternative entry: full row data (same as regression)
+window.loadMixedModelData = function(jsonString) {
+  try {
+    var data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+    if (!data || !data.headers || !data.rows) { showToast('Invalid data format', 'error'); return; }
+
+    var headers = data.headers;
+    var rows    = data.rows;
+
+    // Build varStats from raw rows
+    var stats = {};
+    headers.forEach(function(h) { stats[h] = { count:0, numeric:0, string:0, missing:0, categories:[], rangeAddress:'' }; });
+    rows.forEach(function(row) {
+      headers.forEach(function(h, hi) {
+        var v = Array.isArray(row) ? row[hi] : row[h];
+        if (v === null || v === undefined || v === '') { stats[h].missing++; return; }
+        stats[h].count++;
+        if (typeof v === 'number' || !isNaN(parseFloat(v))) { stats[h].numeric++; }
+        else { stats[h].string++; stats[h].categories.push(String(v)); }
+      });
+    });
+    // De-dup categories
+    headers.forEach(function(h) {
+      stats[h].categories = stats[h].categories.filter(function(v,i,a){ return a.indexOf(v)===i; });
+    });
+
+    if (data.address) qs('metaBadge').textContent = data.address;
+    window.populateVariableSelectionTable(stats);
+  } catch(e) {
+    console.error('[mixed-input] loadMixedModelData error:', e);
+    showToast('Error loading data: ' + e.message, 'error');
+  }
+};
+
+// ============================================================================
+// DEMO MODE  (no VB6 host — auto-loads sample variables)
+// ============================================================================
+(function demoInit() {
+  // Only run if after a small delay nothing has called populateVariableSelectionTable
+  setTimeout(function() {
+    if (STATE.variables.length === 0) {
+      console.log('[mixed-input] No data from host — loading demo variables');
+      window.populateVariableSelectionTable({
+        Score:       { count:120, numeric:120, string:0,  missing:0, categories:[], rangeAddress:'C2:C121' },
+        Treatment:   { count:120, numeric:0,   string:120,missing:0, categories:['Control','DrugA','DrugB'], rangeAddress:'D2:D121' },
+        Age:         { count:117, numeric:117, string:0,  missing:3, categories:[], rangeAddress:'E2:E121' },
+        Gender:      { count:120, numeric:0,   string:120,missing:0, categories:['M','F'], rangeAddress:'F2:F121' },
+        Time:        { count:120, numeric:120, string:0,  missing:0, categories:[], rangeAddress:'G2:G121' },
+        PatientID:   { count:120, numeric:0,   string:120,missing:0, categories:[], rangeAddress:'B2:B121' },
+        Dose:        { count:120, numeric:120, string:0,  missing:0, categories:[], rangeAddress:'H2:H121' }
+      });
+    }
+  }, 800);
+})();
+
+// ============================================================================
+// INIT — wire zones immediately (for demo path)
+// ============================================================================
+document.addEventListener('DOMContentLoaded', function() {
+  // Drop-zone wiring will also be called after data loads.
+  // Wire now in case of immediate demo auto-load.
+  document.querySelectorAll('.mx-zone-body').forEach(wireDropZone);
+  qs('cfgThemeToggle').addEventListener('click', toggleTheme);
+});
+
+</script>
+</body>
+</html>

@@ -3020,8 +3020,10 @@
 
     // ── Build design matrix X ──────────────────────────────────────
     // Detect categorical vars (string cols) and encode as dummies
+    // Include repVar in catSets detection so interactions with it work correctly
     const catSets = {};
-    fixVars.forEach(v => {
+    const allModelVars = fixVars.concat(repVar ? [repVar] : []);
+    allModelVars.forEach(v => {
       const idx = colIdx(v);
       if (idx === -1) return;
       const uniq = [...new Set(complete.map(r => r[idx]).filter(x => x !== '' && x != null))];
@@ -3040,11 +3042,28 @@
           out.push(parseFloat(r[idx]) || 0);
         }
       });
-      // Interaction terms
+      // Interaction terms — handle categorical × numeric, num × num, cat × cat
       ints.forEach(int => {
         const i1 = colIdx(int.v1), i2 = colIdx(int.v2);
         if (i1 === -1 || i2 === -1) { out.push(0); return; }
-        out.push((parseFloat(r[i1]) || 0) * (parseFloat(r[i2]) || 0));
+        const cat1 = catSets[int.v1], cat2 = catSets[int.v2];
+        if (!cat1 && !cat2) {
+          // numeric × numeric
+          out.push((parseFloat(r[i1]) || 0) * (parseFloat(r[i2]) || 0));
+        } else if (cat1 && !cat2) {
+          // categorical × numeric: one column per dummy level
+          const num2 = parseFloat(r[i2]) || 0;
+          cat1.forEach(level => out.push((String(r[i1]) === String(level) ? 1 : 0) * num2));
+        } else if (!cat1 && cat2) {
+          // numeric × categorical
+          const num1 = parseFloat(r[i1]) || 0;
+          cat2.forEach(level => out.push(num1 * (String(r[i2]) === String(level) ? 1 : 0)));
+        } else {
+          // categorical × categorical: one column per pair of levels
+          cat1.forEach(l1 => cat2.forEach(l2 =>
+            out.push((String(r[i1]) === String(l1) ? 1 : 0) * (String(r[i2]) === String(l2) ? 1 : 0))
+          ));
+        }
       });
       return out;
     }
@@ -3058,7 +3077,20 @@
       if (catSets[v]) catSets[v].forEach(l => paramNames.push(v + ' (' + l + ')'));
       else            paramNames.push(v);
     });
-    ints.forEach(int => paramNames.push(int.v1 + ' × ' + int.v2));
+    ints.forEach(int => {
+      const cat1 = catSets[int.v1], cat2 = catSets[int.v2];
+      if (!cat1 && !cat2) {
+        paramNames.push(int.v1 + ' × ' + int.v2);
+      } else if (cat1 && !cat2) {
+        cat1.forEach(l => paramNames.push(int.v1 + ' (' + l + ') × ' + int.v2));
+      } else if (!cat1 && cat2) {
+        cat2.forEach(l => paramNames.push(int.v1 + ' × ' + int.v2 + ' (' + l + ')'));
+      } else {
+        cat1.forEach(l1 => cat2.forEach(l2 =>
+          paramNames.push(int.v1 + ' (' + l1 + ') × ' + int.v2 + ' (' + l2 + ')')
+        ));
+      }
+    });
 
     // ── Iterative GLS for random-intercept model ───────────────────
     // θ = [sigma2_b (between), sigma2 (within)]

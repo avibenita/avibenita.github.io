@@ -433,6 +433,22 @@
     }
 
     /* ── Header action buttons (now removed from header) ─────── */
+    .mx-hdr-actions { display:flex; align-items:center; gap:5px; margin-left:auto; flex-shrink:0; }
+    .mx-hdr-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 11px; border-radius: 7px;
+      border: 1px solid rgba(255,255,255,.15);
+      background: rgba(255,255,255,.08);
+      color: rgba(255,255,255,.85);
+      font-size: 11.5px; font-weight: 600;
+      cursor: pointer; transition: background .15s, border-color .15s;
+      white-space: nowrap;
+    }
+    .mx-hdr-btn i { font-size: 11px; }
+    .mx-hdr-btn:hover:not(:disabled) { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.3); }
+    .mx-hdr-btn:disabled { opacity: .35; cursor: not-allowed; }
+    .mx-hdr-btn--diagram { background: rgba(167,139,250,.15); border-color: rgba(167,139,250,.4); color: #c4b5fd; }
+    .mx-hdr-btn--diagram:hover:not(:disabled) { background: rgba(167,139,250,.28); border-color: #a78bfa; }
 
     /* ── Custom prompt modal (replaces window.prompt) ─────────── */
     .mx-prompt-overlay {
@@ -584,6 +600,11 @@
     </div>
     <span class="cfg-header-title">Linear Mixed Model</span>
     <span class="cfg-meta-badge" id="metaBadge"></span>
+
+    <button class="mx-hdr-btn mx-hdr-btn--diagram" id="btnModelDiagram"
+            onclick="openInputDiagram()" title="Preview model structure diagram" disabled>
+      <i class="fa-solid fa-diagram-project"></i> Model Structure
+    </button>
 
     <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Toggle theme">
       <span class="cfg-toggle-icon">&#x1F319;</span>
@@ -1555,6 +1576,10 @@ function refreshRunButton() {
   qs('btnRun').disabled       = !ok;
   qs('btnSaveConfig').disabled = !ok;
 
+  // "Model Structure" button — enabled once a dep is assigned
+  var diagBtn = document.getElementById('btnModelDiagram');
+  if (diagBtn) diagBtn.disabled = !a.dep;
+
   // "Load previous…" — enabled only when there are saved models
   var hasSaved = getSavedModels().length > 0;
   qs('btnLoadPrev').disabled = !hasSaved;
@@ -1773,6 +1798,291 @@ if (typeof Office !== 'undefined') {
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.mx-zone-body').forEach(wireDropZone);
 });
+
+// ============================================================================
+// MODEL STRUCTURE DIAGRAM POPUP (input screen)
+// Uses the same SVG engine as mixed-results, reading from STATE.assignments
+// ============================================================================
+function openInputDiagram() {
+  if (document.getElementById('mxDiagOverlay')) return;
+
+  var a = STATE.assignments;
+  var overlay = document.createElement('div');
+  overlay.id = 'mxDiagOverlay';
+  overlay.style.cssText = [
+    'position:fixed;inset:0;z-index:9500',
+    'background:rgba(0,0,0,.65)',
+    'display:flex;align-items:center;justify-content:center'
+  ].join(';');
+
+  overlay.innerHTML =
+    '<div id="mxDiagBox" style="' +
+      'background:var(--cfg-surface2,#1c2333);' +
+      'border:1px solid rgba(167,139,250,.4);border-radius:14px;' +
+      'width:min(760px,95vw);max-height:88vh;' +
+      'display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.6);overflow:hidden;">' +
+      // Header
+      '<div style="display:flex;align-items:center;justify-content:space-between;' +
+           'padding:13px 17px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;">' +
+        '<span style="font-size:14px;font-weight:700;color:#e2e8f0;display:flex;align-items:center;gap:9px;">' +
+          '<i class="fa-solid fa-diagram-project" style="color:#a78bfa;"></i> Model Structure' +
+        '</span>' +
+        '<button id="mxDiagClose" style="background:none;border:none;cursor:pointer;' +
+                'color:#64748b;font-size:18px;padding:2px 7px;border-radius:5px;" title="Close">&#x2715;</button>' +
+      '</div>' +
+      // Tab bar
+      '<div style="display:flex;gap:4px;padding:10px 14px 0;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;">' +
+        '<button id="mxDiagTabReg" onclick="mxDiagTab(\'reg\')" style="' +
+                'display:inline-flex;align-items:center;gap:6px;padding:6px 14px;' +
+                'border-radius:8px 8px 0 0;border:1px solid rgba(167,139,250,.4);border-bottom:none;' +
+                'background:var(--cfg-surface2,#1c2333);color:#a78bfa;font-size:12px;font-weight:600;cursor:pointer;">' +
+          '<i class="fa-solid fa-arrow-right-to-bracket"></i> Regression' +
+        '</button>' +
+        '<button id="mxDiagTabHier" onclick="mxDiagTab(\'hier\')" style="' +
+                'display:inline-flex;align-items:center;gap:6px;padding:6px 14px;' +
+                'border-radius:8px 8px 0 0;border:1px solid transparent;border-bottom:none;' +
+                'background:transparent;color:#64748b;font-size:12px;font-weight:600;cursor:pointer;">' +
+          '<i class="fa-solid fa-sitemap"></i> Hierarchy' +
+        '</button>' +
+      '</div>' +
+      // Body
+      '<div style="overflow-y:auto;flex:1;min-height:0;">' +
+        '<div id="mxDiagReg" style="padding:16px 18px;">' +
+          '<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">' +
+            '<div style="flex:0 0 auto;">' +
+              '<svg id="mxDiagSvg" width="280" height="300" viewBox="0 0 280 300" ' +
+                   'style="display:block;overflow:visible;" xmlns="http://www.w3.org/2000/svg"></svg>' +
+            '</div>' +
+            '<div style="flex:1;min-width:180px;display:flex;flex-direction:column;gap:10px;">' +
+              '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#64748b;">Model formula</div>' +
+              '<div id="mxDiagEq" style="font-family:Courier New,monospace;font-size:12.5px;font-weight:600;' +
+                   'color:#a78bfa;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.25);' +
+                   'border-radius:8px;padding:10px 14px;word-break:break-all;line-height:1.6;"></div>' +
+              '<div id="mxDiagLeg" style="display:flex;flex-wrap:wrap;gap:7px;"></div>' +
+              '<div id="mxDiagInts" style="font-size:11px;font-weight:600;color:#f97316;' +
+                   'display:flex;flex-wrap:wrap;gap:5px;align-items:center;"></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div id="mxDiagHier" style="padding:16px 18px;display:none;">' +
+          '<div id="mxDiagHierBody"></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+
+  // Wire close
+  overlay.querySelector('#mxDiagClose').addEventListener('click', closeInputDiagram);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) closeInputDiagram(); });
+  document.addEventListener('keydown', _mxDiagKey = function(e) { if (e.key === 'Escape') closeInputDiagram(); });
+
+  // Render using STATE
+  var spec = {
+    dep: a.dep, fix: a.fix.slice(), cov: a.cov.slice(),
+    rnd: a.rnd, rep: a.rep,
+    interactions: (a.interactions||[]).map(function(i){return{v1:i.v1,v2:i.v2};}),
+    randomSlopes: (a.randomSlopes||[]).slice()
+  };
+  renderInputDiagramSvg(spec, 'mxDiagSvg', 'mxDiagEq', 'mxDiagLeg', 'mxDiagInts');
+  renderInputDiagramHier(spec, 'mxDiagHierBody');
+}
+
+var _mxDiagKey = null;
+function closeInputDiagram() {
+  var el = document.getElementById('mxDiagOverlay');
+  if (el) el.remove();
+  if (_mxDiagKey) { document.removeEventListener('keydown', _mxDiagKey); _mxDiagKey = null; }
+}
+function mxDiagTab(tab) {
+  document.getElementById('mxDiagReg').style.display  = tab === 'reg'  ? '' : 'none';
+  document.getElementById('mxDiagHier').style.display = tab === 'hier' ? '' : 'none';
+  var bReg  = document.getElementById('mxDiagTabReg');
+  var bHier = document.getElementById('mxDiagTabHier');
+  if (bReg)  { bReg.style.background  = tab==='reg'  ? 'var(--cfg-surface2,#1c2333)' : 'transparent';
+               bReg.style.borderColor = tab==='reg'  ? 'rgba(167,139,250,.4)' : 'transparent';
+               bReg.style.color       = tab==='reg'  ? '#a78bfa' : '#64748b'; }
+  if (bHier) { bHier.style.background  = tab==='hier' ? 'var(--cfg-surface2,#1c2333)' : 'transparent';
+               bHier.style.borderColor = tab==='hier' ? 'rgba(167,139,250,.4)' : 'transparent';
+               bHier.style.color       = tab==='hier' ? '#a78bfa' : '#64748b'; }
+}
+
+/* Shared SVG renderer (mirrors mixed-results renderModelDiagram) */
+function renderInputDiagramSvg(spec, svgId, eqId, legId, intsId) {
+  var svg = document.getElementById(svgId);
+  if (!svg) return;
+
+  var dep    = spec.dep  || 'outcome';
+  var fixes  = (spec.fix || []);
+  var covs   = (spec.cov || []);
+  var allFix = fixes.concat(covs);
+  var rnd    = spec.rnd  || null;
+  var rep    = spec.rep  || null;
+  var ints   = (spec.interactions || []).map(function(i){return i.v1+' × '+i.v2;});
+  var rndSlopes = (spec.randomSlopes || []);
+
+  var C = {
+    fix:  {bg:'rgba(59,130,246,.15)',   border:'#60a5fa', text:'#bfdbfe', label:'#93c5fd'},
+    cov:  {bg:'rgba(167,139,250,.13)',  border:'#a78bfa', text:'#ddd6fe', label:'#c4b5fd'},
+    out:  {bg:'#7c3aed',               border:'#a78bfa', text:'#fff'},
+    rnd:  {bg:'rgba(22,163,74,.14)',    border:'#4ade80', text:'#bbf7d0', label:'#86efac'},
+    rep:  {bg:'rgba(225,29,72,.12)',    border:'#fb7185', text:'#fda4af', label:'#f9a8d4'},
+    arr:  '#475569', dash:'#334155'
+  };
+
+  svg.innerHTML = '';
+  var ns = 'http://www.w3.org/2000/svg';
+  function se(tag, attrs) {
+    var e = document.createElementNS(ns, tag);
+    Object.keys(attrs).forEach(function(k){e.setAttribute(k,attrs[k]);});
+    return e;
+  }
+  function rc(x,y,w,h,fill,stroke,rx) {
+    return se('rect',{x:x,y:y,width:w,height:h,rx:rx||7,fill:fill,stroke:stroke,'stroke-width':1.5});
+  }
+  function tx(x,y,s,opts) {
+    opts = opts||{};
+    var t = se('text',{x:x,y:y,'text-anchor':opts.anchor||'middle','dominant-baseline':'central',
+      fill:opts.fill||'#e2e8f0','font-size':opts.sz||11,'font-weight':opts.w||'600',
+      'font-family':"'Segoe UI',Arial,sans-serif"});
+    t.textContent=s; return t;
+  }
+  // Defs
+  var defs = se('defs',{});
+  function mkM(id,col){
+    var m=se('marker',{id:id,'markerWidth':'8','markerHeight':'8','refX':'6','refY':'3','orient':'auto'});
+    m.appendChild(se('path',{d:'M0,0 L0,6 L8,3 z',fill:col})); return m;
+  }
+  defs.appendChild(mkM('mxArr', C.arr)); defs.appendChild(mkM('mxArrD', C.dash));
+  svg.appendChild(defs);
+
+  var W=280, cx=W/2, ITEM_H=26, ITEM_W=160, GAP=8, SEC_LH=16;
+  var fixTop=14;
+  var fixH = SEC_LH + (allFix.length||1)*(ITEM_H+GAP) + 4;
+  var fixBotY = fixTop+fixH, ARR_GAP=32;
+  var outY=fixBotY+ARR_GAP, outW=Math.max(100,dep.length*9+24), outH=34, outBotY=outY+outH;
+  var HGAP=18, hierY=outBotY+24;
+  var rndH = rnd ? (SEC_LH+ITEM_H+(rndSlopes.length?rndSlopes.length*(ITEM_H+GAP):0)+8) : 0;
+  var repH = rep ? (SEC_LH+ITEM_H+8) : 0;
+  var totalH = hierY + rndH + (rnd&&rep?HGAP:0) + repH + 20;
+
+  svg.setAttribute('width',W); svg.setAttribute('height',totalH);
+  svg.setAttribute('viewBox','0 0 '+W+' '+totalH);
+
+  // Fixed block
+  svg.appendChild(rc(cx-ITEM_W/2-4, fixTop, ITEM_W+8, fixH, 'rgba(59,130,246,.05)', C.fix.border, 10));
+  svg.appendChild(tx(cx, fixTop+SEC_LH/2+2, 'FIXED EFFECTS', {fill:C.fix.label,sz:9,w:'800'}));
+  allFix.forEach(function(f,i){
+    var isCov=covs.indexOf(f)>=0, pal=isCov?C.cov:C.fix;
+    var iy=fixTop+SEC_LH+i*(ITEM_H+GAP);
+    svg.appendChild(rc(cx-ITEM_W/2, iy, ITEM_W, ITEM_H, pal.bg, pal.border, 6));
+    svg.appendChild(tx(cx, iy+ITEM_H/2, f, {fill:pal.text,sz:11}));
+    if(isCov) svg.appendChild(tx(cx+ITEM_W/2-6, iy+ITEM_H/2, 'cov', {fill:C.cov.border,sz:8,anchor:'end',w:'700'}));
+  });
+  if(!allFix.length) svg.appendChild(tx(cx, fixTop+SEC_LH+ITEM_H/2, '(no fixed predictors)', {fill:'#475569',sz:10}));
+
+  // Arrow fixed→outcome
+  if(allFix.length) svg.appendChild(se('line',{x1:cx,y1:fixBotY+2,x2:cx,y2:outY-4,stroke:C.arr,'stroke-width':2,'marker-end':'url(#mxArr)'}));
+
+  // Outcome
+  svg.appendChild(rc(cx-outW/2, outY, outW, outH, C.out.bg, C.out.border, 9));
+  svg.appendChild(se('rect',{x:cx-outW/2,y:outY,width:outW,height:outH,rx:9,fill:'none',stroke:C.out.border,'stroke-width':2.5,opacity:.4}));
+  svg.appendChild(tx(cx, outY+outH/2, dep, {fill:'#fff',sz:13,w:'800'}));
+
+  // Random
+  if(rnd){
+    var ry=hierY;
+    svg.appendChild(se('line',{x1:cx,y1:ry-2,x2:cx,y2:outBotY+2,stroke:C.rnd.border,'stroke-width':1.5,'stroke-dasharray':'5,3','marker-end':'url(#mxArr)'}));
+    svg.appendChild(rc(cx-ITEM_W/2-4,ry,ITEM_W+8,rndH,C.rnd.bg,C.rnd.border,8));
+    svg.appendChild(tx(cx,ry+SEC_LH/2+2,'RANDOM STRUCTURE',{fill:C.rnd.label,sz:9,w:'800'}));
+    svg.appendChild(rc(cx-ITEM_W/2,ry+SEC_LH,ITEM_W,ITEM_H,'rgba(22,163,74,.2)',C.rnd.border,6));
+    svg.appendChild(tx(cx,ry+SEC_LH+ITEM_H/2,rnd+' — random intercept',{fill:C.rnd.text,sz:10.5}));
+    rndSlopes.forEach(function(s,si){
+      var sy=ry+SEC_LH+ITEM_H+GAP+si*(ITEM_H+GAP);
+      svg.appendChild(rc(cx-ITEM_W/2,sy,ITEM_W,ITEM_H,'rgba(22,163,74,.15)',C.rnd.border,6));
+      svg.appendChild(tx(cx,sy+ITEM_H/2,s+' — random slope',{fill:C.rnd.text,sz:10.5}));
+    });
+    hierY=ry+rndH+HGAP;
+  }
+  // Repeated
+  if(rep){
+    var rpy=hierY;
+    svg.appendChild(se('line',{x1:cx,y1:rpy-2,x2:cx,y2:(rnd?hierY-HGAP+rndH+2:outBotY+2),stroke:C.rep.border,'stroke-width':1.5,'stroke-dasharray':'4,3'}));
+    svg.appendChild(rc(cx-ITEM_W/2-4,rpy,ITEM_W+8,repH,C.rep.bg,C.rep.border,8));
+    svg.appendChild(tx(cx,rpy+SEC_LH/2+2,'REPEATED MEASURE',{fill:C.rep.label,sz:9,w:'800'}));
+    svg.appendChild(rc(cx-ITEM_W/2,rpy+SEC_LH,ITEM_W,ITEM_H,'rgba(225,29,72,.18)',C.rep.border,6));
+    svg.appendChild(tx(cx,rpy+SEC_LH+ITEM_H/2,rep+' — measurement occasions',{fill:C.rep.text,sz:10.5}));
+  }
+  // Equation
+  var eqEl=document.getElementById(eqId);
+  if(eqEl){
+    var fp=allFix.length?allFix.join(' + '):'1';
+    var ip=ints.length?' + '+ints.join(' + '):'';
+    var rp=rnd?(rndSlopes.length?' + (1 + '+rndSlopes.join(' + ')+'| '+rnd+')':' + (1 | '+rnd+')'):'';
+    var pp=rep?' + ['+rep+']':'';
+    eqEl.textContent=dep+' ~ '+fp+ip+rp+pp+' + ε';
+  }
+  // Legend
+  var legEl=document.getElementById(legId);
+  if(legEl){
+    var items=[{c:'#3b82f6',l:'Fixed factor'},{c:C.out.bg,l:'Outcome'}];
+    if(covs.length) items.push({c:'#a78bfa',l:'Covariate'});
+    if(rnd) items.push({c:C.rnd.border,l:'Random effect'});
+    if(rep) items.push({c:C.rep.border,l:'Repeated measure'});
+    legEl.innerHTML=items.map(function(i){
+      return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;'+
+        'padding:3px 9px;border-radius:20px;background:'+i.c+'22;border:1px solid '+i.c+'55;color:'+i.c+'">'+
+        '<span style="width:8px;height:8px;border-radius:50%;background:'+i.c+';display:inline-block;"></span>'+i.l+'</span>';
+    }).join('');
+  }
+  // Interactions
+  var intsEl=document.getElementById(intsId);
+  if(intsEl && ints.length){
+    intsEl.innerHTML='<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;">Interactions</span> '+
+      ints.map(function(i){return '<span style="background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.4);border-radius:20px;padding:2px 9px;font-size:11px;">'+escHtml(i)+'</span>';}).join('');
+  } else if(intsEl) intsEl.innerHTML='';
+}
+
+function renderInputDiagramHier(spec, elId) {
+  var el = document.getElementById(elId);
+  if (!el) return;
+  var dep=spec.dep||'outcome', allFix=(spec.fix||[]).concat(spec.cov||[]),
+      rnd=spec.rnd||null, rep=spec.rep||null, rndSlopes=spec.randomSlopes||[];
+  var rndLbl=rnd?(rndSlopes.length?'Random intercept + slopes ('+rndSlopes.join(', ')+')':'Random intercept'):null;
+  var lvlStyle='display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-radius:10px;margin-bottom:8px;border:1px solid transparent;';
+  var badgeStyle='flex-shrink:0;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;';
+  var connStyle='margin-left:46px;border-left:2px dashed rgba(100,116,139,.35);height:12px;';
+  var html='';
+  if(rnd){
+    html+='<div style="'+lvlStyle+'background:rgba(22,163,74,.08);border-color:rgba(74,222,128,.25);">'+
+      '<div style="'+badgeStyle+'background:#16a34a;">L2</div>'+
+      '<div><div style="font-weight:700;font-size:12px;color:#e2e8f0;">Subject level — <strong>'+escHtml(rnd)+'</strong></div>'+
+      '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">'+rndLbl+' · Each unique value of '+escHtml(rnd)+' is a cluster</div></div></div>'+
+      '<div style="'+connStyle+'"></div>';
+  }
+  if(rep){
+    html+='<div style="'+lvlStyle+'background:rgba(225,29,72,.08);border-color:rgba(251,113,133,.25);margin-left:32px;">'+
+      '<div style="'+badgeStyle+'background:#e11d48;">L1</div>'+
+      '<div><div style="font-weight:700;font-size:12px;color:#e2e8f0;">Observation level — <strong>'+escHtml(rep)+'</strong></div>'+
+      '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">Repeated occasions · Multiple obs per '+(rnd?escHtml(rnd):'subject')+'</div></div></div>'+
+      '<div style="'+connStyle+'margin-left:78px;"></div>';
+  } else if(rnd){
+    html+='<div style="'+lvlStyle+'background:rgba(225,29,72,.08);border-color:rgba(251,113,133,.25);margin-left:32px;">'+
+      '<div style="'+badgeStyle+'background:#e11d48;">L1</div>'+
+      '<div><div style="font-weight:700;font-size:12px;color:#e2e8f0;">Observation level</div>'+
+      '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">Observations nested within '+escHtml(rnd)+'</div></div></div>'+
+      '<div style="'+connStyle+'margin-left:78px;"></div>';
+  }
+  html+='<div style="'+lvlStyle+'background:rgba(124,58,237,.10);border-color:rgba(167,139,250,.3);margin-left:64px;">'+
+    '<div style="'+badgeStyle+'background:#7c3aed;">Y</div>'+
+    '<div><div style="font-weight:700;font-size:12px;color:#e2e8f0;">Outcome — <strong>'+escHtml(dep)+'</strong></div>'+
+    '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">Predicted by: '+(allFix.length?allFix.map(escHtml).join(', '):'(no predictors assigned)')+'</div></div></div>';
+  if(!rnd&&!rep){
+    html='<div style="padding:20px;color:#64748b;font-style:italic;font-size:12px;">'+
+      'Assign a Subject / Grouping Factor and optionally a Repeated Measure to see the hierarchical structure.</div>';
+  }
+  el.innerHTML=html;
+}
 
 </script>
 </body>

@@ -85,6 +85,8 @@
       display:flex; align-items:center; gap:6px; flex-wrap:nowrap; min-height:44px;
     }
     .depth-selector { margin-left:auto; display:flex; gap:4px; }
+    /* Model structure btn sits before depth selector (after it gets margin-left:auto) */
+    #btnModelStructure { order: -1; }
     .depth-btn {
       padding:5px 12px; border-radius:6px; border:1px solid var(--border);
       background:var(--surface-2); color:var(--text-secondary);
@@ -356,6 +358,19 @@
     .icc-bar-fill  { height:100%; border-radius:99px; background:linear-gradient(90deg,var(--accent-1),var(--accent-3)); transition:width .5s ease; }
 
     /* ── Model Structure Diagram ── */
+    #msdModal { background: rgba(0,0,0,.6); }
+    .msd-popup-btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 6px 14px; border-radius: 8px;
+      border: 1px solid rgba(167,139,250,.4);
+      background: rgba(167,139,250,.1);
+      color: #a78bfa; font-size: 12px; font-weight: 700;
+      cursor: pointer; transition: background .15s, border-color .15s;
+      white-space: nowrap;
+    }
+    .msd-popup-btn:hover:not(:disabled) { background: rgba(167,139,250,.22); border-color: #a78bfa; }
+    .msd-popup-btn:disabled { opacity: .35; cursor: not-allowed; }
+    .msd-popup-btn i { font-size: 11px; }
     .msd-tab-bar {
       display: flex; gap: 4px;
       padding: 10px 14px 0;
@@ -580,6 +595,10 @@
                   <button class="depth-btn active" data-depth="insight" onclick="setDepth('insight')">🟢 Insight</button>
                   <button class="depth-btn"        data-depth="analyst" onclick="setDepth('analyst')">🟡 Analyst</button>
                 </div>
+                <button class="msd-popup-btn" id="btnModelStructure" onclick="openMsdModal()"
+                        title="View model structure diagram" disabled>
+                  <i class="fa-solid fa-diagram-project"></i> Model Structure
+                </button>
               </div>
             </div>
 
@@ -603,47 +622,7 @@
                   </div>
 
                   <!-- ── Model Structure Diagram ─────────────────────── -->
-                  <div class="mm-section" id="msdSection">
-                    <div class="mm-section-header">
-                      <span><i class="fa-solid fa-diagram-project"></i> Model Structure</span>
-                      <button class="collapse-toggle" onclick="toggleSection('msdBody','msdToggle')" id="msdToggle">
-                        <i class="fa-solid fa-chevron-up"></i> Collapse
-                      </button>
-                    </div>
-                    <div class="mm-section-body collapsible-content" id="msdBody">
-                      <!-- Tab bar -->
-                      <div class="msd-tab-bar">
-                        <button class="msd-tab active" id="msdTabReg"    onclick="msdSwitchTab('regression')">
-                          <i class="fa-solid fa-arrow-right-to-bracket"></i> Regression
-                        </button>
-                        <button class="msd-tab"         id="msdTabHier"   onclick="msdSwitchTab('hierarchy')">
-                          <i class="fa-solid fa-sitemap"></i> Hierarchy
-                        </button>
-                      </div>
-                      <!-- Regression view -->
-                      <div id="msdViewRegression" class="msd-view">
-                        <div class="msd-wrap">
-                          <div class="msd-svg-col">
-                            <svg id="msdSvg" width="280" height="300" viewBox="0 0 280 300"
-                                 style="display:block;overflow:visible;"
-                                 xmlns="http://www.w3.org/2000/svg"></svg>
-                          </div>
-                          <div class="msd-eq-col">
-                            <div class="msd-eq-label">Model formula</div>
-                            <div class="msd-equation" id="msdEquation">Awaiting results…</div>
-                            <div class="msd-legend" id="msdLegend"></div>
-                            <div class="msd-ints" id="msdInts"></div>
-                          </div>
-                        </div>
-                      </div>
-                      <!-- Hierarchy view -->
-                      <div id="msdViewHierarchy" class="msd-view" style="display:none;">
-                        <div class="msd-hier" id="msdHier">Awaiting results…</div>
-                      </div>
-                    </div>
-                  </div>
-                  <!-- Tooltip (shared) -->
-                  <div id="msdTooltip" class="msd-tooltip" style="display:none;"></div>
+                  <!-- Moved to popup modal — triggered from toolbar button -->
 
                   <!-- KPI strip -->
                   <div class="kpi-strip" id="kpiStrip">
@@ -1352,6 +1331,9 @@
     renderVarianceDecomp(d);
     buildFactorSelectors(d);
     renderModelDiagram(d, _modelSpec);
+    // Enable the Model Structure popup button
+    const msdBtn = document.getElementById('btnModelStructure');
+    if (msdBtn) msdBtn.disabled = false;
     applyDepth(_depth);
 
     // Notify VB6 that rendering is complete
@@ -1469,6 +1451,29 @@
     document.getElementById('msdViewHierarchy').style.display  = tab === 'hierarchy'  ? '' : 'none';
     document.getElementById('msdTabReg').classList.toggle('active',  tab === 'regression');
     document.getElementById('msdTabHier').classList.toggle('active', tab === 'hierarchy');
+  };
+
+  window.openMsdModal = function() {
+    const modal = document.getElementById('msdModal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    // Reset to regression tab each open
+    msdSwitchTab('regression');
+    // Close on backdrop click
+    modal._bdHandler = function(e) { if (e.target === modal) closeMsdModal(); };
+    modal.addEventListener('click', modal._bdHandler);
+    // Close on Escape
+    modal._keyHandler = function(e) { if (e.key === 'Escape') closeMsdModal(); };
+    document.addEventListener('keydown', modal._keyHandler);
+  };
+
+  window.closeMsdModal = function() {
+    const modal = document.getElementById('msdModal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    if (modal._bdHandler)  { modal.removeEventListener('click', modal._bdHandler); }
+    if (modal._keyHandler) { document.removeEventListener('keydown', modal._keyHandler); }
+    hideMsdTip();
   };
 
   function renderModelDiagram(d, modelSpec) {
@@ -3449,6 +3454,59 @@
   }
 
   </script>
+
+  <!-- ══ Model Structure Popup Modal ═════════════════════════════════ -->
+  <div id="msdModal" style="display:none;position:fixed;inset:0;z-index:8000;
+       align-items:center;justify-content:center;">
+    <div style="background:var(--surface-1,#161b27);border:1px solid var(--border,#2d3a52);
+                border-radius:14px;width:min(780px,95vw);max-height:88vh;
+                display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.6);
+                overflow:hidden;">
+      <!-- Modal header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;
+                  padding:14px 18px;border-bottom:1px solid var(--border,#2d3a52);flex-shrink:0;">
+        <span style="font-size:14px;font-weight:700;color:var(--text-primary,#e2e8f0);display:flex;align-items:center;gap:9px;">
+          <i class="fa-solid fa-diagram-project" style="color:#a78bfa;"></i> Model Structure
+        </span>
+        <button onclick="closeMsdModal()" style="background:none;border:none;cursor:pointer;
+                color:var(--text-muted,#64748b);font-size:18px;padding:2px 7px;border-radius:5px;"
+                title="Close">&#x2715;</button>
+      </div>
+      <!-- Tab bar -->
+      <div class="msd-tab-bar" style="flex-shrink:0;">
+        <button class="msd-tab active" id="msdTabReg"  onclick="msdSwitchTab('regression')">
+          <i class="fa-solid fa-arrow-right-to-bracket"></i> Regression
+        </button>
+        <button class="msd-tab" id="msdTabHier" onclick="msdSwitchTab('hierarchy')">
+          <i class="fa-solid fa-sitemap"></i> Hierarchy
+        </button>
+      </div>
+      <!-- Scrollable content -->
+      <div style="overflow-y:auto;flex:1;min-height:0;">
+        <!-- Regression view -->
+        <div id="msdViewRegression" class="msd-view">
+          <div class="msd-wrap">
+            <div class="msd-svg-col">
+              <svg id="msdSvg" width="280" height="300" viewBox="0 0 280 300"
+                   style="display:block;overflow:visible;" xmlns="http://www.w3.org/2000/svg"></svg>
+            </div>
+            <div class="msd-eq-col">
+              <div class="msd-eq-label">Model formula</div>
+              <div class="msd-equation" id="msdEquation">Awaiting results…</div>
+              <div class="msd-legend" id="msdLegend"></div>
+              <div class="msd-ints"   id="msdInts"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Hierarchy view -->
+        <div id="msdViewHierarchy" class="msd-view" style="display:none;">
+          <div class="msd-hier" id="msdHier">Awaiting results…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Tooltip (shared, outside modal so it's always on top) -->
+  <div id="msdTooltip" class="msd-tooltip" style="display:none;"></div>
 
 </body>
 </html>

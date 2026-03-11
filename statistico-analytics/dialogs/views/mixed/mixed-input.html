@@ -431,6 +431,109 @@
       .mx-vars-col { flex: 0 0 auto; }
       .mx-opts-col  { flex: 0 0 auto; }
     }
+
+    /* ── Header action buttons (Save / Saved list) ────────────── */
+    .mx-hdr-actions {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+    .mx-hdr-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.10);
+      color: rgba(255,255,255,.9);
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+      white-space: nowrap;
+    }
+    .mx-hdr-btn:hover { background: rgba(255,255,255,.22); border-color: rgba(255,255,255,.35); }
+    .mx-hdr-btn i { font-size: 11px; }
+    .mx-hdr-btn--save  { background: rgba(99,200,100,.18); border-color: rgba(99,200,100,.4); }
+    .mx-hdr-btn--save:hover { background: rgba(99,200,100,.32); }
+    .mx-hdr-btn--list  { background: rgba(124,58,237,.22); border-color: rgba(167,139,250,.5); }
+    .mx-hdr-btn--list:hover { background: rgba(124,58,237,.38); }
+
+    /* ── Saved-list modal ─────────────────────────────────────── */
+    .mx-saved-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 9000;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .mx-saved-modal {
+      background: var(--cfg-surface2, #1c2333);
+      border: 1px solid var(--cfg-border, #2d3a52);
+      border-radius: 12px;
+      width: min(480px, 92vw);
+      max-height: 70vh;
+      display: flex; flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,.5);
+      overflow: hidden;
+    }
+    .mx-saved-modal-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--cfg-border, #2d3a52);
+      font-size: 13px; font-weight: 700;
+      color: var(--cfg-text1, #e2e8f0);
+    }
+    .mx-saved-modal-head i { color: #a78bfa; margin-right: 7px; }
+    .mx-saved-close {
+      background: none; border: none; cursor: pointer;
+      color: var(--cfg-text2, #94a3b8); font-size: 16px; padding: 2px 6px;
+    }
+    .mx-saved-close:hover { color: var(--cfg-text1, #e2e8f0); }
+    .mx-saved-list { overflow-y: auto; flex: 1; padding: 8px; }
+    .mx-saved-empty {
+      text-align: center; padding: 28px 16px;
+      font-size: 12px; font-style: italic;
+      color: var(--cfg-text3, #64748b);
+    }
+    .mx-saved-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 10px; border-radius: 8px;
+      border: 1px solid var(--cfg-border, #2d3a52);
+      margin-bottom: 6px;
+      cursor: pointer;
+      transition: background .12s;
+      color: var(--cfg-text1, #e2e8f0);
+    }
+    .mx-saved-item:hover { background: rgba(124,58,237,.15); border-color: #a78bfa; }
+    .mx-saved-item-icon {
+      width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+      background: linear-gradient(135deg,#7c3aed,#a78bfa);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 13px;
+    }
+    .mx-saved-item-body { flex: 1; min-width: 0; }
+    .mx-saved-item-name {
+      font-size: 12.5px; font-weight: 600; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .mx-saved-item-meta {
+      font-size: 10.5px; color: var(--cfg-text2, #94a3b8); margin-top: 2px;
+    }
+    .mx-saved-item-del {
+      background: none; border: none; cursor: pointer;
+      color: var(--cfg-text3, #64748b); font-size: 13px; padding: 4px 6px;
+      border-radius: 5px; flex-shrink: 0;
+    }
+    .mx-saved-item-del:hover { color: #f87171; background: rgba(248,113,113,.12); }
+    .mx-saved-modal-foot {
+      padding: 10px 14px;
+      border-top: 1px solid var(--cfg-border, #2d3a52);
+      display: flex; justify-content: flex-end; gap: 8px;
+    }
+    .mx-saved-modal-foot .cfg-btn { min-width: 80px; font-size: 12px; padding: 6px 14px; }
   </style>
 </head>
 
@@ -444,6 +547,17 @@
     </div>
     <span class="cfg-header-title">Linear Mixed Model</span>
     <span class="cfg-meta-badge" id="metaBadge"></span>
+
+    <!-- Action buttons -->
+    <div class="mx-hdr-actions">
+      <button class="mx-hdr-btn mx-hdr-btn--list" id="btnShowSaved" onclick="showSavedList()" title="Load a saved model configuration">
+        <i class="fa-solid fa-list-ul"></i> Saved
+      </button>
+      <button class="mx-hdr-btn mx-hdr-btn--save" id="btnSaveModel" onclick="saveModelSpec()" title="Save current model configuration">
+        <i class="fa-solid fa-floppy-disk"></i> Save
+      </button>
+    </div>
+
     <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Toggle theme">
       <span class="cfg-toggle-icon">&#x1F319;</span>
       <div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div>
@@ -810,6 +924,147 @@ function showToast(msg, type, duration) {
     '<button onclick="this.parentNode.remove()" style="background:none;border:none;cursor:pointer;color:#555;font-size:16px;padding:0;line-height:1">&times;</button>';
   qs('toastContainer').appendChild(t);
   setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); }, duration);
+}
+
+// ============================================================================
+// SAVE / LOAD MODEL SPEC
+// ============================================================================
+var MX_SAVED_KEY = 'statistico-mixed-saved';
+
+function getSavedModels() {
+  try { return JSON.parse(localStorage.getItem(MX_SAVED_KEY) || '[]'); } catch(e) { return []; }
+}
+function putSavedModels(arr) {
+  try { localStorage.setItem(MX_SAVED_KEY, JSON.stringify(arr)); } catch(e) {}
+}
+
+function saveModelSpec() {
+  var a = STATE.assignments;
+  if (!a.dep) { showToast('Assign a Dependent variable before saving.', 'warning'); return; }
+
+  // Build a readable default name
+  var parts = [];
+  if (a.dep)  parts.push(a.dep);
+  if (a.fix.length) parts.push('by ' + a.fix.join('+'));
+  if (a.rep)  parts.push('over ' + a.rep);
+  var defaultName = parts.join(' ') || 'Mixed Model';
+
+  var name = window.prompt('Save model as:', defaultName);
+  if (!name || !name.trim()) return;
+
+  var saved = getSavedModels();
+  var entry = {
+    id:        'mx_' + Date.now(),
+    name:      name.trim(),
+    savedAt:   new Date().toISOString(),
+    modelSpec: {
+      dep: a.dep,
+      fix: a.fix.slice(),
+      cov: a.cov.slice(),
+      rnd: a.rnd,
+      rep: a.rep,
+      interactions:  (a.interactions  || []).map(function(i){ return {v1:i.v1,v2:i.v2}; }),
+      randomSlopes:  (a.randomSlopes  || []).slice(),
+      options:       JSON.parse(JSON.stringify(STATE.options || {}))
+    }
+  };
+  saved.unshift(entry);
+  if (saved.length > 20) saved = saved.slice(0, 20);
+  putSavedModels(saved);
+  showToast('Model "' + entry.name + '" saved.', 'success');
+}
+
+function showSavedList() {
+  if (document.getElementById('mxSavedOverlay')) return;
+
+  var saved = getSavedModels();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'mxSavedOverlay';
+  overlay.className = 'mx-saved-overlay';
+
+  var listHtml = '';
+  if (saved.length === 0) {
+    listHtml = '<div class="mx-saved-empty"><i class="fa-solid fa-layer-group" style="font-size:22px;opacity:.35;display:block;margin-bottom:10px;"></i>No saved models yet.<br>Configure a model and click <strong>Save</strong>.</div>';
+  } else {
+    saved.forEach(function(item) {
+      var date = '';
+      try { date = new Date(item.savedAt).toLocaleString(); } catch(e){}
+      var spec = item.modelSpec || {};
+      var parts = [];
+      if (spec.dep)  parts.push('dep: ' + spec.dep);
+      if ((spec.fix||[]).length) parts.push('fix: ' + spec.fix.join(', '));
+      if (spec.rep)  parts.push('rep: ' + spec.rep);
+      listHtml +=
+        '<div class="mx-saved-item" onclick="loadSavedModel(\'' + item.id + '\')">' +
+          '<div class="mx-saved-item-icon"><i class="fa-solid fa-layer-group"></i></div>' +
+          '<div class="mx-saved-item-body">' +
+            '<div class="mx-saved-item-name">' + escHtml(item.name) + '</div>' +
+            '<div class="mx-saved-item-meta">' + escHtml(parts.join(' · ')) + ' &nbsp;·&nbsp; ' + escHtml(date) + '</div>' +
+          '</div>' +
+          '<button class="mx-saved-item-del" onclick="deleteSavedModel(event,\'' + item.id + '\')" title="Delete"><i class="fa-solid fa-trash"></i></button>' +
+        '</div>';
+    });
+  }
+
+  overlay.innerHTML =
+    '<div class="mx-saved-modal">' +
+      '<div class="mx-saved-modal-head">' +
+        '<span><i class="fa-solid fa-list-ul"></i>Saved Models</span>' +
+        '<button class="mx-saved-close" onclick="closeSavedList()" title="Close">&#x2715;</button>' +
+      '</div>' +
+      '<div class="mx-saved-list" id="mxSavedList">' + listHtml + '</div>' +
+      '<div class="mx-saved-modal-foot">' +
+        '<button class="cfg-btn cancel" onclick="closeSavedList()"><i class="fa-solid fa-times"></i> Close</button>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+
+  // Close on backdrop click
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) closeSavedList();
+  });
+}
+
+function closeSavedList() {
+  var el = document.getElementById('mxSavedOverlay');
+  if (el) el.remove();
+}
+
+function loadSavedModel(id) {
+  var saved = getSavedModels();
+  var item = saved.find(function(s){ return s.id === id; });
+  if (!item || !item.modelSpec) { showToast('Model not found.', 'error'); return; }
+
+  var spec = item.modelSpec;
+  // Reset state
+  STATE.assignments = {
+    dep: spec.dep || null,
+    fix: (spec.fix || []).slice(),
+    cov: (spec.cov || []).slice(),
+    rnd: spec.rnd || null,
+    rep: spec.rep || null,
+    interactions: (spec.interactions || []).map(function(i){ return {v1:i.v1,v2:i.v2}; }),
+    randomSlopes: (spec.randomSlopes || []).slice()
+  };
+  if (spec.options) STATE.options = JSON.parse(JSON.stringify(spec.options));
+
+  refreshAllZones();
+  refreshInteractionSelectors();
+  updateEquation();
+  closeSavedList();
+  showToast('Model "' + item.name + '" loaded.', 'success');
+}
+
+function deleteSavedModel(event, id) {
+  event.stopPropagation();
+  if (!confirm('Delete this saved model?')) return;
+  var saved = getSavedModels().filter(function(s){ return s.id !== id; });
+  putSavedModels(saved);
+  // Re-render list
+  closeSavedList();
+  showSavedList();
 }
 
 // ============================================================================

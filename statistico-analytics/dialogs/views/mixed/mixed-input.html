@@ -1017,17 +1017,39 @@ function renderZone(zone, names, phEl) {
 // INTERACTION BUILDER
 // ============================================================================
 function refreshInteractionSelectors() {
-  var allFixed = STATE.assignments.fix.concat(STATE.assignments.cov);
+  // Include fixed factors, covariates, AND repeated measure (time variable)
+  var allTerms = STATE.assignments.fix.concat(STATE.assignments.cov);
+  if (STATE.assignments.rep) allTerms = allTerms.concat([STATE.assignments.rep]);
+
   ['intVar1','intVar2'].forEach(function(id) {
     var sel = qs(id);
     var cur = sel.value;
     sel.innerHTML = '<option value="">— Term —</option>';
-    allFixed.forEach(function(n) {
+    allTerms.forEach(function(n) {
       var opt = document.createElement('option');
       opt.value = n; opt.textContent = n;
       if (n === cur) opt.selected = true;
       sel.appendChild(opt);
     });
+  });
+
+  // Auto-suggest group × time when repeated measure + at least one fixed factor are assigned
+  maybeAutoSuggestInteraction();
+}
+
+function maybeAutoSuggestInteraction() {
+  var rep = STATE.assignments.rep;
+  var fixes = STATE.assignments.fix;
+  if (!rep || fixes.length === 0) return;
+
+  // For each fixed factor, suggest factor × time if not already added
+  fixes.forEach(function(factor) {
+    var alreadyAdded = STATE.assignments.interactions.some(function(i) {
+      return (i.v1===factor && i.v2===rep) || (i.v1===rep && i.v2===factor);
+    });
+    if (!alreadyAdded) {
+      // Surface suggestion via the chips area — rendered by refreshIntChips
+    }
   });
 }
 
@@ -1036,10 +1058,58 @@ function refreshIntChips() {
   if (!box) return;
   box.innerHTML = '';
   var ints = STATE.assignments.interactions;
-  if (ints.length === 0) {
+
+  // ── Suggestion pills: factor × repeated-measure ──────────────────
+  var rep   = STATE.assignments.rep;
+  var fixes = STATE.assignments.fix;
+  var suggestions = [];
+  if (rep && fixes.length > 0) {
+    fixes.forEach(function(factor) {
+      var alreadyAdded = ints.some(function(i) {
+        return (i.v1===factor && i.v2===rep) || (i.v1===rep && i.v2===factor);
+      });
+      if (!alreadyAdded) suggestions.push({ v1: factor, v2: rep });
+    });
+  }
+
+  if (suggestions.length > 0) {
+    var hint = document.createElement('div');
+    hint.style.cssText = 'width:100%;display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:4px;';
+    hint.innerHTML = '<span style="font-size:10px;color:var(--cfg-text3);white-space:nowrap;">💡 Suggested:</span>';
+    suggestions.forEach(function(sug) {
+      var pill = document.createElement('button');
+      pill.style.cssText = [
+        'display:inline-flex;align-items:center;gap:4px',
+        'padding:3px 8px',
+        'background:rgba(249,115,22,.12)',
+        'border:1px dashed rgba(249,115,22,.5)',
+        'border-radius:20px',
+        'font-size:11px;font-weight:600',
+        'color:var(--cfg-run-from)',
+        'cursor:pointer',
+        'transition:background .15s'
+      ].join(';');
+      pill.innerHTML = '<i class="fa-solid fa-plus" style="font-size:9px"></i> ' +
+        escHtml(sug.v1) + ' × ' + escHtml(sug.v2);
+      pill.title = 'Add suggested interaction';
+      pill.addEventListener('mouseenter', function(){ this.style.background='rgba(249,115,22,.22)'; });
+      pill.addEventListener('mouseleave', function(){ this.style.background='rgba(249,115,22,.12)'; });
+      pill.addEventListener('click', function() {
+        STATE.assignments.interactions.push({ v1: sug.v1, v2: sug.v2 });
+        refreshIntChips();
+        updateEquation();
+      });
+      hint.appendChild(pill);
+    });
+    box.appendChild(hint);
+  }
+
+  // ── Added interaction chips ───────────────────────────────────────
+  if (ints.length === 0 && suggestions.length === 0) {
     box.innerHTML = '<span style="font-size:11px;color:var(--cfg-text3);font-style:italic;">No interactions specified</span>';
     return;
   }
+
   ints.forEach(function(int, idx) {
     var chip = document.createElement('span');
     chip.className = 'int-chip';

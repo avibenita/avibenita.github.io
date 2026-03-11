@@ -355,6 +355,37 @@
     .icc-bar-track { background:rgba(255,255,255,.08); border-radius:99px; height:10px; flex:1; overflow:hidden; }
     .icc-bar-fill  { height:100%; border-radius:99px; background:linear-gradient(90deg,var(--accent-1),var(--accent-3)); transition:width .5s ease; }
 
+    /* ── Model Structure Diagram ── */
+    .msd-wrap {
+      padding: 14px 16px;
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .msd-svg-col { flex: 0 0 auto; }
+    .msd-eq-col  { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 10px; justify-content: center; }
+    .msd-equation {
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent-3);
+      background: rgba(167,139,250,.1);
+      border: 1px solid rgba(167,139,250,.3);
+      border-radius: 8px;
+      padding: 10px 14px;
+      word-break: break-all;
+    }
+    .msd-legend { display: flex; flex-wrap: wrap; gap: 8px; }
+    .msd-legend-item {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 600;
+      padding: 3px 9px; border-radius: 20px;
+    }
+    .msd-legend-item .msd-dot {
+      width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+    }
+
     /* ── Tab section grid helpers ── */
     .two-col-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
     @media(max-width:900px) { .two-col-grid { grid-template-columns:1fr; } }
@@ -516,6 +547,29 @@
                       <p class="conclusion-verdict" id="conclusionVerdict">Awaiting results…</p>
                       <p class="conclusion-detail"  id="conclusionDetail"></p>
                       <div class="conclusion-microtags" id="conclusionTags"></div>
+                    </div>
+                  </div>
+
+                  <!-- ── Model Structure Diagram ─────────────────────── -->
+                  <div class="mm-section" id="msdSection">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-diagram-project"></i> Model Structure</span>
+                      <button class="collapse-toggle" onclick="toggleSection('msdBody','msdToggle')" id="msdToggle">
+                        <i class="fa-solid fa-chevron-up"></i> Collapse
+                      </button>
+                    </div>
+                    <div class="mm-section-body collapsible-content" id="msdBody">
+                      <div class="msd-wrap">
+                        <div class="msd-svg-col">
+                          <svg id="msdSvg" width="260" height="300" viewBox="0 0 260 300"
+                               style="display:block;overflow:visible;"
+                               xmlns="http://www.w3.org/2000/svg"></svg>
+                        </div>
+                        <div class="msd-eq-col">
+                          <div class="msd-equation" id="msdEquation">Awaiting results…</div>
+                          <div class="msd-legend" id="msdLegend"></div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -1225,6 +1279,7 @@
     renderForestPlot(d);
     renderVarianceDecomp(d);
     buildFactorSelectors(d);
+    renderModelDiagram(d, receivedModelSpec);
     applyDepth(_depth);
 
     // Notify VB6 that rendering is complete
@@ -1328,6 +1383,167 @@
     setText('r2c',    d.r2c !== undefined ? `${(d.r2c * 100).toFixed(2)}%` : '—');
     setText('varFixed', fmt(d.varFixed ?? d.sigmaFixed));
     setText('varResid', fmt(d.varResidual ?? d.sigma2));
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     MODEL STRUCTURE DIAGRAM  (SVG, auto-generated from modelSpec)
+  ───────────────────────────────────────────────────────────── */
+  function renderModelDiagram(d, modelSpec) {
+    const svg    = document.getElementById('msdSvg');
+    const eqEl   = document.getElementById('msdEquation');
+    const legEl  = document.getElementById('msdLegend');
+    if (!svg || !eqEl || !legEl) return;
+
+    // ── Palette ───────────────────────────────────────────────
+    const PAL = {
+      fixed:   { bg: '#3b82f6', border: '#60a5fa', text: '#fff' },   // blue
+      outcome: { bg: '#7c3aed', border: '#a78bfa', text: '#fff' },   // purple
+      random:  { bg: '#16a34a', border: '#4ade80', text: '#fff' },   // green
+      rep:     { bg: '#e11d48', border: '#fb7185', text: '#fff' },   // rose
+      arrow:   '#64748b',
+      line:    '#334155'
+    };
+
+    // ── Collect spec ─────────────────────────────────────────
+    const spec    = modelSpec || {};
+    const dep     = spec.dep  || (d && d.dependentVar) || 'outcome';
+    const fixes   = (spec.fix || []).concat(spec.cov || []);
+    const rnd     = spec.rnd  || null;
+    const rep     = spec.rep  || null;
+    const ints    = (spec.interactions || []).map(i => `${i.v1}×${i.v2}`);
+
+    // ── Layout constants ─────────────────────────────────────
+    const W = 260, cx = W / 2;
+    const BOX_W = 200, BOX_H = 28;
+    const ITEM_H = 24;
+    const fixedTop = 10;
+    const fixedGroupH = 28 + fixes.length * ITEM_H + 8;
+    const outcomeY = fixedTop + fixedGroupH + 40;
+    const randomY  = outcomeY + 80;
+    const repY     = rnd ? randomY + 80 : outcomeY + 80;
+
+    let totalH = repY + (rep ? 60 : 0) + 20;
+    svg.setAttribute('height', totalH);
+    svg.setAttribute('viewBox', `0 0 ${W} ${totalH}`);
+    svg.innerHTML = '';
+
+    function svgEl(tag, attrs) {
+      const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k, v));
+      return el;
+    }
+    function box(x, y, w, h, fill, stroke, rx) {
+      return svgEl('rect', { x, y, width: w, height: h, rx: rx||6,
+                              fill, stroke, 'stroke-width': 1.5 });
+    }
+    function text(x, y, content, opts={}) {
+      const t = svgEl('text', {
+        x, y, 'text-anchor': opts.anchor||'middle',
+        'dominant-baseline': 'central',
+        fill: opts.fill||'#e2e8f0',
+        'font-size': opts.size||11,
+        'font-weight': opts.weight||'600',
+        'font-family': "'Segoe UI',Arial,sans-serif"
+      });
+      t.textContent = content;
+      return t;
+    }
+    function arrow(x1, y1, x2, y2, col) {
+      const g = svgEl('g', {});
+      g.appendChild(svgEl('line', { x1, y1, x2, y2, stroke: col||PAL.arrow, 'stroke-width': 1.5,
+                                    'marker-end': 'url(#arrowhead)' }));
+      return g;
+    }
+    function dashedLine(x1,y1,x2,y2,col){
+      return svgEl('line',{ x1,y1,x2,y2, stroke:col||PAL.arrow,'stroke-width':1.5,
+                             'stroke-dasharray':'4,3','marker-end':'url(#arrowhead)' });
+    }
+
+    // ── Defs: arrowhead ──────────────────────────────────────
+    const defs = svgEl('defs', {});
+    const marker = svgEl('marker', { id:'arrowhead', markerWidth:'8', markerHeight:'8',
+                                     refX:'6', refY:'3', orient:'auto' });
+    marker.appendChild(svgEl('path', { d:'M0,0 L0,6 L8,3 z', fill: PAL.arrow }));
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+
+    // ── 1. FIXED EFFECTS block ───────────────────────────────
+    const fgH = fixedGroupH;
+    // Group border
+    svg.appendChild(box(cx - BOX_W/2, fixedTop, BOX_W, fgH, 'rgba(59,130,246,.1)', PAL.fixed.border, 8));
+    // Label
+    svg.appendChild(text(cx, fixedTop + 12, 'FIXED EFFECTS',
+                     { fill: PAL.fixed.border, size: 9, weight: '700', anchor: 'middle' }));
+    fixes.forEach((f, i) => {
+      const fy = fixedTop + 22 + i * ITEM_H + ITEM_H/2;
+      const itemW = BOX_W - 20;
+      svg.appendChild(box(cx - itemW/2, fixedTop + 22 + i * ITEM_H, itemW, ITEM_H - 2,
+                          'rgba(59,130,246,.25)', PAL.fixed.border, 5));
+      svg.appendChild(text(cx, fy, f, { fill: '#bfdbfe', size: 10.5 }));
+    });
+    if (fixes.length === 0) {
+      svg.appendChild(text(cx, fixedTop + 26, '(no fixed predictors)', { fill:'#475569', size:10 }));
+    }
+
+    // ── Arrow: fixed → outcome ───────────────────────────────
+    const fixedArrowY = fixedTop + fgH;
+    svg.appendChild(arrow(cx, fixedArrowY, cx, outcomeY - 14));
+
+    // ── 2. OUTCOME box ───────────────────────────────────────
+    const outW = Math.max(100, dep.length * 8 + 24);
+    svg.appendChild(box(cx - outW/2, outcomeY, outW, BOX_H, PAL.outcome.bg, PAL.outcome.border, 8));
+    svg.appendChild(text(cx, outcomeY + BOX_H/2, dep, { fill: '#fff', size: 12, weight: '700' }));
+
+    // ── 3. RANDOM EFFECT block ───────────────────────────────
+    if (rnd) {
+      // Arrow: outcome ← random (from below)
+      svg.appendChild(dashedLine(cx, randomY, cx, outcomeY + BOX_H + 2));
+
+      const rndW = BOX_W - 20;
+      svg.appendChild(box(cx - rndW/2, randomY, rndW, BOX_H + 16, 'rgba(22,163,74,.12)', PAL.random.border, 8));
+      svg.appendChild(text(cx, randomY + 12, 'RANDOM EFFECT', { fill: PAL.random.border, size: 9, weight: '700' }));
+      svg.appendChild(text(cx, randomY + 28, rnd + '  (random intercept)',
+                       { fill: '#bbf7d0', size: 10.5 }));
+    }
+
+    // ── 4. REPEATED MEASURE block ────────────────────────────
+    if (rep) {
+      const repBase = rnd ? randomY + BOX_H + 22 : outcomeY + BOX_H + 22;
+      svg.appendChild(dashedLine(cx, repBase + BOX_H + 14, cx, (rnd ? randomY + BOX_H + 16 : outcomeY + BOX_H + 2)));
+
+      const repW = BOX_W - 30;
+      svg.appendChild(box(cx - repW/2, repBase, repW, BOX_H + 10, 'rgba(225,29,72,.12)', PAL.rep.border, 8));
+      svg.appendChild(text(cx, repBase + 10, 'REPEATED MEASURE', { fill: PAL.rep.border, size: 9, weight: '700' }));
+      svg.appendChild(text(cx, repBase + 26, rep, { fill: '#fda4af', size: 10.5 }));
+    }
+
+    // ── Interaction annotations ──────────────────────────────
+    if (ints.length > 0) {
+      const intY = fixedTop + fgH + 14;
+      svg.appendChild(text(W - 4, intY, 'Interactions: ' + ints.join(', '),
+                       { fill: '#f97316', size: 9, anchor: 'end', weight: '600' }));
+    }
+
+    // ── Equation ─────────────────────────────────────────────
+    const fixStr   = fixes.length ? fixes.join(' + ') : '';
+    const intStr   = ints.length  ? ' + ' + ints.join(' + ') : '';
+    const rndStr   = rnd ? ` + (1 | ${rnd})` : '';
+    const repStr   = rep ? ` + [${rep}]` : '';
+    eqEl.textContent = `${dep} ~ ${fixStr || '1'}${intStr}${rndStr}${repStr} + ε`;
+
+    // ── Legend ───────────────────────────────────────────────
+    const legendItems = [
+      { color: PAL.fixed.bg,   label: 'Fixed effect'     },
+      { color: PAL.outcome.bg, label: 'Outcome'          },
+    ];
+    if (rnd) legendItems.push({ color: PAL.random.border, label: 'Random effect' });
+    if (rep) legendItems.push({ color: PAL.rep.border,    label: 'Repeated measure' });
+
+    legEl.innerHTML = legendItems.map(i =>
+      `<span class="msd-legend-item" style="background:${i.color}22;border:1px solid ${i.color}55;color:${i.color}">
+         <span class="msd-dot" style="background:${i.color}"></span>${i.label}
+       </span>`
+    ).join('');
   }
 
   /* ─────────────────────────────────────────────────────────────

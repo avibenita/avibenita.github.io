@@ -432,35 +432,30 @@
       .mx-opts-col  { flex: 0 0 auto; }
     }
 
-    /* ── Header action buttons (Save / Saved list) ────────────── */
-    .mx-hdr-actions {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      margin-left: auto;
-      flex-shrink: 0;
+    /* ── Header action buttons (now removed from header) ─────── */
+
+    /* ── Footer utility buttons ───────────────────────────────── */
+    #btnSaveConfig {
+      background: rgba(74,222,128,.12);
+      border-color: rgba(74,222,128,.45);
+      color: #4ade80;
     }
-    .mx-hdr-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 5px 10px;
-      border-radius: 6px;
-      border: 1px solid rgba(255,255,255,.18);
-      background: rgba(255,255,255,.10);
-      color: rgba(255,255,255,.9);
-      font-size: 11.5px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background .15s, border-color .15s;
-      white-space: nowrap;
+    #btnSaveConfig:hover:not(:disabled) {
+      background: rgba(74,222,128,.22);
+      border-color: #4ade80;
     }
-    .mx-hdr-btn:hover { background: rgba(255,255,255,.22); border-color: rgba(255,255,255,.35); }
-    .mx-hdr-btn i { font-size: 11px; }
-    .mx-hdr-btn--save  { background: rgba(99,200,100,.18); border-color: rgba(99,200,100,.4); }
-    .mx-hdr-btn--save:hover { background: rgba(99,200,100,.32); }
-    .mx-hdr-btn--list  { background: rgba(124,58,237,.22); border-color: rgba(167,139,250,.5); }
-    .mx-hdr-btn--list:hover { background: rgba(124,58,237,.38); }
+    #btnSaveConfig:disabled { opacity: .38; cursor: not-allowed; }
+
+    #btnLoadPrev {
+      background: rgba(167,139,250,.12);
+      border-color: rgba(167,139,250,.45);
+      color: #a78bfa;
+    }
+    #btnLoadPrev:hover:not(:disabled) {
+      background: rgba(167,139,250,.22);
+      border-color: #a78bfa;
+    }
+    #btnLoadPrev:disabled { opacity: .38; cursor: not-allowed; }
 
     /* ── Saved-list modal ─────────────────────────────────────── */
     .mx-saved-overlay {
@@ -547,16 +542,6 @@
     </div>
     <span class="cfg-header-title">Linear Mixed Model</span>
     <span class="cfg-meta-badge" id="metaBadge"></span>
-
-    <!-- Action buttons -->
-    <div class="mx-hdr-actions">
-      <button class="mx-hdr-btn mx-hdr-btn--list" id="btnShowSaved" onclick="showSavedList()" title="Load a saved model configuration">
-        <i class="fa-solid fa-list-ul"></i> Saved
-      </button>
-      <button class="mx-hdr-btn mx-hdr-btn--save" id="btnSaveModel" onclick="saveModelSpec()" title="Save current model configuration">
-        <i class="fa-solid fa-floppy-disk"></i> Save
-      </button>
-    </div>
 
     <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Toggle theme">
       <span class="cfg-toggle-icon">&#x1F319;</span>
@@ -840,6 +825,14 @@
       <button class="cfg-btn cancel" id="btnCancel">
         <i class="fa-solid fa-times"></i> Cancel
       </button>
+      <button class="cfg-btn" id="btnLoadPrev" onclick="showSavedList()"
+              style="gap:6px;" disabled title="Load a previously saved configuration">
+        <i class="fa-solid fa-clock-rotate-left"></i> Load previous…
+      </button>
+      <button class="cfg-btn" id="btnSaveConfig" onclick="saveModelSpec()"
+              style="gap:6px;" disabled title="Save current configuration">
+        <i class="fa-solid fa-floppy-disk"></i> Save configuration
+      </button>
       <button class="cfg-btn run" id="btnRun" disabled>
         <i class="fa-solid fa-play"></i> Run Mixed Model
       </button>
@@ -972,6 +965,7 @@ function saveModelSpec() {
   if (saved.length > 20) saved = saved.slice(0, 20);
   putSavedModels(saved);
   showToast('Model "' + entry.name + '" saved.', 'success');
+  refreshRunButton(); // update "Load previous…" state
 }
 
 function showSavedList() {
@@ -1062,6 +1056,7 @@ function deleteSavedModel(event, id) {
   if (!confirm('Delete this saved model?')) return;
   var saved = getSavedModels().filter(function(s){ return s.id !== id; });
   putSavedModels(saved);
+  refreshRunButton(); // re-check empty state
   // Re-render list
   closeSavedList();
   showSavedList();
@@ -1474,7 +1469,12 @@ function updateEquation() {
 function refreshRunButton() {
   var a = STATE.assignments;
   var ok = !!a.dep && (a.fix.length > 0 || a.cov.length > 0) && !!a.rnd;
-  qs('btnRun').disabled = !ok;
+  qs('btnRun').disabled       = !ok;
+  qs('btnSaveConfig').disabled = !ok;
+
+  // "Load previous…" — enabled only when there are saved models
+  var hasSaved = getSavedModels().length > 0;
+  qs('btnLoadPrev').disabled = !hasSaved;
 
   // Validation banner
   var msgs = [];

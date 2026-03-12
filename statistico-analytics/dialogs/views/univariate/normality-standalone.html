@@ -10,8 +10,8 @@
   <script src="https://code.highcharts.com/highcharts-more.js"></script>
   <script src="https://code.highcharts.com/modules/solid-gauge.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
-  <link rel="stylesheet" href="../shared-header.css?v=20260312a">
-  <script src="../shared-header.js?v=20260312a"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260312c">
+  <script src="../shared-header.js?v=20260312c"></script>
   
   <style>
     :root {
@@ -929,6 +929,7 @@
         { name: 'Jarque-Bera', id: 'jb', ...jb, weight: 0.9 }
       ];
       
+      window.currentNormalityResults = tests;
       displayResults(tests);
       calculateNSI(tests);
       console.log('? Results displayed and NSI calculated');
@@ -1116,6 +1117,24 @@
       const initHeader = () => {
         if (typeof StatisticoHeader !== 'undefined') {
           StatisticoHeader.init('normality', 'Variable', 0);
+          StatisticoHeader.registerActions({
+            exportJson: () => {
+              if (!window.currentNormalityResults) { alert('Run a normality test first.'); return; }
+              const ts   = new Date().toISOString().slice(0,19).replace(/[-T:]/g,'');
+              const varN = (document.getElementById('header-variable-name') || {}).textContent || 'variable';
+              const name = varN.replace(/[^a-zA-Z0-9]/g,'_').slice(0,30);
+              const payload = {
+                variableName : varN.trim(),
+                alpha        : window.currentAlpha || 0.05,
+                tests        : window.currentNormalityResults
+              };
+              const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+              const url  = URL.createObjectURL(blob);
+              const a    = Object.assign(document.createElement('a'), { href: url, download: 'Normality_' + name + '_' + ts + '.json' });
+              document.body.appendChild(a); a.click();
+              setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+            }
+          });
       if (typeof StatisticoHeader !== 'undefined') { StatisticoHeader.initSidebarPage(); StatisticoHeader.updateTitle('Normality Tests'); };
           setTimeout(fitLayout, 150);
         } else {

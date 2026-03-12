@@ -588,9 +588,9 @@ const StatisticoHeader = {
    * Groups: [View] | [Model, HTML] | [Theme toggle]  — separated by dividers.
    * @private
    */
-  _renderActionButtons({ getData, saveModel, exportHtml, moduleName = 'Save model' } = {}) {
+  _renderActionButtons({ getData, saveModel, exportHtml, exportJson, moduleName = 'Save model' } = {}) {
     const hasView  = !!getData;
-    const hasSaves = !!(saveModel || exportHtml);
+    const hasSaves = !!(saveModel || exportHtml || exportJson);
 
     let html = '';
 
@@ -626,6 +626,13 @@ const StatisticoHeader = {
                          onclick="StatisticoHeader._pendingActions.exportHtml()"
                          title="Export complete report as standalone HTML file">
                    <i class="fa-solid fa-file-code"></i> HTML
+                 </button>`;
+      }
+      if (exportJson) {
+        html += `<button class="header-action-btn header-action-btn--json"
+                         onclick="StatisticoHeader._pendingActions.exportJson()"
+                         title="Download results as JSON file">
+                   <i class="fa-solid fa-download"></i> JSON
                  </button>`;
       }
       html += `</div>`;
@@ -819,8 +826,8 @@ const StatisticoHeader = {
    * Register action buttons (View Data / Model / HTML) into the header top bar.
    * Call this right after StatisticoHeader.init().
    */
-  registerActions({ getData, saveModel, exportHtml, moduleName = 'Save model' } = {}) {
-    this._pendingActions = { getData, saveModel, exportHtml, moduleName };
+  registerActions({ getData, saveModel, exportHtml, exportJson, moduleName = 'Save model' } = {}) {
+    this._pendingActions = { getData, saveModel, exportHtml, exportJson, moduleName };
     this.render();
   },
 

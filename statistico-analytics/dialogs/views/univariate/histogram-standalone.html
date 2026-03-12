@@ -16,8 +16,8 @@
   <script src="https://code.highcharts.com/modules/histogram-bellcurve.js"></script>
   
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260312a">
-  <script src="../shared-header.js?v=20260312a"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260312b">
+  <script src="../shared-header.js?v=20260312b"></script>
   
   <style>
     /* EXACT COPY OF ORIGINAL HISTOGRAM STYLES */
@@ -1236,6 +1236,38 @@
           }).catch(() => alert('Failed to copy to clipboard'));
         },
         moduleName: `Copy ${varName} values to clipboard`,
+
+        exportJson: () => {
+          try {
+            const ts   = new Date().toISOString().slice(0,19).replace(/[-T:]/g,'');
+            const name = varName.replace(/[^a-zA-Z0-9_]/g,'_').slice(0,30);
+            const readStat = id => { const el = document.getElementById(id); return el ? el.textContent.trim() : null; };
+            const payload = {
+              variableName : varName,
+              sampleSize   : values.length,
+              descriptives : {
+                n        : readStat('stat-n'),
+                mean     : readStat('stat-mean'),
+                stdDev   : readStat('stat-stddev'),
+                variance : readStat('stat-variance'),
+                kurtosis : readStat('stat-kurtosis'),
+                skewness : readStat('stat-skewness'),
+                range    : readStat('stat-range'),
+                min      : readStat('stat-min'),
+                q25      : readStat('stat-q25'),
+                median   : readStat('stat-median'),
+                q75      : readStat('stat-q75'),
+                max      : readStat('stat-max')
+              },
+              values : values
+            };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url  = URL.createObjectURL(blob);
+            const a    = Object.assign(document.createElement('a'), { href: url, download: `Histogram_${name}_${ts}.json` });
+            document.body.appendChild(a); a.click();
+            setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+          } catch(e) { alert('Export failed: ' + e.message); }
+        },
 
         exportHtml: () => {
           try {

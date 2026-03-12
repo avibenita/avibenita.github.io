@@ -8,8 +8,8 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
   <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-  <link rel="stylesheet" href="../shared-header.css?v=20260312a">
-  <script src="../shared-header.js?v=20260312a"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260312b">
+  <script src="../shared-header.js?v=20260312b"></script>
   
   <!-- AI Configuration -->
   <script>
@@ -1476,6 +1476,7 @@
     <div class="config-section">
       <div class="section-header">
         Hypothesis Test Configuration
+        <button id="btn-export-json" onclick="exportHypothesisJson()" style="display:none;margin-left:auto;align-items:center;gap:6px;padding:4px 12px;background:rgba(120,200,255,0.15);border:1px solid rgba(120,200,255,0.4);border-radius:6px;color:#78c8ff;font-size:12px;font-weight:600;cursor:pointer;" title="Download results as JSON"><i class="fa-solid fa-download"></i> JSON</button>
         <div class="popsize-control">
           <label>Pop. Size:</label>
           <input type="text" id="pop-size" placeholder="?" value="?">
@@ -1600,6 +1601,7 @@
             <input type="range" id="alpha-slider" min="0.01" max="0.15" step="0.01" value="0.05" oninput="updateAlpha()">
             <span class="alpha-value" id="alpha-value">0.05</span>
           </div>
+          <button class="action-btn" id="btn-export-json2" onclick="exportHypothesisJson()" title="Download results as JSON"><i class="fa-solid fa-download"></i> JSON</button>
           <button class="action-btn" onclick="openPowerAnalysis()">
             <i class="fas fa-brain"></i> Power Analysis
           </button>
@@ -1867,6 +1869,21 @@
     let librariesLoaded = false;
     
     // Initialize
+        // ג”€ג”€ Export JSON ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
+    function downloadJson(obj, filename) {
+      const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+    }
+    window.exportHypothesisJson = function() {
+      if (!window.currentTestResults) { alert('Run a test first.'); return; }
+      const ts   = new Date().toISOString().slice(0,19).replace(/[-T:]/g,'');
+      const name = (window.currentTestResults.testType || 'hypothesis').replace(/[^a-zA-Z0-9]/g,'_');
+      downloadJson(window.currentTestResults, 'Hypothesis_' + name + '_' + ts + '.json');
+    };
+
     window.addEventListener('DOMContentLoaded', function() {
       console.log('? Hypothesis Testing loaded');
       updatePopSizeState();  // Set initial pop size state
@@ -2362,6 +2379,7 @@
       };
       
       console.log('? Test results stored:', window.currentTestResults);
+      const _jbtn = document.getElementById('btn-export-json'); if (_jbtn) _jbtn.style.display = 'inline-flex';
       
       document.getElementById('result-test-type').textContent = result.testType;
       document.getElementById('result-orientation').textContent = result.orientation;

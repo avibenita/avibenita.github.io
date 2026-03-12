@@ -10,8 +10,8 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/solid-gauge.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
-  <link rel="stylesheet" href="../shared-header.css?v=20260312a">
-  <script src="../shared-header.js?v=20260312a"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260312b">
+  <script src="../shared-header.js?v=20260312b"></script>
   <script src="../../shared/views/normality-view.js"></script>
   <style>
     :root{--surface-0:#0c1624;--surface-1:#1a1f2e;--surface-2:#242938;--border:#2d3748;--accent-1:rgb(255,165,120);--text-primary:#fff;--text-secondary:rgba(255,255,255,0.85);}
@@ -206,6 +206,7 @@
     <section class="card">
       <div class="card-head">
         <div>Descriptive Statistics</div>
+        <button onclick="exportDescriptiveJson()" style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:4px 12px;background:rgba(120,200,255,0.15);border:1px solid rgba(120,200,255,0.4);border-radius:6px;color:#78c8ff;font-size:12px;font-weight:600;cursor:pointer;" title="Download selected row as JSON"><i class="fa-solid fa-download"></i> JSON</button>
         <div class="control-group">
           <div class="decimal-control">
             <label for="decimal-places">Decimals:</label>
@@ -1301,7 +1302,23 @@
       // Initialize shared header with sidebar
       if (typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.init('descriptive-stats', '', 0, 'univariate');
-        StatisticoHeader.registerActions({});
+        // ג”€ג”€ Export JSON ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
+    function downloadJson(obj, filename) {
+      const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+    }
+    window.exportDescriptiveJson = function() {
+      if (!window.data || !window.data.length) { alert('No data loaded yet.'); return; }
+      const ts  = new Date().toISOString().slice(0,19).replace(/[-T:]/g,'');
+      const row = selectedRow || window.data[0];
+      const name = (row && row.Variable ? row.Variable : 'descriptive').replace(/[^a-zA-Z0-9]/g,'_');
+      downloadJson(row || window.data, 'Descriptive_' + name + '_' + ts + '.json');
+    };
+
+    StatisticoHeader.registerActions({});
         StatisticoHeader.initSidebarPage();
         StatisticoHeader.updateTitle('Descriptive Statistics');
       }

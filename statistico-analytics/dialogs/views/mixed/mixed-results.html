@@ -1188,6 +1188,77 @@
     });
   </script>
 
+  <!-- ════════════════════════════════════════════════════════════
+       JSON EXPORT  (⬇ JSON button in header)
+  ════════════════════════════════════════════════════════════ -->
+  <script>
+  /* downloadJson: creates a blob and triggers a browser download */
+  function downloadJson(obj, filename) {
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = filename; a.style.display = 'none';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+  }
+
+  /* registerActions once the shared header is ready */
+  document.addEventListener('DOMContentLoaded', function() {
+    if (typeof StatisticoHeader === 'undefined') return;
+    StatisticoHeader.registerActions({
+      exportJson: () => {
+        if (!_results) {
+          console.warn('exportJson: no mixed-model results yet. Run a model first.');
+          return;
+        }
+        const ts = new Date().toISOString().replace(/[:.-]/g, '');
+        const outcome = _results.outcome ?? _results.y ?? 'model';
+
+        /* Build the AI-compatible payload (mirrors requestMixedModelAI) plus
+           the full _results object so Python can re-verify every field.       */
+        const payload = {
+          // ── core AI fields ────────────────────────────────────────────────
+          outcome:            outcome,
+          method:             _results.method          ?? 'REML',
+          covStructure:       _results.covStructure    ?? _results.covarianceStructure ?? 'VC',
+          dfMethod:           _results.dfMethod        ?? 'Satterthwaite',
+          n:                  _results.n               ?? _results.N,
+          nGroups:            _results.nGroups         ?? _results.numGroups,
+          converged:          _results.converged,
+          iterations:         _results.iterations,
+          // ── information criteria ──────────────────────────────────────────
+          neg2LL:             _results.neg2LL          ?? _results.deviance,
+          AIC:                _results.AIC,
+          AICc:               _results.AICc,
+          BIC:                _results.BIC,
+          CAIC:               _results.CAIC,
+          HQIC:               _results.HQIC,
+          // ── pseudo R² / ICC ───────────────────────────────────────────────
+          r2m:                _results.r2m,
+          r2c:                _results.r2c,
+          ICC:                _results.ICC             ?? _results.icc,
+          varFixed:           _results.varFixed        ?? _results.sigmaFixed,
+          varResidual:        _results.varResidual     ?? _results.sigma2,
+          // ── fixed effects (Type III + coef table) ─────────────────────────
+          typeIII:            _results.typeIII,
+          fixedEffects:       _results.fixedEffects    ?? _results.coefficients,
+          // ── variance components ───────────────────────────────────────────
+          varianceComponents: _results.varianceComponents ?? _results.randomEffects,
+          // ── LRT ───────────────────────────────────────────────────────────
+          lrt:                _results.lrt,
+          // ── model spec (for re-running) ───────────────────────────────────
+          modelSpec:          _modelSpec,
+          // ── raw _results (full snapshot for Python testing) ───────────────
+          _rawResults:        _results,
+        };
+
+        downloadJson(payload, `MixedModel_${outcome}_${ts}.json`);
+        console.log('Mixed-model JSON exported:', payload);
+      }
+    });
+  });
+  </script>
+
 
   <!-- ════════════════════════════════════════════════════════════
        CORE JAVASCRIPT

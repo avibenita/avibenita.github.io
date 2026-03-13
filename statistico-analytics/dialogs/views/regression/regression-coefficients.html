@@ -5217,6 +5217,30 @@
 
         console.log('✅ All tab data pre-stored in sessionStorage');
         
+        // ── Store results for exportJson (this code path bypasses populateStats/populateTable) ──
+        const _varNamesForAI = results.includeIntercept
+          ? ['Intercept', ...variableNames]
+          : variableNames;
+        const _coeffRowsForAI = results.coefficients.map((coef, i) => ({
+          'Variable':      _varNamesForAI[i] || `Var${i}`,
+          'Coefficient':   coef,
+          'Std. Error':    results.std_errors[i],
+          't-value':       results.t_values[i],
+          'P-value':       results.p_values[i],
+          '95% CI Lower':  results.CI_lower[i],
+          '95% CI Upper':  results.CI_upper[i],
+          'VIF':           results.VIF && results.VIF[i - (results.includeIntercept ? 1 : 0)] || null
+        }));
+        const _statsForAI = {
+          observations: results.n,   validObs: results.n,
+          numNumericVars: xn.length, numCategoricalVars: xc.length,
+          rSquared: results.R2,      adjRSquared: results.R2_adj,
+          rootMSE: results.RMSE,     aic: results.AIC,   bic: results.BIC,
+          fStatistic: results.F_stat, fPValue: results.F_pvalue,
+          ssModel: results.SSE,      ssResidual: results.SSR
+        };
+        storeRegressionResultsForAI(_statsForAI, _coeffRowsForAI);
+        
         // Display results in the UI
         displayRegressionResults(results, y, xn, xc, interactions, interactionColumnNames, interactionInfo);
         

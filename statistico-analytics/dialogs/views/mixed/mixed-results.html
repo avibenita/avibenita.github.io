@@ -1215,7 +1215,9 @@
         const outcome = _results.outcome ?? _results.y ?? 'model';
 
         /* Build the AI-compatible payload (mirrors requestMixedModelAI) plus
-           the full _results object so Python can re-verify every field.       */
+           the full _results object so Python can re-verify every field.
+           Raw data vectors (outcomeVector, subjectVector, fixedVectors) are
+           included when VB6 sends them via Case 705 before model results.    */
         const payload = {
           // ── core AI fields ────────────────────────────────────────────────
           outcome:            outcome,
@@ -1248,7 +1250,11 @@
           lrt:                _results.lrt,
           // ── model spec (for re-running) ───────────────────────────────────
           modelSpec:          _modelSpec,
-          // ── raw _results (full snapshot for Python testing) ───────────────
+          // ── raw data vectors (for Python re-fit, sent via Case 705) ───────
+          outcomeVector:      _rawData ? (_rawData.outcomeVector ?? null) : null,
+          subjectVector:      _rawData ? (_rawData.subjectVector ?? null) : null,
+          fixedVectors:       _rawData ? (_rawData.fixedVectors  ?? null) : null,
+          // ── full _results snapshot ────────────────────────────────────────
           _rawResults:        _results,
         };
 
@@ -1271,6 +1277,7 @@
   let _decimals = 'auto';
   let _results = null;        // full parsed model results
   let _modelSpec = null;      // {y, fixed, random, subject, covStructure}
+  let _rawData  = null;       // raw data vectors for JSON export / Python re-fit
   let _emmData = {};          // cached EMM by factor name
   let _pwData  = {};          // cached pairwise data
 
@@ -1369,6 +1376,12 @@
         // Case 704: BLUPs
         case '704':
           renderBLUPs(data.blups || []);
+          break;
+        // Case 705: Raw data vectors for JSON export / Python re-fit
+        // VB6 sends: { outcomeVector:[...], subjectVector:[...], fixedVectors:{var:[...], ...} }
+        case '705':
+          _rawData = data;
+          console.log('📦 Raw data vectors received, n =', (data.outcomeVector || []).length);
           break;
         default:
           console.warn('Unknown case:', caseId);

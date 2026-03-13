@@ -4771,6 +4771,59 @@
         },
         saveModel:  () => saveCurrentRegressionAnalysis(),
         exportHtml: () => exportResultsAsHtml(),
+        exportJson: () => {
+          if (!regressionResultsForAI) {
+            alert('No regression results yet. Run a regression first.');
+            return;
+          }
+          // Collect raw Y and X vectors from usedRows for Python verification
+          let yVector = null, xMatrix = null, xHeaders = null;
+          try {
+            if (receivedRegressionData && receivedModelSpec) {
+              const { headers, rows } = receivedRegressionData;
+              const { y, xn = [], xc = [] } = receivedModelSpec;
+              const xnS = [...xn].sort((a, b) => headers.indexOf(a) - headers.indexOf(b));
+              const xcS = [...xc].sort((a, b) => headers.indexOf(a) - headers.indexOf(b));
+              const usedRows = _usedModelRows || rows;
+              const yIdx = headers.indexOf(y);
+              const xnIdx = xnS.map(v => headers.indexOf(v));
+              const xcIdx = xcS.map(v => headers.indexOf(v));
+              yVector  = usedRows.map(r => parseFloat(r[yIdx])).filter(v => isFinite(v));
+              xHeaders = [...xnS, ...xcS];
+              xMatrix  = usedRows.map(r => [...xnIdx, ...xcIdx].map(i => r[i]));
+            }
+          } catch(e) { console.warn('Could not extract vectors:', e); }
+
+          const payload = {
+            module: 'Regression',
+            timestamp: new Date().toISOString(),
+            yVariable:    regressionResultsForAI.yVariable,
+            observations: regressionResultsForAI.observations,
+            numPredictors: regressionResultsForAI.numPredictors,
+            rSquared:     regressionResultsForAI.rSquared,
+            adjRSquared:  regressionResultsForAI.adjRSquared,
+            rootMSE:      regressionResultsForAI.rootMSE,
+            aic:          regressionResultsForAI.aic,
+            bic:          regressionResultsForAI.bic,
+            fStatistic:   regressionResultsForAI.fStatistic,
+            fPValue:      regressionResultsForAI.fPValue,
+            ssModel:      regressionResultsForAI.ssModel,
+            ssResidual:   regressionResultsForAI.ssResidual,
+            coefficients: regressionResultsForAI.coefficients,
+            xHeaders:     xHeaders,
+            yVector:      yVector,
+            xMatrix:      xMatrix
+          };
+
+          const ts   = new Date().toISOString().replace(/[-:T]/g,'').slice(0,15);
+          const safe = (regressionResultsForAI.yVariable || 'Y').replace(/[^a-zA-Z0-9_]/g,'_');
+          const name = `Regression_${safe}_${ts}.json`;
+          const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+          const url  = URL.createObjectURL(blob);
+          const a    = document.createElement('a');
+          a.href = url; a.download = name; a.click();
+          URL.revokeObjectURL(url);
+        },
         moduleName: 'Save regression model to workbook'
       });
     }

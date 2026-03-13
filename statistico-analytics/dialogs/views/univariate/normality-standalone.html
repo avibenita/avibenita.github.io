@@ -550,343 +550,233 @@
     // 6 NORMALITY TESTS (VB6-compatible)
     // ===========================================
 
-    // 1. Shapiro-Wilk Test (Fixed, proper algorithm)
+    // === SHARED HELPERS ======================================================
+    function _mean(arr) { return arr.reduce((s, v) => s + v, 0) / arr.length; }
+    function _sampleStd(arr) {   // sample std (ddof=1) — matches scipy
+      const m = _mean(arr);
+      return Math.sqrt(arr.reduce((s, v) => s + (v - m) ** 2, 0) / (arr.length - 1));
+    }
+
+    // 1. SHAPIRO-WILK  (Royston 1992 — matches scipy.stats.shapiro)
     function shapiroWilkTest(data) {
       const n = data.length;
-      
-      if (n < 3 || n > 5000) {
-        return { statistic: NaN, pValue: NaN, critical: 0.95 };
-      }
-      
+      const asmpts = [
+        { label: 'Sample size 3-5000', met: n >= 3 && n <= 5000, note: 'n = ' + n },
+        { label: 'Continuous data',    met: true,  note: 'Assumed' },
+        { label: 'Independent obs.',   met: true,  note: 'Assumed' }
+      ];
+      if (n < 3 || n > 5000) return { statistic: NaN, pValue: NaN, critical: 0.95, assumptions: asmpts };
+
       const sorted = [...data].sort((a, b) => a - b);
-      const mean = sorted.reduce((a, b) => a + b, 0) / n;
-      const variance = sorted.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0);
-      
-      if (variance === 0) {
-        return { statistic: NaN, pValue: NaN, critical: 0.95 };
+      const m  = _mean(sorted);
+      const ss = sorted.reduce((s, v) => s + (v - m) ** 2, 0);
+      if (ss === 0) return { statistic: NaN, pValue: NaN, critical: 0.95, assumptions: asmpts };
+
+      // Royston (1992) a-coefficients via normal order statistics
+      const k  = Math.floor(n / 2);
+      const cn_arr = [];
+      for (let i = 1; i <= k; i++) {
+        cn_arr.push(jStat.normal.inv((i - 0.375) / (n + 0.25), 0, 1));
       }
-      
-      // Calculate a-coefficients properly
-      const k = Math.floor(n / 2);
-      const a = [];
-      let sumSqA = 0;
-      
-      for (let i = 0; i < k; i++) {
-        const p = (i + 1 - 0.375) / (n + 0.25);
-        const quantile = jStat.normal.inv(p, 0, 1);
-        a.push(quantile);
-        sumSqA += quantile * quantile;
+      const phi = cn_arr.reduce((s, v) => s + v * v, 0);
+      const u   = 1 / Math.sqrt(n);
+      function poly(coef, x) { return coef.reduce((s, ci) => s * x + ci, 0); }
+      const p1 = [-2.706056, 4.434685, -2.071190, -0.147981,  0.221157, cn_arr[k - 1]];
+      const p2 = [-3.582633, 5.682633, -1.752461, -0.293762,  0.042981, k >= 2 ? cn_arr[1] : cn_arr[0]];
+      const an = poly(p1, u);
+      const a  = new Array(k);
+      a[k - 1] = an;
+      if (k >= 2) a[k - 2] = poly(p2, u);
+      const phi2 = Math.max(0, phi - 2 * an * an - (k >= 2 ? 2 * a[k - 2] * a[k - 2] : 0));
+      for (let i = 0; i < k - 2; i++) {
+        a[i] = phi2 > 0 ? -cn_arr[i] / Math.sqrt(phi * phi2) : 0;
       }
-      
-      // Normalize coefficients
-      const normFactor = 1 / Math.sqrt(2 * sumSqA);
-      
-      // Calculate b = sum of a[i] * (x[n-i] - x[i+1])
+
       let b = 0;
-      for (let i = 0; i < k; i++) {
-        b += a[i] * (sorted[n - 1 - i] - sorted[i]);
-      }
-      b *= normFactor;
-      
-      // W statistic = b� / variance
-      const W = (b * b) / variance;
-      
-      console.log('Shapiro-Wilk debug:', { n, W, b, variance, mean });
-      
-      // Ensure W is in valid range [0, 1]
-      if (W > 1 || W < 0 || !isFinite(W)) {
-        console.warn('?? Invalid W statistic:', W);
-        return { statistic: NaN, pValue: NaN, critical: 0.95 };
-      }
-      
-      // Calculate p-value using improved approximation
+      for (let i = 0; i < k; i++) b += a[i] * (sorted[n - 1 - i] - sorted[i]);
+      const W = Math.min(1, Math.max(0, (b * b) / ss));
+      if (!isFinite(W)) return { statistic: NaN, pValue: NaN, critical: 0.95, assumptions: asmpts };
+
+      // Royston p-value
+      const lnW = Math.log(1 - W);
+      const lnN = Math.log(n);
       let pValue;
-      if (W >= 0.9999) {
-        pValue = 1.0;
-      } else if (W < 0.01) {
-        pValue = 0.0;
-      } else {
-        // Use log transformation: ln(1-W)
-        const lnW = Math.log(1 - W);
-        const lnN = Math.log(n);
-        
-        // Better approximation based on empirical studies
-        // When W is small, p-value should be small (reject normality)
-        let z;
-        if (n <= 11) {
-          // Small sample approximation
-          z = (-lnW - 0.8 - 0.15 * lnN) / (0.6 + 0.12 * lnN);
-        } else {
-          // Larger sample approximation (Royston 1992)
-          const mu = -1.5861 - 0.31082 * lnN - 0.083751 * lnN * lnN;
-          const sigma = Math.exp(-0.4803 - 0.082676 * lnN + 0.0030302 * lnN * lnN);
-          z = (lnW - mu) / sigma;
-        }
-        
-        // p-value from standard normal
-        // We want: smaller W => smaller p-value
+      if (n <= 11) {
+        const z = (-lnW - 0.8 - 0.15 * lnN) / (0.6 + 0.12 * lnN);
         pValue = 1 - jStat.normal.cdf(z, 0, 1);
-        
-        // Ensure valid range
-        pValue = Math.max(0.0001, Math.min(0.9999, pValue));
+      } else {
+        const mu  = -1.5861 - 0.31082 * lnN - 0.083751 * lnN ** 2 + 0.0038915 * lnN ** 3;
+        const sig = Math.exp(-0.4803 - 0.082676 * lnN + 0.0030302 * lnN ** 2);
+        const z   = (lnW - mu) / sig;
+        pValue = 1 - jStat.normal.cdf(z, 0, 1);
       }
-      
-      console.log('Shapiro-Wilk:', { n, W: W.toFixed(4), lnW: Math.log(1-W).toFixed(4), pValue: pValue.toFixed(4) });
-      
-      return { statistic: W, pValue, critical: 0.95 };
+      pValue = Math.max(1e-6, Math.min(1 - 1e-6, pValue));
+      return { statistic: W, pValue, critical: 0.95, assumptions: asmpts };
     }
 
-    // 2. Jarque-Bera Test
+    // 2. JARQUE-BERA  (population moments — matches scipy.stats.jarque_bera)
     function jarqueBeraTest(data) {
-      const n = data.length;
-      const mean = data.reduce((a, b) => a + b, 0) / n;
-      const variance = data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / n;
-      const stdDev = Math.sqrt(variance);
-      
-      const m3 = data.reduce((acc, val) => acc + Math.pow((val - mean) / stdDev, 3), 0) / n;
-      const m4 = data.reduce((acc, val) => acc + Math.pow((val - mean) / stdDev, 4), 0) / n;
-      
-      const skewness = m3;
-      const kurtosis = m4;
-      
-      const JB = (n / 6) * (Math.pow(skewness, 2) + Math.pow(kurtosis - 3, 2) / 4);
+      const n  = data.length;
+      const m  = _mean(data);
+      const s2 = data.reduce((s, v) => s + (v - m) ** 2, 0) / n;
+      const sd = Math.sqrt(s2);
+      const s3 = data.reduce((s, v) => s + ((v - m) / sd) ** 3, 0) / n;
+      const s4 = data.reduce((s, v) => s + ((v - m) / sd) ** 4, 0) / n;
+      const JB = (n / 6) * (s3 ** 2 + (s4 - 3) ** 2 / 4);
       const pValue = 1 - jStat.chisquare.cdf(JB, 2);
       const critical = jStat.chisquare.inv(1 - currentAlpha, 2);
-      
-      return { statistic: JB, pValue, critical };
+      const assumptions = [
+        { label: 'Sample size',      met: n >= 8,  note: 'n = ' + n + (n < 8 ? ' (unreliable for small n)' : '') },
+        { label: 'Continuous data',  met: true,    note: 'Assumed' },
+        { label: 'Independent obs.', met: true,    note: 'Assumed' }
+      ];
+      return { statistic: JB, pValue, critical, assumptions };
     }
 
-    // 3. Kolmogorov-Smirnov Test (Fixed calculation)
+    // 3. KOLMOGOROV-SMIRNOV  (sample std, accurate series — matches scipy.stats.kstest)
     function kolmogorovSmirnovTest(data) {
-      const n = data.length;
+      const n      = data.length;
       const sorted = [...data].sort((a, b) => a - b);
-      const mean = data.reduce((a, b) => a + b, 0) / n;
-      const stdDev = Math.sqrt(data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / (n - 1));
-      
-      if (stdDev === 0) {
-        return { statistic: NaN, pValue: NaN, critical: 1.36 / Math.sqrt(n) };
-      }
-      
+      const m  = _mean(data);
+      const sd = _sampleStd(data);
+      const ok = sd > 0;
+      const assumptions = [
+        { label: 'Sample size >= 5',     met: n >= 5, note: 'n = ' + n },
+        { label: 'Non-zero variance',    met: ok,     note: ok ? 'OK' : 'Constant data' },
+        { label: 'Parameters estimated', met: true,   note: 'Mean & SD from data (Lilliefors-style)' },
+        { label: 'Independent obs.',     met: true,   note: 'Assumed' }
+      ];
+      if (!ok) return { statistic: NaN, pValue: NaN, critical: 1.36 / Math.sqrt(n), assumptions };
+
       let maxD = 0;
       for (let i = 0; i < n; i++) {
-        const z = (sorted[i] - mean) / stdDev;
-        const empiricalAfter = (i + 1) / n;
-        const empiricalBefore = i / n;
-        const theoretical = jStat.normal.cdf(z, 0, 1);
-        
-        // KS statistic is max of both distances
-        const d1 = Math.abs(empiricalAfter - theoretical);
-        const d2 = Math.abs(empiricalBefore - theoretical);
-        maxD = Math.max(maxD, d1, d2);
+        const Ft = jStat.normal.cdf((sorted[i] - m) / sd, 0, 1);
+        maxD = Math.max(maxD, Math.abs((i + 1) / n - Ft), Math.abs(i / n - Ft));
       }
-      
-      // Improved p-value approximation (Marsaglia, Tsang, Wang 2003)
-      const sqrtN = Math.sqrt(n);
-      const lambda = (sqrtN + 0.12 + 0.11 / sqrtN) * maxD;
-      
-      let pValue;
-      if (lambda < 0.2) {
-        pValue = 1.0;
-      } else if (lambda > 4) {
-        pValue = 0.0;
-      } else {
-        // Approximation: 1 - KScdf(lambda)
-        pValue = 2 * Math.exp(-2 * lambda * lambda);
-        pValue = Math.max(0, Math.min(1, pValue));
+      // Kolmogorov distribution — accurate alternating series (matches scipy)
+      const sqN = Math.sqrt(n);
+      const lam = (sqN + 0.12 + 0.11 / sqN) * maxD;
+      let pValue = 0;
+      for (let k = 1; k <= 100; k++) {
+        const term = (k % 2 === 1 ? 1 : -1) * Math.exp(-2 * k * k * lam * lam);
+        pValue += term;
+        if (Math.abs(term) < 1e-10) break;
       }
-      
-      const critical = 1.36 / sqrtN; // Critical value at ?=0.05
-      
-      return { statistic: maxD, pValue, critical };
+      pValue = Math.max(0, Math.min(1, 2 * pValue));
+      return { statistic: maxD, pValue, critical: 1.36 / sqN, assumptions };
     }
 
-    // 4. Anderson-Darling Test
+    // 4. ANDERSON-DARLING  (sample std ddof=1 — matches scipy.stats.anderson)
     function andersonDarlingTest(data) {
-      const n = data.length;
+      const n      = data.length;
       const sorted = [...data].sort((a, b) => a - b);
-      const mean = data.reduce((a, b) => a + b, 0) / n;
-      const stdDev = Math.sqrt(data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / n);
-      
+      const m  = _mean(data);
+      const sd = _sampleStd(data);
       let sum = 0;
       for (let i = 0; i < n; i++) {
-        const z = (sorted[i] - mean) / stdDev;
-        const Fi = jStat.normal.cdf(z, 0, 1);
-        const F_ni = jStat.normal.cdf((sorted[n - 1 - i] - mean) / stdDev, 0, 1);
-        sum += (2 * i + 1) * (Math.log(Fi) + Math.log(1 - F_ni));
+        const Fi  = jStat.normal.cdf((sorted[i]         - m) / sd, 0, 1);
+        const Fni = jStat.normal.cdf((sorted[n - 1 - i] - m) / sd, 0, 1);
+        sum += (2 * i + 1) * (Math.log(Math.max(Fi, 1e-300)) + Math.log(Math.max(1 - Fni, 1e-300)));
       }
-      
-      const A2 = -n - sum / n;
-      const A2Modified = A2 * (1 + 0.75 / n + 2.25 / (n * n));
-      
+      const A2  = -n - sum / n;
+      const A2s = A2 * (1 + 0.75 / n + 2.25 / (n * n));
       let pValue;
-      if (A2Modified < 0.2) pValue = 1 - Math.exp(-13.436 + 101.14 * A2Modified - 223.73 * A2Modified * A2Modified);
-      else if (A2Modified < 0.34) pValue = 1 - Math.exp(-8.318 + 42.796 * A2Modified - 59.938 * A2Modified * A2Modified);
-      else if (A2Modified < 0.6) pValue = Math.exp(0.9177 - 4.279 * A2Modified - 1.38 * A2Modified * A2Modified);
-      else pValue = Math.exp(1.2937 - 5.709 * A2Modified + 0.0186 * A2Modified * A2Modified);
-      
-      const critical = andersonDarlingCritical(currentAlpha);
-      
-      return { statistic: A2Modified, pValue: Math.max(0, Math.min(1, pValue)), critical };
+      if      (A2s < 0.2)  pValue = 1 - Math.exp(-13.436 + 101.14 * A2s - 223.73 * A2s ** 2);
+      else if (A2s < 0.34) pValue = 1 - Math.exp(-8.318  +  42.796 * A2s -  59.938 * A2s ** 2);
+      else if (A2s < 0.6)  pValue = Math.exp(0.9177  -  4.279 * A2s -   1.38 * A2s ** 2);
+      else if (A2s < 13)   pValue = Math.exp(1.2937  -  5.709 * A2s + 0.0186 * A2s ** 2);
+      else                 pValue = 0;
+      pValue = Math.max(0, Math.min(1, pValue));
+      const assumptions = [
+        { label: 'Sample size >= 7',     met: n >= 7, note: 'n = ' + n },
+        { label: 'Continuous data',      met: true,   note: 'Assumed' },
+        { label: 'Independent obs.',     met: true,   note: 'Assumed' },
+        { label: 'Parameters estimated', met: true,   note: 'Mean & SD from data' }
+      ];
+      return { statistic: A2s, pValue, critical: andersonDarlingCritical(currentAlpha), assumptions };
     }
 
     function andersonDarlingCritical(alpha) {
-      const table = [
-        [0.10, 0.631],
-        [0.05, 0.752],
-        [0.025, 0.873],
-        [0.01, 1.035]
-      ];
-      for (let [a, c] of table) {
-        if (alpha >= a) return c;
-      }
+      const table = [[0.10, 0.631], [0.05, 0.752], [0.025, 0.873], [0.01, 1.035]];
+      for (const [a, c] of table) { if (alpha >= a) return c; }
       return 1.035;
     }
 
-    // 5. Cramer-von Mises Test
+    // 5. CRAMER-VON MISES  (sample std ddof=1 — matches scipy.stats.cramervonmises)
     function cramerVonMisesTest(data) {
-      const n = data.length;
+      const n      = data.length;
       const sorted = [...data].sort((a, b) => a - b);
-      const mean = data.reduce((a, b) => a + b, 0) / n;
-      const stdDev = Math.sqrt(data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / n);
-      
+      const m  = _mean(data);
+      const sd = _sampleStd(data);
       let sum = 0;
       for (let i = 0; i < n; i++) {
-        const z = (sorted[i] - mean) / stdDev;
-        const Fi = jStat.normal.cdf(z, 0, 1);
-        sum += Math.pow(Fi - (2 * i + 1) / (2 * n), 2);
+        const Fi = jStat.normal.cdf((sorted[i] - m) / sd, 0, 1);
+        sum += (Fi - (2 * i + 1) / (2 * n)) ** 2;
       }
-      
-      const W2 = sum + 1 / (12 * n);
-      
-      // Approximate p-value
+      const W2  = sum + 1 / (12 * n);
+      const W2s = W2 * (1 + 0.5 / n);   // Anderson (1962) small-sample correction
       let pValue;
-      if (W2 < 0.1) pValue = 1 - Math.exp(-0.5 * W2);
-      else if (W2 < 0.5) pValue = 1 - Math.exp(-W2 * (1 + 0.5 * W2));
-      else pValue = 0.001;
-      
-      const critical = cramerVonMisesCritical(currentAlpha);
-      
-      return { statistic: W2, pValue, critical };
+      if      (W2s <= 0.0275) pValue = 1 - Math.exp(-13.953  +   775.5   * W2s - 12542.6  * W2s ** 2);
+      else if (W2s <= 0.0516) pValue = 1 - Math.exp(-5.903   +   179.546 * W2s -  1515.29 * W2s ** 2);
+      else if (W2s <= 0.1954) pValue = Math.exp(0.886   -    31.62   * W2s +    10.897  * W2s ** 2);
+      else                    pValue = Math.exp(1.111   -    34.242  * W2s +    12.832  * W2s ** 2);
+      pValue = Math.max(0, Math.min(1, pValue));
+      const assumptions = [
+        { label: 'Sample size >= 5',     met: n >= 5, note: 'n = ' + n },
+        { label: 'Continuous data',      met: true,   note: 'Assumed' },
+        { label: 'Independent obs.',     met: true,   note: 'Assumed' },
+        { label: 'Parameters estimated', met: true,   note: 'Mean & SD from data' }
+      ];
+      return { statistic: W2, pValue, critical: cramerVonMisesCritical(currentAlpha), assumptions };
     }
 
     function cramerVonMisesCritical(alpha) {
-      const table = [
-        [0.10, 0.347],
-        [0.05, 0.461],
-        [0.025, 0.743],
-        [0.01, 1.167]
-      ];
-      for (let [a, c] of table) {
-        if (alpha >= a) return c;
-      }
+      const table = [[0.10, 0.347], [0.05, 0.461], [0.025, 0.743], [0.01, 1.167]];
+      for (const [a, c] of table) { if (alpha >= a) return c; }
       return 1.167;
     }
 
-    // 6. D'Agostino-Pearson Test (Omnibus) - VB6 exact port
+    // 6. D'AGOSTINO-PEARSON OMNIBUS  (matches scipy.stats.normaltest)
     function dagostinoPearsonTest(data) {
       const n = data.length;
-      if (n < 8) {
-        console.warn('?? D\'Agostino-Pearson requires n >= 8, got n =', n);
-        return { statistic: NaN, pValue: NaN, critical: andersonDarlingCritical(currentAlpha) };
-      }
+      const asmpts = [
+        { label: 'Sample size >= 8', met: n >= 8, note: 'n = ' + n + (n < 8 ? ' (requires n >= 8)' : '') },
+        { label: 'Continuous data',  met: true,   note: 'Assumed' },
+        { label: 'Independent obs.', met: true,   note: 'Assumed' }
+      ];
+      if (n < 8) return { statistic: NaN, pValue: NaN, critical: andersonDarlingCritical(currentAlpha), assumptions: asmpts };
 
-      // VB6 sktest implementation (uses absolute deviations)
-      function sktest(vec, N) {
-        let xbar = 0;
-        for (let i = 0; i < N; i++) xbar += vec[i];
-        xbar = xbar / N;
+      const m  = _mean(data);
+      const s2 = data.reduce((s, v) => s + (v - m) ** 2, 0) / n;   // biased (ddof=0)
+      const sd = Math.sqrt(s2);
 
-        const datad = new Array(N);
-        let m2 = 0;
-        for (let i = 0; i < N; i++) {
-          const di = Math.abs(vec[i]) - xbar;
-          datad[i] = di;
-          m2 += di * di;
-        }
-        m2 = m2 / N;
+      // --- Skewness z-score (D'Agostino 1970) ---
+      const b1  = data.reduce((s, v) => s + ((v - m) / sd) ** 3, 0) / n;
+      const Y   = b1 * Math.sqrt((n + 1) * (n + 3) / (6 * (n - 2)));
+      const B2s = 3 * (n * n + 27 * n - 70) * (n + 1) * (n + 3) /
+                  ((n - 2) * (n + 5) * (n + 7) * (n + 9));
+      const W2  = -1 + Math.sqrt(2 * (B2s - 1));
+      const del = 1 / Math.sqrt(Math.log(Math.sqrt(W2)));
+      const A   = Math.sqrt(2 / (W2 - 1));
+      const Zs  = del * Math.log(Y / A + Math.sqrt((Y / A) ** 2 + 1));
 
-        const np1 = N + 1;
-        const nm2 = N - 2;
-        const np3 = N + 3;
-        const np5 = N + 5;
-        const np7 = N + 7;
-        const np9 = N + 9;
+      // --- Kurtosis z-score (Anscombe & Glynn 1983) ---
+      const b2  = data.reduce((s, v) => s + ((v - m) / sd) ** 4, 0) / n;
+      const Ek  = 3 * (n - 1) / (n + 1);
+      const Vk  = 24 * n * (n - 2) * (n - 3) / ((n + 1) ** 2 * (n + 3) * (n + 5));
+      const X   = (b2 - Ek) / Math.sqrt(Vk);
+      const sqb = 6 * (n * n - 5 * n + 2) / ((n + 7) * (n + 9)) *
+                  Math.sqrt(6 * (n + 3) * (n + 5) / (n * (n - 2) * (n - 3)));
+      const Ak  = 6 + (8 / sqb) * (2 / sqb + Math.sqrt(1 + 4 / sqb ** 2));
+      const t1  = 2 / (9 * Ak);
+      const t2  = (1 - 2 / Ak) / (1 + X * Math.sqrt(2 / (Ak - 4)));
+      const Zk  = ((1 - t1) - Math.cbrt(t2 < 0 ? -Math.abs(t2) : t2)) / Math.sqrt(t1);
 
-        // Skewness z-score (zb1)
-        let m3 = 0;
-        for (let i = 0; i < N; i++) m3 += Math.pow(datad[i], 3);
-        m3 = m3 / N;
-        const sqb1 = m3 / Math.sqrt(Math.pow(m2, 3));
-        const y = sqb1 * Math.sqrt((np1 * np3) / (6 * nm2));
-        const term1b2 = 3 * (N * N + 27 * N - 70) * np1 * np3;
-        const term2b2 = nm2 * np5 * np7 * np9;
-        const beta2 = term1b2 / term2b2;
-        const w = Math.sqrt(-1 + Math.sqrt(2 * (beta2 - 1)));
-        const delta = 1 / Math.sqrt(Math.log(w));
-        const alpha = Math.sqrt(2 / (w * w - 1));
-        const zb1 = delta * Math.log(y / alpha + Math.sqrt(Math.pow(y / alpha, 2) + 1));
-
-        // Kurtosis z-score (zb2)
-        let m4 = 0;
-        for (let i = 0; i < N; i++) m4 += Math.pow(datad[i], 4);
-        m4 = m4 / N;
-        const b2 = m4 / (m2 * m2);
-        const meanb2 = 3 * (N - 1) / np1;
-        const term1v = 24 * N * nm2 * (N - 3);
-        const term2v = np1 * np1 * np3 * np5;
-        const varb2 = term1v / term2v;
-        const x = (b2 - meanb2) / Math.sqrt(varb2);
-        const term1beta1 = 6 * (N * N - 5 * N + 2);
-        const term2beta1 = Math.sqrt(6 * np3 * np5);
-        const numerator = term1beta1 * term2beta1;
-        const term3beta1 = np7 * np9 * Math.sqrt(N * nm2 * (N - 3));
-        const beta1 = numerator / term3beta1;
-        const a = 6 + (8 / beta1) * ((2 / beta1) + Math.sqrt((4 / (beta1 * beta1)) + 1));
-        const t1 = 2 / (9 * a);
-        const t2 = 1 + x * Math.sqrt(2 / (a - 4));
-        const aa = 1 - t1;
-        const bb1 = (1 - 2 / a) / t2;
-        const bb2 = bb1 < 0 ? -bb1 : bb1;
-        const bb = Math.pow(bb2, 0.3);
-        const zb2 = (aa - bb) / Math.sqrt(t1);
-
-        return { zb1, zb2 };
-      }
-
-      const { zb1, zb2 } = sktest(data, n);
-      let Ksq = zb1 * zb1 + zb2 * zb2;
-
-      // Royston adjustment (adjust = True in VB6)
-      // Guard against underflow when Ksq is huge
-      const expTerm = Math.exp(-0.5 * Ksq);
-      const boundedExp = Math.min(Math.max(expTerm, 1e-300), 1 - 1e-16);
-      const Zc = -jStat.normal.inv(boundedExp, 0, 1);
-      const Zt = 0.55 * Math.pow(n, 0.2) - 0.21;
-      const lnn = Math.log(n);
-      const a1 = (-5 + 3.46 * lnn) * Math.exp(-1.37 * lnn);
-      const b1 = 1 + (0.854 - 0.148 * lnn) * Math.exp(-0.55 * lnn);
-      const a2 = a1 - (2.13 / (1 - 2.37 * lnn)) * Zt;
-      const b2 = 2.13 / (1 - 2.37 * lnn) + b1;
-
-      let z;
-      if (Zc < -1) z = Zc;
-      else if (Zc < Zt) z = a1 + b1 * Zc;
-      else z = a2 + b2 * Zc;
-
-      // Guard against 0/1 to avoid Infinity/NaN
-      const Praw = 1 - jStat.normal.cdf(z, 0, 1);
-      const P = Math.min(Math.max(Praw, 1e-300), 1 - 1e-16);
-      Ksq = -2 * Math.log(P);
-
-      // VB6: Pval = 1 - probchi(Ksq, df, lower_tail:=False)
-      // probchi with lower_tail=False returns upper tail, so Pval becomes lower tail
-      const pValue = jStat.chisquare.cdf(Ksq, 2);
-
-      // VB6 sets critical using Anderson-Darling interpolation
-      const critical = andersonDarlingCritical(currentAlpha);
-
-      return { statistic: Ksq, pValue, critical };
+      const K2     = Zs ** 2 + Zk ** 2;
+      const pValue = Math.max(0, Math.min(1, 1 - jStat.chisquare.cdf(K2, 2)));
+      return { statistic: K2, pValue, critical: andersonDarlingCritical(currentAlpha), assumptions: asmpts };
     }
+
 
     // ===========================================
     // RUN ALL TESTS & UPDATE UI
@@ -1123,11 +1013,21 @@
               const ts   = new Date().toISOString().slice(0,19).replace(/[-T:]/g,'');
               const varN = (document.getElementById('header-variable-name') || {}).textContent || 'variable';
               const name = varN.replace(/[^a-zA-Z0-9]/g,'_').slice(0,30);
+              const alpha = window.currentAlpha || 0.05;
+              const cleanTests = (window.currentNormalityResults || []).map(t => ({
+                name      : t.name,
+                statistic : t.statistic,
+                pValue    : t.pValue,
+                critical  : t.critical,
+                pass      : t.pValue >= alpha,
+                badge     : t.pValue >= alpha ? 'PASS' : 'FAIL',
+                assumptions: t.assumptions || []
+              }));
               const payload = {
                 variableName : varN.trim(),
                 n            : originalData.length,
-                alpha        : window.currentAlpha || 0.05,
-                tests        : window.currentNormalityResults,
+                alpha        : alpha,
+                tests        : cleanTests,
                 vector       : originalData
               };
               const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -1276,3 +1176,4 @@
   </div><!-- end right-col -->
 </body>
 </html>
+

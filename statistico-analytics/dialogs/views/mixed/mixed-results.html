@@ -2551,6 +2551,105 @@
   /* ─────────────────────────────────────────────────────────────
      PAIRWISE CONTRASTS
   ───────────────────────────────────────────────────────────── */
+  /* ─────────────────────────────────────────────────────────────
+     PAIRWISE FALLBACK — derive pairwise contrasts from fixedEffects
+     when VB6 has not sent Case 703.
+
+     Each non-reference dummy coefficient is itself the contrast
+     (non-reference level J) vs (reference level I = Intercept).
+     For all other pairs (Jₐ vs J_b) we compute the difference
+     of their two coefficients.
+     SE = sqrt(SE_a² + SE_b²)  (conservative; ignores covariance)
+     t  = meanDiff / SE
+     p  = 2-sided t p-value approximated from normal distribution
+  ───────────────────────────────────────────────────────────── */
+  function _derivePairwiseFromCoefficients(factorName) {
+    if (!_results) return null;
+    const coefs = _results.fixedEffects ?? _results.coefficients ?? [];
+    if (!coefs.length) return null;
+
+    const intercept = coefs.find(r =>
+      /^intercept$/i.test(r.parameter ?? r.name ?? r.term ?? ''));
+    if (!intercept) return null;
+
+    const escaped = factorName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`^${escaped}[\\s_\\(\\[]`, 'i');
+
+    const contrasts = coefs.filter(r =>
+      re.test(r.parameter ?? r.name ?? r.term ?? ''));
+    if (!contrasts.length) return null;
+
+    // Helper: extract level label from coefficient name
+    const getLabel = r => {
+      const nm = r.parameter ?? r.name ?? r.term ?? '';
+      const m = nm.match(/[\(\[](.*?)[\)\]]$/) ?? nm.match(/[\s_](\S+)$/);
+      return m ? m[1] : nm;
+    };
+
+    // Build level list: reference first, then contrasts
+    const refLabel = (() => {
+      if (_modelSpec?.refLevels?.[factorName]) return _modelSpec.refLevels[factorName];
+      return 'Reference';
+    })();
+
+    const levels = [
+      { label: refLabel, est: parseFloat(intercept.estimate ?? intercept.coef ?? 0), se: parseFloat(intercept.se ?? intercept.stderr ?? 0), df: parseFloat(intercept.df ?? 0), _ref: true },
+      ...contrasts.map(r => ({
+        label: getLabel(r),
+        est: parseFloat(intercept.estimate ?? 0) + parseFloat(r.estimate ?? r.coef ?? 0),
+        _coefEst: parseFloat(r.estimate ?? r.coef ?? 0),
+        _coefSE: parseFloat(r.se ?? r.stderr ?? 0),
+        se: null,  // computed per-pair below
+        df: parseFloat(r.df ?? intercept.df ?? 0),
+        _ref: false,
+      }))
+    ];
+
+    // Normal quantile for two-sided p-value approximation
+    const normPval = t => {
+      // Approximation of 2*(1 - Φ(|t|)) using Abramowitz & Stegun
+      const x = Math.abs(t);
+      const t1 = 1 / (1 + 0.2316419 * x);
+      const poly = t1 * (0.319381530 + t1 * (-0.356563782 + t1 * (1.781477937 + t1 * (-1.821255978 + t1 * 1.330274429))));
+      const phi = Math.exp(-x * x / 2) / Math.sqrt(2 * Math.PI);
+      return Math.min(1, 2 * phi * poly);
+    };
+
+    const comparisons = [];
+    for (let i = 0; i < levels.length; i++) {
+      for (let j = i + 1; j < levels.length; j++) {
+        const lI = levels[i], lJ = levels[j];
+        let meanDiff, se;
+
+        if (lI._ref) {
+          // Reference vs non-reference: meanDiff = coef_j directly (stored as _coefEst)
+          meanDiff = lJ._coefEst;
+          se = Math.sqrt(parseFloat(intercept.se ?? 0) ** 2 + lJ._coefSE ** 2);
+        } else {
+          // Two non-reference levels: diff of their (intercept + coef) EMMs
+          const aEst = lI.est, aSE = lI._coefSE ?? 0;
+          const bEst = lJ.est, bSE = lJ._coefSE ?? 0;
+          meanDiff = bEst - aEst;
+          se = Math.sqrt(aSE ** 2 + bSE ** 2);
+        }
+
+        const df = Math.max(lI.df, lJ.df) || 0;
+        const tval = se > 0 ? meanDiff / se : 0;
+        const pval = normPval(tval);
+
+        comparisons.push({
+          levelI: lI.label, levelJ: lJ.label,
+          meanDiff, se, df, t: tval, pval, p: pval,
+          ciLow:  meanDiff - 1.96 * se,
+          ciHigh: meanDiff + 1.96 * se,
+          _derived: true,
+        });
+      }
+    }
+
+    return { factor: factorName, comparisons, _derived: true };
+  }
+
   function renderPairwise() {
     const factor = document.getElementById('pwFactorSelect')?.value;
     const adj    = document.getElementById('pwAdjSelect')?.value ?? 'bonferroni';
@@ -2565,8 +2664,16 @@
 
     if (!_pwData[factor]) {
       sendToHost('requestPairwise', { factor, adjustment: adj });
-      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Computing…</td></tr>`;
-      return;
+
+      // JS fallback: derive pairwise contrasts from fixedEffects
+      const fallback = _derivePairwiseFromCoefficients(factor);
+      if (fallback) {
+        _pwData[factor] = fallback;
+        // fall through to render
+      } else {
+        tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Computing…<br><span style="font-size:.75rem;color:var(--text-muted);">Waiting for VB6 response (Case 703)…</span></td></tr>`;
+        return;
+      }
     }
 
     const pw = _pwData[factor];
@@ -2578,9 +2685,10 @@
 
     tbody.innerHTML = comparisons.map((r, i) => {
       const d = fmt(r.cohensD ?? r.d ?? r.effectSize);
+      const derived = r._derived ? ' <span style="color:var(--text-muted);font-size:.7rem;" title="Derived from fixed-effect coefficients">~</span>' : '';
       return `
-        <tr>
-          <td>${r.levelI ?? r.groupI ?? '—'}</td>
+        <tr${r._derived ? ' style="opacity:.85"' : ''}>
+          <td>${r.levelI ?? r.groupI ?? '—'}${derived}</td>
           <td>${r.levelJ ?? r.groupJ ?? '—'}</td>
           <td class="coef-cell">${fmt(r.meanDiff ?? r.diff)}</td>
           <td>${fmt(r.se ?? r.stderr)}</td>
@@ -2593,6 +2701,14 @@
           <td data-show-from="analyst">${d}</td>
         </tr>`;
     }).join('');
+
+    if (pw._derived) {
+      const note = document.createElement('tr');
+      note.innerHTML = `<td colspan="11" style="font-size:.75rem;color:var(--text-muted);padding:6px 8px;font-style:italic;">
+        ~ Values derived from fixed-effect coefficients. SE is conservative (ignores covariance). Exact contrasts will load if VB6 sends Case 703.
+      </td>`;
+      tbody.appendChild(note);
+    }
 
     // Build significance matrix
     const levels = [...new Set(comparisons.flatMap(r => [r.levelI ?? r.groupI, r.levelJ ?? r.groupJ]))];

@@ -494,7 +494,7 @@
 
       <div class="sb-body">
 
-        <!-- Group: Model Summary -->
+        <!-- Group: Model -->
         <div class="sb-group">
           <div class="sb-group-title">Model</div>
           <div class="sb-items-rail">
@@ -502,58 +502,21 @@
               <i class="fa-solid fa-table-cells-large sb-item-icon"></i>
               <span class="sb-item-label">Overview</span>
             </button>
-            <button class="sb-item" onclick="switchTab('model-fit')" data-tab="model-fit">
-              <i class="fa-solid fa-chart-bar sb-item-icon"></i>
-              <span class="sb-item-label">Model Fit</span>
+            <button class="sb-item" onclick="switchTab('model-effects')" data-tab="model-effects">
+              <i class="fa-solid fa-layer-group sb-item-icon"></i>
+              <span class="sb-item-label">Model Effects</span>
             </button>
-          </div>
-        </div>
-
-        <!-- Group: Effects -->
-        <div class="sb-group">
-          <div class="sb-group-title">Effects</div>
-          <div class="sb-items-rail">
-            <button class="sb-item" onclick="switchTab('fixed-effects')" data-tab="fixed-effects">
-              <i class="fa-solid fa-lock sb-item-icon"></i>
-              <span class="sb-item-label">Fixed Effects</span>
-            </button>
-            <button class="sb-item" onclick="switchTab('random-effects')" data-tab="random-effects">
-              <i class="fa-solid fa-dice sb-item-icon"></i>
-              <span class="sb-item-label">Random Effects</span>
-            </button>
-            <button class="sb-item" onclick="switchTab('covariance')" data-tab="covariance">
-              <i class="fa-solid fa-border-all sb-item-icon"></i>
-              <span class="sb-item-label">Covariance</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Group: Estimates -->
-        <div class="sb-group">
-          <div class="sb-group-title">Estimates</div>
-          <div class="sb-items-rail">
-            <button class="sb-item" onclick="switchTab('emm')" data-tab="emm">
+            <button class="sb-item" onclick="switchTab('marginal-means')" data-tab="marginal-means">
               <i class="fa-solid fa-chart-line sb-item-icon"></i>
-              <span class="sb-item-label">Estimated Marginal Means</span>
+              <span class="sb-item-label">Marginal Means</span>
             </button>
-            <button class="sb-item" onclick="switchTab('pairwise')" data-tab="pairwise">
-              <i class="fa-solid fa-arrows-left-right sb-item-icon"></i>
-              <span class="sb-item-label">Pairwise Contrasts</span>
+            <button class="sb-item" onclick="switchTab('diagnostics')" data-tab="diagnostics">
+              <i class="fa-solid fa-stethoscope sb-item-icon"></i>
+              <span class="sb-item-label">Diagnostics</span>
             </button>
-          </div>
-        </div>
-
-        <!-- Group: Diagnostics -->
-        <div class="sb-group">
-          <div class="sb-group-title">Diagnostics</div>
-          <div class="sb-items-rail">
-            <button class="sb-item" onclick="switchTab('residuals')" data-tab="residuals">
-              <i class="fa-solid fa-gauge-high sb-item-icon"></i>
-              <span class="sb-item-label">Residuals</span>
-            </button>
-            <button class="sb-item" onclick="switchTab('influential')" data-tab="influential">
-              <i class="fa-solid fa-triangle-exclamation sb-item-icon"></i>
-              <span class="sb-item-label">Influential Cases</span>
+            <button class="sb-item" onclick="switchTab('advanced')" data-tab="advanced">
+              <i class="fa-solid fa-flask sb-item-icon"></i>
+              <span class="sb-item-label">Advanced</span>
             </button>
           </div>
         </div>
@@ -777,9 +740,277 @@
 
 
                 <!-- ══════════════════════════════════════════════════════
-                     TAB: MODEL FIT
+                     TAB: MODEL EFFECTS  (Fixed Effects + Random Effects + Variance Components)
                 ══════════════════════════════════════════════════════ -->
-                <div id="tab-model-fit" class="tab-content">
+                <div id="tab-model-effects" class="tab-content">
+
+                  <!-- ── Fixed Effects ── -->
+                  <div class="mm-section">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-lock"></i> Fixed Effects — Type III Tests</span>
+                      <button class="collapse-toggle" onclick="toggleSection('fe3Body','fe3Toggle')" id="fe3Toggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                    </div>
+                    <div class="mm-section-body collapsible-content" id="fe3Body">
+                      <div class="mm-table-wrap">
+                        <table class="mm-table" id="fe3Table">
+                          <thead><tr>
+                            <th>Source</th>
+                            <th>Num. DF <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Numerator degrees of freedom for the F-test. Equals the number of contrasts being tested (typically number of levels − 1).</span></span></th>
+                            <th>Den. DF <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Denominator degrees of freedom, approximated by the Satterthwaite or Kenward-Roger method. Smaller values = less power.</span></span></th>
+                            <th>F <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">F-statistic for the omnibus test of this fixed effect. Tests whether any level of this factor differs from the others.</span></span></th>
+                            <th>Sig.</th>
+                            <th data-show-from="analyst">η²<sub>p</sub>
+                              <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
+                                <span class="metric-tip">Partial eta-squared: effect size. Small ≈ .01, Medium ≈ .06, Large ≈ .14</span>
+                              </span>
+                            </th>
+                            <th data-show-from="analyst">ω²<sub>p</sub>
+                              <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
+                                <span class="metric-tip">Partial omega-squared: bias-corrected effect size, preferred for smaller samples.</span>
+                              </span>
+                            </th>
+                          </tr></thead>
+                          <tbody id="fe3Rows">
+                            <tr><td colspan="7" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Awaiting results…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Fixed effect coefficient estimates -->
+                  <div class="mm-section">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-table-list"></i> Estimates of Fixed Effects</span>
+                      <button class="collapse-toggle" onclick="toggleSection('feCoefBody','feCoefToggle')" id="feCoefToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                    </div>
+                    <div class="mm-section-body collapsible-content" id="feCoefBody">
+                      <div class="mm-table-wrap">
+                        <table class="mm-table" id="feCoefTable">
+                          <thead><tr>
+                            <th>Parameter</th>
+                            <th>Estimate <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Fixed-effect coefficient (β). The expected change in the outcome for a one-unit increase in this predictor, holding all others constant.</span></span></th>
+                            <th>Std. Error <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Standard error of the estimate. Smaller SE = more precise estimate. Used to compute t and CI.</span></span></th>
+                            <th>df <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Denominator degrees of freedom for the t-test, approximated by Satterthwaite. Affects the critical value and p-value.</span></span></th>
+                            <th>t <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">t = Estimate / Std. Error. Tests whether the coefficient differs significantly from zero.</span></span></th>
+                            <th>Sig.</th>
+                            <th>95% CI Lower <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Lower bound of the 95% confidence interval. If this interval excludes zero, the effect is significant at α = 0.05.</span></span></th>
+                            <th>95% CI Upper</th>
+                            <th data-show-from="analyst">Std. β <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Standardised coefficient (beta weight). Allows comparison of effect sizes across predictors with different units.</span></span></th>
+                          </tr></thead>
+                          <tbody id="feCoefRows">
+                            <tr><td colspan="9" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Awaiting results…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <p class="table-footnote" id="feCoefFootnote">a. Dependent Variable: — &nbsp;|&nbsp; Satterthwaite DF approximation</p>
+                    </div>
+                  </div>
+
+                  <!-- ── Random Effects / Variance Components ── -->
+                  <div class="mm-section">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-dice"></i> Variance Components (Random Effects)</span>
+                      <button class="collapse-toggle" onclick="toggleSection('vcBody','vcToggle')" id="vcToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                    </div>
+                    <div class="mm-section-body collapsible-content" id="vcBody">
+                      <div class="mm-table-wrap">
+                        <table class="mm-table" id="vcTable">
+                          <thead><tr>
+                            <th>Parameter</th>
+                            <th>Estimate <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Estimated variance for this component (σ²). The random intercept variance is the between-group variance; Residual is the within-group (unexplained) variance.</span></span></th>
+                            <th>Std. Error <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Standard error of the variance estimate, computed from the information matrix. Large SE relative to estimate suggests uncertainty in the variance component.</span></span></th>
+                            <th>Wald Z <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Wald Z = Estimate / SE. Tests whether the variance component is significantly greater than zero. Note: the null distribution is bounded at 0, so p-values are conservative.</span></span></th>
+                            <th>Sig.</th>
+                            <th>95% CI Lower</th>
+                            <th>95% CI Upper</th>
+                            <th data-show-from="analyst">% Total Variance <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">This component's share of total variance (random intercept + residual). Mirrors the ICC when only a random intercept is included.</span></span></th>
+                          </tr></thead>
+                          <tbody id="vcRows">
+                            <tr><td colspan="8" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Awaiting results…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Variance Decomposition chart -->
+                  <div class="mm-section">
+                    <div class="mm-section-header"><span><i class="fa-solid fa-chart-pie"></i> Variance Decomposition</span></div>
+                    <div class="mm-section-body padded">
+                      <div id="varianceDecompChart" style="height:260px;width:100%;"></div>
+                    </div>
+                  </div>
+
+                  <!-- BLUPs (Analyst only) -->
+                  <div class="mm-section" data-show-from="analyst">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-list-ol"></i> Best Linear Unbiased Predictions (BLUPs) — Group Intercepts</span>
+                      <button class="collapse-toggle" onclick="toggleSection('blupBody','blupToggle')" id="blupToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                    </div>
+                    <div class="mm-section-body collapsible-content" id="blupBody">
+                      <div class="mm-table-wrap">
+                        <table class="mm-table" id="blupTable">
+                          <thead><tr>
+                            <th>Group</th>
+                            <th>BLUP (u<sub>j</sub>) <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Best Linear Unbiased Prediction — the estimated random intercept for each group. Positive values = group scores above the grand mean; negative = below. BLUPs are "shrunk" toward zero (partial pooling).</span></span></th>
+                            <th>Std. Error</th>
+                            <th>95% CI Lower</th>
+                            <th>95% CI Upper</th>
+                          </tr></thead>
+                          <tbody id="blupRows">
+                            <tr><td colspan="5" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Awaiting results…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Caterpillar plot (Analyst only) -->
+                  <div class="mm-section" data-show-from="analyst">
+                    <div class="mm-section-header"><span><i class="fa-solid fa-spider"></i> Caterpillar Plot — Group Random Intercepts</span></div>
+                    <div class="mm-section-body padded">
+                      <div id="caterpillarChart" style="height:320px;width:100%;"></div>
+                    </div>
+                  </div>
+
+                </div><!-- /tab-model-effects -->
+
+
+                <!-- ══════════════════════════════════════════════════════
+                     TAB: MARGINAL MEANS  (EMM + Pairwise Contrasts)
+                ══════════════════════════════════════════════════════ -->
+                <div id="tab-marginal-means" class="tab-content">
+
+                  <!-- Shared factor selector row -->
+                  <div class="cov-selector-row">
+                    <label><i class="fa-solid fa-tags"></i> Factor:</label>
+                    <select class="cov-select" id="emmFactorSelect" onchange="renderEMM(); syncPWFactor();">
+                      <option value="">— Select factor —</option>
+                    </select>
+                    <label style="margin-left:12px;"><i class="fa-solid fa-sliders"></i> Adjustment:</label>
+                    <select class="cov-select" id="pwAdjSelect" onchange="renderPairwise()">
+                      <option value="none">None (LSD)</option>
+                      <option value="bonferroni" selected>Bonferroni</option>
+                      <option value="sidak">Šidák</option>
+                      <option value="tukey">Tukey</option>
+                      <option value="fdr">FDR (Benjamini-Hochberg)</option>
+                    </select>
+                    <!-- hidden sync select for pairwise (keeps existing pwFactorSelect id) -->
+                    <select id="pwFactorSelect" style="display:none;"></select>
+                  </div>
+
+                  <!-- EMM table -->
+                  <div class="mm-section">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-table"></i> Estimated Marginal Means</span>
+                      <button class="collapse-toggle" onclick="toggleSection('emmTableBody','emmTableToggle')" id="emmTableToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                    </div>
+                    <div class="mm-section-body collapsible-content" id="emmTableBody">
+                      <div class="mm-table-wrap">
+                        <table class="mm-table" id="emmTable">
+                          <thead><tr>
+                            <th>Level</th>
+                            <th>Mean <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Estimated Marginal Mean — the model-predicted mean for this group, averaged across all other predictors at their means. Adjusted for covariates and unbalanced designs.</span></span></th>
+                            <th>Std. Error <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Standard error of the estimated marginal mean. Used to construct the confidence interval.</span></span></th>
+                            <th>df</th>
+                            <th>95% CI Lower</th>
+                            <th>95% CI Upper</th>
+                          </tr></thead>
+                          <tbody id="emmRows">
+                            <tr><td colspan="6" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Select a factor above…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- EMM profile plot -->
+                  <div class="mm-section">
+                    <div class="mm-section-header"><span><i class="fa-solid fa-chart-line"></i> Profile Plot — Estimated Marginal Means (± 95% CI)</span></div>
+                    <div class="mm-section-body padded">
+                      <div id="emmChart" style="height:300px;width:100%;"></div>
+                    </div>
+                  </div>
+
+                  <!-- Pairwise comparisons table -->
+                  <div class="mm-section">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-arrows-left-right"></i> Pairwise Comparisons</span>
+                      <button class="collapse-toggle" onclick="toggleSection('pwTableBody','pwTableToggle')" id="pwTableToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                    </div>
+                    <div class="mm-section-body collapsible-content" id="pwTableBody">
+                      <div class="mm-table-wrap">
+                        <table class="mm-table" id="pwTable">
+                          <thead><tr>
+                            <th>(I) Level</th><th>(J) Level</th>
+                            <th>Mean Diff (I−J) <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Estimated marginal mean of group I minus group J, holding all other predictors at their means.</span></span></th>
+                            <th>Std. Error</th><th>df</th>
+                            <th>t</th>
+                            <th>Sig. <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Unadjusted p-value for this pairwise comparison (equivalent to LSD / no correction).</span></span></th>
+                            <th>Adj. Sig. <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">P-value after applying the selected multiple-comparison correction (Bonferroni, Šidák, Tukey, or FDR). Use this column to control family-wise error rate.</span></span></th>
+                            <th>95% CI Lower</th><th>95% CI Upper</th>
+                            <th data-show-from="analyst">Cohen's d <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Standardised mean difference: d = (Mean I − Mean J) / pooled SD. Small ≈ 0.2, Medium ≈ 0.5, Large ≈ 0.8 (Cohen 1988).</span></span></th>
+                          </tr></thead>
+                          <tbody id="pwRows">
+                            <tr><td colspan="11" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Select a factor above…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Significance matrix (Analyst only) -->
+                  <div class="mm-section" data-show-from="analyst">
+                    <div class="mm-section-header"><span><i class="fa-solid fa-border-all"></i> Significance Matrix</span></div>
+                    <div class="mm-section-body padded">
+                      <div id="pwSigMatrix" style="overflow-x:auto;">
+                        <div style="text-align:center;padding:20px;color:var(--text-muted);font-style:italic;">Select a factor above…</div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div><!-- /tab-marginal-means -->
+
+
+                <!-- ══════════════════════════════════════════════════════
+                     TAB: DIAGNOSTICS  (Residuals + Influential Cases)
+                ══════════════════════════════════════════════════════ -->
+                <div id="tab-diagnostics" class="tab-content">
+
+                  <!-- Residuals section -->
+                  <div class="mm-section">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-gauge-high"></i> Residual Diagnostics</span>
+                      <button class="collapse-toggle" onclick="toggleSection('residualsDiagBody','residualsDiagToggle')" id="residualsDiagToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                    </div>
+                    <div class="mm-section-body collapsible-content" id="residualsDiagBody">
+                      <div class="res-workspace" id="residualsPanel">
+                        <div class="awaiting-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading residual diagnostics…</p></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Influential cases section -->
+                  <div class="mm-section">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-triangle-exclamation"></i> Influential Cases</span>
+                      <button class="collapse-toggle" onclick="toggleSection('influentialDiagBody','influentialDiagToggle')" id="influentialDiagToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                    </div>
+                    <div class="mm-section-body collapsible-content" id="influentialDiagBody">
+                      <div class="res-workspace" id="influentialPanel">
+                        <div class="awaiting-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading influential case diagnostics…</p></div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div><!-- /tab-diagnostics -->
+
+
+                <!-- ══════════════════════════════════════════════════════
+                     TAB: ADVANCED  (Model Fit + Covariance + Forest/Caterpillar)
+                ══════════════════════════════════════════════════════ -->
+                <div id="tab-advanced" class="tab-content">
 
                   <!-- Information Criteria table -->
                   <div class="mm-section">
@@ -799,8 +1030,8 @@
                     </div>
                   </div>
 
-                  <!-- Model comparison / LRT -->
-                  <div class="mm-section" data-show-from="analyst">
+                  <!-- Likelihood Ratio Test -->
+                  <div class="mm-section">
                     <div class="mm-section-header">
                       <span><i class="fa-solid fa-code-compare"></i> Likelihood Ratio Test (vs. Intercept-Only)</span>
                       <button class="collapse-toggle" onclick="toggleSection('lrtBody','lrtToggle')" id="lrtToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
@@ -822,7 +1053,7 @@
                     </div>
                   </div>
 
-                  <!-- Pseudo R² / variance explained -->
+                  <!-- Pseudo R² -->
                   <div class="mm-section">
                     <div class="mm-section-header"><span><i class="fa-solid fa-percent"></i> Variance Explained (Pseudo R²)</span></div>
                     <div class="mm-section-body padded">
@@ -861,78 +1092,47 @@
                     </div>
                   </div>
 
-                </div><!-- /tab-model-fit -->
-
-
-                <!-- ══════════════════════════════════════════════════════
-                     TAB: FIXED EFFECTS
-                ══════════════════════════════════════════════════════ -->
-                <div id="tab-fixed-effects" class="tab-content">
-
-                  <!-- Type III omnibus tests -->
+                  <!-- Covariance structure selector + matrices -->
                   <div class="mm-section">
                     <div class="mm-section-header">
-                      <span><i class="fa-solid fa-table"></i> Type III Tests of Fixed Effects</span>
-                      <button class="collapse-toggle" onclick="toggleSection('fe3Body','fe3Toggle')" id="fe3Toggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                      <span><i class="fa-solid fa-border-all"></i> Covariance Structure</span>
+                      <button class="collapse-toggle" onclick="toggleSection('covAdvBody','covAdvToggle')" id="covAdvToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
                     </div>
-                    <div class="mm-section-body collapsible-content" id="fe3Body">
-                      <div class="mm-table-wrap">
-                        <table class="mm-table" id="fe3Table">
-                          <thead><tr>
-                            <th>Source</th>
-                            <th>Num. DF <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Numerator degrees of freedom for the F-test. Equals the number of contrasts being tested (typically number of levels − 1).</span></span></th>
-                            <th>Den. DF <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Denominator degrees of freedom, approximated by the Satterthwaite or Kenward-Roger method. Smaller values = less power.</span></span></th>
-                            <th>F <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">F-statistic for the omnibus test of this fixed effect. Tests whether any level of this factor differs from the others.</span></span></th>
-                            <th>Sig.</th>
-                            <th data-show-from="analyst">η²<sub>p</sub>
-                              <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
-                                <span class="metric-tip">Partial eta-squared: effect size. Small ≈ .01, Medium ≈ .06, Large ≈ .14</span>
-                              </span>
-                            </th>
-                            <th data-show-from="analyst">ω²<sub>p</sub>
-                              <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
-                                <span class="metric-tip">Partial omega-squared: bias-corrected effect size, preferred for smaller samples.</span>
-                              </span>
-                            </th>
-                          </tr></thead>
-                          <tbody id="fe3Rows">
-                            <tr><td colspan="7" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Awaiting results…</td></tr>
-                          </tbody>
-                        </table>
+                    <div class="mm-section-body padded collapsible-content" id="covAdvBody">
+                      <div class="cov-selector-row" style="margin-bottom:12px;">
+                        <label><i class="fa-solid fa-border-all"></i> Residual Covariance Structure:</label>
+                        <select class="cov-select" id="covStructSelect" onchange="updateCovStructure()">
+                          <option value="vc"   selected>Variance Components (VC) — default</option>
+                          <option value="cs">Compound Symmetry (CS)</option>
+                          <option value="ar1">First-Order Autoregressive (AR1)</option>
+                          <option value="toep">Toeplitz (TOEP)</option>
+                          <option value="un">Unstructured (UN)</option>
+                          <option value="diag">Diagonal</option>
+                        </select>
+                        <button class="depth-btn" onclick="refitWithCovStructure()" style="margin-left:8px;">
+                          <i class="fa-solid fa-rotate"></i> Refit
+                        </button>
+                      </div>
+                      <div class="mm-section-header" style="margin-bottom:8px;border-radius:4px;"><span><i class="fa-solid fa-border-all"></i> Estimated Residual Covariance Matrix (Σ) <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">The R-matrix (Σ). Describes the covariance structure of residuals within groups. For VC (default) this is σ²·I (diagonal). For AR(1) or CS it captures within-subject correlations across time points.</span></span></span></div>
+                      <div class="mm-table-wrap" id="covMatrixWrap">
+                        <div class="awaiting-state" style="padding:30px;text-align:center;"><i class="fa-solid fa-hourglass-half"></i><p>Awaiting results…</p></div>
+                      </div>
+                      <div class="mm-section-header" style="margin-top:12px;margin-bottom:8px;border-radius:4px;"><span><i class="fa-solid fa-border-all"></i> G-Matrix — Random Effects Covariance <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">The G-matrix contains the variances and covariances of the random effects. The diagonal elements are random-effect variances; off-diagonal elements are covariances between random slopes/intercepts.</span></span></span></div>
+                      <div class="mm-table-wrap" id="gMatrixWrap">
+                        <div class="awaiting-state" style="padding:30px;text-align:center;"><i class="fa-solid fa-hourglass-half"></i><p>Awaiting results…</p></div>
                       </div>
                     </div>
                   </div>
 
-                  <!-- Fixed effect coefficient estimates (SPSS "Estimates of Fixed Effects") -->
-                  <div class="mm-section">
-                    <div class="mm-section-header">
-                      <span><i class="fa-solid fa-table-list"></i> Estimates of Fixed Effects</span>
-                      <button class="collapse-toggle" onclick="toggleSection('feCoefBody','feCoefToggle')" id="feCoefToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
-                    </div>
-                    <div class="mm-section-body collapsible-content" id="feCoefBody">
-                      <div class="mm-table-wrap">
-                        <table class="mm-table" id="feCoefTable">
-                          <thead><tr>
-                            <th>Parameter</th>
-                            <th>Estimate <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Fixed-effect coefficient (β). The expected change in the outcome for a one-unit increase in this predictor, holding all others constant.</span></span></th>
-                            <th>Std. Error <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Standard error of the estimate. Smaller SE = more precise estimate. Used to compute t and CI.</span></span></th>
-                            <th>df <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Denominator degrees of freedom for the t-test, approximated by Satterthwaite. Affects the critical value and p-value.</span></span></th>
-                            <th>t <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">t = Estimate / Std. Error. Tests whether the coefficient differs significantly from zero.</span></span></th>
-                            <th>Sig.</th>
-                            <th>95% CI Lower <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Lower bound of the 95% confidence interval. If this interval excludes zero, the effect is significant at α = 0.05.</span></span></th>
-                            <th>95% CI Upper</th>
-                            <th data-show-from="analyst">Std. β <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Standardised coefficient (beta weight). Allows comparison of effect sizes across predictors with different units.</span></span></th>
-                          </tr></thead>
-                          <tbody id="feCoefRows">
-                            <tr><td colspan="9" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Awaiting results…</td></tr>
-                          </tbody>
-                        </table>
-                      </div>
-                      <p class="table-footnote" id="feCoefFootnote">a. Dependent Variable: — &nbsp;|&nbsp; Satterthwaite DF approximation</p>
+                  <!-- Covariance fit comparison chart (Analyst only) -->
+                  <div class="mm-section" data-show-from="analyst">
+                    <div class="mm-section-header"><span><i class="fa-solid fa-code-compare"></i> Covariance Structure Comparison (AIC)</span></div>
+                    <div class="mm-section-body padded">
+                      <div id="covCompChart" style="height:260px;width:100%;"></div>
                     </div>
                   </div>
 
-                  <!-- Forest plot of fixed effects -->
+                  <!-- Forest plot (Analyst only) -->
                   <div class="mm-section" data-show-from="analyst">
                     <div class="mm-section-header">
                       <span><i class="fa-solid fa-chart-gantt"></i> Forest Plot — Fixed Effect Estimates (95% CI)</span>
@@ -943,256 +1143,7 @@
                     </div>
                   </div>
 
-                </div><!-- /tab-fixed-effects -->
-
-
-                <!-- ══════════════════════════════════════════════════════
-                     TAB: RANDOM EFFECTS
-                ══════════════════════════════════════════════════════ -->
-                <div id="tab-random-effects" class="tab-content">
-
-                  <!-- Variance Components -->
-                  <div class="mm-section">
-                    <div class="mm-section-header">
-                      <span><i class="fa-solid fa-dice"></i> Estimates of Covariance Parameters (Variance Components)</span>
-                      <button class="collapse-toggle" onclick="toggleSection('vcBody','vcToggle')" id="vcToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
-                    </div>
-                    <div class="mm-section-body collapsible-content" id="vcBody">
-                      <div class="mm-table-wrap">
-                        <table class="mm-table" id="vcTable">
-                          <thead><tr>
-                            <th>Parameter</th>
-                            <th>Estimate <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Estimated variance for this component (σ²). The random intercept variance is the between-group variance; Residual is the within-group (unexplained) variance.</span></span></th>
-                            <th>Std. Error <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Standard error of the variance estimate, computed from the information matrix. Large SE relative to estimate suggests uncertainty in the variance component.</span></span></th>
-                            <th>Wald Z <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Wald Z = Estimate / SE. Tests whether the variance component is significantly greater than zero. Note: the null distribution is bounded at 0, so p-values are conservative.</span></span></th>
-                            <th>Sig.</th>
-                            <th>95% CI Lower</th>
-                            <th>95% CI Upper</th>
-                            <th data-show-from="analyst">% Total Variance <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">This component's share of total variance (random intercept + residual). Mirrors the ICC when only a random intercept is included.</span></span></th>
-                          </tr></thead>
-                          <tbody id="vcRows">
-                            <tr><td colspan="8" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Awaiting results…</td></tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Variance decomposition visual -->
-                  <div class="mm-section">
-                    <div class="mm-section-header"><span><i class="fa-solid fa-chart-pie"></i> Variance Decomposition</span></div>
-                    <div class="mm-section-body padded">
-                      <div id="varianceDecompChart" style="height:260px;width:100%;"></div>
-                    </div>
-                  </div>
-
-                  <!-- Random effect BLUPs / shrinkage estimates -->
-                  <div class="mm-section" data-show-from="analyst">
-                    <div class="mm-section-header">
-                      <span><i class="fa-solid fa-list-ol"></i> Best Linear Unbiased Predictions (BLUPs) — Group Intercepts</span>
-                      <button class="collapse-toggle" onclick="toggleSection('blupBody','blupToggle')" id="blupToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
-                    </div>
-                    <div class="mm-section-body collapsible-content" id="blupBody">
-                      <div class="mm-table-wrap">
-                        <table class="mm-table" id="blupTable">
-                          <thead><tr>
-                            <th>Group</th>
-                            <th>BLUP (u<sub>j</sub>) <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Best Linear Unbiased Prediction — the estimated random intercept for each group. Positive values = group scores above the grand mean; negative = below. BLUPs are "shrunk" toward zero (partial pooling).</span></span></th>
-                            <th>Std. Error</th>
-                            <th>95% CI Lower</th>
-                            <th>95% CI Upper</th>
-                          </tr></thead>
-                          <tbody id="blupRows">
-                            <tr><td colspan="5" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Awaiting results…</td></tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Caterpillar plot of BLUPs -->
-                  <div class="mm-section" data-show-from="analyst">
-                    <div class="mm-section-header"><span><i class="fa-solid fa-spider"></i> Caterpillar Plot — Group Random Intercepts</span></div>
-                    <div class="mm-section-body padded">
-                      <div id="caterpillarChart" style="height:320px;width:100%;"></div>
-                    </div>
-                  </div>
-
-                </div><!-- /tab-random-effects -->
-
-
-                <!-- ══════════════════════════════════════════════════════
-                     TAB: COVARIANCE
-                ══════════════════════════════════════════════════════ -->
-                <div id="tab-covariance" class="tab-content">
-
-                  <div class="cov-selector-row">
-                    <label><i class="fa-solid fa-border-all"></i> Residual Covariance Structure:</label>
-                    <select class="cov-select" id="covStructSelect" onchange="updateCovStructure()">
-                      <option value="vc"   selected>Variance Components (VC) — default</option>
-                      <option value="cs">Compound Symmetry (CS)</option>
-                      <option value="ar1">First-Order Autoregressive (AR1)</option>
-                      <option value="toep">Toeplitz (TOEP)</option>
-                      <option value="un">Unstructured (UN)</option>
-                      <option value="diag">Diagonal</option>
-                    </select>
-                    <button class="depth-btn" onclick="refitWithCovStructure()" style="margin-left:8px;">
-                      <i class="fa-solid fa-rotate"></i> Refit
-                    </button>
-                  </div>
-
-                  <!-- Covariance matrix display -->
-                  <div class="mm-section">
-                    <div class="mm-section-header"><span><i class="fa-solid fa-border-all"></i> Estimated Residual Covariance Matrix (Σ) <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">The R-matrix (Σ). Describes the covariance structure of residuals within groups. For VC (default) this is σ²·I (diagonal). For AR(1) or CS it captures within-subject correlations across time points.</span></span></span></div>
-                    <div class="mm-section-body">
-                      <div class="mm-table-wrap" id="covMatrixWrap">
-                        <div class="awaiting-state" style="padding:30px;text-align:center;"><i class="fa-solid fa-hourglass-half"></i><p>Awaiting results…</p></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- G-matrix (random effects covariance) -->
-                  <div class="mm-section">
-                    <div class="mm-section-header"><span><i class="fa-solid fa-border-all"></i> G-Matrix — Random Effects Covariance <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">The G-matrix contains the variances and covariances of the random effects. The diagonal elements are random-effect variances; off-diagonal elements are covariances between random slopes/intercepts.</span></span></span></div>
-                    <div class="mm-section-body">
-                      <div class="mm-table-wrap" id="gMatrixWrap">
-                        <div class="awaiting-state" style="padding:30px;text-align:center;"><i class="fa-solid fa-hourglass-half"></i><p>Awaiting results…</p></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Covariance fit comparison -->
-                  <div class="mm-section" data-show-from="analyst">
-                    <div class="mm-section-header"><span><i class="fa-solid fa-code-compare"></i> Covariance Structure Comparison (AIC)</span></div>
-                    <div class="mm-section-body padded">
-                      <div id="covCompChart" style="height:260px;width:100%;"></div>
-                    </div>
-                  </div>
-
-                </div><!-- /tab-covariance -->
-
-
-                <!-- ══════════════════════════════════════════════════════
-                     TAB: ESTIMATED MARGINAL MEANS
-                ══════════════════════════════════════════════════════ -->
-                <div id="tab-emm" class="tab-content">
-
-                  <!-- Factor selector -->
-                  <div class="cov-selector-row">
-                    <label><i class="fa-solid fa-tags"></i> Factor:</label>
-                    <select class="cov-select" id="emmFactorSelect" onchange="renderEMM()">
-                      <option value="">— Select factor —</option>
-                    </select>
-                  </div>
-
-                  <!-- EMM table -->
-                  <div class="mm-section">
-                    <div class="mm-section-header"><span><i class="fa-solid fa-table"></i> Estimated Marginal Means</span></div>
-                    <div class="mm-section-body">
-                      <div class="mm-table-wrap">
-                        <table class="mm-table" id="emmTable">
-                          <thead><tr>
-                            <th>Level</th>
-                            <th>Mean <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Estimated Marginal Mean — the model-predicted mean for this group, averaged across all other predictors at their means. Adjusted for covariates and unbalanced designs.</span></span></th>
-                            <th>Std. Error <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Standard error of the estimated marginal mean. Used to construct the confidence interval.</span></span></th>
-                            <th>df</th>
-                            <th>95% CI Lower</th>
-                            <th>95% CI Upper</th>
-                          </tr></thead>
-                          <tbody id="emmRows">
-                            <tr><td colspan="6" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Select a factor above…</td></tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- EMM profile plot -->
-                  <div class="mm-section">
-                    <div class="mm-section-header"><span><i class="fa-solid fa-chart-line"></i> Profile Plot — Estimated Marginal Means (± 95% CI)</span></div>
-                    <div class="mm-section-body padded">
-                      <div id="emmChart" style="height:300px;width:100%;"></div>
-                    </div>
-                  </div>
-
-                </div><!-- /tab-emm -->
-
-
-                <!-- ══════════════════════════════════════════════════════
-                     TAB: PAIRWISE CONTRASTS
-                ══════════════════════════════════════════════════════ -->
-                <div id="tab-pairwise" class="tab-content">
-
-                  <div class="cov-selector-row">
-                    <label><i class="fa-solid fa-tags"></i> Factor:</label>
-                    <select class="cov-select" id="pwFactorSelect" onchange="renderPairwise()">
-                      <option value="">— Select factor —</option>
-                    </select>
-                    <label style="margin-left:12px;"><i class="fa-solid fa-sliders"></i> Adjustment:</label>
-                    <select class="cov-select" id="pwAdjSelect" onchange="renderPairwise()">
-                      <option value="none">None (LSD)</option>
-                      <option value="bonferroni" selected>Bonferroni</option>
-                      <option value="sidak">Šidák</option>
-                      <option value="tukey">Tukey</option>
-                      <option value="fdr">FDR (Benjamini-Hochberg)</option>
-                    </select>
-                  </div>
-
-                  <!-- Pairwise contrasts table -->
-                  <div class="mm-section">
-                    <div class="mm-section-header"><span><i class="fa-solid fa-arrows-left-right"></i> Pairwise Comparisons</span></div>
-                    <div class="mm-section-body">
-                      <div class="mm-table-wrap">
-                        <table class="mm-table" id="pwTable">
-                          <thead><tr>
-                            <th>(I) Level</th><th>(J) Level</th>
-                            <th>Mean Diff (I−J) <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Estimated marginal mean of group I minus group J, holding all other predictors at their means.</span></span></th>
-                            <th>Std. Error</th><th>df</th>
-                            <th>t</th>
-                            <th>Sig. <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Unadjusted p-value for this pairwise comparison (equivalent to LSD / no correction).</span></span></th>
-                            <th>Adj. Sig. <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">P-value after applying the selected multiple-comparison correction (Bonferroni, Šidák, Tukey, or FDR). Use this column to control family-wise error rate.</span></span></th>
-                            <th>95% CI Lower</th><th>95% CI Upper</th>
-                            <th data-show-from="analyst">Cohen's d <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Standardised mean difference: d = (Mean I − Mean J) / pooled SD. Small ≈ 0.2, Medium ≈ 0.5, Large ≈ 0.8 (Cohen 1988).</span></span></th>
-                          </tr></thead>
-                          <tbody id="pwRows">
-                            <tr><td colspan="11" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Select a factor above…</td></tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Compact significance matrix -->
-                  <div class="mm-section" data-show-from="analyst">
-                    <div class="mm-section-header"><span><i class="fa-solid fa-border-all"></i> Significance Matrix</span></div>
-                    <div class="mm-section-body padded">
-                      <div id="pwSigMatrix" style="overflow-x:auto;">
-                        <div style="text-align:center;padding:20px;color:var(--text-muted);font-style:italic;">Select a factor above…</div>
-                      </div>
-                    </div>
-                  </div>
-
-                </div><!-- /tab-pairwise -->
-
-
-                <!-- ══════════════════════════════════════════════════════
-                     TAB: RESIDUALS
-                ══════════════════════════════════════════════════════ -->
-                <div id="tab-residuals" class="tab-content">
-                  <div class="res-workspace" id="residualsPanel">
-                    <div class="awaiting-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading residual diagnostics…</p></div>
-                  </div>
-                </div>
-
-
-                <!-- ══════════════════════════════════════════════════════
-                     TAB: INFLUENTIAL CASES
-                ══════════════════════════════════════════════════════ -->
-                <div id="tab-influential" class="tab-content">
-                  <div class="res-workspace" id="influentialPanel">
-                    <div class="awaiting-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading influential case diagnostics…</p></div>
-                  </div>
-                </div>
+                </div><!-- /tab-advanced -->
 
 
               </div><!-- /card-body -->
@@ -2362,7 +2313,22 @@
       sel.innerHTML = '<option value="">— Select factor —</option>' +
         factors.map(f => `<option value="${f}">${f}</option>`).join('');
     });
+    // Auto-select first factor if available
+    if (factors.length) {
+      const emm = document.getElementById('emmFactorSelect');
+      const pw  = document.getElementById('pwFactorSelect');
+      if (emm) emm.value = factors[0];
+      if (pw)  pw.value  = factors[0];
+    }
   }
+
+  // Keep hidden pwFactorSelect in sync with the visible emmFactorSelect
+  window.syncPWFactor = function() {
+    const val = document.getElementById('emmFactorSelect')?.value;
+    const pw  = document.getElementById('pwFactorSelect');
+    if (pw) pw.value = val;
+    renderPairwise();
+  };
 
   /* ─────────────────────────────────────────────────────────────
      EMM FALLBACK — derive group means from fixed-effect coefficients
@@ -2987,14 +2953,10 @@
   ───────────────────────────────────────────────────────────── */
   const TAB_TITLES = {
     'overview':       'Overview',
-    'model-fit':      'Model Fit',
-    'fixed-effects':  'Fixed Effects',
-    'random-effects': 'Random Effects',
-    'covariance':     'Covariance Structure',
-    'emm':            'Estimated Marginal Means',
-    'pairwise':       'Pairwise Contrasts',
-    'residuals':      'Residual Diagnostics',
-    'influential':    'Influential Cases',
+    'model-effects':  'Model Effects',
+    'marginal-means': 'Marginal Means',
+    'diagnostics':    'Diagnostics',
+    'advanced':       'Advanced',
   };
 
   window.switchTab = function(name) {
@@ -3017,9 +2979,9 @@
     if (heroSec)  heroSec.style.display  = showDepth ? '' : 'none';
 
     // Lazy-load heavy tabs
-    if (name === 'residuals'   && !window._residualsLoaded) { loadResidualsTab(); window._residualsLoaded = true; }
-    if (name === 'influential' && !window._influentialLoaded) { loadInfluentialTab(); window._influentialLoaded = true; }
-    if (name === 'covariance'  && _results) { updateCovStructure(); renderCovCompChart(); }
+    if (name === 'diagnostics' && !window._residualsLoaded)   { loadResidualsTab();    window._residualsLoaded = true; }
+    if (name === 'diagnostics' && !window._influentialLoaded) { loadInfluentialTab();  window._influentialLoaded = true; }
+    if (name === 'advanced'    && _results) { updateCovStructure(); renderCovCompChart(); }
 
     const cardBody = document.querySelector('.card-body');
     if (cardBody) cardBody.scrollTop = 0;

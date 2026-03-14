@@ -1449,6 +1449,10 @@
     if (msdBtn) msdBtn.disabled = false;
     applyDepth(_depth);
 
+    // Extract any EMM/pairwise/BLUP data embedded in the results payload
+    // (also handles the in-browser computation path)
+    wirePostResultsData(d);
+
     // Notify VB6 that rendering is complete
     sendToHost('mixedModelRendered', { status: 'ok' });
   }
@@ -2360,6 +2364,97 @@
     });
   }
 
+  /* ─────────────────────────────────────────────────────────────
+     EMM FALLBACK — derive group means from fixed-effect coefficients
+     when VB6 has not sent Case 702.
+
+     Statistico encodes categorical fixed effects as dummy contrasts:
+       Intercept          → mean of the reference level
+       group (Treatment)  → difference from reference
+       group (Control)    → difference from reference (if > 2 levels)
+     We reconstruct each level's EMM = Intercept + contrast_coefficient.
+     SE of each EMM ≈ SE of Intercept (conservative; VB6 gives exact delta-method SE).
+  ───────────────────────────────────────────────────────────── */
+  function _deriveEMMFromCoefficients(factorName) {
+    if (!_results) return null;
+    const coefs = _results.fixedEffects ?? _results.coefficients ?? [];
+    if (!coefs.length) return null;
+
+    // Find intercept
+    const intercept = coefs.find(r =>
+      /^intercept$/i.test(r.parameter ?? r.name ?? r.term ?? ''));
+    if (!intercept) return null;
+
+    const intEst = parseFloat(intercept.estimate ?? intercept.coef ?? 0);
+    const intSE  = parseFloat(intercept.se ?? intercept.stderr ?? 0);
+
+    // Find all coefficients that belong to this factor
+    // Pattern: "<factorName> (Level)" or "<factorName>[Level]" or "<factorName>_Level"
+    const escaped = factorName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`^${escaped}[\\s_\\(\\[]`, 'i');
+
+    const contrasts = coefs.filter(r => {
+      const nm = r.parameter ?? r.name ?? r.term ?? '';
+      return re.test(nm);
+    });
+
+    if (!contrasts.length) return null;
+
+    // Extract level labels from parameter names
+    const levels = contrasts.map(r => {
+      const nm = r.parameter ?? r.name ?? r.term ?? '';
+      // e.g. "group (Treatment)" → "Treatment", "group[Treatment]" → "Treatment"
+      const m = nm.match(/[\(\[](.*?)[\)\]]$/) ?? nm.match(/[\s_](\S+)$/);
+      return { label: m ? m[1] : nm, coef: r };
+    });
+
+    // Reference level EMM = intercept (no contrast row for reference in dummy coding)
+    // Detect reference by checking if contrasts cover all levels in typeIII
+    // We always add a synthetic "Reference" row first
+    const allLevels = [];
+
+    // Reference level: EMM = intercept
+    const refLabel = (() => {
+      // Try to guess from modelSpec or factor name
+      const spec = _modelSpec;
+      if (spec && spec.refLevels && spec.refLevels[factorName])
+        return spec.refLevels[factorName];
+      return 'Reference';
+    })();
+
+    allLevels.push({
+      level:  refLabel,
+      mean:   intEst,
+      se:     intSE,
+      df:     parseFloat(intercept.df ?? 0),
+      ciLow:  parseFloat(intercept.ciLow ?? intercept.lower95 ?? (intEst - 1.96 * intSE)),
+      ciHigh: parseFloat(intercept.ciHigh ?? intercept.upper95 ?? (intEst + 1.96 * intSE)),
+      _derived: true,
+    });
+
+    // Non-reference levels: EMM = intercept + contrast
+    levels.forEach(({ label, coef }) => {
+      const est  = parseFloat(coef.estimate ?? coef.coef ?? 0);
+      const se   = parseFloat(coef.se ?? coef.stderr ?? 0);
+      const mean = intEst + est;
+      // Combined SE ≈ sqrt(SE_int² + SE_contrast²) (ignores covariance — conservative)
+      const cse  = Math.sqrt(intSE ** 2 + se ** 2);
+      const df   = parseFloat(coef.df ?? intercept.df ?? 0);
+      const t95  = df > 0 ? 2.0 : 1.96;   // approximate; exact requires jStat
+      allLevels.push({
+        level:  label,
+        mean:   mean,
+        se:     cse,
+        df:     df,
+        ciLow:  mean - t95 * cse,
+        ciHigh: mean + t95 * cse,
+        _derived: true,
+      });
+    });
+
+    return { factor: factorName, levels: allLevels, _derived: true };
+  }
+
   function renderEMM() {
     const factor = document.getElementById('emmFactorSelect')?.value;
     const tbody = document.getElementById('emmRows');
@@ -2370,23 +2465,39 @@
       return;
     }
 
-    // Request from VB6 if not cached
+    // Request from VB6 if not cached; also attempt JS fallback from fixedEffects
     if (!_emmData[factor]) {
       sendToHost('requestEMM', { factor });
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Computing…</td></tr>`;
-      return;
+
+      // JS fallback: derive EMM from fixed-effect coefficients in _results
+      const fallback = _deriveEMMFromCoefficients(factor);
+      if (fallback) {
+        _emmData[factor] = fallback;
+        // don't return — fall through to render
+      } else {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Computing…<br><span style="font-size:.75rem;color:var(--text-muted);">Waiting for VB6 response (Case 702)…</span></td></tr>`;
+        return;
+      }
     }
 
     const emm = _emmData[factor];
     tbody.innerHTML = (emm.levels ?? []).map(r => `
-      <tr>
-        <td>${r.level ?? r.label ?? '—'}</td>
+      <tr${r._derived ? ' style="opacity:.85"' : ''}>
+        <td>${r.level ?? r.label ?? '—'}${r._derived ? ' <span style="font-size:.65rem;color:var(--text-muted);" title="Derived from fixed-effect coefficients">~</span>' : ''}</td>
         <td class="coef-cell">${fmt(r.mean ?? r.emmean)}</td>
         <td>${fmt(r.se ?? r.stderr)}</td>
         <td>${fmt(r.df, 1)}</td>
         <td>${fmt(r.ciLow ?? r.lower)}</td>
         <td>${fmt(r.ciHigh ?? r.upper)}</td>
       </tr>`).join('');
+
+    if (emm._derived) {
+      const note = document.createElement('tr');
+      note.innerHTML = `<td colspan="6" style="font-size:.7rem;color:var(--text-muted);padding:6px 8px;font-style:italic;">
+        ~ Values derived from fixed-effect coefficients (SE conservative). Exact EMM will load if VB6 sends Case 702.
+      </td>`;
+      tbody.appendChild(note);
+    }
 
     renderEMMChart(emm);
   }

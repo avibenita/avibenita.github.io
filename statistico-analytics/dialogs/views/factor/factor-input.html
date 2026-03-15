@@ -1451,10 +1451,8 @@
         }
         
         STATE.data = {}; // Will be populated on demand
-        STATE.assignments = { y: null, xn: [], xc: [] };
+        STATE.assignments = { y: null, xn: [], xc: [] }; // xn=[] means all unchecked in factor mode
         STATE.excluded = {};
-        // Start all variables excluded (unchecked)
-        STATE.variables.forEach(function(v) { STATE.excluded[v.name] = true; });
         
         renderVariables();
         clearAssignments();
@@ -1529,8 +1527,7 @@
       }
 
       console.log('? Processed variables:', STATE.variables);
-      // Start all variables excluded (unchecked)
-      STATE.variables.forEach(function(v) { STATE.excluded[v.name] = true; });
+      // xn=[] already set — all variables start unchecked in factor mode
       renderVariables();
       
       // Restore saved model configuration if it exists
@@ -1681,25 +1678,28 @@
       var tbody = document.createElement('tbody');
       STATE.variables.forEach(function(variable) {
         var tr = document.createElement('tr');
-        var isAssigned = isVariableAssigned(variable.name);
-        var isExcluded = !!STATE.excluded[variable.name];
-        
-        // Set draggable only if not assigned and not excluded
-        tr.draggable = !isAssigned && !isExcluded;
+        // In factor mode, xn membership = "checked" (not assigned in the drag sense)
+        var isChecked = isFactorMode()
+          ? (STATE.assignments.xn.indexOf(variable.name) >= 0)
+          : false;
+        var isAssigned = isFactorMode() ? false : isVariableAssigned(variable.name);
+        var isExcluded = isFactorMode() ? !isChecked : !!STATE.excluded[variable.name];
+
+        tr.draggable = !isFactorMode() && !isAssigned;
         tr.dataset.varName = variable.name;
         tr.dataset.varType = variable.type;
-        
-        // Assigned rows (already in bucket) look normal but no checkbox
+
+        // Non-factor assigned rows (Y/Xn/Xc in regression mode)
         if (isAssigned) {
           tr.classList.add('variable-row-disabled');
         }
 
-        // Excluded (unchecked) rows — no special styling
+        // Unchecked rows — no special styling
         if (isExcluded && !isAssigned) {
           tr.classList.add('variable-row-excluded');
         }
 
-        // Included (checked) rows — bold highlight
+        // Checked / included rows — bold highlight
         if (!isExcluded && !isAssigned) {
           tr.classList.add('variable-row-included');
         }
@@ -1747,10 +1747,10 @@
         
         var gripIcon = isAssigned ? '' : '<i class="fa-solid fa-grip-vertical grip-icon"></i>';
 
-        // Build include checkbox cell (no checkbox when already assigned)
+        // Checkbox always shown in factor mode; hidden only for drag-assigned rows in other modes
         var cbCell = isAssigned
           ? '<td class="include-col"></td>'
-          : '<td class="include-col"><input type="checkbox" class="var-include-cb" ' + (isExcluded ? '' : 'checked') + ' data-var="' + variable.name + '" title="Include this variable" /></td>';
+          : '<td class="include-col"><input type="checkbox" class="var-include-cb" ' + (!isExcluded ? 'checked' : '') + ' data-var="' + variable.name + '" title="Include this variable" /></td>';
         
         tr.innerHTML = 
           cbCell +
@@ -1769,16 +1769,21 @@
           if (cb) {
             cb.addEventListener('change', function(e) {
               var vName = e.target.dataset.var;
-              if (e.target.checked) {
-                // Include: remove from excluded and auto-add to xn in factor mode
-                delete STATE.excluded[vName];
-                if (isFactorMode() && STATE.assignments.xn.indexOf(vName) < 0) {
-                  STATE.assignments.xn.push(vName);
+              if (isFactorMode()) {
+                if (e.target.checked) {
+                  if (STATE.assignments.xn.indexOf(vName) < 0) {
+                    STATE.assignments.xn.push(vName);
+                  }
+                } else {
+                  STATE.assignments.xn = STATE.assignments.xn.filter(function(n) { return n !== vName; });
                 }
               } else {
-                STATE.excluded[vName] = true;
-                // Remove from assignments
-                removeVariableFromAssignments(vName);
+                if (e.target.checked) {
+                  delete STATE.excluded[vName];
+                } else {
+                  STATE.excluded[vName] = true;
+                  removeVariableFromAssignments(vName);
+                }
               }
               updateSelectAllCheckbox();
               renderBucket();
@@ -2057,13 +2062,16 @@
     function updateSelectAllCheckbox() {
       var cb = document.getElementById('chkSelectAll');
       if (!cb) return;
-      var nonAssigned = STATE.variables.filter(function(v) { return !isVariableAssigned(v.name); });
-      var excludedCount = nonAssigned.filter(function(v) { return !!STATE.excluded[v.name]; }).length;
-      if (excludedCount === 0) {
-        cb.checked = true;
-        cb.indeterminate = false;
-      } else if (excludedCount === nonAssigned.length) {
+      var total = STATE.variables.length;
+      if (total === 0) { cb.checked = false; cb.indeterminate = false; return; }
+      var checkedCount = isFactorMode()
+        ? STATE.assignments.xn.length
+        : STATE.variables.filter(function(v) { return !STATE.excluded[v.name]; }).length;
+      if (checkedCount === 0) {
         cb.checked = false;
+        cb.indeterminate = false;
+      } else if (checkedCount === total) {
+        cb.checked = true;
         cb.indeterminate = false;
       } else {
         cb.checked = false;
@@ -2539,10 +2547,8 @@
     }
     
     function clearAssignments() {
-      STATE.assignments = { y: null, xn: [], xc: [] };
-      // Re-init all as excluded (unchecked)
+      STATE.assignments = { y: null, xn: [], xc: [] }; // xn=[] = all unchecked in factor mode
       STATE.excluded = {};
-      STATE.variables.forEach(function(v) { STATE.excluded[v.name] = true; });
       renderVariables();
       renderBucket();
       renderAssignments();

@@ -98,7 +98,7 @@ function openCorrelationConfig() {
   
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    { height: 88, width: 72, displayInIframe: false },
+    { height: 88, width: 25, displayInIframe: false },
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error('Failed to open dialog:', asyncResult.error);

@@ -43,7 +43,7 @@ function openIndependentBuilder() {
   console.log("Opening configuration dialog...");
   Office.context.ui.displayDialogAsync(
     `${getDialogsBaseUrl()}independent/independent-input.html?v=${Date.now()}`,
-    { height: 88, width: 72, displayInIframe: false },
+    { height: 88, width: 25, displayInIframe: false },
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       independentDialog = asyncResult.value;

@@ -2749,12 +2749,51 @@
     const panel = document.getElementById('residualsPanel');
     if (!panel || !_results) return;
 
-    const res = _results.residuals ?? {};
+    const res    = _results.residuals ?? {};
     const sigma2 = _results.sigma2 ?? _results.varResidual ?? NaN;
+
+    // ── Compute missing stats from residual vector if not provided by VB6 ──
+    const vec = res.values ?? [];
+    if (vec.length > 0) {
+      const n    = vec.length;
+      const mean = vec.reduce((s, v) => s + v, 0) / n;
+      const deviations = vec.map(v => v - mean);
+      const variance   = deviations.reduce((s, v) => s + v * v, 0) / (n - 1);
+      const sd         = Math.sqrt(variance);
+
+      // Skewness (sample, adjusted Fisher-Pearson)
+      if (res.skewness == null) {
+        const m3 = deviations.reduce((s, v) => s + v ** 3, 0) / n;
+        res.skewness = sd > 0 ? (n * m3) / ((n - 1) * (n - 2)) * (n / (sd ** 3)) : 0;
+        // simpler unbiased:
+        res.skewness = sd > 0 ? (deviations.reduce((s, v) => s + (v / sd) ** 3, 0) / n)
+                                 * (Math.sqrt(n * (n - 1)) / (n - 2)) : 0;
+      }
+
+      // Kurtosis (sample excess, unbiased)
+      if (res.kurtosis == null) {
+        const m4 = deviations.reduce((s, v) => s + (v / sd) ** 4, 0) / n;
+        res.kurtosis = n > 3
+          ? ((n + 1) * n * m4 / ((n - 1) * (n - 2) * (n - 3))) -
+            3 * (n - 1) ** 2 / ((n - 2) * (n - 3)) + 3
+          : m4;  // raw kurtosis for very small n
+      }
+
+      // Shapiro-Wilk (Royston 1992 approximation, n ≤ 5000)
+      if (res.swW == null && n >= 3 && n <= 5000) {
+        const sw = _shapiroWilkApprox(vec);
+        res.swW = sw.W;
+        res.swP = sw.p;
+      }
+
+      // Bartlett & Levene require group labels (not available here → keep —)
+      // But we can compute a single-sample version vs. constant variance:
+      // Not meaningful without groups → leave as null (show —)
+    }
 
     panel.innerHTML = `
         <div class="mm-section" style="margin-bottom:14px;">
-        <div class="mm-section-header"><span><i class="fa-solid fa-circle-check"></i> Residual Diagnostics <span class="metric-help">ⓘ<span class="metric-tip">Summary statistics and hypothesis tests on model residuals. Tests of normality and homoscedasticity require the raw residual vector, which is computed in the browser or sent by VB6. Values showing — are not yet available for this run.</span></span></span></div>
+        <div class="mm-section-header"><span><i class="fa-solid fa-circle-check"></i> Summary Statistics <span class="metric-help">ⓘ<span class="metric-tip">Summary statistics and hypothesis tests on model residuals. Bartlett and Levene tests require a group factor and are shown when sent by VB6.</span></span></span></div>
         <div class="mm-section-body padded">
           <div class="stats-row">
             <div class="stat-panel" style="min-width:unset;flex:1;">
@@ -2770,19 +2809,19 @@
             <div class="stat-panel" style="min-width:unset;flex:1;">
               <div class="stat-panel-heading">Normality Tests</div>
               <div class="stat-panel-body">
-                <div class="stat-field"><span class="stat-label">Shapiro-Wilk W:<span class="metric-help">ⓘ<span class="metric-tip">Shapiro-Wilk test statistic W (0–1). Values close to 1 indicate normality. Computed on the marginal residuals. Requires residual vector from VB6.</span></span></span>   <span class="stat-value">${fmt(res.swW)}</span></div>
+                <div class="stat-field"><span class="stat-label">Shapiro-Wilk W:<span class="metric-help">ⓘ<span class="metric-tip">Shapiro-Wilk test statistic W (0–1). Values close to 1 indicate normality. Computed from the residual vector.</span></span></span>   <span class="stat-value">${fmt(res.swW)}</span></div>
                 <div class="stat-field"><span class="stat-label">S-W p-value:<span class="metric-help">ⓘ<span class="metric-tip">p-value for the Shapiro-Wilk test. p &lt; 0.05 suggests significant departure from normality. Small samples have low power; large samples may reject even trivial deviations.</span></span></span>      <span class="stat-value ${pClass(res.swP)}">${fmtP(res.swP)}</span></div>
                 <div class="stat-field"><span class="stat-label">Skewness:<span class="metric-help">ⓘ<span class="metric-tip">Third standardised moment of the residuals. Values near 0 indicate symmetry. |Skewness| &gt; 1 is typically considered substantial.</span></span></span>          <span class="stat-value">${fmt(res.skewness)}</span></div>
-                <div class="stat-field"><span class="stat-label">Kurtosis:<span class="metric-help">ⓘ<span class="metric-tip">Fourth standardised moment (excess kurtosis). Normal distribution has kurtosis = 3. Values &gt; 3 indicate heavy tails; &lt; 3 indicate light tails.</span></span></span>          <span class="stat-value">${fmt(res.kurtosis)}</span></div>
+                <div class="stat-field"><span class="stat-label">Kurtosis:<span class="metric-help">ⓘ<span class="metric-tip">Fourth standardised moment. Normal distribution = 3 (excess = 0). Values &gt; 3 indicate heavy tails; &lt; 3 indicate light tails.</span></span></span>          <span class="stat-value">${fmt(res.kurtosis)}</span></div>
               </div>
             </div>
             <div class="stat-panel" style="min-width:unset;flex:1;">
-              <div class="stat-panel-heading">Homoscedasticity</div>
+              <div class="stat-panel-heading">Homoscedasticity <span style="font-size:.7rem;font-weight:400;color:var(--text-muted);">(requires groups)</span></div>
               <div class="stat-panel-body">
-                <div class="stat-field"><span class="stat-label">Bartlett χ²:<span class="metric-help">ⓘ<span class="metric-tip">Bartlett's test statistic for equality of variance across groups. Sensitive to non-normality — use Levene's test when normality is questionable. Requires group factor from VB6.</span></span></span>      <span class="stat-value">${fmt(res.bartlettChi)}</span></div>
-                <div class="stat-field"><span class="stat-label">Bartlett p:<span class="metric-help">ⓘ<span class="metric-tip">p-value for Bartlett's test. p &lt; 0.05 suggests unequal variances across groups (heteroscedasticity), which may violate model assumptions.</span></span></span>        <span class="stat-value ${pClass(res.bartlettP)}">${fmtP(res.bartlettP)}</span></div>
-                <div class="stat-field"><span class="stat-label">Levene F:<span class="metric-help">ⓘ<span class="metric-tip">Levene's test statistic — a robust alternative to Bartlett's that does not assume normality. Based on absolute deviations from group medians. Requires group factor from VB6.</span></span></span>          <span class="stat-value">${fmt(res.leveneF)}</span></div>
-                <div class="stat-field"><span class="stat-label">Levene p:<span class="metric-help">ⓘ<span class="metric-tip">p-value for Levene's test. Preferred over Bartlett when residuals are non-normal. p &lt; 0.05 indicates heteroscedasticity.</span></span></span>          <span class="stat-value ${pClass(res.leveneP)}">${fmtP(res.leveneP)}</span></div>
+                <div class="stat-field"><span class="stat-label">Bartlett χ²:<span class="metric-help">ⓘ<span class="metric-tip">Bartlett's test statistic for equality of variance across groups. Sensitive to non-normality — use Levene's test when normality is questionable. Requires group labels from VB6.</span></span></span>      <span class="stat-value">${res.bartlettChi != null ? fmt(res.bartlettChi) : '<span style="color:var(--text-muted);">—</span>'}</span></div>
+                <div class="stat-field"><span class="stat-label">Bartlett p:<span class="metric-help">ⓘ<span class="metric-tip">p-value for Bartlett's test. p &lt; 0.05 suggests unequal variances across groups (heteroscedasticity).</span></span></span>        <span class="stat-value ${pClass(res.bartlettP)}">${res.bartlettP != null ? fmtP(res.bartlettP) : '<span style="color:var(--text-muted);">—</span>'}</span></div>
+                <div class="stat-field"><span class="stat-label">Levene F:<span class="metric-help">ⓘ<span class="metric-tip">Levene's test statistic — robust alternative to Bartlett. Based on absolute deviations from group medians. Requires group labels from VB6.</span></span></span>          <span class="stat-value">${res.leveneF != null ? fmt(res.leveneF) : '<span style="color:var(--text-muted);">—</span>'}</span></div>
+                <div class="stat-field"><span class="stat-label">Levene p:<span class="metric-help">ⓘ<span class="metric-tip">p-value for Levene's test. Preferred over Bartlett when residuals are non-normal. p &lt; 0.05 indicates heteroscedasticity.</span></span></span>          <span class="stat-value ${pClass(res.leveneP)}">${res.leveneP != null ? fmtP(res.leveneP) : '<span style="color:var(--text-muted);">—</span>'}</span></div>
               </div>
             </div>
           </div>
@@ -2815,6 +2854,85 @@
         renderResidualCharts(_results.residuals);
       }
     }, 80);
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     SHAPIRO-WILK APPROXIMATION (Royston 1992)
+     Works for 3 ≤ n ≤ 5000.
+     Returns { W, p }
+  ───────────────────────────────────────────────────────────── */
+  function _shapiroWilkApprox(x) {
+    const n = x.length;
+    const sorted = [...x].sort((a, b) => a - b);
+
+    // Mean and variance
+    const mean = sorted.reduce((s, v) => s + v, 0) / n;
+    const ss   = sorted.reduce((s, v) => s + (v - mean) ** 2, 0);
+    if (ss === 0) return { W: 1, p: 1 };
+
+    // Approximate a-coefficients via normal order statistics (Royston 1992)
+    const half = Math.floor(n / 2);
+    const m  = sorted.map((_, i) => _normalQuantile((i + 1 - 3/8) / (n + 1/4)));
+    const mSS = m.reduce((s, v) => s + v * v, 0);
+
+    // Last coefficient an
+    const u = 1 / Math.sqrt(n);
+    const c3 = [-2.706056, 4.434685, -2.071190, -0.147981,  0.221157, _normalQuantile(0.5 * (1 - (0.5 / n) ** (1 / n))) ];
+    const cn = c3[0] * u**5 + c3[1] * u**4 + c3[2] * u**3 + c3[3] * u**2 + c3[4] * u + c3[5] / Math.sqrt(mSS);
+
+    // W statistic (simple approximation)
+    let sumA = 0;
+    for (let i = 0; i < half; i++) {
+      const ai = (i === 0) ? cn : m[n - 1 - i] / Math.sqrt(mSS);
+      sumA += ai * (sorted[n - 1 - i] - sorted[i]);
+    }
+    const W = Math.min(1, (sumA * sumA) / ss);
+
+    // p-value via Royston's log-transform (Table 4 approximation)
+    const p = _swPvalue(W, n);
+    return { W: parseFloat(W.toFixed(6)), p: parseFloat(p.toFixed(6)) };
+  }
+
+  function _normalQuantile(p) {
+    // Beasley-Springer-Moro approximation of Φ⁻¹(p)
+    if (p <= 0) return -Infinity;
+    if (p >= 1) return Infinity;
+    const a = [2.515517, 0.802853, 0.010328];
+    const b = [1.432788, 0.189269, 0.001308];
+    const t = p < 0.5 ? Math.sqrt(-2 * Math.log(p)) : Math.sqrt(-2 * Math.log(1 - p));
+    const num = a[0] + t * (a[1] + t * a[2]);
+    const den = 1 + t * (b[0] + t * (b[1] + t * b[2]));
+    const val = t - num / den;
+    return p < 0.5 ? -val : val;
+  }
+
+  function _swPvalue(W, n) {
+    // Royston (1992) approximation for p-value of W
+    const y = Math.log(1 - W);
+    let mu, sigma;
+    if (n <= 11) {
+      const gamma = [0.459, -2.273];
+      const lnW   = Math.log(W);
+      mu    = gamma[0] + gamma[1] * n;
+      sigma = Math.exp(1.0308 - 0.26763 * n);
+      const z = (lnW - mu) / sigma;
+      return 1 - _normalCDF(z);
+    } else {
+      const lnn = Math.log(n);
+      mu    = 0.0038915 * lnn**3 - 0.083751 * lnn**2 - 0.31082 * lnn - 1.5861;
+      sigma = Math.exp(0.00635 * lnn**2 - 0.079 * lnn + 0.48);
+      const z = (y - mu) / sigma;
+      return 1 - _normalCDF(z);
+    }
+  }
+
+  function _normalCDF(z) {
+    // Approximation of Φ(z)
+    const t = 1 / (1 + 0.2316419 * Math.abs(z));
+    const poly = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+    const pdf  = Math.exp(-z * z / 2) / Math.sqrt(2 * Math.PI);
+    const p    = 1 - pdf * poly;
+    return z >= 0 ? p : 1 - p;
   }
 
   function renderResidualCharts(res) {

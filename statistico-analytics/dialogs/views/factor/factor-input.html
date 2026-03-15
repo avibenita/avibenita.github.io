@@ -238,14 +238,12 @@
     }
     
     .variables-table tbody tr.variable-row-disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-      pointer-events: none;
+      opacity: 1;
+      cursor: default;
     }
-    
+
     .variables-table tbody tr.variable-row-disabled:hover {
-      background: transparent;
-      transform: none;
+      background: var(--surface-1);
     }
     
     .variables-table td {
@@ -298,23 +296,21 @@
     }
 
     .variables-table tbody tr.variable-row-excluded {
-      opacity: 0.35;
-      background: repeating-linear-gradient(
-        135deg,
-        transparent,
-        transparent 4px,
-        rgba(0,0,0,0.04) 4px,
-        rgba(0,0,0,0.04) 8px
-      );
+      /* no visual dimming — just unchecked */
     }
 
     .variables-table tbody tr.variable-row-excluded td {
-      color: var(--text-muted) !important;
-      text-decoration: line-through;
+      /* no strikethrough, no muted colour */
     }
 
     .variables-table tbody tr.variable-row-excluded td.include-col {
       text-decoration: none !important;
+    }
+
+    /* Checked / included rows get bold text */
+    .variables-table tbody tr.variable-row-included td.var-name {
+      font-weight: 800;
+      color: var(--accent-2, #3b82f6);
     }
 
     /* select-all checkbox in header */
@@ -1693,16 +1689,19 @@
         tr.dataset.varName = variable.name;
         tr.dataset.varType = variable.type;
         
-        // Add disabled class if assigned
+        // Assigned rows (already in bucket) look normal but no checkbox
         if (isAssigned) {
           tr.classList.add('variable-row-disabled');
-          tr.style.opacity = '0.4';
-          tr.style.cursor = 'not-allowed';
         }
 
-        // Add excluded style if excluded
+        // Excluded (unchecked) rows — no special styling
         if (isExcluded && !isAssigned) {
           tr.classList.add('variable-row-excluded');
+        }
+
+        // Included (checked) rows — bold highlight
+        if (!isExcluded && !isAssigned) {
+          tr.classList.add('variable-row-included');
         }
         
         var numericCount = variable.numeric || 0;
@@ -1810,9 +1809,10 @@
               });
             }
           } else {
-            // Exclude all non-assigned variables and remove from xn if factor mode
+            // Exclude ALL variables and clear the bucket
+            STATE.excluded = {};
             STATE.variables.forEach(function(v) {
-              if (!isVariableAssigned(v.name)) STATE.excluded[v.name] = true;
+              STATE.excluded[v.name] = true;
             });
             if (isFactorMode()) {
               STATE.assignments.xn = [];

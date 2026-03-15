@@ -16,7 +16,7 @@
     <header class="cfg-header">
       <div class="cfg-header-icon"><i class="fa-solid fa-repeat"></i></div>
       <span class="cfg-header-title">Repeated Measures</span>
-      <span class="cfg-meta-badge" id="metaBadge">—</span>
+      <span class="cfg-meta-badge" id="metaBadge">ï¿½</span>
       <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch to light mode">
         <span class="cfg-toggle-icon">&#x1F319;</span>
         <div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div>
@@ -26,7 +26,7 @@
 
     <!-- Spinner -->
     <div id="loadingSpinner" class="cfg-spinner">
-      <i class="fa-solid fa-spinner fa-spin"></i> Loading data…
+      <i class="fa-solid fa-spinner fa-spin"></i> Loading dataï¿½
     </div>
 
     <!-- Main content -->
@@ -38,7 +38,7 @@
         <div class="cfg-panel">
           <div class="cfg-panel-body">
             <div class="cfg-range-strip">
-              <div class="cfg-range-item">Range: <strong id="rangeAddr">—</strong></div>
+              <div class="cfg-range-item">Range: <strong id="rangeAddr">ï¿½</strong></div>
               <div class="cfg-range-item">Rows: <strong id="rowCount">0</strong></div>
               <div class="cfg-range-item">Columns: <strong id="colCount">0</strong></div>
             </div>
@@ -112,8 +112,14 @@
       <!-- Footer -->
       <div class="cfg-footer">
         <button class="cfg-btn cancel" id="btnCancel"><i class="fa-solid fa-times"></i> Cancel</button>
-        <button class="cfg-btn" id="btnRefresh" style="flex-shrink:0;">
+        <button class="cfg-btn" id="btnRefresh" style="flex-shrink:0;" title="Refresh data">
           <i class="fa-solid fa-rotate"></i>
+        </button>
+        <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Load a previously saved configuration">
+          <i class="fa-solid fa-clock-rotate-left"></i> Load previousâ€¦
+        </button>
+        <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" disabled title="Save current configuration">
+          <i class="fa-solid fa-floppy-disk"></i> Save configuration
         </button>
         <button class="cfg-btn run" id="btnRun" disabled>
           <i class="fa-solid fa-play"></i> Open Dashboard
@@ -193,14 +199,50 @@
     function validateBucket(){
       var mode = (document.querySelector('input[name="dataMode"]:checked')||{}).value||'k-plus';
       var count = STATE.selectedColumns.length;
+      var ok = (mode==="two-vars") ? count===2 : count>=3;
       var btn = qs("btnRun");
-      if(btn) btn.disabled = (mode==="two-vars") ? count!==2 : count<3;
+      if(btn) btn.disabled = !ok;
+      if(qs("btnSaveConfig")) qs("btnSaveConfig").disabled = !ok;
+      var hasSaved = (CfgSave.getSavedList('dep-config').length > 0);
+      if(qs("btnLoadPrev")) qs("btnLoadPrev").disabled = !hasSaved;
+    }
+
+    var STORAGE_KEY_DEP = 'dep-config';
+
+    function saveModelSpec() {
+      var mode = (document.querySelector('input[name="dataMode"]:checked')||{}).value||'k-plus';
+      var defaultName = STATE.selectedColumns.join(', ') || 'Repeated Measures';
+      CfgSave.showPrompt('Save configuration', 'Configuration name', defaultName, function(name) {
+        CfgSave.saveCfgEntry(STORAGE_KEY_DEP, name, {
+          compareMode: mode,
+          primaryFramework: qs("frameworkMode") ? qs("frameworkMode").value : 'parametric',
+          selectedColumns: STATE.selectedColumns.slice()
+        }, function(entry) {
+          validateBucket();
+        });
+      });
+    }
+
+    function showSavedList() {
+      CfgSave.showSavedList(STORAGE_KEY_DEP, function(item) {
+        var spec = item.spec || {};
+        return (spec.selectedColumns||[]).join(', ');
+      }, function(item) {
+        var spec = item.spec || {};
+        if(spec.compareMode) {
+          var r = qs(spec.compareMode==='k-plus'?'kPlusTimepoints':'twoTimepoints');
+          if(r) r.checked = true;
+        }
+        if(spec.primaryFramework && qs("frameworkMode")) qs("frameworkMode").value = spec.primaryFramework;
+        if(Array.isArray(spec.selectedColumns)) STATE.selectedColumns = spec.selectedColumns.slice();
+        renderInterestChecks(STATE.headers); renderBucket(); validateBucket();
+      });
     }
 
     function applyPayload(p){
       if(!p||!p.headers) return;
       STATE.headers=p.headers||[]; STATE.rows=p.rows||[]; STATE.address=p.address||""; STATE.saved=p.savedModelSpec||null;
-      qs("rangeAddr").textContent = STATE.address||"—";
+      qs("rangeAddr").textContent = STATE.address||"ï¿½";
       qs("rowCount").textContent  = STATE.rows.length;
       qs("colCount").textContent  = STATE.headers.length;
       qs("metaBadge").textContent = STATE.address || (STATE.rows.length+" rows");

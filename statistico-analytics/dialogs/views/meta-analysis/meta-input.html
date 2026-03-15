@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Configure Meta-Analysis</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+  <link rel="stylesheet" href="../shared-config.css"/>
+  <script src="../shared-config.js"></script>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; }
     body { font-family:'Segoe UI',Tahoma,sans-serif; background:#f8fafa; padding:20px; color:#1f2937; }
@@ -167,12 +169,16 @@
     </div>
   </div>
 
-  <div class="actions">
-    <button class="btn btn-secondary" onclick="cancel()">
-      <i class="fa-solid fa-times"></i> Cancel
+  <div class="cfg-footer" style="position:sticky;bottom:0;margin:0 -20px -20px -20px;">
+    <button class="cfg-btn cancel" onclick="cancel()"><i class="fa-solid fa-times"></i> Cancel</button>
+    <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Load a previously saved configuration">
+      <i class="fa-solid fa-clock-rotate-left"></i> Load previous…
     </button>
-    <button class="btn btn-primary" onclick="save()">
-      <i class="fa-solid fa-check"></i> Run Analysis
+    <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" title="Save current configuration">
+      <i class="fa-solid fa-floppy-disk"></i> Save configuration
+    </button>
+    <button class="cfg-btn run" onclick="save()">
+      <i class="fa-solid fa-play"></i> Run Analysis
     </button>
   </div>
 
@@ -308,6 +314,45 @@
     function cancel(){
       Office.context.ui.messageParent(JSON.stringify({action:"cancel"}));
     }
+
+    // ── Save / Load configuration ────────────────────────────────────────────
+    var STORAGE_KEY_META = 'meta-config';
+    function saveModelSpec() {
+      var defaultName = currentEffectType + ' / ' + currentModel;
+      CfgSave.showPrompt('Save configuration', 'Configuration name', defaultName, function(name) {
+        var spec = { effectType: currentEffectType, model: currentModel };
+        try {
+          spec.studyCol = parseInt(document.getElementById("studyCol").value);
+          if (currentEffectType === "continuous") {
+            ['mean1Col','sd1Col','n1Col','mean2Col','sd2Col','n2Col'].forEach(function(k){ spec[k]=parseInt(document.getElementById(k).value); });
+          } else if (currentEffectType === "binary") {
+            ['aCol','bCol','cCol','dCol'].forEach(function(k){ spec[k]=parseInt(document.getElementById(k).value); });
+          } else if (currentEffectType === "direct") {
+            ['effectCol','seCol'].forEach(function(k){ spec[k]=parseInt(document.getElementById(k).value); });
+          }
+        } catch(e) {}
+        CfgSave.saveCfgEntry(STORAGE_KEY_META, name, spec, function() {
+          var loadBtn = document.getElementById('btnLoadPrev');
+          if (loadBtn) loadBtn.disabled = false;
+        });
+      });
+    }
+    function showSavedList() {
+      CfgSave.showSavedList(STORAGE_KEY_META, function(item) {
+        var s = item.spec || {};
+        return (s.effectType || '') + (s.model ? ' / ' + s.model : '');
+      }, function(item) {
+        var spec = item.spec || {};
+        restoreSpec(spec);
+      });
+    }
+    // Initialize load button state on page ready
+    document.addEventListener('DOMContentLoaded', function() {
+      var loadBtn = document.getElementById('btnLoadPrev');
+      if (loadBtn && typeof CfgSave !== 'undefined') {
+        loadBtn.disabled = CfgSave.getSavedList(STORAGE_KEY_META).length === 0;
+      }
+    });
   </script>
 </body>
 </html>

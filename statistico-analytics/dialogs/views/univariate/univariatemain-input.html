@@ -16,7 +16,7 @@
     <header class="cfg-header">
       <div class="cfg-header-icon"><i class="fa-solid fa-chart-simple"></i></div>
       <span class="cfg-header-title">Univariate Configuration</span>
-      <span class="cfg-meta-badge" id="metaBadge">—</span>
+      <span class="cfg-meta-badge" id="metaBadge">ï¿½</span>
       <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch to light mode">
         <span class="cfg-toggle-icon">&#x1F319;</span>
         <div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div>
@@ -26,7 +26,7 @@
 
     <!-- Spinner -->
     <div id="loadingSpinner" class="cfg-spinner">
-      <i class="fa-solid fa-spinner fa-spin"></i> Loading data…
+      <i class="fa-solid fa-spinner fa-spin"></i> Loading dataï¿½
     </div>
 
     <!-- Main content (hidden until data arrives) -->
@@ -39,7 +39,7 @@
         <div class="cfg-panel">
           <div class="cfg-panel-body">
             <div class="cfg-range-strip">
-              <div class="cfg-range-item">Range: <strong id="rangeAddr">—</strong></div>
+              <div class="cfg-range-item">Range: <strong id="rangeAddr">ï¿½</strong></div>
               <div class="cfg-range-item">Rows: <strong id="rowCount">0</strong></div>
               <div class="cfg-range-item">Columns: <strong id="colCount">0</strong></div>
             </div>
@@ -116,7 +116,7 @@
                 </div>
                 <div class="cfg-transform-option">
                   <input type="radio" name="transform" id="t_sq" value="square" />
-                  <label for="t_sq" class="cfg-transform-label">x²</label>
+                  <label for="t_sq" class="cfg-transform-label">xï¿½</label>
                 </div>
                 <div class="cfg-transform-option">
                   <input type="radio" name="transform" id="t_rec" value="reciprocal" />
@@ -141,6 +141,12 @@
       <!-- Footer -->
       <div class="cfg-footer">
         <button class="cfg-btn cancel" onclick="cancel()"><i class="fa-solid fa-times"></i> Cancel</button>
+        <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Load a previously saved configuration">
+          <i class="fa-solid fa-clock-rotate-left"></i> Load previousâ€¦
+        </button>
+        <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" disabled title="Save current configuration">
+          <i class="fa-solid fa-floppy-disk"></i> Save configuration
+        </button>
         <button class="cfg-btn run" id="runBtn" onclick="runAnalysis()" disabled>
           <i class="fa-solid fa-play"></i> Run Full Analysis
         </button>
@@ -221,7 +227,7 @@
       });
     }
 
-    function fmt(v) { return Number.isFinite(v) ? v.toFixed(2) : '—'; }
+    function fmt(v) { return Number.isFinite(v) ? v.toFixed(2) : 'ï¿½'; }
 
     function renderVariableTable() {
       document.getElementById('varsTbody').innerHTML = STATE.columnStats.map(s => `
@@ -243,10 +249,51 @@
       const sel  = document.querySelector('input[name="selectedColumn"]:checked');
       const btn  = document.getElementById('runBtn');
       const note = document.getElementById('selectNote');
-      if (!sel) { btn.disabled=true; note.textContent='Choose one valid variable to continue.'; return; }
-      btn.disabled = false;
-      const stats = STATE.columnStats.find(s => s.idx === parseInt(sel.value, 10));
-      note.textContent = stats ? `Selected: ${stats.name} (${stats.n} numeric values)` : '';
+      const ok   = !!sel;
+      if (!sel) { btn.disabled=true; note.textContent='Choose one valid variable to continue.'; }
+      else {
+        btn.disabled = false;
+        const stats = STATE.columnStats.find(s => s.idx === parseInt(sel.value, 10));
+        note.textContent = stats ? `Selected: ${stats.name} (${stats.n} numeric values)` : '';
+      }
+      const saveBtn = document.getElementById('btnSaveConfig');
+      if (saveBtn) saveBtn.disabled = !ok;
+      const loadBtn = document.getElementById('btnLoadPrev');
+      if (loadBtn) loadBtn.disabled = !(typeof CfgSave !== 'undefined' && CfgSave.getSavedList('unimain-config').length > 0);
+    }
+
+    const STORAGE_KEY_UNIMAIN = 'unimain-config';
+    function saveModelSpec() {
+      const sel = document.querySelector('input[name="selectedColumn"]:checked');
+      if (!sel) return;
+      const idx       = parseInt(sel.value, 10);
+      const colName   = STATE.headers[idx] || `Column ${idx+1}`;
+      const transform = document.querySelector('input[name="transform"]:checked')?.value || 'none';
+      const trimMin   = parseInt(document.getElementById('trimMin').value);
+      const trimMax   = parseInt(document.getElementById('trimMax').value);
+      CfgSave.showPrompt('Save configuration', 'Configuration name', colName, function(name) {
+        CfgSave.saveCfgEntry(STORAGE_KEY_UNIMAIN, name, {
+          columnIndex: idx, columnName: colName, transform, trimMin, trimMax
+        }, function() { onVariableSelect(); });
+      });
+    }
+    function showSavedList() {
+      CfgSave.showSavedList(STORAGE_KEY_UNIMAIN, function(item) {
+        const s = item.spec || {};
+        return (s.columnName || '') + (s.transform && s.transform !== 'none' ? '  (' + s.transform + ')' : '');
+      }, function(item) {
+        const spec = item.spec || {};
+        const radio = document.querySelector(`input[name="selectedColumn"][value="${spec.columnIndex}"]`);
+        if (radio && !radio.disabled) radio.checked = true;
+        if (spec.transform) {
+          const tr = document.querySelector(`input[name="transform"][value="${spec.transform}"]`);
+          if (tr) tr.checked = true;
+        }
+        if (spec.trimMin !== undefined) document.getElementById('trimMin').value = spec.trimMin;
+        if (spec.trimMax !== undefined) document.getElementById('trimMax').value = spec.trimMax;
+        onTrimChange();
+        onVariableSelect();
+      });
     }
 
     function onTrimChange() {

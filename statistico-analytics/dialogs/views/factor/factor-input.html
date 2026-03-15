@@ -1002,6 +1002,12 @@
   <!-- Footer -->
   <div class="cfg-footer">
     <button class="cfg-btn cancel" id="btnCancel"><i class="fa-solid fa-times"></i> Cancel</button>
+    <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Load a previously saved configuration">
+      <i class="fa-solid fa-clock-rotate-left"></i> Load previous…
+    </button>
+    <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" disabled title="Save current configuration">
+      <i class="fa-solid fa-floppy-disk"></i> Save configuration
+    </button>
     <button id="btnRunAnalysis" class="cfg-btn run" disabled>
       <i class="fa-solid fa-play"></i> Run Factor
     </button>
@@ -2456,6 +2462,9 @@
         }
         isValid = STATE.assignments.xn.length >= 2;
         qs('btnRunAnalysis').disabled = !isValid;
+        if (qs('btnSaveConfig')) qs('btnSaveConfig').disabled = !isValid;
+        var hasSaved0 = (typeof CfgSave !== 'undefined' && CfgSave.getSavedList('factor-config').length > 0);
+        if (qs('btnLoadPrev')) qs('btnLoadPrev').disabled = !hasSaved0;
         return { valid: isValid, messages: messages };
       }
       
@@ -2479,6 +2488,9 @@
                 (!isLogisticMode() || validateBinaryResponseVariable(STATE.assignments.y).valid);
       
       qs('btnRunAnalysis').disabled = !isValid;
+      if (qs('btnSaveConfig')) qs('btnSaveConfig').disabled = !isValid;
+      var hasSaved1 = (typeof CfgSave !== 'undefined' && CfgSave.getSavedList('factor-config').length > 0);
+      if (qs('btnLoadPrev')) qs('btnLoadPrev').disabled = !hasSaved1;
       
       return { valid: isValid, messages: messages };
     }
@@ -2742,6 +2754,31 @@
         if (cancelBtn) {
           cancelBtn.addEventListener('click', function() { sendToHost('close', null); });
         }
+      });
+    }
+
+    // ── Save / Load configuration ────────────────────────────────────────────
+    var STORAGE_KEY_FACTOR = 'factor-config';
+    function saveModelSpec() {
+      var a = STATE.assignments;
+      var vars = a.xn.concat(a.xc || []);
+      if (!vars.length) return;
+      var defaultName = (a.y ? a.y + ' ~ ' : '') + vars.join('+');
+      CfgSave.showPrompt('Save configuration', 'Configuration name', defaultName, function(name) {
+        CfgSave.saveCfgEntry(STORAGE_KEY_FACTOR, name, {
+          y: a.y, xn: a.xn.slice(), xc: (a.xc||[]).slice()
+        }, function() { validateAssignments(); });
+      });
+    }
+    function showSavedList() {
+      CfgSave.showSavedList(STORAGE_KEY_FACTOR, function(item) {
+        var s = item.spec || {};
+        return (s.y ? 'Y: '+s.y : '') + (s.xn&&s.xn.length ? '  vars: '+s.xn.join(',') : '');
+      }, function(item) {
+        var spec = item.spec || {};
+        STATE.assignments = { y: spec.y || null, xn: (spec.xn||[]).slice(), xc: (spec.xc||[]).slice() };
+        renderVariables();
+        validateAssignments();
       });
     }
     

@@ -16,7 +16,7 @@
     <header class="cfg-header">
       <div class="cfg-header-icon"><i class="fa-solid fa-not-equal"></i></div>
       <span class="cfg-header-title">Independent Means</span>
-      <span class="cfg-meta-badge" id="metaBadge">—</span>
+      <span class="cfg-meta-badge" id="metaBadge">ï¿½</span>
       <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch to light mode">
         <span class="cfg-toggle-icon">&#x1F319;</span>
         <div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div>
@@ -26,7 +26,7 @@
 
     <!-- Spinner -->
     <div id="loadingSpinner" class="cfg-spinner">
-      <i class="fa-solid fa-spinner fa-spin"></i> Loading data…
+      <i class="fa-solid fa-spinner fa-spin"></i> Loading dataï¿½
     </div>
 
     <!-- Main content -->
@@ -39,7 +39,7 @@
         <div class="cfg-panel">
           <div class="cfg-panel-body">
             <div class="cfg-range-strip">
-              <div class="cfg-range-item">Range: <strong id="rangeAddr">—</strong></div>
+              <div class="cfg-range-item">Range: <strong id="rangeAddr">ï¿½</strong></div>
               <div class="cfg-range-item">Rows: <strong id="rowCount">0</strong></div>
               <div class="cfg-range-item">Columns: <strong id="colCount">0</strong></div>
             </div>
@@ -113,6 +113,12 @@
       <!-- Footer -->
       <div class="cfg-footer">
         <button class="cfg-btn cancel" id="btnCancel"><i class="fa-solid fa-times"></i> Cancel</button>
+        <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Load a previously saved configuration">
+          <i class="fa-solid fa-clock-rotate-left"></i> Load previousâ€¦
+        </button>
+        <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" disabled title="Save current configuration">
+          <i class="fa-solid fa-floppy-disk"></i> Save configuration
+        </button>
         <button class="cfg-btn run" id="btnRun" disabled>
           <i class="fa-solid fa-play"></i> Open Dashboard
         </button>
@@ -211,6 +217,37 @@
         ? "Select exactly 2 variables." : "Select at least 3 numeric columns.";
       var runBtn = qs("btnRun");
       if(runBtn) runBtn.disabled = !ok;
+      if(qs("btnSaveConfig")) qs("btnSaveConfig").disabled = !ok;
+      var hasSaved = (typeof CfgSave !== 'undefined' && CfgSave.getSavedList('indep-config').length > 0);
+      if(qs("btnLoadPrev")) qs("btnLoadPrev").disabled = !hasSaved;
+    }
+
+    var STORAGE_KEY_INDEP = 'indep-config';
+    function saveModelSpec() {
+      var mode = (document.querySelector('input[name="dataMode"]:checked')||{}).value||'k-plus';
+      var defaultName = STATE.selectedColumns.join(', ') || 'Independent Means';
+      CfgSave.showPrompt('Save configuration', 'Configuration name', defaultName, function(name) {
+        CfgSave.saveCfgEntry(STORAGE_KEY_INDEP, name, {
+          compareMode: mode,
+          primaryFramework: qs("frameworkMode") ? qs("frameworkMode").value : 'parametric',
+          selectedColumns: STATE.selectedColumns.slice()
+        }, function() { validateBucket(); });
+      });
+    }
+    function showSavedList() {
+      CfgSave.showSavedList(STORAGE_KEY_INDEP, function(item) {
+        var spec = item.spec || {};
+        return (spec.selectedColumns||[]).join(', ');
+      }, function(item) {
+        var spec = item.spec || {};
+        if(spec.compareMode) {
+          var r = qs(spec.compareMode==='k-plus'?'kPlus':'twoVars');
+          if(r) r.checked = true;
+        }
+        if(spec.primaryFramework && qs("frameworkMode")) qs("frameworkMode").value = spec.primaryFramework;
+        if(Array.isArray(spec.selectedColumns)) STATE.selectedColumns = spec.selectedColumns.slice();
+        renderInterestChecks(STATE.headers); renderBucket(); validateBucket();
+      });
     }
 
     function applyPayload(p){

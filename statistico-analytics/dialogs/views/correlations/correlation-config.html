@@ -4,7 +4,7 @@
   <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Correlation Analysis — Configuration</title>
+  <title>Correlation Analysis ï¿½ Configuration</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="../shared-config.css?v=20260309d"/>
@@ -17,7 +17,7 @@
     <header class="cfg-header">
       <div class="cfg-header-icon"><i class="fa-solid fa-chart-scatter"></i></div>
       <span class="cfg-header-title">Correlation Analysis</span>
-      <span class="cfg-meta-badge" id="rangeInfo">—</span>
+      <span class="cfg-meta-badge" id="rangeInfo">ï¿½</span>
       <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch to light mode">
         <span class="cfg-toggle-icon">&#x1F319;</span>
         <div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div>
@@ -27,7 +27,7 @@
 
     <!-- Spinner -->
     <div id="loadingSpinner" class="cfg-spinner">
-      <i class="fa-solid fa-spinner fa-spin"></i> Loading data…
+      <i class="fa-solid fa-spinner fa-spin"></i> Loading dataï¿½
     </div>
 
     <!-- Main content -->
@@ -66,7 +66,7 @@
                   <tbody id="variablesTableBody">
                     <tr>
                       <td colspan="7" style="text-align:center;color:var(--cfg-text3);padding:20px;">
-                        Loading variables…
+                        Loading variablesï¿½
                       </td>
                     </tr>
                   </tbody>
@@ -85,6 +85,13 @@
 
       <!-- Footer -->
       <div class="cfg-footer">
+        <button class="cfg-btn cancel" id="btnCancel" onclick="Office.context.ui.messageParent(JSON.stringify({action:'close'}))"><i class="fa-solid fa-times"></i> Cancel</button>
+        <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Load a previously saved configuration">
+          <i class="fa-solid fa-clock-rotate-left"></i> Load previousâ€¦
+        </button>
+        <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" disabled title="Save current configuration">
+          <i class="fa-solid fa-floppy-disk"></i> Save configuration
+        </button>
         <button class="cfg-btn run" id="btnRun" onclick="runAnalysis()" disabled>
           <i class="fa-solid fa-play"></i> Run Correlation Analysis
         </button>
@@ -165,7 +172,7 @@
           (stats.selected?'checked':'')+' '+(stats.isValid?'':'disabled')+' onchange="updateSelectionSummary()" style="width:16px;height:16px;accent-color:var(--cfg-check-acc);cursor:pointer;"></td>'+
           '<td><strong>'+varName+'</strong></td>'+
           '<td class="center cfg-badge-num">'+stats.numeric+'</td>'+
-          '<td class="center">'+(stats.avg?stats.avg.toFixed(2):'—')+'</td>'+
+          '<td class="center">'+(stats.avg?stats.avg.toFixed(2):'ï¿½')+'</td>'+
           '<td class="center">'+(stats.std?stats.std.toFixed(2):'0.00')+'</td>'+
           '<td class="center cfg-badge-str">'+stats.string+'</td>'+
           '<td class="center cfg-badge-mis">'+stats.missing+'</td>';
@@ -202,8 +209,36 @@
       var selected = Array.from(document.querySelectorAll('.var-checkbox:checked')).length;
       document.getElementById('selectionSummary').innerHTML =
         'Selected: <strong>'+selected+'</strong> variables';
-      document.getElementById('btnRun').disabled = selected < 2;
+      var ok = selected >= 2;
+      document.getElementById('btnRun').disabled = !ok;
+      var saveBtn = document.getElementById('btnSaveConfig');
+      if (saveBtn) saveBtn.disabled = !ok;
+      var loadBtn = document.getElementById('btnLoadPrev');
+      if (loadBtn) loadBtn.disabled = !(typeof CfgSave !== 'undefined' && CfgSave.getSavedList('corr-config').length > 0);
       updateSelectAllCheckbox();
+    }
+
+    var STORAGE_KEY_CORR = 'corr-config';
+    function saveModelSpec() {
+      var selectedVars = Array.from(document.querySelectorAll('.var-checkbox:checked')).map(function(cb){return cb.dataset.var;});
+      if (selectedVars.length < 2) return;
+      var defaultName = selectedVars.slice(0,3).join(', ') + (selectedVars.length > 3 ? 'â€¦' : '');
+      CfgSave.showPrompt('Save configuration', 'Configuration name', defaultName, function(name) {
+        CfgSave.saveCfgEntry(STORAGE_KEY_CORR, name, { variables: selectedVars }, function() { updateSelectionSummary(); });
+      });
+    }
+    function showSavedList() {
+      CfgSave.showSavedList(STORAGE_KEY_CORR, function(item) {
+        var s = item.spec || {};
+        return (s.variables || []).join(', ');
+      }, function(item) {
+        var spec = item.spec || {};
+        var vars = spec.variables || [];
+        document.querySelectorAll('.var-checkbox').forEach(function(cb) {
+          cb.checked = vars.indexOf(cb.dataset.var) >= 0;
+        });
+        updateSelectionSummary();
+      });
     }
 
     function runAnalysis() {

@@ -1115,6 +1115,12 @@
   <!-- Footer -->
   <div class="cfg-footer">
     <button class="cfg-btn cancel" id="btnCancel"><i class="fa-solid fa-times"></i> Cancel</button>
+    <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Load a previously saved configuration">
+      <i class="fa-solid fa-clock-rotate-left"></i> Load previous…
+    </button>
+    <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" disabled title="Save current configuration">
+      <i class="fa-solid fa-floppy-disk"></i> Save configuration
+    </button>
     <button id="btnRunAnalysis" class="cfg-btn run" disabled>
       <i class="fa-solid fa-play"></i> Run Regression
     </button>
@@ -2495,6 +2501,9 @@
                 (STATE.assignments.xn.length > 0 || STATE.assignments.xc.length > 0);
       
       qs('btnRunAnalysis').disabled = !isValid;
+      if (qs('btnSaveConfig')) qs('btnSaveConfig').disabled = !isValid;
+      var hasSaved = (typeof CfgSave !== 'undefined' && CfgSave.getSavedList('reg-config').length > 0);
+      if (qs('btnLoadPrev')) qs('btnLoadPrev').disabled = !hasSaved;
       
       return { valid: isValid, messages: messages };
     }
@@ -2693,6 +2702,36 @@
     document.addEventListener('DOMContentLoaded', function() {
       // theme toggle handled by shared-config.js
     });
+
+    // ── Save / Load configuration ────────────────────────────────────────────
+    var STORAGE_KEY_REG = 'reg-config';
+    function saveModelSpec() {
+      var a = STATE.assignments;
+      if (!a.y) return;
+      var defaultName = a.y + ' ~ ' + a.xn.concat(a.xc).join('+');
+      CfgSave.showPrompt('Save configuration', 'Configuration name', defaultName, function(name) {
+        CfgSave.saveCfgEntry(STORAGE_KEY_REG, name, {
+          y: a.y, xn: a.xn.slice(), xc: a.xc.slice(),
+          interactions: (a.interactions||[]).map(function(i){return {v1:i.v1,v2:i.v2};})
+        }, function() { validateAssignments(); });
+      });
+    }
+    function showSavedList() {
+      CfgSave.showSavedList(STORAGE_KEY_REG, function(item) {
+        var s = item.spec || {};
+        return (s.y ? 'Y: '+s.y : '') + (s.xn&&s.xn.length ? '  Xn: '+s.xn.join(',') : '');
+      }, function(item) {
+        var spec = item.spec || {};
+        STATE.assignments = {
+          y: spec.y || null,
+          xn: (spec.xn || []).slice(),
+          xc: (spec.xc || []).slice(),
+          interactions: (spec.interactions || []).map(function(i){return {v1:i.v1,v2:i.v2};})
+        };
+        renderVariables();
+        validateAssignments();
+      });
+    }
 
     if (typeof Office !== 'undefined') {
       Office.onReady(function() {

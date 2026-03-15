@@ -314,6 +314,16 @@
       --sb-accent-bg: rgba(167,139,250,.18);
     }
 
+    /* Sub-item (indented, muted — sits under its parent) */
+    .sb-item--sub {
+      padding-left: 2.4rem !important;
+      font-size: .82rem !important;
+      opacity: .82;
+      border-left: 2px solid rgba(167,139,250,.25);
+    }
+    .sb-item--sub .sb-item-icon { font-size: .8rem !important; }
+    .sb-item--sub:hover { opacity: 1; border-left-color: var(--sb-accent); }
+
     /* ── Scrollbar ── */
     .tab-content::-webkit-scrollbar { width:6px; }
     .tab-content::-webkit-scrollbar-track { background:rgba(255,255,255,.04); }
@@ -502,6 +512,10 @@
               <i class="fa-solid fa-table-cells-large sb-item-icon"></i>
               <span class="sb-item-label">Overview</span>
             </button>
+            <button class="sb-item sb-item--sub" onclick="setDepth('analyst'); switchTab('overview')" id="detailedViewBtn">
+              <i class="fa-solid fa-microscope sb-item-icon"></i>
+              <span class="sb-item-label">Detailed View</span>
+            </button>
             <button class="sb-item" onclick="switchTab('model-effects')" data-tab="model-effects">
               <i class="fa-solid fa-layer-group sb-item-icon"></i>
               <span class="sb-item-label">Model Effects</span>
@@ -521,9 +535,24 @@
           </div>
         </div>
 
+        <!-- Group: Tools -->
+        <div class="sb-group">
+          <div class="sb-group-title">Tools</div>
+          <div class="sb-items-rail">
+            <button class="sb-item" id="aiBtn" onclick="requestMixedModelAI()" style="display:none;">
+              <i class="fa-solid fa-robot sb-item-icon"></i>
+              <span class="sb-item-label">AI Interpretation</span>
+            </button>
+            <button class="sb-item" id="btnModelStructure" onclick="openMsdModal()" disabled>
+              <i class="fa-solid fa-diagram-project sb-item-icon"></i>
+              <span class="sb-item-label">Model Structure</span>
+            </button>
+          </div>
+        </div>
+
       </div><!-- /sb-body -->
 
-      <!-- Bottom: Decimals + AI -->
+      <!-- Bottom: Decimals -->
       <div class="sb-bottom">
         <div class="sb-bottom-row">
           <i class="fa-solid fa-hashtag sb-bottom-icon"></i>
@@ -538,10 +567,6 @@
             <option value="5">5</option>
           </select>
         </div>
-        <button class="sb-bottom-btn ai-interpret-btn" id="aiBtn" onclick="requestMixedModelAI()" style="display:none;">
-          <i class="fa-solid fa-robot sb-bottom-icon"></i>
-          <span class="sb-item-label">AI Interpret</span>
-        </button>
       </div>
 
     </nav><!-- /sb-nav -->
@@ -562,19 +587,7 @@
         <section class="card" role="main">
           <div class="card-main">
 
-            <!-- Toolbar -->
-            <div class="hero-section">
-              <div class="hero-row-1">
-                <div class="depth-selector" id="depthSel">
-                  <button class="depth-btn active" data-depth="insight" onclick="setDepth('insight')">🟢 Insight</button>
-                  <button class="depth-btn"        data-depth="analyst" onclick="setDepth('analyst')">🟡 Analyst</button>
-                </div>
-                <button class="msd-popup-btn" id="btnModelStructure" onclick="openMsdModal()"
-                        title="View model structure diagram" disabled>
-                  <i class="fa-solid fa-diagram-project"></i> Model Structure
-                </button>
-              </div>
-            </div>
+            <!-- Toolbar (hero removed — controls moved to sidebar) -->
 
             <!-- Tab content area -->
             <div class="view-container">
@@ -3231,6 +3244,9 @@
     _depth = depth;
     document.querySelectorAll('.depth-btn').forEach(b =>
       b.classList.toggle('active', b.dataset.depth === depth));
+    // Highlight "Detailed View" when analyst mode is active
+    const dvBtn = document.getElementById('detailedViewBtn');
+    if (dvBtn) dvBtn.classList.toggle('active', depth === 'analyst');
     applyDepth(depth);
   };
 
@@ -3276,12 +3292,7 @@
       StatisticoHeader.updateTitle(TAB_TITLES[name]);
     }
 
-    // Hide depth selector except on overview
-    const depthSel = document.getElementById('depthSel');
-    const heroSec  = document.querySelector('.hero-section');
-    const showDepth = (name === 'overview');
-    if (depthSel) depthSel.style.display = showDepth ? '' : 'none';
-    if (heroSec)  heroSec.style.display  = showDepth ? '' : 'none';
+    // Depth selector now lives in the sidebar — nothing to show/hide here
 
     // Lazy-load heavy tabs
     if (name === 'diagnostics' && !window._residualsLoaded)   { loadResidualsTab();    window._residualsLoaded = true; }

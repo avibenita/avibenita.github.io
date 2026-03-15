@@ -1165,7 +1165,7 @@
                   <div style="display:flex;flex-direction:column;align-items:center;padding:32px 24px;gap:32px;width:100%;">
 
                     <!-- Tab bar -->
-                    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);width:100%;max-width:900px;">
+                    <div style="display:flex;align-items:center;gap:0;border-bottom:1px solid var(--border);width:100%;max-width:900px;">
                       <button id="msdTabInline_reg" onclick="msdInlineTab('regression')"
                               style="padding:9px 22px;background:none;border:none;border-bottom:3px solid #a78bfa;
                                      color:#a78bfa;font-size:.92rem;font-weight:600;cursor:pointer;">
@@ -1175,6 +1175,13 @@
                               style="padding:9px 22px;background:none;border:none;border-bottom:3px solid transparent;
                                      color:var(--text-muted);font-size:.92rem;font-weight:600;cursor:pointer;">
                         <i class="fa-solid fa-sitemap"></i> Hierarchy
+                      </button>
+                      <!-- Results overlay toggle -->
+                      <button id="msdResultsToggle" onclick="msdToggleResults()"
+                              style="margin-left:auto;padding:6px 16px;border-radius:6px;border:1px solid #a78bfa;
+                                     background:rgba(167,139,250,.15);color:#a78bfa;font-size:.82rem;
+                                     font-weight:600;cursor:pointer;white-space:nowrap;">
+                        📊 + Results
                       </button>
                     </div>
 
@@ -1316,6 +1323,7 @@
   let _decimals = 'auto';
   let _results = null;        // full parsed model results
   let _modelSpec = null;      // {y, fixed, random, subject, covStructure}
+  let _msdShowResults = false; // toggle: show β / σ² overlay on diagram
   let _rawData  = null;       // raw data vectors for JSON export / Python re-fit
   let _emmData = {};          // cached EMM by factor name
   let _pwData  = {};          // cached pairwise data
@@ -1705,7 +1713,7 @@
     hideMsdTip();
   };
 
-  function renderModelDiagram(d, modelSpec) {
+  function renderModelDiagram(d, modelSpec, showResults) {
     const svg   = document.getElementById('msdSvg');
     const eqEl  = document.getElementById('msdEquation');
     const legEl = document.getElementById('msdLegend');
@@ -1723,6 +1731,46 @@
     const rep   = spec.rep  || null;
     const ints  = (spec.interactions || []).map(i => `${i.v1} × ${i.v2}`);
     const rndSlopes = (spec.randomSlopes || []);
+
+    // ── Results overlay data ─────────────────────────────────
+    // Build lookup: paramName → { estimate, pval }
+    const fxMap = {};
+    if (showResults && d && d.fixedEffects) {
+      d.fixedEffects.forEach(fx => {
+        // strip "Intercept" and dummy suffixes like "[T.B]" to get base name
+        const base = fx.parameter
+          .replace(/\[T\.[^\]]+\]/g, '')
+          .replace(/\(Intercept\)/i, 'Intercept')
+          .trim();
+        // keep the strongest (lowest pval) match for multi-level factors
+        if (!fxMap[base] || (fx.pval ?? 1) < (fxMap[base].pval ?? 1)) {
+          fxMap[base] = fx;
+        }
+        fxMap[fx.parameter] = fx; // also store exact match
+      });
+    }
+    const varRandom   = showResults ? (d?.varianceComponents?.[0]?.estimate ?? null) : null;
+    const varResidual = showResults ? (d?.sigma2 ?? d?.varResidual ?? null) : null;
+    const icc         = showResults ? (d?.ICC ?? d?.icc ?? null) : null;
+    const avgObs      = showResults ? (d?.avgObsPerGroup ?? null) : null;
+
+    function fmtB(fx) {
+      if (!fx) return null;
+      const b = fx.estimate ?? fx.coef ?? fx.b;
+      if (b == null) return null;
+      return (b >= 0 ? '+' : '') + b.toFixed(3);
+    }
+    function sigStars(p) {
+      if (p == null) return '';
+      if (p < .001) return '***'; if (p < .01) return '**';
+      if (p < .05)  return '*';   return 'ns';
+    }
+    function arrowColor(fx) {
+      if (!fx || !showResults) return C.arr;
+      const p = fx.pval ?? 1;
+      if (p < .05)  return '#4ade80';  // green — significant
+      return '#64748b';                 // grey  — ns
+    }
 
     // ── Palette ───────────────────────────────────────────────
     const C = {
@@ -1755,28 +1803,26 @@
         'font-family':"'Segoe UI',Arial,sans-serif"});
       t.textContent = s; return t;
     }
-    function solidArrow(x1,y1,x2,y2) {
-      return el('line',{x1,y1,x2,y2,stroke:C.arr,'stroke-width':2,'marker-end':'url(#msdArr)'});
+    function solidArrow(x1,y1,x2,y2,col) {
+      const c = col || C.arr;
+      const markId = c === '#4ade80' ? 'msdArrGreen' : (c === '#64748b' ? 'msdArrGrey' : 'msdArr');
+      return el('line',{x1,y1,x2,y2,stroke:c,'stroke-width':c===C.arr?2:2.5,'marker-end':`url(#${markId})`});
     }
     function dashedArr(x1,y1,x2,y2,col) {
       return el('line',{x1,y1,x2,y2,stroke:col||C.dash,'stroke-width':1.5,
         'stroke-dasharray':'5,3','marker-end':'url(#msdArrDash)'});
     }
-    function fanLines(srcX,srcY, targets, destX, destY) {
-      // Draw fan from multiple sources to one dest — returns group
-      const g = el('g',{});
-      if (targets.length === 1) {
-        g.appendChild(solidArrow(targets[0].x, srcY, destX, destY));
-      } else {
-        // vertical spine
-        const spineX = destX;
-        const spineTop = srcY + 2;
-        targets.forEach(t => {
-          g.appendChild(el('line',{x1:t.x,y1:srcY,x2:spineX,y2:srcY,
-            stroke:C.arr,'stroke-width':1.5}));
-        });
-        g.appendChild(solidArrow(spineX, spineTop, destX, destY));
-      }
+    function betaLabel(x, y, bStr, stars, pval) {
+      // badge: "β = +2.41 ***"
+      const col = pval < .05 ? '#4ade80' : '#94a3b8';
+      const bgCol = pval < .05 ? 'rgba(74,222,128,.12)' : 'rgba(100,116,139,.10)';
+      const label = `β ${bStr}  ${stars}`;
+      const bw = label.length * 6.2 + 14;
+      const bh = 16;
+      const g = el('g', {});
+      g.appendChild(el('rect', { x: x - bw/2, y: y - bh/2, width: bw, height: bh,
+        rx: 4, fill: bgCol, stroke: col, 'stroke-width': .8 }));
+      g.appendChild(txt(x, y, label, { fill: col, sz: 9, w: '700' }));
       return g;
     }
 
@@ -1787,22 +1833,26 @@
       m.appendChild(el('path',{d:'M0,0 L0,6 L8,3 z',fill:col}));
       return m;
     }
-    defs.appendChild(mkMarker('msdArr',     C.arr));
-    defs.appendChild(mkMarker('msdArrDash', C.dash));
+    defs.appendChild(mkMarker('msdArr',      C.arr));
+    defs.appendChild(mkMarker('msdArrDash',  C.dash));
+    defs.appendChild(mkMarker('msdArrGreen', '#4ade80'));
+    defs.appendChild(mkMarker('msdArrGrey',  '#64748b'));
     svg.appendChild(defs);
 
     // ── Layout ───────────────────────────────────────────────
     const W = 280, cx = W / 2;
     const ITEM_H = 26, ITEM_W = 160, GAP = 8;
+    // Extra height per fixed item when showing results (beta badge below box)
+    const BETA_EXTRA = showResults ? 20 : 0;
     const fixTop = 14;
 
     // Section label height
     const SEC_LH = 16;
     // Fixed block
-    const fixH = SEC_LH + allFix.length * (ITEM_H + GAP) + 4;
+    const fixH = SEC_LH + allFix.length * (ITEM_H + GAP + BETA_EXTRA) + 4;
     const fixBotY = fixTop + fixH;
     // Arrow gap
-    const ARR_GAP = 32;
+    const ARR_GAP = showResults ? 36 : 32;
     // Outcome
     const outY = fixBotY + ARR_GAP;
     const outW = Math.max(100, dep.length * 9 + 24), outH = 34;
@@ -1810,9 +1860,12 @@
 
     // Random/rep (below outcome, dashed up arrows)
     const HIER_GAP = 18;
+    // Extra height in rnd/rep boxes for results
+    const RND_EXTRA = showResults ? 18 : 0;
+    const REP_EXTRA = showResults ? 18 : 0;
     let hierY = outBotY + 24;
-    const rndH = rnd ? (SEC_LH + ITEM_H + (rndSlopes.length ? rndSlopes.length * ITEM_H : 0) + 8) : 0;
-    const repH = rep ? (SEC_LH + ITEM_H + 8) : 0;
+    const rndH = rnd ? (SEC_LH + ITEM_H + RND_EXTRA + (rndSlopes.length ? rndSlopes.length * ITEM_H : 0) + 8) : 0;
+    const repH = rep ? (SEC_LH + ITEM_H + REP_EXTRA + 8) : 0;
     const totalH = hierY + rndH + (rnd && rep ? HIER_GAP : 0) + repH + 20;
 
     svg.setAttribute('width',  W);
@@ -1820,7 +1873,6 @@
     svg.setAttribute('viewBox', `0 0 ${W} ${totalH}`);
 
     // ── 1. FIXED EFFECTS section ─────────────────────────────
-    // Outer border
     svg.appendChild(rect(cx - ITEM_W/2 - 4, fixTop, ITEM_W + 8, fixH,
       'rgba(59,130,246,.05)', C.fix.border, 10));
     svg.appendChild(txt(cx, fixTop + SEC_LH/2 + 2, 'FIXED EFFECTS',
@@ -1829,7 +1881,7 @@
     const fixCentres = [];
     allFix.forEach((f, i) => {
       const isCov = covs.includes(f);
-      const iy = fixTop + SEC_LH + i * (ITEM_H + GAP);
+      const iy = fixTop + SEC_LH + i * (ITEM_H + GAP + BETA_EXTRA);
       const pal = isCov ? C.cov : C.fix;
       fixCentres.push({ x: cx, y: iy + ITEM_H/2 });
 
@@ -1842,7 +1894,18 @@
       g.appendChild(txt(cx, iy + ITEM_H/2, f, {fill: pal.text, sz:11}));
       if (isCov) g.appendChild(txt(cx + ITEM_W/2 - 6, iy + ITEM_H/2, 'cov',
         {fill: C.cov.border, sz:8, anchor:'end', w:'700'}));
-      // Hover tooltip
+
+      // ── Results overlay: β badge below each predictor ──────
+      if (showResults) {
+        const fx = fxMap[f] || Object.values(fxMap).find(v =>
+          v.parameter && v.parameter.startsWith(f) && v.parameter !== 'Intercept');
+        const bStr = fmtB(fx);
+        if (bStr) {
+          const stars = sigStars(fx.pval);
+          g.appendChild(betaLabel(cx, iy + ITEM_H + BETA_EXTRA/2, bStr, stars, fx.pval ?? 1));
+        }
+      }
+
       g.addEventListener('mouseenter', e => showMsdTip(e, `<strong>${f}</strong>${isCov ? ' (covariate)' : ' (fixed factor)'}<br>${isCov ? `Continuous predictor. Adjusts for ${f}.` : `Tests group differences across levels of ${f}.`}`));
       g.addEventListener('mouseleave', hideMsdTip);
       svg.appendChild(g);
@@ -1854,15 +1917,16 @@
     }
 
     // ── 2. Arrow: fixed effects → outcome ────────────────────
-    // Single spine from bottom of fixed block to top of outcome
     if (allFix.length > 0) {
-      svg.appendChild(solidArrow(cx, fixBotY + 2, cx, outY - 4));
+      // Use green if any fixed effect is significant
+      const anySig = showResults && Object.values(fxMap).some(fx =>
+        fx.parameter !== 'Intercept' && (fx.pval ?? 1) < .05);
+      svg.appendChild(solidArrow(cx, fixBotY + 2, cx, outY - 4, showResults ? (anySig ? '#4ade80' : '#64748b') : null));
     }
 
     // ── 3. OUTCOME box ───────────────────────────────────────
     const outG = el('g', {style:'cursor:pointer'});
     outG.appendChild(rect(cx - outW/2, outY, outW, outH, C.out.bg, C.out.border, 9));
-    // Glow
     outG.appendChild(el('rect',{x:cx-outW/2,y:outY,width:outW,height:outH,rx:9,
       fill:'none',stroke:C.out.border,'stroke-width':2.5,'opacity':'.4'}));
     outG.appendChild(txt(cx, outY + outH/2, dep, {fill:'#fff', sz:13, w:'800'}));
@@ -1878,24 +1942,33 @@
         ? `(1 + ${rndSlopes.join(' + ')} | ${rnd})`
         : `(1 | ${rnd})`;
 
-      // Dashed arrow: random → outcome (upward)
       svg.appendChild(dashedArr(cx, ry - 2, cx, outBotY + 2, C.rnd.border));
 
-      svg.appendChild(rect(cx - ITEM_W/2 - 4, ry, ITEM_W + 8, rndH, C.rnd.bg, C.rnd.border, 8));
+      const rndBoxH = rndH;
+      svg.appendChild(rect(cx - ITEM_W/2 - 4, ry, ITEM_W + 8, rndBoxH, C.rnd.bg, C.rnd.border, 8));
       svg.appendChild(txt(cx, ry + SEC_LH/2 + 2, 'RANDOM STRUCTURE',
         {fill: C.rnd.label, sz:9, w:'800'}));
 
       const rndG = el('g', {style:'cursor:pointer'});
-      rndG.appendChild(rect(cx - ITEM_W/2, ry + SEC_LH, ITEM_W, ITEM_H, 'rgba(22,163,74,.2)', C.rnd.border, 6));
+      rndG.appendChild(rect(cx - ITEM_W/2, ry + SEC_LH, ITEM_W, ITEM_H + RND_EXTRA, 'rgba(22,163,74,.2)', C.rnd.border, 6));
       rndG.appendChild(txt(cx, ry + SEC_LH + ITEM_H/2, rnd + ' — random intercept', {fill: C.rnd.text, sz:10.5}));
+
+      // ── Results overlay: σ²_b and ICC in random box ─────────
+      if (showResults && (varRandom != null || icc != null)) {
+        const parts = [];
+        if (varRandom != null) parts.push(`σ²ᵤ = ${varRandom.toFixed(3)}`);
+        if (icc       != null) parts.push(`ICC = ${(icc * 100).toFixed(1)}%`);
+        rndG.appendChild(txt(cx, ry + SEC_LH + ITEM_H + RND_EXTRA/2 + 1,
+          parts.join('   '), { fill: '#86efac', sz: 9, w: '600' }));
+      }
+
       rndG.addEventListener('mouseenter', e => showMsdTip(e,
         `<strong>${rnd}</strong> (random intercept)<br>Each unique subject/group in <em>${rnd}</em> gets its own baseline level. Controls for within-subject correlation.`));
       rndG.addEventListener('mouseleave', hideMsdTip);
       svg.appendChild(rndG);
 
-      // Random slopes
       rndSlopes.forEach((s, si) => {
-        const sy = ry + SEC_LH + ITEM_H + GAP + si * (ITEM_H + GAP);
+        const sy = ry + SEC_LH + ITEM_H + RND_EXTRA + GAP + si * (ITEM_H + GAP);
         const sg = el('g', {style:'cursor:pointer'});
         sg.appendChild(rect(cx - ITEM_W/2, sy, ITEM_W, ITEM_H, 'rgba(22,163,74,.15)', C.rnd.border, 6));
         sg.appendChild(txt(cx, sy + ITEM_H/2, s + ' — random slope', {fill: C.rnd.text, sz:10.5}));
@@ -1911,7 +1984,6 @@
     // ── 5. REPEATED MEASURE section ──────────────────────────
     if (rep) {
       const rpy = hierY;
-      // Dashed bracket line (not arrow — time structures, not predicts)
       svg.appendChild(el('line', {x1:cx, y1:rpy - 2, x2:cx, y2:(rnd ? hierY - HIER_GAP + rndH + 2 : outBotY + 2),
         stroke:C.rep.border,'stroke-width':1.5,'stroke-dasharray':'4,3'}));
 
@@ -1920,8 +1992,18 @@
         {fill: C.rep.label, sz:9, w:'800'}));
 
       const repG = el('g', {style:'cursor:pointer'});
-      repG.appendChild(rect(cx - ITEM_W/2, rpy + SEC_LH, ITEM_W, ITEM_H, 'rgba(225,29,72,.18)', C.rep.border, 6));
+      repG.appendChild(rect(cx - ITEM_W/2, rpy + SEC_LH, ITEM_W, ITEM_H + REP_EXTRA, 'rgba(225,29,72,.18)', C.rep.border, 6));
       repG.appendChild(txt(cx, rpy + SEC_LH + ITEM_H/2, rep + ' — measurement occasions', {fill: C.rep.text, sz:10.5}));
+
+      // ── Results overlay: avgObs + σ² residual in rep box ────
+      if (showResults && (avgObs != null || varResidual != null)) {
+        const parts = [];
+        if (avgObs      != null) parts.push(`${Math.round(avgObs)} obs/subject`);
+        if (varResidual != null) parts.push(`σ²ε = ${varResidual.toFixed(3)}`);
+        repG.appendChild(txt(cx, rpy + SEC_LH + ITEM_H + REP_EXTRA/2 + 1,
+          parts.join('   '), { fill: '#fda4af', sz: 9, w: '600' }));
+      }
+
       repG.addEventListener('mouseenter', e => showMsdTip(e,
         `<strong>${rep}</strong> (repeated measure)<br>Structures the data into time points / occasions. Each subject has multiple observations recorded across levels of ${rep}.`));
       repG.addEventListener('mouseleave', hideMsdTip);
@@ -1930,8 +2012,23 @@
 
     // ── Interaction badges (if any) ───────────────────────────
     if (ints.length && intsEl) {
+      // Find beta for each interaction
+      const intBadges = ints.map(i => {
+        if (!showResults) return `<span class="msd-int-chip">${i}</span>`;
+        // look up interaction parameter
+        const fx = Object.values(fxMap).find(v => {
+          const p = v.parameter || '';
+          const parts = i.split(' × ');
+          return parts.every(part => p.includes(part));
+        });
+        const bStr = fmtB(fx);
+        const stars = fx ? sigStars(fx.pval) : '';
+        const col   = fx && (fx.pval ?? 1) < .05 ? '#fb923c' : '#94a3b8';
+        const extra = bStr ? ` &nbsp;<span style="color:${col};font-weight:700">${bStr} ${stars}</span>` : '';
+        return `<span class="msd-int-chip">${i}${extra}</span>`;
+      });
       intsEl.innerHTML = '<span style="color:var(--text-muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Interactions</span> ' +
-        ints.map(i => `<span class="msd-int-chip">${i}</span>`).join('');
+        intBadges.join('');
     } else if (intsEl) {
       intsEl.innerHTML = '';
     }
@@ -1946,7 +2043,7 @@
             : ` + (1 | ${rnd})`)
         : '';
       const repPart = (rep && fixes.concat(covs).includes(rep))
-        ? ''   // rep already in fixed
+        ? ''
         : (rep ? ` + [${rep}]` : '');
       eqEl.textContent = `${dep} ~ ${fixPart || '1'}${intPart}${rndPart}${repPart} + ε`;
     }
@@ -1960,6 +2057,10 @@
       if (covs.length) items.push({ color: '#a78bfa', label: 'Covariate' });
       if (rnd)  items.push({ color: C.rnd.border, label: 'Random effect' });
       if (rep)  items.push({ color: C.rep.border, label: 'Repeated measure' });
+      if (showResults) {
+        items.push({ color: '#4ade80', label: 'Significant (p < .05)' });
+        items.push({ color: '#64748b', label: 'Non-significant' });
+      }
       legEl.innerHTML = items.map(i =>
         `<span class="msd-legend-item" style="background:${i.color}22;border:1px solid ${i.color}55;color:${i.color}">
            <span class="msd-dot" style="background:${i.color}"></span>${i.label}
@@ -3457,6 +3558,11 @@
      Copies rendered content from the hidden modal elements into
      the inline tab SVG / equation / legend / hierarchy slots.   */
   function _renderInlineMsd() {
+    // Re-render the hidden SVG source with current showResults flag
+    if (_results && _modelSpec) {
+      renderModelDiagram(_results, _modelSpec, _msdShowResults);
+    }
+
     // Source elements (rendered by renderModelDiagram into the hidden modal)
     const srcSvg  = document.getElementById('msdSvg');
     const srcEq   = document.getElementById('msdEquation');
@@ -3475,13 +3581,32 @@
     if (srcLeg  && dstLeg)  dstLeg.innerHTML  = srcLeg.innerHTML;
     if (srcInts && dstInts) dstInts.innerHTML = srcInts.innerHTML;
     if (srcHier && dstHier) dstHier.innerHTML = srcHier.innerHTML;
+    // Also copy SVG size attributes
+    if (srcSvg && dstSvg) {
+      dstSvg.setAttribute('width',   srcSvg.getAttribute('width')   || '340');
+      dstSvg.setAttribute('height',  srcSvg.getAttribute('height')  || '380');
+      dstSvg.setAttribute('viewBox', srcSvg.getAttribute('viewBox') || '0 0 280 300');
+    }
 
-    // Show/hide interactions label
+    // Sync toggle button label
+    const btn = document.getElementById('msdResultsToggle');
+    if (btn) {
+      btn.textContent = _msdShowResults ? '📐 Spec only' : '📊 + Results';
+      btn.style.background = _msdShowResults ? 'rgba(74,222,128,.15)' : 'rgba(167,139,250,.15)';
+      btn.style.borderColor = _msdShowResults ? '#4ade80' : '#a78bfa';
+      btn.style.color       = _msdShowResults ? '#4ade80' : '#a78bfa';
+    }
+
     const intsLabel = document.getElementById('msdIntsLabelInline');
     if (intsLabel) intsLabel.style.display = dstInts?.innerHTML?.trim() ? '' : 'none';
 
     msdInlineTab('regression');
   }
+
+  window.msdToggleResults = function() {
+    _msdShowResults = !_msdShowResults;
+    _renderInlineMsd();
+  };
 
   window.msdInlineTab = function(name) {
     const regEl  = document.getElementById('msdInlineRegression');

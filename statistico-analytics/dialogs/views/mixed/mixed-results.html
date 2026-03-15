@@ -543,7 +543,7 @@
               <i class="fa-solid fa-robot sb-item-icon"></i>
               <span class="sb-item-label">AI Interpretation</span>
             </button>
-            <button class="sb-item" id="btnModelStructure" onclick="openMsdModal()" disabled>
+            <button class="sb-item" id="btnModelStructure" data-tab="model-structure" onclick="switchTab('model-structure')" disabled>
               <i class="fa-solid fa-diagram-project sb-item-icon"></i>
               <span class="sb-item-label">Model Structure</span>
             </button>
@@ -1158,8 +1158,55 @@
 
                 </div><!-- /tab-advanced -->
 
+                <!-- ══════════════════════════════════════════════════════
+                     TAB: MODEL STRUCTURE
+                ══════════════════════════════════════════════════════ -->
+                <div id="tab-model-structure" class="tab-content">
+                  <div style="display:flex;flex-direction:column;align-items:center;padding:32px 24px;gap:32px;width:100%;">
 
-              </div><!-- /card-body -->
+                    <!-- Tab bar -->
+                    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);width:100%;max-width:900px;">
+                      <button id="msdTabInline_reg" onclick="msdInlineTab('regression')"
+                              style="padding:9px 22px;background:none;border:none;border-bottom:3px solid #a78bfa;
+                                     color:#a78bfa;font-size:.92rem;font-weight:600;cursor:pointer;">
+                        <i class="fa-solid fa-arrow-right-to-bracket"></i> Regression
+                      </button>
+                      <button id="msdTabInline_hier" onclick="msdInlineTab('hierarchy')"
+                              style="padding:9px 22px;background:none;border:none;border-bottom:3px solid transparent;
+                                     color:var(--text-muted);font-size:.92rem;font-weight:600;cursor:pointer;">
+                        <i class="fa-solid fa-sitemap"></i> Hierarchy
+                      </button>
+                    </div>
+
+                    <!-- Regression view -->
+                    <div id="msdInlineRegression" style="display:flex;gap:56px;align-items:flex-start;flex-wrap:wrap;
+                                                          justify-content:center;width:100%;max-width:900px;">
+                      <div style="flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+                        <svg id="msdSvgInline" width="340" height="380" viewBox="0 0 280 300"
+                             style="display:block;overflow:visible;" xmlns="http://www.w3.org/2000/svg"></svg>
+                      </div>
+                      <div style="flex:1;min-width:280px;">
+                        <div style="font-size:.72rem;font-weight:700;letter-spacing:.08em;
+                                    color:var(--text-muted);text-transform:uppercase;margin-bottom:10px;">Model Formula</div>
+                        <div id="msdEquationInline"
+                             style="background:var(--surface-1);border:1px solid var(--border);border-radius:8px;
+                                    padding:16px 20px;font-family:monospace;font-size:1.05rem;color:var(--text-primary);
+                                    line-height:1.7;margin-bottom:20px;white-space:pre-wrap;">Awaiting results…</div>
+                        <div id="msdLegendInline" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;"></div>
+                        <div style="font-size:.72rem;font-weight:700;letter-spacing:.08em;
+                                    color:var(--text-muted);text-transform:uppercase;margin-bottom:8px;"
+                             id="msdIntsLabelInline" style="display:none;">Interactions</div>
+                        <div id="msdIntsInline" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+                      </div>
+                    </div>
+
+                    <!-- Hierarchy view -->
+                    <div id="msdInlineHierarchy" style="display:none;width:100%;max-width:900px;">
+                      <div id="msdHierInline" style="padding:8px 0;">Awaiting results…</div>
+                    </div>
+
+                  </div>
+                </div><!-- /tab-model-structure -->
             </div><!-- /view-container -->
 
           </div><!-- /card-main -->
@@ -3374,11 +3421,12 @@
      TAB SWITCHING
   ───────────────────────────────────────────────────────────── */
   const TAB_TITLES = {
-    'overview':       'Overview',
-    'model-effects':  'Model Effects',
-    'marginal-means': 'Marginal Means',
-    'diagnostics':    'Diagnostics',
-    'advanced':       'Advanced',
+    'overview':        'Overview',
+    'model-effects':   'Model Effects',
+    'marginal-means':  'Marginal Means',
+    'diagnostics':     'Diagnostics',
+    'advanced':        'Advanced',
+    'model-structure': 'Model Structure',
   };
 
   window.switchTab = function(name) {
@@ -3399,9 +3447,57 @@
     if (name === 'diagnostics' && !window._residualsLoaded)   { loadResidualsTab();    window._residualsLoaded = true; }
     if (name === 'diagnostics' && !window._influentialLoaded) { loadInfluentialTab();  window._influentialLoaded = true; }
     if (name === 'advanced'    && _results) { updateCovStructure(); renderCovCompChart(); }
+    if (name === 'model-structure' && _results) { _renderInlineMsd(); }
 
     const cardBody = document.querySelector('.card-body');
     if (cardBody) cardBody.scrollTop = 0;
+  };
+
+  /* ── Inline Model Structure tab ─────────────────────────────
+     Copies rendered content from the hidden modal elements into
+     the inline tab SVG / equation / legend / hierarchy slots.   */
+  function _renderInlineMsd() {
+    // Source elements (rendered by renderModelDiagram into the hidden modal)
+    const srcSvg  = document.getElementById('msdSvg');
+    const srcEq   = document.getElementById('msdEquation');
+    const srcLeg  = document.getElementById('msdLegend');
+    const srcInts = document.getElementById('msdInts');
+    const srcHier = document.getElementById('msdHier');
+
+    const dstSvg  = document.getElementById('msdSvgInline');
+    const dstEq   = document.getElementById('msdEquationInline');
+    const dstLeg  = document.getElementById('msdLegendInline');
+    const dstInts = document.getElementById('msdIntsInline');
+    const dstHier = document.getElementById('msdHierInline');
+
+    if (srcSvg  && dstSvg)  dstSvg.innerHTML  = srcSvg.innerHTML;
+    if (srcEq   && dstEq)   dstEq.innerHTML   = srcEq.innerHTML;
+    if (srcLeg  && dstLeg)  dstLeg.innerHTML  = srcLeg.innerHTML;
+    if (srcInts && dstInts) dstInts.innerHTML = srcInts.innerHTML;
+    if (srcHier && dstHier) dstHier.innerHTML = srcHier.innerHTML;
+
+    // Show/hide interactions label
+    const intsLabel = document.getElementById('msdIntsLabelInline');
+    if (intsLabel) intsLabel.style.display = dstInts?.innerHTML?.trim() ? '' : 'none';
+
+    msdInlineTab('regression');
+  }
+
+  window.msdInlineTab = function(name) {
+    const regEl  = document.getElementById('msdInlineRegression');
+    const hierEl = document.getElementById('msdInlineHierarchy');
+    const btnReg  = document.getElementById('msdTabInline_reg');
+    const btnHier = document.getElementById('msdTabInline_hier');
+    if (regEl)  regEl.style.display  = name === 'regression' ? 'flex'  : 'none';
+    if (hierEl) hierEl.style.display = name === 'hierarchy'  ? 'block' : 'none';
+    if (btnReg) {
+      btnReg.style.color       = name === 'regression' ? '#a78bfa' : 'var(--text-muted)';
+      btnReg.style.borderBottomColor = name === 'regression' ? '#a78bfa' : 'transparent';
+    }
+    if (btnHier) {
+      btnHier.style.color      = name === 'hierarchy' ? '#a78bfa' : 'var(--text-muted)';
+      btnHier.style.borderBottomColor = name === 'hierarchy' ? '#a78bfa' : 'transparent';
+    }
   };
 
   /* ─────────────────────────────────────────────────────────────

@@ -105,10 +105,11 @@
       overflow: hidden;
     }
     
-    /* Panel 2: Variables List - Fixed height */
+    /* Panel 2: Variables List - capped at ~12 rows */
     .variables-panel {
-      flex: 1 1 0;
-      min-height: 180px;
+      flex: 0 0 auto;
+      max-height: 328px; /* ~12 rows × ~26px + header */
+      min-height: 120px;
       background: var(--surface-1);
       border-bottom: 2px solid var(--border);
       padding: 8px;
@@ -117,14 +118,24 @@
       flex-direction: column;
     }
     
-    /* Panel 3: Model Assignment - Fixed height */
+    /* Panel 2b: Bucket (below variables table) */
+    .bucket-panel {
+      flex: 0 0 auto;
+      background: var(--surface-1);
+      border-bottom: 3px solid var(--accent-2, #3b82f6);
+      padding: 8px 10px 10px;
+    }
+
+    /* Panel 3: Model Assignment */
     .model-panel {
       flex: 0 0 auto;
-      background: var(--surface-2);
+      background: var(--surface-0);
       border-bottom: 2px solid var(--border);
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      border-top: 3px solid var(--accent-1);
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.06);
     }
     
     .model-panel .tabs {
@@ -976,7 +987,7 @@
           <!-- PANEL 2: VARIABLES LIST -->
           <div class="variables-panel">
             <div style="background: var(--surface-0); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; flex-shrink:0;">
-              <h5 style="color: var(--accent-1); margin: 0 0 4px 0; font-size: 0.75em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Available Variables</h5>
+              <h5 style="color: var(--accent-1); margin: 0 0 4px 0; font-size: 0.75em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Select variables to include</h5>
               
             </div>
             
@@ -996,23 +1007,36 @@
             </div>
           </div>
           
+          <!-- PANEL 2b: BUCKET -->
+          <div class="bucket-panel" id="bucketPanelWrap">
+            <div id="factorBucketPanel">
+              <div class="factor-bucket-label">
+                <span><i class="fa-solid fa-calculator" style="color:var(--accent-2,#3b82f6);margin-right:4px;"></i>Selected Variables</span>
+                <span class="factor-bucket-count" id="badgeXn">0</span>
+              </div>
+              <div class="factor-bucket" id="zoneXn">
+                <span class="factor-bucket-empty"><i class="fa-solid fa-circle-info"></i>Check variables above to include them</span>
+              </div>
+            </div>
+          </div>
+
           <!-- PANEL 3: MODEL ASSIGNMENT -->
           <div class="model-panel">
             
-            <!-- Regression Model Header -->
-            <div style="background: var(--surface-0); padding: 8px 12px; border-bottom: 2px solid var(--border); flex-shrink: 0; display:flex; align-items:center; justify-content:space-between; gap:8px;">
-              <h3 style="margin: 0; color: var(--accent-1); font-size: 1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
-                <i class="fa-solid fa-chart-line"></i> Model
+            <!-- Model Header -->
+            <div style="background: var(--accent-1); padding: 8px 14px; flex-shrink: 0; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+              <h3 style="margin: 0; color: #fff; font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;">
+                <i class="fa-solid fa-sliders"></i> Model Configuration
               </h3>
               <div style="display:flex;align-items:center;gap:6px;">
-                <button id="btnValidate" style="padding:4px 10px;font-size:11px;font-weight:600;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;color:var(--text-secondary);cursor:pointer;" title="Validate Model">
+                <button id="btnValidate" style="padding:4px 10px;font-size:11px;font-weight:600;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.35);border-radius:6px;color:#fff;cursor:pointer;" title="Validate Model">
                   <i class="fa-solid fa-check-circle"></i> Validate
                 </button>
-                <button id="btnHelp" style="width:28px;height:28px;padding:0;font-size:11px;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;color:var(--text-secondary);cursor:pointer;text-align:center;" title="Help">
+                <button id="btnHelp" style="width:28px;height:28px;padding:0;font-size:11px;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.35);border-radius:6px;color:#fff;cursor:pointer;text-align:center;" title="Help">
                   <i class="fa-solid fa-question-circle"></i>
                 </button>
               </div>
-              <div class="model-equation-header" id="modelEquation">Model: Y = ?0 + �</div>
+              <div class="model-equation-header" id="modelEquation" style="color:rgba(255,255,255,0.85);">Model: F = (select 2+ vars)</div>
             </div>
             <!-- Hidden intercept checkbox (referenced by shared JS logic) -->
             <input type="checkbox" id="chkIncludeIntercept" checked style="display:none;" />
@@ -1037,17 +1061,6 @@
               </div>
             </div>
               
-            <!-- Read-only Factor Bucket (factor mode) -->
-            <div id="factorBucketPanel">
-              <div class="factor-bucket-label">
-                <span><i class="fa-solid fa-calculator" style="color:var(--accent-2,#3b82f6);margin-right:4px;"></i>Selected Variables</span>
-                <span class="factor-bucket-count" id="badgeXn">0</span>
-              </div>
-              <div class="factor-bucket" id="zoneXn">
-                <span class="factor-bucket-empty"><i class="fa-solid fa-circle-info"></i>Check variables above to include them</span>
-              </div>
-            </div>
-
             <!-- Legacy tab UI (non-factor modes) -->
             <div id="legacyTabsPanel" style="display:none; flex:1; min-height:0; flex-direction:column;">
               <div class="tabs">
@@ -1275,8 +1288,10 @@
       if (panelXc) panelXc.style.display = isFactorMode() ? 'none' : '';
 
       // Show/hide factor bucket vs legacy drop-zones
+      var bucketPanelWrap = qs('bucketPanelWrap');
       var bucketPanel = qs('factorBucketPanel');
       var legacyPanel = qs('legacyTabsPanel');
+      if (bucketPanelWrap) bucketPanelWrap.style.display = isFactorMode() ? 'block' : 'none';
       if (bucketPanel) bucketPanel.style.display = isFactorMode() ? 'block' : 'none';
       if (legacyPanel) legacyPanel.style.display = isFactorMode() ? 'none' : 'flex';
 

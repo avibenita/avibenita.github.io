@@ -1181,15 +1181,27 @@
                     <!-- Regression view: toggle + SVG left, details right -->
                     <div id="msdInlineRegression" style="display:flex;gap:48px;align-items:flex-start;flex:1;min-height:0;">
 
-                      <!-- Left column: toggle button above SVG -->
+                      <!-- Left column: toggle switch + SVG -->
                       <div style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:14px;">
-                        <!-- Results toggle -->
-                        <button id="msdResultsToggle" onclick="msdToggleResults()"
-                                style="padding:7px 18px;border-radius:7px;border:1.5px solid #4ade80;
-                                       background:rgba(74,222,128,.15);color:#4ade80;font-size:.85rem;
-                                       font-weight:700;cursor:pointer;white-space:nowrap;letter-spacing:.02em;">
-                          📊 + Results
-                        </button>
+
+                        <!-- Real toggle switch -->
+                        <label onclick="msdToggleResults()" title="Show estimated results on diagram"
+                               style="display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none;
+                                      font-size:.82rem;font-weight:600;color:var(--text-secondary);">
+                          <span style="position:relative;width:42px;height:22px;flex-shrink:0;">
+                            <input type="checkbox" id="msdResultsChk" checked
+                                   style="opacity:0;width:0;height:0;position:absolute;">
+                            <span id="msdToggleTrack"
+                                  style="position:absolute;inset:0;border-radius:99px;transition:background .2s;
+                                         background:#4ade80;"></span>
+                            <span id="msdToggleThumb"
+                                  style="position:absolute;top:3px;left:22px;width:16px;height:16px;
+                                         border-radius:50%;background:#fff;transition:left .2s;
+                                         box-shadow:0 1px 3px rgba(0,0,0,.4);"></span>
+                          </span>
+                          Results
+                        </label>
+
                         <!-- SVG -->
                         <svg id="msdSvgInline" viewBox="0 0 280 300"
                              style="display:block;overflow:visible;width:min(480px,48vw);height:auto;"
@@ -1817,17 +1829,21 @@
       return el('line',{x1,y1,x2,y2,stroke:col||C.dash,'stroke-width':1.5,
         'stroke-dasharray':'5,3','marker-end':'url(#msdArrDash)'});
     }
-    function betaLabel(x, y, bStr, stars, pval) {
-      // badge: "β = +2.41 ***"
-      const col = pval < .05 ? '#4ade80' : '#94a3b8';
+    function betaLabel(x, y, bStr, _stars, pval) {
+      // badge: "β = +2.411  p = 0.003"
+      const col   = pval < .05 ? '#4ade80' : '#94a3b8';
       const bgCol = pval < .05 ? 'rgba(74,222,128,.12)' : 'rgba(100,116,139,.10)';
-      const label = `β ${bStr}  ${stars}`;
-      const bw = label.length * 6.2 + 14;
-      const bh = 16;
+      const pStr  = pval != null ? (pval < .001 ? '<.001' : pval.toFixed(3)) : '—';
+      // two-line badge rendered as two text rows
+      const line1 = `\u03B2 = ${bStr}`;
+      const line2 = `p = ${pStr}`;
+      const bw = Math.max(line1.length, line2.length) * 6.2 + 14;
+      const bh = 28;
       const g = el('g', {});
       g.appendChild(el('rect', { x: x - bw/2, y: y - bh/2, width: bw, height: bh,
         rx: 4, fill: bgCol, stroke: col, 'stroke-width': .8 }));
-      g.appendChild(txt(x, y, label, { fill: col, sz: 9, w: '700' }));
+      g.appendChild(txt(x, y - 6, line1, { fill: col, sz: 9, w: '700' }));
+      g.appendChild(txt(x, y + 7, line2, { fill: col, sz: 9, w: '400' }));
       return g;
     }
 
@@ -2027,9 +2043,13 @@
           return parts.every(part => p.includes(part));
         });
         const bStr = fmtB(fx);
-        const stars = fx ? sigStars(fx.pval) : '';
-        const col   = fx && (fx.pval ?? 1) < .05 ? '#fb923c' : '#94a3b8';
-        const extra = bStr ? ` &nbsp;<span style="color:${col};font-weight:700">${bStr} ${stars}</span>` : '';
+        const pval  = fx?.pval;
+        const pStr  = pval != null ? (pval < .001 ? '<.001' : pval.toFixed(3)) : null;
+        const col   = fx && (pval ?? 1) < .05 ? '#fb923c' : '#94a3b8';
+        const extra = bStr
+          ? ` &nbsp;<span style="color:${col};font-weight:700">β = ${bStr}</span>`
+            + (pStr ? `<span style="color:${col};font-size:.8em"> p = ${pStr}</span>` : '')
+          : '';
         return `<span class="msd-int-chip">${i}${extra}</span>`;
       });
       intsEl.innerHTML = '<span style="color:var(--text-muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Interactions</span> ' +
@@ -3591,21 +3611,13 @@
       dstSvg.setAttribute('viewBox', srcSvg.getAttribute('viewBox') || '0 0 280 300');
     }
 
-    // Sync toggle button label + style
-    const btn = document.getElementById('msdResultsToggle');
-    if (btn) {
-      if (_msdShowResults) {
-        btn.textContent  = '📊 + Results';
-        btn.style.background   = 'rgba(74,222,128,.15)';
-        btn.style.borderColor  = '#4ade80';
-        btn.style.color        = '#4ade80';
-      } else {
-        btn.textContent  = '📐 Spec only';
-        btn.style.background   = 'rgba(100,116,139,.12)';
-        btn.style.borderColor  = '#475569';
-        btn.style.color        = '#94a3b8';
-      }
-    }
+    // Sync toggle switch state
+    const chk   = document.getElementById('msdResultsChk');
+    const track = document.getElementById('msdToggleTrack');
+    const thumb = document.getElementById('msdToggleThumb');
+    if (chk)   chk.checked           = _msdShowResults;
+    if (track) track.style.background = _msdShowResults ? '#4ade80' : '#334155';
+    if (thumb) thumb.style.left       = _msdShowResults ? '22px' : '3px';
 
     const intsLabel = document.getElementById('msdIntsLabelInline');
     if (intsLabel) intsLabel.style.display = dstInts?.innerHTML?.trim() ? '' : 'none';

@@ -4007,17 +4007,70 @@
         { model: 'Full Fixed Model', neg2LL,               params: nParams, delta2LL: 2*p, deltaDF: p-1, pval: fDist_p(2*p, p-1, n-nParams) }
       ],
       residuals: {
-        values:  finalResid,
-        fitted:  fittedVals,
-        min:     Math.min(...finalResid),
-        max:     Math.max(...finalResid),
-        mean:    finalResid.reduce((s,v)=>s+v,0)/n,
-        sigma:   Math.sqrt(varWithin),
-        skewness: 0,
-        kurtosis: 3,
-        swW: null, swP: null
+        values:   finalResid,
+        fitted:   fittedVals,
+        min:      Math.min(...finalResid),
+        max:      Math.max(...finalResid),
+        mean:     finalResid.reduce((s,v)=>s+v,0)/n,
+        sigma:    Math.sqrt(varWithin),
+        // computed below
+        skewness: null,
+        kurtosis: null,
+        swW: null, swP: null,
+        bartlettChi: null, bartlettP: null,
+        leveneF: null, leveneP: null,
+        _groupName: null
       }
     };
+
+    // ── Compute residual diagnostics from the raw data we already have ──
+    (() => {
+      const rv = result.residuals;
+      const rn = finalResid.length;
+      if (rn < 3) return;
+
+      const rm   = rv.mean;
+      const devs = finalResid.map(v => v - rm);
+      const rvar = devs.reduce((s,v) => s + v*v, 0) / (rn - 1);
+      const rsd  = Math.sqrt(rvar);
+
+      // Skewness (adjusted Fisher-Pearson)
+      if (rsd > 0) {
+        rv.skewness = (devs.reduce((s,v) => s + (v/rsd)**3, 0) / rn)
+                       * (Math.sqrt(rn*(rn-1)) / (rn-2));
+      } else { rv.skewness = 0; }
+
+      // Excess kurtosis (unbiased)
+      if (rsd > 0 && rn > 3) {
+        const m4 = devs.reduce((s,v) => s + (v/rsd)**4, 0) / rn;
+        rv.kurtosis = ((rn+1)*rn*m4 / ((rn-1)*(rn-2)*(rn-3)))
+                      - 3*(rn-1)**2 / ((rn-2)*(rn-3)) + 3;
+      } else { rv.kurtosis = 3; }
+
+      // Shapiro-Wilk (using _shapiroWilkApprox — defined after this function)
+      // Schedule after function definitions are complete
+      setTimeout(() => {
+        if (typeof _shapiroWilkApprox === 'function') {
+          const sw = _shapiroWilkApprox(finalResid);
+          rv.swW = sw.W; rv.swP = sw.p;
+        }
+      }, 0);
+
+      // Bartlett & Levene — use first categorical fixed predictor
+      const catFactor = (modelSpec.fix || [])[0];
+      if (catFactor) {
+        const ci = headers.indexOf(catFactor);
+        if (ci >= 0) {
+          const groupVec = rows.map(r => String(r[ci]));
+          const bl = _bartlettLevene(finalResid, groupVec);
+          rv.bartlettChi = bl.bartlettStat;
+          rv.bartlettP   = bl.bartlettP;
+          rv.leveneF     = bl.leveneF;
+          rv.leveneP     = bl.leveneP;
+          rv._groupName  = catFactor;
+        }
+      }
+    })();
 
     return result;
   }

@@ -285,7 +285,7 @@ function openMetaResultsDialog(bundle) {
   
   const url = window.location.origin + window.location.pathname.replace("meta-analysis.html", "../../dialogs/views/meta-analysis/meta-results.html");
   
-  Office.context.ui.displayDialogAsync(url, {height: 90, width: 85}, (result) => {
+  Office.context.ui.displayDialogAsync(url, {height: 90, width: 70}, (result) => {
     if (result.status === Office.AsyncResultStatus.Failed) {
       console.error("Failed to open results dialog:", result.error.message);
       return;

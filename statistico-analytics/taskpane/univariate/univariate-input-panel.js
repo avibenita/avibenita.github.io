@@ -6,7 +6,7 @@ let univariateDialog = null;
 let univariateResultsDialog = null;
 let univariateCurrentResults = null;
 let pendingUnivariateViewUrl = null;
-const RESULT_DIALOG_OPTIONS = { height: 84, width: 82, displayInIframe: false };
+const RESULT_DIALOG_OPTIONS = { height: 90, width: 70, displayInIframe: false };
 
 // ─── URL RESOLVER ────────────────────────────────────────────────────────────
 function getDialogsBaseUrl() {

@@ -280,6 +280,49 @@
       color: var(--text-muted);
       font-size: 11px;
     }
+
+    /* Include/Exclude checkbox column */
+    .variables-table th.include-col,
+    .variables-table td.include-col {
+      width: 34px;
+      text-align: center;
+      padding: 4px 4px !important;
+    }
+
+    .var-include-cb {
+      width: 15px;
+      height: 15px;
+      accent-color: var(--accent-3, #16a34a);
+      cursor: pointer;
+    }
+
+    .variables-table tbody tr.variable-row-excluded {
+      opacity: 0.35;
+      background: repeating-linear-gradient(
+        135deg,
+        transparent,
+        transparent 4px,
+        rgba(0,0,0,0.04) 4px,
+        rgba(0,0,0,0.04) 8px
+      );
+    }
+
+    .variables-table tbody tr.variable-row-excluded td {
+      color: var(--text-muted) !important;
+      text-decoration: line-through;
+    }
+
+    .variables-table tbody tr.variable-row-excluded td.include-col {
+      text-decoration: none !important;
+    }
+
+    /* select-all checkbox in header */
+    .var-select-all-cb {
+      width: 15px;
+      height: 15px;
+      accent-color: var(--accent-3, #16a34a);
+      cursor: pointer;
+    }
     
     /* Tabs */
     .tabs {
@@ -1094,6 +1137,7 @@
       data: {},
       variableStats: {},  // Stores variable metadata from Excel
       analysisMode: 'factor',
+      excluded: {},       // { varName: true } for excluded variables
       assignments: {
         y: null,
         xn: [],
@@ -1344,6 +1388,7 @@
         
         STATE.data = {}; // Will be populated on demand
         STATE.assignments = { y: null, xn: [], xc: [] };
+        STATE.excluded = {};
         
         renderVariables();
         clearAssignments();
@@ -1400,6 +1445,7 @@
       STATE.variables = [];
       STATE.data = {};
       STATE.assignments = { y: null, xn: [], xc: [] };
+      STATE.excluded = {};
 
       for (var i = 0; i < headers.length; i++) {
         var name = headers[i];
@@ -1551,6 +1597,7 @@
       var thead = document.createElement('thead');
       thead.innerHTML = 
         '<tr>' +
+          '<th class="include-col"><input type="checkbox" class="var-select-all-cb" id="chkSelectAll" checked title="Include / exclude all variables" /></th>' +
           '<th>Variable</th>' +
           '<th class="center">n Numeric</th>' +
           '<th class="center">n String</th>' +
@@ -1558,15 +1605,19 @@
           '<th style="width: 30px;"></th>' +
         '</tr>';
       table.appendChild(thead);
+
+      // Wire select-all checkbox after appending
+      // (done below after container.appendChild(table))
       
       // Table body
       var tbody = document.createElement('tbody');
       STATE.variables.forEach(function(variable) {
         var tr = document.createElement('tr');
         var isAssigned = isVariableAssigned(variable.name);
+        var isExcluded = !!STATE.excluded[variable.name];
         
-        // Set draggable only if not assigned
-        tr.draggable = !isAssigned;
+        // Set draggable only if not assigned and not excluded
+        tr.draggable = !isAssigned && !isExcluded;
         tr.dataset.varName = variable.name;
         tr.dataset.varType = variable.type;
         
@@ -1575,6 +1626,11 @@
           tr.classList.add('variable-row-disabled');
           tr.style.opacity = '0.4';
           tr.style.cursor = 'not-allowed';
+        }
+
+        // Add excluded style if excluded
+        if (isExcluded && !isAssigned) {
+          tr.classList.add('variable-row-excluded');
         }
         
         var numericCount = variable.numeric || 0;
@@ -1619,8 +1675,14 @@
         }
         
         var gripIcon = isAssigned ? '' : '<i class="fa-solid fa-grip-vertical grip-icon"></i>';
+
+        // Build include checkbox cell (no checkbox when already assigned)
+        var cbCell = isAssigned
+          ? '<td class="include-col"></td>'
+          : '<td class="include-col"><input type="checkbox" class="var-include-cb" ' + (isExcluded ? '' : 'checked') + ' data-var="' + variable.name + '" title="Include this variable" /></td>';
         
         tr.innerHTML = 
+          cbCell +
           '<td class="var-name">' + variable.name + '</td>' +
           '<td class="center numeric-col">' + numericCount + '</td>' +
           '<td class="center string-col">' + stringCount + '</td>' +
@@ -1630,6 +1692,25 @@
         if (!isAssigned) {
           tr.addEventListener('dragstart', handleDragStart);
           tr.addEventListener('dragend', handleDragEnd);
+
+          // Include/exclude checkbox handler
+          var cb = tr.querySelector('.var-include-cb');
+          if (cb) {
+            cb.addEventListener('change', function(e) {
+              var vName = e.target.dataset.var;
+              if (e.target.checked) {
+                delete STATE.excluded[vName];
+              } else {
+                STATE.excluded[vName] = true;
+                // If excluded while assigned, remove from model
+                removeVariableFromAssignments(vName);
+                renderAssignments();
+              }
+              updateSelectAllCheckbox();
+              renderVariables();
+              validateModel();
+            });
+          }
         }
         
         tbody.appendChild(tr);
@@ -1637,6 +1718,26 @@
       table.appendChild(tbody);
       
       container.appendChild(table);
+
+      // Wire select-all checkbox
+      var selectAllCb = container.querySelector('#chkSelectAll');
+      if (selectAllCb) {
+        selectAllCb.addEventListener('change', function() {
+          if (this.checked) {
+            STATE.excluded = {};
+          } else {
+            // Exclude all non-assigned variables
+            STATE.variables.forEach(function(v) {
+              if (!isVariableAssigned(v.name)) STATE.excluded[v.name] = true;
+            });
+          }
+          renderVariables();
+          validateModel();
+        });
+      }
+
+      // Sync select-all checkbox state with current exclusion set
+      updateSelectAllCheckbox();
     }
     
     function loadSampleData() {
@@ -1726,6 +1827,12 @@
       // Check if already assigned first
       if (isVariableAssigned(varName)) {
         showToast('Variable "' + varName + '" is already assigned to the model.', 'warning');
+        return false;
+      }
+
+      // Check if excluded
+      if (STATE.excluded[varName]) {
+        showToast('Variable "' + varName + '" is excluded. Re-check it in the table to include it.', 'warning');
         return false;
       }
       
@@ -1849,6 +1956,31 @@
       return STATE.assignments.y === varName ||
              STATE.assignments.xn.indexOf(varName) >= 0 ||
              STATE.assignments.xc.indexOf(varName) >= 0;
+    }
+
+    function removeVariableFromAssignments(varName) {
+      if (STATE.assignments.y === varName) STATE.assignments.y = null;
+      var xi = STATE.assignments.xn.indexOf(varName);
+      if (xi >= 0) STATE.assignments.xn.splice(xi, 1);
+      var xci = STATE.assignments.xc.indexOf(varName);
+      if (xci >= 0) STATE.assignments.xc.splice(xci, 1);
+    }
+
+    function updateSelectAllCheckbox() {
+      var cb = document.getElementById('chkSelectAll');
+      if (!cb) return;
+      var nonAssigned = STATE.variables.filter(function(v) { return !isVariableAssigned(v.name); });
+      var excludedCount = nonAssigned.filter(function(v) { return !!STATE.excluded[v.name]; }).length;
+      if (excludedCount === 0) {
+        cb.checked = true;
+        cb.indeterminate = false;
+      } else if (excludedCount === nonAssigned.length) {
+        cb.checked = false;
+        cb.indeterminate = false;
+      } else {
+        cb.checked = false;
+        cb.indeterminate = true;
+      }
     }
     
     function addVariableToZone(varName, varType, zoneType) {

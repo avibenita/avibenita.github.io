@@ -2786,9 +2786,53 @@
         res.swP = sw.p;
       }
 
-      // Bartlett & Levene require group labels (not available here → keep —)
-      // But we can compute a single-sample version vs. constant variance:
-      // Not meaningful without groups → leave as null (show —)
+      // ── Bartlett & Levene: use first categorical fixed-effect vector ──
+      if (res.bartlettChi == null) {
+        // Try to find a group vector: fixedVectors from Case 705 or _results.factors
+        let groupVec = null;
+        let groupName = null;
+
+        // Option 1: raw data from Case 705
+        if (_rawData && _rawData.fixedVectors) {
+          // Prefer a factor listed in _results.factors (categorical)
+          const catFactors = _results.factors ?? _modelSpec?.fix ?? [];
+          for (const fname of catFactors) {
+            if (_rawData.fixedVectors[fname]) {
+              groupVec  = _rawData.fixedVectors[fname];
+              groupName = fname;
+              break;
+            }
+          }
+          // fallback: first key in fixedVectors
+          if (!groupVec) {
+            const firstKey = Object.keys(_rawData.fixedVectors)[0];
+            if (firstKey) { groupVec = _rawData.fixedVectors[firstKey]; groupName = firstKey; }
+          }
+        }
+
+        // Option 2: reconstruct groups from fixedEffects parameter names
+        // e.g. "treatment[T.B]" → we can read _results.observations rows
+        if (!groupVec && _results.observations) {
+          // find first factor column in observations
+          const obs = _results.observations;
+          if (obs.length && obs[0]) {
+            const keys = Object.keys(obs[0]).filter(k => k !== 'id' && k !== 'fitted' && k !== 'residual');
+            if (keys.length) {
+              groupName = keys[0];
+              groupVec  = obs.map(o => o[keys[0]]);
+            }
+          }
+        }
+
+        if (groupVec && groupVec.length === vec.length) {
+          const bl = _bartlettLevene(vec, groupVec);
+          res.bartlettChi = bl.bartlettStat;
+          res.bartlettP   = bl.bartlettP;
+          res.leveneF     = bl.leveneF;
+          res.leveneP     = bl.leveneP;
+          res._groupName  = groupName;
+        }
+      }
     }
 
     panel.innerHTML = `
@@ -2816,11 +2860,11 @@
               </div>
             </div>
             <div class="stat-panel" style="min-width:unset;flex:1;">
-              <div class="stat-panel-heading">Homoscedasticity <span style="font-size:.7rem;font-weight:400;color:var(--text-muted);">(requires groups)</span></div>
+              <div class="stat-panel-heading">Homoscedasticity${res._groupName ? ` <span style="font-size:.72rem;font-weight:400;color:var(--text-muted);">by ${res._groupName}</span>` : ' <span style="font-size:.7rem;font-weight:400;color:var(--text-muted);">(requires groups)</span>'}</div>
               <div class="stat-panel-body">
-                <div class="stat-field"><span class="stat-label">Bartlett χ²:<span class="metric-help">ⓘ<span class="metric-tip">Bartlett's test statistic for equality of variance across groups. Sensitive to non-normality — use Levene's test when normality is questionable. Requires group labels from VB6.</span></span></span>      <span class="stat-value">${res.bartlettChi != null ? fmt(res.bartlettChi) : '<span style="color:var(--text-muted);">—</span>'}</span></div>
+                <div class="stat-field"><span class="stat-label">Bartlett χ²:<span class="metric-help">ⓘ<span class="metric-tip">Bartlett's test statistic for equality of variance across groups. Sensitive to non-normality — use Levene's test when normality is questionable.</span></span></span>      <span class="stat-value">${res.bartlettChi != null ? fmt(res.bartlettChi) : '<span style="color:var(--text-muted);">—</span>'}</span></div>
                 <div class="stat-field"><span class="stat-label">Bartlett p:<span class="metric-help">ⓘ<span class="metric-tip">p-value for Bartlett's test. p &lt; 0.05 suggests unequal variances across groups (heteroscedasticity).</span></span></span>        <span class="stat-value ${pClass(res.bartlettP)}">${res.bartlettP != null ? fmtP(res.bartlettP) : '<span style="color:var(--text-muted);">—</span>'}</span></div>
-                <div class="stat-field"><span class="stat-label">Levene F:<span class="metric-help">ⓘ<span class="metric-tip">Levene's test statistic — robust alternative to Bartlett. Based on absolute deviations from group medians. Requires group labels from VB6.</span></span></span>          <span class="stat-value">${res.leveneF != null ? fmt(res.leveneF) : '<span style="color:var(--text-muted);">—</span>'}</span></div>
+                <div class="stat-field"><span class="stat-label">Levene F:<span class="metric-help">ⓘ<span class="metric-tip">Levene's test statistic — robust alternative to Bartlett. Based on absolute deviations from group medians.</span></span></span>          <span class="stat-value">${res.leveneF != null ? fmt(res.leveneF) : '<span style="color:var(--text-muted);">—</span>'}</span></div>
                 <div class="stat-field"><span class="stat-label">Levene p:<span class="metric-help">ⓘ<span class="metric-tip">p-value for Levene's test. Preferred over Bartlett when residuals are non-normal. p &lt; 0.05 indicates heteroscedasticity.</span></span></span>          <span class="stat-value ${pClass(res.leveneP)}">${res.leveneP != null ? fmtP(res.leveneP) : '<span style="color:var(--text-muted);">—</span>'}</span></div>
               </div>
             </div>
@@ -2933,6 +2977,149 @@
     const pdf  = Math.exp(-z * z / 2) / Math.sqrt(2 * Math.PI);
     const p    = 1 - pdf * poly;
     return z >= 0 ? p : 1 - p;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     BARTLETT & LEVENE TESTS
+     vec      : residual values array
+     groupVec : parallel array of group labels (string or number)
+     Returns { bartlettStat, bartlettP, bartlettDf,
+               leveneF,      leveneP  }
+  ───────────────────────────────────────────────────────────── */
+  function _bartlettLevene(vec, groupVec) {
+    // Build groups map
+    const groups = {};
+    for (let i = 0; i < vec.length; i++) {
+      const g = String(groupVec[i]);
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(vec[i]);
+    }
+    const keys = Object.keys(groups);
+    const k    = keys.length;
+    if (k < 2) return { bartlettStat: null, bartlettP: null, leveneF: null, leveneP: null };
+
+    const N    = vec.length;
+    const ns   = keys.map(g => groups[g].length);
+    const vars = keys.map(g => {
+      const arr = groups[g];
+      const m   = arr.reduce((s, v) => s + v, 0) / arr.length;
+      return arr.length > 1
+        ? arr.reduce((s, v) => s + (v - m) ** 2, 0) / (arr.length - 1)
+        : 0;
+    });
+
+    // ── Bartlett ──────────────────────────────────────────────
+    const dfArr    = ns.map(n => n - 1);
+    const dfTotal  = dfArr.reduce((s, d) => s + d, 0);   // N - k
+    const pooledS2 = dfArr.reduce((s, d, i) => s + d * vars[i], 0) / dfTotal;
+
+    let bartlettStat = null, bartlettP = null;
+    if (pooledS2 > 0) {
+      const lnPool = Math.log(pooledS2);
+      const sumLn  = dfArr.reduce((s, d, i) => s + d * Math.log(Math.max(vars[i], 1e-30)), 0);
+      const num    = dfTotal * lnPool - sumLn;
+      const c      = 1 + (1 / (3 * (k - 1))) * (dfArr.reduce((s, d) => s + 1 / d, 0) - 1 / dfTotal);
+      bartlettStat = num / c;
+      bartlettP    = 1 - _chi2CDF(bartlettStat, k - 1);
+    }
+
+    // ── Levene (median-based) ─────────────────────────────────
+    const zGroups = keys.map((g, gi) => {
+      const arr    = groups[g];
+      const sorted = [...arr].sort((a, b) => a - b);
+      const med    = sorted.length % 2 === 0
+        ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+        : sorted[Math.floor(sorted.length / 2)];
+      return arr.map(v => Math.abs(v - med));
+    });
+    const allZ    = zGroups.flat();
+    const grandZ  = allZ.reduce((s, v) => s + v, 0) / N;
+    const groupZm = zGroups.map(zg => zg.reduce((s, v) => s + v, 0) / zg.length);
+
+    const ssW = zGroups.reduce((s, zg, gi) =>
+      s + zg.reduce((ss, z) => ss + (z - groupZm[gi]) ** 2, 0), 0);
+    const ssB = ns.reduce((s, ni, i) => s + ni * (groupZm[i] - grandZ) ** 2, 0);
+
+    const dfB = k - 1;
+    const dfW = N - k;
+    const leveneF = ssW > 0 ? (ssB / dfB) / (ssW / dfW) : null;
+    const leveneP = leveneF != null ? 1 - _fCDF(leveneF, dfB, dfW) : null;
+
+    return {
+      bartlettStat: bartlettStat != null ? parseFloat(bartlettStat.toFixed(4)) : null,
+      bartlettP:    bartlettP    != null ? parseFloat(bartlettP.toFixed(6))    : null,
+      bartlettDf:   k - 1,
+      leveneF:      leveneF      != null ? parseFloat(leveneF.toFixed(4))      : null,
+      leveneP:      leveneP      != null ? parseFloat(leveneP.toFixed(6))      : null,
+    };
+  }
+
+  /* χ² CDF via regularised incomplete gamma  P(a, x/2) */
+  function _chi2CDF(x, df) {
+    return x <= 0 ? 0 : _regIncGamma(df / 2, x / 2);
+  }
+
+  /* F CDF via regularised incomplete beta */
+  function _fCDF(f, d1, d2) {
+    if (f <= 0) return 0;
+    const x = d2 / (d2 + d1 * f);
+    return 1 - _regIncBeta(d2 / 2, d1 / 2, x);
+  }
+
+  /* Regularised incomplete gamma P(a, x) — series expansion */
+  function _regIncGamma(a, x) {
+    if (x < 0) return 0;
+    if (x === 0) return 0;
+    let sum = 1 / a, term = 1 / a;
+    for (let n = 1; n < 200; n++) {
+      term *= x / (a + n);
+      sum  += term;
+      if (Math.abs(term) < 1e-10) break;
+    }
+    const lnGammaA = _lgamma(a);
+    return Math.min(1, Math.exp(-x + a * Math.log(x) - lnGammaA) * sum);
+  }
+
+  /* Regularised incomplete beta I_x(a,b) — continued fraction (Lentz) */
+  function _regIncBeta(a, b, x) {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    const lnBeta = _lgamma(a) + _lgamma(b) - _lgamma(a + b);
+    const front  = Math.exp(Math.log(x) * a + Math.log(1 - x) * b - lnBeta);
+    // use symmetry for better convergence
+    if (x > (a + 1) / (a + b + 2)) return 1 - _regIncBeta(b, a, 1 - x);
+    // Lentz continued fraction
+    const MAXIT = 200, EPS = 1e-10, FPMIN = 1e-30;
+    let h = 1, C = 1, D = 1 - (a + b) * x / (a + 1);
+    D = Math.abs(D) < FPMIN ? FPMIN : D; D = 1 / D; h = D;
+    for (let m = 1; m <= MAXIT; m++) {
+      for (let s = 0; s <= 1; s++) {
+        let num;
+        if (s === 0) {
+          num = m * (b - m) * x / ((a + 2*m - 1) * (a + 2*m));
+        } else {
+          num = -(a + m) * (a + b + m) * x / ((a + 2*m) * (a + 2*m + 1));
+        }
+        D = 1 + num * D; if (Math.abs(D) < FPMIN) D = FPMIN;
+        C = 1 + num / C; if (Math.abs(C) < FPMIN) C = FPMIN;
+        D = 1 / D; h *= D * C;
+        if (Math.abs(D * C - 1) < EPS) break;
+      }
+    }
+    return front * h / a;
+  }
+
+  /* log-Gamma via Lanczos */
+  function _lgamma(z) {
+    const p = [676.5203681218851,-1259.1392167224028,771.32342877765313,
+               -176.61502916214059,12.507343278686905,-0.13857109526572012,
+               9.9843695780195716e-6,1.5056327351493116e-7];
+    if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - _lgamma(1 - z);
+    z--;
+    let x = 0.99999999999980993;
+    for (let i = 0; i < 8; i++) x += p[i] / (z + i + 1);
+    const t = z + 7.5;
+    return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
   }
 
   function renderResidualCharts(res) {

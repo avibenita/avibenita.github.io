@@ -512,7 +512,7 @@
               <i class="fa-solid fa-table-cells-large sb-item-icon"></i>
               <span class="sb-item-label">Overview</span>
             </button>
-            <button class="sb-item sb-item--sub" onclick="setDepth('analyst'); switchTab('overview')" id="detailedViewBtn">
+            <button class="sb-item" onclick="setDepth('analyst'); switchTab('overview')" id="detailedViewBtn">
               <i class="fa-solid fa-microscope sb-item-icon"></i>
               <span class="sb-item-label">Detailed View</span>
             </button>
@@ -1535,17 +1535,118 @@
   };
 
   window.openMsdModal = function() {
-    const modal = document.getElementById('msdModal');
-    if (!modal) return;
-    modal.style.display = 'flex';
-    // Reset to regression tab each open
-    msdSwitchTab('regression');
-    // Close on backdrop click
-    modal._bdHandler = function(e) { if (e.target === modal) closeMsdModal(); };
-    modal.addEventListener('click', modal._bdHandler);
-    // Close on Escape
-    modal._keyHandler = function(e) { if (e.key === 'Escape') closeMsdModal(); };
-    document.addEventListener('keydown', modal._keyHandler);
+    // Grab the already-rendered SVG, equation, legend, hierarchy HTML
+    const svgEl   = document.getElementById('msdSvg');
+    const eqEl    = document.getElementById('msdEquation');
+    const legEl   = document.getElementById('msdLegend');
+    const intsEl  = document.getElementById('msdInts');
+    const hierEl  = document.getElementById('msdHier');
+    if (!svgEl) return;
+
+    const svgHtml  = svgEl  ? svgEl.outerHTML  : '';
+    const eqHtml   = eqEl   ? eqEl.innerHTML   : 'Awaiting results…';
+    const legHtml  = legEl  ? legEl.innerHTML  : '';
+    const intsHtml = intsEl ? intsEl.innerHTML : '';
+    const hierHtml = hierEl ? hierEl.innerHTML : 'Awaiting results…';
+
+    const win = window.open('', '_blank');
+    if (!win) return;
+
+    win.document.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Model Structure</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0d1117; color: #e2e8f0;
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column;
+    }
+    header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 16px 28px; border-bottom: 1px solid #2d3a52;
+      background: #161b27;
+    }
+    header i { color: #a78bfa; font-size: 1.3rem; }
+    header h1 { font-size: 1.1rem; font-weight: 700; color: #e2e8f0; }
+    .tab-bar {
+      display: flex; gap: 0; padding: 0 28px;
+      background: #161b27; border-bottom: 1px solid #2d3a52;
+    }
+    .tab-btn {
+      padding: 10px 22px; background: none; border: none; cursor: pointer;
+      color: #94a3b8; font-size: .9rem; font-weight: 600;
+      border-bottom: 3px solid transparent; transition: all .15s;
+    }
+    .tab-btn.active { color: #a78bfa; border-bottom-color: #a78bfa; }
+    .tab-btn:hover:not(.active) { color: #e2e8f0; }
+    .view { display: none; flex: 1; padding: 36px 28px; }
+    .view.active { display: flex; }
+    /* Regression view */
+    .reg-wrap { display: flex; gap: 48px; align-items: flex-start; flex-wrap: wrap; }
+    .svg-col { flex-shrink: 0; }
+    .eq-col { flex: 1; min-width: 260px; }
+    .eq-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em;
+                color: #64748b; text-transform: uppercase; margin-bottom: 10px; }
+    .msd-equation {
+      background: #1e2535; border: 1px solid #2d3a52; border-radius: 8px;
+      padding: 14px 18px; font-family: monospace; font-size: 1rem; color: #e2e8f0;
+      line-height: 1.6; margin-bottom: 18px; white-space: pre-wrap;
+    }
+    /* Legend & ints from host page */
+    .msd-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .msd-legend-item { display:flex;align-items:center;gap:6px;font-size:.8rem;color:#94a3b8; }
+    .msd-legend-dot  { width:10px;height:10px;border-radius:50%;flex-shrink:0; }
+    .msd-ints { display:flex;flex-wrap:wrap;gap:8px;margin-top:8px; }
+    .msd-int-badge {
+      background:rgba(251,146,60,.15);color:#fb923c;border:1px solid rgba(251,146,60,.35);
+      border-radius:99px;padding:3px 12px;font-size:.8rem;font-weight:600;
+    }
+    /* Hierarchy view */
+    .hier-wrap { width: 100%; }
+  </style>
+</head>
+<body>
+  <header>
+    <i class="fa-solid fa-diagram-project"></i>
+    <h1>Model Structure</h1>
+  </header>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('regression')">
+      <i class="fa-solid fa-arrow-right-to-bracket"></i> Regression
+    </button>
+    <button class="tab-btn" onclick="switchTab('hierarchy')">
+      <i class="fa-solid fa-sitemap"></i> Hierarchy
+    </button>
+  </div>
+  <div id="viewRegression" class="view active">
+    <div class="reg-wrap">
+      <div class="svg-col">${svgHtml}</div>
+      <div class="eq-col">
+        <div class="eq-label">Model Formula</div>
+        <div class="msd-equation">${eqHtml}</div>
+        <div class="msd-legend">${legHtml}</div>
+        <div class="msd-ints">${intsHtml}</div>
+      </div>
+    </div>
+  </div>
+  <div id="viewHierarchy" class="view">
+    <div class="hier-wrap">${hierHtml}</div>
+  </div>
+  <script>
+    function switchTab(name) {
+      document.querySelectorAll('.tab-btn').forEach((b,i) =>
+        b.classList.toggle('active', ['regression','hierarchy'][i] === name));
+      document.getElementById('viewRegression').classList.toggle('active', name === 'regression');
+      document.getElementById('viewHierarchy').classList.toggle('active',  name === 'hierarchy');
+    }
+  <\/script>
+</body>
+</html>`);
+    win.document.close();
   };
 
   window.closeMsdModal = function() {

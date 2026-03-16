@@ -620,9 +620,12 @@
       document.querySelectorAll(".tab-panel").forEach(function(panel) {
         panel.classList.toggle("active", panel.id === "tab-" + tabKey);
       });
-      /* Render charts lazily on first visit */
-      if (tabKey === "scree" && lastPcaBundle && lastPcaBundle.eigenvalues) renderScreePlots(lastPcaBundle.eigenvalues);
-      if (tabKey === "biplot" && lastPcaBundle && lastPcaBundle.biplot) renderBiplot(lastPcaBundle.biplot);
+      /* Reflow Highcharts if switching to a chart tab after the chart was rendered offscreen */
+      if ((tabKey === "scree" || tabKey === "biplot") && typeof Highcharts !== "undefined") {
+        setTimeout(function() {
+          Highcharts.charts.forEach(function(c) { if (c) c.reflow(); });
+        }, 50);
+      }
     }
 
     /* ─── Heatmap ─── */
@@ -921,10 +924,16 @@
       if (bundle.scores)        window.populatePcaScores(bundle.scores);
       if (bundle.ai)            window.populatePcaAi(bundle.ai);
 
-      /* Render charts if their tab is already active */
+      /* Render charts: briefly show all panels so Highcharts gets real dimensions */
+      var panels = document.querySelectorAll(".tab-panel");
+      panels.forEach(function(p) { p.style.display = "block"; });
+      if (bundle.eigenvalues) renderScreePlots(bundle.eigenvalues);
+      if (bundle.biplot)      renderBiplot(bundle.biplot);
+      /* Restore — keep only active tab visible */
       var activeTab = (document.querySelector(".sb-item.active") || {}).getAttribute("data-tab") || "overview";
-      if (activeTab === "scree" && bundle.eigenvalues) renderScreePlots(bundle.eigenvalues);
-      if (activeTab === "biplot" && bundle.biplot)     renderBiplot(bundle.biplot);
+      panels.forEach(function(p) {
+        p.style.display = p.id === "tab-" + activeTab ? "block" : "none";
+      });
     };
 
     window.resetResultsPanel = function() {

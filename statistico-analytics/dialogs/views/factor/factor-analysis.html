@@ -769,18 +769,16 @@
                 <div class="stat-panel-heading"><i class="fa-solid fa-compass-drafting"></i> Rotation Overview</div>
                 <div class="stat-panel-body">
                   <div class="stat-field">
-                    <span class="stat-label">Apply Rotation:</span>
-                    <span class="stat-value" style="display:flex; align-items:center; gap:8px; justify-content:flex-end;">
+                    <span class="stat-label">Rotation:</span>
+                    <span class="stat-value">
                       <select id="rotationApplySelect" style="min-width:180px; background:rgba(15,23,42,0.95); color:#cde6ff; border:1px solid rgba(120,200,255,0.35); border-radius:8px; padding:6px 8px;">
                         <option value="Varimax">Varimax</option>
                         <option value="Promax">Promax (Oblique)</option>
                         <option value="Oblimin">Oblimin (Oblique)</option>
                         <option value="None">None</option>
                       </select>
-                      <button id="applyRotationBtn" class="hero-action-btn" style="padding:6px 10px; font-size:12px;">Apply</button>
                     </span>
                   </div>
-                  <div class="stat-field"><span class="stat-label">Rotation Method:</span><span class="stat-value" id="rotationMethod">...</span></div>
                   <div class="stat-field"><span class="stat-label">Loading Cutoff:</span><span class="stat-value" id="loadingCutoff">...</span></div>
                   <div class="stat-field"><span class="stat-label">Cross-loading Count:</span><span class="stat-value" id="crossLoadingCount">...</span></div>
                   <div class="stat-field"><span class="stat-label">Factor Correlation Max:</span><span class="stat-value" id="phiMax">...</span></div>
@@ -790,6 +788,10 @@
             <div class="stat-panel">
               <div class="stat-panel-heading" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
                 <span><i class="fa-solid fa-table-columns"></i> Rotated Loadings Matrix</span>
+                <span id="rotationMethodBadge" style="
+                  flex:1; text-align:center; font-size:11px; font-weight:700; letter-spacing:.5px;
+                  color:var(--accent-2); text-transform:uppercase; opacity:.85; padding:0 8px;
+                "></span>
                 <div style="display:flex; align-items:center; gap:10px; font-size:12px;">
                   <span style="color:var(--text-muted); white-space:nowrap;">Highlight ≥</span>
                   <input type="range" id="loadingSlider" min="0" max="100" value="40"
@@ -1253,15 +1255,17 @@
               td.textContent = formatNumber(parsed);
               var abs = Math.abs(parsed);
               if (abs >= _loadingThreshold) {
-                /* High loading: vibrant colour + bold */
-                var intensity = Math.min(1, (abs - _loadingThreshold) / (1 - _loadingThreshold + 0.001) + 0.45);
+                /* High loading: vibrant colour + bold, scaled to threshold */
+                var span = 1 - _loadingThreshold;
+                var intensity = span > 0 ? Math.min(1, (abs - _loadingThreshold) / span) : 1;
                 var alpha = (0.55 + intensity * 0.45).toFixed(2);
                 if (parsed >= 0) {
                   td.style.color = "rgba(120,200,255," + alpha + ")";
                 } else {
                   td.style.color = "rgba(255,165,120," + alpha + ")";
                 }
-                td.style.fontWeight = abs >= 0.6 ? "700" : "600";
+                /* Bold when in upper 40% of the highlighted range */
+                td.style.fontWeight = intensity >= 0.6 ? "700" : "600";
                 td.style.opacity = "1";
               } else {
                 /* Low loading: greyed out */
@@ -1281,12 +1285,14 @@
 
     window.populateFactorRotation = function(data) {
       var d = typeof data === "string" ? JSON.parse(data) : data || {};
-      setText("rotationMethod", d.rotationMethod, "...");
       setText("loadingCutoff", formatNumber(d.loadingCutoff), "...");
       setText("crossLoadingCount", d.crossLoadingCount, "...");
       setText("phiMax", formatNumber(d.phiMax), "...");
       var rotationSelect = document.getElementById("rotationApplySelect");
       if (rotationSelect && d.rotationMethod) rotationSelect.value = d.rotationMethod;
+      /* Update centred badge in loadings header */
+      var badge = document.getElementById("rotationMethodBadge");
+      if (badge) badge.textContent = d.rotationMethod ? d.rotationMethod + " rotation" : "";
       var cols = d.columns || ["Variable", "Factor 1"];
       _loadingsData = { rows: d.rows || [], cols: cols };
       renderSimpleTableHead("loadingsHead", cols);
@@ -1768,8 +1774,6 @@
       loadSavedTheme();
       switchTab("suitability");
       setDecimalPrecision();
-      var applyRotationBtn = document.getElementById("applyRotationBtn");
-      if (applyRotationBtn) applyRotationBtn.addEventListener("click", applyRotationFromResults);
       var rotationSelect = document.getElementById("rotationApplySelect");
       if (rotationSelect) rotationSelect.addEventListener("change", applyRotationFromResults);
       if (typeof Office !== "undefined" && typeof Office.onReady === "function") {

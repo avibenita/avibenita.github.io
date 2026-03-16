@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>ANOVA Builder</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+  <link rel="stylesheet" href="../shared-config.css?v=20260316"/>
+  <script src="../shared-config.js?v=20260316"></script>
+</head>
+<body>
+<div class="cfg-shell">
+
+  <!-- Header -->
+  <header class="cfg-header">
+    <div class="cfg-header-icon"><i class="fa-solid fa-table-cells"></i></div>
+    <span class="cfg-header-title">ANOVA Builder</span>
+    <span class="cfg-meta-badge" id="metaBadge">—</span>
+    <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch theme">
+      <span class="cfg-toggle-icon">&#x1F319;</span>
+      <div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div>
+      <span class="cfg-toggle-label">Dark</span>
+    </button>
+  </header>
+
+  <!-- Spinner -->
+  <div id="loadingSpinner" class="cfg-spinner">
+    <i class="fa-solid fa-spinner fa-spin"></i> Loading data…
+  </div>
+
+  <!-- Main content -->
+  <div id="mainContent" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
+    <div class="cfg-body">
+
+      <!-- Range info -->
+      <div class="cfg-panel">
+        <div class="cfg-panel-body">
+          <div class="cfg-range-strip">
+            <div class="cfg-range-item">Range: <strong id="rangeAddr">—</strong></div>
+            <div class="cfg-range-item">Rows: <strong id="rowCount">0</strong></div>
+            <div class="cfg-range-item">Columns: <strong id="colCount">0</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Analysis Type -->
+      <div class="cfg-panel">
+        <div class="cfg-panel-head"><i class="fa-solid fa-diagram-project"></i> Analysis Type</div>
+        <div class="cfg-panel-body">
+          <div class="cfg-radio-group" id="typeGroup">
+            <div class="cfg-radio-option">
+              <input type="radio" name="anovaType" id="typeOneWay" value="one-way" checked/>
+              <label for="typeOneWay" class="cfg-radio-label">
+                <span class="radio-icon"><i class="fa-solid fa-layer-group"></i></span>
+                <span class="radio-text">One-Way</span>
+              </label>
+            </div>
+            <div class="cfg-radio-option">
+              <input type="radio" name="anovaType" id="typeTwoWay" value="two-way"/>
+              <label for="typeTwoWay" class="cfg-radio-label">
+                <span class="radio-icon"><i class="fa-solid fa-table-cells-large"></i></span>
+                <span class="radio-text">Two-Way</span>
+              </label>
+            </div>
+            <div class="cfg-radio-option">
+              <input type="radio" name="anovaType" id="typeRM" value="repeated"/>
+              <label for="typeRM" class="cfg-radio-label">
+                <span class="radio-icon"><i class="fa-solid fa-repeat"></i></span>
+                <span class="radio-text">Repeated</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Variable Selection – One-Way / Two-Way -->
+      <div class="cfg-panel" id="panelVars">
+        <div class="cfg-panel-head"><i class="fa-solid fa-list-check"></i> Variables</div>
+        <div class="cfg-panel-body">
+
+          <label class="cfg-label" for="selectDV">Dependent Variable</label>
+          <select id="selectDV" class="cfg-select"></select>
+
+          <label class="cfg-label" style="margin-top:10px;" for="selectFactor1">Factor A (grouping column)</label>
+          <select id="selectFactor1" class="cfg-select"></select>
+
+          <div id="factor2Wrap" style="display:none;">
+            <label class="cfg-label" style="margin-top:10px;" for="selectFactor2">Factor B (grouping column)</label>
+            <select id="selectFactor2" class="cfg-select"></select>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Variable Selection – Repeated Measures -->
+      <div class="cfg-panel" id="panelRM" style="display:none;">
+        <div class="cfg-panel-head"><i class="fa-solid fa-repeat"></i> Conditions (columns)</div>
+        <div class="cfg-panel-body">
+          <p class="cfg-hint">Select 2 or more columns — each column = one condition measured on the same subjects.</p>
+          <div id="conditionCheckList" style="margin-top:8px;max-height:200px;overflow-y:auto;"></div>
+        </div>
+      </div>
+
+      <!-- Options -->
+      <div class="cfg-panel">
+        <div class="cfg-panel-head"><i class="fa-solid fa-sliders"></i> Options</div>
+        <div class="cfg-panel-body">
+
+          <label class="cfg-label" for="selectPosthoc">Post-Hoc Test</label>
+          <select id="selectPosthoc" class="cfg-select">
+            <option value="tukey">Tukey HSD</option>
+            <option value="bonferroni">Bonferroni</option>
+            <option value="games">Games-Howell</option>
+          </select>
+
+          <label class="cfg-label" style="margin-top:10px;" for="selectAlpha">Significance Level (α)</label>
+          <select id="selectAlpha" class="cfg-select">
+            <option value="0.05" selected>α = 0.05</option>
+            <option value="0.01">α = 0.01</option>
+            <option value="0.10">α = 0.10</option>
+          </select>
+
+          <div style="margin-top:10px; display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="chkDescriptives" class="cfg-checkbox" checked/>
+            <label for="chkDescriptives" class="cfg-label" style="margin:0;">Include descriptive statistics</label>
+          </div>
+          <div style="margin-top:6px; display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="chkAssumptions" class="cfg-checkbox" checked/>
+            <label for="chkAssumptions" class="cfg-label" style="margin:0;">Test homogeneity of variance</label>
+          </div>
+          <div style="margin-top:6px; display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="chkNonParam" class="cfg-checkbox" checked/>
+            <label for="chkNonParam" class="cfg-label" style="margin:0;">Include non-parametric test (Kruskal-Wallis)</label>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /.cfg-body -->
+
+    <!-- Footer -->
+    <footer class="cfg-footer">
+      <button class="cfg-btn-secondary" onclick="sendClose()">
+        <i class="fa-solid fa-xmark"></i> Cancel
+      </button>
+      <button class="cfg-btn-run" id="runBtn" onclick="runAnalysis()">
+        <i class="fa-solid fa-play"></i> Run ANOVA
+      </button>
+    </footer>
+  </div><!-- /#mainContent -->
+
+</div><!-- /.cfg-shell -->
+
+<script>
+  /* ── State ────────────────────────────────────────────── */
+  let _headers = [];
+  let _rows    = [];
+  let _saved   = null;
+
+  /* ── Message bridge ───────────────────────────────────── */
+  function sendClose() {
+    Office.context.ui.messageParent(JSON.stringify({ action: 'close' }));
+  }
+
+  Office.onReady(() => {
+    Office.context.ui.addHandlerAsync(
+      Office.EventType.DialogParentMessageReceived,
+      (arg) => {
+        try {
+          const msg = JSON.parse(arg.message || '{}');
+          if (msg.type === 'ANOVA_DATA') {
+            const p = msg.payload || {};
+            _headers = p.headers || [];
+            _rows    = p.rows    || [];
+            _saved   = p.savedModelSpec || null;
+            initUI();
+          }
+        } catch(e) {}
+      }
+    );
+    Office.context.ui.messageParent(JSON.stringify({ action: 'ready' }));
+  });
+
+  /* ── Build UI once data arrives ───────────────────────── */
+  function initUI() {
+    document.getElementById('loadingSpinner').style.display = 'none';
+    const mc = document.getElementById('mainContent');
+    mc.style.display = 'flex';
+
+    document.getElementById('rowCount').textContent = _rows.length;
+    document.getElementById('colCount').textContent = _headers.length;
+    document.getElementById('rangeAddr').textContent = '(workbook)';
+    document.getElementById('metaBadge').textContent = `${_rows.length} rows`;
+
+    populateColumnSelects();
+    buildConditionCheckList();
+
+    /* Radio change */
+    document.querySelectorAll('input[name="anovaType"]').forEach(r => {
+      r.addEventListener('change', onTypeChange);
+    });
+    onTypeChange();
+
+    if (_saved) applySpec(_saved);
+  }
+
+  function populateColumnSelects() {
+    ['selectDV', 'selectFactor1', 'selectFactor2'].forEach(id => {
+      const sel = document.getElementById(id);
+      sel.innerHTML = _headers.map((h, i) => `<option value="${h}">${h}</option>`).join('');
+    });
+    if (_headers.length >= 2) {
+      document.getElementById('selectFactor1').selectedIndex = 1;
+    }
+    if (_headers.length >= 3) {
+      document.getElementById('selectFactor2').selectedIndex = 2;
+    }
+  }
+
+  function buildConditionCheckList() {
+    const div = document.getElementById('conditionCheckList');
+    div.innerHTML = _headers.map((h, i) => `
+      <label style="display:flex;align-items:center;gap:7px;padding:4px 0;font-size:12px;cursor:pointer;">
+        <input type="checkbox" class="cfg-checkbox cond-check" value="${h}" ${i > 0 && i < 4 ? 'checked' : ''}/> ${h}
+      </label>`).join('');
+  }
+
+  function onTypeChange() {
+    const type = document.querySelector('input[name="anovaType"]:checked')?.value || 'one-way';
+    document.getElementById('panelVars').style.display   = (type === 'repeated') ? 'none'  : '';
+    document.getElementById('panelRM').style.display     = (type === 'repeated') ? ''      : 'none';
+    document.getElementById('factor2Wrap').style.display = (type === 'two-way')  ? ''      : 'none';
+    document.getElementById('selectPosthoc').closest('div.cfg-panel').style.opacity = (type === 'two-way') ? '0.5' : '1';
+  }
+
+  function applySpec(spec) {
+    if (!spec) return;
+    if (spec.type) {
+      const r = document.getElementById(
+        spec.type === 'one-way' ? 'typeOneWay' : spec.type === 'two-way' ? 'typeTwoWay' : 'typeRM');
+      if (r) { r.checked = true; onTypeChange(); }
+    }
+    if (spec.dv)      setSelect('selectDV',      spec.dv);
+    if (spec.factor1) setSelect('selectFactor1', spec.factor1);
+    if (spec.factor2) setSelect('selectFactor2', spec.factor2);
+    if (spec.posthocMethod) setSelect('selectPosthoc', spec.posthocMethod);
+    if (spec.alpha)   setSelect('selectAlpha',   String(spec.alpha));
+    if (spec.conditions) {
+      document.querySelectorAll('.cond-check').forEach(cb => {
+        cb.checked = spec.conditions.includes(cb.value);
+      });
+    }
+  }
+
+  function setSelect(id, val) {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    for (const o of sel.options) if (o.value === val) { o.selected = true; return; }
+  }
+
+  function runAnalysis() {
+    const type = document.querySelector('input[name="anovaType"]:checked')?.value || 'one-way';
+    const spec = {
+      type,
+      dv:      document.getElementById('selectDV')?.value,
+      factor1: document.getElementById('selectFactor1')?.value,
+      factor2: document.getElementById('selectFactor2')?.value,
+      conditions: [...document.querySelectorAll('.cond-check:checked')].map(cb => cb.value),
+      posthocMethod: document.getElementById('selectPosthoc')?.value || 'tukey',
+      alpha: parseFloat(document.getElementById('selectAlpha')?.value || '0.05'),
+      includeDescriptives: document.getElementById('chkDescriptives')?.checked !== false,
+      includeAssumptions:  document.getElementById('chkAssumptions')?.checked  !== false,
+      includeNonParam:     document.getElementById('chkNonParam')?.checked     !== false,
+    };
+    Office.context.ui.messageParent(JSON.stringify({ action: 'anovaModel', data: spec }));
+  }
+</script>
+</body>
+</html>

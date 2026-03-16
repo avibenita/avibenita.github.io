@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ANOVA Results – Statistico Analytics</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://code.highcharts.com/highcharts-more.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="../shared-header.css?v=20260316"/>
+  <script src="../shared-header.js?v=20260316"></script>
+
+  <style>
+    :root{
+      --surface-0:#0c1624; --surface-1:#1a1f2e; --surface-2:#242938;
+      --border:#2d3748;
+      --accent-1:rgb(16,185,129); --accent-2:rgb(52,211,153);
+      --text-primary:#fff; --text-secondary:rgba(255,255,255,.82); --text-muted:rgba(255,255,255,.62);
+      --success:#4ade80; --warning:#fbbf24; --danger:#fb7185;
+      --panel-radius:10px; --panel-shadow:0 4px 20px rgba(0,0,0,.4);
+    }
+    :root[data-theme="light"]{
+      --surface-0:#eef0f4; --surface-1:#fff; --surface-2:#f3f4f6; --border:#cbd5e1;
+      --accent-1:#059669; --accent-2:#10b981;
+      --text-primary:#111827; --text-secondary:#1f2937; --text-muted:#374151;
+      --panel-shadow:0 2px 8px rgba(0,0,0,.08);
+    }
+    html,body{height:100%;margin:0;padding:0;overflow:hidden;}
+    body{background:var(--surface-0);color:var(--text-primary);font-family:'Segoe UI',Tahoma,sans-serif;display:flex;flex-direction:column;}
+
+    /* ── Layout ───────────────────────────────────────────── */
+    .anova-body{flex:1;min-height:0;display:flex;overflow:hidden;}
+    .sidebar{width:170px;flex-shrink:0;background:var(--surface-1);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:10px 0;overflow-y:auto;}
+    .sidebar-item{display:flex;align-items:center;gap:8px;padding:8px 14px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;transition:all .15s;border-left:3px solid transparent;white-space:nowrap;}
+    .sidebar-item i{font-size:12px;width:16px;text-align:center;flex-shrink:0;}
+    .sidebar-item:hover{color:var(--text-secondary);background:var(--surface-2);}
+    .sidebar-item.active{color:var(--accent-1);border-left-color:var(--accent-1);background:rgba(16,185,129,.07);}
+    .sidebar-sep{height:1px;background:var(--border);margin:6px 12px;}
+    .sidebar-group-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);padding:8px 14px 3px;}
+
+    .content-pane{flex:1;min-width:0;overflow-y:auto;padding:14px;}
+
+    /* ── Panels ───────────────────────────────────────────── */
+    .tab-panel{display:none;}
+    .tab-panel.active{display:block;}
+    .panel{background:var(--surface-1);border:1.5px solid var(--border);border-radius:var(--panel-radius);margin-bottom:14px;overflow:hidden;box-shadow:var(--panel-shadow);}
+    .panel-head{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:var(--surface-2);border-bottom:1px solid var(--border);font-size:13px;font-weight:700;color:var(--accent-1);}
+    .panel-head i{margin-right:6px;}
+    .panel-body{padding:12px 14px;}
+
+    /* ── Tables ───────────────────────────────────────────── */
+    table{width:100%;border-collapse:collapse;font-size:12px;}
+    thead th{padding:7px 10px;background:var(--surface-2);color:var(--accent-1);font-weight:700;text-align:left;border-bottom:1.5px solid var(--border);}
+    tbody td{padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text-secondary);}
+    tbody tr:last-child td{border-bottom:none;}
+    tbody tr:nth-child(even){background:rgba(255,255,255,.03);}
+    :root[data-theme="light"] tbody tr:nth-child(even){background:rgba(0,0,0,.025);}
+    tbody tr:hover{background:rgba(16,185,129,.05);}
+    .num{text-align:right;font-variant-numeric:tabular-nums;}
+    .sig{color:var(--success);font-weight:700;}
+    .ns {color:var(--text-muted);}
+    .sig-star{color:var(--success);font-weight:900;}
+
+    /* ── Stats grid ───────────────────────────────────────── */
+    .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:14px;}
+    .stat-card{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center;}
+    .stat-card .sv{font-size:20px;font-weight:800;color:var(--accent-1);line-height:1.1;}
+    .stat-card .sl{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px;}
+
+    /* ── Significance badge ───────────────────────────────── */
+    .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;letter-spacing:.3px;}
+    .badge-sig{background:rgba(74,222,128,.15);color:#4ade80;border:1px solid rgba(74,222,128,.3);}
+    .badge-ns {background:rgba(156,163,175,.12);color:#9ca3af;border:1px solid rgba(156,163,175,.2);}
+    .badge-warn{background:rgba(251,191,36,.13);color:#fbbf24;border:1px solid rgba(251,191,36,.25);}
+
+    /* ── Effect size meter ────────────────────────────────── */
+    .effect-bar-wrap{display:flex;align-items:center;gap:8px;}
+    .effect-bar{flex:1;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden;}
+    .effect-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--accent-1),var(--accent-2));transition:width .4s;}
+
+    /* ── Report box ───────────────────────────────────────── */
+    .report-box{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:12px;line-height:1.7;color:var(--text-secondary);}
+    .report-box p{margin-bottom:8px;}
+    .copy-btn{font-size:10px;padding:3px 10px;background:var(--surface-1);border:1px solid var(--border);border-radius:6px;color:var(--text-muted);cursor:pointer;transition:all .15s;float:right;}
+    .copy-btn:hover{border-color:var(--accent-1);color:var(--accent-1);}
+
+    /* ── Chart containers ─────────────────────────────────── */
+    .chart-wrap{width:100%;height:320px;}
+    .chart-wrap-tall{width:100%;height:400px;}
+
+    /* ── Assumption alert ─────────────────────────────────── */
+    .assump-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+    .assump-row:last-child{border-bottom:none;}
+    .assump-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;margin-top:2px;}
+    .assump-icon.pass{background:rgba(74,222,128,.15);color:#4ade80;}
+    .assump-icon.fail{background:rgba(251,191,36,.15);color:#fbbf24;}
+    .assump-icon.warn{background:rgba(251,191,36,.12);color:#fbbf24;}
+    .assump-text .at{font-size:12px;font-weight:700;color:var(--text-primary);}
+    .assump-text .ad{font-size:11px;color:var(--text-muted);margin-top:2px;}
+
+    /* ── View Data ─────────────────────────────────────────── */
+    .vd-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+    .vd-search{flex:1;padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface-2);color:var(--text-primary);font-size:12px;}
+    .vd-search:focus{outline:none;border-color:var(--accent-1);}
+    .vd-info{font-size:11px;color:var(--text-muted);margin-bottom:6px;}
+    .vd-pager{display:flex;align-items:center;gap:4px;margin-top:8px;flex-wrap:wrap;}
+    .pg-btn{padding:3px 9px;border:1px solid var(--border);border-radius:5px;background:var(--surface-2);color:var(--text-muted);font-size:11px;cursor:pointer;}
+    .pg-btn:hover,.pg-btn.active{border-color:var(--accent-1);color:var(--accent-1);background:rgba(16,185,129,.07);}
+
+    /* ── Interaction plot legend ──────────────────────────── */
+    .interaction-note{font-size:11px;color:var(--text-muted);text-align:center;margin-top:6px;}
+
+    /* ── Spinner ──────────────────────────────────────────── */
+    .loading-overlay{position:fixed;inset:0;background:rgba(12,22,36,.7);display:flex;align-items:center;justify-content:center;z-index:999;}
+    .loading-overlay.hidden{display:none;}
+    .loading-overlay-inner{text-align:center;color:var(--text-primary);}
+    .loading-overlay-inner i{font-size:32px;color:var(--accent-1);}
+    .loading-overlay-inner p{margin-top:8px;font-size:13px;color:var(--text-muted);}
+  </style>
+</head>
+<body>
+  <!-- Shared header injected by shared-header.js -->
+  <div id="statisticoHeader"></div>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-overlay-inner">
+      <i class="fa-solid fa-spinner fa-spin"></i>
+      <p>Running analysis…</p>
+    </div>
+  </div>
+
+  <div class="anova-body">
+
+    <!-- Sidebar navigation -->
+    <nav class="sidebar" id="sidebar">
+      <div class="sidebar-group-label">Overview</div>
+      <div class="sidebar-item active" data-tab="overview" onclick="switchTab('overview')">
+        <i class="fa-solid fa-circle-info"></i> Summary
+      </div>
+      <div class="sidebar-sep"></div>
+      <div class="sidebar-group-label">Tests</div>
+      <div class="sidebar-item" data-tab="anova-table" onclick="switchTab('anova-table')">
+        <i class="fa-solid fa-table"></i> ANOVA Table
+      </div>
+      <div class="sidebar-item" data-tab="posthoc" onclick="switchTab('posthoc')">
+        <i class="fa-solid fa-code-compare"></i> Post-Hoc
+      </div>
+      <div class="sidebar-item" data-tab="nonparam" onclick="switchTab('nonparam')">
+        <i class="fa-solid fa-ranking-star"></i> Non-Param
+      </div>
+      <div class="sidebar-sep"></div>
+      <div class="sidebar-group-label">Data</div>
+      <div class="sidebar-item" data-tab="descriptives" onclick="switchTab('descriptives')">
+        <i class="fa-solid fa-list-ol"></i> Descriptives
+      </div>
+      <div class="sidebar-item" data-tab="assumptions" onclick="switchTab('assumptions')">
+        <i class="fa-solid fa-shield-halved"></i> Assumptions
+      </div>
+      <div class="sidebar-sep"></div>
+      <div class="sidebar-group-label">Visualisations</div>
+      <div class="sidebar-item" data-tab="plots" onclick="switchTab('plots')">
+        <i class="fa-solid fa-chart-column"></i> Group Plots
+      </div>
+      <div class="sidebar-item" data-tab="effects" onclick="switchTab('effects')">
+        <i class="fa-solid fa-bolt"></i> Effect Sizes
+      </div>
+      <div class="sidebar-sep"></div>
+      <div class="sidebar-item" data-tab="report" onclick="switchTab('report')">
+        <i class="fa-solid fa-file-lines"></i> APA Report
+      </div>
+      <div class="sidebar-item" data-tab="viewdata" onclick="switchTab('viewdata')">
+        <i class="fa-solid fa-database"></i> View Data
+      </div>
+    </nav>
+
+    <!-- Content panels -->
+    <div class="content-pane" id="contentPane">
+
+      <!-- ── OVERVIEW ──────────────────────────────────── -->
+      <section class="tab-panel active" id="tab-overview">
+        <div class="stat-grid" id="overviewCards"></div>
+        <div class="panel" id="overviewDecision">
+          <div class="panel-head"><i class="fa-solid fa-scale-balanced"></i> Decision</div>
+          <div class="panel-body" id="overviewDecisionBody"></div>
+        </div>
+        <div class="panel" id="overviewDesign">
+          <div class="panel-head"><i class="fa-solid fa-diagram-project"></i> Design</div>
+          <div class="panel-body" id="overviewDesignBody"></div>
+        </div>
+      </section>
+
+      <!-- ── ANOVA TABLE ────────────────────────────────── -->
+      <section class="tab-panel" id="tab-anova-table">
+        <div class="panel">
+          <div class="panel-head"><i class="fa-solid fa-table"></i> ANOVA Table</div>
+          <div class="panel-body" id="anovaTableBody"></div>
+        </div>
+        <div class="panel" id="welchAnovaPanel" style="display:none;">
+          <div class="panel-head"><i class="fa-solid fa-flask"></i> Welch's ANOVA (robust)</div>
+          <div class="panel-body" id="welchAnovaBody"></div>
+        </div>
+      </section>
+
+      <!-- ── POST-HOC ───────────────────────────────────── -->
+      <section class="tab-panel" id="tab-posthoc">
+        <div class="panel">
+          <div class="panel-head"><i class="fa-solid fa-code-compare"></i> Pairwise Comparisons</div>
+          <div class="panel-body" id="posthocBody"></div>
+        </div>
+      </section>
+
+      <!-- ── NON-PARAMETRIC ─────────────────────────────── -->
+      <section class="tab-panel" id="tab-nonparam">
+        <div class="panel">
+          <div class="panel-head"><i class="fa-solid fa-ranking-star"></i> Kruskal-Wallis</div>
+          <div class="panel-body" id="kwBody"></div>
+        </div>
+        <div class="panel" id="kwRanksPanel">
+          <div class="panel-head"><i class="fa-solid fa-sort-numeric-up"></i> Mean Ranks</div>
+          <div class="panel-body" id="kwRanksBody"></div>
+        </div>
+      </section>
+
+      <!-- ── DESCRIPTIVES ───────────────────────────────── -->
+      <section class="tab-panel" id="tab-descriptives">
+        <div class="panel">
+          <div class="panel-head"><i class="fa-solid fa-list-ol"></i> Group Descriptive Statistics</div>
+          <div class="panel-body" id="descBody"></div>
+        </div>
+      </section>
+
+      <!-- ── ASSUMPTIONS ────────────────────────────────── -->
+      <section class="tab-panel" id="tab-assumptions">
+        <div class="panel">
+          <div class="panel-head"><i class="fa-solid fa-shield-halved"></i> Homogeneity of Variance</div>
+          <div class="panel-body" id="assumptionsBody"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><i class="fa-solid fa-circle-info"></i> Assumption Guide</div>
+          <div class="panel-body">
+            <div class="assump-row">
+              <div class="assump-icon warn"><i class="fa-solid fa-bell"></i></div>
+              <div class="assump-text">
+                <div class="at">Normality</div>
+                <div class="ad">ANOVA is robust to mild non-normality when group sizes are ≥ 15. For small groups use Kruskal-Wallis.</div>
+              </div>
+            </div>
+            <div class="assump-row">
+              <div class="assump-icon warn"><i class="fa-solid fa-bell"></i></div>
+              <div class="assump-text">
+                <div class="at">Homogeneity of variance</div>
+                <div class="ad">Levene p &lt; 0.05 suggests unequal variances. Consider Welch's ANOVA (shown in ANOVA table) or Games-Howell post-hoc.</div>
+              </div>
+            </div>
+            <div class="assump-row">
+              <div class="assump-icon warn"><i class="fa-solid fa-bell"></i></div>
+              <div class="assump-text">
+                <div class="at">Independence</div>
+                <div class="ad">Observations must be independent. For repeated/matched measures use the Repeated Measures design.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── PLOTS ──────────────────────────────────────── -->
+      <section class="tab-panel" id="tab-plots">
+        <div class="panel">
+          <div class="panel-head"><i class="fa-solid fa-chart-column"></i> Group Means with 95% CI</div>
+          <div class="panel-body">
+            <div class="chart-wrap" id="meansChart"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><i class="fa-solid fa-box"></i> Box Plots</div>
+          <div class="panel-body">
+            <div class="chart-wrap-tall" id="boxChart"></div>
+          </div>
+        </div>
+        <div class="panel" id="interactionPanel" style="display:none;">
+          <div class="panel-head"><i class="fa-solid fa-arrows-cross"></i> Interaction Plot</div>
+          <div class="panel-body">
+            <div class="chart-wrap" id="interactionChart"></div>
+            <p class="interaction-note">Non-parallel lines suggest a potential interaction effect.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── EFFECT SIZES ───────────────────────────────── -->
+      <section class="tab-panel" id="tab-effects">
+        <div class="panel">
+          <div class="panel-head"><i class="fa-solid fa-bolt"></i> Effect Size Estimates</div>
+          <div class="panel-body" id="effectsBody"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><i class="fa-solid fa-ruler"></i> Interpretation Guide</div>
+          <div class="panel-body">
+            <table>
+              <thead><tr><th>Measure</th><th>Small</th><th>Medium</th><th>Large</th></tr></thead>
+              <tbody>
+                <tr><td>η² (eta-squared)</td><td class="num">0.01</td><td class="num">0.06</td><td class="num">0.14</td></tr>
+                <tr><td>ω² (omega-squared)</td><td class="num">0.01</td><td class="num">0.06</td><td class="num">0.14</td></tr>
+                <tr><td>Cohen's f</td><td class="num">0.10</td><td class="num">0.25</td><td class="num">0.40</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── REPORT ─────────────────────────────────────── -->
+      <section class="tab-panel" id="tab-report">
+        <div class="panel">
+          <div class="panel-head"><i class="fa-solid fa-file-lines"></i> APA-Style Report</div>
+          <div class="panel-body" id="reportBody"></div>
+        </div>
+      </section>
+
+      <!-- ── VIEW DATA ──────────────────────────────────── -->
+      <section class="tab-panel" id="tab-viewdata">
+        <div class="panel">
+          <div class="panel-head"><i class="fa-solid fa-database"></i> Raw Data</div>
+          <div class="panel-body">
+            <div class="vd-toolbar">
+              <input class="vd-search" id="vdSearch" placeholder="Search…" oninput="filterVD(this.value)"/>
+            </div>
+            <div class="vd-info" id="vdInfo"></div>
+            <div style="overflow-x:auto;">
+              <table id="vdTable">
+                <thead id="vdHead"></thead>
+                <tbody id="vdBody"></tbody>
+              </table>
+            </div>
+            <div class="vd-pager" id="vdPager"></div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /.content-pane -->
+  </div><!-- /.anova-body -->
+
+<script>
+/* ── Global state ────────────────────────────────────────── */
+let _bundle = null;
+let _vdRows = [], _vdFiltered = [], _vdCols = [], _vdPage = 0;
+const VD_PAGE_SIZE = 50;
+let _charts = {};
+
+/* ── Tab titles ──────────────────────────────────────────── */
+const TAB_TITLES = {
+  'overview':    'Summary',
+  'anova-table': 'ANOVA Table',
+  'posthoc':     'Post-Hoc',
+  'nonparam':    'Non-Parametric',
+  'descriptives':'Descriptives',
+  'assumptions': 'Assumptions',
+  'plots':       'Group Plots',
+  'effects':     'Effect Sizes',
+  'report':      'APA Report',
+  'viewdata':    'View Data',
+};
+
+function switchTab(id) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sidebar-item').forEach(s => s.classList.remove('active'));
+  const panel = document.getElementById('tab-' + id);
+  if (panel) panel.classList.add('active');
+  document.querySelector(`.sidebar-item[data-tab="${id}"]`)?.classList.add('active');
+
+  /* Reflow charts */
+  if (id === 'plots') {
+    setTimeout(() => {
+      Object.values(_charts).forEach(c => { try { c.reflow(); } catch(e){} });
+    }, 60);
+  }
+
+  if (typeof StatisticoHeader !== 'undefined') {
+    StatisticoHeader.setSubtitle(TAB_TITLES[id] || id);
+  }
+}
+
+/* ── Message listener ────────────────────────────────────── */
+Office.onReady(() => {
+  document.getElementById('loadingOverlay').classList.remove('hidden');
+
+  if (typeof StatisticoHeader !== 'undefined') {
+    StatisticoHeader.init({
+      module: 'anova',
+      title: 'ANOVA',
+      icon: 'fa-table-cells',
+      onClose: () => Office.context.ui.messageParent(JSON.stringify({ action: 'close' })),
+      getData: () => {
+        if (!_vdRows.length) return null;
+        return { headers: _vdCols, rows: _vdRows };
+      }
+    });
+  }
+
+  Office.context.ui.addHandlerAsync(
+    Office.EventType.DialogParentMessageReceived,
+    (arg) => {
+      try {
+        const msg = JSON.parse(arg.message || '{}');
+        if (msg.type === 'ANOVA_BUNDLE') {
+          _bundle = msg.payload;
+          document.getElementById('loadingOverlay').classList.add('hidden');
+          populateAll(_bundle);
+        } else if (msg.type === 'ANOVA_RAW_DATA') {
+          populateViewData(msg.payload || {});
+        }
+      } catch(e) { console.error('ANOVA msg error', e); }
+    }
+  );
+  Office.context.ui.messageParent(JSON.stringify({ action: 'ready' }));
+});
+
+/* ── Master populate ─────────────────────────────────────── */
+function populateAll(b) {
+  if (!b || b.error) {
+    document.getElementById('overviewDecisionBody').innerHTML =
+      `<p style="color:var(--danger)">${b?.error || 'No results available.'}</p>`;
+    return;
+  }
+  populateOverview(b);
+  populateAnovaTable(b);
+  populatePosthoc(b);
+  populateNonParam(b);
+  populateDescriptives(b);
+  populateAssumptions(b);
+  populateEffects(b);
+  populateReport(b);
+
+  /* Render plots after a tick so DOM is ready */
+  setTimeout(() => {
+    renderMeansChart(b);
+    renderBoxChart(b);
+    if (b.type === 'two-way') renderInteractionChart(b);
+  }, 80);
+}
+
+/* ── Helpers ─────────────────────────────────────────────── */
+function fmt(v, d=3) {
+  if (!isFinite(v)) return '—';
+  return Number(v).toFixed(d);
+}
+function fmtP(p) {
+  if (!isFinite(p)) return '—';
+  if (p < 0.001) return '< .001';
+  return '.' + String(Math.round(p * 1000)).padStart(3, '0');
+}
+function sigClass(p, alpha=0.05) { return p < alpha ? 'sig' : 'ns'; }
+function sigBadge(p, alpha=0.05) {
+  return p < alpha
+    ? `<span class="badge badge-sig">p${fmtP(p)} ✓ sig</span>`
+    : `<span class="badge badge-ns">p${fmtP(p)} n.s.</span>`;
+}
+
+/* ── Overview ────────────────────────────────────────────── */
+function populateOverview(b) {
+  const cards = document.getElementById('overviewCards');
+  const F = b.oneWay?.F ?? b.twoWay?.FA ?? b.repeated?.F;
+  const p = b.oneWay?.p ?? b.twoWay?.pA ?? b.repeated?.p;
+  const eta = b.oneWay?.etaSq ?? b.twoWay?.etaSqA ?? b.repeated?.etaSqP;
+  const N = b.oneWay?.N ?? b.twoWay?.N ?? b.repeated?.N;
+
+  cards.innerHTML = `
+    <div class="stat-card"><div class="sv">${fmt(F,2)}</div><div class="sl">F statistic</div></div>
+    <div class="stat-card"><div class="sv">${fmtP(p)}</div><div class="sl">p-value</div></div>
+    <div class="stat-card"><div class="sv">${fmt(eta,3)}</div><div class="sl">η²</div></div>
+    <div class="stat-card"><div class="sv">${N ?? '—'}</div><div class="sl">N</div></div>
+  `;
+
+  const alpha = b.spec?.alpha ?? 0.05;
+  const sig   = isFinite(p) && p < alpha;
+  document.getElementById('overviewDecisionBody').innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      ${sigBadge(p, alpha)}
+      <span style="font-size:12px;color:var(--text-secondary);">
+        ${sig
+          ? 'There is a statistically significant difference between the groups.'
+          : 'No statistically significant difference was detected between the groups.'}
+      </span>
+    </div>
+  `;
+
+  const typeLabel = b.type === 'one-way' ? 'One-Way ANOVA' :
+                    b.type === 'two-way' ? 'Two-Way Factorial ANOVA' : 'Repeated Measures ANOVA';
+  let designHTML = `<table><tbody>
+    <tr><td><strong>Design</strong></td><td>${typeLabel}</td></tr>`;
+  if (b.spec?.dv)      designHTML += `<tr><td><strong>Dependent variable</strong></td><td>${b.spec.dv}</td></tr>`;
+  if (b.spec?.factor1) designHTML += `<tr><td><strong>Factor A</strong></td><td>${b.spec.factor1}</td></tr>`;
+  if (b.spec?.factor2) designHTML += `<tr><td><strong>Factor B</strong></td><td>${b.spec.factor2}</td></tr>`;
+  if (b.levels)        designHTML += `<tr><td><strong>Groups</strong></td><td>${b.levels.join(', ')}</td></tr>`;
+  if (b.spec?.conditions) designHTML += `<tr><td><strong>Conditions</strong></td><td>${b.spec.conditions.join(', ')}</td></tr>`;
+  designHTML += `<tr><td><strong>α</strong></td><td>${b.spec?.alpha ?? 0.05}</td></tr></tbody></table>`;
+  document.getElementById('overviewDesignBody').innerHTML = designHTML;
+}
+
+/* ── ANOVA Table ─────────────────────────────────────────── */
+function populateAnovaTable(b) {
+  const el = document.getElementById('anovaTableBody');
+  const alpha = b.spec?.alpha ?? 0.05;
+
+  if (b.type === 'one-way') {
+    const a = b.oneWay;
+    el.innerHTML = `<table>
+      <thead><tr><th>Source</th><th class="num">SS</th><th class="num">df</th><th class="num">MS</th><th class="num">F</th><th class="num">p</th><th>η²</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Between groups</td><td class="num">${fmt(a.ssBetween)}</td><td class="num">${a.df1}</td><td class="num">${fmt(a.msBetween)}</td><td class="num"><strong>${fmt(a.F,2)}</strong></td><td class="num ${sigClass(a.p,alpha)}">${fmtP(a.p)}</td><td class="num">${fmt(a.etaSq,3)}</td><td>${sigBadge(a.p,alpha)}</td></tr>
+        <tr><td>Within groups</td><td class="num">${fmt(a.ssWithin)}</td><td class="num">${a.df2}</td><td class="num">${fmt(a.msWithin)}</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td></tr>
+        <tr style="font-weight:700;"><td>Total</td><td class="num">${fmt(a.ssTotal)}</td><td class="num">${a.df1+a.df2}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td></tr>
+      </tbody></table>`;
+
+    if (b.welchAnova) {
+      const w = b.welchAnova;
+      document.getElementById('welchAnovaPanel').style.display = '';
+      document.getElementById('welchAnovaBody').innerHTML = `<table>
+        <thead><tr><th></th><th class="num">F</th><th class="num">df1</th><th class="num">df2</th><th class="num">p</th><th></th></tr></thead>
+        <tbody><tr><td>Welch's ANOVA</td><td class="num">${fmt(w.F,2)}</td><td class="num">${w.df1}</td><td class="num">${fmt(w.df2,1)}</td><td class="num ${sigClass(w.p,alpha)}">${fmtP(w.p)}</td><td>${sigBadge(w.p,alpha)}</td></tr></tbody>
+      </table><p style="font-size:11px;color:var(--text-muted);margin-top:6px;">Robust to heterogeneity of variance. Recommended when Levene's p &lt; 0.05.</p>`;
+    }
+  }
+  else if (b.type === 'two-way') {
+    const a = b.twoWay;
+    el.innerHTML = `<table>
+      <thead><tr><th>Source</th><th class="num">SS</th><th class="num">df</th><th class="num">MS</th><th class="num">F</th><th class="num">p</th><th>η²</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>${b.spec?.factor1 || 'Factor A'}</td><td class="num">${fmt(a.ssA)}</td><td class="num">${a.dfA}</td><td class="num">${fmt(a.msA)}</td><td class="num"><strong>${fmt(a.FA,2)}</strong></td><td class="num ${sigClass(a.pA,alpha)}">${fmtP(a.pA)}</td><td class="num">${fmt(a.etaSqA,3)}</td><td>${sigBadge(a.pA,alpha)}</td></tr>
+        <tr><td>${b.spec?.factor2 || 'Factor B'}</td><td class="num">${fmt(a.ssB)}</td><td class="num">${a.dfB}</td><td class="num">${fmt(a.msB)}</td><td class="num"><strong>${fmt(a.FB,2)}</strong></td><td class="num ${sigClass(a.pB,alpha)}">${fmtP(a.pB)}</td><td class="num">${fmt(a.etaSqB,3)}</td><td>${sigBadge(a.pB,alpha)}</td></tr>
+        <tr><td>Interaction (A×B)</td><td class="num">${fmt(a.ssAB)}</td><td class="num">${a.dfAB}</td><td class="num">${fmt(a.msAB)}</td><td class="num"><strong>${fmt(a.FAB,2)}</strong></td><td class="num ${sigClass(a.pAB,alpha)}">${fmtP(a.pAB)}</td><td class="num">${fmt(a.etaSqAB,3)}</td><td>${sigBadge(a.pAB,alpha)}</td></tr>
+        <tr><td>Error</td><td class="num">${fmt(a.ssError)}</td><td class="num">${a.dfError}</td><td class="num">${fmt(a.msError)}</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td></tr>
+        <tr style="font-weight:700;"><td>Total</td><td class="num">${fmt(a.ssTotal)}</td><td class="num">${a.dfA+a.dfB+a.dfAB+a.dfError}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td></tr>
+      </tbody></table>`;
+  }
+  else if (b.type === 'repeated') {
+    const a = b.repeated;
+    el.innerHTML = `<table>
+      <thead><tr><th>Source</th><th class="num">SS</th><th class="num">df</th><th class="num">MS</th><th class="num">F</th><th class="num">p</th><th>η²p</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Condition</td><td class="num">${fmt(a.ssBetweenConditions)}</td><td class="num">${a.dfConditions}</td><td class="num">${fmt(a.msConditions)}</td><td class="num"><strong>${fmt(a.F,2)}</strong></td><td class="num ${sigClass(a.p,alpha)}">${fmtP(a.p)}</td><td class="num">${fmt(a.etaSqP,3)}</td><td>${sigBadge(a.p,alpha)}</td></tr>
+        <tr><td>Subjects (between)</td><td class="num">${fmt(a.ssBetweenSubjects)}</td><td class="num">${a.dfSubjects}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td></tr>
+        <tr><td>Error</td><td class="num">${fmt(a.ssError)}</td><td class="num">${a.dfError}</td><td class="num">${fmt(a.msError)}</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td></tr>
+        <tr style="font-weight:700;"><td>Total</td><td class="num">${fmt(a.ssTotal)}</td><td class="num">${a.dfConditions+a.dfSubjects+a.dfError}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td></tr>
+      </tbody></table>`;
+  }
+}
+
+/* ── Post-Hoc ────────────────────────────────────────────── */
+function populatePosthoc(b) {
+  const el = document.getElementById('posthocBody');
+  const rows = b.posthoc;
+  const alpha = b.spec?.alpha ?? 0.05;
+  if (!rows || !rows.length) {
+    el.innerHTML = '<p style="color:var(--text-muted);font-size:12px;">Post-hoc comparisons are only available for 3+ groups in one-way or repeated designs.</p>';
+    return;
+  }
+  const methodName = rows[0]?.method || b.spec?.posthocMethod || 'Post-Hoc';
+  el.innerHTML = `<p style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Method: <strong>${methodName}</strong></p>
+  <table>
+    <thead><tr><th>Comparison</th><th class="num">Mean diff</th><th class="num">SE</th><th class="num">p</th><th></th></tr></thead>
+    <tbody>
+      ${rows.map(r => `<tr>
+        <td>${r.comparison}</td>
+        <td class="num">${fmt(r.diff)}</td>
+        <td class="num">${fmt(r.se)}</td>
+        <td class="num ${sigClass(r.p ?? r.pAdj, alpha)}">${fmtP(r.p ?? r.pAdj)}</td>
+        <td>${sigBadge(r.p ?? r.pAdj, alpha)}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+/* ── Non-Parametric ──────────────────────────────────────── */
+function populateNonParam(b) {
+  const kw = b.kruskalWallis;
+  const alpha = b.spec?.alpha ?? 0.05;
+
+  if (!kw) {
+    document.getElementById('kwBody').innerHTML =
+      b.type === 'repeated'
+        ? '<p style="color:var(--text-muted);font-size:12px;">Friedman test not yet implemented for repeated measures.</p>'
+        : '<p style="color:var(--text-muted);font-size:12px;">No non-parametric results available.</p>';
+    return;
+  }
+  document.getElementById('kwBody').innerHTML = `
+    <div class="stat-grid" style="margin-bottom:10px;">
+      <div class="stat-card"><div class="sv">${fmt(kw.H,2)}</div><div class="sl">H statistic</div></div>
+      <div class="stat-card"><div class="sv">${kw.df}</div><div class="sl">df</div></div>
+      <div class="stat-card"><div class="sv">${fmtP(kw.p)}</div><div class="sl">p-value</div></div>
+      <div class="stat-card"><div class="sv">${fmt(kw.epsilonSq,3)}</div><div class="sl">ε² (effect)</div></div>
+    </div>
+    ${sigBadge(kw.p, alpha)}
+    <p style="margin-top:8px;font-size:11px;color:var(--text-muted);">
+      Kruskal-Wallis tests whether the median ranks differ across groups. 
+      ε² interpretation: small ≥ 0.01, medium ≥ 0.08, large ≥ 0.26.
+    </p>
+  `;
+
+  if (kw.meanRanks) {
+    document.getElementById('kwRanksBody').innerHTML = `
+      <table>
+        <thead><tr><th>Group</th><th class="num">Mean Rank</th></tr></thead>
+        <tbody>${kw.meanRanks.map(r => `<tr><td>${r.level}</td><td class="num">${fmt(r.meanRank,2)}</td></tr>`).join('')}</tbody>
+      </table>`;
+  }
+}
+
+/* ── Descriptives ────────────────────────────────────────── */
+function populateDescriptives(b) {
+  const el = document.getElementById('descBody');
+  const desc = b.descriptives || b.descA;
+  if (!desc || !desc.length) {
+    el.innerHTML = '<p style="color:var(--text-muted);font-size:12px;">No descriptives available.</p>';
+    return;
+  }
+  el.innerHTML = `<table>
+    <thead><tr><th>Group</th><th class="num">n</th><th class="num">Mean</th><th class="num">SD</th><th class="num">SE</th><th class="num">95% CI Low</th><th class="num">95% CI High</th><th class="num">Min</th><th class="num">Max</th></tr></thead>
+    <tbody>${desc.map(d => `<tr>
+      <td>${d.level}</td>
+      <td class="num">${d.n}</td>
+      <td class="num">${fmt(d.mean)}</td>
+      <td class="num">${fmt(d.sd)}</td>
+      <td class="num">${fmt(d.se)}</td>
+      <td class="num">${fmt(d.ciLow)}</td>
+      <td class="num">${fmt(d.ciHigh)}</td>
+      <td class="num">${fmt(d.min)}</td>
+      <td class="num">${fmt(d.max)}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+/* ── Assumptions ─────────────────────────────────────────── */
+function populateAssumptions(b) {
+  const el = document.getElementById('assumptionsBody');
+  const levene = b.levene;
+  const bf     = b.brownForsythe;
+  const alpha  = b.spec?.alpha ?? 0.05;
+
+  if (!levene) {
+    el.innerHTML = '<p style="color:var(--text-muted);font-size:12px;">No homogeneity tests for this design.</p>';
+    return;
+  }
+
+  const levPass = levene.p >= alpha;
+  const bfPass  = bf?.p >= alpha;
+  el.innerHTML = `<table>
+    <thead><tr><th>Test</th><th class="num">F</th><th class="num">df1</th><th class="num">df2</th><th class="num">p</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Levene's (mean)</td>
+        <td class="num">${fmt(levene.F,2)}</td>
+        <td class="num">${levene.df1}</td>
+        <td class="num">${levene.df2}</td>
+        <td class="num ${sigClass(levene.p,alpha)}">${fmtP(levene.p)}</td>
+        <td><span class="badge ${levPass ? 'badge-sig' : 'badge-warn'}">${levPass ? 'Equal variances assumed' : 'Unequal variances'}</span></td>
+      </tr>
+      ${bf ? `<tr>
+        <td>Brown-Forsythe (median)</td>
+        <td class="num">${fmt(bf.F,2)}</td>
+        <td class="num">${bf.df1}</td>
+        <td class="num">${bf.df2}</td>
+        <td class="num ${sigClass(bf.p,alpha)}">${fmtP(bf.p)}</td>
+        <td><span class="badge ${bfPass ? 'badge-sig' : 'badge-warn'}">${bfPass ? 'Equal variances assumed' : 'Unequal variances'}</span></td>
+      </tr>` : ''}
+    </tbody>
+  </table>
+  <p style="margin-top:10px;font-size:11px;color:var(--text-muted);">
+    ${levPass ? '✓ Homogeneity of variance is supported. Standard ANOVA is appropriate.' : '⚠ Unequal variances detected. Consider Welch\'s ANOVA (see ANOVA Table) or Games-Howell post-hoc.'}
+  </p>`;
+}
+
+/* ── Effect Sizes ────────────────────────────────────────── */
+function populateEffects(b) {
+  const el = document.getElementById('effectsBody');
+  const alpha = b.spec?.alpha ?? 0.05;
+
+  const rows = [];
+  if (b.oneWay) {
+    const a = b.oneWay;
+    rows.push({ name: 'η² (eta-squared)', value: a.etaSq, note: 'Proportion of total variance explained' });
+    rows.push({ name: 'ω² (omega-squared)', value: a.omegaSq, note: 'Less biased estimate of population variance explained' });
+    rows.push({ name: "Cohen's f", value: a.cohenF, note: 'Standardised effect size (small=0.10, med=0.25, large=0.40)' });
+  } else if (b.twoWay) {
+    const a = b.twoWay;
+    rows.push({ name: `η² ${b.spec?.factor1}`, value: a.etaSqA });
+    rows.push({ name: `η² ${b.spec?.factor2}`, value: a.etaSqB });
+    rows.push({ name: `η² Interaction`, value: a.etaSqAB });
+  } else if (b.repeated) {
+    rows.push({ name: 'η²p (partial eta-squared)', value: b.repeated.etaSqP });
+  }
+
+  if (!rows.length) { el.innerHTML = '<p style="color:var(--text-muted);">No effect sizes available.</p>'; return; }
+
+  el.innerHTML = rows.map(r => {
+    const pct = Math.min(100, (isFinite(r.value) ? r.value : 0) * 100 * 7);
+    const label = isFinite(r.value) ? (r.value >= 0.14 ? 'Large' : r.value >= 0.06 ? 'Medium' : 'Small') : '';
+    return `<div style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+        <span style="font-size:12px;font-weight:700;color:var(--text-primary);">${r.name}</span>
+        <span style="font-size:13px;font-weight:800;color:var(--accent-1);">${fmt(r.value,4)}</span>
+      </div>
+      <div class="effect-bar-wrap">
+        <div class="effect-bar"><div class="effect-bar-fill" style="width:${pct}%"></div></div>
+        <span style="font-size:10px;color:var(--text-muted);min-width:40px;">${label}</span>
+      </div>
+      ${r.note ? `<p style="font-size:10.5px;color:var(--text-muted);margin-top:3px;">${r.note}</p>` : ''}
+    </div>`;
+  }).join('');
+}
+
+/* ── Report ──────────────────────────────────────────────── */
+function populateReport(b) {
+  const el = document.getElementById('reportBody');
+  const report = b.report || {};
+  const text = report.apa || 'No APA text available.';
+  el.innerHTML = `
+    <button class="copy-btn" onclick="copyReport('${CSS.escape(text)}')"><i class="fa-solid fa-copy"></i> Copy</button>
+    <div class="report-box"><p>${text}</p>${report.nonParam ? `<p>${report.nonParam}</p>` : ''}${report.consistency ? `<p><em>${report.consistency}</em></p>` : ''}</div>
+  `;
+}
+
+function copyReport(text) {
+  navigator.clipboard?.writeText(document.querySelector('.report-box').innerText)
+    .then(() => alert('Copied!'))
+    .catch(() => {});
+}
+
+/* ── Means Chart (column + CI) ───────────────────────────── */
+function renderMeansChart(b) {
+  const desc = b.descriptives || b.descA;
+  if (!desc || !desc.length) return;
+
+  const isDark = !document.documentElement.dataset.theme || document.documentElement.dataset.theme !== 'light';
+  const textColor = isDark ? 'rgba(255,255,255,0.82)' : '#1f2937';
+  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : '#e5e7eb';
+
+  const categories = desc.map(d => d.level);
+  const means = desc.map(d => isFinite(d.mean) ? Number(d.mean.toFixed(3)) : null);
+  const errorBars = desc.map(d => [
+    isFinite(d.ciLow)  ? Number(d.ciLow.toFixed(3))  : 0,
+    isFinite(d.ciHigh) ? Number(d.ciHigh.toFixed(3)) : 0
+  ]);
+
+  _charts.means = Highcharts.chart('meansChart', {
+    chart: { type: 'column', backgroundColor: 'transparent', animation: true, style: { fontFamily: 'Segoe UI' } },
+    title: { text: '' },
+    credits: { enabled: false },
+    xAxis: { categories, labels: { style: { color: textColor } }, lineColor: gridColor },
+    yAxis: { title: { text: b.spec?.dv || 'Mean', style: { color: textColor } }, gridLineColor: gridColor, labels: { style: { color: textColor } } },
+    legend: { enabled: false },
+    plotOptions: {
+      column: {
+        color: 'rgb(16,185,129)',
+        opacity: 0.82,
+        borderRadius: 4,
+        borderWidth: 0
+      }
+    },
+    series: [
+      { name: 'Mean', data: means },
+      {
+        name: '95% CI', type: 'errorbar',
+        data: errorBars,
+        color: isDark ? 'rgba(255,255,255,.6)' : '#374151',
+        stemWidth: 2, whiskerWidth: 8
+      }
+    ],
+    tooltip: {
+      shared: true,
+      formatter: function() {
+        const d = desc[this.points[0].point.index];
+        return `<b>${d.level}</b><br>Mean: ${d.mean?.toFixed(3)}<br>SD: ${d.sd?.toFixed(3)}<br>n: ${d.n}`;
+      }
+    }
+  });
+}
+
+/* ── Box Chart ───────────────────────────────────────────── */
+function renderBoxChart(b) {
+  const desc = b.descriptives || b.descA;
+  if (!desc || !desc.length) return;
+
+  const isDark = !document.documentElement.dataset.theme || document.documentElement.dataset.theme !== 'light';
+  const textColor = isDark ? 'rgba(255,255,255,0.82)' : '#1f2937';
+  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : '#e5e7eb';
+
+  const boxData = desc.map(d => [
+    isFinite(d.min)    ? d.min    : 0,
+    isFinite(d.q1)     ? d.q1     : 0,
+    isFinite(d.median) ? d.median : 0,
+    isFinite(d.q3)     ? d.q3     : 0,
+    isFinite(d.max)    ? d.max    : 0
+  ]);
+
+  _charts.box = Highcharts.chart('boxChart', {
+    chart: { type: 'boxplot', backgroundColor: 'transparent', style: { fontFamily: 'Segoe UI' } },
+    title: { text: '' },
+    credits: { enabled: false },
+    xAxis: { categories: desc.map(d => d.level), title: { text: '' }, labels: { style: { color: textColor } }, lineColor: gridColor },
+    yAxis: { title: { text: b.spec?.dv || 'Value', style: { color: textColor } }, gridLineColor: gridColor, labels: { style: { color: textColor } } },
+    legend: { enabled: false },
+    series: [{
+      name: 'Distribution',
+      data: boxData,
+      fillColor: 'rgba(16,185,129,.18)',
+      medianColor: 'rgb(52,211,153)',
+      whiskerColor: isDark ? 'rgba(255,255,255,.5)' : '#374151',
+      stemColor: isDark ? 'rgba(255,255,255,.3)' : '#9ca3af',
+      color: 'rgb(16,185,129)',
+      lineWidth: 1.5
+    }]
+  });
+}
+
+/* ── Interaction Chart (two-way) ─────────────────────────── */
+function renderInteractionChart(b) {
+  if (b.type !== 'two-way' || !b.cellDesc) return;
+  document.getElementById('interactionPanel').style.display = '';
+
+  const isDark = !document.documentElement.dataset.theme || document.documentElement.dataset.theme !== 'light';
+  const textColor = isDark ? 'rgba(255,255,255,0.82)' : '#1f2937';
+  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : '#e5e7eb';
+  const colors = ['rgb(16,185,129)','rgb(59,130,246)','rgb(245,158,11)','rgb(239,68,68)','rgb(168,85,247)'];
+
+  const series = b.aLevels.map((a, ai) => ({
+    name: `${b.spec?.factor1}: ${a}`,
+    color: colors[ai % colors.length],
+    data: b.bLevels.map(bl => {
+      const cell = b.cellDesc.find(c => c.a === a && c.b === bl);
+      return cell ? (isFinite(cell.mean) ? cell.mean : null) : null;
+    })
+  }));
+
+  _charts.interaction = Highcharts.chart('interactionChart', {
+    chart: { type: 'line', backgroundColor: 'transparent', style: { fontFamily: 'Segoe UI' } },
+    title: { text: '' },
+    credits: { enabled: false },
+    xAxis: { categories: b.bLevels, title: { text: b.spec?.factor2 || 'Factor B', style: { color: textColor } }, labels: { style: { color: textColor } }, lineColor: gridColor },
+    yAxis: { title: { text: b.spec?.dv || 'Mean', style: { color: textColor } }, gridLineColor: gridColor, labels: { style: { color: textColor } } },
+    legend: { itemStyle: { color: textColor } },
+    series
+  });
+}
+
+/* ── View Data ───────────────────────────────────────────── */
+function populateViewData(data) {
+  _vdCols = data.headers || [];
+  const raw = data.rows || [];
+  _vdRows = raw.map(r => _vdCols.map((_, i) => r[i] ?? ''));
+  _vdFiltered = _vdRows;
+  _vdPage = 0;
+  renderVDPage();
+}
+
+function filterVD(q) {
+  const t = q.toLowerCase().trim();
+  _vdFiltered = t ? _vdRows.filter(r => r.some(c => String(c).toLowerCase().includes(t))) : _vdRows;
+  _vdPage = 0;
+  renderVDPage();
+}
+
+function renderVDPage() {
+  const head = document.getElementById('vdHead');
+  const body = document.getElementById('vdBody');
+  const pager = document.getElementById('vdPager');
+  const info = document.getElementById('vdInfo');
+
+  if (!_vdCols.length) { info.textContent = 'No data received yet.'; return; }
+
+  head.innerHTML = `<tr>${_vdCols.map(c => `<th>${c}</th>`).join('')}</tr>`;
+
+  const start = _vdPage * VD_PAGE_SIZE;
+  const slice = _vdFiltered.slice(start, start + VD_PAGE_SIZE);
+  body.innerHTML = slice.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
+
+  const total = _vdFiltered.length;
+  const pages = Math.ceil(total / VD_PAGE_SIZE);
+  info.textContent = `${total} rows${_vdRows.length !== total ? ` (filtered from ${_vdRows.length})` : ''} · Showing ${start+1}–${Math.min(start+VD_PAGE_SIZE,total)}`;
+
+  pager.innerHTML = Array.from({ length: pages }, (_, i) =>
+    `<button class="pg-btn${i===_vdPage?' active':''}" onclick="_vdPage=${i};renderVDPage()">${i+1}</button>`
+  ).join('');
+}
+</script>
+</body>
+</html>

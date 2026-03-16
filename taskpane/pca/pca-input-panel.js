@@ -489,7 +489,7 @@ function buildPcaBundle(headers, rows, modelSpec) {
 /* ─────────────── Dialog orchestration ─────────────── */
 
 function openPcaResultsDialog() {
-  const dialogUrl = `${getDialogsBaseUrl()}pca/pca-analysis.html`;
+  const dialogUrl = `${getDialogsBaseUrl()}pca/pca-analysis.html?v=${Date.now()}`;
 
   Office.context.ui.displayDialogAsync(
     dialogUrl,

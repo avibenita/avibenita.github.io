@@ -526,7 +526,7 @@ function buildFactorBundle(headers, rows, modelSpec) {
 }
 
 function openFactorResultsDialog() {
-  const dialogUrl = `${getDialogsBaseUrl()}factor/factor-analysis.html`;
+  const dialogUrl = `${getDialogsBaseUrl()}factor/factor-analysis.html?v=${Date.now()}`;
 
   Office.context.ui.displayDialogAsync(
     dialogUrl,

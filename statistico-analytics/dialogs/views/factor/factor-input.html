@@ -1220,7 +1220,11 @@
     }
 
     function isFactorMode() {
-      return STATE.analysisMode === 'factor';
+      return STATE.analysisMode === 'factor' || STATE.analysisMode === 'pca';
+    }
+
+    function isPcaMode() {
+      return STATE.analysisMode === 'pca';
     }
 
     function getYBadgeBaseLabel() {
@@ -1236,10 +1240,23 @@
     function setViewMode(mode) {
       if (mode === 'logistic') {
         STATE.analysisMode = 'logistic';
+      } else if (mode === 'pca') {
+        STATE.analysisMode = 'pca';
       } else if (mode === 'factor') {
         STATE.analysisMode = 'factor';
       } else {
         STATE.analysisMode = 'regression';
+      }
+
+      /* ── Update the top header icon + title ── */
+      var headerIcon  = document.querySelector('.cfg-header-icon i');
+      var headerTitle = document.querySelector('.cfg-header-title');
+      if (isPcaMode()) {
+        if (headerIcon)  headerIcon.className  = 'fa-solid fa-circle-nodes';
+        if (headerTitle) headerTitle.textContent = 'Principal Component Analysis';
+      } else if (isFactorMode()) {
+        if (headerIcon)  headerIcon.className  = 'fa-solid fa-cubes';
+        if (headerTitle) headerTitle.textContent = 'Factor Analysis';
       }
 
       var titleEl = qs('viewTitle');
@@ -1254,19 +1271,23 @@
       var panelXc = qs('panelXc');
 
       if (titleEl) {
-        titleEl.innerHTML = isFactorMode()
-          ? '<i class="fa-solid fa-cubes"></i> Factor Analysis Builder'
-          : (isLogisticMode()
-            ? '<i class="fa-solid fa-chart-line"></i> Logistic Regression (Binary)'
-            : '<i class="fa-solid fa-chart-line"></i> Multiple Regression (ANCOVA)');
+        titleEl.innerHTML = isPcaMode()
+          ? '<i class="fa-solid fa-circle-nodes"></i> PCA Builder'
+          : (isFactorMode()
+            ? '<i class="fa-solid fa-cubes"></i> Factor Analysis Builder'
+            : (isLogisticMode()
+              ? '<i class="fa-solid fa-chart-line"></i> Logistic Regression (Binary)'
+              : '<i class="fa-solid fa-chart-line"></i> Multiple Regression (ANCOVA)'));
       }
 
       if (runBtn) {
-        runBtn.innerHTML = isFactorMode()
-          ? '<i class="fa-solid fa-play"></i> Run Factor'
-          : (isLogisticMode()
-            ? '<i class="fa-solid fa-play"></i> Run Logistic'
-            : '<i class="fa-solid fa-play"></i> Run Regression');
+        runBtn.innerHTML = isPcaMode()
+          ? '<i class="fa-solid fa-play"></i> Run PCA'
+          : (isFactorMode()
+            ? '<i class="fa-solid fa-play"></i> Run Factor'
+            : (isLogisticMode()
+              ? '<i class="fa-solid fa-play"></i> Run Logistic'
+              : '<i class="fa-solid fa-play"></i> Run Regression'));
       }
 
       if (yBadge && !STATE.assignments.y) {
@@ -3007,7 +3028,12 @@
       sendToHost('requestData', null);
     }
 
-    setViewMode('factor');
+    /* ── Read ?mode= from URL so header updates before parent data arrives ── */
+    (function() {
+      var urlMode = new URLSearchParams(window.location.search).get('mode');
+      if (urlMode) setViewMode(urlMode);
+      else setViewMode('factor');
+    })();
 
     if (typeof Office !== 'undefined') {
       Office.onReady(function() {

@@ -563,6 +563,60 @@
       text-align:center;
       padding:16px;
     }
+
+    /* ── View Data tab ── */
+    .viewdata-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .viewdata-search {
+      flex: 1;
+      min-width: 160px;
+      max-width: 340px;
+      padding: 7px 12px;
+      border-radius: 7px;
+      border: 1px solid rgba(255,255,255,.2);
+      background: rgba(255,255,255,.07);
+      color: var(--text-primary);
+      font-size: .85rem;
+    }
+    .viewdata-search::placeholder { color: var(--text-muted); }
+    .viewdata-info {
+      font-size: .8rem;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+    .viewdata-pagination {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      justify-content: center;
+    }
+    .page-btn {
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,.2);
+      background: rgba(255,255,255,.07);
+      color: var(--text-primary);
+      font-size: .8rem;
+      cursor: pointer;
+    }
+    .page-btn:disabled { opacity: .35; cursor: default; }
+    .page-btn.active {
+      background: rgba(0,51,102,.7);
+      border-color: rgba(120,200,255,.6);
+      color: #fff;
+      font-weight: 700;
+    }
+    .page-info {
+      font-size: .8rem;
+      color: var(--text-muted);
+      padding: 0 6px;
+    }
   </style>
 </head>
 <body>
@@ -609,6 +663,10 @@
           <button class="sb-item" onclick="switchTab('ai')" data-tab="ai">
             <i class="fa-solid fa-brain sb-item-icon"></i>
             <span class="sb-item-label">AI Summary</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('viewdata')" data-tab="viewdata">
+            <i class="fa-solid fa-table sb-item-icon"></i>
+            <span class="sb-item-label">View Data</span>
           </button>
         </div>
       </div>
@@ -836,6 +894,30 @@
               <pre id="aiPromptPreview" class="ai-prompt-preview"></pre>
             </div>
           </section>
+
+          <!-- ══ Tab: View Data ══ -->
+          <section id="tab-viewdata" class="tab-panel">
+            <div class="stat-panel">
+              <div class="stat-panel-heading"><i class="fa-solid fa-table"></i> Raw Input Data</div>
+              <div class="stat-panel-body">
+                <div class="viewdata-toolbar">
+                  <input id="viewdataSearch" class="viewdata-search" type="text" placeholder="Search rows…" oninput="filterViewData()"/>
+                  <span class="viewdata-info" id="viewdataInfo">—</span>
+                </div>
+                <div class="table-container" style="margin:0; max-height:480px;">
+                  <table class="analysis-table" id="viewdataTable">
+                    <thead id="viewdataHead"></thead>
+                    <tbody id="viewdataBody">
+                      <tr><td class="hint-empty">Awaiting data…</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="viewdata-pagination" id="viewdataPagination"></div>
+              </div>
+            </div>
+            <div class="section-note">Showing the numeric data used in the factor analysis. Max 500 rows displayed. Use the search box to filter rows by any value.</div>
+          </section>
+
         </div>
       </div>
     </section>
@@ -868,7 +950,8 @@
         'rotation':    'Rotation',
         'diagnostics': 'Diagnostics',
         'scores':      'Scores',
-        'ai':          'AI Summary'
+        'ai':          'AI Summary',
+        'viewdata':    'View Data'
       };
       if (tabTitles[tabKey] && typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.updateTitle(tabTitles[tabKey]);
@@ -1330,7 +1413,96 @@
       if (bundle.diagnostics) window.populateFactorDiagnostics(bundle.diagnostics);
       if (bundle.scores) window.populateFactorScores(bundle.scores);
       if (bundle.ai) window.populateFactorSummary(bundle.ai);
+      if (bundle.rawData) window.populateFactorViewData(bundle.rawData);
     };
+
+    /* ─── View Data ─── */
+    var _faVdAllRows      = [];
+    var _faVdFilteredRows = [];
+    var _faVdCols         = [];
+    var _faVdPage         = 0;
+    var _faVdPageSize     = 50;
+
+    window.populateFactorViewData = function(data) {
+      var d = typeof data === "string" ? JSON.parse(data) : data || {};
+      _faVdCols         = d.columns || [];
+      _faVdAllRows      = d.rows    || [];
+      _faVdFilteredRows = _faVdAllRows.slice();
+      _faVdPage         = 0;
+      var search = document.getElementById("viewdataSearch");
+      if (search) search.value = "";
+      renderFaViewDataPage();
+    };
+
+    function renderFaViewDataPage() {
+      var head = document.getElementById("viewdataHead");
+      var body = document.getElementById("viewdataBody");
+      var info = document.getElementById("viewdataInfo");
+      var pag  = document.getElementById("viewdataPagination");
+      if (!head || !body) return;
+
+      if (_faVdCols.length) {
+        var hRow = "<tr>";
+        _faVdCols.forEach(function(c) { hRow += "<th>" + c + "</th>"; });
+        hRow += "</tr>";
+        head.innerHTML = hRow;
+      }
+
+      var total     = _faVdFilteredRows.length;
+      var pageCount = Math.max(1, Math.ceil(total / _faVdPageSize));
+      _faVdPage     = Math.max(0, Math.min(_faVdPage, pageCount - 1));
+      var start     = _faVdPage * _faVdPageSize;
+      var pageRows  = _faVdFilteredRows.slice(start, start + _faVdPageSize);
+
+      if (!pageRows.length) {
+        body.innerHTML = '<tr><td colspan="' + (_faVdCols.length || 1) + '" class="hint-empty">No rows match filter.</td></tr>';
+      } else {
+        var html = "";
+        pageRows.forEach(function(row) {
+          html += "<tr>";
+          _faVdCols.forEach(function(c) {
+            var v = row[c];
+            var display = (v === null || v === undefined) ? "—" : (typeof v === "number" ? formatNumber(v) : String(v));
+            html += "<td>" + display + "</td>";
+          });
+          html += "</tr>";
+        });
+        body.innerHTML = html;
+      }
+
+      if (info) info.textContent = total + " row" + (total !== 1 ? "s" : "") + (total < _faVdAllRows.length ? " (filtered from " + _faVdAllRows.length + ")" : "");
+
+      if (!pag) return;
+      if (pageCount <= 1) { pag.innerHTML = ""; return; }
+      var pagHtml = '<button class="page-btn" onclick="_faVdPage=Math.max(0,_faVdPage-1);renderFaViewDataPage();" ' + (_faVdPage === 0 ? "disabled" : "") + '><i class="fa-solid fa-chevron-left"></i></button>';
+      var s2 = Math.max(0, _faVdPage - 2);
+      var e2 = Math.min(pageCount - 1, _faVdPage + 2);
+      if (s2 > 0)           pagHtml += '<span class="page-info">…</span>';
+      for (var i = s2; i <= e2; i++) {
+        pagHtml += '<button class="page-btn' + (i === _faVdPage ? " active" : "") + '" onclick="_faVdPage=' + i + ';renderFaViewDataPage();">' + (i + 1) + '</button>';
+      }
+      if (e2 < pageCount - 1) pagHtml += '<span class="page-info">…</span>';
+      pagHtml += '<button class="page-btn" onclick="_faVdPage=Math.min(' + (pageCount-1) + ',_faVdPage+1);renderFaViewDataPage();" ' + (_faVdPage === pageCount - 1 ? "disabled" : "") + '><i class="fa-solid fa-chevron-right"></i></button>';
+      pagHtml += '<span class="page-info">Page ' + (_faVdPage + 1) + ' / ' + pageCount + '</span>';
+      pag.innerHTML = pagHtml;
+    }
+
+    function filterViewData() {
+      var search = document.getElementById("viewdataSearch");
+      var q = search ? search.value.trim().toLowerCase() : "";
+      if (!q) {
+        _faVdFilteredRows = _faVdAllRows.slice();
+      } else {
+        _faVdFilteredRows = _faVdAllRows.filter(function(row) {
+          return _faVdCols.some(function(c) {
+            var v = row[c];
+            return v !== null && v !== undefined && String(v).toLowerCase().indexOf(q) >= 0;
+          });
+        });
+      }
+      _faVdPage = 0;
+      renderFaViewDataPage();
+    }
 
     function requestFactorAI() {
       var prompt = buildFactorNamingPrompt();
@@ -1439,6 +1611,12 @@
       window.lastFactorBundle = null;
       var _resetBtn = document.getElementById("aiInterpretBtn");
       if (_resetBtn) _resetBtn.style.display = "none";
+      /* view data */
+      document.getElementById("viewdataHead").innerHTML = "";
+      document.getElementById("viewdataBody").innerHTML = '<tr><td class="hint-empty">Awaiting data…</td></tr>';
+      document.getElementById("viewdataPagination").innerHTML = "";
+      setText("viewdataInfo", "—", "—");
+      _faVdAllRows = []; _faVdFilteredRows = []; _faVdCols = []; _faVdPage = 0;
       switchTab("suitability");
     };
 

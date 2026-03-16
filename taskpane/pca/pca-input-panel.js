@@ -406,6 +406,15 @@ function buildPcaBundle(headers, rows, modelSpec) {
     y: loadingsMatrix[r][1] || 0
   }));
 
+  /* ── 6b. Raw data preview (first 500 rows, all selected numeric cols) ── */
+  const maxViewRows = Math.min(500, X.length);
+  const rawDataRows = X.slice(0, maxViewRows).map((xRow, idx) => {
+    const row = { '#': idx + 1 };
+    numericNames.forEach((name, j) => { row[name] = xRow[j]; });
+    return row;
+  });
+  const rawDataCols = ['#'].concat(numericNames);
+
   /* ── 7. Communalities (proportion of variance explained by retained PCs) ── */
   const communalities = numericNames.map((name, r) => {
     const h2 = loadingsMatrix[r].reduce((a, v) => a + v * v, 0);
@@ -461,6 +470,12 @@ function buildPcaBundle(headers, rows, modelSpec) {
       pc2Variance: eigenTable[1] ? eigenTable[1].variancePct : 0
     },
     communalities,
+    rawData: {
+      columns: rawDataCols,
+      rows: rawDataRows,
+      totalCases: n,
+      displayedCases: maxViewRows
+    },
     ai: {
       structureSummary: `${retained} principal component(s) extracted from ${p} variables (n=${n}).`,
       varianceStory: `Retained components explain ${eigenTable[Math.max(0, retained - 1)].cumulativePct.toFixed(1)}% of total variance.`,

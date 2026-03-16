@@ -451,6 +451,15 @@ function buildFactorBundle(headers, rows, modelSpec) {
   const meanComm = communalities.reduce((a, b) => a + b.extracted, 0) / communalities.length;
   const rmsr = Math.max(0, 0.12 - (meanComm * 0.05));
 
+  /* ── Raw data preview (first 500 rows, all selected numeric cols) ── */
+  const maxViewRows = Math.min(500, X.length);
+  const rawDataRows = X.slice(0, maxViewRows).map((xRow, idx) => {
+    const row = { '#': idx + 1 };
+    numericNames.forEach((name, j) => { row[name] = xRow[j]; });
+    return row;
+  });
+  const rawDataCols = ['#'].concat(numericNames);
+
   return {
     suitability: {
       variableCount: numericNames.length,
@@ -499,6 +508,12 @@ function buildFactorBundle(headers, rows, modelSpec) {
       exportReady: true,
       columns: scoreCols,
       rows: scores
+    },
+    rawData: {
+      columns: rawDataCols,
+      rows: rawDataRows,
+      totalCases: X.length,
+      displayedCases: maxViewRows
     },
     ai: {
       structureSummary: `${retained} latent factor(s) extracted from ${numericNames.length} variables.`,

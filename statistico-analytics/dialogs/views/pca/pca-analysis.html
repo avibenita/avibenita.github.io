@@ -320,6 +320,60 @@
       color: var(--text-muted);
       padding: 0 3px;
     }
+
+    /* ── View Data tab ── */
+    .viewdata-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .viewdata-search {
+      flex: 1;
+      min-width: 160px;
+      max-width: 340px;
+      padding: 7px 12px;
+      border-radius: 7px;
+      border: 1px solid rgba(255,255,255,.2);
+      background: rgba(255,255,255,.07);
+      color: var(--text-primary);
+      font-size: .85rem;
+    }
+    .viewdata-search::placeholder { color: var(--text-muted); }
+    .viewdata-info {
+      font-size: .8rem;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+    .viewdata-pagination {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      justify-content: center;
+    }
+    .page-btn {
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,.2);
+      background: rgba(255,255,255,.07);
+      color: var(--text-primary);
+      font-size: .8rem;
+      cursor: pointer;
+    }
+    .page-btn:disabled { opacity: .35; cursor: default; }
+    .page-btn.active {
+      background: rgba(140,100,255,.35);
+      border-color: rgba(180,130,255,.6);
+      color: #fff;
+      font-weight: 700;
+    }
+    .page-info {
+      font-size: .8rem;
+      color: var(--text-muted);
+      padding: 0 6px;
+    }
   </style>
 </head>
 <body>
@@ -374,6 +428,10 @@
           <button class="sb-item" onclick="switchTab('ai')" data-tab="ai">
             <i class="fa-solid fa-brain sb-item-icon"></i>
             <span class="sb-item-label">AI Summary</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('viewdata')" data-tab="viewdata">
+            <i class="fa-solid fa-table sb-item-icon"></i>
+            <span class="sb-item-label">View Data</span>
           </button>
         </div>
       </div>
@@ -648,6 +706,29 @@
               </div>
             </section>
 
+            <!-- ══ Tab: View Data ══ -->
+            <section id="tab-viewdata" class="tab-panel">
+              <div class="stat-panel">
+                <div class="stat-panel-heading"><i class="fa-solid fa-table"></i> Raw Input Data</div>
+                <div class="stat-panel-body">
+                  <div class="viewdata-toolbar">
+                    <input id="viewdataSearch" class="viewdata-search" type="text" placeholder="Search rows…" oninput="filterViewData()"/>
+                    <span class="viewdata-info" id="viewdataInfo">—</span>
+                  </div>
+                  <div class="table-container" style="margin:0; max-height:480px;">
+                    <table class="analysis-table" id="viewdataTable">
+                      <thead id="viewdataHead"></thead>
+                      <tbody id="viewdataBody">
+                        <tr><td class="hint-empty">Awaiting data…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="viewdata-pagination" id="viewdataPagination"></div>
+                </div>
+              </div>
+              <div class="section-note">Showing the standardised numeric data sent to the PCA engine. Max 500 rows displayed. Use the search box to filter rows by any value.</div>
+            </section>
+
           </div><!-- /card-body -->
         </div><!-- /view-container -->
       </section>
@@ -731,7 +812,8 @@
         rotation:    "Rotation",
         biplot:      "Biplot",
         scores:      "Component Scores",
-        ai:          "AI Summary"
+        ai:          "AI Summary",
+        viewdata:    "View Data"
       };
       if (tabTitles[tabKey] && typeof StatisticoHeader !== "undefined") {
         StatisticoHeader.updateTitle(tabTitles[tabKey]);
@@ -1106,6 +1188,96 @@
       setText("aiRecommendations",  d.recommendations, "Awaiting assessment...");
     };
 
+    /* ─── View Data ─── */
+    var _vdAllRows     = [];
+    var _vdFilteredRows = [];
+    var _vdCols        = [];
+    var _vdPage        = 0;
+    var _vdPageSize    = 50;
+
+    window.populatePcaViewData = function(data) {
+      var d = typeof data === "string" ? JSON.parse(data) : data || {};
+      _vdCols        = d.columns || [];
+      _vdAllRows     = d.rows    || [];
+      _vdFilteredRows = _vdAllRows.slice();
+      _vdPage        = 0;
+      var search = document.getElementById("viewdataSearch");
+      if (search) search.value = "";
+      renderViewDataPage();
+    };
+
+    function renderViewDataPage() {
+      var head = document.getElementById("viewdataHead");
+      var body = document.getElementById("viewdataBody");
+      var info = document.getElementById("viewdataInfo");
+      var pag  = document.getElementById("viewdataPagination");
+      if (!head || !body) return;
+
+      /* Header (only once per data load) */
+      if (_vdCols.length) {
+        var hRow = "<tr>";
+        _vdCols.forEach(function(c) { hRow += "<th>" + c + "</th>"; });
+        hRow += "</tr>";
+        head.innerHTML = hRow;
+      }
+
+      var total    = _vdFilteredRows.length;
+      var pageCount = Math.max(1, Math.ceil(total / _vdPageSize));
+      _vdPage = Math.max(0, Math.min(_vdPage, pageCount - 1));
+      var start = _vdPage * _vdPageSize;
+      var pageRows = _vdFilteredRows.slice(start, start + _vdPageSize);
+
+      if (!pageRows.length) {
+        body.innerHTML = '<tr><td colspan="' + (_vdCols.length || 1) + '" class="hint-empty">No rows match filter.</td></tr>';
+      } else {
+        var html = "";
+        pageRows.forEach(function(row) {
+          html += "<tr>";
+          _vdCols.forEach(function(c) {
+            var v = row[c];
+            var display = (v === null || v === undefined) ? "—" : (typeof v === "number" ? formatNumber(v) : String(v));
+            html += "<td>" + display + "</td>";
+          });
+          html += "</tr>";
+        });
+        body.innerHTML = html;
+      }
+
+      if (info) info.textContent = total + " row" + (total !== 1 ? "s" : "") + (total < (_vdAllRows.length) ? " (filtered from " + _vdAllRows.length + ")" : "");
+
+      /* Pagination */
+      if (!pag) return;
+      if (pageCount <= 1) { pag.innerHTML = ""; return; }
+      var pagHtml = '<button class="page-btn" onclick="_vdPage=Math.max(0,_vdPage-1);renderViewDataPage();" ' + (_vdPage === 0 ? "disabled" : "") + '><i class="fa-solid fa-chevron-left"></i></button>';
+      var start2 = Math.max(0, _vdPage - 2);
+      var end2   = Math.min(pageCount - 1, _vdPage + 2);
+      if (start2 > 0)             pagHtml += '<span class="page-info">…</span>';
+      for (var i = start2; i <= end2; i++) {
+        pagHtml += '<button class="page-btn' + (i === _vdPage ? " active" : "") + '" onclick="_vdPage=' + i + ';renderViewDataPage();">' + (i + 1) + '</button>';
+      }
+      if (end2 < pageCount - 1)   pagHtml += '<span class="page-info">…</span>';
+      pagHtml += '<button class="page-btn" onclick="_vdPage=Math.min(' + (pageCount-1) + ',_vdPage+1);renderViewDataPage();" ' + (_vdPage === pageCount - 1 ? "disabled" : "") + '><i class="fa-solid fa-chevron-right"></i></button>';
+      pagHtml += '<span class="page-info">Page ' + (_vdPage + 1) + ' / ' + pageCount + '</span>';
+      pag.innerHTML = pagHtml;
+    }
+
+    function filterViewData() {
+      var search = document.getElementById("viewdataSearch");
+      var q = search ? search.value.trim().toLowerCase() : "";
+      if (!q) {
+        _vdFilteredRows = _vdAllRows.slice();
+      } else {
+        _vdFilteredRows = _vdAllRows.filter(function(row) {
+          return _vdCols.some(function(c) {
+            var v = row[c];
+            return v !== null && v !== undefined && String(v).toLowerCase().indexOf(q) >= 0;
+          });
+        });
+      }
+      _vdPage = 0;
+      renderViewDataPage();
+    }
+
     window.populatePcaBundle = function(data) {
       var bundle = typeof data === "string" ? JSON.parse(data) : data || {};
       lastPcaBundle = bundle;
@@ -1117,6 +1289,7 @@
       if (bundle.biplot)        window.populatePcaBiplot(bundle.biplot);
       if (bundle.scores)        window.populatePcaScores(bundle.scores);
       if (bundle.ai)            window.populatePcaAi(bundle.ai);
+      if (bundle.rawData)       window.populatePcaViewData(bundle.rawData);
 
       /* Render charts: briefly show all panels so Highcharts gets real dimensions */
       var panels = document.querySelectorAll(".tab-panel");
@@ -1153,6 +1326,12 @@
       document.getElementById("scoresBody").innerHTML = '<tr><td class="hint-empty">Awaiting component scores...</td></tr>';
       var sc = document.getElementById("screeChart"); if (sc) sc.innerHTML = "";
       var vb = document.getElementById("varianceBarChart"); if (vb) vb.innerHTML = "";
+      /* view data */
+      document.getElementById("viewdataHead").innerHTML = "";
+      document.getElementById("viewdataBody").innerHTML = '<tr><td class="hint-empty">Awaiting data…</td></tr>';
+      document.getElementById("viewdataPagination").innerHTML = "";
+      setText("viewdataInfo", "—", "—");
+      _vdAllRows = []; _vdFilteredRows = []; _vdCols = []; _vdPage = 0;
       var bp = document.getElementById("biplotChart"); if (bp) bp.innerHTML = "";
       setText("aiStructure", "Awaiting assessment...");
       setText("aiVariance", "Awaiting assessment...");

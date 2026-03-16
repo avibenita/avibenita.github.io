@@ -359,6 +359,10 @@
             <i class="fa-solid fa-table-columns sb-item-icon"></i>
             <span class="sb-item-label">Component Loadings</span>
           </button>
+          <button class="sb-item" onclick="switchTab('rotation')" data-tab="rotation">
+            <i class="fa-solid fa-compass-drafting sb-item-icon"></i>
+            <span class="sb-item-label">Rotation</span>
+          </button>
           <button class="sb-item" onclick="switchTab('biplot')" data-tab="biplot">
             <i class="fa-solid fa-circle-dot sb-item-icon"></i>
             <span class="sb-item-label">Biplot</span>
@@ -545,8 +549,46 @@
               <div class="section-note">Loadings are correlations between original variables and principal components. Large absolute loadings (|loading| > 0.5) indicate strong association. Communality = sum of squared loadings across retained components.</div>
             </section>
 
-            <!-- ══ Tab: Biplot ══ -->
-            <section id="tab-biplot" class="tab-panel">
+            <!-- ══ Tab: Rotation ══ -->
+            <section id="tab-rotation" class="tab-panel">
+              <div class="stats-container">
+                <div class="stat-panel">
+                  <div class="stat-panel-heading"><i class="fa-solid fa-compass-drafting"></i> Rotation Overview</div>
+                  <div class="stat-panel-body">
+                    <div class="stat-field">
+                      <span class="stat-label">Apply Rotation:</span>
+                      <span class="stat-value" style="display:flex;align-items:center;gap:8px;justify-content:flex-end;">
+                        <select id="rotationApplySelect" style="min-width:170px;background:rgba(15,23,42,0.95);color:#cde6ff;border:1px solid rgba(120,200,255,0.35);border-radius:8px;padding:6px 8px;font-size:.82rem;">
+                          <option value="None">None (Unrotated)</option>
+                          <option value="Varimax">Varimax (Orthogonal)</option>
+                          <option value="Promax">Promax (Oblique)</option>
+                        </select>
+                        <button id="applyRotationBtn" onclick="applyRotationFromResults()" style="padding:6px 10px;font-size:.8rem;background:linear-gradient(135deg,rgba(80,0,160,.9),rgba(120,0,200,.7));color:#fff;border:1px solid rgba(180,130,255,.4);border-radius:6px;cursor:pointer;">Apply</button>
+                      </span>
+                    </div>
+                    <div class="stat-field"><span class="stat-label">Method Used:</span><span class="stat-value" id="pcaRotationMethod">...</span></div>
+                    <div class="stat-field"><span class="stat-label">Cross-loading Count (|load|≥0.4):</span><span class="stat-value" id="pcaCrossLoadingCount">...</span></div>
+                    <div class="stat-field"><span class="stat-label">Max Factor Correlation (φ):</span><span class="stat-value" id="pcaPhiMax">...</span></div>
+                  </div>
+                </div>
+              </div>
+              <div class="stat-panel" style="margin-top:14px;">
+                <div class="stat-panel-heading"><i class="fa-solid fa-table-columns"></i> Rotated Loading Matrix</div>
+                <div class="stat-panel-body" style="padding:0;">
+                  <div class="table-container" style="margin:0;">
+                    <table class="analysis-table">
+                      <thead id="rotLoadingsHead"></thead>
+                      <tbody id="rotLoadingsBody">
+                        <tr><td class="hint-empty">Awaiting rotation output...</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              <div class="section-note">Rotation redistributes variance across components to improve interpretability. <strong>Varimax</strong> (orthogonal) keeps components uncorrelated; <strong>Promax</strong> (oblique) allows components to correlate. With <strong>None</strong>, raw PCA loadings are shown. Cross-loading count = variables loading ≥ 0.4 on more than one component.</div>
+            </section>
+
+            <!-- ══ Tab: Biplot ══ -->            <section id="tab-biplot" class="tab-panel">
               <div class="stats-container">
                 <div class="stat-panel">
                   <div class="stat-panel-heading"><i class="fa-solid fa-circle-info"></i> Biplot Axes</div>
@@ -686,6 +728,7 @@
         eigenvalues: "Eigenvalues",
         scree:       "Scree Plot",
         loadings:    "Component Loadings",
+        rotation:    "Rotation",
         biplot:      "Biplot",
         scores:      "Component Scores",
         ai:          "AI Summary"
@@ -1032,8 +1075,30 @@
       renderSimpleTableBody("scoresBody", d.rows || [], d.columns || ["Case"]);
     };
 
-    window.populatePcaAi = function(data) {
+    window.populatePcaRotation = function(data) {
       var d = typeof data === "string" ? JSON.parse(data) : data || {};
+      var method = d.rotationMethod || "None";
+      setText("pcaRotationMethod",      method, "None");
+      setText("pcaCrossLoadingCount",   d.crossLoadingCount !== undefined ? d.crossLoadingCount : "...", "...");
+      setText("pcaPhiMax",              isFinite(parseMaybeNumber(d.phiMax)) ? formatNumber(d.phiMax) : (method === "None" || method === "Varimax" ? "N/A (orthogonal)" : "..."), "...");
+      /* Sync the dropdown */
+      var sel = document.getElementById("rotationApplySelect");
+      if (sel && method) {
+        for (var i = 0; i < sel.options.length; i++) {
+          if (sel.options[i].value.toLowerCase() === method.toLowerCase()) { sel.selectedIndex = i; break; }
+        }
+      }
+      renderSimpleTableHead("rotLoadingsHead", d.columns || ["Variable"]);
+      renderSimpleTableBody("rotLoadingsBody", d.rows || [], d.columns || ["Variable"]);
+    };
+
+    function applyRotationFromResults() {
+      var sel = document.getElementById("rotationApplySelect");
+      if (!sel) return;
+      sendToHost("pcaRotationChanged", { rotationMethod: sel.value });
+    }
+
+    window.populatePcaAi = function(data) {      var d = typeof data === "string" ? JSON.parse(data) : data || {};
       setText("aiStructure",        d.structureSummary, "Awaiting assessment...");
       setText("aiVariance",         d.varianceStory, "Awaiting assessment...");
       setText("aiTopComponents",    d.topComponents, "Awaiting assessment...");
@@ -1047,6 +1112,7 @@
       if (bundle.overview)      window.populatePcaOverview(bundle.overview);
       if (bundle.eigenvalues)   window.populatePcaEigenvalues(bundle.eigenvalues);
       if (bundle.loadings)      window.populatePcaLoadings(bundle.loadings);
+      if (bundle.rotation)      window.populatePcaRotation(bundle.rotation);
       if (bundle.communalities) window.populatePcaCommunalities(bundle.communalities);
       if (bundle.biplot)        window.populatePcaBiplot(bundle.biplot);
       if (bundle.scores)        window.populatePcaScores(bundle.scores);
@@ -1079,6 +1145,9 @@
       document.getElementById("eigenTableBody").innerHTML = '<tr><td colspan="5" class="hint-empty">Awaiting eigenvalue output...</td></tr>';
       document.getElementById("loadingsHead").innerHTML = "";
       document.getElementById("loadingsBody").innerHTML = '<tr><td class="hint-empty">Awaiting loading matrix...</td></tr>';
+      document.getElementById("rotLoadingsHead").innerHTML = "";
+      document.getElementById("rotLoadingsBody").innerHTML = '<tr><td class="hint-empty">Awaiting rotation output...</td></tr>';
+      ["pcaRotationMethod","pcaCrossLoadingCount","pcaPhiMax"].forEach(function(id) { setText(id, "...", "..."); });
       document.getElementById("communalityBody").innerHTML = '<tr><td colspan="3" class="hint-empty">Awaiting communalities...</td></tr>';
       document.getElementById("scoresHead").innerHTML = "";
       document.getElementById("scoresBody").innerHTML = '<tr><td class="hint-empty">Awaiting component scores...</td></tr>';
@@ -1125,7 +1194,7 @@
             var message = JSON.parse(arg.message || "{}");
             if (!message || !message.type) return;
             switch (message.type) {
-              case "PCA_BUNDLE": window.populatePcaBundle(message.payload || {}); break;
+              case "PCA_BUNDLE":    window.populatePcaBundle(message.payload || {}); break;
               case "NAVIGATE_TAB": if (message.payload && message.payload.tab) switchTab(message.payload.tab); break;
               case "RESET_RESULTS": window.resetResultsPanel(); break;
             }

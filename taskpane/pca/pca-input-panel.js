@@ -108,6 +108,75 @@ function sendPcaDialogData() {
 
 /* ─────────────── Math helpers ─────────────── */
 
+function invertMatrix(A) {
+  const n = A.length;
+  if (!n) return [];
+  const M = A.map((row, i) => row.concat(identity(n)[i]));
+  for (let i = 0; i < n; i++) {
+    let pivot = i;
+    for (let r = i + 1; r < n; r++) {
+      if (Math.abs(M[r][i]) > Math.abs(M[pivot][i])) pivot = r;
+    }
+    if (Math.abs(M[pivot][i]) < 1e-12) return identity(n);
+    if (pivot !== i) [M[pivot], M[i]] = [M[i], M[pivot]];
+    const div = M[i][i];
+    for (let c = 0; c < 2 * n; c++) M[i][c] /= div;
+    for (let r = 0; r < n; r++) {
+      if (r === i) continue;
+      const f = M[r][i];
+      for (let c = 0; c < 2 * n; c++) M[r][c] -= f * M[i][c];
+    }
+  }
+  return M.map(row => row.slice(n));
+}
+
+function varimaxRotate(loadings, maxIter = 30, tol = 1e-6) {
+  const p = loadings.length;
+  const m = p ? loadings[0].length : 0;
+  const L = loadings.map(r => r.slice());
+  const R = identity(m);
+  if (m < 2) return { loadings: L, rot: R };
+  let improved = true, iter = 0;
+  while (improved && iter < maxIter) {
+    improved = false; iter++;
+    for (let a = 0; a < m - 1; a++) {
+      for (let b = a + 1; b < m; b++) {
+        let u = 0, v = 0;
+        for (let i = 0; i < p; i++) {
+          const x = L[i][a], y = L[i][b];
+          u += 2 * x * y * (x * x - y * y);
+          v += (x * x - y * y) * (x * x - y * y) - 4 * x * x * y * y;
+        }
+        const angle = 0.25 * Math.atan2(u, v);
+        if (Math.abs(angle) > tol) {
+          improved = true;
+          const c = Math.cos(angle), s = Math.sin(angle);
+          for (let i = 0; i < p; i++) {
+            const xa = L[i][a], xb = L[i][b];
+            L[i][a] = c * xa + s * xb; L[i][b] = -s * xa + c * xb;
+          }
+          for (let i = 0; i < m; i++) {
+            const ra = R[i][a], rb = R[i][b];
+            R[i][a] = c * ra + s * rb; R[i][b] = -s * ra + c * rb;
+          }
+        }
+      }
+    }
+  }
+  return { loadings: L, rot: R };
+}
+
+function promaxRotate(loadings, power) {
+  const orth = varimaxRotate(loadings);
+  const L = orth.loadings;
+  const Lt = transpose(L);
+  const target = L.map(row => row.map(v => Math.sign(v || 0) * Math.pow(Math.abs(v || 0), power)));
+  const P = matMul(matMul(invertMatrix(matMul(Lt, L)), Lt), target);
+  const pattern = matMul(L, P);
+  const phi = invertMatrix(matMul(transpose(P), P));
+  return { loadings: pattern, phi };
+}
+
 function parseNum(v) {
   if (v === null || v === undefined || v === "") return NaN;
   const n = Number(v);
@@ -282,9 +351,31 @@ function buildPcaBundle(headers, rows, modelSpec) {
   });
 
   /* ── 4. Component loadings  (p × retained)  loading[j][k] = eigVec[j][k] * sqrt(λ_k) ── */
-  const loadingsMatrix = numericNames.map((_, r) =>
+  const rawLoadingsMatrix = numericNames.map((_, r) =>
     Array.from({ length: retained }, (__, f) => eigVecs[r][f] * Math.sqrt(Math.max(0, eigVals[f])))
   );
+
+  /* ── 4b. Apply rotation ── */
+  const rotationMethod = ((modelSpec && modelSpec.rotationMethod) || "None").trim();
+  let rotatedMatrix = rawLoadingsMatrix.map(r => r.slice());
+  let phi = identity(retained);
+  if (rotationMethod.toLowerCase() === "varimax" && retained >= 2) {
+    rotatedMatrix = varimaxRotate(rawLoadingsMatrix).loadings;
+  } else if (rotationMethod.toLowerCase() === "promax" && retained >= 2) {
+    const pro = promaxRotate(rawLoadingsMatrix, 4);
+    rotatedMatrix = pro.loadings; phi = pro.phi;
+  }
+  const loadingsMatrix = rotatedMatrix;
+
+  /* cross-loading count (|loading| ≥ 0.4 in > 1 component) */
+  const crossLoadingCount = numericNames.filter((_, r) => {
+    let c = 0;
+    for (let f = 0; f < retained; f++) if (Math.abs(loadingsMatrix[r][f]) >= 0.4) c++;
+    return c > 1;
+  }).length;
+  const phiMax = retained > 1
+    ? Math.max(0, ...phi.flatMap((row, i) => row.map((v, j) => (i === j ? 0 : Math.abs(v || 0)))))
+    : 0;
 
   const loadingRows = numericNames.map((name, r) => {
     const row = { Variable: name };
@@ -349,6 +440,14 @@ function buildPcaBundle(headers, rows, modelSpec) {
       columns: loadingCols,
       rows: loadingRows
     },
+    rotation: {
+      rotationMethod,
+      crossLoadingCount,
+      phiMax,
+      columns: loadingCols,
+      rows: loadingRows,
+      phiMatrix: phi
+    },
     scores: {
       totalCases: n,
       displayedCases: maxScoreRows,
@@ -389,6 +488,16 @@ function openPcaResultsDialog() {
           try {
             const message = JSON.parse(arg.message);
             if (message.action === "ready") {
+              sendPcaBundle();
+            } else if (message.action === "HOST_EVENT") {
+              const cmd = message.cmd || "";
+              if (cmd === "pcaRotationChanged") {
+                const modelSpec = JSON.parse(sessionStorage.getItem("pcaModelSpec") || "{}");
+                if (message.data && message.data.rotationMethod) {
+                  modelSpec.rotationMethod = String(message.data.rotationMethod);
+                  sessionStorage.setItem("pcaModelSpec", JSON.stringify(modelSpec));
+                }
+              }
               sendPcaBundle();
             } else if (message.action === "close") {
               pcaDialog.close();

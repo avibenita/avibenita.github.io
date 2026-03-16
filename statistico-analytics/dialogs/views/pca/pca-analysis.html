@@ -255,6 +255,43 @@
     .comm-high { color: var(--success) !important; }
     .comm-mid  { color: var(--warning) !important; }
     .comm-low  { color: var(--danger)  !important; }
+
+    /* ── Overview correlation block ── */
+    .overview-corr-block {
+      margin-top: 14px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .overview-corr-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: linear-gradient(135deg, rgba(80,0,160,.82), rgba(120,0,200,.62));
+      border-bottom: 2px solid var(--accent-1);
+    }
+    .overview-corr-title {
+      color: #fff;
+      font-weight: 700;
+      font-size: .9rem;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+    .expand-corr-btn {
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.3);
+      color: #fff;
+      border-radius: 5px;
+      padding: 4px 10px;
+      font-size: .76rem;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .expand-corr-btn:hover { background: rgba(255,255,255,.22); }
+    .heatmap-preview { padding: 8px; max-height: 260px; }
+    #corrHeatmapFull { padding: 8px; }
   </style>
 </head>
 <body>
@@ -281,10 +318,6 @@
           <button class="sb-item active" onclick="switchTab('overview')" data-tab="overview">
             <i class="fa-solid fa-circle-info sb-item-icon"></i>
             <span class="sb-item-label">Overview</span>
-          </button>
-          <button class="sb-item" onclick="switchTab('correlation')" data-tab="correlation">
-            <i class="fa-solid fa-table-cells sb-item-icon"></i>
-            <span class="sb-item-label">Correlation Matrix</span>
           </button>
           <button class="sb-item" onclick="switchTab('eigenvalues')" data-tab="eigenvalues">
             <i class="fa-solid fa-list-ol sb-item-icon"></i>
@@ -347,7 +380,6 @@
                     <div class="stat-field"><span class="stat-label">Variables:</span><span class="stat-value" id="pcaVarCount">...</span></div>
                     <div class="stat-field"><span class="stat-label">Cases:</span><span class="stat-value" id="pcaCaseCount">...</span></div>
                     <div class="stat-field"><span class="stat-label">Excluded Rows:</span><span class="stat-value" id="pcaMissingRows">...</span></div>
-                    <div class="stat-field"><span class="stat-label">Verdict:</span><span class="stat-value" id="pcaVerdict">...</span></div>
                   </div>
                 </div>
                 <div class="stat-panel">
@@ -359,30 +391,31 @@
                   </div>
                 </div>
                 <div class="stat-panel">
-                  <div class="stat-panel-heading"><i class="fa-solid fa-layer-group"></i> Components Retained</div>
+                  <div class="stat-panel-heading"><i class="fa-solid fa-layer-group"></i> Component Retention</div>
                   <div class="stat-panel-body">
-                    <div class="stat-field"><span class="stat-label">Retained (Kaiser):</span><span class="stat-value" id="pcaKaiserCount">...</span></div>
+                    <div class="stat-field"><span class="stat-label">Kaiser (≥ 1):</span><span class="stat-value" id="pcaKaiserCount">...</span></div>
+                    <div class="stat-field"><span class="stat-label">Scree Suggestion:</span><span class="stat-value" id="pcaScreeSuggestion">...</span></div>
                     <div class="stat-field"><span class="stat-label">Retained (Used):</span><span class="stat-value" id="pcaRetained">...</span></div>
                     <div class="stat-field"><span class="stat-label">Cumulative Variance:</span><span class="stat-value" id="pcaCumVariance">...</span></div>
                   </div>
                 </div>
               </div>
-              <div class="section-note">PCA finds orthogonal directions of maximum variance in standardised data. Retained components are those with eigenvalue ≥ 1 (Kaiser criterion) unless overridden.</div>
-            </section>
 
-            <!-- ══ Tab: Correlation Matrix ══ -->
-            <section id="tab-correlation" class="tab-panel">
-              <div class="stats-container">
-                <div class="stat-panel" style="min-width:100%;">
-                  <div class="stat-panel-heading"><i class="fa-solid fa-table-cells"></i> Correlation Matrix</div>
-                  <div class="stat-panel-body" style="padding:6px;">
-                    <div id="corrHeatmap" class="heatmap-wrap">
-                      <div class="hint-empty">Awaiting correlation matrix...</div>
-                    </div>
-                  </div>
+              <!-- Correlation Structure -->
+              <div class="overview-corr-block">
+                <div class="overview-corr-header">
+                  <span class="overview-corr-title"><i class="fa-solid fa-table-cells"></i> Correlation Structure</span>
+                  <button class="expand-corr-btn" id="expandCorrBtn" onclick="toggleCorrExpand()">
+                    <i class="fa-solid fa-expand-alt"></i> Expand full matrix
+                  </button>
                 </div>
+                <!-- Heatmap preview (first 8 vars) -->
+                <div id="corrHeatmapPreview" class="heatmap-wrap heatmap-preview"></div>
+                <!-- Full matrix (hidden by default) -->
+                <div id="corrHeatmapFull" class="heatmap-wrap" style="display:none;max-height:420px;"></div>
               </div>
-              <div class="section-note">Pairwise Pearson correlations on standardised variables. Strong inter-correlations indicate shared variance suitable for PCA.</div>
+
+              <div class="section-note">PCA finds orthogonal directions of maximum variance in standardised data. Retained components are those with eigenvalue ≥ 1 (Kaiser criterion) unless overridden. The correlation heatmap shows pairwise Pearson correlations — strong inter-correlations indicate shared variance suitable for PCA.</div>
             </section>
 
             <!-- ══ Tab: Eigenvalues ══ -->
@@ -603,7 +636,6 @@
     function switchTab(tabKey) {
       var tabTitles = {
         overview:    "Overview",
-        correlation: "Correlation Matrix",
         eigenvalues: "Eigenvalues",
         scree:       "Scree Plot",
         loadings:    "Component Loadings",
@@ -629,13 +661,8 @@
     }
 
     /* ─── Heatmap ─── */
-    function renderHeatmap(matrix, labels) {
-      var host = document.getElementById("corrHeatmap");
-      if (!host) return;
-      if (!matrix || !matrix.length) {
-        host.innerHTML = '<div class="hint-empty">Awaiting correlation matrix...</div>';
-        return;
-      }
+    function buildHeatmapHtml(matrix, labels) {
+      if (!matrix || !matrix.length) return '<div class="hint-empty">Awaiting correlation matrix...</div>';
       var cols = labels && labels.length ? labels : matrix.map(function(_, i) { return "V" + (i + 1); });
       var html = '<table class="heatmap"><thead><tr><th></th>';
       cols.forEach(function(c) { html += "<th>" + c + "</th>"; });
@@ -653,7 +680,50 @@
         html += "</tr>";
       });
       html += "</tbody></table>";
-      host.innerHTML = html;
+      return html;
+    }
+
+    var _fullCorrMatrix = null;
+    var _fullCorrLabels = null;
+    var _corrExpanded   = false;
+
+    function renderHeatmaps(matrix, labels) {
+      _fullCorrMatrix = matrix;
+      _fullCorrLabels = labels;
+      _corrExpanded   = false;
+      var preview = document.getElementById("corrHeatmapPreview");
+      var full    = document.getElementById("corrHeatmapFull");
+      var btn     = document.getElementById("expandCorrBtn");
+      if (!matrix || !matrix.length) {
+        if (preview) preview.innerHTML = '<div class="hint-empty">Awaiting correlation matrix...</div>';
+        if (full)    full.style.display = "none";
+        return;
+      }
+      /* Preview: first 8 variables */
+      var previewSize = Math.min(8, labels ? labels.length : matrix.length);
+      var previewMatrix = matrix.slice(0, previewSize).map(function(row) { return row.slice(0, previewSize); });
+      var previewLabels = (labels || []).slice(0, previewSize);
+      if (preview) preview.innerHTML = buildHeatmapHtml(previewMatrix, previewLabels);
+      /* Full: pre-build but keep hidden */
+      if (full)    full.innerHTML = buildHeatmapHtml(matrix, labels);
+      if (full)    full.style.display = "none";
+      /* Show expand button only if matrix > 8 vars */
+      if (btn) {
+        btn.style.display = (matrix.length > 8) ? "" : "none";
+        btn.innerHTML = '<i class="fa-solid fa-expand-alt"></i> Expand full matrix';
+      }
+    }
+
+    function toggleCorrExpand() {
+      var preview = document.getElementById("corrHeatmapPreview");
+      var full    = document.getElementById("corrHeatmapFull");
+      var btn     = document.getElementById("expandCorrBtn");
+      _corrExpanded = !_corrExpanded;
+      if (preview) preview.style.display = _corrExpanded ? "none" : "";
+      if (full)    full.style.display    = _corrExpanded ? ""     : "none";
+      if (btn) btn.innerHTML = _corrExpanded
+        ? '<i class="fa-solid fa-compress-alt"></i> Show preview'
+        : '<i class="fa-solid fa-expand-alt"></i> Expand full matrix';
     }
 
     /* ─── Scree + Variance bar charts ─── */
@@ -818,13 +888,12 @@
       setText("pcaVarCount",   d.variableCount, "...");
       setText("pcaCaseCount",  d.caseCount, "...");
       setText("pcaMissingRows", d.missingRows !== undefined ? d.missingRows : "...", "...");
-      setText("pcaVerdict",    d.verdict, "...");
       setText("pcaKmo",        formatNumber(d.kmo), "...");
       setText("pcaBartlettChi2", formatNumber(d.bartlettChi2), "...");
       setText("pcaBartlettP",  d.bartlettP !== undefined ? formatNumber(d.bartlettP) : "...", "...");
       setMetricClass("pcaKmo", d.kmo, "kmo");
       setMetricClass("pcaBartlettP", d.bartlettP, "p");
-      renderHeatmap(d.correlationMatrix || [], d.variableLabels || []);
+      renderHeatmaps(d.correlationMatrix || [], d.variableLabels || []);
 
       if (typeof StatisticoHeader !== "undefined") {
         var labels = d.variableLabels || [];
@@ -838,7 +907,19 @@
       setText("pcaRetained",     d.retainedComponents, "...");
       setText("pcaCumVariance",  isFinite(parseMaybeNumber(d.cumulativeVariance)) ? formatNumber(d.cumulativeVariance) + "%" : (d.cumulativeVariance || "..."), "...");
 
+      /* Scree suggestion: elbow = first PC where drop in eigenvalue < previous drop */
       var rows = d.table || [];
+      var screeSugg = d.kaiserCount || "—";
+      if (rows.length >= 3) {
+        var eigs = rows.map(function(r) { return parseMaybeNumber(r.eigenvalue); });
+        for (var i = 1; i < eigs.length - 1; i++) {
+          var dropBefore = eigs[i - 1] - eigs[i];
+          var dropAfter  = eigs[i] - eigs[i + 1];
+          if (dropAfter < dropBefore * 0.5) { screeSugg = i + 1; break; }
+        }
+      }
+      setText("pcaScreeSuggestion", screeSugg, "—");
+
       var body = document.getElementById("eigenTableBody");
       if (!body) return;
       body.innerHTML = "";
@@ -935,13 +1016,19 @@
 
     window.resetResultsPanel = function() {
       lastPcaBundle = null;
-      ["pcaVarCount","pcaCaseCount","pcaMissingRows","pcaVerdict",
+      _fullCorrMatrix = null; _fullCorrLabels = null; _corrExpanded = false;
+      ["pcaVarCount","pcaCaseCount","pcaMissingRows",
        "pcaKmo","pcaBartlettChi2","pcaBartlettP",
-       "pcaKaiserCount","pcaRetained","pcaCumVariance",
+       "pcaKaiserCount","pcaScreeSuggestion","pcaRetained","pcaCumVariance",
        "biplotPC1Var","biplotPC2Var","biplotN","biplotP",
        "scoreTotalCases","scoreDisplayed","scoreComponents"
       ].forEach(function(id) { setText(id, "...", "..."); });
-      document.getElementById("corrHeatmap").innerHTML = '<div class="hint-empty">Awaiting correlation matrix...</div>';
+      var cp = document.getElementById("corrHeatmapPreview");
+      if (cp) cp.innerHTML = '<div class="hint-empty">Awaiting correlation matrix...</div>';
+      var cf = document.getElementById("corrHeatmapFull");
+      if (cf) { cf.innerHTML = ""; cf.style.display = "none"; }
+      var eb = document.getElementById("expandCorrBtn");
+      if (eb) { eb.style.display = "none"; }
       document.getElementById("eigenTableBody").innerHTML = '<tr><td colspan="5" class="hint-empty">Awaiting eigenvalue output...</td></tr>';
       document.getElementById("loadingsHead").innerHTML = "";
       document.getElementById("loadingsBody").innerHTML = '<tr><td class="hint-empty">Awaiting loading matrix...</td></tr>';

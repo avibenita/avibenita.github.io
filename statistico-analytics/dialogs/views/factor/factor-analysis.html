@@ -329,6 +329,27 @@
     }
     #highlightRuleModal.open{ display:flex; animation:hrmFadeIn .18s ease; }
     @keyframes hrmFadeIn{ from{opacity:0; transform:scale(.96)} to{opacity:1; transform:scale(1)} }
+    /* ── rotation transition ──────────────────────────────────────── */
+    @keyframes rotFadeIn{ from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:translateY(0)} }
+    @keyframes rotSpinner{ to{transform:rotate(360deg)} }
+    .rot-loading #loadingsBody{
+      opacity:.28; pointer-events:none; transition:opacity .2s;
+    }
+    .rot-loading #loadingsHead th{
+      opacity:.3; transition:opacity .2s;
+    }
+    #rotationMethodBadge.rot-badge-enter{
+      animation:rotFadeIn .35s ease both;
+    }
+    #rotationSpinner{
+      display:none; align-items:center; gap:6px;
+      font-size:11px; color:rgba(120,200,255,.7); font-weight:600;
+    }
+    #rotationSpinner.spinning{ display:flex; }
+    #rotationSpinner .spin-icon{
+      display:inline-block; font-size:12px;
+      animation:rotSpinner .7s linear infinite;
+    }
     #highlightRuleModal .hrm-box{
       background:rgb(13,22,42); border:1px solid rgba(120,200,255,.25);
       border-radius:14px; padding:28px 30px 24px;
@@ -915,6 +936,9 @@
                   flex:1; text-align:center; font-size:11px; font-weight:700; letter-spacing:.5px;
                   color:var(--accent-2); text-transform:uppercase; opacity:.85; padding:0 8px;
                 "></span>
+                <span id="rotationSpinner">
+                  <i class="fa-solid fa-gear spin-icon"></i> Recalculating…
+                </span>
                 <div style="display:flex; align-items:center; gap:10px; font-size:12px;">
                   <span style="color:var(--text-muted); white-space:nowrap; display:flex; align-items:center; gap:5px;">
                     Highlight ≥
@@ -1359,8 +1383,10 @@
       var body = document.getElementById("loadingsBody");
       if (!body) return;
       body.innerHTML = "";
+      body.style.opacity = "0";
       if (!rows || !rows.length) {
         body.innerHTML = '<tr><td colspan="' + cols.length + '" class="hint-empty">No rows available</td></tr>';
+        body.style.opacity = "1";
         return;
       }
       rows.forEach(function(row) {
@@ -1407,18 +1433,33 @@
         });
         body.appendChild(tr);
       });
+      /* Fade the table back in after render */
+      requestAnimationFrame(function(){
+        body.style.transition = "opacity .3s ease";
+        body.style.opacity = "1";
+      });
     }
 
     window.populateFactorRotation = function(data) {
       var d = typeof data === "string" ? JSON.parse(data) : data || {};
+      /* Clear loading state */
+      var panel = document.getElementById("tab-rotation");
+      if (panel) panel.classList.remove("rot-loading");
+      var spinner = document.getElementById("rotationSpinner");
+      if (spinner) spinner.classList.remove("spinning");
       setText("loadingCutoff", formatNumber(d.loadingCutoff), "...");
       setText("crossLoadingCount", d.crossLoadingCount, "...");
       setText("phiMax", formatNumber(d.phiMax), "...");
       var rotationSelect = document.getElementById("rotationApplySelect");
       if (rotationSelect && d.rotationMethod) rotationSelect.value = d.rotationMethod;
-      /* Update centred badge in loadings header */
+      /* Update centred badge with entrance animation */
       var badge = document.getElementById("rotationMethodBadge");
-      if (badge) badge.textContent = d.rotationMethod ? d.rotationMethod + " rotation" : "";
+      if (badge) {
+        badge.textContent = d.rotationMethod ? d.rotationMethod + " rotation" : "";
+        badge.classList.remove("rot-badge-enter");
+        void badge.offsetWidth; /* force reflow to restart animation */
+        badge.classList.add("rot-badge-enter");
+      }
       var cols = d.columns || ["Variable", "Factor 1"];
       _loadingsData = { rows: d.rows || [], cols: cols };
       renderSimpleTableHead("loadingsHead", cols);
@@ -1431,6 +1472,13 @@
     function applyRotationFromResults() {
       var rotationSelect = document.getElementById("rotationApplySelect");
       if (!rotationSelect) return;
+      /* Visual: fade table + show spinner */
+      var panel = document.getElementById("tab-rotation");
+      if (panel) panel.classList.add("rot-loading");
+      var spinner = document.getElementById("rotationSpinner");
+      if (spinner) spinner.classList.add("spinning");
+      var badge = document.getElementById("rotationMethodBadge");
+      if (badge) badge.textContent = "";
       sendToHost("factorRotationChanged", { rotationMethod: rotationSelect.value });
     }
 

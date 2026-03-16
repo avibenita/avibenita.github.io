@@ -311,6 +311,61 @@
       box-shadow:0 4px 16px rgba(0,0,0,.5);
     }
     .info-icon:hover .tip{ display:block; }
+    /* ── highlight-rule info button ───────────────────────────────── */
+    .hl-info-btn{
+      display:inline-flex; align-items:center; justify-content:center;
+      width:18px; height:18px; border-radius:50%;
+      background:rgba(120,200,255,.12); border:1px solid rgba(120,200,255,.35);
+      color:rgba(120,200,255,.8); font-size:10px; font-weight:700;
+      cursor:pointer; flex-shrink:0; transition:background .15s, color .15s;
+      user-select:none;
+    }
+    .hl-info-btn:hover{ background:rgba(120,200,255,.3); color:#fff; }
+    /* ── highlight-rule modal ─────────────────────────────────────── */
+    #highlightRuleModal{
+      display:none; position:fixed; inset:0; z-index:9000;
+      background:rgba(0,0,0,.55); backdrop-filter:blur(4px);
+      align-items:center; justify-content:center;
+    }
+    #highlightRuleModal.open{ display:flex; }
+    #highlightRuleModal .hrm-box{
+      background:rgba(10,17,35,.97); border:1px solid rgba(120,200,255,.3);
+      border-radius:12px; padding:24px 26px 20px;
+      width:360px; max-width:92vw; max-height:80vh; overflow-y:auto;
+      box-shadow:0 8px 40px rgba(0,0,0,.7);
+      position:relative;
+    }
+    #highlightRuleModal .hrm-close{
+      position:absolute; top:12px; right:14px;
+      background:none; border:none; color:rgba(120,200,255,.6);
+      font-size:18px; cursor:pointer; line-height:1;
+      transition:color .15s;
+    }
+    #highlightRuleModal .hrm-close:hover{ color:#fff; }
+    #highlightRuleModal h3{
+      margin:0 0 14px; font-size:13px; font-weight:700;
+      color:#cde6ff; letter-spacing:.3px;
+      display:flex; align-items:center; gap:7px;
+    }
+    #highlightRuleModal .hrm-rule{
+      display:flex; gap:10px; align-items:flex-start;
+      padding:9px 0; border-bottom:1px solid rgba(255,255,255,.06);
+    }
+    #highlightRuleModal .hrm-rule:last-child{ border-bottom:none; padding-bottom:0; }
+    #highlightRuleModal .hrm-dot{
+      width:10px; height:10px; border-radius:50%; flex-shrink:0; margin-top:3px;
+    }
+    #highlightRuleModal .hrm-rule p{
+      margin:0; font-size:11.5px; color:#b0c8e8; line-height:1.55;
+    }
+    #highlightRuleModal .hrm-rule p b{ color:#cde6ff; }
+    #highlightRuleModal .hrm-swatch-row{
+      display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;
+    }
+    #highlightRuleModal .hrm-swatch{
+      padding:3px 8px; border-radius:5px; font-size:10.5px;
+      font-weight:700; font-variant-numeric:tabular-nums;
+    }
     .stat-value{
       background:linear-gradient(135deg, rgba(120,200,255,.16), rgba(120,200,255,.05));
       border:1px solid rgba(120,200,255,.3);
@@ -834,14 +889,9 @@
                   color:var(--accent-2); text-transform:uppercase; opacity:.85; padding:0 8px;
                 "></span>
                 <div style="display:flex; align-items:center; gap:10px; font-size:12px;">
-                  <span style="color:var(--text-muted); white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                  <span style="color:var(--text-muted); white-space:nowrap; display:flex; align-items:center; gap:5px;">
                     Highlight ≥
-                    <span class="info-icon" style="font-size:8px;">i<span class="tip" style="width:240px;">
-                      <b>Colour rule:</b> loadings at or above this threshold are coloured and bold.<br><br>
-                      <b>Colour intensity</b> scales with how far the loading is above the threshold — stronger loadings appear brighter.<br><br>
-                      <b>Bold (700)</b> kicks in when a loading is in the top 40% of the highlighted range (i.e. intensity ≥ 0.6).<br><br>
-                      Loadings below the threshold are greyed-out at 38% opacity.
-                    </span></span>
+                    <button class="hl-info-btn" onclick="document.getElementById('highlightRuleModal').classList.add('open')" title="How highlighting works">i</button>
                   </span>
                   <input type="range" id="loadingSlider" min="0" max="100" value="40"
                     style="width:110px; accent-color:var(--accent-1); cursor:pointer;"
@@ -1836,5 +1886,79 @@
     });
   </script>
   </div><!-- /right-col -->
+
+  <!-- ── Highlight Rule Modal ────────────────────────────────────────── -->
+  <div id="highlightRuleModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="hrm-box">
+      <button class="hrm-close" onclick="document.getElementById('highlightRuleModal').classList.remove('open')">&#x2715;</button>
+      <h3><i class="fa-solid fa-highlighter" style="color:var(--accent-1);"></i> Loading Highlight Rules</h3>
+
+      <div class="hrm-rule">
+        <div class="hrm-dot" style="background:rgba(120,200,255,.8);"></div>
+        <p><b>Threshold (slider)</b><br>
+          Only loadings with an absolute value <b>≥ the slider value</b> are coloured. Everything below is greyed-out at 38% opacity — reducing visual noise from near-zero loadings.</p>
+      </div>
+
+      <div class="hrm-rule">
+        <div class="hrm-dot" style="background:rgba(120,200,255,.5);"></div>
+        <p><b>Colour intensity</b><br>
+          Within the highlighted range, brightness scales with how far a loading exceeds the threshold:<br>
+          <code style="font-size:10px; color:#7dd3fc;">intensity = (|loading| − threshold) / (1 − threshold)</code><br>
+          A loading just above the threshold is faint; a loading of 1.0 is fully saturated.</p>
+      </div>
+
+      <div class="hrm-rule">
+        <div class="hrm-dot" style="background:rgba(255,165,120,.7);"></div>
+        <p><b>Colour direction</b><br>
+          <span style="color:rgba(120,200,255,1); font-weight:700;">Blue</span> = positive loading &nbsp;·&nbsp;
+          <span style="color:rgba(255,165,120,1); font-weight:700;">Amber</span> = negative loading.<br>
+          Both use the same intensity formula; only the hue differs.</p>
+      </div>
+
+      <div class="hrm-rule">
+        <div class="hrm-dot" style="background:#fff; opacity:.7;"></div>
+        <p><b>Bold weight</b><br>
+          A loading becomes <b>bold (700)</b> when its intensity is ≥ 0.6 — i.e. it sits in the <b>top 40% of the highlighted range</b>. Below that it uses semi-bold (600).<br>
+          Example: threshold = 0.30, loading = 0.72 → intensity ≈ 0.60 → bold.</p>
+      </div>
+
+      <div class="hrm-rule">
+        <div class="hrm-dot" style="background:rgba(255,255,255,.2);"></div>
+        <p><b>Swatches at current threshold</b></p>
+        <div class="hrm-swatch-row" id="hrmSwatches"></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function(){
+      var modal = document.getElementById("highlightRuleModal");
+      if (!modal) return;
+      /* Populate swatches when modal opens */
+      modal.addEventListener("transitionend", updateSwatches);
+      document.querySelector(".hl-info-btn") && document.querySelector(".hl-info-btn").addEventListener("click", updateSwatches);
+      function updateSwatches(){
+        var t = typeof _loadingThreshold !== "undefined" ? _loadingThreshold : 0.40;
+        var vals = [t, t + (1-t)*0.3, t + (1-t)*0.6, t + (1-t)*0.85, 1.0];
+        var box = document.getElementById("hrmSwatches");
+        if (!box) return;
+        box.innerHTML = "";
+        vals.forEach(function(v){
+          if (v > 1) v = 1;
+          var span = document.createElement("span");
+          span.className = "hrm-swatch";
+          var intensity = (1 - t) > 0 ? Math.min(1, (v - t) / (1 - t)) : 1;
+          var alpha = (0.55 + intensity * 0.45).toFixed(2);
+          var bold = intensity >= 0.6 ? "700" : "600";
+          span.style.color = "rgba(120,200,255," + alpha + ")";
+          span.style.fontWeight = bold;
+          span.style.background = "rgba(120,200,255,.08)";
+          span.style.border = "1px solid rgba(120,200,255,.2)";
+          span.textContent = v.toFixed(2);
+          box.appendChild(span);
+        });
+      }
+    })();
+  </script>
+
 </body>
 </html>

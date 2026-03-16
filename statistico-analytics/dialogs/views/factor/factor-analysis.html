@@ -788,7 +788,16 @@
               </div>
             </div>
             <div class="stat-panel">
-              <div class="stat-panel-heading"><i class="fa-solid fa-table-columns"></i> Rotated Loadings Matrix</div>
+              <div class="stat-panel-heading" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                <span><i class="fa-solid fa-table-columns"></i> Rotated Loadings Matrix</span>
+                <div style="display:flex; align-items:center; gap:10px; font-size:12px;">
+                  <span style="color:var(--text-muted); white-space:nowrap;">Highlight ≥</span>
+                  <input type="range" id="loadingSlider" min="0" max="100" value="40"
+                    style="width:110px; accent-color:var(--accent-1); cursor:pointer;"
+                    oninput="onLoadingSliderChange(this.value)">
+                  <span id="loadingSliderVal" style="color:var(--accent-1); font-weight:700; min-width:28px; text-align:right;">0.40</span>
+                </div>
+              </div>
               <div class="stat-panel-body" style="padding:0;">
                 <div class="table-container" style="margin:0;">
                   <table class="analysis-table">
@@ -1206,6 +1215,70 @@
       factorPayloadForAI = Object.assign({}, factorPayloadForAI || {}, { extraction: d });
     };
 
+    /* ── Loadings highlight state ──────────────────────────────── */
+    var _loadingsData = { rows: [], cols: [] };
+    var _loadingThreshold = 0.40;
+
+    function onLoadingSliderChange(val) {
+      _loadingThreshold = val / 100;
+      document.getElementById("loadingSliderVal").textContent = _loadingThreshold.toFixed(2);
+      renderLoadingsTable();
+    }
+
+    function renderLoadingsTable() {
+      var rows = _loadingsData.rows;
+      var cols = _loadingsData.cols;
+      var body = document.getElementById("loadingsBody");
+      if (!body) return;
+      body.innerHTML = "";
+      if (!rows || !rows.length) {
+        body.innerHTML = '<tr><td colspan="' + cols.length + '" class="hint-empty">No rows available</td></tr>';
+        return;
+      }
+      rows.forEach(function(row) {
+        var tr = document.createElement("tr");
+        cols.forEach(function(col, ci) {
+          var td = document.createElement("td");
+          var raw = row[col];
+          if (raw === undefined || raw === null || raw === "") {
+            td.textContent = "—";
+          } else if (ci === 0) {
+            /* Variable name column – always full opacity */
+            td.textContent = raw;
+            td.style.color = "var(--text-primary)";
+            td.style.fontWeight = "600";
+          } else {
+            var parsed = parseMaybeNumber(raw);
+            if (isFinite(parsed)) {
+              td.textContent = formatNumber(parsed);
+              var abs = Math.abs(parsed);
+              if (abs >= _loadingThreshold) {
+                /* High loading: vibrant colour + bold */
+                var intensity = Math.min(1, (abs - _loadingThreshold) / (1 - _loadingThreshold + 0.001) + 0.45);
+                var alpha = (0.55 + intensity * 0.45).toFixed(2);
+                if (parsed >= 0) {
+                  td.style.color = "rgba(120,200,255," + alpha + ")";
+                } else {
+                  td.style.color = "rgba(255,165,120," + alpha + ")";
+                }
+                td.style.fontWeight = abs >= 0.6 ? "700" : "600";
+                td.style.opacity = "1";
+              } else {
+                /* Low loading: greyed out */
+                td.style.color = "var(--text-muted)";
+                td.style.fontWeight = "400";
+                td.style.opacity = "0.38";
+              }
+            } else {
+              td.textContent = raw;
+            }
+          }
+          tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      });
+    }
+
     window.populateFactorRotation = function(data) {
       var d = typeof data === "string" ? JSON.parse(data) : data || {};
       setText("rotationMethod", d.rotationMethod, "...");
@@ -1215,8 +1288,9 @@
       var rotationSelect = document.getElementById("rotationApplySelect");
       if (rotationSelect && d.rotationMethod) rotationSelect.value = d.rotationMethod;
       var cols = d.columns || ["Variable", "Factor 1"];
+      _loadingsData = { rows: d.rows || [], cols: cols };
       renderSimpleTableHead("loadingsHead", cols);
-      renderSimpleTableBody("loadingsBody", d.rows || [], cols);
+      renderLoadingsTable();
       factorPayloadForAI = Object.assign({}, factorPayloadForAI || {}, { rotation: d });
       /* Rebuild per-factor AI cards whenever rotation data arrives */
       renderAiFactorCards(d);

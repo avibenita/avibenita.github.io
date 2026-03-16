@@ -213,10 +213,12 @@ function standardise(X, means, sds) {
 
 function buildPcaBundle(headers, rows, modelSpec) {
   const allVars  = headers.slice();
+  const seen = new Set();
   const selected = [];
-  if (modelSpec && Array.isArray(modelSpec.variables)) selected.push(...modelSpec.variables);
-  if (modelSpec && Array.isArray(modelSpec.xn))        selected.push(...modelSpec.xn);
-  if (modelSpec && Array.isArray(modelSpec.xc))        selected.push(...modelSpec.xc);
+  const pushUnique = arr => { if (Array.isArray(arr)) arr.forEach(v => { if (!seen.has(v)) { seen.add(v); selected.push(v); } }); };
+  if (modelSpec && Array.isArray(modelSpec.variables)) pushUnique(modelSpec.variables);
+  if (modelSpec && Array.isArray(modelSpec.xn)) pushUnique(modelSpec.xn);
+  if (modelSpec && Array.isArray(modelSpec.xc)) pushUnique(modelSpec.xc);
   const requested = selected.length ? selected : allVars;
 
   const numericNames = requested.filter(name => {

@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title id="page-title">PCA Module — Statistico Analytics</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://code.highcharts.com/highcharts-more.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="../shared-header.css?v=20260309c"/>
+  <script src="../shared-header.js?v=20260309c"></script>
+  <style>
+    :root{
+      --surface-0:#0c1624;
+      --surface-1:#1a1f2e;
+      --surface-2:#242938;
+      --border:#2d3748;
+      --accent-1:rgb(180,130,255);
+      --accent-2:rgb(140,190,255);
+      --text-primary:#fff;
+      --text-secondary:rgba(255,255,255,0.82);
+      --text-muted:rgba(255,255,255,0.62);
+      --success:#4ade80;
+      --warning:#fbbf24;
+      --danger:#fb7185;
+      --panel-radius:10px;
+      --panel-shadow:0 4px 20px rgba(0,0,0,.4);
+    }
+    :root[data-theme="light"]{
+      --surface-0:#f0eeff;
+      --surface-1:#ffffff;
+      --surface-2:#f5f3ff;
+      --border:#ddd6fe;
+      --accent-1:#7c3aed;
+      --accent-2:#2563eb;
+      --text-primary:#111827;
+      --text-secondary:#1f2937;
+      --text-muted:#374151;
+      --panel-shadow:0px 4px 20px rgba(0,0,0,0.08);
+    }
+
+    html,body{height:100%;margin:0;padding:0;}
+    body{
+      background:var(--surface-0);
+      color:var(--text-primary);
+      font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+      overflow-x:hidden;
+    }
+    .wrap{ display:flex; justify-content:center; padding:8px 12px 20px; }
+    .card{
+      width:min(1600px,99%);
+      background:var(--surface-1);
+      min-height:760px;
+      border-radius:var(--panel-radius);
+      box-shadow:var(--panel-shadow);
+      border:1px solid var(--border);
+      overflow:visible;
+      display:flex;
+      flex-direction:column;
+    }
+
+    /* ── Sidebar ── */
+
+    /* ── Content layout ── */
+    .view-container{
+      display:flex;
+      flex-direction:column;
+      height:100%;
+      margin-top:10px;
+      padding-top:10px;
+      background:radial-gradient(900px 360px at 25% 0%, rgba(120,80,255,.07), transparent 62%), linear-gradient(180deg, #0b121a, #070c12);
+      border-top:1px solid rgba(255,255,255,.06);
+    }
+    .card-body{
+      padding:12px;
+      flex:1;
+      min-height:0;
+      overflow-y:auto;
+      overflow-x:hidden;
+    }
+    .tab-panel{ display:none; }
+    .tab-panel.active{ display:block; }
+
+    /* ── Stat panels ── */
+    .stats-container{
+      display:flex;
+      gap:12px;
+      justify-content:space-between;
+      margin-bottom:12px;
+      flex-wrap:wrap;
+    }
+    .stat-panel{
+      flex:1;
+      min-width:280px;
+      background:rgba(255,255,255,.05);
+      border:1px solid var(--border);
+      border-radius:var(--panel-radius);
+      box-shadow:0 2px 4px rgba(0,0,0,.2);
+      overflow:hidden;
+    }
+    .stat-panel-heading{
+      background:linear-gradient(135deg, rgba(80,0,160,.82), rgba(120,0,200,.62));
+      color:#fff;
+      padding:8px 12px;
+      font-weight:700;
+      font-size:.9rem;
+      text-align:center;
+      text-transform:uppercase;
+      letter-spacing:.5px;
+      border-bottom:2px solid var(--accent-1);
+    }
+    .stat-panel-body{ padding:10px 12px; }
+    .stat-field{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+      margin:4px 0;
+      padding:3px 0;
+      border-bottom:1px solid rgba(255,255,255,.06);
+    }
+    .stat-field:last-child{ border-bottom:none; }
+    .stat-label{ font-weight:600; color:var(--text-secondary); font-size:.86rem; }
+    .stat-value{
+      background:linear-gradient(135deg, rgba(140,100,255,.16), rgba(140,100,255,.05));
+      border:1px solid rgba(140,100,255,.35);
+      border-radius:6px;
+      padding:5px 10px;
+      min-width:92px;
+      text-align:center;
+      color:var(--accent-1);
+      font-weight:700;
+      font-size:.9rem;
+      font-variant-numeric:tabular-nums;
+    }
+    .metric-good { color: var(--success) !important; border-color: rgba(74,222,128,.55) !important; }
+    .metric-warning { color: var(--warning) !important; border-color: rgba(251,191,36,.55) !important; }
+    .metric-bad { color: var(--danger) !important; border-color: rgba(251,113,133,.55) !important; }
+
+    /* ── Tables ── */
+    .table-container{
+      width:100%;
+      margin:12px auto 0;
+      overflow:auto;
+      max-height:430px;
+      border-radius:8px;
+    }
+    .analysis-table{
+      width:100%;
+      border-collapse:collapse;
+      table-layout:fixed;
+    }
+    .analysis-table th{
+      background:linear-gradient(135deg, rgba(80,0,160,.9), rgba(120,0,200,.7));
+      color:#fff;
+      padding:8px 6px;
+      position:sticky;
+      top:0;
+      z-index:2;
+      font-weight:700;
+      text-align:center;
+      border:1px solid rgba(255,255,255,.3);
+      font-size:.74rem;
+      text-transform:uppercase;
+      letter-spacing:.3px;
+      min-width:72px;
+    }
+    .analysis-table td{
+      background:rgba(255,255,255,.04);
+      color:var(--text-primary);
+      border:1px solid rgba(255,255,255,.15);
+      padding:6px 8px;
+      text-align:right;
+      font-size:.8rem;
+      white-space:nowrap;
+      font-variant-numeric:tabular-nums;
+    }
+    .analysis-table td:first-child{
+      text-align:left;
+      background:rgba(32,20,52,.95);
+      font-weight:600;
+      color:var(--accent-1);
+    }
+
+    /* ── Viz cards ── */
+    .viz-card{
+      margin-top:12px;
+      background:rgba(255,255,255,.04);
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:10px;
+    }
+    .viz-title{
+      font-size:.88rem;
+      font-weight:700;
+      color:var(--accent-1);
+      margin-bottom:8px;
+    }
+    .heatmap-wrap{
+      overflow:auto;
+      max-height:360px;
+    }
+    .heatmap{
+      border-collapse:collapse;
+      font-size:.74rem;
+      min-width:100%;
+    }
+    .heatmap th,.heatmap td{
+      border:1px solid rgba(255,255,255,.14);
+      padding:6px 7px;
+      text-align:center;
+      white-space:nowrap;
+    }
+    .chart-wrap{
+      background:rgba(12,22,36,.55);
+      border:1px solid rgba(140,100,255,.18);
+      border-radius:8px;
+      padding:8px;
+    }
+    .chart-container{ width:100%; height:280px; }
+    .biplot-container{ width:100%; height:380px; }
+
+    .section-note{
+      margin-top:10px;
+      padding:9px;
+      border-left:3px solid var(--accent-1);
+      border-radius:4px;
+      background:rgba(180,130,255,.08);
+      color:var(--text-muted);
+      font-size:.84rem;
+    }
+    .ai-panel{
+      background:linear-gradient(135deg, rgba(124,58,237,.14), rgba(168,85,247,.06));
+      border:1px solid rgba(168,85,247,.35);
+      border-radius:10px;
+      padding:12px;
+    }
+    .ai-row{
+      border-bottom:1px solid rgba(255,255,255,.1);
+      padding:8px 0;
+      color:var(--text-secondary);
+      font-size:.9rem;
+    }
+    .ai-row:last-child{ border-bottom:none; }
+    .ai-key{ color:#e9d5ff; font-weight:700; margin-right:6px; }
+    .hint-empty{
+      color:var(--text-muted);
+      font-style:italic;
+      text-align:center;
+      padding:16px;
+    }
+
+    /* ── Communality table colour coding ── */
+    .comm-high { color: var(--success) !important; }
+    .comm-mid  { color: var(--warning) !important; }
+    .comm-low  { color: var(--danger)  !important; }
+  </style>
+</head>
+<body>
+  <!-- ── Sidebar Navigation ── -->
+  <nav class="sb-nav" id="sidebarNav">
+    <div class="sb-logo">
+      <div class="sb-logo-icon"><i class="fa-solid fa-chart-scatter"></i></div>
+      <div class="sb-logo-text">
+        <span class="sb-logo-name">Statistico</span>
+        <span class="sb-logo-sub">PCA</span>
+      </div>
+    </div>
+    <div class="sb-header">
+      <i class="fa-solid fa-bars-staggered sb-menu-icon"></i>
+      <span class="sb-menu-title">Menu</span>
+      <button class="sb-toggle-btn" onclick="StatisticoHeader.toggleSidebar()" title="Collapse / expand">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+    </div>
+    <div class="sb-body">
+      <div class="sb-group">
+        <div class="sb-group-title">Analysis</div>
+        <div class="sb-items-rail">
+          <button class="sb-item active" onclick="switchTab('overview')" data-tab="overview">
+            <i class="fa-solid fa-circle-info sb-item-icon"></i>
+            <span class="sb-item-label">Overview</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('correlation')" data-tab="correlation">
+            <i class="fa-solid fa-table-cells sb-item-icon"></i>
+            <span class="sb-item-label">Correlation Matrix</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('eigenvalues')" data-tab="eigenvalues">
+            <i class="fa-solid fa-list-ol sb-item-icon"></i>
+            <span class="sb-item-label">Eigenvalues</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('scree')" data-tab="scree">
+            <i class="fa-solid fa-chart-line sb-item-icon"></i>
+            <span class="sb-item-label">Scree Plot</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('loadings')" data-tab="loadings">
+            <i class="fa-solid fa-table-columns sb-item-icon"></i>
+            <span class="sb-item-label">Component Loadings</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('biplot')" data-tab="biplot">
+            <i class="fa-solid fa-circle-dot sb-item-icon"></i>
+            <span class="sb-item-label">Biplot</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('scores')" data-tab="scores">
+            <i class="fa-solid fa-chart-scatter sb-item-icon"></i>
+            <span class="sb-item-label">Component Scores</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('ai')" data-tab="ai">
+            <i class="fa-solid fa-brain sb-item-icon"></i>
+            <span class="sb-item-label">AI Summary</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="sb-bottom">
+      <div class="sb-bottom-row">
+        <i class="fa-solid fa-hashtag sb-bottom-icon"></i>
+        <span class="sb-bottom-label">Decimals:</span>
+        <select id="decimalSelect" class="sb-bottom-select" onchange="setDecimalPrecision()">
+          <option value="auto">Auto</option>
+          <option value="0">0</option>
+          <option value="1">1</option>
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        </select>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Right column: shared header + content ── -->
+  <div class="right-col">
+    <div id="header-container"></div>
+    <div class="wrap">
+      <section class="card" role="main">
+
+        <div class="view-container">
+          <div class="card-body">
+
+            <!-- ══ Tab: Overview ══ -->
+            <section id="tab-overview" class="tab-panel active">
+              <div class="stats-container">
+                <div class="stat-panel">
+                  <div class="stat-panel-heading"><i class="fa-solid fa-database"></i> Data Summary</div>
+                  <div class="stat-panel-body">
+                    <div class="stat-field"><span class="stat-label">Variables:</span><span class="stat-value" id="pcaVarCount">...</span></div>
+                    <div class="stat-field"><span class="stat-label">Cases:</span><span class="stat-value" id="pcaCaseCount">...</span></div>
+                    <div class="stat-field"><span class="stat-label">Excluded Rows:</span><span class="stat-value" id="pcaMissingRows">...</span></div>
+                    <div class="stat-field"><span class="stat-label">Verdict:</span><span class="stat-value" id="pcaVerdict">...</span></div>
+                  </div>
+                </div>
+                <div class="stat-panel">
+                  <div class="stat-panel-heading"><i class="fa-solid fa-shield-halved"></i> Adequacy Tests</div>
+                  <div class="stat-panel-body">
+                    <div class="stat-field"><span class="stat-label">KMO:</span><span class="stat-value" id="pcaKmo">...</span></div>
+                    <div class="stat-field"><span class="stat-label">Bartlett Chi²:</span><span class="stat-value" id="pcaBartlettChi2">...</span></div>
+                    <div class="stat-field"><span class="stat-label">Bartlett p-value:</span><span class="stat-value" id="pcaBartlettP">...</span></div>
+                  </div>
+                </div>
+                <div class="stat-panel">
+                  <div class="stat-panel-heading"><i class="fa-solid fa-layer-group"></i> Components Retained</div>
+                  <div class="stat-panel-body">
+                    <div class="stat-field"><span class="stat-label">Retained (Kaiser):</span><span class="stat-value" id="pcaKaiserCount">...</span></div>
+                    <div class="stat-field"><span class="stat-label">Retained (Used):</span><span class="stat-value" id="pcaRetained">...</span></div>
+                    <div class="stat-field"><span class="stat-label">Cumulative Variance:</span><span class="stat-value" id="pcaCumVariance">...</span></div>
+                  </div>
+                </div>
+              </div>
+              <div class="section-note">PCA finds orthogonal directions of maximum variance in standardised data. Retained components are those with eigenvalue ≥ 1 (Kaiser criterion) unless overridden.</div>
+            </section>
+
+            <!-- ══ Tab: Correlation Matrix ══ -->
+            <section id="tab-correlation" class="tab-panel">
+              <div class="stats-container">
+                <div class="stat-panel" style="min-width:100%;">
+                  <div class="stat-panel-heading"><i class="fa-solid fa-table-cells"></i> Correlation Matrix</div>
+                  <div class="stat-panel-body" style="padding:6px;">
+                    <div id="corrHeatmap" class="heatmap-wrap">
+                      <div class="hint-empty">Awaiting correlation matrix...</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="section-note">Pairwise Pearson correlations on standardised variables. Strong inter-correlations indicate shared variance suitable for PCA.</div>
+            </section>
+
+            <!-- ══ Tab: Eigenvalues ══ -->
+            <section id="tab-eigenvalues" class="tab-panel">
+              <div class="stats-container">
+                <div class="stat-panel" style="min-width:100%;">
+                  <div class="stat-panel-heading"><i class="fa-solid fa-table"></i> Eigenvalue Table</div>
+                  <div class="stat-panel-body" style="padding:0;">
+                    <div class="table-container" style="margin:0;">
+                      <table class="analysis-table">
+                        <thead>
+                          <tr>
+                            <th>Component</th>
+                            <th>Eigenvalue</th>
+                            <th>% Variance</th>
+                            <th>Cumulative %</th>
+                            <th>Kaiser (≥1)</th>
+                          </tr>
+                        </thead>
+                        <tbody id="eigenTableBody">
+                          <tr><td colspan="5" class="hint-empty">Awaiting eigenvalue output...</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="section-note">Each eigenvalue equals the variance captured by the corresponding principal component. Sum of all eigenvalues = number of variables.</div>
+            </section>
+
+            <!-- ══ Tab: Scree Plot ══ -->
+            <section id="tab-scree" class="tab-panel">
+              <div class="viz-card">
+                <div class="viz-title"><i class="fa-solid fa-chart-line"></i> Scree Plot</div>
+                <div class="chart-wrap">
+                  <div id="screeChart" class="chart-container"></div>
+                </div>
+              </div>
+              <div class="viz-card" style="margin-top:14px;">
+                <div class="viz-title"><i class="fa-solid fa-chart-bar"></i> Variance Explained per Component</div>
+                <div class="chart-wrap">
+                  <div id="varianceBarChart" class="chart-container"></div>
+                </div>
+              </div>
+              <div class="section-note">The elbow in the scree plot indicates the natural cutoff for retaining components. The bar chart shows percentage of variance per component.</div>
+            </section>
+
+            <!-- ══ Tab: Component Loadings ══ -->
+            <section id="tab-loadings" class="tab-panel">
+              <div class="stats-container">
+                <div class="stat-panel" style="min-width:100%;">
+                  <div class="stat-panel-heading"><i class="fa-solid fa-table-columns"></i> Component Loading Matrix</div>
+                  <div class="stat-panel-body" style="padding:0;">
+                    <div class="table-container" style="margin:0;">
+                      <table class="analysis-table">
+                        <thead id="loadingsHead"></thead>
+                        <tbody id="loadingsBody">
+                          <tr><td class="hint-empty">Awaiting loading matrix...</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="stats-container" style="margin-top:14px;">
+                <div class="stat-panel" style="min-width:100%;">
+                  <div class="stat-panel-heading"><i class="fa-solid fa-percentage"></i> Communalities (Variance Explained per Variable)</div>
+                  <div class="stat-panel-body" style="padding:0;">
+                    <div class="table-container" style="margin:0;">
+                      <table class="analysis-table">
+                        <thead><tr><th>Variable</th><th>Communality (h²)</th><th>Uniqueness</th></tr></thead>
+                        <tbody id="communalityBody">
+                          <tr><td colspan="3" class="hint-empty">Awaiting communalities...</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="section-note">Loadings are correlations between original variables and principal components. Large absolute loadings (|loading| > 0.5) indicate strong association. Communality = sum of squared loadings across retained components.</div>
+            </section>
+
+            <!-- ══ Tab: Biplot ══ -->
+            <section id="tab-biplot" class="tab-panel">
+              <div class="stats-container">
+                <div class="stat-panel">
+                  <div class="stat-panel-heading"><i class="fa-solid fa-circle-info"></i> Biplot Axes</div>
+                  <div class="stat-panel-body">
+                    <div class="stat-field"><span class="stat-label">X-axis (PC1):</span><span class="stat-value" id="biplotPC1Var">...</span></div>
+                    <div class="stat-field"><span class="stat-label">Y-axis (PC2):</span><span class="stat-value" id="biplotPC2Var">...</span></div>
+                    <div class="stat-field"><span class="stat-label">Observations:</span><span class="stat-value" id="biplotN">...</span></div>
+                    <div class="stat-field"><span class="stat-label">Variables:</span><span class="stat-value" id="biplotP">...</span></div>
+                  </div>
+                </div>
+              </div>
+              <div class="viz-card">
+                <div class="viz-title"><i class="fa-solid fa-circle-dot"></i> PCA Biplot — Scores + Loading Vectors</div>
+                <div class="chart-wrap">
+                  <div id="biplotChart" class="biplot-container"></div>
+                </div>
+              </div>
+              <div class="section-note">Grey dots = observations projected onto PC1/PC2. Coloured arrows = variable loading vectors. Arrow direction and length show how each variable contributes to the two components. Observations close together are similar in the PCA space.</div>
+            </section>
+
+            <!-- ══ Tab: Component Scores ══ -->
+            <section id="tab-scores" class="tab-panel">
+              <div class="stats-container">
+                <div class="stat-panel">
+                  <div class="stat-panel-heading"><i class="fa-solid fa-calculator"></i> Score Info</div>
+                  <div class="stat-panel-body">
+                    <div class="stat-field"><span class="stat-label">Total Cases:</span><span class="stat-value" id="scoreTotalCases">...</span></div>
+                    <div class="stat-field"><span class="stat-label">Displayed:</span><span class="stat-value" id="scoreDisplayed">...</span></div>
+                    <div class="stat-field"><span class="stat-label">Components:</span><span class="stat-value" id="scoreComponents">...</span></div>
+                  </div>
+                </div>
+              </div>
+              <div class="stat-panel">
+                <div class="stat-panel-heading"><i class="fa-solid fa-table-cells-large"></i> Case-wise Component Scores</div>
+                <div class="stat-panel-body" style="padding:0;">
+                  <div class="table-container" style="margin:0;">
+                    <table class="analysis-table">
+                      <thead id="scoresHead"></thead>
+                      <tbody id="scoresBody">
+                        <tr><td class="hint-empty">Awaiting component scores...</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              <div class="section-note">Scores are computed by projecting standardised observations onto eigenvectors. PC1 scores capture the most variance, PC2 the second most, and so on.</div>
+            </section>
+
+            <!-- ══ Tab: AI Summary ══ -->
+            <section id="tab-ai" class="tab-panel">
+              <div class="ai-panel">
+                <div class="ai-row"><span class="ai-key">Structure Summary:</span> <span id="aiStructure">Awaiting assessment...</span></div>
+                <div class="ai-row"><span class="ai-key">Variance Story:</span> <span id="aiVariance">Awaiting assessment...</span></div>
+                <div class="ai-row"><span class="ai-key">Top Components:</span> <span id="aiTopComponents">Awaiting assessment...</span></div>
+                <div class="ai-row"><span class="ai-key">Model Quality:</span> <span id="aiQuality">Awaiting assessment...</span></div>
+                <div class="ai-row"><span class="ai-key">Recommendations:</span> <span id="aiRecommendations">Awaiting assessment...</span></div>
+              </div>
+            </section>
+
+          </div><!-- /card-body -->
+        </div><!-- /view-container -->
+      </section>
+    </div>
+  </div><!-- /right-col -->
+
+  <script>
+    /* ─── State ─── */
+    var globalDecimalPrecision = "auto";
+    var officeBridgeReady = false;
+    var lastPcaBundle = null;
+
+    /* ─── Utility ─── */
+    function parseMaybeNumber(value) {
+      if (value === undefined || value === null) return NaN;
+      var v = String(value).trim();
+      if (!v || v === "—" || v === "N/A") return NaN;
+      if (v.indexOf("<") === 0) v = v.slice(1);
+      if (v.indexOf("%") >= 0) v = v.replace("%", "");
+      if (v.indexOf(",") >= 0 && v.indexOf(".") < 0) v = v.replace(",", ".");
+      var n = Number(v);
+      return isFinite(n) ? n : NaN;
+    }
+
+    function formatNumber(val) {
+      var n = parseMaybeNumber(val);
+      if (!isFinite(n)) return val === undefined || val === null ? "N/A" : String(val);
+      if (globalDecimalPrecision === "auto") {
+        if (Math.abs(n) < 0.001 && n !== 0) return n.toExponential(3);
+        if (Math.abs(n) < 1 && n !== 0) return n.toFixed(4);
+        return n.toFixed(2);
+      }
+      return n.toFixed(parseInt(globalDecimalPrecision, 10));
+    }
+
+    function setDecimalPrecision() {
+      var select = document.getElementById("decimalSelect");
+      globalDecimalPrecision = select ? select.value : "auto";
+      if (lastPcaBundle) populatePcaBundle(lastPcaBundle);
+    }
+
+    function setText(id, value, fallback) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.innerText = (value !== undefined && value !== null && value !== "") ? value : (fallback || "N/A");
+    }
+
+    function setMetricClass(id, value, kind) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.classList.remove("metric-good", "metric-warning", "metric-bad");
+      var n = parseMaybeNumber(value);
+      if (!isFinite(n)) return;
+      if (kind === "kmo") {
+        if (n >= 0.8) el.classList.add("metric-good");
+        else if (n >= 0.6) el.classList.add("metric-warning");
+        else el.classList.add("metric-bad");
+      } else if (kind === "p") {
+        if (n < 0.05) el.classList.add("metric-good");
+        else el.classList.add("metric-warning");
+      }
+    }
+
+    function sendToHost(cmd, data) {
+      try {
+        if (typeof Office !== "undefined" && Office.context && Office.context.ui && typeof Office.context.ui.messageParent === "function") {
+          Office.context.ui.messageParent(JSON.stringify({ action: "HOST_EVENT", cmd: cmd, data: data || {} }));
+        }
+      } catch (e) {
+        console.error("Error sending to host:", e);
+      }
+    }
+
+    /* ─── Tab switching ─── */
+    function switchTab(tabKey) {
+      var tabTitles = {
+        overview:    "Overview",
+        correlation: "Correlation Matrix",
+        eigenvalues: "Eigenvalues",
+        scree:       "Scree Plot",
+        loadings:    "Component Loadings",
+        biplot:      "Biplot",
+        scores:      "Component Scores",
+        ai:          "AI Summary"
+      };
+      if (tabTitles[tabKey] && typeof StatisticoHeader !== "undefined") {
+        StatisticoHeader.updateTitle(tabTitles[tabKey]);
+      }
+      document.querySelectorAll(".sb-item[data-tab]").forEach(function(btn) {
+        btn.classList.toggle("active", btn.getAttribute("data-tab") === tabKey);
+      });
+      document.querySelectorAll(".tab-panel").forEach(function(panel) {
+        panel.classList.toggle("active", panel.id === "tab-" + tabKey);
+      });
+      /* Render charts lazily on first visit */
+      if (tabKey === "scree" && lastPcaBundle && lastPcaBundle.eigenvalues) renderScreePlots(lastPcaBundle.eigenvalues);
+      if (tabKey === "biplot" && lastPcaBundle && lastPcaBundle.biplot) renderBiplot(lastPcaBundle.biplot);
+    }
+
+    /* ─── Heatmap ─── */
+    function renderHeatmap(matrix, labels) {
+      var host = document.getElementById("corrHeatmap");
+      if (!host) return;
+      if (!matrix || !matrix.length) {
+        host.innerHTML = '<div class="hint-empty">Awaiting correlation matrix...</div>';
+        return;
+      }
+      var cols = labels && labels.length ? labels : matrix.map(function(_, i) { return "V" + (i + 1); });
+      var html = '<table class="heatmap"><thead><tr><th></th>';
+      cols.forEach(function(c) { html += "<th>" + c + "</th>"; });
+      html += "</tr></thead><tbody>";
+      matrix.forEach(function(row, i) {
+        html += "<tr><th>" + cols[i] + "</th>";
+        row.forEach(function(v) {
+          var n = parseMaybeNumber(v);
+          var alpha = isFinite(n) ? Math.min(0.8, Math.abs(n)) : 0;
+          var bg = isFinite(n)
+            ? (n >= 0 ? "rgba(140,100,255," + alpha.toFixed(2) + ")" : "rgba(255,120,120," + alpha.toFixed(2) + ")")
+            : "transparent";
+          html += '<td style="background:' + bg + ';">' + (isFinite(n) ? formatNumber(n) : "—") + "</td>";
+        });
+        html += "</tr>";
+      });
+      html += "</tbody></table>";
+      host.innerHTML = html;
+    }
+
+    /* ─── Scree + Variance bar charts ─── */
+    function renderScreePlots(data) {
+      if (typeof Highcharts === "undefined") return;
+      var table = data.table || [];
+      var vals      = table.map(function(r) { return parseMaybeNumber(r.eigenvalue); }).filter(isFinite);
+      var varPcts   = table.map(function(r) { return parseMaybeNumber(r.variancePct); }).filter(isFinite);
+      var cumPcts   = table.map(function(r) { return parseMaybeNumber(r.cumulativePct); }).filter(isFinite);
+      var cats      = vals.map(function(_, i) { return "PC" + (i + 1); });
+
+      if (!vals.length) return;
+
+      /* Scree */
+      Highcharts.chart("screeChart", {
+        chart: { backgroundColor: "transparent", animation: false, spacing: [12,10,12,10] },
+        title: { text: null },
+        credits: { enabled: false },
+        legend: { enabled: false },
+        xAxis: { categories: cats, title: { text: "Component", style: { color: "rgba(255,255,255,.85)" } }, labels: { style: { color: "rgba(255,255,255,.78)" } }, lineColor: "rgba(255,255,255,.22)", tickColor: "rgba(255,255,255,.22)" },
+        yAxis: { title: { text: "Eigenvalue", style: { color: "rgba(255,255,255,.85)" } }, labels: { style: { color: "rgba(255,255,255,.78)" } }, gridLineColor: "rgba(255,255,255,.12)", plotLines: [{ value: 1, color: "rgba(251,191,36,.7)", dashStyle: "Dash", width: 2, label: { text: "Kaiser = 1", style: { color: "rgba(251,191,36,.9)" } } }] },
+        tooltip: { shared: true, pointFormat: "<b>{point.y:.3f}</b>" },
+        plotOptions: { series: { marker: { enabled: true, radius: 4 }, dataLabels: { enabled: true, formatter: function() { return formatNumber(this.y); }, style: { color: "#d8c0ff", textOutline: "none", fontSize: "10px" } } } },
+        series: [{ name: "Eigenvalue", data: vals, color: "rgba(180,130,255,1)", lineWidth: 3 }]
+      });
+
+      /* Variance bar + cumulative line */
+      Highcharts.chart("varianceBarChart", {
+        chart: { backgroundColor: "transparent", animation: false, spacing: [12,10,12,10] },
+        title: { text: null },
+        credits: { enabled: false },
+        xAxis: { categories: cats, labels: { style: { color: "rgba(255,255,255,.78)" } }, lineColor: "rgba(255,255,255,.22)" },
+        yAxis: [
+          { title: { text: "% Variance", style: { color: "rgba(255,255,255,.85)" } }, labels: { style: { color: "rgba(255,255,255,.78)" } }, gridLineColor: "rgba(255,255,255,.12)" },
+          { title: { text: "Cumulative %", style: { color: "rgba(140,200,255,.85)" } }, labels: { style: { color: "rgba(140,200,255,.78)" } }, opposite: true, max: 100 }
+        ],
+        tooltip: { shared: true },
+        legend: { enabled: true, itemStyle: { color: "rgba(255,255,255,.82)" } },
+        series: [
+          { name: "% Variance", type: "column", data: varPcts, color: "rgba(180,130,255,.85)", yAxis: 0, dataLabels: { enabled: true, formatter: function() { return formatNumber(this.y) + "%"; }, style: { color: "#d8c0ff", textOutline: "none", fontSize: "9px" } } },
+          { name: "Cumulative %", type: "line", data: cumPcts, color: "rgba(140,200,255,1)", yAxis: 1, lineWidth: 2, marker: { radius: 3 } }
+        ]
+      });
+    }
+
+    /* ─── Biplot ─── */
+    function renderBiplot(data) {
+      if (typeof Highcharts === "undefined") return;
+      var scores  = data.scores || [];
+      var vectors = data.vectors || [];
+      if (!scores.length && !vectors.length) return;
+
+      /* Scale vectors to fit within score range */
+      var maxScore = 0;
+      scores.forEach(function(s) { maxScore = Math.max(maxScore, Math.abs(s.x), Math.abs(s.y)); });
+      var maxVec = 0;
+      vectors.forEach(function(v) { maxVec = Math.max(maxVec, Math.abs(v.x), Math.abs(v.y)); });
+      var scale = maxVec > 0 ? (maxScore * 0.8) / maxVec : 1;
+
+      var scoreData = scores.map(function(s) { return { x: s.x, y: s.y, name: s.label }; });
+      var pc1var    = isFinite(parseMaybeNumber(data.pc1Variance)) ? formatNumber(data.pc1Variance) + "%" : "";
+      var pc2var    = isFinite(parseMaybeNumber(data.pc2Variance)) ? formatNumber(data.pc2Variance) + "%" : "";
+
+      Highcharts.chart("biplotChart", {
+        chart: { type: "scatter", backgroundColor: "transparent", animation: false, spacing: [12,10,12,10] },
+        title: { text: null },
+        credits: { enabled: false },
+        legend: { enabled: false },
+        xAxis: { title: { text: "PC1 (" + pc1var + ")", style: { color: "rgba(255,255,255,.85)" } }, labels: { style: { color: "rgba(255,255,255,.78)" } }, lineColor: "rgba(255,255,255,.22)", gridLineColor: "rgba(255,255,255,.06)", plotLines: [{ value: 0, color: "rgba(255,255,255,.3)", width: 1 }] },
+        yAxis: { title: { text: "PC2 (" + pc2var + ")", style: { color: "rgba(255,255,255,.85)" } }, labels: { style: { color: "rgba(255,255,255,.78)" } }, gridLineColor: "rgba(255,255,255,.06)", plotLines: [{ value: 0, color: "rgba(255,255,255,.3)", width: 1 }] },
+        tooltip: {
+          formatter: function() {
+            if (this.series.name === "Observations") return "<b>" + this.point.name + "</b><br>PC1: " + formatNumber(this.x) + "<br>PC2: " + formatNumber(this.y);
+            return "<b>" + this.point.varName + "</b><br>Load PC1: " + formatNumber(this.point.lx) + "<br>Load PC2: " + formatNumber(this.point.ly);
+          }
+        },
+        series: [
+          {
+            name: "Observations",
+            data: scoreData,
+            color: "rgba(180,180,180,.55)",
+            marker: { radius: 3, symbol: "circle" }
+          },
+          {
+            name: "Variables",
+            type: "scatter",
+            data: vectors.map(function(v) {
+              return {
+                x: v.x * scale, y: v.y * scale,
+                varName: v.name, lx: v.x, ly: v.y,
+                dataLabels: { enabled: true, format: v.name, style: { color: "#d8c0ff", textOutline: "none", fontSize: "10px", fontWeight: "700" } }
+              };
+            }),
+            color: "rgba(220,150,255,.9)",
+            marker: { radius: 5, symbol: "triangle" },
+            dataLabels: { enabled: true, useHTML: false, style: { color: "#d8c0ff", textOutline: "none", fontSize: "10px", fontWeight: "700" } }
+          }
+        ]
+      });
+
+      /* Draw vector arrows via SVG renderer after chart renders */
+      setTimeout(function() {
+        var chart = Highcharts.charts[Highcharts.charts.length - 1];
+        if (!chart) return;
+        vectors.forEach(function(v) {
+          var x2px = chart.xAxis[0].toPixels(v.x * scale, false);
+          var y2py = chart.yAxis[0].toPixels(v.y * scale, false);
+          var x0px = chart.xAxis[0].toPixels(0, false);
+          var y0py = chart.yAxis[0].toPixels(0, false);
+          chart.renderer.path(["M", x0px, y0py, "L", x2px, y2py])
+            .attr({ "stroke": "rgba(220,150,255,.7)", "stroke-width": 1.5, "zIndex": 3 })
+            .add();
+        });
+      }, 200);
+    }
+
+    /* ─── Table helpers ─── */
+    function renderSimpleTableHead(headId, columns) {
+      var head = document.getElementById(headId);
+      if (!head) return;
+      head.innerHTML = "";
+      var tr = document.createElement("tr");
+      columns.forEach(function(col) {
+        var th = document.createElement("th");
+        th.textContent = col;
+        tr.appendChild(th);
+      });
+      head.appendChild(tr);
+    }
+
+    function renderSimpleTableBody(bodyId, rows, columns) {
+      var body = document.getElementById(bodyId);
+      if (!body) return;
+      body.innerHTML = "";
+      if (!rows || !rows.length) {
+        body.innerHTML = '<tr><td colspan="' + columns.length + '" class="hint-empty">No rows available</td></tr>';
+        return;
+      }
+      rows.forEach(function(row) {
+        var tr = document.createElement("tr");
+        columns.forEach(function(col) {
+          var td = document.createElement("td");
+          var raw = row[col];
+          if (raw === undefined || raw === null || raw === "") { td.textContent = "—"; }
+          else {
+            var parsed = parseMaybeNumber(raw);
+            if (isFinite(parsed) && (typeof raw === "number" || /^-?\d+([.,]\d+)?([eE]-?\d+)?$/.test(String(raw).trim()))) {
+              td.textContent = formatNumber(parsed);
+            } else {
+              td.textContent = raw;
+            }
+          }
+          tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      });
+    }
+
+    /* ─── Populate functions ─── */
+    window.populatePcaOverview = function(data) {
+      var d = typeof data === "string" ? JSON.parse(data) : data || {};
+      setText("pcaVarCount",   d.variableCount, "...");
+      setText("pcaCaseCount",  d.caseCount, "...");
+      setText("pcaMissingRows", d.missingRows !== undefined ? d.missingRows : "...", "...");
+      setText("pcaVerdict",    d.verdict, "...");
+      setText("pcaKmo",        formatNumber(d.kmo), "...");
+      setText("pcaBartlettChi2", formatNumber(d.bartlettChi2), "...");
+      setText("pcaBartlettP",  d.bartlettP !== undefined ? formatNumber(d.bartlettP) : "...", "...");
+      setMetricClass("pcaKmo", d.kmo, "kmo");
+      setMetricClass("pcaBartlettP", d.bartlettP, "p");
+      renderHeatmap(d.correlationMatrix || [], d.variableLabels || []);
+
+      if (typeof StatisticoHeader !== "undefined") {
+        var labels = d.variableLabels || [];
+        StatisticoHeader.updateVariable(labels.length ? labels.join(" / ").slice(0, 60) : "Variables", d.caseCount || 0);
+      }
+    };
+
+    window.populatePcaEigenvalues = function(data) {
+      var d = typeof data === "string" ? JSON.parse(data) : data || {};
+      setText("pcaKaiserCount",  d.kaiserCount, "...");
+      setText("pcaRetained",     d.retainedComponents, "...");
+      setText("pcaCumVariance",  isFinite(parseMaybeNumber(d.cumulativeVariance)) ? formatNumber(d.cumulativeVariance) + "%" : (d.cumulativeVariance || "..."), "...");
+
+      var rows = d.table || [];
+      var body = document.getElementById("eigenTableBody");
+      if (!body) return;
+      body.innerHTML = "";
+      if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="5" class="hint-empty">Awaiting eigenvalue output...</td></tr>';
+      } else {
+        rows.forEach(function(r, idx) {
+          var tr = document.createElement("tr");
+          var isKaiser = parseMaybeNumber(r.eigenvalue) >= 1;
+          [r.component || (idx + 1), formatNumber(r.eigenvalue), formatNumber(r.variancePct), formatNumber(r.cumulativePct), isKaiser ? "✔" : ""].forEach(function(v, ci) {
+            var td = document.createElement("td");
+            td.textContent = v;
+            if (ci === 4 && isKaiser) td.style.color = "var(--success)";
+            tr.appendChild(td);
+          });
+          body.appendChild(tr);
+        });
+      }
+    };
+
+    window.populatePcaLoadings = function(data) {
+      var d = typeof data === "string" ? JSON.parse(data) : data || {};
+      renderSimpleTableHead("loadingsHead", d.columns || ["Variable"]);
+      renderSimpleTableBody("loadingsBody", d.rows || [], d.columns || ["Variable"]);
+    };
+
+    window.populatePcaCommunalities = function(rows) {
+      var body = document.getElementById("communalityBody");
+      if (!body) return;
+      body.innerHTML = "";
+      if (!rows || !rows.length) {
+        body.innerHTML = '<tr><td colspan="3" class="hint-empty">Awaiting communalities...</td></tr>';
+        return;
+      }
+      rows.forEach(function(r) {
+        var tr = document.createElement("tr");
+        var h2 = parseMaybeNumber(r.h2);
+        var cls = isFinite(h2) ? (h2 >= 0.7 ? "comm-high" : (h2 >= 0.4 ? "comm-mid" : "comm-low")) : "";
+        [r.variable || "—", formatNumber(h2), formatNumber(r.uniqueness)].forEach(function(v, ci) {
+          var td = document.createElement("td");
+          td.textContent = v;
+          if (ci === 1 && cls) td.className = cls;
+          tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      });
+    };
+
+    window.populatePcaBiplot = function(data) {
+      var d = typeof data === "string" ? JSON.parse(data) : data || {};
+      setText("biplotPC1Var", isFinite(parseMaybeNumber(d.pc1Variance)) ? formatNumber(d.pc1Variance) + "% variance" : "...", "...");
+      setText("biplotPC2Var", isFinite(parseMaybeNumber(d.pc2Variance)) ? formatNumber(d.pc2Variance) + "% variance" : "...", "...");
+      setText("biplotN", (d.scores || []).length, "...");
+      setText("biplotP", (d.vectors || []).length, "...");
+    };
+
+    window.populatePcaScores = function(data) {
+      var d = typeof data === "string" ? JSON.parse(data) : data || {};
+      setText("scoreTotalCases",  d.totalCases, "...");
+      setText("scoreDisplayed",   d.displayedCases, "...");
+      setText("scoreComponents",  d.columns ? d.columns.length - 1 : "...", "...");
+      renderSimpleTableHead("scoresHead", d.columns || ["Case"]);
+      renderSimpleTableBody("scoresBody", d.rows || [], d.columns || ["Case"]);
+    };
+
+    window.populatePcaAi = function(data) {
+      var d = typeof data === "string" ? JSON.parse(data) : data || {};
+      setText("aiStructure",        d.structureSummary, "Awaiting assessment...");
+      setText("aiVariance",         d.varianceStory, "Awaiting assessment...");
+      setText("aiTopComponents",    d.topComponents, "Awaiting assessment...");
+      setText("aiQuality",          d.modelQuality, "Awaiting assessment...");
+      setText("aiRecommendations",  d.recommendations, "Awaiting assessment...");
+    };
+
+    window.populatePcaBundle = function(data) {
+      var bundle = typeof data === "string" ? JSON.parse(data) : data || {};
+      lastPcaBundle = bundle;
+      if (bundle.overview)      window.populatePcaOverview(bundle.overview);
+      if (bundle.eigenvalues)   window.populatePcaEigenvalues(bundle.eigenvalues);
+      if (bundle.loadings)      window.populatePcaLoadings(bundle.loadings);
+      if (bundle.communalities) window.populatePcaCommunalities(bundle.communalities);
+      if (bundle.biplot)        window.populatePcaBiplot(bundle.biplot);
+      if (bundle.scores)        window.populatePcaScores(bundle.scores);
+      if (bundle.ai)            window.populatePcaAi(bundle.ai);
+
+      /* Render charts if their tab is already active */
+      var activeTab = (document.querySelector(".sb-item.active") || {}).getAttribute("data-tab") || "overview";
+      if (activeTab === "scree" && bundle.eigenvalues) renderScreePlots(bundle.eigenvalues);
+      if (activeTab === "biplot" && bundle.biplot)     renderBiplot(bundle.biplot);
+    };
+
+    window.resetResultsPanel = function() {
+      lastPcaBundle = null;
+      ["pcaVarCount","pcaCaseCount","pcaMissingRows","pcaVerdict",
+       "pcaKmo","pcaBartlettChi2","pcaBartlettP",
+       "pcaKaiserCount","pcaRetained","pcaCumVariance",
+       "biplotPC1Var","biplotPC2Var","biplotN","biplotP",
+       "scoreTotalCases","scoreDisplayed","scoreComponents"
+      ].forEach(function(id) { setText(id, "...", "..."); });
+      document.getElementById("corrHeatmap").innerHTML = '<div class="hint-empty">Awaiting correlation matrix...</div>';
+      document.getElementById("eigenTableBody").innerHTML = '<tr><td colspan="5" class="hint-empty">Awaiting eigenvalue output...</td></tr>';
+      document.getElementById("loadingsHead").innerHTML = "";
+      document.getElementById("loadingsBody").innerHTML = '<tr><td class="hint-empty">Awaiting loading matrix...</td></tr>';
+      document.getElementById("communalityBody").innerHTML = '<tr><td colspan="3" class="hint-empty">Awaiting communalities...</td></tr>';
+      document.getElementById("scoresHead").innerHTML = "";
+      document.getElementById("scoresBody").innerHTML = '<tr><td class="hint-empty">Awaiting component scores...</td></tr>';
+      var sc = document.getElementById("screeChart"); if (sc) sc.innerHTML = "";
+      var vb = document.getElementById("varianceBarChart"); if (vb) vb.innerHTML = "";
+      var bp = document.getElementById("biplotChart"); if (bp) bp.innerHTML = "";
+      setText("aiStructure", "Awaiting assessment...");
+      setText("aiVariance", "Awaiting assessment...");
+      setText("aiTopComponents", "Awaiting assessment...");
+      setText("aiQuality", "Awaiting assessment...");
+      setText("aiRecommendations", "Awaiting assessment...");
+      switchTab("overview");
+    };
+
+    /* ─── Export HTML ─── */
+    async function exportPcaHtml() {
+      try {
+        document.querySelectorAll(".tab-panel").forEach(function(p) { p.classList.add("active"); p.style.display = "block"; });
+        await new Promise(function(r) { setTimeout(r, 120); });
+        var clone = document.documentElement.cloneNode(true);
+        clone.querySelectorAll("script").forEach(function(s) { s.remove(); });
+        ["#sidebarNav","#header-container"].forEach(function(sel) { var el = clone.querySelector(sel); if (el) el.remove(); });
+        var html  = "<!DOCTYPE html>\n" + clone.outerHTML;
+        var stamp = new Date().toISOString().replace(/[:.]/g, "-");
+        var name  = "pca-snapshot-" + stamp + ".html";
+        var blob  = new Blob([html], { type: "text/html;charset=utf-8" });
+        var url   = URL.createObjectURL(blob);
+        var a     = document.createElement("a"); a.href = url; a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+        alert("Saved: " + name);
+      } catch(e) {
+        console.error("Failed to export PCA HTML:", e);
+        alert("Failed to export HTML: " + e.message);
+      }
+    }
+
+    /* ─── Office bridge ─── */
+    function wireOfficeDialogMessaging() {
+      if (!Office || !Office.context || !Office.context.ui || !Office.EventType) return;
+      try {
+        Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function(arg) {
+          try {
+            var message = JSON.parse(arg.message || "{}");
+            if (!message || !message.type) return;
+            switch (message.type) {
+              case "PCA_BUNDLE": window.populatePcaBundle(message.payload || {}); break;
+              case "NAVIGATE_TAB": if (message.payload && message.payload.tab) switchTab(message.payload.tab); break;
+              case "RESET_RESULTS": window.resetResultsPanel(); break;
+            }
+          } catch(e) { console.error("Failed to parse parent message:", e); }
+        });
+      } catch(err) { console.error("Failed to wire Office dialog messaging:", err); }
+    }
+
+    function initOfficeBridge() {
+      if (officeBridgeReady) return;
+      officeBridgeReady = true;
+      wireOfficeDialogMessaging();
+      sendToHost("pcaDashboardReady", {});
+      setTimeout(function() { sendToHost("pcaDashboardReady", {}); }, 400);
+      setTimeout(function() { sendToHost("pcaDashboardReady", {}); }, 1200);
+    }
+
+    /* ─── Boot ─── */
+    document.addEventListener("DOMContentLoaded", function() {
+      if (typeof StatisticoHeader !== "undefined") {
+        StatisticoHeader.init("pca-analysis", "", 0, "pca");
+        StatisticoHeader.registerActions({
+          getData: function() { return null; },
+          exportHtml: function() { exportPcaHtml(); },
+          moduleName: "Save PCA model"
+        });
+        StatisticoHeader.initSidebarPage();
+        StatisticoHeader.updateTitle("Overview");
+      }
+      switchTab("overview");
+      setDecimalPrecision();
+      if (typeof Office !== "undefined" && typeof Office.onReady === "function") {
+        Office.onReady(function() { initOfficeBridge(); });
+      } else {
+        setTimeout(initOfficeBridge, 0);
+      }
+    });
+  </script>
+  </div><!-- /right-col (closed here to match factor layout) -->
+</body>
+</html>

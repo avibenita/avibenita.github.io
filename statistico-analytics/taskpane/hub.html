@@ -123,6 +123,42 @@
       box-shadow: 0 2px 8px rgba(249,115,22,.07);
     }
     .module-card:hover .module-arrow { opacity: 1; }
+
+    /* ── Info button & popup ──────────────────────────────────────── */
+    .mod-info-btn {
+      width: 20px; height: 20px; flex-shrink: 0; border-radius: 50%;
+      background: rgba(0,0,0,.05); border: 1px solid var(--border);
+      color: var(--text-muted); font-size: 10px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: background .13s, color .13s, border-color .13s;
+      position: relative; z-index: 2;
+      font-style: normal; line-height: 1;
+    }
+    .mod-info-btn:hover {
+      background: var(--accent-1); color: #fff; border-color: var(--accent-1);
+    }
+    .mod-info-popup {
+      display: none; position: absolute; right: 0; top: calc(100% + 6px);
+      background: #fff; border: 1.5px solid var(--border);
+      border-radius: 10px; padding: 12px 14px;
+      width: 230px; z-index: 100;
+      box-shadow: 0 6px 24px rgba(0,0,0,.12);
+      font-size: 11px; line-height: 1.55; color: var(--text-secondary);
+      pointer-events: auto;
+    }
+    .mod-info-popup.open { display: block; }
+    .mod-info-popup .pip-title {
+      font-size: 11.5px; font-weight: 700; color: var(--text-primary);
+      margin-bottom: 7px; display: flex; align-items: center; gap: 6px;
+    }
+    .mod-info-popup ul {
+      margin: 0; padding: 0 0 0 14px;
+    }
+    .mod-info-popup ul li { margin-bottom: 3px; }
+    /* wrapper so we can position the popup relative to the button */
+    .mod-info-wrap {
+      position: relative; flex-shrink: 0;
+    }
     .module-icon {
       width: 30px; height: 30px; flex-shrink: 0;
       border-radius: 7px; display: flex;
@@ -255,29 +291,40 @@
     const MODULES = [
       /* Descriptive */
       { id: 'univariate',   group: 'descriptive',  icon: 'fa-chart-bar',       color: '#f97316', bg: 'rgba(249,115,22,.1)',
-        name: 'Univariate',        desc: 'Summary stats, distributions & normality' },
+        name: 'Univariate',          desc: 'Summary stats, distributions & normality',
+        info: ['Mean, median, mode, SD, skewness, kurtosis', 'Histograms & box plots', 'Normality tests (Shapiro-Wilk, K-S)', 'Outlier detection', 'Frequency tables'] },
       { id: 'correlations', group: 'descriptive',  icon: 'fa-diagram-project', color: '#06b6d4', bg: 'rgba(6,182,212,.1)',
-        name: 'Correlations',      desc: 'Pearson, Spearman & partial correlations' },
+        name: 'Correlations',        desc: 'Pearson, Spearman & partial correlations',
+        info: ['Pearson & Spearman matrices', 'Partial & semi-partial correlations', 'Correlation heatmap', 'Significance testing', 'Pairwise scatter plots'] },
       /* Comparisons */
       { id: 'independent',  group: 'comparisons',  icon: 'fa-not-equal',       color: '#f59e0b', bg: 'rgba(245,158,11,.1)',
-        name: 'Independent Means', desc: 'Two-group comparison with robust checks' },
+        name: 'Independent Means',   desc: 'Two-group comparison with robust checks',
+        info: ['Independent samples t-test', 'Welch correction for unequal variance', "Levene's & Brown-Forsythe tests", 'Effect size (Cohen\'s d)', 'Mann-Whitney U (non-parametric)'] },
       { id: 'anova',        group: 'comparisons',  icon: 'fa-table-cells',     color: '#10b981', bg: 'rgba(16,185,129,.1)',
-        name: 'ANOVA',             desc: 'One-way, two-way & factorial designs' },
+        name: 'ANOVA',               desc: 'One-way, two-way & factorial designs',
+        info: ['One-way & two-way ANOVA', 'Factorial & interaction effects', 'Post-hoc tests (Tukey, Bonferroni)', 'Effect size (η²)', 'Kruskal-Wallis (non-parametric)'] },
       { id: 'dependent',    group: 'comparisons',  icon: 'fa-repeat',          color: '#10b981', bg: 'rgba(16,185,129,.1)',
-        name: 'Repeated Measures', desc: 'Paired samples & within-subject designs' },
+        name: 'Repeated Measures',   desc: 'Paired samples & within-subject designs',
+        info: ['Paired t-test', 'One-way repeated measures ANOVA', "Mauchly's sphericity test", 'Greenhouse-Geisser correction', 'Wilcoxon signed-rank (non-parametric)'] },
       { id: 'mixed',        group: 'comparisons',  icon: 'fa-sitemap',         color: '#10b981', bg: 'rgba(16,185,129,.1)',
-        name: 'Mixed Model',       desc: 'Linear mixed-effects with random effects' },
+        name: 'Mixed Model',         desc: 'Linear mixed-effects with random effects',
+        info: ['Fixed & random effects', 'Random intercepts & slopes', 'AIC / BIC model comparison', 'Intraclass correlation (ICC)', 'Residual diagnostics'] },
       /* Multivariate */
       { id: 'regression',   group: 'multivariate', icon: 'fa-chart-line',      color: '#3b82f6', bg: 'rgba(59,130,246,.1)',
-        name: 'Regression',        desc: 'OLS with diagnostics & predictions' },
+        name: 'Regression',          desc: 'OLS with diagnostics & predictions',
+        info: ['Multiple linear regression', 'Standardised & unstandardised coefficients', 'R², adjusted R², F-test', 'Residual plots & Cook\'s D', 'VIF multicollinearity check'] },
       { id: 'logistic',     group: 'multivariate', icon: 'fa-percent',         color: '#ef4444', bg: 'rgba(239,68,68,.1)',
-        name: 'Logistic Regression', desc: 'Binary & multinomial classification' },
+        name: 'Logistic Regression', desc: 'Binary & multinomial classification',
+        info: ['Binary logistic regression', 'Odds ratios & 95% CI', 'Hosmer-Lemeshow goodness-of-fit', 'ROC curve & AUC', 'Classification table'] },
       { id: 'factor',       group: 'multivariate', icon: 'fa-cubes',           color: '#8b5cf6', bg: 'rgba(139,92,246,.1)',
-        name: 'Factor Analysis',   desc: 'EFA, latent structure & dimension reduction' },
+        name: 'Factor Analysis',     desc: 'EFA, latent structure & dimension reduction',
+        info: ['Exploratory Factor Analysis (EFA)', 'PCA & PAF extraction', 'Varimax, Promax, Oblimin rotation', 'KMO & Bartlett adequacy tests', 'Scree plot & loadings matrix'] },
       { id: 'pca',          group: 'multivariate', icon: 'fa-circle-nodes',    color: '#a855f7', bg: 'rgba(168,85,247,.1)',
-        name: 'PCA',               desc: 'Principal components & biplots' },
+        name: 'PCA',                 desc: 'Principal components & biplots',
+        info: ['Principal Component Analysis', 'Eigenvalue decomposition', 'Scree plot & variance explained', 'Component loadings & scores', 'Biplot visualisation'] },
       { id: 'meta-analysis',group: 'multivariate', icon: 'fa-layer-group',     color: '#6366f1', bg: 'rgba(99,102,241,.1)',
-        name: 'Meta-Analysis',     desc: 'Evidence synthesis & effect size pooling' },
+        name: 'Meta-Analysis',       desc: 'Evidence synthesis & effect size pooling',
+        info: ['Fixed & random effects models', 'Forest plot', 'Heterogeneity (I², Q-test)', "Funnel plot & Egger's test", 'Effect size conversions'] },
     ];
 
     Office.onReady(info => {
@@ -306,6 +353,8 @@
       div.setAttribute('data-name', m.name.toLowerCase());
       div.setAttribute('data-desc', m.desc.toLowerCase());
       div.onclick = () => navigateToModule(m.id);
+
+      const bullets = (m.info || []).map(b => `<li>${b}</li>`).join('');
       div.innerHTML = `
         <div class="module-icon" style="background:${m.bg}; color:${m.color};">
           <i class="fa-solid ${m.icon}"></i>
@@ -314,9 +363,37 @@
           <div class="module-name">${m.name}</div>
           <div class="module-description">${m.desc}</div>
         </div>
+        <div class="mod-info-wrap">
+          <button class="mod-info-btn" title="What's included">i
+            <div class="mod-info-popup">
+              <div class="pip-title">
+                <i class="fa-solid ${m.icon}" style="color:${m.color};font-size:11px;"></i>
+                ${m.name}
+              </div>
+              <ul>${bullets}</ul>
+            </div>
+          </button>
+        </div>
         <i class="fa-solid fa-chevron-right module-arrow"></i>`;
+
+      /* Info button: toggle popup, don't navigate */
+      const btn = div.querySelector('.mod-info-btn');
+      const popup = div.querySelector('.mod-info-popup');
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const isOpen = popup.classList.contains('open');
+        closeAllPopups();
+        if (!isOpen) popup.classList.add('open');
+      });
+
       return div;
     }
+
+    function closeAllPopups() {
+      document.querySelectorAll('.mod-info-popup.open').forEach(p => p.classList.remove('open'));
+    }
+
+    document.addEventListener('click', closeAllPopups);
 
     function filterModules(q) {
       const term = q.trim().toLowerCase();

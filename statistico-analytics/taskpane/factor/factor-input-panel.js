@@ -576,7 +576,17 @@ function sendFactorBundle() {
   const rows = factorRangeData.slice(1);
   const modelSpec = JSON.parse(sessionStorage.getItem("factorModelSpec") || "{}");
   const bundle = buildFactorBundle(headers, rows, modelSpec);
-  factorDialog.messageChild(JSON.stringify({ type: "FACTOR_BUNDLE", payload: bundle }));
+  // Strip rawData from main bundle so the message stays small
+  const rawData = bundle.rawData;
+  const mainBundle = Object.assign({}, bundle);
+  delete mainBundle.rawData;
+  factorDialog.messageChild(JSON.stringify({ type: "FACTOR_BUNDLE", payload: mainBundle }));
+  // Send raw data separately after a brief delay to avoid message-size issues
+  if (rawData) {
+    setTimeout(function() {
+      factorDialog.messageChild(JSON.stringify({ type: "FACTOR_RAW_DATA", payload: rawData }));
+    }, 300);
+  }
 }
 
 function resetFactorModel() {

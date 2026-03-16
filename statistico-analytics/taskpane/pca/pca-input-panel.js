@@ -539,7 +539,17 @@ function sendPcaBundle() {
   const rows      = pcaRangeData.slice(1);
   const modelSpec = JSON.parse(sessionStorage.getItem("pcaModelSpec") || "{}");
   const bundle    = buildPcaBundle(headers, rows, modelSpec);
-  pcaDialog.messageChild(JSON.stringify({ type: "PCA_BUNDLE", payload: bundle }));
+  // Strip rawData from main bundle so the message stays small
+  const rawData   = bundle.rawData;
+  const mainBundle = Object.assign({}, bundle);
+  delete mainBundle.rawData;
+  pcaDialog.messageChild(JSON.stringify({ type: "PCA_BUNDLE", payload: mainBundle }));
+  // Send raw data separately after a brief delay to avoid message-size issues
+  if (rawData) {
+    setTimeout(function() {
+      pcaDialog.messageChild(JSON.stringify({ type: "PCA_RAW_DATA", payload: rawData }));
+    }, 300);
+  }
 }
 
 function resetPcaModel() {

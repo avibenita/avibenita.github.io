@@ -747,14 +747,29 @@
 
     /* CASE: standard post-hoc results */
     if (rows && rows.length) {
-      html += '<div style="margin-top:8px;">' +
-        '<p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Method: <strong>' + method + '</strong> &nbsp;|&nbsp; α = ' + alpha + '</p>' +
-        '<table><thead><tr><th>Comparison</th><th class="num">Mean diff</th><th class="num">SE</th><th class="num">p (adj)</th><th></th></tr></thead><tbody>' +
-        rows.map(function(r) {
-          var p = (r.pAdj !== undefined) ? r.pAdj : r.p;
-          return '<tr><td>' + r.comparison + '</td><td class="num">' + fmt(r.diff) + '</td><td class="num">' + fmt(r.se) + '</td><td class="num ' + sigCell(p,alpha) + '">' + fmtP(p) + '</td><td>' + sigBadge(p,alpha) + '</td></tr>';
-        }).join('') +
-        '</tbody></table></div>';
+      /* Group rows by factor (two-way has r.factor set; one-way/repeated don't) */
+      var factorGroups = {};
+      rows.forEach(function(r) {
+        var key = r.factor || 'Pairwise';
+        if (!factorGroups[key]) factorGroups[key] = [];
+        factorGroups[key].push(r);
+      });
+
+      Object.keys(factorGroups).forEach(function(fName) {
+        var fRows = factorGroups[fName];
+        var fMethod = (fRows[0] && fRows[0].method) || method;
+        html += '<div style="margin-top:8px;">' +
+          '<p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:7px;font-weight:600;">' +
+            (Object.keys(factorGroups).length > 1 ? '<i class="fa-solid fa-layer-group" style="color:var(--accent-1);margin-right:5px;"></i>' + fName + ' &nbsp;—&nbsp; ' : '') +
+            'Method: <strong>' + fMethod + '</strong> &nbsp;|&nbsp; α = ' + alpha +
+          '</p>' +
+          '<table><thead><tr><th>Comparison</th><th class="num">Mean diff</th><th class="num">SE</th><th class="num">p (adj)</th><th></th></tr></thead><tbody>' +
+          fRows.map(function(r) {
+            var p = (r.pAdj !== undefined) ? r.pAdj : r.p;
+            return '<tr><td>' + r.comparison + '</td><td class="num">' + fmt(r.diff) + '</td><td class="num">' + fmt(r.se) + '</td><td class="num ' + sigCell(p,alpha) + '">' + fmtP(p) + '</td><td>' + sigBadge(p,alpha) + '</td></tr>';
+          }).join('') +
+          '</tbody></table></div>';
+      });
     } else if (mode === 'posthoc') {
       /* Eligible but no results yet (data not yet computed) */
       html += '<div class="cmp-box cmp-info" style="margin-top:8px;">' +

@@ -439,8 +439,33 @@ function buildAnovaBundle(headers, rows, spec) {
       return { a, b, n: vals.length, mean: vals.length ? mean(vals) : NaN, sd: vals.length > 1 ? sd(vals) : NaN };
     }));
 
+    /* Post-hoc for each main factor with 3+ levels (marginal groups) */
+    const posthocRows = [];
+    const fAname = headers[aIdx], fBname = headers[bIdx];
+
+    if (aLevels.length >= 3) {
+      const margGroupsA = {};
+      aLevels.forEach(a => { margGroupsA[a] = bLevels.flatMap(b => cells[`${a}::${b}`] || []).filter(isFinite); });
+      let phA;
+      if (posthocMethod === 'games')           phA = gamesHowell(margGroupsA, aLevels);
+      else if (posthocMethod === 'bonferroni') phA = bonferroniPosthoc(margGroupsA, aLevels, anova.msError, anova.dfError);
+      else                                     phA = tukeyHSD(margGroupsA, aLevels, anova.msError, anova.dfError);
+      phA.forEach(r => posthocRows.push({ ...r, factor: fAname }));
+    }
+
+    if (bLevels.length >= 3) {
+      const margGroupsB = {};
+      bLevels.forEach(b => { margGroupsB[b] = aLevels.flatMap(a => cells[`${a}::${b}`] || []).filter(isFinite); });
+      let phB;
+      if (posthocMethod === 'games')           phB = gamesHowell(margGroupsB, bLevels);
+      else if (posthocMethod === 'bonferroni') phB = bonferroniPosthoc(margGroupsB, bLevels, anova.msError, anova.dfError);
+      else                                     phB = tukeyHSD(margGroupsB, bLevels, anova.msError, anova.dfError);
+      phB.forEach(r => posthocRows.push({ ...r, factor: fBname }));
+    }
+
     return { type, spec: { dv: headers[dvIdx], factor1: headers[aIdx], factor2: headers[bIdx], alpha, posthocMethod },
       twoWay: anova, aLevels, bLevels, cells, descA, descB, cellDesc,
+      posthoc: posthocRows,
       report: buildReport_2way(anova, headers[aIdx], headers[bIdx], alpha) };
   }
 

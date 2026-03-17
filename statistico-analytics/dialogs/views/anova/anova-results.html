@@ -755,134 +755,172 @@
   function populatePosthoc(b) {
     var el    = document.getElementById('posthocBody');
     var alpha = (b.spec && b.spec.alpha) ? b.spec.alpha : 0.05;
-    var rows  = b.posthoc;
+    var method = (b.spec && b.spec.posthocMethod) || 'tukey';
+    var methodLabel = method === 'games' ? 'Games-Howell' : method === 'bonferroni' ? 'Bonferroni' : 'Tukey HSD';
+    var leveneUnequal = b.levene && isFinite(b.levene.p) && b.levene.p < alpha;
 
-    /* ── Determine situation ── */
-    var factors   = [];
-    var interactionSig = false;
-    var leveneUnequal  = b.levene && isFinite(b.levene.p) && b.levene.p < alpha;
-    var method = (b.spec && b.spec.posthocMethod) || (rows && rows[0] && rows[0].method) || (leveneUnequal ? 'Games-Howell' : 'Tukey HSD');
-
+    /* ── Build factor list ── */
+    var factors = [];
     if (b.type === 'one-way') {
-      var nLevels = b.levels ? b.levels.length : 0;
-      factors = [{ name: (b.spec && b.spec.factor1) || 'Group', levels: nLevels }];
-    } else if (b.type === 'two-way' && b.twoWay) {
-      var tw = b.twoWay;
+      factors = [{ name: (b.spec && b.spec.factor1) || 'Group', levels: b.levels ? b.levels.length : 0 }];
+    } else if (b.type === 'two-way') {
       factors = [
         { name: (b.spec && b.spec.factor1) || 'Factor A', levels: b.aLevels ? b.aLevels.length : 0 },
         { name: (b.spec && b.spec.factor2) || 'Factor B', levels: b.bLevels ? b.bLevels.length : 0 }
       ];
-      interactionSig = isFinite(tw.pAB) && tw.pAB < alpha;
     } else if (b.type === 'repeated') {
       var nCond = b.spec && b.spec.conditions ? b.spec.conditions.length : 0;
       factors = [{ name: 'Condition', levels: nCond }];
     }
 
     var eligibleFactors = factors.filter(function(f){ return f.levels >= 3; });
-    var mode = interactionSig ? 'simple-effects' : eligibleFactors.length > 0 ? 'posthoc' : 'none';
-
-    /* ── Render ── */
+    var interactionSig  = b.interactionSig || false;  /* set by engine for two-way */
     var html = '';
 
-    /* Warning / interaction banner */
-    if (interactionSig) {
-      html += '<div class="cmp-box cmp-warn">' +
-        '<div class="cmp-box-title"><i class="fa-solid fa-triangle-exclamation"></i> Significant interaction detected</div>' +
-        '<div class="cmp-box-body">Main effects should be interpreted with caution. <strong>Simple effects analysis is recommended</strong> — compare levels of each factor <em>within</em> each level of the other factor.</div>' +
-        '</div>';
+    /* ── Unequal variances banner ── */
+    if (leveneUnequal) {
+      html += '<div class="cmp-box cmp-warn" style="margin-bottom:10px;">' +
+        '<div class="cmp-box-title"><i class="fa-solid fa-flask"></i> Unequal variances detected</div>' +
+        '<div class="cmp-box-body">Levene\'s test is significant. ' +
+          (method === 'games' ? '<strong>Games-Howell</strong> (already selected) does not assume equal variances — appropriate choice.'
+            : 'Consider switching to <strong>Games-Howell</strong> in the input dialog.') +
+        '</div></div>';
     }
 
-    if (leveneUnequal && mode !== 'none') {
-      html += '<div class="cmp-box cmp-warn" style="margin-top:8px;">' +
-        '<div class="cmp-box-title"><i class="fa-solid fa-flask"></i> Unequal variances</div>' +
-        '<div class="cmp-box-body">Levene\'s test is significant. Using <strong>Games-Howell</strong> (does not assume equal variances).</div>' +
-        '</div>';
-    }
-
-    /* Two-way: per-factor eligibility summary */
-    if (b.type === 'two-way' && factors.length === 2) {
-      html += '<div class="cmp-box cmp-info" style="margin-top:8px;">' +
-        '<div class="cmp-box-title"><i class="fa-solid fa-diagram-project"></i> Post-hoc eligibility per factor</div>' +
+    /* ── Two-way: eligibility summary ── */
+    if (b.type === 'two-way') {
+      html += '<div class="cmp-box cmp-info" style="margin-bottom:10px;">' +
+        '<div class="cmp-box-title"><i class="fa-solid fa-diagram-project"></i> Factor eligibility</div>' +
         '<div class="cmp-box-body">' +
         '<table style="width:100%;font-size:13px;"><thead><tr><th>Factor</th><th class="num">Levels</th><th>Post-hoc?</th></tr></thead><tbody>' +
         factors.map(function(f) {
           var ok = f.levels >= 3;
           return '<tr><td>' + f.name + '</td><td class="num">' + (f.levels || '?') + '</td><td>' +
-            (ok ? '<span class="badge badge-sig"><i class="fa-solid fa-check" style="font-size:9px;"></i> Available</span>'
-                : '<span class="badge badge-ns">Not required (2 levels)</span>') +
+            (ok
+              ? '<span class="badge badge-sig"><i class="fa-solid fa-check" style="font-size:9px;"></i> Eligible</span>'
+              : '<span class="badge badge-ns">Direct comparison (2 levels)</span>') +
             '</td></tr>';
         }).join('') +
-        '</tbody></table></div></div>';
+        '</tbody></table>' +
+        (interactionSig
+          ? '<div style="margin-top:8px;font-size:12.5px;color:#fbbf24;"><i class="fa-solid fa-triangle-exclamation"></i> ' +
+            'Significant interaction — showing <strong>simple effects</strong> (stratified by factor). Main-effect post-hoc is shown below for reference.</div>'
+          : '<div style="margin-top:8px;font-size:12.5px;color:var(--accent-1);"><i class="fa-solid fa-circle-check"></i> ' +
+            'No significant interaction — showing <strong>main-effect post-hoc</strong>.</div>') +
+        '</div></div>';
     }
 
-    /* CASE: no comparisons needed */
-    if (mode === 'none') {
-      html += '<div class="cmp-box cmp-info" style="margin-top:8px;">' +
+    /* ── CASE A: no eligible factors ── */
+    if (eligibleFactors.length === 0) {
+      html += '<div class="cmp-box cmp-info">' +
         '<div class="cmp-box-title"><i class="fa-solid fa-circle-info"></i> No post-hoc comparisons required</div>' +
-        '<div class="cmp-box-body">Each factor has only 2 levels. The ANOVA F-test already tests the difference directly — no further pairwise comparisons are needed.' +
-        (b.type === 'two-way' ? '<br><br><em>For multi-factor designs: post-hoc tests apply per factor when it has 3+ levels. If the interaction is significant, examine simple effects instead.</em>' : '') +
-        '</div></div>';
+        '<div class="cmp-box-body">Each factor has only 2 levels — the ANOVA F-test directly tests the difference. No pairwise comparisons are needed.</div>' +
+        '</div>';
       el.innerHTML = html;
       return;
     }
 
-    /* CASE: simple effects (interaction significant) */
-    if (mode === 'simple-effects') {
-      html += '<div class="cmp-box cmp-info" style="margin-top:8px;">' +
-        '<div class="cmp-box-title"><i class="fa-solid fa-arrows-split-up-and-left"></i> Simple Effects — Method: ' + method + '</div>' +
-        '<div class="cmp-box-body">';
-      factors.forEach(function(f) {
-        var other = factors.filter(function(x){ return x.name !== f.name; }).map(function(x){ return x.name; }).join(', ');
-        html += '<div style="margin-bottom:6px;"><strong>' + f.name + '</strong> — compare levels within each level of <em>' + other + '</em></div>';
-      });
-      html += '</div></div>';
+    /* ── CASE B: significant interaction → stratified simple effects ── */
+    if (interactionSig && b.simpleEffects && b.simpleEffects.length) {
+      html += renderSimpleEffects(b.simpleEffects, methodLabel, alpha, b);
+      /* Optionally add exploratory overall post-hoc if present */
+      if (b.posthoc && b.posthoc.length) {
+        html += '<details style="margin-top:12px;">' +
+          '<summary style="cursor:pointer;font-size:12.5px;color:var(--text-muted);padding:6px 0;">' +
+            '<i class="fa-solid fa-flask" style="margin-right:5px;"></i>Exploratory: overall main-effect post-hoc (ignores interaction)' +
+          '</summary>' +
+          '<div style="margin-top:8px;">' + renderPosthocTables(b.posthoc, methodLabel, alpha) + '</div>' +
+          '</details>';
+      }
+      el.innerHTML = html;
+      return;
     }
 
-    /* CASE: standard post-hoc results */
-    if (rows && rows.length) {
-      /* Group rows by factor (two-way has r.factor set; one-way/repeated don't) */
-      var factorGroups = {};
-      rows.forEach(function(r) {
-        var key = r.factor || 'Pairwise';
-        if (!factorGroups[key]) factorGroups[key] = [];
-        factorGroups[key].push(r);
-      });
-
-      Object.keys(factorGroups).forEach(function(fName) {
-        var fRows = factorGroups[fName];
-        var fMethod = (fRows[0] && fRows[0].method) || method;
-        html += '<div style="margin-top:8px;">' +
-          '<p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:7px;font-weight:600;">' +
-            (Object.keys(factorGroups).length > 1 ? '<i class="fa-solid fa-layer-group" style="color:var(--accent-1);margin-right:5px;"></i>' + fName + ' &nbsp;—&nbsp; ' : '') +
-            'Method: <strong>' + fMethod + '</strong> &nbsp;|&nbsp; α = ' + alpha +
-          '</p>' +
-          '<table><thead><tr><th>Comparison</th><th class="num">Mean diff</th><th class="num">SE</th><th class="num">p (adj)</th><th></th></tr></thead><tbody>' +
-          fRows.map(function(r) {
-            var p = (r.pAdj !== undefined) ? r.pAdj : r.p;
-            return '<tr><td>' + r.comparison + '</td><td class="num">' + fmt(r.diff) + '</td><td class="num">' + fmt(r.se) + '</td><td class="num ' + sigCell(p,alpha) + '">' + fmtP(p) + '</td><td>' + sigBadge(p,alpha) + '</td></tr>';
-          }).join('') +
-          '</tbody></table></div>';
-      });
-    } else if (mode === 'posthoc') {
-      /* Eligible but posthoc array is empty — explain clearly */
-      var nPairs = eligibleFactors.reduce(function(sum, f) {
-        return sum + (f.levels * (f.levels - 1) / 2);
-      }, 0);
-      var factorList = eligibleFactors.map(function(f) {
-        return '<strong>' + f.name + '</strong> (' + f.levels + ' levels → ' + (f.levels*(f.levels-1)/2) + ' pairs)';
-      }).join(', ');
-
-      html += '<div class="cmp-box cmp-warn" style="margin-top:8px;">' +
-        '<div class="cmp-box-title"><i class="fa-solid fa-rotate"></i> Re-run required to display comparisons</div>' +
+    /* ── CASE C: no (or n.s.) interaction → standard main-effect post-hoc ── */
+    if (b.posthoc && b.posthoc.length) {
+      html += renderPosthocTables(b.posthoc, methodLabel, alpha);
+    } else {
+      /* Eligible but empty — needs re-run */
+      var nPairs = eligibleFactors.reduce(function(s,f){ return s + f.levels*(f.levels-1)/2; }, 0);
+      html += '<div class="cmp-box cmp-warn">' +
+        '<div class="cmp-box-title"><i class="fa-solid fa-rotate"></i> Re-run required</div>' +
         '<div class="cmp-box-body">' +
-          'Pairwise comparisons are <strong>eligible</strong> for: ' + factorList + '.<br><br>' +
-          'The comparison table (' + nPairs + ' pair' + (nPairs !== 1 ? 's' : '') + ', method: <strong>' + method + '</strong>) was not included in this result bundle — ' +
-          'this typically happens when the analysis was run with an older version of the engine before pairwise computation was added.<br><br>' +
+          'Post-hoc is eligible (' + nPairs + ' pair' + (nPairs!==1?'s':'') + ', method: <strong>' + methodLabel + '</strong>) ' +
+          'but was not included in this bundle — the analysis was run before pairwise computation was added.<br><br>' +
           '<strong>To see the table:</strong> close this dialog, re-select your data range, and run the analysis again.' +
         '</div></div>';
     }
 
     el.innerHTML = html;
+  }
+
+  /* ── Render stratified simple-effects tables ─────────────── */
+  function renderSimpleEffects(simpleEffects, methodLabel, alpha, b) {
+    /* Group strata by withinFactor so we get blocks: "Time within Group" then "Group within Time" */
+    var blocks = {};
+    simpleEffects.forEach(function(se) {
+      if (!blocks[se.withinFactor]) blocks[se.withinFactor] = [];
+      blocks[se.withinFactor].push(se);
+    });
+
+    var html = '';
+    Object.keys(blocks).forEach(function(withinFactor) {
+      var strata = blocks[withinFactor];
+      /* Find the stratifying factor name from the first stratum label */
+      var byFactor = strata[0] ? strata[0].stratum.split(' = ')[0] : '';
+      html += '<div style="margin-bottom:14px;">' +
+        '<div style="font-size:13px;font-weight:700;color:var(--accent-1);margin-bottom:6px;">' +
+          '<i class="fa-solid fa-arrows-split-up-and-left"></i>&nbsp;' +
+          'Simple effects for <strong>' + withinFactor + '</strong> within each level of <em>' + byFactor + '</em>' +
+        '</div>' +
+        '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Method: ' + methodLabel + ' &nbsp;|&nbsp; α = ' + alpha + '</div>';
+
+      strata.forEach(function(se) {
+        html += '<div style="margin-bottom:10px;">' +
+          '<div style="font-size:12.5px;font-weight:700;color:var(--text-secondary);margin-bottom:5px;padding:4px 8px;background:var(--surface-2);border-radius:5px;border-left:3px solid var(--accent-1);">' +
+            se.stratum +
+          '</div>' +
+          '<table><thead><tr>' +
+            '<th>Comparison</th><th class="num">Mean diff</th><th class="num">SE</th><th class="num">p (adj)</th><th></th>' +
+          '</tr></thead><tbody>' +
+          se.rows.map(function(r) {
+            var p = (r.pAdj !== undefined) ? r.pAdj : r.p;
+            return '<tr><td>' + r.comparison + '</td><td class="num">' + fmt(r.diff) + '</td><td class="num">' + fmt(r.se) + '</td><td class="num ' + sigCell(p,alpha) + '">' + fmtP(p) + '</td><td>' + sigBadge(p,alpha) + '</td></tr>';
+          }).join('') +
+          '</tbody></table></div>';
+      });
+
+      html += '</div>';
+    });
+    return html;
+  }
+
+  /* ── Render flat post-hoc tables grouped by factor ───────── */
+  function renderPosthocTables(rows, methodLabel, alpha) {
+    var factorGroups = {};
+    rows.forEach(function(r) {
+      var key = r.factor || 'Pairwise';
+      if (!factorGroups[key]) factorGroups[key] = [];
+      factorGroups[key].push(r);
+    });
+    var multipleFactors = Object.keys(factorGroups).length > 1;
+    var html = '';
+    Object.keys(factorGroups).forEach(function(fName) {
+      var fRows = factorGroups[fName];
+      var fMethod = (fRows[0] && fRows[0].method) || methodLabel;
+      html += '<div style="margin-bottom:12px;">' +
+        '<div style="font-size:13px;font-weight:700;color:var(--accent-1);margin-bottom:5px;">' +
+          (multipleFactors ? '<i class="fa-solid fa-layer-group" style="margin-right:5px;"></i>Post-hoc for <strong>' + fName + '</strong><br>' : '') +
+          '<span style="font-size:11.5px;font-weight:400;color:var(--text-muted);">Method: ' + fMethod + ' &nbsp;|&nbsp; α = ' + alpha + '</span>' +
+        '</div>' +
+        '<table><thead><tr><th>Comparison</th><th class="num">Mean diff</th><th class="num">SE</th><th class="num">p (adj)</th><th></th></tr></thead><tbody>' +
+        fRows.map(function(r) {
+          var p = (r.pAdj !== undefined) ? r.pAdj : r.p;
+          return '<tr><td>' + r.comparison + '</td><td class="num">' + fmt(r.diff) + '</td><td class="num">' + fmt(r.se) + '</td><td class="num ' + sigCell(p,alpha) + '">' + fmtP(p) + '</td><td>' + sigBadge(p,alpha) + '</td></tr>';
+        }).join('') +
+        '</tbody></table></div>';
+    });
+    return html;
   }
 
   /* ── Non-Parametric ──────────────────────────────────────── */

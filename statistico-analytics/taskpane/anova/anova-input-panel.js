@@ -439,34 +439,74 @@ function buildAnovaBundle(headers, rows, spec) {
       return { a, b, n: vals.length, mean: vals.length ? mean(vals) : NaN, sd: vals.length > 1 ? sd(vals) : NaN };
     }));
 
-    /* Post-hoc for each main factor with 3+ levels (marginal groups) */
-    const posthocRows = [];
     const fAname = headers[aIdx], fBname = headers[bIdx];
+    const interactionSig = anova.pAB < alpha;
+
+    /* Helper: run post-hoc on a grouped object */
+    function runPosthoc(grouped, levels) {
+      if (posthocMethod === 'games')           return gamesHowell(grouped, levels);
+      if (posthocMethod === 'bonferroni')      return bonferroniPosthoc(grouped, levels, anova.msError, anova.dfError);
+      return tukeyHSD(grouped, levels, anova.msError, anova.dfError);
+    }
+
+    /* ── Main-effect post-hoc (used when interaction NOT significant) */
+    const posthocRows = [];
 
     if (aLevels.length >= 3) {
       const margGroupsA = {};
       aLevels.forEach(a => { margGroupsA[a] = bLevels.flatMap(b => cells[`${a}::${b}`] || []).filter(isFinite); });
-      let phA;
-      if (posthocMethod === 'games')           phA = gamesHowell(margGroupsA, aLevels);
-      else if (posthocMethod === 'bonferroni') phA = bonferroniPosthoc(margGroupsA, aLevels, anova.msError, anova.dfError);
-      else                                     phA = tukeyHSD(margGroupsA, aLevels, anova.msError, anova.dfError);
-      phA.forEach(r => posthocRows.push({ ...r, factor: fAname }));
+      runPosthoc(margGroupsA, aLevels).forEach(r => {
+        posthocRows.push({ ...r,
+          factor: fAname,
+          comparison: fAname + ' ' + r.comparison.replace(' vs ', ' vs ' + fAname + ' ')
+        });
+      });
     }
 
     if (bLevels.length >= 3) {
       const margGroupsB = {};
       bLevels.forEach(b => { margGroupsB[b] = aLevels.flatMap(a => cells[`${a}::${b}`] || []).filter(isFinite); });
-      let phB;
-      if (posthocMethod === 'games')           phB = gamesHowell(margGroupsB, bLevels);
-      else if (posthocMethod === 'bonferroni') phB = bonferroniPosthoc(margGroupsB, bLevels, anova.msError, anova.dfError);
-      else                                     phB = tukeyHSD(margGroupsB, bLevels, anova.msError, anova.dfError);
-      phB.forEach(r => posthocRows.push({ ...r, factor: fBname }));
+      runPosthoc(margGroupsB, bLevels).forEach(r => {
+        posthocRows.push({ ...r,
+          factor: fBname,
+          comparison: fBname + ' ' + r.comparison.replace(' vs ', ' vs ' + fBname + ' ')
+        });
+      });
     }
 
-    return { type, spec: { dv: headers[dvIdx], factor1: headers[aIdx], factor2: headers[bIdx], alpha, posthocMethod },
+    /* ── Simple effects (used when interaction IS significant) */
+    /* B within each level of A */
+    const simpleEffects = [];
+    if (bLevels.length >= 3) {
+      aLevels.forEach(aLv => {
+        const grouped = {};
+        bLevels.forEach(b => { grouped[b] = (cells[`${aLv}::${b}`] || []).filter(isFinite); });
+        const rows2 = runPosthoc(grouped, bLevels).map(r => ({
+          ...r,
+          comparison: fBname + ' ' + r.comparison.replace(' vs ', ' vs ' + fBname + ' ')
+        }));
+        if (rows2.length) simpleEffects.push({ stratum: fAname + ' = ' + aLv, withinFactor: fBname, rows: rows2 });
+      });
+    }
+    /* A within each level of B (only if A has 3+ levels) */
+    if (aLevels.length >= 3) {
+      bLevels.forEach(bLv => {
+        const grouped = {};
+        aLevels.forEach(a => { grouped[a] = (cells[`${a}::${bLv}`] || []).filter(isFinite); });
+        const rows2 = runPosthoc(grouped, aLevels).map(r => ({
+          ...r,
+          comparison: fAname + ' ' + r.comparison.replace(' vs ', ' vs ' + fAname + ' ')
+        }));
+        if (rows2.length) simpleEffects.push({ stratum: fBname + ' = ' + bLv, withinFactor: fAname, rows: rows2 });
+      });
+    }
+
+    return { type, spec: { dv: headers[dvIdx], factor1: fAname, factor2: fBname, alpha, posthocMethod },
       twoWay: anova, aLevels, bLevels, cells, descA, descB, cellDesc,
+      interactionSig,
       posthoc: posthocRows,
-      report: buildReport_2way(anova, headers[aIdx], headers[bIdx], alpha) };
+      simpleEffects,
+      report: buildReport_2way(anova, fAname, fBname, alpha) };
   }
 
   /* ── REPEATED MEASURES ────────────────────────────────────── */

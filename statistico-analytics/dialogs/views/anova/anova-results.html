@@ -774,7 +774,8 @@
     }
 
     var eligibleFactors = factors.filter(function(f){ return f.levels >= 3; });
-    var interactionSig  = b.interactionSig || false;  /* set by engine for two-way */
+    var interactionSig  = b.interactionSig ||
+      (b.type === 'two-way' && b.twoWay && isFinite(b.twoWay.pAB) && b.twoWay.pAB < alpha);
     var html = '';
 
     /* ── Unequal variances banner ── */
@@ -821,16 +822,42 @@
     }
 
     /* ── CASE B: significant interaction → stratified simple effects ── */
-    if (interactionSig && b.simpleEffects && b.simpleEffects.length) {
-      html += renderSimpleEffects(b.simpleEffects, methodLabel, alpha, b);
-      /* Optionally add exploratory overall post-hoc if present */
-      if (b.posthoc && b.posthoc.length) {
-        html += '<details style="margin-top:12px;">' +
-          '<summary style="cursor:pointer;font-size:12.5px;color:var(--text-muted);padding:6px 0;">' +
-            '<i class="fa-solid fa-flask" style="margin-right:5px;"></i>Exploratory: overall main-effect post-hoc (ignores interaction)' +
-          '</summary>' +
-          '<div style="margin-top:8px;">' + renderPosthocTables(b.posthoc, methodLabel, alpha) + '</div>' +
-          '</details>';
+    if (interactionSig) {
+      var se = b.simpleEffects;
+
+      /* If engine didn't supply simpleEffects but cells data is present, compute client-side */
+      if ((!se || !se.length) && b.cells && b.aLevels && b.bLevels) {
+        se = buildSimpleEffectsFromCells(b, alpha, methodLabel);
+      }
+
+      if (se && se.length) {
+        html += renderSimpleEffects(se, methodLabel, alpha, b);
+        /* Exploratory: overall main-effect post-hoc collapsed */
+        if (b.posthoc && b.posthoc.length) {
+          html += '<details style="margin-top:12px;">' +
+            '<summary style="cursor:pointer;font-size:12.5px;color:var(--text-muted);padding:6px 0;">' +
+              '<i class="fa-solid fa-flask" style="margin-right:5px;"></i>Exploratory: overall main-effect post-hoc (ignores interaction)' +
+            '</summary>' +
+            '<div style="margin-top:8px;">' + renderPosthocTables(b.posthoc, methodLabel, alpha) + '</div>' +
+            '</details>';
+        }
+      } else {
+        /* Interaction significant but no cell data — re-run needed */
+        var fA = (b.spec && b.spec.factor1) || 'Factor A';
+        var fB = (b.spec && b.spec.factor2) || 'Factor B';
+        var bLevCount = b.bLevels ? b.bLevels.length : '?';
+        var aLevCount = b.aLevels ? b.aLevels.length : '?';
+        html += '<div class="cmp-box cmp-warn">' +
+          '<div class="cmp-box-title"><i class="fa-solid fa-rotate"></i> Re-run required for simple effects</div>' +
+          '<div class="cmp-box-body">' +
+            'The interaction <strong>' + fA + ' × ' + fB + '</strong> is significant — simple effects should be shown.<br><br>' +
+            'After re-running you will see:<br>' +
+            '<ul style="margin:6px 0 0 16px;line-height:1.8;">' +
+              '<li><strong>' + fB + '</strong> pairwise comparisons within each level of <em>' + fA + '</em> (' + aLevCount + ' tables)</li>' +
+              (parseInt(aLevCount) >= 3 ? '<li><strong>' + fA + '</strong> pairwise comparisons within each level of <em>' + fB + '</em> (' + bLevCount + ' tables)</li>' : '') +
+            '</ul><br>' +
+            '<strong>To see the tables:</strong> close this dialog, re-select your data range, and run the analysis again.' +
+          '</div></div>';
       }
       el.innerHTML = html;
       return;
@@ -852,6 +879,62 @@
     }
 
     el.innerHTML = html;
+  }
+
+  /* ── Build simple effects from raw cells (client-side fallback) ── */
+  function buildSimpleEffectsFromCells(b, alpha, methodLabel) {
+    var fAname = (b.spec && b.spec.factor1) || 'Factor A';
+    var fBname = (b.spec && b.spec.factor2) || 'Factor B';
+    var aLevels = b.aLevels || [], bLevels = b.bLevels || [];
+    var cells   = b.cells   || {};
+    var msError = b.twoWay  ? b.twoWay.msError  : 0;
+    var dfError = b.twoWay  ? b.twoWay.dfError  : 1;
+    var se = [];
+
+    function grpMean(arr) { return arr.length ? arr.reduce(function(s,v){return s+v;},0)/arr.length : NaN; }
+    function grpVar(arr) {
+      if (arr.length < 2) return 0;
+      var m = grpMean(arr);
+      return arr.reduce(function(s,v){return s+(v-m)*(v-m);},0)/(arr.length-1);
+    }
+    function runPairs(grouped, levels, fName) {
+      var rows = [];
+      for (var i = 0; i < levels.length-1; i++) {
+        for (var j = i+1; j < levels.length; j++) {
+          var a = grouped[levels[i]] || [], bArr = grouped[levels[j]] || [];
+          var diff = grpMean(a) - grpMean(bArr);
+          var seVal = (msError > 0 && a.length && bArr.length)
+            ? Math.sqrt(msError * (1/a.length + 1/bArr.length) / 2) : 0;
+          var q = seVal > 0 ? Math.abs(diff)/seVal : 0;
+          var p = Math.max(0, Math.min(1, 2*(1 - (function(z){
+            var t=1/(1+0.3275911*Math.abs(z));
+            return 0.5*(1+((((1.061405429*t-1.453152027)*t+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-z*z)*(z<0?-1:1));
+          })(q/Math.SQRT2))));
+          rows.push({ comparison: fName+' '+levels[i]+' vs '+fName+' '+levels[j], diff: diff, se: seVal, p: p, method: 'Tukey HSD' });
+        }
+      }
+      return rows;
+    }
+
+    /* B within each A level */
+    if (bLevels.length >= 3) {
+      aLevels.forEach(function(aLv) {
+        var grouped = {};
+        bLevels.forEach(function(bLv) { grouped[bLv] = cells[aLv+'::'+bLv] || []; });
+        var rows = runPairs(grouped, bLevels, fBname);
+        if (rows.length) se.push({ stratum: fAname+' = '+aLv, withinFactor: fBname, rows: rows });
+      });
+    }
+    /* A within each B level (only if A has 3+ levels) */
+    if (aLevels.length >= 3) {
+      bLevels.forEach(function(bLv) {
+        var grouped = {};
+        aLevels.forEach(function(aLv) { grouped[aLv] = cells[aLv+'::'+bLv] || []; });
+        var rows = runPairs(grouped, aLevels, fAname);
+        if (rows.length) se.push({ stratum: fBname+' = '+bLv, withinFactor: fAname, rows: rows });
+      });
+    }
+    return se;
   }
 
   /* ── Render stratified simple-effects tables ─────────────── */

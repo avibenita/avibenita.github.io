@@ -128,9 +128,18 @@
     .assump-text .ad{ font-size:12.5px; color:var(--text-muted); margin-top:3px; line-height:1.55; }
 
     /* ── Chart containers ───────────────────────────────────── */
-    .chart-wrap{ width:100%; height:320px; }
+    .chart-wrap{ width:100%; height:300px; }
     .chart-wrap-tall{ width:100%; height:420px; }
     .interaction-note{ font-size:11px; color:var(--text-muted); text-align:center; margin-top:6px; }
+
+    /* ── Chart toggle buttons ───────────────────────────────── */
+    .chart-toggle-btn{
+      padding:4px 9px; border-radius:6px; border:1.5px solid var(--border);
+      background:var(--surface-2); color:var(--text-muted);
+      font-size:12px; cursor:pointer; transition:all .15s;
+    }
+    .chart-toggle-btn:hover{ border-color:var(--accent-1); color:var(--accent-1); }
+    .chart-toggle-btn.active{ background:var(--accent-1); color:#fff; border-color:var(--accent-1); }
 
     /* ── Mode Switch (Inference) — removed, all 3 shown always ─ */
 
@@ -322,43 +331,60 @@
 
         <!-- ── VISUALS (Plots + Effect Sizes) ───────────────── -->
         <div class="tab-panel" id="tab-visuals" style="display:none;">
-          <div class="results-panel">
-            <div class="results-panel-heading"><i class="fa-solid fa-chart-column"></i>Group Means with 95% CI</div>
-            <div class="results-panel-body">
-              <div class="chart-wrap" id="meansChart"></div>
+
+          <!-- Top row: chart toggle (left) + effect sizes (right) -->
+          <div style="display:grid;grid-template-columns:1fr 340px;gap:12px;align-items:start;">
+
+            <!-- Chart panel with toggle -->
+            <div class="results-panel" style="margin-bottom:0;">
+              <div class="results-panel-heading" style="justify-content:space-between;">
+                <span id="chartTitle"><i class="fa-solid fa-chart-column"></i>&nbsp;Group Means with 95% CI</span>
+                <div style="display:flex;gap:4px;">
+                  <button class="chart-toggle-btn active" id="btnBar" onclick="showChart('bar')" title="Bar chart">
+                    <i class="fa-solid fa-chart-column"></i>
+                  </button>
+                  <button class="chart-toggle-btn" id="btnBox" onclick="showChart('box')" title="Box plot">
+                    <i class="fa-solid fa-box"></i>
+                  </button>
+                  <button class="chart-toggle-btn" id="btnLine" onclick="showChart('line')" title="Interaction plot" style="display:none;" id="btnLine">
+                    <i class="fa-solid fa-chart-line"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="results-panel-body" style="padding:8px;">
+                <div class="chart-wrap" id="meansChart"></div>
+                <div class="chart-wrap" id="boxChart"         style="display:none;"></div>
+                <div class="chart-wrap" id="interactionChart" style="display:none;"></div>
+                <p class="interaction-note" id="interactionNote" style="display:none;">Non-parallel lines suggest an interaction effect between the two factors.</p>
+              </div>
             </div>
-          </div>
-          <div class="results-panel">
-            <div class="results-panel-heading"><i class="fa-solid fa-box"></i>Box Plots by Group</div>
-            <div class="results-panel-body">
-              <div class="chart-wrap-tall" id="boxChart"></div>
+
+            <!-- Effect sizes (right column) -->
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div class="results-panel" style="margin-bottom:0;">
+                <div class="results-panel-heading"><i class="fa-solid fa-bolt"></i>Effect Sizes</div>
+                <div class="results-panel-body" id="effectsBody"></div>
+              </div>
+              <div class="results-panel" style="margin-bottom:0;">
+                <div class="results-panel-heading"><i class="fa-solid fa-ruler"></i>Benchmarks</div>
+                <div class="results-panel-body" style="font-size:12px;">
+                  <table>
+                    <thead><tr><th>Measure</th><th class="num">S</th><th class="num">M</th><th class="num">L</th></tr></thead>
+                    <tbody>
+                      <tr><td>η²</td><td class="num">.01</td><td class="num">.06</td><td class="num">.14</td></tr>
+                      <tr><td>ω²</td><td class="num">.01</td><td class="num">.06</td><td class="num">.14</td></tr>
+                      <tr><td>Cohen's f</td><td class="num">.10</td><td class="num">.25</td><td class="num">.40</td></tr>
+                      <tr><td>ε²</td><td class="num">.01</td><td class="num">.08</td><td class="num">.26</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          </div>
-          <div class="results-panel" id="interactionPanel" style="display:none;">
-            <div class="results-panel-heading"><i class="fa-solid fa-arrows-cross"></i>Interaction Plot (Two-Way)</div>
-            <div class="results-panel-body">
-              <div class="chart-wrap" id="interactionChart"></div>
-              <p class="interaction-note">Non-parallel lines suggest an interaction effect between the two factors.</p>
-            </div>
-          </div>
-          <div class="results-panel">
-            <div class="results-panel-heading"><i class="fa-solid fa-bolt"></i>Effect Size Estimates</div>
-            <div class="results-panel-body" id="effectsBody"></div>
-          </div>
-          <div class="results-panel">
-            <div class="results-panel-heading"><i class="fa-solid fa-ruler"></i>Interpretation Benchmarks</div>
-            <div class="results-panel-body">
-              <table>
-                <thead><tr><th>Measure</th><th class="num">Small</th><th class="num">Medium</th><th class="num">Large</th></tr></thead>
-                <tbody>
-                  <tr><td>η² (eta-squared)</td><td class="num">.01</td><td class="num">.06</td><td class="num">.14</td></tr>
-                  <tr><td>ω² (omega-squared)</td><td class="num">.01</td><td class="num">.06</td><td class="num">.14</td></tr>
-                  <tr><td>Cohen's f</td><td class="num">.10</td><td class="num">.25</td><td class="num">.40</td></tr>
-                  <tr><td>ε² (Kruskal-Wallis)</td><td class="num">.01</td><td class="num">.08</td><td class="num">.26</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+          </div><!-- /grid -->
+
+          <!-- Hidden interaction panel trigger (two-way only) -->
+          <div id="interactionPanel" style="display:none;"></div>
+
         </div>
 
         <!-- ── REPORT ────────────────────────────────────────── -->
@@ -459,9 +485,7 @@
     if (btn) btn.classList.add('active');
 
     if (id === 'visuals') {
-      setTimeout(function() {
-        Object.values(_charts).forEach(function(c) { try { c.reflow(); } catch(e){} });
-      }, 60);
+      setTimeout(function() { showChart(_chartMode); }, 60);
     }
 
     if (typeof StatisticoHeader !== 'undefined' && TAB_TITLES[id]) {
@@ -756,7 +780,34 @@
     navigator.clipboard && navigator.clipboard.writeText(box.innerText);
   }
 
-  /* ── Means Chart ─────────────────────────────────────────── */
+  /* ── Chart toggle ────────────────────────────────────────── */
+  var _chartMode = 'bar';
+  function showChart(mode) {
+    _chartMode = mode;
+    document.getElementById('meansChart').style.display       = mode === 'bar'  ? '' : 'none';
+    document.getElementById('boxChart').style.display         = mode === 'box'  ? '' : 'none';
+    document.getElementById('interactionChart').style.display = mode === 'line' ? '' : 'none';
+    var note = document.getElementById('interactionNote');
+    if (note) note.style.display = mode === 'line' ? '' : 'none';
+
+    document.getElementById('btnBar').classList.toggle('active', mode === 'bar');
+    document.getElementById('btnBox').classList.toggle('active', mode === 'box');
+    var btnLine = document.getElementById('btnLine');
+    if (btnLine) btnLine.classList.toggle('active', mode === 'line');
+
+    var titles = { bar:'<i class="fa-solid fa-chart-column"></i>&nbsp;Group Means with 95% CI',
+                   box:'<i class="fa-solid fa-box"></i>&nbsp;Box Plots by Group',
+                   line:'<i class="fa-solid fa-chart-line"></i>&nbsp;Interaction Plot (Two-Way)' };
+    document.getElementById('chartTitle').innerHTML = titles[mode] || titles.bar;
+
+    setTimeout(function() {
+      if (mode === 'bar'  && _charts.means)       _charts.means.reflow();
+      if (mode === 'box'  && _charts.box)         _charts.box.reflow();
+      if (mode === 'line' && _charts.interaction) _charts.interaction.reflow();
+    }, 40);
+  }
+
+  /* ── Means Chart (bar + CI + data labels) ────────────────── */
   function renderMeansChart(b) {
     var desc = b.descriptives || b.descA;
     if (!desc || !desc.length) return;
@@ -766,28 +817,31 @@
     var gc  = isDark ? 'rgba(255,255,255,.07)' : '#e5e7eb';
 
     _charts.means = Highcharts.chart('meansChart', {
-      chart: { type:'column', backgroundColor:'transparent', style:{ fontFamily:'Segoe UI' } },
+      chart: { type:'column', backgroundColor:'transparent', style:{ fontFamily:'Segoe UI' }, animation:{ duration:400 } },
       title: { text:'' }, credits:{ enabled:false },
-      xAxis: { categories: desc.map(function(d){return d.level;}), labels:{ style:{color:tc} }, lineColor:gc },
+      xAxis: { categories: desc.map(function(d){return d.level;}), labels:{ style:{color:tc,fontSize:'13px'} }, lineColor:gc },
       yAxis: { title:{ text:(b.spec&&b.spec.dv)||'Mean', style:{color:tc} }, gridLineColor:gc, labels:{style:{color:tc}} },
       legend:{ enabled:false },
-      plotOptions:{ column:{ color:'rgb(16,185,129)', opacity:.85, borderRadius:4, borderWidth:0 } },
+      plotOptions:{ column:{
+        color:'rgb(16,185,129)', opacity:.88, borderRadius:5, borderWidth:0,
+        dataLabels:{ enabled:true, format:'{point.y:.2f}', style:{ color:tc, fontSize:'13px', fontWeight:'700', textOutline:'none' }, inside:false, verticalAlign:'top', y:-4 }
+      }},
       series:[
         { name:'Mean', data: desc.map(function(d){ return isFinite(d.mean)?+d.mean.toFixed(4):null; }) },
         { name:'95% CI', type:'errorbar',
           data: desc.map(function(d){ return [isFinite(d.ciLow)?+d.ciLow.toFixed(4):0, isFinite(d.ciHigh)?+d.ciHigh.toFixed(4):0]; }),
-          color: isDark ? 'rgba(255,255,255,.55)' : '#374151', stemWidth:2, whiskerWidth:9 }
+          color: isDark ? 'rgba(255,255,255,.55)' : '#374151', stemWidth:2, whiskerWidth:10 }
       ],
       tooltip:{ shared:true,
         formatter: function() {
           var d = desc[this.points[0].point.index];
-          return '<b>' + d.level + '</b><br>n: ' + d.n + '<br>Mean: ' + fmt(d.mean) + '<br>SD: ' + fmt(d.sd);
+          return '<b>' + d.level + '</b><br>n: ' + d.n + '<br>Mean: ' + fmt(d.mean) + '<br>SD: ' + fmt(d.sd) + '<br>95% CI: [' + fmt(d.ciLow) + ', ' + fmt(d.ciHigh) + ']';
         }
       }
     });
   }
 
-  /* ── Box Chart ───────────────────────────────────────────── */
+  /* ── Box Chart (with median label) ──────────────────────── */
   function renderBoxChart(b) {
     var desc = b.descriptives || b.descA;
     if (!desc || !desc.length) return;
@@ -797,34 +851,48 @@
     var gc  = isDark ? 'rgba(255,255,255,.07)' : '#e5e7eb';
 
     _charts.box = Highcharts.chart('boxChart', {
-      chart:{ type:'boxplot', backgroundColor:'transparent', style:{fontFamily:'Segoe UI'} },
+      chart:{ type:'boxplot', backgroundColor:'transparent', style:{fontFamily:'Segoe UI'}, animation:{duration:400} },
       title:{ text:'' }, credits:{ enabled:false },
-      xAxis:{ categories: desc.map(function(d){return d.level;}), labels:{style:{color:tc}}, lineColor:gc },
+      xAxis:{ categories: desc.map(function(d){return d.level;}), labels:{style:{color:tc,fontSize:'13px'}}, lineColor:gc },
       yAxis:{ title:{ text:(b.spec&&b.spec.dv)||'Value', style:{color:tc} }, gridLineColor:gc, labels:{style:{color:tc}} },
       legend:{ enabled:false },
+      plotOptions:{ boxplot:{
+        dataLabels:{ enabled:true,
+          formatter: function() { return '<span style="font-size:11px;color:' + tc + '">M=' + this.point.median.toFixed(2) + '</span>'; },
+          useHTML:true, verticalAlign:'top', y:-18
+        }
+      }},
       series:[{
         name:'Distribution',
         data: desc.map(function(d){
-          return [
-            isFinite(d.min)    ? d.min    : 0,
-            isFinite(d.q1)     ? d.q1     : 0,
-            isFinite(d.median) ? d.median : 0,
-            isFinite(d.q3)     ? d.q3     : 0,
-            isFinite(d.max)    ? d.max    : 0
-          ];
+          return {
+            low:    isFinite(d.min)    ? d.min    : 0,
+            q1:     isFinite(d.q1)     ? d.q1     : 0,
+            median: isFinite(d.median) ? d.median : 0,
+            q3:     isFinite(d.q3)     ? d.q3     : 0,
+            high:   isFinite(d.max)    ? d.max    : 0
+          };
         }),
         fillColor:'rgba(16,185,129,.18)', medianColor:'rgb(52,211,153)',
         whiskerColor: isDark ? 'rgba(255,255,255,.5)' : '#374151',
         stemColor: isDark ? 'rgba(255,255,255,.3)' : '#9ca3af',
         color:'rgb(16,185,129)', lineWidth:1.5
-      }]
+      }],
+      tooltip:{
+        formatter: function() {
+          var d = desc[this.point.index];
+          return '<b>' + d.level + '</b><br>Max: ' + fmt(d.max) + '<br>Q3: ' + fmt(d.q3) + '<br>Median: ' + fmt(d.median) + '<br>Q1: ' + fmt(d.q1) + '<br>Min: ' + fmt(d.min);
+        }
+      }
     });
   }
 
   /* ── Interaction Chart ───────────────────────────────────── */
   function renderInteractionChart(b) {
     if (b.type !== 'two-way' || !b.cellDesc) return;
-    document.getElementById('interactionPanel').style.display = '';
+    /* Show the line toggle button */
+    var btnLine = document.getElementById('btnLine');
+    if (btnLine) btnLine.style.display = '';
 
     var isDark = document.documentElement.getAttribute('data-theme') !== 'light';
     var tc  = isDark ? 'rgba(255,255,255,.82)' : '#1f2937';
@@ -837,6 +905,7 @@
       xAxis:{ categories: b.bLevels, title:{ text:(b.spec&&b.spec.factor2)||'Factor B', style:{color:tc} }, labels:{style:{color:tc}}, lineColor:gc },
       yAxis:{ title:{ text:(b.spec&&b.spec.dv)||'Mean', style:{color:tc} }, gridLineColor:gc, labels:{style:{color:tc}} },
       legend:{ itemStyle:{color:tc} },
+      plotOptions:{ line:{ dataLabels:{ enabled:true, format:'{point.y:.2f}', style:{color:tc,fontSize:'11px',fontWeight:'600',textOutline:'none'} } } },
       series: (b.aLevels || []).map(function(a, ai) {
         return {
           name: ((b.spec&&b.spec.factor1)||'Factor A') + ': ' + a,

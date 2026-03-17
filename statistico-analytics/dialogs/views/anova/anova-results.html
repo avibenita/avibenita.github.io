@@ -112,7 +112,28 @@
     .effect-bar-fill{ height:100%; background:linear-gradient(90deg,var(--accent-1),var(--accent-2)); border-radius:4px; transition:width .4s; }
     .effect-row-note{ font-size:10.5px; color:var(--text-muted); margin-top:3px; }
 
-    /* ── Report box ─────────────────────────────────────────── */
+    /* ── Smart Comparison boxes ─────────────────────────────── */
+    .cmp-box{
+      border-radius:9px; border:1.5px solid; padding:0; overflow:hidden; margin-bottom:0;
+    }
+    .cmp-box-title{
+      padding:9px 14px; font-size:13px; font-weight:700;
+      display:flex; align-items:center; gap:7px;
+    }
+    .cmp-box-body{
+      padding:10px 14px; font-size:13px; line-height:1.65; color:var(--text-secondary);
+      border-top:1px solid;
+    }
+    .cmp-info{
+      background:rgba(16,185,129,.06); border-color:rgba(16,185,129,.25);
+    }
+    .cmp-info .cmp-box-title{ color:var(--accent-1); }
+    .cmp-info .cmp-box-body{ border-color:rgba(16,185,129,.15); }
+    .cmp-warn{
+      background:rgba(251,191,36,.07); border-color:rgba(251,191,36,.35);
+    }
+    .cmp-warn .cmp-box-title{ color:#fbbf24; }
+    .cmp-warn .cmp-box-body{ border-color:rgba(251,191,36,.2); }
     .report-box{ background:var(--surface-2); border:1.5px solid var(--border); border-radius:9px; padding:14px 16px; font-size:14px; line-height:1.75; color:var(--text-secondary); }
     .report-box p{ margin-bottom:8px; }
     .report-box p:last-child{ margin-bottom:0; }
@@ -646,24 +667,113 @@
     }
   }
 
-  /* ── Post-Hoc ────────────────────────────────────────────── */
+  /* ── Smart Comparisons Engine ───────────────────────────── */
   function populatePosthoc(b) {
     var el    = document.getElementById('posthocBody');
-    var rows  = b.posthoc;
     var alpha = (b.spec && b.spec.alpha) ? b.spec.alpha : 0.05;
-    if (!rows || !rows.length) {
-      el.innerHTML = '<p style="color:var(--text-muted);font-size:12px;">Post-hoc comparisons require 3+ groups (one-way) or are available per condition (repeated).</p>';
+    var rows  = b.posthoc;
+
+    /* ── Determine situation ── */
+    var factors   = [];
+    var interactionSig = false;
+    var leveneUnequal  = b.levene && isFinite(b.levene.p) && b.levene.p < alpha;
+    var method = (b.spec && b.spec.posthocMethod) || (rows && rows[0] && rows[0].method) || (leveneUnequal ? 'Games-Howell' : 'Tukey HSD');
+
+    if (b.type === 'one-way') {
+      var nLevels = b.levels ? b.levels.length : 0;
+      factors = [{ name: (b.spec && b.spec.factor1) || 'Group', levels: nLevels }];
+    } else if (b.type === 'two-way' && b.twoWay) {
+      var tw = b.twoWay;
+      factors = [
+        { name: (b.spec && b.spec.factor1) || 'Factor A', levels: b.aLevels ? b.aLevels.length : 0 },
+        { name: (b.spec && b.spec.factor2) || 'Factor B', levels: b.bLevels ? b.bLevels.length : 0 }
+      ];
+      interactionSig = isFinite(tw.pAB) && tw.pAB < alpha;
+    } else if (b.type === 'repeated') {
+      var nCond = b.spec && b.spec.conditions ? b.spec.conditions.length : 0;
+      factors = [{ name: 'Condition', levels: nCond }];
+    }
+
+    var eligibleFactors = factors.filter(function(f){ return f.levels >= 3; });
+    var mode = interactionSig ? 'simple-effects' : eligibleFactors.length > 0 ? 'posthoc' : 'none';
+
+    /* ── Render ── */
+    var html = '';
+
+    /* Warning / interaction banner */
+    if (interactionSig) {
+      html += '<div class="cmp-box cmp-warn">' +
+        '<div class="cmp-box-title"><i class="fa-solid fa-triangle-exclamation"></i> Significant interaction detected</div>' +
+        '<div class="cmp-box-body">Main effects should be interpreted with caution. <strong>Simple effects analysis is recommended</strong> — compare levels of each factor <em>within</em> each level of the other factor.</div>' +
+        '</div>';
+    }
+
+    if (leveneUnequal && mode !== 'none') {
+      html += '<div class="cmp-box cmp-warn" style="margin-top:8px;">' +
+        '<div class="cmp-box-title"><i class="fa-solid fa-flask"></i> Unequal variances</div>' +
+        '<div class="cmp-box-body">Levene's test is significant. Using <strong>Games-Howell</strong> (does not assume equal variances).</div>' +
+        '</div>';
+    }
+
+    /* Two-way: per-factor eligibility summary */
+    if (b.type === 'two-way' && factors.length === 2) {
+      html += '<div class="cmp-box cmp-info" style="margin-top:8px;">' +
+        '<div class="cmp-box-title"><i class="fa-solid fa-diagram-project"></i> Post-hoc eligibility per factor</div>' +
+        '<div class="cmp-box-body">' +
+        '<table style="width:100%;font-size:13px;"><thead><tr><th>Factor</th><th class="num">Levels</th><th>Post-hoc?</th></tr></thead><tbody>' +
+        factors.map(function(f) {
+          var ok = f.levels >= 3;
+          return '<tr><td>' + f.name + '</td><td class="num">' + (f.levels || '?') + '</td><td>' +
+            (ok ? '<span class="badge badge-sig"><i class="fa-solid fa-check" style="font-size:9px;"></i> Available</span>'
+                : '<span class="badge badge-ns">Not required (2 levels)</span>') +
+            '</td></tr>';
+        }).join('') +
+        '</tbody></table></div></div>';
+    }
+
+    /* CASE: no comparisons needed */
+    if (mode === 'none') {
+      html += '<div class="cmp-box cmp-info" style="margin-top:8px;">' +
+        '<div class="cmp-box-title"><i class="fa-solid fa-circle-info"></i> No post-hoc comparisons required</div>' +
+        '<div class="cmp-box-body">Each factor has only 2 levels. The ANOVA F-test already tests the difference directly — no further pairwise comparisons are needed.' +
+        (b.type === 'two-way' ? '<br><br><em>For multi-factor designs: post-hoc tests apply per factor when it has 3+ levels. If the interaction is significant, examine simple effects instead.</em>' : '') +
+        '</div></div>';
+      el.innerHTML = html;
       return;
     }
-    var method = (rows[0] && rows[0].method) ? rows[0].method : (b.spec && b.spec.posthocMethod) || '';
-    el.innerHTML =
-      '<p style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Method: <strong>' + method + '</strong></p>' +
-      '<table><thead><tr><th>Comparison</th><th class="num">Mean diff</th><th class="num">SE</th><th class="num">p (adj)</th><th></th></tr></thead><tbody>' +
-      rows.map(function(r) {
-        var p = (r.pAdj !== undefined) ? r.pAdj : r.p;
-        return '<tr><td>' + r.comparison + '</td><td class="num">' + fmt(r.diff) + '</td><td class="num">' + fmt(r.se) + '</td><td class="num ' + sigCell(p,alpha) + '">' + fmtP(p) + '</td><td>' + sigBadge(p,alpha) + '</td></tr>';
-      }).join('') +
-      '</tbody></table>';
+
+    /* CASE: simple effects (interaction significant) */
+    if (mode === 'simple-effects') {
+      html += '<div class="cmp-box cmp-info" style="margin-top:8px;">' +
+        '<div class="cmp-box-title"><i class="fa-solid fa-arrows-split-up-and-left"></i> Simple Effects — Method: ' + method + '</div>' +
+        '<div class="cmp-box-body">';
+      factors.forEach(function(f) {
+        var other = factors.filter(function(x){ return x.name !== f.name; }).map(function(x){ return x.name; }).join(', ');
+        html += '<div style="margin-bottom:6px;"><strong>' + f.name + '</strong> — compare levels within each level of <em>' + other + '</em></div>';
+      });
+      html += '</div></div>';
+    }
+
+    /* CASE: standard post-hoc results */
+    if (rows && rows.length) {
+      html += '<div style="margin-top:8px;">' +
+        '<p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Method: <strong>' + method + '</strong> &nbsp;|&nbsp; α = ' + alpha + '</p>' +
+        '<table><thead><tr><th>Comparison</th><th class="num">Mean diff</th><th class="num">SE</th><th class="num">p (adj)</th><th></th></tr></thead><tbody>' +
+        rows.map(function(r) {
+          var p = (r.pAdj !== undefined) ? r.pAdj : r.p;
+          return '<tr><td>' + r.comparison + '</td><td class="num">' + fmt(r.diff) + '</td><td class="num">' + fmt(r.se) + '</td><td class="num ' + sigCell(p,alpha) + '">' + fmtP(p) + '</td><td>' + sigBadge(p,alpha) + '</td></tr>';
+        }).join('') +
+        '</tbody></table></div>';
+    } else if (mode === 'posthoc') {
+      /* Eligible but no results yet (data not yet computed) */
+      html += '<div class="cmp-box cmp-info" style="margin-top:8px;">' +
+        '<div class="cmp-box-title"><i class="fa-solid fa-code-compare"></i> Post-hoc comparisons available</div>' +
+        '<div class="cmp-box-body">Method: <strong>' + method + '</strong><br>' +
+        eligibleFactors.map(function(f){ return f.name + ' (' + f.levels + ' levels)'; }).join(', ') +
+        '</div></div>';
+    }
+
+    el.innerHTML = html;
   }
 
   /* ── Non-Parametric ──────────────────────────────────────── */

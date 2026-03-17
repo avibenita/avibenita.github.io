@@ -257,6 +257,9 @@ const StatisticoHeader = {
       // PCA views
       'pca-analysis': 'Principal Component Analysis',
 
+      // ANOVA views
+      'anova-results': 'ANOVA',
+
       // Independent means views
       'independent-results': 'Independent Means (2 Groups)',
       'independent-results-kplus': 'Independent Means (K+ Groups)',
@@ -273,7 +276,8 @@ const StatisticoHeader = {
       'dependent': 'Dependent Means',
       'logistic': 'Logistic Regression',
       'factor': 'Factor Analysis',
-      'pca': 'PCA'
+      'pca': 'PCA',
+      'anova': 'ANOVA'
     };
     
     const currentTheme = this.getTheme();
@@ -306,7 +310,7 @@ const StatisticoHeader = {
     `;
 
     // All sidebar-based modules hide the shared-header navrow to avoid duplicate navigation.
-    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate');
+    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'anova' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate');
 
     const headerHTML = `
       <div class="statistico-shell">

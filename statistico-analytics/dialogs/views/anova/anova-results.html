@@ -648,7 +648,13 @@
     setTimeout(function() {
       renderMeansChart(b);
       renderBoxChart(b);
-      if (b.type === 'two-way') renderInteractionChart(b);
+      if (b.type === 'two-way') {
+        renderInteractionChart(b);
+        /* Show Interaction button and default to it for two-way */
+        var btnLine = document.getElementById('btnLine');
+        if (btnLine) btnLine.style.display = '';
+        showChart('line');
+      }
     }, 80);
 
     /* Update header subtitle */
@@ -1163,9 +1169,10 @@
     var btnLine = document.getElementById('btnLine');
     if (btnLine) btnLine.classList.toggle('active', mode === 'line');
 
-    var titles = { bar:'<i class="fa-solid fa-chart-column"></i>&nbsp;Group Means with 95% CI',
-                   box:'<i class="fa-solid fa-box"></i>&nbsp;Box Plots by Group',
-                   line:'<i class="fa-solid fa-chart-line"></i>&nbsp;Interaction Plot (Two-Way)' };
+    var b = _bundle;
+    var titles = { bar:'<i class="fa-solid fa-chart-column"></i>&nbsp;' + (b && b.type === 'two-way' ? 'Cell Means by Factor' : 'Group Means with 95% CI'),
+                   box:'<i class="fa-solid fa-box"></i>&nbsp;' + (b && b.type === 'two-way' ? 'Box Plots — ' + ((b.spec&&b.spec.factor2)||'Factor B') : 'Box Plots by Group'),
+                   line:'<i class="fa-solid fa-chart-line"></i>&nbsp;Interaction Plot — ' + (b ? ((b.spec&&b.spec.factor1)||'A') + ' × ' + ((b.spec&&b.spec.factor2)||'B') : 'Two-Way') };
     document.getElementById('chartTitle').innerHTML = titles[mode] || titles.bar;
 
     setTimeout(function() {
@@ -1175,24 +1182,57 @@
     }, 40);
   }
 
-  /* ── Means Chart (bar + CI + data labels) ────────────────── */
+  /* ── Means Chart ─────────────────────────────────────────── */
   function renderMeansChart(b) {
+    var isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+    var tc = isDark ? 'rgba(255,255,255,.82)' : '#1f2937';
+    var gc = isDark ? 'rgba(255,255,255,.07)' : '#e5e7eb';
+    var colors = ['rgb(16,185,129)','rgb(59,130,246)','rgb(245,158,11)','rgb(239,68,68)','rgb(168,85,247)'];
+
+    /* ── TWO-WAY: grouped columns — one series per Factor A level, x-axis = Factor B levels ── */
+    if (b.type === 'two-way' && b.cellDesc && b.aLevels && b.bLevels) {
+      var fAname = (b.spec && b.spec.factor1) || 'Factor A';
+      var fBname = (b.spec && b.spec.factor2) || 'Factor B';
+      _charts.means = Highcharts.chart('meansChart', {
+        chart:{ type:'column', backgroundColor:'transparent', style:{fontFamily:'Segoe UI'}, animation:{duration:400} },
+        title:{ text:'' }, credits:{ enabled:false },
+        xAxis:{ categories: b.bLevels, title:{text:fBname,style:{color:tc}}, labels:{style:{color:tc,fontSize:'12px'}}, lineColor:gc },
+        yAxis:{ title:{text:(b.spec&&b.spec.dv)||'Mean',style:{color:tc}}, gridLineColor:gc, labels:{style:{color:tc}} },
+        legend:{ itemStyle:{color:tc}, enabled:true },
+        plotOptions:{ column:{
+          grouping:true, borderRadius:4, borderWidth:0,
+          dataLabels:{ enabled:true, format:'{point.y:.1f}', style:{color:tc,fontSize:'11px',fontWeight:'700',textOutline:'none'}, inside:false, verticalAlign:'top', y:-4 }
+        }},
+        series: b.aLevels.map(function(aLv, ai) {
+          return {
+            name: fAname + ': ' + aLv,
+            color: colors[ai % colors.length],
+            data: b.bLevels.map(function(bLv) {
+              var cell = (b.cellDesc || []).find(function(c){ return c.a === aLv && c.b === bLv; });
+              return cell && isFinite(cell.mean) ? +cell.mean.toFixed(4) : null;
+            })
+          };
+        }),
+        tooltip:{ formatter: function() {
+          var cell = (b.cellDesc||[]).find(function(c){ return c.b === this.x && (fAname+': '+c.a) === this.series.name; }.bind(this));
+          return '<b>' + this.series.name + ', ' + fBname + ': ' + this.x + '</b><br>Mean: ' + fmt(this.y) + (cell ? '<br>n: '+cell.n : '');
+        }}
+      });
+      return;
+    }
+
+    /* ── ONE-WAY / REPEATED: single-series bar ── */
     var desc = b.descriptives || b.descA;
     if (!desc || !desc.length) return;
-
-    var isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-    var tc  = isDark ? 'rgba(255,255,255,.82)' : '#1f2937';
-    var gc  = isDark ? 'rgba(255,255,255,.07)' : '#e5e7eb';
-
     _charts.means = Highcharts.chart('meansChart', {
-      chart: { type:'column', backgroundColor:'transparent', style:{ fontFamily:'Segoe UI' }, animation:{ duration:400 } },
-      title: { text:'' }, credits:{ enabled:false },
-      xAxis: { categories: desc.map(function(d){return d.level;}), labels:{ style:{color:tc,fontSize:'13px'} }, lineColor:gc },
-      yAxis: { title:{ text:(b.spec&&b.spec.dv)||'Mean', style:{color:tc} }, gridLineColor:gc, labels:{style:{color:tc}} },
+      chart:{ type:'column', backgroundColor:'transparent', style:{fontFamily:'Segoe UI'}, animation:{duration:400} },
+      title:{ text:'' }, credits:{ enabled:false },
+      xAxis:{ categories: desc.map(function(d){return d.level;}), labels:{style:{color:tc,fontSize:'13px'}}, lineColor:gc },
+      yAxis:{ title:{text:(b.spec&&b.spec.dv)||'Mean',style:{color:tc}}, gridLineColor:gc, labels:{style:{color:tc}} },
       legend:{ enabled:false },
       plotOptions:{ column:{
         color:'rgb(16,185,129)', opacity:.88, borderRadius:5, borderWidth:0,
-        dataLabels:{ enabled:true, format:'{point.y:.2f}', style:{ color:tc, fontSize:'13px', fontWeight:'700', textOutline:'none' }, inside:false, verticalAlign:'top', y:-4 }
+        dataLabels:{ enabled:true, format:'{point.y:.2f}', style:{color:tc,fontSize:'13px',fontWeight:'700',textOutline:'none'}, inside:false, verticalAlign:'top', y:-4 }
       }},
       series:[
         { name:'Mean', data: desc.map(function(d){ return isFinite(d.mean)?+d.mean.toFixed(4):null; }) },
@@ -1200,18 +1240,17 @@
           data: desc.map(function(d){ return [isFinite(d.ciLow)?+d.ciLow.toFixed(4):0, isFinite(d.ciHigh)?+d.ciHigh.toFixed(4):0]; }),
           color: isDark ? 'rgba(255,255,255,.55)' : '#374151', stemWidth:2, whiskerWidth:10 }
       ],
-      tooltip:{ shared:true,
-        formatter: function() {
-          var d = desc[this.points[0].point.index];
-          return '<b>' + d.level + '</b><br>n: ' + d.n + '<br>Mean: ' + fmt(d.mean) + '<br>SD: ' + fmt(d.sd) + '<br>95% CI: [' + fmt(d.ciLow) + ', ' + fmt(d.ciHigh) + ']';
-        }
-      }
+      tooltip:{ shared:true, formatter: function() {
+        var d = desc[this.points[0].point.index];
+        return '<b>' + d.level + '</b><br>n: ' + d.n + '<br>Mean: ' + fmt(d.mean) + (d.sd ? '<br>SD: ' + fmt(d.sd) : '') + (d.ciLow ? '<br>95% CI: [' + fmt(d.ciLow) + ', ' + fmt(d.ciHigh) + ']' : '');
+      }}
     });
   }
 
-  /* ── Box Chart (with median label) ──────────────────────── */
+  /* ── Box Chart ───────────────────────────────────────────── */
   function renderBoxChart(b) {
-    var desc = b.descriptives || b.descA;
+    /* For two-way, show marginal descB (the factor with more levels, usually time) */
+    var desc = b.descriptives || (b.type === 'two-way' ? (b.descB || b.descA) : b.descA);
     if (!desc || !desc.length) return;
 
     var isDark = document.documentElement.getAttribute('data-theme') !== 'light';

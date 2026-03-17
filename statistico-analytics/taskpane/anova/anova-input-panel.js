@@ -549,23 +549,68 @@ function buildAnovaBundle(headers, rows, spec) {
 }
 
 function buildReport_1way(anova, kw, desc, levels, alpha) {
-  const sig = anova.p < alpha;
-  const kwSig = kw.p < alpha;
+  function apaP(p) {
+    if (!isFinite(p)) return 'p = —';
+    if (p < .001) return 'p < .001';
+    return 'p = ' + p.toFixed(3).replace('0.', '.');
+  }
+  const sig = anova.p < alpha, kwSig = kw.p < alpha;
+  const effLbl = anova.etaSq >= .14 ? 'large' : anova.etaSq >= .06 ? 'medium' : 'small';
   return {
-    apa: `A one-way ANOVA revealed ${sig ? 'a statistically significant' : 'no statistically significant'} effect of group on the outcome, F(${anova.df1}, ${anova.df2}) = ${anova.F.toFixed(2)}, p = ${anova.p.toFixed(4)}, η² = ${anova.etaSq.toFixed(3)}.`,
-    nonParam: `Kruskal-Wallis H(${kw.df}) = ${kw.H.toFixed(2)}, p = ${kw.p.toFixed(4)}.`,
-    consistency: sig === kwSig ? 'Parametric and non-parametric conclusions agree.' : 'Tests disagree — inspect distributions and outliers.'
+    apa: `A one-way ANOVA revealed ${sig ? 'a statistically significant' : 'no statistically significant'} effect of group on the outcome, ` +
+      `F(${anova.df1}, ${anova.df2}) = ${anova.F.toFixed(2)}, ${apaP(anova.p)}, η² = ${anova.etaSq.toFixed(3).replace('0.','.')} (${effLbl} effect).`,
+    nonParam: `A Kruskal-Wallis test ${kwSig ? 'confirmed' : 'did not confirm'} a significant group difference, H(${kw.df}) = ${kw.H.toFixed(2)}, ${apaP(kw.p)}.`,
+    consistency: sig === kwSig ? 'Parametric and non-parametric conclusions agree.' : 'Parametric and non-parametric tests disagree — inspect distributions and outliers.'
   };
 }
 function buildReport_2way(anova, fA, fB, alpha) {
-  return {
-    apa: `Two-way ANOVA: ${fA} F(${anova.dfA},${anova.dfError})=${anova.FA.toFixed(2)}, p=${anova.pA.toFixed(4)}, η²=${anova.etaSqA.toFixed(3)}. ${fB} F(${anova.dfB},${anova.dfError})=${anova.FB.toFixed(2)}, p=${anova.pB.toFixed(4)}, η²=${anova.etaSqB.toFixed(3)}. Interaction F(${anova.dfAB},${anova.dfError})=${anova.FAB.toFixed(2)}, p=${anova.pAB.toFixed(4)}, η²=${anova.etaSqAB.toFixed(3)}.`
-  };
+  function apaP(p) {
+    if (!isFinite(p)) return 'p = —';
+    if (p < .001) return 'p < .001';
+    if (p < .01)  return 'p = ' + p.toFixed(3).replace('0.', '.');
+    return 'p = ' + p.toFixed(3).replace('0.', '.');
+  }
+  function apaEta(v) { return 'η² = ' + v.toFixed(3).replace('0.', '.'); }
+  function effLbl(v) { return v >= .14 ? 'large' : v >= .06 ? 'medium' : 'small'; }
+
+  const sigA   = anova.pA  < alpha, sigB = anova.pB < alpha, sigAB = anova.pAB < alpha;
+
+  /* ── Sentence 1: omnibus results ── */
+  const s1 = `A two-way ANOVA revealed ${sigA ? 'a significant' : 'no significant'} main effect of ${fA}, ` +
+    `F(${anova.dfA}, ${anova.dfError}) = ${anova.FA.toFixed(2)}, ${apaP(anova.pA)}, ${apaEta(anova.etaSqA)} (${effLbl(anova.etaSqA)} effect), ` +
+    `and ${sigB ? 'a significant' : 'no significant'} main effect of ${fB}, ` +
+    `F(${anova.dfB}, ${anova.dfError}) = ${anova.FB.toFixed(2)}, ${apaP(anova.pB)}, ${apaEta(anova.etaSqB)} (${effLbl(anova.etaSqB)} effect).`;
+
+  /* ── Sentence 2: interaction ── */
+  const s2 = sigAB
+    ? `Importantly, a significant ${fA} × ${fB} interaction was observed, ` +
+      `F(${anova.dfAB}, ${anova.dfError}) = ${anova.FAB.toFixed(2)}, ${apaP(anova.pAB)}, ${apaEta(anova.etaSqAB)}, ` +
+      `indicating that the effect of ${fB} differed across levels of ${fA}.`
+    : `The ${fA} × ${fB} interaction was not significant, ` +
+      `F(${anova.dfAB}, ${anova.dfError}) = ${anova.FAB.toFixed(2)}, ${apaP(anova.pAB)}, ${apaEta(anova.etaSqAB)}, ` +
+      `suggesting that the effect of ${fB} did not differ across levels of ${fA}.`;
+
+  /* ── Sentence 3: follow-up guidance ── */
+  const s3 = sigAB
+    ? `Follow-up simple effects analyses are recommended to examine the effect of ${fB} within each level of ${fA} (see Comparisons tab).`
+    : (sigA || sigB)
+      ? `Post-hoc comparisons for ${[sigA ? fA : null, sigB ? fB : null].filter(Boolean).join(' and ')} are available in the Comparisons tab.`
+      : `No further comparisons are warranted.`;
+
+  return { apa: s1, interaction: s2, followup: s3 };
 }
 function buildReport_rm(anova, levels, alpha) {
+  function apaP(p) {
+    if (!isFinite(p)) return 'p = —';
+    if (p < .001) return 'p < .001';
+    return 'p = ' + p.toFixed(3).replace('0.', '.');
+  }
   const sig = anova.p < alpha;
+  const effLbl = anova.etaSqP >= .14 ? 'large' : anova.etaSqP >= .06 ? 'medium' : 'small';
   return {
-    apa: `A one-way repeated measures ANOVA ${sig ? 'revealed a significant' : 'did not reveal a significant'} effect of condition, F(${anova.dfConditions},${anova.dfError}) = ${anova.F.toFixed(2)}, p = ${anova.p.toFixed(4)}, η²p = ${anova.etaSqP.toFixed(3)}.`
+    apa: `A one-way repeated measures ANOVA ${sig ? 'revealed a significant' : 'did not reveal a significant'} effect of condition, ` +
+      `F(${anova.dfConditions}, ${anova.dfError}) = ${anova.F.toFixed(2)}, ${apaP(anova.p)}, η²p = ${anova.etaSqP.toFixed(3).replace('0.','.')} (${effLbl} effect).` +
+      (sig ? ` Post-hoc pairwise comparisons (Bonferroni-corrected) are available in the Comparisons tab.` : '')
   };
 }
 

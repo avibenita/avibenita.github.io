@@ -165,13 +165,53 @@
 
     /* ── Mode Switch (Inference) — removed, all 3 shown always ─ */
 
-    /* ── Inference 2×2 grid ─────────────────────────────────── */
-    .inf-grid{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:10px;
+    /* ── Accordion panels ───────────────────────────────────── */
+    .acc-panel{
+      background:var(--surface-1);
+      border:1.5px solid var(--border);
+      border-radius:var(--panel-radius);
+      margin-bottom:8px;
+      overflow:hidden;
     }
-    @media(max-width:800px){ .inf-grid{ grid-template-columns:1fr; } }
+    .acc-header{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 16px; cursor:pointer;
+      background:var(--surface-2);
+      user-select:none;
+      transition:background .15s;
+    }
+    .acc-header:hover{ background:rgba(16,185,129,.08); }
+    .acc-title{
+      display:flex; align-items:center; gap:8px;
+      font-size:13.5px; font-weight:700; color:var(--accent-1);
+    }
+    .acc-meta{
+      display:flex; align-items:center; gap:8px;
+    }
+    .acc-tag{
+      font-size:11px; font-weight:600; padding:2px 9px; border-radius:10px;
+      background:rgba(156,163,175,.12); color:var(--text-muted);
+      border:1px solid rgba(156,163,175,.2);
+    }
+    .acc-tag.has-data{
+      background:rgba(16,185,129,.1); color:var(--accent-1);
+      border-color:rgba(16,185,129,.25);
+    }
+    .acc-chevron{
+      font-size:11px; color:var(--text-muted);
+      transition:transform .25s;
+    }
+    .acc-panel.open .acc-chevron{ transform:rotate(180deg); }
+    .acc-body{
+      display:none;
+      padding:14px 16px;
+      border-top:1px solid var(--border);
+    }
+    .acc-panel.open .acc-body{ display:block; }
+    .acc-empty-msg{
+      font-size:13px; color:var(--text-muted); line-height:1.7;
+    }
+    .acc-empty-msg strong{ color:var(--text-secondary); }
 
     /* ── View Data ──────────────────────────────────────────── */
     .vd-toolbar{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
@@ -279,7 +319,7 @@
           </div>
         </div>
 
-        <!-- ── INFERENCE (all 3 always visible) ──────────────── -->
+        <!-- ── INFERENCE ──────────────────────────────────────── -->
         <div class="tab-panel" id="tab-inference" style="display:none;">
           <!-- Smart warning banner -->
           <div id="welchWarning" class="results-panel" style="display:none;border-color:rgba(251,191,36,.4);background:rgba(251,191,36,.06);margin-bottom:10px;">
@@ -291,36 +331,61 @@
             </div>
           </div>
 
-          <!-- 2×2 grid -->
-          <div class="inf-grid">
+          <!-- PRIMARY: ANOVA table — full width, always open -->
+          <div class="results-panel" style="margin-bottom:12px;">
+            <div class="results-panel-heading"><i class="fa-solid fa-table"></i>Parametric — ANOVA Table</div>
+            <div class="results-panel-body" id="anovaTableBody"></div>
+          </div>
 
-            <!-- Top-left: Parametric ANOVA -->
-            <div class="results-panel" style="margin-bottom:0;">
-              <div class="results-panel-heading"><i class="fa-solid fa-table"></i>Parametric — ANOVA Table</div>
-              <div class="results-panel-body" id="anovaTableBody"></div>
-            </div>
-
-            <!-- Top-right: Welch -->
-            <div class="results-panel" id="welchPanel" style="margin-bottom:0;">
-              <div class="results-panel-heading"><i class="fa-solid fa-flask"></i>Robust — Welch's ANOVA <span style="font-weight:400;color:var(--text-muted);font-size:12px;">(unequal variances)</span></div>
-              <div class="results-panel-body" id="welchBody">
-                <p style="color:var(--text-muted);font-size:13px;">Welch's ANOVA is computed only for one-way designs.</p>
+          <!-- SECONDARY: Accordion row — Welch | KW | Mean Ranks -->
+          <div id="accWelch" class="acc-panel">
+            <div class="acc-header" onclick="toggleAcc('accWelch')">
+              <div class="acc-title"><i class="fa-solid fa-flask"></i>Robust — Welch's ANOVA</div>
+              <div class="acc-meta">
+                <span class="acc-tag" id="accWelchTag">not applicable</span>
+                <i class="fa-solid fa-chevron-down acc-chevron"></i>
               </div>
             </div>
-
-            <!-- Bottom-left: Kruskal-Wallis -->
-            <div class="results-panel" style="margin-bottom:0;">
-              <div class="results-panel-heading"><i class="fa-solid fa-ranking-star"></i>Non-parametric — Kruskal-Wallis</div>
-              <div class="results-panel-body" id="kwBody"></div>
+            <div class="acc-body" id="welchBody">
+              <p class="acc-empty-msg">
+                <strong>Why is this empty?</strong><br>
+                Welch's ANOVA is only computed for <strong>one-way</strong> designs. For two-way or repeated-measures designs the standard ANOVA table above handles variance heterogeneity differently.
+              </p>
             </div>
+          </div>
 
-            <!-- Bottom-right: Mean Ranks -->
-            <div class="results-panel" style="margin-bottom:0;">
-              <div class="results-panel-heading"><i class="fa-solid fa-sort-numeric-up"></i>Mean Ranks by Group</div>
-              <div class="results-panel-body" id="kwRanksBody"></div>
+          <div id="accKW" class="acc-panel">
+            <div class="acc-header" onclick="toggleAcc('accKW')">
+              <div class="acc-title"><i class="fa-solid fa-ranking-star"></i>Non-parametric — Kruskal-Wallis</div>
+              <div class="acc-meta">
+                <span class="acc-tag" id="accKWTag">not applicable</span>
+                <i class="fa-solid fa-chevron-down acc-chevron"></i>
+              </div>
             </div>
+            <div class="acc-body" id="kwBody">
+              <p class="acc-empty-msg">
+                <strong>Why is this empty?</strong><br>
+                The Kruskal-Wallis test is a non-parametric alternative for <strong>one-way between-subjects</strong> designs. It is not computed for two-way factorial or repeated-measures designs.
+              </p>
+            </div>
+          </div>
 
-          </div><!-- /.inf-grid -->
+          <div id="accMR" class="acc-panel">
+            <div class="acc-header" onclick="toggleAcc('accMR')">
+              <div class="acc-title"><i class="fa-solid fa-sort-numeric-up"></i>Mean Ranks by Group</div>
+              <div class="acc-meta">
+                <span class="acc-tag" id="accMRTag">not applicable</span>
+                <i class="fa-solid fa-chevron-down acc-chevron"></i>
+              </div>
+            </div>
+            <div class="acc-body" id="kwRanksBody">
+              <p class="acc-empty-msg">
+                <strong>Why is this empty?</strong><br>
+                Mean ranks are derived from the Kruskal-Wallis test and are only available for one-way designs. Run a one-way analysis to see per-group mean ranks.
+              </p>
+            </div>
+          </div>
+
         </div>
 
         <!-- ── COMPARISONS (Post-Hoc) ────────────────────────── -->
@@ -525,6 +590,24 @@
 
   /* ── Inference mode switch — removed (all 3 always visible) ─ */
 
+  /* ── Accordion toggle ────────────────────────────────────── */
+  function toggleAcc(id) {
+    var panel = document.getElementById(id);
+    if (panel) panel.classList.toggle('open');
+  }
+  function setAccState(id, hasData, tagText) {
+    var panel = document.getElementById(id);
+    var tag   = document.getElementById(id + 'Tag');
+    if (!panel) return;
+    if (hasData) {
+      panel.classList.add('open');
+      if (tag) { tag.textContent = tagText || 'available'; tag.classList.add('has-data'); }
+    } else {
+      panel.classList.remove('open');
+      if (tag) { tag.textContent = tagText || 'not applicable'; tag.classList.remove('has-data'); }
+    }
+  }
+
   /* ── Office messaging ────────────────────────────────────── */
   function initOfficeBridge() {
     try {
@@ -633,6 +716,16 @@
           '<tr><td>Welch\'s ANOVA</td><td class="num">' + fmt(w.F,2) + '</td><td class="num">' + w.df1 + '</td><td class="num">' + fmt(w.df2,1) + '</td><td class="num ' + sigCell(w.p,alpha) + '">' + fmtP(w.p) + '</td><td>' + sigBadge(w.p,alpha) + '</td></tr>' +
           '</tbody></table>' +
           '<p style="margin-top:8px;font-size:11px;color:var(--text-muted);">Recommended when Levene\'s test is significant (p &lt; 0.05). Does not assume equal variances.</p>';
+        setAccState('accWelch', true, 'F=' + fmt(w.F,2) + ' p' + fmtP(w.p));
+      } else {
+        var whyWelch = b.type === 'two-way'
+          ? 'Welch\'s ANOVA is not computed for two-way factorial designs. Variance heterogeneity in two-way designs should be assessed per-cell.'
+          : b.type === 'repeated'
+            ? 'Welch\'s ANOVA does not apply to repeated-measures designs. Use the standard RM-ANOVA above, which accounts for within-subject error.'
+            : 'Welch\'s ANOVA could not be computed (insufficient data or single group).';
+        document.getElementById('welchBody').innerHTML =
+          '<p class="acc-empty-msg"><strong>Why is this empty?</strong><br>' + whyWelch + '</p>';
+        setAccState('accWelch', false, 'not applicable');
       }
     } else if (b.type === 'two-way') {
       var a = b.twoWay;
@@ -788,9 +881,17 @@
     var alpha = (b.spec && b.spec.alpha) ? b.spec.alpha : 0.05;
 
     if (!kw) {
-      document.getElementById('kwBody').innerHTML = '<p style="color:var(--text-muted);font-size:12px;">' +
-        (b.type === 'repeated' ? 'Friedman test not yet implemented for repeated measures.' : 'No non-parametric results available.') + '</p>';
-      document.getElementById('kwRanksBody').innerHTML = '';
+      var whyKW = b.type === 'two-way'
+        ? 'Kruskal-Wallis is a non-parametric alternative for <strong>one-way between-subjects</strong> designs only. For two-way factorial designs there is no direct non-parametric equivalent implemented here.'
+        : b.type === 'repeated'
+          ? 'For repeated-measures designs, the non-parametric equivalent is the <strong>Friedman test</strong>, which is not yet implemented. Kruskal-Wallis assumes independent groups.'
+          : 'No non-parametric results are available for this analysis.';
+      document.getElementById('kwBody').innerHTML =
+        '<p class="acc-empty-msg"><strong>Why is this empty?</strong><br>' + whyKW + '</p>';
+      document.getElementById('kwRanksBody').innerHTML =
+        '<p class="acc-empty-msg"><strong>Why is this empty?</strong><br>Mean ranks are derived from the Kruskal-Wallis test and are only available for one-way designs.</p>';
+      setAccState('accKW', false, 'not applicable');
+      setAccState('accMR', false, 'not applicable');
       return;
     }
 
@@ -803,12 +904,14 @@
       '</div>' +
       sigBadge(kw.p, alpha) +
       '<p style="margin-top:10px;font-size:11px;color:var(--text-muted);">ε² interpretation: small ≥ .01, medium ≥ .08, large ≥ .26.</p>';
+    setAccState('accKW', true, 'H=' + fmt(kw.H,2) + ' p' + fmtP(kw.p));
 
     if (kw.meanRanks && kw.meanRanks.length) {
       document.getElementById('kwRanksBody').innerHTML =
         '<table><thead><tr><th>Group</th><th class="num">Mean Rank</th></tr></thead><tbody>' +
         kw.meanRanks.map(function(r) { return '<tr><td>' + r.level + '</td><td class="num">' + fmt(r.meanRank,2) + '</td></tr>'; }).join('') +
         '</tbody></table>';
+      setAccState('accMR', true, kw.meanRanks.length + ' groups');
     }
   }
 

@@ -901,6 +901,35 @@
     });
   }
 
+  /* ── HTML Export ─────────────────────────────────────────── */
+  async function exportAnovaHtml() {
+    try {
+      /* Briefly show all panels so charts/tables are in the snapshot */
+      document.querySelectorAll('.tab-panel').forEach(function(p) {
+        p.classList.add('active');
+        p.style.display = 'block';
+      });
+      await new Promise(function(resolve) { setTimeout(resolve, 120); });
+
+      var clone = document.documentElement.cloneNode(true);
+      clone.querySelectorAll('script').forEach(function(s) { s.remove(); });
+      ['#sidebarNav', '#header-container'].forEach(function(sel) {
+        var el = clone.querySelector(sel); if (el) el.remove();
+      });
+      var html  = '<!DOCTYPE html>\n' + clone.outerHTML;
+      var stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      var name  = 'anova-results-' + stamp + '.html';
+      var blob  = new Blob([html], { type: 'text/html;charset=utf-8' });
+      var url   = URL.createObjectURL(blob);
+      var a     = document.createElement('a');
+      a.href = url; a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch(e) {
+      console.error('ANOVA HTML export failed:', e);
+    }
+  }
+
   /* ── DOMContentLoaded ────────────────────────────────────── */
   document.addEventListener('DOMContentLoaded', function() {
     if (typeof StatisticoHeader !== 'undefined') {
@@ -910,6 +939,7 @@
           if (!_vdCols.length || !_vdRows.length) return null;
           return { headers: _vdCols, allRows: _vdRows, usedRows: _vdRows, fullRange:'ANOVA input data', usedRange:'ANOVA input data' };
         },
+        exportHtml: function() { exportAnovaHtml(); },
         moduleName: 'Save ANOVA model'
       });
       StatisticoHeader.initSidebarPage();

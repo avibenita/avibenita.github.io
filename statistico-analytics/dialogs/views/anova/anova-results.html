@@ -132,6 +132,21 @@
     .chart-wrap-tall{ width:100%; height:420px; }
     .interaction-note{ font-size:11px; color:var(--text-muted); text-align:center; margin-top:6px; }
 
+    /* ── Mode Switch (Inference) ────────────────────────────── */
+    .mode-switch{
+      display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap;
+    }
+    .mode-btn{
+      padding:7px 14px; border-radius:7px; border:1.5px solid var(--border);
+      background:var(--surface-2); color:var(--text-muted);
+      font-size:12px; font-weight:600; cursor:pointer;
+      transition:all .15s ease;
+    }
+    .mode-btn:hover{ border-color:var(--accent-1); color:var(--accent-1); }
+    .mode-btn.active{
+      background:var(--accent-1); color:#fff; border-color:var(--accent-1);
+    }
+
     /* ── View Data ──────────────────────────────────────────── */
     .vd-toolbar{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
     .vd-search{ flex:1; padding:6px 10px; border:1px solid var(--border); border-radius:7px; background:var(--surface-2); color:var(--text-primary); font-size:12px; }
@@ -171,45 +186,23 @@
         </div>
       </div>
       <div class="sb-group">
-        <div class="sb-group-title">Tests</div>
+        <div class="sb-group-title">Analysis</div>
         <div class="sb-items-rail">
-          <button class="sb-item" onclick="switchTab('anova-table')" data-tab="anova-table">
+          <button class="sb-item" onclick="switchTab('inference')" data-tab="inference">
             <i class="fa-solid fa-table sb-item-icon"></i>
-            <span class="sb-item-label">ANOVA Table</span>
+            <span class="sb-item-label">Inference</span>
           </button>
-          <button class="sb-item" onclick="switchTab('posthoc')" data-tab="posthoc">
+          <button class="sb-item" onclick="switchTab('comparisons')" data-tab="comparisons">
             <i class="fa-solid fa-code-compare sb-item-icon"></i>
-            <span class="sb-item-label">Post-Hoc</span>
+            <span class="sb-item-label">Comparisons</span>
           </button>
-          <button class="sb-item" onclick="switchTab('nonparam')" data-tab="nonparam">
-            <i class="fa-solid fa-ranking-star sb-item-icon"></i>
-            <span class="sb-item-label">Non-Param</span>
-          </button>
-        </div>
-      </div>
-      <div class="sb-group">
-        <div class="sb-group-title">Data</div>
-        <div class="sb-items-rail">
-          <button class="sb-item" onclick="switchTab('descriptives')" data-tab="descriptives">
-            <i class="fa-solid fa-list-ol sb-item-icon"></i>
-            <span class="sb-item-label">Descriptives</span>
-          </button>
-          <button class="sb-item" onclick="switchTab('assumptions')" data-tab="assumptions">
+          <button class="sb-item" onclick="switchTab('diagnostics')" data-tab="diagnostics">
             <i class="fa-solid fa-shield-halved sb-item-icon"></i>
-            <span class="sb-item-label">Assumptions</span>
+            <span class="sb-item-label">Diagnostics</span>
           </button>
-        </div>
-      </div>
-      <div class="sb-group">
-        <div class="sb-group-title">Visualisations</div>
-        <div class="sb-items-rail">
-          <button class="sb-item" onclick="switchTab('plots')" data-tab="plots">
+          <button class="sb-item" onclick="switchTab('visuals')" data-tab="visuals">
             <i class="fa-solid fa-chart-column sb-item-icon"></i>
-            <span class="sb-item-label">Group Plots</span>
-          </button>
-          <button class="sb-item" onclick="switchTab('effects')" data-tab="effects">
-            <i class="fa-solid fa-bolt sb-item-icon"></i>
-            <span class="sb-item-label">Effect Sizes</span>
+            <span class="sb-item-label">Visuals</span>
           </button>
         </div>
       </div>
@@ -218,11 +211,7 @@
         <div class="sb-items-rail">
           <button class="sb-item" onclick="switchTab('report')" data-tab="report">
             <i class="fa-solid fa-file-lines sb-item-icon"></i>
-            <span class="sb-item-label">APA Report</span>
-          </button>
-          <button class="sb-item" onclick="switchTab('viewdata')" data-tab="viewdata">
-            <i class="fa-solid fa-database sb-item-icon"></i>
-            <span class="sb-item-label">View Data</span>
+            <span class="sb-item-label">Report</span>
           </button>
         </div>
       </div>
@@ -252,7 +241,7 @@
         <!-- tab-navigation removed: sidebar handles navigation -->
 
         <!-- ── OVERVIEW ─────────────────────────────────────── -->
-        <div class="tab-panel active" id="tab-overview">
+        <div class="tab-panel active" id="tab-overview" style="display:block;">
           <div class="stat-grid" id="overviewCards"></div>
           <div class="results-panel" id="panelDecision">
             <div class="results-panel-heading"><i class="fa-solid fa-scale-balanced"></i>Decision</div>
@@ -264,48 +253,68 @@
           </div>
         </div>
 
-        <!-- ── ANOVA TABLE ──────────────────────────────────── -->
-        <div class="tab-panel" id="tab-anova-table">
-          <div class="results-panel">
-            <div class="results-panel-heading"><i class="fa-solid fa-table"></i>ANOVA Table</div>
-            <div class="results-panel-body" id="anovaTableBody"></div>
+        <!-- ── INFERENCE (Parametric + Robust + Non-param) ──── -->
+        <div class="tab-panel" id="tab-inference" style="display:none;">
+          <!-- Smart warning banner (shown when variances unequal) -->
+          <div id="welchWarning" class="results-panel" style="display:none;border-color:rgba(251,191,36,.4);background:rgba(251,191,36,.06);">
+            <div class="results-panel-body" style="padding:10px 14px;">
+              <span style="color:#fbbf24;font-weight:700;font-size:12.5px;">
+                <i class="fa-solid fa-triangle-exclamation"></i>&nbsp;
+                Variances unequal (Levene p &lt; α) — Welch ANOVA + Games-Howell recommended
+              </span>
+            </div>
           </div>
-          <div class="results-panel" id="welchPanel" style="display:none;">
-            <div class="results-panel-heading"><i class="fa-solid fa-flask"></i>Welch's ANOVA (robust to unequal variances)</div>
-            <div class="results-panel-body" id="welchBody"></div>
+          <!-- Mode switch -->
+          <div class="mode-switch">
+            <button class="mode-btn active" data-mode="parametric" onclick="setInferenceMode('parametric')">
+              <i class="fa-solid fa-table" style="margin-right:4px;"></i>Parametric
+            </button>
+            <button class="mode-btn" data-mode="robust" onclick="setInferenceMode('robust')">
+              <i class="fa-solid fa-flask" style="margin-right:4px;"></i>Robust
+            </button>
+            <button class="mode-btn" data-mode="nonparam" onclick="setInferenceMode('nonparam')">
+              <i class="fa-solid fa-ranking-star" style="margin-right:4px;"></i>Non-parametric
+            </button>
+          </div>
+          <!-- Parametric panel -->
+          <div id="anova-parametric">
+            <div class="results-panel">
+              <div class="results-panel-heading"><i class="fa-solid fa-table"></i>ANOVA Table</div>
+              <div class="results-panel-body" id="anovaTableBody"></div>
+            </div>
+          </div>
+          <!-- Robust (Welch) panel -->
+          <div id="anova-robust" style="display:none;">
+            <div class="results-panel" id="welchPanel">
+              <div class="results-panel-heading"><i class="fa-solid fa-flask"></i>Welch's ANOVA <span style="font-weight:400;color:var(--text-muted);font-size:11px;">(robust to unequal variances)</span></div>
+              <div class="results-panel-body" id="welchBody">
+                <p style="color:var(--text-muted);font-size:12px;">Welch's ANOVA is computed only for one-way designs.</p>
+              </div>
+            </div>
+          </div>
+          <!-- Non-parametric panel -->
+          <div id="anova-nonparam" style="display:none;">
+            <div class="results-panel">
+              <div class="results-panel-heading"><i class="fa-solid fa-ranking-star"></i>Kruskal-Wallis Test</div>
+              <div class="results-panel-body" id="kwBody"></div>
+            </div>
+            <div class="results-panel">
+              <div class="results-panel-heading"><i class="fa-solid fa-sort-numeric-up"></i>Mean Ranks by Group</div>
+              <div class="results-panel-body" id="kwRanksBody"></div>
+            </div>
           </div>
         </div>
 
-        <!-- ── POST-HOC ─────────────────────────────────────── -->
-        <div class="tab-panel" id="tab-posthoc">
+        <!-- ── COMPARISONS (Post-Hoc) ────────────────────────── -->
+        <div class="tab-panel" id="tab-posthoc" style="display:none;">
           <div class="results-panel">
             <div class="results-panel-heading"><i class="fa-solid fa-code-compare"></i>Pairwise Comparisons</div>
             <div class="results-panel-body" id="posthocBody"></div>
           </div>
         </div>
 
-        <!-- ── NON-PARAMETRIC ───────────────────────────────── -->
-        <div class="tab-panel" id="tab-nonparam">
-          <div class="results-panel">
-            <div class="results-panel-heading"><i class="fa-solid fa-ranking-star"></i>Kruskal-Wallis Test</div>
-            <div class="results-panel-body" id="kwBody"></div>
-          </div>
-          <div class="results-panel">
-            <div class="results-panel-heading"><i class="fa-solid fa-sort-numeric-up"></i>Mean Ranks by Group</div>
-            <div class="results-panel-body" id="kwRanksBody"></div>
-          </div>
-        </div>
-
-        <!-- ── DESCRIPTIVES ─────────────────────────────────── -->
-        <div class="tab-panel" id="tab-descriptives">
-          <div class="results-panel">
-            <div class="results-panel-heading"><i class="fa-solid fa-list-ol"></i>Group Descriptive Statistics</div>
-            <div class="results-panel-body" id="descBody"></div>
-          </div>
-        </div>
-
-        <!-- ── ASSUMPTIONS ──────────────────────────────────── -->
-        <div class="tab-panel" id="tab-assumptions">
+        <!-- ── DIAGNOSTICS (Assumptions + Descriptives) ──────── -->
+        <div class="tab-panel" id="tab-diagnostics" style="display:none;">
           <div class="results-panel">
             <div class="results-panel-heading"><i class="fa-solid fa-shield-halved"></i>Homogeneity of Variance</div>
             <div class="results-panel-body" id="assumptionsBody"></div>
@@ -317,14 +326,14 @@
                 <div class="assump-icon warn"><i class="fa-solid fa-bell"></i></div>
                 <div class="assump-text">
                   <div class="at">Normality</div>
-                  <div class="ad">ANOVA is robust to mild non-normality when n ≥ 15 per group. For small or heavily skewed groups use Kruskal-Wallis (Non-Param tab).</div>
+                  <div class="ad">ANOVA is robust to mild non-normality when n ≥ 15 per group. For small or heavily skewed groups use Kruskal-Wallis (Inference → Non-parametric).</div>
                 </div>
               </div>
               <div class="assump-row">
                 <div class="assump-icon warn"><i class="fa-solid fa-bell"></i></div>
                 <div class="assump-text">
                   <div class="at">Homogeneity of variance</div>
-                  <div class="ad">If Levene p &lt; .05, prefer Welch's ANOVA (shown in ANOVA Table tab) and Games-Howell for post-hoc comparisons.</div>
+                  <div class="ad">If Levene p &lt; .05, prefer Welch's ANOVA (Inference → Robust) and Games-Howell for post-hoc comparisons.</div>
                 </div>
               </div>
               <div class="assump-row">
@@ -336,10 +345,14 @@
               </div>
             </div>
           </div>
+          <div class="results-panel">
+            <div class="results-panel-heading"><i class="fa-solid fa-list-ol"></i>Group Descriptive Statistics</div>
+            <div class="results-panel-body" id="descBody"></div>
+          </div>
         </div>
 
-        <!-- ── PLOTS ────────────────────────────────────────── -->
-        <div class="tab-panel" id="tab-plots">
+        <!-- ── VISUALS (Plots + Effect Sizes) ───────────────── -->
+        <div class="tab-panel" id="tab-visuals" style="display:none;">
           <div class="results-panel">
             <div class="results-panel-heading"><i class="fa-solid fa-chart-column"></i>Group Means with 95% CI</div>
             <div class="results-panel-body">
@@ -359,10 +372,6 @@
               <p class="interaction-note">Non-parallel lines suggest an interaction effect between the two factors.</p>
             </div>
           </div>
-        </div>
-
-        <!-- ── EFFECT SIZES ──────────────────────────────────── -->
-        <div class="tab-panel" id="tab-effects">
           <div class="results-panel">
             <div class="results-panel-heading"><i class="fa-solid fa-bolt"></i>Effect Size Estimates</div>
             <div class="results-panel-body" id="effectsBody"></div>
@@ -383,16 +392,16 @@
           </div>
         </div>
 
-        <!-- ── APA REPORT ────────────────────────────────────── -->
-        <div class="tab-panel" id="tab-report">
+        <!-- ── REPORT ────────────────────────────────────────── -->
+        <div class="tab-panel" id="tab-report" style="display:none;">
           <div class="results-panel">
             <div class="results-panel-heading"><i class="fa-solid fa-file-lines"></i>APA-Style Write-Up</div>
             <div class="results-panel-body" id="reportBody"></div>
           </div>
         </div>
 
-        <!-- ── VIEW DATA ─────────────────────────────────────── -->
-        <div class="tab-panel" id="tab-viewdata">
+        <!-- ── VIEW DATA (hidden from menu, accessible via header) ── -->
+        <div class="tab-panel" id="tab-viewdata" style="display:none;">
           <div class="results-panel">
             <div class="results-panel-heading"><i class="fa-solid fa-database"></i>Raw Data</div>
             <div class="results-panel-body">
@@ -447,29 +456,40 @@
       : '<span class="badge badge-ns">n.s. p' + fmtP(p) + '</span>';
   }
 
-  /* ── Tab switching ───────────────────────────────────────── */
+    /* ── Tab switching ───────────────────────────────────────── */
   var TAB_TITLES = {
     'overview':    'Summary',
-    'anova-table': 'ANOVA Table',
-    'posthoc':     'Post-Hoc',
-    'nonparam':    'Non-Parametric',
-    'descriptives':'Descriptives',
-    'assumptions': 'Assumptions',
-    'plots':       'Group Plots',
-    'effects':     'Effect Sizes',
-    'report':      'APA Report',
+    'inference':   'Inference',
+    'comparisons': 'Comparisons',
+    'diagnostics': 'Diagnostics',
+    'visuals':     'Visuals',
+    'report':      'Report',
     'viewdata':    'View Data'
   };
 
+  /* tabMap: logical nav item → array of physical panel IDs to show */
+  var TAB_MAP = {
+    'overview':    ['tab-overview'],
+    'inference':   ['tab-inference'],
+    'comparisons': ['tab-posthoc'],
+    'diagnostics': ['tab-diagnostics'],
+    'visuals':     ['tab-visuals'],
+    'report':      ['tab-report'],
+    'viewdata':    ['tab-viewdata']
+  };
+
   function switchTab(id) {
-    document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+    document.querySelectorAll('.tab-panel').forEach(function(p) { p.style.display = 'none'; p.classList.remove('active'); });
     document.querySelectorAll('.sb-item').forEach(function(s) { s.classList.remove('active'); });
-    var panel = document.getElementById('tab-' + id);
-    if (panel) panel.classList.add('active');
+    var panels = TAB_MAP[id] || ['tab-' + id];
+    panels.forEach(function(pid) {
+      var p = document.getElementById(pid);
+      if (p) { p.style.display = 'block'; p.classList.add('active'); }
+    });
     var btn = document.querySelector('.sb-item[data-tab="' + id + '"]');
     if (btn) btn.classList.add('active');
 
-    if (id === 'plots') {
+    if (id === 'visuals') {
       setTimeout(function() {
         Object.values(_charts).forEach(function(c) { try { c.reflow(); } catch(e){} });
       }, 60);
@@ -478,6 +498,19 @@
     if (typeof StatisticoHeader !== 'undefined' && TAB_TITLES[id]) {
       StatisticoHeader.updateTitle(TAB_TITLES[id]);
     }
+  }
+
+  /* ── Inference mode switch ───────────────────────────────── */
+  function setInferenceMode(mode) {
+    ['anova-parametric', 'anova-robust', 'anova-nonparam'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    var target = document.getElementById('anova-' + mode);
+    if (target) target.style.display = 'block';
+    document.querySelectorAll('.mode-btn').forEach(function(b) { b.classList.remove('active'); });
+    var btn = document.querySelector('.mode-btn[data-mode="' + mode + '"]');
+    if (btn) btn.classList.add('active');
   }
 
   /* ── Office messaging ────────────────────────────────────── */
@@ -583,7 +616,6 @@
 
       if (b.welchAnova) {
         var w = b.welchAnova;
-        document.getElementById('welchPanel').style.display = '';
         document.getElementById('welchBody').innerHTML =
           '<table><thead><tr><th></th><th class="num">F</th><th class="num">df1</th><th class="num">df2</th><th class="num">p</th><th></th></tr></thead><tbody>' +
           '<tr><td>Welch\'s ANOVA</td><td class="num">' + fmt(w.F,2) + '</td><td class="num">' + w.df1 + '</td><td class="num">' + fmt(w.df2,1) + '</td><td class="num ' + sigCell(w.p,alpha) + '">' + fmtP(w.p) + '</td><td>' + sigBadge(w.p,alpha) + '</td></tr>' +
@@ -690,14 +722,20 @@
     }
     var lev = b.levene;
     var bf  = b.brownForsythe;
+    var unequalVar = isFinite(lev.p) && lev.p < alpha;
+
+    /* Show smart warning in Inference tab if variances unequal */
+    var warn = document.getElementById('welchWarning');
+    if (warn) warn.style.display = unequalVar ? '' : 'none';
+
     el.innerHTML =
       '<table><thead><tr><th>Test</th><th class="num">F</th><th class="num">df1</th><th class="num">df2</th><th class="num">p</th><th>Verdict</th></tr></thead><tbody>' +
       '<tr><td>Levene\'s (mean-based)</td><td class="num">' + fmt(lev.F,2) + '</td><td class="num">' + lev.df1 + '</td><td class="num">' + lev.df2 + '</td><td class="num ' + sigCell(lev.p,alpha) + '">' + fmtP(lev.p) + '</td><td>' + (lev.p >= alpha ? '<span class="badge badge-sig">Equal variances</span>' : '<span class="badge badge-warn">Unequal variances</span>') + '</td></tr>' +
       (bf ? '<tr><td>Brown-Forsythe (median-based)</td><td class="num">' + fmt(bf.F,2) + '</td><td class="num">' + bf.df1 + '</td><td class="num">' + bf.df2 + '</td><td class="num ' + sigCell(bf.p,alpha) + '">' + fmtP(bf.p) + '</td><td>' + (bf.p >= alpha ? '<span class="badge badge-sig">Equal variances</span>' : '<span class="badge badge-warn">Unequal variances</span>') + '</td></tr>' : '') +
       '</tbody></table>' +
       '<p style="margin-top:10px;font-size:11px;color:var(--text-muted);">' +
-        (lev.p >= alpha ? '✓ Homogeneity of variance is supported. Standard ANOVA is appropriate.' :
-          '⚠ Unequal variances detected. See Welch\'s ANOVA (ANOVA Table tab) and consider Games-Howell post-hoc.') +
+        (unequalVar ? '⚠ Unequal variances detected. Use Welch\'s ANOVA (Inference → Robust) and consider Games-Howell post-hoc.' :
+          '✓ Homogeneity of variance is supported. Standard ANOVA is appropriate.') +
       '</p>';
   }
 
@@ -946,6 +984,8 @@
       StatisticoHeader.updateTitle('Summary');
     }
 
+    /* Hide all panels except overview on init */
+    document.querySelectorAll('.tab-panel').forEach(function(p) { p.style.display = 'none'; p.classList.remove('active'); });
     switchTab('overview');
 
     if (typeof Office !== 'undefined' && typeof Office.onReady === 'function') {

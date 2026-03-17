@@ -186,7 +186,17 @@
       background:none; border:none; color:var(--text-muted);
       font-size:18px; cursor:pointer; line-height:1;
     }
-    #drillChart{ width:100%; height:260px; }
+    #drillChart{ width:100%; height:280px; }
+
+    /* ── ANOVA row chart button ─────────────────────────────── */
+    .row-chart-btn{
+      display:inline-flex; align-items:center; gap:4px;
+      padding:3px 9px; border-radius:6px; font-size:11px; font-weight:600;
+      border:1.5px solid var(--accent-1); color:var(--accent-1);
+      background:transparent; cursor:pointer; white-space:nowrap;
+      transition:all .15s;
+    }
+    .row-chart-btn:hover{ background:var(--accent-1); color:#fff; }
 
     /* ── Mode Switch (Inference) — removed, all 3 shown always ─ */
 
@@ -760,11 +770,12 @@
 
     if (b.type === 'one-way') {
       var a = b.oneWay;
+      var btnGrp = '<button class="row-chart-btn" onclick="openRowChart(\'A\')"><i class="fa-solid fa-chart-column"></i> Chart</button>';
       el.innerHTML =
-        '<table><thead><tr><th>Source</th><th class="num">SS</th><th class="num">df</th><th class="num">MS</th><th class="num">F</th><th class="num">p</th><th class="num">η²</th><th></th></tr></thead><tbody>' +
-        '<tr><td>Between groups</td><td class="num">' + fmt(a.ssBetween) + '</td><td class="num">' + a.df1 + '</td><td class="num">' + fmt(a.msBetween) + '</td><td class="num"><strong>' + fmt(a.F,2) + '</strong></td><td class="num ' + sigCell(a.p,alpha) + '">' + fmtP(a.p) + '</td><td class="num">' + fmt(a.etaSq,3) + '</td><td>' + sigBadge(a.p,alpha) + '</td></tr>' +
-        '<tr><td>Within groups (error)</td><td class="num">' + fmt(a.ssWithin) + '</td><td class="num">' + a.df2 + '</td><td class="num">' + fmt(a.msWithin) + '</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td></tr>' +
-        '<tr class="total-row"><td>Total</td><td class="num">' + fmt(a.ssTotal) + '</td><td class="num">' + (a.df1+a.df2) + '</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td></tr>' +
+        '<table><thead><tr><th>Source</th><th class="num">SS</th><th class="num">df</th><th class="num">MS</th><th class="num">F</th><th class="num">p</th><th class="num">η²</th><th></th><th></th></tr></thead><tbody>' +
+        '<tr><td>Between groups</td><td class="num">' + fmt(a.ssBetween) + '</td><td class="num">' + a.df1 + '</td><td class="num">' + fmt(a.msBetween) + '</td><td class="num"><strong>' + fmt(a.F,2) + '</strong></td><td class="num ' + sigCell(a.p,alpha) + '">' + fmtP(a.p) + '</td><td class="num">' + fmt(a.etaSq,3) + '</td><td>' + sigBadge(a.p,alpha) + '</td><td>' + btnGrp + '</td></tr>' +
+        '<tr><td>Within groups (error)</td><td class="num">' + fmt(a.ssWithin) + '</td><td class="num">' + a.df2 + '</td><td class="num">' + fmt(a.msWithin) + '</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td><td></td></tr>' +
+        '<tr class="total-row"><td>Total</td><td class="num">' + fmt(a.ssTotal) + '</td><td class="num">' + (a.df1+a.df2) + '</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td><td></td></tr>' +
         '</tbody></table>';
 
       if (b.welchAnova) {
@@ -789,13 +800,16 @@
       var a = b.twoWay;
       var fA = (b.spec && b.spec.factor1) || 'Factor A';
       var fB = (b.spec && b.spec.factor2) || 'Factor B';
+      var btnA   = '<button class="row-chart-btn" onclick="openRowChart(\'A\')"><i class="fa-solid fa-chart-column"></i> Chart</button>';
+      var btnB   = '<button class="row-chart-btn" onclick="openRowChart(\'B\')"><i class="fa-solid fa-chart-column"></i> Chart</button>';
+      var btnAB  = '<button class="row-chart-btn" onclick="openRowChart(\'AB\')"><i class="fa-solid fa-chart-line"></i> Chart</button>';
       el.innerHTML =
-        '<table><thead><tr><th>Source</th><th class="num">SS</th><th class="num">df</th><th class="num">MS</th><th class="num">F</th><th class="num">p</th><th class="num">η²</th><th></th></tr></thead><tbody>' +
-        '<tr><td>' + fA + '</td><td class="num">' + fmt(a.ssA) + '</td><td class="num">' + a.dfA + '</td><td class="num">' + fmt(a.msA) + '</td><td class="num"><strong>' + fmt(a.FA,2) + '</strong></td><td class="num ' + sigCell(a.pA,alpha) + '">' + fmtP(a.pA) + '</td><td class="num">' + fmt(a.etaSqA,3) + '</td><td>' + sigBadge(a.pA,alpha) + '</td></tr>' +
-        '<tr><td>' + fB + '</td><td class="num">' + fmt(a.ssB) + '</td><td class="num">' + a.dfB + '</td><td class="num">' + fmt(a.msB) + '</td><td class="num"><strong>' + fmt(a.FB,2) + '</strong></td><td class="num ' + sigCell(a.pB,alpha) + '">' + fmtP(a.pB) + '</td><td class="num">' + fmt(a.etaSqB,3) + '</td><td>' + sigBadge(a.pB,alpha) + '</td></tr>' +
-        '<tr><td>' + fA + ' × ' + fB + ' (Interaction)</td><td class="num">' + fmt(a.ssAB) + '</td><td class="num">' + a.dfAB + '</td><td class="num">' + fmt(a.msAB) + '</td><td class="num"><strong>' + fmt(a.FAB,2) + '</strong></td><td class="num ' + sigCell(a.pAB,alpha) + '">' + fmtP(a.pAB) + '</td><td class="num">' + fmt(a.etaSqAB,3) + '</td><td>' + sigBadge(a.pAB,alpha) + '</td></tr>' +
-        '<tr><td>Error</td><td class="num">' + fmt(a.ssError) + '</td><td class="num">' + a.dfError + '</td><td class="num">' + fmt(a.msError) + '</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td></tr>' +
-        '<tr class="total-row"><td>Total</td><td class="num">' + fmt(a.ssTotal) + '</td><td class="num">' + (a.dfA+a.dfB+a.dfAB+a.dfError) + '</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td></tr>' +
+        '<table><thead><tr><th>Source</th><th class="num">SS</th><th class="num">df</th><th class="num">MS</th><th class="num">F</th><th class="num">p</th><th class="num">η²</th><th></th><th></th></tr></thead><tbody>' +
+        '<tr><td>' + fA + '</td><td class="num">' + fmt(a.ssA) + '</td><td class="num">' + a.dfA + '</td><td class="num">' + fmt(a.msA) + '</td><td class="num"><strong>' + fmt(a.FA,2) + '</strong></td><td class="num ' + sigCell(a.pA,alpha) + '">' + fmtP(a.pA) + '</td><td class="num">' + fmt(a.etaSqA,3) + '</td><td>' + sigBadge(a.pA,alpha) + '</td><td>' + btnA + '</td></tr>' +
+        '<tr><td>' + fB + '</td><td class="num">' + fmt(a.ssB) + '</td><td class="num">' + a.dfB + '</td><td class="num">' + fmt(a.msB) + '</td><td class="num"><strong>' + fmt(a.FB,2) + '</strong></td><td class="num ' + sigCell(a.pB,alpha) + '">' + fmtP(a.pB) + '</td><td class="num">' + fmt(a.etaSqB,3) + '</td><td>' + sigBadge(a.pB,alpha) + '</td><td>' + btnB + '</td></tr>' +
+        '<tr><td>' + fA + ' × ' + fB + ' (Interaction)</td><td class="num">' + fmt(a.ssAB) + '</td><td class="num">' + a.dfAB + '</td><td class="num">' + fmt(a.msAB) + '</td><td class="num"><strong>' + fmt(a.FAB,2) + '</strong></td><td class="num ' + sigCell(a.pAB,alpha) + '">' + fmtP(a.pAB) + '</td><td class="num">' + fmt(a.etaSqAB,3) + '</td><td>' + sigBadge(a.pAB,alpha) + '</td><td>' + btnAB + '</td></tr>' +
+        '<tr><td>Error</td><td class="num">' + fmt(a.ssError) + '</td><td class="num">' + a.dfError + '</td><td class="num">' + fmt(a.msError) + '</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td><td></td></tr>' +
+        '<tr class="total-row"><td>Total</td><td class="num">' + fmt(a.ssTotal) + '</td><td class="num">' + (a.dfA+a.dfB+a.dfAB+a.dfError) + '</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td><td></td></tr>' +
         '</tbody></table>';
     } else if (b.type === 'repeated') {
       var a = b.repeated;
@@ -1526,6 +1540,111 @@
   /* ── close drill modal ── */
   function closeDrill() {
     document.getElementById('drillModal').classList.remove('open');
+  }
+
+  /* ── openRowChart: called from ANOVA table chart buttons ──────
+     type = 'A'  → main effect Factor A (marginal means bar)
+            'B'  → main effect Factor B (marginal means bar)
+            'AB' → interaction line chart
+  ── */
+  function openRowChart(type) {
+    var b = _bundle;
+    if (!b) return;
+    var t  = _visTheme();
+    var dv = (b.spec && b.spec.dv) || 'Mean';
+    var f1 = (b.spec && b.spec.factor1) || (b.spec && b.spec.factor) || 'Group';
+    var f2 = (b.spec && b.spec.factor2) || 'Time';
+
+    var modal = document.getElementById('drillModal');
+    var title = document.getElementById('drillTitle');
+    modal.classList.add('open');
+
+    setTimeout(function() {
+      if (_charts.drill) { try { _charts.drill.destroy(); } catch(e) {} }
+
+      /* ── Factor A: marginal means bar ── */
+      if (type === 'A') {
+        var desc = b.descA || b.descriptives || [];
+        if (!desc.length) { title.textContent = f1 + ' — no data'; return; }
+        title.textContent = f1 + ' — marginal means';
+        _charts.drill = Highcharts.chart('drillChart', {
+          chart:{ type:'column', backgroundColor:'transparent', style:{fontFamily:'Segoe UI,sans-serif'}, animation:{duration:350} },
+          title:{ text:'' }, credits:{ enabled:false },
+          xAxis:{ categories: desc.map(function(d){ return d.level; }), labels:{style:{color:t.tc,fontSize:'12px'}}, lineColor:t.gc },
+          yAxis:{ title:{text:dv,style:{color:t.tc}}, gridLineColor:t.gc, labels:{style:{color:t.tc}} },
+          legend:{ enabled:false },
+          plotOptions:{ column:{
+            color: t.colors[0], borderRadius:5, borderWidth:0,
+            dataLabels:{ enabled:true, format:'{point.y:.2f}',
+              style:{color:t.tc,fontSize:'11px',fontWeight:'700',textOutline:'none'}, verticalAlign:'top', inside:false, y:-2 }
+          }},
+          series:[{ name:dv, data: desc.map(function(d){ return isFinite(d.mean) ? +d.mean.toFixed(4) : null; }) }],
+          tooltip:{ backgroundColor: t.isDark?'#1e293b':'#fff', style:{color:t.isDark?'#f1f5f9':'#1f2937'}, borderRadius:8,
+            formatter:function(){
+              var d = desc[this.point.index];
+              return '<b>'+this.key+'</b><br>n: '+(d.n||'?')+'<br>Mean: <b>'+fmt(d.mean)+'</b>'+(d.sd?'<br>SD: '+fmt(d.sd):'');
+            }}
+        });
+
+      /* ── Factor B: marginal means bar ── */
+      } else if (type === 'B') {
+        var desc = b.descB || [];
+        if (!desc.length) { title.textContent = f2 + ' — no data'; return; }
+        title.textContent = f2 + ' — marginal means';
+        _charts.drill = Highcharts.chart('drillChart', {
+          chart:{ type:'column', backgroundColor:'transparent', style:{fontFamily:'Segoe UI,sans-serif'}, animation:{duration:350} },
+          title:{ text:'' }, credits:{ enabled:false },
+          xAxis:{ categories: desc.map(function(d){ return d.level; }), labels:{style:{color:t.tc,fontSize:'12px'}}, lineColor:t.gc },
+          yAxis:{ title:{text:dv,style:{color:t.tc}}, gridLineColor:t.gc, labels:{style:{color:t.tc}} },
+          legend:{ enabled:false },
+          plotOptions:{ column:{
+            color: t.colors[1], borderRadius:5, borderWidth:0,
+            dataLabels:{ enabled:true, format:'{point.y:.2f}',
+              style:{color:t.tc,fontSize:'11px',fontWeight:'700',textOutline:'none'}, verticalAlign:'top', inside:false, y:-2 }
+          }},
+          series:[{ name:dv, data: desc.map(function(d){ return isFinite(d.mean) ? +d.mean.toFixed(4) : null; }) }],
+          tooltip:{ backgroundColor: t.isDark?'#1e293b':'#fff', style:{color:t.isDark?'#f1f5f9':'#1f2937'}, borderRadius:8,
+            formatter:function(){
+              var d = desc[this.point.index];
+              return '<b>'+this.key+'</b><br>n: '+(d.n||'?')+'<br>Mean: <b>'+fmt(d.mean)+'</b>'+(d.sd?'<br>SD: '+fmt(d.sd):'');
+            }}
+        });
+
+      /* ── Interaction: line chart ── */
+      } else if (type === 'AB') {
+        if (!b.cellDesc || !b.aLevels || !b.bLevels) { title.textContent = 'Interaction — no data'; return; }
+        title.textContent = f1 + ' × ' + f2 + ' — interaction plot';
+        _charts.drill = Highcharts.chart('drillChart', {
+          chart:{ type:'line', backgroundColor:'transparent', style:{fontFamily:'Segoe UI,sans-serif'}, animation:{duration:400} },
+          title:{ text:'' }, credits:{ enabled:false },
+          xAxis:{ categories: b.bLevels, title:{text:f2,style:{color:t.tc,fontSize:'12px'}},
+                  labels:{style:{color:t.tc,fontSize:'12px'}}, lineColor:t.gc },
+          yAxis:{ title:{text:dv,style:{color:t.tc,fontSize:'12px'}}, gridLineColor:t.gc, labels:{style:{color:t.tc}} },
+          legend:{ itemStyle:{color:t.tc,fontSize:'12px'} },
+          plotOptions:{ line:{
+            marker:{ enabled:true, radius:5, symbol:'circle' }, lineWidth:2.5,
+            dataLabels:{ enabled:true, format:'{point.y:.2f}',
+              style:{color:t.tc,fontSize:'10px',fontWeight:'600',textOutline:'none'} }
+          }},
+          series: b.aLevels.map(function(aLv, ai){
+            return {
+              name: f1+': '+aLv, color: t.colors[ai % t.colors.length],
+              data: b.bLevels.map(function(bLv){
+                var cell = (b.cellDesc||[]).find(function(c){ return c.a===aLv && c.b===bLv; });
+                return cell && isFinite(cell.mean) ? +cell.mean.toFixed(4) : null;
+              })
+            };
+          }),
+          tooltip:{ backgroundColor: t.isDark?'#1e293b':'#fff', style:{color:t.isDark?'#f1f5f9':'#1f2937'}, borderRadius:8, shadow:true,
+            formatter:function(){
+              var cell = (b.cellDesc||[]).find(function(c){
+                return c.b===this.x && (f1+': '+c.a)===this.series.name;
+              }.bind(this));
+              return '<b>'+this.series.name+'</b><br>'+f2+': <b>'+this.x+'</b><br>Mean: <b>'+fmt(this.y)+'</b>'+(cell?'<br>n: '+cell.n:'');
+            }}
+        });
+      }
+    }, 60);
   }
 
   /* legacy aliases so populateAll still works */

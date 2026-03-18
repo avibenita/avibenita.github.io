@@ -289,7 +289,17 @@
     }
     #drillChart{ width:100%; height:280px; }
 
-    /* ── ANOVA row chart button ─────────────────────────────── */
+    /* ── Drilldown hint strip ───────────────────────────────── */
+    .drill-hint{
+      display:flex; align-items:center; gap:6px;
+      margin:0 0 6px; padding:5px 10px;
+      border-radius:7px;
+      background:rgba(16,185,129,.10); border:1px solid rgba(16,185,129,.28);
+      font-size:12px; font-weight:600; color:var(--accent-1);
+      cursor:default; user-select:none;
+    }
+    .drill-hint strong{ color:var(--text-primary); }
+    .drill-hint i{ font-size:11px; }
     .row-chart-btn{
       display:inline-flex; align-items:center; gap:5px;
       padding:4px 11px; border-radius:20px; font-size:11px; font-weight:600;
@@ -599,7 +609,7 @@
                 </div>
               </div>
               <div class="results-panel-body" style="padding:8px;">
-                <p id="hintGrp" style="font-size:11px;color:var(--text-muted);margin:0 0 4px 2px;">Click a bar to drill into time breakdown</p>
+                <div id="hintGrp" class="drill-hint"><i class="fa-solid fa-magnifying-glass-chart"></i> Click any bar to drill into <strong>time</strong> breakdown</div>
                 <div class="chart-wrap-std" id="grpBarChart"></div>
                 <div class="chart-wrap-std" id="grpBoxChart" style="display:none;"></div>
               </div>
@@ -617,7 +627,7 @@
                 </div>
               </div>
               <div class="results-panel-body" style="padding:8px;">
-                <p style="font-size:11px;color:var(--text-muted);margin:0 0 4px 2px;">Click a bar to drill into group breakdown</p>
+                <div id="hintTim" class="drill-hint"><i class="fa-solid fa-magnifying-glass-chart"></i> Click any bar to drill into <strong>group</strong> breakdown</div>
                 <div class="chart-wrap-std" id="timBarChart"></div>
                 <div class="chart-wrap-std" id="timBoxChart" style="display:none;"></div>
               </div>
@@ -1374,6 +1384,7 @@
   /* shared column-chart config builder */
   function _colCfg(categories, series, yTitle, tc, gc, opts) {
     opts = opts || {};
+    var drillable = !!(opts.pointEvents && opts.pointEvents.click);
     return {
       chart:{ type:'column', backgroundColor:'transparent',
               style:{fontFamily:'Segoe UI,sans-serif'}, animation:{duration:400},
@@ -1386,17 +1397,40 @@
       legend:{ enabled: series.length > 1, itemStyle:{color:tc,fontSize:'12px'} },
       plotOptions:{ column:{
         borderRadius:5, borderWidth:0, groupPadding:.1, pointPadding:.08,
+        /* value label at top */
         dataLabels:{
           enabled:true, format:'{point.y:.2f}',
-          style:{color:tc,fontSize:'11px',fontWeight:'700',textOutline:'none'},
+          style:{color:tc,fontSize:'12px',fontWeight:'700',textOutline:'none'},
           verticalAlign:'top', inside:false, y:-2
         },
+        /* drill icon INSIDE the bar — only when clickable */
         point: opts.pointEvents ? { events: opts.pointEvents } : {}
       }},
-      series: series,
+      /* add a second series shadow just for the drill icon label (same data, invisible columns) */
+      series: drillable
+        ? series.concat(series.slice(0,1).map(function(s){
+            return {
+              name:'__drill__', type:'column', color:'transparent',
+              borderWidth:0, showInLegend:false, enableMouseTracking:false,
+              data: s.data,
+              dataLabels:{
+                enabled:true, useHTML:true,
+                verticalAlign:'bottom', inside:true, y:0,
+                formatter:function(){
+                  return '<span style="font-size:11px;opacity:.75;letter-spacing:-.5px">🔍 drill</span>';
+                }
+              }
+            };
+          }))
+        : series,
       tooltip:{ backgroundColor: tc === '#1f2937' ? '#fff' : '#1e293b',
                 style:{color: tc === '#1f2937' ? '#1f2937' : '#f1f5f9'},
-                borderRadius:8, shadow:true }
+                borderRadius:8, shadow:true,
+                headerFormat:'<span style="font-size:12px;font-weight:700">{point.key}</span><br/>',
+                pointFormat: drillable
+                  ? '<span style="color:{point.color}">●</span> Mean: <b>{point.y:.2f}</b><br/><span style="font-size:10px;opacity:.7">Click to drill down →</span>'
+                  : '<span style="color:{point.color}">●</span> Mean: <b>{point.y:.2f}</b>'
+              }
     };
   }
 
@@ -1499,13 +1533,17 @@
   /* ── switchVisPanel: toggle bar/box within a panel ── */
   function switchVisPanel(panel, mode) {
     var ids = panel === 'grp'
-      ? { bar:'grpBarChart', box:'grpBoxChart', btnBar:'btnGrpBar', btnBox:'btnGrpBox', key:'grp' }
-      : { bar:'timBarChart', box:'timBoxChart', btnBar:'btnTimBar', btnBox:'btnTimBox', key:'tim' };
+      ? { bar:'grpBarChart', box:'grpBoxChart', btnBar:'btnGrpBar', btnBox:'btnGrpBox', key:'grp', hint:'hintGrp' }
+      : { bar:'timBarChart', box:'timBoxChart', btnBar:'btnTimBar', btnBox:'btnTimBox', key:'tim', hint:'hintTim' };
 
     document.getElementById(ids.bar).style.display = mode === 'bar' ? '' : 'none';
     document.getElementById(ids.box).style.display = mode === 'box' ? '' : 'none';
     document.getElementById(ids.btnBar).classList.toggle('active', mode === 'bar');
     document.getElementById(ids.btnBox).classList.toggle('active', mode === 'box');
+
+    /* show drill hint only in bar mode (box has no drill) */
+    var hint = document.getElementById(ids.hint);
+    if (hint) hint.style.display = mode === 'bar' ? '' : 'none';
 
     setTimeout(function() {
       var c = mode === 'bar' ? _charts[ids.key+'Bar'] : _charts[ids.key+'Box'];

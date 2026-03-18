@@ -131,19 +131,94 @@
     .col-p  { font-weight:800; color:var(--col-p) !important; }
     .col-eta{ font-weight:700; color:var(--col-eta) !important; }
 
+    /* ── #3 Column separators (reading anchor) ──────────────── */
+    .results-panel td + td,
+    .results-panel th + th{
+      border-left:1px solid rgba(255,255,255,.045);
+    }
+    :root[data-theme="light"] .results-panel td + td,
+    :root[data-theme="light"] .results-panel th + th{
+      border-left:1px solid rgba(0,0,0,.06);
+    }
+
     /* ── Row states ─────────────────────────────────────────── */
     .sig-cell{ color:var(--col-p); font-weight:800; }
     .ns-cell { color:var(--text-muted); }
-    .total-row td{ font-weight:700; color:rgba(238,244,255,.50) !important; font-size:12px; }
-    :root[data-theme="light"] .total-row td{ color:rgba(55,65,81,.55) !important; }
-    .error-row td{ color:rgba(238,244,255,.48) !important; font-size:12.5px; }
-    :root[data-theme="light"] .error-row td{ color:rgba(55,65,81,.55) !important; }
+
+    /* #2 Collapse technical rows */
+    .error-row td,
+    .total-row td{
+      color:rgba(238,244,255,.38) !important;
+      font-size:12px !important; font-weight:400 !important;
+    }
+    :root[data-theme="light"] .error-row td,
+    :root[data-theme="light"] .total-row td{ color:rgba(55,65,81,.45) !important; }
+    .tech-rows-hidden .error-row,
+    .tech-rows-hidden .total-row{ display:none; }
+    .tech-toggle-btn{
+      background:none; border:none;
+      font-size:11px; color:var(--text-muted); cursor:pointer;
+      padding:4px 0 2px; display:flex; align-items:center; gap:4px;
+      transition:color .15s;
+    }
+    .tech-toggle-btn:hover{ color:var(--accent-1); }
+
+    /* #1 Interaction row — dominant purple */
     .is-significant{ box-shadow:inset 3px 0 0 0 var(--accent-1); }
     .interaction-row{
-      background:linear-gradient(90deg,rgba(155,92,255,.10),rgba(155,92,255,0) 18%),rgba(255,255,255,.02) !important;
-      box-shadow:inset 3px 0 0 0 #9b5cff;
+      background:
+        linear-gradient(90deg, rgba(155,92,255,.18), rgba(155,92,255,0) 28%),
+        rgba(255,255,255,.025) !important;
+      box-shadow:
+        inset 4px 0 0 0 #9b5cff,
+        0 0 0 1px rgba(155,92,255,.18);
     }
-    .interaction-row td:first-child{ font-weight:800; color:#ecd8ff !important; }
+    .interaction-row td:first-child{ font-weight:800; color:#e2c4ff !important; letter-spacing:.01em; }
+
+    /* #5 Meaning column (insight mode) */
+    .col-meaning{
+      color:#cfe3ff; font-weight:600; font-size:12.5px;
+      white-space:nowrap;
+    }
+    :root[data-theme="light"] .col-meaning{ color:#1e40af; }
+    .meaning-effect{ display:inline-flex; align-items:center; gap:5px; }
+    .meaning-dot{
+      width:7px; height:7px; border-radius:50%; flex-shrink:0;
+      display:inline-block;
+    }
+    .meaning-dot.large { background:#f87171; }
+    .meaning-dot.medium{ background:#fbbf24; }
+    .meaning-dot.small { background:#34d399; }
+    .meaning-dot.ns    { background:#6b7280; }
+
+    /* #4 p-dot indicator (replaces badge column in Insight mode) */
+    .p-dot{
+      display:inline-block; width:8px; height:8px;
+      border-radius:50%; flex-shrink:0; vertical-align:middle; margin-left:5px;
+    }
+    .p-dot.sig { background:#4dffb0; box-shadow:0 0 5px rgba(77,255,176,.5); }
+    .p-dot.ns  { background:#6b7280; }
+
+    /* #6 Mode toggle */
+    .mode-toggle{
+      display:inline-flex; border-radius:20px; overflow:hidden;
+      border:1.5px solid var(--border); background:var(--surface-2);
+      font-size:11.5px;
+    }
+    .mode-toggle button{
+      padding:4px 12px; border:none; cursor:pointer;
+      font-size:11.5px; font-weight:600;
+      background:transparent; color:var(--text-muted); transition:all .15s;
+    }
+    .mode-toggle button.active{
+      background:var(--accent-1); color:#fff;
+    }
+
+    /* insight mode: hide badge col, show meaning col */
+    .insight-mode .col-badge{ display:none; }
+    .insight-mode .col-meaning-cell{ display:table-cell !important; }
+    .standard-mode .col-meaning-cell{ display:none; }
+    .col-meaning-cell{ display:none; } /* hidden by default */
 
     /* ── Badge ──────────────────────────────────────────────── */
     .badge{
@@ -511,9 +586,23 @@
           </div>
 
           <!-- PRIMARY: ANOVA table — full width, always open -->
-          <div class="results-panel" style="margin-bottom:12px;">
-            <div class="results-panel-heading"><i class="fa-solid fa-table"></i>Parametric — ANOVA Table</div>
-            <div class="results-panel-body" id="anovaTableBody"></div>
+          <div class="results-panel" id="anovaTablePanel" style="margin-bottom:12px;">
+            <div class="results-panel-heading">
+              <span><i class="fa-solid fa-table"></i>ANOVA Table</span>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div class="mode-toggle" id="modeToggle">
+                  <button class="active" id="btnStdMode"    onclick="setInsightMode(false)">Standard</button>
+                  <button            id="btnInsightMode" onclick="setInsightMode(true)">✦ Insight</button>
+                </div>
+              </div>
+            </div>
+            <div class="results-panel-body" id="anovaTableBody" style="padding:0;"></div>
+            <div style="padding:4px 14px 8px;">
+              <button class="tech-toggle-btn" id="techToggleBtn" onclick="toggleTechRows()">
+                <i class="fa-solid fa-chevron-down" id="techToggleIcon" style="font-size:9px;"></i>
+                <span id="techToggleLabel">Show technical rows</span>
+              </button>
+            </div>
           </div>
 
           <!-- SECONDARY: Accordion row — Welch | KW | Mean Ranks -->
@@ -749,6 +838,56 @@
       : '<span class="badge badge-ns">n.s. p' + fmtP(p) + '</span>';
   }
 
+  /* ── Insight mode helpers ─────────────────────────────────── */
+  var _insightMode = false;
+  var _techRowsVisible = false;
+
+  function etaLabel(eta) {
+    if (!isFinite(eta)) return { text: '—', cls: 'ns' };
+    if (eta >= 0.14) return { text: 'very large', cls: 'large' };
+    if (eta >= 0.06) return { text: 'large',      cls: 'large' };
+    if (eta >= 0.01) return { text: 'medium',     cls: 'medium' };
+    return               { text: 'small',          cls: 'small' };
+  }
+
+  function meaningCell(p, eta, alpha, extra) {
+    var sig = isFinite(p) && p < alpha;
+    if (!sig) {
+      return '<td class="col-meaning-cell"><span class="meaning-effect">' +
+        '<span class="meaning-dot ns"></span>not significant</span></td>';
+    }
+    var el = etaLabel(eta);
+    var txt = extra || el.text + ' effect';
+    return '<td class="col-meaning-cell"><span class="meaning-effect">' +
+      '<span class="meaning-dot ' + el.cls + '"></span>' + txt + '</span></td>';
+  }
+
+  function pDot(p, alpha) {
+    var sig = isFinite(p) && p < alpha;
+    return '<span class="p-dot ' + (sig ? 'sig' : 'ns') + '"></span>';
+  }
+
+  function setInsightMode(on) {
+    _insightMode = on;
+    document.getElementById('btnStdMode').classList.toggle('active', !on);
+    document.getElementById('btnInsightMode').classList.toggle('active', on);
+    var panel = document.getElementById('anovaTablePanel');
+    if (panel) {
+      panel.classList.toggle('insight-mode', on);
+      panel.classList.toggle('standard-mode', !on);
+    }
+  }
+
+  function toggleTechRows() {
+    _techRowsVisible = !_techRowsVisible;
+    var panel = document.getElementById('anovaTablePanel');
+    if (panel) panel.classList.toggle('tech-rows-hidden', !_techRowsVisible);
+    var icon  = document.getElementById('techToggleIcon');
+    var label = document.getElementById('techToggleLabel');
+    if (icon)  icon.style.transform = _techRowsVisible ? 'rotate(180deg)' : '';
+    if (label) label.textContent = _techRowsVisible ? 'Hide technical rows' : 'Show technical rows';
+  }
+
     /* ── Tab switching ───────────────────────────────────────── */
   var TAB_TITLES = {
     'overview':    'Summary',
@@ -913,31 +1052,35 @@
     if (b.type === 'one-way') {
       var a = b.oneWay;
       var btnGrp = '<button class="row-chart-btn btn-grp" onclick="openRowChart(\'A\')"><i class="fa-solid fa-chart-column"></i> Means</button>';
-      el.innerHTML =
-        '<table><thead><tr><th>Source</th><th class="num col-secondary">SS</th><th class="num col-secondary">df</th><th class="num col-secondary">MS</th><th class="num">F</th><th class="num">p</th><th class="num">η²</th><th></th><th></th></tr></thead><tbody>' +
+      var TH = '<table><thead><tr>' +
+        '<th>Source</th>' +
+        '<th class="num col-secondary">SS</th><th class="num col-secondary">df</th><th class="num col-secondary">MS</th>' +
+        '<th class="num">F</th><th class="num">p</th><th class="num">η²</th>' +
+        '<th class="col-badge"></th><th class="col-meaning-cell col-meaning">Meaning</th><th></th>' +
+        '</tr></thead><tbody>';
+      el.innerHTML = TH +
         '<tr class="' + (isFinite(a.p) && a.p < alpha ? 'is-significant' : '') + '">' +
           '<td>Between groups</td>' +
           '<td class="num col-secondary">' + fmt(a.ssBetween) + '</td>' +
           '<td class="num col-secondary">' + a.df1 + '</td>' +
           '<td class="num col-secondary">' + fmt(a.msBetween) + '</td>' +
           '<td class="num col-f">' + fmt(a.F,2) + '</td>' +
-          '<td class="num col-p">' + fmtP(a.p) + '</td>' +
+          '<td class="num col-p">' + fmtP(a.p) + pDot(a.p,alpha) + '</td>' +
           '<td class="num col-eta">' + fmt(a.etaSq,3) + '</td>' +
-          '<td>' + sigBadge(a.p,alpha) + '</td>' +
+          '<td class="col-badge">' + sigBadge(a.p,alpha) + '</td>' +
+          meaningCell(a.p, a.etaSq, alpha) +
           '<td>' + btnGrp + '</td>' +
         '</tr>' +
         '<tr class="error-row">' +
           '<td>Within groups (error)</td>' +
-          '<td class="num">' + fmt(a.ssWithin) + '</td>' +
-          '<td class="num">' + a.df2 + '</td>' +
+          '<td class="num">' + fmt(a.ssWithin) + '</td><td class="num">' + a.df2 + '</td>' +
           '<td class="num">' + fmt(a.msWithin) + '</td>' +
-          '<td class="num">—</td><td class="num">—</td><td>—</td><td></td><td></td>' +
+          '<td class="num">—</td><td class="num">—</td><td>—</td><td></td><td class="col-meaning-cell"></td><td></td>' +
         '</tr>' +
         '<tr class="total-row">' +
           '<td>Total</td>' +
-          '<td class="num">' + fmt(a.ssTotal) + '</td>' +
-          '<td class="num">' + (a.df1+a.df2) + '</td>' +
-          '<td class="num">—</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td><td></td>' +
+          '<td class="num">' + fmt(a.ssTotal) + '</td><td class="num">' + (a.df1+a.df2) + '</td>' +
+          '<td class="num">—</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td><td class="col-meaning-cell"></td><td></td>' +
         '</tr>' +
         '</tbody></table>';
 
@@ -967,17 +1110,24 @@
       var btnB   = '<button class="row-chart-btn btn-tim" onclick="openRowChart(\'B\')"><i class="fa-solid fa-chart-column"></i> Means</button>';
       var btnAB  = '<button class="row-chart-btn btn-int" onclick="openRowChart(\'AB\')"><i class="fa-solid fa-chart-line"></i> Interaction</button>';
       var intSig = isFinite(a.pAB) && a.pAB < alpha;
-      el.innerHTML =
-        '<table><thead><tr><th>Source</th><th class="num col-secondary">SS</th><th class="num col-secondary">df</th><th class="num col-secondary">MS</th><th class="num">F</th><th class="num">p</th><th class="num">η²</th><th></th><th></th></tr></thead><tbody>' +
+      var TH2 = '<table><thead><tr>' +
+        '<th>Source</th>' +
+        '<th class="num col-secondary">SS</th><th class="num col-secondary">df</th><th class="num col-secondary">MS</th>' +
+        '<th class="num">F</th><th class="num">p</th><th class="num">η²</th>' +
+        '<th class="col-badge"></th><th class="col-meaning-cell col-meaning">Meaning</th><th></th>' +
+        '</tr></thead><tbody>';
+      el.innerHTML = TH2 +
         '<tr class="' + (isFinite(a.pA) && a.pA < alpha ? 'is-significant' : '') + '">' +
           '<td>' + fA + '</td>' +
           '<td class="num col-secondary">' + fmt(a.ssA) + '</td>' +
           '<td class="num col-secondary">' + a.dfA + '</td>' +
           '<td class="num col-secondary">' + fmt(a.msA) + '</td>' +
           '<td class="num col-f">' + fmt(a.FA,2) + '</td>' +
-          '<td class="num col-p">' + fmtP(a.pA) + '</td>' +
+          '<td class="num col-p">' + fmtP(a.pA) + pDot(a.pA,alpha) + '</td>' +
           '<td class="num col-eta">' + fmt(a.etaSqA,3) + '</td>' +
-          '<td>' + sigBadge(a.pA,alpha) + '</td><td>' + btnA + '</td>' +
+          '<td class="col-badge">' + sigBadge(a.pA,alpha) + '</td>' +
+          meaningCell(a.pA, a.etaSqA, alpha) +
+          '<td>' + btnA + '</td>' +
         '</tr>' +
         '<tr class="' + (isFinite(a.pB) && a.pB < alpha ? 'is-significant' : '') + '">' +
           '<td>' + fB + '</td>' +
@@ -985,9 +1135,11 @@
           '<td class="num col-secondary">' + a.dfB + '</td>' +
           '<td class="num col-secondary">' + fmt(a.msB) + '</td>' +
           '<td class="num col-f">' + fmt(a.FB,2) + '</td>' +
-          '<td class="num col-p">' + fmtP(a.pB) + '</td>' +
+          '<td class="num col-p">' + fmtP(a.pB) + pDot(a.pB,alpha) + '</td>' +
           '<td class="num col-eta">' + fmt(a.etaSqB,3) + '</td>' +
-          '<td>' + sigBadge(a.pB,alpha) + '</td><td>' + btnB + '</td>' +
+          '<td class="col-badge">' + sigBadge(a.pB,alpha) + '</td>' +
+          meaningCell(a.pB, a.etaSqB, alpha) +
+          '<td>' + btnB + '</td>' +
         '</tr>' +
         '<tr class="' + (intSig ? 'interaction-row' : (isFinite(a.pAB) && a.pAB < alpha ? 'is-significant' : '')) + '">' +
           '<td>' + fA + ' × ' + fB + '</td>' +
@@ -995,56 +1147,59 @@
           '<td class="num col-secondary">' + a.dfAB + '</td>' +
           '<td class="num col-secondary">' + fmt(a.msAB) + '</td>' +
           '<td class="num col-f">' + fmt(a.FAB,2) + '</td>' +
-          '<td class="num col-p">' + fmtP(a.pAB) + '</td>' +
+          '<td class="num col-p">' + fmtP(a.pAB) + pDot(a.pAB,alpha) + '</td>' +
           '<td class="num col-eta">' + fmt(a.etaSqAB,3) + '</td>' +
-          '<td>' + sigBadge(a.pAB,alpha) + '</td><td>' + btnAB + '</td>' +
+          '<td class="col-badge">' + sigBadge(a.pAB,alpha) + '</td>' +
+          meaningCell(a.pAB, a.etaSqAB, alpha, intSig ? 'interaction present' : null) +
+          '<td>' + btnAB + '</td>' +
         '</tr>' +
         '<tr class="error-row">' +
           '<td>Error</td>' +
-          '<td class="num">' + fmt(a.ssError) + '</td>' +
-          '<td class="num">' + a.dfError + '</td>' +
+          '<td class="num">' + fmt(a.ssError) + '</td><td class="num">' + a.dfError + '</td>' +
           '<td class="num">' + fmt(a.msError) + '</td>' +
-          '<td class="num">—</td><td class="num">—</td><td>—</td><td></td><td></td>' +
+          '<td class="num">—</td><td class="num">—</td><td>—</td><td></td><td class="col-meaning-cell"></td><td></td>' +
         '</tr>' +
         '<tr class="total-row">' +
           '<td>Total</td>' +
-          '<td class="num">' + fmt(a.ssTotal) + '</td>' +
-          '<td class="num">' + (a.dfA+a.dfB+a.dfAB+a.dfError) + '</td>' +
-          '<td class="num">—</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td><td></td>' +
+          '<td class="num">' + fmt(a.ssTotal) + '</td><td class="num">' + (a.dfA+a.dfB+a.dfAB+a.dfError) + '</td>' +
+          '<td class="num">—</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td><td class="col-meaning-cell"></td><td></td>' +
         '</tr>' +
         '</tbody></table>';
     } else if (b.type === 'repeated') {
       var a = b.repeated;
-      el.innerHTML =
-        '<table><thead><tr><th>Source</th><th class="num col-secondary">SS</th><th class="num col-secondary">df</th><th class="num col-secondary">MS</th><th class="num">F</th><th class="num">p</th><th class="num">η²p</th><th></th></tr></thead><tbody>' +
+      var TH3 = '<table><thead><tr>' +
+        '<th>Source</th>' +
+        '<th class="num col-secondary">SS</th><th class="num col-secondary">df</th><th class="num col-secondary">MS</th>' +
+        '<th class="num">F</th><th class="num">p</th><th class="num">η²p</th>' +
+        '<th class="col-badge"></th><th class="col-meaning-cell col-meaning">Meaning</th>' +
+        '</tr></thead><tbody>';
+      el.innerHTML = TH3 +
         '<tr class="' + (isFinite(a.p) && a.p < alpha ? 'is-significant' : '') + '">' +
           '<td>Condition (within)</td>' +
           '<td class="num col-secondary">' + fmt(a.ssBetweenConditions) + '</td>' +
           '<td class="num col-secondary">' + a.dfConditions + '</td>' +
           '<td class="num col-secondary">' + fmt(a.msConditions) + '</td>' +
           '<td class="num col-f">' + fmt(a.F,2) + '</td>' +
-          '<td class="num col-p">' + fmtP(a.p) + '</td>' +
+          '<td class="num col-p">' + fmtP(a.p) + pDot(a.p,alpha) + '</td>' +
           '<td class="num col-eta">' + fmt(a.etaSqP,3) + '</td>' +
-          '<td>' + sigBadge(a.p,alpha) + '</td>' +
+          '<td class="col-badge">' + sigBadge(a.p,alpha) + '</td>' +
+          meaningCell(a.p, a.etaSqP, alpha) +
         '</tr>' +
         '<tr class="error-row">' +
           '<td>Subjects (between)</td>' +
-          '<td class="num">' + fmt(a.ssBetweenSubjects) + '</td>' +
-          '<td class="num">' + a.dfSubjects + '</td>' +
-          '<td class="num">—</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td>' +
+          '<td class="num">' + fmt(a.ssBetweenSubjects) + '</td><td class="num">' + a.dfSubjects + '</td>' +
+          '<td class="num">—</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td><td class="col-meaning-cell"></td>' +
         '</tr>' +
         '<tr class="error-row">' +
           '<td>Error (residual)</td>' +
-          '<td class="num">' + fmt(a.ssError) + '</td>' +
-          '<td class="num">' + a.dfError + '</td>' +
+          '<td class="num">' + fmt(a.ssError) + '</td><td class="num">' + a.dfError + '</td>' +
           '<td class="num">' + fmt(a.msError) + '</td>' +
-          '<td class="num">—</td><td class="num">—</td><td>—</td><td></td>' +
+          '<td class="num">—</td><td class="num">—</td><td>—</td><td></td><td class="col-meaning-cell"></td>' +
         '</tr>' +
         '<tr class="total-row">' +
           '<td>Total</td>' +
-          '<td class="num">' + fmt(a.ssTotal) + '</td>' +
-          '<td class="num">' + (a.dfConditions+a.dfSubjects+a.dfError) + '</td>' +
-          '<td class="num">—</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td>' +
+          '<td class="num">' + fmt(a.ssTotal) + '</td><td class="num">' + (a.dfConditions+a.dfSubjects+a.dfError) + '</td>' +
+          '<td class="num">—</td><td class="num">—</td><td class="num">—</td><td>—</td><td></td><td class="col-meaning-cell"></td>' +
         '</tr>' +
         '</tbody></table>';
     }
@@ -2021,6 +2176,13 @@
     /* Hide all panels except overview on init */
     document.querySelectorAll('.tab-panel').forEach(function(p) { p.style.display = 'none'; p.classList.remove('active'); });
     switchTab('overview');
+
+    /* Init ANOVA table panel to standard mode, tech rows hidden */
+    var anovaPanel = document.getElementById('anovaTablePanel');
+    if (anovaPanel) {
+      anovaPanel.classList.add('standard-mode');
+      anovaPanel.classList.add('tech-rows-hidden');
+    }
 
     if (typeof Office !== 'undefined' && typeof Office.onReady === 'function') {
       Office.onReady(function() { initOfficeBridge(); });

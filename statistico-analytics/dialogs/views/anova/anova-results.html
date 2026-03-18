@@ -159,24 +159,34 @@
     .cmp-factor-meta{ font-size:11px; color:var(--text-muted); margin-left:auto; }
     .cmp-factor-body{ padding:10px 14px; font-size:13px; }
     .cmp-factor-na{ color:var(--text-muted); font-size:12.5px; font-style:italic; padding:6px 0; }
-    .cmp-se-block{ margin-bottom:12px; }
-    .cmp-se-block:last-child{ margin-bottom:0; }
-    .cmp-se-stratum{
-      font-size:12.5px; font-weight:700; color:var(--text-secondary);
-      padding:4px 8px; background:var(--surface-2); border-radius:5px;
-      border-left:3px solid var(--accent-1); margin-bottom:5px;
+    /* ── Level-filter chips ─────────────────────────────────── */
+    .cmp-chip-bar{
+      display:flex; align-items:center; gap:5px; flex-wrap:wrap;
+      padding:6px 14px 7px; background:var(--surface-1);
+      border-bottom:1px solid var(--border);
     }
+    .cmp-chip-label{
+      font-size:10.5px; font-weight:600; color:var(--text-muted);
+      text-transform:uppercase; letter-spacing:.05em; white-space:nowrap;
+      margin-right:3px;
+    }
+    .cmp-chip{
+      padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:600;
+      cursor:pointer; border:1.5px solid var(--border);
+      background:var(--surface-2); color:var(--text-secondary);
+      transition:all .15s; white-space:nowrap; user-select:none;
+    }
+    .cmp-chip:hover{ border-color:var(--accent-1); color:var(--accent-1); }
+    .cmp-chip.active{
+      background:var(--accent-1); border-color:var(--accent-1);
+      color:#fff; box-shadow:0 2px 6px rgba(16,185,129,.35);
+    }
+    .cmp-chip-all{ font-style:normal; }
     .cmp-rerun{
       font-size:12.5px; color:var(--text-muted);
       padding:8px 10px; border:1px dashed var(--border);
       border-radius:6px; background:rgba(255,255,255,.02);
     }
-    .se-view-select{
-      padding:5px 10px; border-radius:6px; border:1.5px solid var(--border);
-      background:var(--surface-2); color:var(--text-primary);
-      font-size:12px; cursor:pointer;
-    }
-    .se-view-select:focus{ outline:none; border-color:var(--accent-1); }
     .report-box{ background:var(--surface-2); border:1.5px solid var(--border); border-radius:9px; padding:14px 16px; font-size:14px; line-height:1.75; color:var(--text-secondary); }
     .report-box p{ margin-bottom:8px; }
     .report-box p:last-child{ margin-bottom:0; }
@@ -891,17 +901,41 @@
      ══════════════════════════════════════════════════════════ */
 
   /* state for dropdown */
-  var _seView = 'BinA'; /* 'BinA' or 'AinB' */
+  var _seView = 'BinA'; /* kept for compatibility — unused */
 
   function populatePosthoc(b) {
-    _b_posthoc = b;          /* save for dropdown re-render */
+    _b_posthoc = b;          /* save for chip re-render */
     _renderPosthoc(b);
   }
 
   var _b_posthoc = null;
 
-  function switchSEView(v) {
-    _seView = v;
+  /* ── chip filter: factorKey = 'A'|'B', level = string|'__all__' ── */
+  function switchFactorFilter(factorKey, level) {
+    if (!_b_posthoc) return;
+    var panelId = 'cmpPanel_' + factorKey;
+    var panel   = document.getElementById(panelId);
+    if (!panel) return;
+
+    /* update chip active state */
+    panel.querySelectorAll('.cmp-chip').forEach(function(ch) {
+      ch.classList.toggle('active', ch.dataset.level === level);
+    });
+
+    /* filter table rows */
+    var tbody = panel.querySelector('tbody');
+    if (!tbody) return;
+    tbody.querySelectorAll('tr').forEach(function(tr) {
+      if (level === '__all__') {
+        tr.style.display = '';
+      } else {
+        var cmp = tr.cells[0] ? tr.cells[0].textContent : '';
+        /* match if the selected level appears as a word in the comparison label */
+        var re = new RegExp('(?:^|\\s|vs )' + level.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '(?:\\s|$|\\s)');
+        tr.style.display = (cmp.indexOf(level) >= 0) ? '' : 'none';
+      }
+    });
+  }
     if (_b_posthoc) _renderPosthoc(_b_posthoc);
   }
 
@@ -949,25 +983,21 @@
         '<div class="cmp-box-title" style="color:#f59e0b;"><i class="fa-solid fa-triangle-exclamation"></i> Significant interaction detected</div>' +
         '<div class="cmp-box-body" style="font-size:12.5px;">' +
           'The <strong>' + factors[0].name + ' × ' + factors[1].name + '</strong> interaction is significant. ' +
-          'Main-effect post-hoc results should be interpreted cautiously — inspect the <strong>Simple Effects</strong> section below for stratified pairwise comparisons.' +
+          'Main-effect post-hoc results should be interpreted cautiously. ' +
+          'Use the level filters below to explore pairwise comparisons within specific strata.' +
         '</div></div>';
     }
 
-    /* ══ SECTION 1 — MAIN EFFECTS ══════════════════════════ */
+    /* ══ MAIN EFFECTS only ══════════════════════════════════ */
     html += _renderMainEffectsSection(b, factors, eligibleFactors, methodLabel, alpha, interactionSig);
-
-    /* ══ SECTION 2 — SIMPLE EFFECTS (two-way only) ══════════ */
-    if (isTwoWay) {
-      html += _renderSimpleEffectsSection(b, factors, methodLabel, alpha, interactionSig);
-    }
 
     el.innerHTML = html;
   }
 
-  /* ── Section 1: one panel per eligible factor ─────────── */
+  /* ── Section: one panel per eligible factor, with level-filter chips ── */
   function _renderMainEffectsSection(b, factors, eligibleFactors, methodLabel, alpha, interactionSig) {
     var html = '<div class="cmp-section-head">' +
-      '<i class="fa-solid fa-layer-group"></i> Main Effect Post-hoc' +
+      '<i class="fa-solid fa-layer-group"></i> Post-hoc Comparisons' +
       (interactionSig ? ' <span style="font-size:11px;color:#f59e0b;font-weight:400;">(interpret cautiously — interaction present)</span>' : '') +
     '</div>';
 
@@ -978,17 +1008,42 @@
         '</div>';
     }
 
-    factors.forEach(function(f) {
-      var eligible = f.levels >= 3;
-      /* header strip */
-      html += '<div class="cmp-factor-panel">' +
-        '<div class="cmp-factor-head">' +
-          '<span class="cmp-factor-label"><i class="fa-solid fa-tag"></i>&nbsp;' + f.name + '</span>' +
-          '<span class="cmp-factor-meta">' + f.levels + ' levels</span>' +
-          (eligible
-            ? '<span class="badge badge-sig"><i class="fa-solid fa-check" style="font-size:9px;"></i> Eligible</span>'
-            : '<span class="badge badge-ns">2 levels — direct comparison</span>') +
+    var isTwoWay = b.type === 'two-way';
+
+    factors.forEach(function(f, fi) {
+      var eligible  = f.levels >= 3;
+      /* the "other" factor provides the filter levels (two-way only) */
+      var otherFactor = isTwoWay ? factors[1 - fi] : null;
+      var otherLevels = otherFactor
+        ? (f.key === 'A' ? (b.bLevels || []) : (b.aLevels || []))
+        : [];
+
+      /* panel with unique id for chip targeting */
+      html += '<div class="cmp-factor-panel" id="cmpPanel_' + f.key + '">';
+
+      /* ── header row ── */
+      html += '<div class="cmp-factor-head">' +
+        '<span class="cmp-factor-label"><i class="fa-solid fa-tag"></i>&nbsp;' + f.name + '</span>' +
+        '<span class="cmp-factor-meta">' + f.levels + ' levels</span>' +
+        (eligible
+          ? '<span class="badge badge-sig"><i class="fa-solid fa-check" style="font-size:9px;"></i> Eligible</span>'
+          : '<span class="badge badge-ns">2 levels — direct comparison</span>') +
+      '</div>';
+
+      /* ── chip bar (only for two-way with eligible factor and other levels) ── */
+      if (eligible && isTwoWay && otherLevels.length) {
+        var chipLabel = 'Filter by ' + otherFactor.name + ':';
+        html += '<div class="cmp-chip-bar">' +
+          '<span class="cmp-chip-label">' + chipLabel + '</span>' +
+          '<span class="cmp-chip cmp-chip-all active" data-level="__all__" ' +
+            'onclick="switchFactorFilter(\'' + f.key + '\',\'__all__\')">All pairs</span>' +
+          otherLevels.map(function(lv) {
+            return '<span class="cmp-chip" data-level="' + lv + '" ' +
+              'onclick="switchFactorFilter(\'' + f.key + '\',\'' + lv.replace(/'/g,"\\'") + '\')">' +
+              lv + '</span>';
+          }).join('') +
         '</div>';
+      }
 
       if (!eligible) {
         html += '<div class="cmp-factor-body cmp-factor-na">With only 2 levels the ANOVA F-test is the pairwise comparison — no post-hoc needed.</div>';
@@ -1018,145 +1073,6 @@
     });
 
     return html;
-  }
-
-  /* ── Section 2: simple effects with view dropdown ─────── */
-  function _renderSimpleEffectsSection(b, factors, methodLabel, alpha, interactionSig) {
-    var fA = factors[0] ? factors[0].name : 'Factor A';
-    var fB = factors[1] ? factors[1].name : 'Factor B';
-    var hasA3 = factors[0] && factors[0].levels >= 3;
-    var hasB3 = factors[1] && factors[1].levels >= 3;
-
-    /* compute/retrieve simple effects */
-    var se = b.simpleEffects;
-    if ((!se || !se.length) && b.cells && b.aLevels && b.bLevels) {
-      se = buildSimpleEffectsFromCells(b, alpha, methodLabel);
-    }
-
-    /* ── build grouped lookup ── */
-    /* BinA: withinFactor=fB, stratum=fA level → strata list */
-    var BinA = [];   /* [{stratum, rows}] — B within each A level */
-    var AinB = [];   /* [{stratum, rows}] — A within each B level */
-    if (se && se.length) {
-      se.forEach(function(s) {
-        if (s.withinFactor === fB) BinA.push(s);
-        else                        AinB.push(s);
-      });
-    }
-
-    var title = '<div class="cmp-section-head" style="margin-top:16px;">' +
-      '<i class="fa-solid fa-arrows-split-up-and-left"></i> Simple Effects' +
-      (!interactionSig ? ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">(interaction n.s. — exploratory only)</span>' : '') +
-    '</div>';
-
-    if (!se || !se.length) {
-      return title + '<div class="cmp-box cmp-warn" style="margin-bottom:14px;">' +
-        '<div class="cmp-box-title"><i class="fa-solid fa-rotate"></i> Re-run required</div>' +
-        '<div class="cmp-box-body">Simple effects tables require cell-level data. Re-run the analysis to generate these tables.</div>' +
-        '</div>';
-    }
-
-    /* ── dropdown ── */
-    var opts = [];
-    if (BinA.length) opts.push({ v:'BinA', label: fB + ' within each level of ' + fA });
-    if (AinB.length) opts.push({ v:'AinB', label: fA + ' within each level of ' + fB });
-
-    /* ensure _seView is valid */
-    var validViews = opts.map(function(o){ return o.v; });
-    if (validViews.indexOf(_seView) < 0 && validViews.length) _seView = validViews[0];
-
-    var dropdown = '';
-    if (opts.length > 1) {
-      dropdown = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">' +
-        '<label style="font-size:12px;color:var(--text-muted);white-space:nowrap;">Show:</label>' +
-        '<select class="se-view-select" onchange="switchSEView(this.value)" style="flex:1;">' +
-        opts.map(function(o){
-          return '<option value="' + o.v + '"' + (_seView === o.v ? ' selected' : '') + '>' + o.label + '</option>';
-        }).join('') +
-        '</select></div>';
-    } else if (opts.length === 1) {
-      dropdown = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">' +
-        '<i class="fa-solid fa-info-circle"></i>&nbsp;' + opts[0].label + '</div>';
-    }
-
-    /* ── active strata ── */
-    var activeStrata = _seView === 'AinB' ? AinB : BinA;
-    var withinName   = _seView === 'AinB' ? fA : fB;
-    var byName       = _seView === 'AinB' ? fB : fA;
-
-    var tables = activeStrata.map(function(s) {
-      return '<div class="cmp-se-block">' +
-        '<div class="cmp-se-stratum">' + s.stratum + '</div>' +
-        '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Method: ' + methodLabel + ' &nbsp;|&nbsp; α = ' + alpha + '</div>' +
-        '<table><thead><tr><th>Comparison</th><th class="num">Mean diff</th><th class="num">SE</th><th class="num">p (adj)</th><th></th></tr></thead><tbody>' +
-        s.rows.map(function(r){
-          var p = r.pAdj !== undefined ? r.pAdj : r.p;
-          return '<tr><td>' + r.comparison + '</td><td class="num">' + fmt(r.diff) + '</td><td class="num">' + fmt(r.se) + '</td><td class="num ' + sigCell(p,alpha) + '">' + fmtP(p) + '</td><td>' + sigBadge(p,alpha) + '</td></tr>';
-        }).join('') +
-        '</tbody></table></div>';
-    }).join('');
-
-    return title +
-      '<div class="cmp-factor-panel">' +
-        dropdown +
-        (tables || '<div class="cmp-factor-na">No comparisons available for this view.</div>') +
-      '</div>';
-  }
-
-  /* ── Build simple effects from raw cells (client-side fallback) ── */
-  function buildSimpleEffectsFromCells(b, alpha, methodLabel) {
-    var fAname = (b.spec && b.spec.factor1) || 'Factor A';
-    var fBname = (b.spec && b.spec.factor2) || 'Factor B';
-    var aLevels = b.aLevels || [], bLevels = b.bLevels || [];
-    var cells   = b.cells   || {};
-    var msError = b.twoWay  ? b.twoWay.msError  : 0;
-    var dfError = b.twoWay  ? b.twoWay.dfError  : 1;
-    var se = [];
-
-    function grpMean(arr) { return arr.length ? arr.reduce(function(s,v){return s+v;},0)/arr.length : NaN; }
-    function grpVar(arr) {
-      if (arr.length < 2) return 0;
-      var m = grpMean(arr);
-      return arr.reduce(function(s,v){return s+(v-m)*(v-m);},0)/(arr.length-1);
-    }
-    function runPairs(grouped, levels, fName) {
-      var rows = [];
-      for (var i = 0; i < levels.length-1; i++) {
-        for (var j = i+1; j < levels.length; j++) {
-          var a = grouped[levels[i]] || [], bArr = grouped[levels[j]] || [];
-          var diff = grpMean(a) - grpMean(bArr);
-          var seVal = (msError > 0 && a.length && bArr.length)
-            ? Math.sqrt(msError * (1/a.length + 1/bArr.length) / 2) : 0;
-          var q = seVal > 0 ? Math.abs(diff)/seVal : 0;
-          var p = Math.max(0, Math.min(1, 2*(1 - (function(z){
-            var t=1/(1+0.3275911*Math.abs(z));
-            return 0.5*(1+((((1.061405429*t-1.453152027)*t+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-z*z)*(z<0?-1:1));
-          })(q/Math.SQRT2))));
-          rows.push({ comparison: fName+' '+levels[i]+' vs '+fName+' '+levels[j], diff: diff, se: seVal, p: p, method: 'Tukey HSD' });
-        }
-      }
-      return rows;
-    }
-
-    /* B within each A level */
-    if (bLevels.length >= 3) {
-      aLevels.forEach(function(aLv) {
-        var grouped = {};
-        bLevels.forEach(function(bLv) { grouped[bLv] = cells[aLv+'::'+bLv] || []; });
-        var rows = runPairs(grouped, bLevels, fBname);
-        if (rows.length) se.push({ stratum: fAname+' = '+aLv, withinFactor: fBname, rows: rows });
-      });
-    }
-    /* A within each B level (only if A has 3+ levels) */
-    if (aLevels.length >= 3) {
-      bLevels.forEach(function(bLv) {
-        var grouped = {};
-        aLevels.forEach(function(aLv) { grouped[aLv] = cells[aLv+'::'+bLv] || []; });
-        var rows = runPairs(grouped, aLevels, fAname);
-        if (rows.length) se.push({ stratum: fBname+' = '+bLv, withinFactor: fAname, rows: rows });
-      });
-    }
-    return se;
   }
 
   /* ── Non-Parametric ──────────────────────────────────────── */

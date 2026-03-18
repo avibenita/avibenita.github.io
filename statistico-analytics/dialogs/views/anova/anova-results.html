@@ -1423,32 +1423,47 @@
       legend:{ enabled: series.length > 1, itemStyle:{color:tc,fontSize:'12px'} },
       plotOptions:{ column:{
         borderRadius:5, borderWidth:0, groupPadding:.1, pointPadding:.08,
-        /* value label at top */
-        dataLabels:{
-          enabled:true, format:'{point.y:.2f}',
-          style:{color:tc,fontSize:'12px',fontWeight:'700',textOutline:'none'},
-          verticalAlign:'top', inside:false, y:-2
-        },
-        /* drill icon INSIDE the bar — only when clickable */
+        /* default OFF — each series sets its own dataLabels */
+        dataLabels:{ enabled:false },
         point: opts.pointEvents ? { events: opts.pointEvents } : {}
       }},
       /* add a second series shadow just for the drill icon label (same data, invisible columns) */
       series: drillable
-        ? series.concat(series.slice(0,1).map(function(s){
-            return {
-              name:'__drill__', type:'column', color:'transparent',
-              borderWidth:0, showInLegend:false, enableMouseTracking:false,
-              data: s.data,
+        ? series.slice(0,1).map(function(s){
+            /* main series: value on TOP of bar */
+            return Object.assign({}, s, {
               dataLabels:{
-                enabled:true, useHTML:true,
-                verticalAlign:'bottom', inside:true, y:0,
-                formatter:function(){
-                  return '<span style="font-size:11px;opacity:.75;letter-spacing:-.5px">🔍 drill</span>';
-                }
+                enabled:true, format:'{point.y:.2f}',
+                style:{color:tc,fontSize:'12px',fontWeight:'700',textOutline:'none'},
+                verticalAlign:'top', inside:false, y:-6
               }
-            };
-          }))
-        : series,
+            });
+          }).concat(series.slice(1)).concat(
+            series.slice(0,1).map(function(s){
+              /* drill shadow series: icon INSIDE bar, no value */
+              return {
+                name:'__drill__', type:'column', color:'transparent',
+                borderWidth:0, showInLegend:false, enableMouseTracking:false,
+                data: s.data,
+                dataLabels:{
+                  enabled:true, useHTML:true,
+                  verticalAlign:'bottom', inside:true, y:-6,
+                  formatter:function(){
+                    return '<span style="font-size:11px;opacity:.72;letter-spacing:-.5px">🔍 drill</span>';
+                  }
+                }
+              };
+            })
+          )
+        : series.slice(0,1).map(function(s){
+            return Object.assign({}, s, {
+              dataLabels:{
+                enabled:true, format:'{point.y:.2f}',
+                style:{color:tc,fontSize:'12px',fontWeight:'700',textOutline:'none'},
+                verticalAlign:'top', inside:false, y:-6
+              }
+            });
+          }).concat(series.slice(1)),
       tooltip:{ backgroundColor: tc === '#1f2937' ? '#fff' : '#1e293b',
                 style:{color: tc === '#1f2937' ? '#1f2937' : '#f1f5f9'},
                 borderRadius:8, shadow:true,

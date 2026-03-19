@@ -1600,10 +1600,194 @@
         document.getElementById('interpretationText').textContent = text;
     }
 
+    // ── URL Parameter Parsing & Auto-fill ─────────────────────────────
+    function parseURLParams() {
+        const params = new URLSearchParams(window.location.search);
+        const testType = params.get('test');
+        const autoCalculate = params.get('autoCalculate') === 'true' || params.get('autoCalculate') === '1';
+        
+        if (!testType) return false;
+        
+        // Map URL test names to internal test types
+        const testTypeMap = {
+            'one-sample-mean': 'one-sample-mean',
+            'two-sample-mean': 'two-sample-mean',
+            'one-sample-proportion': 'one-sample-proportion',
+            'two-sample-proportion': 'two-sample-proportion',
+            'correlation': 'correlation',
+            'anova': 'anova',
+            'regression': 'regression'
+        };
+        
+        const mappedTestType = testTypeMap[testType];
+        if (!mappedTestType) return false;
+        
+        // Select the test type
+        const testElement = document.querySelector(`.sb-item[data-test="${mappedTestType}"]`);
+        if (testElement) {
+            selectTest(testElement);
+        }
+        
+        // Fill in common parameters
+        if (params.has('alpha')) {
+            document.getElementById('alpha').value = parseFloat(params.get('alpha'));
+        }
+        if (params.has('power')) {
+            document.getElementById('power').value = parseFloat(params.get('power'));
+        }
+        if (params.has('alternative')) {
+            const alt = params.get('alternative');
+            const select = document.getElementById('alternative');
+            if (select) {
+                select.value = alt === 'one-sided' ? 'one-sided' : 'two-sided';
+            }
+        }
+        
+        // Fill test-specific parameters
+        switch(mappedTestType) {
+            case 'one-sample-mean':
+                if (params.has('effectSize') || params.has('d')) {
+                    const d = params.get('effectSize') || params.get('d');
+                    document.getElementById('effectSize').value = parseFloat(d);
+                }
+                break;
+            case 'two-sample-mean':
+                if (params.has('effectSize') || params.has('d')) {
+                    const d = params.get('effectSize') || params.get('d');
+                    document.getElementById('effectSize2').value = parseFloat(d);
+                }
+                if (params.has('allocationRatio') || params.has('k')) {
+                    const k = params.get('allocationRatio') || params.get('k');
+                    document.getElementById('allocationRatio').value = parseFloat(k);
+                }
+                break;
+            case 'one-sample-proportion':
+                if (params.has('p1') || params.has('p')) {
+                    const p = params.get('p1') || params.get('p');
+                    document.getElementById('p1').value = parseFloat(p);
+                }
+                break;
+            case 'two-sample-proportion':
+                if (params.has('p1')) {
+                    document.getElementById('p1').value = parseFloat(params.get('p1'));
+                }
+                if (params.has('p2')) {
+                    document.getElementById('p2').value = parseFloat(params.get('p2'));
+                }
+                break;
+            case 'correlation':
+                if (params.has('rho') || params.has('r')) {
+                    const r = params.get('rho') || params.get('r');
+                    document.getElementById('rho').value = parseFloat(r);
+                }
+                if (params.has('rho0') || params.has('r0')) {
+                    const r0 = params.get('rho0') || params.get('r0');
+                    document.getElementById('rho0').value = parseFloat(r0);
+                }
+                break;
+            case 'anova':
+                if (params.has('numGroups') || params.has('k')) {
+                    const k = params.get('numGroups') || params.get('k');
+                    document.getElementById('numGroups').value = parseInt(k);
+                }
+                if (params.has('effectSizeF') || params.has('f')) {
+                    const f = params.get('effectSizeF') || params.get('f');
+                    document.getElementById('effectSizeF').value = parseFloat(f);
+                }
+                break;
+            case 'regression':
+                if (params.has('numPredictors') || params.has('p')) {
+                    const p = params.get('numPredictors') || params.get('p');
+                    document.getElementById('numPredictors').value = parseInt(p);
+                }
+                if (params.has('rsquared') || params.has('r2') || params.has('R2')) {
+                    const r2 = params.get('rsquared') || params.get('r2') || params.get('R2');
+                    document.getElementById('rsquared').value = parseFloat(r2);
+                }
+                break;
+        }
+        
+        // Auto-calculate if requested
+        if (autoCalculate) {
+            // Small delay to ensure DOM is ready
+            setTimeout(() => {
+                calculateSampleSize();
+            }, 100);
+        }
+        
+        return true;
+    }
+    
+    // ── Helper function to generate calculator URL ─────────────────────
+    // This can be called from other modules to generate the calculator URL
+    window.generateCalculatorURL = function(testType, params, autoCalculate = true) {
+        const baseURL = window.location.origin + 
+                       (window.location.pathname.includes('/statistico-calculators/') 
+                        ? '' 
+                        : '/statistico-calculators/') + 
+                       'SampleSizeCalculator.html';
+        const urlParams = new URLSearchParams();
+        
+        urlParams.set('test', testType);
+        if (autoCalculate) urlParams.set('autoCalculate', 'true');
+        
+        // Add common parameters
+        if (params.alpha !== undefined) urlParams.set('alpha', params.alpha);
+        if (params.power !== undefined) urlParams.set('power', params.power);
+        if (params.alternative) urlParams.set('alternative', params.alternative);
+        
+        // Add test-specific parameters
+        switch(testType) {
+            case 'one-sample-mean':
+            case 'two-sample-mean':
+                if (params.effectSize !== undefined) urlParams.set('effectSize', params.effectSize);
+                if (params.d !== undefined) urlParams.set('d', params.d);
+                if (testType === 'two-sample-mean' && params.allocationRatio !== undefined) {
+                    urlParams.set('allocationRatio', params.allocationRatio);
+                }
+                break;
+            case 'one-sample-proportion':
+                if (params.p1 !== undefined) urlParams.set('p1', params.p1);
+                if (params.p !== undefined) urlParams.set('p', params.p);
+                break;
+            case 'two-sample-proportion':
+                if (params.p1 !== undefined) urlParams.set('p1', params.p1);
+                if (params.p2 !== undefined) urlParams.set('p2', params.p2);
+                break;
+            case 'correlation':
+                if (params.rho !== undefined) urlParams.set('rho', params.rho);
+                if (params.r !== undefined) urlParams.set('r', params.r);
+                if (params.rho0 !== undefined) urlParams.set('rho0', params.rho0);
+                if (params.r0 !== undefined) urlParams.set('r0', params.r0);
+                break;
+            case 'anova':
+                if (params.numGroups !== undefined) urlParams.set('numGroups', params.numGroups);
+                if (params.k !== undefined) urlParams.set('k', params.k);
+                if (params.effectSizeF !== undefined) urlParams.set('effectSizeF', params.effectSizeF);
+                if (params.f !== undefined) urlParams.set('f', params.f);
+                break;
+            case 'regression':
+                if (params.numPredictors !== undefined) urlParams.set('numPredictors', params.numPredictors);
+                if (params.p !== undefined) urlParams.set('p', params.p);
+                if (params.rsquared !== undefined) urlParams.set('rsquared', params.rsquared);
+                if (params.r2 !== undefined) urlParams.set('r2', params.r2);
+                if (params.R2 !== undefined) urlParams.set('R2', params.R2);
+                break;
+        }
+        
+        return baseURL + '?' + urlParams.toString();
+    };
+
     // ── Init ──────────────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function() {
-        // Set initial header subtitle
-        document.getElementById('headerSubtitle').textContent = testLabels[currentTestType];
+        // Try to parse URL parameters first
+        const hasParams = parseURLParams();
+        
+        // Set initial header subtitle (if not set by URL params)
+        if (!hasParams) {
+            document.getElementById('headerSubtitle').textContent = testLabels[currentTestType];
+        }
+        
         // Ensure modal hidden
         document.getElementById('loadingModal').classList.add('hidden');
     });

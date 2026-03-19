@@ -1141,7 +1141,7 @@
             </div>
           </div>
           <div class="results-panel">
-            <div class="results-panel-heading"><i class="fa-solid fa-list-ol"></i>Group Descriptive Statistics</div>
+            <div class="results-panel-heading"><i class="fa-solid fa-list-ol"></i>Descriptive Statistics</div>
             <div class="results-panel-body" id="descBody"></div>
           </div>
         </div>
@@ -2015,17 +2015,48 @@
   /* ── Descriptives ────────────────────────────────────────── */
   function populateDescriptives(b) {
     var el   = document.getElementById('descBody');
+    var fA   = (b.spec && b.spec.factor1) || (b.spec && b.spec.factor) || 'Group';
+    var fB   = (b.spec && b.spec.factor2) || null;
+
+    function descTable(factorLabel, desc) {
+      if (!desc || !desc.length) return '';
+      return '<div style="margin-bottom:16px;">' +
+        '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);">' +
+          '<i class="fa-solid fa-tag" style="color:var(--accent-1);margin-right:5px;"></i>' + factorLabel +
+        '</div>' +
+        '<table><thead><tr>' +
+          '<th>' + factorLabel + '</th>' +
+          '<th class="num">n</th><th class="num">Mean</th><th class="num">SD</th><th class="num">SE</th>' +
+          '<th class="num">95% CI Low</th><th class="num">95% CI High</th>' +
+          '<th class="num">Min</th><th class="num">Max</th>' +
+        '</tr></thead><tbody>' +
+        desc.map(function(d) {
+          return '<tr><td>' + d.level + '</td>' +
+            '<td class="num">' + d.n + '</td>' +
+            '<td class="num">' + fmt(d.mean) + '</td>' +
+            '<td class="num">' + fmt(d.sd) + '</td>' +
+            '<td class="num">' + fmt(d.se) + '</td>' +
+            '<td class="num">' + fmt(d.ciLow) + '</td>' +
+            '<td class="num">' + fmt(d.ciHigh) + '</td>' +
+            '<td class="num">' + fmt(d.min) + '</td>' +
+            '<td class="num">' + fmt(d.max) + '</td>' +
+          '</tr>';
+        }).join('') +
+        '</tbody></table></div>';
+    }
+
     var desc = b.descriptives || b.descA;
     if (!desc || !desc.length) {
       el.innerHTML = '<p style="color:var(--text-muted);font-size:12px;">No descriptive statistics available.</p>';
       return;
     }
-    el.innerHTML =
-      '<table><thead><tr><th>Group</th><th class="num">n</th><th class="num">Mean</th><th class="num">SD</th><th class="num">SE</th><th class="num">95% CI Low</th><th class="num">95% CI High</th><th class="num">Min</th><th class="num">Max</th></tr></thead><tbody>' +
-      desc.map(function(d) {
-        return '<tr><td>' + d.level + '</td><td class="num">' + d.n + '</td><td class="num">' + fmt(d.mean) + '</td><td class="num">' + fmt(d.sd) + '</td><td class="num">' + fmt(d.se) + '</td><td class="num">' + fmt(d.ciLow) + '</td><td class="num">' + fmt(d.ciHigh) + '</td><td class="num">' + fmt(d.min) + '</td><td class="num">' + fmt(d.max) + '</td></tr>';
-      }).join('') +
-      '</tbody></table>';
+
+    var html = descTable(fA, desc);
+    /* For two-way: also show Factor B descriptives */
+    if (fB && b.descB && b.descB.length) {
+      html += descTable(fB, b.descB);
+    }
+    el.innerHTML = html;
   }
 
   /* ── Assumptions ─────────────────────────────────────────── */

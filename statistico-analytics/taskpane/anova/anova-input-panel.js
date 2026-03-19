@@ -425,15 +425,14 @@ function buildAnovaBundle(headers, rows, spec) {
     const aLevels = [...aSet].sort(), bLevels = [...bSet].sort();
     const anova = twoWayAnova(cells, aLevels, bLevels);
 
-    /* Marginal descriptives */
-    const descA = aLevels.map(a => {
-      const vals = bLevels.flatMap(b => cells[`${a}::${b}`] || []).filter(isFinite);
-      return { level: a, n: vals.length, mean: mean(vals), sd: sd(vals) };
-    });
-    const descB = bLevels.map(b => {
-      const vals = aLevels.flatMap(a => cells[`${a}::${b}`] || []).filter(isFinite);
-      return { level: b, n: vals.length, mean: mean(vals), sd: sd(vals) };
-    });
+    /* Marginal descriptives — using groupDescriptivesFixed for full stats */
+    const margGroupsA = {};
+    aLevels.forEach(a => { margGroupsA[a] = bLevels.flatMap(b => cells[`${a}::${b}`] || []).filter(isFinite); });
+    const descA = groupDescriptivesFixed(margGroupsA, aLevels);
+
+    const margGroupsB = {};
+    bLevels.forEach(b => { margGroupsB[b] = aLevels.flatMap(a => cells[`${a}::${b}`] || []).filter(isFinite); });
+    const descB = groupDescriptivesFixed(margGroupsB, bLevels);
     const cellDesc = aLevels.flatMap(a => bLevels.map(b => {
       const vals = (cells[`${a}::${b}`] || []).filter(isFinite);
       return { a, b, n: vals.length, mean: vals.length ? mean(vals) : NaN, sd: vals.length > 1 ? sd(vals) : NaN };

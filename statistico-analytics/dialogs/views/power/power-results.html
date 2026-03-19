@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Power & Sample Size — Statistico</title>
+  <link rel="stylesheet" href="../shared-header.css"/>
+  <link rel="stylesheet" href="../shared-config.css"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <style>
+    /* ── Root tokens (dark theme default) ──────────────────────── */
+    :root{
+      --surface-0:#0f172a; --surface-1:#1e293b; --surface-2:#273549; --surface-3:#2d3f56;
+      --border:rgba(255,255,255,.09); --border-strong:rgba(255,255,255,.16);
+      --accent-1:#18d38b; --accent-2:#34d399;
+      --text-primary:rgba(255,255,255,.93); --text-secondary:rgba(255,255,255,.70);
+      --text-muted:rgba(255,255,255,.42); --col-secondary:rgba(255,255,255,.55);
+      --panel-radius:10px; --panel-shadow:0 4px 20px rgba(0,0,0,.35);
+    }
+    *{ box-sizing:border-box; margin:0; padding:0; }
+    body{ font-family:'Segoe UI',system-ui,sans-serif; background:var(--surface-0);
+          color:var(--text-primary); font-size:15px; }
+
+    /* ── Layout: sidebar + right col ───────────────────────────── */
+    .laptop-frame{ display:flex; flex-direction:row; min-height:100vh; }
+    .right-col{ flex:1; display:flex; flex-direction:column; min-width:0; overflow:hidden; }
+    .wrap{ flex:1; overflow-y:auto; padding:18px 20px 40px; }
+
+    /* ── Sidebar (Power context) ────────────────────────────────── */
+    .sb-nav{
+      width:200px; flex-shrink:0;
+      background:var(--surface-1); border-right:1px solid var(--border);
+      display:flex; flex-direction:column;
+      transition:width .22s ease;
+      position:relative; z-index:10;
+    }
+    .sb-nav.collapsed{ width:56px; }
+    .sb-logo{
+      display:flex; align-items:center; gap:10px;
+      padding:16px 14px 12px;
+      border-bottom:1px solid var(--border);
+    }
+    .sb-logo-icon{
+      width:32px; height:32px; border-radius:8px;
+      background:linear-gradient(135deg,var(--accent-1),var(--accent-2));
+      display:flex; align-items:center; justify-content:center;
+      font-size:14px; color:#fff; flex-shrink:0;
+    }
+    .sb-logo-text{ overflow:hidden; }
+    .sb-logo-name{ display:block; font-size:14px; font-weight:800; color:var(--text-primary); white-space:nowrap; }
+    .sb-logo-sub{ display:block; font-size:10.5px; font-weight:600; color:var(--accent-1); white-space:nowrap; letter-spacing:.3px; }
+    .sb-header{
+      display:flex; align-items:center; gap:8px;
+      padding:9px 14px; border-bottom:1px solid var(--border);
+    }
+    .sb-menu-icon{ color:var(--text-muted); font-size:12px; }
+    .sb-menu-title{ font-size:11px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.6px; color:var(--text-muted); flex:1; overflow:hidden; white-space:nowrap; }
+    .sb-toggle-btn{
+      background:none; border:none; cursor:pointer; color:var(--text-muted);
+      padding:4px; border-radius:4px; font-size:11px;
+      transition:color .15s, transform .22s;
+    }
+    .sb-toggle-btn:hover{ color:var(--text-primary); }
+    .sb-nav.collapsed .sb-toggle-btn{ transform:rotate(180deg); }
+    .sb-body{ flex:1; overflow-y:auto; padding:10px 0; }
+    .sb-group{ margin-bottom:4px; }
+    .sb-group-title{
+      font-size:10px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.7px; color:var(--text-muted);
+      padding:6px 16px 4px; white-space:nowrap; overflow:hidden;
+    }
+    .sb-nav.collapsed .sb-group-title{ visibility:hidden; height:0; padding:0; }
+    .sb-items-rail{ display:flex; flex-direction:column; gap:1px; }
+    .sb-item{
+      display:flex; align-items:center; gap:10px;
+      padding:9px 14px; border:none; background:none;
+      color:var(--text-secondary); cursor:pointer; text-align:left;
+      border-radius:0; border-left:3px solid transparent;
+      transition:background .15s, color .15s, border-color .15s;
+      width:100%; overflow:hidden; white-space:nowrap;
+      min-height:38px;
+    }
+    .sb-item:hover{ background:rgba(16,185,129,.07); color:var(--text-primary); }
+    .sb-item.active{
+      background:rgba(16,185,129,.12); border-left-color:var(--accent-1);
+      color:var(--accent-1); font-weight:700;
+    }
+    .sb-item-icon{ font-size:13px; flex-shrink:0; width:16px; text-align:center; }
+    .sb-item-label{ font-size:13px; overflow:hidden; text-overflow:ellipsis; }
+    .sb-nav.collapsed .sb-item-label{ display:none; }
+    .sb-nav.collapsed .sb-group-title{ display:none; }
+    .sb-bottom{
+      border-top:1px solid var(--border); padding:10px 14px;
+    }
+    .sb-bottom-row{ display:flex; align-items:center; gap:6px; }
+    .sb-bottom-icon{ font-size:11px; color:var(--text-muted); }
+    .sb-bottom-label{ font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; }
+    .sb-bottom-select{
+      font-size:11px; background:var(--surface-2); color:var(--text-primary);
+      border:1px solid var(--border); border-radius:5px; padding:3px 5px; cursor:pointer;
+    }
+    .sb-nav.collapsed .sb-bottom-label,
+    .sb-nav.collapsed .sb-bottom-icon,
+    .sb-nav.collapsed .sb-bottom-select{ display:none; }
+
+    /* ── Breadcrumb ─────────────────────────────────────────────── */
+    .pw-breadcrumb{
+      display:flex; align-items:center; gap:8px;
+      font-size:12px; color:var(--text-muted);
+      margin-bottom:14px; padding:0 2px;
+    }
+    .pw-breadcrumb a{
+      color:var(--text-muted); text-decoration:none;
+      transition:color .15s;
+    }
+    .pw-breadcrumb a:hover{ color:var(--accent-1); }
+    .pw-breadcrumb i{ font-size:9px; }
+
+    /* ── Results panel (reuse ANOVA style) ──────────────────────── */
+    .results-panel{
+      background:var(--surface-1); border:1.5px solid var(--border);
+      border-radius:var(--panel-radius); margin-bottom:14px;
+      box-shadow:var(--panel-shadow); overflow:hidden;
+    }
+    .results-panel-heading{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:11px 16px; background:var(--surface-2);
+      border-bottom:1px solid var(--border);
+      font-size:15px; font-weight:700; color:var(--accent-1);
+      gap:8px;
+    }
+    .results-panel-heading span,.results-panel-heading>*:first-child{
+      display:flex; align-items:center; gap:7px;
+    }
+    .results-panel-body{ padding:14px 16px; }
+
+    /* ── Stat cards ─────────────────────────────────────────────── */
+    .stat-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px; }
+    @media(max-width:760px){ .stat-grid{ grid-template-columns:repeat(2,1fr); } }
+    .stat-card{
+      background:var(--surface-1); border:1.5px solid var(--border);
+      border-radius:var(--panel-radius); padding:14px 16px;
+      box-shadow:var(--panel-shadow);
+    }
+    .stat-card .sv{ font-size:26px; font-weight:800; color:var(--accent-1); line-height:1.1; }
+    .stat-card .sl{ font-size:11.5px; font-weight:700; color:var(--text-muted);
+      text-transform:uppercase; letter-spacing:.5px; margin-top:4px; }
+
+    /* ── Decision strip ─────────────────────────────────────────── */
+    .pw-decision{
+      border-radius:9px; padding:12px 16px;
+      display:flex; align-items:center; gap:12px;
+      margin-bottom:14px;
+      font-size:14px; font-weight:600;
+    }
+    .pw-decision.good{ background:rgba(16,185,129,.10); border:1.5px solid rgba(16,185,129,.30); color:var(--accent-1); }
+    .pw-decision.warn{ background:rgba(251,191,36,.08); border:1.5px solid rgba(251,191,36,.30); color:#fbbf24; }
+    .pw-decision.danger{ background:rgba(239,68,68,.08); border:1.5px solid rgba(239,68,68,.28); color:#fb7185; }
+    .pw-decision i{ font-size:18px; flex-shrink:0; }
+
+    /* ── Config strip ───────────────────────────────────────────── */
+    .pw-config{
+      display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px;
+      margin-bottom:14px;
+    }
+    .pw-cfg-group{ display:flex; flex-direction:column; gap:5px; }
+    .pw-cfg-label{
+      font-size:11px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.5px; color:var(--text-muted);
+    }
+    .pw-cfg-input, .pw-cfg-select{
+      background:var(--surface-2); border:1.5px solid var(--border);
+      color:var(--text-primary); border-radius:7px;
+      padding:7px 10px; font-size:14px;
+      transition:border-color .15s;
+    }
+    .pw-cfg-input:focus, .pw-cfg-select:focus{
+      outline:none; border-color:var(--accent-1);
+      box-shadow:0 0 0 3px rgba(24,211,139,.12);
+    }
+    .pw-cfg-hint{ font-size:10.5px; color:var(--text-muted); margin-top:1px; }
+
+    /* ── Mode tabs ──────────────────────────────────────────────── */
+    .pw-mode-tabs{
+      display:inline-flex; gap:4px; background:var(--surface-2);
+      border-radius:8px; padding:3px; margin-bottom:14px;
+      border:1px solid var(--border);
+    }
+    .pw-mode-tabs button{
+      padding:6px 16px; border-radius:6px; border:none; cursor:pointer;
+      font-size:13px; font-weight:600; background:transparent;
+      color:var(--text-muted); transition:all .15s; display:flex; align-items:center; gap:6px;
+    }
+    .pw-mode-tabs button.active{
+      background:var(--accent-1); color:#fff;
+      box-shadow:0 2px 8px rgba(16,185,129,.35);
+    }
+
+    /* ── Gauge ──────────────────────────────────────────────────── */
+    .pw-gauge-wrap{
+      margin:10px 0 6px;
+    }
+    .pw-gauge-lbl{
+      display:flex; justify-content:space-between;
+      font-size:11px; color:var(--text-muted); margin-bottom:4px;
+    }
+    .pw-gauge{
+      height:12px; border-radius:8px; overflow:hidden;
+      background:var(--surface-2); border:1px solid var(--border);
+    }
+    .pw-gauge-fill{
+      height:100%; border-radius:8px;
+      background:linear-gradient(90deg,#ef4444,#fbbf24 50%,var(--accent-1));
+      transition:width .4s cubic-bezier(.4,0,.2,1);
+    }
+    .pw-thresh{
+      display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;
+    }
+    .pw-thresh-chip{
+      padding:4px 10px; border-radius:8px; font-size:11.5px; font-weight:600;
+      background:var(--surface-2); border:1.5px solid var(--border);
+      color:var(--text-muted); transition:all .2s;
+    }
+    .pw-thresh-chip.active{
+      background:rgba(24,211,139,.14); border-color:rgba(24,211,139,.3);
+      color:var(--accent-1);
+    }
+
+    /* ── N result box ───────────────────────────────────────────── */
+    .pw-n-box{
+      background:var(--surface-2); border:1.5px solid rgba(16,185,129,.25);
+      border-radius:9px; padding:14px 18px; font-size:14px;
+      color:var(--text-secondary); line-height:1.7;
+      margin-bottom:10px;
+    }
+    .pw-n-box strong{ font-size:22px; font-weight:800; color:var(--accent-1); }
+
+    /* ── Power result value ─────────────────────────────────────── */
+    .pw-result-row{
+      display:flex; justify-content:space-between; align-items:center;
+      padding:8px 0; border-bottom:1px solid var(--border);
+    }
+    .pw-result-row:last-child{ border-bottom:none; }
+    .pw-result-label{ font-size:13px; color:var(--text-muted); }
+    .pw-result-value{ font-size:22px; font-weight:800; color:var(--accent-1); }
+
+    /* ── Context chips ──────────────────────────────────────────── */
+    .pw-ctx-strip{
+      display:flex; flex-wrap:wrap; gap:7px; margin-bottom:14px;
+    }
+    .pw-ctx-chip{
+      display:inline-flex; align-items:center; gap:5px;
+      padding:5px 11px; border-radius:20px;
+      background:rgba(16,185,129,.08); border:1.5px solid rgba(16,185,129,.22);
+      font-size:12px; font-weight:600; color:var(--text-secondary);
+    }
+    .pw-ctx-chip i{ font-size:10px; color:var(--accent-1); }
+    .pw-ctx-chip strong{ color:var(--accent-1); }
+
+    /* ── Power curve chart ──────────────────────────────────────── */
+    #pwCurveChart{ width:100%; height:260px; }
+
+    /* ── Interpretation ─────────────────────────────────────────── */
+    #pwInterpText{
+      font-size:14px; line-height:1.75; color:var(--text-secondary);
+    }
+
+    /* ── Light theme overrides ──────────────────────────────────── */
+    :root[data-theme="light"]{
+      --surface-0:#f8fafa; --surface-1:#ffffff; --surface-2:#f0fdf9; --surface-3:#e8f8f2;
+      --border:#e5e7eb; --border-strong:#d1d5db;
+      --accent-1:#047857; --accent-2:#059669;
+      --text-primary:#111827; --text-secondary:#374151;
+      --text-muted:#6b7280; --col-secondary:#4b5563;
+      --panel-shadow:0 2px 10px rgba(0,0,0,.08);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Sidebar (Power context) ─────────────────────────────────── -->
+  <nav class="sb-nav" id="sidebarNav">
+    <div class="sb-logo">
+      <div class="sb-logo-icon"><i class="fa-solid fa-bolt"></i></div>
+      <div class="sb-logo-text">
+        <span class="sb-logo-name">Statistico</span>
+        <span class="sb-logo-sub">Power</span>
+      </div>
+    </div>
+    <div class="sb-header">
+      <i class="fa-solid fa-bars-staggered sb-menu-icon"></i>
+      <span class="sb-menu-title">Power Module</span>
+      <button class="sb-toggle-btn" onclick="StatisticoHeader.toggleSidebar()" title="Collapse / expand">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+    </div>
+    <div class="sb-body">
+      <div class="sb-group">
+        <div class="sb-group-title">Test Type</div>
+        <div class="sb-items-rail">
+          <button class="sb-item" id="sbMeans" onclick="switchTest('means')">
+            <i class="fa-solid fa-equals sb-item-icon"></i>
+            <span class="sb-item-label">Means (t-test)</span>
+          </button>
+          <button class="sb-item active" id="sbAnova" onclick="switchTest('anova')">
+            <i class="fa-solid fa-table sb-item-icon"></i>
+            <span class="sb-item-label">ANOVA</span>
+          </button>
+          <button class="sb-item" id="sbCorr" onclick="switchTest('correlation')">
+            <i class="fa-solid fa-arrow-trend-up sb-item-icon"></i>
+            <span class="sb-item-label">Correlation</span>
+          </button>
+          <button class="sb-item" id="sbProp" onclick="switchTest('proportion')">
+            <i class="fa-solid fa-percent sb-item-icon"></i>
+            <span class="sb-item-label">Proportions</span>
+          </button>
+          <button class="sb-item" id="sbReg" onclick="switchTest('regression')">
+            <i class="fa-solid fa-chart-line sb-item-icon"></i>
+            <span class="sb-item-label">Regression</span>
+          </button>
+        </div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-group-title">Mode</div>
+        <div class="sb-items-rail">
+          <button class="sb-item active" id="sbModePower" onclick="setMode('power')">
+            <i class="fa-solid fa-bolt sb-item-icon"></i>
+            <span class="sb-item-label">Compute Power</span>
+          </button>
+          <button class="sb-item" id="sbModeN" onclick="setMode('n')">
+            <i class="fa-solid fa-users sb-item-icon"></i>
+            <span class="sb-item-label">Find Sample Size</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="sb-bottom">
+      <div class="sb-bottom-row">
+        <i class="fa-solid fa-hashtag sb-bottom-icon"></i>
+        <span class="sb-bottom-label">Decimals:</span>
+        <select id="decimalSelect" class="sb-bottom-select" onchange="setDecimalPrecision()">
+          <option value="2">2</option>
+          <option value="3" selected>3</option>
+          <option value="4">4</option>
+        </select>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Right column ──────────────────────────────────────────────── -->
+  <div class="right-col">
+    <div id="header-container"></div>
+
+    <div class="wrap">
+
+      <!-- Breadcrumb -->
+      <div class="pw-breadcrumb" id="pwBreadcrumb">
+        <a href="#" id="pwBreadcrumbBack" onclick="goBack()">
+          <i class="fa-solid fa-chevron-left"></i> ANOVA
+        </a>
+        <i class="fa-solid fa-chevron-right"></i>
+        <span>Power &amp; Sample Size</span>
+      </div>
+
+      <!-- Context chips (pre-filled from ANOVA) -->
+      <div class="pw-ctx-strip" id="pwCtxStrip"></div>
+
+      <!-- Decision strip -->
+      <div class="pw-decision good" id="pwDecision">
+        <i class="fa-solid fa-circle-notch fa-spin"></i>
+        <span id="pwDecisionText">Calculating…</span>
+      </div>
+
+      <!-- Stat cards -->
+      <div class="stat-grid" id="pwCards">
+        <div class="stat-card">
+          <div class="sv" id="cardPower">—</div>
+          <div class="sl">Power (1−β)</div>
+        </div>
+        <div class="stat-card">
+          <div class="sv" id="cardN">—</div>
+          <div class="sl">Current N</div>
+        </div>
+        <div class="stat-card">
+          <div class="sv" id="cardF">—</div>
+          <div class="sl">Cohen's f</div>
+        </div>
+        <div class="stat-card">
+          <div class="sv" id="cardAlpha">—</div>
+          <div class="sl">Alpha (α)</div>
+        </div>
+      </div>
+
+      <!-- Configuration panel -->
+      <div class="results-panel">
+        <div class="results-panel-heading">
+          <span><i class="fa-solid fa-sliders"></i> Configuration</span>
+          <!-- Mode tabs inside heading -->
+          <div class="pw-mode-tabs">
+            <button class="active" id="tabPower" onclick="setMode('power')">
+              <i class="fa-solid fa-bolt"></i> Compute Power
+            </button>
+            <button id="tabN" onclick="setMode('n')">
+              <i class="fa-solid fa-users"></i> Find N
+            </button>
+          </div>
+        </div>
+        <div class="results-panel-body">
+          <div class="pw-config">
+            <div class="pw-cfg-group">
+              <label class="pw-cfg-label">Effect size (f)</label>
+              <input class="pw-cfg-input" type="number" id="cfgF" min="0.01" max="3" step="0.01" value="0.25" oninput="calculate()"/>
+              <div class="pw-cfg-hint">Small=.10 · Med=.25 · Large=.40</div>
+            </div>
+            <div class="pw-cfg-group">
+              <label class="pw-cfg-label">Significance α</label>
+              <select class="pw-cfg-select" id="cfgAlpha" onchange="calculate()">
+                <option value="0.10">0.10</option>
+                <option value="0.05" selected>0.05</option>
+                <option value="0.01">0.01</option>
+                <option value="0.001">0.001</option>
+              </select>
+            </div>
+            <div class="pw-cfg-group" id="cfgGroupN">
+              <label class="pw-cfg-label">Total N</label>
+              <input class="pw-cfg-input" type="number" id="cfgN" min="3" max="10000" step="1" value="30" oninput="calculate()"/>
+            </div>
+            <div class="pw-cfg-group">
+              <label class="pw-cfg-label">Groups (k)</label>
+              <input class="pw-cfg-input" type="number" id="cfgK" min="2" max="50" step="1" value="3" oninput="calculate()"/>
+            </div>
+            <div class="pw-cfg-group" id="cfgGroupDesired" style="display:none;">
+              <label class="pw-cfg-label">Target power</label>
+              <select class="pw-cfg-select" id="cfgDesiredPower" onchange="calculate()">
+                <option value="0.70">0.70 (70%)</option>
+                <option value="0.80" selected>0.80 (80%)</option>
+                <option value="0.90">0.90 (90%)</option>
+                <option value="0.95">0.95 (95%)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results panel -->
+      <div class="results-panel" id="pwResultsPanel">
+        <div class="results-panel-heading">
+          <span><i class="fa-solid fa-gauge-high"></i> Results</span>
+        </div>
+        <div class="results-panel-body">
+          <!-- Power mode -->
+          <div id="pwPowerSection">
+            <div class="pw-result-row">
+              <span class="pw-result-label">Statistical Power (1−β)</span>
+              <span class="pw-result-value" id="pwPowerVal">—</span>
+            </div>
+            <div class="pw-result-row">
+              <span class="pw-result-label">Type II error rate (β)</span>
+              <span style="font-size:16px;font-weight:700;color:var(--text-muted);" id="pwBetaVal">—</span>
+            </div>
+            <div class="pw-gauge-wrap">
+              <div class="pw-gauge-lbl">
+                <span>0%</span><span>Conventional threshold: 80%</span><span>100%</span>
+              </div>
+              <div class="pw-gauge"><div class="pw-gauge-fill" id="pwGaugeFill" style="width:0%"></div></div>
+            </div>
+            <div class="pw-thresh" id="pwThresh">
+              <span class="pw-thresh-chip" id="chip70">≥ 70% Acceptable</span>
+              <span class="pw-thresh-chip" id="chip80">≥ 80% Conventional</span>
+              <span class="pw-thresh-chip" id="chip90">≥ 90% High</span>
+              <span class="pw-thresh-chip" id="chip95">≥ 95% Very High</span>
+            </div>
+          </div>
+          <!-- N mode -->
+          <div id="pwNSection" style="display:none;">
+            <div class="pw-n-box" id="pwNBox">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Power curve panel -->
+      <div class="results-panel">
+        <div class="results-panel-heading">
+          <span><i class="fa-solid fa-chart-line"></i> Power Curve — N vs Power</span>
+        </div>
+        <div class="results-panel-body" style="padding:10px 14px;">
+          <div id="pwCurveChart"></div>
+        </div>
+      </div>
+
+      <!-- Interpretation panel -->
+      <div class="results-panel">
+        <div class="results-panel-heading">
+          <span><i class="fa-solid fa-comment-dots"></i> Interpretation</span>
+        </div>
+        <div class="results-panel-body">
+          <div id="pwInterpText">—</div>
+        </div>
+      </div>
+
+    </div><!-- /wrap -->
+  </div><!-- /right-col -->
+
+  <script src="../shared-header.js"></script>
+  <script>
+  /* ══════════════════════════════════════════════════════════════
+     Power & Sample Size — full-page module
+     Receives params via URL hash or localStorage from ANOVA page
+  ══════════════════════════════════════════════════════════════ */
+
+  /* ── State ───────────────────────────────────────────────────── */
+  var _mode     = 'power';  /* 'power' | 'n' */
+  var _test     = 'anova';
+  var _decimals = 3;
+  var _bundle   = null;     /* ANOVA bundle if launched from ANOVA */
+  var _curveChart = null;
+
+  /* ── Number formatting ───────────────────────────────────────── */
+  function fmt(v, d) {
+    if (!isFinite(v)) return '—';
+    var dp = (d !== undefined) ? d : _decimals;
+    return Number(v).toFixed(dp);
+  }
+
+  /* ── Test switcher ───────────────────────────────────────────── */
+  function switchTest(test) {
+    _test = test;
+    ['means','anova','correlation','proportion','regression'].forEach(function(t){
+      document.getElementById('sb' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === test);
+    });
+    /* For now only ANOVA is fully implemented */
+    if (test !== 'anova') {
+      document.getElementById('pwDecisionText').textContent = test.charAt(0).toUpperCase() + test.slice(1) + ' power — coming soon.';
+    }
+    calculate();
+  }
+
+  /* ── Mode toggle ─────────────────────────────────────────────── */
+  function setMode(mode) {
+    _mode = mode;
+    document.getElementById('tabPower').classList.toggle('active', mode === 'power');
+    document.getElementById('tabN').classList.toggle('active', mode === 'n');
+    document.getElementById('sbModePower').classList.toggle('active', mode === 'power');
+    document.getElementById('sbModeN').classList.toggle('active', mode === 'n');
+    document.getElementById('cfgGroupN').style.display    = mode === 'power' ? '' : 'none';
+    document.getElementById('cfgGroupDesired').style.display = mode === 'n' ? '' : 'none';
+    document.getElementById('pwPowerSection').style.display  = mode === 'power' ? '' : 'none';
+    document.getElementById('pwNSection').style.display      = mode === 'n' ? '' : 'none';
+    calculate();
+  }
+
+  /* ── Decimal precision ───────────────────────────────────────── */
+  function setDecimalPrecision() {
+    _decimals = parseInt(document.getElementById('decimalSelect').value) || 3;
+    calculate();
+  }
+
+  /* ── Go back to ANOVA ────────────────────────────────────────── */
+  function goBack() {
+    try { window.history.back(); } catch(e) {}
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     POWER ENGINE  (Patnaik approximation — same as in ANOVA modal)
+  ════════════════════════════════════════════════════════════════ */
+
+  function _lnGamma(z) {
+    var g = 7, c = [0.99999999999980993,676.5203681218851,-1259.1392167224028,
+      771.32342877765313,-176.61502916214059,12.507343278686905,
+      -0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+    if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - _lnGamma(1 - z);
+    z -= 1;
+    var x = c[0];
+    for (var i = 1; i < g + 2; i++) x += c[i] / (z + i);
+    var t = z + g + 0.5;
+    return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+  }
+
+  function _betaInc(x, a, b) {
+    if (x <= 0) return 0; if (x >= 1) return 1;
+    var lbeta = _lnGamma(a) + _lnGamma(b) - _lnGamma(a + b);
+    var front = Math.exp(Math.log(x)*a + Math.log(1-x)*b - lbeta) / a;
+    var useSymmetry = x > (a+1)/(a+b+2);
+    if (useSymmetry) return 1 - _betaInc(1-x, b, a);
+    var d = 0, c = 1, eps = 3e-7, maxIt = 200;
+    for (var m = 0; m <= maxIt; m++) {
+      var mx2 = 2*m;
+      var aa = m===0 ? 1 : (m*(b-m)*x)/((a+mx2-1)*(a+mx2));
+      d = 1/(1+aa*d); c = 1+aa/c; var delta = c*d; front *= delta;
+      aa = -((a+m)*(a+b+m)*x)/((a+mx2)*(a+mx2+1));
+      d = 1/(1+aa*d); c = 1+aa/c; delta = c*d; front *= delta;
+      if (Math.abs(delta-1) < eps) break;
+    }
+    return front;
+  }
+
+  function _fCdf(x, df1, df2) {
+    if (x <= 0) return 0;
+    var u = df1*x/(df1*x + df2);
+    return _betaInc(u, df1/2, df2/2);
+  }
+
+  function _fSurv(x, df1, df2) { return 1 - _fCdf(x, df1, df2); }
+
+  function _getFcrit(df1, df2, alpha) {
+    var lo = 0, hi = 1e4;
+    for (var i = 0; i < 80; i++) {
+      var mid = (lo + hi) / 2;
+      if (_fSurv(mid, df1, df2) > alpha) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+  }
+
+  function anovaPower(f, k, N, alpha) {
+    if (!isFinite(f)||!isFinite(k)||!isFinite(N)||f<=0||k<2||N<k) return 0;
+    var df1 = k - 1, df2 = N - k;
+    if (df2 < 1) return 0;
+    var lambda = f * f * N;
+    var c = 1 + lambda / df1;
+    var fcrit = _getFcrit(df1, df2, alpha);
+    return Math.max(0, Math.min(1, _fSurv(fcrit / c, df1, df2)));
+  }
+
+  function findN(f, k, alpha, desiredPower) {
+    var lo = k + 1, hi = 100000;
+    if (anovaPower(f, k, hi, alpha) < desiredPower) return '>100 000';
+    for (var i = 0; i < 60; i++) {
+      var mid = Math.ceil((lo + hi) / 2);
+      if (anovaPower(f, k, mid, alpha) >= desiredPower) hi = mid; else lo = mid;
+      if (hi - lo <= 1) break;
+    }
+    return hi;
+  }
+
+  /* ── Context chips ───────────────────────────────────────────── */
+  function renderContext() {
+    var strip = document.getElementById('pwCtxStrip');
+    if (!_bundle) { strip.innerHTML = ''; return; }
+    var b = _bundle;
+    var chips = [];
+    var design = b.type === 'two-way' ? 'Two-way ANOVA' : b.type === 'repeated' ? 'Repeated-measures ANOVA' : 'One-way ANOVA';
+    chips.push('<span class="pw-ctx-chip"><i class="fa-solid fa-flask"></i> ' + design + '</span>');
+    if (b.spec && b.spec.dv) chips.push('<span class="pw-ctx-chip"><i class="fa-solid fa-circle-dot"></i> DV: <strong>' + b.spec.dv + '</strong></span>');
+    var N = _getBundleN(b);
+    if (N) chips.push('<span class="pw-ctx-chip"><i class="fa-solid fa-users"></i> n = <strong>' + N + '</strong></span>');
+    var eta = _getBundleEta(b);
+    if (isFinite(eta)) {
+      var f = Math.sqrt(eta / Math.max(1e-12, 1 - eta));
+      chips.push('<span class="pw-ctx-chip"><i class="fa-solid fa-ruler"></i> η² = <strong>' + eta.toFixed(3) + '</strong> → f = <strong>' + f.toFixed(3) + '</strong></span>');
+    }
+    strip.innerHTML = chips.join('');
+  }
+
+  function _getBundleN(b) {
+    if (!b) return null;
+    if (b.oneWay) return b.oneWay.df1 + b.oneWay.df2 + 1;
+    if (b.twoWay) return b.twoWay.dfA + b.twoWay.dfB + b.twoWay.dfAB + b.twoWay.dfError + 1;
+    if (b.repeated) return b.repeated.dfSubjects + 1;
+    return null;
+  }
+
+  function _getBundleEta(b) {
+    if (!b) return NaN;
+    if (b.oneWay && isFinite(b.oneWay.etaSq)) return b.oneWay.etaSq;
+    if (b.twoWay) {
+      var a = b.twoWay;
+      var maxEta = Math.max(isFinite(a.etaSqA)?a.etaSqA:0, isFinite(a.etaSqB)?a.etaSqB:0, isFinite(a.etaSqAB)?a.etaSqAB:0);
+      return maxEta > 0 ? maxEta : NaN;
+    }
+    if (b.repeated && isFinite(b.repeated.etaSqP)) return b.repeated.etaSqP;
+    return NaN;
+  }
+
+  function _getBundleK(b) {
+    if (!b) return 3;
+    if (b.oneWay) return b.oneWay.df1 + 1;
+    if (b.twoWay) {
+      var a = b.twoWay;
+      return (a.dfA + 1) * (a.dfB + 1);
+    }
+    if (b.repeated) return b.repeated.dfConditions + 1;
+    return 3;
+  }
+
+  /* ── Main calculate ──────────────────────────────────────────── */
+  function calculate() {
+    var f     = parseFloat(document.getElementById('cfgF').value) || 0.25;
+    var alpha = parseFloat(document.getElementById('cfgAlpha').value) || 0.05;
+    var k     = parseInt(document.getElementById('cfgK').value) || 3;
+
+    if (_mode === 'power') {
+      var N    = parseInt(document.getElementById('cfgN').value) || 30;
+      var pow  = anovaPower(f, k, N, alpha);
+      var pct  = (pow * 100).toFixed(1);
+
+      /* cards */
+      document.getElementById('cardPower').textContent = pct + '%';
+      document.getElementById('cardN').textContent = N;
+      document.getElementById('cardF').textContent = fmt(f, 3);
+      document.getElementById('cardAlpha').textContent = alpha;
+
+      /* gauge */
+      document.getElementById('pwPowerVal').textContent = pct + '%';
+      document.getElementById('pwBetaVal').textContent  = ((1-pow)*100).toFixed(1) + '%';
+      document.getElementById('pwGaugeFill').style.width = Math.min(100, pct) + '%';
+
+      /* threshold chips */
+      [['chip70',70],['chip80',80],['chip90',90],['chip95',95]].forEach(function(pair){
+        document.getElementById(pair[0]).classList.toggle('active', pow*100 >= pair[1]);
+      });
+
+      /* decision strip */
+      var dec = document.getElementById('pwDecision');
+      var decText = document.getElementById('pwDecisionText');
+      dec.className = 'pw-decision ' + (pow>=0.8 ? 'good' : pow>=0.7 ? 'warn' : 'danger');
+      dec.querySelector('i').className = pow>=0.8
+        ? 'fa-solid fa-circle-check'
+        : pow>=0.7 ? 'fa-solid fa-triangle-exclamation' : 'fa-solid fa-circle-xmark';
+      if (pow >= 0.8) {
+        decText.textContent = 'Adequate power (' + pct + '%) — N = ' + N + ' is sufficient to detect f = ' + fmt(f,2) + ' (' + _fLabel(f) + ' effect) at α = ' + alpha + '.';
+      } else if (pow >= 0.7) {
+        var n80 = findN(f, k, alpha, 0.80);
+        decText.textContent = 'Borderline power (' + pct + '%) — N = ' + N + '. To reach 80% power you need N = ' + n80 + '.';
+      } else {
+        var n80 = findN(f, k, alpha, 0.80);
+        var n90 = findN(f, k, alpha, 0.90);
+        decText.textContent = 'Insufficient power (' + pct + '%) — N = ' + N + '. Need N = ' + n80 + ' for 80% power, N = ' + n90 + ' for 90%.';
+      }
+
+      /* interpretation */
+      _renderInterp(pow, f, k, N, alpha);
+
+    } else {
+      /* Compute N mode */
+      var desired = parseFloat(document.getElementById('cfgDesiredPower').value) || 0.80;
+      var nNeeded = findN(f, k, alpha, desired);
+      var nNum    = typeof nNeeded === 'number' ? nNeeded : null;
+      var nPerGrp = nNum ? Math.ceil(nNum / k) : '?';
+
+      document.getElementById('cardN').textContent  = nNum ? nNeeded : '—';
+      document.getElementById('cardF').textContent  = fmt(f, 3);
+      document.getElementById('cardAlpha').textContent = alpha;
+
+      var pow80 = nNum ? anovaPower(f, k, nNum, alpha) : 0;
+      document.getElementById('cardPower').textContent = (pow80*100).toFixed(1) + '%';
+
+      document.getElementById('pwNBox').innerHTML =
+        '<strong>' + nNeeded + '</strong> total participants needed ' +
+        '(<strong>' + nPerGrp + '</strong> per group) to achieve ' +
+        '<strong>' + (desired*100).toFixed(0) + '% power</strong>' +
+        ' with f = ' + fmt(f,2) + ', k = ' + k + ' groups, α = ' + alpha + '.' +
+        (nNum ? '<br><span style="font-size:12px;color:var(--text-muted);margin-top:4px;display:block;">Achieved power at this N: ' + (pow80*100).toFixed(1) + '%</span>' : '');
+
+      /* decision */
+      var dec = document.getElementById('pwDecision');
+      dec.className = 'pw-decision good';
+      dec.querySelector('i').className = 'fa-solid fa-circle-check';
+      document.getElementById('pwDecisionText').textContent =
+        'To detect a ' + _fLabel(f) + ' effect (f = ' + fmt(f,2) + ') with ' + (desired*100).toFixed(0) + '% power at α = ' + alpha + ' → required N = ' + nNeeded + '.';
+    }
+
+    /* draw/update power curve */
+    _drawCurve(f, k, alpha);
+  }
+
+  function _fLabel(f) {
+    return f >= 0.40 ? 'large' : f >= 0.25 ? 'medium' : f >= 0.10 ? 'small' : 'very small';
+  }
+
+  function _renderInterp(pow, f, k, N, alpha) {
+    var el = document.getElementById('pwInterpText');
+    var pct = (pow*100).toFixed(1);
+    var fLbl = _fLabel(f);
+    var n80 = findN(f, k, alpha, 0.80);
+    var interp;
+    if (pow >= 0.9) {
+      interp = '<strong style="color:var(--accent-1)"><i class="fa-solid fa-circle-check"></i> Excellent power (' + pct + '%).</strong> ' +
+        'Your study has a ' + pct + '% chance of detecting a ' + fLbl + ' effect (f = ' + fmt(f,2) + ') with N = ' + N + ' and α = ' + alpha + '. ' +
+        'The risk of a Type II error is only ' + ((1-pow)*100).toFixed(1) + '%.';
+    } else if (pow >= 0.8) {
+      interp = '<strong style="color:var(--accent-1)"><i class="fa-solid fa-circle-check"></i> Adequate power (' + pct + '%).</strong> ' +
+        'Your design meets the conventional 80% threshold. With N = ' + N + ' and f = ' + fmt(f,2) + ' (' + fLbl + ' effect), the study is well-powered.';
+    } else if (pow >= 0.7) {
+      interp = '<strong style="color:#fbbf24"><i class="fa-solid fa-triangle-exclamation"></i> Borderline power (' + pct + '%).</strong> ' +
+        'Power is below the 80% convention. Consider increasing N to <strong>' + n80 + '</strong> to reach 80% power. ' +
+        'Current risk of missing a real effect: ' + ((1-pow)*100).toFixed(1) + '%.';
+    } else {
+      interp = '<strong style="color:#fb7185"><i class="fa-solid fa-circle-xmark"></i> Insufficient power (' + pct + '%).</strong> ' +
+        'There is a ' + ((1-pow)*100).toFixed(1) + '% chance of missing a real ' + fLbl + ' effect with this design. ' +
+        'Needed N for 80% power: <strong>' + n80 + '</strong>. ' +
+        'Needed N for 90% power: <strong>' + findN(f, k, alpha, 0.90) + '</strong>.';
+    }
+    el.innerHTML = interp;
+  }
+
+  /* ── Power curve ─────────────────────────────────────────────── */
+  function _drawCurve(f, k, alpha) {
+    var isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+    var tc = isDark ? 'rgba(255,255,255,.82)' : '#1f2937';
+    var gc = isDark ? 'rgba(255,255,255,.07)' : '#e5e7eb';
+
+    /* current N */
+    var currentN = _mode === 'power'
+      ? (parseInt(document.getElementById('cfgN').value) || 30)
+      : null;
+
+    /* build series: N from 2k to 2k + 200 */
+    var nMin = k * 2, nMax = Math.max(nMin + 200, (currentN || 0) + 80);
+    var data = [];
+    for (var n = nMin; n <= nMax; n += Math.max(1, Math.floor((nMax - nMin) / 120))) {
+      data.push([n, Math.round(anovaPower(f, k, n, alpha) * 1000) / 10]);
+    }
+
+    var plotLines = [];
+    if (currentN) {
+      plotLines.push({ value: currentN, color: '#f59e0b', dashStyle: 'ShortDash', width: 2,
+        label: { text: 'Current N = ' + currentN, style: { color: '#f59e0b', fontSize: '11px' } } });
+    }
+    /* 80% line */
+    plotLines.push({ value: 80, color: 'rgba(16,185,129,.5)', dashStyle: 'ShortDash', width: 1.5,
+      label: { text: '80% threshold', style: { color: 'rgba(16,185,129,.7)', fontSize: '11px' }, align: 'right', x: -6 },
+      axis: 'y' });
+
+    var cfg = {
+      chart:{ type:'spline', backgroundColor:'transparent',
+              style:{fontFamily:'Segoe UI,sans-serif'}, animation:{duration:400},
+              spacingTop:16, spacingBottom:10 },
+      title:{ text:'' }, credits:{ enabled:false },
+      xAxis:{ title:{ text:'Total N', style:{color:tc,fontSize:'12px'} },
+              labels:{style:{color:tc}}, lineColor:gc, tickColor:gc,
+              plotLines: plotLines.filter(function(pl){ return !pl.axis; }) },
+      yAxis:{ title:{ text:'Power (%)', style:{color:tc,fontSize:'12px'} },
+              gridLineColor:gc, labels:{style:{color:tc}},
+              min:0, max:100,
+              plotLines: plotLines.filter(function(pl){ return pl.axis === 'y'; }) },
+      legend:{ enabled:false },
+      plotOptions:{ spline:{ marker:{enabled:false}, lineWidth:2.5 }},
+      series:[{
+        name:'Power',
+        color: '#3b82f6',
+        data: data,
+        tooltip:{ pointFormat:'N={point.x}: <b>{point.y:.1f}%</b>' }
+      }],
+      tooltip:{ backgroundColor: isDark ? '#1e293b' : '#fff',
+                style:{color: isDark ? '#f1f5f9' : '#1f2937'},
+                borderRadius:8, shadow:true }
+    };
+
+    if (_curveChart) { try { _curveChart.destroy(); } catch(e){} }
+    _curveChart = Highcharts.chart('pwCurveChart', cfg);
+  }
+
+  /* ── Pre-fill from ANOVA bundle ──────────────────────────────── */
+  function prefillFromBundle(b) {
+    _bundle = b;
+
+    var N   = _getBundleN(b) || 30;
+    var k   = _getBundleK(b) || 3;
+    var eta = _getBundleEta(b);
+    var f   = isFinite(eta) ? Math.sqrt(eta / Math.max(1e-12, 1 - eta)) : 0.25;
+    var alpha = (b.spec && b.spec.alpha) ? b.spec.alpha : 0.05;
+
+    document.getElementById('cfgF').value     = f.toFixed(3);
+    document.getElementById('cfgN').value     = N;
+    document.getElementById('cfgK').value     = k;
+    document.getElementById('cfgAlpha').value = alpha;
+
+    /* set alpha dropdown to nearest option */
+    var sel = document.getElementById('cfgAlpha');
+    var best = '0.05';
+    for (var i = 0; i < sel.options.length; i++) {
+      if (Math.abs(parseFloat(sel.options[i].value) - alpha) < 1e-6) { best = sel.options[i].value; break; }
+    }
+    sel.value = best;
+
+    /* update header subtitle */
+    if (b.spec && b.spec.dv) {
+      StatisticoHeader.updateVariable(b.spec.dv, N);
+    }
+
+    /* update breadcrumb */
+    var breadcrumb = document.getElementById('pwBreadcrumb');
+    if (breadcrumb) breadcrumb.style.display = '';
+
+    renderContext();
+  }
+
+  /* ── Init ────────────────────────────────────────────────────── */
+  document.addEventListener('DOMContentLoaded', function() {
+    StatisticoHeader.init('power-results', '', 0, 'power');
+
+    /* Try to load ANOVA bundle from sessionStorage */
+    try {
+      var stored = sessionStorage.getItem('statistico-power-params');
+      if (stored) {
+        var params = JSON.parse(stored);
+        if (params.bundle) {
+          prefillFromBundle(params.bundle);
+        } else {
+          /* minimal params without full bundle */
+          if (params.f)     document.getElementById('cfgF').value     = params.f;
+          if (params.N)     document.getElementById('cfgN').value     = params.N;
+          if (params.k)     document.getElementById('cfgK').value     = params.k;
+          if (params.alpha) document.getElementById('cfgAlpha').value = params.alpha;
+          if (params.dv)    StatisticoHeader.updateVariable(params.dv, params.N || 0);
+        }
+        /* update breadcrumb back link */
+        if (params.fromModule) {
+          var back = document.getElementById('pwBreadcrumbBack');
+          if (back) back.textContent = '← ' + params.fromModule;
+        }
+      }
+    } catch(e) { console.warn('Power: could not load stored params', e); }
+
+    calculate();
+  });
+
+  /* theme reflow */
+  document.addEventListener('statistico-theme-changed', function() {
+    var f     = parseFloat(document.getElementById('cfgF').value) || 0.25;
+    var alpha = parseFloat(document.getElementById('cfgAlpha').value) || 0.05;
+    var k     = parseInt(document.getElementById('cfgK').value) || 3;
+    _drawCurve(f, k, alpha);
+  });
+  </script>
+</body>
+</html>

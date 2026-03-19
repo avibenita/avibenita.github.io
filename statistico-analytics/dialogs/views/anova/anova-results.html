@@ -2885,10 +2885,71 @@
     return Math.sqrt(eta / (1 - eta));
   }
 
-  /* ── Power Modal state ──────────────────────────────────── */
+  /* ── Power Modal state (kept for legacy; openPowerModal now navigates) ── */
   var _pmMode = 'power'; /* 'power' | 'n' */
 
+  /**
+   * Navigate to the dedicated Power & Sample Size page,
+   * passing the current ANOVA bundle via sessionStorage.
+   */
   function openPowerModal() {
+    /* Build params to pre-fill the power page */
+    var params = { fromModule: 'ANOVA' };
+    if (_bundle) {
+      params.bundle = _bundle;
+      if (_bundle.spec) {
+        params.dv    = _bundle.spec.dv    || '';
+        params.alpha = _bundle.spec.alpha || 0.05;
+      }
+      /* derive f, N, k for fast pre-fill even without bundle parsing */
+      if (_bundle.oneWay) {
+        var ow = _bundle.oneWay;
+        params.N = ow.N || 0;
+        params.k = ow.df1 ? ow.df1 + 1 : 3;
+        if (isFinite(ow.etaSq) && ow.etaSq > 0 && ow.etaSq < 1)
+          params.f = Math.sqrt(ow.etaSq / (1 - ow.etaSq));
+      } else if (_bundle.twoWay) {
+        var tw = _bundle.twoWay;
+        params.N = (tw.dfA||0) + (tw.dfB||0) + (tw.dfAB||0) + (tw.dfError||0) + 1;
+        params.k = ((tw.dfA||0)+1) * ((tw.dfB||0)+1);
+        var maxEta = Math.max(
+          isFinite(tw.etaSqA)  ? tw.etaSqA  : 0,
+          isFinite(tw.etaSqB)  ? tw.etaSqB  : 0,
+          isFinite(tw.etaSqAB) ? tw.etaSqAB : 0);
+        if (maxEta > 0 && maxEta < 1)
+          params.f = Math.sqrt(maxEta / (1 - maxEta));
+      } else if (_bundle.repeated) {
+        var rm = _bundle.repeated;
+        params.N = (rm.dfSubjects||0) + 1;
+        params.k = (rm.dfConditions||0) + 1;
+        if (isFinite(rm.etaSqP) && rm.etaSqP > 0 && rm.etaSqP < 1)
+          params.f = Math.sqrt(rm.etaSqP / (1 - rm.etaSqP));
+      }
+    }
+    try { sessionStorage.setItem('statistico-power-params', JSON.stringify(params)); } catch(e) {}
+
+    /* Navigate to the power page (relative from anova/ → power/) */
+    var powerUrl = '../power/power-results.html';
+    try {
+      window.location.href = powerUrl;
+    } catch(e) {
+      /* fallback: open in same frame */
+      window.open(powerUrl, '_self');
+    }
+    return; /* legacy modal code below is no longer reached */
+  }
+  /* Keep closePowerModal so any stale references don't throw */
+  function closePowerModal() {
+    var m = document.getElementById('powerModal');
+    if (m) m.classList.remove('open');
+  }
+
+  /* ──────────────────────────────────────────────────────────────
+     LEGACY modal functions kept (but modal itself is now invisible).
+     Removing them would break nothing; keeping avoids parse errors
+     if something still references them.
+  ──────────────────────────────────────────────────────────────── */
+  function _openPowerModalLegacy() {
     /* Pre-fill from current bundle */
     if (_bundle) {
       var alpha = (_bundle.spec && _bundle.spec.alpha) ? _bundle.spec.alpha : 0.05;
@@ -2940,16 +3001,13 @@
       }
     }
 
-    setPmMode(_pmMode, true);
-    document.getElementById('powerModal').classList.add('open');
-    runPower();
+    _setPmModeLegacy(_pmMode, true);
+    var m = document.getElementById('powerModal');
+    if (m) m.classList.add('open');
+    _runPowerLegacy();
   }
 
-  function closePowerModal() {
-    document.getElementById('powerModal').classList.remove('open');
-  }
-
-  function setPmMode(mode, skipRun) {
+  function _setPmModeLegacy(mode, skipRun) {
     _pmMode = mode;
     document.getElementById('pmTabPower').classList.toggle('active', mode === 'power');
     document.getElementById('pmTabN').classList.toggle('active', mode === 'n');
@@ -2958,10 +3016,10 @@
     document.getElementById('pmFieldDesired').style.display  = mode === 'n'     ? '' : 'none';
     document.getElementById('pmGaugeSection').style.display  = mode === 'power' ? '' : 'none';
     document.getElementById('pmNSection').style.display      = mode === 'n'     ? '' : 'none';
-    if (!skipRun) runPower();
+    if (!skipRun) _runPowerLegacy();
   }
 
-  function runPower() {
+  function _runPowerLegacy() {
     var f     = parseFloat(document.getElementById('pmF').value)     || 0.25;
     var alpha = parseFloat(document.getElementById('pmAlpha').value) || 0.05;
     var k     = parseInt  (document.getElementById('pmK').value,10)  || 3;
@@ -3048,6 +3106,10 @@
       if (el) el.innerHTML = interpN;
     }
   }
+
+  /* Thin aliases for legacy modal inline handlers (modal is hidden but kept in DOM) */
+  function setPmMode(mode, skipRun) { _setPmModeLegacy(mode, skipRun); }
+  function runPower() { _runPowerLegacy(); }
 
   function _fLabel(f) {
     if (!isFinite(f)) return 'unknown';

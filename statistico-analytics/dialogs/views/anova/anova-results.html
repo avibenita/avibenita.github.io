@@ -1777,6 +1777,11 @@
   /* ── chip filter: factorKey = 'A'|'B', level = string|'__all__' ── */
   function switchFactorFilter(factorKey, level) {
     if (!_b_posthoc) return;
+    var b     = _b_posthoc;
+    var alpha = (b.spec && b.spec.alpha) ? b.spec.alpha : 0.05;
+    var method = (b.spec && b.spec.posthocMethod) || 'tukey';
+    var methodLabel = method === 'games' ? 'Games-Howell' : method === 'bonferroni' ? 'Bonferroni' : 'Tukey HSD';
+
     var panelId = 'cmpPanel_' + factorKey;
     var panel   = document.getElementById(panelId);
     if (!panel) return;
@@ -1786,19 +1791,46 @@
       ch.classList.toggle('active', ch.dataset.level === level);
     });
 
-    /* filter table rows */
+    /* determine this factor's name */
+    var isTwoWay = b.type === 'two-way';
+    var fAname = (b.spec && b.spec.factor1) || 'Factor A';
+    var fBname = (b.spec && b.spec.factor2) || 'Factor B';
+    var thisFactorName = (factorKey === 'A') ? fAname : fBname;
+    var otherFactorName = (factorKey === 'A') ? fBname : fAname;
+
     var tbody = panel.querySelector('tbody');
     if (!tbody) return;
-    tbody.querySelectorAll('tr').forEach(function(tr) {
-      if (level === '__all__') {
-        tr.style.display = '';
-      } else {
-        var cmp = tr.cells[0] ? tr.cells[0].textContent : '';
-        /* match if the selected level appears as a word in the comparison label */
-        var re = new RegExp('(?:^|\\s|vs )' + level.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '(?:\\s|$|\\s)');
-        tr.style.display = (cmp.indexOf(level) >= 0) ? '' : 'none';
-      }
-    });
+
+    if (level === '__all__') {
+      /* restore marginal (main-effect) rows */
+      var margRows = (b.posthoc || []).filter(function(r){
+        return (r.factor === thisFactorName) || (!r.factor && factorKey === 'A');
+      });
+      tbody.innerHTML = margRows.map(function(r){
+        var p = r.pAdj !== undefined ? r.pAdj : r.p;
+        return '<tr><td>' + r.comparison + '</td><td class="num">' + fmt(r.diff) + '</td><td class="num">' + fmt(r.se) + '</td><td class="num ' + sigCell(p,alpha) + '">' + fmtP(p) + '</td><td>' + sigBadge(p,alpha) + '</td></tr>';
+      }).join('') || '<tr><td colspan="5" style="color:var(--text-muted);font-style:italic;padding:8px 0;">No marginal comparisons available</td></tr>';
+
+      /* update label */
+      var metaEl = panel.querySelector('.cmp-strata-note');
+      if (metaEl) metaEl.textContent = 'Marginal means · ' + methodLabel;
+    } else {
+      /* find simple-effects rows for: otherFactor = level, withinFactor = thisFactorName */
+      var stratumKey = otherFactorName + ' = ' + level;
+      var se = (b.simpleEffects || []).find(function(s){
+        return s.stratum === stratumKey && s.withinFactor === thisFactorName;
+      });
+      var seRows = se ? se.rows : [];
+
+      tbody.innerHTML = seRows.map(function(r){
+        var p = r.pAdj !== undefined ? r.pAdj : r.p;
+        return '<tr><td>' + r.comparison + '</td><td class="num">' + fmt(r.diff) + '</td><td class="num">' + fmt(r.se) + '</td><td class="num ' + sigCell(p,alpha) + '">' + fmtP(p) + '</td><td>' + sigBadge(p,alpha) + '</td></tr>';
+      }).join('') || '<tr><td colspan="5" style="color:var(--text-muted);font-style:italic;padding:8px 0;">No pairs for ' + otherFactorName + ' = ' + level + '</td></tr>';
+
+      /* update label */
+      var metaEl = panel.querySelector('.cmp-strata-note');
+      if (metaEl) metaEl.textContent = otherFactorName + ' = ' + level + ' · ' + methodLabel;
+    }
   }
 
   function _renderPosthoc(b) {
@@ -1924,7 +1956,7 @@
           '</div>';
         } else {
           html += '<div class="cmp-factor-body">' +
-            '<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Method: ' + methodLabel + ' &nbsp;|&nbsp; α = ' + alpha + '</div>' +
+            '<div class="cmp-strata-note" style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Marginal means · ' + methodLabel + ' &nbsp;|&nbsp; α = ' + alpha + '</div>' +
             '<table><thead><tr><th>Comparison</th><th class="num">Mean diff</th><th class="num">SE</th><th class="num">p (adj)</th><th></th></tr></thead><tbody>' +
             rows.map(function(r){
               var p = r.pAdj !== undefined ? r.pAdj : r.p;

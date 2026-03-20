@@ -2937,29 +2937,35 @@
     }
     
     /* Build URL with parameters */
-    /* Calculate path to calculator - try multiple approaches for reliability */
+    /* Calculate path to calculator - handle different serving scenarios */
     var calculatorPath = '';
     var currentPath = window.location.pathname;
+    var currentUrl = window.location.href;
     
-    /* Method 1: Try absolute path from root */
+    /* Method 1: If served from GitHub Pages (avibenita.github.io), use absolute path from root */
     if (currentPath.startsWith('/')) {
-      /* Extract base path up to repository root */
-      var pathParts = currentPath.split('/').filter(function(p) { return p; });
+      var pathParts = currentPath.split('/').filter(function(p) { return p && p !== ''; });
       var anovaIdx = pathParts.indexOf('statistico-analytics');
+      
       if (anovaIdx >= 0) {
-        /* Build path to root, then to calculator */
-        var rootParts = pathParts.slice(0, anovaIdx);
-        calculatorPath = '/' + rootParts.join('/') + '/statistico-calculators/SampleSizeCalculator.html';
+        /* We're in statistico-analytics, calculator is at same level */
+        /* Build absolute path: /statistico-calculators/SampleSizeCalculator.html */
+        var rootPath = '/' + pathParts.slice(0, anovaIdx).join('/');
+        calculatorPath = (rootPath === '/' ? '' : rootPath) + '/statistico-calculators/SampleSizeCalculator.html';
       } else {
-        /* Fallback: assume both folders are at same level */
+        /* Fallback: assume repository root */
         calculatorPath = '/statistico-calculators/SampleSizeCalculator.html';
       }
     } else {
       /* Method 2: Relative path (for file:// protocol or local development) */
-      /* From: statistico-analytics/dialogs/views/anova/ */
-      /* To:   statistico-calculators/ */
+      /* From: statistico-analytics/dialogs/views/anova/anova-results.html */
+      /* To:   statistico-calculators/SampleSizeCalculator.html */
+      /* Go up 4 levels: anova -> views -> dialogs -> statistico-analytics -> root */
       calculatorPath = '../../../../statistico-calculators/SampleSizeCalculator.html';
     }
+    
+    /* Debug: log the path for troubleshooting */
+    console.log('Calculator path:', calculatorPath, 'from current path:', currentPath);
     
     var urlParams = new URLSearchParams();
     urlParams.set('test', 'anova');

@@ -2889,54 +2889,73 @@
   var _pmMode = 'power'; /* 'power' | 'n' */
 
   /**
-   * Navigate to the dedicated Power & Sample Size page,
-   * passing the current ANOVA bundle via sessionStorage.
+   * Navigate to the dedicated Power & Sample Size Calculator,
+   * passing the current ANOVA parameters via URL.
    */
   function openPowerModal() {
-    /* Build params to pre-fill the power page */
-    var params = { fromModule: 'ANOVA' };
+    /* Extract parameters from current bundle */
+    var alpha = 0.05;
+    var numGroups = 3;
+    var effectSizeF = 0.25; /* default medium effect */
+    var power = 0.80; /* default power */
+    
     if (_bundle) {
-      params.bundle = _bundle;
       if (_bundle.spec) {
-        params.dv    = _bundle.spec.dv    || '';
-        params.alpha = _bundle.spec.alpha || 0.05;
+        alpha = _bundle.spec.alpha || 0.05;
       }
-      /* derive f, N, k for fast pre-fill even without bundle parsing */
+      
+      /* derive f, N, k for pre-fill */
       if (_bundle.oneWay) {
         var ow = _bundle.oneWay;
-        params.N = ow.N || 0;
-        params.k = ow.df1 ? ow.df1 + 1 : 3;
-        if (isFinite(ow.etaSq) && ow.etaSq > 0 && ow.etaSq < 1)
-          params.f = Math.sqrt(ow.etaSq / (1 - ow.etaSq));
+        numGroups = ow.df1 ? ow.df1 + 1 : 3;
+        if (isFinite(ow.etaSq) && ow.etaSq > 0 && ow.etaSq < 1) {
+          effectSizeF = Math.sqrt(ow.etaSq / (1 - ow.etaSq));
+        } else if (isFinite(ow.cohenF) && ow.cohenF > 0) {
+          effectSizeF = ow.cohenF;
+        }
       } else if (_bundle.twoWay) {
         var tw = _bundle.twoWay;
-        params.N = (tw.dfA||0) + (tw.dfB||0) + (tw.dfAB||0) + (tw.dfError||0) + 1;
-        params.k = ((tw.dfA||0)+1) * ((tw.dfB||0)+1);
+        /* For two-way: use total number of groups (Factor A × Factor B) */
+        var factorA = (tw.dfA || 0) + 1;
+        var factorB = (tw.dfB || 0) + 1;
+        numGroups = factorA * factorB;
+        /* Use the maximum eta-squared to calculate effect size */
         var maxEta = Math.max(
           isFinite(tw.etaSqA)  ? tw.etaSqA  : 0,
           isFinite(tw.etaSqB)  ? tw.etaSqB  : 0,
           isFinite(tw.etaSqAB) ? tw.etaSqAB : 0);
-        if (maxEta > 0 && maxEta < 1)
-          params.f = Math.sqrt(maxEta / (1 - maxEta));
+        if (maxEta > 0 && maxEta < 1) {
+          effectSizeF = Math.sqrt(maxEta / (1 - maxEta));
+        }
       } else if (_bundle.repeated) {
         var rm = _bundle.repeated;
-        params.N = (rm.dfSubjects||0) + 1;
-        params.k = (rm.dfConditions||0) + 1;
-        if (isFinite(rm.etaSqP) && rm.etaSqP > 0 && rm.etaSqP < 1)
-          params.f = Math.sqrt(rm.etaSqP / (1 - rm.etaSqP));
+        numGroups = (rm.dfConditions || 0) + 1;
+        if (isFinite(rm.etaSqP) && rm.etaSqP > 0 && rm.etaSqP < 1) {
+          effectSizeF = Math.sqrt(rm.etaSqP / (1 - rm.etaSqP));
+        }
       }
     }
-    try { sessionStorage.setItem('statistico-power-params', JSON.stringify(params)); } catch(e) {}
-
-    /* Navigate to the power page (relative from anova/ → power/) */
-    var powerUrl = '../power/power-results.html';
+    
+    /* Build URL with parameters */
+    /* Path from anova-results.html to statistico-calculators: ../../../../statistico-calculators/ */
+    var baseUrl = '../../../../statistico-calculators/SampleSizeCalculator.html';
+    var urlParams = new URLSearchParams();
+    urlParams.set('test', 'anova');
+    urlParams.set('autoCalculate', 'true');
+    urlParams.set('alpha', alpha);
+    urlParams.set('power', power);
+    urlParams.set('numGroups', numGroups);
+    urlParams.set('effectSizeF', effectSizeF.toFixed(3));
+    
+    var calculatorUrl = baseUrl + '?' + urlParams.toString();
+    
+    /* Navigate to the calculator */
     try {
-      window.location.href = powerUrl;
+      window.location.href = calculatorUrl;
     } catch(e) {
       /* fallback: open in same frame */
-      window.open(powerUrl, '_self');
+      window.open(calculatorUrl, '_self');
     }
-    return; /* legacy modal code below is no longer reached */
   }
   /* Keep closePowerModal so any stale references don't throw */
   function closePowerModal() {

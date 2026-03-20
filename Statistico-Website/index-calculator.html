@@ -1620,17 +1620,29 @@
         };
         
         const mappedTestType = testTypeMap[testType];
-        if (!mappedTestType) return false;
+        if (!mappedTestType) {
+            console.warn('Unknown test type:', testType);
+            return false;
+        }
         
-        // Select the test type first - wait for DOM to be ready
-        const testElement = document.querySelector(`.sb-item[data-test="${mappedTestType}"]`);
-        if (!testElement) return false;
-        
-        // Trigger click to select the test - this will show the correct parameter fields
-        testElement.click();
-        
-        // Wait for test selection to complete, then fill parameters
-        setTimeout(() => {
+        // Wait for DOM to be fully ready, then select the test
+        const selectTestAndFill = () => {
+            const testElement = document.querySelector(`.sb-item[data-test="${mappedTestType}"]`);
+            if (!testElement) {
+                console.warn('Test element not found:', mappedTestType);
+                return false;
+            }
+            
+            // Call selectTest directly to ensure it runs
+            if (typeof selectTest === 'function') {
+                selectTest(testElement);
+            } else {
+                // Fallback to click if selectTest isn't available yet
+                testElement.click();
+            }
+            
+            // Wait for test selection to complete, then fill parameters
+            setTimeout(() => {
             // Fill in common parameters
             if (params.has('alpha')) {
                 const alphaEl = document.getElementById('alpha');
@@ -1718,7 +1730,16 @@
                     calculateSampleSize();
                 }, 100);
             }
-        }, 100); // Wait 100ms for test selection to complete
+            }, 150); // Wait 150ms for test selection to complete
+        };
+        
+        // Try immediately, or wait a bit if DOM isn't ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', selectTestAndFill);
+        } else {
+            // DOM is ready, but wait a tiny bit for any dynamic content
+            setTimeout(selectTestAndFill, 50);
+        }
         
         return true;
     }

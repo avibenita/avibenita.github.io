@@ -1622,32 +1622,34 @@
         const mappedTestType = testTypeMap[testType];
         if (!mappedTestType) return false;
         
-        // Select the test type - wait a bit for DOM to be ready
+        // Select the test type first - wait for DOM to be ready
+        const testElement = document.querySelector(`.sb-item[data-test="${mappedTestType}"]`);
+        if (!testElement) return false;
+        
+        // Trigger click to select the test - this will show the correct parameter fields
+        testElement.click();
+        
+        // Wait for test selection to complete, then fill parameters
         setTimeout(() => {
-            const testElement = document.querySelector(`.sb-item[data-test="${mappedTestType}"]`);
-            if (testElement) {
-                // Trigger click to ensure all side effects happen
-                testElement.click();
+            // Fill in common parameters
+            if (params.has('alpha')) {
+                const alphaEl = document.getElementById('alpha');
+                if (alphaEl) alphaEl.value = parseFloat(params.get('alpha'));
             }
-        }, 50);
-        
-        // Fill in common parameters
-        if (params.has('alpha')) {
-            document.getElementById('alpha').value = parseFloat(params.get('alpha'));
-        }
-        if (params.has('power')) {
-            document.getElementById('power').value = parseFloat(params.get('power'));
-        }
-        if (params.has('alternative')) {
-            const alt = params.get('alternative');
-            const select = document.getElementById('alternative');
-            if (select) {
-                select.value = alt === 'one-sided' ? 'one-sided' : 'two-sided';
+            if (params.has('power')) {
+                const powerEl = document.getElementById('power');
+                if (powerEl) powerEl.value = parseFloat(params.get('power'));
             }
-        }
-        
-        // Fill test-specific parameters
-        switch(mappedTestType) {
+            if (params.has('alternative')) {
+                const alt = params.get('alternative');
+                const select = document.getElementById('alternative');
+                if (select) {
+                    select.value = alt === 'one-sided' ? 'one-sided' : 'two-sided';
+                }
+            }
+            
+            // Fill test-specific parameters
+            switch(mappedTestType) {
             case 'one-sample-mean':
                 if (params.has('effectSize') || params.has('d')) {
                     const d = params.get('effectSize') || params.get('d');
@@ -1708,15 +1710,15 @@
                     document.getElementById('rsquared').value = parseFloat(r2);
                 }
                 break;
-        }
-        
-        // Auto-calculate if requested - wait longer for test selection to complete
-        if (autoCalculate) {
-            // Delay to ensure test selection and parameter filling is complete
-            setTimeout(() => {
-                calculateSampleSize();
-            }, 200);
-        }
+            }
+            
+            // Auto-calculate if requested - after parameters are filled
+            if (autoCalculate) {
+                setTimeout(() => {
+                    calculateSampleSize();
+                }, 100);
+            }
+        }, 100); // Wait 100ms for test selection to complete
         
         return true;
     }

@@ -46,6 +46,90 @@
       overflow-x:hidden;
     }
 
+    /* ── Calculator Modal ─────────────────────────────────────── */
+    .calculator-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 10000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    .calculator-modal-overlay.open {
+      display: flex;
+    }
+    .calculator-modal-container {
+      width: 75vw;
+      height: 75vh;
+      background: var(--surface-1);
+      border-radius: var(--panel-radius);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+    .calculator-modal-header {
+      padding: 12px 16px;
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .calculator-modal-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .calculator-modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 20px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: background 0.2s, color 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+    }
+    .calculator-modal-close:hover {
+      background: var(--surface-3);
+      color: var(--text-primary);
+    }
+    .calculator-modal-iframe {
+      flex: 1;
+      width: 100%;
+      border: none;
+      background: var(--surface-1);
+    }
+    @media (max-width: 1200px) {
+      .calculator-modal-container {
+        width: 90vw;
+        height: 85vh;
+      }
+    }
+    @media (max-width: 768px) {
+      .calculator-modal-container {
+        width: 95vw;
+        height: 90vh;
+      }
+    }
+
     /* ── Page shell matching other modules ─────────────────── */
     .wrap{ display:flex; justify-content:center; padding:8px 12px 20px; }
     .card{
@@ -2963,18 +3047,55 @@
     /* Debug: log the URL for troubleshooting */
     console.log('Calculator URL:', calculatorUrl, 'origin:', window.location.origin, 'pathname:', window.location.pathname);
     
-    /* Navigate to the calculator */
-    try {
-      window.location.href = calculatorUrl;
-    } catch(e) {
-      /* fallback: open in same frame */
-      window.open(calculatorUrl, '_self');
+    /* Open calculator in modal overlay */
+    var modal = document.getElementById('calculatorModal');
+    if (!modal) {
+      /* Create modal if it doesn't exist */
+      modal = document.createElement('div');
+      modal.id = 'calculatorModal';
+      modal.className = 'calculator-modal-overlay';
+      modal.innerHTML = '<div class="calculator-modal-container">' +
+        '<div class="calculator-modal-header">' +
+        '<div class="calculator-modal-title"><i class="fas fa-calculator"></i> Power & Sample Size Calculator</div>' +
+        '<button class="calculator-modal-close" onclick="closePowerModal()" title="Close"><i class="fas fa-times"></i></button>' +
+        '</div>' +
+        '<iframe class="calculator-modal-iframe" id="calculatorIframe" src=""></iframe>' +
+        '</div>';
+      document.body.appendChild(modal);
+      
+      /* Close on overlay click (but not on container click) */
+      modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+          closePowerModal();
+        }
+      });
+      
+      /* Close on Escape key */
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.classList.contains('open')) {
+          closePowerModal();
+        }
+      });
     }
+    
+    /* Set iframe source and show modal */
+    var iframe = document.getElementById('calculatorIframe');
+    if (iframe) {
+      iframe.src = calculatorUrl;
+    }
+    modal.classList.add('open');
+    
+    /* Prevent body scroll when modal is open */
+    document.body.style.overflow = 'hidden';
   }
-  /* Keep closePowerModal so any stale references don't throw */
+  
   function closePowerModal() {
-    var m = document.getElementById('powerModal');
-    if (m) m.classList.remove('open');
+    var modal = document.getElementById('calculatorModal');
+    if (modal) {
+      modal.classList.remove('open');
+      /* Restore body scroll */
+      document.body.style.overflow = '';
+    }
   }
 
   /* ──────────────────────────────────────────────────────────────

@@ -2461,11 +2461,14 @@
     /**
      * @param powerX  desired power on the x-axis (e.g. 0.1 … 0.95)
      * @param testTypeFallback  when set, used if za+zpRef ≤ 0 (avoids returning nRef for every x → flat line)
+     * @param omnibusFZa  when true (ANOVA / regression), use zα = Φ⁻¹(1−α) like the omnibus F tail, not the UI t-test two-sided z
      */
-    function sampleSizeCurveFromReference(powerX, alpha, alternative, nRef, pRef, testTypeFallback) {
+    function sampleSizeCurveFromReference(powerX, alpha, alternative, nRef, pRef, testTypeFallback, omnibusFZa) {
         const a = parseLocalizedNumber(alpha);
         const alphaEff = isFinite(a) && a > 0 && a < 1 ? a : 0.05;
-        const za = alternative === 'two-sided' ? normalInverse(1 - alphaEff / 2) : normalInverse(1 - alphaEff);
+        const za = omnibusFZa === true
+            ? normalInverse(1 - alphaEff)
+            : (alternative === 'two-sided' ? normalInverse(1 - alphaEff / 2) : normalInverse(1 - alphaEff));
         const clamp = function (q) { return Math.max(0.001, Math.min(0.999, q)); };
         const zp = normalInverse(clamp(powerX));
         const zpRef = normalInverse(clamp(pRef));
@@ -2498,32 +2501,39 @@
         /* Reference curve: scale n from the last Calculate anchor (pRef, nRef) using normal quantiles.
            For ANOVA/regression the main result uses non-central F (API) or a different search; the curve helper
            calculateSampleSizeForPower uses calculateActualPower’s normal ncp f·√(nk), which is optimistic and
-           often hits the n≥2 floor for all powers → a flat line. When za+zpRef>0, reference scaling matches the
-           dashboard n and rises with power; when den≤0 (rare edge α/power), stay on calculateSampleSizeForPower. */
-        let useNormalReferenceCurve =
+           often hits the n≥2 floor for all powers → a flat line. Use reference scaling with omnibus F-style zα
+           for those tests; if the search path still yields a constant series, rebuild once with the same scaling. */
+        const omnibusRef = (testType === 'anova' || testType === 'regression');
+        const useNormalReferenceCurve =
             nRef > 0 &&
             isFinite(pRef) &&
             pRef >= 0.05 &&
             pRef <= 0.999;
-        if (useNormalReferenceCurve && (testType === 'anova' || testType === 'regression')) {
-            const za = alternative === 'two-sided' ? normalInverse(1 - alphaForCurve / 2) : normalInverse(1 - alphaForCurve);
-            const clampQ = function (q) { return Math.max(0.001, Math.min(0.999, q)); };
-            const zpRef = normalInverse(clampQ(pRef));
-            if (!isFinite(za) || !isFinite(zpRef) || !(za + zpRef > 0)) {
-                useNormalReferenceCurve = false;
-            }
-        }
 
         for (let p = 0.1; p <= 0.95; p += 0.05) {
             const rp = Math.round(p * 100) / 100;
             powerValues.push(rp);
             let nPt;
             if (useNormalReferenceCurve) {
-                nPt = sampleSizeCurveFromReference(rp, alphaForCurve, alternative, nRef, pRef, testType);
+                nPt = sampleSizeCurveFromReference(rp, alphaForCurve, alternative, nRef, pRef, testType, omnibusRef);
             } else {
                 nPt = calculateSampleSizeForPower(testType, rp, alphaForCurve, alternative);
             }
             sampleSizes.push(nPt);
+        }
+
+        if (omnibusRef && nRef > 0 && sampleSizes.length > 1) {
+            const firstN = sampleSizes[0];
+            let allSame = true;
+            for (let i = 1; i < sampleSizes.length; i++) {
+                if (sampleSizes[i] !== firstN) { allSame = false; break; }
+            }
+            if (allSame) {
+                for (let i = 0; i < powerValues.length; i++) {
+                    sampleSizes[i] = sampleSizeCurveFromReference(
+                        powerValues[i], alphaForCurve, alternative, nRef, pRef, undefined, true);
+                }
+            }
         }
 
         document.getElementById('chartPlaceholder').style.display = 'none';

@@ -3072,7 +3072,7 @@
     /* Light theme inside iframe — reads as a separate “sheet” vs dark host */
     urlParams.set('theme', 'light');
     /* Bust Office / browser cache on embedded calculator (otherwise old JS = wrong chart) */
-    urlParams.set('_cb', '20260321-1');
+    urlParams.set('_cb', '20260321-2');
     if (studyTotalN > 0) {
       urlParams.set('studyTotalN', String(Math.round(studyTotalN)));
     }
@@ -3085,9 +3085,22 @@
       /* To:   statistico-calculators/index-calculator.html (power engine container) */
       calculatorUrl = '../../../../statistico-calculators/index-calculator.html?' + urlParams.toString();
     } else {
-      /* Canonical path is plural: statistico-calculators (not statistico-calculator) */
-      calculatorUrl = window.location.origin + '/statistico-calculators/index-calculator.html?' + urlParams.toString();
+      /* Absolute path from origin — canonical folder is plural: statistico-calculators */
+      calculatorUrl = new URL('/statistico-calculators/index-calculator.html?' + urlParams.toString(), window.location.origin).href;
     }
+
+    /* Defensive: if any code path used a typo’d folder name, fix before iframe load */
+    try {
+      var _u = new URL(calculatorUrl, window.location.href);
+      var _p = _u.pathname || '';
+      if (_p.indexOf('/statistico-calculator/') >= 0 && _p.indexOf('/statistico-calculators/') < 0) {
+        _u.pathname = _p.replace('/statistico-calculator/', '/statistico-calculators/');
+        calculatorUrl = _u.href;
+      } else if (_p.indexOf('/statistic-calculators/') >= 0) {
+        _u.pathname = _p.replace('/statistic-calculators/', '/statistico-calculators/');
+        calculatorUrl = _u.href;
+      }
+    } catch (_e) { /* keep calculatorUrl as built */ }
     
     /* Debug: log the URL for troubleshooting */
     console.log('Calculator URL:', calculatorUrl, 'origin:', window.location.origin, 'pathname:', window.location.pathname);

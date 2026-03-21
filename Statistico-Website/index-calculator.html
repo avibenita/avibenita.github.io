@@ -2444,6 +2444,26 @@
         }
     }
 
+    /**
+     * Required n scales ~ (zα + zΦ⁻¹(p))² for fixed effect (normal approx).
+     * Anchor to the last Calculate result so the curve passes through (pRef, nRef)
+     * and rises with power — avoids flat lines when crude ANOVA power() is already
+     * ~1 at n = 2 (minimal-n search stuck at 2).
+     */
+    function sampleSizeCurveFromReference(p, alpha, alternative, nRef, pRef) {
+        const za = alternative === 'two-sided' ? normalInverse(1 - alpha / 2) : normalInverse(1 - alpha);
+        const clamp = function (q) { return Math.max(0.001, Math.min(0.999, q)); };
+        const zp = normalInverse(clamp(p));
+        const zpRef = normalInverse(clamp(pRef));
+        const num = za + zp;
+        const den = za + zpRef;
+        if (!(den > 0) || !isFinite(num) || !isFinite(den) || !isFinite(nRef) || nRef <= 0) {
+            return Math.max(2, Math.round(nRef));
+        }
+        const ratio = (num / den) * (num / den);
+        return Math.max(2, Math.ceil(nRef * ratio));
+    }
+
     // ── Power curve ───────────────────────────────────────────────────
     function createPowerCurve(testType, result) {
         const alpha = parseFloat(document.getElementById('alpha').value);
@@ -2451,10 +2471,19 @@
         const alternative = document.getElementById('alternative').value;
         const powerValues = [], sampleSizes = [];
 
+        const nRef = (result && isFinite(result.sampleSize) && result.sampleSize > 0) ? result.sampleSize : 0;
+        const pRef = targetPower;
+
         for (let p = 0.1; p <= 0.95; p += 0.05) {
             const rp = Math.round(p * 100) / 100;
             powerValues.push(rp);
-            sampleSizes.push(calculateSampleSizeForPower(testType, rp, alpha, alternative));
+            let nPt;
+            if (nRef > 0 && isFinite(pRef) && pRef > 0.04 && pRef < 0.999) {
+                nPt = sampleSizeCurveFromReference(rp, alpha, alternative, nRef, pRef);
+            } else {
+                nPt = calculateSampleSizeForPower(testType, rp, alpha, alternative);
+            }
+            sampleSizes.push(nPt);
         }
 
         document.getElementById('chartPlaceholder').style.display = 'none';

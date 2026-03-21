@@ -2019,7 +2019,8 @@
 
     // ── Calculation dispatcher ─────────────────────────────────────────
     async function calculateSampleSize() {
-        const alpha = parseFloat(document.getElementById('alpha').value);
+        let alpha = parseLocalizedNumber(document.getElementById('alpha').value);
+        if (!isFinite(alpha) || alpha <= 0 || alpha >= 1) alpha = 0.05;
         const powerEl = document.getElementById('power');
         const powerRaw = powerEl ? powerEl.value : '0.8';
         const power = normalizeStatisticalPower(powerRaw);
@@ -2450,23 +2451,39 @@
      * and rises with power — avoids flat lines when crude ANOVA power() is already
      * ~1 at n = 2 (minimal-n search stuck at 2).
      */
-    function sampleSizeCurveFromReference(p, alpha, alternative, nRef, pRef) {
-        const za = alternative === 'two-sided' ? normalInverse(1 - alpha / 2) : normalInverse(1 - alpha);
+    function parseLocalizedNumber(raw) {
+        if (raw === undefined || raw === null) return NaN;
+        const s = String(raw).trim().replace(/\s/g, '').replace(',', '.');
+        const x = parseFloat(s);
+        return x;
+    }
+
+    /**
+     * @param powerX  desired power on the x-axis (e.g. 0.1 … 0.95)
+     */
+    function sampleSizeCurveFromReference(powerX, alpha, alternative, nRef, pRef) {
+        const a = parseLocalizedNumber(alpha);
+        const alphaEff = isFinite(a) && a > 0 && a < 1 ? a : 0.05;
+        const za = alternative === 'two-sided' ? normalInverse(1 - alphaEff / 2) : normalInverse(1 - alphaEff);
         const clamp = function (q) { return Math.max(0.001, Math.min(0.999, q)); };
-        const zp = normalInverse(clamp(p));
+        const zp = normalInverse(clamp(powerX));
         const zpRef = normalInverse(clamp(pRef));
         const num = za + zp;
         const den = za + zpRef;
-        if (!(den > 0) || !isFinite(num) || !isFinite(den) || !isFinite(nRef) || nRef <= 0) {
+        /* If alpha was mis-parsed (e.g. "0,05" → 0), za is non-finite and this used to fall back to nRef for every point → flat line */
+        if (!isFinite(num) || !isFinite(den) || !(den > 0) || !isFinite(nRef) || nRef <= 0) {
             return Math.max(2, Math.round(nRef));
         }
         const ratio = (num / den) * (num / den);
-        return Math.max(2, Math.ceil(nRef * ratio));
+        const nEst = nRef * ratio;
+        return Math.max(2, Math.ceil(isFinite(nEst) ? nEst : nRef));
     }
 
     // ── Power curve ───────────────────────────────────────────────────
     function createPowerCurve(testType, result) {
-        const alpha = parseFloat(document.getElementById('alpha').value);
+        const alphaEl = document.getElementById('alpha');
+        const alpha = parseLocalizedNumber(alphaEl ? alphaEl.value : '0.05');
+        const alphaForCurve = isFinite(alpha) && alpha > 0 && alpha < 1 ? alpha : 0.05;
         const targetPower = normalizeStatisticalPower(document.getElementById('power').value);
         const alternative = document.getElementById('alternative').value;
         const powerValues = [], sampleSizes = [];
@@ -2478,10 +2495,11 @@
             const rp = Math.round(p * 100) / 100;
             powerValues.push(rp);
             let nPt;
-            if (nRef > 0 && isFinite(pRef) && pRef > 0.04 && pRef < 0.999) {
-                nPt = sampleSizeCurveFromReference(rp, alpha, alternative, nRef, pRef);
+            /* Allow pRef up to normalizeStatisticalPower max (0.999); strict < 0.999 skipped valid 99.9% runs */
+            if (nRef > 0 && isFinite(pRef) && pRef >= 0.05 && pRef <= 0.999) {
+                nPt = sampleSizeCurveFromReference(rp, alphaForCurve, alternative, nRef, pRef);
             } else {
-                nPt = calculateSampleSizeForPower(testType, rp, alpha, alternative);
+                nPt = calculateSampleSizeForPower(testType, rp, alphaForCurve, alternative);
             }
             sampleSizes.push(nPt);
         }

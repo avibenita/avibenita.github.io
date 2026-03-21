@@ -85,20 +85,12 @@ function navigateToCalculator(testType, params = {}, autoCalculate = true, newWi
  */
 function getCalculatorBaseURL() {
     /**
-     * Single source of truth: statistico-calculators/index-calculator.html
-     * (SampleSizeCalculator.html redirects here for legacy URLs.)
+     * Live URL: statistico-analytics/embed/index-calculator.html
+     * (Mirrors statistico-calculators/ in git; GitHub Pages reliably serves analytics paths.)
+     * Legacy /statistico-calculators/ links use SampleSizeCalculator.html → redirect.
      */
     const origin = window.location.origin;
-    const path = window.location.pathname || '/';
-    const sc = path.indexOf('/statistico-calculators');
-    if (sc >= 0) {
-        return origin + path.substring(0, sc) + '/statistico-calculators/index-calculator.html';
-    }
-    const sw = path.indexOf('/Statistico-Website/');
-    if (sw >= 0) {
-        return origin + path.substring(0, sw) + '/statistico-calculators/index-calculator.html';
-    }
-    return origin + '/statistico-calculators/index-calculator.html';
+    return origin + '/statistico-analytics/embed/index-calculator.html';
 }
 
 /**

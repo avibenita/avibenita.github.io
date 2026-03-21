@@ -2,6 +2,6 @@
 
 Some deployments or bookmarks may request **`/statistic-calculators/`** (missing the **`o`** in *Statistico*).
 
-These files **redirect** to the canonical module: **`/statistico-calculators/`**.
+These files **redirect** to the URL GitHub Pages serves reliably: **`/statistico-analytics/embed/`** (mirrors `statistico-calculators/` in git).
 
-Always link to **`statistico-calculators`** in source code.
+Prefer **`/statistico-analytics/embed/index-calculator.html`** in new links.

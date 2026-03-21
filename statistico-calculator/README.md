@@ -2,6 +2,6 @@
 
 Some builds or links use **`/statistico-calculator/`** (missing the final **`s`**).
 
-These files **redirect** to the canonical module: **`/statistico-calculators/`**.
+These files **redirect** to **`/statistico-analytics/embed/`** (mirrors `statistico-calculators/` in git; served reliably on GitHub Pages).
 
-Always use **`statistico-calculators`** in source code.
+Prefer **`statistico-calculators/`** in source and **`/statistico-analytics/embed/`** for public URLs.

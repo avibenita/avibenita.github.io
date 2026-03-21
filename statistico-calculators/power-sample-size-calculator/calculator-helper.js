@@ -85,11 +85,10 @@ function navigateToCalculator(testType, params = {}, autoCalculate = true, newWi
  */
 function getCalculatorBaseURL() {
     /**
-     * Live URL: statistico-analytics/embed/index-calculator.html
-     * (Source in git: statistico-calculators/power-sample-size-calculator/; CI copies to embed for Pages.)
+     * Live URL (GitHub Pages): /statistico-calculators/power-sample-size-calculator/index-calculator.html
      */
     const origin = window.location.origin;
-    return origin + '/statistico-analytics/embed/index-calculator.html';
+    return origin + '/statistico-calculators/power-sample-size-calculator/index-calculator.html';
 }
 
 /**

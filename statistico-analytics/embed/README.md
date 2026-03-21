@@ -1,13 +1,12 @@
-# Embedded power UI (GitHub Pages only)
+# `embed/` (legacy folder)
 
-There is **no** `index-calculator.html` in git here. The **canonical source** is:
+The power UI is **not** mirrored here anymore.
 
-**`statistico-calculators/power-sample-size-calculator/index-calculator.html`**  
-**`statistico-calculators/power-sample-size-calculator/index-formulas.html`**
+**Canonical URLs on GitHub Pages:**
 
-Before each deploy, **`.github/workflows/static.yml`** copies those files into this folder so **statistico.live** can serve:
+- `/statistico-calculators/power-sample-size-calculator/index-calculator.html`
+- `/statistico-calculators/power-sample-size-calculator/index-formulas.html`
 
-- `/statistico-analytics/embed/index-calculator.html`
-- `/statistico-analytics/embed/index-formulas.html`
+Source in git: `statistico-calculators/power-sample-size-calculator/`.
 
-**Local dev:** run `scripts/sync-embed-from-calculators.ps1` (or `.sh`) after editing the calculator.
+Older bookmarks to `/statistico-analytics/embed/...` may 404 unless you add redirects elsewhere.

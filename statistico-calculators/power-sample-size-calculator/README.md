@@ -7,10 +7,10 @@
 | **`index-calculator.html`** | Main calculator — **edit this** for UI/logic. |
 | **`index-formulas.html`** | Formula reference (module switcher links here). |
 | `calculator-helper.js` | Build URLs with pre-filled query params. |
-| `SampleSizeCalculator.html` / `SampleSizeFormulas.html` | Legacy entry names; redirect (https → embed, `file:` → same folder). |
+| `SampleSizeCalculator.html` / `SampleSizeFormulas.html` | Legacy entry names; redirect (https → canonical `/statistico-calculators/.../`, `file:` → same folder). |
 
 **Repo layout:** This folder is the calculator package under `statistico-calculators/`.
 
-**Live site (GitHub Pages):** files are copied to **`/statistico-analytics/embed/`** on deploy so the ANOVA iframe and Office hosts load reliably. See **`.github/workflows/static.yml`**.
+**Live site (GitHub Pages):** **`/statistico-calculators/power-sample-size-calculator/index-calculator.html`** (and `index-formulas.html`). ANOVA and links use this path.
 
-**Local preview of embed:** run `scripts/sync-embed-from-calculators.ps1` (or `.sh`) after edits.
+**Local preview:** serve the repo root (or open `index-calculator.html` from disk); no embed copy step.

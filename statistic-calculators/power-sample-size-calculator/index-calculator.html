@@ -1,0 +1,2785 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+    CORS ISSUE RESOLUTION:
+    
+    If you're seeing CORS errors when using the cloud function, here are solutions:
+    
+    1. SERVE FROM WEB SERVER (Recommended):
+       - Use: python -m http.server 8000
+       - Or: npx serve .
+       - Then open: http://localhost:8000/statistic-calculators/power-sample-size-calculator/index-calculator.html
+    
+    2. CONFIGURE CLOUD FUNCTION CORS (Server-side fix):
+       Add these headers to your cloud function:
+       - Access-Control-Allow-Origin: *
+       - Access-Control-Allow-Methods: GET, POST, OPTIONS
+       - Access-Control-Allow-Headers: Content-Type
+    
+    3. BROWSER EXTENSION:
+       Install a CORS browser extension for development (NOT for production)
+-->
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Sample Size Calculator</title>
+    <script>
+    /* Apply before paint when opened as light popup (?theme=light) from Statistico */
+    try {
+        var _tp = new URLSearchParams(window.location.search);
+        if (_tp.get('theme') === 'light' || _tp.get('theme') === 'paper') {
+            document.documentElement.classList.add('theme-embed-light');
+        }
+    } catch (e) {}
+    </script>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/modules/annotations.js"></script>
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    <script src="https://code.highcharts.com/modules/export-data.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
+    <style>
+        :root {
+            --panel-bg: #484b57;
+            --panel-radius: 10px;
+            --panel-shadow: 0px 4px 20px rgba(0, 0, 0, 0.4);
+            --header-bg: #000;
+            --header-color: rgb(255,192,192);
+            --highlight-bg: rgba(255, 192, 192, 0.2);
+            --highlight-text: rgb(255, 192, 192);
+            --primary-blue: #3498db;
+            --primary-blue-hover: #2980b9;
+            --success-green: #27ae60;
+            --warning-orange: #f39c12;
+            --danger-red: #e74c3c;
+            --accent-1: rgb(255,192,192);
+            --sidebar-width: 270px;
+            --sidebar-bg: #2c2f3b;
+            --sidebar-border: rgba(255,255,255,0.08);
+            /* Power configuration strip (index100 pattern) */
+            --border: rgba(255, 255, 255, 0.12);
+            --text-muted: #9ba3b8;
+            --text-primary: #f1f5f9;
+            --surface-2: rgba(36, 40, 52, 0.96);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            min-height: 100vh;
+            overflow-x: hidden;
+            background: #1e2130;
+        }
+
+        /* ── APP SHELL ─────────────────────────────────── */
+        .app-shell {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ── TOP HEADER BAR ─────────────────────────────── */
+        .top-header {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            background: linear-gradient(135deg, #000 0%, #1a1a2e 100%);
+            padding: 0 24px;
+            height: 58px;
+            flex-shrink: 0;
+            border-bottom: 1px solid rgba(255,192,192,0.15);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+        }
+
+        .top-header .app-icon {
+            font-size: 1.4rem;
+            color: var(--accent-1);
+            margin-right: 14px;
+        }
+
+        .top-header .app-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--accent-1);
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+
+        .top-header .header-divider {
+            width: 1px;
+            height: 28px;
+            background: rgba(255,255,255,0.15);
+            margin: 0 18px;
+        }
+
+        .top-header .header-subtitle {
+            font-size: 0.9rem;
+            color: #9ba3b8;
+            flex: 1;
+        }
+
+        .top-header .header-badge {
+            font-size: 0.75rem;
+            background: rgba(16,185,129,0.18);
+            color: #10b981;
+            border: 1px solid rgba(16,185,129,0.3);
+            padding: 3px 10px;
+            border-radius: 20px;
+            white-space: nowrap;
+        }
+
+        /* ── BODY ROW (sidebar + main) ──────────────────── */
+        .body-row {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* ── SIDEBAR ────────────────────────────────────── */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--sidebar-border);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            overflow-x: hidden;
+            flex-shrink: 0;
+        }
+
+        .sidebar::-webkit-scrollbar { width: 4px; }
+        .sidebar::-webkit-scrollbar-track { background: transparent; }
+        .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+        /* ── Module switcher ────────────────────────────── */
+        .module-switch {
+            margin: 14px 14px 4px 14px;
+            display: flex;
+            border-radius: 7px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .module-btn {
+            flex: 1; padding: 7px 4px; text-align: center;
+            font-size: 0.75rem; font-weight: 600; cursor: pointer;
+            color: #9ba3b8; background: rgba(255,255,255,0.04);
+            border: none; transition: background 0.2s, color 0.2s;
+            text-decoration: none; display: flex; align-items: center;
+            justify-content: center; gap: 5px;
+        }
+        .module-btn:hover { background: rgba(255,255,255,0.09); color: #e2e8f0; }
+        .module-btn.active { background: rgba(255,192,192,0.14); color: var(--accent-1); }
+        .module-btn + .module-btn { border-left: 1px solid rgba(255,255,255,0.1); }
+
+        .sb-section-label {
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #6b7280;
+            padding: 18px 18px 8px 18px;
+        }
+
+        .sb-item {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            padding: 10px 18px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+            color: #c9cdd8;
+            font-size: 0.92rem;
+            border-left: 3px solid transparent;
+            position: relative;
+        }
+
+        .sb-item:hover {
+            background: rgba(255,255,255,0.06);
+            color: #fff;
+        }
+
+        .sb-item.active {
+            background: rgba(255,192,192,0.1);
+            border-left-color: var(--accent-1);
+            color: var(--accent-1);
+            font-weight: 600;
+        }
+
+        .sb-item i {
+            width: 16px;
+            text-align: center;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .sb-item.active i {
+            opacity: 1;
+        }
+
+        /* Sidebar parameter section */
+        .sb-params {
+            padding: 0 14px 14px 14px;
+        }
+
+        .sb-param-group {
+            margin-bottom: 12px;
+        }
+
+        .sb-param-label {
+            display: block;
+            font-size: 0.75rem;
+            color: #9ba3b8;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .sb-input {
+            width: 100%;
+            padding: 7px 10px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 6px;
+            background: rgba(255,255,255,0.07);
+            color: white;
+            font-size: 0.88rem;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .sb-input:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            background: rgba(255,255,255,0.12);
+            box-shadow: 0 0 0 2px rgba(52,152,219,0.2);
+        }
+
+        .sb-select {
+            width: 100%;
+            padding: 7px 10px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 6px;
+            background: rgba(40,43,55,0.9);
+            color: white;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .sb-select:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 2px rgba(52,152,219,0.2);
+        }
+
+        .sb-select option {
+            background: #2c2f3b;
+        }
+
+        .sb-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .sb-divider {
+            height: 1px;
+            background: var(--sidebar-border);
+            margin: 10px 0;
+        }
+
+        .btn-calc {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 7px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 0.92rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--success-green) 0%, #16a085 100%);
+            color: white;
+            transition: all 0.25s ease;
+            letter-spacing: 0.02em;
+            box-shadow: 0 2px 8px rgba(39,174,96,0.3);
+            margin-top: 4px;
+        }
+
+        .btn-calc:hover:not(:disabled) {
+            background: linear-gradient(135deg, #2ecc71 0%, #17a2b8 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(39,174,96,0.4);
+        }
+
+        .btn-calc:disabled {
+            cursor: not-allowed;
+            opacity: 0.65;
+            transform: none;
+        }
+
+        /* Dynamic param panels - inside sidebar */
+        .sb-test-params {
+            display: none;
+        }
+        .sb-test-params.active {
+            display: block;
+        }
+
+        /* ── MAIN CONTENT ───────────────────────────────── */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 22px 26px;
+            gap: 20px;
+        }
+
+        .main-content::-webkit-scrollbar { width: 6px; }
+        .main-content::-webkit-scrollbar-track { background: transparent; }
+        .main-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+
+        /* ── INPUT HEADER (spec section) ───────────────────────── */
+        .input-header {
+            background: rgba(44,47,59,0.6);
+            border-radius: var(--panel-radius);
+            padding: 16px 18px;
+            border: 1px solid rgba(255,255,255,0.08);
+            margin-bottom: 18px;
+        }
+
+        .input-header-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--accent-1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .input-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            align-items: end;
+        }
+
+        @media (max-width: 1200px) {
+            .input-grid {
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            }
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .input-label {
+            font-size: 0.75rem;
+            color: #9ba3b8;
+            font-weight: 500;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 6px;
+            background: rgba(255,255,255,0.07);
+            color: white;
+            font-size: 0.88rem;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            background: rgba(255,255,255,0.12);
+            box-shadow: 0 0 0 2px rgba(52,152,219,0.2);
+        }
+
+        .input-select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 6px;
+            background: rgba(40,43,55,0.9);
+            color: white;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .input-select:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 2px rgba(52,152,219,0.2);
+        }
+
+        .input-select option {
+            background: #2c2f3b;
+        }
+
+        .input-header-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 7px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 0.92rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--success-green) 0%, #16a085 100%);
+            color: white;
+            transition: all 0.25s ease;
+            letter-spacing: 0.02em;
+            box-shadow: 0 2px 8px rgba(39,174,96,0.3);
+            white-space: nowrap;
+        }
+
+        .input-header-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, #2ecc71 0%, #17a2b8 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(39,174,96,0.4);
+        }
+
+        .input-header-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.65;
+            transform: none;
+        }
+
+        .test-params-section {
+            display: none;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .test-params-section.active {
+            display: block;
+        }
+
+        /* ── POWER: top configuration strip (index100 pattern) ─────────── */
+        .power-topbar {
+            background: linear-gradient(180deg, rgba(18, 26, 46, 0.96), rgba(14, 22, 40, 0.96));
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 14px 14px;
+            margin-bottom: 14px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(16, 185, 129, 0.12);
+        }
+
+        .power-topbar-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .power-topbar-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .power-topbar-title i {
+            color: var(--accent-1);
+            font-size: 12px;
+        }
+
+        .power-topbar-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .power-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 24px;
+            padding: 0 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(16, 185, 129, 0.28);
+            background: rgba(16, 185, 129, 0.08);
+            color: #6ee7b7;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .power-chip.soft {
+            border-color: var(--border);
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-muted);
+        }
+
+        .power-topbar-grid {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 10px;
+            align-items: stretch;
+        }
+
+        /* Same vertical band for title + hint/spacer so input rows line up across columns */
+        .power-sync-head {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 8px;
+            min-height: 52px;
+        }
+
+        .power-sync-spacer {
+            flex: 1;
+            min-height: 40px;
+            margin: 0;
+            padding: 6px 8px;
+            border: 1px dashed transparent;
+            border-radius: 8px;
+            box-sizing: border-box;
+            pointer-events: none;
+        }
+
+        .power-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            padding: 10px 10px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.025);
+        }
+
+        .power-group-title {
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        /* Statistical targets first in DOM — wider column for emphasis */
+        .power-group.targets { grid-column: span 5; }
+        .power-group.test { grid-column: span 4; }
+        .power-group.action { grid-column: span 3; }
+
+        .power-group.targets.prominent {
+            border-color: rgba(16, 185, 129, 0.38);
+            background: linear-gradient(165deg, rgba(16, 185, 129, 0.12) 0%, rgba(255, 255, 255, 0.04) 55%, rgba(255, 255, 255, 0.02) 100%);
+            box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.12), 0 10px 28px rgba(0, 0, 0, 0.25);
+        }
+
+        .power-group.targets.prominent .power-group-title {
+            color: #6ee7b7;
+            font-size: 11px;
+            letter-spacing: 0.1em;
+        }
+
+        .power-targets-hint {
+            font-size: 10px;
+            font-weight: 600;
+            color: rgba(155, 163, 184, 0.95);
+            line-height: 1.4;
+            margin: 0;
+            min-height: 40px;
+            padding: 6px 8px;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.18);
+            border: 1px dashed rgba(16, 185, 129, 0.25);
+            box-sizing: border-box;
+        }
+
+        .power-targets-hint i {
+            color: rgba(16, 185, 129, 0.85);
+            margin-right: 6px;
+        }
+
+        .power-field label .label-sub {
+            display: block;
+            font-weight: 600;
+            color: rgba(110, 231, 183, 0.75);
+            font-size: 9px;
+            letter-spacing: 0.04em;
+            text-transform: none;
+            margin-top: 2px;
+        }
+
+        /* Power row: main label + prominent “target to achieve” badge */
+        .label-with-badge {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px 8px;
+            line-height: 1.25;
+        }
+
+        .label-with-badge .label-main {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-muted);
+        }
+
+        .power-target-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 8px;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #a7f3d0;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.35) 0%, rgba(5, 150, 105, 0.2) 100%);
+            border: 1px solid rgba(52, 211, 153, 0.55);
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(16, 185, 129, 0.15);
+        }
+
+        /* (actual) tag on study N */
+        .field-actual-tag {
+            font-weight: 800;
+            font-size: 9px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: rgba(110, 231, 183, 0.9);
+            margin-left: 4px;
+        }
+
+        /* Always-visible steppers (α, power) — composite control */
+        .power-spin-box {
+            display: flex;
+            align-items: stretch;
+            height: 34px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.04);
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        .power-spin-box:focus-within {
+            border-color: rgba(16, 185, 129, 0.55);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+        }
+
+        .power-field.has-spin .power-spin-input {
+            flex: 1;
+            min-width: 0;
+            width: auto;
+            height: 34px !important;
+            border: none !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            padding: 0 6px 0 10px !important;
+            -moz-appearance: textfield;
+        }
+
+        .power-field.has-spin .power-spin-input::-webkit-outer-spin-button,
+        .power-field.has-spin .power-spin-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .power-spin-nudge {
+            display: flex;
+            flex-direction: column;
+            width: 28px;
+            flex-shrink: 0;
+            border-left: 1px solid rgba(255, 255, 255, 0.12);
+            background: #f1f5f9;
+            overflow: hidden;
+        }
+
+        .power-spin-btn {
+            flex: 1;
+            margin: 0;
+            padding: 0;
+            border: none;
+            cursor: pointer;
+            font-size: 10px;
+            line-height: 1;
+            color: #64748b;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.12s, color 0.12s;
+        }
+
+        .power-spin-btn:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+
+        .power-spin-btn:active {
+            background: #cbd5e1;
+        }
+
+        .power-spin-btn + .power-spin-btn {
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .power-field input.field-locked,
+        .power-field select.field-locked {
+            opacity: 0.88;
+            cursor: not-allowed;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.28) !important;
+            border-color: rgba(255, 255, 255, 0.08) !important;
+            box-shadow: none !important;
+        }
+
+        .statistico-design-hint {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 8px;
+            padding: 6px 8px;
+            border-radius: 8px;
+            background: rgba(52, 152, 219, 0.08);
+            border: 1px solid rgba(52, 152, 219, 0.22);
+            display: none;
+        }
+
+        .statistico-design-hint.visible {
+            display: block;
+        }
+
+        .power-fields-inline {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .power-fields-inline.three {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            align-items: stretch;
+        }
+
+        /* Bottom-align inputs when labels differ in height (e.g. power badge) */
+        .power-fields-inline.three > .power-field {
+            display: flex;
+            flex-direction: column;
+            min-height: 100%;
+        }
+
+        .power-fields-inline.three > .power-field > .power-spin-box,
+        .power-fields-inline.three > .power-field > select,
+        .power-fields-inline.three > .power-field > input:not(.power-spin-input) {
+            margin-top: auto;
+        }
+
+        .power-group.test .test-params-section {
+            margin-top: 0;
+            padding-top: 0;
+            border-top: none;
+        }
+
+        .power-group.test .test-params-section:not(.active) {
+            display: none !important;
+        }
+
+        .power-group.test .test-params-section.active {
+            display: block;
+        }
+
+        .power-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .power-field label {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-muted);
+            line-height: 1.2;
+        }
+
+        .power-field input,
+        .power-field select {
+            height: 34px;
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 600;
+            padding: 0 10px;
+            outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+        }
+
+        .power-field input:focus,
+        .power-field select:focus {
+            border-color: rgba(16, 185, 129, 0.55);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .power-field select option {
+            background: #2c2f3b;
+            color: var(--text-primary);
+        }
+
+        .power-field.compact input,
+        .power-field.compact select {
+            text-align: center;
+        }
+
+        .power-hint {
+            font-size: 10.5px;
+            color: var(--text-muted);
+            line-height: 1.35;
+        }
+
+        .power-effect-link {
+            color: #8fd3ff;
+            font-weight: 700;
+        }
+
+        .power-run {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+        }
+
+        /* Align Calculate with α / power / hypothesis input row */
+        .power-run-align-spacer {
+            min-height: 30px;
+            margin-bottom: 4px;
+            flex-shrink: 0;
+        }
+
+        .power-run-btn {
+            height: 34px;
+            width: 100%;
+            border: none;
+            border-radius: 9px;
+            background: linear-gradient(180deg, #1ecf8d, #10b981);
+            color: #fff;
+            font-size: 12.5px;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .power-run-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(16, 185, 129, 0.28);
+            filter: brightness(1.03);
+        }
+
+        .power-run-btn:active:not(:disabled) {
+            transform: translateY(0);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+        }
+
+        .power-run-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.65;
+            transform: none;
+        }
+
+        .power-run-sub {
+            font-size: 10.5px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        @media (max-width: 1180px) {
+            .power-group.test { grid-column: span 6; }
+            .power-group.targets { grid-column: span 6; }
+            .power-group.action { grid-column: 1 / -1; }
+        }
+
+        @media (max-width: 840px) {
+            .power-group.test,
+            .power-group.targets,
+            .power-group.action {
+                grid-column: 1 / -1;
+            }
+            .power-fields-inline,
+            .power-fields-inline.three {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 560px) {
+            .power-fields-inline,
+            .power-fields-inline.three {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ── DECISION STRIP ─────────────────────────────── */
+        .decision-strip {
+            background: rgba(39,174,96,0.1);
+            border: 1px solid rgba(39,174,96,0.3);
+            border-radius: 8px;
+            padding: 12px 18px;
+            font-size: 0.95rem;
+            color: #6ee7b7;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .decision-strip.hidden {
+            display: none;
+        }
+
+        .decision-strip i {
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        /* ── RESULTS PANEL (3 horizontal sections) ─────────────────────────── */
+        .results-panel {
+            background: var(--panel-bg);
+            border-radius: var(--panel-radius);
+            box-shadow: var(--panel-shadow);
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        /* ── FANCY RESULT CARDS ─────────────────────────────── */
+        .results-cards-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin: 8px 0;
+        }
+
+        .result-card {
+            background: linear-gradient(135deg, rgba(72,75,87,0.9) 0%, rgba(44,47,59,0.9) 100%);
+            border-radius: 12px;
+            padding: 24px 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .result-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent-1), var(--primary-blue));
+        }
+
+        .result-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        }
+
+        .result-card.primary {
+            background: linear-gradient(135deg, rgba(255,192,192,0.15) 0%, rgba(72,75,87,0.9) 100%);
+            border-color: rgba(255,192,192,0.3);
+        }
+
+        .result-card.primary::before {
+            background: linear-gradient(90deg, var(--accent-1), #ff6b6b);
+            height: 4px;
+        }
+
+        .result-card-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: #9ba3b8;
+            margin-bottom: 4px;
+        }
+
+        .result-card-value {
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: white;
+            line-height: 1;
+            margin: 4px 0;
+        }
+
+        .result-card.primary .result-card-value {
+            color: var(--accent-1);
+            font-size: 3.2rem;
+        }
+
+        .result-card-sub {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+
+        .result-card-unit {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--primary-blue);
+            margin-left: 4px;
+        }
+
+        .result-card.primary .result-card-unit {
+            color: var(--accent-1);
+        }
+
+        /* ── CHART SECTION ─────────────────────────── */
+        .chart-section {
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 16px;
+            border: 1px solid rgba(255,255,255,0.08);
+            margin-top: 8px;
+        }
+
+        .panel-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--accent-1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 9px 12px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 6px;
+            border-left: 3px solid var(--primary-blue);
+        }
+
+        .result-row-label {
+            font-size: 0.82rem;
+            color: #c9cdd8;
+        }
+
+        .result-row-value {
+            font-size: 1rem;
+            font-weight: 700;
+            color: white;
+        }
+
+        .chart-container {
+            flex: 1;
+            min-height: 280px;
+        }
+
+        #powerChart {
+            width: 100%;
+            height: 100%;
+            min-height: 280px;
+        }
+
+        /* Interpretation */
+        .interp-panel {
+            background: rgba(52,152,219,0.08);
+            border: 1px solid rgba(52,152,219,0.25);
+            border-radius: 8px;
+            padding: 14px 18px;
+        }
+
+        .interp-panel h4 {
+            color: var(--primary-blue);
+            margin-bottom: 7px;
+            font-size: 0.82rem;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .interp-panel p {
+            font-size: 0.88rem;
+            line-height: 1.55;
+            color: #d4dae8;
+        }
+
+        /* Placeholder state */
+        .placeholder-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            min-height: 200px;
+            gap: 12px;
+            color: #4b5568;
+        }
+
+        .placeholder-state i {
+            font-size: 3rem;
+            opacity: 0.3;
+        }
+
+        .placeholder-state p {
+            font-size: 0.9rem;
+            text-align: center;
+            max-width: 260px;
+            opacity: 0.6;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* ── LOADING MODAL ──────────────────────────────── */
+        .loading-modal {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            backdrop-filter: blur(4px);
+        }
+
+        .loading-modal.hidden { display: none; }
+
+        .loading-modal-content {
+            background: var(--panel-bg);
+            border-radius: var(--panel-radius);
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+            min-width: 300px;
+            animation: modalFadeIn 0.3s ease;
+        }
+
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: scale(0.9) translateY(-20px); }
+            to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .modal-spinner {
+            width: 46px; height: 46px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top: 4px solid var(--primary-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 18px auto;
+        }
+
+        @keyframes spin {
+            0%   { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .modal-loading-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--highlight-text);
+            margin-bottom: 8px;
+        }
+
+        .modal-loading-subtitle {
+            font-size: 0.9rem;
+            color: #b0b0b0;
+        }
+
+        /* ── RESPONSIVE ─────────────────────────────────── */
+        @media (max-width: 900px) {
+            .body-row { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--sidebar-border); }
+            .results-cards-section { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 600px) {
+            .results-cards-section { grid-template-columns: 1fr; }
+            .top-header .header-subtitle { display: none; }
+            .result-card-value { font-size: 2.2rem; }
+            .result-card.primary .result-card-value { font-size: 2.6rem; }
+        }
+
+        /* ═══ Embed light theme (“porcelain”) — contrasts with dark host app ═══ */
+        html.theme-embed-light {
+            --panel-bg: #ffffff;
+            --panel-radius: 12px;
+            --panel-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+            --header-color: #0f7669;
+            --highlight-bg: rgba(13, 148, 136, 0.12);
+            --highlight-text: #0f7669;
+            --primary-blue: #2563eb;
+            --primary-blue-hover: #1d4ed8;
+            --success-green: #059669;
+            --warning-orange: #d97706;
+            --danger-red: #dc2626;
+            --accent-1: #0d9488;
+            --sidebar-bg: #ffffff;
+            --sidebar-border: #e2e8f0;
+            --border: rgba(15, 23, 42, 0.12);
+            --text-muted: #64748b;
+            --text-primary: #0f172a;
+            --surface-2: #f8fafc;
+        }
+
+        html.theme-embed-light body {
+            background: linear-gradient(165deg, #f8fafc 0%, #eef2f7 45%, #f1f5f9 100%);
+            color: var(--text-primary);
+        }
+
+        html.theme-embed-light .top-header {
+            background: linear-gradient(135deg, #ffffff 0%, #ecfdf5 50%, #f0fdfa 100%);
+            border-bottom: 1px solid rgba(13, 148, 136, 0.22);
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.95), 0 10px 28px rgba(15, 23, 42, 0.06);
+        }
+
+        html.theme-embed-light .top-header .app-icon { color: #14b8a6; }
+        html.theme-embed-light .top-header .app-title { color: #0f7669; }
+        html.theme-embed-light .top-header .header-divider { background: rgba(13, 148, 136, 0.25); }
+        html.theme-embed-light .top-header .header-subtitle { color: #475569; }
+        html.theme-embed-light .header-badge {
+            background: rgba(13, 148, 136, 0.12);
+            color: #0f7669;
+            border: 1px solid rgba(13, 148, 136, 0.28);
+        }
+
+        html.theme-embed-light .sidebar { box-shadow: 4px 0 20px rgba(15, 23, 42, 0.04); }
+        html.theme-embed-light .sidebar::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.12); }
+
+        html.theme-embed-light .module-switch { border-color: #e2e8f0; }
+        html.theme-embed-light .module-btn { color: #64748b; background: #f8fafc; }
+        html.theme-embed-light .module-btn:hover { background: #f1f5f9; color: #0f172a; }
+        html.theme-embed-light .module-btn.active {
+            background: rgba(13, 148, 136, 0.12);
+            color: #0f7669;
+        }
+        html.theme-embed-light .module-btn + .module-btn { border-left-color: #e2e8f0; }
+
+        html.theme-embed-light .sb-section-label { color: #94a3b8; }
+        html.theme-embed-light .sb-item { color: #475569; }
+        html.theme-embed-light .sb-item:hover { background: #f1f5f9; color: #0f172a; }
+        html.theme-embed-light .sb-item.active {
+            background: rgba(13, 148, 136, 0.1);
+            border-left-color: #0d9488;
+            color: #0f7669;
+        }
+
+        html.theme-embed-light .main-content::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.12); }
+
+        html.theme-embed-light .power-topbar {
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
+        }
+
+        html.theme-embed-light .power-chip {
+            border-color: rgba(13, 148, 136, 0.35);
+            background: rgba(13, 148, 136, 0.08);
+            color: #0f7669;
+        }
+        html.theme-embed-light .power-chip.soft {
+            border-color: #e2e8f0;
+            background: #f8fafc;
+            color: #64748b;
+        }
+
+        html.theme-embed-light .power-group {
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+        }
+
+        html.theme-embed-light .power-group.targets.prominent {
+            border-color: rgba(13, 148, 136, 0.38);
+            background: linear-gradient(165deg, rgba(236, 253, 245, 0.95) 0%, #ffffff 72%);
+            box-shadow: 0 0 0 1px rgba(13, 148, 136, 0.12), 0 10px 28px rgba(15, 23, 42, 0.07);
+        }
+        html.theme-embed-light .power-group.targets.prominent .power-group-title { color: #0f7669; }
+
+        html.theme-embed-light .power-targets-hint {
+            color: #475569;
+            background: #f8fafc;
+            border-color: rgba(13, 148, 136, 0.32);
+        }
+        html.theme-embed-light .power-targets-hint i { color: #0d9488; }
+
+        html.theme-embed-light .power-field label .label-sub { color: rgba(13, 148, 136, 0.9); }
+
+        html.theme-embed-light .label-with-badge .label-main { color: #475569; }
+        html.theme-embed-light .power-target-badge {
+            color: #065f46;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.22) 0%, rgba(5, 150, 105, 0.12) 100%);
+            border-color: rgba(5, 150, 105, 0.45);
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8), 0 2px 8px rgba(5, 150, 105, 0.12);
+        }
+        html.theme-embed-light .field-actual-tag { color: #0d9488; }
+        html.theme-embed-light .power-spin-nudge {
+            border-left-color: #cbd5e1;
+            background: #f8fafc;
+        }
+        html.theme-embed-light .power-spin-btn {
+            background: #ffffff;
+            color: #64748b;
+        }
+        html.theme-embed-light .power-spin-btn + .power-spin-btn { border-top-color: #e2e8f0; }
+        html.theme-embed-light .power-spin-box:focus-within {
+            border-color: #0d9488;
+            box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.18);
+        }
+
+        html.theme-embed-light .power-field input,
+        html.theme-embed-light .power-field select {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            color: #0f172a;
+        }
+        html.theme-embed-light .power-field input:focus,
+        html.theme-embed-light .power-field select:focus {
+            border-color: #0d9488;
+            box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.18);
+            background: #ffffff;
+        }
+        html.theme-embed-light .power-field select option { background: #ffffff; color: #0f172a; }
+
+        html.theme-embed-light .power-field input.field-locked,
+        html.theme-embed-light .power-field select.field-locked {
+            background: #f1f5f9 !important;
+            border-color: #cbd5e1 !important;
+            color: #475569 !important;
+        }
+
+        html.theme-embed-light .statistico-design-hint {
+            background: rgba(37, 99, 235, 0.06);
+            border-color: rgba(37, 99, 235, 0.22);
+        }
+
+        html.theme-embed-light .power-effect-link { color: #2563eb; }
+        html.theme-embed-light .test-params-section { border-top-color: #e2e8f0; }
+
+        html.theme-embed-light .decision-strip {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: rgba(5, 150, 105, 0.35);
+            color: #047857;
+        }
+
+        html.theme-embed-light .results-panel {
+            border: 1px solid #e2e8f0;
+        }
+
+        html.theme-embed-light .result-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
+        }
+        html.theme-embed-light .result-card:hover { box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1); }
+        html.theme-embed-light .result-card.primary {
+            background: linear-gradient(135deg, rgba(13, 148, 136, 0.1) 0%, #ffffff 100%);
+            border-color: rgba(13, 148, 136, 0.38);
+        }
+        html.theme-embed-light .result-card.primary::before {
+            background: linear-gradient(90deg, #0d9488, #dc2626);
+        }
+        html.theme-embed-light .result-card-label { color: #64748b; }
+        html.theme-embed-light .result-card-value { color: #0f172a; }
+        html.theme-embed-light .result-card.primary .result-card-value { color: #0f7669; }
+        html.theme-embed-light .result-card-sub { color: #94a3b8; }
+
+        html.theme-embed-light .chart-section {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+        }
+
+        html.theme-embed-light .result-row {
+            background: #f8fafc;
+            border-left-color: #2563eb;
+        }
+        html.theme-embed-light .result-row-label { color: #475569; }
+        html.theme-embed-light .result-row-value { color: #0f172a; }
+
+        html.theme-embed-light .interp-panel {
+            background: rgba(37, 99, 235, 0.06);
+            border-color: rgba(37, 99, 235, 0.22);
+        }
+        html.theme-embed-light .interp-panel p { color: #334155; }
+
+        html.theme-embed-light .placeholder-state { color: #94a3b8; }
+
+        html.theme-embed-light .loading-modal { background: rgba(15, 23, 42, 0.45); }
+        html.theme-embed-light .loading-modal-content {
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.14);
+        }
+        html.theme-embed-light .modal-spinner {
+            border-color: #e2e8f0;
+            border-top-color: #0d9488;
+        }
+        html.theme-embed-light .modal-loading-subtitle { color: #64748b; }
+    </style>
+</head>
+<body>
+<div class="app-shell">
+
+    <!-- ── TOP HEADER ── -->
+    <header class="top-header">
+        <i class="fas fa-calculator app-icon"></i>
+        <span class="app-title">Power &amp; Sample Size</span>
+        <div class="header-divider"></div>
+        <span class="header-subtitle" id="headerSubtitle">Select a test type from the sidebar to begin</span>
+        <span class="header-badge">Non-Central Distributions</span>
+    </header>
+
+    <div class="body-row">
+
+        <!-- ── SIDEBAR ── -->
+        <aside class="sidebar">
+
+            <!-- Module switcher -->
+            <div class="module-switch">
+                <span class="module-btn active">
+                    <i class="fas fa-calculator"></i> Calculator
+                </span>
+                <a href="./index-formulas.html" class="module-btn">
+                    <i class="fas fa-function"></i> Formulas
+                </a>
+            </div>
+
+            <!-- Navigation: Test Types -->
+            <div class="sb-section-label">Test Type</div>
+
+            <div class="sb-item active" data-test="one-sample-mean" onclick="selectTest(this)">
+                <i class="fas fa-chart-bar"></i> Means (1-sample)
+            </div>
+            <div class="sb-item" data-test="two-sample-mean" onclick="selectTest(this)">
+                <i class="fas fa-balance-scale"></i> Means (2-sample)
+            </div>
+            <div class="sb-item" data-test="one-sample-proportion" onclick="selectTest(this)">
+                <i class="fas fa-percentage"></i> Proportion (1-sample)
+            </div>
+            <div class="sb-item" data-test="two-sample-proportion" onclick="selectTest(this)">
+                <i class="fas fa-chart-pie"></i> Proportions (2-sample)
+            </div>
+            <div class="sb-item" data-test="correlation" onclick="selectTest(this)">
+                <i class="fas fa-project-diagram"></i> Correlation
+            </div>
+            <div class="sb-item" data-test="anova" onclick="selectTest(this)">
+                <i class="fas fa-layer-group"></i> ANOVA
+            </div>
+            <div class="sb-item" data-test="regression" onclick="selectTest(this)">
+                <i class="fas fa-chart-line"></i> Regression
+            </div>
+
+        </aside>
+
+        <!-- ── MAIN CONTENT ── -->
+        <main class="main-content">
+
+            <!-- Decision strip -->
+            <div id="decisionStrip" class="decision-strip hidden">
+                <i class="fas fa-check-circle"></i>
+                <span id="decisionText"></span>
+            </div>
+
+            <!-- Results Panel (3 horizontal sections) -->
+            <div class="results-panel">
+                <!-- 1. Configuration strip (index100 pattern: control deck, not a card) -->
+                <div class="power-topbar">
+                    <div class="power-topbar-head">
+                        <div class="power-topbar-title">
+                            <i class="fas fa-sliders-h"></i>
+                            <span>Test Configuration Panel — Power</span>
+                        </div>
+                        <div class="power-topbar-meta" id="powerTopbarMeta">
+                            <span class="power-chip" id="powerChipTest">Means</span>
+                            <span class="power-chip soft" id="powerChipSub">1-sample</span>
+                            <span class="power-chip soft">Non-central distributions</span>
+                        </div>
+                    </div>
+                    <div class="power-topbar-grid">
+                        <div class="power-group targets prominent">
+                            <div class="power-sync-head">
+                                <div class="power-group-title">Statistical targets</div>
+                                <div class="power-targets-hint" id="powerTargetsHint">
+                                    <i class="fas fa-edit"></i>
+                                    Edit α, power, and hypothesis here — click <strong>Calculate</strong> to refresh required <em>n</em> and the power curve.
+                                </div>
+                            </div>
+                            <div class="power-fields-inline three">
+                                <div class="power-field compact has-spin">
+                                    <label>α (alpha)</label>
+                                    <div class="power-spin-box">
+                                        <input type="number" id="alpha" class="power-spin-input" value="0.05" min="0.001" max="0.5" step="0.001">
+                                        <div class="power-spin-nudge" role="group" aria-label="Adjust alpha">
+                                            <button type="button" class="power-spin-btn up" data-target="alpha" aria-label="Increase alpha">▴</button>
+                                            <button type="button" class="power-spin-btn down" data-target="alpha" aria-label="Decrease alpha">▾</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="power-field compact has-spin">
+                                    <label class="label-with-badge">
+                                        <span class="label-main">Power (1−β)</span>
+                                        <span class="power-target-badge">Target to achieve</span>
+                                    </label>
+                                    <div class="power-spin-box">
+                                        <input type="number" id="power" class="power-spin-input" value="0.80" min="0.1" max="0.99" step="0.01">
+                                        <div class="power-spin-nudge" role="group" aria-label="Adjust power">
+                                            <button type="button" class="power-spin-btn up" data-target="power" aria-label="Increase power">▴</button>
+                                            <button type="button" class="power-spin-btn down" data-target="power" aria-label="Decrease power">▾</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="power-field">
+                                    <label>Hypothesis</label>
+                                    <select id="alternative">
+                                        <option value="two-sided">Two-sided</option>
+                                        <option value="one-sided">One-sided</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="power-group test">
+                            <div class="power-sync-head">
+                                <div class="power-group-title">Actual study design</div>
+                                <div class="power-sync-spacer" aria-hidden="true"></div>
+                            </div>
+                            <!-- ── One-Sample Mean params ── -->
+                            <div id="test-one-sample-mean-params" class="test-params-section active">
+                                <div class="power-fields-inline">
+                                    <div class="power-field compact">
+                                        <label>Cohen's d</label>
+                                        <input type="number" id="effectSize" value="0.5" min="0.01" step="0.01">
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- ── Two-Sample Mean params ── -->
+                            <div id="test-two-sample-mean-params" class="test-params-section">
+                                <div class="power-fields-inline">
+                                    <div class="power-field compact">
+                                        <label>Cohen's d</label>
+                                        <input type="number" id="effectSize2" value="0.5" min="0.01" step="0.01">
+                                    </div>
+                                    <div class="power-field compact">
+                                        <label>Allocation n₂/n₁</label>
+                                        <input type="number" id="allocationRatio" value="1" min="0.1" step="0.1">
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- ── Proportion params ── -->
+                            <div id="test-proportion-params" class="test-params-section">
+                                <div class="power-fields-inline">
+                                    <div class="power-field compact">
+                                        <label>Expected p₁</label>
+                                        <input type="number" id="p1" value="0.5" min="0.01" max="0.99" step="0.01">
+                                    </div>
+                                    <div id="p2-group" class="power-field compact">
+                                        <label>Comparison p₂</label>
+                                        <input type="number" id="p2" value="0.3" min="0.01" max="0.99" step="0.01">
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- ── Correlation params ── -->
+                            <div id="test-correlation-params" class="test-params-section">
+                                <div class="power-fields-inline">
+                                    <div class="power-field compact">
+                                        <label>Expected ρ</label>
+                                        <input type="number" id="rho" value="0.3" min="-0.99" max="0.99" step="0.01">
+                                    </div>
+                                    <div class="power-field compact">
+                                        <label>Null ρ₀</label>
+                                        <input type="number" id="rho0" value="0" min="-0.99" max="0.99" step="0.01">
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- ── ANOVA params ── -->
+                            <div id="test-anova-params" class="test-params-section">
+                                <div class="power-fields-inline three">
+                                    <div class="power-field compact">
+                                        <label>Groups (k)</label>
+                                        <input type="number" id="numGroups" value="3" min="2" max="10" step="1">
+                                    </div>
+                                    <div class="power-field compact">
+                                        <label>Effect size f</label>
+                                        <input type="number" id="effectSizeF" value="0.25" min="0.01" step="0.01">
+                                    </div>
+                                    <div class="power-field compact">
+                                        <label>Nb. participants <span class="field-actual-tag">actual</span></label>
+                                        <input type="number" id="studyTotalN" value="" min="1" step="1" placeholder="—" title="Actual total N observed in your study (from ANOVA when opened from Statistico)">
+                                    </div>
+                                </div>
+                                <div class="power-hint" id="powerEtaHint" style="display:none;">
+                                    Linked to <span class="power-effect-link">η²</span> from ANOVA when opened from results.
+                                </div>
+                                <div class="statistico-design-hint" id="statisticoDesignHint">
+                                    <i class="fas fa-link"></i> These values come from your ANOVA results and stay fixed while you adjust targets above.
+                                </div>
+                            </div>
+                            <!-- ── Regression params ── -->
+                            <div id="test-regression-params" class="test-params-section">
+                                <div class="power-fields-inline">
+                                    <div class="power-field compact">
+                                        <label>Predictors</label>
+                                        <input type="number" id="numPredictors" value="2" min="1" max="20" step="1">
+                                    </div>
+                                    <div class="power-field compact">
+                                        <label>Expected R²</label>
+                                        <input type="number" id="rsquared" value="0.15" min="0.01" max="0.99" step="0.01">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="power-group action">
+                            <div class="power-sync-head">
+                                <div class="power-group-title">Run</div>
+                                <div class="power-sync-spacer" aria-hidden="true"></div>
+                            </div>
+                            <div class="power-run">
+                                <div class="power-run-align-spacer" aria-hidden="true"></div>
+                                <button type="button" class="power-run-btn" onclick="calculateSampleSize()" id="calcBtn">
+                                    <i class="fas fa-bolt"></i> Calculate
+                                </button>
+                                <div class="power-run-sub">Updates required N and achieved power</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Results Cards Section -->
+                <div id="resultsPlaceholder" class="placeholder-state" style="min-height:180px;">
+                    <i class="fas fa-calculator"></i>
+                    <p>Set parameters above and click <strong>Calculate</strong></p>
+                </div>
+
+                <div id="resultsCardsSection" class="results-cards-section hidden">
+                    <div class="result-card primary">
+                        <div class="result-card-label">Required Sample Size</div>
+                        <div class="result-card-value" id="cardRequiredN">—</div>
+                        <div class="result-card-sub" id="cardRequiredSub">per group</div>
+                    </div>
+                    <div class="result-card">
+                        <div class="result-card-label">Total N</div>
+                        <div class="result-card-value" id="cardTotalN">—</div>
+                        <div class="result-card-sub">all participants</div>
+                    </div>
+                    <div class="result-card">
+                        <div class="result-card-label">Effect Size</div>
+                        <div class="result-card-value" id="cardEffectSize">—</div>
+                        <div class="result-card-sub" id="cardEffectLabel">—</div>
+                    </div>
+                    <div class="result-card">
+                        <div class="result-card-label">Actual Power</div>
+                        <div class="result-card-value" id="cardActualPower">—</div>
+                        <div class="result-card-sub">achieved</div>
+                    </div>
+                </div>
+
+                <!-- 3. Chart Section -->
+                <div class="chart-section">
+                    <div class="panel-title"><i class="fas fa-chart-area"></i> Power Curve</div>
+                    <div class="chart-container">
+                        <div id="chartPlaceholder" class="placeholder-state" style="height:100%; min-height:250px;">
+                            <i class="fas fa-chart-area"></i>
+                            <p>Power curve will appear after calculation</p>
+                        </div>
+                        <div id="powerChart" style="display:none; width:100%; height:300px;"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div><!-- /body-row -->
+</div><!-- /app-shell -->
+
+<!-- Loading Modal -->
+<div id="loadingModal" class="loading-modal hidden">
+    <div class="loading-modal-content">
+        <div class="modal-spinner"></div>
+        <div class="modal-loading-title">Calculating Sample Size...</div>
+        <div class="modal-loading-subtitle" id="modalLoadingSubtitle">Preparing calculation...</div>
+    </div>
+</div>
+
+<script>
+    // ── Current test type tracking ──────────────────────────────────────
+    let currentTestType = 'one-sample-mean';
+    /** When true (URL source=statistico), ANOVA study-design fields stay read-only */
+    let statisticoStudyDesignLocked = false;
+
+    function isEmbedLightTheme() {
+        return document.documentElement.classList.contains('theme-embed-light');
+    }
+
+    const testLabels = {
+        'one-sample-mean':         'Means (1-sample) • One-Sample t-test',
+        'two-sample-mean':         'Means (2-sample) • Two-Sample t-test',
+        'one-sample-proportion':   'Proportion (1-sample)',
+        'two-sample-proportion':   'Proportions (2-sample)',
+        'correlation':             'Correlation Analysis',
+        'anova':                   'One-Way ANOVA',
+        'regression':              'Linear Regression'
+    };
+
+    const powerChipLabels = {
+        'one-sample-mean':         ['Means', '1-sample'],
+        'two-sample-mean':         ['Means', '2-sample'],
+        'one-sample-proportion':   ['Proportion', '1-sample'],
+        'two-sample-proportion':   ['Proportions', '2-sample'],
+        'correlation':             ['Correlation', 'ρ test'],
+        'anova':                   ['ANOVA', 'One-way'],
+        'regression':              ['Regression', 'Linear']
+    };
+
+    function updatePowerTopbarChips() {
+        var pair = powerChipLabels[currentTestType] || ['Test', '—'];
+        var ct = document.getElementById('powerChipTest');
+        var cs = document.getElementById('powerChipSub');
+        if (ct) ct.textContent = pair[0];
+        if (cs) cs.textContent = pair[1];
+    }
+
+    /**
+     * Lock k, f, and observed total N when opened from Statistico ANOVA (source=statistico).
+     * Statistical targets (α, power, hypothesis) stay editable.
+     */
+    function applyStatisticoAnovaLock() {
+        var ids = ['numGroups', 'effectSizeF', 'studyTotalN'];
+        var hint = document.getElementById('statisticoDesignHint');
+        var lock = statisticoStudyDesignLocked && currentTestType === 'anova';
+        if (hint) {
+            hint.classList.toggle('visible', lock);
+        }
+        ids.forEach(function(id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.readOnly = lock;
+            el.classList.toggle('field-locked', lock);
+            el.tabIndex = lock ? -1 : 0;
+        });
+    }
+
+    /** Step α / power via always-visible spinner buttons */
+    function nudgePowerInput(targetId, direction) {
+        var el = document.getElementById(targetId);
+        if (!el || el.readOnly || el.disabled) return;
+        var step = parseFloat(el.getAttribute('step') || '0.01');
+        var min = parseFloat(el.getAttribute('min'));
+        var max = parseFloat(el.getAttribute('max'));
+        var v = parseFloat(String(el.value).replace(',', '.'));
+        if (!isFinite(v)) v = isFinite(min) ? min : 0;
+        var nv = v + direction * step;
+        nv = Math.min(max, Math.max(min, nv));
+        if (targetId === 'alpha') {
+            var snapped = Math.round(nv / step) * step;
+            nv = Math.min(max, Math.max(min, snapped));
+            el.value = nv.toFixed(3);
+        } else {
+            nv = Math.round(nv * 100) / 100;
+            el.value = nv.toFixed(2);
+        }
+    }
+
+    function wirePowerSpinControls() {
+        var bar = document.querySelector('.power-topbar');
+        if (!bar || bar.getAttribute('data-spin-wired') === '1') return;
+        bar.setAttribute('data-spin-wired', '1');
+        bar.addEventListener('click', function(e) {
+            var btn = e.target.closest('.power-spin-btn');
+            if (!btn || !bar.contains(btn)) return;
+            e.preventDefault();
+            var id = btn.getAttribute('data-target');
+            if (!id) return;
+            var dir = btn.classList.contains('up') ? 1 : -1;
+            nudgePowerInput(id, dir);
+        });
+    }
+
+    // ── Sidebar navigation ──────────────────────────────────────────────
+    function selectTest(el) {
+        // Update active nav item
+        document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+
+        currentTestType = el.dataset.test;
+
+        // Show correct param panel in configuration strip
+        document.querySelectorAll('.test-params-section').forEach(p => p.classList.remove('active'));
+
+        const paramPanelMap = {
+            'one-sample-mean':       'test-one-sample-mean-params',
+            'two-sample-mean':       'test-two-sample-mean-params',
+            'one-sample-proportion': 'test-proportion-params',
+            'two-sample-proportion': 'test-proportion-params',
+            'correlation':           'test-correlation-params',
+            'anova':                 'test-anova-params',
+            'regression':            'test-regression-params'
+        };
+
+        const panelId = paramPanelMap[currentTestType];
+        if (panelId) document.getElementById(panelId).classList.add('active');
+
+        // Show/hide p2 group for proportions
+        const p2Group = document.getElementById('p2-group');
+        if (p2Group) p2Group.style.display = (currentTestType === 'one-sample-proportion') ? 'none' : '';
+
+        // Update header subtitle + topbar chips (index100 pattern)
+        document.getElementById('headerSubtitle').textContent = testLabels[currentTestType] || '';
+        updatePowerTopbarChips();
+        applyStatisticoAnovaLock();
+    }
+
+    // ── Mathematical Functions ──────────────────────────────────────────
+    function normalCDF(x) {
+        return 0.5 * (1 + erf(x / Math.sqrt(2)));
+    }
+
+    function normalInverse(p) {
+        const a = [0, -3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+        const b = [0, -5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+        const c = [0, -7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+        const d = [0, 7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+
+        if (p < 0 || p > 1) return NaN;
+        if (p === 0) return -Infinity;
+        if (p === 1) return Infinity;
+
+        let q = p - 0.5;
+        if (Math.abs(q) <= 0.42) {
+            let r = q * q;
+            return q * (((((a[6] * r + a[5]) * r + a[4]) * r + a[3]) * r + a[2]) * r + a[1]) * r + a[0] /
+                (((((b[5] * r + b[4]) * r + b[3]) * r + b[2]) * r + b[1]) * r + 1);
+        }
+
+        let r = p < 0.5 ? p : 1 - p;
+        r = Math.sqrt(-Math.log(r));
+
+        let val = (((c[4] * r + c[3]) * r + c[2]) * r + c[1]) * r + c[0];
+        val /= ((d[3] * r + d[2]) * r + d[1]) * r + 1;
+
+        return p < 0.5 ? -val : val;
+    }
+
+    function erf(x) {
+        const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741, a4 = -1.453152027, a5 = 1.061405429;
+        const p = 0.3275911;
+        const sign = x >= 0 ? 1 : -1;
+        x = Math.abs(x);
+        const t = 1.0 / (1.0 + p * x);
+        const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+        return sign * y;
+    }
+
+    function logGamma(x) {
+        const g = 7;
+        const c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+                   771.32342877765313, -176.61502916214059, 12.507343278686905,
+                   -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+        if (x < 0.5) return Math.log(Math.PI) - Math.log(Math.sin(Math.PI * x)) - logGamma(1 - x);
+        x -= 1;
+        let a = c[0];
+        for (let i = 1; i < c.length; i++) a += c[i] / (x + i);
+        const t = x + g + 0.5;
+        return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+    }
+
+    function incompleteBeta(a, b, x) {
+        if (x === 0) return 0;
+        if (x === 1) return 1;
+        if (x < 0 || x > 1) return NaN;
+        const bt = Math.exp(logGamma(a + b) - logGamma(a) - logGamma(b) + a * Math.log(x) + b * Math.log(1 - x));
+        if (x < (a + 1) / (a + b + 2)) return bt * betaContinuedFraction(a, b, x) / a;
+        return 1 - bt * betaContinuedFraction(b, a, 1 - x) / b;
+    }
+
+    function betaContinuedFraction(a, b, x) {
+        const qab = a + b, qap = a + 1, qam = a - 1;
+        let c = 1, d = 1 - qab * x / qap;
+        if (Math.abs(d) < 1e-30) d = 1e-30;
+        d = 1 / d;
+        let h = d;
+        for (let m = 1; m <= 100; m++) {
+            const m2 = 2 * m;
+            let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+            d = 1 + aa * d; if (Math.abs(d) < 1e-30) d = 1e-30;
+            c = 1 + aa / c; if (Math.abs(c) < 1e-30) c = 1e-30;
+            d = 1 / d; h *= d * c;
+            aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+            d = 1 + aa * d; if (Math.abs(d) < 1e-30) d = 1e-30;
+            c = 1 + aa / c; if (Math.abs(c) < 1e-30) c = 1e-30;
+            d = 1 / d; const del = d * c; h *= del;
+            if (Math.abs(del - 1) < 1e-12) break;
+        }
+        return h;
+    }
+
+    function tCDF(x, df) {
+        if (df <= 0) return NaN;
+        if (x === 0) return 0.5;
+        const a = 0.5 * df, b = 0.5, z = df / (df + x * x);
+        if (x >= 0) return 0.5 + 0.5 * (1 - incompleteBeta(a, b, z));
+        return 0.5 * incompleteBeta(a, b, z);
+    }
+
+    function tInverse(p, df) {
+        if (p < 0 || p > 1) return NaN;
+        if (p === 0) return -Infinity;
+        if (p === 1) return Infinity;
+        if (p === 0.5) return 0;
+        let x = normalInverse(p);
+        for (let i = 0; i < 10; i++) {
+            const fx = tCDF(x, df) - p;
+            const fpx = tPDF(x, df);
+            if (Math.abs(fx) < 1e-12 || Math.abs(fpx) < 1e-30) break;
+            const newX = x - fx / fpx;
+            if (Math.abs(newX - x) < 1e-12) break;
+            x = newX;
+        }
+        return x;
+    }
+
+    function tPDF(x, df) {
+        const logGammaRatio = logGamma((df + 1) / 2) - logGamma(df / 2);
+        return Math.exp(logGammaRatio - 0.5 * Math.log(df * Math.PI) - (df + 1) / 2 * Math.log(1 + (x * x) / df));
+    }
+
+    function fCDF(x, df1, df2) {
+        if (x <= 0) return 0;
+        if (x === Infinity) return 1;
+        const y = (df1 * x) / (df1 * x + df2);
+        return incompleteBeta(df1 / 2, df2 / 2, y);
+    }
+
+    function fInverse(p, df1, df2) {
+        if (p < 0 || p > 1) return NaN;
+        if (p === 0) return 0;
+        if (p === 1) return Infinity;
+        let x = 1;
+        for (let i = 0; i < 20; i++) {
+            const fx = fCDF(x, df1, df2) - p;
+            const fpx = fPDF(x, df1, df2);
+            if (Math.abs(fx) < 1e-12 || Math.abs(fpx) < 1e-30) break;
+            const newX = x - fx / fpx;
+            if (newX <= 0) { x = x / 2; }
+            else { if (Math.abs(newX - x) < 1e-12) break; x = newX; }
+        }
+        return x;
+    }
+
+    function fPDF(x, df1, df2) {
+        if (x < 0) return 0;
+        if (x === 0) return df1 === 2 ? 1 : (df1 < 2 ? Infinity : 0);
+        const logBeta = logGamma(df1/2) + logGamma(df2/2) - logGamma((df1+df2)/2);
+        return Math.exp(-logBeta + (df1/2) * Math.log(df1/df2) + (df1/2 - 1) * Math.log(x) - ((df1+df2)/2) * Math.log(1 + (df1/df2) * x));
+    }
+
+    /**
+     * Power must be in (0,1) for APIs and display. User entries like "095" parse as 95 → treat as percent.
+     */
+    function normalizeStatisticalPower(raw) {
+        let p = parseFloat(String(raw).replace(',', '.'));
+        if (!isFinite(p) || p <= 0) return 0.8;
+        if (p > 1 && p <= 100) p = p / 100;
+        if (p > 1) p = 0.99;
+        return Math.min(0.999, Math.max(0.05, p));
+    }
+
+    // ── Calculation dispatcher ─────────────────────────────────────────
+    async function calculateSampleSize() {
+        let alpha = parseLocalizedNumber(document.getElementById('alpha').value);
+        if (!isFinite(alpha) || alpha <= 0 || alpha >= 1) alpha = 0.05;
+        const powerEl = document.getElementById('power');
+        const powerRaw = powerEl ? powerEl.value : '0.8';
+        const power = normalizeStatisticalPower(powerRaw);
+        const rawParsed = parseFloat(String(powerRaw).replace(',', '.'));
+        /* "095" → 95 → 0.95; "80" → 0.80 — fix the field so API and % labels are correct */
+        if (powerEl && isFinite(rawParsed) && rawParsed > 1) {
+            powerEl.value = power.toFixed(2);
+        }
+        const alternative = document.getElementById('alternative').value;
+        const testType = currentTestType;
+
+        const startTime = Date.now();
+        showLoadingSpinner(testType);
+
+        let result = {};
+
+        try {
+            switch(testType) {
+                case 'one-sample-mean':
+                    updateLoadingMessage('Calling cloud function for non-central t-distribution...');
+                    result = await calculateOneSampleMean(alpha, power, alternative);
+                    break;
+                case 'two-sample-mean':
+                    updateLoadingMessage('Calculating two-sample t-test...');
+                    await new Promise(r => setTimeout(r, 200));
+                    result = calculateTwoSampleMean(alpha, power, alternative);
+                    break;
+                case 'one-sample-proportion':
+                    updateLoadingMessage('Calculating proportion test...');
+                    await new Promise(r => setTimeout(r, 200));
+                    result = calculateOneSampleProportion(alpha, power, alternative);
+                    break;
+                case 'two-sample-proportion':
+                    updateLoadingMessage('Calculating two-proportion test...');
+                    await new Promise(r => setTimeout(r, 200));
+                    result = calculateTwoSampleProportion(alpha, power, alternative);
+                    break;
+                case 'correlation':
+                    updateLoadingMessage("Calculating with Fisher's Z...");
+                    await new Promise(r => setTimeout(r, 200));
+                    result = calculateCorrelation(alpha, power, alternative);
+                    break;
+                case 'anova':
+                    updateLoadingMessage('anova-module cloud function — non-central F distribution…');
+                    await new Promise(r => setTimeout(r, 200));
+                    result = await calculateANOVA(alpha, power);
+                    break;
+                case 'regression':
+                    updateLoadingMessage('Calculating regression requirements...');
+                    await new Promise(r => setTimeout(r, 300));
+                    result = calculateRegression(alpha, power);
+                    break;
+            }
+
+            const elapsed = Date.now() - startTime;
+            if (elapsed < 1000) {
+                updateLoadingMessage('Finalizing results...');
+                await new Promise(r => setTimeout(r, 1000 - elapsed));
+            }
+
+            hideLoadingSpinner();
+            displayResults(result, testType, alpha, power);
+            createPowerCurve(testType, result);
+
+        } catch (error) {
+            const elapsed = Date.now() - startTime;
+            if (elapsed < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed));
+            hideLoadingSpinner();
+            alert('Error in calculation: ' + error.message);
+        }
+    }
+
+    function showLoadingSpinner(testType) {
+        const msgs = {
+            'one-sample-mean': 'Cloud function — non-central t-distribution',
+            'two-sample-mean': 'Iterating to find optimal sample size',
+            'one-sample-proportion': 'Applying normal approximation',
+            'two-sample-proportion': 'Calculating proportion comparison',
+            'correlation': "Using Fisher's Z transformation",
+            'anova': 'anova-module cloud function — non-central F distribution',
+            'regression': 'Analysing regression requirements'
+        };
+        document.getElementById('modalLoadingSubtitle').textContent = msgs[testType] || 'Computing...';
+        const btn = document.getElementById('calcBtn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Calculating...';
+        }
+        document.getElementById('loadingModal').classList.remove('hidden');
+    }
+
+    function hideLoadingSpinner() {
+        const btn = document.getElementById('calcBtn');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-bolt"></i> Calculate';
+        }
+        document.getElementById('loadingModal').classList.add('hidden');
+    }
+
+    function updateLoadingMessage(msg) {
+        const el = document.getElementById('modalLoadingSubtitle');
+        if (el) el.textContent = msg;
+    }
+
+    // ── Individual calculation functions ─────────────────────────────
+    async function calculateOneSampleMean(alpha, power, alternative) {
+        const effectSize = parseFloat(document.getElementById('effectSize').value);
+        const tail_type = alternative === 'two-sided' ? 'two_tailed' : 'one_tailed';
+        const url = `https://us-central1-tukey-multple-comparisons.cloudfunctions.net/t_testOneSample` +
+                   `?effect_size=${effectSize}&target_power=${power}&significance_level=${alpha}&tail_type=${tail_type}`;
+        try {
+            updateLoadingMessage('Connecting to cloud function...');
+            /* No custom headers on GET — avoids CORS preflight (Content-Type: application/json triggers OPTIONS) */
+            const response = await fetch(url, { method: 'GET', mode: 'cors' });
+            if (!response.ok) throw new Error(`API request failed: ${response.status}`);
+            updateLoadingMessage('Processing non-central t-distribution results...');
+            const json = await response.json();
+            const n = Math.ceil(json.required_sample_size);
+            if (!n || n < 1) throw new Error('Invalid sample size from API');
+            await new Promise(r => setTimeout(r, 300));
+            return { sampleSize: n, totalSampleSize: n, effectSize, testType: 'One-Sample t-test',
+                     actualPower: calculateSimplePowerForCurve(n, effectSize, alpha, alternative, 'one-sample-mean') };
+        } catch (error) {
+            updateLoadingMessage('Cloud function unavailable, using normal approximation...');
+            const zAlpha = alternative === 'two-sided' ? normalInverse(1 - alpha/2) : normalInverse(1 - alpha);
+            const zBeta = normalInverse(power);
+            const n = Math.ceil(Math.pow((zAlpha + zBeta) / effectSize, 2));
+            await new Promise(r => setTimeout(r, 500));
+            showFallbackNotice();
+            return { sampleSize: n, totalSampleSize: n, effectSize, testType: 'One-Sample t-test (Fallback)',
+                     actualPower: calculateSimplePowerForCurve(n, effectSize, alpha, alternative, 'one-sample-mean') };
+        }
+    }
+
+    function showFallbackNotice() {
+        const note = document.createElement('div');
+        note.style.cssText = 'position:fixed;top:20px;right:20px;z-index:1000;background:#f39c12;color:white;padding:15px;border-radius:8px;max-width:300px;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+        note.innerHTML = '<strong>⚠️ Cloud Function Unavailable</strong><br>Using fallback calculation.<button onclick="this.parentElement.remove()" style="float:right;background:none;border:none;color:white;cursor:pointer;font-size:16px;">×</button>';
+        document.body.appendChild(note);
+        setTimeout(() => { if (note.parentElement) note.remove(); }, 10000);
+    }
+
+    function calculateTwoSampleMean(alpha, power, alternative) {
+        const effectSize = parseFloat(document.getElementById('effectSize2').value);
+        const ratio = parseFloat(document.getElementById('allocationRatio').value);
+        let low = 2, high = 5000;
+        while (high - low > 1) {
+            const n1 = Math.floor((low + high) / 2);
+            const n2 = Math.floor(n1 * ratio);
+            const df = n1 + n2 - 2;
+            const criticalValue = alternative === 'two-sided' ? tInverse(1 - alpha/2, df) : tInverse(1 - alpha, df);
+            const pooledSE = Math.sqrt(1/n1 + 1/n2);
+            const delta = effectSize / pooledSE;
+            const ncp = delta * Math.sqrt(df);
+            const actualPower = alternative === 'two-sided' ?
+                normalCDF(ncp - criticalValue) + (1 - normalCDF(ncp + criticalValue)) :
+                1 - normalCDF(criticalValue - ncp);
+            if (actualPower < power) low = n1; else high = n1;
+        }
+        const n1 = high, n2 = Math.ceil(n1 * ratio);
+        return { sampleSize: n1, sampleSize2: n2, totalSampleSize: n1 + n2, effectSize,
+                 testType: 'Two-Sample t-test',
+                 actualPower: calculateSimplePowerForCurve(n1, effectSize, alpha, alternative, 'two-sample-mean') };
+    }
+
+    function calculateOneSampleProportion(alpha, power, alternative) {
+        const p = parseFloat(document.getElementById('p1').value), p0 = 0.5;
+        const cv = alternative === 'two-sided' ? normalInverse(1 - alpha/2) : normalInverse(1 - alpha);
+        const pv = normalInverse(power);
+        const n = Math.ceil(Math.pow(cv * Math.sqrt(p0*(1-p0)) + pv * Math.sqrt(p*(1-p)), 2) / Math.pow(p - p0, 2));
+        return { sampleSize: n, totalSampleSize: n, effectSize: Math.abs(p - p0),
+                 testType: 'One-Sample Proportion',
+                 actualPower: calculateSimplePowerForCurve(n, Math.abs(p - p0), alpha, alternative, 'one-sample-proportion') };
+    }
+
+    function calculateTwoSampleProportion(alpha, power, alternative) {
+        const p1 = parseFloat(document.getElementById('p1').value);
+        const p2 = parseFloat(document.getElementById('p2').value);
+        const cv = alternative === 'two-sided' ? normalInverse(1 - alpha/2) : normalInverse(1 - alpha);
+        const pv = normalInverse(power);
+        const pBar = (p1 + p2) / 2;
+        const n = Math.ceil((Math.pow(cv * Math.sqrt(2*pBar*(1-pBar)) + pv * Math.sqrt(p1*(1-p1) + p2*(1-p2)), 2)) / Math.pow(p1-p2, 2));
+        return { sampleSize: n, totalSampleSize: 2 * n, effectSize: Math.abs(p1 - p2),
+                 testType: 'Two-Sample Proportions',
+                 actualPower: calculateSimplePowerForCurve(n, Math.abs(p1-p2), alpha, alternative, 'two-sample-proportion') };
+    }
+
+    function calculateCorrelation(alpha, power, alternative) {
+        const rho = parseFloat(document.getElementById('rho').value);
+        const rho0 = parseFloat(document.getElementById('rho0').value);
+        const cv = alternative === 'two-sided' ? normalInverse(1 - alpha/2) : normalInverse(1 - alpha);
+        const pv = normalInverse(power);
+        const z1 = 0.5 * Math.log((1 + rho) / (1 - rho));
+        const z0 = 0.5 * Math.log((1 + rho0) / (1 - rho0));
+        const n = Math.ceil(Math.pow((cv + pv) / (z1 - z0), 2) + 3);
+        return { sampleSize: n, totalSampleSize: n, effectSize: Math.abs(rho - rho0),
+                 testType: 'Correlation' };
+    }
+
+    async function calculateANOVA(alpha, power) {
+        const numGroups = parseInt(document.getElementById('numGroups').value);
+        const f = parseFloat(document.getElementById('effectSizeF').value);
+        
+        // Try cloud function first for accurate F-distribution calculation
+        const url = `https://us-central1-tukey-multple-comparisons.cloudfunctions.net/anova-module` +
+                   `?num_groups=${numGroups}&effect_size_f=${f}&target_power=${power}&significance_level=${alpha}`;
+        try {
+            updateLoadingMessage('Connecting to anova-module (non-central F)…');
+            const response = await fetch(url, { method: 'GET', mode: 'cors' });
+            if (!response.ok) throw new Error(`API request failed: ${response.status}`);
+            updateLoadingMessage('Processing anova-module response — non-central F…');
+            const json = await response.json();
+            const n = Math.ceil(json.required_sample_size_per_group || json.required_sample_size);
+            const totalN = Math.ceil(json.total_sample_size || (n * numGroups));
+            const actualPower = json.actual_power || power;
+            if (!n || n < 1) throw new Error('Invalid sample size from API');
+            await new Promise(r => setTimeout(r, 300));
+            return { sampleSize: n, totalSampleSize: totalN, effectSize: f,
+                     testType: 'One-Way ANOVA',
+                     actualPower: actualPower };
+        } catch (error) {
+            console.warn('Cloud function unavailable, using fallback approximation:', error);
+            updateLoadingMessage('Cloud function unavailable, using approximation...');
+            // Fallback: Use improved approximation (still not perfect, but better than before)
+            // This uses a simplified approach - cloud function is preferred
+            let low = 2, high = 1000;
+            while (high - low > 1) {
+                const n = Math.floor((low + high) / 2);
+                // Improved approximation using F-distribution approximation
+                const df1 = numGroups - 1;
+                const df2 = (n * numGroups) - numGroups;
+                const lambda = n * numGroups * f * f; // non-centrality parameter
+                // Simplified power approximation (not as accurate as true F-distribution)
+                const ncp = Math.sqrt(lambda);
+                const criticalZ = normalInverse(1 - alpha);
+                const actualPower = 1 - normalCDF(criticalZ - ncp);
+                if (actualPower < power) low = n; else high = n;
+            }
+            const n = high;
+            await new Promise(r => setTimeout(r, 500));
+            showFallbackNotice();
+            return { sampleSize: n, totalSampleSize: n * numGroups, effectSize: f,
+                     testType: 'One-Way ANOVA (Fallback)',
+                     actualPower: calculateActualPower('anova', n, f, alpha, 'two-sided', numGroups) };
+        }
+    }
+
+    function calculateRegression(alpha, power) {
+        const p = parseInt(document.getElementById('numPredictors').value);
+        const r2 = parseFloat(document.getElementById('rsquared').value);
+        let low = p + 2, high = 5000;
+        while (high - low > 1) {
+            const n = Math.floor((low + high) / 2);
+            if (n - p - 1 <= 0) { low = n; continue; }
+            const lambda = n * r2 / (1 - r2);
+            const ncp = Math.sqrt(lambda);
+            const criticalZ = normalInverse(1 - alpha);
+            const actualPower = 1 - normalCDF(criticalZ - ncp);
+            if (actualPower < power) low = n; else high = n;
+        }
+        const n = high;
+        return { sampleSize: n, totalSampleSize: n, effectSize: Math.sqrt(r2/(1-r2)),
+                 testType: 'Linear Regression',
+                 actualPower: calculateActualPower('regression', n, r2, alpha, 'two-sided', p) };
+    }
+
+    function calculateActualPower(testType, n, effectSize, alpha, alternative, param2) {
+        switch(testType) {
+            case 'one-sample-mean': {
+                const cz = alternative === 'two-sided' ? normalInverse(1-alpha/2) : normalInverse(1-alpha);
+                const ncp = effectSize * Math.sqrt(n);
+                return alternative === 'two-sided' ? normalCDF(ncp-cz) + (1-normalCDF(ncp+cz)) : 1-normalCDF(cz-ncp);
+            }
+            case 'anova': {
+                const ng = param2 || 3;
+                const ncp = effectSize * Math.sqrt(n * ng);
+                return 1 - normalCDF(normalInverse(1-alpha) - ncp);
+            }
+            case 'regression': {
+                const ncp = Math.sqrt(n * effectSize / (1 - effectSize));
+                return 1 - normalCDF(normalInverse(1-alpha) - ncp);
+            }
+            default: return 0.8;
+        }
+    }
+
+    function calculateSimplePowerForCurve(n, effectSize, alpha, alternative, testType) {
+        try {
+            if (!effectSize || effectSize <= 0 || !n || n <= 0) return 0.1;
+            let power;
+            if (testType === 'one-sample-mean' || testType === 'two-sample-mean') {
+                const cz = alternative === 'two-sided' ? normalInverse(1-alpha/2) : normalInverse(1-alpha);
+                const ncp = effectSize * Math.sqrt(n);
+                power = alternative === 'two-sided' ? normalCDF(ncp-cz) + (1-normalCDF(ncp+cz)) : 1-normalCDF(cz-ncp);
+            } else if (testType === 'anova') {
+                /* n = per-group sample size; Cohen's f — must include k groups (was wrongly using sqrt(n) only → flat/wrong curve) */
+                const k = Math.max(2, parseInt(document.getElementById('numGroups').value, 10) || 2);
+                power = calculateActualPower('anova', n, effectSize, alpha, alternative, k);
+            } else if (testType === 'regression') {
+                const pPred = Math.max(1, parseInt(document.getElementById('numPredictors').value, 10) || 1);
+                const r2 = parseFloat(document.getElementById('rsquared').value) || 0.15;
+                power = calculateActualPower('regression', n, r2, alpha, alternative, pPred);
+            } else if (testType === 'correlation') {
+                const cz = alternative === 'two-sided' ? normalInverse(1-alpha/2) : normalInverse(1-alpha);
+                const se = 1 / Math.sqrt(n - 3);
+                const z = effectSize / se;
+                power = alternative === 'two-sided' ? normalCDF(z-cz) + (1-normalCDF(z+cz)) : 1-normalCDF(cz-z);
+            } else if (testType.includes('proportion')) {
+                const cz = alternative === 'two-sided' ? normalInverse(1-alpha/2) : normalInverse(1-alpha);
+                const p = 0.5, se = Math.sqrt(testType === 'one-sample-proportion' ? p*(1-p)/n : 2*p*(1-p)/n);
+                const z = effectSize / se;
+                power = alternative === 'two-sided' ? normalCDF(z-cz) + (1-normalCDF(z+cz)) : 1-normalCDF(cz-z);
+            } else {
+                const cz = alternative === 'two-sided' ? normalInverse(1-alpha/2) : normalInverse(1-alpha);
+                const ncp = effectSize * Math.sqrt(n);
+                power = alternative === 'two-sided' ? normalCDF(ncp-cz) + (1-normalCDF(ncp+cz)) : 1-normalCDF(cz-ncp);
+            }
+            const out = Math.max(0.05, Math.min(0.99, power));
+            return isFinite(out) ? out : 0.1;
+        } catch(e) { return 0.1; }
+    }
+
+    function getEffectSizeFromTestType(testType) {
+        try {
+            switch(testType) {
+                case 'one-sample-mean':       return parseFloat(document.getElementById('effectSize').value) || 0.5;
+                case 'two-sample-mean':       return parseFloat(document.getElementById('effectSize2').value) || 0.5;
+                case 'one-sample-proportion': return Math.abs((parseFloat(document.getElementById('p1').value)||0.5) - 0.5);
+                case 'two-sample-proportion': return Math.abs((parseFloat(document.getElementById('p1').value)||0.5) - (parseFloat(document.getElementById('p2').value)||0.3));
+                case 'correlation':           return Math.abs((parseFloat(document.getElementById('rho').value)||0.3) - (parseFloat(document.getElementById('rho0').value)||0));
+                case 'anova':                 return parseFloat(document.getElementById('effectSizeF').value) || 0.25;
+                /* Power curve uses R² with calculateActualPower('regression', n, r2, …) — return R² here, not Cohen's f */
+                case 'regression':            return parseFloat(document.getElementById('rsquared').value) || 0.15;
+                default:                      return 0.5;
+            }
+        } catch(e) { return 0.5; }
+    }
+
+    /**
+     * Smallest per-group n (or generic n) such that approximate power >= targetPower.
+     * Uses monotone binary search — NOT “best diff” on mid, which stuck ~5000 when power
+     * plateaued near 0.99 for almost all n (flat blue curve bug).
+     */
+    function calculateSampleSizeForPower(testType, targetPower, alpha, alternative) {
+        try {
+            const effectSize = getEffectSizeFromTestType(testType);
+            if (!effectSize || effectSize <= 0) return Math.floor(10 + targetPower * 100);
+            const tp = Math.max(0.05, Math.min(0.99, targetPower));
+            const hiCap = 100000;
+
+            function achievedAt(n) {
+                const p = calculateSimplePowerForCurve(n, effectSize, alpha, alternative, testType);
+                return isFinite(p) ? p : 0;
+            }
+
+            if (achievedAt(hiCap) < tp) return hiCap;
+
+            let lo = 2, hi = hiCap;
+            while (lo < hi) {
+                const mid = Math.floor((lo + hi) / 2);
+                if (achievedAt(mid) < tp) lo = mid + 1;
+                else hi = mid;
+            }
+            return Math.max(2, Math.min(hiCap, lo));
+        } catch(e) { return Math.floor(20 * Math.pow(targetPower/(1-targetPower), 2)); }
+    }
+
+    // ── Display results ────────────────────────────────────────────────
+    function displayResults(result, testType, alpha, targetPower) {
+        // Decision strip
+        const strip = document.getElementById('decisionStrip');
+        const stripText = document.getElementById('decisionText');
+        strip.classList.remove('hidden');
+        const tp = normalizeStatisticalPower(targetPower);
+        stripText.textContent = `To detect this effect with ${(tp*100).toFixed(0)}% power at α=${alpha} → required n = ${result.sampleSize}` +
+            (result.sampleSize2 ? ` per group (${result.totalSampleSize} total)` : '') +
+            (result.actualPower ? ` · achieved power = ${(result.actualPower*100).toFixed(1)}%` : '');
+
+        // Hide placeholder, show cards
+        document.getElementById('resultsPlaceholder').classList.add('hidden');
+        document.getElementById('resultsCardsSection').classList.remove('hidden');
+        
+        const effectLabels = {
+            'one-sample-mean': "Cohen's d", 'two-sample-mean': "Cohen's d",
+            'correlation': 'Δr', 'one-sample-proportion': 'Δp', 'two-sample-proportion': 'Δp',
+            'anova': "Cohen's f", 'regression': "Cohen's f"
+        };
+        
+        // Update fancy result cards
+        const isMultiGroup = result.totalSampleSize !== result.sampleSize || result.sampleSize2;
+        
+        document.getElementById('cardRequiredN').textContent = result.sampleSize;
+        document.getElementById('cardRequiredSub').textContent = 
+            result.sampleSize2 ? `n₁=${result.sampleSize} / n₂=${result.sampleSize2}` :
+            isMultiGroup ? 'per group' : 'participants';
+        document.getElementById('cardTotalN').textContent = result.totalSampleSize;
+        document.getElementById('cardEffectSize').textContent = result.effectSize.toFixed(3);
+        document.getElementById('cardEffectLabel').textContent = effectLabels[testType] || '';
+        document.getElementById('cardActualPower').textContent = 
+            result.actualPower ? (result.actualPower * 100).toFixed(1) : '—';
+    }
+
+    /** Avoid stacked Highcharts instances on repeated Calculate (stale / wrong series). */
+    function destroyPowerChartIfAny() {
+        const el = document.getElementById('powerChart');
+        if (!el || typeof Highcharts === 'undefined') return;
+        try {
+            if (typeof Highcharts.getChart === 'function') {
+                const ch = Highcharts.getChart(el);
+                if (ch && typeof ch.destroy === 'function') { ch.destroy(); return; }
+            }
+        } catch (e) { /* ignore */ }
+        if (Highcharts.charts) {
+            for (let i = Highcharts.charts.length - 1; i >= 0; i--) {
+                const c = Highcharts.charts[i];
+                if (c && c.renderTo === el) {
+                    c.destroy();
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * Required n scales ~ (zα + zΦ⁻¹(p))² for fixed effect (normal approx).
+     * Anchor to the last Calculate result so the curve passes through (pRef, nRef)
+     * and rises with power — avoids flat lines when crude ANOVA power() is already
+     * ~1 at n = 2 (minimal-n search stuck at 2).
+     */
+    function parseLocalizedNumber(raw) {
+        if (raw === undefined || raw === null) return NaN;
+        const s = String(raw).trim().replace(/\s/g, '').replace(',', '.');
+        const x = parseFloat(s);
+        return x;
+    }
+
+    /**
+     * @param powerX  desired power on the x-axis (e.g. 0.1 … 0.95)
+     */
+    function sampleSizeCurveFromReference(powerX, alpha, alternative, nRef, pRef) {
+        const a = parseLocalizedNumber(alpha);
+        const alphaEff = isFinite(a) && a > 0 && a < 1 ? a : 0.05;
+        const za = alternative === 'two-sided' ? normalInverse(1 - alphaEff / 2) : normalInverse(1 - alphaEff);
+        const clamp = function (q) { return Math.max(0.001, Math.min(0.999, q)); };
+        const zp = normalInverse(clamp(powerX));
+        const zpRef = normalInverse(clamp(pRef));
+        const num = za + zp;
+        const den = za + zpRef;
+        /* If alpha was mis-parsed (e.g. "0,05" → 0), za is non-finite and this used to fall back to nRef for every point → flat line */
+        if (!isFinite(num) || !isFinite(den) || !(den > 0) || !isFinite(nRef) || nRef <= 0) {
+            return Math.max(2, Math.round(nRef));
+        }
+        const ratio = (num / den) * (num / den);
+        const nEst = nRef * ratio;
+        return Math.max(2, Math.ceil(isFinite(nEst) ? nEst : nRef));
+    }
+
+    // ── Power curve ───────────────────────────────────────────────────
+    function createPowerCurve(testType, result) {
+        const alphaEl = document.getElementById('alpha');
+        const alpha = parseLocalizedNumber(alphaEl ? alphaEl.value : '0.05');
+        const alphaForCurve = isFinite(alpha) && alpha > 0 && alpha < 1 ? alpha : 0.05;
+        const targetPower = normalizeStatisticalPower(document.getElementById('power').value);
+        const alternative = document.getElementById('alternative').value;
+        const powerValues = [], sampleSizes = [];
+
+        const nRef = (result && isFinite(result.sampleSize) && result.sampleSize > 0) ? result.sampleSize : 0;
+        const pRef = targetPower;
+
+        for (let p = 0.1; p <= 0.95; p += 0.05) {
+            const rp = Math.round(p * 100) / 100;
+            powerValues.push(rp);
+            let nPt;
+            /* Allow pRef up to normalizeStatisticalPower max (0.999); strict < 0.999 skipped valid 99.9% runs */
+            if (nRef > 0 && isFinite(pRef) && pRef >= 0.05 && pRef <= 0.999) {
+                nPt = sampleSizeCurveFromReference(rp, alphaForCurve, alternative, nRef, pRef);
+            } else {
+                nPt = calculateSampleSizeForPower(testType, rp, alphaForCurve, alternative);
+            }
+            sampleSizes.push(nPt);
+        }
+
+        document.getElementById('chartPlaceholder').style.display = 'none';
+        const chartEl = document.getElementById('powerChart');
+        chartEl.style.display = 'block';
+
+        destroyPowerChartIfAny();
+
+        const maxCurveY = Math.max(
+            1,
+            result && isFinite(result.sampleSize) ? result.sampleSize : 0,
+            ...sampleSizes.filter(function (x) { return isFinite(x); })
+        );
+
+        const L = isEmbedLightTheme();
+        const cTitle = L ? '#0f7669' : '#ffc0c0';
+        const cText = L ? '#334155' : '#e8e8e8';
+        const cGrid = L ? '#e2e8f0' : '#444';
+        const cLine = L ? '#2563eb' : '#3498db';
+        const cGreen = L ? '#059669' : '#27ae60';
+        const cRed = L ? '#dc2626' : '#e74c3c';
+        const tipBg = L ? 'rgba(255,255,255,0.97)' : 'rgba(44,47,59,0.95)';
+        const tipBorder = L ? '#cbd5e1' : '#555';
+        const tipColor = L ? '#0f172a' : '#e8e8e8';
+
+        Highcharts.chart('powerChart', {
+            title: { text: 'Required Sample Size vs Statistical Power', style: { color: cTitle, fontSize: '13px', fontWeight: '700' } },
+            xAxis: {
+                title: { text: 'Statistical Power', style: { color: cText } },
+                labels: { style: { color: cText }, formatter: function() { return (this.value*100).toFixed(0)+'%'; } },
+                min: 0.1, max: 0.95, gridLineColor: cGrid, lineColor: cGrid
+            },
+            yAxis: {
+                title: { text: 'Required Sample Size', style: { color: cText } },
+                labels: { style: { color: cText } }, min: 0, gridLineColor: cGrid, lineColor: cGrid
+            },
+            chart: { backgroundColor: 'transparent', style: { fontFamily: 'Segoe UI' }, height: 300 },
+            legend: { itemStyle: { color: cText, fontSize: '11px' } },
+            series: [
+                {
+                    name: 'Sample Size Curve',
+                    data: powerValues.map((p, i) => [p, sampleSizes[i]]),
+                    type: 'line', color: cLine, lineWidth: 2.5
+                },
+                {
+                    name: 'Target Power',
+                    data: [[targetPower, 0], [targetPower, maxCurveY]],
+                    type: 'line', color: cGreen, dashStyle: 'dash', lineWidth: 1.5
+                },
+                {
+                    name: 'Required n',
+                    data: [[0.1, result.sampleSize], [0.95, result.sampleSize]],
+                    type: 'line', color: cRed, dashStyle: 'dash', lineWidth: 1.5
+                }
+            ],
+            plotOptions: { series: { marker: { enabled: false } } },
+            tooltip: {
+                formatter: function() {
+                    return '<b>' + this.series.name + '</b><br/>Power: ' + (this.x*100).toFixed(1) + '%<br/>n: ' + Math.round(this.y);
+                },
+                style: { color: tipColor },
+                backgroundColor: tipBg,
+                borderColor: tipBorder
+            }
+        });
+    }
+
+    // ── Interpretation ─────────────────────────────────────────────────
+    function updateInterpretation(testType, result) {
+        const power = normalizeStatisticalPower(document.getElementById('power').value);
+        const alpha = parseFloat(document.getElementById('alpha').value);
+        const pct = (power*100).toFixed(0);
+        let text = '';
+        switch(testType) {
+            case 'one-sample-mean':
+                text = `For a one-sample t-test with Cohen's d = ${result.effectSize.toFixed(3)}, you need ${result.sampleSize} participants to achieve ${pct}% power at α = ${alpha}.`;
+                break;
+            case 'two-sample-mean':
+                text = `For comparing two group means with Cohen's d = ${result.effectSize.toFixed(3)}, you need ${result.sampleSize} participants per group (N = ${result.totalSampleSize} total) for ${pct}% power at α = ${alpha}.`;
+                break;
+            case 'one-sample-proportion':
+                text = `For testing a single proportion with Δp = ${result.effectSize.toFixed(3)}, you need ${result.sampleSize} participants for ${pct}% power at α = ${alpha}.`;
+                break;
+            case 'two-sample-proportion':
+                text = `For comparing two proportions with Δp = ${result.effectSize.toFixed(3)}, you need ${result.sampleSize} per group (N = ${result.totalSampleSize} total) for ${pct}% power at α = ${alpha}.`;
+                break;
+            case 'correlation':
+                text = `For detecting a correlation of Δr = ${result.effectSize.toFixed(3)}, you need ${result.sampleSize} participants for ${pct}% power at α = ${alpha}. Uses Fisher's Z transformation.`;
+                break;
+            case 'anova':
+                text = `For this one-way ANOVA with ${document.getElementById('numGroups').value} groups and Cohen's f = ${result.effectSize.toFixed(3)}, you need ${result.sampleSize} per group (N = ${result.totalSampleSize}) for ${pct}% power at α = ${alpha}.`;
+                break;
+            case 'regression':
+                text = `For regression with ${document.getElementById('numPredictors').value} predictors and R² = ${document.getElementById('rsquared').value}, you need ${result.sampleSize} participants for ${pct}% power at α = ${alpha}.`;
+                break;
+        }
+        if (result.actualPower) text += ` Achieved power: ${(result.actualPower*100).toFixed(1)}%.`;
+        document.getElementById('interpretationText').textContent = text;
+    }
+
+    // ── URL Parameter Parsing & Auto-fill ─────────────────────────────
+    function parseURLParams() {
+        const params = new URLSearchParams(window.location.search);
+        const testType = params.get('test');
+        const autoCalculate = params.get('autoCalculate') === 'true' || params.get('autoCalculate') === '1';
+        
+        if (!testType) return false;
+        
+        // Map URL test names to internal test types
+        const testTypeMap = {
+            'one-sample-mean': 'one-sample-mean',
+            'two-sample-mean': 'two-sample-mean',
+            'one-sample-proportion': 'one-sample-proportion',
+            'two-sample-proportion': 'two-sample-proportion',
+            'correlation': 'correlation',
+            'anova': 'anova',
+            'regression': 'regression'
+        };
+        
+        const mappedTestType = testTypeMap[testType];
+        if (!mappedTestType) {
+            console.warn('Unknown test type:', testType);
+            return false;
+        }
+        
+        // Wait for DOM to be fully ready, then select the test
+        const selectTestAndFill = () => {
+            const testElement = document.querySelector(`.sb-item[data-test="${mappedTestType}"]`);
+            if (!testElement) {
+                console.warn('Test element not found:', mappedTestType);
+                return false;
+            }
+            
+            console.log('Selecting test type:', mappedTestType, 'element:', testElement);
+            
+            // Call selectTest directly to ensure it runs
+            if (typeof selectTest === 'function') {
+                selectTest(testElement);
+                console.log('Test selected, currentTestType:', currentTestType);
+            } else {
+                // Fallback to click if selectTest isn't available yet
+                console.warn('selectTest function not available, using click()');
+                testElement.click();
+            }
+            
+            // Wait for test selection to complete, then fill parameters
+            setTimeout(() => {
+            // Fill in common parameters
+            if (params.has('alpha')) {
+                const alphaEl = document.getElementById('alpha');
+                if (alphaEl) alphaEl.value = parseFloat(params.get('alpha'));
+            }
+            if (params.has('power')) {
+                const powerEl = document.getElementById('power');
+                if (powerEl) powerEl.value = normalizeStatisticalPower(params.get('power')).toFixed(2);
+            }
+            if (params.has('alternative')) {
+                const alt = params.get('alternative');
+                const select = document.getElementById('alternative');
+                if (select) {
+                    select.value = alt === 'one-sided' ? 'one-sided' : 'two-sided';
+                }
+            }
+            
+            // Fill test-specific parameters
+            switch(mappedTestType) {
+            case 'one-sample-mean':
+                if (params.has('effectSize') || params.has('d')) {
+                    const d = params.get('effectSize') || params.get('d');
+                    document.getElementById('effectSize').value = parseFloat(d);
+                }
+                break;
+            case 'two-sample-mean':
+                if (params.has('effectSize') || params.has('d')) {
+                    const d = params.get('effectSize') || params.get('d');
+                    document.getElementById('effectSize2').value = parseFloat(d);
+                }
+                if (params.has('allocationRatio') || params.has('k')) {
+                    const k = params.get('allocationRatio') || params.get('k');
+                    document.getElementById('allocationRatio').value = parseFloat(k);
+                }
+                break;
+            case 'one-sample-proportion':
+                if (params.has('p1') || params.has('p')) {
+                    const p = params.get('p1') || params.get('p');
+                    document.getElementById('p1').value = parseFloat(p);
+                }
+                break;
+            case 'two-sample-proportion':
+                if (params.has('p1')) {
+                    document.getElementById('p1').value = parseFloat(params.get('p1'));
+                }
+                if (params.has('p2')) {
+                    document.getElementById('p2').value = parseFloat(params.get('p2'));
+                }
+                break;
+            case 'correlation':
+                if (params.has('rho') || params.has('r')) {
+                    const r = params.get('rho') || params.get('r');
+                    document.getElementById('rho').value = parseFloat(r);
+                }
+                if (params.has('rho0') || params.has('r0')) {
+                    const r0 = params.get('rho0') || params.get('r0');
+                    document.getElementById('rho0').value = parseFloat(r0);
+                }
+                break;
+            case 'anova':
+                const numGroupsEl = document.getElementById('numGroups');
+                const effectSizeFEl = document.getElementById('effectSizeF');
+                const studyTotalNEl = document.getElementById('studyTotalN');
+                if (numGroupsEl && (params.has('numGroups') || params.has('k'))) {
+                    const k = params.get('numGroups') || params.get('k');
+                    numGroupsEl.value = parseInt(k);
+                    console.log('Set numGroups to:', k);
+                }
+                if (effectSizeFEl && (params.has('effectSizeF') || params.has('f'))) {
+                    const f = params.get('effectSizeF') || params.get('f');
+                    effectSizeFEl.value = parseFloat(f);
+                    console.log('Set effectSizeF to:', f);
+                }
+                if (studyTotalNEl && (params.has('studyTotalN') || params.has('totalN'))) {
+                    const tN = params.get('studyTotalN') || params.get('totalN');
+                    const ntot = parseInt(tN, 10);
+                    studyTotalNEl.value = (isFinite(ntot) && ntot > 0) ? String(ntot) : '';
+                }
+                break;
+            case 'regression':
+                if (params.has('numPredictors') || params.has('p')) {
+                    const p = params.get('numPredictors') || params.get('p');
+                    document.getElementById('numPredictors').value = parseInt(p);
+                }
+                if (params.has('rsquared') || params.has('r2') || params.has('R2')) {
+                    const r2 = params.get('rsquared') || params.get('r2') || params.get('R2');
+                    document.getElementById('rsquared').value = parseFloat(r2);
+                }
+                break;
+            }
+
+            /* Opened from Statistico ANOVA modal: freeze study-design inputs (k, f, observed N) */
+            if (params.get('source') === 'statistico') {
+                statisticoStudyDesignLocked = true;
+            }
+            applyStatisticoAnovaLock();
+            
+            // Auto-calculate if requested - after parameters are filled
+            if (autoCalculate) {
+                setTimeout(() => {
+                    calculateSampleSize();
+                }, 100);
+            }
+            }, 150); // Wait 150ms for test selection to complete
+        };
+        
+        // Try immediately, or wait a bit if DOM isn't ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', selectTestAndFill);
+        } else {
+            // DOM is ready, but wait a tiny bit for any dynamic content
+            setTimeout(selectTestAndFill, 50);
+        }
+        
+        return true;
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function() {
+        wirePowerSpinControls();
+        // Try to parse URL parameters first
+        const hasParams = parseURLParams();
+        
+        // Set initial header subtitle (if not set by URL params)
+        if (!hasParams) {
+            document.getElementById('headerSubtitle').textContent = testLabels[currentTestType];
+            updatePowerTopbarChips();
+        }
+        // Ensure modal hidden
+        document.getElementById('loadingModal').classList.add('hidden');
+    });
+</script>
+</body>
+</html>

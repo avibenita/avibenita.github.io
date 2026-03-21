@@ -86,8 +86,7 @@ function navigateToCalculator(testType, params = {}, autoCalculate = true, newWi
 function getCalculatorBaseURL() {
     /**
      * Live URL: statistico-analytics/embed/index-calculator.html
-     * (Mirrors statistico-calculators/ in git; GitHub Pages reliably serves analytics paths.)
-     * Legacy /statistico-calculators/ links use SampleSizeCalculator.html → redirect.
+     * (Source in git: statistic-calculators/power-sample-size-calculator/; CI copies to embed for Pages.)
      */
     const origin = window.location.origin;
     return origin + '/statistico-analytics/embed/index-calculator.html';

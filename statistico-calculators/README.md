@@ -1,8 +1,11 @@
-# Legacy path: `statistico-calculators/`
+# Statistico-calculators hub
 
-The power & sample-size app **moved** to:
+This folder hosts **multiple** interactive calculators. Each major tool lives in its own subfolder.
 
-**[`statistic-calculators/power-sample-size-calculator/`](../statistic-calculators/power-sample-size-calculator/)**
+| Subfolder | Description |
+|-----------|-------------|
+| **[`power-sample-size-calculator/`](power-sample-size-calculator/)** | **Power & sample size** calculator (URL-safe folder name; not `power&samplesize` / spaces). |
 
-- Use that folder for all edits.
-- Bookmarks to old `/statistico-calculators/…` URLs are redirected by the stub HTML files in this directory.
+Add new calculators as additional subdirectories here (keep each app self-contained).
+
+**Public URLs on GitHub Pages:** the power UI is also mirrored to **`/statistico-analytics/embed/`** for reliable loading from analytics / Office (see `power-sample-size-calculator/README.md`).

@@ -1,7 +1,15 @@
-# Embedded power UI (GitHub Pages)
+# Embedded power UI (GitHub Pages only)
 
-`index-calculator.html` and `index-formulas.html` here are **copies** of the files in **`statistico-calculators/`** (canonical source in git).
+There is **no** `index-calculator.html` in git here. The only canonical copies are:
 
-**Why duplicate?** GitHub Pages for this site returns **404** for most files under `/statistico-calculators/`, while paths under **`/statistico-analytics/`** are served correctly. The ANOVA dialog iframe and legacy redirects target **`/statistico-analytics/embed/`** so the calculator loads on **statistico.live**.
+- **`statistico-calculators/index-calculator.html`**
+- **`statistico-calculators/index-formulas.html`**
 
-The workflow **`.github/workflows/static.yml`** runs `cp` before deploy so embed stays in sync with `statistico-calculators/` when you edit the source there.
+Before each deploy, **`.github/workflows/static.yml`** copies those files into this folder so **statistico.live** can serve them at:
+
+- `/statistico-analytics/embed/index-calculator.html`
+- `/statistico-analytics/embed/index-formulas.html`
+
+(GitHub Pages does not reliably serve the same files under `/statistico-calculators/`.)
+
+**Local dev:** run `scripts/sync-embed-from-calculators.ps1` (or the `.sh` script) after editing the calculator, if you need this folder populated.

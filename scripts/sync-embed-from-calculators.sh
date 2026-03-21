@@ -1,3 +1,8 @@
 #!/usr/bin/env bash
-# Deprecated: the power UI is served from statistico-calculators (no embed mirror).
-echo "No sync: use statistico-calculators/power-sample-size-calculator/ directly (see statistico-analytics/embed/README.md)."
+# Mirror power UI into statistico-analytics/embed (same as CI).
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+mkdir -p "$ROOT/statistico-analytics/embed"
+cp -f "$ROOT/statistico-calculators/power-sample-size-calculator/index-calculator.html" "$ROOT/statistico-analytics/embed/"
+cp -f "$ROOT/statistico-calculators/power-sample-size-calculator/index-formulas.html"   "$ROOT/statistico-analytics/embed/"
+echo "Synced embed from statistico-calculators/power-sample-size-calculator/ -> statistico-analytics/embed/"

@@ -1,6 +1,6 @@
 /**
  * StatisticoPowerEmbed — open the shared Power & Sample Size calculator (mirrored at
- * /statistico-analytics/embed/index-calculator.html) in a modal iframe.
+ * /statistico-analytics/embed/index-calculator.html) in an iframe (default: floating panel on results pages).
  * Same flow as ANOVA "Power"; use from any analytics results page.
  */
 (function (global) {
@@ -8,7 +8,7 @@
 
   var EMBED_PATH = '/statistico-analytics/embed/index-calculator.html';
   /** Bump when calculator HTML/JS changes materially (Office/cache). */
-  var CACHE_BUSTER = '20260324-1';
+  var CACHE_BUSTER = '20260325-1';
 
   var MODAL_ID = 'statisticoPowerEmbedModal';
   var IFRAME_ID = 'statisticoPowerEmbedIframe';
@@ -88,11 +88,11 @@
    * Open embed calculator.
    * @param {object} params Query params; must include `test` (e.g. anova, two-sample-mean, one-sample-mean).
    *        Common: alpha, power, autoCalculate, source, alternative, plus test-specific fields.
-   *        presentation: 'floating' | 'modal' — floating = corner panel, no dimmer, page stays scrollable (default modal).
+   *        presentation: 'modal' — optional; omit for floating (corner panel, no dimmer, page scrollable).
    */
   function open(params) {
     var p = Object.assign({}, params || {});
-    var presentation = p.presentation === 'floating' ? 'floating' : 'modal';
+    var presentation = p.presentation === 'modal' ? 'modal' : 'floating';
     delete p.presentation;
     if (!p.test) {
       console.warn('StatisticoPowerEmbed.open: missing test; defaulting to two-sample-mean');

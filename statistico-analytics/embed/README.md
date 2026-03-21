@@ -1,12 +1,18 @@
-# `embed/` (legacy folder)
+# `embed/` — power calculator mirror for GitHub Pages
 
-The power UI is **not** mirrored here anymore.
+**Canonical source in git:** `statistico-calculators/power-sample-size-calculator/`
 
-**Canonical URLs on GitHub Pages:**
+On each deploy, `.github/workflows/static.yml` copies `index-calculator.html` and
+`index-formulas.html` into this folder so they ship with the Pages artifact. Files are
+listed in `.gitignore` here so the mirror is **CI-only**, not duplicated in commits.
+
+**URL used by ANOVA (hosted):**
+
+- `/statistico-analytics/embed/index-calculator.html`
+
+That path lives next to `dialogs/views/...` on the same origin, which avoids **404** on
+some hosts where `/statistico-calculators/...` is missing or not routed.
+
+Direct calculators URLs still work when that tree is deployed:
 
 - `/statistico-calculators/power-sample-size-calculator/index-calculator.html`
-- `/statistico-calculators/power-sample-size-calculator/index-formulas.html`
-
-Source in git: `statistico-calculators/power-sample-size-calculator/`.
-
-Older bookmarks to `/statistico-analytics/embed/...` may 404 unless you add redirects elsewhere.

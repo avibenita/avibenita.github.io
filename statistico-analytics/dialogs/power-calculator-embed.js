@@ -8,7 +8,7 @@
 
   var EMBED_PATH = '/statistico-analytics/embed/index-calculator.html';
   /** Bump when calculator HTML/JS changes materially (Office/cache). */
-  var CACHE_BUSTER = '20260330-1';
+  var CACHE_BUSTER = '20260331-1';
 
   var MODAL_ID = 'statisticoPowerEmbedModal';
   var IFRAME_ID = 'statisticoPowerEmbedIframe';

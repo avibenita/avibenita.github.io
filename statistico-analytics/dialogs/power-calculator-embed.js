@@ -8,11 +8,53 @@
 
   var EMBED_PATH = '/statistico-analytics/embed/index-calculator.html';
   /** Bump when calculator HTML/JS changes materially (Office/cache). */
-  var CACHE_BUSTER = '20260325-1';
+  var CACHE_BUSTER = '20260326-1';
 
   var MODAL_ID = 'statisticoPowerEmbedModal';
   var IFRAME_ID = 'statisticoPowerEmbedIframe';
   var PRESENTATION_ATTR = 'data-statistico-pe-presentation';
+
+  function clearPeLayout(modal) {
+    if (!modal) return;
+    ['align-items', 'justify-content', 'background', 'backdrop-filter', '-webkit-backdrop-filter', 'pointer-events', 'padding'].forEach(function (k) {
+      modal.style.removeProperty(k);
+    });
+    var panel = modal.querySelector('.statistico-pe-modal-container');
+    if (!panel) return;
+    ['width', 'height', 'max-height', 'pointer-events', 'flex'].forEach(function (k) {
+      panel.style.removeProperty(k);
+    });
+  }
+
+  /**
+   * Force floating geometry with !important so it wins over cached CSS, theme sheets, or load order.
+   */
+  function applyPeLayout(modal, presentation) {
+    clearPeLayout(modal);
+    var panel = modal.querySelector('.statistico-pe-modal-container');
+    if (!panel || presentation !== 'floating') return;
+
+    var narrow = global.innerWidth <= 600;
+    modal.style.setProperty('align-items', 'flex-end', 'important');
+    modal.style.setProperty('justify-content', narrow ? 'center' : 'flex-end', 'important');
+    modal.style.setProperty('background', 'transparent', 'important');
+    modal.style.setProperty('backdrop-filter', 'none', 'important');
+    modal.style.setProperty('-webkit-backdrop-filter', 'none', 'important');
+    modal.style.setProperty('pointer-events', 'none', 'important');
+    modal.style.setProperty(
+      'padding',
+      narrow
+        ? '8px'
+        : '12px 16px max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-right))',
+      'important'
+    );
+
+    panel.style.setProperty('pointer-events', 'auto', 'important');
+    panel.style.setProperty('flex', '0 1 auto', 'important');
+    panel.style.setProperty('width', narrow ? 'calc(100vw - 16px)' : 'min(460px, calc(100vw - 32px))', 'important');
+    panel.style.setProperty('height', narrow ? 'min(86vh, 720px)' : 'min(78vh, 720px)', 'important');
+    panel.style.setProperty('max-height', narrow ? '90vh' : 'min(85vh, 760px)', 'important');
+  }
 
   function injectParams(usp, params) {
     if (!params || typeof params !== 'object') return;
@@ -116,6 +158,7 @@
     } else {
       modal.classList.remove('statistico-pe-modal-overlay--floating');
     }
+    applyPeLayout(modal, presentation);
     var iframe = document.getElementById(IFRAME_ID);
     if (iframe) iframe.src = href;
     modal.classList.add('open');
@@ -124,7 +167,10 @@
 
   function close() {
     var modal = document.getElementById(MODAL_ID);
-    if (modal) modal.classList.remove('open');
+    if (modal) {
+      modal.classList.remove('open');
+      clearPeLayout(modal);
+    }
     document.body.style.overflow = '';
   }
 

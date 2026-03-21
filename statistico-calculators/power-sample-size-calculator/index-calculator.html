@@ -2460,25 +2460,18 @@
 
     /**
      * @param powerX  desired power on the x-axis (e.g. 0.1 … 0.95)
-     * @param testTypeFallback  when set, used if za+zpRef ≤ 0 (avoids returning nRef for every x → flat line)
-     * @param omnibusFZa  when true (ANOVA / regression), use zα = Φ⁻¹(1−α) like the omnibus F tail, not the UI t-test two-sided z
      */
-    function sampleSizeCurveFromReference(powerX, alpha, alternative, nRef, pRef, testTypeFallback, omnibusFZa) {
+    function sampleSizeCurveFromReference(powerX, alpha, alternative, nRef, pRef) {
         const a = parseLocalizedNumber(alpha);
         const alphaEff = isFinite(a) && a > 0 && a < 1 ? a : 0.05;
-        const za = omnibusFZa === true
-            ? normalInverse(1 - alphaEff)
-            : (alternative === 'two-sided' ? normalInverse(1 - alphaEff / 2) : normalInverse(1 - alphaEff));
+        const za = alternative === 'two-sided' ? normalInverse(1 - alphaEff / 2) : normalInverse(1 - alphaEff);
         const clamp = function (q) { return Math.max(0.001, Math.min(0.999, q)); };
         const zp = normalInverse(clamp(powerX));
         const zpRef = normalInverse(clamp(pRef));
         const num = za + zp;
         const den = za + zpRef;
-        /* If alpha was mis-parsed (e.g. "0,05" → 0), za is non-finite; one-sided + low target power can make den ≤ 0 */
+        /* If alpha was mis-parsed (e.g. "0,05" → 0), za is non-finite and this used to fall back to nRef for every point → flat line */
         if (!isFinite(num) || !isFinite(den) || !(den > 0) || !isFinite(nRef) || nRef <= 0) {
-            if (testTypeFallback) {
-                return calculateSampleSizeForPower(testTypeFallback, powerX, alphaEff, alternative);
-            }
             return Math.max(2, Math.round(nRef));
         }
         const ratio = (num / den) * (num / den);
@@ -2498,42 +2491,17 @@
         const nRef = (result && isFinite(result.sampleSize) && result.sampleSize > 0) ? result.sampleSize : 0;
         const pRef = targetPower;
 
-        /* Reference curve: scale n from the last Calculate anchor (pRef, nRef) using normal quantiles.
-           For ANOVA/regression the main result uses non-central F (API) or a different search; the curve helper
-           calculateSampleSizeForPower uses calculateActualPower’s normal ncp f·√(nk), which is optimistic and
-           often hits the n≥2 floor for all powers → a flat line. Use reference scaling with omnibus F-style zα
-           for those tests; if the search path still yields a constant series, rebuild once with the same scaling. */
-        const omnibusRef = (testType === 'anova' || testType === 'regression');
-        const useNormalReferenceCurve =
-            nRef > 0 &&
-            isFinite(pRef) &&
-            pRef >= 0.05 &&
-            pRef <= 0.999;
-
         for (let p = 0.1; p <= 0.95; p += 0.05) {
             const rp = Math.round(p * 100) / 100;
             powerValues.push(rp);
             let nPt;
-            if (useNormalReferenceCurve) {
-                nPt = sampleSizeCurveFromReference(rp, alphaForCurve, alternative, nRef, pRef, testType, omnibusRef);
+            /* Allow pRef up to normalizeStatisticalPower max (0.999); strict < 0.999 skipped valid 99.9% runs */
+            if (nRef > 0 && isFinite(pRef) && pRef >= 0.05 && pRef <= 0.999) {
+                nPt = sampleSizeCurveFromReference(rp, alphaForCurve, alternative, nRef, pRef);
             } else {
                 nPt = calculateSampleSizeForPower(testType, rp, alphaForCurve, alternative);
             }
             sampleSizes.push(nPt);
-        }
-
-        if (omnibusRef && nRef > 0 && sampleSizes.length > 1) {
-            const firstN = sampleSizes[0];
-            let allSame = true;
-            for (let i = 1; i < sampleSizes.length; i++) {
-                if (sampleSizes[i] !== firstN) { allSame = false; break; }
-            }
-            if (allSame) {
-                for (let i = 0; i < powerValues.length; i++) {
-                    sampleSizes[i] = sampleSizeCurveFromReference(
-                        powerValues[i], alphaForCurve, alternative, nRef, pRef, undefined, true);
-                }
-            }
         }
 
         document.getElementById('chartPlaceholder').style.display = 'none';

@@ -2495,16 +2495,24 @@
         const nRef = (result && isFinite(result.sampleSize) && result.sampleSize > 0) ? result.sampleSize : 0;
         const pRef = targetPower;
 
-        /* ANOVA / regression: do NOT use sampleSizeCurveFromReference — it is normal-quantile scaling for z-tests.
-           For F-based designs it is the wrong model; also za+zpRef can be ≤0 (one-sided / edge α, power),
-           which triggers the fallback that returns nRef for every x → flat horizontal “curve”. */
-        const useNormalReferenceCurve =
-            testType !== 'anova' &&
-            testType !== 'regression' &&
+        /* Reference curve: scale n from the last Calculate anchor (pRef, nRef) using normal quantiles.
+           For ANOVA/regression the main result uses non-central F (API) or a different search; the curve helper
+           calculateSampleSizeForPower uses calculateActualPower’s normal ncp f·√(nk), which is optimistic and
+           often hits the n≥2 floor for all powers → a flat line. When za+zpRef>0, reference scaling matches the
+           dashboard n and rises with power; when den≤0 (rare edge α/power), stay on calculateSampleSizeForPower. */
+        let useNormalReferenceCurve =
             nRef > 0 &&
             isFinite(pRef) &&
             pRef >= 0.05 &&
             pRef <= 0.999;
+        if (useNormalReferenceCurve && (testType === 'anova' || testType === 'regression')) {
+            const za = alternative === 'two-sided' ? normalInverse(1 - alphaForCurve / 2) : normalInverse(1 - alphaForCurve);
+            const clampQ = function (q) { return Math.max(0.001, Math.min(0.999, q)); };
+            const zpRef = normalInverse(clampQ(pRef));
+            if (!isFinite(za) || !isFinite(zpRef) || !(za + zpRef > 0)) {
+                useNormalReferenceCurve = false;
+            }
+        }
 
         for (let p = 0.1; p <= 0.95; p += 0.05) {
             const rp = Math.round(p * 100) / 100;

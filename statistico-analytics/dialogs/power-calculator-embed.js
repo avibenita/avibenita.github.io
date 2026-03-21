@@ -8,7 +8,7 @@
 
   var EMBED_PATH = '/statistico-analytics/embed/index-calculator.html';
   /** Bump when calculator HTML/JS changes materially (Office/cache). */
-  var CACHE_BUSTER = '20260327-1';
+  var CACHE_BUSTER = '20260328-1';
 
   var MODAL_ID = 'statisticoPowerEmbedModal';
   var IFRAME_ID = 'statisticoPowerEmbedIframe';
@@ -39,7 +39,7 @@
     });
     var panel = modal.querySelector('.statistico-pe-modal-container');
     if (!panel) return;
-    ['width', 'height', 'max-height', 'pointer-events', 'flex'].forEach(function (k) {
+    ['width', 'height', 'max-height', 'pointer-events', 'flex', 'margin-inline', 'margin-inline-start', 'margin-inline-end'].forEach(function (k) {
       panel.style.removeProperty(k);
     });
   }
@@ -64,9 +64,11 @@
     modal.style.setProperty('z-index', '10000', 'important');
 
     if (presentation === 'floating') {
+      /* flex-end on the main axis is the *physical* right in LTR but the *physical* left in RTL (e.g. Hebrew Office).
+         Use margin-inline-start:auto so the panel sits on the logical “end” side in both directions. */
       var narrow = global.innerWidth <= 600;
       modal.style.setProperty('align-items', 'flex-end', 'important');
-      modal.style.setProperty('justify-content', narrow ? 'center' : 'flex-end', 'important');
+      modal.style.setProperty('justify-content', 'flex-start', 'important');
       modal.style.setProperty('background', 'transparent', 'important');
       modal.style.setProperty('backdrop-filter', 'none', 'important');
       modal.style.setProperty('-webkit-backdrop-filter', 'none', 'important');
@@ -81,6 +83,12 @@
 
       panel.style.setProperty('pointer-events', 'auto', 'important');
       panel.style.setProperty('flex', '0 1 auto', 'important');
+      if (narrow) {
+        panel.style.setProperty('margin-inline', 'auto', 'important');
+      } else {
+        panel.style.setProperty('margin-inline-start', 'auto', 'important');
+        panel.style.setProperty('margin-inline-end', '0', 'important');
+      }
       panel.style.setProperty('width', narrow ? 'calc(100vw - 16px)' : 'min(460px, calc(100vw - 32px))', 'important');
       panel.style.setProperty('height', narrow ? 'min(86vh, 720px)' : 'min(78vh, 720px)', 'important');
       panel.style.setProperty('max-height', narrow ? '90vh' : 'min(85vh, 760px)', 'important');

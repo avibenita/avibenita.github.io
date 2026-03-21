@@ -63,6 +63,11 @@
     .calculator-modal-overlay.open {
       display: flex;
     }
+    /* Light “porcelain” shell — contrasts with dark ANOVA app */
+    .calculator-modal-overlay.calculator-modal-overlay--light {
+      background: rgba(15, 23, 42, 0.52);
+      backdrop-filter: blur(8px);
+    }
     .calculator-modal-container {
       width: 75vw;
       height: 75vh;
@@ -75,6 +80,13 @@
       overflow: hidden;
       position: relative;
     }
+    .calculator-modal-container.calculator-popup-light {
+      background: #fafbfc;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      box-shadow:
+        0 25px 50px -12px rgba(15, 23, 42, 0.28),
+        0 0 0 1px rgba(255, 255, 255, 0.9) inset;
+    }
     .calculator-modal-header {
       padding: 12px 16px;
       background: var(--surface-2);
@@ -84,6 +96,10 @@
       justify-content: space-between;
       flex-shrink: 0;
     }
+    .calculator-popup-light .calculator-modal-header {
+      background: linear-gradient(180deg, #ffffff 0%, #f4f7fb 100%);
+      border-bottom: 1px solid #e2e8f0;
+    }
     .calculator-modal-title {
       font-size: 16px;
       font-weight: 600;
@@ -91,6 +107,13 @@
       display: flex;
       align-items: center;
       gap: 8px;
+    }
+    .calculator-popup-light .calculator-modal-title {
+      color: #0f7669;
+      letter-spacing: 0.01em;
+    }
+    .calculator-popup-light .calculator-modal-title i {
+      color: #14b8a6;
     }
     .calculator-modal-close {
       background: transparent;
@@ -111,11 +134,22 @@
       background: var(--surface-3);
       color: var(--text-primary);
     }
+    .calculator-popup-light .calculator-modal-close {
+      color: #64748b;
+      border-radius: 8px;
+    }
+    .calculator-popup-light .calculator-modal-close:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
     .calculator-modal-iframe {
       flex: 1;
       width: 100%;
       border: none;
       background: var(--surface-1);
+    }
+    .calculator-popup-light .calculator-modal-iframe {
+      background: #f1f5f9;
     }
     @media (max-width: 1200px) {
       .calculator-modal-container {
@@ -2982,6 +3016,7 @@
     var numGroups = 3;
     var effectSizeF = 0.25; /* default medium effect */
     var power = 0.80; /* default power */
+    var studyTotalN = 0; /* total participants in the actual study (for calculator display) */
     
     if (_bundle) {
       if (_bundle.spec) {
@@ -2992,6 +3027,7 @@
       if (_bundle.oneWay) {
         var ow = _bundle.oneWay;
         numGroups = ow.df1 ? ow.df1 + 1 : 3;
+        studyTotalN = ow.N || 0;
         if (isFinite(ow.etaSq) && ow.etaSq > 0 && ow.etaSq < 1) {
           effectSizeF = Math.sqrt(ow.etaSq / (1 - ow.etaSq));
         } else if (isFinite(ow.cohenF) && ow.cohenF > 0) {
@@ -3003,6 +3039,7 @@
         var factorA = (tw.dfA || 0) + 1;
         var factorB = (tw.dfB || 0) + 1;
         numGroups = factorA * factorB;
+        studyTotalN = tw.N || 0;
         /* Use the maximum eta-squared to calculate effect size */
         var maxEta = Math.max(
           isFinite(tw.etaSqA)  ? tw.etaSqA  : 0,
@@ -3014,6 +3051,7 @@
       } else if (_bundle.repeated) {
         var rm = _bundle.repeated;
         numGroups = (rm.dfConditions || 0) + 1;
+        studyTotalN = rm.N || 0;
         if (isFinite(rm.etaSqP) && rm.etaSqP > 0 && rm.etaSqP < 1) {
           effectSizeF = Math.sqrt(rm.etaSqP / (1 - rm.etaSqP));
         }
@@ -3029,6 +3067,13 @@
     urlParams.set('power', power);
     urlParams.set('numGroups', numGroups);
     urlParams.set('effectSizeF', effectSizeF.toFixed(3));
+    /* Lock study-design fields in the embedded calculator; pass observed total N */
+    urlParams.set('source', 'statistico');
+    /* Light theme inside iframe — reads as a separate “sheet” vs dark host */
+    urlParams.set('theme', 'light');
+    if (studyTotalN > 0) {
+      urlParams.set('studyTotalN', String(Math.round(studyTotalN)));
+    }
     
     var calculatorUrl = '';
     
@@ -3050,11 +3095,10 @@
     /* Open calculator in modal overlay */
     var modal = document.getElementById('calculatorModal');
     if (!modal) {
-      /* Create modal if it doesn't exist */
       modal = document.createElement('div');
       modal.id = 'calculatorModal';
-      modal.className = 'calculator-modal-overlay';
-      modal.innerHTML = '<div class="calculator-modal-container">' +
+      modal.className = 'calculator-modal-overlay calculator-modal-overlay--light';
+      modal.innerHTML = '<div class="calculator-modal-container calculator-popup-light">' +
         '<div class="calculator-modal-header">' +
         '<div class="calculator-modal-title"><i class="fas fa-calculator"></i> Power & Sample Size Calculator</div>' +
         '<button class="calculator-modal-close" onclick="closePowerModal()" title="Close"><i class="fas fa-times"></i></button>' +
@@ -3062,20 +3106,16 @@
         '<iframe class="calculator-modal-iframe" id="calculatorIframe" src=""></iframe>' +
         '</div>';
       document.body.appendChild(modal);
-      
-      /* Close on overlay click (but not on container click) */
       modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-          closePowerModal();
-        }
+        if (e.target === modal) closePowerModal();
       });
-      
-      /* Close on Escape key */
       document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && modal.classList.contains('open')) {
-          closePowerModal();
-        }
+        if (e.key === 'Escape' && modal.classList.contains('open')) closePowerModal();
       });
+    } else {
+      modal.classList.add('calculator-modal-overlay--light');
+      var contUp = modal.querySelector('.calculator-modal-container');
+      if (contUp) contUp.classList.add('calculator-popup-light');
     }
     
     /* Set iframe source and show modal */

@@ -1463,10 +1463,28 @@
         return Math.exp(-logBeta + (df1/2) * Math.log(df1/df2) + (df1/2 - 1) * Math.log(x) - ((df1+df2)/2) * Math.log(1 + (df1/df2) * x));
     }
 
+    /**
+     * Power must be in (0,1) for APIs and display. User entries like "095" parse as 95 → treat as percent.
+     */
+    function normalizeStatisticalPower(raw) {
+        let p = parseFloat(String(raw).replace(',', '.'));
+        if (!isFinite(p) || p <= 0) return 0.8;
+        if (p > 1 && p <= 100) p = p / 100;
+        if (p > 1) p = 0.99;
+        return Math.min(0.999, Math.max(0.05, p));
+    }
+
     // ── Calculation dispatcher ─────────────────────────────────────────
     async function calculateSampleSize() {
         const alpha = parseFloat(document.getElementById('alpha').value);
-        const power = parseFloat(document.getElementById('power').value);
+        const powerEl = document.getElementById('power');
+        const powerRaw = powerEl ? powerEl.value : '0.8';
+        const power = normalizeStatisticalPower(powerRaw);
+        const rawParsed = parseFloat(String(powerRaw).replace(',', '.'));
+        /* "095" → 95 → 0.95; "80" → 0.80 — fix the field so API and % labels are correct */
+        if (powerEl && isFinite(rawParsed) && rawParsed > 1) {
+            powerEl.value = power.toFixed(2);
+        }
         const alternative = document.getElementById('alternative').value;
         const testType = currentTestType;
 
@@ -1554,7 +1572,7 @@
         const btn = document.getElementById('calcBtn');
         if (btn) {
             btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-calculator"></i> Calculate';
+            btn.innerHTML = '<i class="fas fa-bolt"></i> Calculate';
         }
         document.getElementById('loadingModal').classList.add('hidden');
     }
@@ -1812,7 +1830,8 @@
         const strip = document.getElementById('decisionStrip');
         const stripText = document.getElementById('decisionText');
         strip.classList.remove('hidden');
-        stripText.textContent = `To detect this effect with ${(targetPower*100).toFixed(0)}% power at α=${alpha} → required n = ${result.sampleSize}` +
+        const tp = normalizeStatisticalPower(targetPower);
+        stripText.textContent = `To detect this effect with ${(tp*100).toFixed(0)}% power at α=${alpha} → required n = ${result.sampleSize}` +
             (result.sampleSize2 ? ` per group (${result.totalSampleSize} total)` : '') +
             (result.actualPower ? ` · achieved power = ${(result.actualPower*100).toFixed(1)}%` : '');
 
@@ -1843,7 +1862,7 @@
     // ── Power curve ───────────────────────────────────────────────────
     function createPowerCurve(testType, result) {
         const alpha = parseFloat(document.getElementById('alpha').value);
-        const targetPower = parseFloat(document.getElementById('power').value);
+        const targetPower = normalizeStatisticalPower(document.getElementById('power').value);
         const alternative = document.getElementById('alternative').value;
         const powerValues = [], sampleSizes = [];
 
@@ -1901,7 +1920,7 @@
 
     // ── Interpretation ─────────────────────────────────────────────────
     function updateInterpretation(testType, result) {
-        const power = parseFloat(document.getElementById('power').value);
+        const power = normalizeStatisticalPower(document.getElementById('power').value);
         const alpha = parseFloat(document.getElementById('alpha').value);
         const pct = (power*100).toFixed(0);
         let text = '';
@@ -1986,7 +2005,7 @@
             }
             if (params.has('power')) {
                 const powerEl = document.getElementById('power');
-                if (powerEl) powerEl.value = parseFloat(params.get('power'));
+                if (powerEl) powerEl.value = normalizeStatisticalPower(params.get('power')).toFixed(2);
             }
             if (params.has('alternative')) {
                 const alt = params.get('alternative');

@@ -49,6 +49,10 @@ def anova_module(request):
         target_power = float(request.args.get("target_power", 0.8))
         alpha = float(request.args.get("significance_level", 0.05))
 
+        # Accept mistaken "percent" input (e.g. 95 or 095 parsed as 95 from clients)
+        if target_power > 1.0 and target_power <= 100.0:
+            target_power = target_power / 100.0
+
         if num_groups < 2:
             return _json_cors({"error": "num_groups must be at least 2"}, 400)
         if effect_size_f <= 0:

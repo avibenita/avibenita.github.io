@@ -14,6 +14,8 @@
   <!-- Shared Header (same version pattern as other modules) -->
   <link rel="stylesheet" href="../shared-header.css?v=20260317"/>
   <script src="../shared-header.js?v=20260317"></script>
+  <link rel="stylesheet" href="../../power-calculator-embed.css?v=20260323"/>
+  <script src="../../power-calculator-embed.js?v=20260323"></script>
 
   <style>
     /* ── CSS tokens ─────────────────────────────────────────── */
@@ -46,123 +48,7 @@
       overflow-x:hidden;
     }
 
-    /* ── Calculator Modal ─────────────────────────────────────── */
-    .calculator-modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.75);
-      z-index: 10000;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      backdrop-filter: blur(4px);
-    }
-    .calculator-modal-overlay.open {
-      display: flex;
-    }
-    /* Light “porcelain” shell — contrasts with dark ANOVA app */
-    .calculator-modal-overlay.calculator-modal-overlay--light {
-      background: rgba(15, 23, 42, 0.52);
-      backdrop-filter: blur(8px);
-    }
-    .calculator-modal-container {
-      width: 75vw;
-      height: 75vh;
-      background: var(--surface-1);
-      border-radius: var(--panel-radius);
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-      border: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      position: relative;
-    }
-    .calculator-modal-container.calculator-popup-light {
-      background: #fafbfc;
-      border: 1px solid rgba(148, 163, 184, 0.5);
-      box-shadow:
-        0 25px 50px -12px rgba(15, 23, 42, 0.28),
-        0 0 0 1px rgba(255, 255, 255, 0.9) inset;
-    }
-    .calculator-modal-header {
-      padding: 12px 16px;
-      background: var(--surface-2);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-shrink: 0;
-    }
-    .calculator-popup-light .calculator-modal-header {
-      background: linear-gradient(180deg, #ffffff 0%, #f4f7fb 100%);
-      border-bottom: 1px solid #e2e8f0;
-    }
-    .calculator-modal-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--text-primary);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .calculator-popup-light .calculator-modal-title {
-      color: #0f7669;
-      letter-spacing: 0.01em;
-    }
-    .calculator-popup-light .calculator-modal-title i {
-      color: #14b8a6;
-    }
-    .calculator-modal-close {
-      background: transparent;
-      border: none;
-      color: var(--text-secondary);
-      font-size: 20px;
-      cursor: pointer;
-      padding: 4px 8px;
-      border-radius: 4px;
-      transition: background 0.2s, color 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 32px;
-      height: 32px;
-    }
-    .calculator-modal-close:hover {
-      background: var(--surface-3);
-      color: var(--text-primary);
-    }
-    .calculator-popup-light .calculator-modal-close {
-      color: #64748b;
-      border-radius: 8px;
-    }
-    .calculator-popup-light .calculator-modal-close:hover {
-      background: #e2e8f0;
-      color: #0f172a;
-    }
-    .calculator-modal-iframe {
-      flex: 1;
-      width: 100%;
-      border: none;
-      background: var(--surface-1);
-    }
-    .calculator-popup-light .calculator-modal-iframe {
-      background: #f1f5f9;
-    }
-    @media (max-width: 1200px) {
-      .calculator-modal-container {
-        width: 90vw;
-        height: 85vh;
-      }
-    }
-    @media (max-width: 768px) {
-      .calculator-modal-container {
-        width: 95vw;
-        height: 90vh;
-      }
-    }
+    /* Calculator modal: ../../power-calculator-embed.css (StatisticoPowerEmbed) */
 
     /* ── Page shell matching other modules ─────────────────── */
     .wrap{ display:flex; justify-content:center; padding:8px 12px 20px; }
@@ -3011,19 +2897,17 @@
    * passing the current ANOVA parameters via URL.
    */
   function openPowerModal() {
-    /* Extract parameters from current bundle */
+    /* Extract parameters from current bundle → shared embed calculator (power-calculator-embed.js) */
     var alpha = 0.05;
     var numGroups = 3;
     var effectSizeF = 0.25; /* default medium effect */
-    var power = 0.80; /* default power */
-    var studyTotalN = 0; /* total participants in the actual study (for calculator display) */
-    
+    var power = 0.80;
+    var studyTotalN = 0;
+
     if (_bundle) {
       if (_bundle.spec) {
         alpha = _bundle.spec.alpha || 0.05;
       }
-      
-      /* derive f, N, k for pre-fill */
       if (_bundle.oneWay) {
         var ow = _bundle.oneWay;
         numGroups = ow.df1 ? ow.df1 + 1 : 3;
@@ -3035,12 +2919,10 @@
         }
       } else if (_bundle.twoWay) {
         var tw = _bundle.twoWay;
-        /* For two-way: use total number of groups (Factor A × Factor B) */
         var factorA = (tw.dfA || 0) + 1;
         var factorB = (tw.dfB || 0) + 1;
         numGroups = factorA * factorB;
         studyTotalN = tw.N || 0;
-        /* Use the maximum eta-squared to calculate effect size */
         var maxEta = Math.max(
           isFinite(tw.etaSqA)  ? tw.etaSqA  : 0,
           isFinite(tw.etaSqB)  ? tw.etaSqB  : 0,
@@ -3057,94 +2939,26 @@
         }
       }
     }
-    
-    /* Build URL with parameters */
-    /* Build full URL using current origin - works for custom domains and GitHub Pages */
-    var urlParams = new URLSearchParams();
-    urlParams.set('test', 'anova');
-    urlParams.set('autoCalculate', 'true');
-    urlParams.set('alpha', alpha);
-    urlParams.set('power', power);
-    urlParams.set('numGroups', numGroups);
-    urlParams.set('effectSizeF', effectSizeF.toFixed(3));
-    /* Lock study-design fields in the embedded calculator; pass observed total N */
-    urlParams.set('source', 'statistico');
-    /* Light theme inside iframe — reads as a separate “sheet” vs dark host */
-    urlParams.set('theme', 'light');
-    /* Bust Office / browser cache on embedded calculator (otherwise old JS = wrong chart) */
-    urlParams.set('_cb', '20260322-4');
-    if (studyTotalN > 0) {
-      urlParams.set('studyTotalN', String(Math.round(studyTotalN)));
-    }
-    
-    var calculatorUrl = '';
-    
-    /* Live (https): use analytics/embed mirror — same tree as ANOVA; avoids Pages 404 on deep /statistico-calculators/... */
-    /* Source of truth in git: statistico-calculators/power-sample-size-calculator/index-calculator.html */
-    var _calcPath = '/statistico-analytics/embed/index-calculator.html';
-    if (window.location.protocol === 'file:') {
-      /* From: statistico-analytics/dialogs/views/anova/anova-results.html → run scripts/sync-embed-from-calculators.* after edits */
-      calculatorUrl = '../../../embed/index-calculator.html?' + urlParams.toString();
-    } else {
-      calculatorUrl = new URL(_calcPath + '?' + urlParams.toString(), window.location.origin).href;
-    }
 
-    /* Force embed for any non-embed calculator URL (legacy /statistico-calculators/..., typos, etc.) */
-    try {
-      var _u = new URL(calculatorUrl, window.location.href);
-      var _p = _u.pathname || '';
-      if (_p.indexOf('index-calculator') >= 0 && _p.indexOf('/statistico-analytics/embed/') < 0) {
-        calculatorUrl = new URL(_calcPath + '?' + urlParams.toString(), window.location.origin).href;
-      }
-    } catch (_e) { /* keep calculatorUrl as built */ }
-    
-    /* Debug: log the URL for troubleshooting */
-    console.log('Calculator URL:', calculatorUrl, 'origin:', window.location.origin, 'pathname:', window.location.pathname);
-    
-    /* Open calculator in modal overlay */
-    var modal = document.getElementById('calculatorModal');
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'calculatorModal';
-      modal.className = 'calculator-modal-overlay calculator-modal-overlay--light';
-      modal.innerHTML = '<div class="calculator-modal-container calculator-popup-light">' +
-        '<div class="calculator-modal-header">' +
-        '<div class="calculator-modal-title"><i class="fas fa-calculator"></i> Power & Sample Size Calculator</div>' +
-        '<button class="calculator-modal-close" onclick="closePowerModal()" title="Close"><i class="fas fa-times"></i></button>' +
-        '</div>' +
-        '<iframe class="calculator-modal-iframe" id="calculatorIframe" src=""></iframe>' +
-        '</div>';
-      document.body.appendChild(modal);
-      modal.addEventListener('click', function(e) {
-        if (e.target === modal) closePowerModal();
-      });
-      document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && modal.classList.contains('open')) closePowerModal();
-      });
-    } else {
-      modal.classList.add('calculator-modal-overlay--light');
-      var contUp = modal.querySelector('.calculator-modal-container');
-      if (contUp) contUp.classList.add('calculator-popup-light');
+    if (typeof StatisticoPowerEmbed === 'undefined') {
+      console.error('StatisticoPowerEmbed not loaded (power-calculator-embed.js)');
+      return;
     }
-    
-    /* Set iframe source and show modal */
-    var iframe = document.getElementById('calculatorIframe');
-    if (iframe) {
-      iframe.src = calculatorUrl;
-    }
-    modal.classList.add('open');
-    
-    /* Prevent body scroll when modal is open */
-    document.body.style.overflow = 'hidden';
+    var q = {
+      test: 'anova',
+      autoCalculate: 'true',
+      alpha: alpha,
+      power: power,
+      numGroups: numGroups,
+      effectSizeF: effectSizeF.toFixed(3),
+      source: 'statistico'
+    };
+    if (studyTotalN > 0) q.studyTotalN = String(Math.round(studyTotalN));
+    StatisticoPowerEmbed.open(q);
   }
-  
+
   function closePowerModal() {
-    var modal = document.getElementById('calculatorModal');
-    if (modal) {
-      modal.classList.remove('open');
-      /* Restore body scroll */
-      document.body.style.overflow = '';
-    }
+    if (typeof StatisticoPowerEmbed !== 'undefined') StatisticoPowerEmbed.close();
   }
 
   /* ──────────────────────────────────────────────────────────────

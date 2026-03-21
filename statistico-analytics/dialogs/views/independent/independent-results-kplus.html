@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
@@ -12,6 +12,8 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260309c" />
   <script src="../shared-header.js?v=20260309c"></script>
+  <link rel="stylesheet" href="../../power-calculator-embed.css?v=20260323"/>
+  <script src="../../power-calculator-embed.js?v=20260323"></script>
 
   <script>
     // AI API Key configuration (Groq)
@@ -708,12 +710,17 @@
           </div></div></div>
         </section>
         <section id="tab-power" class="tab-panel">
-          <div class="stats-container"><div class="stat-panel"><div class="stat-panel-heading">Power & Sample Size (Python)</div><div class="stat-panel-body">
+          <div class="statistico-pe-embed-cta">
+            <button type="button" class="statistico-pe-embed-btn" onclick="openIndependentKPlusPowerEmbed()">
+              <i class="fas fa-calculator"></i> Open Power &amp; Sample Size calculator
+            </button>
+            <p class="statistico-pe-embed-note">k-group independent design → pre-fills the <strong>ANOVA</strong> module (Cohen’s f, k, α) in the same embedded calculator as one-way ANOVA results.</p>
+          </div>
+          <div class="stats-container"><div class="stat-panel"><div class="stat-panel-heading">Bundle snapshot (debug)</div><div class="stat-panel-body">
             <div class="stat-field"><span class="stat-label">Status</span><span class="stat-value" id="powNote">...</span></div>
             <div class="stat-field"><span class="stat-label">Endpoint</span><span class="stat-value" id="powEndpoint">...</span></div>
             <div class="stat-field"><span class="stat-label">Placeholder Power</span><span class="stat-value" id="powVal">...</span></div>
           </div></div></div>
-          <div class="section-note">Power is designed to call a Python service endpoint with exact/simulation routines.</div>
         </section>
         <section id="tab-report" class="tab-panel">
           <!-- AI Statistical Summary Panel -->
@@ -794,6 +801,38 @@
   <script>
     let globalDecimalPrecision = "auto";
     let lastBundle = null;
+
+    /** k-group independent → ANOVA module in embed (approx. one-way). */
+    function openIndependentKPlusPowerEmbed() {
+      if (typeof StatisticoPowerEmbed === 'undefined') {
+        alert('Power calculator embed not loaded.');
+        return;
+      }
+      var b = lastBundle || {};
+      var s = b.setup || {};
+      var r = b.results || {};
+      var e = b.explore || {};
+      var ob = r.omnibus || {};
+      var ksum = e.kplusSummary || {};
+      var alpha = 1 - (parseMaybeNumber(s.confidence) || 0.95);
+      if (!isFinite(alpha) || alpha <= 0 || alpha >= 1) alpha = 0.05;
+      var k = isFinite(parseMaybeNumber(ob.anovaDf1)) ? Math.round(parseMaybeNumber(ob.anovaDf1) + 1) : (parseMaybeNumber(ksum.variableCount) || 3);
+      if (!isFinite(k) || k < 2) k = 3;
+      var f = parseMaybeNumber(ob.cohenF);
+      if (!isFinite(f) || f <= 0) f = 0.25;
+      var ntot = parseMaybeNumber(ob.N) || parseMaybeNumber(ksum.totalN) || 0;
+      var o = {
+        test: 'anova',
+        autoCalculate: 'true',
+        alpha: alpha,
+        power: 0.8,
+        numGroups: k,
+        effectSizeF: f.toFixed(3),
+        source: 'statistico'
+      };
+      if (ntot > 0) o.studyTotalN = String(Math.round(ntot));
+      StatisticoPowerEmbed.open(o);
+    }
     let primaryFramework = "parametric";
     let availableHeaders = [];
     let currentCompareMode = "k-plus";

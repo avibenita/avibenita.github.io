@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
@@ -12,6 +12,8 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260309c" />
   <script src="../shared-header.js?v=20260309c"></script>
+  <link rel="stylesheet" href="../../power-calculator-embed.css?v=20260323"/>
+  <script src="../../power-calculator-embed.js?v=20260323"></script>
 
   <script>
     // AI API Key configuration (Groq)
@@ -506,12 +508,17 @@
           </div></div></div>
         </section>
         <section id="tab-power" class="tab-panel">
-          <div class="stats-container"><div class="stat-panel"><div class="stat-panel-heading">Power & Sample Size (Python)</div><div class="stat-panel-body">
+          <div class="statistico-pe-embed-cta">
+            <button type="button" class="statistico-pe-embed-btn" onclick="openDependentPowerEmbed()">
+              <i class="fas fa-calculator"></i> Open Power &amp; Sample Size calculator
+            </button>
+            <p class="statistico-pe-embed-note">Paired / repeated-measures on two time points: uses the <strong>one-sample</strong> module on mean difference (Cohen’s d<sub>z</sub> ≈ Hedges g from your results). Same embedded app as ANOVA.</p>
+          </div>
+          <div class="stats-container"><div class="stat-panel"><div class="stat-panel-heading">Bundle snapshot (debug)</div><div class="stat-panel-body">
             <div class="stat-field"><span class="stat-label">Status</span><span class="stat-value" id="powNote">...</span></div>
             <div class="stat-field"><span class="stat-label">Endpoint</span><span class="stat-value" id="powEndpoint">...</span></div>
             <div class="stat-field"><span class="stat-label">Placeholder Power</span><span class="stat-value" id="powVal">...</span></div>
           </div></div></div>
-          <div class="section-note">Power is designed to call a Python service endpoint with exact/simulation routines.</div>
         </section>
         <section id="tab-report" class="tab-panel">
           <div class="stat-panel"><div class="stat-panel-heading">APA-ready Report</div><div class="stat-panel-body">
@@ -524,6 +531,31 @@
   <script>
     let globalDecimalPrecision = "auto";
     let lastBundle = null;
+
+    /** Power & sample size: embed calculator, one-sample mean on differences (paired). */
+    function openDependentPowerEmbed() {
+      if (typeof StatisticoPowerEmbed === 'undefined') {
+        alert('Power calculator embed not loaded.');
+        return;
+      }
+      var b = lastBundle || {};
+      var s = b.setup || {};
+      var fx = b.effects || {};
+      var alpha = 1 - (parseMaybeNumber(s.confidence) || 0.95);
+      if (!isFinite(alpha) || alpha <= 0 || alpha >= 1) alpha = 0.05;
+      var d = parseMaybeNumber(fx.hedgesG);
+      if (!isFinite(d) || d <= 0) d = 0.5;
+      var alt = (s.hypothesis === 'one-sided' || currentHypothesis === 'one-sided') ? 'one-sided' : 'two-sided';
+      StatisticoPowerEmbed.open({
+        test: 'one-sample-mean',
+        autoCalculate: 'true',
+        alpha: alpha,
+        power: 0.8,
+        effectSize: d.toFixed(3),
+        alternative: alt,
+        source: 'statistico'
+      });
+    }
     let primaryFramework = "parametric";
     let availableHeaders = [];
     let currentCompareMode = "two-vars";

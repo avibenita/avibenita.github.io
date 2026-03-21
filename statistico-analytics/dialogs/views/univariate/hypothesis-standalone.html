@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -10,6 +10,8 @@
   <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
   <link rel="stylesheet" href="../shared-header.css?v=20260312d">
   <script src="../shared-header.js?v=20260312d"></script>
+  <link rel="stylesheet" href="../../power-calculator-embed.css?v=20260323">
+  <script src="../../power-calculator-embed.js?v=20260323"></script>
   
   <!-- AI Configuration -->
   <script>
@@ -3095,55 +3097,38 @@ Decision: ${testData.decision}`;
       }
     }
 
-    window.openPowerAnalysis = async function() {
-      console.log('?? Power Analysis button clicked');
-      console.log('?? currentTestResults:', window.currentTestResults);
-      console.log('?? resultsData:', resultsData);
-      
+    /** Same Power & Sample Size embed as ANOVA / independent / dependent (URL-prefilled means module). */
+    window.openPowerAnalysis = function() {
       if (!window.currentTestResults) {
-        console.warn('?? No test results available');
         showNotification('No test results available. Please run a test first.', 'error');
         return;
       }
-
-      try {
-        console.log('? Power Analysis requested - opening modal');
-
-        // Get modal elements
-        const overlay = document.getElementById('powerOverlay');
-        const loader = document.getElementById('powerOverlayLoader');
-        const content = document.getElementById('powerOverlayContent');
-        
-        if (!overlay) {
-          console.error('? powerOverlay element not found!');
-          showNotification('Power Analysis modal not found', 'error');
-          return;
-        }
-
-        console.log('? Modal elements found, opening...');
-        
-        overlay.classList.add('open');
-        loader.style.display = 'flex';
-        content.classList.add('hidden');
-
-        // Calculate power analysis with async/await
-        setTimeout(async () => {
-          try {
-            await calculatePowerAnalysis();
-            loader.style.display = 'none';
-            content.classList.remove('hidden');
-            console.log('? Power analysis displayed');
-          } catch (calcError) {
-            console.error('? Error calculating power:', calcError);
-            showNotification('Error calculating power: ' + calcError.message, 'error');
-            closePowerAnalysis();
-          }
-        }, 300);
-
-      } catch (error) {
-        console.error('? Error opening power analysis:', error);
-        showNotification('Error opening power analysis: ' + error.message, 'error', 5000);
+      if (typeof StatisticoPowerEmbed === 'undefined') {
+        showNotification('Power calculator embed not loaded.', 'error');
+        return;
       }
+      var r = window.currentTestResults;
+      var tt = String(r.testType || '').toLowerCase();
+      var alpha = (isFinite(r.alpha) && r.alpha > 0 && r.alpha < 1) ? r.alpha : 0.05;
+      var ori = String(r.orientation || '');
+      var alt = ori.toLowerCase().indexOf('two') >= 0 ? 'two-sided' : 'one-sided';
+      var d = (isFinite(r.effectSize) && r.effectSize > 0) ? r.effectSize : 0.5;
+      var params = {
+        autoCalculate: 'true',
+        alpha: alpha,
+        power: 0.8,
+        alternative: alt,
+        source: 'statistico'
+      };
+      if (tt.indexOf('two-sample') >= 0 || tt.indexOf('two sample') >= 0 || tt.indexOf('independent') >= 0) {
+        params.test = 'two-sample-mean';
+        params.effectSize2 = Number(d).toFixed(3);
+        params.allocationRatio = 1;
+      } else {
+        params.test = 'one-sample-mean';
+        params.effectSize = Number(d).toFixed(3);
+      }
+      StatisticoPowerEmbed.open(params);
     };
 
     window.closePowerAnalysis = function() {

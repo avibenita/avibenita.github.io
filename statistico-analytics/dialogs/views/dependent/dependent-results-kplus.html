@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
@@ -12,6 +12,8 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260309c" />
   <script src="../shared-header.js?v=20260309c"></script>
+  <link rel="stylesheet" href="../../power-calculator-embed.css?v=20260323"/>
+  <script src="../../power-calculator-embed.js?v=20260323"></script>
 
   <script>
     // AI API Key configuration (Groq)
@@ -1330,9 +1332,13 @@
           </div>
         </section>
         <section id="tab-power" class="tab-panel">
-          <div class="power-analysis-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <div class="power-analysis-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px;">
             <h2 style="margin:0;font-size:1em;color:#ff9d5c;"><i class="fa-solid fa-bolt"></i> Power Analysis</h2>
+            <button type="button" class="statistico-pe-embed-btn" style="max-width:none;padding:8px 14px;font-size:12px;" onclick="openDependentKPlusPowerEmbed()">
+              <i class="fas fa-calculator"></i> Open embed calculator (ANOVA)
+            </button>
           </div>
+          <p class="statistico-pe-embed-note" style="margin:0 0 8px;">Uses the same <code>/statistico-analytics/embed/</code> Power &amp; Sample Size app as ANOVA, pre-filled from this RM-ANOVA (Cohen’s f, k, N).</p>
           
           <div class="stats-container" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
             <!-- Observed Statistics Panel -->
@@ -1530,6 +1536,39 @@
     let currentHypothesis = "two-sided";
     let currentPrimaryTest = "welch";
     let persistedColumns = { groupA: "", groupB: "", valueColumn: "", groupColumn: "" };
+
+    /** RM k+ → ANOVA module in shared embed (Cohen’s f, k — between-subjects approximation). */
+    function openDependentKPlusPowerEmbed() {
+      if (typeof StatisticoPowerEmbed === 'undefined') {
+        alert('Power calculator embed not loaded.');
+        return;
+      }
+      var b = lastBundle || {};
+      var s = b.setup || {};
+      var ob = (b.results || {}).omnibus || {};
+      var k = Array.isArray(s.selectedColumns) ? s.selectedColumns.length : 3;
+      if (isFinite(parseMaybeNumber(ob.anovaDf1))) k = Math.round(parseMaybeNumber(ob.anovaDf1) + 1);
+      var f = parseMaybeNumber(ob.cohenF);
+      if (!isFinite(f) || f <= 0) {
+        var pe = parseMaybeNumber(ob.partialEtaSquared);
+        if (isFinite(pe) && pe > 0 && pe < 1) f = Math.sqrt(pe / (1 - pe));
+        else f = 0.25;
+      }
+      var alpha = 1 - (parseMaybeNumber(s.confidence) || 0.95);
+      if (!isFinite(alpha) || alpha <= 0 || alpha >= 1) alpha = 0.05;
+      var n = parseMaybeNumber(ob.n) || 0;
+      var o = {
+        test: 'anova',
+        autoCalculate: 'true',
+        alpha: alpha,
+        power: 0.8,
+        numGroups: Math.max(2, Math.round(k)),
+        effectSizeF: f.toFixed(3),
+        source: 'statistico'
+      };
+      if (n > 0) o.studyTotalN = String(Math.round(n));
+      StatisticoPowerEmbed.open(o);
+    }
     
     function onFrameworkChange() {
       const fwRadio = document.querySelector('input[name="frameworkMode"]:checked');

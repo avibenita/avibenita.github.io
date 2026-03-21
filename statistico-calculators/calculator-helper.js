@@ -85,20 +85,20 @@ function navigateToCalculator(testType, params = {}, autoCalculate = true, newWi
  */
 function getCalculatorBaseURL() {
     /**
-     * Single source of truth: Statistico-Website/index-calculator.html
-     * (statistico-calculators/SampleSizeCalculator.html only redirects for legacy URLs.)
+     * Single source of truth: statistico-calculators/index-calculator.html
+     * (SampleSizeCalculator.html redirects here for legacy URLs.)
      */
     const origin = window.location.origin;
     const path = window.location.pathname || '/';
     const sc = path.indexOf('/statistico-calculators');
     if (sc >= 0) {
-        return origin + path.substring(0, sc) + '/Statistico-Website/index-calculator.html';
+        return origin + path.substring(0, sc) + '/statistico-calculators/index-calculator.html';
     }
     const sw = path.indexOf('/Statistico-Website/');
     if (sw >= 0) {
-        return origin + path.substring(0, sw + '/Statistico-Website'.length) + '/index-calculator.html';
+        return origin + path.substring(0, sw) + '/statistico-calculators/index-calculator.html';
     }
-    return origin + '/Statistico-Website/index-calculator.html';
+    return origin + '/statistico-calculators/index-calculator.html';
 }
 
 /**

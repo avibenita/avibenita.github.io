@@ -2338,7 +2338,8 @@
                 const ncp = effectSize * Math.sqrt(n);
                 power = alternative === 'two-sided' ? normalCDF(ncp-cz) + (1-normalCDF(ncp+cz)) : 1-normalCDF(cz-ncp);
             }
-            return Math.max(0.05, Math.min(0.99, power));
+            const out = Math.max(0.05, Math.min(0.99, power));
+            return isFinite(out) ? out : 0.1;
         } catch(e) { return 0.1; }
     }
 
@@ -2358,21 +2359,32 @@
         } catch(e) { return 0.5; }
     }
 
+    /**
+     * Smallest per-group n (or generic n) such that approximate power >= targetPower.
+     * Uses monotone binary search — NOT “best diff” on mid, which stuck ~5000 when power
+     * plateaued near 0.99 for almost all n (flat blue curve bug).
+     */
     function calculateSampleSizeForPower(testType, targetPower, alpha, alternative) {
         try {
             const effectSize = getEffectSizeFromTestType(testType);
             if (!effectSize || effectSize <= 0) return Math.floor(10 + targetPower * 100);
-            let low = 2, high = 10000, bestN = 50, bestDiff = Infinity;
-            for (let i = 0; i < 100; i++) {
-                const mid = Math.floor((low + high) / 2);
-                const achieved = calculateSimplePowerForCurve(mid, effectSize, alpha, alternative, testType);
-                const diff = Math.abs(achieved - targetPower);
-                if (diff < bestDiff) { bestDiff = diff; bestN = mid; }
-                if (diff < 0.005) return mid;
-                if (achieved < targetPower) low = mid + 1; else high = mid - 1;
-                if (low > high) break;
+            const tp = Math.max(0.05, Math.min(0.99, targetPower));
+            const hiCap = 100000;
+
+            function achievedAt(n) {
+                const p = calculateSimplePowerForCurve(n, effectSize, alpha, alternative, testType);
+                return isFinite(p) ? p : 0;
             }
-            return Math.max(2, Math.min(10000, bestN));
+
+            if (achievedAt(hiCap) < tp) return hiCap;
+
+            let lo = 2, hi = hiCap;
+            while (lo < hi) {
+                const mid = Math.floor((lo + hi) / 2);
+                if (achievedAt(mid) < tp) lo = mid + 1;
+                else hi = mid;
+            }
+            return Math.max(2, Math.min(hiCap, lo));
         } catch(e) { return Math.floor(20 * Math.pow(targetPower/(1-targetPower), 2)); }
     }
 
@@ -2414,12 +2426,20 @@
     /** Avoid stacked Highcharts instances on repeated Calculate (stale / wrong series). */
     function destroyPowerChartIfAny() {
         const el = document.getElementById('powerChart');
-        if (!el || typeof Highcharts === 'undefined' || !Highcharts.charts) return;
-        for (let i = Highcharts.charts.length - 1; i >= 0; i--) {
-            const c = Highcharts.charts[i];
-            if (c && c.renderTo === el) {
-                c.destroy();
-                break;
+        if (!el || typeof Highcharts === 'undefined') return;
+        try {
+            if (typeof Highcharts.getChart === 'function') {
+                const ch = Highcharts.getChart(el);
+                if (ch && typeof ch.destroy === 'function') { ch.destroy(); return; }
+            }
+        } catch (e) { /* ignore */ }
+        if (Highcharts.charts) {
+            for (let i = Highcharts.charts.length - 1; i >= 0; i--) {
+                const c = Highcharts.charts[i];
+                if (c && c.renderTo === el) {
+                    c.destroy();
+                    break;
+                }
             }
         }
     }

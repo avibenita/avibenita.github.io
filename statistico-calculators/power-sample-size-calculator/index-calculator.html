@@ -2460,8 +2460,9 @@
 
     /**
      * @param powerX  desired power on the x-axis (e.g. 0.1 … 0.95)
+     * @param testTypeFallback  when set, used if za+zpRef ≤ 0 (avoids returning nRef for every x → flat line)
      */
-    function sampleSizeCurveFromReference(powerX, alpha, alternative, nRef, pRef) {
+    function sampleSizeCurveFromReference(powerX, alpha, alternative, nRef, pRef, testTypeFallback) {
         const a = parseLocalizedNumber(alpha);
         const alphaEff = isFinite(a) && a > 0 && a < 1 ? a : 0.05;
         const za = alternative === 'two-sided' ? normalInverse(1 - alphaEff / 2) : normalInverse(1 - alphaEff);
@@ -2470,8 +2471,11 @@
         const zpRef = normalInverse(clamp(pRef));
         const num = za + zp;
         const den = za + zpRef;
-        /* If alpha was mis-parsed (e.g. "0,05" → 0), za is non-finite and this used to fall back to nRef for every point → flat line */
+        /* If alpha was mis-parsed (e.g. "0,05" → 0), za is non-finite; one-sided + low target power can make den ≤ 0 */
         if (!isFinite(num) || !isFinite(den) || !(den > 0) || !isFinite(nRef) || nRef <= 0) {
+            if (testTypeFallback) {
+                return calculateSampleSizeForPower(testTypeFallback, powerX, alphaEff, alternative);
+            }
             return Math.max(2, Math.round(nRef));
         }
         const ratio = (num / den) * (num / den);
@@ -2491,13 +2495,23 @@
         const nRef = (result && isFinite(result.sampleSize) && result.sampleSize > 0) ? result.sampleSize : 0;
         const pRef = targetPower;
 
+        /* ANOVA / regression: do NOT use sampleSizeCurveFromReference — it is normal-quantile scaling for z-tests.
+           For F-based designs it is the wrong model; also za+zpRef can be ≤0 (one-sided / edge α, power),
+           which triggers the fallback that returns nRef for every x → flat horizontal “curve”. */
+        const useNormalReferenceCurve =
+            testType !== 'anova' &&
+            testType !== 'regression' &&
+            nRef > 0 &&
+            isFinite(pRef) &&
+            pRef >= 0.05 &&
+            pRef <= 0.999;
+
         for (let p = 0.1; p <= 0.95; p += 0.05) {
             const rp = Math.round(p * 100) / 100;
             powerValues.push(rp);
             let nPt;
-            /* Allow pRef up to normalizeStatisticalPower max (0.999); strict < 0.999 skipped valid 99.9% runs */
-            if (nRef > 0 && isFinite(pRef) && pRef >= 0.05 && pRef <= 0.999) {
-                nPt = sampleSizeCurveFromReference(rp, alphaForCurve, alternative, nRef, pRef);
+            if (useNormalReferenceCurve) {
+                nPt = sampleSizeCurveFromReference(rp, alphaForCurve, alternative, nRef, pRef, testType);
             } else {
                 nPt = calculateSampleSizeForPower(testType, rp, alphaForCurve, alternative);
             }

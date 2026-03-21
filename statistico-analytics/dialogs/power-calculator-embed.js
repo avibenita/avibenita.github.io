@@ -8,10 +8,11 @@
 
   var EMBED_PATH = '/statistico-analytics/embed/index-calculator.html';
   /** Bump when calculator HTML/JS changes materially (Office/cache). */
-  var CACHE_BUSTER = '20260323-1';
+  var CACHE_BUSTER = '20260324-1';
 
   var MODAL_ID = 'statisticoPowerEmbedModal';
   var IFRAME_ID = 'statisticoPowerEmbedIframe';
+  var PRESENTATION_ATTR = 'data-statistico-pe-presentation';
 
   function injectParams(usp, params) {
     if (!params || typeof params !== 'object') return;
@@ -68,7 +69,9 @@
     document.body.appendChild(modal);
 
     modal.addEventListener('click', function (e) {
-      if (e.target === modal) close();
+      if (e.target !== modal) return;
+      if (modal.getAttribute(PRESENTATION_ATTR) === 'floating') return;
+      close();
     });
     modal.querySelector('[data-statistico-pe-close]').addEventListener('click', function (e) {
       e.preventDefault();
@@ -85,9 +88,12 @@
    * Open embed calculator.
    * @param {object} params Query params; must include `test` (e.g. anova, two-sample-mean, one-sample-mean).
    *        Common: alpha, power, autoCalculate, source, alternative, plus test-specific fields.
+   *        presentation: 'floating' | 'modal' — floating = corner panel, no dimmer, page stays scrollable (default modal).
    */
   function open(params) {
     var p = Object.assign({}, params || {});
+    var presentation = p.presentation === 'floating' ? 'floating' : 'modal';
+    delete p.presentation;
     if (!p.test) {
       console.warn('StatisticoPowerEmbed.open: missing test; defaulting to two-sample-mean');
       p.test = 'two-sample-mean';
@@ -104,10 +110,16 @@
     } catch (_e) { /* ignore */ }
 
     var modal = ensureModal();
+    modal.setAttribute(PRESENTATION_ATTR, presentation);
+    if (presentation === 'floating') {
+      modal.classList.add('statistico-pe-modal-overlay--floating');
+    } else {
+      modal.classList.remove('statistico-pe-modal-overlay--floating');
+    }
     var iframe = document.getElementById(IFRAME_ID);
     if (iframe) iframe.src = href;
     modal.classList.add('open');
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = presentation === 'modal' ? 'hidden' : '';
   }
 
   function close() {

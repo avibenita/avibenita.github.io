@@ -3072,10 +3072,11 @@
     /* Light theme inside iframe — reads as a separate “sheet” vs dark host */
     urlParams.set('theme', 'light');
     /* Bust Office / browser cache on embedded calculator (otherwise old JS = wrong chart) */
-    urlParams.set('_cb', '20260322-5');
+    urlParams.set('_cb', '20260322-7');
     if (studyTotalN > 0) {
       urlParams.set('studyTotalN', String(Math.round(studyTotalN)));
     }
+    var queryString = urlParams.toString();
     
     var calculatorUrl = '';
     
@@ -3083,11 +3084,12 @@
        /statistico-calculators/... (see .github/workflows/static.yml copy step). */
     /* Source of truth in git: statistico-calculators/power-sample-size-calculator/index-calculator.html */
     var _calcPath = '/statistico-analytics/embed/index-calculator.html';
+    var _calcFallbackPath = '/statistico-calculators/power-sample-size-calculator/index-calculator.html';
     if (window.location.protocol === 'file:') {
       /* From: dialogs/views/anova/ → dialogs/embed/ (run scripts/sync-embed-from-calculators.* after calculator edits) */
-      calculatorUrl = '../../../embed/index-calculator.html?' + urlParams.toString();
+      calculatorUrl = '../../../embed/index-calculator.html?' + queryString;
     } else {
-      calculatorUrl = new URL(_calcPath + '?' + urlParams.toString(), window.location.origin).href;
+      calculatorUrl = new URL(_calcPath + '?' + queryString, window.location.origin).href;
     }
 
     /* Force embed for any non-embed calculator URL (legacy /statistico-calculators/..., typos, etc.) */
@@ -3095,7 +3097,7 @@
       var _u = new URL(calculatorUrl, window.location.href);
       var _p = _u.pathname || '';
       if (_p.indexOf('index-calculator') >= 0 && _p.indexOf('/statistico-analytics/embed/') < 0) {
-        calculatorUrl = new URL(_calcPath + '?' + urlParams.toString(), window.location.origin).href;
+        calculatorUrl = new URL(_calcPath + '?' + queryString, window.location.origin).href;
       }
     } catch (_e) { /* keep calculatorUrl as built */ }
     
@@ -3131,7 +3133,27 @@
     /* Set iframe source and show modal */
     var iframe = document.getElementById('calculatorIframe');
     if (iframe) {
+      iframe.setAttribute('title', 'Power and sample size calculator');
+      iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
       iframe.src = calculatorUrl;
+      /* If embed mirror is missing (e.g. stale deploy), same-origin HEAD → fallback URL. No layout/CSS change. */
+      if (window.location.protocol !== 'file:' && typeof fetch === 'function') {
+        var _probeUrl = new URL(_calcPath + '?' + queryString, window.location.origin).href;
+        var _fallbackCalc = new URL(_calcFallbackPath + '?' + queryString, window.location.origin).href;
+        var _ac = new AbortController();
+        var _probeT = setTimeout(function() { try { _ac.abort(); } catch (_x) {} }, 4000);
+        fetch(_probeUrl.split('#')[0], { method: 'HEAD', cache: 'no-store', signal: _ac.signal })
+          .then(function(res) {
+            clearTimeout(_probeT);
+            if (res.status !== 404) return;
+            var ifEl = document.getElementById('calculatorIframe');
+            var mod = document.getElementById('calculatorModal');
+            if (!ifEl || !mod || !mod.classList.contains('open')) return;
+            console.warn('[Statistico ANOVA] Power embed returned 404; loading fallback:', _fallbackCalc);
+            ifEl.src = _fallbackCalc;
+          })
+          .catch(function() { clearTimeout(_probeT); });
+      }
     }
     modal.classList.add('open');
     
@@ -3140,6 +3162,8 @@
   }
   
   function closePowerModal() {
+    var iframe = document.getElementById('calculatorIframe');
+    if (iframe) iframe.src = 'about:blank';
     var modal = document.getElementById('calculatorModal');
     if (modal) {
       modal.classList.remove('open');

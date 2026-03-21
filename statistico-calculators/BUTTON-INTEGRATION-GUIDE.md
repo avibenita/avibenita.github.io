@@ -1,5 +1,8 @@
 # Power & Sample Size Button Integration Guide
 
+**Canonical calculator (live):** `/Statistico-Website/index-calculator.html`  
+`statistico-calculators/SampleSizeCalculator.html` **redirects** there and keeps the query string (legacy links still work).
+
 ## Quick Update for ANOVA Dashboard
 
 If your "Power & Sample Size" button is pointing to an old version, update it using one of these methods:
@@ -26,7 +29,8 @@ If your "Power & Sample Size" button is pointing to an old version, update it us
 ### Method 2: Direct URL (If helper script not available)
 
 ```html
-<button class="power-button" onclick="window.location.href = '../statistico-calculators/SampleSizeCalculator.html?test=anova&numGroups=3&effectSizeF=0.25&alpha=0.05&power=0.80&autoCalculate=true'">
+<!-- Prefer Statistico-Website (same query params as before) -->
+<button class="power-button" onclick="window.location.href = '../Statistico-Website/index-calculator.html?test=anova&numGroups=3&effectSizeF=0.25&alpha=0.05&power=0.80&autoCalculate=true'">
     <i class="fas fa-bolt"></i> Power & Sample Size
 </button>
 ```

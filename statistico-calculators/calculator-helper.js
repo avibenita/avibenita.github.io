@@ -84,17 +84,21 @@ function navigateToCalculator(testType, params = {}, autoCalculate = true, newWi
  * @returns {string} Base URL
  */
 function getCalculatorBaseURL() {
-    // Try to detect the base path
-    const currentPath = window.location.pathname;
-    if (currentPath.includes('/statistico-calculators/')) {
-        return window.location.origin + currentPath.substring(0, currentPath.lastIndexOf('/') + 1) + 'SampleSizeCalculator.html';
-    } else if (currentPath.includes('/Statistico-Website/')) {
-        // If in Statistico-Website, navigate to statistico-calculators
-        return window.location.origin + '/statistico-calculators/SampleSizeCalculator.html';
-    } else {
-        // Default relative path
-        return './statistico-calculators/SampleSizeCalculator.html';
+    /**
+     * Single source of truth: Statistico-Website/index-calculator.html
+     * (statistico-calculators/SampleSizeCalculator.html only redirects for legacy URLs.)
+     */
+    const origin = window.location.origin;
+    const path = window.location.pathname || '/';
+    const sc = path.indexOf('/statistico-calculators');
+    if (sc >= 0) {
+        return origin + path.substring(0, sc) + '/Statistico-Website/index-calculator.html';
     }
+    const sw = path.indexOf('/Statistico-Website/');
+    if (sw >= 0) {
+        return origin + path.substring(0, sw + '/Statistico-Website'.length) + '/index-calculator.html';
+    }
+    return origin + '/Statistico-Website/index-calculator.html';
 }
 
 /**

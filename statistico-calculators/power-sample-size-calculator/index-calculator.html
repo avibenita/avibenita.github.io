@@ -2776,7 +2776,8 @@
         const alternative = document.getElementById('alternative').value;
         const powerValues = [], sampleSizes = [];
 
-        const nRef = (result && isFinite(result.sampleSize) && result.sampleSize > 0) ? result.sampleSize : 0;
+        const nRefNum = result != null ? Number(result.sampleSize) : NaN;
+        const nRef = (isFinite(nRefNum) && nRefNum > 0) ? nRefNum : 0;
         const pRef = targetPower;
 
         function ingestApiPowerCurve(curve) {
@@ -2796,6 +2797,19 @@
             }
             if (pts.length < 2) return false;
             pts.sort(function (a, b) { return a.x - b.x; });
+            /* Remote bug / stub: API sometimes sends the same n for every power → flat blue line.
+               Ignore and fall back to client scaling + binary search (index100 intent). */
+            if (pts.length >= 6) {
+                var y0 = pts[0].y;
+                var allSame = true;
+                for (var t = 1; t < pts.length; t++) {
+                    if (pts[t].y !== y0) { allSame = false; break; }
+                }
+                if (allSame) {
+                    console.warn('[Power calc] Ignoring degenerate API power_curve (constant n); using client curve.');
+                    return false;
+                }
+            }
             powerValues.length = 0;
             sampleSizes.length = 0;
             for (let j = 0; j < pts.length; j++) {
@@ -2817,6 +2831,20 @@
                     nPt = calculateSampleSizeForPower(testType, rp, alphaForCurve, alternative);
                 }
                 sampleSizes.push(nPt);
+            }
+        }
+
+        /* ANOVA: if every point is the same n (degenerate API curve or bad scaling), recompute per power. */
+        if (testType === 'anova' && powerValues.length >= 6 && sampleSizes.length === powerValues.length) {
+            var y0 = sampleSizes[0];
+            var flatClient = true;
+            for (var fi = 1; fi < sampleSizes.length; fi++) {
+                if (sampleSizes[fi] !== y0) { flatClient = false; break; }
+            }
+            if (flatClient) {
+                for (var fj = 0; fj < powerValues.length; fj++) {
+                    sampleSizes[fj] = calculateSampleSizeForPower('anova', powerValues[fj], alphaForCurve, alternative);
+                }
             }
         }
 

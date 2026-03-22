@@ -2825,12 +2825,25 @@
                 powerValues.push(rp);
                 let nPt;
                 /* Allow pRef up to normalizeStatisticalPower max (0.999); strict < 0.999 skipped valid 99.9% runs */
-                if (nRef > 0 && isFinite(pRef) && pRef >= 0.05 && pRef <= 0.999) {
+                /* ANOVA: always use per-power binary search on the same approximate power model.
+                   Normal z-scaling from (p_ref, n_ref) is for t/z-style tests; for F/ANOVA it can
+                   mis-track and collapse to a constant n_ref (flat blue line). Higher target power
+                   must require >= n (monotone) under a fixed f and k. */
+                if (testType !== 'anova' && nRef > 0 && isFinite(pRef) && pRef >= 0.05 && pRef <= 0.999) {
                     nPt = sampleSizeCurveFromReference(rp, alphaForCurve, alternative, nRef, pRef);
                 } else {
                     nPt = calculateSampleSizeForPower(testType, rp, alphaForCurve, alternative);
                 }
                 sampleSizes.push(nPt);
+            }
+        }
+
+        /* ANOVA: enforce non-decreasing n vs power (x-axis is sorted); fixes rare discrete glitches. */
+        if (testType === 'anova' && sampleSizes.length > 1) {
+            for (var mi = 1; mi < sampleSizes.length; mi++) {
+                if (sampleSizes[mi] < sampleSizes[mi - 1]) {
+                    sampleSizes[mi] = sampleSizes[mi - 1];
+                }
             }
         }
 

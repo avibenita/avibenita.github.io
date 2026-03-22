@@ -32,10 +32,9 @@
         }
     } catch (e) {}
     </script>
-    <script src="https://code.highcharts.com/highcharts.js"></script>
-    <script src="https://code.highcharts.com/modules/annotations.js"></script>
-    <script src="https://code.highcharts.com/modules/exporting.js"></script>
-    <script src="https://code.highcharts.com/modules/export-data.js"></script>
+    <!-- Core only: optional modules were removed — they threw if core failed to load (common with file:// / blocked CDN). -->
+    <script src="https://code.highcharts.com/highcharts.js"
+            onerror="this.onerror=null;var h=document.createElement('script');h.src='https://cdn.jsdelivr.net/npm/highcharts@11/highcharts.js';document.head.appendChild(h);"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
     <style>
         :root {
@@ -1210,6 +1209,81 @@
             width: 100%;
             height: 100%;
             min-height: 280px;
+        }
+
+        .power-chart-fallback .power-chart-fallback-msg,
+        .power-chart-fallback .power-chart-fallback-tip {
+            max-width: 520px;
+            text-align: center;
+            font-size: 0.88rem;
+            line-height: 1.45;
+            color: #9ba3b8;
+        }
+
+        html.theme-embed-light .power-chart-fallback .power-chart-fallback-msg,
+        html.theme-embed-light .power-chart-fallback .power-chart-fallback-tip {
+            color: #64748b;
+        }
+
+        .power-chart-fallback .power-chart-fallback-tip code {
+            font-size: 0.82rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.25);
+        }
+
+        html.theme-embed-light .power-chart-fallback .power-chart-fallback-tip code {
+            background: #f1f5f9;
+            color: #0f172a;
+        }
+
+        .power-chart-fallback-table-wrap {
+            width: 100%;
+            max-width: 360px;
+            max-height: 200px;
+            overflow: auto;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: 6px;
+        }
+
+        html.theme-embed-light .power-chart-fallback-table-wrap {
+            border-color: #e2e8f0;
+        }
+
+        .power-chart-fallback-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+        }
+
+        .power-chart-fallback-table th,
+        .power-chart-fallback-table td {
+            padding: 6px 10px;
+            text-align: right;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .power-chart-fallback-table th {
+            text-align: right;
+            font-weight: 700;
+            color: var(--accent-1);
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        html.theme-embed-light .power-chart-fallback-table th {
+            background: #f8fafc;
+            color: #0f7669;
+        }
+
+        html.theme-embed-light .power-chart-fallback-table th,
+        html.theme-embed-light .power-chart-fallback-table td {
+            border-bottom-color: #e2e8f0;
+        }
+
+        .power-chart-fallback-table td:first-child,
+        .power-chart-fallback-table th:first-child {
+            text-align: left;
         }
 
         /* Interpretation */
@@ -2657,6 +2731,34 @@
         return Math.max(2, Math.ceil(isFinite(nEst) ? nEst : nRef));
     }
 
+    function isHighchartsAvailable() {
+        return typeof Highcharts !== 'undefined' && typeof Highcharts.chart === 'function';
+    }
+
+    /** When Highcharts never loaded (file://, blocked CDN, offline), still show numeric sweep + dev tip. */
+    function showPowerCurveFallback(powerValues, sampleSizes) {
+        const ph = document.getElementById('chartPlaceholder');
+        const chartEl = document.getElementById('powerChart');
+        if (chartEl) chartEl.style.display = 'none';
+        destroyPowerChartIfAny();
+        if (!ph) return;
+        ph.className = 'placeholder-state power-chart-fallback';
+        ph.style.display = 'flex';
+        ph.style.height = 'auto';
+        ph.style.minHeight = '250px';
+        let rows = '';
+        for (let i = 0; i < powerValues.length; i++) {
+            rows += '<tr><td>' + (powerValues[i] * 100).toFixed(0) + '%</td><td>' + Math.round(sampleSizes[i]) + '</td></tr>';
+        }
+        ph.innerHTML =
+            '<i class="fas fa-chart-area"></i>' +
+            '<p class="power-chart-fallback-msg"><strong>Power curve chart unavailable</strong> — the Highcharts script did not load (often when opening HTML as <code>file://</code> or when the browser blocks the CDN). The sample-size results above are still valid.</p>' +
+            '<div class="power-chart-fallback-table-wrap"><table class="power-chart-fallback-table"><thead><tr><th>Target power</th><th>Required n</th></tr></thead><tbody>' +
+            rows +
+            '</tbody></table></div>' +
+            '<p class="power-chart-fallback-tip">For the interactive chart locally, serve the folder over HTTP, e.g. from repo root: <code>npx --yes serve -p 4173</code> then open<br><code>http://localhost:4173/statistico-calculators/power-sample-size-calculator/index-calculator.html</code></p>';
+    }
+
     // ── Power curve ───────────────────────────────────────────────────
     function createPowerCurve(testType, result) {
         const alphaEl = document.getElementById('alpha');
@@ -2682,6 +2784,12 @@
             sampleSizes.push(nPt);
         }
 
+        if (!isHighchartsAvailable()) {
+            console.warn('[Power calc] Highcharts not available — showing numeric fallback.');
+            showPowerCurveFallback(powerValues, sampleSizes);
+            return;
+        }
+
         document.getElementById('chartPlaceholder').style.display = 'none';
         const chartEl = document.getElementById('powerChart');
         chartEl.style.display = 'block';
@@ -2705,46 +2813,51 @@
         const tipBorder = L ? '#cbd5e1' : '#555';
         const tipColor = L ? '#0f172a' : '#e8e8e8';
 
-        Highcharts.chart('powerChart', {
-            title: { text: 'Required Sample Size vs Statistical Power', style: { color: cTitle, fontSize: '13px', fontWeight: '700' } },
-            xAxis: {
-                title: { text: 'Statistical Power', style: { color: cText } },
-                labels: { style: { color: cText }, formatter: function() { return (this.value*100).toFixed(0)+'%'; } },
-                min: 0.1, max: 0.95, gridLineColor: cGrid, lineColor: cGrid
-            },
-            yAxis: {
-                title: { text: 'Required Sample Size', style: { color: cText } },
-                labels: { style: { color: cText } }, min: 0, gridLineColor: cGrid, lineColor: cGrid
-            },
-            chart: { backgroundColor: 'transparent', style: { fontFamily: 'Segoe UI' }, height: 300 },
-            legend: { itemStyle: { color: cText, fontSize: '11px' } },
-            series: [
-                {
-                    name: 'Sample Size Curve',
-                    data: powerValues.map((p, i) => [p, sampleSizes[i]]),
-                    type: 'line', color: cLine, lineWidth: 2.5
+        try {
+            Highcharts.chart('powerChart', {
+                title: { text: 'Required Sample Size vs Statistical Power', style: { color: cTitle, fontSize: '13px', fontWeight: '700' } },
+                xAxis: {
+                    title: { text: 'Statistical Power', style: { color: cText } },
+                    labels: { style: { color: cText }, formatter: function() { return (this.value*100).toFixed(0)+'%'; } },
+                    min: 0.1, max: 0.95, gridLineColor: cGrid, lineColor: cGrid
                 },
-                {
-                    name: 'Target Power',
-                    data: [[targetPower, 0], [targetPower, maxCurveY]],
-                    type: 'line', color: cGreen, dashStyle: 'dash', lineWidth: 1.5
+                yAxis: {
+                    title: { text: 'Required Sample Size', style: { color: cText } },
+                    labels: { style: { color: cText } }, min: 0, gridLineColor: cGrid, lineColor: cGrid
                 },
-                {
-                    name: 'Required n',
-                    data: [[0.1, result.sampleSize], [0.95, result.sampleSize]],
-                    type: 'line', color: cRed, dashStyle: 'dash', lineWidth: 1.5
+                chart: { backgroundColor: 'transparent', style: { fontFamily: 'Segoe UI' }, height: 300 },
+                legend: { itemStyle: { color: cText, fontSize: '11px' } },
+                series: [
+                    {
+                        name: 'Sample Size Curve',
+                        data: powerValues.map((p, i) => [p, sampleSizes[i]]),
+                        type: 'line', color: cLine, lineWidth: 2.5
+                    },
+                    {
+                        name: 'Target Power',
+                        data: [[targetPower, 0], [targetPower, maxCurveY]],
+                        type: 'line', color: cGreen, dashStyle: 'dash', lineWidth: 1.5
+                    },
+                    {
+                        name: 'Required n',
+                        data: [[0.1, result.sampleSize], [0.95, result.sampleSize]],
+                        type: 'line', color: cRed, dashStyle: 'dash', lineWidth: 1.5
+                    }
+                ],
+                plotOptions: { series: { marker: { enabled: false } } },
+                tooltip: {
+                    formatter: function() {
+                        return '<b>' + this.series.name + '</b><br/>Power: ' + (this.x*100).toFixed(1) + '%<br/>n: ' + Math.round(this.y);
+                    },
+                    style: { color: tipColor },
+                    backgroundColor: tipBg,
+                    borderColor: tipBorder
                 }
-            ],
-            plotOptions: { series: { marker: { enabled: false } } },
-            tooltip: {
-                formatter: function() {
-                    return '<b>' + this.series.name + '</b><br/>Power: ' + (this.x*100).toFixed(1) + '%<br/>n: ' + Math.round(this.y);
-                },
-                style: { color: tipColor },
-                backgroundColor: tipBg,
-                borderColor: tipBorder
-            }
-        });
+            });
+        } catch (hcErr) {
+            console.warn('[Power calc] Highcharts.chart failed:', hcErr);
+            showPowerCurveFallback(powerValues, sampleSizes);
+        }
     }
 
     // ── Interpretation ─────────────────────────────────────────────────

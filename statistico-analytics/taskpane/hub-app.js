@@ -6,6 +6,33 @@
 
 let MODULES = [];
 
+/** Ensures Cluster appears even if a cached or older modules.config.json omits it (inserted after PCA). */
+var CLUSTER_MODULE_CARD = {
+  id: "cluster",
+  group: "multivariate",
+  icon: "fa-object-group",
+  color: "#14b8a6",
+  bg: "rgba(20,184,166,.12)",
+  name: "Cluster Analysis",
+  desc: "Partition observations into groups using K-means or hierarchical agglomerative clustering on numeric inputs.",
+  info: [
+    "K-means (Euclidean, standardisation optional)",
+    "Hierarchical: average, complete, single linkage",
+    "Cluster sizes & case assignments",
+    "Correlation heatmap of inputs",
+    "Runs in the task pane — no cloud round-trip"
+  ]
+};
+
+function ensureClusterModule(list) {
+  var out = list.slice();
+  if (out.some(function(m) { return m.id === "cluster"; })) return out;
+  var pcaIdx = out.findIndex(function(m) { return m.id === "pca"; });
+  if (pcaIdx >= 0) out.splice(pcaIdx + 1, 0, CLUSTER_MODULE_CARD);
+  else out.push(CLUSTER_MODULE_CARD);
+  return out;
+}
+
 async function loadModulesConfig() {
   const url = new URL("modules.config.json", window.location.href);
   url.searchParams.set("v", String(Date.now()));
@@ -34,9 +61,13 @@ function makeCard(m) {
   const div = document.createElement("div");
   div.className = "module-card";
   div.onclick = function() { navigateToModule(m.id); };
+  var iconBg = m.bg ? String(m.bg) : "";
+  var iconColor = m.color ? String(m.color) : "";
+  var wrapSt = iconBg ? ' style="background:' + iconBg + ' !important"' : "";
+  var iSt = iconColor ? ' style="color:' + iconColor + ' !important"' : "";
   div.innerHTML =
-    '<div class="module-icon">' +
-    '  <i class="fa-solid ' + m.icon + '"></i>' +
+    '<div class="module-icon"' + wrapSt + ">" +
+    '  <i class="fa-solid ' + m.icon + '"' + iSt + "></i>" +
     "</div>" +
     '<div class="module-name">' + escapeHtml(m.name) + "</div>" +
     '<button class="mod-info-btn" type="button" title="What\'s included">i</button>' +
@@ -136,7 +167,7 @@ Office.onReady(function(info) {
   }
   loadModulesConfig()
     .then(function(list) {
-      MODULES = list;
+      MODULES = ensureClusterModule(list);
       renderModules(MODULES);
     })
     .catch(function(err) {

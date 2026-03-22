@@ -2482,10 +2482,18 @@
             const totalN = Math.ceil(json.total_sample_size || (n * numGroups));
             const actualPower = json.actual_power || power;
             if (!n || n < 1) throw new Error('Invalid sample size from API');
+            /* Remote API may return power_curve — use for chart (index100 / avoids flat curve from reusing single n). */
+            let powerCurve = null;
+            if (Array.isArray(json.power_curve)) {
+                powerCurve = json.power_curve;
+            } else if (Array.isArray(json.powerCurve)) {
+                powerCurve = json.powerCurve;
+            }
             await new Promise(r => setTimeout(r, 300));
             return { sampleSize: n, totalSampleSize: totalN, effectSize: f,
                      testType: 'One-Way ANOVA',
-                     actualPower: actualPower };
+                     actualPower: actualPower,
+                     powerCurve: powerCurve };
         } catch (error) {
             console.warn('Cloud function unavailable, using fallback approximation:', error);
             updateLoadingMessage('Cloud function unavailable, using approximation...');
@@ -2771,17 +2779,45 @@
         const nRef = (result && isFinite(result.sampleSize) && result.sampleSize > 0) ? result.sampleSize : 0;
         const pRef = targetPower;
 
-        for (let p = 0.1; p <= 0.95; p += 0.05) {
-            const rp = Math.round(p * 100) / 100;
-            powerValues.push(rp);
-            let nPt;
-            /* Allow pRef up to normalizeStatisticalPower max (0.999); strict < 0.999 skipped valid 99.9% runs */
-            if (nRef > 0 && isFinite(pRef) && pRef >= 0.05 && pRef <= 0.999) {
-                nPt = sampleSizeCurveFromReference(rp, alphaForCurve, alternative, nRef, pRef);
-            } else {
-                nPt = calculateSampleSizeForPower(testType, rp, alphaForCurve, alternative);
+        function ingestApiPowerCurve(curve) {
+            if (!Array.isArray(curve) || curve.length < 2) return false;
+            const pts = [];
+            for (let i = 0; i < curve.length; i++) {
+                const pt = curve[i];
+                if (!pt || typeof pt !== 'object') continue;
+                const px = pt.power != null ? Number(pt.power) : (Array.isArray(pt) ? Number(pt[0]) : NaN);
+                const ny = pt.n != null ? Number(pt.n)
+                    : pt.n_per_group != null ? Number(pt.n_per_group)
+                    : pt.required_sample_size_per_group != null ? Number(pt.required_sample_size_per_group)
+                    : (Array.isArray(pt) ? Number(pt[1]) : NaN);
+                if (isFinite(px) && isFinite(ny) && px > 0 && px < 1 && ny >= 1) {
+                    pts.push({ x: Math.round(px * 1000) / 1000, y: Math.max(2, Math.round(ny)) });
+                }
             }
-            sampleSizes.push(nPt);
+            if (pts.length < 2) return false;
+            pts.sort(function (a, b) { return a.x - b.x; });
+            powerValues.length = 0;
+            sampleSizes.length = 0;
+            for (let j = 0; j < pts.length; j++) {
+                powerValues.push(pts[j].x);
+                sampleSizes.push(pts[j].y);
+            }
+            return true;
+        }
+
+        if (!(result && ingestApiPowerCurve(result.powerCurve))) {
+            for (let p = 0.1; p <= 0.95; p += 0.05) {
+                const rp = Math.round(p * 100) / 100;
+                powerValues.push(rp);
+                let nPt;
+                /* Allow pRef up to normalizeStatisticalPower max (0.999); strict < 0.999 skipped valid 99.9% runs */
+                if (nRef > 0 && isFinite(pRef) && pRef >= 0.05 && pRef <= 0.999) {
+                    nPt = sampleSizeCurveFromReference(rp, alphaForCurve, alternative, nRef, pRef);
+                } else {
+                    nPt = calculateSampleSizeForPower(testType, rp, alphaForCurve, alternative);
+                }
+                sampleSizes.push(nPt);
+            }
         }
 
         if (!isHighchartsAvailable()) {

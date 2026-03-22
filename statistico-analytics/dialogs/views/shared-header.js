@@ -100,6 +100,8 @@ const StatisticoHeader = {
       this.module = 'logistic';
     } else if (viewName.includes('factor')) {
       this.module = 'factor';
+    } else if (viewName.includes('cluster')) {
+      this.module = 'cluster';
     } else if (viewName.includes('independent')) {
       this.module = 'independent';
     } else if (viewName.includes('dependent')) {
@@ -257,6 +259,9 @@ const StatisticoHeader = {
       // PCA views
       'pca-analysis': 'Principal Component Analysis',
 
+      // Cluster analysis
+      'cluster-analysis': 'Cluster Analysis',
+
       // ANOVA views
       'anova-results': 'ANOVA',
       // Power & Sample Size
@@ -279,6 +284,7 @@ const StatisticoHeader = {
       'logistic': 'Logistic Regression',
       'factor': 'Factor Analysis',
       'pca': 'PCA',
+      'cluster': 'Cluster Analysis',
       'anova': 'ANOVA',
       'power': 'Power & Sample Size'
     };
@@ -313,7 +319,7 @@ const StatisticoHeader = {
     `;
 
     // All sidebar-based modules hide the shared-header navrow to avoid duplicate navigation.
-    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate');
+    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate');
 
     const headerHTML = `
       <div class="statistico-shell">

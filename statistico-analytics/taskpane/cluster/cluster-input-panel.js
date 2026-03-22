@@ -3,7 +3,6 @@
 let clusterRangeData = null;
 let clusterRangeAddress = "";
 let clusterDialog = null;
-let clusterConfigDialog = null;
 
 function clusterCfg() {
   if (typeof window.getClusterModuleConfig === "function") {
@@ -13,20 +12,25 @@ function clusterCfg() {
 }
 
 function onRangeDataLoaded(values, address) {
-  const btn = document.getElementById("runClusterBtn");
+  const runBtn = document.getElementById("runClusterBtn");
+  const configureBtn = document.getElementById("configureClusterBtn");
   const hint = document.getElementById("hintText");
+  const hintDash = document.getElementById("hintDashboardText");
   const ui = (clusterCfg().ui) || {};
   if (!values || values.length < 2) {
     clusterRangeData = null;
     clusterRangeAddress = "";
-    if (btn) btn.disabled = true;
+    if (runBtn) runBtn.disabled = true;
+    if (configureBtn) configureBtn.disabled = true;
     if (hint) hint.textContent = ui.hintNeedRange || "Select a data range to continue";
     return;
   }
   clusterRangeData = values;
   clusterRangeAddress = address || "";
-  if (btn) btn.disabled = false;
-  if (hint) hint.textContent = ui.hintReady || "Review module configuration, then open the cluster dashboard";
+  if (configureBtn) configureBtn.disabled = false;
+  if (runBtn) runBtn.disabled = false;
+  if (hint) hint.textContent = ui.hintReadyPick || "Ready — click Configure clustering to set options";
+  if (hintDash) hintDash.textContent = ui.hintDashboard || "Adjust options above, then open the dashboard";
 }
 
 function getDialogsBaseUrl() {
@@ -400,78 +404,6 @@ function buildClusterBundle(headers, rows, spec) {
   };
 }
 
-function getClusterConfigPayload() {
-  return {
-    moduleConfig: clusterCfg(),
-    runtimeSpec: readClusterSpec(),
-    rangeAddress: clusterRangeAddress || ""
-  };
-}
-
-function pushClusterConfigToDialog() {
-  if (!clusterConfigDialog) return;
-  try {
-    clusterConfigDialog.messageChild(JSON.stringify({
-      action: "clusterConfigPayload",
-      payload: getClusterConfigPayload()
-    }));
-  } catch (e) {
-    console.error("clusterConfig messageChild:", e);
-  }
-}
-
-function openClusterModuleConfigDialog(opts) {
-  const options = opts || {};
-  const continueToDashboard = !!options.continueToDashboard;
-  const dlg = clusterCfg().dialog || {};
-  const cfgFile = dlg.configDialogFilename || "cluster/cluster-config-dialog.html";
-  const hPct = dlg.configDialogHeightPercent != null ? Number(dlg.configDialogHeightPercent) : 58;
-  const wPct = dlg.configDialogWidthPercent != null ? Number(dlg.configDialogWidthPercent) : 46;
-  const cont = continueToDashboard ? "1" : "0";
-  const dialogUrl = `${getDialogsBaseUrl()}${cfgFile}?continue=${cont}&v=${Date.now()}`;
-
-  Office.context.ui.displayDialogAsync(
-    dialogUrl,
-    { height: hPct, width: wPct, displayInIframe: false },
-    (asyncResult) => {
-      if (asyncResult.status === Office.AsyncResultStatus.Failed) {
-        console.error("Failed to open cluster config dialog:", asyncResult.error);
-        return;
-      }
-      clusterConfigDialog = asyncResult.value;
-      clusterConfigDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
-        let message = null;
-        try {
-          message = typeof arg.message === "string" ? JSON.parse(arg.message) : arg.message;
-        } catch (e) {
-          console.error("Cluster config dialog message:", e);
-          return;
-        }
-        if (!message || !message.action) return;
-        if (message.action === "requestClusterConfig") {
-          pushClusterConfigToDialog();
-        } else if (message.action === "clusterConfigClose") {
-          try {
-            clusterConfigDialog.close();
-          } catch (e) {}
-          clusterConfigDialog = null;
-        } else if (message.action === "clusterConfigContinue") {
-          try {
-            clusterConfigDialog.close();
-          } catch (e) {}
-          clusterConfigDialog = null;
-          saveClusterSpec();
-          openClusterResultsDialogOnly();
-        }
-      });
-      clusterConfigDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
-        clusterConfigDialog = null;
-      });
-      setTimeout(() => pushClusterConfigToDialog(), 1100);
-    }
-  );
-}
-
 function openClusterResultsDialogOnly() {
   if (!clusterRangeData || clusterRangeData.length < 2) return;
   const dlg = clusterCfg().dialog || {};
@@ -511,13 +443,8 @@ function openClusterResultsDialogOnly() {
 
 function openClusterResultsDialog() {
   if (!clusterRangeData || clusterRangeData.length < 2) return;
-  const wf = clusterCfg().workflow || {};
-  if (wf.openModuleConfigDialogBeforeDashboard !== false) {
-    openClusterModuleConfigDialog({ continueToDashboard: true });
-  } else {
-    saveClusterSpec();
-    openClusterResultsDialogOnly();
-  }
+  saveClusterSpec();
+  openClusterResultsDialogOnly();
 }
 
 function sendClusterBundle() {
@@ -539,6 +466,5 @@ function sendClusterBundle() {
 
 window.onRangeDataLoaded = onRangeDataLoaded;
 window.openClusterResultsDialog = openClusterResultsDialog;
-window.openClusterModuleConfigDialog = openClusterModuleConfigDialog;
 window.readClusterSpec = readClusterSpec;
 window.saveClusterSpec = saveClusterSpec;

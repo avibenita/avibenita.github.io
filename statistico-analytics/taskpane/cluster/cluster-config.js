@@ -13,14 +13,10 @@
     displayName: "Cluster Analysis",
     version: "1.0.0",
     theme: { clr: "#0d9488", clrDark: "#0f766e", clrLight: "#f0fdfa", clrBorder: "#99f6e4" },
-    workflow: { openModuleConfigDialogBeforeDashboard: true },
     dialog: {
       resultsFilename: "cluster/cluster-analysis.html",
       heightPercent: 90,
-      widthPercent: 70,
-      configDialogFilename: "cluster/cluster-config-dialog.html",
-      configDialogHeightPercent: 58,
-      configDialogWidthPercent: 46
+      widthPercent: 70
     },
     defaults: { numClusters: 3, standardize: true, linkage: "average" },
     limits: {
@@ -45,9 +41,12 @@
       labelLinkage: "Hierarchical linkage",
       labelStandardize: "Standardise variables (recommended)",
       runButtonHtml: "<i class=\"fa-solid fa-chart-diagram\"></i><span>Open cluster dashboard</span>",
-      hintReady: "Review module configuration, then open the cluster dashboard",
-      hintNeedRange: "Select a data range to continue",
-      openModuleConfigButton: "Open module configuration"
+      configureClusterButtonHtml: "<i class=\"fa-solid fa-sliders\"></i><span>Configure clustering</span>",
+      hintReadyPick: "Ready — click Configure clustering to set options",
+      hintDashboard: "Adjust options above, then open the dashboard",
+      clusterSetupTitle: "Clustering setup",
+      backToRangeButton: "Back to range selection",
+      hintNeedRange: "Select a data range to continue"
     }
   };
 
@@ -125,8 +124,17 @@
     var runBtn = document.getElementById("runClusterBtn");
     if (runBtn && ui.runButtonHtml) runBtn.innerHTML = ui.runButtonHtml;
 
-    var cfgBtn = document.getElementById("btnOpenClusterModuleConfig");
-    if (cfgBtn && ui.openModuleConfigButton) cfgBtn.textContent = ui.openModuleConfigButton;
+    var configureBtn = document.getElementById("configureClusterBtn");
+    if (configureBtn && ui.configureClusterButtonHtml) configureBtn.innerHTML = ui.configureClusterButtonHtml;
+
+    var setupTitle = document.getElementById("clusterSetupTitleText");
+    if (setupTitle && ui.clusterSetupTitle) setupTitle.textContent = ui.clusterSetupTitle;
+
+    var backBtn = document.getElementById("clusterBackToRangeBtn");
+    if (backBtn && ui.backToRangeButton) backBtn.textContent = ui.backToRangeButton;
+
+    var hintDash = document.getElementById("hintDashboardText");
+    if (hintDash && ui.hintDashboard) hintDash.textContent = ui.hintDashboard;
 
     /* hintText is updated when range loads (cluster-input-panel.js) */
   }

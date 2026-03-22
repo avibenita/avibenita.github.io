@@ -4,20 +4,28 @@ let clusterRangeData = null;
 let clusterRangeAddress = "";
 let clusterDialog = null;
 
+function clusterCfg() {
+  if (typeof window.getClusterModuleConfig === "function") {
+    return window.getClusterModuleConfig();
+  }
+  return {};
+}
+
 function onRangeDataLoaded(values, address) {
   const btn = document.getElementById("runClusterBtn");
   const hint = document.getElementById("hintText");
+  const ui = (clusterCfg().ui) || {};
   if (!values || values.length < 2) {
     clusterRangeData = null;
     clusterRangeAddress = "";
     if (btn) btn.disabled = true;
-    if (hint) hint.textContent = "Select a data range to continue";
+    if (hint) hint.textContent = ui.hintNeedRange || "Select a data range to continue";
     return;
   }
   clusterRangeData = values;
   clusterRangeAddress = address || "";
   if (btn) btn.disabled = false;
-  if (hint) hint.textContent = "Adjust options, then open the cluster dashboard";
+  if (hint) hint.textContent = ui.hintReady || "Adjust options, then open the cluster dashboard";
 }
 
 function getDialogsBaseUrl() {
@@ -29,12 +37,20 @@ function getDialogsBaseUrl() {
 }
 
 function readClusterSpec() {
+  const cfg = clusterCfg();
+  const lim = cfg.limits || {};
+  const def = cfg.defaults || {};
+  const kMin = lim.kMin != null ? Number(lim.kMin) : 2;
+  const kMax = lim.kMax != null ? Number(lim.kMax) : 50;
   const kEl = document.getElementById("clusterK");
-  const k = Math.max(2, parseInt(kEl && kEl.value, 10) || 3);
+  let k = parseInt(kEl && kEl.value, 10);
+  if (!isFinite(k)) k = def.numClusters != null ? Number(def.numClusters) : 3;
+  k = Math.max(kMin, Math.min(kMax, k));
   const stdEl = document.getElementById("clusterStandardize");
-  const standardize = !stdEl || stdEl.checked;
+  let standardize = def.standardize !== false;
+  if (stdEl) standardize = stdEl.checked;
   const linkEl = document.getElementById("clusterLinkage");
-  const linkage = (linkEl && linkEl.value) || "average";
+  const linkage = (linkEl && linkEl.value) || def.linkage || "average";
   return { k, standardize, linkage };
 }
 
@@ -234,7 +250,8 @@ function kmeans(Z, k, maxIter) {
 }
 
 function extractNumericMatrix(headers, rows) {
-  const p0 = headers.length;
+  const an = clusterCfg().analysis || {};
+  const th = an.numericColumnThreshold != null ? Number(an.numericColumnThreshold) : 0.8;
   const numericFlags = headers.map((_, j) => {
     let num = 0;
     let nm = 0;
@@ -244,7 +261,7 @@ function extractNumericMatrix(headers, rows) {
       nm++;
       if (isFinite(parseNum(v))) num++;
     });
-    return nm > 0 && num / nm >= 0.8;
+    return nm > 0 && num / nm >= th;
   });
   const indices = numericFlags.map((ok, j) => (ok ? j : -1)).filter((j) => j >= 0);
   const names = indices.map((j) => String(headers[j] || `V${j + 1}`));
@@ -287,11 +304,17 @@ function buildClusterBundle(headers, rows, spec) {
     };
   }
 
+  const lim = clusterCfg().limits || {};
+  const maxKmIter = lim.maxKmeansIterations != null ? Number(lim.maxKmeansIterations) : 100;
+  const maxAssign = lim.maxAssignmentRowsDisplay != null ? Number(lim.maxAssignmentRowsDisplay) : 500;
+  const maxRaw = lim.maxRawDataRows != null ? Number(lim.maxRawDataRows) : 500;
+  const maxMergeRows = lim.maxHierarchicalMergeRowsDisplay != null ? Number(lim.maxHierarchicalMergeRowsDisplay) : 40;
+
   const workX = standardize ? standardise(X).Z : X.map((r) => r.slice());
-  const km = kmeans(workX, kReq, 100);
+  const km = kmeans(workX, kReq, maxKmIter);
   const hi = hierarchicalCluster(workX, linkage, kReq);
 
-  const maxShow = Math.min(500, n);
+  const maxShow = Math.min(maxAssign, n);
   const kmRows = [];
   for (let i = 0; i < maxShow; i++) {
     kmRows.push({ Case: i + 1, Cluster: km.labels[i] + 1 });
@@ -304,7 +327,7 @@ function buildClusterBundle(headers, rows, spec) {
   const hiSizes = Array(km.kUsed).fill(0);
   hi.labels.forEach((c) => { hiSizes[c]++; });
 
-  const mergeShow = hi.merges.slice(-Math.min(40, hi.merges.length));
+  const mergeShow = hi.merges.slice(-Math.min(maxMergeRows, hi.merges.length));
 
   let R = [];
   if (p >= 2 && n >= 2) {
@@ -329,7 +352,7 @@ function buildClusterBundle(headers, rows, spec) {
     R = [[1]];
   }
 
-  const rawDataRows = X.slice(0, Math.min(500, n)).map((xRow, idx) => {
+  const rawDataRows = X.slice(0, Math.min(maxRaw, n)).map((xRow, idx) => {
     const row = { "#": idx + 1 };
     names.forEach((name, j) => { row[name] = xRow[j]; });
     return row;
@@ -379,11 +402,15 @@ function buildClusterBundle(headers, rows, spec) {
 function openClusterResultsDialog() {
   if (!clusterRangeData || clusterRangeData.length < 2) return;
   saveClusterSpec();
-  const dialogUrl = `${getDialogsBaseUrl()}cluster/cluster-analysis.html?v=${Date.now()}`;
+  const dlg = clusterCfg().dialog || {};
+  const resultsFile = dlg.resultsFilename || "cluster/cluster-analysis.html";
+  const dialogUrl = `${getDialogsBaseUrl()}${resultsFile}?v=${Date.now()}`;
+  const hPct = dlg.heightPercent != null ? Number(dlg.heightPercent) : 90;
+  const wPct = dlg.widthPercent != null ? Number(dlg.widthPercent) : 70;
 
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    { height: 90, width: 70, displayInIframe: false },
+    { height: hPct, width: wPct, displayInIframe: false },
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error("Failed to open cluster dialog:", asyncResult.error);

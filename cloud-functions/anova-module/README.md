@@ -2,6 +2,39 @@
 
 Cloud Function for calculating required sample size for one-way ANOVA using non-central F-distribution.
 
+## Local development (PyCharm or terminal)
+
+Use the [Functions Framework](https://github.com/GoogleCloudPlatform/functions-framework-python) (already in `requirements.txt`) so the same `anova_module` entry point runs on your machine with CORS enabled.
+
+1. **Create a virtualenv** (PyCharm: *Add Interpreter → Virtualenv*), then install deps:
+
+   ```bash
+   cd cloud-functions/anova-module
+   pip install -r requirements.txt
+   ```
+
+2. **Run the HTTP server** (listens on port **8080** by default):
+
+   ```bash
+   functions-framework --target=anova_module --port=8080 --debug
+   ```
+
+   **PyCharm:** *Run → Edit Configurations → + Python*, then set **Module name** to `functions_framework`, **Parameters** to `--target=anova_module --port=8080 --debug`, and **Working directory** to `cloud-functions/anova-module`.
+
+3. **Point the calculator at localhost.** Serve the repo over HTTP (e.g. `python -m http.server 8000` from the repo root) and open:
+
+   ```text
+   http://localhost:8000/statistico-calculators/power-sample-size-calculator/index-calculator.html?anovaApi=http%3A%2F%2F127.0.0.1%3A8080
+   ```
+
+   (`anovaApi` is the base URL only; the page appends `?num_groups=…&effect_size_f=…` itself. For a local Functions Framework instance the base is `http://127.0.0.1:8080` with **no** `/anova-module` path.)
+
+4. **Smoke test** the API directly:
+
+   ```text
+   http://127.0.0.1:8080/?num_groups=3&effect_size_f=0.25&target_power=0.8&significance_level=0.05
+   ```
+
 ## Deployment
 
 ### Using gcloud CLI:

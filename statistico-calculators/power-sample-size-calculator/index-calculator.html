@@ -2465,13 +2465,35 @@
                  testType: 'Correlation' };
     }
 
+    /**
+     * Base URL for the ANOVA Python function (Cloud Function or local Functions Framework), no query string.
+     * Local: run cloud-functions/anova-module with functions-framework, then open the calculator with e.g.
+     *   ?anovaApi=http://127.0.0.1:8080
+     * Aliases: anovaApiBase (same value).
+     */
+    function getAnovaModuleApiBase() {
+        try {
+            var p = new URLSearchParams(window.location.search);
+            var o = (p.get('anovaApi') || p.get('anovaApiBase') || '').trim();
+            if (o) return o.replace(/\/+$/, '');
+        } catch (e) { /* ignore */ }
+        return 'https://us-central1-tukey-multple-comparisons.cloudfunctions.net/anova-module';
+    }
+
+    function buildAnovaModuleRequestUrl(numGroups, f, power, alpha) {
+        var base = getAnovaModuleApiBase();
+        var q = 'num_groups=' + encodeURIComponent(numGroups) +
+            '&effect_size_f=' + encodeURIComponent(f) +
+            '&target_power=' + encodeURIComponent(power) +
+            '&significance_level=' + encodeURIComponent(alpha);
+        return base.indexOf('?') >= 0 ? (base + '&' + q) : (base + '?' + q);
+    }
+
     async function calculateANOVA(alpha, power) {
         const numGroups = parseInt(document.getElementById('numGroups').value);
         const f = parseFloat(document.getElementById('effectSizeF').value);
         
-        // Try cloud function first for accurate F-distribution calculation
-        const url = `https://us-central1-tukey-multple-comparisons.cloudfunctions.net/anova-module` +
-                   `?num_groups=${numGroups}&effect_size_f=${f}&target_power=${power}&significance_level=${alpha}`;
+        const url = buildAnovaModuleRequestUrl(numGroups, f, power, alpha);
         try {
             updateLoadingMessage('Connecting to anova-module (non-central F)…');
             const response = await fetch(url, { method: 'GET', mode: 'cors' });
@@ -2722,23 +2744,57 @@
      * @param powerX  desired power on the x-axis (e.g. 0.1 … 0.95)
      */
     function sampleSizeCurveFromReference(powerX, alpha, alternative, nRef, pRef) {
+        const px = Number(powerX);
+        const pref = Number(pRef);
+        const nref = Number(nRef);
         const a = parseLocalizedNumber(alpha);
         const alphaEff = isFinite(a) && a > 0 && a < 1 ? a : 0.05;
-        const altStr = String(alternative || 'two-sided').toLowerCase();
+        const altStr = String(alternative != null ? alternative : 'two-sided').toLowerCase();
         const alt = altStr === 'one-sided' || altStr === '1-sided' || altStr === 'greater' || altStr === 'less' ? 'one-sided' : 'two-sided';
         const za = alt === 'two-sided' ? normalInverse(1 - alphaEff / 2) : normalInverse(1 - alphaEff);
-        const clamp = function (q) { return Math.max(0.001, Math.min(0.999, q)); };
-        const zp = normalInverse(clamp(powerX));
-        const zpRef = normalInverse(clamp(pRef));
+        const clamp = function (q) {
+            const x = Number(q);
+            if (!isFinite(x)) return 0.5;
+            return Math.max(0.001, Math.min(0.999, x));
+        };
+        const zp = normalInverse(clamp(px));
+        const zpRef = normalInverse(clamp(pref));
         const num = za + zp;
         const den = za + zpRef;
         /* If alpha was mis-parsed (e.g. "0,05" → 0), za is non-finite and this used to fall back to nRef for every point → flat line */
-        if (!isFinite(num) || !isFinite(den) || !(den > 0) || !isFinite(nRef) || nRef <= 0) {
-            return Math.max(2, Math.round(nRef));
+        if (!isFinite(num) || !isFinite(den) || !(den > 0) || !isFinite(nref) || nref <= 0 || !isFinite(pref) || pref <= 0 || pref >= 1) {
+            return Math.max(2, Math.round(nref));
         }
         const ratio = (num / den) * (num / den);
-        const nEst = nRef * ratio;
-        return Math.max(2, Math.ceil(isFinite(nEst) ? nEst : nRef));
+        const nEst = nref * ratio;
+        return Math.max(2, Math.ceil(isFinite(nEst) ? nEst : nref));
+    }
+
+    /**
+     * Last-resort ANOVA curve shape: anchored at (pRef, nRef), strictly wider spread than a constant line
+     * when the x-grid crosses below and above pRef. Uses a mild power law on (p/pRef) so no reliance on z if broken.
+     */
+    function anovaCurvePowerLawAnchored(powerValues, nRef, pRef) {
+        const nref = Number(nRef);
+        const pref = Number(pRef);
+        if (!isFinite(nref) || nref <= 0 || !isFinite(pref) || pref <= 0 || pref >= 1) return null;
+        const gamma = 1.45;
+        const out = [];
+        for (var i = 0; i < powerValues.length; i++) {
+            var pxi = Number(powerValues[i]);
+            if (!isFinite(pxi) || pxi <= 0 || pxi >= 1) {
+                out.push(Math.max(2, Math.round(nref)));
+                continue;
+            }
+            var r = pxi / pref;
+            r = Math.max(0.12, Math.min(2.8, r));
+            var nEst = nref * Math.pow(r, gamma);
+            out.push(Math.max(2, Math.ceil(nEst)));
+        }
+        for (var m = 1; m < out.length; m++) {
+            if (out[m] < out[m - 1]) out[m] = out[m - 1];
+        }
+        return out;
     }
 
     function isHighchartsAvailable() {
@@ -2774,8 +2830,10 @@
         const alphaEl = document.getElementById('alpha');
         const alpha = parseLocalizedNumber(alphaEl ? alphaEl.value : '0.05');
         const alphaForCurve = isFinite(alpha) && alpha > 0 && alpha < 1 ? alpha : 0.05;
-        const targetPower = normalizeStatisticalPower(document.getElementById('power').value);
-        const alternative = document.getElementById('alternative').value;
+        const powerElCurve = document.getElementById('power');
+        const targetPower = normalizeStatisticalPower(powerElCurve ? powerElCurve.value : '0.8');
+        const altElCurve = document.getElementById('alternative');
+        const alternative = altElCurve ? altElCurve.value : 'two-sided';
         const powerValues = [], sampleSizes = [];
 
         const nRefNum = result != null ? Number(result.sampleSize) : NaN;
@@ -2799,18 +2857,15 @@
             }
             if (pts.length < 2) return false;
             pts.sort(function (a, b) { return a.x - b.x; });
-            /* Remote bug / stub: API sometimes sends the same n for every power → flat blue line.
-               Ignore and fall back to client scaling + binary search (index100 intent). */
-            if (pts.length >= 6) {
-                var y0 = pts[0].y;
-                var allSame = true;
-                for (var t = 1; t < pts.length; t++) {
-                    if (pts[t].y !== y0) { allSame = false; break; }
-                }
-                if (allSame) {
-                    console.warn('[Power calc] Ignoring degenerate API power_curve (constant n); using client curve.');
-                    return false;
-                }
+            /* API often sends the same n for every power (2–17 points) → flat blue line. Reject any constant series. */
+            var y0p = pts[0].y;
+            var allSameP = true;
+            for (var t = 1; t < pts.length; t++) {
+                if (pts[t].y !== y0p) { allSameP = false; break; }
+            }
+            if (allSameP) {
+                console.warn('[Power calc] Ignoring degenerate API power_curve (constant n); using client curve.');
+                return false;
             }
             powerValues.length = 0;
             sampleSizes.length = 0;
@@ -2851,7 +2906,7 @@
 
         /* ANOVA: crude achieved-power() can plateau (same minimal n for every target power) → flat blue line.
            If so, use z-quantile scaling anchored at (pRef, nRef) for *shape* only (illustrative vs true F). */
-        if (testType === 'anova' && powerValues.length >= 6 && sampleSizes.length === powerValues.length) {
+        if (testType === 'anova' && powerValues.length >= 3 && sampleSizes.length === powerValues.length) {
             var yFlat = sampleSizes[0];
             var flatBin = true;
             for (var fi = 1; fi < sampleSizes.length; fi++) {
@@ -2863,6 +2918,19 @@
                 }
                 for (var mk = 1; mk < sampleSizes.length; mk++) {
                     if (sampleSizes[mk] < sampleSizes[mk - 1]) sampleSizes[mk] = sampleSizes[mk - 1];
+                }
+            }
+        }
+
+        /* ANOVA: z-scaling can still collapse (e.g. bad pRef/nRef reads); guarantee a non-constant curve when possible */
+        if (testType === 'anova' && powerValues.length >= 3 && sampleSizes.length === powerValues.length
+                && nRef > 0 && isFinite(pRef) && pRef >= 0.05 && pRef <= 0.999) {
+            var uniqMap = {};
+            for (var ui = 0; ui < sampleSizes.length; ui++) uniqMap[sampleSizes[ui]] = 1;
+            if (Object.keys(uniqMap).length === 1) {
+                var plCurve = anovaCurvePowerLawAnchored(powerValues, nRef, pRef);
+                if (plCurve) {
+                    for (var pli = 0; pli < plCurve.length; pli++) sampleSizes[pli] = plCurve[pli];
                 }
             }
         }

@@ -2724,7 +2724,9 @@
     function sampleSizeCurveFromReference(powerX, alpha, alternative, nRef, pRef) {
         const a = parseLocalizedNumber(alpha);
         const alphaEff = isFinite(a) && a > 0 && a < 1 ? a : 0.05;
-        const za = alternative === 'two-sided' ? normalInverse(1 - alphaEff / 2) : normalInverse(1 - alphaEff);
+        const altStr = String(alternative || 'two-sided').toLowerCase();
+        const alt = altStr === 'one-sided' || altStr === '1-sided' || altStr === 'greater' || altStr === 'less' ? 'one-sided' : 'two-sided';
+        const za = alt === 'two-sided' ? normalInverse(1 - alphaEff / 2) : normalInverse(1 - alphaEff);
         const clamp = function (q) { return Math.max(0.001, Math.min(0.999, q)); };
         const zp = normalInverse(clamp(powerX));
         const zpRef = normalInverse(clamp(pRef));
@@ -2847,16 +2849,20 @@
             }
         }
 
-        /* ANOVA: if every point is the same n (degenerate API curve or bad scaling), recompute per power. */
+        /* ANOVA: crude achieved-power() can plateau (same minimal n for every target power) → flat blue line.
+           If so, use z-quantile scaling anchored at (pRef, nRef) for *shape* only (illustrative vs true F). */
         if (testType === 'anova' && powerValues.length >= 6 && sampleSizes.length === powerValues.length) {
-            var y0 = sampleSizes[0];
-            var flatClient = true;
+            var yFlat = sampleSizes[0];
+            var flatBin = true;
             for (var fi = 1; fi < sampleSizes.length; fi++) {
-                if (sampleSizes[fi] !== y0) { flatClient = false; break; }
+                if (sampleSizes[fi] !== yFlat) { flatBin = false; break; }
             }
-            if (flatClient) {
+            if (flatBin && nRef > 0 && isFinite(pRef) && pRef >= 0.05 && pRef <= 0.999) {
                 for (var fj = 0; fj < powerValues.length; fj++) {
-                    sampleSizes[fj] = calculateSampleSizeForPower('anova', powerValues[fj], alphaForCurve, alternative);
+                    sampleSizes[fj] = sampleSizeCurveFromReference(powerValues[fj], alphaForCurve, alternative, nRef, pRef);
+                }
+                for (var mk = 1; mk < sampleSizes.length; mk++) {
+                    if (sampleSizes[mk] < sampleSizes[mk - 1]) sampleSizes[mk] = sampleSizes[mk - 1];
                 }
             }
         }

@@ -384,6 +384,12 @@ function buildPcaBundle(headers, rows, modelSpec) {
   });
   const loadingCols = ["Variable"].concat(Array.from({ length: retained }, (_, f) => `PC${f + 1}`));
 
+  const unrotatedRows = numericNames.map((name, r) => {
+    const row = { Variable: name };
+    for (let f = 0; f < retained; f++) row[`PC${f + 1}`] = rawLoadingsMatrix[r][f];
+    return row;
+  });
+
   /* ── 5. Component scores  (n × retained) ── */
   const Zstd    = standardise(X, means, sds);
   const maxScoreRows = Math.min(200, n);
@@ -448,6 +454,10 @@ function buildPcaBundle(headers, rows, modelSpec) {
     loadings: {
       columns: loadingCols,
       rows: loadingRows
+    },
+    unrotatedLoadings: {
+      columns: loadingCols,
+      rows: unrotatedRows
     },
     rotation: {
       rotationMethod,

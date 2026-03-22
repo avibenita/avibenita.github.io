@@ -263,7 +263,7 @@
     .comm-mid  { color: var(--warning) !important; }
     .comm-low  { color: var(--danger)  !important; }
 
-    /* ── Components tab: unified run summary (stats + correlation) ── */
+    /* ── Run summary shell (Summary tab: stats + correlation) ── */
     .pca-components-summary{
       padding:14px 16px 16px;
       margin-bottom:20px;
@@ -294,6 +294,7 @@
     }
     .pca-components-summary .stats-container{ margin-bottom:0; }
     .pca-components-summary .overview-corr-block{ margin-top:14px; margin-bottom:0; }
+    #tab-summary .pca-components-summary{ margin-bottom:12px; }
 
     /* ── Overview correlation block ── */
     .overview-corr-block {
@@ -513,7 +514,14 @@
       <div class="sb-group">
         <div class="sb-group-title">Principal Component Analysis</div>
         <div class="sb-items-rail">
-          <button type="button" class="sb-item sb-item-stack active" onclick="switchTab('components')" data-tab="components" title="Scree plot, eigenvalue table, and variance charts — one place to decide how many components to keep.">
+          <button type="button" class="sb-item sb-item-stack active" onclick="switchTab('summary')" data-tab="summary" title="Data summary, adequacy tests, retention metrics, and correlation matrix.">
+            <i class="fa-solid fa-clipboard-check sb-item-icon"></i>
+            <span class="sb-item-label">
+              <span>Summary</span>
+              <span class="sb-item-subtitle">Data &amp; correlation</span>
+            </span>
+          </button>
+          <button type="button" class="sb-item sb-item-stack" onclick="switchTab('components')" data-tab="components" title="Scree plot, eigenvalue table, and variance charts — decide how many components to keep.">
             <i class="fa-solid fa-chart-line sb-item-icon"></i>
             <span class="sb-item-label">
               <span>Components</span>
@@ -572,8 +580,8 @@
         <div class="view-container">
           <div class="card-body">
 
-            <!-- ══ Tab: Components (eigenvalues + scree) ══ -->
-            <section id="tab-components" class="tab-panel active">
+            <!-- ══ Tab: Summary (data, adequacy, retention, correlation) ══ -->
+            <section id="tab-summary" class="tab-panel active">
               <div class="pca-components-summary" aria-label="Run summary">
                 <div class="pca-components-summary-head">
                   <i class="fa-solid fa-clipboard-check" aria-hidden="true"></i>
@@ -636,7 +644,11 @@
                   </div>
                 </div>
               </div>
+              <div class="section-note">Open <strong>Components</strong> for the scree plot, full eigenvalue table, and variance chart when choosing <em>k</em>.</div>
+            </section>
 
+            <!-- ══ Tab: Components (eigenvalues + scree) ══ -->
+            <section id="tab-components" class="tab-panel">
               <div id="componentRetentionHint" class="component-retention-hint" style="display:none;"></div>
 
               <div class="viz-card scree-chart-primary">
@@ -677,7 +689,7 @@
                 </div>
               </div>
 
-              <div class="section-note">The <strong>Run summary</strong> above groups data checks, adequacy, retention, and the correlation matrix. Use the scree plot for the elbow, then the table; hover a scree point to highlight its row. Retained components are emphasised in the chart and table.</div>
+              <div class="section-note">See <strong>Summary</strong> for data checks, adequacy, retention, and the correlation matrix. Use the scree plot for the elbow, then the table; hover a scree point to highlight its row. Retained components are emphasised in the chart and table.</div>
             </section>
 
             <!-- ══ Tab: Component Loadings ══ -->
@@ -804,7 +816,7 @@
                   </div>
                 </div>
               </div>
-              <div class="section-note" style="margin-top:12px;">|Loading| highlighting: <span class="load-strong" style="padding:2px 6px;border-radius:4px;">≥ 0.5</span> strong · <span class="load-mod">0.3 – 0.5</span> moderate · <span class="load-weak">&lt; 0.3</span> weak. Rotation is applied after the number of components <em>k</em> is fixed (shown above).</div>
+              <div class="section-note" style="margin-top:12px;">|Loading| highlighting: <span class="load-strong" style="padding:2px 6px;border-radius:4px;">≥ 0.5</span> strong · <span class="load-mod">0.3 – 0.5</span> moderate · <span class="load-weak">&lt; 0.3</span> weak. Rotation is applied after the number of components <em>k</em> is fixed (see <strong>Summary</strong> and <strong>Components</strong>).</div>
             </section>
 
             <!-- ══ Tab: Biplot ══ -->
@@ -980,7 +992,9 @@
     /* ─── Tab switching ─── */
     function switchTab(tabKey) {
       if (tabKey === "variance" || tabKey === "scree") tabKey = "components";
+      if (tabKey === "overview") tabKey = "summary";
       var tabTitles = {
+        summary:      "Summary",
         components:   "Components",
         loadings:     "Component Loadings",
         rotation:     "Rotation",
@@ -1956,7 +1970,7 @@
       var bp = document.getElementById("biplotChart"); if (bp) bp.innerHTML = "";
       var crh = document.getElementById("componentRetentionHint");
       if (crh) { crh.innerHTML = ""; crh.style.display = "none"; }
-      switchTab("components");
+      switchTab("summary");
     };
 
     /* ─── Export HTML ─── */
@@ -1997,6 +2011,7 @@
                 if (message.payload && message.payload.tab) {
                   var tk = message.payload.tab;
                   if (tk === "variance" || tk === "scree") tk = "components";
+                  if (tk === "overview") tk = "summary";
                   switchTab(tk);
                 }
                 break;
@@ -2040,9 +2055,9 @@
           moduleName: "Save PCA model"
         });
         StatisticoHeader.initSidebarPage();
-        StatisticoHeader.updateTitle("Components");
+        StatisticoHeader.updateTitle("Summary");
       }
-      switchTab("components");
+      switchTab("summary");
       setDecimalPrecision();
       if (typeof Office !== "undefined" && typeof Office.onReady === "function") {
         Office.onReady(function() { initOfficeBridge(); });

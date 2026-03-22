@@ -16,7 +16,10 @@
     dialog: {
       resultsFilename: "cluster/cluster-analysis.html",
       heightPercent: 90,
-      widthPercent: 70
+      widthPercent: 70,
+      setupFilename: "cluster/cluster-setup-dialog.html",
+      setupHeightPercent: 52,
+      setupWidthPercent: 38
     },
     defaults: { numClusters: 3, standardize: true, linkage: "average" },
     limits: {
@@ -41,11 +44,10 @@
       labelLinkage: "Hierarchical linkage",
       labelStandardize: "Standardise variables (recommended)",
       runButtonHtml: "<i class=\"fa-solid fa-chart-diagram\"></i><span>Open cluster dashboard</span>",
-      configureClusterButtonHtml: "<i class=\"fa-solid fa-sliders\"></i><span>Configure clustering</span>",
-      hintReadyPick: "Ready — click Configure clustering to set options",
-      hintDashboard: "Adjust options above, then open the dashboard",
+      configureClusterButtonHtml: "<i class=\"fa-solid fa-sliders\"></i><span>Open clustering configuration</span>",
+      hintReadyPick: "Ready — click to open clustering configuration",
       clusterSetupTitle: "Clustering setup",
-      backToRangeButton: "Back to range selection",
+      setupCloseButton: "Close",
       hintNeedRange: "Select a data range to continue"
     }
   };
@@ -85,56 +87,8 @@
     var hts = document.getElementById("clusterHeaderTitle");
     if (hts && ui.headerTitle) hts.textContent = ui.headerTitle;
 
-    var lim = cfg.limits || {};
-    var def = cfg.defaults || {};
-    var kEl = document.getElementById("clusterK");
-    if (kEl) {
-      if (lim.kMin != null) kEl.min = String(lim.kMin);
-      if (lim.kMax != null) kEl.max = String(lim.kMax);
-      if (def.numClusters != null) kEl.value = String(def.numClusters);
-    }
-    var stdEl = document.getElementById("clusterStandardize");
-    if (stdEl && def.standardize != null) stdEl.checked = !!def.standardize;
-
-    var sel = document.getElementById("clusterLinkage");
-    if (sel && Array.isArray(cfg.linkageOptions) && cfg.linkageOptions.length) {
-      var v0 = def.linkage || (cfg.linkageOptions[0] && cfg.linkageOptions[0].value);
-      sel.innerHTML = "";
-      cfg.linkageOptions.forEach(function(opt) {
-        var o = document.createElement("option");
-        o.value = opt.value;
-        o.textContent = opt.label || opt.value;
-        sel.appendChild(o);
-      });
-      if (v0) sel.value = v0;
-    }
-
-    var blurb = document.getElementById("clusterOptionsBlurb");
-    if (blurb && ui.optionsBlurb) blurb.innerHTML = ui.optionsBlurb;
-
-    var lk = document.getElementById("labelClusterK");
-    if (lk && ui.labelK) lk.innerHTML = ui.labelK;
-
-    var ll = document.getElementById("labelClusterLinkage");
-    if (ll && ui.labelLinkage) ll.textContent = ui.labelLinkage;
-
-    var ls = document.getElementById("labelClusterStandardize");
-    if (ls && ui.labelStandardize) ls.textContent = ui.labelStandardize;
-
-    var runBtn = document.getElementById("runClusterBtn");
-    if (runBtn && ui.runButtonHtml) runBtn.innerHTML = ui.runButtonHtml;
-
     var configureBtn = document.getElementById("configureClusterBtn");
     if (configureBtn && ui.configureClusterButtonHtml) configureBtn.innerHTML = ui.configureClusterButtonHtml;
-
-    var setupTitle = document.getElementById("clusterSetupTitleText");
-    if (setupTitle && ui.clusterSetupTitle) setupTitle.textContent = ui.clusterSetupTitle;
-
-    var backBtn = document.getElementById("clusterBackToRangeBtn");
-    if (backBtn && ui.backToRangeButton) backBtn.textContent = ui.backToRangeButton;
-
-    var hintDash = document.getElementById("hintDashboardText");
-    if (hintDash && ui.hintDashboard) hintDash.textContent = ui.hintDashboard;
 
     /* hintText is updated when range loads (cluster-input-panel.js) */
   }

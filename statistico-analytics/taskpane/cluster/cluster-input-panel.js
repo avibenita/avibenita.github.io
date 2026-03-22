@@ -3,6 +3,7 @@
 let clusterRangeData = null;
 let clusterRangeAddress = "";
 let clusterDialog = null;
+let clusterSetupDialog = null;
 
 function clusterCfg() {
   if (typeof window.getClusterModuleConfig === "function") {
@@ -12,15 +13,12 @@ function clusterCfg() {
 }
 
 function onRangeDataLoaded(values, address) {
-  const runBtn = document.getElementById("runClusterBtn");
   const configureBtn = document.getElementById("configureClusterBtn");
   const hint = document.getElementById("hintText");
-  const hintDash = document.getElementById("hintDashboardText");
   const ui = (clusterCfg().ui) || {};
   if (!values || values.length < 2) {
     clusterRangeData = null;
     clusterRangeAddress = "";
-    if (runBtn) runBtn.disabled = true;
     if (configureBtn) configureBtn.disabled = true;
     if (hint) hint.textContent = ui.hintNeedRange || "Select a data range to continue";
     return;
@@ -28,9 +26,7 @@ function onRangeDataLoaded(values, address) {
   clusterRangeData = values;
   clusterRangeAddress = address || "";
   if (configureBtn) configureBtn.disabled = false;
-  if (runBtn) runBtn.disabled = false;
-  if (hint) hint.textContent = ui.hintReadyPick || "Ready — click Configure clustering to set options";
-  if (hintDash) hintDash.textContent = ui.hintDashboard || "Adjust options above, then open the dashboard";
+  if (hint) hint.textContent = ui.hintReadyPick || "Ready — click to open clustering configuration";
 }
 
 function getDialogsBaseUrl() {
@@ -47,22 +43,122 @@ function readClusterSpec() {
   const def = cfg.defaults || {};
   const kMin = lim.kMin != null ? Number(lim.kMin) : 2;
   const kMax = lim.kMax != null ? Number(lim.kMax) : 50;
-  const kEl = document.getElementById("clusterK");
-  let k = parseInt(kEl && kEl.value, 10);
-  if (!isFinite(k)) k = def.numClusters != null ? Number(def.numClusters) : 3;
+  try {
+    const raw = sessionStorage.getItem("clusterSpec");
+    if (raw) {
+      const o = JSON.parse(raw);
+      if (o && typeof o === "object") {
+        let k = parseInt(o.k, 10);
+        if (!isFinite(k)) k = def.numClusters != null ? Number(def.numClusters) : 3;
+        k = Math.max(kMin, Math.min(kMax, k));
+        let standardize = def.standardize !== false;
+        if (o.standardize === false) standardize = false;
+        if (o.standardize === true) standardize = true;
+        const linkage = o.linkage || def.linkage || "average";
+        return { k, standardize, linkage };
+      }
+    }
+  } catch (e) {}
+  let k = def.numClusters != null ? Number(def.numClusters) : 3;
   k = Math.max(kMin, Math.min(kMax, k));
-  const stdEl = document.getElementById("clusterStandardize");
-  let standardize = def.standardize !== false;
-  if (stdEl) standardize = stdEl.checked;
-  const linkEl = document.getElementById("clusterLinkage");
-  const linkage = (linkEl && linkEl.value) || def.linkage || "average";
-  return { k, standardize, linkage };
+  return { k, standardize: def.standardize !== false, linkage: def.linkage || "average" };
 }
 
 function saveClusterSpec() {
   try {
     sessionStorage.setItem("clusterSpec", JSON.stringify(readClusterSpec()));
   } catch (e) {}
+}
+
+function persistClusterSpec(spec) {
+  if (!spec || typeof spec !== "object") return;
+  const cfg = clusterCfg();
+  const lim = cfg.limits || {};
+  const def = cfg.defaults || {};
+  const kMin = lim.kMin != null ? Number(lim.kMin) : 2;
+  const kMax = lim.kMax != null ? Number(lim.kMax) : 50;
+  let k = parseInt(spec.k, 10);
+  if (!isFinite(k)) k = def.numClusters != null ? Number(def.numClusters) : 3;
+  k = Math.max(kMin, Math.min(kMax, k));
+  let standardize = def.standardize !== false;
+  if (spec.standardize === false) standardize = false;
+  if (spec.standardize === true) standardize = true;
+  const linkage = spec.linkage || def.linkage || "average";
+  try {
+    sessionStorage.setItem("clusterSpec", JSON.stringify({ k, standardize, linkage }));
+  } catch (e) {}
+}
+
+function pushClusterSetupPayload() {
+  if (!clusterSetupDialog || !clusterRangeData || clusterRangeData.length < 2) return;
+  const headers = clusterRangeData[0] || [];
+  const rows = clusterRangeData.length - 1;
+  let savedSpec = null;
+  try {
+    const raw = sessionStorage.getItem("clusterSpec");
+    if (raw) savedSpec = JSON.parse(raw);
+  } catch (e) {}
+  try {
+    clusterSetupDialog.messageChild(JSON.stringify({
+      action: "clusterSetupInit",
+      payload: {
+        moduleConfig: clusterCfg(),
+        rangeAddress: clusterRangeAddress || "",
+        dataRows: rows,
+        dataCols: headers.length,
+        savedSpec: savedSpec && typeof savedSpec === "object" ? savedSpec : null
+      }
+    }));
+  } catch (e) {
+    console.error("clusterSetup messageChild:", e);
+  }
+}
+
+function openClusterSetupDialog() {
+  if (!clusterRangeData || clusterRangeData.length < 2) return;
+  const dlg = clusterCfg().dialog || {};
+  const setupFile = dlg.setupFilename || "cluster/cluster-setup-dialog.html";
+  const hPct = dlg.setupHeightPercent != null ? Number(dlg.setupHeightPercent) : 52;
+  const wPct = dlg.setupWidthPercent != null ? Number(dlg.setupWidthPercent) : 38;
+  const dialogUrl = `${getDialogsBaseUrl()}${setupFile}?v=${Date.now()}`;
+
+  Office.context.ui.displayDialogAsync(
+    dialogUrl,
+    { height: hPct, width: wPct, displayInIframe: false },
+    (asyncResult) => {
+      if (asyncResult.status === Office.AsyncResultStatus.Failed) {
+        console.error("Failed to open cluster setup dialog:", asyncResult.error);
+        return;
+      }
+      clusterSetupDialog = asyncResult.value;
+      clusterSetupDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
+        try {
+          const message = JSON.parse(arg.message);
+          if (message.action === "requestClusterSetup") {
+            pushClusterSetupPayload();
+          } else if (message.action === "clusterSetupRun") {
+            persistClusterSpec(message.spec);
+            try {
+              clusterSetupDialog.close();
+            } catch (e) {}
+            clusterSetupDialog = null;
+            openClusterResultsDialogOnly();
+          } else if (message.action === "clusterSetupClose") {
+            try {
+              clusterSetupDialog.close();
+            } catch (e) {}
+            clusterSetupDialog = null;
+          }
+        } catch (e) {
+          console.error("Cluster setup dialog message:", e);
+        }
+      });
+      clusterSetupDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
+        clusterSetupDialog = null;
+      });
+      setTimeout(() => pushClusterSetupPayload(), 800);
+    }
+  );
 }
 
 function parseNum(v) {
@@ -465,6 +561,7 @@ function sendClusterBundle() {
 }
 
 window.onRangeDataLoaded = onRangeDataLoaded;
+window.openClusterSetupDialog = openClusterSetupDialog;
 window.openClusterResultsDialog = openClusterResultsDialog;
 window.readClusterSpec = readClusterSpec;
 window.saveClusterSpec = saveClusterSpec;

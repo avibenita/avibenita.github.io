@@ -430,6 +430,31 @@ function kmeans(Z, k, maxIter, metric) {
   return { labels, wcss, iterations: it, kUsed: kEff, sizes, distanceMetric: manhattan ? "manhattan" : "euclidean" };
 }
 
+/** Mean z-score profile per K-means cluster (column-wise z on full X; comparable across variables). */
+function computeKmeansProfileSeries(X, labels, kUsed, p) {
+  if (!X.length || !p || kUsed < 1) return [];
+  const { Z } = standardise(X);
+  const n = X.length;
+  const sums = Array.from({ length: kUsed }, () => Array(p).fill(0));
+  const counts = Array(kUsed).fill(0);
+  for (let i = 0; i < n; i++) {
+    const c = labels[i];
+    if (c < 0 || c >= kUsed) continue;
+    counts[c]++;
+    for (let j = 0; j < p; j++) sums[c][j] += Z[i][j];
+  }
+  const series = [];
+  for (let c = 0; c < kUsed; c++) {
+    const cnt = counts[c];
+    const data = [];
+    for (let j = 0; j < p; j++) {
+      data.push(cnt > 0 ? sums[c][j] / cnt : null);
+    }
+    series.push({ name: `Cluster ${c + 1}`, data });
+  }
+  return series;
+}
+
 function extractNumericMatrix(headers, rows, spec) {
   const an = clusterCfg().analysis || {};
   const th = an.numericColumnThreshold != null ? Number(an.numericColumnThreshold) : 0.8;
@@ -554,6 +579,8 @@ function buildClusterBundle(headers, rows, spec) {
   });
   const rawDataCols = ["#"].concat(names);
 
+  const profileSeries = computeKmeansProfileSeries(X, km.labels, km.kUsed, p);
+
   return {
     summary: {
       variableCount: p,
@@ -575,7 +602,12 @@ function buildClusterBundle(headers, rows, spec) {
       columns: ["Case", "Cluster"],
       rows: kmRows,
       totalCases: n,
-      displayedCases: maxShow
+      displayedCases: maxShow,
+      profile: {
+        categories: names.slice(),
+        yLabel: "Mean z-score (pooled SD)",
+        series: profileSeries
+      }
     },
     hierarchical: {
       linkage,

@@ -159,6 +159,7 @@
       padding:8px;
     }
     .chart-container{ width:100%; height:280px; }
+    .chart-container.chart-profile{ height:340px; }
     .section-note{
       margin-top:10px;
       padding:9px;
@@ -400,6 +401,11 @@
                 <div class="viz-title"><i class="fa-solid fa-chart-column"></i> Cluster sizes (K-means)</div>
                 <div class="chart-wrap"><div id="kmSizesChart" class="chart-container"></div></div>
               </div>
+              <div class="viz-card">
+                <div class="viz-title"><i class="fa-solid fa-chart-line"></i> Cluster profiles (K-means)</div>
+                <div class="chart-wrap"><div id="kmProfileChart" class="chart-container chart-profile"></div></div>
+                <div class="section-note" style="margin-top:8px;margin-bottom:0;">Each line is the <strong>mean z-score</strong> by variable within that cluster (using pooled column SDs on the full sample). Compare curve shapes to see how segments differ on the included variables.</div>
+              </div>
               <div class="stat-panel" style="margin-top:12px;">
                 <div class="stat-panel-heading"><i class="fa-solid fa-list"></i> Case assignment (first rows)</div>
                 <div class="stat-panel-body" style="padding:0;">
@@ -481,6 +487,7 @@
     var _vdCols = [];
     var _vdPage = 0;
     var _vdPageSize = 50;
+    var _kmProfileChart = null;
 
     function parseMaybeNumber(value) {
       if (value === undefined || value === null) return NaN;
@@ -607,6 +614,58 @@
         : '<i class="fa-solid fa-expand-alt"></i> Expand full matrix';
     }
 
+    function destroyKmProfileChart() {
+      if (_kmProfileChart) {
+        try { _kmProfileChart.destroy(); } catch (e) {}
+        _kmProfileChart = null;
+      }
+      var el = document.getElementById("kmProfileChart");
+      if (el) el.innerHTML = "";
+    }
+
+    function renderClusterProfileChart(id, categories, series, yLabel) {
+      if (typeof Highcharts === "undefined") return;
+      var el = document.getElementById(id);
+      if (id === "kmProfileChart") destroyKmProfileChart();
+      if (!el || !categories || !categories.length || !series || !series.length) {
+        if (el) el.innerHTML = '<div class="hint-empty">Not enough data for cluster profiles</div>';
+        return;
+      }
+      var colors = ["#2dd4bf", "#60a5fa", "#fbbf24", "#fb7185", "#a78bfa", "#4ade80", "#f97316", "#38bdf8", "#e879f9", "#94a3b8"];
+      var hcSeries = series.map(function(s, idx) {
+        return {
+          name: s.name || ("Cluster " + (idx + 1)),
+          data: s.data || [],
+          color: colors[idx % colors.length],
+          marker: { enabled: true, radius: 3 }
+        };
+      });
+      var rot = categories.length > 10 ? -40 : (categories.length > 6 ? -25 : 0);
+      var chart = Highcharts.chart(id, {
+        chart: { type: "line", backgroundColor: "transparent", animation: false },
+        title: { text: null },
+        credits: { enabled: false },
+        xAxis: {
+          categories: categories,
+          labels: { style: { color: "rgba(255,255,255,.78)", fontSize: "10px" }, rotation: rot }
+        },
+        yAxis: {
+          title: { text: yLabel || "Mean z", style: { color: "rgba(255,255,255,.85)" } },
+          gridLineColor: "rgba(255,255,255,.1)",
+          plotLines: [{ value: 0, color: "rgba(255,255,255,.22)", width: 1, zIndex: 3 }]
+        },
+        legend: { itemStyle: { color: "rgba(255,255,255,.82)" } },
+        tooltip: {
+          shared: true,
+          crosshairs: true,
+          pointFormat: "<span style=\"color:{series.color}\">{series.name}</span>: <b>{point.y:.2f}</b><br/>"
+        },
+        plotOptions: { line: { lineWidth: 2 } },
+        series: hcSeries
+      });
+      if (id === "kmProfileChart") _kmProfileChart = chart;
+    }
+
     function renderBarChart(id, categories, values, title) {
       if (typeof Highcharts === "undefined") return;
       var el = document.getElementById(id);
@@ -668,6 +727,14 @@
         }
         var kcats = (km.sizes || []).map(function(_, i) { return "C" + (i + 1); });
         renderBarChart("kmSizesChart", kcats, km.sizes || [], "K-means");
+        var prof = km.profile;
+        if (prof && prof.categories && prof.categories.length && prof.series && prof.series.length) {
+          renderClusterProfileChart("kmProfileChart", prof.categories, prof.series, prof.yLabel);
+        } else {
+          destroyKmProfileChart();
+          var ep = document.getElementById("kmProfileChart");
+          if (ep) ep.innerHTML = '<div class="hint-empty">No profile data</div>';
+        }
       } else {
         setText("kmIter", "—");
         setText("kmWcss", "—");
@@ -675,6 +742,9 @@
         if (kb0) kb0.innerHTML = '<tr><td colspan="2" class="hint-empty">No K-means output</td></tr>';
         var elKm = document.getElementById("kmSizesChart");
         if (elKm) elKm.innerHTML = "";
+        destroyKmProfileChart();
+        var ep0 = document.getElementById("kmProfileChart");
+        if (ep0) ep0.innerHTML = '<div class="hint-empty">No K-means output</div>';
       }
 
       var hi = bundle.hierarchical;

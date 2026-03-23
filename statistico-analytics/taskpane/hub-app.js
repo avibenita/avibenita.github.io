@@ -57,14 +57,21 @@ function renderModules(list) {
   if (noResults) noResults.style.display = list.length ? "none" : "block";
 }
 
+var GROUP_COLORS = {
+  descriptive: { color: "#f97316", bg: "rgba(249,115,22,.1)" },
+  comparisons: { color: "#10b981", bg: "rgba(16,185,129,.1)" },
+  multivariate: { color: "#8b5cf6", bg: "rgba(139,92,246,.1)" }
+};
+
 function makeCard(m) {
   const div = document.createElement("div");
   div.className = "module-card";
   div.onclick = function() { navigateToModule(m.id); };
-  var iconBg = m.bg ? String(m.bg) : "";
-  var iconColor = m.color ? String(m.color) : "";
-  var wrapSt = iconBg ? ' style="background:' + iconBg + ' !important"' : "";
-  var iSt = iconColor ? ' style="color:' + iconColor + ' !important"' : "";
+  var gc = GROUP_COLORS[m.group] || GROUP_COLORS.descriptive;
+  var iconBg = gc.bg;
+  var iconColor = gc.color;
+  var wrapSt = ' style="background:' + iconBg + ' !important"';
+  var iSt = ' style="color:' + iconColor + ' !important"';
   div.innerHTML =
     '<div class="module-icon"' + wrapSt + ">" +
     '  <i class="fa-solid ' + m.icon + '"' + iSt + "></i>" +

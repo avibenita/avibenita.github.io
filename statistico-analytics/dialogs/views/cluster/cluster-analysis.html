@@ -1077,6 +1077,52 @@
       } catch (err) { console.error(err); }
     }
 
+    async function exportClusterHtml() {
+      var savedKey = _currentNavKey;
+      try {
+        document.querySelectorAll('.tab-panel').forEach(function(p) {
+          p.classList.add('active');
+          p.style.display = 'block';
+        });
+        if (typeof Highcharts !== 'undefined') {
+          Highcharts.charts.forEach(function(c) { if (c) try { c.reflow(); } catch (e) {} });
+        }
+        await new Promise(function(resolve) { setTimeout(resolve, 220); });
+
+        var clone = document.documentElement.cloneNode(true);
+        clone.querySelectorAll('script').forEach(function(s) { s.remove(); });
+        ['#sidebarNav', '#header-container'].forEach(function(sel) {
+          var el = clone.querySelector(sel);
+          if (el) el.remove();
+        });
+        var html = '<!DOCTYPE html>\n' + clone.outerHTML;
+        var stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        var name = 'cluster-analysis-' + stamp + '.html';
+        var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        console.error('Cluster HTML export failed:', e);
+      } finally {
+        document.querySelectorAll('.tab-panel').forEach(function(p) {
+          p.style.display = '';
+          p.classList.remove('active');
+        });
+        switchClusterView(savedKey, true);
+        if (typeof Highcharts !== 'undefined') {
+          setTimeout(function() {
+            Highcharts.charts.forEach(function(c) { if (c) try { c.reflow(); } catch (e2) {} });
+          }, 50);
+        }
+      }
+    }
+
     function initOfficeBridge() {
       if (officeBridgeReady) return;
       officeBridgeReady = true;
@@ -1110,6 +1156,7 @@
               usedRange: "Cluster input data"
             };
           },
+          exportHtml: function() { exportClusterHtml(); },
           moduleName: "Cluster analysis"
         });
         StatisticoHeader.initSidebarPage();

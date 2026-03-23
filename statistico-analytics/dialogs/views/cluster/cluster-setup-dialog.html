@@ -37,13 +37,72 @@
       margin-bottom: 10px;
       line-height: 1.5;
     }
-    .summary strong { color: #374151; }
     .blurb {
       font-size: 11.5px;
       color: #6b7280;
       margin-bottom: 12px;
       line-height: 1.45;
     }
+    .variables-panel {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fff;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .variables-panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px 10px;
+      background: var(--clr-light);
+      border-bottom: 1px solid var(--clr-border);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.45px;
+      color: var(--clr-dark);
+    }
+    .var-actions { display: flex; gap: 10px; flex-shrink: 0; }
+    .var-actions button {
+      background: none;
+      border: none;
+      color: var(--clr);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 2px 4px;
+      font-family: inherit;
+    }
+    .var-actions button:hover { text-decoration: underline; }
+    .var-list-scroll {
+      max-height: 240px;
+      overflow-y: auto;
+      padding: 4px 6px 10px;
+    }
+    .var-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 5px 6px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #374151;
+      cursor: pointer;
+      user-select: none;
+    }
+    .var-row:hover { background: #f9fafb; }
+    .var-row input { margin-top: 2px; flex-shrink: 0; accent-color: var(--clr); width: 15px; height: 15px; }
+    .var-row span { line-height: 1.35; word-break: break-word; }
+    .vars-empty, .vars-error {
+      font-size: 11.5px;
+      padding: 10px 10px 12px;
+      color: #6b7280;
+      line-height: 1.45;
+    }
+    .vars-error { display: none; color: #b45309; background: #fffbeb; border-top: 1px solid #fde68a; }
     .opt-grid { display: grid; gap: 10px; }
     .opt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
     .opt-row label.field { font-size: 12px; font-weight: 600; color: #374151; }
@@ -65,7 +124,7 @@
       background: #fff;
       flex-shrink: 0;
     }
-    button {
+    button.foot-btn {
       padding: 9px 16px;
       border-radius: 8px;
       border: none;
@@ -78,18 +137,19 @@
       justify-content: center;
       gap: 6px;
     }
-    .primary {
+    button.foot-btn.primary {
       background: linear-gradient(135deg, var(--clr), var(--clr-dark));
       color: #fff;
       box-shadow: 0 2px 8px rgba(13,148,136,.28);
     }
-    .primary:hover { filter: brightness(1.05); }
-    .ghost {
+    button.foot-btn.primary:hover:not(:disabled) { filter: brightness(1.05); }
+    button.foot-btn.primary:disabled { opacity: 0.45; cursor: not-allowed; filter: none; box-shadow: none; }
+    button.foot-btn.ghost {
       background: #f9fafb;
       color: #4b5563;
       border: 1px solid #e5e7eb;
     }
-    .ghost:hover { background: #f3f4f6; }
+    button.foot-btn.ghost:hover { background: #f3f4f6; }
   </style>
 </head>
 <body>
@@ -97,6 +157,18 @@
   <div class="body">
     <div class="summary" id="dlgSummary"></div>
     <p class="blurb" id="clusterOptionsBlurb"></p>
+    <div class="variables-panel" id="variablesPanel">
+      <div class="variables-panel-head">
+        <span id="labelVariablesSection">Variables to include</span>
+        <div class="var-actions">
+          <button type="button" id="btnSelectAllVars" style="display:none;">Select all</button>
+          <button type="button" id="btnClearVars" style="display:none;">Clear</button>
+        </div>
+      </div>
+      <div class="var-list-scroll" id="varListScroll"></div>
+      <div class="vars-empty" id="varsEmpty" style="display:none;"></div>
+      <div class="vars-error" id="varsError"></div>
+    </div>
     <div class="opt-grid">
       <div class="opt-row">
         <label class="field" id="labelClusterK" for="clusterK">Number of clusters <em>k</em></label>
@@ -113,14 +185,17 @@
     </div>
   </div>
   <div class="foot">
-    <button type="button" class="ghost" id="btnSetupClose">Close</button>
-    <button type="button" class="primary" id="btnOpenDashboard">
-      <i class="fa-solid fa-chart-diagram"></i>
-      <span>Open cluster dashboard</span>
+    <button type="button" class="foot-btn ghost" id="btnSetupClose">Close</button>
+    <button type="button" class="foot-btn primary" id="btnOpenDashboard">
+      <i class="fa-solid fa-up-right-from-square"></i>
+      <span>Open results</span>
     </button>
   </div>
   <script>
     (function() {
+      var lastModuleConfig = null;
+      var lastUi = {};
+
       function sendToParent(obj) {
         try {
           Office.context.ui.messageParent(JSON.stringify(obj));
@@ -136,6 +211,103 @@
         if (t.clrDark) r.style.setProperty("--clr-dark", t.clrDark);
         if (t.clrLight) r.style.setProperty("--clr-light", t.clrLight);
         if (t.clrBorder) r.style.setProperty("--clr-border", t.clrBorder);
+      }
+
+      function setVarsError(msg) {
+        var el = document.getElementById("varsError");
+        if (!el) return;
+        if (msg) {
+          el.textContent = msg;
+          el.style.display = "block";
+        } else {
+          el.textContent = "";
+          el.style.display = "none";
+        }
+      }
+
+      function renderVariableCandidates(payload) {
+        var ui = (payload.moduleConfig && payload.moduleConfig.ui) || {};
+        lastUi = ui;
+        var candidates = payload.variableCandidates || [];
+        var scroll = document.getElementById("varListScroll");
+        var empty = document.getElementById("varsEmpty");
+        var panel = document.getElementById("variablesPanel");
+        var selAll = document.getElementById("btnSelectAllVars");
+        var clr = document.getElementById("btnClearVars");
+        var runBtn = document.getElementById("btnOpenDashboard");
+
+        if (ui.variablesSectionTitle) {
+          var h = document.getElementById("labelVariablesSection");
+          if (h) h.textContent = ui.variablesSectionTitle;
+        }
+        if (ui.selectAllVariables && selAll) selAll.textContent = ui.selectAllVariables;
+        if (ui.clearVariablesSelection && clr) clr.textContent = ui.clearVariablesSelection;
+        if (selAll) selAll.style.display = candidates.length ? "inline" : "none";
+        if (clr) clr.style.display = candidates.length ? "inline" : "none";
+
+        if (!scroll) return;
+        scroll.innerHTML = "";
+
+        if (candidates.length === 0) {
+          if (empty) {
+            empty.textContent = ui.variablesEmptyHint || "No numeric columns detected in this range. Include columns that are mostly numeric.";
+            empty.style.display = "block";
+          }
+          if (panel) panel.style.opacity = "0.92";
+          if (runBtn) runBtn.disabled = true;
+          setVarsError("");
+          return;
+        }
+
+        if (empty) empty.style.display = "none";
+        if (panel) panel.style.opacity = "1";
+
+        var saved = payload.savedSpec || {};
+        var savedSet = null;
+        if (saved && Array.isArray(saved.selectedVariableIndices) && saved.selectedVariableIndices.length > 0) {
+          savedSet = {};
+          saved.selectedVariableIndices.forEach(function(x) {
+            savedSet[Number(x)] = true;
+          });
+        }
+
+        candidates.forEach(function(c) {
+          var row = document.createElement("label");
+          row.className = "var-row";
+          var cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.className = "var-cb";
+          cb.setAttribute("data-col-index", String(c.index));
+          var on = savedSet === null ? true : !!savedSet[c.index];
+          cb.checked = on;
+          var sp = document.createElement("span");
+          sp.textContent = c.label;
+          row.appendChild(cb);
+          row.appendChild(sp);
+          scroll.appendChild(row);
+        });
+
+        if (runBtn) runBtn.disabled = false;
+        setVarsError("");
+      }
+
+      function wireVariableActions() {
+        var selAll = document.getElementById("btnSelectAllVars");
+        var clr = document.getElementById("btnClearVars");
+        if (selAll && !selAll._wired) {
+          selAll._wired = true;
+          selAll.onclick = function() {
+            setVarsError("");
+            document.querySelectorAll(".var-cb").forEach(function(cb) { cb.checked = true; });
+          };
+        }
+        if (clr && !clr._wired) {
+          clr._wired = true;
+          clr.onclick = function() {
+            setVarsError("");
+            document.querySelectorAll(".var-cb").forEach(function(cb) { cb.checked = false; });
+          };
+        }
       }
 
       function applyPayload(payload) {
@@ -207,9 +379,13 @@
           var cols = payload.dataCols != null ? payload.dataCols : "—";
           sum.textContent = "Range: " + addr + "  ·  Rows: " + rows + "  ·  Columns: " + cols;
         }
+
+        renderVariableCandidates(payload);
+        wireVariableActions();
       }
 
       function readSpecFromForm(cfg) {
+        setVarsError("");
         var lim = (cfg && cfg.limits) || {};
         var def = (cfg && cfg.defaults) || {};
         var kMin = lim.kMin != null ? Number(lim.kMin) : 2;
@@ -222,10 +398,23 @@
         var standardize = stdEl ? stdEl.checked : def.standardize !== false;
         var linkEl = document.getElementById("clusterLinkage");
         var linkage = (linkEl && linkEl.value) || def.linkage || "average";
-        return { k: k, standardize: standardize, linkage: linkage };
-      }
 
-      var lastModuleConfig = null;
+        var selectedVariableIndices = [];
+        document.querySelectorAll(".var-cb:checked").forEach(function(cb) {
+          var i = parseInt(cb.getAttribute("data-col-index"), 10);
+          if (isFinite(i)) selectedVariableIndices.push(i);
+        });
+
+        if (document.querySelectorAll(".var-cb").length > 0 && selectedVariableIndices.length === 0) {
+          var msg = (lastUi && lastUi.noVariablesSelectedMessage) || "Select at least one variable to include.";
+          setVarsError(msg);
+          return null;
+        }
+
+        var spec = { k: k, standardize: standardize, linkage: linkage };
+        if (selectedVariableIndices.length > 0) spec.selectedVariableIndices = selectedVariableIndices;
+        return spec;
+      }
 
       Office.onReady(function() {
         Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function(arg) {
@@ -248,8 +437,11 @@
 
         document.getElementById("btnOpenDashboard").onclick = function() {
           var spec = readSpecFromForm(lastModuleConfig);
+          if (!spec) return;
           sendToParent({ action: "clusterSetupRun", spec: spec });
         };
+
+        wireVariableActions();
       });
     })();
   </script>

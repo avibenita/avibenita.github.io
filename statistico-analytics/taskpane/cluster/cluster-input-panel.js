@@ -55,7 +55,13 @@ function readClusterSpec() {
         if (o.standardize === false) standardize = false;
         if (o.standardize === true) standardize = true;
         const linkage = o.linkage || def.linkage || "average";
-        return { k, standardize, linkage };
+        const out = { k, standardize, linkage };
+        if (Array.isArray(o.selectedVariableIndices) && o.selectedVariableIndices.length > 0) {
+          out.selectedVariableIndices = o.selectedVariableIndices
+            .map((x) => Number(x))
+            .filter((i) => Number.isInteger(i) && i >= 0);
+        }
+        return out;
       }
     }
   } catch (e) {}
@@ -84,8 +90,14 @@ function persistClusterSpec(spec) {
   if (spec.standardize === false) standardize = false;
   if (spec.standardize === true) standardize = true;
   const linkage = spec.linkage || def.linkage || "average";
+  const obj = { k, standardize, linkage };
+  if (Array.isArray(spec.selectedVariableIndices) && spec.selectedVariableIndices.length > 0) {
+    obj.selectedVariableIndices = spec.selectedVariableIndices
+      .map((x) => Number(x))
+      .filter((i) => Number.isInteger(i) && i >= 0);
+  }
   try {
-    sessionStorage.setItem("clusterSpec", JSON.stringify({ k, standardize, linkage }));
+    sessionStorage.setItem("clusterSpec", JSON.stringify(obj));
   } catch (e) {}
 }
 
@@ -106,6 +118,7 @@ function pushClusterSetupPayload() {
         rangeAddress: clusterRangeAddress || "",
         dataRows: rows,
         dataCols: headers.length,
+        variableCandidates: buildNumericVariableCandidates(headers, clusterRangeData.slice(1)),
         savedSpec: savedSpec && typeof savedSpec === "object" ? savedSpec : null
       }
     }));
@@ -118,8 +131,8 @@ function openClusterSetupDialog() {
   if (!clusterRangeData || clusterRangeData.length < 2) return;
   const dlg = clusterCfg().dialog || {};
   const setupFile = dlg.setupFilename || "cluster/cluster-setup-dialog.html";
-  const hPct = dlg.setupHeightPercent != null ? Number(dlg.setupHeightPercent) : 52;
-  const wPct = dlg.setupWidthPercent != null ? Number(dlg.setupWidthPercent) : 38;
+  const hPct = dlg.setupHeightPercent != null ? Number(dlg.setupHeightPercent) : 58;
+  const wPct = dlg.setupWidthPercent != null ? Number(dlg.setupWidthPercent) : 44;
   const dialogUrl = `${getDialogsBaseUrl()}${setupFile}?v=${Date.now()}`;
 
   Office.context.ui.displayDialogAsync(
@@ -165,6 +178,27 @@ function parseNum(v) {
   if (v === null || v === undefined || v === "") return NaN;
   const n = Number(v);
   return isFinite(n) ? n : NaN;
+}
+
+function buildNumericVariableCandidates(headers, rows) {
+  if (!headers || !rows || rows.length === 0) return [];
+  const an = clusterCfg().analysis || {};
+  const th = an.numericColumnThreshold != null ? Number(an.numericColumnThreshold) : 0.8;
+  const out = [];
+  headers.forEach((h, j) => {
+    let num = 0;
+    let nm = 0;
+    rows.forEach((r) => {
+      const v = r[j];
+      if (v === null || v === undefined || v === "") return;
+      nm++;
+      if (isFinite(parseNum(v))) num++;
+    });
+    if (nm > 0 && num / nm >= th) {
+      out.push({ index: j, label: String(h || `V${j + 1}`) });
+    }
+  });
+  return out;
 }
 
 function columnMeans(X) {
@@ -350,7 +384,7 @@ function kmeans(Z, k, maxIter) {
   return { labels, wcss, iterations: it, kUsed: kEff, sizes };
 }
 
-function extractNumericMatrix(headers, rows) {
+function extractNumericMatrix(headers, rows, spec) {
   const an = clusterCfg().analysis || {};
   const th = an.numericColumnThreshold != null ? Number(an.numericColumnThreshold) : 0.8;
   const numericFlags = headers.map((_, j) => {
@@ -364,7 +398,14 @@ function extractNumericMatrix(headers, rows) {
     });
     return nm > 0 && num / nm >= th;
   });
-  const indices = numericFlags.map((ok, j) => (ok ? j : -1)).filter((j) => j >= 0);
+  let indices = numericFlags.map((ok, j) => (ok ? j : -1)).filter((j) => j >= 0);
+  const sel = spec && spec.selectedVariableIndices;
+  if (Array.isArray(sel) && sel.length > 0) {
+    const want = new Set(
+      sel.map((x) => Number(x)).filter((i) => Number.isInteger(i) && i >= 0 && i < headers.length)
+    );
+    indices = indices.filter((j) => want.has(j));
+  }
   const names = indices.map((j) => String(headers[j] || `V${j + 1}`));
   const X = [];
   let missingRows = 0;
@@ -383,7 +424,7 @@ function buildClusterBundle(headers, rows, spec) {
   const kReq = spec && isFinite(spec.k) ? Number(spec.k) : 3;
   const standardize = !(spec && spec.standardize === false);
   const linkage = (spec && spec.linkage) || "average";
-  const { names, X, missingRows, p } = extractNumericMatrix(headers, rows);
+  const { names, X, missingRows, p } = extractNumericMatrix(headers, rows, spec);
   const n = X.length;
 
   if (!n || p < 1) {

@@ -18,8 +18,8 @@
       heightPercent: 90,
       widthPercent: 70,
       setupFilename: "cluster/cluster-setup-dialog.html",
-      setupHeightPercent: 52,
-      setupWidthPercent: 38
+      setupHeightPercent: 58,
+      setupWidthPercent: 44
     },
     defaults: { numClusters: 3, standardize: true, linkage: "average" },
     limits: {
@@ -39,11 +39,16 @@
     ui: {
       pageTitle: "Cluster Analysis – Statistico Analytics",
       headerTitle: "Cluster Analysis",
-      optionsBlurb: "All numeric columns in the range are used (listwise complete rows). K-means and hierarchical clustering both use the same <em>k</em> and distance on the analysis space.",
+      optionsBlurb: "Choose which <strong>numeric</strong> variables to include below (like PCA). Listwise complete rows are used. K-means and hierarchical clustering share the same <em>k</em>, distance, and variable set.",
       labelK: "Number of clusters <em>k</em>",
       labelLinkage: "Hierarchical linkage",
       labelStandardize: "Standardise variables (recommended)",
-      runButtonHtml: "<i class=\"fa-solid fa-chart-diagram\"></i><span>Open cluster dashboard</span>",
+      runButtonHtml: "<i class=\"fa-solid fa-up-right-from-square\"></i><span>Open results</span>",
+      variablesSectionTitle: "Variables to include",
+      selectAllVariables: "Select all",
+      clearVariablesSelection: "Clear",
+      variablesEmptyHint: "No numeric columns were detected in this range. Use columns that are mostly numeric, or widen the numeric threshold in cluster.module.json (analysis.numericColumnThreshold).",
+      noVariablesSelectedMessage: "Select at least one variable to include, or click Close.",
       configureClusterButtonHtml: "<i class=\"fa-solid fa-sliders\"></i><span>Open clustering configuration</span>",
       hintReadyPick: "Ready — click to open clustering configuration",
       clusterSetupTitle: "Clustering setup",

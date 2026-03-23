@@ -37,6 +37,17 @@ function getDialogsBaseUrl() {
   return `${window.location.origin}/dialogs/views/`;
 }
 
+function parseDialogMessage(arg) {
+  if (!arg || arg.message == null) return null;
+  const m = arg.message;
+  if (typeof m === "object") return m;
+  try {
+    return JSON.parse(String(m));
+  } catch (e) {
+    return null;
+  }
+}
+
 function readClusterSpec() {
   const cfg = clusterCfg();
   const lim = cfg.limits || {};
@@ -146,19 +157,24 @@ function openClusterSetupDialog() {
       clusterSetupDialog = asyncResult.value;
       clusterSetupDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
         try {
-          const message = JSON.parse(arg.message);
+          const message = parseDialogMessage(arg);
+          if (!message || !message.action) return;
           if (message.action === "requestClusterSetup") {
             pushClusterSetupPayload();
           } else if (message.action === "clusterSetupRun") {
-            persistClusterSpec(message.spec);
-            try {
-              clusterSetupDialog.close();
-            } catch (e) {}
+            persistClusterSpec(message.spec || message.payload);
+            const setupDlg = clusterSetupDialog;
             clusterSetupDialog = null;
-            openClusterResultsDialogOnly();
+            try {
+              if (setupDlg) setupDlg.close();
+            } catch (e) {}
+            /* Excel/Office often rejects opening a second dialog until the first has finished closing (PCA uses the same delay). */
+            setTimeout(() => {
+              openClusterResultsDialogOnly();
+            }, 480);
           } else if (message.action === "clusterSetupClose") {
             try {
-              clusterSetupDialog.close();
+              if (clusterSetupDialog) clusterSetupDialog.close();
             } catch (e) {}
             clusterSetupDialog = null;
           }
@@ -560,7 +576,8 @@ function openClusterResultsDialogOnly() {
       clusterDialog = asyncResult.value;
       clusterDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
         try {
-          const message = JSON.parse(arg.message);
+          const message = parseDialogMessage(arg);
+          if (!message) return;
           if (message.action === "ready") sendClusterBundle();
           else if (message.action === "close") {
             clusterDialog.close();
@@ -588,7 +605,13 @@ function sendClusterBundle() {
   if (!clusterDialog || !clusterRangeData) return;
   const headers = clusterRangeData[0] || [];
   const rows = clusterRangeData.slice(1);
-  const spec = JSON.parse(sessionStorage.getItem("clusterSpec") || "{}");
+  let spec = {};
+  try {
+    const raw = sessionStorage.getItem("clusterSpec");
+    if (raw) spec = JSON.parse(raw);
+  } catch (e) {
+    spec = {};
+  }
   const bundle = buildClusterBundle(headers, rows, spec);
   const rawData = bundle.rawData;
   const main = Object.assign({}, bundle);

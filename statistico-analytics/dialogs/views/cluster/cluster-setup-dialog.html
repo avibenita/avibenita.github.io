@@ -43,14 +43,14 @@
       margin-bottom: 12px;
       line-height: 1.45;
     }
-    .variables-panel {
+    .setup-section {
       border: 1px solid #e5e7eb;
       border-radius: 8px;
       background: #fff;
       margin-bottom: 12px;
       overflow: hidden;
     }
-    .variables-panel-head {
+    .setup-section-head {
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -65,6 +65,28 @@
       letter-spacing: 0.45px;
       color: var(--clr-dark);
     }
+    .setup-section-body { padding: 10px 12px 12px; }
+    .method-choice {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 6px 4px;
+      cursor: pointer;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #374151;
+    }
+    .method-choice input { margin-top: 3px; accent-color: var(--clr); }
+    .method-hint {
+      font-size: 11px;
+      color: #6b7280;
+      line-height: 1.45;
+      margin: 6px 0 0;
+      padding: 8px 10px;
+      background: #f9fafb;
+      border-radius: 6px;
+      border: 1px solid #e5e7eb;
+    }
     .var-actions { display: flex; gap: 10px; flex-shrink: 0; }
     .var-actions button {
       background: none;
@@ -78,7 +100,7 @@
     }
     .var-actions button:hover { text-decoration: underline; }
     .var-list-scroll {
-      max-height: 320px;
+      max-height: 220px;
       overflow-y: auto;
       padding: 4px 6px 10px;
     }
@@ -157,9 +179,10 @@
   <div class="body">
     <div class="summary" id="dlgSummary"></div>
     <p class="blurb" id="clusterOptionsBlurb"></p>
-    <div class="variables-panel" id="variablesPanel">
-      <div class="variables-panel-head">
-        <span id="labelVariablesSection">Variables to include</span>
+
+    <div class="setup-section" id="variablesPanel">
+      <div class="setup-section-head">
+        <span id="labelVariablesSection">Variables</span>
         <div class="var-actions">
           <button type="button" id="btnSelectAllVars" style="display:none;">Select all</button>
           <button type="button" id="btnClearVars" style="display:none;">Clear</button>
@@ -169,18 +192,43 @@
       <div class="vars-empty" id="varsEmpty" style="display:none;"></div>
       <div class="vars-error" id="varsError"></div>
     </div>
-    <div class="opt-grid">
-      <div class="opt-row">
-        <label class="field" id="labelClusterK" for="clusterK">Number of clusters <em>k</em></label>
-        <input type="number" id="clusterK" min="2" max="50" value="3"/>
+
+    <div class="setup-section" id="methodSection">
+      <div class="setup-section-head"><span id="methodSectionTitle">Method</span></div>
+      <div class="setup-section-body">
+        <label class="method-choice">
+          <input type="radio" name="clusterMethod" value="kmeans" id="radKmeans" checked/>
+          <span id="lblMethodKmeans">K-means</span>
+        </label>
+        <label class="method-choice">
+          <input type="radio" name="clusterMethod" value="hierarchical" id="radHierarchical"/>
+          <span id="lblMethodHierarchical">Hierarchical</span>
+        </label>
+        <p class="method-hint" id="methodGuidance"></p>
       </div>
-      <div class="opt-row">
-        <label class="field" id="labelClusterLinkage" for="clusterLinkage">Hierarchical linkage</label>
-        <select id="clusterLinkage" aria-labelledby="labelClusterLinkage"></select>
-      </div>
-      <div class="opt-row">
-        <input type="checkbox" id="clusterStandardize" checked aria-labelledby="labelClusterStandardize"/>
-        <label id="labelClusterStandardize" for="clusterStandardize" style="font-weight:500;font-size:12px;">Standardise variables (recommended)</label>
+    </div>
+
+    <div class="setup-section" id="parametersSection">
+      <div class="setup-section-head"><span id="parametersSectionTitle">Parameters</span></div>
+      <div class="setup-section-body">
+        <div class="opt-grid">
+          <div class="opt-row" id="rowK">
+            <label class="field" id="labelClusterK" for="clusterK">Number of clusters (<em>k</em>)</label>
+            <input type="number" id="clusterK" min="2" max="50" value="3"/>
+          </div>
+          <div class="opt-row" id="rowLinkage" style="display:none;">
+            <label class="field" id="labelClusterLinkage" for="clusterLinkage">Linkage method</label>
+            <select id="clusterLinkage" aria-labelledby="labelClusterLinkage"></select>
+          </div>
+          <div class="opt-row" id="rowDistance">
+            <label class="field" id="labelClusterDistance" for="clusterDistance">Distance measure</label>
+            <select id="clusterDistance" aria-labelledby="labelClusterDistance"></select>
+          </div>
+          <div class="opt-row" id="rowStd">
+            <input type="checkbox" id="clusterStandardize" checked aria-labelledby="labelClusterStandardize"/>
+            <label id="labelClusterStandardize" for="clusterStandardize" style="font-weight:500;font-size:12px;">Standardise variables (recommended)</label>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -204,6 +252,17 @@
         }
       }
 
+      function parseParentMessage(arg) {
+        if (!arg || arg.message == null) return null;
+        var m = arg.message;
+        if (typeof m === "object") return m;
+        try {
+          return JSON.parse(String(m));
+        } catch (e) {
+          return null;
+        }
+      }
+
       function applyTheme(t) {
         if (!t) return;
         var r = document.documentElement;
@@ -223,6 +282,39 @@
           el.textContent = "";
           el.style.display = "none";
         }
+      }
+
+      function getUi() {
+        return (lastModuleConfig && lastModuleConfig.ui) || {};
+      }
+
+      function updateMethodUi() {
+        var ui = getUi();
+        var hier = document.getElementById("radHierarchical");
+        var isHi = hier && hier.checked;
+        var rowL = document.getElementById("rowLinkage");
+        var lblK = document.getElementById("labelClusterK");
+        var g = document.getElementById("methodGuidance");
+        if (rowL) rowL.style.display = isHi ? "" : "none";
+        if (lblK) {
+          if (isHi && ui.labelKTreeCut) lblK.innerHTML = ui.labelKTreeCut;
+          else if (!isHi && ui.labelKCentroids) lblK.innerHTML = ui.labelKCentroids;
+          else if (ui.labelK) lblK.innerHTML = ui.labelK;
+        }
+        if (g) {
+          g.innerHTML = isHi ? (ui.methodHelpHierarchical || "") : (ui.methodHelpKmeans || "");
+        }
+      }
+
+      function wireMethodRadios() {
+        document.querySelectorAll('input[name="clusterMethod"]').forEach(function(r) {
+          if (r._wiredMethod) return;
+          r._wiredMethod = true;
+          r.addEventListener("change", function() {
+            setVarsError("");
+            updateMethodUi();
+          });
+        });
       }
 
       function renderVariableCandidates(payload) {
@@ -250,7 +342,7 @@
 
         if (candidates.length === 0) {
           if (empty) {
-            empty.textContent = ui.variablesEmptyHint || "No numeric columns detected in this range. Include columns that are mostly numeric.";
+            empty.textContent = ui.variablesEmptyHint || "No numeric columns detected.";
             empty.style.display = "block";
           }
           if (panel) panel.style.opacity = "0.92";
@@ -310,9 +402,30 @@
         }
       }
 
+      function fillDistanceSelect(cfg, saved) {
+        var sel = document.getElementById("clusterDistance");
+        if (!sel) return;
+        var opts = (cfg && cfg.distanceOptions) || [
+          { value: "euclidean", label: "Euclidean (L2)" },
+          { value: "manhattan", label: "Manhattan (L1)" }
+        ];
+        sel.innerHTML = "";
+        opts.forEach(function(opt) {
+          var o = document.createElement("option");
+          o.value = opt.value;
+          o.textContent = opt.label || opt.value;
+          sel.appendChild(o);
+        });
+        var an = (cfg && cfg.analysis) || {};
+        var v = (saved && saved.distance) || an.distance || "euclidean";
+        if (v === "manhattan") sel.value = "manhattan";
+        else sel.value = "euclidean";
+      }
+
       function applyPayload(payload) {
         if (!payload || !payload.moduleConfig) return;
         var cfg = payload.moduleConfig;
+        lastModuleConfig = cfg;
         var ui = cfg.ui || {};
         var lim = cfg.limits || {};
         var def = cfg.defaults || {};
@@ -330,12 +443,35 @@
         var blurb = document.getElementById("clusterOptionsBlurb");
         if (blurb && ui.optionsBlurb) blurb.innerHTML = ui.optionsBlurb;
 
-        var lk = document.getElementById("labelClusterK");
-        if (lk && ui.labelK) lk.innerHTML = ui.labelK;
-        var ll = document.getElementById("labelClusterLinkage");
-        if (ll && ui.labelLinkage) ll.textContent = ui.labelLinkage;
-        var ls = document.getElementById("labelClusterStandardize");
-        if (ls && ui.labelStandardize) ls.textContent = ui.labelStandardize;
+        if (ui.methodSectionTitle) {
+          var ms = document.getElementById("methodSectionTitle");
+          if (ms) ms.textContent = ui.methodSectionTitle;
+        }
+        if (ui.parametersSectionTitle) {
+          var ps = document.getElementById("parametersSectionTitle");
+          if (ps) ps.textContent = ui.parametersSectionTitle;
+        }
+        if (ui.methodKmeansLabel) {
+          var lk = document.getElementById("lblMethodKmeans");
+          if (lk) lk.textContent = ui.methodKmeansLabel;
+        }
+        if (ui.methodHierarchicalLabel) {
+          var lh = document.getElementById("lblMethodHierarchical");
+          if (lh) lh.textContent = ui.methodHierarchicalLabel;
+        }
+
+        if (ui.labelLinkageMethod) {
+          var ll = document.getElementById("labelClusterLinkage");
+          if (ll) ll.textContent = ui.labelLinkageMethod;
+        }
+        if (ui.labelDistanceMeasure) {
+          var ld = document.getElementById("labelClusterDistance");
+          if (ld) ld.textContent = ui.labelDistanceMeasure;
+        }
+        if (ui.labelStandardize) {
+          var ls = document.getElementById("labelClusterStandardize");
+          if (ls) ls.textContent = ui.labelStandardize;
+        }
 
         var kEl = document.getElementById("clusterK");
         if (kEl) {
@@ -343,14 +479,14 @@
           if (lim.kMax != null) kEl.max = String(lim.kMax);
         }
 
-        var sel = document.getElementById("clusterLinkage");
-        if (sel && Array.isArray(cfg.linkageOptions) && cfg.linkageOptions.length) {
-          sel.innerHTML = "";
+        var linkSel = document.getElementById("clusterLinkage");
+        if (linkSel && Array.isArray(cfg.linkageOptions) && cfg.linkageOptions.length) {
+          linkSel.innerHTML = "";
           cfg.linkageOptions.forEach(function(opt) {
             var o = document.createElement("option");
             o.value = opt.value;
             o.textContent = opt.label || opt.value;
-            sel.appendChild(o);
+            linkSel.appendChild(o);
           });
         }
 
@@ -370,7 +506,18 @@
         }
 
         var linkVal = saved.linkage || def.linkage || (cfg.linkageOptions[0] && cfg.linkageOptions[0].value);
-        if (sel && linkVal) sel.value = linkVal;
+        if (linkSel && linkVal) linkSel.value = linkVal;
+
+        fillDistanceSelect(cfg, saved);
+
+        var radK = document.getElementById("radKmeans");
+        var radH = document.getElementById("radHierarchical");
+        var meth = saved.clusterMethod || def.clusterMethod || "kmeans";
+        if (String(meth).toLowerCase() === "hierarchical") {
+          if (radH) radH.checked = true;
+        } else {
+          if (radK) radK.checked = true;
+        }
 
         var sum = document.getElementById("dlgSummary");
         if (sum) {
@@ -382,6 +529,8 @@
 
         renderVariableCandidates(payload);
         wireVariableActions();
+        wireMethodRadios();
+        updateMethodUi();
       }
 
       function readSpecFromForm(cfg) {
@@ -398,6 +547,12 @@
         var standardize = stdEl ? stdEl.checked : def.standardize !== false;
         var linkEl = document.getElementById("clusterLinkage");
         var linkage = (linkEl && linkEl.value) || def.linkage || "average";
+        var distEl = document.getElementById("clusterDistance");
+        var distance = (distEl && distEl.value) || "euclidean";
+        if (distance !== "manhattan") distance = "euclidean";
+
+        var radH = document.getElementById("radHierarchical");
+        var clusterMethod = radH && radH.checked ? "hierarchical" : "kmeans";
 
         var selectedVariableIndices = [];
         document.querySelectorAll(".var-cb:checked").forEach(function(cb) {
@@ -411,21 +566,22 @@
           return null;
         }
 
-        var spec = { k: k, standardize: standardize, linkage: linkage };
+        var spec = {
+          k: k,
+          standardize: standardize,
+          linkage: linkage,
+          clusterMethod: clusterMethod,
+          distance: distance
+        };
         if (selectedVariableIndices.length > 0) spec.selectedVariableIndices = selectedVariableIndices;
         return spec;
       }
 
       Office.onReady(function() {
         Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function(arg) {
-          try {
-            var m = JSON.parse(arg.message || "{}");
-            if (m.action === "clusterSetupInit" && m.payload) {
-              lastModuleConfig = m.payload.moduleConfig || null;
-              applyPayload(m.payload);
-            }
-          } catch (err) {
-            console.error(err);
+          var m = parseParentMessage(arg);
+          if (m && m.action === "clusterSetupInit" && m.payload) {
+            applyPayload(m.payload);
           }
         });
 
@@ -442,6 +598,7 @@
         };
 
         wireVariableActions();
+        wireMethodRadios();
       });
     })();
   </script>

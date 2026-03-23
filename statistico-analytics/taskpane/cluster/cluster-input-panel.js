@@ -66,7 +66,10 @@ function readClusterSpec() {
         if (o.standardize === false) standardize = false;
         if (o.standardize === true) standardize = true;
         const linkage = o.linkage || def.linkage || "average";
-        const out = { k, standardize, linkage };
+        const clusterMethod = o.clusterMethod === "hierarchical" ? "hierarchical" : "kmeans";
+        const an0 = clusterCfg().analysis || {};
+        const distance = o.distance === "manhattan" ? "manhattan" : (o.distance || an0.distance || "euclidean");
+        const out = { k, standardize, linkage, clusterMethod, distance };
         if (Array.isArray(o.selectedVariableIndices) && o.selectedVariableIndices.length > 0) {
           out.selectedVariableIndices = o.selectedVariableIndices
             .map((x) => Number(x))
@@ -78,7 +81,16 @@ function readClusterSpec() {
   } catch (e) {}
   let k = def.numClusters != null ? Number(def.numClusters) : 3;
   k = Math.max(kMin, Math.min(kMax, k));
-  return { k, standardize: def.standardize !== false, linkage: def.linkage || "average" };
+  const an1 = clusterCfg().analysis || {};
+  const d0 = an1.distance === "manhattan" ? "manhattan" : "euclidean";
+  const m0 = String(def.clusterMethod || "kmeans").toLowerCase() === "hierarchical" ? "hierarchical" : "kmeans";
+  return {
+    k,
+    standardize: def.standardize !== false,
+    linkage: def.linkage || "average",
+    clusterMethod: m0,
+    distance: d0
+  };
 }
 
 function saveClusterSpec() {
@@ -101,7 +113,10 @@ function persistClusterSpec(spec) {
   if (spec.standardize === false) standardize = false;
   if (spec.standardize === true) standardize = true;
   const linkage = spec.linkage || def.linkage || "average";
-  const obj = { k, standardize, linkage };
+  const clusterMethod = spec.clusterMethod === "hierarchical" ? "hierarchical" : "kmeans";
+  const an2 = clusterCfg().analysis || {};
+  const distance = spec.distance === "manhattan" ? "manhattan" : (spec.distance || an2.distance || "euclidean");
+  const obj = { k, standardize, linkage, clusterMethod, distance };
   if (Array.isArray(spec.selectedVariableIndices) && spec.selectedVariableIndices.length > 0) {
     obj.selectedVariableIndices = spec.selectedVariableIndices
       .map((x) => Number(x))
@@ -247,19 +262,25 @@ function standardise(X) {
   return { Z, means, sds };
 }
 
-function distMatrix(X) {
+function distMatrix(X, metric) {
   const n = X.length;
   const d = Array.from({ length: n }, () => Array(n).fill(0));
+  const manhattan = metric === "manhattan";
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
-      let s = 0;
-      for (let f = 0; f < X[0].length; f++) {
-        const t = X[i][f] - X[j][f];
-        s += t * t;
+      let v = 0;
+      if (manhattan) {
+        for (let f = 0; f < X[0].length; f++) v += Math.abs(X[i][f] - X[j][f]);
+      } else {
+        let s = 0;
+        for (let f = 0; f < X[0].length; f++) {
+          const t = X[i][f] - X[j][f];
+          s += t * t;
+        }
+        v = Math.sqrt(s);
       }
-      const r = Math.sqrt(s);
-      d[i][j] = r;
-      d[j][i] = r;
+      d[i][j] = v;
+      d[j][i] = v;
     }
   }
   return d;
@@ -286,9 +307,9 @@ function linkDist(membersA, membersB, dist, mode) {
   return cnt ? sum / cnt : 0;
 }
 
-function hierarchicalCluster(X, linkageMode, kTarget) {
+function hierarchicalCluster(X, linkageMode, kTarget, metric) {
   const n = X.length;
-  const dist = distMatrix(X);
+  const dist = distMatrix(X, metric);
   let clusters = Array.from({ length: n }, (_, i) => ({ members: [i] }));
   const merges = [];
   const kEff = Math.min(Math.max(2, kTarget), n);
@@ -337,9 +358,10 @@ function hierarchicalCluster(X, linkageMode, kTarget) {
   return { merges, labels: labelsAtK, kUsed: kEff };
 }
 
-function kmeans(Z, k, maxIter) {
+function kmeans(Z, k, maxIter, metric) {
   const n = Z.length;
   const p = Z[0].length;
+  const manhattan = metric === "manhattan";
   const kEff = Math.min(Math.max(2, k), n);
   const centroids = [];
   const used = new Set();
@@ -358,13 +380,19 @@ function kmeans(Z, k, maxIter) {
       let best = 0;
       let bestD = Infinity;
       for (let c = 0; c < kEff; c++) {
-        let s = 0;
-        for (let f = 0; f < p; f++) {
-          const t = Z[i][f] - centroids[c][f];
-          s += t * t;
+        let d = 0;
+        if (manhattan) {
+          for (let f = 0; f < p; f++) d += Math.abs(Z[i][f] - centroids[c][f]);
+        } else {
+          let s = 0;
+          for (let f = 0; f < p; f++) {
+            const t = Z[i][f] - centroids[c][f];
+            s += t * t;
+          }
+          d = s;
         }
-        if (s < bestD) {
-          bestD = s;
+        if (d < bestD) {
+          bestD = d;
           best = c;
         }
       }
@@ -388,16 +416,18 @@ function kmeans(Z, k, maxIter) {
   let wcss = 0;
   for (let i = 0; i < n; i++) {
     const c = labels[i];
-    let s = 0;
-    for (let f = 0; f < p; f++) {
-      const t = Z[i][f] - centroids[c][f];
-      s += t * t;
+    if (manhattan) {
+      for (let f = 0; f < p; f++) wcss += Math.abs(Z[i][f] - centroids[c][f]);
+    } else {
+      for (let f = 0; f < p; f++) {
+        const t = Z[i][f] - centroids[c][f];
+        wcss += t * t;
+      }
     }
-    wcss += s;
   }
   const sizes = Array(kEff).fill(0);
   labels.forEach((c) => { sizes[c]++; });
-  return { labels, wcss, iterations: it, kUsed: kEff, sizes };
+  return { labels, wcss, iterations: it, kUsed: kEff, sizes, distanceMetric: manhattan ? "manhattan" : "euclidean" };
 }
 
 function extractNumericMatrix(headers, rows, spec) {
@@ -440,6 +470,11 @@ function buildClusterBundle(headers, rows, spec) {
   const kReq = spec && isFinite(spec.k) ? Number(spec.k) : 3;
   const standardize = !(spec && spec.standardize === false);
   const linkage = (spec && spec.linkage) || "average";
+  const cm = spec && spec.clusterMethod;
+  const clusterMethod = cm === "hierarchical" ? "hierarchical" : "kmeans";
+  const an = clusterCfg().analysis || {};
+  const distRaw = (spec && spec.distance) || an.distance || "euclidean";
+  const metric = distRaw === "manhattan" ? "manhattan" : "euclidean";
   const { names, X, missingRows, p } = extractNumericMatrix(headers, rows, spec);
   const n = X.length;
 
@@ -452,6 +487,8 @@ function buildClusterBundle(headers, rows, spec) {
         k: kReq,
         standardize,
         linkage,
+        clusterMethod,
+        distanceMeasure: metric,
         variableLabels: names,
         verdict: "Insufficient numeric data",
         correlationMatrix: []
@@ -469,8 +506,8 @@ function buildClusterBundle(headers, rows, spec) {
   const maxMergeRows = lim.maxHierarchicalMergeRowsDisplay != null ? Number(lim.maxHierarchicalMergeRowsDisplay) : 40;
 
   const workX = standardize ? standardise(X).Z : X.map((r) => r.slice());
-  const km = kmeans(workX, kReq, maxKmIter);
-  const hi = hierarchicalCluster(workX, linkage, kReq);
+  const km = kmeans(workX, kReq, maxKmIter, metric);
+  const hi = hierarchicalCluster(workX, linkage, kReq, metric);
 
   const maxShow = Math.min(maxAssign, n);
   const kmRows = [];
@@ -525,6 +562,8 @@ function buildClusterBundle(headers, rows, spec) {
       k: km.kUsed,
       standardize,
       linkage,
+      clusterMethod,
+      distanceMeasure: metric,
       variableLabels: names,
       verdict: n >= kReq ? "Clustering run complete" : "Very small sample — interpret with caution",
       correlationMatrix: R

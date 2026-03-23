@@ -164,6 +164,7 @@
     }
     .chart-container{ width:100%; height:280px; }
     .chart-container.chart-profile{ height:340px; }
+    .chart-container.chart-dendrogram{ height:320px; min-height:200px; }
     .section-note{
       margin-top:10px;
       padding:9px;
@@ -511,9 +512,8 @@
             <section id="tab-hi-dendrogram" class="tab-panel">
               <div class="viz-card">
                 <div class="viz-title"><i class="fa-solid fa-diagram-project"></i> Dendrogram</div>
-                <div class="section-note" style="margin:0;border-left-color:var(--border);background:rgba(255,255,255,.04);">
-                  A full dendrogram plot is not shown here. Use <strong>Clusters</strong> for merge-step heights and cluster sizes at your chosen <em>k</em>, or re-run with different linkage in setup.
-                </div>
+                <div class="chart-wrap"><div id="hiDendrogramChart" class="chart-container chart-dendrogram"></div></div>
+                <div class="section-note" style="margin-top:8px;margin-bottom:0;">Merge height (y-axis) shows distance at which clusters combine. A horizontal cut at height <em>h</em> gives the number of clusters at that level.</div>
               </div>
             </section>
 
@@ -843,6 +843,69 @@
       }).join("");
     }
 
+    function renderDendrogram(containerId, merges, n) {
+      var el = document.getElementById(containerId);
+      if (!el) return;
+      if (!merges || !merges.length || n < 2 || merges[0].left === undefined || merges[0].right === undefined) {
+        el.innerHTML = '<div class="hint-empty">No dendrogram data. Re-run hierarchical clustering.</div>';
+        return;
+      }
+      var xPos = [];
+      var yPos = [];
+      var i;
+      function getLeafOrder() {
+        var order = [];
+        function visit(nodeId) {
+          if (nodeId < n) { order.push(nodeId); return; }
+          var idx = nodeId - n;
+          if (idx < 0 || idx >= merges.length) return;
+          var m = merges[idx];
+          visit(m.left);
+          visit(m.right);
+        }
+        visit(n + merges.length - 1);
+        return order;
+      }
+      var leafOrder = getLeafOrder();
+      for (i = 0; i < n; i++) xPos[i] = leafOrder.indexOf(i);
+      for (i = 0; i < n; i++) yPos[i] = 0;
+      for (i = 0; i < merges.length; i++) {
+        var m = merges[i];
+        var lid = m.left, rid = m.right;
+        xPos[n + i] = (xPos[lid] + xPos[rid]) / 2;
+        yPos[n + i] = m.height;
+      }
+      var w = Math.max(400, n * 2);
+      var h = 260;
+      var pad = { top: 8, right: 12, bottom: 24, left: 40 };
+      var maxH = merges.length ? Math.max.apply(null, merges.map(function(m) { return m.height; })) : 0;
+      var scaleX = function(x) { return pad.left + (x / Math.max(1, n - 1)) * (w - pad.left - pad.right); };
+      var scaleY = function(y) { return pad.top + h - pad.top - pad.bottom - (y / Math.max(1e-9, maxH)) * (h - pad.top - pad.bottom); };
+      var strokes = [];
+      for (i = 0; i < merges.length; i++) {
+        var m = merges[i];
+        var l = m.left, r = m.right;
+        var xL = scaleX(xPos[l]), xR = scaleX(xPos[r]);
+        var yBot = l < n ? scaleY(0) : scaleY(yPos[l]);
+        var yTop = scaleY(m.height);
+        strokes.push("M" + xL.toFixed(2) + "," + yBot + "V" + yTop);
+        strokes.push("M" + xR.toFixed(2) + "," + (r < n ? scaleY(0) : scaleY(yPos[r])) + "V" + yTop);
+        strokes.push("M" + xL.toFixed(2) + "," + yTop + "H" + xR.toFixed(2));
+      }
+      var yAxisTicks = maxH > 0 ? [0, maxH * 0.25, maxH * 0.5, maxH * 0.75, maxH] : [0];
+      var yAxisHtml = yAxisTicks.map(function(v) {
+        var yy = scaleY(v);
+        return "<line x1='" + pad.left + "' y1='" + yy + "' x2='" + (w - pad.right) + "' y2='" + yy + "' stroke='rgba(255,255,255,.15)' stroke-width='1' stroke-dasharray='2,2'/>" +
+          "<text x='" + (pad.left - 6) + "' y='" + (yy + 4) + "' fill='rgba(255,255,255,.6)' font-size='10' text-anchor='end'>" + formatNumber(v) + "</text>";
+      }).join("");
+      var svg = "<svg width=\"100%\" height=\"100%\" viewBox=\"0 0 " + w + " " + h + "\" preserveAspectRatio=\"xMidYMid meet\" style=\"overflow:visible;\">" +
+        "<rect width=\"100%\" height=\"100%\" fill=\"transparent\"/>" +
+        yAxisHtml +
+        "<path d=\"" + strokes.join(" ") + "\" fill=\"none\" stroke=\"rgba(45,212,191,.85)\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>" +
+        "</svg>";
+      el.innerHTML = svg;
+    }
+
     function renderBarChart(id, categories, values, title) {
       if (typeof Highcharts === "undefined") return;
       var el = document.getElementById(id);
@@ -957,6 +1020,14 @@
         }
         var hcats = (hi.sizes || []).map(function(_, i) { return "C" + (i + 1); });
         renderBarChart("hiSizesChart", hcats, hi.sizes || [], "Hierarchical");
+        var dm = hi.dendrogramMerges;
+        if (dm && dm.length) {
+          var nCases = hi.totalCases != null ? hi.totalCases : (lastClusterBundle && lastClusterBundle.summary ? lastClusterBundle.summary.caseCount : 0);
+          renderDendrogram("hiDendrogramChart", dm, nCases);
+        } else {
+          var dendEl = document.getElementById("hiDendrogramChart");
+          if (dendEl) dendEl.innerHTML = '<div class="hint-empty">No dendrogram data (upgrade task pane for merge-tree support)</div>';
+        }
         var hip = hi.profile;
         if (hip && hip.categories && hip.categories.length && hip.series && hip.series.length) {
           renderClusterProfileChart("hiProfileChart", hip.categories, hip.series, hip.yLabel);
@@ -974,6 +1045,8 @@
         if (ab0) ab0.innerHTML = '<tr><td colspan="2" class="hint-empty">No hierarchical output</td></tr>';
         var elHi = document.getElementById("hiSizesChart");
         if (elHi) elHi.innerHTML = "";
+        var dendEl0 = document.getElementById("hiDendrogramChart");
+        if (dendEl0) dendEl0.innerHTML = '<div class="hint-empty">No hierarchical output</div>';
         destroyHiProfileChart();
         var ehp0 = document.getElementById("hiProfileChart");
         if (ehp0) ehp0.innerHTML = '<div class="hint-empty">No hierarchical output</div>';
@@ -1049,6 +1122,8 @@
       document.getElementById("hiAssignBody").innerHTML = '<tr><td colspan="2" class="hint-empty">Awaiting hierarchical output…</td></tr>';
       var a = document.getElementById("kmSizesChart"); if (a) a.innerHTML = "";
       var b = document.getElementById("hiSizesChart"); if (b) b.innerHTML = "";
+      var dendReset = document.getElementById("hiDendrogramChart");
+      if (dendReset) dendReset.innerHTML = '<div class="hint-empty">Awaiting hierarchical output…</div>';
       _vdAllRows = []; _vdFilteredRows = []; _vdCols = []; _vdPage = 0;
       document.getElementById("viewdataHead").innerHTML = "";
       document.getElementById("viewdataBody").innerHTML = "";

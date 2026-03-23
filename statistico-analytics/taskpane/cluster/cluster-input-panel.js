@@ -310,9 +310,10 @@ function linkDist(membersA, membersB, dist, mode) {
 function hierarchicalCluster(X, linkageMode, kTarget, metric) {
   const n = X.length;
   const dist = distMatrix(X, metric);
-  let clusters = Array.from({ length: n }, (_, i) => ({ members: [i] }));
+  let clusters = Array.from({ length: n }, (_, i) => ({ members: [i], id: i }));
   const merges = [];
   const kEff = Math.min(Math.max(2, kTarget), n);
+  let nextId = n;
 
   function labelFromClusters(clist) {
     const lab = Array(n).fill(0);
@@ -341,13 +342,15 @@ function hierarchicalCluster(X, linkageMode, kTarget, metric) {
     }
     const A = clusters[bi];
     const B = clusters[bj];
-    const merged = { members: A.members.concat(B.members) };
+    const merged = { members: A.members.concat(B.members), id: nextId++ };
     merges.push({
       step: merges.length + 1,
       n1: A.members.length,
       n2: B.members.length,
       nMerged: merged.members.length,
-      height: best
+      height: best,
+      left: A.id,
+      right: B.id
     });
     clusters = clusters.filter((_, idx) => idx !== bi && idx !== bj);
     clusters.push(merged);
@@ -626,6 +629,7 @@ function buildClusterBundle(headers, rows, spec) {
       sizes: hiSizes,
       mergeSteps: mergeShow,
       totalMerges: hi.merges.length,
+      dendrogramMerges: hi.merges,
       columns: ["Case", "Cluster"],
       rows: hiRows,
       totalCases: n,

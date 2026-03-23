@@ -131,8 +131,8 @@ function openClusterSetupDialog() {
   if (!clusterRangeData || clusterRangeData.length < 2) return;
   const dlg = clusterCfg().dialog || {};
   const setupFile = dlg.setupFilename || "cluster/cluster-setup-dialog.html";
-  const hPct = dlg.setupHeightPercent != null ? Number(dlg.setupHeightPercent) : 58;
-  const wPct = dlg.setupWidthPercent != null ? Number(dlg.setupWidthPercent) : 44;
+  const hPct = dlg.setupHeightPercent != null ? Number(dlg.setupHeightPercent) : 66;
+  const wPct = dlg.setupWidthPercent != null ? Number(dlg.setupWidthPercent) : 56;
   const dialogUrl = `${getDialogsBaseUrl()}${setupFile}?v=${Date.now()}`;
 
   Office.context.ui.displayDialogAsync(

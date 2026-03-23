@@ -427,7 +427,15 @@ function kmeans(Z, k, maxIter, metric) {
   }
   const sizes = Array(kEff).fill(0);
   labels.forEach((c) => { sizes[c]++; });
-  return { labels, wcss, iterations: it, kUsed: kEff, sizes, distanceMetric: manhattan ? "manhattan" : "euclidean" };
+  return {
+    labels,
+    wcss,
+    iterations: it,
+    kUsed: kEff,
+    sizes,
+    distanceMetric: manhattan ? "manhattan" : "euclidean",
+    centroids: centroids.map((row) => row.slice())
+  };
 }
 
 /** Mean z-score profile per K-means cluster (column-wise z on full X; comparable across variables). */
@@ -549,6 +557,9 @@ function buildClusterBundle(headers, rows, spec) {
 
   const mergeShow = hi.merges.slice(-Math.min(maxMergeRows, hi.merges.length));
 
+  const hiK = hi.labels.length ? Math.max.apply(null, hi.labels) + 1 : 0;
+  const hiProfileSeries = computeKmeansProfileSeries(X, hi.labels, hiK, p);
+
   let R = [];
   if (p >= 2 && n >= 2) {
     const { Z: Zc } = standardise(X);
@@ -599,6 +610,7 @@ function buildClusterBundle(headers, rows, spec) {
       iterations: km.iterations,
       wcss: km.wcss,
       sizes: km.sizes,
+      centroids: km.centroids || [],
       columns: ["Case", "Cluster"],
       rows: kmRows,
       totalCases: n,
@@ -617,7 +629,12 @@ function buildClusterBundle(headers, rows, spec) {
       columns: ["Case", "Cluster"],
       rows: hiRows,
       totalCases: n,
-      displayedCases: maxShow
+      displayedCases: maxShow,
+      profile: {
+        categories: names.slice(),
+        yLabel: "Mean z-score (pooled SD)",
+        series: hiProfileSeries
+      }
     },
     rawData: {
       columns: rawDataCols,

@@ -12,7 +12,11 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root { --clr: #6366f1; --clr-dark: #4f46e5; --clr-light: #eef2ff; --clr-border: #c7d2fe; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1f2937; background: #f3f4f6; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1f2937; background: #f3f4f6;
+      display: flex; flex-direction: column; min-height: 100%;
+    }
 
     .module-header {
       position: sticky; top: 0; z-index: 10;
@@ -76,6 +80,27 @@
     .configure-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 5px 14px rgba(99,102,241,.45); }
     .configure-btn:disabled { background: #cbd5e1; cursor: not-allowed; transform: none; box-shadow: none; }
     .hint { font-size: 11px; color: #9ca3af; text-align: center; }
+
+    .uni-picker-area { display: flex; flex-direction: column; gap: 16px; }
+    body.config-active .uni-picker-area { display: none; }
+
+    .univariate-config-host {
+      display: none;
+      flex: 1 1 auto;
+      flex-direction: column;
+      min-height: 360px;
+      margin: 0 -14px -16px;
+      border-top: 2px solid var(--clr-border);
+      background: #fff;
+    }
+    .univariate-config-host.visible { display: flex; }
+    .univariate-config-frame {
+      flex: 1;
+      width: 100%;
+      border: 0;
+      min-height: 380px;
+      background: #fff;
+    }
   </style>
 </head>
 <body>
@@ -91,43 +116,48 @@
   </div>
 
   <div class="taskpane-content">
-
-    <div class="section-card">
-      <div class="section-label">
-        <i class="fa-solid fa-table-cells-large"></i> Pick Range
+    <div class="uni-picker-area" id="uniPickerArea">
+      <div class="section-card">
+        <div class="section-label">
+          <i class="fa-solid fa-table-cells-large"></i> Pick Range
+        </div>
+        <div class="section-body">
+          <div class="radio-row">
+            <label id="lblNamed" onclick="setRangeMode('named')">
+              <input type="radio" name="rm" value="named">
+              <i class="fa-solid fa-bookmark"></i> Named
+            </label>
+            <label id="lblUsed" class="active" onclick="setRangeMode('used')">
+              <input type="radio" name="rm" value="used" checked>
+              <i class="fa-solid fa-wand-magic-sparkles"></i> Default
+            </label>
+            <label id="lblSelection" onclick="setRangeMode('selection')">
+              <input type="radio" name="rm" value="selection">
+              <i class="fa-solid fa-hand-pointer"></i> Selected
+            </label>
+          </div>
+          <div class="named-list" id="namedRangePanel" style="display:none;">
+            <select id="namedRangeSelect" size="4" onchange="loadFromNamedRange()">
+              <option value="">— Select a named range —</option>
+            </select>
+          </div>
+          <div class="range-badge" id="rangeBadge">
+            <i class="fa-solid fa-check-circle"></i> <span id="rangeBadgeText"></span>
+          </div>
+        </div>
       </div>
-      <div class="section-body">
-        <div class="radio-row">
-          <label id="lblNamed" onclick="setRangeMode('named')">
-            <input type="radio" name="rm" value="named">
-            <i class="fa-solid fa-bookmark"></i> Named
-          </label>
-          <label id="lblUsed" class="active" onclick="setRangeMode('used')">
-            <input type="radio" name="rm" value="used" checked>
-            <i class="fa-solid fa-wand-magic-sparkles"></i> Default
-          </label>
-          <label id="lblSelection" onclick="setRangeMode('selection')">
-            <input type="radio" name="rm" value="selection">
-            <i class="fa-solid fa-hand-pointer"></i> Selected
-          </label>
-        </div>
-        <div class="named-list" id="namedRangePanel" style="display:none;">
-          <select id="namedRangeSelect" size="4" onchange="loadFromNamedRange()">
-            <option value="">— Select a named range —</option>
-          </select>
-        </div>
-        <div class="range-badge" id="rangeBadge">
-          <i class="fa-solid fa-check-circle"></i> <span id="rangeBadgeText"></span>
-        </div>
+
+      <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+        <button class="configure-btn" id="configureBtn" disabled onclick="onConfigureClick()">
+          <i class="fa-solid fa-sliders"></i>
+          <span>Show configuration</span>
+        </button>
+        <p class="hint" id="hintText">Select a data range to continue</p>
       </div>
     </div>
 
-    <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
-      <button class="configure-btn" id="configureBtn" disabled onclick="onConfigureClick()">
-        <i class="fa-solid fa-sliders"></i>
-        <span>Configure Analysis</span>
-      </button>
-      <p class="hint" id="hintText">Select a data range to continue</p>
+    <div id="univariateConfigHost" class="univariate-config-host" aria-label="Univariate configuration">
+      <iframe id="univariateConfigFrame" class="univariate-config-frame" title="Univariate configuration"></iframe>
     </div>
 
   </div>
@@ -230,7 +260,7 @@
       const rows = values.length - 1;
       showRangeBadge(`${address}  –  ${rows} rows × ${cols} cols`, false);
       document.getElementById('configureBtn').disabled = false;
-      document.getElementById('hintText').textContent = 'Ready — click to open the model builder';
+      document.getElementById('hintText').textContent = 'Ready — configuration opens below';
       if (window.StatisticoGlobalRange) StatisticoGlobalRange.save(values, address, rangeMode);
       if (typeof onRangeDataLoaded === 'function') onRangeDataLoaded(values, address);
     }

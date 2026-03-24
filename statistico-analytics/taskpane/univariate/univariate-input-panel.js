@@ -6,6 +6,7 @@ let univariateDialog = null;
 let univariateResultsDialog = null;
 let univariateCurrentResults = null;
 let pendingUnivariateViewUrl = null;
+let _uniEmbedMessageHandler = null;
 const RESULT_DIALOG_OPTIONS = { height: 90, width: 70, displayInIframe: false };
 
 // ─── URL RESOLVER ────────────────────────────────────────────────────────────
@@ -58,11 +59,81 @@ function updateButtonState() {
 
 function resetUnivariateModel() {
   sessionStorage.removeItem('univariateModelSpec');
+  hideUnivariateConfigEmbed();
   updateButtonState();
 }
 
-// ─── OPEN CONFIG DIALOG ───────────────────────────────────────────────────────
-function openUnivariateBuilder() {
+function setUnivariateConfigVisible(show) {
+  document.body.classList.toggle('config-active', !!show);
+  const host = document.getElementById('univariateConfigHost');
+  if (host) host.classList.toggle('visible', !!show);
+}
+
+function detachUniEmbedListener() {
+  if (_uniEmbedMessageHandler) {
+    window.removeEventListener('message', _uniEmbedMessageHandler);
+    _uniEmbedMessageHandler = null;
+  }
+}
+
+function hideUnivariateConfigEmbed() {
+  detachUniEmbedListener();
+  setUnivariateConfigVisible(false);
+  const frame = document.getElementById('univariateConfigFrame');
+  if (frame) {
+    try { frame.src = 'about:blank'; } catch (_e) {}
+  }
+}
+
+function sendDialogDataToEmbed() {
+  const frame = document.getElementById('univariateConfigFrame');
+  if (!frame || !frame.contentWindow || !univariateRangeData) return;
+  const headers = univariateRangeData[0] || [];
+  const rows = univariateRangeData.slice(1);
+  const savedSpec = JSON.parse(sessionStorage.getItem('univariateModelSpec') || 'null');
+  frame.contentWindow.postMessage(
+    {
+      statisticoUnivariateHost: true,
+      body: JSON.stringify({
+        type: 'UNIVARIATE_DATA',
+        payload: { headers, rows, address: univariateRangeAddress, savedSpec }
+      })
+    },
+    '*'
+  );
+}
+
+function attachUniEmbedListener() {
+  detachUniEmbedListener();
+  _uniEmbedMessageHandler = function (ev) {
+    const d = ev.data;
+    if (!d || d.statisticoUnivariateEmbed !== true) return;
+    let message;
+    try {
+      message = JSON.parse(d.body || '{}');
+    } catch (_e) {
+      return;
+    }
+    if (message.action === 'ready' || message.action === 'requestData') {
+      sendDialogDataToEmbed();
+      return;
+    }
+    if (message.action === 'univariateResults') {
+      sessionStorage.setItem('univariateModelSpec', JSON.stringify(message.spec || {}));
+      hideUnivariateConfigEmbed();
+      updateButtonState();
+      setTimeout(() => openResultsDialog(message.data), 380);
+      return;
+    }
+    if (message.action === 'close') {
+      hideUnivariateConfigEmbed();
+    }
+  };
+  window.addEventListener('message', _uniEmbedMessageHandler);
+}
+
+// ─── OPEN CONFIG: DIALOG FALLBACK ────────────────────────────────────────────
+function openUnivariateBuilderDialog() {
   if (!univariateRangeData || univariateRangeData.length < 2) return;
   const dialogUrl = `${getDialogsBaseUrl()}univariate/univariate-input.html?v=${Date.now()}`;
   Office.context.ui.displayDialogAsync(
@@ -97,6 +168,21 @@ function openUnivariateBuilder() {
       });
     }
   );
+}
+
+// ─── OPEN CONFIG EMBED (PRIMARY) ─────────────────────────────────────────────
+function openUnivariateBuilder() {
+  if (!univariateRangeData || univariateRangeData.length < 2) return;
+  const host = document.getElementById('univariateConfigHost');
+  const frame = document.getElementById('univariateConfigFrame');
+  if (!host || !frame) {
+    openUnivariateBuilderDialog();
+    return;
+  }
+  setUnivariateConfigVisible(true);
+  attachUniEmbedListener();
+  frame.src = `${getDialogsBaseUrl()}univariate/univariate-input.html?embed=1&v=${Date.now()}`;
+  try { frame.focus(); } catch (_e) {}
 }
 
 function sendDialogData() {

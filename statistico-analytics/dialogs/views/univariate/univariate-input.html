@@ -8,6 +8,10 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
   <link rel="stylesheet" href="../shared-config.css?v=20260309d"/>
   <script src="../shared-config.js?v=20260309d"></script>
+  <style>
+    body.cfg-embed .cfg-header { display: none; }
+    body.cfg-embed .cfg-shell { min-height: 100%; }
+  </style>
 </head>
 <body>
   <div class="cfg-shell">
@@ -157,6 +161,11 @@
   </div><!-- /cfg-shell -->
 
   <script>
+    const EMBED = (() => {
+      try { return /[?&]embed=1(?:&|$)/.test(window.location.search || ''); }
+      catch (_e) { return false; }
+    })();
+
     let STATE = { headers: [], rows: [], address: '', savedSpec: null, columnStats: [] };
 
     // Show mainContent as flex once loaded
@@ -165,12 +174,32 @@
       el.style.display = 'flex';
     }
 
-    // ?? Office init ??????????????????????????????????????????????????????????
+    function send(msg) {
+      const s = JSON.stringify(msg);
+      if (EMBED && window.parent && window.parent !== window) {
+        try { window.parent.postMessage({ statisticoUnivariateEmbed: true, body: s }, '*'); } catch (_e) {}
+        return;
+      }
+      Office.context.ui.messageParent(s);
+    }
+
     Office.onReady(() => {
-      Office.context.ui.addHandlerAsync(
-        Office.EventType.DialogParentMessageReceived,
-        onMessageFromParent
-      );
+      if (EMBED) {
+        document.body.classList.add('cfg-embed');
+        window.addEventListener('message', (ev) => {
+          const d = ev.data;
+          if (!d || d.statisticoUnivariateHost !== true) return;
+          try {
+            const msg = typeof d.body === 'string' ? JSON.parse(d.body || '{}') : d.body;
+            if (msg.type === 'UNIVARIATE_DATA') applyPayload(msg.payload);
+          } catch (_e) {}
+        });
+      } else {
+        Office.context.ui.addHandlerAsync(
+          Office.EventType.DialogParentMessageReceived,
+          onMessageFromParent
+        );
+      }
       send({ action: 'ready' });
     });
 
@@ -378,7 +407,6 @@
     function calcKurtosis(d,m,sd){ const n=d.length; return (d.reduce((a,v)=>a+(v-m)**4,0)/n)/sd**4-3; }
 
     function cancel() { send({ action: 'close' }); }
-    function send(msg) { Office.context.ui.messageParent(JSON.stringify(msg)); }
   </script>
 </body>
 </html>

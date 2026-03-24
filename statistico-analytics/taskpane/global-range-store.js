@@ -51,6 +51,15 @@
     } catch (e) {}
   }
 
+  /** True when hub navigation appended ?autoConfig=1 (valid global range at click time). */
+  function shouldAutoOpenConfigFromHub() {
+    try {
+      return new URLSearchParams(window.location.search).get("autoConfig") === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+
   function syncRangeModeUI(mode) {
     mode = mode || "used";
     var map = { named: "lblNamed", used: "lblUsed", selection: "lblSelection" };
@@ -70,7 +79,8 @@
       save: save,
       load: load,
       clear: clear,
-      syncRangeModeUI: syncRangeModeUI
+      syncRangeModeUI: syncRangeModeUI,
+      shouldAutoOpenConfigFromHub: shouldAutoOpenConfigFromHub
     };
   }
 })();

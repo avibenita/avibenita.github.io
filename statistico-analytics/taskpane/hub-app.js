@@ -143,7 +143,16 @@ function filterModules(q) {
 }
 
 function navigateToModule(id) {
-  window.location.href = "./" + id + "/" + id + ".html?v=" + Date.now();
+  var url = "./" + id + "/" + id + ".html?v=" + Date.now();
+  try {
+    if (window.StatisticoGlobalRange && typeof StatisticoGlobalRange.load === "function") {
+      var gr = StatisticoGlobalRange.load();
+      if (gr && gr.values && gr.values.length >= 2) {
+        url += "&autoConfig=1";
+      }
+    }
+  } catch (e) {}
+  window.location.href = url;
 }
 
 function showAdvisor() {

@@ -102,9 +102,8 @@
     if (!values || values.length < 2) {
       return showRangeBadge("Need at least 2 rows (header + 1 data row)", true);
     }
-    var cols = (values[0] || []).length;
-    var rows = values.length - 1;
-    showRangeBadge((address || "") + "  –  " + rows + " rows × " + cols + " cols", false);
+    var addr = (address || "").trim();
+    showRangeBadge(addr || "Range loaded", false);
     if (window.StatisticoGlobalRange) {
       StatisticoGlobalRange.save(values, address || "", rangeMode);
     }

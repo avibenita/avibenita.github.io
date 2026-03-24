@@ -66,7 +66,7 @@
         applyRangeData(rng.values, rng.address);
       });
     } catch (e) {
-      showRangeBadge("Could not detect used range", true);
+      showRangeBadge("Could not read worksheet range", true);
     }
   }
 

@@ -59,7 +59,6 @@ function updateButtonState() {
 
 function resetUnivariateModel() {
   sessionStorage.removeItem('univariateModelSpec');
-  hideUnivariateConfigEmbed();
   updateButtonState();
 }
 
@@ -172,17 +171,7 @@ function openUnivariateBuilderDialog() {
 
 // ─── OPEN CONFIG EMBED (PRIMARY) ─────────────────────────────────────────────
 function openUnivariateBuilder() {
-  if (!univariateRangeData || univariateRangeData.length < 2) return;
-  const host = document.getElementById('univariateConfigHost');
-  const frame = document.getElementById('univariateConfigFrame');
-  if (!host || !frame) {
-    openUnivariateBuilderDialog();
-    return;
-  }
-  setUnivariateConfigVisible(true);
-  attachUniEmbedListener();
-  frame.src = `${getDialogsBaseUrl()}univariate/univariate-input.html?embed=1&v=${Date.now()}`;
-  try { frame.focus(); } catch (_e) {}
+  openUnivariateBuilderDialog();
 }
 
 function sendDialogData() {

@@ -15,6 +15,7 @@ let hubRegressionFlowActive = false;
 let hubRegressionConfigDialog = null;
 let hubRegressionResultsDialog = null;
 let hubRegressionModelSpec = null;
+let hubRegressionDataPayload = null;
 const HUB_RESULT_DIALOG_OPTIONS = { height: 90, width: 70, displayInIframe: false };
 
 /** Ensures Cluster appears even if a cached or older modules.config.json omits it (inserted after PCA). */
@@ -186,6 +187,7 @@ function finishHubUnivariateFlow() {
 function finishHubRegressionFlow() {
   hubRegressionFlowActive = false;
   hubRegressionModelSpec = null;
+  hubRegressionDataPayload = null;
   if (!hubRegressionConfigDialog && !hubRegressionResultsDialog) setSelectedModuleCard("regression", false);
 }
 
@@ -333,28 +335,21 @@ function openUnivariateConfigFromHub() {
 }
 
 function sendRegressionBuilderDataFromHub() {
-  var gr = getGlobalRangePayload();
-  if (!hubRegressionConfigDialog || !gr) return;
+  if (!hubRegressionConfigDialog || !hubRegressionDataPayload) return;
   hubRegressionConfigDialog.messageChild(JSON.stringify({
     type: "REGRESSION_DATA",
-    payload: {
-      headers: gr.values[0] || [],
-      rows: gr.values.slice(1),
-      address: gr.address || "",
-      savedModelSpec: null
-    }
+    payload: hubRegressionDataPayload
   }));
 }
 
 function sendRegressionResultsDataFromHub() {
-  var gr = getGlobalRangePayload();
-  if (!hubRegressionResultsDialog || !gr) return;
+  if (!hubRegressionResultsDialog || !hubRegressionDataPayload) return;
   hubRegressionResultsDialog.messageChild(JSON.stringify({
     type: "REGRESSION_RESULTS",
     payload: {
-      headers: gr.values[0] || [],
-      rows: gr.values.slice(1),
-      address: gr.address || "",
+      headers: hubRegressionDataPayload.headers || [],
+      rows: hubRegressionDataPayload.rows || [],
+      address: hubRegressionDataPayload.address || "",
       modelSpec: hubRegressionModelSpec || {}
     }
   }));
@@ -394,6 +389,12 @@ function openRegressionResultsFromHub() {
 function openRegressionConfigFromHub() {
   var gr = getGlobalRangePayload();
   if (!gr) return false;
+  hubRegressionDataPayload = {
+    headers: gr.values[0] || [],
+    rows: gr.values.slice(1),
+    address: gr.address || "",
+    savedModelSpec: null
+  };
   hubRegressionFlowActive = true;
   setSelectedModuleCard("regression", true);
   Office.context.ui.displayDialogAsync(
@@ -407,6 +408,8 @@ function openRegressionConfigFromHub() {
       }
       hubRegressionConfigDialog = res.value;
       setTimeout(sendRegressionBuilderDataFromHub, 600);
+      setTimeout(sendRegressionBuilderDataFromHub, 1200);
+      setTimeout(sendRegressionBuilderDataFromHub, 2000);
       hubRegressionConfigDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
         try {
           var msg = JSON.parse(arg.message || "{}");

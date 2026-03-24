@@ -5,6 +5,12 @@
  */
 
 let MODULES = [];
+let hubConfigDialog = null;
+let hubResultsDialog = null;
+let hubCurrentUnivariateResults = null;
+let hubPendingResultsViewUrl = null;
+let hubUnivariateFlowActive = false;
+const HUB_RESULT_DIALOG_OPTIONS = { height: 90, width: 70, displayInIframe: false };
 
 /** Ensures Cluster appears even if a cached or older modules.config.json omits it (inserted after PCA). */
 var CLUSTER_MODULE_CARD = {
@@ -66,6 +72,7 @@ var GROUP_COLORS = {
 function makeCard(m) {
   const div = document.createElement("div");
   div.className = "module-card";
+  div.setAttribute("data-module-id", m.id);
   div.onclick = function() { navigateToModule(m.id); };
   var gc = GROUP_COLORS[m.group] || GROUP_COLORS.descriptive;
   var iconBg = gc.bg;
@@ -142,21 +149,167 @@ function filterModules(q) {
   renderModules(t ? MODULES.filter(function(m) { return m.name.toLowerCase().indexOf(t) >= 0; }) : MODULES);
 }
 
-function navigateToModule(id) {
-  var url = "./" + id + "/" + id + ".html?v=" + Date.now() + "&fromHub=1";
-  var hasGlobalRange = false;
+function getDialogsBaseUrl() {
+  var href = window.location.href;
+  if (href.includes("/taskpane/")) return href.split("/taskpane/")[0] + "/dialogs/views/";
+  return window.location.origin + "/dialogs/views/";
+}
+
+function getGlobalRangePayload() {
   try {
-    if (window.StatisticoGlobalRange && typeof StatisticoGlobalRange.load === "function") {
-      var gr = StatisticoGlobalRange.load();
-      if (gr && gr.values && gr.values.length >= 2) {
-        hasGlobalRange = true;
-        url += "&autoConfig=1";
-      }
-    }
-  } catch (e) {}
-  if (id === "univariate" && hasGlobalRange) {
-    url += "&directDialog=1";
+    if (!window.StatisticoGlobalRange || typeof StatisticoGlobalRange.load !== "function") return null;
+    var gr = StatisticoGlobalRange.load();
+    if (!gr || !gr.values || !Array.isArray(gr.values) || gr.values.length < 2) return null;
+    return gr;
+  } catch (e) {
+    return null;
   }
+}
+
+function setSelectedModuleCard(moduleId, active) {
+  var card = document.querySelector('.module-card[data-module-id="' + moduleId + '"]');
+  if (card) card.classList.toggle("selected", !!active);
+}
+
+function finishHubUnivariateFlow() {
+  hubUnivariateFlowActive = false;
+  hubPendingResultsViewUrl = null;
+  if (!hubConfigDialog && !hubResultsDialog) setSelectedModuleCard("univariate", false);
+}
+
+function sendUnivariateDialogData() {
+  var gr = getGlobalRangePayload();
+  if (!hubConfigDialog || !gr) return;
+  var headers = gr.values[0] || [];
+  var rows = gr.values.slice(1);
+  var savedSpec = null;
+  try { savedSpec = JSON.parse(sessionStorage.getItem("univariateModelSpec") || "null"); } catch (e) {}
+  hubConfigDialog.messageChild(JSON.stringify({
+    type: "UNIVARIATE_DATA",
+    payload: { headers: headers, rows: rows, address: gr.address || "", savedSpec: savedSpec }
+  }));
+}
+
+function queueHubResultsViewSwitch(viewPath) {
+  hubPendingResultsViewUrl = getDialogsBaseUrl() + viewPath;
+  if (hubResultsDialog) {
+    try { hubResultsDialog.close(); } catch (e) {}
+    return;
+  }
+  if (hubPendingResultsViewUrl && hubCurrentUnivariateResults) {
+    var target = hubPendingResultsViewUrl;
+    hubPendingResultsViewUrl = null;
+    openHubUnivariateResultsAt(target, hubCurrentUnivariateResults);
+  }
+}
+
+function openHubUnivariateResultsAt(dialogUrl, results) {
+  Office.context.ui.displayDialogAsync(dialogUrl, HUB_RESULT_DIALOG_OPTIONS, function (asyncResult) {
+    if (asyncResult.status === Office.AsyncResultStatus.Failed) {
+      console.error("Failed to open univariate results:", asyncResult.error && asyncResult.error.message);
+      finishHubUnivariateFlow();
+      return;
+    }
+    var dialog = asyncResult.value;
+    hubResultsDialog = dialog;
+    var sendData = function () {
+      if (!dialog) return;
+      dialog.messageChild(JSON.stringify({
+        action: "loadData",
+        data: {
+          values: results.rawData,
+          column: results.column,
+          descriptive: results.descriptive,
+          n: results.n
+        }
+      }));
+    };
+    setTimeout(sendData, 1000);
+    dialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+      try {
+        var message = JSON.parse(arg.message || "{}");
+        if (message.status === "ready") {
+          sendData();
+        } else if (message.action === "switchView") {
+          if (dialog !== hubResultsDialog) return;
+          queueHubResultsViewSwitch(message.view);
+        } else if (message.action === "close" || message.action === "closeDialog") {
+          hubPendingResultsViewUrl = null;
+          if (dialog === hubResultsDialog) {
+            dialog.close();
+            hubResultsDialog = null;
+            finishHubUnivariateFlow();
+          }
+        }
+      } catch (e) {}
+    });
+    dialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
+      if (dialog === hubResultsDialog) hubResultsDialog = null;
+      if (hubPendingResultsViewUrl && !hubResultsDialog && hubCurrentUnivariateResults) {
+        var next = hubPendingResultsViewUrl;
+        hubPendingResultsViewUrl = null;
+        setTimeout(function () { openHubUnivariateResultsAt(next, hubCurrentUnivariateResults); }, 120);
+        return;
+      }
+      if (!hubPendingResultsViewUrl) finishHubUnivariateFlow();
+    });
+  });
+}
+
+function openHubUnivariateResults(results) {
+  hubCurrentUnivariateResults = results;
+  openHubUnivariateResultsAt(getDialogsBaseUrl() + "univariate/histogram-standalone.html", results);
+}
+
+function openUnivariateConfigFromHub() {
+  var gr = getGlobalRangePayload();
+  if (!gr) return false;
+  hubUnivariateFlowActive = true;
+  setSelectedModuleCard("univariate", true);
+  Office.context.ui.displayDialogAsync(
+    getDialogsBaseUrl() + "univariate/univariate-input.html?v=" + Date.now(),
+    { height: 88, width: 25, displayInIframe: false },
+    function (asyncResult) {
+      if (asyncResult.status === Office.AsyncResultStatus.Failed) {
+        console.error("Failed to open univariate config dialog:", asyncResult.error && asyncResult.error.message);
+        finishHubUnivariateFlow();
+        return;
+      }
+      hubConfigDialog = asyncResult.value;
+      setTimeout(sendUnivariateDialogData, 550);
+      hubConfigDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+        try {
+          var message = JSON.parse(arg.message || "{}");
+          if (message.action === "ready" || message.action === "requestData") {
+            sendUnivariateDialogData();
+          } else if (message.action === "univariateResults") {
+            sessionStorage.setItem("univariateModelSpec", JSON.stringify(message.spec || {}));
+            hubConfigDialog.close();
+            hubConfigDialog = null;
+            openHubUnivariateResults(message.data);
+          } else if (message.action === "close") {
+            hubConfigDialog.close();
+            hubConfigDialog = null;
+            if (!hubResultsDialog) finishHubUnivariateFlow();
+          }
+        } catch (e) {}
+      });
+      hubConfigDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
+        hubConfigDialog = null;
+        if (!hubResultsDialog) finishHubUnivariateFlow();
+      });
+    }
+  );
+  return true;
+}
+
+function navigateToModule(id) {
+  var gr = getGlobalRangePayload();
+  if (id === "univariate" && gr && gr.values && gr.values.length >= 2) {
+    if (openUnivariateConfigFromHub()) return;
+  }
+  var url = "./" + id + "/" + id + ".html?v=" + Date.now() + "&fromHub=1";
+  if (gr && gr.values && gr.values.length >= 2) url += "&autoConfig=1";
   window.location.href = url;
 }
 

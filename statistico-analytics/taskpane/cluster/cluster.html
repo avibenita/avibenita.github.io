@@ -146,13 +146,14 @@
     const urlParams = (() => { try { return new URLSearchParams(window.location.search); } catch(e) { return new URLSearchParams(''); } })();
     const openedFromHub = urlParams.get('fromHub') === '1';
     const directDialogFromHub = openedFromHub && urlParams.get('directDialog') === '1';
-    if (directDialogFromHub) document.body.classList.add('direct-config-opening');
+    if (directDialogFromHub) {
+      document.body.classList.add('direct-config-opening');
+      window.addEventListener('focus', function () {
+        document.body.classList.remove('direct-config-opening');
+      });
+    }
 
     function goBack() { window.location.href = '../hub.html'; }
-    function clearDirectOpeningSoon() {
-      if (!directDialogFromHub) return;
-      setTimeout(function() { document.body.classList.remove('direct-config-opening'); }, 1200);
-    }
 
     function setRangeMode(mode) {
       rangeMode = mode;
@@ -268,14 +269,12 @@
           setTimeout(function() {
             if (typeof openClusterSetupDialog === "function") openClusterSetupDialog();
           }, openedFromHub ? 0 : 450);
-          clearDirectOpeningSoon();
         } else {
           await autoDetectRange();
           if (window.StatisticoGlobalRange && typeof StatisticoGlobalRange.shouldAutoOpenConfigFromHub === 'function' && StatisticoGlobalRange.shouldAutoOpenConfigFromHub() && rangeData) {
             setTimeout(function() {
               if (typeof openClusterSetupDialog === "function") openClusterSetupDialog();
             }, openedFromHub ? 0 : 450);
-            clearDirectOpeningSoon();
           } else if (!rangeData) {
             document.body.classList.remove('direct-config-opening');
           }

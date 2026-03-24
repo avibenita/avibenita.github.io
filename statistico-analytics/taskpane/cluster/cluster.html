@@ -134,6 +134,7 @@
   </div>
 
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="../global-range-store.js?v=20260324a"></script>
   <script src="cluster-config.js?v=20250322g"></script>
   <script src="cluster-input-panel.js?v=20260322d"></script>
 
@@ -230,6 +231,7 @@
       const cols = (values[0] || []).length;
       const rows = values.length - 1;
       showRangeBadge(`${address}  –  ${rows} rows × ${cols} cols`, false);
+      if (window.StatisticoGlobalRange) StatisticoGlobalRange.save(values, address, rangeMode);
       if (typeof onRangeDataLoaded === 'function') onRangeDataLoaded(values, address);
     }
 
@@ -249,7 +251,17 @@
       if (info.host === Office.HostType.Excel) {
         await loadNamedRanges();
         await watchSelection();
-        await autoDetectRange();
+        var gr = window.StatisticoGlobalRange && StatisticoGlobalRange.load();
+        if (gr && gr.values && gr.values.length >= 2) {
+          rangeMode = gr.mode || "used";
+          StatisticoGlobalRange.syncRangeModeUI(rangeMode);
+          applyRangeData(gr.values, gr.address);
+          setTimeout(function() {
+            if (typeof openClusterSetupDialog === "function") openClusterSetupDialog();
+          }, 450);
+        } else {
+          await autoDetectRange();
+        }
       }
     });
   </script>

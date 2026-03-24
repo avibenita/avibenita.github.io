@@ -270,6 +270,7 @@
 
   <!-- Scripts -->
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="../global-range-store.js?v=20260324a"></script>
   <script src="../../src/shared/js/core/saved-analyses-manager.js"></script>
 
   <script>
@@ -390,6 +391,7 @@
       const rows   = values.length - 1;
       showRangeBadge(`${address}  –  ${rows} rows × ${cols} cols`, false);
       updateConfigureBtn();
+      if (window.StatisticoGlobalRange) StatisticoGlobalRange.save(values, address, rangeMode);
     }
 
     function showRangeLoading() { showRangeBadge('Loading…', false); }
@@ -635,8 +637,18 @@
         await loadNamedRanges();
         await loadSavedModels();
         await watchSelection();
-        await autoDetectRange();
-        updateConfigureBtn();
+        const gr = window.StatisticoGlobalRange && StatisticoGlobalRange.load();
+        if (gr && gr.values && gr.values.length >= 2) {
+          rangeMode = gr.mode || 'used';
+          StatisticoGlobalRange.syncRangeModeUI(rangeMode);
+          applyRangeData(gr.values, gr.address);
+          if (!selectedModelId) {
+            setTimeout(function () { openMixedInputDialog(); }, 450);
+          }
+        } else {
+          await autoDetectRange();
+          updateConfigureBtn();
+        }
       }
     });
   </script>

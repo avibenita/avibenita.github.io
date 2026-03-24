@@ -143,7 +143,7 @@ function filterModules(q) {
 }
 
 function navigateToModule(id) {
-  var url = "./" + id + "/" + id + ".html?v=" + Date.now();
+  var url = "./" + id + "/" + id + ".html?v=" + Date.now() + "&fromHub=1";
   try {
     if (window.StatisticoGlobalRange && typeof StatisticoGlobalRange.load === "function") {
       var gr = StatisticoGlobalRange.load();

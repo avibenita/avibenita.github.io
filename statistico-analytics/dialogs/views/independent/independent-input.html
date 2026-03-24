@@ -8,6 +8,11 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
   <link rel="stylesheet" href="../shared-config.css?v=20260309d"/>
   <script src="../shared-config.js?v=20260309d"></script>
+  <style>
+    /* Task-pane iframe: avoid duplicating the module title bar */
+    body.cfg-embed .cfg-header { display: none; }
+    body.cfg-embed .cfg-shell { min-height: 100%; }
+  </style>
 </head>
 <body>
   <div class="cfg-shell">
@@ -128,11 +133,21 @@
   </div><!-- /cfg-shell -->
 
   <script>
+    var EMBED = (function () {
+      try { return /[?&]embed=1(?:&|$)/.test(window.location.search || ""); } catch (e) { return false; }
+    })();
     var STATE = { headers:[], rows:[], address:"", saved:null, selectedColumns:[], draggingCol:null };
     function qs(id){ return document.getElementById(id); }
     function send(action,data){
-      if(Office&&Office.context&&Office.context.ui&&typeof Office.context.ui.messageParent==="function")
-        Office.context.ui.messageParent(JSON.stringify({action:action,data:data||null}));
+      var payload = JSON.stringify({ action: action, data: data || null });
+      if (EMBED && window.parent && window.parent !== window) {
+        try {
+          window.parent.postMessage({ statisticoIndependentEmbed: true, body: payload }, "*");
+        } catch (_e) {}
+        return;
+      }
+      if (Office && Office.context && Office.context.ui && typeof Office.context.ui.messageParent === "function")
+        Office.context.ui.messageParent(payload);
     }
 
     function countKinds(headers,rows){
@@ -287,6 +302,7 @@
     }
 
     document.addEventListener("DOMContentLoaded",function(){
+      if (EMBED) document.body.classList.add("cfg-embed");
       // Bucket drag-and-drop
       var bucketWrap = document.querySelector(".cfg-bucket");
       function allowDrop(e){e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect="copy";}
@@ -304,6 +320,19 @@
       qs("btnRun").addEventListener("click",run);
 
       Office.onReady(function(){
+        if (EMBED) {
+          window.addEventListener("message", function (ev) {
+            var d = ev.data;
+            if (!d || d.statisticoIndependentHost !== true) return;
+            try {
+              var msg = typeof d.body === "string" ? JSON.parse(d.body || "{}") : d.body;
+              if (msg.type === "INDEPENDENT_DATA" && msg.payload) applyPayload(msg.payload);
+            } catch (_e) {}
+          });
+          send("requestData", null);
+          send("ready", null);
+          return;
+        }
         Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived,function(arg){
           var msg=JSON.parse(arg.message||"{}");
           if(msg.type==="INDEPENDENT_DATA"&&msg.payload) applyPayload(msg.payload);

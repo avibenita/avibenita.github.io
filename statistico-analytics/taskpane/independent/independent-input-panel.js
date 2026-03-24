@@ -3,6 +3,7 @@
 let independentRangeData = null;
 let independentRangeAddress = "";
 let independentDialog = null;
+let _indEmbedMessageHandler = null;
 
 function onRangeDataLoaded(values, address) {
   if (!values || values.length < 2) return showPanel(false);
@@ -33,14 +34,80 @@ function getDialogsBaseUrl() {
   return `${window.location.origin}/dialogs/views/`;
 }
 
-function openIndependentBuilder() {
-  console.log("=== openIndependentBuilder CLICKED ===");
-  console.log("independentRangeData:", independentRangeData);
-  if (!independentRangeData || independentRangeData.length < 2) {
-    console.log("openIndependentBuilder: early exit, no data");
-    return;
+function detachIndEmbedListener() {
+  if (_indEmbedMessageHandler) {
+    window.removeEventListener("message", _indEmbedMessageHandler);
+    _indEmbedMessageHandler = null;
   }
-  console.log("Opening configuration dialog...");
+}
+
+function hideIndependentConfigEmbed() {
+  detachIndEmbedListener();
+  const host = document.getElementById("independentConfigHost");
+  const frame = document.getElementById("independentConfigFrame");
+  if (host) host.classList.remove("visible");
+  if (frame) {
+    try { frame.src = "about:blank"; } catch (_e) {}
+  }
+}
+
+function sendDialogDataToEmbed() {
+  const frame = document.getElementById("independentConfigFrame");
+  if (!frame || !frame.contentWindow || !independentRangeData) return;
+  const headers = independentRangeData[0] || [];
+  const rows = independentRangeData.slice(1);
+  let savedModelSpec = null;
+  try {
+    savedModelSpec = JSON.parse(sessionStorage.getItem("independentModelSpec") || "null");
+  } catch (_e) {
+    savedModelSpec = null;
+  }
+  try {
+    frame.contentWindow.postMessage(
+      {
+        statisticoIndependentHost: true,
+        body: JSON.stringify({
+          type: "INDEPENDENT_DATA",
+          payload: { headers, rows, address: independentRangeAddress, savedModelSpec }
+        })
+      },
+      "*"
+    );
+  } catch (_e) {}
+}
+
+function attachIndEmbedListener() {
+  detachIndEmbedListener();
+  _indEmbedMessageHandler = function (ev) {
+    const d = ev.data;
+    if (!d || d.statisticoIndependentEmbed !== true) return;
+    let message;
+    try {
+      message = JSON.parse(d.body || "{}");
+    } catch (_e) {
+      return;
+    }
+    if (message.action === "ready" || message.action === "requestData") {
+      sendDialogDataToEmbed();
+      return;
+    }
+    if (message.action === "independentModel") {
+      sessionStorage.setItem("independentModelSpec", JSON.stringify(message.data || message.payload || {}));
+      hideIndependentConfigEmbed();
+      updateButtonState();
+      setTimeout(openIndependentResultsDialog, 380);
+      return;
+    }
+    if (message.action === "close") {
+      hideIndependentConfigEmbed();
+    }
+  };
+  window.addEventListener("message", _indEmbedMessageHandler);
+}
+
+/** Fallback: floating Office dialog (used only if task pane has no embed host). */
+function openIndependentBuilderDialog() {
+  if (!independentRangeData || independentRangeData.length < 2) return;
   Office.context.ui.displayDialogAsync(
     `${getDialogsBaseUrl()}independent/independent-input.html?v=${Date.now()}`,
     { height: 88, width: 25, displayInIframe: false },
@@ -53,14 +120,10 @@ function openIndependentBuilder() {
           const message = JSON.parse(arg.message || "{}");
           if (message.action === "ready" || message.action === "requestData") sendDialogData();
           else if (message.action === "independentModel") {
-            console.log("=== Received independentModel from config dialog ===");
-            console.log("message.data:", message.data);
             sessionStorage.setItem("independentModelSpec", JSON.stringify(message.data || message.payload || {}));
-            console.log("Saved to sessionStorage, closing config dialog...");
             independentDialog.close();
             independentDialog = null;
             updateButtonState();
-            console.log("Calling openIndependentResultsDialog in 380ms...");
             setTimeout(openIndependentResultsDialog, 380);
           } else if (message.action === "close") {
             independentDialog.close();
@@ -70,6 +133,24 @@ function openIndependentBuilder() {
       });
     }
   );
+}
+
+function openIndependentBuilder() {
+  if (!independentRangeData || independentRangeData.length < 2) return;
+  const host = document.getElementById("independentConfigHost");
+  const frame = document.getElementById("independentConfigFrame");
+  if (!host || !frame) {
+    openIndependentBuilderDialog();
+    return;
+  }
+  host.classList.add("visible");
+  attachIndEmbedListener();
+  const url = `${getDialogsBaseUrl()}independent/independent-input.html?embed=1&v=${Date.now()}`;
+  frame.src = url;
+  try {
+    frame.focus();
+    host.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  } catch (_e) {}
 }
 
 function sendDialogData() {
@@ -753,6 +834,7 @@ function sendIndependentBundle() {
 
 function resetIndependentModel() {
   sessionStorage.removeItem("independentModelSpec");
+  hideIndependentConfigEmbed();
   updateButtonState();
 }
 
@@ -771,5 +853,7 @@ function updateButtonState() {
 }
 
 window.openIndependentBuilder = openIndependentBuilder;
+window.openIndependentBuilderDialog = openIndependentBuilderDialog;
+window.hideIndependentConfigEmbed = hideIndependentConfigEmbed;
 window.openIndependentResultsDialog = openIndependentResultsDialog;
 window.resetIndependentModel = resetIndependentModel;

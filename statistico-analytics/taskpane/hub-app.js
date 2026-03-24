@@ -283,10 +283,13 @@ function openUnivariateConfigFromHub() {
           if (message.action === "ready" || message.action === "requestData") {
             sendUnivariateDialogData();
           } else if (message.action === "univariateResults") {
+            var nextResults = message.data;
             sessionStorage.setItem("univariateModelSpec", JSON.stringify(message.spec || {}));
             hubConfigDialog.close();
             hubConfigDialog = null;
-            openHubUnivariateResults(message.data);
+            setTimeout(function () {
+              openHubUnivariateResults(nextResults);
+            }, 380);
           } else if (message.action === "close") {
             hubConfigDialog.close();
             hubConfigDialog = null;

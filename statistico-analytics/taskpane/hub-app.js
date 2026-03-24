@@ -11,6 +11,10 @@ let hubCurrentUnivariateResults = null;
 let hubPendingResultsViewUrl = null;
 let hubPendingUnivariateResults = null;
 let hubUnivariateFlowActive = false;
+let hubRegressionFlowActive = false;
+let hubRegressionConfigDialog = null;
+let hubRegressionResultsDialog = null;
+let hubRegressionModelSpec = null;
 const HUB_RESULT_DIALOG_OPTIONS = { height: 90, width: 70, displayInIframe: false };
 
 /** Ensures Cluster appears even if a cached or older modules.config.json omits it (inserted after PCA). */
@@ -179,6 +183,12 @@ function finishHubUnivariateFlow() {
   if (!hubConfigDialog && !hubResultsDialog) setSelectedModuleCard("univariate", false);
 }
 
+function finishHubRegressionFlow() {
+  hubRegressionFlowActive = false;
+  hubRegressionModelSpec = null;
+  if (!hubRegressionConfigDialog && !hubRegressionResultsDialog) setSelectedModuleCard("regression", false);
+}
+
 function sendUnivariateDialogData() {
   var gr = getGlobalRangePayload();
   if (!hubConfigDialog || !gr) return;
@@ -322,10 +332,114 @@ function openUnivariateConfigFromHub() {
   return true;
 }
 
+function sendRegressionBuilderDataFromHub() {
+  var gr = getGlobalRangePayload();
+  if (!hubRegressionConfigDialog || !gr) return;
+  hubRegressionConfigDialog.messageChild(JSON.stringify({
+    type: "REGRESSION_DATA",
+    payload: {
+      headers: gr.values[0] || [],
+      rows: gr.values.slice(1),
+      address: gr.address || "",
+      savedModelSpec: null
+    }
+  }));
+}
+
+function sendRegressionResultsDataFromHub() {
+  var gr = getGlobalRangePayload();
+  if (!hubRegressionResultsDialog || !gr) return;
+  hubRegressionResultsDialog.messageChild(JSON.stringify({
+    type: "REGRESSION_RESULTS",
+    payload: {
+      headers: gr.values[0] || [],
+      rows: gr.values.slice(1),
+      address: gr.address || "",
+      modelSpec: hubRegressionModelSpec || {}
+    }
+  }));
+}
+
+function openRegressionResultsFromHub() {
+  Office.context.ui.displayDialogAsync(
+    getDialogsBaseUrl() + "regression/regression-coefficients.html?cb=" + Date.now(),
+    { height: 90, width: 70, displayInIframe: false },
+    function (res) {
+      if (res.status === Office.AsyncResultStatus.Failed) {
+        console.error("Could not open regression results:", res.error && res.error.message);
+        finishHubRegressionFlow();
+        return;
+      }
+      hubRegressionResultsDialog = res.value;
+      hubRegressionResultsDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+        try {
+          var msg = JSON.parse(arg.message || "{}");
+          if (msg.action === "ready" || msg.action === "requestData") sendRegressionResultsDataFromHub();
+          else if (msg.action === "close") {
+            hubRegressionResultsDialog.close();
+            hubRegressionResultsDialog = null;
+            finishHubRegressionFlow();
+          }
+        } catch (e) {}
+      });
+      hubRegressionResultsDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
+        hubRegressionResultsDialog = null;
+        finishHubRegressionFlow();
+      });
+      setTimeout(sendRegressionResultsDataFromHub, 1200);
+    }
+  );
+}
+
+function openRegressionConfigFromHub() {
+  var gr = getGlobalRangePayload();
+  if (!gr) return false;
+  hubRegressionFlowActive = true;
+  setSelectedModuleCard("regression", true);
+  Office.context.ui.displayDialogAsync(
+    getDialogsBaseUrl() + "regression/regression-input.html?v=" + Date.now(),
+    { height: 90, width: 30, displayInIframe: false },
+    function (res) {
+      if (res.status === Office.AsyncResultStatus.Failed) {
+        console.error("Could not open regression config:", res.error && res.error.message);
+        finishHubRegressionFlow();
+        return;
+      }
+      hubRegressionConfigDialog = res.value;
+      setTimeout(sendRegressionBuilderDataFromHub, 600);
+      hubRegressionConfigDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+        try {
+          var msg = JSON.parse(arg.message || "{}");
+          if (msg.action === "ready" || msg.action === "requestData") {
+            sendRegressionBuilderDataFromHub();
+          } else if (msg.action === "regressionModel") {
+            hubRegressionModelSpec = msg.payload || msg.data || {};
+            hubRegressionConfigDialog.close();
+            hubRegressionConfigDialog = null;
+            setTimeout(openRegressionResultsFromHub, 500);
+          } else if (msg.action === "close") {
+            hubRegressionConfigDialog.close();
+            hubRegressionConfigDialog = null;
+            finishHubRegressionFlow();
+          }
+        } catch (e) {}
+      });
+      hubRegressionConfigDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
+        hubRegressionConfigDialog = null;
+        if (!hubRegressionResultsDialog) finishHubRegressionFlow();
+      });
+    }
+  );
+  return true;
+}
+
 function navigateToModule(id) {
   var gr = getGlobalRangePayload();
   if (id === "univariate" && gr && gr.values && gr.values.length >= 2) {
     if (openUnivariateConfigFromHub()) return;
+  }
+  if (id === "regression" && gr && gr.values && gr.values.length >= 2) {
+    if (openRegressionConfigFromHub()) return;
   }
   var url = "./" + id + "/" + id + ".html?v=" + Date.now() + "&fromHub=1";
   if (gr && gr.values && gr.values.length >= 2) url += "&autoConfig=1&directDialog=1";

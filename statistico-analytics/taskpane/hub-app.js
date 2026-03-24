@@ -9,6 +9,7 @@ let hubConfigDialog = null;
 let hubResultsDialog = null;
 let hubCurrentUnivariateResults = null;
 let hubPendingResultsViewUrl = null;
+let hubPendingUnivariateResults = null;
 let hubUnivariateFlowActive = false;
 const HUB_RESULT_DIALOG_OPTIONS = { height: 90, width: 70, displayInIframe: false };
 
@@ -174,6 +175,7 @@ function setSelectedModuleCard(moduleId, active) {
 function finishHubUnivariateFlow() {
   hubUnivariateFlowActive = false;
   hubPendingResultsViewUrl = null;
+  hubPendingUnivariateResults = null;
   if (!hubConfigDialog && !hubResultsDialog) setSelectedModuleCard("univariate", false);
 }
 
@@ -283,14 +285,12 @@ function openUnivariateConfigFromHub() {
           if (message.action === "ready" || message.action === "requestData") {
             sendUnivariateDialogData();
           } else if (message.action === "univariateResults") {
-            var nextResults = message.data;
+            hubPendingUnivariateResults = message.data;
             sessionStorage.setItem("univariateModelSpec", JSON.stringify(message.spec || {}));
             hubConfigDialog.close();
             hubConfigDialog = null;
-            setTimeout(function () {
-              openHubUnivariateResults(nextResults);
-            }, 380);
           } else if (message.action === "close") {
+            hubPendingUnivariateResults = null;
             hubConfigDialog.close();
             hubConfigDialog = null;
             if (!hubResultsDialog) finishHubUnivariateFlow();
@@ -299,6 +299,12 @@ function openUnivariateConfigFromHub() {
       });
       hubConfigDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
         hubConfigDialog = null;
+        if (hubPendingUnivariateResults) {
+          var readyResults = hubPendingUnivariateResults;
+          hubPendingUnivariateResults = null;
+          setTimeout(function () { openHubUnivariateResults(readyResults); }, 120);
+          return;
+        }
         if (!hubResultsDialog) finishHubUnivariateFlow();
       });
     }

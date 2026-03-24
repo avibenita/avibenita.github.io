@@ -328,7 +328,7 @@ function navigateToModule(id) {
     if (openUnivariateConfigFromHub()) return;
   }
   var url = "./" + id + "/" + id + ".html?v=" + Date.now() + "&fromHub=1";
-  if (gr && gr.values && gr.values.length >= 2) url += "&autoConfig=1";
+  if (gr && gr.values && gr.values.length >= 2) url += "&autoConfig=1&directDialog=1";
   window.location.href = url;
 }
 

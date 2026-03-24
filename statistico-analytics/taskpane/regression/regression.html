@@ -178,6 +178,7 @@
 
     /* ── Hint text ──────────────────────────────────────── */
     .hint { font-size: 11px; color: #9ca3af; text-align: center; }
+    body.direct-config-opening .taskpane-content { visibility: hidden; }
   </style>
 </head>
 <body>
@@ -282,11 +283,19 @@
     let selectedModelId  = '';      // '' = new model
     let savedModels      = [];
     let activeDialog     = null;
+    const urlParams = (() => { try { return new URLSearchParams(window.location.search); } catch(e) { return new URLSearchParams(''); } })();
+    const openedFromHub = urlParams.get('fromHub') === '1';
+    const directDialogFromHub = openedFromHub && urlParams.get('directDialog') === '1';
+    if (directDialogFromHub) document.body.classList.add('direct-config-opening');
 
     // ================================================================
     // NAVIGATION
     // ================================================================
     function goBack() { window.location.href = '../hub.html'; }
+    function clearDirectOpeningSoon() {
+      if (!directDialogFromHub) return;
+      setTimeout(function () { document.body.classList.remove('direct-config-opening'); }, 1200);
+    }
 
     // ================================================================
     // RANGE MODE (segmented control)
@@ -645,19 +654,25 @@
           StatisticoGlobalRange.syncRangeModeUI(rangeMode);
           applyRangeData(gr.values, gr.address);
           if (!selectedModelId) {
-            setTimeout(function () { openModelBuilder(); }, 450);
+            setTimeout(function () { openModelBuilder(); }, openedFromHub ? 0 : 450);
+            clearDirectOpeningSoon();
           } else if (autoFromHub) {
-            setTimeout(function () { onConfigureClick(); }, 450);
+            setTimeout(function () { onConfigureClick(); }, openedFromHub ? 0 : 450);
+            clearDirectOpeningSoon();
           }
         } else {
           await autoDetectRange();
           updateConfigureBtn();
           if (autoFromHub && rangeData) {
             if (!selectedModelId) {
-              setTimeout(function () { openModelBuilder(); }, 450);
+              setTimeout(function () { openModelBuilder(); }, openedFromHub ? 0 : 450);
+              clearDirectOpeningSoon();
             } else {
-              setTimeout(function () { onConfigureClick(); }, 450);
+              setTimeout(function () { onConfigureClick(); }, openedFromHub ? 0 : 450);
+              clearDirectOpeningSoon();
             }
+          } else if (!rangeData) {
+            document.body.classList.remove('direct-config-opening');
           }
         }
       }

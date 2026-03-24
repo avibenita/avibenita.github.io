@@ -77,6 +77,7 @@
     .configure-btn:disabled { background: #cbd5e1; cursor: not-allowed; transform: none; box-shadow: none; }
 
     .hint { font-size: 11px; color: #9ca3af; text-align: center; }
+    body.direct-config-opening .taskpane-content { visibility: hidden; }
   </style>
 </head>
 <body>
@@ -142,8 +143,16 @@
     let rangeData = null;
     let rangeAddress = '';
     let rangeMode = 'used';
+    const urlParams = (() => { try { return new URLSearchParams(window.location.search); } catch(e) { return new URLSearchParams(''); } })();
+    const openedFromHub = urlParams.get('fromHub') === '1';
+    const directDialogFromHub = openedFromHub && urlParams.get('directDialog') === '1';
+    if (directDialogFromHub) document.body.classList.add('direct-config-opening');
 
     function goBack() { window.location.href = '../hub.html'; }
+    function clearDirectOpeningSoon() {
+      if (!directDialogFromHub) return;
+      setTimeout(function() { document.body.classList.remove('direct-config-opening'); }, 1200);
+    }
 
     function setRangeMode(mode) {
       rangeMode = mode;
@@ -258,13 +267,17 @@
           applyRangeData(gr.values, gr.address);
           setTimeout(function() {
             if (typeof openClusterSetupDialog === "function") openClusterSetupDialog();
-          }, 450);
+          }, openedFromHub ? 0 : 450);
+          clearDirectOpeningSoon();
         } else {
           await autoDetectRange();
           if (window.StatisticoGlobalRange && typeof StatisticoGlobalRange.shouldAutoOpenConfigFromHub === 'function' && StatisticoGlobalRange.shouldAutoOpenConfigFromHub() && rangeData) {
             setTimeout(function() {
               if (typeof openClusterSetupDialog === "function") openClusterSetupDialog();
-            }, 450);
+            }, openedFromHub ? 0 : 450);
+            clearDirectOpeningSoon();
+          } else if (!rangeData) {
+            document.body.classList.remove('direct-config-opening');
           }
         }
       }

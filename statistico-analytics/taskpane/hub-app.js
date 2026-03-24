@@ -144,14 +144,19 @@ function filterModules(q) {
 
 function navigateToModule(id) {
   var url = "./" + id + "/" + id + ".html?v=" + Date.now() + "&fromHub=1";
+  var hasGlobalRange = false;
   try {
     if (window.StatisticoGlobalRange && typeof StatisticoGlobalRange.load === "function") {
       var gr = StatisticoGlobalRange.load();
       if (gr && gr.values && gr.values.length >= 2) {
+        hasGlobalRange = true;
         url += "&autoConfig=1";
       }
     }
   } catch (e) {}
+  if (id === "univariate" && hasGlobalRange) {
+    url += "&directDialog=1";
+  }
   window.location.href = url;
 }
 

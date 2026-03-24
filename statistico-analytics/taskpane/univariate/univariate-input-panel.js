@@ -9,6 +9,12 @@ let pendingUnivariateViewUrl = null;
 let _uniEmbedMessageHandler = null;
 const RESULT_DIALOG_OPTIONS = { height: 90, width: 70, displayInIframe: false };
 
+function notifyConfigDialogClosed() {
+  if (typeof window.onUnivariateConfigDialogClosed === 'function') {
+    try { window.onUnivariateConfigDialogClosed(); } catch (_e) {}
+  }
+}
+
 // ─── URL RESOLVER ────────────────────────────────────────────────────────────
 function getDialogsBaseUrl() {
   const { origin, pathname, href } = window.location;
@@ -141,6 +147,7 @@ function openUnivariateBuilderDialog() {
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error('Failed to open univariate config dialog:', asyncResult.error.message);
+        notifyConfigDialogClosed();
         return;
       }
       univariateDialog = asyncResult.value;
@@ -154,16 +161,19 @@ function openUnivariateBuilderDialog() {
             sessionStorage.setItem('univariateModelSpec', JSON.stringify(message.spec || {}));
             univariateDialog.close();
             univariateDialog = null;
+            notifyConfigDialogClosed();
             updateButtonState();
             setTimeout(() => openResultsDialog(message.data), 380);
           } else if (message.action === 'close') {
             univariateDialog.close();
             univariateDialog = null;
+            notifyConfigDialogClosed();
           }
         } catch (_e) {}
       });
       univariateDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
         univariateDialog = null;
+        notifyConfigDialogClosed();
       });
     }
   );

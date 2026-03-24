@@ -16,6 +16,12 @@ let hubRegressionConfigDialog = null;
 let hubRegressionResultsDialog = null;
 let hubRegressionModelSpec = null;
 let hubRegressionDataPayload = null;
+let hubAnovaFlowActive = false;
+let hubAnovaDialog = null;
+let hubIndependentFlowActive = false;
+let hubIndependentDialog = null;
+let hubCorrelationFlowActive = false;
+let hubCorrelationDialog = null;
 const HUB_RESULT_DIALOG_OPTIONS = { height: 90, width: 70, displayInIframe: false };
 
 /** Ensures Cluster appears even if a cached or older modules.config.json omits it (inserted after PCA). */
@@ -189,6 +195,21 @@ function finishHubRegressionFlow() {
   hubRegressionModelSpec = null;
   hubRegressionDataPayload = null;
   if (!hubRegressionConfigDialog && !hubRegressionResultsDialog) setSelectedModuleCard("regression", false);
+}
+
+function finishHubAnovaFlow() {
+  hubAnovaFlowActive = false;
+  if (!hubAnovaDialog) setSelectedModuleCard("anova", false);
+}
+
+function finishHubIndependentFlow() {
+  hubIndependentFlowActive = false;
+  if (!hubIndependentDialog) setSelectedModuleCard("independent", false);
+}
+
+function finishHubCorrelationFlow() {
+  hubCorrelationFlowActive = false;
+  if (!hubCorrelationDialog) setSelectedModuleCard("correlations", false);
 }
 
 function sendUnivariateDialogData() {
@@ -436,6 +457,164 @@ function openRegressionConfigFromHub() {
   return true;
 }
 
+function openAnovaConfigFromHub() {
+  var gr = getGlobalRangePayload();
+  if (!gr) return false;
+  hubAnovaFlowActive = true;
+  setSelectedModuleCard("anova", true);
+  Office.context.ui.displayDialogAsync(
+    getDialogsBaseUrl() + "anova/anova-input.html?v=" + Date.now(),
+    { height: 88, width: 26, displayInIframe: false },
+    function (res) {
+      if (res.status === Office.AsyncResultStatus.Failed) {
+        finishHubAnovaFlow();
+        return;
+      }
+      hubAnovaDialog = res.value;
+      var sendAnovaData = function () {
+        if (!hubAnovaDialog || !gr) return;
+        var savedModelSpec = null;
+        try { savedModelSpec = JSON.parse(sessionStorage.getItem("anovaModelSpec") || "null"); } catch (e) {}
+        hubAnovaDialog.messageChild(JSON.stringify({
+          type: "ANOVA_DATA",
+          payload: {
+            headers: gr.values[0] || [],
+            rows: gr.values.slice(1),
+            address: gr.address || "",
+            savedModelSpec: savedModelSpec
+          }
+        }));
+      };
+      setTimeout(sendAnovaData, 550);
+      hubAnovaDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+        try {
+          var msg = JSON.parse(arg.message || "{}");
+          if (msg.action === "ready" || msg.action === "requestData") {
+            sendAnovaData();
+          } else if (msg.action === "anovaModel") {
+            sessionStorage.setItem("anovaModelSpec", JSON.stringify(msg.data || msg.payload || {}));
+            try { hubAnovaDialog.close(); } catch (e) {}
+            hubAnovaDialog = null;
+            window.location.href = "./anova/anova.html?v=" + Date.now() + "&fromHub=1&autoConfig=1&directDialog=1&openResults=1";
+          } else if (msg.action === "close") {
+            try { hubAnovaDialog.close(); } catch (e) {}
+            hubAnovaDialog = null;
+            finishHubAnovaFlow();
+          }
+        } catch (e) {}
+      });
+      hubAnovaDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
+        hubAnovaDialog = null;
+        finishHubAnovaFlow();
+      });
+    }
+  );
+  return true;
+}
+
+function openIndependentConfigFromHub() {
+  var gr = getGlobalRangePayload();
+  if (!gr) return false;
+  hubIndependentFlowActive = true;
+  setSelectedModuleCard("independent", true);
+  Office.context.ui.displayDialogAsync(
+    getDialogsBaseUrl() + "independent/independent-input.html?v=" + Date.now(),
+    { height: 88, width: 25, displayInIframe: false },
+    function (res) {
+      if (res.status === Office.AsyncResultStatus.Failed) {
+        finishHubIndependentFlow();
+        return;
+      }
+      hubIndependentDialog = res.value;
+      var sendIndependentData = function () {
+        if (!hubIndependentDialog || !gr) return;
+        var savedModelSpec = null;
+        try { savedModelSpec = JSON.parse(sessionStorage.getItem("independentModelSpec") || "null"); } catch (e) {}
+        hubIndependentDialog.messageChild(JSON.stringify({
+          type: "INDEPENDENT_DATA",
+          payload: {
+            headers: gr.values[0] || [],
+            rows: gr.values.slice(1),
+            address: gr.address || "",
+            savedModelSpec: savedModelSpec
+          }
+        }));
+      };
+      setTimeout(sendIndependentData, 550);
+      hubIndependentDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+        try {
+          var msg = JSON.parse(arg.message || "{}");
+          if (msg.action === "ready" || msg.action === "requestData") {
+            sendIndependentData();
+          } else if (msg.action === "independentModel") {
+            sessionStorage.setItem("independentModelSpec", JSON.stringify(msg.data || msg.payload || {}));
+            try { hubIndependentDialog.close(); } catch (e) {}
+            hubIndependentDialog = null;
+            window.location.href = "./independent/independent.html?v=" + Date.now() + "&fromHub=1&autoConfig=1&directDialog=1&openResults=1";
+          } else if (msg.action === "close") {
+            try { hubIndependentDialog.close(); } catch (e) {}
+            hubIndependentDialog = null;
+            finishHubIndependentFlow();
+          }
+        } catch (e) {}
+      });
+      hubIndependentDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
+        hubIndependentDialog = null;
+        finishHubIndependentFlow();
+      });
+    }
+  );
+  return true;
+}
+
+function openCorrelationConfigFromHub() {
+  var gr = getGlobalRangePayload();
+  if (!gr) return false;
+  hubCorrelationFlowActive = true;
+  setSelectedModuleCard("correlations", true);
+  Office.context.ui.displayDialogAsync(
+    getDialogsBaseUrl() + "correlations/correlation-config.html?v=" + Date.now(),
+    { height: 88, width: 25, displayInIframe: false },
+    function (res) {
+      if (res.status === Office.AsyncResultStatus.Failed) {
+        finishHubCorrelationFlow();
+        return;
+      }
+      hubCorrelationDialog = res.value;
+      var sendCorrelationData = function () {
+        if (!hubCorrelationDialog || !gr) return;
+        hubCorrelationDialog.messageChild(JSON.stringify({
+          type: "CORRELATION_DATA",
+          payload: { values: gr.values, address: gr.address || "" }
+        }));
+      };
+      setTimeout(sendCorrelationData, 550);
+      hubCorrelationDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+        try {
+          var msg = JSON.parse(arg.message || "{}");
+          if (msg.action === "ready" || msg.action === "requestData") {
+            sendCorrelationData();
+          } else if (msg.action === "runAnalysis") {
+            sessionStorage.setItem("correlationHubRunData", JSON.stringify(msg.data || {}));
+            try { hubCorrelationDialog.close(); } catch (e) {}
+            hubCorrelationDialog = null;
+            window.location.href = "./correlations/correlations.html?v=" + Date.now() + "&fromHub=1&autoConfig=1&directDialog=1&openResults=1";
+          } else if (msg.action === "close") {
+            try { hubCorrelationDialog.close(); } catch (e) {}
+            hubCorrelationDialog = null;
+            finishHubCorrelationFlow();
+          }
+        } catch (e) {}
+      });
+      hubCorrelationDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
+        hubCorrelationDialog = null;
+        finishHubCorrelationFlow();
+      });
+    }
+  );
+  return true;
+}
+
 function navigateToModule(id) {
   var gr = getGlobalRangePayload();
   if (id === "univariate" && gr && gr.values && gr.values.length >= 2) {
@@ -443,6 +622,15 @@ function navigateToModule(id) {
   }
   if (id === "regression" && gr && gr.values && gr.values.length >= 2) {
     if (openRegressionConfigFromHub()) return;
+  }
+  if (id === "anova" && gr && gr.values && gr.values.length >= 2) {
+    if (openAnovaConfigFromHub()) return;
+  }
+  if (id === "independent" && gr && gr.values && gr.values.length >= 2) {
+    if (openIndependentConfigFromHub()) return;
+  }
+  if (id === "correlations" && gr && gr.values && gr.values.length >= 2) {
+    if (openCorrelationConfigFromHub()) return;
   }
   var url = "./" + id + "/" + id + ".html?v=" + Date.now() + "&fromHub=1";
   if (gr && gr.values && gr.values.length >= 2) url += "&autoConfig=1&directDialog=1";

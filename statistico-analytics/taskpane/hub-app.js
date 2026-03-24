@@ -287,8 +287,18 @@ function openUnivariateConfigFromHub() {
           } else if (message.action === "univariateResults") {
             hubPendingUnivariateResults = message.data;
             sessionStorage.setItem("univariateModelSpec", JSON.stringify(message.spec || {}));
-            hubConfigDialog.close();
+            var cfg = hubConfigDialog;
+            try { if (cfg) cfg.close(); } catch (e) {}
             hubConfigDialog = null;
+            // Fallback: some Office hosts miss DialogEventReceived occasionally.
+            // If still pending shortly after close, open results anyway.
+            setTimeout(function () {
+              if (hubPendingUnivariateResults && !hubResultsDialog) {
+                var lateResults = hubPendingUnivariateResults;
+                hubPendingUnivariateResults = null;
+                openHubUnivariateResults(lateResults);
+              }
+            }, 900);
           } else if (message.action === "close") {
             hubPendingUnivariateResults = null;
             hubConfigDialog.close();

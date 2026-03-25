@@ -140,12 +140,7 @@ function renderCategoryTiles(query) {
       '<div class="category-modules">' +
       c.modules.map(function (m) {
         var tip = m.tip || m.label;
-        return (
-          '<div class="category-module-wrap">' +
-          '<button class="category-module-btn" data-module-id="' + escapeHtml(m.id) + '" onclick="navigateToModule(\'' + escapeHtml(m.id) + '\')">' + escapeHtml(m.label) + "</button>" +
-          '<span class="category-module-info" tabindex="0" role="img" aria-label="More info" data-tip="' + escapeHtml(tip) + '" title="' + escapeHtml(tip) + '">i</span>' +
-          "</div>"
-        );
+        return '<button class="category-module-btn" data-module-id="' + escapeHtml(m.id) + '" data-tip="' + escapeHtml(tip) + '" title="' + escapeHtml(tip) + '" onclick="navigateToModule(\'' + escapeHtml(m.id) + '\')">' + escapeHtml(m.label) + "</button>";
       }).join("") +
       "</div></div>"
     );

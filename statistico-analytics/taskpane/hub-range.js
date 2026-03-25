@@ -109,8 +109,7 @@
     }
     var hint = document.getElementById("hubRangeHint");
     if (hint) {
-      hint.textContent =
-        "Range saved for all modules. Choose an analysis below — its configuration can open right away.";
+      hint.textContent = "Data range ready to analyze.";
     }
   }
 

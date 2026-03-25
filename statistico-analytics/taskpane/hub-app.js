@@ -23,6 +23,53 @@ let hubIndependentDialog = null;
 let hubCorrelationFlowActive = false;
 let hubCorrelationDialog = null;
 const HUB_RESULT_DIALOG_OPTIONS = { height: 90, width: 70, displayInIframe: false };
+const HUB_CATEGORY_TILES = [
+  {
+    id: "explore-data",
+    title: "Explore data",
+    subtitle: "Inspect distributions and associations",
+    modules: [
+      { id: "univariate", label: "Univariate" },
+      { id: "correlations", label: "Correlation" }
+    ]
+  },
+  {
+    id: "compare-groups",
+    title: "Compare groups",
+    subtitle: "Compare means across groups",
+    modules: [
+      { id: "anova", label: "ANOVA" },
+      { id: "independent", label: "Independent Means" },
+      { id: "mixed", label: "Mixed" }
+    ]
+  },
+  {
+    id: "model-relationships",
+    title: "Model relationships",
+    subtitle: "Predict outcomes and estimate effects",
+    modules: [
+      { id: "regression", label: "Regression" },
+      { id: "logistic", label: "Logistic" }
+    ]
+  },
+  {
+    id: "reduce-dimensions",
+    title: "Reduce dimensions",
+    subtitle: "Compress and reveal latent structure",
+    modules: [
+      { id: "factor", label: "Factor" },
+      { id: "pca", label: "PCA" }
+    ]
+  },
+  {
+    id: "segment-data",
+    title: "Segment data",
+    subtitle: "Group similar observations",
+    modules: [
+      { id: "cluster", label: "Clustering" }
+    ]
+  }
+];
 
 /** Ensures Cluster appears even if a cached or older modules.config.json omits it (inserted after PCA). */
 var CLUSTER_MODULE_CARD = {
@@ -72,6 +119,31 @@ function renderModules(list) {
     block.classList.toggle("hidden", cards.length === 0);
   });
   const noResults = document.getElementById("noResults");
+  if (noResults) noResults.style.display = list.length ? "none" : "block";
+}
+
+function renderCategoryTiles(query) {
+  var holder = document.getElementById("categoryTiles");
+  var noResults = document.getElementById("noResults");
+  if (!holder) return;
+  var q = (query || "").trim().toLowerCase();
+  var list = HUB_CATEGORY_TILES.filter(function (c) {
+    if (!q) return true;
+    if (c.title.toLowerCase().indexOf(q) >= 0) return true;
+    return c.modules.some(function (m) { return m.label.toLowerCase().indexOf(q) >= 0; });
+  });
+  holder.innerHTML = list.map(function (c) {
+    return (
+      '<div class="category-tile">' +
+      '<div class="category-title">' + escapeHtml(c.title) + "</div>" +
+      '<div class="category-subtitle">' + escapeHtml(c.subtitle) + "</div>" +
+      '<div class="category-modules">' +
+      c.modules.map(function (m) {
+        return '<button class="category-module-btn" data-module-id="' + escapeHtml(m.id) + '" onclick="navigateToModule(\'' + escapeHtml(m.id) + '\')">' + escapeHtml(m.label) + "</button>";
+      }).join("") +
+      "</div></div>"
+    );
+  }).join("");
   if (noResults) noResults.style.display = list.length ? "none" : "block";
 }
 
@@ -157,8 +229,7 @@ document.addEventListener("click", function(e) {
 });
 
 function filterModules(q) {
-  const t = q.trim().toLowerCase();
-  renderModules(t ? MODULES.filter(function(m) { return m.name.toLowerCase().indexOf(t) >= 0; }) : MODULES);
+  renderCategoryTiles(q || "");
 }
 
 function getDialogsBaseUrl() {
@@ -179,8 +250,9 @@ function getGlobalRangePayload() {
 }
 
 function setSelectedModuleCard(moduleId, active) {
-  var card = document.querySelector('.module-card[data-module-id="' + moduleId + '"]');
-  if (card) card.classList.toggle("selected", !!active);
+  document.querySelectorAll('[data-module-id="' + moduleId + '"]').forEach(function (el) {
+    el.classList.toggle("selected", !!active);
+  });
 }
 
 function finishHubUnivariateFlow() {
@@ -939,7 +1011,7 @@ function showAdvisor() {
 }
 
 function showError(msg) {
-  const list = document.getElementById("modulesList");
+  const list = document.getElementById("categoryTiles");
   if (list) {
     list.innerHTML =
       '<div style="text-align:center;padding:24px;color:#ef4444;font-size:12px;">' +
@@ -961,7 +1033,7 @@ Office.onReady(function(info) {
   loadModulesConfig()
     .then(function(list) {
       MODULES = ensureClusterModule(list);
-      renderModules(MODULES);
+      renderCategoryTiles("");
     })
     .catch(function(err) {
       console.error("Hub config load failed:", err);

@@ -107,10 +107,6 @@
     if (window.StatisticoGlobalRange) {
       StatisticoGlobalRange.save(values, address || "", rangeMode);
     }
-    var hint = document.getElementById("hubRangeHint");
-    if (hint) {
-      hint.textContent = "Data range ready to analyze.";
-    }
   }
 
   function showRangeBadge(text, isError) {
@@ -121,10 +117,18 @@
     if (isError && window.StatisticoGlobalRange) {
       StatisticoGlobalRange.clear();
     }
-    var hint = document.getElementById("hubRangeHint");
-    if (hint && isError) {
-      hint.textContent = "Pick a range above, then open a module.";
-    }
+  }
+
+  function toggleRangeInfo(event) {
+    if (event) event.stopPropagation();
+    var box = document.getElementById("hubRangeInfo");
+    if (!box) return;
+    box.classList.toggle("open");
+  }
+
+  function closeRangeInfo() {
+    var box = document.getElementById("hubRangeInfo");
+    if (box) box.classList.remove("open");
   }
 
   Office.onReady(async function (info) {
@@ -143,4 +147,13 @@
 
   window.hubSetRangeMode = setRangeMode;
   window.hubLoadFromNamedRange = loadFromNamedRange;
+  window.hubToggleRangeInfo = toggleRangeInfo;
+
+  document.addEventListener("click", function (ev) {
+    var box = document.getElementById("hubRangeInfo");
+    var btn = document.getElementById("hubRangeInfoBtn");
+    if (!box || !btn) return;
+    if (box.contains(ev.target) || btn.contains(ev.target)) return;
+    closeRangeInfo();
+  });
 })();

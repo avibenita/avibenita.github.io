@@ -27,6 +27,9 @@ const HUB_CATEGORY_TILES = [
   {
     id: "explore-data",
     title: "Explore data",
+    icon: "fa-chart-bar",
+    color: "#f97316",
+    colorDark: "#c2410c",
     subtitle: "Inspect distributions and associations",
     modules: [
       { id: "univariate", label: "Univariate", tip: "Distribution summaries, outliers, and normality checks for single variables." },
@@ -36,6 +39,9 @@ const HUB_CATEGORY_TILES = [
   {
     id: "compare-groups",
     title: "Compare groups",
+    icon: "fa-scale-balanced",
+    color: "#10b981",
+    colorDark: "#0f766e",
     subtitle: "Compare means across groups",
     modules: [
       { id: "anova", label: "ANOVA", tip: "Compare means across 3+ groups with post-hoc support." },
@@ -46,6 +52,9 @@ const HUB_CATEGORY_TILES = [
   {
     id: "model-relationships",
     title: "Model relationships",
+    icon: "fa-chart-line",
+    color: "#3b82f6",
+    colorDark: "#1d4ed8",
     subtitle: "Predict outcomes and estimate effects",
     modules: [
       { id: "regression", label: "Regression", tip: "Linear regression with coefficients, intervals, and diagnostics." },
@@ -55,6 +64,9 @@ const HUB_CATEGORY_TILES = [
   {
     id: "reduce-dimensions",
     title: "Reduce dimensions",
+    icon: "fa-layer-group",
+    color: "#8b5cf6",
+    colorDark: "#6d28d9",
     subtitle: "Compress and reveal latent structure",
     modules: [
       { id: "factor", label: "Factor", tip: "Latent factor extraction and rotation for construct discovery." },
@@ -64,6 +76,9 @@ const HUB_CATEGORY_TILES = [
   {
     id: "segment-data",
     title: "Segment data",
+    icon: "fa-object-group",
+    color: "#14b8a6",
+    colorDark: "#0f766e",
     subtitle: "Group similar observations",
     modules: [
       { id: "cluster", label: "Clustering", tip: "K-means and hierarchical clustering to segment observations." }
@@ -133,9 +148,15 @@ function renderCategoryTiles(query) {
     return c.modules.some(function (m) { return m.label.toLowerCase().indexOf(q) >= 0; });
   });
   holder.innerHTML = list.map(function (c) {
+    var color = c.color || "#f97316";
+    var colorDark = c.colorDark || "#c2410c";
+    var icon = c.icon || "fa-table-cells-large";
     return (
-      '<div class="category-tile">' +
+      '<div class="category-tile" style="--cat-color:' + escapeHtml(color) + ";--cat-color-dark:" + escapeHtml(colorDark) + ';">' +
+      '<div class="category-title-row">' +
+      '<div class="category-icon"><i class="fa-solid ' + escapeHtml(icon) + '"></i></div>' +
       '<div class="category-title">' + escapeHtml(c.title) + "</div>" +
+      "</div>" +
       '<div class="category-subtitle">' + escapeHtml(c.subtitle) + "</div>" +
       '<div class="category-modules">' +
       c.modules.map(function (m) {

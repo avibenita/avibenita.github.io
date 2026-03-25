@@ -615,6 +615,280 @@ function openCorrelationConfigFromHub() {
   return true;
 }
 
+function openBuilderDialogFromHub(options) {
+  var gr = getGlobalRangePayload();
+  if (!gr) return false;
+  setSelectedModuleCard(options.moduleId, true);
+  Office.context.ui.displayDialogAsync(
+    getDialogsBaseUrl() + options.dialogPath + (options.dialogPath.indexOf("?") >= 0 ? "&" : "?") + "v=" + Date.now(),
+    options.dialogOptions || { height: 88, width: 25, displayInIframe: false },
+    function (res) {
+      if (res.status === Office.AsyncResultStatus.Failed) {
+        setSelectedModuleCard(options.moduleId, false);
+        return;
+      }
+      var dlg = res.value;
+      var sendPayload = function () {
+        if (!dlg) return;
+        dlg.messageChild(JSON.stringify({
+          type: options.dataType,
+          payload: options.payloadBuilder ? options.payloadBuilder(gr) : {}
+        }));
+      };
+      setTimeout(sendPayload, options.initialDelayMs || 550);
+      if (options.retryDelayMs) setTimeout(sendPayload, options.retryDelayMs);
+      dlg.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+        try {
+          var msg = JSON.parse(arg.message || "{}");
+          if (msg.action === "ready" || msg.action === "requestData") {
+            sendPayload();
+            return;
+          }
+          var modelActions = options.modelActions || [];
+          if (modelActions.indexOf(msg.action) >= 0) {
+            if (typeof options.onModel === "function") options.onModel(msg);
+            try { dlg.close(); } catch (e) {}
+            dlg = null;
+            setTimeout(function () {
+              window.location.href = options.nextUrl();
+            }, options.nextDelayMs || 380);
+            return;
+          }
+          var closeActions = options.closeActions || ["close"];
+          if (closeActions.indexOf(msg.action) >= 0) {
+            try { dlg.close(); } catch (e) {}
+            dlg = null;
+            setSelectedModuleCard(options.moduleId, false);
+          }
+        } catch (e) {}
+      });
+      dlg.addEventHandler(Office.EventType.DialogEventReceived, function () {
+        dlg = null;
+        setSelectedModuleCard(options.moduleId, false);
+      });
+    }
+  );
+  return true;
+}
+
+function nextModuleResultUrl(moduleId) {
+  return "./" + moduleId + "/" + moduleId + ".html?v=" + Date.now() + "&fromHub=1&autoConfig=1&directDialog=1&openResults=1";
+}
+
+function openDependentConfigFromHub() {
+  return openBuilderDialogFromHub({
+    moduleId: "dependent",
+    dialogPath: "dependent/dependent-input.html",
+    dialogOptions: { height: 88, width: 25, displayInIframe: false },
+    dataType: "DEPENDENT_DATA",
+    payloadBuilder: function (gr) {
+      var saved = null;
+      try { saved = JSON.parse(sessionStorage.getItem("dependentModelSpec") || "null"); } catch (e) {}
+      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", savedModelSpec: saved };
+    },
+    modelActions: ["dependentModel"],
+    onModel: function (msg) {
+      sessionStorage.setItem("dependentModelSpec", JSON.stringify(msg.data || msg.payload || {}));
+    },
+    nextUrl: function () { return nextModuleResultUrl("dependent"); }
+  });
+}
+
+function openFactorConfigFromHub() {
+  return openBuilderDialogFromHub({
+    moduleId: "factor",
+    dialogPath: "factor/factor-input.html",
+    dialogOptions: { height: 88, width: 25, displayInIframe: false },
+    dataType: "FACTOR_DATA",
+    payloadBuilder: function (gr) {
+      var saved = null;
+      try { saved = JSON.parse(sessionStorage.getItem("factorModelSpec") || "null"); } catch (e) {}
+      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", analysisMode: "factor", savedModelSpec: saved };
+    },
+    modelActions: ["factorModel", "regressionModel"],
+    onModel: function (msg) {
+      var spec = msg.payload || msg.data || {};
+      spec.analysisMode = "factor";
+      sessionStorage.setItem("factorModelSpec", JSON.stringify(spec));
+    },
+    nextUrl: function () { return nextModuleResultUrl("factor"); },
+    nextDelayMs: 450
+  });
+}
+
+function openLogisticConfigFromHub() {
+  return openBuilderDialogFromHub({
+    moduleId: "logistic",
+    dialogPath: "logistic/logistic-input.html",
+    dialogOptions: { height: 88, width: 25, displayInIframe: false },
+    dataType: "LOGISTIC_DATA",
+    payloadBuilder: function (gr) {
+      var saved = null;
+      try { saved = JSON.parse(sessionStorage.getItem("logisticModelSpec") || "null"); } catch (e) {}
+      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", analysisMode: "logistic", savedModelSpec: saved };
+    },
+    modelActions: ["logisticModel", "regressionModel"],
+    onModel: function (msg) {
+      var spec = msg.payload || msg.data || {};
+      spec.analysisMode = "logistic";
+      sessionStorage.setItem("logisticModelSpec", JSON.stringify(spec));
+    },
+    nextUrl: function () { return nextModuleResultUrl("logistic"); },
+    nextDelayMs: 450
+  });
+}
+
+function openPcaConfigFromHub() {
+  return openBuilderDialogFromHub({
+    moduleId: "pca",
+    dialogPath: "factor/factor-input.html?mode=pca",
+    dialogOptions: { height: 90, width: 30, displayInIframe: false },
+    dataType: "FACTOR_DATA",
+    payloadBuilder: function (gr) {
+      var saved = null;
+      try { saved = JSON.parse(sessionStorage.getItem("pcaModelSpec") || "null"); } catch (e) {}
+      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", analysisMode: "pca", savedModelSpec: saved };
+    },
+    modelActions: ["factorModel", "regressionModel"],
+    onModel: function (msg) {
+      var spec = msg.payload || msg.data || {};
+      spec.analysisMode = "pca";
+      sessionStorage.setItem("pcaModelSpec", JSON.stringify(spec));
+    },
+    nextUrl: function () { return nextModuleResultUrl("pca"); },
+    nextDelayMs: 450
+  });
+}
+
+function openMixedConfigFromHub() {
+  return openBuilderDialogFromHub({
+    moduleId: "mixed",
+    dialogPath: "mixed/mixed-input.html",
+    dialogOptions: { height: 88, width: 25, displayInIframe: false },
+    dataType: "MIXED_DATA",
+    payloadBuilder: function (gr) {
+      var saved = null;
+      try { saved = JSON.parse(sessionStorage.getItem("mixedModelSpec") || "null"); } catch (e) {}
+      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", savedModelSpec: saved };
+    },
+    modelActions: ["mixedModel"],
+    onModel: function (msg) {
+      sessionStorage.setItem("mixedModelSpec", JSON.stringify(msg.payload || msg.data || {}));
+    },
+    nextUrl: function () { return nextModuleResultUrl("mixed"); },
+    nextDelayMs: 500
+  });
+}
+
+function openMetaConfigFromHub() {
+  return openBuilderDialogFromHub({
+    moduleId: "meta-analysis",
+    dialogPath: "meta-analysis/meta-input.html",
+    dialogOptions: { height: 88, width: 25, displayInIframe: false },
+    dataType: "META_DATA",
+    payloadBuilder: function (gr) {
+      var saved = null;
+      try { saved = JSON.parse(sessionStorage.getItem("metaModelSpec") || "null"); } catch (e) {}
+      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", savedSpec: saved };
+    },
+    modelActions: ["metaModel"],
+    onModel: function (msg) {
+      sessionStorage.setItem("metaModelSpec", JSON.stringify(msg.spec || msg.payload || msg.data || {}));
+    },
+    nextUrl: function () { return nextModuleResultUrl("meta-analysis"); }
+  });
+}
+
+function buildClusterNumericCandidates(gr, threshold) {
+  var values = (gr && gr.values) || [];
+  if (!values.length) return [];
+  var headers = values[0] || [];
+  var rows = values.slice(1);
+  var th = isFinite(Number(threshold)) ? Number(threshold) : 0.8;
+  var out = [];
+  headers.forEach(function (h, j) {
+    var num = 0, nm = 0;
+    rows.forEach(function (r) {
+      var v = r[j];
+      if (v === null || v === undefined || v === "") return;
+      nm++;
+      var n = Number(v);
+      if (isFinite(n)) num++;
+    });
+    if (nm > 0 && num / nm >= th) out.push({ index: j, label: String(h || ("V" + (j + 1))) });
+  });
+  return out;
+}
+
+function openClusterConfigFromHub() {
+  var gr = getGlobalRangePayload();
+  if (!gr) return false;
+  setSelectedModuleCard("cluster", true);
+  fetch("./cluster/cluster.module.json?v=" + Date.now(), { cache: "no-store" })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (moduleConfig) {
+      if (!moduleConfig) throw new Error("cluster.module.json missing");
+      Office.context.ui.displayDialogAsync(
+        getDialogsBaseUrl() + "cluster/cluster-setup-dialog.html?v=" + Date.now(),
+        {
+          height: Number((moduleConfig.dialog && moduleConfig.dialog.setupHeightPercent) || 66),
+          width: Number((moduleConfig.dialog && moduleConfig.dialog.setupWidthPercent) || 56),
+          displayInIframe: false
+        },
+        function (res) {
+          if (res.status === Office.AsyncResultStatus.Failed) {
+            setSelectedModuleCard("cluster", false);
+            return;
+          }
+          var dlg = res.value;
+          var sendInit = function () {
+            if (!dlg) return;
+            var savedClusterSpec = null;
+            try { savedClusterSpec = JSON.parse(sessionStorage.getItem("clusterSpec") || "null"); } catch (e) {}
+            dlg.messageChild(JSON.stringify({
+              action: "clusterSetupInit",
+              payload: {
+                moduleConfig: moduleConfig,
+                rangeAddress: gr.address || "",
+                dataRows: Math.max(0, (gr.values || []).length - 1),
+                dataCols: ((gr.values && gr.values[0]) || []).length,
+                variableCandidates: buildClusterNumericCandidates(gr, moduleConfig.analysis && moduleConfig.analysis.numericColumnThreshold),
+                savedSpec: savedClusterSpec
+              }
+            }));
+          };
+          setTimeout(sendInit, 600);
+          dlg.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+            try {
+              var msg = JSON.parse(arg.message || "{}");
+              if (msg.action === "requestClusterSetup") sendInit();
+              else if (msg.action === "clusterSetupRun") {
+                sessionStorage.setItem("clusterSpec", JSON.stringify(msg.spec || msg.payload || {}));
+                try { dlg.close(); } catch (e) {}
+                dlg = null;
+                setTimeout(function () {
+                  window.location.href = nextModuleResultUrl("cluster");
+                }, 480);
+              } else if (msg.action === "clusterSetupClose" || msg.action === "close") {
+                try { dlg.close(); } catch (e) {}
+                dlg = null;
+                setSelectedModuleCard("cluster", false);
+              }
+            } catch (e) {}
+          });
+          dlg.addEventHandler(Office.EventType.DialogEventReceived, function () {
+            dlg = null;
+            setSelectedModuleCard("cluster", false);
+          });
+        }
+      );
+    })
+    .catch(function () {
+      setSelectedModuleCard("cluster", false);
+    });
+  return true;
+}
+
 function navigateToModule(id) {
   var gr = getGlobalRangePayload();
   if (id === "univariate" && gr && gr.values && gr.values.length >= 2) {
@@ -631,6 +905,27 @@ function navigateToModule(id) {
   }
   if (id === "correlations" && gr && gr.values && gr.values.length >= 2) {
     if (openCorrelationConfigFromHub()) return;
+  }
+  if (id === "dependent" && gr && gr.values && gr.values.length >= 2) {
+    if (openDependentConfigFromHub()) return;
+  }
+  if (id === "factor" && gr && gr.values && gr.values.length >= 2) {
+    if (openFactorConfigFromHub()) return;
+  }
+  if (id === "logistic" && gr && gr.values && gr.values.length >= 2) {
+    if (openLogisticConfigFromHub()) return;
+  }
+  if (id === "pca" && gr && gr.values && gr.values.length >= 2) {
+    if (openPcaConfigFromHub()) return;
+  }
+  if (id === "meta-analysis" && gr && gr.values && gr.values.length >= 2) {
+    if (openMetaConfigFromHub()) return;
+  }
+  if (id === "mixed" && gr && gr.values && gr.values.length >= 2) {
+    if (openMixedConfigFromHub()) return;
+  }
+  if (id === "cluster" && gr && gr.values && gr.values.length >= 2) {
+    if (openClusterConfigFromHub()) return;
   }
   var url = "./" + id + "/" + id + ".html?v=" + Date.now() + "&fromHub=1";
   if (gr && gr.values && gr.values.length >= 2) url += "&autoConfig=1&directDialog=1";

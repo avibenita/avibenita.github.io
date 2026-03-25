@@ -145,6 +145,7 @@
     const urlParams = (() => { try { return new URLSearchParams(window.location.search); } catch(e) { return new URLSearchParams(''); } })();
     const openedFromHub = urlParams.get('fromHub') === '1';
     const directDialogFromHub = openedFromHub && (urlParams.get('directDialog') === '1' || urlParams.get('autoConfig') === '1');
+    const openResultsFromHub = openedFromHub && urlParams.get('openResults') === '1';
     if (directDialogFromHub) {
       document.body.classList.add('direct-config-opening');
       window.addEventListener('focus', function () {
@@ -272,11 +273,19 @@
           rangeMode = gr.mode || 'used';
           StatisticoGlobalRange.syncRangeModeUI(rangeMode);
           applyRangeData(gr.values, gr.address);
-          setTimeout(function() { if (typeof onConfigureClick === 'function') onConfigureClick(); }, openedFromHub ? 0 : 450);
+          if (openResultsFromHub && typeof openDependentResultsDialog === 'function') {
+            setTimeout(function() { openDependentResultsDialog(); }, openedFromHub ? 0 : 450);
+          } else {
+            setTimeout(function() { if (typeof onConfigureClick === 'function') onConfigureClick(); }, openedFromHub ? 0 : 450);
+          }
         } else {
           await autoDetectRange();
           if (window.StatisticoGlobalRange && typeof StatisticoGlobalRange.shouldAutoOpenConfigFromHub === 'function' && StatisticoGlobalRange.shouldAutoOpenConfigFromHub() && rangeData) {
-            setTimeout(function() { if (typeof onConfigureClick === 'function') onConfigureClick(); }, openedFromHub ? 0 : 450);
+            if (openResultsFromHub && typeof openDependentResultsDialog === 'function') {
+              setTimeout(function() { openDependentResultsDialog(); }, openedFromHub ? 0 : 450);
+            } else {
+              setTimeout(function() { if (typeof onConfigureClick === 'function') onConfigureClick(); }, openedFromHub ? 0 : 450);
+            }
           }
         }
       }

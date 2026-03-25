@@ -43,10 +43,21 @@ const HUB_CATEGORY_TILES = [
     color: "#10b981",
     colorDark: "#0f766e",
     subtitle: "Compare means across groups",
-    modules: [
-      { id: "anova", label: "ANOVA", tip: "Compare means across 3+ groups with post-hoc support." },
-      { id: "independent", label: "Independent Means", tip: "Compare two independent groups on a numeric outcome." },
-      { id: "mixed", label: "Mixed", tip: "Mixed-effects models for grouped or repeated-measures style data." }
+    subgroups: [
+      {
+        label: "Multi-group models",
+        modules: [
+          { id: "anova", label: "ANOVA", tip: "Compare means across 3+ groups with post-hoc support." },
+          { id: "mixed", label: "Mixed", tip: "Mixed-effects models for grouped or repeated-measures style data." }
+        ]
+      },
+      {
+        label: "Two-condition means",
+        modules: [
+          { id: "independent", label: "Independent Means", tip: "Compare two independent groups on a numeric outcome." },
+          { id: "dependent", label: "Repeated Means", tip: "Compare paired/repeated measurements for the same cases." }
+        ]
+      }
     ]
   },
   {
@@ -143,9 +154,10 @@ function renderCategoryTiles(query) {
   if (!holder) return;
   var q = (query || "").trim().toLowerCase();
   var list = HUB_CATEGORY_TILES.filter(function (c) {
+    var mods = getCategoryModules(c);
     if (!q) return true;
     if (c.title.toLowerCase().indexOf(q) >= 0) return true;
-    return c.modules.some(function (m) { return m.label.toLowerCase().indexOf(q) >= 0; });
+    return mods.some(function (m) { return m.label.toLowerCase().indexOf(q) >= 0; });
   });
   holder.innerHTML = list.map(function (c) {
     var color = c.color || "#f97316";
@@ -158,15 +170,41 @@ function renderCategoryTiles(query) {
       '<div class="category-title">' + escapeHtml(c.title) + "</div>" +
       "</div>" +
       '<div class="category-subtitle">' + escapeHtml(c.subtitle) + "</div>" +
-      '<div class="category-modules">' +
-      c.modules.map(function (m) {
-        var tip = m.tip || m.label;
-        return '<button class="category-module-btn" data-module-id="' + escapeHtml(m.id) + '" data-tip="' + escapeHtml(tip) + '" title="' + escapeHtml(tip) + '" onclick="navigateToModule(\'' + escapeHtml(m.id) + '\')">' + escapeHtml(m.label) + "</button>";
-      }).join("") +
-      "</div></div>"
+      renderCategoryGroups(c) +
+      "</div>"
     );
   }).join("");
   if (noResults) noResults.style.display = list.length ? "none" : "block";
+}
+
+function getCategoryModules(category) {
+  if (Array.isArray(category.modules)) return category.modules;
+  if (Array.isArray(category.subgroups)) {
+    return category.subgroups.reduce(function (all, g) {
+      return all.concat(Array.isArray(g.modules) ? g.modules : []);
+    }, []);
+  }
+  return [];
+}
+
+function renderCategoryGroups(category) {
+  if (Array.isArray(category.subgroups) && category.subgroups.length) {
+    return category.subgroups.map(function (g, idx) {
+      return (
+        '<div class="category-subgroup' + (idx > 0 ? " with-divider" : "") + '">' +
+        '<div class="category-subgroup-label">' + escapeHtml(g.label || "") + "</div>" +
+        '<div class="category-modules">' +
+        ((g.modules || []).map(renderCategoryModuleBtn).join("")) +
+        "</div></div>"
+      );
+    }).join("");
+  }
+  return '<div class="category-modules">' + getCategoryModules(category).map(renderCategoryModuleBtn).join("") + "</div>";
+}
+
+function renderCategoryModuleBtn(m) {
+  var tip = m.tip || m.label;
+  return '<button class="category-module-btn" data-module-id="' + escapeHtml(m.id) + '" data-tip="' + escapeHtml(tip) + '" title="' + escapeHtml(tip) + '" onclick="navigateToModule(\'' + escapeHtml(m.id) + '\')">' + escapeHtml(m.label) + "</button>";
 }
 
 var GROUP_COLORS = {

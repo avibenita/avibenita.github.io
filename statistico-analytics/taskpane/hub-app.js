@@ -29,8 +29,8 @@ const HUB_CATEGORY_TILES = [
     title: "Explore data",
     subtitle: "Inspect distributions and associations",
     modules: [
-      { id: "univariate", label: "Univariate" },
-      { id: "correlations", label: "Correlation" }
+      { id: "univariate", label: "Univariate", tip: "Distribution summaries, outliers, and normality checks for single variables." },
+      { id: "correlations", label: "Correlation", tip: "Pairwise associations and correlation matrix between numeric variables." }
     ]
   },
   {
@@ -38,9 +38,9 @@ const HUB_CATEGORY_TILES = [
     title: "Compare groups",
     subtitle: "Compare means across groups",
     modules: [
-      { id: "anova", label: "ANOVA" },
-      { id: "independent", label: "Independent Means" },
-      { id: "mixed", label: "Mixed" }
+      { id: "anova", label: "ANOVA", tip: "Compare means across 3+ groups with post-hoc support." },
+      { id: "independent", label: "Independent Means", tip: "Compare two independent groups on a numeric outcome." },
+      { id: "mixed", label: "Mixed", tip: "Mixed-effects models for grouped or repeated-measures style data." }
     ]
   },
   {
@@ -48,8 +48,8 @@ const HUB_CATEGORY_TILES = [
     title: "Model relationships",
     subtitle: "Predict outcomes and estimate effects",
     modules: [
-      { id: "regression", label: "Regression" },
-      { id: "logistic", label: "Logistic" }
+      { id: "regression", label: "Regression", tip: "Linear regression with coefficients, intervals, and diagnostics." },
+      { id: "logistic", label: "Logistic", tip: "Binary outcome modeling with odds ratios and model fit metrics." }
     ]
   },
   {
@@ -57,8 +57,8 @@ const HUB_CATEGORY_TILES = [
     title: "Reduce dimensions",
     subtitle: "Compress and reveal latent structure",
     modules: [
-      { id: "factor", label: "Factor" },
-      { id: "pca", label: "PCA" }
+      { id: "factor", label: "Factor", tip: "Latent factor extraction and rotation for construct discovery." },
+      { id: "pca", label: "PCA", tip: "Principal component reduction for compact feature representation." }
     ]
   },
   {
@@ -66,7 +66,7 @@ const HUB_CATEGORY_TILES = [
     title: "Segment data",
     subtitle: "Group similar observations",
     modules: [
-      { id: "cluster", label: "Clustering" }
+      { id: "cluster", label: "Clustering", tip: "K-means and hierarchical clustering to segment observations." }
     ]
   }
 ];
@@ -139,7 +139,13 @@ function renderCategoryTiles(query) {
       '<div class="category-subtitle">' + escapeHtml(c.subtitle) + "</div>" +
       '<div class="category-modules">' +
       c.modules.map(function (m) {
-        return '<button class="category-module-btn" data-module-id="' + escapeHtml(m.id) + '" onclick="navigateToModule(\'' + escapeHtml(m.id) + '\')">' + escapeHtml(m.label) + "</button>";
+        var tip = m.tip || m.label;
+        return (
+          '<div class="category-module-wrap">' +
+          '<button class="category-module-btn" data-module-id="' + escapeHtml(m.id) + '" onclick="navigateToModule(\'' + escapeHtml(m.id) + '\')">' + escapeHtml(m.label) + "</button>" +
+          '<span class="category-module-info" tabindex="0" role="img" aria-label="More info" data-tip="' + escapeHtml(tip) + '" title="' + escapeHtml(tip) + '">i</span>' +
+          "</div>"
+        );
       }).join("") +
       "</div></div>"
     );

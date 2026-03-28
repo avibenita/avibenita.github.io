@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title id="page-title">Box Plot Analysis</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://code.highcharts.com/highcharts-more.js"></script>
+  <script src="https://code.highcharts.com/modules/exporting.js"></script>
+  <script src="https://code.highcharts.com/modules/export-data.js"></script>
+  <script src="https://code.highcharts.com/modules/annotations.js"></script>
+
+  <style>
+    :root {
+      --surface-0: #0c1624; /* page background */
+      --surface-1: #1a1f2e; /* cards / panels - warmer dark gray-blue */
+      --surface-2: #242938; /* chart / results boxes */
+      --border: #2d3748; /* softer border color */
+      --accent-1: rgb(255,165,120); /* warm orange */
+      --accent-2: rgb(120,200,255); /* cyan blue */
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255,255,255,0.8);
+      --text-muted: rgba(255,255,255,0.6);
+      --panel-bg: var(--surface-1);
+      --panel-radius: 10px;
+      --panel-shadow: 0px 4px 20px rgba(0, 0, 0, 0.4);
+      --header-color: rgb(255,165,120);
+      --pad: 12px;
+      --panel-radius: 10px;
+      --panel-shadow: 0px 4px 20px rgba(0, 0, 0, 0.4);
+      --header-bg: #000;
+      --header-color: var(--accent-1);
+      --panel-width: 700px;
+      --panel-min-width: 280px;
+      --panel-max-width: 1100px;
+      --histogram-panel-width: 900px;
+      --histogram-height-min: 300px;
+      --histogram-height-max: 500px;
+      --histogram-height-ratio: 0.4;
+      --highlight-bg: rgba(255, 165, 120, 0.2);
+      --highlight-text: var(--accent-1);
+    }
+
+    body {
+      background-color: var(--surface-0);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      color: var(--text-primary);
+    }
+
+    .header-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 32px;
+      margin: 0;
+      color: var(--header-color);
+    }
+
+    .dropdown {
+      position: relative;
+    }
+
+    /* Panel styling to match input panel */
+    .wrap{ display:flex; justify-content:center; padding:clamp(6px,2vh,12px); }
+    .card{
+      width:min(980px, 100%);
+      background:var(--surface-1);
+      border-radius:var(--panel-radius);
+      box-shadow:var(--panel-shadow);
+      border: 1px solid var(--border);
+      overflow:hidden;
+    }
+    .card-head{ background: transparent; color:var(--header-color); padding:12px 16px; font-weight:600; font-size:1.2rem; letter-spacing:.3px }
+    .card-body{ padding:var(--pad); max-height:calc(100vh - 80px); overflow-y:auto; display: flex; flex-direction: column; }
+    
+    /* Dropdown styling for header */
+    .dropdown-container { position: relative; }
+    .dropdown-content { 
+      display: none;
+      position: absolute;
+      top: 100%;
+      right: 0;
+      min-width: 250px;
+      z-index: 1000;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--panel-shadow);
+      padding: 8px 0;
+      margin-top: 4px;
+    }
+    .dropdown-content.show { display: block; }
+    
+    /* Dropdown button with 3D effect and animated glow */
+    .dropdown-btn {
+      position: relative;
+      transition: all 0.3s ease;
+      animation: subtle-glow 3s ease-in-out infinite;
+      background: linear-gradient(145deg, #4a5568, #2d3748) !important;
+      border: 1px solid #4a5568 !important;
+      box-shadow: 
+        0 4px 8px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.2) !important;
+      text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+      border-radius: 8px !important;
+      font-weight: 600;
+      color: #e2e8f0 !important;
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    @keyframes subtle-glow {
+      0%, 100% {
+        box-shadow: 
+          0 4px 8px rgba(0, 0, 0, 0.3),
+          0 0 5px rgba(255, 165, 120, 0.3),
+          inset 0 1px 0 rgba(255, 255, 255, 0.1),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+      }
+      50% {
+        box-shadow: 
+          0 4px 8px rgba(0, 0, 0, 0.3),
+          0 0 15px rgba(255, 165, 120, 0.5), 
+          0 0 25px rgba(255, 165, 120, 0.2),
+          inset 0 1px 0 rgba(255, 255, 255, 0.1),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+      }
+    }
+
+    .dropdown-btn:hover { 
+      background: linear-gradient(145deg, #5a6578, #3d4758) !important;
+      box-shadow: 
+        0 6px 12px rgba(0, 0, 0, 0.4),
+        0 0 20px rgba(255, 165, 120, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.25) !important;
+      transform: translateY(-1px);
+      animation: none;
+    }
+    
+    .dropdown-btn:active {
+      background: linear-gradient(145deg, #2d3748, #4a5568) !important;
+      box-shadow: 
+        0 2px 4px rgba(0, 0, 0, 0.4),
+        inset 0 2px 4px rgba(0, 0, 0, 0.3),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.05) !important;
+      transform: translateY(1px);
+    }
+
+    .dropdown-arrow { transition: transform 0.3s ease; }
+    .dropdown-btn.open .dropdown-arrow { transform: rotate(180deg); }
+
+    /* Analysis option styling in dropdown */
+    .analysis-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border-radius: 4px;
+      margin: 2px 8px;
+    }
+
+    .analysis-option:hover {
+      background: var(--surface-2);
+      color: var(--accent-1);
+    }
+
+    .analysis-option.active {
+      background: var(--surface-2);
+      color: var(--accent-1);
+      font-weight: 600;
+    }
+    .analysis-option[aria-disabled="true"]{ opacity:.5; pointer-events:none; cursor:not-allowed; }
+
+    .option-icon {
+      font-size: 16px;
+      width: 20px;
+      text-align: center;
+    }
+
+    .option-text {
+      font-size: 14px;
+    }
+
+    .dropdown-separator {
+      height: 1px;
+      background: var(--border);
+      margin: 8px 12px;
+    }
+
+    .panel-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+      margin: 20px;
+    }
+
+    .panel {
+      background-color: var(--surface-1);
+      border-radius: var(--panel-radius);
+      box-shadow: var(--panel-shadow);
+      border: 1px solid var(--border);
+      flex: 0 0 auto;
+      min-width: var(--panel-min-width);
+      max-width: var(--panel-max-width);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-heading {
+      background: transparent;
+      color: var(--header-color);
+      font-weight: 600;
+      padding: 8px 16px 6px 16px;
+      font-size: 1.1rem;
+      letter-spacing: .3px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-body {
+      padding: 8px;
+      background: var(--surface-2);
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      margin: 8px 12px 12px 12px;
+      flex: 1;
+    }
+
+    /* Results container layout - vertical stacking */
+    .results-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      height: calc(100vh - 36px);
+      overflow: hidden;
+      padding: 8px 0;
+    }
+
+    body.embedded-hero .results-container {
+      height: 100vh;
+      max-height: none;
+      overflow: hidden;
+      padding: 0;
+    }
+
+    body.embedded-hero .panel-heading {
+      display: none;
+    }
+    
+    .results-container.show {
+      display: flex !important;
+    }
+
+    /* Override panel styles within results container */
+    .results-container .panel {
+      flex-shrink: 0;
+      min-width: auto;
+      max-width: none;
+    }
+
+    .boxplot-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Box plot specific chart styling */
+    .highcharts-container {
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    #withOutliers, #withoutOutliers {
+      width: 100%;
+      height: 280px;
+      margin-bottom: 8px;
+      min-height: 280px;
+      position: relative;
+      visibility: visible;
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+    }
+
+    body.embedded-hero #withOutliers,
+    body.embedded-hero #withoutOutliers {
+      height: 100%;
+      min-height: 0;
+      margin-bottom: 0;
+    }
+
+    body.embedded-hero .panel-body {
+      margin: 4px 8px 8px 8px;
+      padding: 6px;
+      height: calc(100vh - 18px);
+      min-height: 0;
+    }
+
+    body.embedded-hero .card-body {
+      max-height: none;
+      height: 100vh;
+      overflow: hidden;
+      padding: 0;
+    }
+
+    body.embedded-hero .panel {
+      height: 100%;
+      min-height: 0;
+    }
+
+    body.embedded-hero .boxplot-group {
+      height: 100%;
+      min-height: 0;
+    }
+
+    body.embedded-hero .boxplot-group > div {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+    }
+
+    body.embedded-hero .boxplot-group > div > div {
+      flex: 1;
+      min-height: 0;
+    }
+
+    
+    .chart-panel {
+      margin-bottom: 8px;
+    }
+    
+    .chart-panel:last-child {
+      margin-bottom: 0;
+    }
+
+    /* Ensure panels have flexible height */
+    .panel {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    @media (max-width: 768px) {
+      .panel {
+        flex: 1 1 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+      <div class="card-body">
+
+<!-- Results container -->
+<div class="results-container" id="results-container">
+        <div class="panel">
+          <div class="panel-heading">Box Plot Comparison</div>
+          <div class="panel-body boxplot-group">
+            <div>
+              <div id="withOutliers"></div>
+            </div>
+            <div>
+              <div id="withoutOutliers"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    </section>
+  </div>
+   <script>
+    function buildStatLabelSeries(data, labelColor = '#ffa578') {
+  // data: [{ boxWithOutliers:[low,q1,med,q3,high], boxWithoutOutliers:[...]}]
+  // We only have 1 category, so x = 0
+  const makeSeries = (arr) => {
+    const labels = [
+      { key:'Min',    y: arr[0], dx:  10 },
+      { key:'Q1',     y: arr[1], dx:  10 },
+      { key:'Median', y: arr[2], dx: -10, align:'right' },
+      { key:'Q3',     y: arr[3], dx:  10 },
+      { key:'Max',    y: arr[4], dx:  10 }
+    ];
+    return labels.map(l => ({
+      x: 0, y: l.y,
+      dataLabels: {
+        enabled: true,
+        formatter() { return `${l.key}: ${this.y.toFixed(1)}`; },
+        style: { color: labelColor, fontSize: '10px', fontWeight: 600 },
+        align: l.align || 'left',
+        verticalAlign: 'middle',
+        x: l.dx,  // small horizontal nudge (chart is inverted)
+        y: 0,
+        padding: 2,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        borderRadius: 3
+      }
+    }));
+  };
+  return {
+    withOutliers: makeSeries(data[0].boxWithOutliers),
+    withoutOutliers: makeSeries(data[0].boxWithoutOutliers)
+  };
+}
+
+
+
+    </script>
+  <script>
+    const isHeroEmbed = new URLSearchParams(window.location.search).get('embed') === 'hero';
+    if (isHeroEmbed) {
+      document.body.classList.add('embedded-hero');
+    }
+    let highchartsLoadPromise = null;
+
+    function loadExternalScript(src) {
+      return new Promise((resolve, reject) => {
+        const existing = document.querySelector(`script[data-hc-src="${src}"]`);
+        if (existing) {
+          if (existing.dataset.loaded === '1') {
+            resolve();
+          } else {
+            existing.addEventListener('load', () => resolve(), { once: true });
+            existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)), { once: true });
+          }
+          return;
+        }
+
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.dataset.hcSrc = src;
+        script.onload = () => {
+          script.dataset.loaded = '1';
+          resolve();
+        };
+        script.onerror = () => reject(new Error(`Failed to load ${src}`));
+        document.head.appendChild(script);
+      });
+    }
+
+    async function ensureHighchartsLoaded() {
+      if (typeof Highcharts !== 'undefined' && typeof Highcharts.chart === 'function') {
+        return true;
+      }
+      if (highchartsLoadPromise) {
+        return highchartsLoadPromise;
+      }
+
+      const scriptSets = [
+        [
+          'https://code.highcharts.com/highcharts.js',
+          'https://code.highcharts.com/highcharts-more.js',
+          'https://code.highcharts.com/modules/exporting.js',
+          'https://code.highcharts.com/modules/export-data.js',
+          'https://code.highcharts.com/modules/annotations.js'
+        ],
+        [
+          'https://cdn.jsdelivr.net/npm/highcharts@12/highcharts.js',
+          'https://cdn.jsdelivr.net/npm/highcharts@12/highcharts-more.js',
+          'https://cdn.jsdelivr.net/npm/highcharts@12/modules/exporting.js',
+          'https://cdn.jsdelivr.net/npm/highcharts@12/modules/export-data.js',
+          'https://cdn.jsdelivr.net/npm/highcharts@12/modules/annotations.js'
+        ],
+        [
+          'https://unpkg.com/highcharts@12/highcharts.js',
+          'https://unpkg.com/highcharts@12/highcharts-more.js',
+          'https://unpkg.com/highcharts@12/modules/exporting.js',
+          'https://unpkg.com/highcharts@12/modules/export-data.js',
+          'https://unpkg.com/highcharts@12/modules/annotations.js'
+        ]
+      ];
+
+      highchartsLoadPromise = (async () => {
+        for (const set of scriptSets) {
+          try {
+            for (const src of set) {
+              await loadExternalScript(src);
+            }
+            if (typeof Highcharts !== 'undefined' && typeof Highcharts.chart === 'function') {
+              return true;
+            }
+          } catch (_) {
+            // Try next CDN set.
+          }
+        }
+        return false;
+      })();
+
+      return highchartsLoadPromise;
+    }
+
+    function processData(jsonData) {
+      const processedData = jsonData.map(item => {
+        const values = item.values.slice().sort((a, b) => a - b);
+        const n = values.length;
+        const low = values[0];
+        const high = values[n - 1];
+        const median = (values[Math.floor((n - 1) / 2)] + values[Math.ceil((n - 1) / 2)]) / 2;
+        const q1 = (values[Math.floor((n - 1) / 4)] + values[Math.ceil((n - 1) / 4)]) / 2;
+        const q3 = (values[Math.floor((3 * (n - 1)) / 4)] + values[Math.ceil((3 * (n - 1)) / 4)]) / 2;
+        const iqr = q3 - q1;
+        const lowerFence = q1 - 1.5 * iqr;
+        const upperFence = q3 + 1.5 * iqr;
+        const outliers = values.filter(v => v < lowerFence || v > upperFence);
+        const adjustedLow = values.find(v => v >= lowerFence);
+        const adjustedHigh = [...values].reverse().find(v => v <= upperFence);
+        return {
+          boxWithOutliers: [low, q1, median, q3, high],
+          boxWithoutOutliers: [adjustedLow, q1, median, q3, adjustedHigh],
+          outliers
+        };
+      });
+      renderCharts(processedData);
+      
+      // Update the title with sample size
+      updateTitleWithSampleSize(jsonData[0].values.length);
+    }
+    
+    function updateTitleWithSampleSize(sampleSize) {
+  try {
+    if (typeof window.updateHeaderCenter === 'function') {
+      window.updateHeaderCenter({
+        analysisName: 'Box Plot Analysis',
+        variableName: '',
+        sampleSize: sampleSize
+      });
+    } else if (typeof window.updateHeaderSampleSize === 'function') {
+      window.updateHeaderSampleSize(sampleSize);
+    }
+
+    // Keep only "n=..." visible in the shared header line.
+    const headerEl = document.querySelector('dropdown-menu');
+    const shadow = headerEl && headerEl.shadowRoot;
+    if (shadow) {
+      const variableNameEl = shadow.getElementById('variableName');
+      const variableLineEl = shadow.getElementById('headerVariableLine');
+      const nWrapper = shadow.querySelector('.variable-line .n');
+      if (variableNameEl) {
+        variableNameEl.textContent = '';
+        variableNameEl.style.display = 'none';
+      }
+      if (nWrapper) {
+        nWrapper.style.display = 'inline';
+      }
+      if (variableLineEl) {
+        variableLineEl.style.display = (sampleSize > 0 ? 'block' : 'none');
+      }
+    }
+  } catch (_) {}
+    }
+
+    function renderInlineBoxplot(containerId, boxValues, outliers, color) {
+      const container = document.getElementById(containerId);
+      if (!container || !Array.isArray(boxValues) || boxValues.length < 5) return;
+
+      const [low, q1, median, q3, high] = boxValues;
+      const outlierVals = Array.isArray(outliers) ? outliers : [];
+      const minDomain = Math.min(low, ...(outlierVals.length ? outlierVals : [low]));
+      const maxDomain = Math.max(high, ...(outlierVals.length ? outlierVals : [high]));
+      const span = maxDomain - minDomain || 1;
+      const left = 60;
+      const width = 860;
+      const y = 112;
+      const top = 82;
+      const h = 60;
+      const sx = (v) => left + ((v - minDomain) / span) * width;
+
+      const xLow = sx(low), xQ1 = sx(q1), xMed = sx(median), xQ3 = sx(q3), xHigh = sx(high);
+      const outlierSvg = outlierVals.map((v) => `<circle cx="${sx(v).toFixed(2)}" cy="${y}" r="4" fill="#ff6b6b"></circle>`).join('');
+
+      container.innerHTML = `
+        <svg viewBox="0 0 980 220" role="img" aria-label="Box plot fallback">
+          <line x1="${left}" y1="182" x2="${left + width}" y2="182" stroke="rgba(255,255,255,.25)" stroke-width="1.5"></line>
+          <line x1="${xLow.toFixed(2)}" y1="${y}" x2="${xQ1.toFixed(2)}" y2="${y}" stroke="#ffffff" stroke-width="2"></line>
+          <line x1="${xQ3.toFixed(2)}" y1="${y}" x2="${xHigh.toFixed(2)}" y2="${y}" stroke="#ffffff" stroke-width="2"></line>
+          <rect x="${xQ1.toFixed(2)}" y="${top}" width="${Math.max(2, xQ3 - xQ1).toFixed(2)}" height="${h}" fill="${color}" fill-opacity=".28" stroke="${color}" stroke-width="2"></rect>
+          <line x1="${xMed.toFixed(2)}" y1="${top}" x2="${xMed.toFixed(2)}" y2="${top + h}" stroke="#ffffff" stroke-width="2.5"></line>
+          <line x1="${xLow.toFixed(2)}" y1="${top + 12}" x2="${xLow.toFixed(2)}" y2="${top + h - 12}" stroke="#ffffff" stroke-width="2"></line>
+          <line x1="${xHigh.toFixed(2)}" y1="${top + 12}" x2="${xHigh.toFixed(2)}" y2="${top + h - 12}" stroke="#ffffff" stroke-width="2"></line>
+          ${outlierSvg}
+          <text x="${xLow.toFixed(2)}" y="58" fill="#ffa578" font-size="12" text-anchor="middle">Min ${low.toFixed(2)}</text>
+          <text x="${xQ1.toFixed(2)}" y="58" fill="#ffa578" font-size="12" text-anchor="middle">Q1 ${q1.toFixed(2)}</text>
+          <text x="${xMed.toFixed(2)}" y="58" fill="#ffa578" font-size="12" text-anchor="middle">Median ${median.toFixed(2)}</text>
+          <text x="${xQ3.toFixed(2)}" y="58" fill="#ffa578" font-size="12" text-anchor="middle">Q3 ${q3.toFixed(2)}</text>
+          <text x="${xHigh.toFixed(2)}" y="58" fill="#ffa578" font-size="12" text-anchor="middle">Max ${high.toFixed(2)}</text>
+        </svg>
+      `;
+    }
+
+    function renderFallbackCharts(data) {
+      const first = data && data[0];
+      if (!first) return;
+      renderInlineBoxplot('withOutliers', first.boxWithOutliers, [], '#e94560');
+      renderInlineBoxplot('withoutOutliers', first.boxWithoutOutliers, first.outliers || [], '#00bcd4');
+    }
+
+    function renderCharts(data) {
+      console.log('Rendering charts with data:', data);
+      
+      try {
+        // Check if containers exist
+        if (!document.getElementById('withOutliers')) {
+          console.error('Container "withOutliers" not found');
+          return;
+        }
+        if (!document.getElementById('withoutOutliers')) {
+          console.error('Container "withoutOutliers" not found');
+          return;
+        }
+        
+        // Check if Highcharts is loaded
+        if (typeof Highcharts === 'undefined') {
+          ensureHighchartsLoaded().then((loaded) => {
+            if (loaded) {
+              renderCharts(data);
+              return;
+            }
+            if (!isHeroEmbed) {
+              console.warn('Highcharts unavailable across CDNs, using fallback charts');
+            }
+            renderFallbackCharts(data);
+          });
+          return;
+        }
+        
+        console.log('Creating first chart (with outliers)...');
+        console.log('Chart container element:', document.getElementById('withOutliers'));
+        console.log('Container dimensions:', {
+          width: document.getElementById('withOutliers')?.offsetWidth,
+          height: document.getElementById('withOutliers')?.offsetHeight,
+          visible: document.getElementById('withOutliers')?.offsetParent !== null
+        });
+        
+        const variableName = window.currentVariableName || 'Variable';
+        const statLabels = buildStatLabelSeries(data);
+        const withOutliersContainer = document.getElementById('withOutliers');
+        const measuredHeight = withOutliersContainer ? withOutliersContainer.clientHeight : 0;
+        const fallbackEmbedHeight = Math.floor((window.innerHeight - 100) / 2);
+        const chartHeight = isHeroEmbed
+          ? Math.max(220, measuredHeight || fallbackEmbedHeight)
+          : 280;
+      Highcharts.chart('withOutliers', {
+          chart: { 
+            type: 'boxplot', 
+            inverted: true,
+            backgroundColor: 'transparent',
+            height: chartHeight,
+            marginTop: 40,
+            marginBottom: 50,
+            marginLeft: 80,
+            marginRight: 20
+          },
+          title: { 
+            text: `With Outliers`,
+            style: { color: '#ffffff', fontSize: '13px' },
+            margin: 15
+          },
+          xAxis: {
+            categories: [variableName],
+            labels: { style: { color: '#ffffff', fontSize: '11px' } },
+            gridLineColor: 'rgba(255,255,255,0.1)',
+            title: {
+              text: 'Distribution',
+              style: { color: '#ffffff', fontSize: '11px' }
+            }
+          },
+          yAxis: {
+            labels: { style: { color: '#ffffff', fontSize: '11px' } },
+            gridLineColor: 'rgba(255,255,255,0.1)',
+            title: { 
+              text: 'Values',
+              style: { color: '#ffffff', fontSize: '11px' }
+            }
+          },
+          legend: {
+            enabled: false
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            style: { color: '#ffffff' },
+            formatter: function() {
+              const point = this.point;
+              return `<b>${variableName}</b><br/>` +
+                     `Min: ${point.low}<br/>` +
+                     `Q1: ${point.q1}<br/>` +
+                     `Median: ${point.median}<br/>` +
+                     `Q3: ${point.q3}<br/>` +
+                     `Max: ${point.high}`;
+            }
+          },
+          plotOptions: {
+            boxplot: {
+              dataLabels: {
+                enabled: false
+              },
+              fillColor: 'rgba(255, 255, 255, 0.1)',
+              lineWidth: 2,
+              medianColor: '#ffffff',
+              medianWidth: 3,
+              stemColor: '#ffffff',
+              stemWidth: 1,
+              whiskerColor: '#ffffff',
+              whiskerWidth: 2
+            }
+          },
+          series: [
+            { 
+              name: 'Box Plot', 
+              data: data.map(d => d.boxWithOutliers),
+              color: '#e94560'
+            },
+            {
+              name: 'Stats',
+              type: 'scatter',
+              data: statLabels.withOutliers,
+              marker: { enabled: false },
+              enableMouseTracking: false,
+              tooltip: { enabled: false },
+              showInLegend: false
+            }
+          ]
+        });
+
+        console.log('Creating second chart (without outliers)...');
+      Highcharts.chart('withoutOutliers', {
+          chart: { 
+            type: 'boxplot', 
+            inverted: true,
+            backgroundColor: 'transparent',
+            height: chartHeight,
+            marginTop: 40,
+            marginBottom: 50,
+            marginLeft: 80,
+            marginRight: 20
+          },
+          title: { 
+            text: `Without Outliers + Outlier Points`,
+            style: { color: '#ffffff', fontSize: '13px' },
+            margin: 15
+          },
+          xAxis: {
+            categories: [variableName],
+            labels: { style: { color: '#ffffff', fontSize: '11px' } },
+            gridLineColor: 'rgba(255,255,255,0.1)',
+            title: {
+              text: 'Distribution',
+              style: { color: '#ffffff', fontSize: '11px' }
+            }
+          },
+          yAxis: {
+            labels: { style: { color: '#ffffff', fontSize: '11px' } },
+            gridLineColor: 'rgba(255,255,255,0.1)',
+            title: { 
+              text: 'Values',
+              style: { color: '#ffffff', fontSize: '11px' }
+            }
+          },
+          legend: {
+            enabled: true,
+            align: 'right',
+            verticalAlign: 'top',
+            layout: 'vertical',
+            x: -10,
+            y: 20,
+            itemStyle: { color: '#ffffff', fontSize: '10px' },
+            itemMarginBottom: 2
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            style: { color: '#ffffff' }
+          },
+          plotOptions: {
+            boxplot: {
+              dataLabels: {
+                enabled: false
+              },
+              fillColor: 'rgba(255, 255, 255, 0.1)',
+              lineWidth: 2,
+              medianColor: '#ffffff',
+              medianWidth: 3,
+              stemColor: '#ffffff',
+              stemWidth: 1,
+              whiskerColor: '#ffffff',
+              whiskerWidth: 2
+            },
+            scatter: {
+              dataLabels: {
+                enabled: false
+              }
+            }
+          },
+        series: [
+            { 
+              name: 'Box Plot', 
+              data: data.map(d => d.boxWithoutOutliers),
+              color: '#00bcd4',
+              tooltip: {
+                pointFormatter: function() {
+                  return `<b>${variableName}</b><br/>` +
+                         `Min: ${this.low}<br/>` +
+                         `Q1: ${this.q1}<br/>` +
+                         `Median: ${this.median}<br/>` +
+                         `Q3: ${this.q3}<br/>` +
+                         `Max: ${this.high}`;
+                }
+              }
+            },
+            {
+              name: `Outliers (${data.reduce((sum, d) => sum + d.outliers.length, 0)})`,
+            type: 'scatter',
+            data: data.flatMap((d, i) => d.outliers.map(v => [i, v])),
+              marker: { radius: 3 },
+              color: '#ff6b6b',
+              tooltip: {
+                pointFormat: 'Outlier: <b>{point.y}</b>'
+              }
+            },
+            {
+              name: 'Stats',
+              type: 'scatter',
+              data: statLabels.withoutOutliers,
+              marker: { enabled: false },
+              enableMouseTracking: false,
+              tooltip: { enabled: false },
+              showInLegend: false
+          }
+        ]
+      });
+        
+        console.log('Charts rendered successfully');
+        
+        // Force container visibility and resize
+        setTimeout(() => {
+          const containers = ['withOutliers', 'withoutOutliers'];
+          containers.forEach(id => {
+            const container = document.getElementById(id);
+            if (container) {
+              container.style.visibility = 'visible';
+              container.style.opacity = '1';
+              console.log(`✅ Forced visibility for ${id}`);
+            }
+          });
+          
+          // Trigger Highcharts reflow to ensure proper sizing
+          if (window.Highcharts && window.Highcharts.charts) {
+            window.Highcharts.charts.forEach(chart => {
+              if (chart) {
+                chart.reflow();
+                console.log('✅ Chart reflow triggered');
+              }
+            });
+          }
+        }, 100);
+        
+      } catch (error) {
+        console.error('Error rendering charts:', error);
+      }
+    }
+
+    window.populateBoxPlot = function(jsonString) {
+      console.log('populateBoxPlot called with:', jsonString);
+      try {
+        const parsed = JSON.parse(jsonString);
+        console.log('Parsed data:', parsed);
+        
+        // Update variable name if available (accept a few common keys)
+        const varName = parsed.title || parsed.variableName || parsed.variable || parsed.colName || parsed.name;
+        if (varName) {
+          updateVariableName(varName);
+          // Also update the unified header immediately
+          try {
+            if (typeof window.updateHeaderCenter === 'function') {
+              window.updateHeaderCenter({ analysisName: 'Box Plot Analysis', variableName: '' });
+            } else {
+              if (typeof window.updateHeaderVariableName === 'function') window.updateHeaderVariableName('');
+            }
+          } catch (_) {}
+        }
+        
+        if (!Array.isArray(parsed.values)) throw new Error('Invalid format - expected values array');
+        
+        // Notify that data has been received (hides awaiting overlay, shows results)
+        if (typeof window.notifyDataReceived === 'function') {
+          window.notifyDataReceived();
+        }
+        
+        // Show results container
+        const resultsContainer = document.getElementById("results-container");
+        if (resultsContainer) {
+          resultsContainer.style.display = "flex";
+          resultsContainer.classList.add("show");
+          console.log('✅ Results container shown');
+        }
+
+        // Enable analysis items when data is ready
+        try{
+          document.querySelectorAll('#analysisDropdown .analysis-option').forEach(function(a){ a.removeAttribute('aria-disabled'); });
+        }catch(e){}
+        
+        // Update title with sample size (also syncs the header center) and buffer header state
+        updateTitleWithSampleSize(parsed.values.length);
+        try { window.__pendingHeaderState = { analysisName: 'Box Plot Analysis', variableName: '', sampleSize: parsed.values.length }; } catch(e) {}
+        
+        processData([parsed]);
+      } catch (e) {
+        console.error('Error parsing input JSON:', e.message);
+        console.error('Raw data:', jsonString);
+      }
+    };
+
+    // Test function to verify charts are working
+    function buildSkewedSampleWithOutliers(sampleSize = 260) {
+      const values = [];
+      for (let i = 0; i < sampleSize; i += 1) {
+        // Right-skewed base using exponential transform.
+        const v = 28 + (-Math.log(1 - Math.random())) * 14;
+        values.push(Number(Math.min(96, v).toFixed(2)));
+      }
+      // Add explicit outliers to emphasize the "with outliers" panel.
+      values.push(108.5, 112.3, 118.9, 126.4, 131.7);
+      return values;
+    }
+
+    window.testBoxPlot = function() {
+      console.log('Running skewed sample with outliers...');
+      const testData = {
+        values: buildSkewedSampleWithOutliers()
+      };
+      window.populateBoxPlot(JSON.stringify(testData));
+    };
+
+    // Function to toggle dropdown visibility - EXACT COPY FROM HISTOGRAM
+    window.toggleAnalysisDropdown = function() {
+      const dropdown = document.getElementById('analysisDropdown');
+      const btn = document.querySelector('.dropdown-btn');
+      
+      if (dropdown.classList.contains('show')) {
+        dropdown.classList.remove('show');
+        btn.classList.remove('open');
+      } else {
+        dropdown.classList.add('show');
+        btn.classList.add('open');
+      }
+    };
+
+
+
+    // IMMEDIATE function exposure (before DOMContentLoaded)
+    console.log('🚀 Exposing functions immediately...');
+    
+    // Ensure populateHistogram is available immediately
+    if (typeof window.populateHistogram === 'undefined') {
+      window.populateHistogram = function(jsonString) {
+        console.log('🔄 populateHistogram called immediately (redirecting to populateBoxPlot):', jsonString);
+        return window.populateBoxPlot(jsonString);
+      };
+      console.log('✅ populateHistogram exposed immediately');
+    }
+    
+    // Ensure populateBoxPlot is available immediately
+    if (typeof window.populateBoxPlot === 'undefined') {
+      window.populateBoxPlot = function(jsonString) {
+        console.log('📦 populateBoxPlot called immediately:', jsonString);
+        try {
+          const parsed = JSON.parse(jsonString);
+          console.log('Parsed data:', parsed);
+          
+          if (parsed.title || parsed.variableName) {
+            if (typeof updateVariableName === 'function') {
+              updateVariableName(parsed.title || parsed.variableName);
+            }
+          }
+          
+          if (!Array.isArray(parsed.values)) throw new Error('Invalid format - expected values array');
+          
+          const resultsContainer = document.getElementById("results-container");
+          
+          if (resultsContainer) resultsContainer.style.display = "flex";
+          
+          processData([parsed]);
+        } catch (e) {
+          console.error('Error parsing input JSON:', e.message);
+          console.error('Raw data:', jsonString);
+        }
+      };
+      console.log('✅ populateBoxPlot exposed immediately');
+    }
+    
+    console.log('🎯 All functions exposed. Testing availability:');
+    console.log('- populateHistogram:', typeof window.populateHistogram);
+    console.log('- populateBoxPlot:', typeof window.populateBoxPlot);
+
+    // Debug: Log available functions on page load
+    window.addEventListener('DOMContentLoaded', function() {
+      console.log('🔍 Box Plot page loaded. Available functions:');
+      console.log('- populateHistogram:', typeof window.populateHistogram);
+      console.log('- populateBoxPlot:', typeof window.populateBoxPlot);
+      console.log('- testBoxPlot:', typeof window.testBoxPlot);
+      console.log('- toggleAnalysisDropdown:', typeof window.toggleAnalysisDropdown);
+      console.log('- selectAnalysis:', typeof window.selectAnalysis);
+      console.log('- updateVariableName:', typeof window.updateVariableName);
+
+      // Read pending header from localStorage (if user navigated from Histogram)
+      try {
+        const raw = localStorage.getItem('statsticoPendingHeader');
+        if (raw) {
+          const s = JSON.parse(raw);
+          if (s && (s.variableName || s.sampleSize)) {
+            if (typeof window.updateHeaderCenter === 'function') {
+              window.updateHeaderCenter({ analysisName: 'Box Plot Analysis', variableName: '', sampleSize: s.sampleSize || 0 });
+            } else {
+              if (typeof window.updateHeaderVariableName === 'function') window.updateHeaderVariableName('');
+              if (typeof window.updateHeaderSampleSize === 'function') window.updateHeaderSampleSize(s.sampleSize || 0);
+            }
+          }
+        }
+      } catch (e) { /* ignore */ }
+      
+      // Test that functions are callable
+      try {
+        if (typeof window.populateHistogram === 'function') {
+          console.log('✅ populateHistogram function is available and callable');
+        } else {
+          console.error('❌ populateHistogram function is NOT available');
+        }
+        
+        if (typeof window.populateBoxPlot === 'function') {
+          console.log('✅ populateBoxPlot function is available and callable');
+        } else {
+          console.error('❌ populateBoxPlot function is NOT available');
+        }
+      } catch (error) {
+        console.error('Error testing functions:', error);
+      }
+    });
+
+    // Auto-seed with skewed data if no external data arrives.
+    setTimeout(() => {
+      const hasRenderedChart = document.querySelector('#withOutliers .highcharts-container, #withOutliers svg');
+      if (!hasRenderedChart) {
+        console.log('No charts detected, loading skewed sample data...');
+        window.testBoxPlot();
+      }
+    }, isHeroEmbed ? 250 : 1000);
+    
+    // Additional global exposure for debugging
+    window.debugBoxPlot = function() {
+      console.log('🐛 Debug info:');
+      console.log('Current functions available:', Object.keys(window).filter(key => key.includes('populate') || key.includes('BoxPlot')));
+      console.log('DOM ready state:', document.readyState);
+      console.log('Highcharts loaded:', typeof Highcharts !== 'undefined');
+    };
+    
+    // Force expose functions globally (redundant but ensures availability)
+    if (typeof window.populateHistogram === 'undefined') {
+      console.warn('Re-defining populateHistogram function...');
+      window.populateHistogram = function(jsonString) {
+        console.log('populateHistogram called (redirecting to populateBoxPlot):', jsonString);
+        return window.populateBoxPlot(jsonString);
+      };
+    }
+    
+    if (typeof window.populateBoxPlot === 'undefined') {
+      console.warn('Re-defining populateBoxPlot function...');
+      window.populateBoxPlot = function(jsonString) {
+        console.log('populateBoxPlot called with:', jsonString);
+        try {
+          const parsed = JSON.parse(jsonString);
+          console.log('Parsed data:', parsed);
+          
+          if (parsed.title || parsed.variableName) {
+            updateVariableName(parsed.title || parsed.variableName);
+          }
+          
+          if (!Array.isArray(parsed.values)) throw new Error('Invalid format - expected values array');
+          
+          const resultsContainer = document.getElementById("results-container");
+          
+          if (resultsContainer) resultsContainer.style.display = "flex";
+          
+          // Update title with sample size
+          if (typeof updateTitleWithSampleSize === 'function') {
+            updateTitleWithSampleSize(parsed.values.length);
+          }
+          
+          processData([parsed]);
+        } catch (e) {
+          console.error('Error parsing input JSON:', e.message);
+          console.error('Raw data:', jsonString);
+        }
+      };
+    }
+
+
+</script>
+<script>
+  // Define page-specific reset function for Results Panel Manager
+  window.resetResultsPanel = function(){
+    try{
+      console.log('🔄 Box Plot resetResultsPanel called');
+      
+      // Clear charts
+      try{ if (window.Highcharts && Highcharts.charts){ Highcharts.charts.forEach(function(c){ if(c){ try{c.destroy();}catch(e){} } }); } }catch(e){}
+      var withO = document.getElementById('withOutliers');
+      var withoutO = document.getElementById('withoutOutliers');
+      if (withO) withO.innerHTML = '';
+      if (withoutO) withoutO.innerHTML = '';
+
+      // Hide results container
+      var results = document.getElementById('results-container');
+      if (results){ results.classList.remove('show'); results.style.removeProperty('display'); }
+
+      // Reset titles/name
+      try{ document.getElementById('selectedAnalysisTitle').textContent = 'Box Plot Analysis'; }catch(e){}
+      try{ document.getElementById('variableNameDisplay').textContent = ''; }catch(e){}
+      try{ document.getElementById('page-title').textContent = 'Box Plot Analysis'; }catch(e){}
+
+      // Close and disable dropdown items
+      try{
+        var dd = document.getElementById('analysisDropdown');
+        var btn = document.querySelector('.dropdown-btn');
+        if (dd) dd.classList.remove('show');
+        if (btn) btn.classList.remove('open');
+        document.querySelectorAll('#analysisDropdown .analysis-option').forEach(function(a){
+          if (a.dataset && a.dataset.case){ a.setAttribute('aria-disabled','true'); }
+        });
+      }catch(e){}
+
+      console.log('✅ Box Plot reset complete');
+      return true;
+    }catch(err){ 
+      console.error('❌ Box Plot reset failed', err); 
+      return false; 
+    }
+  };
+  console.log('✅ Box Plot resetResultsPanel defined');
+</script>
+
+
+
+<script>
+  // Keep header sync from localStorage, without awaiting overlay dependencies.
+  setTimeout(function() {
+    try {
+      const pendingHeader = localStorage.getItem('statsticoPendingHeader');
+      if (pendingHeader) {
+        const headerData = JSON.parse(pendingHeader);
+        if (headerData && headerData.variableName) {
+          if (typeof window.updateHeaderCenter === 'function') {
+            window.updateHeaderCenter({
+              analysisName: 'Box Plot Analysis',
+              variableName: headerData.variableName,
+              sampleSize: headerData.sampleSize || 0
+            });
+          }
+          window.currentVariableName = headerData.variableName;
+        }
+        localStorage.removeItem('statsticoPendingHeader');
+      }
+    } catch (e) {
+      console.warn('BoxPlot: Could not read header from localStorage:', e);
+    }
+  }, 100);
+</script>
+
+  </body>
+  </html>
+
+
+

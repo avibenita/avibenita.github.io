@@ -4,21 +4,13 @@
 
 // Navigation links - dynamically adjusted based on page location
 function getNavLinks() {
-  const currentPath = window.location.pathname;
-  const currentFile = currentPath.split('/').pop() || 'index.html';
-  
-  // Only support pages are currently inside a subfolder.
-  const isInSubfolder = currentPath.includes('Support/');
-  
-  const basePath = isInSubfolder ? '../' : '';
-  
   return {
-    home: basePath + 'index.html',
-    why: basePath + 'why-another-package.html',
-    calculators: basePath + 'index-Calculators.html',
-    analytics: basePath + 'index-Analytics.html',
-    addins: basePath + 'index-Addins.html',
-    support: basePath + 'Support/index.html'
+    home: '/index.html',
+    why: '/Statistico-Website/why-another-package.html',
+    calculators: '/Statistico-Website/index-Calculators.html',
+    analytics: '/Statistico-Website/index-Analytics.html',
+    addins: '/Statistico-Website/index-Addins.html',
+    support: '/Statistico-Website/Support/index.html'
   };
 }
 
@@ -531,12 +523,12 @@ const FOOTER_TEMPLATE = `
 
   // Set active page based on URL
   function setActivePage() {
-    const currentPath = window.location.pathname;
+    const currentPath = window.location.pathname.replace(/\\/g, '/');
     const currentFile = currentPath.split('/').pop() || 'index.html';
     
     // Determine which page we're on
     let activePage = 'home';
-    if (currentFile === 'index.html' && currentPath.includes('index.html')) {
+    if (currentFile === 'index.html') {
       activePage = 'home';
     } else if (currentFile === 'why-another-package.html') {
       activePage = 'why';

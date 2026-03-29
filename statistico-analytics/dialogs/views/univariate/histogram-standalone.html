@@ -18,6 +18,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260312c">
   <script src="../shared-header.js?v=20260312c"></script>
+  <script src="../runtime-core.js?v=20260329a"></script>
   
   <style>
     /* EXACT COPY OF ORIGINAL HISTOGRAM STYLES */
@@ -608,19 +609,13 @@
     let originalMax = 100;
     let currentDecimals = 2;
 
-    const isHubEmbed = new URLSearchParams(window.location.search).get('embed') === '1';
+    var SR = window.StatisticoRuntime;
+    var runtime = SR.createRuntime();
+    SR.logRuntime(runtime, 'initial');
 
-    console.log('MODE:', { isHubEmbed: isHubEmbed, hasOffice: typeof Office !== 'undefined' });
-
-    // Hub / site iframe (?embed=1): web-first — no Office dialog messaging (avoids racing Office.initialize vs browser fallbacks)
-    if (isHubEmbed) {
-      Office.initialize = function () {
-        console.log('Office.initialize (no-op: hub embed mode)');
-      };
-    } else {
-      Office.initialize = function (reason) {
+    SR.installOfficeBootstrap(runtime, {
+      onOfficeReady: function (reason) {
         console.log('? Office.js initialized:', reason);
-
         try {
           if (Office.context && Office.context.ui) {
             Office.context.ui.addHandlerAsync(
@@ -631,21 +626,17 @@
         } catch (e) {
           console.warn('Dialog message handler not available (browser/iframe):', e);
         }
-
         setTimeout(function () {
           sendMessageToParent({ status: 'ready' });
         }, 500);
-
         setTimeout(function () {
           if (!histogramChart) {
             console.log('?? Checking localStorage for univariateResults...');
-            const storedResults = localStorage.getItem('univariateResults');
-            if (storedResults) {
+            var parsedData = SR.tryLoadUnivariateFromStorage();
+            if (parsedData) {
               try {
-                const parsedData = JSON.parse(storedResults);
                 console.log('? Found data in localStorage');
                 handleDataReceived(parsedData);
-                return;
               } catch (e) {
                 console.error('? Error parsing localStorage data:', e);
               }
@@ -654,11 +645,12 @@
             }
           }
         }, 1000);
-      };
-    }
+      }
+    });
 
-    window.addEventListener('DOMContentLoaded', function () {
+    SR.whenDomReady(function () {
       console.log('?? DOM Content Loaded');
+      SR.applyUrlThemeOverride();
 
       StatisticoHeader.init('histogram', 'Variable', 0);
       if (typeof StatisticoHeader !== 'undefined') {
@@ -667,9 +659,9 @@
       }
       console.log('? Shared header initialized');
 
-      if (isHubEmbed) {
+      if (runtime.mode === SR.MODE.HUB_EMBED) {
         document.documentElement.setAttribute('data-hub-embed', '1');
-        console.log('HUB EMBED MODE — single init path (sample data)');
+        SR.logRuntime(runtime, 'hub-embed bootstrap (sample data only)');
         loadSampleData();
         setTimeout(fitLayout, 150);
         return;
@@ -686,7 +678,7 @@
       }, 100);
 
       setTimeout(function () {
-        const resultsContainer = document.getElementById('results-container');
+        var resultsContainer = document.getElementById('results-container');
         if (resultsContainer && !resultsContainer.classList.contains('show')) {
           console.log('?? Browser fallback: load sample if still no results');
           loadSampleData();

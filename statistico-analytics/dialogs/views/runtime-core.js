@@ -76,16 +76,27 @@
 
   /**
    * Register Office.initialize. For hub-embed, no-op. For office/browser-off-Host paths, full init.
+   * Safe to call regardless of whether office.js was loaded.
    * @param {object} runtime - from createRuntime()
    * @param {object} hooks
    * @param {function(string, object): void} hooks.onOfficeReady - (reason, runtime)
    */
   function installOfficeBootstrap(runtime, hooks) {
     hooks = hooks || {};
+
     if (runtime.mode === MODE.HUB_EMBED) {
-      Office.initialize = function () {
-        console.log('[StatisticoRuntime] Office.initialize no-op (hub-embed)');
-      };
+      /* office.js should not be loaded at all in embed mode.
+         Guard in case a future page still includes it conditionally. */
+      if (typeof Office !== 'undefined') {
+        Office.initialize = function () {
+          console.log('[StatisticoRuntime] Office.initialize no-op (hub-embed)');
+        };
+      }
+      return;
+    }
+
+    if (typeof Office === 'undefined') {
+      console.warn('[StatisticoRuntime] Office not loaded — bootstrap will rely on browser fallback path');
       return;
     }
 

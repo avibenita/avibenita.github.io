@@ -932,10 +932,11 @@
       const DEMO_MAP = {
         univariate: {
           title: 'Univariate Demo',
-          description: 'Real Univariate taskpane module from the remote analytics repository.',
+          description: 'Launches the real Univariate taskpane module in a popup window (taskpane-style flow).',
           family: 'Explore Data',
           url: 'https://statistico.live/statistico-analytics/taskpane/univariate/univariate.html',
-          fallbackUrl: 'https://statistico.live/statistico-analytics/dialogs/views/univariate/histogram-standalone.html'
+          fallbackUrl: 'https://statistico.live/statistico-analytics/dialogs/views/univariate/histogram-standalone.html',
+          preferPopup: true
         },
         correlations: {
           title: 'Correlation Demo',
@@ -988,7 +989,35 @@
         }
       }
 
-      function openDemo(moduleKey) {
+      function openModulePopup(entry) {
+        if (!entry || !entry.url) return null;
+        const popupFeatures = [
+          'width=1460',
+          'height=940',
+          'menubar=no',
+          'toolbar=no',
+          'location=yes',
+          'status=no',
+          'resizable=yes',
+          'scrollbars=yes'
+        ].join(',');
+        return window.open(entry.url, 'statisticoModulePopup', popupFeatures);
+      }
+
+      function showPopupLaunchState(entry, popupOpened) {
+        frame.hidden = true;
+        frame.src = '';
+        coming.hidden = false;
+        if (popupOpened) {
+          comingTitle.textContent = entry.title + ' opened in popup';
+          comingText.textContent = 'The real module is now running in a separate window, aligned with taskpane-style launch behavior. If you do not see it, allow popups for this site.';
+        } else {
+          comingTitle.textContent = 'Popup blocked by browser';
+          comingText.textContent = 'Please allow popups for this page and click the module button again, or use "Open Real Module".';
+        }
+      }
+
+      function openDemo(moduleKey, userInitiated) {
         const entry = DEMO_MAP[moduleKey];
         if (!entry) return;
 
@@ -1002,7 +1031,10 @@
           openRealModuleLink.style.display = entry.url ? 'inline-flex' : 'none';
         }
 
-        if (entry.url) {
+        if (entry.url && entry.preferPopup && userInitiated) {
+          const popupHandle = openModulePopup(entry);
+          showPopupLaunchState(entry, !!popupHandle);
+        } else if (entry.url) {
           coming.hidden = true;
           frame.hidden = false;
           frame.removeAttribute('src');
@@ -1031,7 +1063,7 @@
 
       chips.forEach((chip) => {
         chip.addEventListener('click', function () {
-          openDemo(chip.dataset.module);
+          openDemo(chip.dataset.module, true);
         });
       });
 
@@ -1048,7 +1080,7 @@
         comingText.textContent = 'This module cannot be embedded in the current context. Use "Open Real Module" to launch it directly.';
       });
 
-      openDemo('univariate');
+      openDemo('univariate', false);
     });
   </script>
 

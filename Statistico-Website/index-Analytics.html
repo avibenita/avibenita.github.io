@@ -1046,18 +1046,13 @@
             bodyHtmlLength: bodyHtmlLength
           });
 
+          /* Do not hide the iframe from here: on hard refresh, timing often triggers false positives
+             (transient empty body, inspect before paint, etc.). Chip click works because load order differs. */
           if (bodyHtmlLength < 50) {
-            showFallback(
-              'Module preview became blank',
-              'The iframe loaded but the inner document became nearly empty. Current URL: ' + href
-            );
+            console.warn('[iframe]', stage, '— inner HTML unusually short; if preview looks wrong, use Open Real Module. URL:', href);
           }
         } catch (err) {
-          console.error('[iframe] inspect failed:', err);
-          showFallback(
-            'Module preview unavailable',
-            'The iframe loaded, but its document could not be inspected. This usually means redirect, frame-policy behavior, or startup code inside the embedded page.'
-          );
+          console.warn('[iframe] inspect failed (often harmless on first paint):', stage, err);
         }
       }
 
@@ -1079,7 +1074,8 @@
         }, 700);
       });
 
-      function openDemo(moduleKey) {
+      function openDemo(moduleKey, options) {
+        options = options || {};
         const entry = DEMO_MAP[moduleKey];
         if (!entry) return;
 
@@ -1108,9 +1104,14 @@
           showFallback(entry.title, entry.description + ' Use the full module in taskpane for now.');
         }
 
-        const offset = 92;
-        const y = demoSection.getBoundingClientRect().top + window.pageYOffset - offset;
-        window.scrollTo({ top: y, behavior: 'smooth' });
+        if (!options.skipScroll) {
+          const offset = 92;
+          const y = demoSection.getBoundingClientRect().top + window.pageYOffset - offset;
+          window.scrollTo({
+            top: y,
+            behavior: options.scrollBehavior || 'smooth'
+          });
+        }
       }
 
       chips.forEach((chip) => {
@@ -1119,7 +1120,13 @@
         });
       });
 
-      openDemo('univariate');
+      /* Hard refresh: DOMContentLoaded is too early (nav/fonts/layout still settling; smooth scroll can race iframe).
+         Defer first embed + use instant scroll — matches stable behavior when user clicks a chip. */
+      window.addEventListener('load', function () {
+        requestAnimationFrame(function () {
+          openDemo('univariate', { scrollBehavior: 'auto' });
+        });
+      });
     });
   </script>
 

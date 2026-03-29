@@ -60,9 +60,13 @@ const NAV_TEMPLATE = `
     </ul>
 
     <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle color theme" aria-pressed="false" title="Toggle dark/light">
-      <i class="fa-solid fa-sun theme-icon theme-icon--sun" aria-hidden="true"></i>
-      <i class="fa-solid fa-moon theme-icon theme-icon--moon" aria-hidden="true"></i>
-      <span class="theme-toggle-label">Theme</span>
+      <span class="theme-mode-icon" aria-hidden="true">
+        <i class="fa-solid fa-moon"></i>
+      </span>
+      <span class="theme-switch" aria-hidden="true">
+        <span class="theme-switch-thumb"></span>
+      </span>
+      <span class="theme-toggle-label">Dark</span>
     </button>
 
     <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle mobile menu">
@@ -356,51 +360,85 @@ const NAV_STYLE = `
 .theme-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 8px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.16);
-  background: rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.9);
+  gap: 9px;
+  min-height: 42px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: linear-gradient(180deg, rgba(49, 61, 90, 0.92), rgba(39, 49, 76, 0.9));
+  color: rgba(245,249,255,0.96);
   cursor: pointer;
   transition: all 0.2s ease;
+  box-shadow: 0 8px 22px rgba(5, 10, 26, 0.28);
 }
 
 .theme-toggle:hover {
-  background: rgba(255,255,255,0.1);
+  background: linear-gradient(180deg, rgba(58, 72, 104, 0.95), rgba(44, 57, 88, 0.92));
   transform: translateY(-1px);
 }
 
-.theme-icon {
-  font-size: 0.82rem;
-  line-height: 1;
+.theme-mode-icon {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255, 196, 106, 0.14);
+  color: #ffcd6f;
+  font-size: 0.78rem;
+}
+
+.theme-switch {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.24);
+  border: 1px solid rgba(255,255,255,0.24);
+}
+
+.theme-switch-thumb {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.25);
+  transition: transform 0.22s ease;
 }
 
 .theme-toggle-label {
-  font-size: 0.76rem;
+  font-size: 0.86rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  line-height: 1;
 }
-
-.theme-icon--sun { color: #ffd089; }
-.theme-icon--moon { color: #93c5fd; opacity: 0.72; }
 
 :root[data-theme="light"] .theme-toggle {
-  border-color: rgba(15, 23, 42, 0.14);
-  background: rgba(15, 23, 42, 0.04);
-  color: rgba(15, 23, 42, 0.88);
+  border-color: rgba(15, 23, 42, 0.2);
+  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(240,246,255,0.94));
+  color: rgba(15, 23, 42, 0.92);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
 }
 
-:root[data-theme="light"] .theme-icon--sun {
-  color: #d97706;
-  opacity: 0.66;
+:root[data-theme="light"] .theme-toggle:hover {
+  background: linear-gradient(180deg, rgba(255,255,255,0.99), rgba(234,243,255,0.97));
 }
 
-:root[data-theme="light"] .theme-icon--moon {
+:root[data-theme="light"] .theme-mode-icon {
+  background: rgba(37, 99, 235, 0.12);
   color: #1d4ed8;
-  opacity: 1;
+}
+
+:root[data-theme="light"] .theme-switch {
+  background: rgba(148, 163, 184, 0.35);
+  border-color: rgba(148, 163, 184, 0.42);
+}
+
+:root[data-theme="light"] .theme-switch-thumb {
+  transform: translateX(16px);
 }
 
 .sticky-nav.scrolled .nav-container {
@@ -583,6 +621,15 @@ const FOOTER_TEMPLATE = `
       const isLight = theme === 'light';
       themeToggle.setAttribute('aria-pressed', String(isLight));
       themeToggle.title = isLight ? 'Switch to dark mode' : 'Switch to light mode';
+      themeToggle.classList.toggle('is-light', isLight);
+      const themeLabel = themeToggle.querySelector('.theme-toggle-label');
+      if (themeLabel) {
+        themeLabel.textContent = isLight ? 'Light' : 'Dark';
+      }
+      const themeIcon = themeToggle.querySelector('.theme-mode-icon i');
+      if (themeIcon) {
+        themeIcon.className = isLight ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+      }
     }
   }
 

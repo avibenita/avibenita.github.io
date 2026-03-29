@@ -59,6 +59,12 @@ const NAV_TEMPLATE = `
       </li>
     </ul>
 
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle color theme" aria-pressed="false" title="Toggle dark/light">
+      <i class="fa-solid fa-sun theme-icon theme-icon--sun" aria-hidden="true"></i>
+      <i class="fa-solid fa-moon theme-icon theme-icon--moon" aria-hidden="true"></i>
+      <span class="theme-toggle-label">Theme</span>
+    </button>
+
     <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle mobile menu">
       <i class="fa-solid fa-bars"></i>
     </button>
@@ -67,6 +73,32 @@ const NAV_TEMPLATE = `
 `;
 
 const NAV_STYLE = `
+:root {
+  --site-surface-0: #0c1624;
+  --site-surface-1: #1a1f2e;
+  --site-surface-2: #242938;
+  --site-border: #2d3748;
+  --site-text-primary: #ffffff;
+  --site-text-secondary: rgba(255,255,255,0.82);
+  --site-text-muted: rgba(255,255,255,0.62);
+  --site-shadow-xl: 0px 8px 28px rgba(0, 0, 0, 0.34);
+  --site-bg-glow-warm: rgba(255,165,120,.15);
+  --site-bg-glow-cool: rgba(120,200,255,.12);
+}
+
+:root[data-theme="light"] {
+  --site-surface-0: #f3f7fc;
+  --site-surface-1: #ffffff;
+  --site-surface-2: #eaf1fb;
+  --site-border: rgba(15, 23, 42, 0.14);
+  --site-text-primary: #0f172a;
+  --site-text-secondary: rgba(15, 23, 42, 0.82);
+  --site-text-muted: rgba(15, 23, 42, 0.6);
+  --site-shadow-xl: 0px 10px 26px rgba(15, 23, 42, 0.1);
+  --site-bg-glow-warm: rgba(255,165,120,.12);
+  --site-bg-glow-cool: rgba(120,200,255,.1);
+}
+
 .sticky-nav,
 .sticky-nav * {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
@@ -88,6 +120,12 @@ const NAV_STYLE = `
 
 .sticky-nav.scrolled {
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+}
+
+:root[data-theme="light"] .sticky-nav {
+  background: linear-gradient(90deg, #f8fbff 0%, #f0f6ff 58%, #e9f2ff 100%);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
 }
 
 .nav-container {
@@ -215,6 +253,55 @@ const NAV_STYLE = `
   opacity: 0;
 }
 
+:root[data-theme="light"] .nav-logo {
+  background: linear-gradient(45deg, #b45309, #1d4ed8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+:root[data-theme="light"] .nav-link {
+  color: rgba(15, 23, 42, 0.9);
+}
+
+:root[data-theme="light"] .nav-link::before {
+  background: rgba(15, 23, 42, 0.06);
+}
+
+:root[data-theme="light"] .nav-link:hover {
+  color: #0f172a;
+}
+
+:root[data-theme="light"] .nav-link--product {
+  border-color: rgba(180, 83, 9, 0.18);
+  background: rgba(180, 83, 9, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(180, 83, 9, 0.05);
+}
+
+:root[data-theme="light"] .nav-link--product-lite {
+  background: rgba(180, 83, 9, 0.05);
+  color: rgba(30, 41, 59, 0.92);
+}
+
+:root[data-theme="light"] .nav-link--product-core {
+  background: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.26);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
+  color: rgba(30, 58, 138, 0.95);
+}
+
+:root[data-theme="light"] .nav-link-tag {
+  border-color: rgba(180, 83, 9, 0.3);
+  background: rgba(180, 83, 9, 0.1);
+  color: rgba(146, 64, 14, 0.96);
+}
+
+:root[data-theme="light"] .nav-link.active {
+  background: linear-gradient(180deg, rgba(37,99,235,0.95) 0%, rgba(29,78,216,0.9) 100%);
+  border-color: rgba(30,64,175,0.32);
+  box-shadow: 0 4px 12px rgba(37,99,235,0.24);
+}
+
 .nav-link--product {
   border: 1px solid rgba(255,165,120,0.2);
   background: rgba(255,165,120,0.06);
@@ -266,6 +353,56 @@ const NAV_STYLE = `
   color: #ffffff;
 }
 
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.9);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.theme-toggle:hover {
+  background: rgba(255,255,255,0.1);
+  transform: translateY(-1px);
+}
+
+.theme-icon {
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.theme-toggle-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.theme-icon--sun { color: #ffd089; }
+.theme-icon--moon { color: #93c5fd; opacity: 0.72; }
+
+:root[data-theme="light"] .theme-toggle {
+  border-color: rgba(15, 23, 42, 0.14);
+  background: rgba(15, 23, 42, 0.04);
+  color: rgba(15, 23, 42, 0.88);
+}
+
+:root[data-theme="light"] .theme-icon--sun {
+  color: #d97706;
+  opacity: 0.66;
+}
+
+:root[data-theme="light"] .theme-icon--moon {
+  color: #1d4ed8;
+  opacity: 1;
+}
+
 .sticky-nav.scrolled .nav-container {
   min-height: 68px;
   padding-top: 6px;
@@ -303,6 +440,10 @@ body {
 }
 
 @media (max-width: 768px) {
+  .theme-toggle {
+    display: none;
+  }
+
   .mobile-toggle {
     display: block;
   }
@@ -416,6 +557,48 @@ const FOOTER_TEMPLATE = `
 (function() {
   'use strict';
 
+  const THEME_STORAGE_KEY = 'statistico-theme';
+
+  function getStoredTheme() {
+    try {
+      const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+      if (savedTheme === 'light' || savedTheme === 'dark') {
+        return savedTheme;
+      }
+    } catch (error) {
+      // Ignore storage errors and fall back to default theme.
+    }
+    return 'dark';
+  }
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch (error) {
+      // Ignore storage errors.
+    }
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+      const isLight = theme === 'light';
+      themeToggle.setAttribute('aria-pressed', String(isLight));
+      themeToggle.title = isLight ? 'Switch to dark mode' : 'Switch to light mode';
+    }
+  }
+
+  function initializeThemeToggle() {
+    const themeToggle = document.getElementById('themeToggle');
+    if (!themeToggle) return;
+    applyTheme(document.documentElement.getAttribute('data-theme') || getStoredTheme());
+    themeToggle.addEventListener('click', function() {
+      const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+      const nextTheme = currentTheme === 'light' ? 'dark' : 'light';
+      applyTheme(nextTheme);
+    });
+  }
+
+  applyTheme(getStoredTheme());
+
   // Inject shared header styles so all pages use the same header.
   if (!document.getElementById('statistico-shared-nav-style')) {
     const styleEl = document.createElement('style');
@@ -429,6 +612,7 @@ const FOOTER_TEMPLATE = `
   if (navPlaceholder) {
     navPlaceholder.innerHTML = NAV_TEMPLATE;
     initializeNavigation();
+    initializeThemeToggle();
   }
 
   // Insert footer

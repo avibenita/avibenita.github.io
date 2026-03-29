@@ -610,105 +610,85 @@
 
     const isHubEmbed = new URLSearchParams(window.location.search).get('embed') === '1';
 
-    // Office.js initialization
-    Office.initialize = function (reason) {
-      console.log('? Office.js initialized:', reason);
-      
-      // Listen for messages from parent (fails in plain browser / non-dialog iframe — do not block fallbacks)
-      try {
-        if (Office.context && Office.context.ui) {
-          Office.context.ui.addHandlerAsync(
-            Office.EventType.DialogParentMessageReceived,
-            onMessageReceived
-          );
-        }
-      } catch (e) {
-        console.warn('Dialog message handler not available (browser/iframe):', e);
-      }
-      
-      // Send ready message to parent
-      setTimeout(() => {
-        sendMessageToParent({ status: 'ready' });
-      }, 500);
-      
-      // Check localStorage for data
-      setTimeout(() => {
-        if (!histogramChart) {
-          console.log('?? Checking localStorage for univariateResults...');
-          const storedResults = localStorage.getItem('univariateResults');
-          if (storedResults) {
-            try {
-              const parsedData = JSON.parse(storedResults);
-              console.log('? Found data in localStorage');
-              console.log('?? HISTOGRAM - Column from localStorage:', parsedData.column);
-              console.log('?? HISTOGRAM - Trim:', parsedData.trim, 'Transform:', parsedData.transform);
-              handleDataReceived(parsedData);
-              return;
-            } catch (e) {
-              console.error('? Error parsing localStorage data:', e);
-            }
-          } else {
-            console.log('?? No localStorage data found');
+    console.log('MODE:', { isHubEmbed: isHubEmbed, hasOffice: typeof Office !== 'undefined' });
+
+    // Hub / site iframe (?embed=1): web-first — no Office dialog messaging (avoids racing Office.initialize vs browser fallbacks)
+    if (isHubEmbed) {
+      Office.initialize = function () {
+        console.log('Office.initialize (no-op: hub embed mode)');
+      };
+    } else {
+      Office.initialize = function (reason) {
+        console.log('? Office.js initialized:', reason);
+
+        try {
+          if (Office.context && Office.context.ui) {
+            Office.context.ui.addHandlerAsync(
+              Office.EventType.DialogParentMessageReceived,
+              onMessageReceived
+            );
           }
+        } catch (e) {
+          console.warn('Dialog message handler not available (browser/iframe):', e);
         }
-      }, 1000);
-      
-      // Fallback to sample data
-      setTimeout(() => {
-        if (!histogramChart) {
-          console.log('? No data received from parent or localStorage, loading sample data...');
-          loadSampleData();
-        }
-      }, 5000);
-    };
-    
-    // Fallback: If Office.js doesn't load (browser testing), load sample data anyway
-    window.addEventListener('DOMContentLoaded', function() {
+
+        setTimeout(function () {
+          sendMessageToParent({ status: 'ready' });
+        }, 500);
+
+        setTimeout(function () {
+          if (!histogramChart) {
+            console.log('?? Checking localStorage for univariateResults...');
+            const storedResults = localStorage.getItem('univariateResults');
+            if (storedResults) {
+              try {
+                const parsedData = JSON.parse(storedResults);
+                console.log('? Found data in localStorage');
+                handleDataReceived(parsedData);
+                return;
+              } catch (e) {
+                console.error('? Error parsing localStorage data:', e);
+              }
+            } else {
+              console.log('?? No localStorage data found');
+            }
+          }
+        }, 1000);
+      };
+    }
+
+    window.addEventListener('DOMContentLoaded', function () {
       console.log('?? DOM Content Loaded');
-      
-      // Initialize shared header
+
       StatisticoHeader.init('histogram', 'Variable', 0);
-      if (typeof StatisticoHeader !== 'undefined') { StatisticoHeader.initSidebarPage(); StatisticoHeader.updateTitle('Interactive Histogram'); };
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.initSidebarPage();
+        StatisticoHeader.updateTitle('Interactive Histogram');
+      }
       console.log('? Shared header initialized');
+
       if (isHubEmbed) {
         document.documentElement.setAttribute('data-hub-embed', '1');
-        setTimeout(function hubEmbedKick() {
-          var resultsContainer = document.getElementById('results-container');
-          if (resultsContainer && !resultsContainer.classList.contains('show')) {
-            console.log('?? Hub embed (?embed=1): loading sample data early');
-            loadSampleData();
-          }
-        }, 30);
+        console.log('HUB EMBED MODE — single init path (sample data)');
+        loadSampleData();
+        setTimeout(fitLayout, 150);
+        return;
       }
-      setTimeout(fitLayout, 150); // initial size pass after header renders
-      
-      // Try immediately
-      setTimeout(() => {
-        console.log('? Checking Office.js availability...');
-        console.log('typeof Office:', typeof Office);
-        
-        // Check if Office.js loaded
+
+      setTimeout(fitLayout, 150);
+
+      setTimeout(function () {
+        console.log('? Checking Office.js availability...', typeof Office);
         if (typeof Office === 'undefined' || !Office.context) {
           console.log('?? Office.js not available - loading sample data for browser testing');
           loadSampleData();
-        } else {
-          console.log('? Office.js is available');
-          // Embedded in a normal page iframe: Office may exist but dialog/message APIs never populate data.
-          setTimeout(function ensureBrowserPreview() {
-            var el = document.getElementById('results-container');
-            if (el && !el.classList.contains('show')) {
-              console.log('?? Office present but no results — loading sample data for iframe preview');
-              loadSampleData();
-            }
-          }, 400);
         }
       }, 100);
-      
-      // Backup fallback - just load data after 1 second regardless
-      setTimeout(() => {
+
+      setTimeout(function () {
         const resultsContainer = document.getElementById('results-container');
-        if (!resultsContainer.classList.contains('show')) {
-          console.log('?? Force loading sample data (backup)');
+        if (resultsContainer && !resultsContainer.classList.contains('show')) {
+          console.log('?? Browser fallback: load sample if still no results');
           loadSampleData();
         }
       }, 1000);

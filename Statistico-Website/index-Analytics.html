@@ -902,7 +902,12 @@
       <div class="content-panel demo-panel">
         <div class="demo-panel-header">
           <h3 id="activeDemoTitle"><i class="fas fa-chart-pie"></i> Univariate Demo</h3>
-          <span class="demo-family-pill" id="activeDemoFamily">Explore Data</span>
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <span class="demo-family-pill" id="activeDemoFamily">Explore Data</span>
+            <a id="openRealModuleLink" class="family-chip" href="#" target="_blank" rel="noopener noreferrer" style="font-size:.72rem; padding:5px 10px;">
+              <i class="fa-solid fa-arrow-up-right-from-square" style="margin-right:6px;"></i>Open Real Module
+            </a>
+          </div>
         </div>
         <p id="activeDemoDescription">Interactive histogram and distribution controls with live recalculation.</p>
         <div class="demo-host" id="demoHost">
@@ -929,7 +934,8 @@
           title: 'Univariate Demo',
           description: 'Real Univariate taskpane module from the remote analytics repository.',
           family: 'Explore Data',
-          url: 'https://statistico.live/statistico-analytics/taskpane/univariate/univariate.html'
+          url: 'https://statistico.live/statistico-analytics/taskpane/univariate/univariate.html',
+          fallbackUrl: 'https://statistico.live/statistico-analytics/dialogs/views/univariate/histogram-standalone.html'
         },
         correlations: {
           title: 'Correlation Demo',
@@ -966,6 +972,8 @@
       const descEl = document.getElementById('activeDemoDescription');
       const familyEl = document.getElementById('activeDemoFamily');
       const demoSection = document.getElementById('module-demo-section');
+      const openRealModuleLink = document.getElementById('openRealModuleLink');
+      let frameFailoverTimer = null;
 
       function setActiveChip(moduleKey) {
         chips.forEach((chip) => {
@@ -973,19 +981,41 @@
         });
       }
 
+      function clearFrameFailoverTimer() {
+        if (frameFailoverTimer) {
+          clearTimeout(frameFailoverTimer);
+          frameFailoverTimer = null;
+        }
+      }
+
       function openDemo(moduleKey) {
         const entry = DEMO_MAP[moduleKey];
         if (!entry) return;
 
+        clearFrameFailoverTimer();
         titleEl.innerHTML = '<i class="fa-solid fa-chart-column"></i> ' + entry.title;
         descEl.textContent = entry.description;
         familyEl.textContent = entry.family || 'Analytics';
         setActiveChip(moduleKey);
+        if (openRealModuleLink) {
+          openRealModuleLink.href = entry.url || '#';
+          openRealModuleLink.style.display = entry.url ? 'inline-flex' : 'none';
+        }
 
         if (entry.url) {
           coming.hidden = true;
           frame.hidden = false;
+          frame.removeAttribute('src');
           frame.src = entry.url;
+
+          if (entry.fallbackUrl) {
+            frameFailoverTimer = setTimeout(function () {
+              if (!frame.hidden) {
+                frame.src = entry.fallbackUrl;
+                descEl.textContent = entry.description + ' (Taskpane route did not stabilize in iframe, showing module standalone view.)';
+              }
+            }, 4200);
+          }
         } else {
           frame.hidden = true;
           frame.src = '';
@@ -1003,6 +1033,19 @@
         chip.addEventListener('click', function () {
           openDemo(chip.dataset.module);
         });
+      });
+
+      frame.addEventListener('load', function () {
+        clearFrameFailoverTimer();
+      });
+
+      frame.addEventListener('error', function () {
+        clearFrameFailoverTimer();
+        coming.hidden = false;
+        frame.hidden = true;
+        frame.src = '';
+        comingTitle.textContent = 'Module preview unavailable';
+        comingText.textContent = 'This module cannot be embedded in the current context. Use "Open Real Module" to launch it directly.';
       });
 
       openDemo('univariate');

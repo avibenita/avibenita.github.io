@@ -1003,15 +1003,87 @@
       const demoSection = document.getElementById('module-demo-section');
       const openRealModuleLink = document.getElementById('openRealModuleLink');
 
+      let currentModuleKey = null;
+      let blankCheckTimer = null;
+
+      /** Preview URLs ask modules for web-embed mode (?embed=1). "Open Real Module" keeps the clean URL. */
+      function previewUrl(base) {
+        if (!base) return '';
+        try {
+          const u = new URL(base, window.location.href);
+          u.searchParams.set('embed', '1');
+          return u.href;
+        } catch (e) {
+          return base.indexOf('?') >= 0 ? base + '&embed=1' : base + '?embed=1';
+        }
+      }
+
       function setActiveChip(moduleKey) {
         chips.forEach((chip) => {
           chip.classList.toggle('is-active', chip.dataset.module === moduleKey);
         });
       }
 
+      function showFallback(title, text) {
+        frame.hidden = true;
+        coming.hidden = false;
+        comingTitle.textContent = title;
+        comingText.textContent = text;
+      }
+
+      function inspectFrameState(stage) {
+        try {
+          const doc = frame.contentDocument || frame.contentWindow.document;
+          const href = frame.contentWindow.location.href;
+          const title = doc.title || '(no title)';
+          const bodyText = (doc.body && doc.body.innerText ? doc.body.innerText : '').trim();
+          const bodyHtmlLength = doc.body && doc.body.innerHTML ? doc.body.innerHTML.length : 0;
+
+          console.log('[iframe]', stage, currentModuleKey, {
+            href: href,
+            title: title,
+            bodyTextLength: bodyText.length,
+            bodyHtmlLength: bodyHtmlLength
+          });
+
+          if (bodyHtmlLength < 50) {
+            showFallback(
+              'Module preview became blank',
+              'The iframe loaded but the inner document became nearly empty. Current URL: ' + href
+            );
+          }
+        } catch (err) {
+          console.error('[iframe] inspect failed:', err);
+          showFallback(
+            'Module preview unavailable',
+            'The iframe loaded, but its document could not be inspected. This usually means redirect, frame-policy behavior, or startup code inside the embedded page.'
+          );
+        }
+      }
+
+      frame.addEventListener('load', function () {
+        console.log('[iframe] load fired for:', currentModuleKey, frame.src);
+        /* removeAttribute('src') causes a transitional about:blank load — do not treat as module failure */
+        try {
+          if (frame.contentWindow.location.href === 'about:blank') {
+            console.log('[iframe] ignoring about:blank transition');
+            return;
+          }
+        } catch (err) {
+          /* cross-origin: cannot read href; proceed with inspection attempt */
+        }
+        clearTimeout(blankCheckTimer);
+        inspectFrameState('immediate');
+        blankCheckTimer = setTimeout(function () {
+          inspectFrameState('after 700ms');
+        }, 700);
+      });
+
       function openDemo(moduleKey) {
         const entry = DEMO_MAP[moduleKey];
         if (!entry) return;
+
+        currentModuleKey = moduleKey;
 
         titleEl.innerHTML = '<i class="fa-solid fa-chart-column"></i> ' + entry.title;
         descEl.textContent = entry.description;
@@ -1022,16 +1094,18 @@
           openRealModuleLink.style.display = entry.url ? 'inline-flex' : 'none';
         }
 
+        clearTimeout(blankCheckTimer);
+
         if (entry.url) {
           coming.hidden = true;
           frame.hidden = false;
-          frame.src = entry.url;
+          frame.removeAttribute('src');
+          requestAnimationFrame(function () {
+            frame.src = previewUrl(entry.url);
+          });
         } else {
-          frame.hidden = true;
-          frame.src = '';
-          coming.hidden = false;
-          comingTitle.textContent = entry.title;
-          comingText.textContent = entry.description + ' Use the full module in taskpane for now.';
+          frame.removeAttribute('src');
+          showFallback(entry.title, entry.description + ' Use the full module in taskpane for now.');
         }
 
         const offset = 92;
@@ -1043,12 +1117,6 @@
         chip.addEventListener('click', function () {
           openDemo(chip.dataset.module);
         });
-      });
-
-      frame.addEventListener('error', function () {
-        coming.hidden = false;
-        comingTitle.textContent = 'Module preview unavailable';
-        comingText.textContent = 'This module cannot be embedded in the current context. Use "Open Real Module" to launch it directly.';
       });
 
       openDemo('univariate');

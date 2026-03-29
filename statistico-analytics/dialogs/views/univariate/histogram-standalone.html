@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -72,7 +72,8 @@
       margin: 0;
       color: var(--text-primary);
       overflow: hidden;
-      min-height: 100vh;
+      /* Use % height chain so layout works inside site iframes (100vh can match outer window). */
+      min-height: 100%;
       display: flex;
       flex-direction: column;
     }
@@ -611,11 +612,17 @@
     Office.initialize = function (reason) {
       console.log('? Office.js initialized:', reason);
       
-      // Listen for messages from parent
-      Office.context.ui.addHandlerAsync(
-        Office.EventType.DialogParentMessageReceived,
-        onMessageReceived
-      );
+      // Listen for messages from parent (fails in plain browser / non-dialog iframe — do not block fallbacks)
+      try {
+        if (Office.context && Office.context.ui) {
+          Office.context.ui.addHandlerAsync(
+            Office.EventType.DialogParentMessageReceived,
+            onMessageReceived
+          );
+        }
+      } catch (e) {
+        console.warn('Dialog message handler not available (browser/iframe):', e);
+      }
       
       // Send ready message to parent
       setTimeout(() => {
@@ -674,6 +681,14 @@
           loadSampleData();
         } else {
           console.log('? Office.js is available');
+          // Embedded in a normal page iframe: Office may exist but dialog/message APIs never populate data.
+          setTimeout(function ensureBrowserPreview() {
+            var el = document.getElementById('results-container');
+            if (el && !el.classList.contains('show')) {
+              console.log('?? Office present but no results — loading sample data for iframe preview');
+              loadSampleData();
+            }
+          }, 400);
         }
       }, 100);
       

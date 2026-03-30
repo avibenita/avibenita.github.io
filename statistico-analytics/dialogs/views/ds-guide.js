@@ -71,17 +71,33 @@
     },
 
     anova: {
-      badge: 'Wide format — one outcome + category columns',
-      rule:  'One outcome column. One or more grouping (category) columns.',
+      badge: 'Wide format — outcome + grouping columns',
+      rule:  'One numeric outcome column. Two category (grouping) columns for two-way design.',
+      note:  'Unlike SPSS long format, each row is one observation — outcome and its group labels in the same row.',
       cols: [
-        { label: 'Salary',   role: 'outcome', roleLabel: 'Outcome'  },
-        { label: 'Role',     role: 'cat',     roleLabel: 'Category' },
-        { label: 'Region',   role: 'cat',     roleLabel: 'Category' }
+        { label: 'Salary',  role: 'outcome', roleLabel: 'Outcome'  },
+        { label: 'Role',    role: 'cat',     roleLabel: 'Factor A' },
+        { label: 'Region',  role: 'cat',     roleLabel: 'Factor B' }
       ],
       rows: [
         ['5 200', 'Analyst', 'US'],
         ['6 100', 'Manager', 'EU'],
         ['5 800', 'Analyst', 'EU']
+      ]
+    },
+
+    'anova-oneway': {
+      badge: 'Wide format — outcome + one grouping column',
+      rule:  'One numeric outcome column. One category (grouping) column for one-way design.',
+      note:  'Unlike SPSS long format, each row is one observation — outcome and its group label in the same row.',
+      cols: [
+        { label: 'Salary', role: 'outcome', roleLabel: 'Outcome'  },
+        { label: 'Role',   role: 'cat',     roleLabel: 'Factor A' }
+      ],
+      rows: [
+        ['5 200', 'Analyst'],
+        ['6 100', 'Manager'],
+        ['5 800', 'Analyst']
       ]
     },
 
@@ -214,5 +230,14 @@
     render(compareMode === 'two-vars' ? 'dependent' : 'dependent-kplus', target);
   }
 
-  global.DsGuide = { render: render, renderIndependent: renderIndependent, renderDependent: renderDependent, CONFIGS: CONFIGS };
+  /**
+   * Convenience: re-render for ANOVA type switches.
+   * @param {'one-way'|'two-way'} anovaType
+   * @param {string|HTMLElement}  target
+   */
+  function renderAnova(anovaType, target) {
+    render(anovaType === 'two-way' ? 'anova' : 'anova-oneway', target);
+  }
+
+  global.DsGuide = { render: render, renderIndependent: renderIndependent, renderDependent: renderDependent, renderAnova: renderAnova, CONFIGS: CONFIGS };
 })(typeof window !== 'undefined' ? window : this);

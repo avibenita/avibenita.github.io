@@ -72,12 +72,12 @@
 
     anova: {
       badge: 'Wide format — outcome + grouping columns',
-      rule:  'One numeric outcome column. Two category (grouping) columns for two-way design.',
-      note:  'Unlike SPSS long format, each row is one observation — outcome and its group labels in the same row.',
+      rule:  'One numeric outcome column. Two grouping columns, each containing category labels.',
+      note:  'This matches SPSS GLM format. R/Python typically use long (stacked) format instead.',
       cols: [
-        { label: 'Salary',  role: 'outcome', roleLabel: 'Outcome'  },
-        { label: 'Role',    role: 'cat',     roleLabel: 'Factor A' },
-        { label: 'Region',  role: 'cat',     roleLabel: 'Factor B' }
+        { label: 'Salary',  role: 'outcome', roleLabel: 'Outcome' },
+        { label: 'Role',    role: 'cat',     roleLabel: 'Group A' },
+        { label: 'Region',  role: 'cat',     roleLabel: 'Group B' }
       ],
       rows: [
         ['5 200', 'Analyst', 'US'],
@@ -88,11 +88,11 @@
 
     'anova-oneway': {
       badge: 'Wide format — outcome + one grouping column',
-      rule:  'One numeric outcome column. One category (grouping) column for one-way design.',
-      note:  'Unlike SPSS long format, each row is one observation — outcome and its group label in the same row.',
+      rule:  'One numeric outcome column. One grouping column containing category labels.',
+      note:  'This matches SPSS GLM format. R/Python typically use long (stacked) format instead.',
       cols: [
-        { label: 'Salary', role: 'outcome', roleLabel: 'Outcome'  },
-        { label: 'Role',   role: 'cat',     roleLabel: 'Factor A' }
+        { label: 'Salary', role: 'outcome', roleLabel: 'Outcome' },
+        { label: 'Role',   role: 'cat',     roleLabel: 'Group A' }
       ],
       rows: [
         ['5 200', 'Analyst'],

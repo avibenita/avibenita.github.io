@@ -103,11 +103,12 @@
 
     mixed: {
       badge: '⚠ Long format — one row per measurement',
-      rule:  'Multiple rows per subject. Outcome in a single column. Time = repeated index.',
+      rule:  'Multiple rows per subject. Each row = one occasion. Outcome, group, time, and subject ID all in separate columns.',
+      note:  'This matches SPSS Mixed Models format. Wide (one column per timepoint) is not supported here.',
       isLong: true,
       cols: [
         { label: 'id',    role: 'id',      roleLabel: 'Subject ID' },
-        { label: 'group', role: 'cat',     roleLabel: 'Category'   },
+        { label: 'group', role: 'cat',     roleLabel: 'Group'      },
         { label: 'time',  role: 'time',    roleLabel: 'Time'       },
         { label: 'score', role: 'outcome', roleLabel: 'Outcome'    }
       ],

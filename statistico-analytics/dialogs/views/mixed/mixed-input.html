@@ -225,6 +225,31 @@
     .zone-rnd  .mx-chip { background: rgba(74,222,128,.15);  border-color: rgba(74,222,128,.4);  color: var(--mx-rnd); }
     .zone-rep  .mx-chip { background: rgba(244,114,182,.15); border-color: rgba(244,114,182,.4); color: var(--mx-rep); }
 
+    /* Badge shown on fix chip when it also serves as the repeated-measure index */
+    .chip-rep-badge {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .03em;
+      padding: 1px 5px;
+      border-radius: 8px;
+      background: rgba(244,114,182,.25);
+      color: var(--mx-rep);
+      border: 1px solid rgba(244,114,182,.5);
+      vertical-align: middle;
+    }
+    /* Inline note under repeated zone when var is auto-added to fixed */
+    .rep-also-fixed-note {
+      font-size: 10px;
+      color: var(--mx-rep);
+      opacity: .85;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 6px 2px;
+      animation: fadeIn .25s ease;
+    }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:.85; } }
+
     .mx-chip-x {
       background: none;
       border: none;
@@ -708,6 +733,10 @@
           <div class="mx-zone-body" id="zoneRep" data-zone="rep" data-max="1">
             <div class="mx-zone-placeholder" id="phRep">Drag time / wave variable here (optional)</div>
           </div>
+          <div class="rep-also-fixed-note" id="repNote" style="display:none;">
+            <i class="fa-solid fa-link" style="font-size:9px;"></i>
+            Also added to <strong>Fixed Factors</strong> for inference &mdash; remove from Fixed to test correlation structure only.
+          </div>
         </div>
 
         <!-- Interaction builder (fixed effects) -->
@@ -927,7 +956,8 @@ var STATE = {
     rnd:  null,          // grouping factor name
     rep:  null,          // repeated measure name
     interactions: [],    // [{v1, v2}]
-    randomSlopes: []     // covariate names that also get random slopes
+    randomSlopes: [],    // covariate names that also get random slopes
+    repFixedAuto: false  // true when rep variable was auto-added to fix
   }
 };
 
@@ -1152,6 +1182,7 @@ function loadSavedModel(id) {
   refreshInteractionSelectors();
   updateEquation();
   refreshRunButton();
+  refreshRepNote();
   closeSavedList();
   showToast('Model "' + item.name + '" loaded.', 'success');
 }
@@ -1234,12 +1265,13 @@ function renderVarsList() {
 }
 
 function getUsedNames() {
-  var out = [];
-  if (STATE.assignments.dep)  out.push(STATE.assignments.dep);
-  if (STATE.assignments.rnd)  out.push(STATE.assignments.rnd);
-  if (STATE.assignments.rep)  out.push(STATE.assignments.rep);
-  STATE.assignments.fix.forEach(function(n){ out.push(n); });
-  STATE.assignments.cov.forEach(function(n){ out.push(n); });
+  var seen = {}, out = [];
+  function add(n) { if (n && !seen[n]) { seen[n] = true; out.push(n); } }
+  add(STATE.assignments.dep);
+  add(STATE.assignments.rnd);
+  add(STATE.assignments.rep);
+  STATE.assignments.fix.forEach(add);
+  STATE.assignments.cov.forEach(add);
   return out;
 }
 
@@ -1299,23 +1331,54 @@ function handleDrop(zone, name, isNumeric) {
     if (a.rnd) { returnToList(a.rnd); }
     a.rnd = name;
   } else if (zone === 'rep') {
-    if (a.rep) { returnToList(a.rep); }
+    // If replacing old rep, clean up its auto-fix link first
+    if (a.rep) {
+      var oldRep = a.rep;
+      if (a.repFixedAuto) {
+        a.fix = a.fix.filter(function(n){ return n !== oldRep; });
+        a.interactions = a.interactions.filter(function(i){ return i.v1 !== oldRep && i.v2 !== oldRep; });
+      }
+      a.rep = null;
+      a.repFixedAuto = false;
+    }
     a.rep = name;
+    // Auto-add to Fixed Factors so the repeated variable is also tested as a main effect
+    if (a.fix.indexOf(name) === -1) {
+      a.fix.push(name);
+      a.repFixedAuto = true;
+    } else {
+      a.repFixedAuto = false; // user already had it in Fixed manually
+    }
   }
 
   refreshAllZones();
   refreshInteractionSelectors();
   refreshRandomSlopeSection();
   refreshRunButton();
+  refreshRepNote();
   updateEquation();
 }
 
+function refreshRepNote() {
+  var note = qs('repNote');
+  if (!note) return;
+  note.style.display = STATE.assignments.repFixedAuto ? '' : 'none';
+}
+
 function returnToList(name) {
-  // Remove from all assignments
+  // Remove from all assignments (used when a var is fully unassigned or re-dragged)
   var a = STATE.assignments;
   if (a.dep === name) a.dep = null;
   if (a.rnd === name) a.rnd = null;
-  if (a.rep === name) a.rep = null;
+  if (a.rep === name) {
+    // Also clear repFixedAuto if removing the rep variable entirely
+    if (a.repFixedAuto) {
+      a.fix = a.fix.filter(function(n){ return n !== name; });
+      a.interactions = a.interactions.filter(function(i){ return i.v1 !== name && i.v2 !== name; });
+    }
+    a.rep = null;
+    a.repFixedAuto = false;
+  }
   a.fix = a.fix.filter(function(n){ return n !== name; });
   a.cov = a.cov.filter(function(n){ return n !== name; });
   // Remove interactions involving this var
@@ -1353,18 +1416,61 @@ function renderZone(zone, names, phEl) {
   names.forEach(function(name) {
     var chip = document.createElement('span');
     chip.className = 'mx-chip';
-    chip.innerHTML = escHtml(name) +
+
+    // Show [rep] badge on a fix chip that is also the repeated-measure index
+    var isRepInFix = (zone === 'fix' && name === STATE.assignments.rep);
+    var badge = isRepInFix
+      ? '<span class="chip-rep-badge" title="This variable is also used as the Repeated Measure index">rep</span>'
+      : '';
+
+    chip.innerHTML = escHtml(name) + badge +
       '<button class="mx-chip-x" data-zone="'+ zone +'" data-var="'+ escHtml(name) +'" title="Remove">&times;</button>';
+
     chip.querySelector('.mx-chip-x').addEventListener('click', function() {
-      returnToList(this.getAttribute('data-var'));
+      var varName = this.getAttribute('data-var');
+      var fromZone = this.getAttribute('data-zone');
+      if (fromZone === 'rep') {
+        removeFromRep(varName);
+      } else if (fromZone === 'fix' && varName === STATE.assignments.rep) {
+        removeRepFromFixOnly(varName);
+      } else {
+        returnToList(varName);
+      }
       refreshAllZones();
       refreshInteractionSelectors();
       refreshRandomSlopeSection();
       refreshRunButton();
+      refreshRepNote();
       updateEquation();
     });
     body.appendChild(chip);
   });
+}
+
+// Remove rep variable: if auto-fixed, also clean up from fix
+function removeFromRep(name) {
+  var a = STATE.assignments;
+  if (a.repFixedAuto) {
+    a.fix = a.fix.filter(function(n){ return n !== name; });
+    a.interactions = a.interactions.filter(function(i){ return i.v1 !== name && i.v2 !== name; });
+    a.randomSlopes = a.randomSlopes.filter(function(n){ return n !== name; });
+  }
+  a.rep = null;
+  a.repFixedAuto = false;
+  // If not left in any other zone, interactions/slopes cleanup already done above
+}
+
+// Keep in rep but remove from fix; user is opting out of testing the time effect
+function removeRepFromFixOnly(name) {
+  var a = STATE.assignments;
+  a.fix = a.fix.filter(function(n){ return n !== name; });
+  a.interactions = a.interactions.filter(function(i){ return i.v1 !== name && i.v2 !== name; });
+  a.repFixedAuto = false;
+  showToast(
+    '<strong>' + escHtml(name) + '</strong> removed from Fixed Factors. ' +
+    'It will model correlation structure only &mdash; its time effect will not be tested.',
+    'info', 5500
+  );
 }
 
 // ============================================================================
@@ -1676,6 +1782,7 @@ window.populateVariableSelectionTable = function(varStats) {
 
     refreshAllZones();
     refreshRunButton();
+    refreshRepNote();
     updateEquation();
 
     // Wire drop zones now that UI is visible

@@ -40,16 +40,33 @@
     },
 
     dependent: {
-      badge: 'Wide format — columns are measurements',
-      rule:  'Each row = the same subject. Columns = repeated time-points or conditions.',
+      badge: 'Wide format — each column is a timepoint',
+      rule:  'Each row = the same subject measured twice. Each column = one timepoint.',
+      note:  'Unlike SPSS, timepoints are NOT stacked in one column — each timepoint has its own column.',
       cols: [
-        { label: 'Before',  role: 'meas', roleLabel: 'Measurement' },
-        { label: 'After',   role: 'meas', roleLabel: 'Measurement' }
+        { label: 'Before', role: 'meas', roleLabel: 'Timepoint' },
+        { label: 'After',  role: 'meas', roleLabel: 'Timepoint' }
       ],
       rows: [
         ['120', '110'],
         ['135', '128'],
         ['140', '130']
+      ]
+    },
+
+    'dependent-kplus': {
+      badge: 'Wide format — each column is a timepoint',
+      rule:  'Each row = the same subject. Each column = one timepoint or condition.',
+      note:  'Unlike SPSS, timepoints are NOT stacked in one column — each timepoint has its own column.',
+      cols: [
+        { label: 'Time 1', role: 'meas', roleLabel: 'Timepoint' },
+        { label: 'Time 2', role: 'meas', roleLabel: 'Timepoint' },
+        { label: 'Time 3', role: 'meas', roleLabel: 'Timepoint' }
+      ],
+      rows: [
+        ['120', '115', '108'],
+        ['135', '129', '121'],
+        ['140', '133', '125']
       ]
     },
 
@@ -188,5 +205,14 @@
     render(compareMode === 'two-vars' ? 'independent-two' : 'independent', target);
   }
 
-  global.DsGuide = { render: render, renderIndependent: renderIndependent, CONFIGS: CONFIGS };
+  /**
+   * Convenience: re-render for repeated-measures mode switches.
+   * @param {'two-vars'|'k-plus'} compareMode
+   * @param {string|HTMLElement}  target
+   */
+  function renderDependent(compareMode, target) {
+    render(compareMode === 'two-vars' ? 'dependent' : 'dependent-kplus', target);
+  }
+
+  global.DsGuide = { render: render, renderIndependent: renderIndependent, renderDependent: renderDependent, CONFIGS: CONFIGS };
 })(typeof window !== 'undefined' ? window : this);

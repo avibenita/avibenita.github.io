@@ -10,6 +10,7 @@
     independent: {
       badge: 'Wide format — each column is a group',
       rule:  'Each column = one group. Rows are independent observations of the same outcome variable.',
+      note:  'Unlike SPSS, groups are NOT stacked in one column — each group has its own column.',
       cols: [
         { label: 'Engineers', role: 'group', roleLabel: 'Group' },
         { label: 'Sales',     role: 'group', roleLabel: 'Group' },
@@ -20,6 +21,21 @@
         ['5 200', '6 100', '5 800', '4 900'],
         ['5 800', '6 400', '5 950', '5 100'],
         ['6 100', '6 700', '6 200', '5 300']
+      ]
+    },
+
+    'independent-two': {
+      badge: 'Wide format — each column is a group',
+      rule:  'Each column = one group. Rows are independent observations of the same outcome variable.',
+      note:  'Unlike SPSS, groups are NOT stacked in one column — each group has its own column.',
+      cols: [
+        { label: 'Control', role: 'group', roleLabel: 'Group' },
+        { label: 'Treatment', role: 'group', roleLabel: 'Group' }
+      ],
+      rows: [
+        ['5 200', '6 100'],
+        ['5 800', '6 400'],
+        ['6 100', '6 700']
       ]
     },
 
@@ -98,6 +114,9 @@
     }).join('');
 
     var badgeCls = cfg.isLong ? 'ds-badge ds-badge--long' : 'ds-badge';
+    var noteHtml = cfg.note
+      ? '  <div class="ds-note"><i class="fa-solid fa-circle-info"></i> ' + cfg.note + '</div>'
+      : '';
 
     return [
       '<div class="ds-guide">',
@@ -111,6 +130,7 @@
       dataRows,
       '  </div>',
       '  <div class="ds-caption">' + cfg.rule + '</div>',
+      noteHtml,
       '</div>'
     ].join('\n');
   }
@@ -142,7 +162,7 @@
 
   /**
    * Render the guide into the given container element or ID.
-   * @param {'independent'|'dependent'|'anova'|'mixed'} type
+   * @param {'independent'|'independent-two'|'dependent'|'anova'|'mixed'} type
    * @param {string|HTMLElement} target  – element or element ID
    */
   function render(type, target) {
@@ -156,5 +176,14 @@
     wireHover(el);
   }
 
-  global.DsGuide = { render: render, CONFIGS: CONFIGS };
+  /**
+   * Convenience: re-render when the user switches between compare modes.
+   * @param {'two-vars'|'k-plus'} compareMode  – value of the dataMode radio
+   * @param {string|HTMLElement}  target
+   */
+  function renderIndependent(compareMode, target) {
+    render(compareMode === 'two-vars' ? 'independent-two' : 'independent', target);
+  }
+
+  global.DsGuide = { render: render, renderIndependent: renderIndependent, CONFIGS: CONFIGS };
 })(typeof window !== 'undefined' ? window : this);

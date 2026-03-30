@@ -1,5 +1,5 @@
-/**
- * ds-guide.js  –  Data Structure Guide panel
+﻿/**
+ * ds-guide.js  ג€“  Data Structure Guide panel
  * Renders a role-coloured mini-grid and one-line rule for each input module.
  * Usage: DsGuide.render('independent', 'dsGuideContainer');
  */
@@ -8,9 +8,9 @@
 
   var CONFIGS = {
     independent: {
-      badge: 'Wide format — each column is a group',
+      badge: 'Wide format ג€” each column is a group',
       rule:  'Each column = one group. Rows are independent observations of the same outcome variable.',
-      note:  'Unlike SPSS, groups are NOT stacked in one column — each group has its own column.',
+      note:  'Unlike SPSS, groups are NOT stacked in one column ג€” each group has its own column.',
       cols: [
         { label: 'Engineers', role: 'group', roleLabel: 'Group' },
         { label: 'Sales',     role: 'group', roleLabel: 'Group' },
@@ -25,9 +25,9 @@
     },
 
     'independent-two': {
-      badge: 'Wide format — each column is a group',
+      badge: 'Wide format ג€” each column is a group',
       rule:  'Each column = one group. Rows are independent observations of the same outcome variable.',
-      note:  'Unlike SPSS, groups are NOT stacked in one column — each group has its own column.',
+      note:  'Unlike SPSS, groups are NOT stacked in one column ג€” each group has its own column.',
       cols: [
         { label: 'Control', role: 'group', roleLabel: 'Group' },
         { label: 'Treatment', role: 'group', roleLabel: 'Group' }
@@ -40,9 +40,9 @@
     },
 
     dependent: {
-      badge: 'Wide format — each column is a timepoint',
+      badge: 'Wide format ג€” each column is a timepoint',
       rule:  'Each row = the same subject measured twice. Each column = one timepoint.',
-      note:  'Unlike SPSS, timepoints are NOT stacked in one column — each timepoint has its own column.',
+      note:  'Unlike SPSS, timepoints are NOT stacked in one column ג€” each timepoint has its own column.',
       cols: [
         { label: 'Before', role: 'meas', roleLabel: 'Timepoint' },
         { label: 'After',  role: 'meas', roleLabel: 'Timepoint' }
@@ -55,9 +55,9 @@
     },
 
     'dependent-kplus': {
-      badge: 'Wide format — each column is a timepoint',
+      badge: 'Wide format ג€” each column is a timepoint',
       rule:  'Each row = the same subject. Each column = one timepoint or condition.',
-      note:  'Unlike SPSS, timepoints are NOT stacked in one column — each timepoint has its own column.',
+      note:  'Unlike SPSS, timepoints are NOT stacked in one column ג€” each timepoint has its own column.',
       cols: [
         { label: 'Time 1', role: 'meas', roleLabel: 'Timepoint' },
         { label: 'Time 2', role: 'meas', roleLabel: 'Timepoint' },
@@ -71,7 +71,7 @@
     },
 
     anova: {
-      badge: 'Wide format — outcome + grouping columns',
+      badge: 'Wide format ג€” outcome + grouping columns',
       rule:  'One numeric outcome column. Two grouping columns, each containing category labels.',
       note:  'This matches SPSS GLM format. R/Python typically use long (stacked) format instead.',
       cols: [
@@ -87,7 +87,7 @@
     },
 
     'anova-oneway': {
-      badge: 'Wide format — outcome + one grouping column',
+      badge: 'Wide format ג€” outcome + one grouping column',
       rule:  'One numeric outcome column. One grouping column containing category labels.',
       note:  'This matches SPSS GLM format. R/Python typically use long (stacked) format instead.',
       cols: [
@@ -102,7 +102,7 @@
     },
 
     mixed: {
-      badge: '⚠ Long format — one row per measurement',
+      badge: 'ג  Long format ג€” one row per measurement',
       rule:  'Multiple rows per subject. Each row = one occasion. Outcome, group, time, and subject ID all in separate columns.',
       note:  'This matches SPSS Mixed Models format. Wide (one column per timepoint) is not supported here.',
       isLong: true,
@@ -154,26 +154,29 @@
 
     return [
       '<div class="ds-guide">',
-      '  <div class="ds-guide-head">',
-      '    <i class="fa-solid fa-triangle-exclamation ds-guide-warn" title="Important: read before selecting variables"></i>',
+      '  <button class="ds-toggle" type="button" aria-expanded="true" title="Toggle guide">',
+      '    <i class="fa-solid fa-triangle-exclamation ds-guide-warn"></i>',
       '    <span class="ds-guide-title">Data Structure Guide</span>',
       '    <span class="' + badgeCls + '">' + cfg.badge + '</span>',
-      '  </div>',
-      '  <div class="ds-grid-wrap">',
-      '    <div class="ds-grid">',
-      '      <div class="ds-row ds-header" style="grid-template-columns:' + gridCols + ';">' + headerCells + '</div>',
-      '      <div class="ds-row ds-colnames" style="grid-template-columns:' + gridCols + ';">' + colLabelCells + '</div>',
+      '    <i class="fa-solid fa-chevron-down ds-chevron"></i>',
+      '  </button>',
+      '  <div class="ds-body">',
+      '    <div class="ds-grid-wrap">',
+      '      <div class="ds-grid">',
+      '        <div class="ds-row ds-header" style="grid-template-columns:' + gridCols + ';">' + headerCells + '</div>',
+      '        <div class="ds-row ds-colnames" style="grid-template-columns:' + gridCols + ';">' + colLabelCells + '</div>',
       dataRows,
+      '      </div>',
       '    </div>',
-      '  </div>',
-      '  <div class="ds-caption">' + cfg.rule + '</div>',
+      '    <div class="ds-caption">' + cfg.rule + '</div>',
       noteHtml,
+      '  </div>',
       '</div>'
     ].join('\n');
   }
 
   /**
-   * Wire hover highlights — hovering a role header dims the others.
+   * Wire hover highlights ג€” hovering a role header dims the others.
    */
   function wireHover(container) {
     var cells = container.querySelectorAll('[data-role]');
@@ -200,9 +203,10 @@
   /**
    * Render the guide into the given container element or ID.
    * @param {'independent'|'independent-two'|'dependent'|'anova'|'mixed'} type
-   * @param {string|HTMLElement} target  – element or element ID
+   * @param {string|HTMLElement} target  ג€“ element or element ID
+   * @param {{ collapsed?: boolean }} [opts]
    */
-  function render(type, target) {
+  function render(type, target, opts) {
     var cfg = CONFIGS[type];
     if (!cfg) { console.warn('[DsGuide] unknown type:', type); return; }
 
@@ -210,16 +214,33 @@
     if (!el) { console.warn('[DsGuide] container not found:', target); return; }
 
     el.innerHTML = buildHtml(cfg);
+
+    var guide  = el.querySelector('.ds-guide');
+    var toggle = el.querySelector('.ds-toggle');
+    var body   = el.querySelector('.ds-body');
+
+    // Apply initial collapsed state
+    if (opts && opts.collapsed) {
+      guide.classList.add('ds-collapsed');
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+
+    // Wire toggle button
+    toggle.addEventListener('click', function () {
+      var isCollapsed = guide.classList.toggle('ds-collapsed');
+      toggle.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+    });
+
     wireHover(el);
   }
 
   /**
    * Convenience: re-render when the user switches between compare modes.
-   * @param {'two-vars'|'k-plus'} compareMode  – value of the dataMode radio
+   * @param {'two-vars'|'k-plus'} compareMode  ג€“ value of the dataMode radio
    * @param {string|HTMLElement}  target
    */
-  function renderIndependent(compareMode, target) {
-    render(compareMode === 'two-vars' ? 'independent-two' : 'independent', target);
+  function renderIndependent(compareMode, target, opts) {
+    render(compareMode === 'two-vars' ? 'independent-two' : 'independent', target, opts);
   }
 
   /**
@@ -227,8 +248,8 @@
    * @param {'two-vars'|'k-plus'} compareMode
    * @param {string|HTMLElement}  target
    */
-  function renderDependent(compareMode, target) {
-    render(compareMode === 'two-vars' ? 'dependent' : 'dependent-kplus', target);
+  function renderDependent(compareMode, target, opts) {
+    render(compareMode === 'two-vars' ? 'dependent' : 'dependent-kplus', target, opts);
   }
 
   /**
@@ -236,9 +257,10 @@
    * @param {'one-way'|'two-way'} anovaType
    * @param {string|HTMLElement}  target
    */
-  function renderAnova(anovaType, target) {
-    render(anovaType === 'two-way' ? 'anova' : 'anova-oneway', target);
+  function renderAnova(anovaType, target, opts) {
+    render(anovaType === 'two-way' ? 'anova' : 'anova-oneway', target, opts);
   }
 
   global.DsGuide = { render: render, renderIndependent: renderIndependent, renderDependent: renderDependent, renderAnova: renderAnova, CONFIGS: CONFIGS };
 })(typeof window !== 'undefined' ? window : this);
+

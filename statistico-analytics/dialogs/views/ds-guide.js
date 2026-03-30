@@ -8,17 +8,18 @@
 
   var CONFIGS = {
     independent: {
-      badge: 'Wide format — columns are groups',
-      rule:  'Each column = a category (group). Rows are independent observations.',
+      badge: 'Wide format — each column is a group',
+      rule:  'Each column = one group. Rows are independent observations of the same outcome variable.',
       cols: [
-        { label: 'Salary',   role: 'outcome',  roleLabel: 'Outcome'    },
-        { label: 'Group A',  role: 'cat',      roleLabel: 'Category'   },
-        { label: 'Group B',  role: 'cat',      roleLabel: 'Category'   }
+        { label: 'Engineers', role: 'group', roleLabel: 'Group' },
+        { label: 'Sales',     role: 'group', roleLabel: 'Group' },
+        { label: 'Marketing', role: 'group', roleLabel: 'Group' },
+        { label: 'Support',   role: 'group', roleLabel: 'Group' }
       ],
       rows: [
-        ['5 200', '5 200', '6 100'],
-        ['5 800', '5 800', '6 400'],
-        ['6 100', '5 950', '6 700']
+        ['5 200', '6 100', '5 800', '4 900'],
+        ['5 800', '6 400', '5 950', '5 100'],
+        ['6 100', '6 700', '6 200', '5 300']
       ]
     },
 

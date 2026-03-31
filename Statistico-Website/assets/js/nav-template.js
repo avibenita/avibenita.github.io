@@ -7,6 +7,7 @@ function getNavLinks() {
   return {
     home: '/index.html',
     why: '/Statistico-Website/why-another-package.html',
+    how: '/Statistico-Website/how-it-works.html',
     calculators: '/Statistico-Website/index-Calculators.html',
     analytics: '/Statistico-Website/index-Analytics.html',
     addins: '/Statistico-Website/index-Addins.html',
@@ -31,6 +32,11 @@ const NAV_TEMPLATE = `
       <li class="nav-item">
         <a href="javascript:void(0)" class="nav-link" data-page="why" id="link-why">
           Why Statistico?
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="javascript:void(0)" class="nav-link" data-page="how" id="link-how">
+          How It Works
         </a>
       </li>
       <li class="nav-item nav-item--product-start">
@@ -693,6 +699,7 @@ const FOOTER_TEMPLATE = `
     document.getElementById('nav-logo-link').href = links.home;
     document.getElementById('link-home').href = links.home;
     document.getElementById('link-why').href = links.why;
+    document.getElementById('link-how').href = links.how;
     document.getElementById('link-calculators').href = links.calculators;
     document.getElementById('link-analytics').href = links.analytics;
     document.getElementById('link-addins').href = links.addins;
@@ -763,6 +770,8 @@ const FOOTER_TEMPLATE = `
       activePage = 'home';
     } else if (currentFile === 'why-another-package.html') {
       activePage = 'why';
+    } else if (currentFile === 'how-it-works.html') {
+      activePage = 'how';
     } else if (currentFile === 'index-Calculators.html') {
       activePage = 'calculators';
     } else if (currentFile === 'index-Analytics.html') {

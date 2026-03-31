@@ -262,6 +262,130 @@
     }
     .mx-chip-x:hover { opacity: 1; }
 
+    /* -- Suggestion panel --------------------------------------- */
+    #suggestionPanel {
+      margin: 0 10px 6px;
+      border: 1px solid rgba(79,195,247,.4);
+      border-radius: 10px;
+      background: rgba(79,195,247,.07);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .sugg-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(79,195,247,.12);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--mx-fix);
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+    .sugg-head i { font-size: 12px; }
+    .sugg-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px 12px;
+    }
+    .sugg-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--cfg-text2);
+    }
+    .sugg-role {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 5px;
+      opacity: .85;
+    }
+    .sugg-role-outcome { background: rgba(249,115,22,.2); color: var(--mx-dep); border: 1px solid rgba(249,115,22,.4); }
+    .sugg-role-subject { background: rgba(74,222,128,.2);  color: var(--mx-rnd); border: 1px solid rgba(74,222,128,.4); }
+    .sugg-role-rep     { background: rgba(244,114,182,.2); color: var(--mx-rep); border: 1px solid rgba(244,114,182,.4); }
+    .sugg-role-fix     { background: rgba(79,195,247,.2);  color: var(--mx-fix); border: 1px solid rgba(79,195,247,.4); }
+    .sugg-role-cov     { background: rgba(167,139,250,.2); color: var(--mx-cov); border: 1px solid rgba(167,139,250,.4); }
+    .sugg-var {
+      font-weight: 600;
+      color: var(--cfg-text);
+    }
+    .sugg-actions {
+      display: flex;
+      gap: 8px;
+      padding: 6px 12px 10px;
+      align-items: center;
+    }
+    .sugg-accept {
+      padding: 5px 14px;
+      background: var(--mx-fix);
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .sugg-accept:hover { opacity: .88; }
+    .sugg-dismiss {
+      padding: 5px 10px;
+      background: none;
+      border: 1px solid var(--cfg-border);
+      border-radius: 7px;
+      font-size: 11px;
+      color: var(--cfg-text3);
+      cursor: pointer;
+    }
+    .sugg-dismiss:hover { color: var(--cfg-text); }
+
+    /* -- Variable role tags ------------------------------------- */
+    .var-role-tag {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 5px;
+      margin-left: auto;
+      flex-shrink: 0;
+      opacity: .8;
+    }
+    .var-role-tag-outcome { background: rgba(249,115,22,.15); color: var(--mx-dep); }
+    .var-role-tag-subject { background: rgba(74,222,128,.15);  color: var(--mx-rnd); }
+    .var-role-tag-rep     { background: rgba(244,114,182,.15); color: var(--mx-rep); }
+    .var-role-tag-fix     { background: rgba(79,195,247,.15);  color: var(--mx-fix); }
+    .var-role-tag-cov     { background: rgba(167,139,250,.15); color: var(--mx-cov); }
+
+    /* -- Model summary (structured, replaces plain equation) ---- */
+    .mx-model-summary {
+      font-size: 11px;
+      background: var(--cfg-surface2);
+      border: 1px solid var(--cfg-border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-family: 'Courier New', monospace;
+      flex-shrink: 0;
+    }
+    .mx-summary-line { display: flex; gap: 8px; align-items: baseline; }
+    .mx-summary-label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: var(--cfg-text3);
+      min-width: 54px;
+      font-family: var(--cfg-font);
+    }
+    .mx-summary-formula { color: var(--cfg-text); word-break: break-all; }
+    .mx-summary-line.warn .mx-summary-formula { color: #d97706; font-size: 10px; font-family: var(--cfg-font); font-style: italic; }
+
     /* -- Advanced collapsible wrapper ----------------------------- */
     .adv-toggle {
       width: 100%;
@@ -698,6 +822,21 @@
     <!-- Data Structure Guide -->
     <div id="dsGuideContainer" style="padding: 0 10px; flex-shrink: 0;"></div>
 
+    <!-- Auto-suggestion panel (shown after detectStructure runs) -->
+    <div id="suggestionPanel" style="display:none;">
+      <div class="sugg-head">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+        Detected structure &mdash; suggested assignments
+      </div>
+      <div class="sugg-list" id="suggList"></div>
+      <div class="sugg-actions">
+        <button class="sugg-accept" id="btnAcceptSugg">
+          <i class="fa-solid fa-check"></i> Accept all
+        </button>
+        <button class="sugg-dismiss" id="btnDismissSugg">Dismiss</button>
+      </div>
+    </div>
+
     <!-- Three-column layout -->
     <div class="mx-layout">
 
@@ -717,9 +856,24 @@
       <!-- -- CENTRE: model specification ----------------------- -->
       <div class="mx-model-col">
 
-        <!-- Model equation -->
-        <div class="mx-equation" id="modelEquation">
-          Y = (fixed effects) + (random effects) + &epsilon;
+        <!-- Structured model summary -->
+        <div class="mx-model-summary" id="modelSummary">
+          <div class="mx-summary-line">
+            <span class="mx-summary-label">Fixed</span>
+            <span class="mx-summary-formula" id="sumFixed">&hellip;</span>
+          </div>
+          <div class="mx-summary-line">
+            <span class="mx-summary-label">Random</span>
+            <span class="mx-summary-formula" id="sumRandom">&hellip;</span>
+          </div>
+          <div class="mx-summary-line" id="sumRepLine" style="display:none;">
+            <span class="mx-summary-label">Repeated</span>
+            <span class="mx-summary-formula" id="sumRepeated"></span>
+          </div>
+          <div class="mx-summary-line warn" id="sumWarnLine" style="display:none;">
+            <span class="mx-summary-label"></span>
+            <span class="mx-summary-formula" id="sumWarn"></span>
+          </div>
         </div>
 
         <!-- Zone 1: Dependent variable -->
@@ -1294,8 +1448,8 @@ function renderVarsList() {
   var box = qs('varsList');
   if (!box) return;
 
-  // Figure out which names are used
   var used = getUsedNames();
+  var roleLabels = { outcome: 'outcome', subject: 'subject', rep: 'repeated', fix: 'factor', cov: 'covariate' };
 
   if (STATE.variables.length === 0) {
     box.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;color:var(--cfg-text3);font-style:italic;">No data loaded.</div>';
@@ -1306,16 +1460,21 @@ function renderVarsList() {
   STATE.variables.forEach(function(v) {
     var isUsed = used.indexOf(v.name) !== -1;
     var isNum  = v.numeric > v.string;
+    var role   = _detectedRoles[v.name];
     var row = document.createElement('div');
     row.className = 'mx-var-row' + (isUsed ? ' used' : '');
     row.setAttribute('draggable', isUsed ? 'false' : 'true');
     row.setAttribute('data-var', v.name);
     row.setAttribute('data-numeric', isNum ? '1' : '0');
 
+    var tagHtml = role
+      ? '<span class="var-role-tag var-role-tag-' + role + '">' + roleLabels[role] + '</span>'
+      : '<span class="mx-var-meta">n=' + (v.validCount||0) + '</span>';
+
     row.innerHTML =
       '<div class="mx-var-icon '+ (isNum ? 'num' : 'str') +'">' + (isNum ? 'N' : 'S') + '</div>' +
       '<span class="mx-var-name" title="'+ escHtml(v.name) +'">'+ escHtml(v.name) +'</span>' +
-      '<span class="mx-var-meta">n='+ (v.validCount||0) +'</span>';
+      tagHtml;
 
     row.addEventListener('dragstart', onVarDragStart);
     box.appendChild(row);
@@ -1676,29 +1835,182 @@ qs('chkPairwise').addEventListener('change', function() {
 });
 
 // ============================================================================
-// MODEL EQUATION
+// MODEL SUMMARY
 // ============================================================================
 function updateEquation() {
-  var a = STATE.assignments;
-  var dep  = a.dep || 'Y';
+  var a   = STATE.assignments;
+  var dep = a.dep || 'Y';
+
+  // Fixed line
   var fixTerms = [];
   a.fix.forEach(function(f){ fixTerms.push(escHtml(f)); });
   a.cov.forEach(function(c){ fixTerms.push(escHtml(c)); });
-  a.interactions.forEach(function(i){ fixTerms.push(escHtml(i.v1)+' &times; '+escHtml(i.v2)); });
+  a.interactions.forEach(function(i){ fixTerms.push(escHtml(i.v1) + ' &times; ' + escHtml(i.v2)); });
+  var fixStr = fixTerms.length ? escHtml(dep) + ' ~ ' + fixTerms.join(' + ') : escHtml(dep) + ' ~ &hellip;';
 
-  var rndTerms = [];
+  // Random line
+  var rndStr = '&hellip;';
   if (a.rnd) {
-    var slopes = a.randomSlopes.length > 0 ? a.randomSlopes.map(function(r){ return escHtml(r); }).join(' + ') : '1';
-    rndTerms.push('(' + slopes + ' | ' + escHtml(a.rnd) + ')');
+    var slopes = a.randomSlopes.length > 0
+      ? a.randomSlopes.map(function(r){ return escHtml(r); }).join(' + ')
+      : '1';
+    rndStr = '(' + slopes + ' | ' + escHtml(a.rnd) + ')';
   }
-  if (a.rep) { rndTerms.push('(' + escHtml(a.rep) + ')'); }
 
-  var parts = [];
-  if (fixTerms.length)  parts.push(fixTerms.join(' + '));
-  if (rndTerms.length)  parts.push(rndTerms.join(' + '));
+  // Repeated line
+  var repStr = a.rep && a.rnd ? escHtml(a.rep) + ' within ' + escHtml(a.rnd) : null;
 
-  var eq = escHtml(dep) + ' = ' + (parts.length ? parts.join(' + ') : '&hellip;') + ' + &epsilon;';
-  qs('modelEquation').innerHTML = eq;
+  // Warning: time in repeated but not in fixed
+  var warnStr = null;
+  if (a.rep && a.fix.indexOf(a.rep) === -1) {
+    warnStr = escHtml(a.rep) + ' models correlation only &mdash; its effect is not tested';
+  }
+
+  var sumFixed   = qs('sumFixed');
+  var sumRandom  = qs('sumRandom');
+  var sumRepLine = qs('sumRepLine');
+  var sumRepeated= qs('sumRepeated');
+  var sumWarnLine= qs('sumWarnLine');
+  var sumWarn    = qs('sumWarn');
+  if (sumFixed)   sumFixed.innerHTML   = fixStr;
+  if (sumRandom)  sumRandom.innerHTML  = rndStr;
+  if (sumRepLine) sumRepLine.style.display = repStr ? '' : 'none';
+  if (sumRepeated && repStr) sumRepeated.innerHTML = repStr;
+  if (sumWarnLine) sumWarnLine.style.display = warnStr ? '' : 'none';
+  if (sumWarn && warnStr)    sumWarn.innerHTML    = warnStr;
+}
+
+// ============================================================================
+// AUTO-DETECTION ENGINE
+// ============================================================================
+var _detectedRoles = {};   // { varName: 'outcome'|'subject'|'rep'|'fix'|'cov' }
+var _lastSuggestions = null;
+
+function detectStructure(variables) {
+  if (!variables || variables.length === 0) return null;
+  _detectedRoles = {};
+
+  var scored = variables.map(function(v) {
+    var isNum      = v.numeric > v.string;
+    var n          = Math.max(v.validCount || 1, 1);
+    var cats       = v.categories || [];
+    var nUniq      = cats.length || n;
+    var uRatio     = nUniq / n;
+    var nm         = v.name.toLowerCase();
+    var isSmallInt = isNum && nUniq <= 10 && cats.every(function(c) {
+      var f = parseFloat(c);
+      return !isNaN(f) && f === Math.round(f) && f >= 0;
+    });
+    return {
+      v: v, isNum: isNum, n: n, nUniq: nUniq, uRatio: uRatio,
+      isSmallInt: isSmallInt,
+      nameIsId:   /\bid\b|subject|participant|patient|cluster|school|person/i.test(nm),
+      nameIsTime: /\btime\b|wave|period|occasion|visit|week|month|day|year|session/i.test(nm),
+      nameIsOut:  /\bscore\b|outcome|result|response|\by\b|measure|rating|value/i.test(nm)
+    };
+  });
+
+  var sugg = { outcome: null, subject: null, rep: null, fix: [], cov: [] };
+
+  // 1. Subject: lowest unique ratio (most repetition), prefer name hint
+  var subCands = scored.filter(function(s){ return s.uRatio < 0.5 && s.nUniq > 1; })
+                       .sort(function(a,b){ return a.uRatio - b.uRatio; });
+  if (subCands.length) {
+    sugg.subject = (subCands.find(function(s){ return s.nameIsId; }) || subCands[0]).v.name;
+  }
+
+  // 2. Repeated: small integer range or name hint, not the subject
+  var repCands = scored.filter(function(s){
+    return s.v.name !== sugg.subject && (s.nameIsTime || (s.isSmallInt && s.nUniq <= 8));
+  });
+  if (repCands.length) {
+    sugg.rep = (repCands.find(function(s){ return s.nameIsTime; }) || repCands[0]).v.name;
+  }
+
+  // 3. Outcome: most continuous numeric, not subject/rep
+  var excl = [sugg.subject, sugg.rep].filter(Boolean);
+  var outCands = scored.filter(function(s){ return s.isNum && excl.indexOf(s.v.name) === -1; })
+                       .sort(function(a,b){ return b.uRatio - a.uRatio; });
+  if (outCands.length) {
+    sugg.outcome = (outCands.find(function(s){ return s.nameIsOut; }) || outCands[0]).v.name;
+  }
+
+  // 4. Remaining: categorical → fixed, continuous numeric → covariate
+  var used = [sugg.subject, sugg.rep, sugg.outcome].filter(Boolean);
+  scored.forEach(function(s) {
+    if (used.indexOf(s.v.name) !== -1) return;
+    if (!s.isNum || s.nUniq <= 6) sugg.fix.push(s.v.name);
+    else                           sugg.cov.push(s.v.name);
+  });
+
+  // Build role map
+  if (sugg.outcome) _detectedRoles[sugg.outcome] = 'outcome';
+  if (sugg.subject) _detectedRoles[sugg.subject] = 'subject';
+  if (sugg.rep)     _detectedRoles[sugg.rep]     = 'rep';
+  sugg.fix.forEach(function(n){ _detectedRoles[n] = 'fix'; });
+  sugg.cov.forEach(function(n){ _detectedRoles[n] = 'cov'; });
+
+  _lastSuggestions = sugg;
+  return sugg;
+}
+
+function showSuggestionPanel(sugg) {
+  var panel = qs('suggestionPanel');
+  var list  = qs('suggList');
+  if (!panel || !list || !sugg) return;
+
+  var roleLabels = {
+    outcome: 'Outcome',  subject: 'Subject',
+    rep:     'Repeated', fix:     'Fixed',  cov: 'Covariate'
+  };
+
+  var items = [];
+  if (sugg.outcome) items.push({ role: 'outcome', names: [sugg.outcome] });
+  if (sugg.subject) items.push({ role: 'subject', names: [sugg.subject] });
+  if (sugg.rep)     items.push({ role: 'rep',     names: [sugg.rep] });
+  if (sugg.fix.length) items.push({ role: 'fix',  names: sugg.fix });
+  if (sugg.cov.length) items.push({ role: 'cov',  names: sugg.cov });
+
+  list.innerHTML = items.map(function(item) {
+    return item.names.map(function(n) {
+      return '<div class="sugg-item">' +
+        '<span class="sugg-role sugg-role-' + item.role + '">' + roleLabels[item.role] + '</span>' +
+        '<span class="sugg-var">' + escHtml(n) + '</span>' +
+        '</div>';
+    }).join('');
+  }).join('');
+
+  panel.style.display = '';
+}
+
+function applyDetectedRoles(sugg) {
+  if (!sugg) return;
+  var a = STATE.assignments;
+  // Clear existing
+  a.dep = null; a.fix = []; a.cov = []; a.rnd = null; a.rep = null;
+  a.interactions = []; a.randomSlopes = []; a.repFixedAuto = false;
+
+  if (sugg.outcome) a.dep = sugg.outcome;
+  if (sugg.subject) a.rnd = sugg.subject;
+  sugg.fix.forEach(function(n){ a.fix.push(n); });
+  sugg.cov.forEach(function(n){ a.cov.push(n); });
+
+  // Apply rep last (triggers auto-fix logic)
+  if (sugg.rep) {
+    a.rep = sugg.rep;
+    if (a.fix.indexOf(sugg.rep) === -1) {
+      a.fix.push(sugg.rep);
+      a.repFixedAuto = true;
+    }
+  }
+
+  refreshAllZones();
+  refreshInteractionSelectors();
+  refreshRandomSlopeSection();
+  refreshRunButton();
+  refreshRepNote();
+  updateEquation();
+  qs('suggestionPanel').style.display = 'none';
 }
 
 // ============================================================================
@@ -1836,12 +2148,16 @@ window.populateVariableSelectionTable = function(varStats) {
     // Range badge
     var nVars = STATE.variables.length;
     var nObs  = STATE.variables.length > 0 ? (STATE.variables[0].validCount || 0) : 0;
-    qs('metaBadge').textContent = nVars + ' vars &middot; n = ' + nObs;
+    qs('metaBadge').textContent = nVars + ' vars \u00B7 n = ' + nObs;
 
     refreshAllZones();
     refreshRunButton();
     refreshRepNote();
     updateEquation();
+
+    // Auto-detect structure and show suggestion panel
+    var sugg = detectStructure(STATE.variables);
+    if (sugg) showSuggestionPanel(sugg);
 
     // Wire drop zones now that UI is visible
     document.querySelectorAll('.mx-zone-body').forEach(wireDropZone);
@@ -1942,6 +2258,12 @@ document.addEventListener('DOMContentLoaded', function() {
       advWrap.classList.toggle('open');
     });
   }
+
+  // Suggestion panel buttons
+  var btnAccept  = document.getElementById('btnAcceptSugg');
+  var btnDismiss = document.getElementById('btnDismissSugg');
+  if (btnAccept)  btnAccept.addEventListener('click',  function() { applyDetectedRoles(_lastSuggestions); });
+  if (btnDismiss) btnDismiss.addEventListener('click', function() { qs('suggestionPanel').style.display = 'none'; });
 });
 
 // ============================================================================

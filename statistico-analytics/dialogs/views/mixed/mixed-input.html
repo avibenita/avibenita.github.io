@@ -344,6 +344,157 @@
     }
     .sugg-dismiss:hover { color: var(--cfg-text); }
 
+    /* -- Variable-filter modal ------------------------------------------ */
+    .varfilter-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 9900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .varfilter-card {
+      background: var(--cfg-bg, #1e1e2e);
+      border: 1px solid var(--cfg-border);
+      border-radius: 14px;
+      width: 440px;
+      max-height: 82vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 16px 48px rgba(0,0,0,.55);
+      overflow: hidden;
+    }
+    .varfilter-head {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--cfg-border);
+    }
+    .varfilter-head-icon {
+      font-size: 18px;
+      color: #facc15;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .varfilter-head-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--cfg-text);
+      line-height: 1.3;
+    }
+    .varfilter-head-sub {
+      font-size: 11px;
+      color: var(--cfg-text2);
+      margin-top: 3px;
+      line-height: 1.4;
+    }
+    .varfilter-close {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: var(--cfg-text3);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+    .varfilter-close:hover { color: var(--cfg-text); }
+    .varfilter-list {
+      overflow-y: auto;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      flex: 1 1 0;
+    }
+    .varfilter-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background .12s;
+    }
+    .varfilter-item:hover { background: rgba(255,255,255,.06); }
+    .varfilter-item input[type=checkbox] {
+      width: 15px;
+      height: 15px;
+      accent-color: var(--mx-fix);
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+    .varfilter-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--cfg-text);
+      flex: 1;
+    }
+    .varfilter-badge {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 5px;
+    }
+    .varfilter-badge-assigned {
+      background: rgba(79,195,247,.18);
+      color: var(--mx-fix);
+      border: 1px solid rgba(79,195,247,.4);
+    }
+    .varfilter-badge-ambig {
+      background: rgba(250,204,21,.15);
+      color: #ca8a04;
+      border: 1px solid rgba(250,204,21,.4);
+    }
+    .varfilter-divider {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--cfg-text3);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      padding: 6px 4px 2px;
+    }
+    .varfilter-footer {
+      padding: 10px 16px 14px;
+      border-top: 1px solid var(--cfg-border);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .varfilter-btn-primary {
+      padding: 7px 16px;
+      background: var(--mx-fix);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .varfilter-btn-primary:hover { opacity: .88; }
+    .varfilter-btn-secondary {
+      padding: 7px 12px;
+      background: none;
+      border: 1px solid var(--cfg-border);
+      border-radius: 8px;
+      font-size: 11px;
+      color: var(--cfg-text3);
+      cursor: pointer;
+    }
+    .varfilter-btn-secondary:hover { color: var(--cfg-text); }
+    .varfilter-count {
+      margin-left: auto;
+      font-size: 10px;
+      color: var(--cfg-text3);
+    }
+
     /* -- Variable role tags ------------------------------------- */
     .var-role-tag {
       font-size: 9px;
@@ -2293,6 +2444,132 @@ qs('btnCancel').addEventListener('click', function() {
 qs('cfgThemeToggle').addEventListener('click', toggleTheme);
 
 // ============================================================================
+// VARIABLE FILTER MODAL
+// ============================================================================
+
+var _varFilterPendingSugg = null;   // suggestions pending user confirmation
+
+function showVarFilterModal(sugg, ambiguousNames) {
+  _varFilterPendingSugg = sugg;
+  var all = STATE.variables;
+
+  var roleLabels = {
+    outcome: 'Outcome', subject: 'Subject',
+    rep: 'Repeated', fix: 'Fixed', cov: 'Covariate'
+  };
+
+  var sub = qs('varFilterSub');
+  var list = qs('varFilterList');
+  var count = qs('varFilterCount');
+  if (!sub || !list) return;
+
+  sub.textContent = ambiguousNames.length + ' variable' +
+    (ambiguousNames.length !== 1 ? 's' : '') +
+    ' could not be clearly identified. Uncheck any that are not part of the analysis.';
+
+  // Separate assigned / ambiguous
+  var assigned = all.filter(function(v){ return !!_detectedRoles[v.name]; });
+  var ambig    = all.filter(function(v){ return !_detectedRoles[v.name]; });
+
+  var html = '';
+  if (assigned.length) {
+    html += '<div class="varfilter-divider">Identified (' + assigned.length + ')</div>';
+    assigned.forEach(function(v) {
+      var role = _detectedRoles[v.name];
+      var lbl  = roleLabels[role] || role;
+      html += '<label class="varfilter-item">' +
+        '<input type="checkbox" class="vfc" data-name="' + escHtml(v.name) + '" checked>' +
+        '<span class="varfilter-name">' + escHtml(v.name) + '</span>' +
+        '<span class="varfilter-badge varfilter-badge-assigned">' + lbl + '</span>' +
+        '</label>';
+    });
+  }
+  if (ambig.length) {
+    html += '<div class="varfilter-divider">Ambiguous / unidentified (' + ambig.length + ')</div>';
+    ambig.forEach(function(v) {
+      html += '<label class="varfilter-item">' +
+        '<input type="checkbox" class="vfc" data-name="' + escHtml(v.name) + '">' +
+        '<span class="varfilter-name">' + escHtml(v.name) + '</span>' +
+        '<span class="varfilter-badge varfilter-badge-ambig">unidentified</span>' +
+        '</label>';
+    });
+  }
+  list.innerHTML = html;
+
+  // Live counter update
+  function updateCount() {
+    var checked = list.querySelectorAll('.vfc:checked').length;
+    count.textContent = checked + ' / ' + all.length + ' selected';
+  }
+  list.querySelectorAll('.vfc').forEach(function(cb) {
+    cb.addEventListener('change', updateCount);
+  });
+  updateCount();
+
+  qs('varFilterModal').style.display = 'flex';
+}
+
+function closeVarFilterModal() {
+  qs('varFilterModal').style.display = 'none';
+}
+
+function getCheckedVarNames() {
+  return Array.prototype.slice.call(
+    document.querySelectorAll('#varFilterList .vfc:checked')
+  ).map(function(cb){ return cb.getAttribute('data-name'); });
+}
+
+function runDetectionOnSubset(selectedNames) {
+  var subset = STATE.variables.filter(function(v){
+    return selectedNames.indexOf(v.name) !== -1;
+  });
+  // Re-run detection on the smaller set (better accuracy)
+  var savedAll = STATE.variables;
+  STATE.variables = subset;
+  var sugg = detectStructure(subset);
+  STATE.variables = savedAll;   // restore full list (user can still drag others)
+  if (sugg) showSuggestionPanel(sugg);
+}
+
+// Wire modal buttons (called once from DOMContentLoaded)
+function wireVarFilterModal() {
+  var btnConfirm = qs('varFilterConfirm');
+  var btnUseAll  = qs('varFilterUseAll');
+  var btnClose   = qs('varFilterClose');
+
+  if (btnConfirm) {
+    btnConfirm.addEventListener('click', function() {
+      var sel = getCheckedVarNames();
+      if (sel.length === 0) { showToast('Select at least one variable.', 'warning'); return; }
+      closeVarFilterModal();
+      runDetectionOnSubset(sel);
+    });
+  }
+  if (btnUseAll) {
+    btnUseAll.addEventListener('click', function() {
+      closeVarFilterModal();
+      if (_varFilterPendingSugg) showSuggestionPanel(_varFilterPendingSugg);
+    });
+  }
+  if (btnClose) {
+    btnClose.addEventListener('click', function() {
+      closeVarFilterModal();
+      if (_varFilterPendingSugg) showSuggestionPanel(_varFilterPendingSugg);
+    });
+  }
+  // Click on backdrop closes (use-all behaviour)
+  var modal = qs('varFilterModal');
+  if (modal) {
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) {
+        closeVarFilterModal();
+        if (_varFilterPendingSugg) showSuggestionPanel(_varFilterPendingSugg);
+      }
+    });
+  }
+}
+
+// ============================================================================
 // DATA LOADING  (called by VB6 / Office host)
 // ============================================================================
 
@@ -2331,9 +2608,17 @@ window.populateVariableSelectionTable = function(varStats) {
     refreshRepNote();
     updateEquation();
 
-    // Auto-detect structure and show suggestion panel
+    // Auto-detect structure and show suggestion panel (or filter modal if many ambiguous)
     var sugg = detectStructure(STATE.variables);
-    if (sugg) showSuggestionPanel(sugg);
+    if (sugg) {
+      var ambiguous = STATE.variables.filter(function(v){ return !_detectedRoles[v.name]; });
+      var AMBIG_THRESHOLD = 2;
+      if (ambiguous.length >= AMBIG_THRESHOLD && STATE.variables.length > 4) {
+        showVarFilterModal(sugg, ambiguous);
+      } else {
+        showSuggestionPanel(sugg);
+      }
+    }
 
     // Wire drop zones now that UI is visible
     document.querySelectorAll('.mx-zone-body').forEach(wireDropZone);
@@ -2454,6 +2739,9 @@ document.addEventListener('DOMContentLoaded', function() {
   var btnDismiss = document.getElementById('btnDismissSugg');
   if (btnAccept)  btnAccept.addEventListener('click',  function() { applyDetectedRoles(_lastSuggestions); });
   if (btnDismiss) btnDismiss.addEventListener('click', function() { qs('suggestionPanel').style.display = 'none'; });
+
+  // Variable-filter modal buttons
+  wireVarFilterModal();
 });
 
 // ============================================================================
@@ -2742,6 +3030,29 @@ function renderInputDiagramHier(spec, elId) {
 }
 
 </script>
+
+<!-- Variable-filter modal (populated dynamically) -->
+<div id="varFilterModal" class="varfilter-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="varFilterTitle">
+  <div class="varfilter-card">
+    <div class="varfilter-head">
+      <i class="fa-solid fa-circle-question varfilter-head-icon"></i>
+      <div>
+        <div class="varfilter-head-title" id="varFilterTitle">Many ambiguous variables detected</div>
+        <div class="varfilter-head-sub" id="varFilterSub"></div>
+      </div>
+      <button class="varfilter-close" id="varFilterClose" title="Use all">&times;</button>
+    </div>
+    <div class="varfilter-list" id="varFilterList"></div>
+    <div class="varfilter-footer">
+      <button class="varfilter-btn-primary" id="varFilterConfirm">
+        <i class="fa-solid fa-wand-magic-sparkles"></i> Analyse selected
+      </button>
+      <button class="varfilter-btn-secondary" id="varFilterUseAll">Use all variables</button>
+      <span class="varfilter-count" id="varFilterCount"></span>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
 

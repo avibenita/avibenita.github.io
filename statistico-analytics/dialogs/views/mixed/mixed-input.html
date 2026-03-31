@@ -1161,6 +1161,8 @@
 var STATE = {
   variables: [],         // [{name, numeric, string, missing, categories, rangeAddress}]
   variableStats: {},
+  rawRows:    [],        // raw row objects [{colName: value, ...}] for detection engine
+  rawHeaders: [],        // ordered header names
   assignments: {
     dep:  null,          // single var name
     fix:  [],            // factor names
@@ -1881,77 +1883,226 @@ function updateEquation() {
 }
 
 // ============================================================================
-// AUTO-DETECTION ENGINE
+// AUTO-DETECTION ENGINE  (spec from index100 — scoring-based, row-level analysis)
 // ============================================================================
-var _detectedRoles = {};   // { varName: 'outcome'|'subject'|'rep'|'fix'|'cov' }
+var _detectedRoles   = {};   // { varName: 'outcome'|'subject'|'rep'|'fix'|'cov' }
 var _lastSuggestions = null;
 
-function detectStructure(variables) {
-  if (!variables || variables.length === 0) return null;
-  _detectedRoles = {};
+// ---- helpers ----------------------------------------------------------------
 
-  var scored = variables.map(function(v) {
-    var isNum      = v.numeric > v.string;
-    var n          = Math.max(v.validCount || 1, 1);
-    var cats       = v.categories || [];
-    var nUniq      = cats.length || n;
-    var uRatio     = nUniq / n;
-    var nm         = v.name.toLowerCase();
-    var isSmallInt = isNum && nUniq <= 10 && cats.every(function(c) {
-      var f = parseFloat(c);
-      return !isNaN(f) && f === Math.round(f) && f >= 0;
-    });
+function mxGroupBy(rows, key) {
+  var groups = {};
+  rows.forEach(function(row) {
+    var k = String(row[key] !== undefined ? row[key] : '');
+    if (!groups[k]) groups[k] = [];
+    groups[k].push(row);
+  });
+  return groups;
+}
+
+function mxVariesWithinSubject(groups, col) {
+  return Object.keys(groups).some(function(k) {
+    var vals = groups[k].map(function(r){ return r[col]; });
+    var first = vals[0];
+    return vals.some(function(v){ return v !== first; });
+  });
+}
+
+function mxIsConstantWithinSubject(groups, col) {
+  return Object.keys(groups).every(function(k) {
+    var vals = groups[k].map(function(r){ return r[col]; });
+    var first = vals[0];
+    return vals.every(function(v){ return v === first; });
+  });
+}
+
+function mxClusterStability(rows, subjectCol, allCols) {
+  var groups = mxGroupBy(rows, subjectCol);
+  var constant = 0, varying = 0;
+  allCols.forEach(function(col) {
+    if (col === subjectCol) return;
+    if (mxIsConstantWithinSubject(groups, col)) constant++;
+    else varying++;
+  });
+  return { constantColumns: constant, varyingColumns: varying };
+}
+
+function mxGetNameHints(name) {
+  var n = name.toLowerCase();
+  return {
+    isIdLike:       /\bid\b|subject|patient|participant|person|case\b/.test(n),
+    isTimeLike:     /\btime\b|visit|wave|occasion|trial|period|day|week|month|session/.test(n),
+    isOutcomeLike:  /\bscore\b|outcome|response|result|value|measure|rating/.test(n),
+    isGroupLike:    /\bgroup\b|treatment|arm|condition|cohort|sex|gender/.test(n),
+    isBaselineLike: /baseline|pre\b|initial/.test(n)
+  };
+}
+
+// ---- main engine ------------------------------------------------------------
+
+function detectStructure(variables) {
+  _detectedRoles   = {};
+  _lastSuggestions = null;
+  if (!variables || variables.length === 0) return null;
+
+  var rows    = STATE.rawRows;
+  var hasRows = rows && rows.length > 0;
+
+  // Build profiles from variable stats (always available)
+  var profiles = variables.map(function(v) {
+    var isNum     = v.numeric > v.string;
+    var n         = Math.max(v.validCount || 1, 1);
+    var cats      = v.categories || [];
+    var nUniq     = cats.length || 1;
+    var numInts   = cats.filter(function(c) {
+      var f = parseFloat(c); return !isNaN(f) && f === Math.round(f) && f >= 0;
+    }).length;
     return {
-      v: v, isNum: isNum, n: n, nUniq: nUniq, uRatio: uRatio,
-      isSmallInt: isSmallInt,
-      nameIsId:   /\bid\b|subject|participant|patient|cluster|school|person/i.test(nm),
-      nameIsTime: /\btime\b|wave|period|occasion|visit|week|month|day|year|session/i.test(nm),
-      nameIsOut:  /\bscore\b|outcome|result|response|\by\b|measure|rating|value/i.test(nm)
+      name:         v.name,
+      n:            n,
+      nUniq:        nUniq,
+      uniqueRatio:  nUniq / n,
+      repeatsCount: n - nUniq,
+      numeric:      isNum,
+      isIntegerLike: isNum && numInts === cats.length && nUniq <= 12,
+      nameHints:    mxGetNameHints(v.name)
     };
   });
 
-  var sugg = { outcome: null, subject: null, rep: null, fix: [], cov: [] };
+  // ---- 1. SUBJECT -----------------------------------------------------------
+  var subjectName = null;
+  var subjectGroups = null;
+  var bestSubjectScore = -Infinity;
 
-  // 1. Subject: lowest unique ratio (most repetition), prefer name hint
-  var subCands = scored.filter(function(s){ return s.uRatio < 0.5 && s.nUniq > 1; })
-                       .sort(function(a,b){ return a.uRatio - b.uRatio; });
-  if (subCands.length) {
-    sugg.subject = (subCands.find(function(s){ return s.nameIsId; }) || subCands[0]).v.name;
-  }
+  profiles.forEach(function(p) {
+    var score = 0;
+    if (p.nameHints.isIdLike)       score += 5;
+    if (p.repeatsCount > 0)         score += 3;
+    if (p.nUniq < 5)                score -= 5;  // too few uniques = group not subject
+    if (p.nameHints.isGroupLike)    score -= 4;
+    if (p.nameHints.isTimeLike)     score -= 3;
 
-  // 2. Repeated: small integer range or name hint, not the subject
-  var repCands = scored.filter(function(s){
-    return s.v.name !== sugg.subject && (s.nameIsTime || (s.isSmallInt && s.nUniq <= 8));
+    if (hasRows) {
+      var stab = mxClusterStability(rows, p.name, profiles.map(function(x){ return x.name; }));
+      score += stab.constantColumns * 3;
+      score += stab.varyingColumns  * 2;
+    } else {
+      // Fallback: reward medium cardinality (5–50 unique values)
+      if (p.nUniq >= 5 && p.nUniq <= 100) score += 4;
+    }
+
+    if (score > bestSubjectScore) { bestSubjectScore = score; subjectName = p.name; }
   });
-  if (repCands.length) {
-    sugg.rep = (repCands.find(function(s){ return s.nameIsTime; }) || repCands[0]).v.name;
-  }
+  if (subjectName && hasRows) subjectGroups = mxGroupBy(rows, subjectName);
 
-  // 3. Outcome: most continuous numeric, not subject/rep
-  var excl = [sugg.subject, sugg.rep].filter(Boolean);
-  var outCands = scored.filter(function(s){ return s.isNum && excl.indexOf(s.v.name) === -1; })
-                       .sort(function(a,b){ return b.uRatio - a.uRatio; });
-  if (outCands.length) {
-    sugg.outcome = (outCands.find(function(s){ return s.nameIsOut; }) || outCands[0]).v.name;
-  }
+  // ---- 2. REPEATED ---------------------------------------------------------
+  var repeatedName = null;
+  var bestRepScore = -Infinity;
 
-  // 4. Remaining: categorical → fixed, continuous numeric → covariate
-  var used = [sugg.subject, sugg.rep, sugg.outcome].filter(Boolean);
-  scored.forEach(function(s) {
-    if (used.indexOf(s.v.name) !== -1) return;
-    if (!s.isNum || s.nUniq <= 6) sugg.fix.push(s.v.name);
-    else                           sugg.cov.push(s.v.name);
+  profiles.forEach(function(p) {
+    if (p.name === subjectName) return;
+    var score = 0;
+    if (p.nameHints.isTimeLike)  score += 5;
+    if (p.nUniq <= 10)           score += 2;
+    if (p.isIntegerLike)         score += 2;
+    if (p.nameHints.isIdLike)    score -= 4;
+    if (p.nameHints.isGroupLike) score -= 2;
+
+    if (hasRows && subjectGroups) {
+      if (mxVariesWithinSubject(subjectGroups, p.name))  score += 4;
+      if (mxIsConstantWithinSubject(subjectGroups, p.name)) score -= 4;
+    }
+
+    if (score > bestRepScore) { bestRepScore = score; repeatedName = p.name; }
   });
+  // Only keep repeated if score is meaningful
+  if (bestRepScore < 3) repeatedName = null;
+
+  // ---- 3. OUTCOME ----------------------------------------------------------
+  var outcomeName = null;
+  var bestOutcomeScore = -Infinity;
+
+  profiles.forEach(function(p) {
+    if (!p.numeric) return;
+    if (p.name === subjectName || p.name === repeatedName) return;
+    var score = 0;
+    if (p.nameHints.isOutcomeLike)  score += 4;
+    if (p.numeric)                  score += 3;
+    if (p.nameHints.isBaselineLike) score -= 2;
+    if (p.nameHints.isIdLike)       score -= 5;
+
+    if (hasRows && subjectGroups) {
+      if (mxVariesWithinSubject(subjectGroups, p.name)) score += 3;
+    } else {
+      // Fallback: most unique numeric = outcome
+      score += Math.round(p.uniqueRatio * 4);
+    }
+
+    if (score > bestOutcomeScore) { bestOutcomeScore = score; outcomeName = p.name; }
+  });
+
+  // ---- 4. FIXED FACTORS ----------------------------------------------------
+  var fixed = [];
+  profiles.forEach(function(p) {
+    if (p.name === subjectName || p.name === outcomeName) return;
+    var score = 0;
+    if (p.nameHints.isGroupLike)       score += 4;
+    if (!p.numeric)                    score += 3;
+    if (p.nUniq <= 6)                  score += 2;
+    if (p.name === repeatedName)       score += 3;  // time goes in fixed too
+    if (p.nameHints.isIdLike)          score -= 3;
+
+    if (hasRows && subjectGroups) {
+      if (mxIsConstantWithinSubject(subjectGroups, p.name)) score += 3;
+    }
+
+    if (score >= 4) fixed.push(p.name);
+  });
+  // Always include repeated in fixed (spec rule)
+  if (repeatedName && fixed.indexOf(repeatedName) === -1) fixed.push(repeatedName);
+
+  // ---- 5. COVARIATES -------------------------------------------------------
+  var covariates = [];
+  profiles.forEach(function(p) {
+    if (!p.numeric) return;
+    if (p.name === subjectName || p.name === repeatedName || p.name === outcomeName) return;
+    if (fixed.indexOf(p.name) !== -1) return;
+    var score = 0;
+    if (p.numeric)                  score += 4;
+    if (!p.nameHints.isIdLike)      score += 3;
+    if (p.nameHints.isBaselineLike) score += 2;
+
+    if (hasRows && subjectGroups) {
+      if (mxIsConstantWithinSubject(subjectGroups, p.name)) score += 2;
+    }
+
+    if (score >= 4) covariates.push(p.name);
+  });
+
+  // ---- 6. INTERACTIONS -----------------------------------------------------
+  var interactions = [];
+  if (repeatedName && fixed.indexOf(repeatedName) !== -1) {
+    fixed.forEach(function(f) {
+      if (f !== repeatedName) interactions.push({ v1: f, v2: repeatedName });
+    });
+  }
 
   // Build role map
-  if (sugg.outcome) _detectedRoles[sugg.outcome] = 'outcome';
-  if (sugg.subject) _detectedRoles[sugg.subject] = 'subject';
-  if (sugg.rep)     _detectedRoles[sugg.rep]     = 'rep';
-  sugg.fix.forEach(function(n){ _detectedRoles[n] = 'fix'; });
-  sugg.cov.forEach(function(n){ _detectedRoles[n] = 'cov'; });
+  if (outcomeName) _detectedRoles[outcomeName] = 'outcome';
+  if (subjectName) _detectedRoles[subjectName] = 'subject';
+  if (repeatedName) _detectedRoles[repeatedName] = 'rep';
+  fixed.forEach(function(n){ if (!_detectedRoles[n]) _detectedRoles[n] = 'fix'; });
+  covariates.forEach(function(n){ if (!_detectedRoles[n]) _detectedRoles[n] = 'cov'; });
 
-  _lastSuggestions = sugg;
-  return sugg;
+  _lastSuggestions = {
+    outcome:      outcomeName,
+    subject:      subjectName,
+    rep:          repeatedName,
+    fix:          fixed,
+    cov:          covariates,
+    interactions: interactions
+  };
+  return _lastSuggestions;
 }
 
 function showSuggestionPanel(sugg) {
@@ -1980,6 +2131,16 @@ function showSuggestionPanel(sugg) {
     }).join('');
   }).join('');
 
+  // Show suggested interactions if any
+  if (sugg.interactions && sugg.interactions.length) {
+    list.innerHTML += sugg.interactions.map(function(int) {
+      return '<div class="sugg-item">' +
+        '<span class="sugg-role" style="background:rgba(249,115,22,.15);color:var(--mx-dep);border:1px solid rgba(249,115,22,.3);">Interaction</span>' +
+        '<span class="sugg-var">' + escHtml(int.v1) + ' &times; ' + escHtml(int.v2) + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
   panel.style.display = '';
 }
 
@@ -2002,6 +2163,20 @@ function applyDetectedRoles(sugg) {
       a.fix.push(sugg.rep);
       a.repFixedAuto = true;
     }
+    // repFixedAuto only if not already explicitly in fixed from detection
+    else {
+      a.repFixedAuto = false;
+    }
+  }
+
+  // Apply suggested interactions
+  if (sugg.interactions && sugg.interactions.length) {
+    sugg.interactions.forEach(function(int) {
+      var already = a.interactions.some(function(i){
+        return (i.v1===int.v1&&i.v2===int.v2)||(i.v1===int.v2&&i.v2===int.v1);
+      });
+      if (!already) a.interactions.push({ v1: int.v1, v2: int.v2 });
+    });
   }
 
   refreshAllZones();
@@ -2177,21 +2352,35 @@ window.loadMixedModelData = function(payload) {
     var headers = data.headers;
     var rows    = data.rows;
 
-    // Build varStats from raw rows
+    // Store raw data for the detection engine (row-level analysis)
+    STATE.rawHeaders = headers;
+    STATE.rawRows    = rows.map(function(row) {
+      // Normalise each row to an object keyed by header name
+      if (Array.isArray(row)) {
+        var obj = {};
+        headers.forEach(function(h, i){ obj[h] = row[i]; });
+        return obj;
+      }
+      return row;
+    });
+
+    // Build varStats — include ALL unique values (numeric + string) for categories
     var stats = {};
-    headers.forEach(function(h) { stats[h] = { count:0, numeric:0, string:0, missing:0, categories:[], rangeAddress:'' }; });
-    rows.forEach(function(row) {
-      headers.forEach(function(h, hi) {
-        var v = Array.isArray(row) ? row[hi] : row[h];
+    headers.forEach(function(h) {
+      stats[h] = { count:0, numeric:0, string:0, missing:0, categories:[], rangeAddress:'' };
+    });
+    STATE.rawRows.forEach(function(row) {
+      headers.forEach(function(h) {
+        var v = row[h];
         if (v === null || v === undefined || v === '') { stats[h].missing++; return; }
         stats[h].count++;
-        if (typeof v === 'number' || !isNaN(parseFloat(v))) { stats[h].numeric++; }
-        else { stats[h].string++; stats[h].categories.push(String(v)); }
+        var isNum = (typeof v === 'number') || !isNaN(parseFloat(v));
+        if (isNum) stats[h].numeric++;
+        else       stats[h].string++;
+        // Collect unique values regardless of type
+        var str = String(v);
+        if (stats[h].categories.indexOf(str) === -1) stats[h].categories.push(str);
       });
-    });
-    // De-dup categories
-    headers.forEach(function(h) {
-      stats[h].categories = stats[h].categories.filter(function(v,i,a){ return a.indexOf(v)===i; });
     });
 
     if (data.address) qs('metaBadge').textContent = data.address;

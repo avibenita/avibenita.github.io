@@ -25,7 +25,6 @@ const NAV_TEMPLATE = `
     <ul class="nav-menu" id="navMenu">
       <li class="nav-item">
         <a href="javascript:void(0)" class="nav-link" data-page="home" id="link-home">
-          <i class="fa-solid fa-home" style="margin-right: 8px;"></i>
           Home
         </a>
       </li>
@@ -42,7 +41,7 @@ const NAV_TEMPLATE = `
       <li class="nav-item nav-item--product-start nav-item--dropdown" id="nav-products-item">
         <button class="nav-link nav-link--product-parent" id="nav-products-btn" aria-haspopup="true" aria-expanded="false">
           Products
-          <i class="fa-solid fa-chevron-down nav-dropdown-caret" aria-hidden="true"></i>
+          <span class="nav-dropdown-caret" aria-hidden="true">&#8964;</span>
         </button>
         <ul class="nav-dropdown" id="nav-products-dropdown" role="menu">
           <li role="none">
@@ -76,7 +75,6 @@ const NAV_TEMPLATE = `
       </li>
       <li class="nav-item nav-item--after-products">
         <a href="javascript:void(0)" class="nav-link" data-page="support" id="link-support">
-          <i class="fa-solid fa-life-ring" style="margin-right: 8px;"></i>
           Support
         </a>
       </li>
@@ -410,7 +408,9 @@ const NAV_STYLE = `
 }
 
 .nav-dropdown-caret {
-  font-size: 0.68rem;
+  font-size: 0.9rem;
+  line-height: 1;
+  display: inline-block;
   transition: transform 0.22s ease;
 }
 
@@ -822,6 +822,14 @@ const FOOTER_TEMPLATE = `
 // Load components immediately (no fetch required)
 (function() {
   'use strict';
+
+  // Ensure Font Awesome is loaded — nav-template is self-contained
+  if (!document.querySelector('link[href*="font-awesome"]')) {
+    const faLink = document.createElement('link');
+    faLink.rel  = 'stylesheet';
+    faLink.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css';
+    document.head.appendChild(faLink);
+  }
 
   const THEME_STORAGE_KEY = 'statistico-theme';
 

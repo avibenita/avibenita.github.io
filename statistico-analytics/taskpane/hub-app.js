@@ -896,7 +896,7 @@ function openMixedConfigFromHub() {
   return openBuilderDialogFromHub({
     moduleId: "mixed",
     dialogPath: "mixed/mixed-input.html",
-    dialogOptions: { height: 92, width: 95, displayInIframe: false },
+    dialogOptions: { height: 92, width: 30, displayInIframe: false },
     dataType: "MIXED_DATA",
     payloadBuilder: function (gr) {
       var saved = null;

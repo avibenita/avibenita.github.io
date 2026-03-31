@@ -1432,6 +1432,61 @@ function saveModelSpec() {
   });
 }
 
+
+// ---- Confirm dialog (2-button) used for Cancel / Reset ----
+function showMxConfirm(title, message, btnA, btnB, onA, onB) {
+  if (document.getElementById('mxConfirmOverlay')) return;
+  var overlay = document.createElement('div');
+  overlay.id = 'mxConfirmOverlay';
+  overlay.className = 'mx-prompt-overlay';
+  overlay.innerHTML =
+    '<div class="mx-prompt-box">' +
+      '<div class="mx-prompt-title"><i class="fa-solid fa-rotate-left"></i>' + escHtml(title) + '</div>' +
+      '<div class="mx-prompt-label" style="white-space:pre-line">' + escHtml(message) + '</div>' +
+      '<div class="mx-prompt-actions" style="margin-top:14px">' +
+        '<button id="mxConfirmA" class="cfg-btn" style="background:linear-gradient(135deg,#f97316,#fb923c);color:#fff;border:none;">' +
+          '<i class="fa-solid fa-rotate-left"></i> ' + escHtml(btnA) +
+        '</button>' +
+        '<button id="mxConfirmB" class="cfg-btn cancel">' +
+          '<i class="fa-solid fa-times"></i> ' + escHtml(btnB) +
+        '</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  overlay.querySelector('#mxConfirmA').addEventListener('click', function(){ overlay.remove(); onA && onA(); });
+  overlay.querySelector('#mxConfirmB').addEventListener('click', function(){ overlay.remove(); onB && onB(); });
+  overlay.addEventListener('click', function(e){ if (e.target === overlay) overlay.remove(); });
+}
+
+function resetAllAssignments() {
+  STATE.assignments = { dep:null, fix:[], cov:[], rnd:null, rep:null,
+                        interactions:[], randomSlopes:[], repFixedAuto:false };
+  _detectedRoles  = {};
+  _lastSuggestions = null;
+  _varFilterPendingSugg = null;
+  qs('suggestionPanel').style.display = 'none';
+  refreshAllZones();
+  refreshInteractionSelectors();
+  refreshRandomSlopeSection();
+  refreshRunButton();
+  refreshRepNote();
+  updateEquation();
+  renderVarsList();
+  showToast('All assignments cleared.', 'info', 2500);
+  // Re-run detection on the full variable set
+  if (STATE.variables && STATE.variables.length > 0) {
+    var sugg = detectStructure(STATE.variables);
+    if (sugg) {
+      var ambiguous = sugg.ambiguousVars || [];
+      if (ambiguous.length >= 2 && STATE.variables.length > 4) {
+        showVarFilterModal(sugg, ambiguous);
+      } else {
+        showSuggestionPanel(sugg);
+      }
+    }
+  }
+}
+
 function showMxPrompt(title, label, defaultVal, onConfirm) {
   if (document.getElementById('mxPromptOverlay')) return;
   var overlay = document.createElement('div');
@@ -2450,7 +2505,14 @@ qs('btnRun').addEventListener('click', function() {
 });
 
 qs('btnCancel').addEventListener('click', function() {
-  sendToHost('cancel', null);
+  showMxConfirm(
+    'Reset or Close?',
+    'Reset — clear all assignments and start over.\nClose — close the dialog without running.',
+    'Reset assignments',
+    'Close dialog',
+    resetAllAssignments,
+    function(){ sendToHost('cancel', null); }
+  );
 });
 
 // ============================================================================
@@ -2733,7 +2795,7 @@ if (typeof Office !== 'undefined') {
 
     var cancelBtn = qs('btnCancel');
     if (cancelBtn) {
-      cancelBtn.addEventListener('click', function() { sendToHost('cancel', null); });
+      // Cancel is wired globally above; skip duplicate here
     }
   });
 }

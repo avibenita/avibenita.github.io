@@ -262,8 +262,7 @@
       border: 5px solid transparent;
       border-top-color: #1e293b;
     }
-    .zone-info-btn:hover .zone-tooltip,
-    .zone-info-btn:focus  .zone-tooltip { display: block; }
+    /* tooltip rendered in JS as fixed overlay — no CSS hover needed */
 
     /* --- Response arrow ----------------------------------------------- */
     .dep-response-arrow {
@@ -1156,9 +1155,9 @@
             <span class="zone-label">Dependent Variable</span>
             <span class="zone-hint">one numeric variable</span>
             <span class="zone-single-badge"><span>&times;1</span></span>
-            <button class="zone-info-btn" tabindex="0" aria-label="About Dependent Variable">
+            <button class="zone-info-btn" tabindex="0" aria-label="About Dependent Variable"
+              data-tip="The outcome you are measuring. Must be continuous/numeric. All fixed factors, covariates and random effects model variability in this variable.">
               <i class="fa-solid fa-circle-info"></i>
-              <div class="zone-tooltip">The outcome you are measuring. Must be continuous/numeric. All fixed factors, covariates and random effects model variability in this variable.</div>
             </button>
           </div>
           <div class="mx-zone-body" id="zoneDep" data-zone="dep" data-max="1">
@@ -1179,9 +1178,9 @@
             <div class="dot"></div>
             <span class="zone-label">Fixed Factors</span>
             <span class="zone-hint">(categorical predictors)</span>
-            <button class="zone-info-btn" tabindex="0" aria-label="About Fixed Factors">
+            <button class="zone-info-btn" tabindex="0" aria-label="About Fixed Factors"
+              data-tip="Categorical predictors whose effects are estimated directly (e.g. treatment group, sex). Each level gets its own coefficient. Equivalent to SPSS Fixed Effects.">
               <i class="fa-solid fa-circle-info"></i>
-              <div class="zone-tooltip">Categorical predictors whose effects are estimated directly (e.g. treatment group, sex). Each level gets its own coefficient. Equivalent to SPSS "Fixed Effects".</div>
             </button>
           </div>
           <div class="mx-zone-body" id="zoneFix" data-zone="fix">
@@ -1195,9 +1194,9 @@
             <div class="dot"></div>
             <span class="zone-label">Covariates</span>
             <span class="zone-hint">(continuous predictors)</span>
-            <button class="zone-info-btn" tabindex="0" aria-label="About Covariates">
+            <button class="zone-info-btn" tabindex="0" aria-label="About Covariates"
+              data-tip="Continuous predictors included to control for confounding or reduce residual variance (e.g. age, baseline score). Equivalent to SPSS Covariates.">
               <i class="fa-solid fa-circle-info"></i>
-              <div class="zone-tooltip">Continuous predictors (numeric variables) included to control for confounding or reduce residual variance (e.g. age, baseline score). Equivalent to SPSS "Covariates".</div>
             </button>
           </div>
           <div class="mx-zone-body" id="zoneCov" data-zone="cov">
@@ -1212,9 +1211,9 @@
             <span class="zone-label">Subject / Grouping Factor</span>
             <span class="zone-hint">one grouping variable</span>
             <span class="zone-single-badge"><span>&times;1</span></span>
-            <button class="zone-info-btn" tabindex="0" aria-label="About Subject / Grouping Factor">
+            <button class="zone-info-btn" tabindex="0" aria-label="About Subject / Grouping Factor"
+              data-tip="The clustering variable that defines random intercepts — typically a subject, patient or school ID. Observations within the same group are correlated.">
               <i class="fa-solid fa-circle-info"></i>
-              <div class="zone-tooltip">The clustering variable that defines random intercepts — typically a subject, patient or school ID. Observations within the same group are correlated.</div>
             </button>
           </div>
           <div class="mx-zone-body" id="zoneRnd" data-zone="rnd">
@@ -1229,9 +1228,9 @@
             <span class="zone-label">Repeated Measure</span>
             <span class="zone-hint">one time / occasion variable</span>
             <span class="zone-single-badge"><span>&times;1</span></span>
-            <button class="zone-info-btn" tabindex="0" aria-label="About Repeated Measure">
+            <button class="zone-info-btn" tabindex="0" aria-label="About Repeated Measure"
+              data-tip="The within-subject time or occasion variable (e.g. visit, wave). Defines the covariance structure of repeated measurements. Optional — only needed for explicit repeated-measures modelling.">
               <i class="fa-solid fa-circle-info"></i>
-              <div class="zone-tooltip">The within-subject time or occasion variable (e.g. visit, wave). Defines the covariance structure of repeated measurements. Optional — only needed for explicit repeated-measures modelling.</div>
             </button>
           </div>
           <div class="mx-zone-body" id="zoneRep" data-zone="rep" data-max="1">
@@ -3256,6 +3255,97 @@ function renderInputDiagramHier(spec, elId) {
   }
   el.innerHTML=html;
 }
+
+// ============================================================================
+// ZONE INFO TOOLTIP  — fixed-position singleton, unclipped by overflow
+// ============================================================================
+(function() {
+  var tip = document.createElement('div');
+  tip.id  = 'zoneInfoTip';
+  tip.style.cssText = [
+    'position:fixed',
+    'z-index:99999',
+    'max-width:230px',
+    'background:#1e293b',
+    'color:#e2e8f0',
+    'font-size:11px',
+    'font-weight:400',
+    'line-height:1.5',
+    'padding:8px 10px',
+    'border-radius:8px',
+    'box-shadow:0 6px 20px rgba(0,0,0,.5)',
+    'pointer-events:none',
+    'white-space:normal',
+    'display:none'
+  ].join(';');
+  document.body.appendChild(tip);
+
+  var caret = document.createElement('div');
+  caret.id  = 'zoneInfoCaret';
+  caret.style.cssText = [
+    'position:fixed',
+    'z-index:99999',
+    'width:0','height:0',
+    'pointer-events:none',
+    'display:none'
+  ].join(';');
+  document.body.appendChild(caret);
+
+  function showTip(btn) {
+    var text = btn.getAttribute('data-tip');
+    if (!text) return;
+    tip.textContent = text;
+    tip.style.display = 'block';
+    caret.style.display = 'block';
+
+    var r   = btn.getBoundingClientRect();
+    var tw  = tip.offsetWidth;
+    var th  = tip.offsetHeight;
+    var gap = 8;
+    var caretH = 6;
+
+    // Prefer above; fall back to below if not enough room
+    var spaceAbove = r.top;
+    var spaceBelow = window.innerHeight - r.bottom;
+    var above = spaceAbove >= th + gap + caretH;
+
+    var tipTop, caretTop, caretBorder;
+    if (above || spaceAbove > spaceBelow) {
+      tipTop     = r.top - th - gap - caretH;
+      caretTop   = r.top - gap - caretH;
+      caretBorder = 'border-top:' + caretH + 'px solid #1e293b;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:none';
+    } else {
+      tipTop     = r.bottom + gap + caretH;
+      caretTop   = r.bottom + gap;
+      caretBorder = 'border-bottom:' + caretH + 'px solid #1e293b;border-left:6px solid transparent;border-right:6px solid transparent;border-top:none';
+    }
+
+    // Align right edge with button right, clamp to viewport
+    var tipLeft = Math.min(r.right - tw, window.innerWidth - tw - 4);
+    tipLeft = Math.max(tipLeft, 4);
+
+    tip.style.top  = tipTop  + 'px';
+    tip.style.left = tipLeft + 'px';
+
+    var caretLeft = r.right - r.width / 2 - 6;
+    caret.style.cssText += ';top:' + caretTop + 'px;left:' + caretLeft + 'px;' + caretBorder;
+  }
+
+  function hideTip() {
+    tip.style.display    = 'none';
+    caret.style.display  = 'none';
+  }
+
+  document.addEventListener('mouseover', function(e) {
+    var btn = e.target.closest && e.target.closest('.zone-info-btn');
+    if (btn) showTip(btn);
+  });
+  document.addEventListener('mouseout', function(e) {
+    var btn = e.target.closest && e.target.closest('.zone-info-btn');
+    if (btn) hideTip();
+  });
+  document.addEventListener('scroll', hideTip, true);
+})();
 
 </script>
 

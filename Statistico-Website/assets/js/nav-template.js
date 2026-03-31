@@ -39,23 +39,40 @@ const NAV_TEMPLATE = `
           How It Works
         </a>
       </li>
-      <li class="nav-item nav-item--product-start">
-        <a href="javascript:void(0)" class="nav-link nav-link--product nav-link--product-lite" data-page="calculators" id="link-calculators">
-          <span>Calculators Hub</span>
-          <span class="nav-link-tag">Product</span>
-        </a>
-      </li>
-      <li class="nav-item nav-item--product-core">
-        <a href="javascript:void(0)" class="nav-link nav-link--product nav-link--product-core" data-page="analytics" id="link-analytics">
-          <span>Analytics Suite</span>
-          <span class="nav-link-tag">Product</span>
-        </a>
-      </li>
-      <li class="nav-item nav-item--product-end">
-        <a href="javascript:void(0)" class="nav-link nav-link--product nav-link--product-lite" data-page="addins" id="link-addins">
-          <span>Add-ins</span>
-          <span class="nav-link-tag">Product</span>
-        </a>
+      <li class="nav-item nav-item--product-start nav-item--dropdown" id="nav-products-item">
+        <button class="nav-link nav-link--product-parent" id="nav-products-btn" aria-haspopup="true" aria-expanded="false">
+          Products
+          <i class="fa-solid fa-chevron-down nav-dropdown-caret" aria-hidden="true"></i>
+        </button>
+        <ul class="nav-dropdown" id="nav-products-dropdown" role="menu">
+          <li role="none">
+            <a href="javascript:void(0)" class="nav-dropdown-item" data-page="calculators" id="link-calculators" role="menuitem">
+              <span class="nav-dropdown-icon"><i class="fa-solid fa-calculator"></i></span>
+              <span class="nav-dropdown-text">
+                <span class="nav-dropdown-title">Calculators Hub</span>
+                <span class="nav-dropdown-desc">Statistical calculators &amp; tools</span>
+              </span>
+            </a>
+          </li>
+          <li role="none">
+            <a href="javascript:void(0)" class="nav-dropdown-item" data-page="analytics" id="link-analytics" role="menuitem">
+              <span class="nav-dropdown-icon"><i class="fa-solid fa-chart-line"></i></span>
+              <span class="nav-dropdown-text">
+                <span class="nav-dropdown-title">Analytics Suite</span>
+                <span class="nav-dropdown-desc">Interactive statistical analysis</span>
+              </span>
+            </a>
+          </li>
+          <li role="none">
+            <a href="javascript:void(0)" class="nav-dropdown-item" data-page="addins" id="link-addins" role="menuitem">
+              <span class="nav-dropdown-icon"><i class="fa-regular fa-file-excel"></i></span>
+              <span class="nav-dropdown-text">
+                <span class="nav-dropdown-title">Add-ins</span>
+                <span class="nav-dropdown-desc">Excel-native extensions</span>
+              </span>
+            </a>
+          </li>
+        </ul>
       </li>
       <li class="nav-item nav-item--after-products">
         <a href="javascript:void(0)" class="nav-link" data-page="support" id="link-support">
@@ -357,6 +374,176 @@ const NAV_STYLE = `
   font-weight: 700;
 }
 
+/* ── Products dropdown ── */
+.nav-item--dropdown {
+  position: relative;
+}
+
+.nav-link--product-parent {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 12px;
+  background: rgba(255,165,120,0.08);
+  border: 1px solid rgba(255,165,120,0.22);
+  border-radius: 16px;
+  color: rgba(255,239,231,0.95);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.nav-link--product-parent:hover {
+  background: rgba(255,165,120,0.16);
+  transform: translateY(-1px);
+  color: #fff;
+}
+
+.nav-link--product-parent.active {
+  background: linear-gradient(180deg, rgba(244,174,132,0.9) 0%, rgba(232,157,112,0.86) 100%);
+  color: white;
+  border-color: rgba(255,204,178,0.42);
+}
+
+.nav-dropdown-caret {
+  font-size: 0.68rem;
+  transition: transform 0.22s ease;
+}
+
+.nav-item--dropdown[data-open="true"] .nav-dropdown-caret {
+  transform: rotate(180deg);
+}
+
+.nav-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px);
+  min-width: 240px;
+  background: linear-gradient(160deg, #0f1e35 0%, #162336 100%);
+  border: 1px solid rgba(255,165,120,0.22);
+  border-radius: 18px;
+  padding: 8px;
+  list-style: none;
+  margin: 0;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+  z-index: 200;
+}
+
+.nav-dropdown::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 6px;
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  background: rgba(255,165,120,0.3);
+}
+
+.nav-item--dropdown[data-open="true"] .nav-dropdown {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: all;
+  transform: translateX(-50%) translateY(0);
+}
+
+.nav-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  text-decoration: none;
+  color: rgba(220,235,255,0.88);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.nav-dropdown-item:hover,
+.nav-dropdown-item.active {
+  background: rgba(255,165,120,0.1);
+  color: #fff;
+  filter: none;
+}
+
+.nav-dropdown-item.active {
+  background: rgba(255,165,120,0.15);
+}
+
+.nav-dropdown-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(255,165,120,0.1);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  color: rgba(255,165,120,0.9);
+}
+
+.nav-dropdown-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-dropdown-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.nav-dropdown-desc {
+  font-size: 0.74rem;
+  color: rgba(180,200,230,0.65);
+  line-height: 1.2;
+}
+
+:root[data-theme="light"] .nav-link--product-parent {
+  background: rgba(180,83,9,0.07);
+  border-color: rgba(180,83,9,0.22);
+  color: rgba(30,41,59,0.92);
+}
+
+:root[data-theme="light"] .nav-link--product-parent:hover {
+  background: rgba(180,83,9,0.13);
+  color: #0f172a;
+}
+
+:root[data-theme="light"] .nav-dropdown {
+  background: linear-gradient(160deg, #f8fbff 0%, #eef5ff 100%);
+  border-color: rgba(180,83,9,0.18);
+  box-shadow: 0 16px 48px rgba(15,23,42,0.18);
+}
+
+:root[data-theme="light"] .nav-dropdown-item {
+  color: rgba(15,23,42,0.82);
+}
+
+:root[data-theme="light"] .nav-dropdown-item:hover {
+  background: rgba(180,83,9,0.07);
+  color: #0f172a;
+}
+
+:root[data-theme="light"] .nav-dropdown-icon {
+  background: rgba(180,83,9,0.1);
+  color: rgba(180,83,9,0.85);
+}
+
+:root[data-theme="light"] .nav-dropdown-desc {
+  color: rgba(15,23,42,0.48);
+}
+
 .nav-link.active .nav-link-tag {
   background: rgba(255,255,255,0.2);
   border-color: rgba(255,255,255,0.36);
@@ -544,6 +731,41 @@ body {
     display: none;
   }
 
+  /* Mobile: flatten dropdown inline */
+  .nav-item--dropdown {
+    width: 100%;
+  }
+
+  .nav-link--product-parent {
+    width: 100%;
+    justify-content: center;
+    padding: 12px 16px;
+    margin-bottom: 4px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+  }
+
+  .nav-dropdown {
+    position: static;
+    transform: none;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: all;
+    box-shadow: none;
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,165,120,0.12);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 8px;
+    display: none;
+  }
+
+  .nav-dropdown::before { display: none; }
+
+  .nav-item--dropdown[data-open="true"] .nav-dropdown {
+    display: block;
+  }
+
   .nav-container {
     padding: 0 16px;
     min-height: 68px;
@@ -705,6 +927,24 @@ const FOOTER_TEMPLATE = `
     document.getElementById('link-addins').href = links.addins;
     document.getElementById('link-support').href = links.support;
 
+    // Products dropdown
+    const productsItem = document.getElementById('nav-products-item');
+    const productsBtn  = document.getElementById('nav-products-btn');
+    function openDropdown()  { productsItem.dataset.open = 'true';  productsBtn.setAttribute('aria-expanded', 'true'); }
+    function closeDropdown() { delete productsItem.dataset.open;    productsBtn.setAttribute('aria-expanded', 'false'); }
+
+    productsBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      productsItem.dataset.open === 'true' ? closeDropdown() : openDropdown();
+    });
+
+    // Close on outside click
+    document.addEventListener('click', function() { closeDropdown(); });
+    productsItem.addEventListener('click', function(e) { e.stopPropagation(); });
+
+    // Close on Escape
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeDropdown(); });
+
     // Mobile menu toggle
     mobileToggle.addEventListener('click', function() {
       navMenu.classList.toggle('active');
@@ -788,6 +1028,16 @@ const FOOTER_TEMPLATE = `
       if (link.getAttribute('data-page') === activePage) {
         link.classList.add('active');
       }
+    });
+
+    // Also mark dropdown items and the Products button active
+    const productPages = ['calculators', 'analytics', 'addins'];
+    const productsBtn = document.getElementById('nav-products-btn');
+    if (productsBtn) {
+      productsBtn.classList.toggle('active', productPages.includes(activePage));
+    }
+    document.querySelectorAll('.nav-dropdown-item').forEach(item => {
+      item.classList.toggle('active', item.getAttribute('data-page') === activePage);
     });
   }
 

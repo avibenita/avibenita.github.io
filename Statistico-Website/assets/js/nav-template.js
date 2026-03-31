@@ -40,10 +40,11 @@ const NAV_TEMPLATE = `
       </li>
       <li class="nav-item nav-item--product-start nav-item--dropdown" id="nav-products-item">
         <button class="nav-link nav-link--product-parent" id="nav-products-btn" aria-haspopup="true" aria-expanded="false">
-          Products
+          Platform
           <span class="nav-dropdown-caret" aria-hidden="true">&#8964;</span>
         </button>
         <ul class="nav-dropdown" id="nav-products-dropdown" role="menu">
+          <li class="nav-dropdown-header" role="presentation">Statistico Platform</li>
           <li role="none">
             <a href="javascript:void(0)" class="nav-dropdown-item" data-page="calculators" id="link-calculators" role="menuitem">
               <span class="nav-dropdown-icon"><i class="fa-solid fa-calculator"></i></span>
@@ -51,6 +52,7 @@ const NAV_TEMPLATE = `
                 <span class="nav-dropdown-title">Calculators Hub</span>
                 <span class="nav-dropdown-desc">Statistical calculators &amp; tools</span>
               </span>
+              <span class="nav-dropdown-arrow" aria-hidden="true">&#8594;</span>
             </a>
           </li>
           <li role="none">
@@ -60,6 +62,7 @@ const NAV_TEMPLATE = `
                 <span class="nav-dropdown-title">Analytics Suite</span>
                 <span class="nav-dropdown-desc">Interactive statistical analysis</span>
               </span>
+              <span class="nav-dropdown-arrow" aria-hidden="true">&#8594;</span>
             </a>
           </li>
           <li role="none">
@@ -69,6 +72,7 @@ const NAV_TEMPLATE = `
                 <span class="nav-dropdown-title">Add-ins</span>
                 <span class="nav-dropdown-desc">Excel-native extensions</span>
               </span>
+              <span class="nav-dropdown-arrow" aria-hidden="true">&#8594;</span>
             </a>
           </li>
         </ul>
@@ -420,14 +424,14 @@ const NAV_STYLE = `
 
 .nav-dropdown {
   position: absolute;
-  top: calc(100% + 10px);
+  top: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%) translateY(-6px);
-  min-width: 240px;
+  min-width: 256px;
   background: linear-gradient(160deg, #0f1e35 0%, #162336 100%);
   border: 1px solid rgba(255,165,120,0.22);
   border-radius: 18px;
-  padding: 8px;
+  padding: 6px 6px 8px;
   list-style: none;
   margin: 0;
   box-shadow: 0 16px 48px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04);
@@ -457,15 +461,26 @@ const NAV_STYLE = `
   transform: translateX(-50%) translateY(0);
 }
 
+.nav-dropdown-header {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(255,165,120,.6);
+  padding: 8px 12px 6px;
+  user-select: none;
+}
+
 .nav-dropdown-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 11px 12px;
   border-radius: 12px;
   text-decoration: none;
   color: rgba(220,235,255,0.88);
   transition: background 0.15s ease, color 0.15s ease;
+  position: relative;
 }
 
 .nav-dropdown-item:hover,
@@ -477,6 +492,20 @@ const NAV_STYLE = `
 
 .nav-dropdown-item.active {
   background: rgba(255,165,120,0.15);
+}
+
+.nav-dropdown-arrow {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: rgba(255,165,120,0.4);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.nav-dropdown-item:hover .nav-dropdown-arrow {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .nav-dropdown-icon {
@@ -524,6 +553,10 @@ const NAV_STYLE = `
   background: linear-gradient(160deg, #f8fbff 0%, #eef5ff 100%);
   border-color: rgba(180,83,9,0.18);
   box-shadow: 0 16px 48px rgba(15,23,42,0.18);
+}
+
+:root[data-theme="light"] .nav-dropdown-header {
+  color: rgba(180,83,9,0.55);
 }
 
 :root[data-theme="light"] .nav-dropdown-item {
@@ -761,6 +794,7 @@ body {
   }
 
   .nav-dropdown::before { display: none; }
+  .nav-dropdown-header { display: none; }
 
   .nav-item--dropdown[data-open="true"] .nav-dropdown {
     display: block;

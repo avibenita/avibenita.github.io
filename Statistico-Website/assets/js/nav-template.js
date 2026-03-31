@@ -47,7 +47,13 @@ const NAV_TEMPLATE = `
           <li class="nav-dropdown-header" role="presentation">Statistico Platform</li>
           <li role="none">
             <a href="javascript:void(0)" class="nav-dropdown-item" data-page="calculators" id="link-calculators" role="menuitem">
-              <span class="nav-dropdown-icon"><i class="fa-solid fa-calculator"></i></span>
+              <span class="nav-dropdown-icon">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="2" width="12" height="12" rx="2"/>
+                  <line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/>
+                  <line x1="5" y1="11" x2="8" y2="11"/>
+                </svg>
+              </span>
               <span class="nav-dropdown-text">
                 <span class="nav-dropdown-title">Calculators Hub</span>
                 <span class="nav-dropdown-desc">Statistical calculators &amp; tools</span>
@@ -57,7 +63,11 @@ const NAV_TEMPLATE = `
           </li>
           <li role="none">
             <a href="javascript:void(0)" class="nav-dropdown-item" data-page="analytics" id="link-analytics" role="menuitem">
-              <span class="nav-dropdown-icon"><i class="fa-solid fa-chart-line"></i></span>
+              <span class="nav-dropdown-icon">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="1,12 5,7 8,10 11,5 15,3"/>
+                </svg>
+              </span>
               <span class="nav-dropdown-text">
                 <span class="nav-dropdown-title">Analytics Suite</span>
                 <span class="nav-dropdown-desc">Interactive statistical analysis</span>
@@ -67,7 +77,13 @@ const NAV_TEMPLATE = `
           </li>
           <li role="none">
             <a href="javascript:void(0)" class="nav-dropdown-item" data-page="addins" id="link-addins" role="menuitem">
-              <span class="nav-dropdown-icon"><i class="fa-regular fa-file-excel"></i></span>
+              <span class="nav-dropdown-icon">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="1" width="10" height="14" rx="1.5"/>
+                  <line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/>
+                  <line x1="6" y1="11" x2="8.5" y2="11"/>
+                </svg>
+              </span>
               <span class="nav-dropdown-text">
                 <span class="nav-dropdown-title">Add-ins</span>
                 <span class="nav-dropdown-desc">Excel-native extensions</span>
@@ -86,7 +102,8 @@ const NAV_TEMPLATE = `
 
     <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle color theme" aria-pressed="false" title="Toggle dark/light">
       <span class="theme-mode-icon" aria-hidden="true">
-        <i class="fa-solid fa-moon"></i>
+        <svg class="icon-moon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="icon-sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       </span>
       <span class="theme-switch" aria-hidden="true">
         <span class="theme-switch-thumb"></span>
@@ -900,6 +917,10 @@ const FOOTER_TEMPLATE = `
       if (themeIcon) {
         themeIcon.className = isLight ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
       }
+      const iconMoon = themeToggle.querySelector('.icon-moon');
+      const iconSun  = themeToggle.querySelector('.icon-sun');
+      if (iconMoon) iconMoon.style.display = isLight ? 'none'   : '';
+      if (iconSun)  iconSun.style.display  = isLight ? ''       : 'none';
     }
   }
 

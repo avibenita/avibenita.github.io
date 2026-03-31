@@ -2246,13 +2246,22 @@ function detectStructure(variables) {
   fixed.forEach(function(n){ if (!_detectedRoles[n]) _detectedRoles[n] = 'fix'; });
   covariates.forEach(function(n){ if (!_detectedRoles[n]) _detectedRoles[n] = 'cov'; });
 
+  // Variables with NO matching name hints are "ambiguous" — the engine may have
+  // assigned them a generic role (numeric→cov, categorical→fix) but the user
+  // should confirm they belong in the analysis.
+  var ambiguousVars = profiles.filter(function(p) {
+    var h = p.nameHints;
+    return !h.isIdLike && !h.isTimeLike && !h.isOutcomeLike && !h.isGroupLike && !h.isBaselineLike;
+  }).map(function(p){ return p.name; });
+
   _lastSuggestions = {
-    outcome:      outcomeName,
-    subject:      subjectName,
-    rep:          repeatedName,
-    fix:          fixed,
-    cov:          covariates,
-    interactions: interactions
+    outcome:       outcomeName,
+    subject:       subjectName,
+    rep:           repeatedName,
+    fix:           fixed,
+    cov:           covariates,
+    interactions:  interactions,
+    ambiguousVars: ambiguousVars
   };
   return _lastSuggestions;
 }
@@ -2467,14 +2476,16 @@ function showVarFilterModal(sugg, ambiguousNames) {
     (ambiguousNames.length !== 1 ? 's' : '') +
     ' could not be clearly identified. Uncheck any that are not part of the analysis.';
 
-  // Separate assigned / ambiguous
-  var assigned = all.filter(function(v){ return !!_detectedRoles[v.name]; });
-  var ambig    = all.filter(function(v){ return !_detectedRoles[v.name]; });
+  // Separate: "identified" = has name hints; "ambiguous" = no name hints (generic role only)
+  var ambigSet = {};
+  ambiguousNames.forEach(function(n){ ambigSet[n] = true; });
+  var identified = all.filter(function(v){ return !ambigSet[v.name]; });
+  var ambig      = all.filter(function(v){ return  ambigSet[v.name]; });
 
   var html = '';
-  if (assigned.length) {
-    html += '<div class="varfilter-divider">Identified (' + assigned.length + ')</div>';
-    assigned.forEach(function(v) {
+  if (identified.length) {
+    html += '<div class="varfilter-divider">Identified (' + identified.length + ')</div>';
+    identified.forEach(function(v) {
       var role = _detectedRoles[v.name];
       var lbl  = roleLabels[role] || role;
       html += '<label class="varfilter-item">' +
@@ -2487,10 +2498,13 @@ function showVarFilterModal(sugg, ambiguousNames) {
   if (ambig.length) {
     html += '<div class="varfilter-divider">Ambiguous / unidentified (' + ambig.length + ')</div>';
     ambig.forEach(function(v) {
+      var role = _detectedRoles[v.name];
+      var lbl  = role ? (roleLabels[role] || role) : '';
       html += '<label class="varfilter-item">' +
         '<input type="checkbox" class="vfc" data-name="' + escHtml(v.name) + '">' +
         '<span class="varfilter-name">' + escHtml(v.name) + '</span>' +
-        '<span class="varfilter-badge varfilter-badge-ambig">unidentified</span>' +
+        (lbl ? '<span class="varfilter-badge varfilter-badge-assigned" style="opacity:.5">' + lbl + '?</span>' : '') +
+        '<span class="varfilter-badge varfilter-badge-ambig">no hint</span>' +
         '</label>';
     });
   }
@@ -2611,7 +2625,7 @@ window.populateVariableSelectionTable = function(varStats) {
     // Auto-detect structure and show suggestion panel (or filter modal if many ambiguous)
     var sugg = detectStructure(STATE.variables);
     if (sugg) {
-      var ambiguous = STATE.variables.filter(function(v){ return !_detectedRoles[v.name]; });
+      var ambiguous = sugg.ambiguousVars || [];
       var AMBIG_THRESHOLD = 2;
       if (ambiguous.length >= AMBIG_THRESHOLD && STATE.variables.length > 4) {
         showVarFilterModal(sugg, ambiguous);

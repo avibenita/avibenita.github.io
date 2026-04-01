@@ -1863,7 +1863,7 @@
                     </div>
                     <div class="section-hero-text">
                         <div class="section-hero-title">Study Specification</div>
-                        <div class="section-hero-sub">Set α, power, hypothesis and test parameters, then calculate</div>
+                        <div class="section-hero-sub">Set α, power, test settings and design parameters, then calculate</div>
                     </div>
                     <span class="section-hero-pill">Configuration</span>
                 </div>
@@ -1884,10 +1884,10 @@
                     <div class="power-topbar-grid">
                         <div class="power-group targets prominent">
                             <div class="power-sync-head">
-                                <div class="power-group-title">Statistical targets</div>
+                                <div class="power-group-title">Step 2 - Statistical targets</div>
                                 <div class="power-targets-hint" id="powerTargetsHint">
                                     <i class="fas fa-edit"></i>
-                                    Set <strong>targets</strong> (α, power, hypothesis) in the row below, then <strong>Calculate</strong> to update required <em>n</em> and the curve.
+                                    Set <strong>targets</strong> (α, power, test setting) in the row below, then <strong>Calculate</strong> to update required <em>n</em> and the curve.
                                 </div>
                             </div>
                             <div class="power-fields-inline three">
@@ -1914,8 +1914,8 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="power-field editable">
-                                    <label>Hypothesis</label>
+                                <div class="power-field editable" id="alternativeFieldWrap">
+                                    <label id="alternativeLabel">Hypothesis</label>
                                     <select id="alternative">
                                         <option value="two-sided">Two-sided</option>
                                         <option value="one-sided">One-sided</option>
@@ -1931,7 +1931,7 @@
                         </div>
                         <div class="power-group test">
                             <div class="power-sync-head">
-                                <div class="power-group-title">Actual study design</div>
+                                <div class="power-group-title">Step 3 - Actual study design</div>
                                 <div class="power-sync-spacer" aria-hidden="true"></div>
                             </div>
                             <!-- ── One-Sample Mean params ── -->
@@ -2043,15 +2043,15 @@
                 </div>
 
                 <div id="resultsCardsSection" class="results-cards-section hidden">
+                    <div class="result-card">
+                        <div class="result-card-label">Actual Power</div>
+                        <div class="result-card-value" id="cardActualPower">—</div>
+                        <div class="result-card-sub">achieved</div>
+                    </div>
                     <div class="result-card primary">
                         <div class="result-card-label">Required Sample Size</div>
                         <div class="result-card-value" id="cardRequiredN">—</div>
                         <div class="result-card-sub" id="cardRequiredSub">per group</div>
-                    </div>
-                    <div class="result-card">
-                        <div class="result-card-label">Total N</div>
-                        <div class="result-card-value" id="cardTotalN">—</div>
-                        <div class="result-card-sub">all participants</div>
                     </div>
                     <div class="result-card">
                         <div class="result-card-label">Effect Size</div>
@@ -2059,9 +2059,9 @@
                         <div class="result-card-sub" id="cardEffectLabel">—</div>
                     </div>
                     <div class="result-card">
-                        <div class="result-card-label">Actual Power</div>
-                        <div class="result-card-value" id="cardActualPower">—</div>
-                        <div class="result-card-sub">achieved</div>
+                        <div class="result-card-label">Total N</div>
+                        <div class="result-card-value" id="cardTotalN">—</div>
+                        <div class="result-card-sub">all participants</div>
                     </div>
                 </div>
 
@@ -2229,6 +2229,32 @@
         });
     }
 
+    function syncAlternativeControlForTest() {
+        var alt = document.getElementById('alternative');
+        var label = document.getElementById('alternativeLabel');
+        if (!alt || !label) return;
+
+        if (currentTestType === 'anova') {
+            if (alt.dataset.mode !== 'anova') {
+                alt.dataset.prev = alt.value || 'two-sided';
+                alt.innerHTML = '<option value="two-sided">Omnibus test (any group difference)</option>';
+                alt.value = 'two-sided';
+                alt.dataset.mode = 'anova';
+            }
+            label.textContent = 'ANOVA hypothesis';
+            alt.disabled = true;
+            return;
+        }
+
+        if (alt.dataset.mode === 'anova') {
+            alt.innerHTML = '<option value="two-sided">Two-sided</option><option value="one-sided">One-sided</option>';
+            alt.value = (alt.dataset.prev === 'one-sided') ? 'one-sided' : 'two-sided';
+            alt.dataset.mode = 'default';
+        }
+        label.textContent = 'Hypothesis';
+        alt.disabled = false;
+    }
+
     // ── Sidebar navigation ──────────────────────────────────────────────
     function selectTest(el) {
         // Update active nav item
@@ -2260,6 +2286,7 @@
         // Update header subtitle + topbar chips (index100 pattern)
         document.getElementById('headerSubtitle').textContent = testLabels[currentTestType] || '';
         updatePowerTopbarChips();
+        syncAlternativeControlForTest();
         applyStatisticoAnovaLock();
         updatePowerAnovaEffectLine();
         updateStatisticoHeaderSubtitle();
@@ -3401,6 +3428,7 @@
             document.getElementById('headerSubtitle').textContent = testLabels[currentTestType];
             updatePowerTopbarChips();
         }
+        syncAlternativeControlForTest();
         updatePowerAnovaEffectLine();
         // Ensure modal hidden
         document.getElementById('loadingModal').classList.add('hidden');

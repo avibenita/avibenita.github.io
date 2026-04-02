@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distribution Calculators</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        :root {
+            --surface-0: #0c1624;
+            --surface-1: #1a1f2e;
+            --surface-2: #242938;
+            --border: #2d3748;
+            --accent-1: rgb(255,165,120);
+            --accent-2: rgb(120,200,255);
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255,255,255,0.8);
+            --text-muted: rgba(255,255,255,0.6);
+            --panel-radius: 10px;
+            --panel-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            --sidebar-width: 300px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--surface-0);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-shell {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .top-header {
+            height: 58px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 12px 0 8px;
+            background: linear-gradient(135deg, var(--surface-0) 0%, #1a1a2e 100%);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 2px 16px rgba(0,0,0,0.3);
+        }
+
+        .header-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 220px;
+            height: 100%;
+            padding: 0 14px;
+            border-right: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .header-brand .app-icon {
+            color: var(--accent-1);
+            font-size: 1.1rem;
+        }
+
+        .header-brand .app-title {
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: rgba(240,246,255,0.98);
+            white-space: nowrap;
+        }
+
+        .header-subtitle {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            text-align: center;
+            min-width: 0;
+        }
+
+        .header-subtitle-main {
+            font-size: 0.94rem;
+            font-weight: 800;
+            color: rgba(240,246,255,0.98);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .header-subtitle-detail {
+            font-size: 0.72rem;
+            color: rgba(214,226,242,0.78);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .header-badge {
+            font-size: 0.68rem;
+            background: rgba(255,165,120,0.2);
+            color: var(--accent-1);
+            border: 1px solid rgba(255,165,120,0.34);
+            border-radius: 999px;
+            padding: 4px 11px;
+            white-space: nowrap;
+        }
+
+        .body-row {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            background: #000;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            flex-shrink: 0;
+            background: var(--surface-1);
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            padding: 12px 12px 14px;
+        }
+
+        .sidebar-title {
+            font-size: 2rem;
+            line-height: 1.05;
+            color: var(--accent-1);
+            margin: 8px 8px 14px;
+            font-weight: 500;
+        }
+
+        .dist-group {
+            margin-bottom: 14px;
+            border: 1px solid rgba(120,200,255,0.18);
+            border-radius: 12px;
+            overflow: hidden;
+            background: rgba(20,30,46,0.7);
+        }
+
+        .group-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 12px 12px;
+            color: #fff;
+            background: rgba(16,24,40,0.7);
+            font-size: 1rem;
+            font-weight: 700;
+            border-bottom: 1px solid rgba(120,200,255,0.14);
+        }
+
+        .group-header i {
+            color: var(--accent-1);
+        }
+
+        .group-list {
+            display: block;
+        }
+
+        .dist-item {
+            width: 100%;
+            border: none;
+            background: transparent;
+            color: rgba(239,246,255,0.92);
+            text-align: left;
+            padding: 12px 14px;
+            font-size: 0.92rem;
+            border-top: 1px solid rgba(120,200,255,0.1);
+            cursor: pointer;
+        }
+
+        .dist-item:hover {
+            background: rgba(120,200,255,0.08);
+        }
+
+        .dist-item.active {
+            background: rgba(255,165,120,0.12);
+            color: #fff;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            padding: 16px 18px;
+            overflow-y: auto;
+            background: var(--surface-0);
+        }
+
+        .panel {
+            border-radius: var(--panel-radius);
+            box-shadow: var(--panel-shadow);
+            border: 1px solid rgba(120,200,255,0.14);
+            background: var(--surface-1);
+        }
+
+        .panel-head {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(120,200,255,0.14);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .panel-title {
+            font-size: 1.12rem;
+            font-weight: 800;
+            color: var(--accent-1);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-sub {
+            color: var(--text-secondary);
+            font-size: 0.82rem;
+        }
+
+        .spec-body {
+            padding: 14px 16px 16px;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(120px, 1fr));
+            gap: 12px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .field label {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .field input {
+            width: 100%;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+            font-size: 0.92rem;
+            padding: 10px 10px;
+        }
+
+        .field input:focus {
+            outline: none;
+            border-color: var(--accent-1);
+            box-shadow: 0 0 0 2px rgba(255,165,120,0.2);
+        }
+
+        .spec-actions {
+            display: flex;
+            align-items: end;
+            gap: 8px;
+        }
+
+        .btn {
+            border: none;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            color: #fff;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-1) 0%, #2c3e50 100%);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.18);
+        }
+
+        .results-body {
+            padding: 14px 16px 16px;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(160px, 1fr));
+            gap: 12px;
+        }
+
+        .result-card {
+            border: 1px solid rgba(120,200,255,0.16);
+            border-radius: 10px;
+            background: var(--surface-2);
+            padding: 12px 12px;
+            min-height: 84px;
+        }
+
+        .result-label {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .result-value {
+            font-size: 1.32rem;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .result-value.highlight {
+            color: var(--accent-1);
+        }
+
+        .result-note {
+            margin-top: 10px;
+            grid-column: 1 / -1;
+            color: var(--text-secondary);
+            font-size: 0.82rem;
+            background: rgba(0,0,0,0.22);
+            border: 1px solid rgba(120,200,255,0.14);
+            border-radius: 8px;
+            padding: 10px 12px;
+        }
+
+        .muted-chip {
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            border: 1px solid rgba(120,200,255,0.22);
+            border-radius: 999px;
+            padding: 4px 10px;
+            background: rgba(120,200,255,0.08);
+        }
+
+        @media (max-width: 1050px) {
+            .spec-body { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+            .results-body { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="app-shell">
+    <header class="top-header">
+        <div class="header-brand">
+            <i class="fa-solid fa-chart-line app-icon"></i>
+            <span class="app-title">Distribution Calculators</span>
+        </div>
+        <div class="header-subtitle">
+            <span class="header-subtitle-main" id="headerTitle">Normal Distribution</span>
+            <span class="header-subtitle-detail" id="headerDetail">Compute z-score, density, and cumulative probability from mean, standard deviation, and x.</span>
+        </div>
+        <span class="header-badge">Unified Layout</span>
+    </header>
+
+    <div class="body-row">
+        <aside class="sidebar">
+            <h1 class="sidebar-title">Distribution<br>Calculators</h1>
+
+            <section class="dist-group">
+                <div class="group-header">
+                    <span><i class="fa-solid fa-chart-line"></i> Continuous Distributions</span>
+                    <i class="fa-solid fa-caret-down"></i>
+                </div>
+                <div class="group-list">
+                    <button class="dist-item active" data-dist="normal">Normal Distribution</button>
+                    <button class="dist-item" data-dist="uniform">Uniform Distribution</button>
+                    <button class="dist-item" data-dist="exponential">Exponential Distribution</button>
+                    <button class="dist-item" data-dist="lognormal">Log-Normal Distribution</button>
+                    <button class="dist-item" data-dist="weibull">Weibull Distribution</button>
+                    <button class="dist-item" data-dist="beta">Beta Distribution</button>
+                    <button class="dist-item" data-dist="chisquare">Chi-Square Distribution</button>
+                    <button class="dist-item" data-dist="fdist">F Distribution</button>
+                    <button class="dist-item" data-dist="tdist">t Distribution</button>
+                </div>
+            </section>
+
+            <section class="dist-group">
+                <div class="group-header">
+                    <span><i class="fa-solid fa-cubes"></i> Discrete Distributions</span>
+                    <i class="fa-solid fa-caret-right"></i>
+                </div>
+                <div class="group-list">
+                    <button class="dist-item" data-dist="binomial">Binomial Distribution</button>
+                    <button class="dist-item" data-dist="poisson">Poisson Distribution</button>
+                    <button class="dist-item" data-dist="geometric">Geometric Distribution</button>
+                    <button class="dist-item" data-dist="hypergeometric">Hypergeometric Distribution</button>
+                </div>
+            </section>
+
+            <section class="dist-group">
+                <div class="group-header">
+                    <span><i class="fa-solid fa-flask-vial"></i> H0 Testing Distributions</span>
+                    <i class="fa-solid fa-caret-right"></i>
+                </div>
+            </section>
+        </aside>
+
+        <main class="main-content">
+            <section class="panel">
+                <div class="panel-head">
+                    <div class="panel-title"><i class="fa-solid fa-sliders"></i> Specification</div>
+                    <span class="muted-chip" id="specChip">Normal Distribution</span>
+                </div>
+                <div class="spec-body">
+                    <div class="field">
+                        <label for="meanInput">Mean (mu)</label>
+                        <input id="meanInput" type="number" step="any" value="0">
+                    </div>
+                    <div class="field">
+                        <label for="sdInput">Std. Deviation (sigma)</label>
+                        <input id="sdInput" type="number" min="0.000001" step="any" value="1">
+                    </div>
+                    <div class="field">
+                        <label for="xInput">x Value</label>
+                        <input id="xInput" type="number" step="any" value="1.96">
+                    </div>
+                    <div class="spec-actions">
+                        <button id="calcBtn" class="btn btn-primary"><i class="fa-solid fa-bolt"></i> Calculate</button>
+                        <button id="resetBtn" class="btn btn-secondary">Reset</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-head">
+                    <div class="panel-title"><i class="fa-solid fa-square-poll-vertical"></i> Results</div>
+                    <div class="panel-sub" id="resultsSubtitle">Normal Distribution output</div>
+                </div>
+                <div class="results-body">
+                    <article class="result-card">
+                        <div class="result-label">Z-Score</div>
+                        <div class="result-value" id="zValue">-</div>
+                    </article>
+                    <article class="result-card">
+                        <div class="result-label">Density f(x)</div>
+                        <div class="result-value" id="pdfValue">-</div>
+                    </article>
+                    <article class="result-card">
+                        <div class="result-label">Cumulative P(X <= x)</div>
+                        <div class="result-value highlight" id="cdfValue">-</div>
+                    </article>
+                    <div class="result-note" id="resultNote">Select Normal Distribution from the sidebar, adjust inputs in Specification, then click Calculate.</div>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+
+<script>
+    (function () {
+        var distItems = Array.prototype.slice.call(document.querySelectorAll(".dist-item"));
+        var activeDist = "normal";
+        var meanInput = document.getElementById("meanInput");
+        var sdInput = document.getElementById("sdInput");
+        var xInput = document.getElementById("xInput");
+        var calcBtn = document.getElementById("calcBtn");
+        var resetBtn = document.getElementById("resetBtn");
+        var zValue = document.getElementById("zValue");
+        var pdfValue = document.getElementById("pdfValue");
+        var cdfValue = document.getElementById("cdfValue");
+        var headerTitle = document.getElementById("headerTitle");
+        var headerDetail = document.getElementById("headerDetail");
+        var specChip = document.getElementById("specChip");
+        var resultsSubtitle = document.getElementById("resultsSubtitle");
+        var resultNote = document.getElementById("resultNote");
+
+        function erfApprox(x) {
+            var sign = x < 0 ? -1 : 1;
+            var ax = Math.abs(x);
+            var t = 1 / (1 + 0.3275911 * ax);
+            var a1 = 0.254829592;
+            var a2 = -0.284496736;
+            var a3 = 1.421413741;
+            var a4 = -1.453152027;
+            var a5 = 1.061405429;
+            var y = 1 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-ax * ax);
+            return sign * y;
+        }
+
+        function normalCDF(z) {
+            return 0.5 * (1 + erfApprox(z / Math.sqrt(2)));
+        }
+
+        function setDistribution(name) {
+            activeDist = name;
+            distItems.forEach(function (item) {
+                item.classList.toggle("active", item.getAttribute("data-dist") === name);
+            });
+
+            if (name !== "normal") {
+                headerTitle.textContent = name.replace(/(^|[-_])([a-z])/g, function (_, p1, p2) { return (p1 ? " " : "") + p2.toUpperCase(); }) + " (migration pending)";
+                headerDetail.textContent = "This calculator will be migrated into the unified sidebar/specification/results layout next.";
+                specChip.textContent = "Coming next";
+                resultsSubtitle.textContent = "Layout is ready - " + name + " logic pending migration";
+                resultNote.textContent = "Start point delivered: Normal Distribution is fully implemented in the new layout. Selected calculator will be migrated next.";
+                return;
+            }
+
+            headerTitle.textContent = "Normal Distribution";
+            headerDetail.textContent = "Compute z-score, density, and cumulative probability from mean, standard deviation, and x.";
+            specChip.textContent = "Normal Distribution";
+            resultsSubtitle.textContent = "Normal Distribution output";
+            resultNote.textContent = "Enter mean, standard deviation, and x, then click Calculate.";
+            calculateNormal();
+        }
+
+        function calculateNormal() {
+            var mu = parseFloat(meanInput.value);
+            var sigma = parseFloat(sdInput.value);
+            var x = parseFloat(xInput.value);
+            if (!isFinite(mu) || !isFinite(sigma) || !isFinite(x) || sigma <= 0) {
+                resultNote.textContent = "Please provide valid numeric inputs and ensure sigma > 0.";
+                return;
+            }
+
+            var z = (x - mu) / sigma;
+            var pdf = Math.exp(-0.5 * z * z) / (sigma * Math.sqrt(2 * Math.PI));
+            var cdf = normalCDF(z);
+
+            zValue.textContent = z.toFixed(4);
+            pdfValue.textContent = pdf.toFixed(6);
+            cdfValue.textContent = cdf.toFixed(6);
+            resultNote.textContent = "Interpretation: x = " + x.toFixed(4) + " is z = " + z.toFixed(4) + " standard deviations from mean, with cumulative probability " + cdf.toFixed(4) + ".";
+        }
+
+        calcBtn.addEventListener("click", function () {
+            if (activeDist === "normal") calculateNormal();
+        });
+
+        resetBtn.addEventListener("click", function () {
+            meanInput.value = "0";
+            sdInput.value = "1";
+            xInput.value = "1.96";
+            if (activeDist === "normal") calculateNormal();
+        });
+
+        distItems.forEach(function (item) {
+            item.addEventListener("click", function () {
+                setDistribution(item.getAttribute("data-dist"));
+            });
+        });
+
+        calculateNormal();
+    })();
+</script>
+</body>
+</html>

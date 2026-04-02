@@ -420,50 +420,13 @@
         </aside>
 
         <main class="main-content">
-            <section class="panel">
+            <section class="panel" style="display:flex; flex-direction:column; min-height:100%;">
                 <div class="panel-head">
-                    <div class="panel-title"><i class="fa-solid fa-sliders"></i> Specification</div>
-                    <span class="muted-chip" id="specChip">Normal Distribution</span>
+                    <div class="panel-title"><i class="fa-solid fa-window-maximize"></i> Workspace</div>
+                    <span class="muted-chip" id="workspaceChip">Normal Distribution</span>
                 </div>
-                <div class="spec-body">
-                    <div class="field">
-                        <label for="meanInput">Mean (mu)</label>
-                        <input id="meanInput" type="number" step="any" value="0">
-                    </div>
-                    <div class="field">
-                        <label for="sdInput">Std. Deviation (sigma)</label>
-                        <input id="sdInput" type="number" min="0.000001" step="any" value="1">
-                    </div>
-                    <div class="field">
-                        <label for="xInput">x Value</label>
-                        <input id="xInput" type="number" step="any" value="1.96">
-                    </div>
-                    <div class="spec-actions">
-                        <button id="calcBtn" class="btn btn-primary"><i class="fa-solid fa-bolt"></i> Calculate</button>
-                        <button id="resetBtn" class="btn btn-secondary">Reset</button>
-                    </div>
-                </div>
-            </section>
-
-            <section class="panel">
-                <div class="panel-head">
-                    <div class="panel-title"><i class="fa-solid fa-square-poll-vertical"></i> Results</div>
-                    <div class="panel-sub" id="resultsSubtitle">Normal Distribution output</div>
-                </div>
-                <div class="results-body">
-                    <article class="result-card">
-                        <div class="result-label">Z-Score</div>
-                        <div class="result-value" id="zValue">-</div>
-                    </article>
-                    <article class="result-card">
-                        <div class="result-label">Density f(x)</div>
-                        <div class="result-value" id="pdfValue">-</div>
-                    </article>
-                    <article class="result-card">
-                        <div class="result-label">Cumulative P(X <= x)</div>
-                        <div class="result-value highlight" id="cdfValue">-</div>
-                    </article>
-                    <div class="result-note" id="resultNote">Select Normal Distribution from the sidebar, adjust inputs in Specification, then click Calculate.</div>
+                <div style="padding:12px; flex:1; min-height:0;">
+                    <iframe id="distributionFrame" title="Distribution calculator workspace" src="./Normal.html" style="width:100%; height:100%; min-height:640px; border:1px solid rgba(120,200,255,0.18); border-radius:12px; background:#0c1624;"></iframe>
                 </div>
             </section>
         </main>
@@ -474,36 +437,10 @@
     (function () {
         var distItems = Array.prototype.slice.call(document.querySelectorAll(".dist-item"));
         var activeDist = "normal";
-        var meanInput = document.getElementById("meanInput");
-        var sdInput = document.getElementById("sdInput");
-        var xInput = document.getElementById("xInput");
-        var calcBtn = document.getElementById("calcBtn");
-        var resetBtn = document.getElementById("resetBtn");
-        var zValue = document.getElementById("zValue");
-        var pdfValue = document.getElementById("pdfValue");
-        var cdfValue = document.getElementById("cdfValue");
+        var frame = document.getElementById("distributionFrame");
         var headerTitle = document.getElementById("headerTitle");
         var headerDetail = document.getElementById("headerDetail");
-        var specChip = document.getElementById("specChip");
-        var resultsSubtitle = document.getElementById("resultsSubtitle");
-        var resultNote = document.getElementById("resultNote");
-
-        function erfApprox(x) {
-            var sign = x < 0 ? -1 : 1;
-            var ax = Math.abs(x);
-            var t = 1 / (1 + 0.3275911 * ax);
-            var a1 = 0.254829592;
-            var a2 = -0.284496736;
-            var a3 = 1.421413741;
-            var a4 = -1.453152027;
-            var a5 = 1.061405429;
-            var y = 1 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-ax * ax);
-            return sign * y;
-        }
-
-        function normalCDF(z) {
-            return 0.5 * (1 + erfApprox(z / Math.sqrt(2)));
-        }
+        var workspaceChip = document.getElementById("workspaceChip");
 
         function setDistribution(name) {
             activeDist = name;
@@ -511,52 +448,21 @@
                 item.classList.toggle("active", item.getAttribute("data-dist") === name);
             });
 
-            if (name !== "normal") {
-                headerTitle.textContent = name.replace(/(^|[-_])([a-z])/g, function (_, p1, p2) { return (p1 ? " " : "") + p2.toUpperCase(); }) + " (migration pending)";
-                headerDetail.textContent = "This calculator will be migrated into the unified sidebar/specification/results layout next.";
-                specChip.textContent = "Coming next";
-                resultsSubtitle.textContent = "Layout is ready - " + name + " logic pending migration";
-                resultNote.textContent = "Start point delivered: Normal Distribution is fully implemented in the new layout. Selected calculator will be migrated next.";
-                return;
+            if (name === "normal") {
+                headerTitle.textContent = "Normal Distribution";
+                headerDetail.textContent = "Compute probabilities, percentiles, density, and z-values in the full Normal calculator.";
+                workspaceChip.textContent = "Normal Distribution";
+                frame.src = "./Normal.html";
+            } else {
+                var label = name.replace(/(^|[-_])([a-z])/g, function (_, p1, p2) { return (p1 ? " " : "") + p2.toUpperCase(); });
+                headerTitle.textContent = label + " (migration pending)";
+                headerDetail.textContent = "This distribution will be migrated to the unified shell next.";
+                workspaceChip.textContent = "Coming next";
+                frame.src = "about:blank";
+                frame.removeAttribute("srcdoc");
+                frame.srcdoc = '<!doctype html><html><body style="margin:0;background:#0c1624;color:#c9d7ec;font-family:Segoe UI,Tahoma,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;"><div style="text-align:center;max-width:560px;padding:24px;"><h2 style="margin:0 0 10px;color:rgb(255,165,120);font-size:28px;">' + label + '</h2><p style="margin:0;line-height:1.5;">This calculator is listed in the sidebar and will be connected to its dedicated workspace next. Normal Distribution is already live.</p></div></body></html>';
             }
-
-            headerTitle.textContent = "Normal Distribution";
-            headerDetail.textContent = "Compute z-score, density, and cumulative probability from mean, standard deviation, and x.";
-            specChip.textContent = "Normal Distribution";
-            resultsSubtitle.textContent = "Normal Distribution output";
-            resultNote.textContent = "Enter mean, standard deviation, and x, then click Calculate.";
-            calculateNormal();
         }
-
-        function calculateNormal() {
-            var mu = parseFloat(meanInput.value);
-            var sigma = parseFloat(sdInput.value);
-            var x = parseFloat(xInput.value);
-            if (!isFinite(mu) || !isFinite(sigma) || !isFinite(x) || sigma <= 0) {
-                resultNote.textContent = "Please provide valid numeric inputs and ensure sigma > 0.";
-                return;
-            }
-
-            var z = (x - mu) / sigma;
-            var pdf = Math.exp(-0.5 * z * z) / (sigma * Math.sqrt(2 * Math.PI));
-            var cdf = normalCDF(z);
-
-            zValue.textContent = z.toFixed(4);
-            pdfValue.textContent = pdf.toFixed(6);
-            cdfValue.textContent = cdf.toFixed(6);
-            resultNote.textContent = "Interpretation: x = " + x.toFixed(4) + " is z = " + z.toFixed(4) + " standard deviations from mean, with cumulative probability " + cdf.toFixed(4) + ".";
-        }
-
-        calcBtn.addEventListener("click", function () {
-            if (activeDist === "normal") calculateNormal();
-        });
-
-        resetBtn.addEventListener("click", function () {
-            meanInput.value = "0";
-            sdInput.value = "1";
-            xInput.value = "1.96";
-            if (activeDist === "normal") calculateNormal();
-        });
 
         distItems.forEach(function (item) {
             item.addEventListener("click", function () {
@@ -564,7 +470,7 @@
             });
         });
 
-        calculateNormal();
+        setDistribution(activeDist);
     })();
 </script>
 </body>

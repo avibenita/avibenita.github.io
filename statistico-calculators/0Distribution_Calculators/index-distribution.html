@@ -512,26 +512,6 @@
             var contentWidth = 1280;
             var contentHeight = 900;
 
-            try {
-                var doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
-                if (doc && doc.documentElement) {
-                    var html = doc.documentElement;
-                    var body = doc.body;
-                    contentWidth = Math.max(html.scrollWidth || 0, body ? body.scrollWidth : 0, 1280);
-                    contentHeight = Math.max(html.scrollHeight || 0, body ? body.scrollHeight : 0, 900);
-
-                    var styleTag = doc.getElementById("dist-shell-fit-style");
-                    if (!styleTag) {
-                        styleTag = doc.createElement("style");
-                        styleTag.id = "dist-shell-fit-style";
-                        styleTag.textContent = "html,body{overflow:hidden!important;}";
-                        doc.head.appendChild(styleTag);
-                    }
-                }
-            } catch (e) {
-                // Ignore cross-origin or iframe readiness issues and use fallback size.
-            }
-
             var scaleX = viewportRect.width / contentWidth;
             var scaleY = viewportRect.height / contentHeight;
             var scale = Math.min(scaleX, scaleY, 1);
@@ -542,17 +522,7 @@
 
         function refreshEmbeddedCharts() {
             if (!frame || !frame.contentWindow) return;
-            try {
-                frame.contentWindow.dispatchEvent(new Event("resize"));
-                var hc = frame.contentWindow.Highcharts;
-                if (hc && hc.charts && hc.charts.length) {
-                    hc.charts.forEach(function (chart) {
-                        if (chart && typeof chart.reflow === "function") chart.reflow();
-                    });
-                }
-            } catch (e) {
-                // Ignore cross-origin/availability errors.
-            }
+            frame.contentWindow.postMessage({ type: "distribution-shell-resize" }, "*");
         }
 
         function setDistribution(name) {

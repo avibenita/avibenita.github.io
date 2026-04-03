@@ -2301,10 +2301,171 @@ hr, .divider { border: none; height: 1px; background: #21364f; }
             });
         }
 
+        function createFallbackChart(containerId, seriesDefs) {
+            const chart = {
+                containerId: containerId,
+                series: [],
+                xAxis: [{
+                    min: null,
+                    max: null,
+                    plotLines: {},
+                    setExtremes: function(min, max) { this.min = min; this.max = max; },
+                    removePlotLine: function(id) { delete this.plotLines[id]; },
+                    addPlotLine: function(cfg) { this.plotLines[cfg.id || ('pl-' + Date.now())] = cfg; }
+                }],
+                update: function() {},
+                reflow: function() { drawFallbackChart(this); },
+                redraw: function() { drawFallbackChart(this); }
+            };
+
+            chart.series = (seriesDefs || []).map(function(def) {
+                return {
+                    name: def.name || '',
+                    type: def.type || 'line',
+                    color: def.color || '#e67e22',
+                    lineWidth: def.lineWidth || 2,
+                    fillOpacity: typeof def.fillOpacity === 'number' ? def.fillOpacity : 0.2,
+                    yAxis: def.yAxis || 0,
+                    data: [],
+                    setData: function(d) { this.data = Array.isArray(d) ? d : []; },
+                    update: function(opts) {
+                        if (!opts) return;
+                        Object.keys(opts).forEach(k => { this[k] = opts[k]; });
+                    }
+                };
+            });
+
+            return chart;
+        }
+
+        function drawFallbackChart(chart) {
+            const container = document.getElementById(chart.containerId);
+            if (!container) return;
+            const width = Math.max(container.clientWidth || 0, 320);
+            const height = Math.max(container.clientHeight || 0, 260);
+            const pad = { l: 42, r: 18, t: 16, b: 26 };
+            const plotW = Math.max(width - pad.l - pad.r, 40);
+            const plotH = Math.max(height - pad.t - pad.b, 40);
+
+            const allSeries = chart.series.filter(s => Array.isArray(s.data) && s.data.length);
+            const allPoints = [];
+            allSeries.forEach(s => s.data.forEach(p => allPoints.push(p)));
+            if (!allPoints.length) {
+                container.innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#9fb3cc;font-size:12px;">Chart fallback ready - run a calculation to render curves.</div>';
+                return;
+            }
+
+            let minX = chart.xAxis[0].min;
+            let maxX = chart.xAxis[0].max;
+            if (!isFinite(minX) || !isFinite(maxX) || minX >= maxX) {
+                minX = Math.min.apply(null, allPoints.map(p => p[0]));
+                maxX = Math.max.apply(null, allPoints.map(p => p[0]));
+            }
+            let minY = 0;
+            let maxY = Math.max.apply(null, allPoints.map(p => p[1]));
+            if (!isFinite(maxY) || maxY <= 0) maxY = 1;
+
+            const sx = x => pad.l + ((x - minX) / (maxX - minX || 1)) * plotW;
+            const sy = y => pad.t + plotH - ((y - minY) / (maxY - minY || 1)) * plotH;
+
+            const ns = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(ns, 'svg');
+            svg.setAttribute('width', String(width));
+            svg.setAttribute('height', String(height));
+            svg.style.display = 'block';
+            svg.style.width = '100%';
+            svg.style.height = '100%';
+
+            const bg = document.createElementNS(ns, 'rect');
+            bg.setAttribute('x', '0');
+            bg.setAttribute('y', '0');
+            bg.setAttribute('width', String(width));
+            bg.setAttribute('height', String(height));
+            bg.setAttribute('fill', 'rgba(15,35,58,0.35)');
+            svg.appendChild(bg);
+
+            const axisColor = 'rgba(255,255,255,0.25)';
+            const xAxis = document.createElementNS(ns, 'line');
+            xAxis.setAttribute('x1', String(pad.l));
+            xAxis.setAttribute('y1', String(pad.t + plotH));
+            xAxis.setAttribute('x2', String(pad.l + plotW));
+            xAxis.setAttribute('y2', String(pad.t + plotH));
+            xAxis.setAttribute('stroke', axisColor);
+            svg.appendChild(xAxis);
+
+            const yAxis = document.createElementNS(ns, 'line');
+            yAxis.setAttribute('x1', String(pad.l));
+            yAxis.setAttribute('y1', String(pad.t));
+            yAxis.setAttribute('x2', String(pad.l));
+            yAxis.setAttribute('y2', String(pad.t + plotH));
+            yAxis.setAttribute('stroke', axisColor);
+            svg.appendChild(yAxis);
+
+            Object.keys(chart.xAxis[0].plotLines).forEach(id => {
+                const pl = chart.xAxis[0].plotLines[id];
+                if (!pl || !isFinite(pl.value)) return;
+                const x = sx(pl.value);
+                const l = document.createElementNS(ns, 'line');
+                l.setAttribute('x1', String(x));
+                l.setAttribute('y1', String(pad.t));
+                l.setAttribute('x2', String(x));
+                l.setAttribute('y2', String(pad.t + plotH));
+                l.setAttribute('stroke', pl.color || 'rgba(255,255,255,0.35)');
+                l.setAttribute('stroke-width', String(pl.width || 1));
+                svg.appendChild(l);
+            });
+
+            allSeries.forEach(s => {
+                const pts = s.data.filter(p => Array.isArray(p) && isFinite(p[0]) && isFinite(p[1]));
+                if (!pts.length) return;
+                const pathData = pts.map((p, i) => (i ? 'L' : 'M') + sx(p[0]).toFixed(2) + ' ' + sy(p[1]).toFixed(2)).join(' ');
+                const path = document.createElementNS(ns, 'path');
+                path.setAttribute('d', pathData);
+                path.setAttribute('fill', 'none');
+                path.setAttribute('stroke', s.color || '#e67e22');
+                path.setAttribute('stroke-width', String(s.lineWidth || 2));
+                path.setAttribute('stroke-linecap', 'round');
+                path.setAttribute('stroke-linejoin', 'round');
+
+                if (s.type === 'area') {
+                    const area = document.createElementNS(ns, 'path');
+                    const first = pts[0];
+                    const last = pts[pts.length - 1];
+                    const areaPath = pathData + ' L' + sx(last[0]).toFixed(2) + ' ' + sy(0).toFixed(2) + ' L' + sx(first[0]).toFixed(2) + ' ' + sy(0).toFixed(2) + ' Z';
+                    area.setAttribute('d', areaPath);
+                    area.setAttribute('fill', s.color || 'rgba(255,165,120,0.2)');
+                    area.setAttribute('opacity', String(s.fillOpacity || 0.25));
+                    area.setAttribute('stroke', 'none');
+                    svg.appendChild(area);
+                }
+
+                svg.appendChild(path);
+            });
+
+            container.innerHTML = '';
+            container.appendChild(svg);
+        }
+
+        function initializeFallbackCharts() {
+            pdfChart = createFallbackChart('pdfChart', [
+                { name: 'Probability Density', color: '#e67e22', lineWidth: 3, type: 'line' },
+                { name: 'Shaded Area', color: 'rgba(255,165,120,0.4)', lineWidth: 2, type: 'area', fillOpacity: 0.3 }
+            ]);
+            cdfChart = createFallbackChart('cdfChart', [
+                { name: 'Cumulative Probability', color: '#27ae60', lineWidth: 3, type: 'line' }
+            ]);
+            combinedChart = createFallbackChart('combinedChart', [
+                { name: 'PDF', color: '#e67e22', lineWidth: 3, type: 'line' },
+                { name: 'Shaded Area', color: 'rgba(255,165,120,0.4)', lineWidth: 2, type: 'area', fillOpacity: 0.3 },
+                { name: 'CDF', color: '#27ae60', lineWidth: 3, type: 'line' }
+            ]);
+        }
+
         function initializeCharts() {
             try {
                 if (typeof Highcharts === 'undefined') {
-                    console.error('Highcharts not loaded');
+                    console.warn('Highcharts not loaded, using fallback SVG charts');
+                    initializeFallbackCharts();
                     return;
                 }
 

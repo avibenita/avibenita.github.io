@@ -2750,29 +2750,69 @@ hr, .divider { border: none; height: 1px; background: #21364f; }
             }
         }
 
-        // Normal distribution functions using jStat library
-        function normalPDF(x, mean, stddev) {
-            if (typeof jStat === 'undefined') {
-                console.error('jStat library not loaded');
-                return NaN;
+        function erfApprox(x) {
+            var sign = x < 0 ? -1 : 1;
+            var ax = Math.abs(x);
+            var t = 1 / (1 + 0.3275911 * ax);
+            var a1 = 0.254829592;
+            var a2 = -0.284496736;
+            var a3 = 1.421413741;
+            var a4 = -1.453152027;
+            var a5 = 1.061405429;
+            var y = 1 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-ax * ax);
+            return sign * y;
+        }
+
+        function normInvApprox(p) {
+            // Acklam inverse normal approximation
+            var a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+            var b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+            var c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+            var d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+            var plow = 0.02425;
+            var phigh = 1 - plow;
+            var q, r;
+            if (p <= 0) return -Infinity;
+            if (p >= 1) return Infinity;
+            if (p < plow) {
+                q = Math.sqrt(-2 * Math.log(p));
+                return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
+                       ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
             }
-            return jStat.normal.pdf(x, mean, stddev);
+            if (p > phigh) {
+                q = Math.sqrt(-2 * Math.log(1 - p));
+                return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
+                        ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+            }
+            q = p - 0.5;
+            r = q * q;
+            return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q /
+                   (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+        }
+
+        // Normal distribution functions using jStat when available, pure JS fallback otherwise
+        function normalPDF(x, mean, stddev) {
+            if (typeof jStat !== 'undefined' && jStat.normal && typeof jStat.normal.pdf === 'function') {
+                return jStat.normal.pdf(x, mean, stddev);
+            }
+            var z = (x - mean) / stddev;
+            return Math.exp(-0.5 * z * z) / (stddev * Math.sqrt(2 * Math.PI));
         }
 
         function normalCDF(x, mean, stddev) {
-            if (typeof jStat === 'undefined') {
-                console.error('jStat library not loaded');
-                return NaN;
+            if (typeof jStat !== 'undefined' && jStat.normal && typeof jStat.normal.cdf === 'function') {
+                return jStat.normal.cdf(x, mean, stddev);
             }
-            return jStat.normal.cdf(x, mean, stddev);
+            var z = (x - mean) / stddev;
+            return 0.5 * (1 + erfApprox(z / Math.sqrt(2)));
         }
 
         function normalQuantile(p, mean, stddev) {
-            if (typeof jStat === 'undefined') {
-                console.error('jStat library not loaded');
-                return NaN;
+            if (typeof jStat !== 'undefined' && jStat.normal && typeof jStat.normal.inv === 'function') {
+                return jStat.normal.inv(p, mean, stddev);
             }
-            return jStat.normal.inv(p, mean, stddev);
+            var z = normInvApprox(p);
+            return mean + stddev * z;
         }
 
         function calculateWithFeedback() {

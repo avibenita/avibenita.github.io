@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-\1
 
 <!-- Injected: iframe detection + overflow/height override -->
 <script>
@@ -2105,16 +2104,53 @@ hr, .divider { border: none; height: 1px; background: #21364f; }
         // Track if this is initial load to prevent double animation
         let isInitialLoad = true;
 
+        function loadScriptSequential(urls, done) {
+            var idx = 0;
+            function tryNext() {
+                if (idx >= urls.length) return done(false);
+                var s = document.createElement('script');
+                s.src = urls[idx++];
+                s.async = false;
+                s.onload = function() { done(true); };
+                s.onerror = tryNext;
+                document.head.appendChild(s);
+            }
+            tryNext();
+        }
+
+        function ensureChartLibsReady(cb) {
+            if (window.Highcharts) return cb(true);
+
+            loadScriptSequential([
+                'https://code.highcharts.com/highcharts.js',
+                'https://cdn.jsdelivr.net/npm/highcharts@11/highcharts.js',
+                'https://unpkg.com/highcharts@11/highcharts.js'
+            ], function(coreOk) {
+                if (!coreOk) return cb(false);
+
+                var modules = [
+                    { key: 'Annotations', urls: ['https://code.highcharts.com/modules/annotations.js', 'https://cdn.jsdelivr.net/npm/highcharts@11/modules/annotations.js'] },
+                    { key: 'Exporting', urls: ['https://code.highcharts.com/modules/exporting.js', 'https://cdn.jsdelivr.net/npm/highcharts@11/modules/exporting.js'] },
+                    { key: 'ExportData', urls: ['https://code.highcharts.com/modules/export-data.js', 'https://cdn.jsdelivr.net/npm/highcharts@11/modules/export-data.js'] }
+                ];
+
+                (function loadModule(i) {
+                    if (i >= modules.length) return cb(true);
+                    loadScriptSequential(modules[i].urls, function() {
+                        loadModule(i + 1);
+                    });
+                })(0);
+            });
+        }
+
         // Initialize the application
         document.addEventListener('DOMContentLoaded', function() {
-            // Wait for Highcharts to load
-            if (typeof Highcharts === 'undefined') {
-                setTimeout(() => {
-                    initializeApp();
-                }, 100);
-            } else {
+            ensureChartLibsReady(function(ok) {
+                if (!ok) {
+                    console.error('Highcharts failed to load from all sources');
+                }
                 initializeApp();
-            }
+            });
         });
 
         function initializeApp() {

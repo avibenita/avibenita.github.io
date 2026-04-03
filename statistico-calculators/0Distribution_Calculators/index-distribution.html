@@ -473,6 +473,36 @@
         var headerTitle = document.getElementById("headerTitle");
         var headerDetail = document.getElementById("headerDetail");
         var workspaceChip = document.getElementById("workspaceChip");
+        var distSources = {
+            normal: "./Normal.html",
+            uniform: "./UniformDistribution.html",
+            exponential: "./ExponentialDistribution.html",
+            lognormal: "./LogNormalDistribution.html",
+            weibull: "./WeibullDistribution.html",
+            beta: "./BetaDistribution.html",
+            chisquare: "./ChiSquare.html",
+            fdist: "./FDistribution.html",
+            tdist: "./TDistribution.html",
+            binomial: "./BinomialDistribution.html",
+            poisson: "./PoissonDistribution.html",
+            geometric: "./GeometricDistribution.html",
+            hypergeometric: "./HypergeometricDistribution.html"
+        };
+        var distDetails = {
+            normal: "Compute probabilities, percentiles, density, and z-values in the full Normal calculator.",
+            uniform: "Explore continuous uniform probabilities, CDF, and interval behavior.",
+            exponential: "Analyze exponential waiting-time probabilities and cumulative behavior.",
+            lognormal: "Work with log-normal density, percentiles, and right-skewed probabilities.",
+            weibull: "Model reliability and failure-time probabilities with Weibull parameters.",
+            beta: "Analyze bounded probabilities on [0,1] with flexible beta-shape parameters.",
+            chisquare: "Compute chi-square probabilities, quantiles, and critical regions.",
+            fdist: "Explore F-distribution probabilities and tail critical values for variance tests.",
+            tdist: "Compute t-distribution probabilities, confidence limits, and critical values.",
+            binomial: "Calculate exact binomial probabilities, tails, and cumulative outcomes.",
+            poisson: "Evaluate Poisson event-count probabilities and cumulative rates.",
+            geometric: "Calculate trial-until-first-success probabilities and cumulative forms.",
+            hypergeometric: "Model sampling without replacement using hypergeometric probabilities."
+        };
 
         function fitWorkspaceFrame() {
             if (!frame || !viewport) return;
@@ -510,28 +540,37 @@
             frame.style.transform = "scale(" + scale.toFixed(4) + ")";
         }
 
+        function refreshEmbeddedCharts() {
+            if (!frame || !frame.contentWindow) return;
+            try {
+                frame.contentWindow.dispatchEvent(new Event("resize"));
+                var hc = frame.contentWindow.Highcharts;
+                if (hc && hc.charts && hc.charts.length) {
+                    hc.charts.forEach(function (chart) {
+                        if (chart && typeof chart.reflow === "function") chart.reflow();
+                    });
+                }
+            } catch (e) {
+                // Ignore cross-origin/availability errors.
+            }
+        }
+
         function setDistribution(name) {
             activeDist = name;
             distItems.forEach(function (item) {
                 item.classList.toggle("active", item.getAttribute("data-dist") === name);
             });
 
-            if (name === "normal") {
-                headerTitle.textContent = "Normal Distribution";
-                headerDetail.textContent = "Compute probabilities, percentiles, density, and z-values in the full Normal calculator.";
-                workspaceChip.textContent = "Normal Distribution";
-                frame.src = "./Normal.html";
-                setTimeout(fitWorkspaceFrame, 60);
-            } else {
-                var label = name.replace(/(^|[-_])([a-z])/g, function (_, p1, p2) { return (p1 ? " " : "") + p2.toUpperCase(); });
-                headerTitle.textContent = label + " (migration pending)";
-                headerDetail.textContent = "This distribution will be migrated to the unified shell next.";
-                workspaceChip.textContent = "Coming next";
-                frame.src = "about:blank";
+            var item = document.querySelector('.dist-item[data-dist="' + name + '"]');
+            var label = item ? item.textContent.trim() : name;
+            headerTitle.textContent = label;
+            headerDetail.textContent = distDetails[name] || "Loaded in unified distribution workspace.";
+            workspaceChip.textContent = label;
+            if (distSources[name]) {
                 frame.removeAttribute("srcdoc");
-                frame.srcdoc = '<!doctype html><html><body style="margin:0;background:#0c1624;color:#c9d7ec;font-family:Segoe UI,Tahoma,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;"><div style="text-align:center;max-width:560px;padding:24px;"><h2 style="margin:0 0 10px;color:rgb(255,165,120);font-size:28px;">' + label + '</h2><p style="margin:0;line-height:1.5;">This calculator is listed in the sidebar and will be connected to its dedicated workspace next. Normal Distribution is already live.</p></div></body></html>';
-                setTimeout(fitWorkspaceFrame, 20);
+                frame.src = distSources[name];
             }
+            setTimeout(fitWorkspaceFrame, 60);
         }
 
         distItems.forEach(function (item) {
@@ -544,6 +583,8 @@
             frame.addEventListener("load", function () {
                 setTimeout(fitWorkspaceFrame, 20);
                 setTimeout(fitWorkspaceFrame, 120);
+                setTimeout(refreshEmbeddedCharts, 140);
+                setTimeout(refreshEmbeddedCharts, 380);
             });
         }
         window.addEventListener("resize", fitWorkspaceFrame);

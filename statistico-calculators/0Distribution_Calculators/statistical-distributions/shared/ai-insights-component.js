@@ -149,11 +149,33 @@
         const scoreLabelEl = modal.querySelector('.ai-score-label');
         const scoreBarEl = modal.querySelector('.ai-score-fill');
         const subheadEl = modal.querySelector('.ai-subhead');
+        const premiumPillEl = modal.querySelector('.ai-premium-pill');
+        const unlockWrapEl = modal.querySelector('.ai-unlock-wrap');
+        const unlockBtnEl = modal.querySelector('.ai-unlock-btn');
 
-        if (!inlineScoreEl || !content || !scoreValueEl || !scoreLabelEl || !scoreBarEl || !subheadEl) return;
+        if (!inlineScoreEl || !content || !scoreValueEl || !scoreLabelEl || !scoreBarEl || !subheadEl || !premiumPillEl || !unlockWrapEl || !unlockBtnEl) return;
 
-        inlineScoreEl.textContent = `Insight strength: ${score}/100`;
-        content.innerHTML = lines.map(line => `<div class="ai-line">${line}</div>`).join('');
+        inlineScoreEl.textContent = panel.isPremiumUnlocked
+            ? `Insight strength: ${score}/100`
+            : `AI+ locked • preview active`;
+
+        if (panel.isPremiumUnlocked) {
+            content.innerHTML = lines.map(line => `<div class="ai-line">${line}</div>`).join('');
+            premiumPillEl.textContent = 'AI+ Enabled';
+            premiumPillEl.classList.add('enabled');
+            unlockWrapEl.style.display = 'none';
+        } else {
+            const firstLine = lines[0] || 'Preview insight unavailable.';
+            const secondLine = lines[1] || 'Unlock AI+ for decision-ready depth and workflow mapping.';
+            content.innerHTML = `
+                <div class="ai-line">${firstLine}</div>
+                <div class="ai-line locked">${secondLine}</div>
+            `;
+            premiumPillEl.textContent = 'AI+ Locked';
+            premiumPillEl.classList.remove('enabled');
+            unlockWrapEl.style.display = 'block';
+        }
+
         scoreValueEl.textContent = `${score} / 100`;
         scoreLabelEl.textContent = scoreLabel;
         scoreBarEl.style.width = `${score}%`;
@@ -183,6 +205,7 @@
             <div class="ai-insights-dialog" role="dialog" aria-modal="true" aria-label="AI insights">
                 <div class="ai-panel-head">
                     <span class="ai-title"><i class="fas fa-sparkles"></i> Insight Lens</span>
+                    <span class="ai-premium-pill">AI+ Locked</span>
                     <button class="ai-close-btn" type="button" aria-label="Close insights"><i class="fas fa-times"></i></button>
                 </div>
                 <div class="ai-subhead"></div>
@@ -192,6 +215,10 @@
                     <button class="ai-tab-btn" data-tab="apply" type="button">Apply</button>
                 </div>
                 <div class="ai-panel-content"></div>
+                <div class="ai-unlock-wrap">
+                    <div class="ai-unlock-note">Premium reasoning includes deeper interpretation, teaching clarity, and applied workflow guidance.</div>
+                    <button class="ai-unlock-btn" type="button">Unlock AI+ insights</button>
+                </div>
                 <div class="ai-score-wrap">
                     <div class="ai-score-head">
                         <span>Insight strength</span>
@@ -221,6 +248,16 @@
         const closeBtn = modal.querySelector('.ai-close-btn');
         if (closeBtn) closeBtn.addEventListener('click', () => closeModal(targetId));
 
+        const unlockBtn = modal.querySelector('.ai-unlock-btn');
+        if (unlockBtn) {
+            unlockBtn.addEventListener('click', () => {
+                const current = getPanel(targetId);
+                if (!current) return;
+                current.isPremiumUnlocked = true;
+                renderPanel(targetId);
+            });
+        }
+
         return modal;
     }
 
@@ -232,7 +269,8 @@
             panelRegistry.set(targetId, {
                 state: {},
                 activeTab: 'interpret',
-                modalId: `aiInsightsModal-${targetId}`
+                modalId: `aiInsightsModal-${targetId}`,
+                isPremiumUnlocked: false
             });
         }
 

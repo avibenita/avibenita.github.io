@@ -1797,6 +1797,13 @@
                             </label>
                             <input type="number" id="kValue" class="input-field" value="5" step="1" min="0" placeholder="e.g., 0, 1, 5, 10">
                         </div>
+                        <div class="input-group">
+                            <label>Exploratory k Slider (Discrete)
+                                <small style="color: #bbb; font-weight: normal; display: block; margin-top: 2px;">Slide integer k from 0 to n</small>
+                            </label>
+                            <input type="range" id="kDiscreteSlider" min="0" max="10" step="1" value="5" style="width: 100%; accent-color: rgb(120,165,255);">
+                            <small id="kDiscreteLabel" style="color:#bcd7ff; display:block; margin-top:6px; font-weight:600;">k = 5 (n = 10)</small>
+                        </div>
                     `;
                     break;
                 case 'cumulative':
@@ -1806,6 +1813,13 @@
                                 <small style="color: #bbb; font-weight: normal; display: block; margin-top: 2px;">Non-negative integer ≤ n</small>
                             </label>
                             <input type="number" id="kValue" class="input-field" value="5" step="1" min="0" placeholder="e.g., 0, 1, 5, 10">
+                        </div>
+                        <div class="input-group">
+                            <label>Exploratory k Slider (Discrete)
+                                <small style="color: #bbb; font-weight: normal; display: block; margin-top: 2px;">Slide integer k from 0 to n</small>
+                            </label>
+                            <input type="range" id="kDiscreteSlider" min="0" max="10" step="1" value="5" style="width: 100%; accent-color: rgb(120,165,255);">
+                            <small id="kDiscreteLabel" style="color:#bcd7ff; display:block; margin-top:6px; font-weight:600;">k = 5 (n = 10)</small>
                         </div>
                     `;
                     break;
@@ -1831,6 +1845,53 @@
             inputSection.querySelectorAll('input').forEach(input => {
                 input.addEventListener('input', debounce(calculateWithFeedback, 250));
             });
+
+            if (calcType === 'probability' || calcType === 'cumulative') {
+                bindDiscreteKSliderControls();
+                syncDiscreteKSliderDisplay(false);
+            }
+        }
+
+        function bindDiscreteKSliderControls() {
+            const kInput = document.getElementById('kValue');
+            const kSlider = document.getElementById('kDiscreteSlider');
+            if (!kInput || !kSlider) return;
+
+            kSlider.addEventListener('input', function() {
+                syncDiscreteKSliderDisplay(true);
+            });
+
+            kInput.addEventListener('input', function() {
+                syncDiscreteKSliderDisplay(false);
+            });
+        }
+
+        function syncDiscreteKSliderDisplay(fromSlider = false) {
+            const calcType = document.querySelector('input[name="calcType"]:checked')?.value;
+            if (calcType !== 'probability' && calcType !== 'cumulative') return;
+
+            const kInput = document.getElementById('kValue');
+            const kSlider = document.getElementById('kDiscreteSlider');
+            const kLabel = document.getElementById('kDiscreteLabel');
+            const n = parseInt(document.getElementById('nTrials')?.value) || 10;
+            if (!kInput || !kSlider || !kLabel) return;
+
+            const maxK = Math.max(0, n);
+            kSlider.min = '0';
+            kSlider.max = String(maxK);
+
+            if (fromSlider) {
+                const k = parseInt(kSlider.value) || 0;
+                kInput.value = String(Math.max(0, Math.min(maxK, k)));
+            } else {
+                const kRaw = parseInt(kInput.value) || 0;
+                const k = Math.max(0, Math.min(maxK, kRaw));
+                if (kRaw !== k) kInput.value = String(k);
+                kSlider.value = String(k);
+            }
+
+            const kDisplay = parseInt(kInput.value) || 0;
+            kLabel.textContent = `k = ${kDisplay} (n = ${maxK})`;
         }
 
         function initializeCharts() {
@@ -2187,6 +2248,8 @@
                     if (mainResultEl) mainResultEl.textContent = 'Error: Probability must be between 0 and 1';
                     return;
                 }
+
+                syncDiscreteKSliderDisplay(false);
 
                 let result, areaDescription, explanation;
 

@@ -109,26 +109,53 @@
         return Math.round(clamp(score, 8, 100));
     }
 
+    function getPanel(targetId) {
+        return panelRegistry.get(targetId);
+    }
+
+    function closeModal(targetId) {
+        const panel = getPanel(targetId);
+        if (!panel) return;
+        const modal = document.getElementById(panel.modalId);
+        if (!modal) return;
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
+    }
+
+    function openModal(targetId) {
+        const panel = getPanel(targetId);
+        if (!panel) return;
+        const modal = document.getElementById(panel.modalId);
+        if (!modal) return;
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden', 'false');
+    }
+
     function renderPanel(targetId) {
-        const panel = panelRegistry.get(targetId);
+        const panel = getPanel(targetId);
         if (!panel) return;
 
         const mount = document.getElementById(targetId);
-        if (!mount) return;
+        const modal = document.getElementById(panel.modalId);
+        if (!mount || !modal) return;
 
         const lines = buildLines(panel.state, panel.activeTab);
-        const content = mount.querySelector('.ai-panel-content');
-        const scoreValueEl = mount.querySelector('.ai-score-value');
-        const scoreLabelEl = mount.querySelector('.ai-score-label');
-        const scoreBarEl = mount.querySelector('.ai-score-fill');
-        const subheadEl = mount.querySelector('.ai-subhead');
-
-        if (!content || !scoreValueEl || !scoreLabelEl || !scoreBarEl || !subheadEl) return;
-
-        content.innerHTML = lines.map(line => `<div class="ai-line">${line}</div>`).join('');
         const score = computeInsightScore(panel.state);
+        const scoreLabel = insightLabel(score);
+
+        const inlineScoreEl = mount.querySelector('.ai-inline-score');
+        const content = modal.querySelector('.ai-panel-content');
+        const scoreValueEl = modal.querySelector('.ai-score-value');
+        const scoreLabelEl = modal.querySelector('.ai-score-label');
+        const scoreBarEl = modal.querySelector('.ai-score-fill');
+        const subheadEl = modal.querySelector('.ai-subhead');
+
+        if (!inlineScoreEl || !content || !scoreValueEl || !scoreLabelEl || !scoreBarEl || !subheadEl) return;
+
+        inlineScoreEl.textContent = `Insight strength: ${score}/100`;
+        content.innerHTML = lines.map(line => `<div class="ai-line">${line}</div>`).join('');
         scoreValueEl.textContent = `${score} / 100`;
-        scoreLabelEl.textContent = insightLabel(score);
+        scoreLabelEl.textContent = scoreLabel;
         scoreBarEl.style.width = `${score}%`;
         subheadEl.textContent = panel.activeTab === 'interpret'
             ? 'Decision-focused reading of the current result'
@@ -136,27 +163,27 @@
                 ? 'Compact conceptual guidance tied to current state'
                 : 'Workflow bridge for practical statistical use';
 
-        mount.querySelectorAll('.ai-tab-btn').forEach(btn => {
+        modal.querySelectorAll('.ai-tab-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tab === panel.activeTab);
         });
     }
 
-    function initPanel(targetId) {
-        const mount = document.getElementById(targetId);
-        if (!mount) return;
+    function ensureModal(targetId) {
+        const panel = getPanel(targetId);
+        if (!panel) return null;
+        const existing = document.getElementById(panel.modalId);
+        if (existing) return existing;
 
-        if (!panelRegistry.has(targetId)) {
-            panelRegistry.set(targetId, {
-                state: {},
-                activeTab: 'interpret'
-            });
-        }
-
-        mount.innerHTML = `
-            <div class="ai-insights-panel">
+        const modal = document.createElement('div');
+        modal.id = panel.modalId;
+        modal.className = 'ai-insights-modal';
+        modal.setAttribute('aria-hidden', 'true');
+        modal.innerHTML = `
+            <div class="ai-insights-backdrop" data-ai-close></div>
+            <div class="ai-insights-dialog" role="dialog" aria-modal="true" aria-label="AI insights">
                 <div class="ai-panel-head">
                     <span class="ai-title"><i class="fas fa-sparkles"></i> Insight Lens</span>
-                    <span class="ai-score-label">Neutral</span>
+                    <button class="ai-close-btn" type="button" aria-label="Close insights"><i class="fas fa-times"></i></button>
                 </div>
                 <div class="ai-subhead"></div>
                 <div class="ai-tabs">
@@ -171,28 +198,75 @@
                         <span class="ai-score-value">0 / 100</span>
                     </div>
                     <div class="ai-score-track"><div class="ai-score-fill"></div></div>
+                    <div class="ai-score-label">Neutral</div>
                 </div>
             </div>
         `;
 
-        mount.querySelectorAll('.ai-tab-btn').forEach(btn => {
+        document.body.appendChild(modal);
+
+        modal.querySelectorAll('.ai-tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                const panel = panelRegistry.get(targetId);
-                if (!panel) return;
-                panel.activeTab = btn.dataset.tab;
+                const current = getPanel(targetId);
+                if (!current) return;
+                current.activeTab = btn.dataset.tab;
                 renderPanel(targetId);
             });
         });
+
+        modal.querySelectorAll('[data-ai-close]').forEach(el => {
+            el.addEventListener('click', () => closeModal(targetId));
+        });
+
+        const closeBtn = modal.querySelector('.ai-close-btn');
+        if (closeBtn) closeBtn.addEventListener('click', () => closeModal(targetId));
+
+        return modal;
+    }
+
+    function initPanel(targetId) {
+        const mount = document.getElementById(targetId);
+        if (!mount) return;
+
+        if (!panelRegistry.has(targetId)) {
+            panelRegistry.set(targetId, {
+                state: {},
+                activeTab: 'interpret',
+                modalId: `aiInsightsModal-${targetId}`
+            });
+        }
+
+        mount.innerHTML = `
+            <div class="ai-inline-trigger">
+                <button class="ai-open-btn" type="button">
+                    <i class="fas fa-sparkles"></i>
+                    Insight Lens
+                </button>
+                <span class="ai-inline-score">Insight strength: --</span>
+            </div>
+        `;
+
+        ensureModal(targetId);
+
+        const openBtn = mount.querySelector('.ai-open-btn');
+        if (openBtn) {
+            openBtn.addEventListener('click', () => openModal(targetId));
+        }
     }
 
     function update(targetId, state) {
         if (!document.getElementById(targetId)) return;
         initPanel(targetId);
-        const panel = panelRegistry.get(targetId);
+        const panel = getPanel(targetId);
         if (!panel) return;
         panel.state = state || {};
         renderPanel(targetId);
     }
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        panelRegistry.forEach((_value, key) => closeModal(key));
+    });
 
     window.StatisticoAIInsights = {
         update

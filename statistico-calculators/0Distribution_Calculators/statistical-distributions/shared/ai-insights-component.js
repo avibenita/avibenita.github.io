@@ -9,6 +9,17 @@
         return Number.isFinite(value) ? value : fallback;
     }
 
+    function insightLabel(score) {
+        if (score < 35) return 'Neutral';
+        if (score < 60) return 'Informative';
+        if (score < 80) return 'Strong';
+        return 'Highly informative';
+    }
+
+    function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
     function buildLines(state, tab) {
         const calcType = state.calcType || 'probability';
         const mean = safeNum(state.mean);
@@ -16,44 +27,47 @@
         const result = safeNum(state.result);
         const z = stddev > 0 ? (result - mean) / stddev : 0;
         const probability = safeNum(state.probability, 0.5);
+        const leftTail = safeNum(state.leftTail, probability);
+        const rightTail = safeNum(state.rightTail, 1 - leftTail);
+        const absZ = Math.abs(z);
 
         if (tab === 'teach') {
             return [
-                `Mean (mu) sets the center at ${mean.toFixed(3)}, while sigma controls spread at ${stddev.toFixed(3)}.`,
-                'As sigma increases, the curve widens and the peak becomes lower.',
-                'PDF shows density near a point; CDF shows accumulated probability up to a point.'
+                `Unusualness is determined by distance from the mean in sigma units; here that distance is ${absZ.toFixed(3)}σ.`,
+                'Increasing sigma spreads the curve, so the same x becomes less extreme.',
+                'CDF answers "how much is below", while PDF answers "how dense values are near this point."'
             ];
         }
 
         if (tab === 'apply') {
             if (calcType === 'quantile') {
                 return [
-                    `This cutoff is the ${formatPct(probability)} quantile of the model.`,
-                    'Use this as a threshold for risk limits or critical-value style decision rules.',
-                    `The implied standardized cutoff is z = ${z.toFixed(3)}.`
+                    `This cutoff corresponds to the ${formatPct(probability)} percentile used in threshold-based decisions.`,
+                    `${(1 - probability) < 0.05 ? 'It is in a tail region often used for critical-value rules.' : 'It remains inside the broad central region, not a strict critical cutoff.'}`,
+                    `Reference position: z = ${z.toFixed(3)}.`
                 ];
             }
 
             if (calcType === 'between') {
                 return [
-                    `This interval contains ${formatPct(result)} of the modeled outcomes.`,
-                    'Interval probabilities map directly to confidence-style coverage intuition.',
-                    'This is useful for acceptance bands, tolerance windows, and risk envelopes.'
+                    `This interval captures ${formatPct(leftTail)} to ${formatPct(safeNum(state.upperTailCdf, leftTail + result))}, i.e. ${formatPct(result)} total coverage.`,
+                    'Use this directly for acceptance bands, tolerance windows, or risk envelopes.',
+                    `${result < 0.5 ? 'Coverage is relatively narrow, so misses outside the interval are common.' : 'Coverage is broad, so misses outside the interval are less common.'}`
                 ];
             }
 
             return [
-                `This left-tail probability (${formatPct(result)}) can be interpreted as a one-sided tail area.`,
-                'Tail areas connect directly to significance-style reasoning in hypothesis workflows.',
-                `The selected point corresponds to z = ${z.toFixed(3)} from the mean.`
+                `If treated as a right-tail cutoff, this point implies a one-sided p-value of about ${rightTail.toFixed(4)}.`,
+                `${rightTail < 0.05 ? 'This would cross conventional significance thresholds in a right-tailed test.' : 'This is above common significance thresholds, so it is not decision-critical in a right-tailed test.'}`,
+                `Reference position: z = ${z.toFixed(3)}.`
             ];
         }
 
         if (calcType === 'quantile') {
             return [
                 `${formatPct(probability)} of observations are expected at or below x = ${result.toFixed(3)}.`,
-                `This cutoff lies ${Math.abs(z).toFixed(3)} standard deviations ${z >= 0 ? 'above' : 'below'} the mean.`,
-                'For symmetric normal models, the complementary tail can be read directly from this percentile.'
+                `Only ${formatPct(1 - probability)} remain above this threshold, so it is ${probability > 0.9 || probability < 0.1 ? 'tail-oriented' : 'centrally positioned'}.`,
+                `This maps to z = ${z.toFixed(3)} (${z >= 0 ? 'above' : 'below'} the mean).`
             ];
         }
 
@@ -61,18 +75,38 @@
             const lower = safeNum(state.lowerBound);
             const upper = safeNum(state.upperBound);
             return [
-                `The selected interval [${lower.toFixed(3)}, ${upper.toFixed(3)}] contains ${formatPct(result)} of outcomes.`,
-                'This is a direct coverage statement under the current normal assumptions.',
-                'Narrower intervals reduce coverage; wider intervals increase coverage.'
+                `The interval [${lower.toFixed(3)}, ${upper.toFixed(3)}] contains ${formatPct(result)} of modeled outcomes.`,
+                `Outside-interval probability is ${formatPct(1 - result)}, so this range is ${result >= 0.8 ? 'high-coverage' : 'moderate-coverage'}.`,
+                'This directly supports interval-based quality and risk decisions.'
             ];
         }
 
         const x = safeNum(state.xValue);
         return [
-            `At x = ${x.toFixed(3)}, the model places ${formatPct(result)} of outcomes at or below this point.`,
-            `This location is z = ${z.toFixed(3)} relative to mean ${mean.toFixed(3)}.`,
-            'Because the normal model is symmetric, center-adjacent points produce near 50% cumulative probability.'
+            `At x = ${x.toFixed(3)}, the model places ${formatPct(leftTail)} at or below this point and ${formatPct(rightTail)} above it.`,
+            `${rightTail < 0.1 ? 'This sits in a relatively rare upper region.' : 'This remains within a commonly observed region.'}`,
+            `Standardized position is z = ${z.toFixed(3)} relative to mean ${mean.toFixed(3)}.`
         ];
+    }
+
+    function computeInsightScore(state) {
+        const calcType = state.calcType || 'probability';
+        const mean = safeNum(state.mean);
+        const stddev = safeNum(state.stddev, 1);
+        const result = safeNum(state.result);
+        const leftTail = safeNum(state.leftTail, calcType === 'quantile' ? safeNum(state.probability, 0.5) : result);
+        const rightTail = safeNum(state.rightTail, 1 - leftTail);
+        const z = stddev > 0 ? (result - mean) / stddev : 0;
+        const absZ = Math.abs(z);
+
+        let score = 18 + absZ * 26;
+        const tail = Math.min(leftTail, rightTail);
+        if (tail < 0.1) score += 8;
+        if (tail < 0.05) score += 10;
+        if (tail < 0.01) score += 12;
+        if (calcType === 'between') score = 22 + (1 - safeNum(state.result)) * 55;
+        if (calcType === 'quantile') score += 6;
+        return Math.round(clamp(score, 8, 100));
     }
 
     function renderPanel(targetId) {
@@ -84,23 +118,23 @@
 
         const lines = buildLines(panel.state, panel.activeTab);
         const content = mount.querySelector('.ai-panel-content');
-        const unlockBtn = mount.querySelector('.ai-unlock-btn');
-        const badge = mount.querySelector('.ai-badge');
+        const scoreValueEl = mount.querySelector('.ai-score-value');
+        const scoreLabelEl = mount.querySelector('.ai-score-label');
+        const scoreBarEl = mount.querySelector('.ai-score-fill');
+        const subheadEl = mount.querySelector('.ai-subhead');
 
-        if (!content || !unlockBtn || !badge) return;
+        if (!content || !scoreValueEl || !scoreLabelEl || !scoreBarEl || !subheadEl) return;
 
-        if (!panel.premiumEnabled) {
-            content.innerHTML = `
-                <div class="ai-line">${lines[0]}</div>
-                <div class="ai-line locked">${lines[1] || 'Premium insight available.'}</div>
-            `;
-            unlockBtn.style.display = 'inline-flex';
-            badge.textContent = 'Preview';
-        } else {
-            content.innerHTML = lines.map(line => `<div class="ai-line">${line}</div>`).join('');
-            unlockBtn.style.display = 'none';
-            badge.textContent = 'AI+ Enabled';
-        }
+        content.innerHTML = lines.map(line => `<div class="ai-line">${line}</div>`).join('');
+        const score = computeInsightScore(panel.state);
+        scoreValueEl.textContent = `${score} / 100`;
+        scoreLabelEl.textContent = insightLabel(score);
+        scoreBarEl.style.width = `${score}%`;
+        subheadEl.textContent = panel.activeTab === 'interpret'
+            ? 'Decision-focused reading of the current result'
+            : panel.activeTab === 'teach'
+                ? 'Compact conceptual guidance tied to current state'
+                : 'Workflow bridge for practical statistical use';
 
         mount.querySelectorAll('.ai-tab-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tab === panel.activeTab);
@@ -114,24 +148,30 @@
         if (!panelRegistry.has(targetId)) {
             panelRegistry.set(targetId, {
                 state: {},
-                activeTab: 'interpret',
-                premiumEnabled: false
+                activeTab: 'interpret'
             });
         }
 
         mount.innerHTML = `
             <div class="ai-insights-panel">
                 <div class="ai-panel-head">
-                    <span class="ai-title"><i class="fas fa-brain"></i> AI Insights</span>
-                    <span class="ai-badge">Preview</span>
+                    <span class="ai-title"><i class="fas fa-sparkles"></i> Insight Lens</span>
+                    <span class="ai-score-label">Neutral</span>
                 </div>
+                <div class="ai-subhead"></div>
                 <div class="ai-tabs">
                     <button class="ai-tab-btn active" data-tab="interpret" type="button">Interpret</button>
                     <button class="ai-tab-btn" data-tab="teach" type="button">Teach</button>
                     <button class="ai-tab-btn" data-tab="apply" type="button">Apply</button>
                 </div>
                 <div class="ai-panel-content"></div>
-                <button class="ai-unlock-btn" type="button">Unlock full AI+ insights</button>
+                <div class="ai-score-wrap">
+                    <div class="ai-score-head">
+                        <span>Insight strength</span>
+                        <span class="ai-score-value">0 / 100</span>
+                    </div>
+                    <div class="ai-score-track"><div class="ai-score-fill"></div></div>
+                </div>
             </div>
         `;
 
@@ -143,16 +183,6 @@
                 renderPanel(targetId);
             });
         });
-
-        const unlockBtn = mount.querySelector('.ai-unlock-btn');
-        if (unlockBtn) {
-            unlockBtn.addEventListener('click', () => {
-                const panel = panelRegistry.get(targetId);
-                if (!panel) return;
-                panel.premiumEnabled = true;
-                renderPanel(targetId);
-            });
-        }
     }
 
     function update(targetId, state) {

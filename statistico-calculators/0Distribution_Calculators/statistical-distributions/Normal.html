@@ -100,12 +100,7 @@
             </div>
         </div>
         <div class="result-hero-card">
-            <h4><i class="fas fa-lightbulb"></i> Interpretation <span class="main-result-badge" style="margin-left: 6px;">AI+</span></h4>
-            <ul class="interpretation-list" id="interpretationList">
-                <li>Center of this distribution is μ = 0.000.</li>
-                <li>Spread is σ = 1.000.</li>
-                <li>The selected x corresponds to z = 0.000.</li>
-            </ul>
+            <h4><i class="fas fa-lightbulb"></i> Interpretation</h4>
             <div id="aiInsightsMount"></div>
         </div>
 
@@ -1069,57 +1064,43 @@
                     explanationLineEl.textContent = explanationText;
                 }
 
-                const interpretationListEl = document.getElementById('interpretationList');
-                if (interpretationListEl) {
-                    let interpretationLines = [];
-                    switch(calcType) {
-                        case 'probability': {
-                            const xValue = parseFloat(document.getElementById('xValue')?.value) || 0;
-                            const zScore = (xValue - mean) / stddev;
-                            interpretationLines = [
-                                `Center of this distribution is μ = ${mean.toFixed(precision)}.`,
-                                `Spread is σ = ${stddev.toFixed(precision)}.`,
-                                `The selected x corresponds to z = ${zScore.toFixed(precision)}.`
-                            ];
-                            break;
-                        }
-                        case 'between': {
-                            const lowerBound = parseFloat(document.getElementById('lowerBound')?.value) || -1;
-                            const upperBound = parseFloat(document.getElementById('upperBound')?.value) || 1;
-                            const zLower = (lowerBound - mean) / stddev;
-                            const zUpper = (upperBound - mean) / stddev;
-                            interpretationLines = [
-                                `Center of this distribution is μ = ${mean.toFixed(precision)}.`,
-                                `Spread is σ = ${stddev.toFixed(precision)}.`,
-                                `Range maps to z from ${zLower.toFixed(precision)} to ${zUpper.toFixed(precision)}.`
-                            ];
-                            break;
-                        }
-                        case 'quantile': {
-                            const probability = parseFloat(document.getElementById('probability')?.value) || 0.5;
-                            const zQuantile = (result - mean) / stddev;
-                            interpretationLines = [
-                                `Center of this distribution is μ = ${mean.toFixed(precision)}.`,
-                                `Spread is σ = ${stddev.toFixed(precision)}.`,
-                                `${(probability * 100).toFixed(1)}% lies at or below x = ${result.toFixed(precision)} (z = ${zQuantile.toFixed(precision)}).`
-                            ];
-                            break;
-                        }
-                    }
-                    interpretationListEl.innerHTML = interpretationLines.map(line => `<li>${line}</li>`).join('');
-                }
-
                 if (window.StatisticoAIInsights?.update) {
+                    const xValue = parseFloat(document.getElementById('xValue')?.value);
+                    const lowerBound = parseFloat(document.getElementById('lowerBound')?.value);
+                    const upperBound = parseFloat(document.getElementById('upperBound')?.value);
+                    const quantileProbability = parseFloat(document.getElementById('probability')?.value);
+
+                    let leftTail = result;
+                    let rightTail = 1 - result;
+                    let effectiveProbability = result;
+                    let upperTailCdf = lowerBound;
+
+                    if (calcType === 'between') {
+                        const lowerCdf = normalCDF(lowerBound, mean, stddev);
+                        const upperCdf = normalCDF(upperBound, mean, stddev);
+                        leftTail = lowerCdf;
+                        rightTail = 1 - upperCdf;
+                        effectiveProbability = result;
+                        upperTailCdf = upperCdf;
+                    } else if (calcType === 'quantile') {
+                        leftTail = quantileProbability;
+                        rightTail = 1 - quantileProbability;
+                        effectiveProbability = quantileProbability;
+                    }
+
                     const aiState = {
                         distribution: 'normal',
                         calcType,
                         mean,
                         stddev,
                         result,
-                        xValue: parseFloat(document.getElementById('xValue')?.value),
-                        lowerBound: parseFloat(document.getElementById('lowerBound')?.value),
-                        upperBound: parseFloat(document.getElementById('upperBound')?.value),
-                        probability: parseFloat(document.getElementById('probability')?.value)
+                        xValue,
+                        lowerBound,
+                        upperBound,
+                        probability: effectiveProbability,
+                        leftTail,
+                        rightTail,
+                        upperTailCdf
                     };
                     window.StatisticoAIInsights.update('aiInsightsMount', aiState);
                 }

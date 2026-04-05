@@ -1207,6 +1207,21 @@
     <link href="shared/distribution-layout.css" rel="stylesheet"/>
     <style>
         /* Binomial-specific layout tuning: narrower hero card + one-row summary stats */
+        .control-panel {
+            scrollbar-width: thin;
+            -ms-overflow-style: auto;
+        }
+
+        .control-panel::-webkit-scrollbar {
+            display: block;
+            width: 8px;
+        }
+
+        .control-panel::-webkit-scrollbar-thumb {
+            background: rgba(120,165,255,0.35);
+            border-radius: 999px;
+        }
+
         .result-hero-left.main-result-card {
             flex: 0 0 33%;
             max-width: 340px;
@@ -1775,6 +1790,11 @@
             };
         }
 
+        function getIntInput(id, fallback) {
+            const rawValue = parseInt(document.getElementById(id)?.value, 10);
+            return Number.isNaN(rawValue) ? fallback : rawValue;
+        }
+
         function updateRadioSelection() {
             document.querySelectorAll('.radio-option').forEach(option => {
                 option.classList.remove('selected');
@@ -1873,7 +1893,7 @@
             const kInput = document.getElementById('kValue');
             const kSlider = document.getElementById('kDiscreteSlider');
             const kLabel = document.getElementById('kDiscreteLabel');
-            const n = parseInt(document.getElementById('nTrials')?.value) || 10;
+            const n = getIntInput('nTrials', 10);
             if (!kInput || !kSlider || !kLabel) return;
 
             const maxK = Math.max(0, n);
@@ -1881,10 +1901,10 @@
             kSlider.max = String(maxK);
 
             if (fromSlider) {
-                const k = parseInt(kSlider.value) || 0;
+                const k = parseInt(kSlider.value, 10) || 0;
                 kInput.value = String(Math.max(0, Math.min(maxK, k)));
             } else {
-                const kRaw = parseInt(kInput.value) || 0;
+                const kRaw = parseInt(kInput.value, 10) || 0;
                 const k = Math.max(0, Math.min(maxK, kRaw));
                 if (kRaw !== k) kInput.value = String(k);
                 kSlider.value = String(k);
@@ -1961,7 +1981,7 @@
                 pmfChart = Highcharts.chart('pmfChart', {
                     chart: {
                         type: 'column',
-                        marginBottom: 60,
+                        marginBottom: 80,
                         animation: {
                             duration: 800,
                             easing: 'easeOutQuart'
@@ -2050,7 +2070,7 @@
                 cdfChart = Highcharts.chart('cdfChart', {
                     chart: {
                         type: 'line',
-                        marginBottom: 60,
+                        marginBottom: 80,
                         animation: {
                             duration: 800,
                             easing: 'easeOutQuart'
@@ -2101,7 +2121,7 @@
                 combinedChart = Highcharts.chart('combinedChart', {
                     chart: {
                         type: 'column',
-                        marginBottom: 60,
+                        marginBottom: 80,
                         animation: {
                             duration: 800,
                             easing: 'easeOutQuart'
@@ -2232,7 +2252,7 @@
 
         function calculate() {
             try {
-                const n = parseInt(document.getElementById('nTrials')?.value) || 10;
+                const n = getIntInput('nTrials', 10);
                 const p = parseFloat(document.getElementById('pSuccess')?.value) || 0.5;
                 const precision = parseInt(document.getElementById('precision')?.value) || 4;
                 const calcType = document.querySelector('input[name="calcType"]:checked').value;
@@ -2255,7 +2275,7 @@
 
                 switch(calcType) {
                     case 'probability':
-                        const kValue = parseInt(document.getElementById('kValue')?.value) || 5;
+                        const kValue = getIntInput('kValue', 5);
                         if (kValue < 0 || kValue > n) {
                             const mainResultEl = document.getElementById('mainResult');
                             if (mainResultEl) mainResultEl.textContent = `Error: k must be between 0 and ${n}`;
@@ -2267,7 +2287,7 @@
                         break;
 
                     case 'cumulative':
-                        const kValueCum = parseInt(document.getElementById('kValue')?.value) || 5;
+                        const kValueCum = getIntInput('kValue', 5);
                         if (kValueCum < 0 || kValueCum > n) {
                             const mainResultEl = document.getElementById('mainResult');
                             if (mainResultEl) mainResultEl.textContent = `Error: k must be between 0 and ${n}`;
@@ -2279,8 +2299,8 @@
                         break;
 
                     case 'between':
-                        const lowerBound = parseInt(document.getElementById('lowerBound')?.value) || 3;
-                        const upperBound = parseInt(document.getElementById('upperBound')?.value) || 7;
+                        const lowerBound = getIntInput('lowerBound', 3);
+                        const upperBound = getIntInput('upperBound', 7);
                         if (lowerBound < 0 || upperBound < 0 || lowerBound > n || upperBound > n) {
                             const mainResultEl = document.getElementById('mainResult');
                             if (mainResultEl) mainResultEl.textContent = `Error: Bounds must be between 0 and ${n}`;
@@ -2341,14 +2361,14 @@
                     let modeLine = 'Review different inputs to compare event likelihood.';
 
                     if (calcType === 'probability') {
-                        const kValue = parseInt(document.getElementById('kValue')?.value) || 0;
+                        const kValue = getIntInput('kValue', 0);
                         modeLine = `Exact-event mode: evaluating only k = ${kValue}.`;
                     } else if (calcType === 'cumulative') {
-                        const kValue = parseInt(document.getElementById('kValue')?.value) || 0;
+                        const kValue = getIntInput('kValue', 0);
                         modeLine = `Cumulative mode: aggregating outcomes from 0 through ${kValue}.`;
                     } else if (calcType === 'between') {
-                        const lowerBound = parseInt(document.getElementById('lowerBound')?.value) || 0;
-                        const upperBound = parseInt(document.getElementById('upperBound')?.value) || 0;
+                        const lowerBound = getIntInput('lowerBound', 0);
+                        const upperBound = getIntInput('upperBound', 0);
                         modeLine = `Range mode: aggregating outcomes from ${lowerBound} through ${upperBound}.`;
                     }
 
@@ -2478,7 +2498,7 @@
         }
 
         function updateStatistics() {
-            const n = parseInt(document.getElementById('nTrials')?.value) || 10;
+            const n = getIntInput('nTrials', 10);
             const p = parseFloat(document.getElementById('pSuccess')?.value) || 0.5;
             const precision = parseInt(document.getElementById('precision')?.value) || 4;
 
@@ -2507,7 +2527,7 @@
         }
 
         function updateCharts() {
-            const n = parseInt(document.getElementById('nTrials')?.value) || 10;
+            const n = getIntInput('nTrials', 10);
             const p = parseFloat(document.getElementById('pSuccess')?.value) || 0.5;
             const chartRange = document.getElementById('chartRange')?.value || 'centered';
             const calcType = document.querySelector('input[name="calcType"]:checked').value;
@@ -2529,20 +2549,20 @@
             let highlightValues = [];
             switch(calcType) {
                 case 'probability':
-                    const kValue = parseInt(document.getElementById('kValue')?.value) || 5;
+                    const kValue = getIntInput('kValue', 5);
                     if (kValue >= 0 && kValue <= n) {
                         highlightValues = [kValue];
                     }
                     break;
                 case 'cumulative':
-                    const kValueCum = parseInt(document.getElementById('kValue')?.value) || 5;
+                    const kValueCum = getIntInput('kValue', 5);
                     if (kValueCum >= 0 && kValueCum <= n) {
                         highlightValues = Array.from({length: kValueCum + 1}, (_, i) => i);
                     }
                     break;
                 case 'between':
-                    const lowerBound = parseInt(document.getElementById('lowerBound')?.value) || 3;
-                    const upperBound = parseInt(document.getElementById('upperBound')?.value) || 7;
+                    const lowerBound = getIntInput('lowerBound', 3);
+                    const upperBound = getIntInput('upperBound', 7);
                     if (lowerBound >= 0 && upperBound <= n && lowerBound <= upperBound) {
                         highlightValues = Array.from({length: upperBound - lowerBound + 1}, (_, i) => lowerBound + i);
                     }
@@ -2616,7 +2636,7 @@
                         const precision = parseInt(document.getElementById('precision')?.value) || 4;
 
                         if (calcType === 'cumulative') {
-                            const kValueCum = parseInt(document.getElementById('kValue')?.value) || 5;
+                            const kValueCum = getIntInput('kValue', 5);
                             if (kValueCum >= minK && kValueCum <= maxK) {
                                 const cumulativeResult = binomialCDF(kValueCum, n, p);
 
@@ -2641,7 +2661,7 @@
                                 });
                             }
                         } else if (calcType === 'probability') {
-                            const kValue = parseInt(document.getElementById('kValue')?.value) || 5;
+                            const kValue = getIntInput('kValue', 5);
                             if (kValue >= minK && kValue <= maxK) {
                                 const probabilityResult = binomialPMF(kValue, n, p);
 
@@ -2666,8 +2686,8 @@
                                 });
                             }
                         } else if (calcType === 'between') {
-                            const lowerBound = parseInt(document.getElementById('lowerBound')?.value) || 3;
-                            const upperBound = parseInt(document.getElementById('upperBound')?.value) || 7;
+                            const lowerBound = getIntInput('lowerBound', 3);
+                            const upperBound = getIntInput('upperBound', 7);
 
                             if (lowerBound >= minK && upperBound <= maxK && lowerBound <= upperBound) {
                                 const lowerProb = lowerBound > 0 ? binomialCDF(lowerBound - 1, n, p) : 0;
@@ -2772,7 +2792,7 @@
                         const precision = parseInt(document.getElementById('precision')?.value) || 4;
 
                         if (calcType === 'cumulative') {
-                            const kValueCum = parseInt(document.getElementById('kValue')?.value) || 5;
+                            const kValueCum = getIntInput('kValue', 5);
                             if (kValueCum >= minK && kValueCum <= maxK) {
                                 const cumulativeResult = binomialCDF(kValueCum, n, p);
 
@@ -2797,7 +2817,7 @@
                                 });
                             }
                         } else if (calcType === 'probability') {
-                            const kValue = parseInt(document.getElementById('kValue')?.value) || 5;
+                            const kValue = getIntInput('kValue', 5);
                             if (kValue >= minK && kValue <= maxK) {
                                 const probabilityResult = binomialPMF(kValue, n, p);
 
@@ -2822,8 +2842,8 @@
                                 });
                             }
                         } else if (calcType === 'between') {
-                            const lowerBound = parseInt(document.getElementById('lowerBound')?.value) || 3;
-                            const upperBound = parseInt(document.getElementById('upperBound')?.value) || 7;
+                            const lowerBound = getIntInput('lowerBound', 3);
+                            const upperBound = getIntInput('upperBound', 7);
 
                             if (lowerBound >= minK && upperBound <= maxK && lowerBound <= upperBound) {
                                 const lowerProb = lowerBound > 0 ? binomialCDF(lowerBound - 1, n, p) : 0;

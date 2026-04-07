@@ -226,7 +226,9 @@
 .srng-panel {
   width: min(900px, 96vw);
   max-height: 88vh;
-  overflow: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   background: linear-gradient(180deg, #0c1a31 0%, #0a1528 100%);
   border: 1px solid rgba(120, 165, 255, 0.35);
   border-radius: 14px;
@@ -275,7 +277,7 @@
 .srng-chip { border:1px solid rgba(155,191,255,0.28); background: rgba(71,111,178,0.15); border-radius:8px; padding:8px; }
 .srng-chip-label { font-size:0.72rem; color:#9fc2ef; margin-bottom:3px; }
 .srng-chip-value { font-size:0.95rem; color:#edf6ff; font-weight:600; }
-.srng-table-wrap { border:1px solid rgba(255,255,255,0.14); border-radius:10px; overflow:hidden; }
+.srng-table-wrap { border:1px solid rgba(255,255,255,0.14); border-radius:10px; overflow:auto; max-height: 33vh; }
 .srng-table { width:100%; border-collapse: collapse; font-size: 0.9rem; }
 .srng-table th, .srng-table td { padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left; }
 .srng-table th { position: sticky; top: 0; background:#112446; color:#cfe6ff; z-index: 1; }

@@ -33,6 +33,137 @@
                 grid-template-columns: 1fr !important;
             }
         }
+
+        .random-generator-trigger {
+            width: 90%;
+            background: linear-gradient(135deg, rgba(84, 201, 255, 0.2), rgba(120, 165, 255, 0.15));
+            border: 1px solid rgba(120, 200, 255, 0.45);
+            color: rgb(150, 220, 255);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+        }
+
+        .random-generator-trigger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(84, 201, 255, 0.24);
+            border-color: rgba(120, 200, 255, 0.62);
+        }
+
+        .random-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(4, 10, 20, 0.76);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            padding: 20px;
+            backdrop-filter: blur(4px);
+        }
+
+        .random-modal.active {
+            display: flex;
+        }
+
+        .random-modal-panel {
+            width: min(880px, 96vw);
+            max-height: 88vh;
+            overflow: auto;
+            background: linear-gradient(180deg, #0c1a31 0%, #0a1528 100%);
+            border: 1px solid rgba(120, 165, 255, 0.35);
+            border-radius: 14px;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+            padding: 16px;
+        }
+
+        .random-modal-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .random-modal-title {
+            margin: 0;
+            font-size: 1.05rem;
+            color: #d7ecff;
+        }
+
+        .random-close {
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.06);
+            color: #e8f2ff;
+            border-radius: 8px;
+            padding: 4px 10px;
+            cursor: pointer;
+        }
+
+        .random-specs-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .random-specs-grid label {
+            display: block;
+            font-size: 0.82rem;
+            color: #b8d8ff;
+            margin-bottom: 6px;
+        }
+
+        .random-actions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .random-table-wrap {
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 10px;
+            overflow: auto;
+            max-height: 46vh;
+        }
+
+        .random-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .random-table th,
+        .random-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            text-align: left;
+        }
+
+        .random-table th {
+            position: sticky;
+            top: 0;
+            background: #112446;
+            color: #cfe6ff;
+            z-index: 1;
+        }
+
+        .random-status {
+            margin-bottom: 10px;
+            font-size: 0.85rem;
+            color: #9dc7ff;
+            min-height: 1.1em;
+        }
+
+        @media (max-width: 760px) {
+            .random-specs-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
     </style>
     </head>
 <body style="margin: 0; overflow: hidden;">
@@ -202,6 +333,11 @@
                                     </div>
                                 </div>
                             </div>
+                            <div class="control-block-random">
+                                <button class="random-generator-trigger" onclick="openRandomModal()">
+                                    <i class="fas fa-dice"></i> Generate Random Numbers
+                                </button>
+                            </div>
                             <div class="control-block-about">
                                 <button onclick="openAboutModal()" style="
                                     width: 90%;
@@ -286,6 +422,57 @@
                         </div>
                     </div>
                 </div>
+
+    <div id="randomModal" class="random-modal">
+        <div class="random-modal-panel">
+            <div class="random-modal-top">
+                <h3 class="random-modal-title"><i class="fas fa-dice"></i> Random Samples from Normal Distribution</h3>
+                <button class="random-close" onclick="closeRandomModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="random-specs-grid">
+                <div>
+                    <label for="randomMean">Mean (mu)</label>
+                    <input id="randomMean" class="input-field" type="number" readonly>
+                </div>
+                <div>
+                    <label for="randomStddev">Std Dev (sigma)</label>
+                    <input id="randomStddev" class="input-field" type="number" readonly>
+                </div>
+                <div>
+                    <label for="randomSampleSize">Sample Size (n)</label>
+                    <input id="randomSampleSize" class="input-field" type="number" min="1" max="2000" step="1" value="30">
+                </div>
+                <div>
+                    <label for="randomPrecision">Decimals</label>
+                    <input id="randomPrecision" class="input-field" type="number" min="0" max="10" step="1" value="4">
+                </div>
+            </div>
+            <div class="random-actions">
+                <button class="btn btn-primary" onclick="generateRandomSamples()">
+                    <i class="fas fa-bolt"></i> Generate
+                </button>
+                <button class="btn btn-success" id="copyRandomBtn" onclick="copyRandomSamples()" disabled>
+                    <i class="fas fa-copy"></i> Copy to Clipboard
+                </button>
+            </div>
+            <div class="random-status" id="randomStatus">Set sample size, then click Generate.</div>
+            <div class="random-table-wrap">
+                <table class="random-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Sample Value</th>
+                        </tr>
+                    </thead>
+                    <tbody id="randomTableBody">
+                        <tr>
+                            <td colspan="2" style="color:#9fb5cc;">No samples generated yet.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 
     <!-- About Normal Distribution Modal -->
     <div id="aboutModal" class="about-modal">
@@ -424,6 +611,7 @@
     <script>
         let pdfChart, cdfChart, combinedChart;
         let currentCalcType = 'probability';
+        let latestRandomSamples = [];
 
         // Store chart data for animations
         let chartDataStore = {
@@ -1865,19 +2053,128 @@
             document.body.style.overflow = 'auto'; // Restore background scrolling
         }
 
+        function openRandomModal() {
+            const mean = parseFloat(document.getElementById('mean')?.value) || 0;
+            const stddev = parseFloat(document.getElementById('stddev')?.value) || 1;
+            const precision = parseInt(document.getElementById('precision')?.value) || 3;
+            document.getElementById('randomMean').value = mean;
+            document.getElementById('randomStddev').value = stddev;
+            document.getElementById('randomPrecision').value = Math.max(0, Math.min(10, precision));
+            document.getElementById('randomModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeRandomModal() {
+            document.getElementById('randomModal').classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
+
+        function drawStandardNormal() {
+            let u1 = 0;
+            while (u1 === 0) {
+                u1 = Math.random();
+            }
+            const u2 = Math.random();
+            return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        }
+
+        function generateRandomSamples() {
+            const mean = parseFloat(document.getElementById('mean')?.value);
+            const stddev = parseFloat(document.getElementById('stddev')?.value);
+            const nRaw = parseInt(document.getElementById('randomSampleSize')?.value, 10);
+            const decimalsRaw = parseInt(document.getElementById('randomPrecision')?.value, 10);
+            const status = document.getElementById('randomStatus');
+            const copyBtn = document.getElementById('copyRandomBtn');
+
+            if (!Number.isFinite(mean) || !Number.isFinite(stddev) || stddev <= 0) {
+                status.textContent = 'Invalid mean/std dev. Standard deviation must be greater than 0.';
+                return;
+            }
+
+            const n = Math.max(1, Math.min(2000, Number.isFinite(nRaw) ? nRaw : 30));
+            const decimals = Math.max(0, Math.min(10, Number.isFinite(decimalsRaw) ? decimalsRaw : 4));
+
+            latestRandomSamples = [];
+            for (let i = 0; i < n; i++) {
+                latestRandomSamples.push(mean + stddev * drawStandardNormal());
+            }
+
+            renderRandomSamplesTable(decimals);
+            copyBtn.disabled = latestRandomSamples.length === 0;
+            status.textContent = `Generated ${latestRandomSamples.length} samples from N(${mean}, ${stddev}).`;
+        }
+
+        function renderRandomSamplesTable(decimals) {
+            const tbody = document.getElementById('randomTableBody');
+            tbody.innerHTML = '';
+
+            if (!latestRandomSamples.length) {
+                tbody.innerHTML = '<tr><td colspan="2" style="color:#9fb5cc;">No samples generated yet.</td></tr>';
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            latestRandomSamples.forEach((value, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${index + 1}</td><td>${value.toFixed(decimals)}</td>`;
+                fragment.appendChild(tr);
+            });
+            tbody.appendChild(fragment);
+        }
+
+        async function copyRandomSamples() {
+            const status = document.getElementById('randomStatus');
+            if (!latestRandomSamples.length) {
+                status.textContent = 'Nothing to copy yet. Generate samples first.';
+                return;
+            }
+
+            const decimalsRaw = parseInt(document.getElementById('randomPrecision')?.value, 10);
+            const decimals = Math.max(0, Math.min(10, Number.isFinite(decimalsRaw) ? decimalsRaw : 4));
+            const mean = parseFloat(document.getElementById('mean')?.value) || 0;
+            const stddev = parseFloat(document.getElementById('stddev')?.value) || 1;
+
+            const lines = ['index,value', ...latestRandomSamples.map((v, i) => `${i + 1},${v.toFixed(decimals)}`)];
+            const payload = `Normal samples generated from N(${mean}, ${stddev})\n${lines.join('\n')}`;
+
+            try {
+                await navigator.clipboard.writeText(payload);
+                status.textContent = 'Copied samples to clipboard.';
+            } catch (error) {
+                const temp = document.createElement('textarea');
+                temp.value = payload;
+                document.body.appendChild(temp);
+                temp.select();
+                document.execCommand('copy');
+                temp.remove();
+                status.textContent = 'Copied samples to clipboard.';
+            }
+        }
+
         // Close modal when clicking outside the content
         document.addEventListener('DOMContentLoaded', function() {
-            const modal = document.getElementById('aboutModal');
-            modal.addEventListener('click', function(e) {
-                if (e.target === modal) {
+            const aboutModal = document.getElementById('aboutModal');
+            const randomModal = document.getElementById('randomModal');
+
+            aboutModal.addEventListener('click', function(e) {
+                if (e.target === aboutModal) {
                     closeAboutModal();
+                }
+            });
+
+            randomModal.addEventListener('click', function(e) {
+                if (e.target === randomModal) {
+                    closeRandomModal();
                 }
             });
 
             // Close modal with Escape key
             document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape' && modal.classList.contains('active')) {
+                if (e.key === 'Escape' && aboutModal.classList.contains('active')) {
                     closeAboutModal();
+                }
+                if (e.key === 'Escape' && randomModal.classList.contains('active')) {
+                    closeRandomModal();
                 }
             });
         });

@@ -190,6 +190,36 @@
     style.id = "srng-style";
     style.textContent = `
 .srng-button-wrap { margin: 10px 0 12px; display:flex; justify-content:center; }
+.srng-layout-standard .control-panel-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 100%;
+}
+.srng-layout-standard .control-block-inputs,
+.srng-layout-standard .control-block-calculation,
+.srng-layout-standard .control-block-contextual {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(120,165,255,0.22);
+  background: rgba(6, 17, 32, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+}
+.srng-layout-standard .control-block-about {
+  margin: 0;
+  padding: 8px 0 0 0;
+  border-top: 1px solid rgba(120,165,255,0.2);
+  text-align: center;
+}
+.srng-layout-standard .mean-std-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  gap: 10px;
+  align-items: end;
+}
+.srng-layout-standard .mean-std-row .input-group { margin-bottom: 0 !important; }
 .srng-trigger {
   width: min(280px, 78%);
   display:block;
@@ -197,7 +227,8 @@
   background: linear-gradient(135deg, #2ecc71, #27ae60);
   border: 1px solid rgba(46, 204, 113, 0.7);
   color: #ffffff;
-  padding: 7px 14px;
+  height: 40px;
+  padding: 0 14px;
   border-radius: 8px;
   font-size: 0.88rem;
   font-weight: 600;
@@ -210,6 +241,17 @@
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(46, 204, 113, 0.3);
   border-color: rgba(46, 204, 113, 0.9);
+}
+.srng-layout-standard .about-action-btn,
+.srng-layout-standard .about-btn,
+.srng-layout-standard .control-block-about button {
+  min-height: 40px !important;
+  height: 40px !important;
+  padding: 0 14px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
 }
 .srng-modal {
   position: fixed;
@@ -300,6 +342,9 @@
   .srng-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .srng-pedagogy-grid { grid-template-columns:1fr; }
   .srng-analytics { grid-template-columns:1fr; }
+}
+@media (max-width: 520px) {
+  .srng-layout-standard .mean-std-row { grid-template-columns: 1fr !important; }
 }
 `;
     document.head.appendChild(style);
@@ -542,14 +587,44 @@
       });
   }
 
+  function applyUnifiedCalculatorLayout() {
+    document.body.classList.add("srng-layout-standard");
+
+    const aboutBtn =
+      document.querySelector(".control-block-about button") ||
+      document.querySelector("button[onclick*=\"openAboutModal\"]") ||
+      document.querySelector(".about-btn");
+    if (aboutBtn) {
+      aboutBtn.classList.add("about-action-btn");
+    }
+
+    const meanInput = document.getElementById("mean");
+    const stdInput = document.getElementById("stddev");
+    if (meanInput && stdInput) {
+      const meanGroup = meanInput.closest(".input-group");
+      const stdGroup = stdInput.closest(".input-group");
+      if (meanGroup && stdGroup && meanGroup.parentElement && meanGroup.parentElement === stdGroup.parentElement) {
+        const parent = meanGroup.parentElement;
+        if (!meanGroup.closest(".mean-std-row")) {
+          const row = document.createElement("div");
+          row.className = "mean-std-row";
+          parent.insertBefore(row, meanGroup);
+          row.appendChild(meanGroup);
+          row.appendChild(stdGroup);
+        }
+      }
+    }
+  }
+
   function installComponent() {
+    injectStyles();
+    applyUnifiedCalculatorLayout();
+
     if (document.getElementById(COMPONENT_ID)) return;
     if (document.querySelector(".random-generator-trigger")) return;
 
     const config = distConfigFromPath();
     if (!config) return;
-
-    injectStyles();
 
     const aboutBtn =
       document.querySelector(".control-block-about button") ||

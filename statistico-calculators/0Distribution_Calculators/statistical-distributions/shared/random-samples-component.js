@@ -269,6 +269,11 @@
 .srng-btn.srng-copy { background: linear-gradient(135deg, #28c76f, #1ba083); color: #fff; border: none; }
 .srng-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .srng-status { margin-bottom:10px; font-size:0.85rem; color:#9dc7ff; min-height:1.1em; }
+.srng-pedagogy { border:1px solid rgba(255,255,255,0.14); border-radius:10px; background: rgba(10, 24, 48, 0.72); padding:10px; margin-bottom:12px; display:none; }
+.srng-pedagogy-title { margin:0 0 8px 0; font-size:0.86rem; color:#bcd9ff; font-weight:600; }
+.srng-pedagogy-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.srng-pedagogy-item label { display:flex; justify-content:space-between; font-size:0.78rem; color:#b8d8ff; margin-bottom:6px; }
+.srng-pedagogy-item input[type="range"] { width:100%; accent-color:#7dbdff; }
 .srng-analytics { display:grid; grid-template-columns:1.4fr 1fr; gap:10px; margin-bottom:12px; }
 .srng-card { border: 1px solid rgba(255,255,255,0.14); border-radius:10px; background: rgba(10, 24, 48, 0.72); padding:10px; }
 .srng-mini-title { margin:0 0 8px 0; font-size:0.86rem; color:#bcd9ff; font-weight:600; }
@@ -283,6 +288,7 @@
 .srng-table th { position: sticky; top: 0; background:#112446; color:#cfe6ff; z-index: 1; }
 @media (max-width: 760px) {
   .srng-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .srng-pedagogy-grid { grid-template-columns:1fr; }
   .srng-analytics { grid-template-columns:1fr; }
 }
 `;
@@ -314,6 +320,23 @@
         <div class="srng-actions">
           <button class="srng-btn srng-generate" type="button" id="srngGenerateBtn"><i class="fas fa-bolt"></i> Generate</button>
           <button class="srng-btn srng-copy" type="button" id="srngCopyBtn" disabled><i class="fas fa-copy"></i> Copy Numbers</button>
+        </div>
+        <div class="srng-pedagogy" id="srngPedagogy">
+          <h4 class="srng-pedagogy-title">Interactive Pedagogic Sliders</h4>
+          <div class="srng-pedagogy-grid">
+            <div class="srng-pedagogy-item">
+              <label>Mean (mu) <span id="srngMeanValue">0.00</span></label>
+              <input id="srngMeanSlider" type="range" min="-10" max="10" step="0.1" value="0"/>
+            </div>
+            <div class="srng-pedagogy-item">
+              <label>Std Dev (sigma) <span id="srngStdValue">1.00</span></label>
+              <input id="srngStdSlider" type="range" min="0.1" max="5" step="0.1" value="1"/>
+            </div>
+            <div class="srng-pedagogy-item">
+              <label>Sample Size (n) <span id="srngNValue">30</span></label>
+              <input id="srngNSlider" type="range" min="5" max="300" step="1" value="30"/>
+            </div>
+          </div>
         </div>
         <div class="srng-status" id="srngStatus">Set sample size, then click Generate.</div>
         <div class="srng-analytics">
@@ -518,17 +541,44 @@
     const generateBtn = document.getElementById("srngGenerateBtn");
     const copyBtn = document.getElementById("srngCopyBtn");
     const statusEl = document.getElementById("srngStatus");
+    const pedagogyPanel = document.getElementById("srngPedagogy");
+    const meanSlider = document.getElementById("srngMeanSlider");
+    const stdSlider = document.getElementById("srngStdSlider");
+    const nSlider = document.getElementById("srngNSlider");
+    const isNormal = config.name === "Normal Distribution";
     const setStatus = (msg) => {
       statusEl.textContent = msg;
     };
 
-    let latestValues = [];
-    generateBtn.addEventListener("click", () => {
+    function syncPedagogyValues() {
+      if (!isNormal) return;
+      const mean = parseFloat(meanSlider.value) || 0;
+      const std = parseFloat(stdSlider.value) || 1;
+      const n = parseInt(nSlider.value, 10) || 30;
+      const meanValue = document.getElementById("srngMeanValue");
+      const stdValue = document.getElementById("srngStdValue");
+      const nValue = document.getElementById("srngNValue");
+      if (meanValue) meanValue.textContent = mean.toFixed(2);
+      if (stdValue) stdValue.textContent = std.toFixed(2);
+      if (nValue) nValue.textContent = String(n);
+      document.getElementById("srngSampleSize").value = String(n);
+      document.getElementById("srngParamText").textContent = `mean=${mean.toFixed(3)}, stddev=${std.toFixed(3)}`;
+    }
+
+    function getActiveParams() {
+      if (!isNormal) return config.getParams();
+      return {
+        mean: parseFloat(meanSlider.value) || 0,
+        stddev: parseFloat(stdSlider.value) || 1,
+      };
+    }
+
+    function runGeneration(isInteractive = false) {
       if (config.requiresJstat) {
         setStatus(config.jstatMissingMessage || "Required math library is missing.");
         return;
       }
-      const params = config.getParams();
+      const params = getActiveParams();
       if (!config.validate(params)) {
         setStatus("Invalid distribution parameters. Please correct inputs and retry.");
         return;
@@ -549,13 +599,51 @@
       renderHistogram(latestValues);
       copyBtn.disabled = latestValues.length === 0;
       const shown = Math.min(8, latestValues.length);
-      setStatus(`Generated ${latestValues.length} samples from ${config.name}. Showing ${shown} rows.`);
-    });
+      setStatus(`${isInteractive ? "Interactive update" : "Generated"} ${latestValues.length} samples from ${config.name}. Showing ${shown} rows.`);
+    }
+
+    let latestValues = [];
+    generateBtn.addEventListener("click", () => runGeneration(false));
+
+    if (isNormal) {
+      pedagogyPanel.style.display = "block";
+      [meanSlider, stdSlider, nSlider].forEach((slider) => {
+        slider.addEventListener("input", () => {
+          syncPedagogyValues();
+          runGeneration(true);
+        });
+      });
+      const sampleSizeInput = document.getElementById("srngSampleSize");
+      sampleSizeInput.addEventListener("input", () => {
+        const parsed = parseInt(sampleSizeInput.value, 10);
+        if (Number.isFinite(parsed)) nSlider.value = String(Math.max(5, Math.min(300, parsed)));
+        syncPedagogyValues();
+      });
+    } else {
+      pedagogyPanel.style.display = "none";
+    }
 
     copyBtn.addEventListener("click", () => {
       const decimalsRaw = parseInt(document.getElementById("srngDecimals").value, 10);
       const decimals = Math.max(0, Math.min(10, Number.isFinite(decimalsRaw) ? decimalsRaw : 4));
       copyNumbersOnly(latestValues, decimals, setStatus);
+    });
+
+    const originalOpenModal = openModal;
+    triggerWrap.querySelector("button").removeEventListener("click", openModal);
+    triggerWrap.querySelector("button").addEventListener("click", () => {
+      originalOpenModal();
+      if (isNormal) {
+        const p = config.getParams();
+        meanSlider.min = String((Number.isFinite(p.mean) ? p.mean : 0) - 10);
+        meanSlider.max = String((Number.isFinite(p.mean) ? p.mean : 0) + 10);
+        meanSlider.value = String(Number.isFinite(p.mean) ? p.mean : 0);
+        stdSlider.max = String(Math.max(5, (Number.isFinite(p.stddev) ? p.stddev : 1) * 3));
+        stdSlider.value = String(Number.isFinite(p.stddev) ? p.stddev : 1);
+        nSlider.value = document.getElementById("srngSampleSize").value || "30";
+        syncPedagogyValues();
+        runGeneration(true);
+      }
     });
   }
 

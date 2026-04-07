@@ -129,6 +129,40 @@
             flex-wrap: wrap;
         }
 
+        .random-pedagogic {
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 10px;
+            background: rgba(10, 24, 48, 0.72);
+            padding: 10px;
+            margin-bottom: 12px;
+        }
+
+        .random-pedagogic h4 {
+            margin: 0 0 8px 0;
+            font-size: 0.86rem;
+            color: #bcd9ff;
+            font-weight: 600;
+        }
+
+        .random-slider-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .random-slider-item label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            color: #b8d8ff;
+            margin-bottom: 6px;
+        }
+
+        .random-slider-item input[type="range"] {
+            width: 100%;
+            accent-color: #7dbdff;
+        }
+
         .random-table-wrap {
             border: 1px solid rgba(255, 255, 255, 0.14);
             border-radius: 10px;
@@ -218,6 +252,10 @@
         @media (max-width: 760px) {
             .random-specs-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .random-slider-grid {
+                grid-template-columns: 1fr;
             }
 
             .random-analytics {
@@ -514,6 +552,23 @@
                 <button class="btn btn-success" id="copyRandomBtn" onclick="copyRandomSamples()" disabled>
                     <i class="fas fa-copy"></i> Copy to Clipboard
                 </button>
+            </div>
+            <div class="random-pedagogic">
+                <h4>Interactive Pedagogic Sliders</h4>
+                <div class="random-slider-grid">
+                    <div class="random-slider-item">
+                        <label>Mean (mu) <span id="pedagMeanValue">0.00</span></label>
+                        <input id="pedagMeanSlider" type="range" min="-10" max="10" step="0.1" value="0">
+                    </div>
+                    <div class="random-slider-item">
+                        <label>Std Dev (sigma) <span id="pedagStdValue">1.00</span></label>
+                        <input id="pedagStdSlider" type="range" min="0.1" max="5" step="0.1" value="1">
+                    </div>
+                    <div class="random-slider-item">
+                        <label>Sample Size (n) <span id="pedagNValue">30</span></label>
+                        <input id="pedagNSlider" type="range" min="5" max="300" step="1" value="30">
+                    </div>
+                </div>
             </div>
             <div class="random-status" id="randomStatus">Set sample size, then click Generate.</div>
             <div class="random-analytics">
@@ -2148,8 +2203,22 @@
             document.getElementById('randomMean').value = mean;
             document.getElementById('randomStddev').value = stddev;
             document.getElementById('randomPrecision').value = Math.max(0, Math.min(10, precision));
+
+            const meanSlider = document.getElementById('pedagMeanSlider');
+            const stdSlider = document.getElementById('pedagStdSlider');
+            const nSlider = document.getElementById('pedagNSlider');
+            meanSlider.min = String(mean - 10);
+            meanSlider.max = String(mean + 10);
+            meanSlider.value = String(mean);
+            stdSlider.max = String(Math.max(5, stddev * 3));
+            stdSlider.value = String(stddev);
+            nSlider.value = document.getElementById('randomSampleSize').value || '30';
+            syncPedagogicValues();
+            bindPedagogicSliders();
+
             document.getElementById('randomModal').classList.add('active');
             document.body.style.overflow = 'hidden';
+            generateRandomSamples(true);
         }
 
         function closeRandomModal() {
@@ -2166,9 +2235,34 @@
             return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
         }
 
-        function generateRandomSamples() {
-            const mean = parseFloat(document.getElementById('mean')?.value);
-            const stddev = parseFloat(document.getElementById('stddev')?.value);
+        function bindPedagogicSliders() {
+            if (window.__pedagSlidersBound) return;
+            window.__pedagSlidersBound = true;
+            ['pedagMeanSlider', 'pedagStdSlider', 'pedagNSlider'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.addEventListener('input', () => {
+                    syncPedagogicValues();
+                    generateRandomSamples(true);
+                });
+            });
+        }
+
+        function syncPedagogicValues() {
+            const mean = parseFloat(document.getElementById('pedagMeanSlider')?.value) || 0;
+            const stddev = parseFloat(document.getElementById('pedagStdSlider')?.value) || 1;
+            const n = parseInt(document.getElementById('pedagNSlider')?.value, 10) || 30;
+            document.getElementById('pedagMeanValue').textContent = mean.toFixed(2);
+            document.getElementById('pedagStdValue').textContent = stddev.toFixed(2);
+            document.getElementById('pedagNValue').textContent = String(n);
+            document.getElementById('randomMean').value = mean;
+            document.getElementById('randomStddev').value = stddev;
+            document.getElementById('randomSampleSize').value = String(n);
+        }
+
+        function generateRandomSamples(isInteractive = false) {
+            const mean = parseFloat(document.getElementById('randomMean')?.value);
+            const stddev = parseFloat(document.getElementById('randomStddev')?.value);
             const nRaw = parseInt(document.getElementById('randomSampleSize')?.value, 10);
             const decimalsRaw = parseInt(document.getElementById('randomPrecision')?.value, 10);
             const status = document.getElementById('randomStatus');
@@ -2191,7 +2285,7 @@
             renderRandomAnalytics(decimals);
             copyBtn.disabled = latestRandomSamples.length === 0;
             const shown = Math.min(8, latestRandomSamples.length);
-            status.textContent = `Generated ${latestRandomSamples.length} samples from N(${mean}, ${stddev}). Showing ${shown} rows.`;
+            status.textContent = `${isInteractive ? 'Interactive update' : 'Generated'} ${latestRandomSamples.length} samples from N(${mean}, ${stddev}). Showing ${shown} rows.`;
         }
 
         function renderRandomAnalytics(decimals) {

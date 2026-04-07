@@ -283,6 +283,16 @@
 .srng-chip-label { font-size:0.72rem; color:#9fc2ef; margin-bottom:3px; }
 .srng-chip-value { font-size:0.95rem; color:#edf6ff; font-weight:600; }
 .srng-table-wrap { border:1px solid rgba(255,255,255,0.14); border-radius:10px; overflow:auto; max-height: 33vh; }
+.srng-table-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding: 8px 10px;
+  border-bottom:1px solid rgba(255,255,255,0.12);
+  background: rgba(17, 36, 70, 0.62);
+}
+.srng-table-title { font-size:0.82rem; color:#cfe0f5; font-weight:700; }
 .srng-table { width:100%; border-collapse: collapse; font-size: 0.9rem; }
 .srng-table th, .srng-table td { padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left; }
 .srng-table th { position: sticky; top: 0; background:#112446; color:#cfe6ff; z-index: 1; }
@@ -319,7 +329,6 @@
         </div>
         <div class="srng-actions">
           <button class="srng-btn srng-generate" type="button" id="srngGenerateBtn"><i class="fas fa-bolt"></i> Generate</button>
-          <button class="srng-btn srng-copy" type="button" id="srngCopyBtn" disabled><i class="fas fa-copy"></i> Copy Numbers</button>
         </div>
         <div class="srng-pedagogy" id="srngPedagogy">
           <h4 class="srng-pedagogy-title">Interactive Pedagogic Sliders</h4>
@@ -355,6 +364,10 @@
           </div>
         </div>
         <div class="srng-table-wrap">
+          <div class="srng-table-head">
+            <span class="srng-table-title">Generated Samples (first 8 rows)</span>
+            <button class="srng-btn srng-copy" type="button" id="srngCopyBtn" disabled><i class="fas fa-copy"></i> Copy to Clipboard</button>
+          </div>
           <table class="srng-table">
             <thead><tr><th>#</th><th>Sample Value</th></tr></thead>
             <tbody id="srngTableBody"><tr><td colspan="2" style="color:#9fb5cc;">No samples generated yet.</td></tr></tbody>

@@ -444,11 +444,23 @@
 
     if (srngHistogram) srngHistogram.destroy();
     srngHistogram = window.Highcharts.chart(containerId, {
-      chart: { type: "column", backgroundColor: "transparent", margin: [10, 8, 30, 28] },
+      chart: {
+        type: "column",
+        backgroundColor: "transparent",
+        margin: [8, 8, 12, 28],
+        spacingBottom: 0,
+      },
       title: { text: null },
       credits: { enabled: false },
       exporting: { enabled: false },
-      legend: { enabled: false },
+      legend: {
+        enabled: true,
+        align: "right",
+        verticalAlign: "top",
+        y: 0,
+        itemStyle: { color: "#cfe0f5", fontSize: "10px", fontWeight: "600" },
+        itemHoverStyle: { color: "#e6f0ff" },
+      },
       xAxis: {
         labels: { enabled: false },
         lineColor: "rgba(255,255,255,0.2)",
@@ -457,6 +469,9 @@
       yAxis: {
         title: { text: null },
         min: 0,
+        minPadding: 0,
+        maxPadding: 0.02,
+        endOnTick: false,
         labels: { style: { color: "#b7ccdf", fontSize: "10px" } },
         gridLineColor: "rgba(255,255,255,0.08)",
       },

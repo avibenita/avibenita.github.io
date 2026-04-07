@@ -194,9 +194,9 @@
   width: min(280px, 78%);
   display:block;
   margin:0 auto;
-  background: linear-gradient(135deg, rgba(167, 110, 255, 0.24), rgba(123, 91, 255, 0.18));
-  border: 1px solid rgba(174, 140, 255, 0.52);
-  color: rgb(221, 206, 255);
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+  border: 1px solid rgba(46, 204, 113, 0.7);
+  color: #ffffff;
   padding: 7px 14px;
   border-radius: 8px;
   font-size: 0.88rem;
@@ -208,8 +208,8 @@
 }
 .srng-trigger:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(145, 112, 255, 0.28);
-  border-color: rgba(180, 148, 255, 0.72);
+  box-shadow: 0 6px 16px rgba(46, 204, 113, 0.3);
+  border-color: rgba(46, 204, 113, 0.9);
 }
 .srng-modal {
   position: fixed;

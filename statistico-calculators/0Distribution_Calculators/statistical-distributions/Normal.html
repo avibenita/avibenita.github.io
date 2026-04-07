@@ -134,6 +134,57 @@
             max-height: 46vh;
         }
 
+        .random-analytics {
+            display: grid;
+            grid-template-columns: 1.4fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .random-hist-card,
+        .random-stats-card {
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 10px;
+            background: rgba(10, 24, 48, 0.72);
+            padding: 10px;
+        }
+
+        .random-mini-title {
+            margin: 0 0 8px 0;
+            font-size: 0.86rem;
+            color: #bcd9ff;
+            font-weight: 600;
+        }
+
+        #randomHistogramChart {
+            height: 145px;
+        }
+
+        .random-stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .random-stat-chip {
+            border: 1px solid rgba(155, 191, 255, 0.28);
+            background: rgba(71, 111, 178, 0.15);
+            border-radius: 8px;
+            padding: 8px;
+        }
+
+        .random-stat-label {
+            font-size: 0.72rem;
+            color: #9fc2ef;
+            margin-bottom: 3px;
+        }
+
+        .random-stat-value {
+            font-size: 0.95rem;
+            color: #edf6ff;
+            font-weight: 600;
+        }
+
         .random-table {
             width: 100%;
             border-collapse: collapse;
@@ -165,6 +216,10 @@
         @media (max-width: 760px) {
             .random-specs-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .random-analytics {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -459,6 +514,33 @@
                 </button>
             </div>
             <div class="random-status" id="randomStatus">Set sample size, then click Generate.</div>
+            <div class="random-analytics">
+                <div class="random-hist-card">
+                    <h4 class="random-mini-title">Sample Histogram</h4>
+                    <div id="randomHistogramChart"></div>
+                </div>
+                <div class="random-stats-card">
+                    <h4 class="random-mini-title">Basic Sample Stats</h4>
+                    <div class="random-stats-grid">
+                        <div class="random-stat-chip">
+                            <div class="random-stat-label">Mean</div>
+                            <div class="random-stat-value" id="randomStatMean">-</div>
+                        </div>
+                        <div class="random-stat-chip">
+                            <div class="random-stat-label">Std Dev</div>
+                            <div class="random-stat-value" id="randomStatStd">-</div>
+                        </div>
+                        <div class="random-stat-chip">
+                            <div class="random-stat-label">Min</div>
+                            <div class="random-stat-value" id="randomStatMin">-</div>
+                        </div>
+                        <div class="random-stat-chip">
+                            <div class="random-stat-label">Max</div>
+                            <div class="random-stat-value" id="randomStatMax">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <div class="random-table-wrap">
                 <table class="random-table">
                     <thead>
@@ -615,6 +697,7 @@
         let pdfChart, cdfChart, combinedChart;
         let currentCalcType = 'probability';
         let latestRandomSamples = [];
+        let randomHistogramChart = null;
 
         // Store chart data for animations
         let chartDataStore = {
@@ -2103,8 +2186,103 @@
             }
 
             renderRandomSamplesTable(decimals);
+            renderRandomAnalytics(decimals);
             copyBtn.disabled = latestRandomSamples.length === 0;
             status.textContent = `Generated ${latestRandomSamples.length} samples from N(${mean}, ${stddev}).`;
+        }
+
+        function renderRandomAnalytics(decimals) {
+            if (!latestRandomSamples.length) return;
+
+            const n = latestRandomSamples.length;
+            const sampleMean = latestRandomSamples.reduce((acc, v) => acc + v, 0) / n;
+            const variance = latestRandomSamples.reduce((acc, v) => acc + Math.pow(v - sampleMean, 2), 0) / Math.max(1, n - 1);
+            const sampleStd = Math.sqrt(Math.max(0, variance));
+            const minVal = Math.min(...latestRandomSamples);
+            const maxVal = Math.max(...latestRandomSamples);
+
+            document.getElementById('randomStatMean').textContent = sampleMean.toFixed(decimals);
+            document.getElementById('randomStatStd').textContent = sampleStd.toFixed(decimals);
+            document.getElementById('randomStatMin').textContent = minVal.toFixed(decimals);
+            document.getElementById('randomStatMax').textContent = maxVal.toFixed(decimals);
+
+            renderRandomHistogram();
+        }
+
+        function renderRandomHistogram() {
+            if (!latestRandomSamples.length || typeof Highcharts === 'undefined') return;
+
+            const minVal = Math.min(...latestRandomSamples);
+            const maxVal = Math.max(...latestRandomSamples);
+            const binsCount = Math.max(8, Math.min(24, Math.round(Math.sqrt(latestRandomSamples.length))));
+            const safeWidth = Math.max(1e-9, maxVal - minVal);
+            const binWidth = safeWidth / binsCount;
+            const bins = Array.from({ length: binsCount }, (_, i) => ({
+                start: minVal + i * binWidth,
+                end: minVal + (i + 1) * binWidth,
+                count: 0
+            }));
+
+            latestRandomSamples.forEach((v) => {
+                let idx = Math.floor((v - minVal) / binWidth);
+                if (!Number.isFinite(idx)) idx = 0;
+                idx = Math.max(0, Math.min(binsCount - 1, idx));
+                bins[idx].count += 1;
+            });
+
+            const categories = bins.map((b) => `${b.start.toFixed(2)}..${b.end.toFixed(2)}`);
+            const counts = bins.map((b) => b.count);
+
+            if (randomHistogramChart) {
+                randomHistogramChart.destroy();
+            }
+
+            randomHistogramChart = Highcharts.chart('randomHistogramChart', {
+                chart: {
+                    type: 'column',
+                    backgroundColor: 'transparent',
+                    margin: [10, 8, 30, 28]
+                },
+                title: { text: null },
+                credits: { enabled: false },
+                exporting: { enabled: false },
+                legend: { enabled: false },
+                xAxis: {
+                    categories,
+                    labels: {
+                        style: { color: '#b7ccdf', fontSize: '10px' },
+                        rotation: -25
+                    },
+                    lineColor: 'rgba(255,255,255,0.2)',
+                    tickColor: 'rgba(255,255,255,0.2)'
+                },
+                yAxis: {
+                    title: { text: null },
+                    min: 0,
+                    labels: {
+                        style: { color: '#b7ccdf', fontSize: '10px' }
+                    },
+                    gridLineColor: 'rgba(255,255,255,0.08)'
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(6, 12, 24, 0.92)',
+                    style: { color: '#e7f2ff' },
+                    formatter: function() {
+                        return `<b>Bin:</b> ${this.x}<br/><b>Count:</b> ${this.y}`;
+                    }
+                },
+                plotOptions: {
+                    column: {
+                        borderWidth: 0,
+                        pointPadding: 0.05,
+                        groupPadding: 0.06
+                    }
+                },
+                series: [{
+                    data: counts,
+                    color: 'rgba(124, 183, 255, 0.86)'
+                }]
+            });
         }
 
         function renderRandomSamplesTable(decimals) {

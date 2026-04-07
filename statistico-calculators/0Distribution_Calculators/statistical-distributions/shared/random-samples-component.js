@@ -401,8 +401,10 @@
       bins[idx].count += 1;
     });
 
-    const categories = bins.map((b) => `${b.start.toFixed(2)}..${b.end.toFixed(2)}`);
-    const counts = bins.map((b) => b.count);
+    const points = bins.map((b) => ({
+      y: b.count,
+      custom: { start: b.start, end: b.end },
+    }));
 
     if (srngHistogram) srngHistogram.destroy();
     srngHistogram = window.Highcharts.chart(containerId, {
@@ -412,8 +414,7 @@
       exporting: { enabled: false },
       legend: { enabled: false },
       xAxis: {
-        categories,
-        labels: { style: { color: "#b7ccdf", fontSize: "10px" }, rotation: -25 },
+        labels: { enabled: false },
         lineColor: "rgba(255,255,255,0.2)",
         tickColor: "rgba(255,255,255,0.2)",
       },
@@ -427,11 +428,13 @@
         backgroundColor: "rgba(6, 12, 24, 0.92)",
         style: { color: "#e7f2ff" },
         formatter: function () {
-          return `<b>Bin:</b> ${this.x}<br/><b>Count:</b> ${this.y}`;
+          const start = this.point?.custom?.start;
+          const end = this.point?.custom?.end;
+          return `<b>Range:</b> ${Number(start).toFixed(3)} to ${Number(end).toFixed(3)}<br/><b>Count:</b> ${this.y}`;
         },
       },
       plotOptions: { column: { borderWidth: 0, pointPadding: 0.05, groupPadding: 0.06 } },
-      series: [{ data: counts, color: "rgba(124, 183, 255, 0.86)" }],
+      series: [{ data: points, color: "rgba(124, 183, 255, 0.86)" }],
     });
   }
 

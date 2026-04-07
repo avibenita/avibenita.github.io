@@ -754,6 +754,7 @@
         let pdfChart, cdfChart, combinedChart;
         let currentCalcType = 'probability';
         let latestRandomSamples = [];
+        let previousRandomSamples = [];
         let randomHistogramChart = null;
 
         // Store chart data for animations
@@ -2276,6 +2277,12 @@
             const n = Math.max(1, Math.min(2000, Number.isFinite(nRaw) ? nRaw : 30));
             const decimals = Math.max(0, Math.min(10, Number.isFinite(decimalsRaw) ? decimalsRaw : 4));
 
+            if (isInteractive && latestRandomSamples.length) {
+                previousRandomSamples = [...latestRandomSamples];
+            } else if (!isInteractive) {
+                previousRandomSamples = [];
+            }
+
             latestRandomSamples = [];
             for (let i = 0; i < n; i++) {
                 latestRandomSamples.push(mean + stddev * drawStandardNormal());
@@ -2309,15 +2316,19 @@
         function renderRandomHistogram() {
             if (!latestRandomSamples.length || typeof Highcharts === 'undefined') return;
 
-            const minVal = Math.min(...latestRandomSamples);
-            const maxVal = Math.max(...latestRandomSamples);
+            const allValues = previousRandomSamples.length
+                ? latestRandomSamples.concat(previousRandomSamples)
+                : latestRandomSamples;
+            const minVal = Math.min(...allValues);
+            const maxVal = Math.max(...allValues);
             const binsCount = Math.max(8, Math.min(24, Math.round(Math.sqrt(latestRandomSamples.length))));
             const safeWidth = Math.max(1e-9, maxVal - minVal);
             const binWidth = safeWidth / binsCount;
             const bins = Array.from({ length: binsCount }, (_, i) => ({
                 start: minVal + i * binWidth,
                 end: minVal + (i + 1) * binWidth,
-                count: 0
+                count: 0,
+                prevCount: 0
             }));
 
             latestRandomSamples.forEach((v) => {
@@ -2327,8 +2338,19 @@
                 bins[idx].count += 1;
             });
 
+            previousRandomSamples.forEach((v) => {
+                let idx = Math.floor((v - minVal) / binWidth);
+                if (!Number.isFinite(idx)) idx = 0;
+                idx = Math.max(0, Math.min(binsCount - 1, idx));
+                bins[idx].prevCount += 1;
+            });
+
             const points = bins.map((b) => ({
                 y: b.count,
+                custom: { start: b.start, end: b.end }
+            }));
+            const prevPoints = bins.map((b) => ({
+                y: b.prevCount,
                 custom: { start: b.start, end: b.end }
             }));
 
@@ -2362,12 +2384,19 @@
                     gridLineColor: 'rgba(255,255,255,0.08)'
                 },
                 tooltip: {
+                    shared: true,
                     backgroundColor: 'rgba(6, 12, 24, 0.92)',
                     style: { color: '#e7f2ff' },
                     formatter: function() {
-                        const start = this.point?.custom?.start;
-                        const end = this.point?.custom?.end;
-                        return `<b>Range:</b> ${Number(start).toFixed(3)} to ${Number(end).toFixed(3)}<br/><b>Count:</b> ${this.y}`;
+                        const pointsForBin = this.points || [];
+                        const samplePoint = pointsForBin[0];
+                        const start = samplePoint?.point?.custom?.start;
+                        const end = samplePoint?.point?.custom?.end;
+                        let html = `<b>Range:</b> ${Number(start).toFixed(3)} to ${Number(end).toFixed(3)}`;
+                        pointsForBin.forEach((p) => {
+                            html += `<br/><span style="color:${p.color}">${p.series.name}:</span> ${p.y}`;
+                        });
+                        return html;
                     }
                 },
                 plotOptions: {
@@ -2377,10 +2406,18 @@
                         groupPadding: 0.06
                     }
                 },
-                series: [{
-                    data: points,
-                    color: 'rgba(124, 183, 255, 0.86)'
-                }]
+                series: [
+                    ...(previousRandomSamples.length ? [{
+                        name: 'Previous',
+                        data: prevPoints,
+                        color: 'rgba(160, 186, 220, 0.25)'
+                    }] : []),
+                    {
+                        name: 'Current',
+                        data: points,
+                        color: 'rgba(124, 183, 255, 0.86)'
+                    }
+                ]
             });
         }
 

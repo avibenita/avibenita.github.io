@@ -410,15 +410,16 @@
   }
 
   let srngHistogram = null;
-  function renderHistogram(values) {
+  function renderHistogram(values, previousValues = []) {
     const containerId = "srngHistogram";
     if (!values.length || typeof window.Highcharts === "undefined") return;
-    const min = Math.min(...values);
-    const max = Math.max(...values);
+    const allValues = previousValues.length ? values.concat(previousValues) : values;
+    const min = Math.min(...allValues);
+    const max = Math.max(...allValues);
     const binsCount = Math.max(8, Math.min(24, Math.round(Math.sqrt(values.length))));
     const span = Math.max(1e-9, max - min);
     const width = span / binsCount;
-    const bins = Array.from({ length: binsCount }, (_, i) => ({ start: min + i * width, end: min + (i + 1) * width, count: 0 }));
+    const bins = Array.from({ length: binsCount }, (_, i) => ({ start: min + i * width, end: min + (i + 1) * width, count: 0, prevCount: 0 }));
 
     values.forEach((v) => {
       let idx = Math.floor((v - min) / width);
@@ -426,8 +427,18 @@
       bins[idx].count += 1;
     });
 
+    previousValues.forEach((v) => {
+      let idx = Math.floor((v - min) / width);
+      idx = Math.max(0, Math.min(binsCount - 1, idx));
+      bins[idx].prevCount += 1;
+    });
+
     const points = bins.map((b) => ({
       y: b.count,
+      custom: { start: b.start, end: b.end },
+    }));
+    const prevPoints = bins.map((b) => ({
+      y: b.prevCount,
       custom: { start: b.start, end: b.end },
     }));
 
@@ -450,16 +461,28 @@
         gridLineColor: "rgba(255,255,255,0.08)",
       },
       tooltip: {
+        shared: true,
         backgroundColor: "rgba(6, 12, 24, 0.92)",
         style: { color: "#e7f2ff" },
         formatter: function () {
-          const start = this.point?.custom?.start;
-          const end = this.point?.custom?.end;
-          return `<b>Range:</b> ${Number(start).toFixed(3)} to ${Number(end).toFixed(3)}<br/><b>Count:</b> ${this.y}`;
+          const pointsForBin = this.points || [];
+          const samplePoint = pointsForBin[0];
+          const start = samplePoint?.point?.custom?.start;
+          const end = samplePoint?.point?.custom?.end;
+          let html = `<b>Range:</b> ${Number(start).toFixed(3)} to ${Number(end).toFixed(3)}`;
+          pointsForBin.forEach((p) => {
+            html += `<br/><span style="color:${p.color}">${p.series.name}:</span> ${p.y}`;
+          });
+          return html;
         },
       },
       plotOptions: { column: { borderWidth: 0, pointPadding: 0.05, groupPadding: 0.06 } },
-      series: [{ data: points, color: "rgba(124, 183, 255, 0.86)" }],
+      series: [
+        ...(previousValues.length
+          ? [{ name: "Previous", data: prevPoints, color: "rgba(160, 186, 220, 0.25)" }]
+          : []),
+        { name: "Current", data: points, color: "rgba(124, 183, 255, 0.86)" },
+      ],
     });
   }
 
@@ -588,6 +611,12 @@
       const n = Math.max(1, Math.min(5000, Number.isFinite(nRaw) ? nRaw : 30));
       const decimals = Math.max(0, Math.min(10, Number.isFinite(decimalsRaw) ? decimalsRaw : 4));
 
+      if (isInteractive && latestValues.length) {
+        previousValues = [...latestValues];
+      } else if (!isInteractive) {
+        previousValues = [];
+      }
+
       latestValues = [];
       for (let i = 0; i < n; i += 1) {
         const value = config.sampleOne(params);
@@ -596,13 +625,14 @@
 
       renderTable(latestValues, decimals);
       renderStats(latestValues, decimals);
-      renderHistogram(latestValues);
+      renderHistogram(latestValues, previousValues);
       copyBtn.disabled = latestValues.length === 0;
       const shown = Math.min(8, latestValues.length);
       setStatus(`${isInteractive ? "Interactive update" : "Generated"} ${latestValues.length} samples from ${config.name}. Showing ${shown} rows.`);
     }
 
     let latestValues = [];
+    let previousValues = [];
     generateBtn.addEventListener("click", () => runGeneration(false));
 
     if (isNormal) {

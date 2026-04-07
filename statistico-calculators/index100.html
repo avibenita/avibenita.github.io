@@ -365,6 +365,11 @@
             align-items: center;
         }
 
+        #statusMessage {
+            color: #ffe7b9;
+            font-weight: 600;
+        }
+
         .dot {
             width: 8px;
             height: 8px;
@@ -429,7 +434,7 @@
         <div class="top-actions">
             <a class="top-btn" href="../Statistico-Website/index-Calculators.html"><i class="fa-solid fa-arrow-left"></i> Back to Site</a>
             <button type="button" class="top-btn" id="installAppBtn" data-tooltip="Install Statistico Launcher for quick app-like access outside the website flow."><i class="fa-solid fa-download"></i> Install App</button>
-            <a class="top-btn" href="#" data-tooltip="Open the Excel-connected path for spreadsheet-driven analysis and calculator workflows."><i class="fa-solid fa-file-excel"></i> Open in Excel</a>
+            <button type="button" class="top-btn" id="excelModeBtn" data-tooltip="Open the Excel-connected path for spreadsheet-driven analysis and calculator workflows."><i class="fa-solid fa-file-excel"></i> Open in Excel</button>
             <a class="top-btn" href="#" data-tooltip="Open guidance and support docs for launcher navigation and calculator usage."><i class="fa-solid fa-circle-question"></i> Help</a>
         </div>
     </header>
@@ -523,6 +528,7 @@
         <div class="status-right">
             <span>Premium features available</span>
             <span>Need help? Press /</span>
+            <span id="statusMessage"></span>
         </div>
     </footer>
 </div>
@@ -531,6 +537,8 @@
     (function () {
         const searchInput = document.getElementById("launcherSearch");
         const installAppBtn = document.getElementById("installAppBtn");
+        const excelModeBtn = document.getElementById("excelModeBtn");
+        const statusMessage = document.getElementById("statusMessage");
         const launchItems = Array.from(document.querySelectorAll(".launch-item"));
         const filterButtons = Array.from(document.querySelectorAll(".nav-btn[data-filter]"));
         const comingButtons = Array.from(document.querySelectorAll("[data-coming]"));
@@ -538,10 +546,36 @@
 
         let activeFilter = "all";
         const params = new URLSearchParams(window.location.search);
+        const actionParam = (params.get("action") || "").toLowerCase();
         const familyParam = (params.get("family") || "").toLowerCase();
         const allowedFamilies = new Set(["distributions", "power", "staffing", "qc", "effect", "premium", "recent", "favorites"]);
         if (allowedFamilies.has(familyParam)) {
             activeFilter = familyParam;
+        }
+
+        function showStatus(text) {
+            if (!statusMessage) return;
+            statusMessage.textContent = text;
+            window.clearTimeout(showStatus._timer);
+            showStatus._timer = window.setTimeout(() => {
+                statusMessage.textContent = "";
+            }, 5000);
+        }
+
+        async function triggerInstallFlow() {
+            if (deferredInstallPrompt) {
+                deferredInstallPrompt.prompt();
+                await deferredInstallPrompt.userChoice;
+                deferredInstallPrompt = null;
+                if (installAppBtn) {
+                    installAppBtn.disabled = true;
+                    installAppBtn.setAttribute("data-tooltip", "Installed or already accepted. You can reopen from your apps list.");
+                }
+                showStatus("Install flow opened.");
+                return true;
+            }
+            showStatus("Install prompt not available yet. Use browser menu: Install app.");
+            return false;
         }
 
         function matchesFilter(item) {
@@ -608,15 +642,13 @@
 
         if (installAppBtn) {
             installAppBtn.addEventListener("click", async () => {
-                if (deferredInstallPrompt) {
-                    deferredInstallPrompt.prompt();
-                    await deferredInstallPrompt.userChoice;
-                    deferredInstallPrompt = null;
-                    installAppBtn.disabled = true;
-                    installAppBtn.setAttribute("data-tooltip", "Installed or already accepted. You can reopen from your apps list.");
-                    return;
-                }
-                alert("If install is available, use your browser menu: Install app / Add to desktop.");
+                await triggerInstallFlow();
+            });
+        }
+
+        if (excelModeBtn) {
+            excelModeBtn.addEventListener("click", () => {
+                showStatus("Excel handoff mode: connect workbook and launch spreadsheet-first workflows.");
             });
         }
 
@@ -626,6 +658,9 @@
             if (installAppBtn) {
                 installAppBtn.disabled = false;
                 installAppBtn.setAttribute("data-tooltip", "Ready to install. Click to open the native install prompt.");
+            }
+            if (actionParam === "install") {
+                triggerInstallFlow();
             }
         });
 
@@ -641,6 +676,15 @@
             window.addEventListener("load", () => {
                 navigator.serviceWorker.register("./service-worker.js").catch(() => {});
             });
+        }
+
+        if (actionParam === "launch") {
+            showStatus("Workspace mode opened.");
+        } else if (actionParam === "install") {
+            showStatus("Install mode: waiting for browser install prompt.");
+            triggerInstallFlow();
+        } else if (actionParam === "excel") {
+            showStatus("Excel mode: open in Excel path selected.");
         }
 
         if (allowedFamilies.has(familyParam)) {

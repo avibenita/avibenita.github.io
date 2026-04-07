@@ -37,6 +37,12 @@
                 radial-gradient(ellipse at 88% 100%, rgba(255, 191, 102, 0.12), transparent 38%),
                 linear-gradient(180deg, var(--bg-0) 0%, #071220 50%, var(--bg-1) 100%);
         }
+        body.minimal-one-shot {
+            background:
+                radial-gradient(ellipse at 15% -10%, rgba(93, 180, 255, 0.12), transparent 46%),
+                radial-gradient(ellipse at 90% 120%, rgba(90, 130, 255, 0.1), transparent 44%),
+                linear-gradient(180deg, #050d1b 0%, #071326 100%);
+        }
 
         .app-shell {
             height: 100vh;
@@ -182,12 +188,18 @@
             grid-template-columns: 220px minmax(0, 1fr);
             min-height: 0;
         }
+        body.minimal-one-shot .workspace {
+            grid-template-columns: 1fr;
+        }
 
         .sidebar {
             border-right: 1px solid rgba(255, 255, 255, 0.08);
             background: linear-gradient(180deg, rgba(16, 31, 51, 0.92), rgba(9, 18, 30, 0.92));
             padding: 12px 10px;
             overflow: auto;
+        }
+        body.minimal-one-shot .sidebar {
+            display: none !important;
         }
 
         .nav-title {
@@ -220,6 +232,69 @@
         .main {
             overflow: auto;
             padding: 14px 14px 18px;
+        }
+        body.minimal-one-shot .main {
+            display: grid;
+            place-items: center;
+            padding: 20px;
+        }
+        body.minimal-one-shot #recentSection,
+        body.minimal-one-shot #familySection {
+            display: none !important;
+        }
+        .one-shot-shell {
+            width: min(760px, 92vw);
+            border: 1px solid rgba(121, 191, 255, 0.28);
+            border-radius: 20px;
+            background: linear-gradient(180deg, rgba(12, 28, 49, 0.95), rgba(8, 19, 35, 0.98));
+            box-shadow: 0 24px 48px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255,255,255,0.03);
+            padding: 22px;
+        }
+        .one-shot-shell h2 {
+            font-size: 1.2rem;
+            color: #dff0ff;
+            margin-bottom: 8px;
+        }
+        .one-shot-shell p {
+            color: #a9bfdc;
+            margin-bottom: 14px;
+            font-size: 0.88rem;
+        }
+        .one-shot-controls {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        #oneShotSelect {
+            width: 100%;
+            border-radius: 12px;
+            border: 1px solid rgba(123, 185, 255, 0.35);
+            background: rgba(8, 16, 27, 0.92);
+            color: #ebf3ff;
+            padding: 11px 12px;
+            font-size: 0.9rem;
+        }
+        .one-shot-btn {
+            border: 1px solid rgba(93, 198, 255, 0.5);
+            border-radius: 12px;
+            background: linear-gradient(135deg, #44b8ff, #417cff);
+            color: #ffffff;
+            font-weight: 800;
+            padding: 0 16px;
+            cursor: pointer;
+            min-height: 42px;
+            white-space: nowrap;
+        }
+        .one-shot-secondary {
+            display: inline-flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .one-shot-secondary .top-btn {
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 0.8rem;
         }
 
         .section-card {
@@ -417,6 +492,9 @@
             .family-grid {
                 grid-template-columns: 1fr;
             }
+            .one-shot-controls {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -455,6 +533,23 @@
         </aside>
 
         <main class="main">
+            <section class="one-shot-shell" id="oneShotSection">
+                <h2>One-Shot Launcher</h2>
+                <p>Choose one calculator path and open it immediately. No sidebar, no last-used, no distractions.</p>
+                <div class="one-shot-controls">
+                    <select id="oneShotSelect" aria-label="Choose calculator path">
+                        <option value="./0Distribution_Calculators/index-distribution.html">Distribution Suite</option>
+                        <option value="./0Distribution_Calculators/statistical-distributions/Normal.html">Normal Distribution</option>
+                        <option value="./0Distribution_Calculators/statistical-distributions/BinomialDistribution.html">Binomial Distribution</option>
+                        <option value="./power-sample-size-calculator/index-calculator.html">Power &amp; Sample Size</option>
+                    </select>
+                    <button class="one-shot-btn" id="oneShotGoBtn"><i class="fa-solid fa-bolt"></i> Open Now</button>
+                </div>
+                <div class="one-shot-secondary">
+                    <button type="button" class="top-btn" id="oneShotInstallBtn"><i class="fa-solid fa-download"></i> Install App</button>
+                    <button type="button" class="top-btn" id="oneShotExcelBtn"><i class="fa-solid fa-file-excel"></i> Open in Excel</button>
+                </div>
+            </section>
             <section class="section-card" id="recentSection">
                 <h2>Continue</h2>
                 <p>Launch a recent tool instantly.</p>
@@ -535,10 +630,15 @@
 
 <script>
     (function () {
+        document.body.classList.add("minimal-one-shot");
         const searchInput = document.getElementById("launcherSearch");
         const installAppBtn = document.getElementById("installAppBtn");
         const excelModeBtn = document.getElementById("excelModeBtn");
         const statusMessage = document.getElementById("statusMessage");
+        const oneShotSelect = document.getElementById("oneShotSelect");
+        const oneShotGoBtn = document.getElementById("oneShotGoBtn");
+        const oneShotInstallBtn = document.getElementById("oneShotInstallBtn");
+        const oneShotExcelBtn = document.getElementById("oneShotExcelBtn");
         const launchItems = Array.from(document.querySelectorAll(".launch-item"));
         const filterButtons = Array.from(document.querySelectorAll(".nav-btn[data-filter]"));
         const comingButtons = Array.from(document.querySelectorAll("[data-coming]"));
@@ -649,6 +749,23 @@
         if (excelModeBtn) {
             excelModeBtn.addEventListener("click", () => {
                 showStatus("Excel handoff mode: connect workbook and launch spreadsheet-first workflows.");
+            });
+        }
+
+        if (oneShotGoBtn && oneShotSelect) {
+            oneShotGoBtn.addEventListener("click", () => {
+                const target = oneShotSelect.value;
+                if (target) window.location.href = target;
+            });
+        }
+        if (oneShotInstallBtn) {
+            oneShotInstallBtn.addEventListener("click", async () => {
+                await triggerInstallFlow();
+            });
+        }
+        if (oneShotExcelBtn) {
+            oneShotExcelBtn.addEventListener("click", () => {
+                showStatus("Excel handoff mode: open in Excel path selected.");
             });
         }
 

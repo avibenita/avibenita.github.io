@@ -245,13 +245,20 @@
 .srng-layout-standard .about-action-btn,
 .srng-layout-standard .about-btn,
 .srng-layout-standard .control-block-about button {
+  width: min(280px, 78%) !important;
+  margin: 0 auto !important;
   min-height: 40px !important;
   height: 40px !important;
   padding: 0 14px !important;
-  display: inline-flex !important;
+  display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 8px !important;
+}
+.srng-layout-standard .srng-trigger,
+.srng-layout-standard .random-generator-trigger {
+  width: min(280px, 78%) !important;
+  margin: 0 auto !important;
 }
 .srng-modal {
   position: fixed;

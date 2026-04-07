@@ -476,12 +476,20 @@
           return html;
         },
       },
-      plotOptions: { column: { borderWidth: 0, pointPadding: 0.05, groupPadding: 0.06 } },
+      plotOptions: { column: { borderWidth: 0, pointPadding: 0.05, groupPadding: 0.06, grouping: false } },
       series: [
+        { name: "Current", data: points, color: "rgba(124, 183, 255, 0.86)", pointWidth: 22, zIndex: 2 },
         ...(previousValues.length
-          ? [{ name: "Previous", data: prevPoints, color: "rgba(160, 186, 220, 0.25)" }]
+          ? [{
+              name: "Previous overlay",
+              data: prevPoints,
+              color: "rgba(216, 234, 255, 0.32)",
+              borderColor: "rgba(216, 234, 255, 0.45)",
+              borderWidth: 1,
+              pointWidth: 14,
+              zIndex: 3,
+            }]
           : []),
-        { name: "Current", data: points, color: "rgba(124, 183, 255, 0.86)" },
       ],
     });
   }

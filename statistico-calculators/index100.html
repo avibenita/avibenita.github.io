@@ -3,7 +3,11 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#071422">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Statistico Launcher</title>
+    <link rel="manifest" href="./manifest.webmanifest">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <style>
         :root {
@@ -136,6 +140,10 @@
         }
 
         .top-btn:hover { background: rgba(255, 204, 102, 0.16); }
+        .top-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
 
         .top-btn[data-tooltip] {
             position: relative;
@@ -420,7 +428,7 @@
         </div>
         <div class="top-actions">
             <a class="top-btn" href="../Statistico-Website/index-Calculators.html"><i class="fa-solid fa-arrow-left"></i> Back to Site</a>
-            <a class="top-btn" href="#" data-tooltip="Install Statistico Launcher for quick app-like access outside the website flow."><i class="fa-solid fa-download"></i> Install App</a>
+            <button type="button" class="top-btn" id="installAppBtn" data-tooltip="Install Statistico Launcher for quick app-like access outside the website flow."><i class="fa-solid fa-download"></i> Install App</button>
             <a class="top-btn" href="#" data-tooltip="Open the Excel-connected path for spreadsheet-driven analysis and calculator workflows."><i class="fa-solid fa-file-excel"></i> Open in Excel</a>
             <a class="top-btn" href="#" data-tooltip="Open guidance and support docs for launcher navigation and calculator usage."><i class="fa-solid fa-circle-question"></i> Help</a>
         </div>
@@ -522,9 +530,11 @@
 <script>
     (function () {
         const searchInput = document.getElementById("launcherSearch");
+        const installAppBtn = document.getElementById("installAppBtn");
         const launchItems = Array.from(document.querySelectorAll(".launch-item"));
         const filterButtons = Array.from(document.querySelectorAll(".nav-btn[data-filter]"));
         const comingButtons = Array.from(document.querySelectorAll("[data-coming]"));
+        let deferredInstallPrompt = null;
 
         let activeFilter = "all";
         const params = new URLSearchParams(window.location.search);
@@ -595,6 +605,43 @@
                 alert(button.getAttribute("data-coming") || "This module is coming soon.");
             });
         });
+
+        if (installAppBtn) {
+            installAppBtn.addEventListener("click", async () => {
+                if (deferredInstallPrompt) {
+                    deferredInstallPrompt.prompt();
+                    await deferredInstallPrompt.userChoice;
+                    deferredInstallPrompt = null;
+                    installAppBtn.disabled = true;
+                    installAppBtn.setAttribute("data-tooltip", "Installed or already accepted. You can reopen from your apps list.");
+                    return;
+                }
+                alert("If install is available, use your browser menu: Install app / Add to desktop.");
+            });
+        }
+
+        window.addEventListener("beforeinstallprompt", (event) => {
+            event.preventDefault();
+            deferredInstallPrompt = event;
+            if (installAppBtn) {
+                installAppBtn.disabled = false;
+                installAppBtn.setAttribute("data-tooltip", "Ready to install. Click to open the native install prompt.");
+            }
+        });
+
+        window.addEventListener("appinstalled", () => {
+            deferredInstallPrompt = null;
+            if (installAppBtn) {
+                installAppBtn.disabled = true;
+                installAppBtn.setAttribute("data-tooltip", "Statistico Launcher installed.");
+            }
+        });
+
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", () => {
+                navigator.serviceWorker.register("./service-worker.js").catch(() => {});
+            });
+        }
 
         if (allowedFamilies.has(familyParam)) {
             const matchingButton = filterButtons.find((btn) => btn.getAttribute("data-filter") === familyParam);

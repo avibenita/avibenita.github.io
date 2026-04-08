@@ -179,8 +179,7 @@
         .random-table-wrap {
             border: 1px solid rgba(255, 255, 255, 0.14);
             border-radius: 10px;
-            overflow: auto;
-            max-height: 33vh;
+            overflow: hidden;
         }
 
         .random-table-head {
@@ -253,14 +252,20 @@
         .random-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
         }
 
         .random-table th,
         .random-table td {
-            padding: 8px 10px;
+            padding: 6px 8px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
             text-align: left;
+        }
+        #copyRandomBtn {
+            padding: 5px 9px !important;
+            font-size: 0.78rem !important;
+            border-radius: 7px !important;
+            min-height: 30px;
         }
 
         .random-table th {
@@ -592,7 +597,7 @@
                     </div>
                     <div class="random-slider-item">
                         <label>Sample Size (n) <span id="pedagNValue">150</span></label>
-                        <input id="pedagNSlider" type="range" min="5" max="300" step="1" value="150">
+                        <input id="pedagNSlider" type="range" min="5" max="1000" step="1" value="150">
                     </div>
                 </div>
             </div>
@@ -626,9 +631,9 @@
             </div>
             <div class="random-table-wrap">
                 <div class="random-table-head">
-                    <span class="random-table-title">Generated Samples (first 8 rows)</span>
+                    <span class="random-table-title">Generated Samples (first 10 rows)</span>
                     <button class="btn btn-success" id="copyRandomBtn" onclick="copyRandomSamples()" disabled>
-                        <i class="fas fa-copy"></i> Copy to Clipboard
+                        <i class="fas fa-copy"></i> Copy
                     </button>
                 </div>
                 <table class="random-table">
@@ -786,7 +791,6 @@
         let pdfChart, cdfChart, combinedChart;
         let currentCalcType = 'probability';
         let latestRandomSamples = [];
-        let previousRandomSamples = [];
         let randomHistogramChart = null;
 
         // Store chart data for animations
@@ -2306,14 +2310,8 @@
                 return;
             }
 
-            const n = Math.max(1, Math.min(2000, Number.isFinite(nRaw) ? nRaw : 30));
+            const n = Math.max(1, Math.min(2000, Number.isFinite(nRaw) ? nRaw : 150));
             const decimals = Math.max(0, Math.min(10, Number.isFinite(decimalsRaw) ? decimalsRaw : 4));
-
-            if (isInteractive && latestRandomSamples.length) {
-                previousRandomSamples = [...latestRandomSamples];
-            } else if (!isInteractive) {
-                previousRandomSamples = [];
-            }
 
             latestRandomSamples = [];
             for (let i = 0; i < n; i++) {
@@ -2323,7 +2321,7 @@
             renderRandomSamplesTable(decimals);
             renderRandomAnalytics(decimals);
             copyBtn.disabled = latestRandomSamples.length === 0;
-            const shown = Math.min(8, latestRandomSamples.length);
+            const shown = Math.min(10, latestRandomSamples.length);
             status.textContent = `${isInteractive ? 'Interactive update' : 'Generated'} ${latestRandomSamples.length} samples from N(${mean}, ${stddev}). Showing ${shown} rows.`;
         }
 
@@ -2348,19 +2346,15 @@
         function renderRandomHistogram() {
             if (!latestRandomSamples.length || typeof Highcharts === 'undefined') return;
 
-            const allValues = previousRandomSamples.length
-                ? latestRandomSamples.concat(previousRandomSamples)
-                : latestRandomSamples;
-            const minVal = Math.min(...allValues);
-            const maxVal = Math.max(...allValues);
+            const minVal = Math.min(...latestRandomSamples);
+            const maxVal = Math.max(...latestRandomSamples);
             const binsCount = Math.max(8, Math.min(24, Math.round(Math.sqrt(latestRandomSamples.length))));
             const safeWidth = Math.max(1e-9, maxVal - minVal);
             const binWidth = safeWidth / binsCount;
             const bins = Array.from({ length: binsCount }, (_, i) => ({
                 start: minVal + i * binWidth,
                 end: minVal + (i + 1) * binWidth,
-                count: 0,
-                prevCount: 0
+                count: 0
             }));
 
             latestRandomSamples.forEach((v) => {
@@ -2370,19 +2364,8 @@
                 bins[idx].count += 1;
             });
 
-            previousRandomSamples.forEach((v) => {
-                let idx = Math.floor((v - minVal) / binWidth);
-                if (!Number.isFinite(idx)) idx = 0;
-                idx = Math.max(0, Math.min(binsCount - 1, idx));
-                bins[idx].prevCount += 1;
-            });
-
             const points = bins.map((b) => ({
                 y: b.count,
-                custom: { start: b.start, end: b.end }
-            }));
-            const prevPoints = bins.map((b) => ({
-                y: b.prevCount,
                 custom: { start: b.start, end: b.end }
             }));
 
@@ -2400,14 +2383,7 @@
                 title: { text: null },
                 credits: { enabled: false },
                 exporting: { enabled: false },
-                legend: {
-                    enabled: true,
-                    align: 'right',
-                    verticalAlign: 'top',
-                    y: 0,
-                    itemStyle: { color: '#cfe0f5', fontSize: '10px', fontWeight: '600' },
-                    itemHoverStyle: { color: '#e6f0ff' }
-                },
+                legend: { enabled: false },
                 xAxis: {
                     labels: {
                         enabled: false
@@ -2427,19 +2403,13 @@
                     gridLineColor: 'rgba(255,255,255,0.08)'
                 },
                 tooltip: {
-                    shared: true,
+                    shared: false,
                     backgroundColor: 'rgba(6, 12, 24, 0.92)',
                     style: { color: '#e7f2ff' },
                     formatter: function() {
-                        const pointsForBin = this.points || [];
-                        const samplePoint = pointsForBin[0];
-                        const start = samplePoint?.point?.custom?.start;
-                        const end = samplePoint?.point?.custom?.end;
-                        let html = `<b>Range:</b> ${Number(start).toFixed(3)} to ${Number(end).toFixed(3)}`;
-                        pointsForBin.forEach((p) => {
-                            html += `<br/><span style="color:${p.color}">${p.series.name}:</span> ${p.y}`;
-                        });
-                        return html;
+                        const start = this.point?.custom?.start;
+                        const end = this.point?.custom?.end;
+                        return `<b>Range:</b> ${Number(start).toFixed(3)} to ${Number(end).toFixed(3)}<br/><span style="color:${this.color}">Count:</span> ${this.y}`;
                     }
                 },
                 plotOptions: {
@@ -2457,16 +2427,7 @@
                         color: 'rgba(124, 183, 255, 0.86)',
                         pointWidth: 22,
                         zIndex: 2
-                    },
-                    ...(previousRandomSamples.length ? [{
-                        name: 'Previous overlay',
-                        data: prevPoints,
-                        color: 'rgba(216, 234, 255, 0.32)',
-                        borderColor: 'rgba(216, 234, 255, 0.45)',
-                        borderWidth: 1,
-                        pointWidth: 14,
-                        zIndex: 3
-                    }] : [])
+                    }
                 ]
             });
         }
@@ -2480,18 +2441,13 @@
                 return;
             }
 
-            const displayedRows = latestRandomSamples.slice(0, 8);
+            const displayedRows = latestRandomSamples.slice(0, 10);
             const fragment = document.createDocumentFragment();
             displayedRows.forEach((value, index) => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `<td>${index + 1}</td><td>${value.toFixed(decimals)}</td>`;
                 fragment.appendChild(tr);
             });
-            if (latestRandomSamples.length > displayedRows.length) {
-                const infoTr = document.createElement('tr');
-                infoTr.innerHTML = `<td colspan="2" style="color:#9fb5cc;">Showing first 8 rows of ${latestRandomSamples.length} generated values.</td>`;
-                fragment.appendChild(infoTr);
-            }
             tbody.appendChild(fragment);
         }
 

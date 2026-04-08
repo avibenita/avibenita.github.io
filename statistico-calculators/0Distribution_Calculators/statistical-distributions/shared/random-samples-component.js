@@ -315,7 +315,14 @@
   cursor: pointer;
 }
 .srng-btn.srng-generate { background: linear-gradient(135deg, #f39c7a, #7dbdff); color: #fff; border: none; }
-.srng-btn.srng-copy { background: linear-gradient(135deg, #28c76f, #1ba083); color: #fff; border: none; }
+.srng-btn.srng-copy {
+  background: linear-gradient(135deg, #28c76f, #1ba083);
+  color: #fff;
+  border: none;
+  padding: 5px 9px;
+  font-size: 0.78rem;
+  border-radius: 7px;
+}
 .srng-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .srng-status { margin-bottom:10px; font-size:0.85rem; color:#9dc7ff; min-height:1.1em; }
 .srng-pedagogy { border:1px solid rgba(255,255,255,0.14); border-radius:10px; background: rgba(10, 24, 48, 0.72); padding:10px; margin-bottom:12px; display:none; }
@@ -331,7 +338,7 @@
 .srng-chip { border:1px solid rgba(155,191,255,0.28); background: rgba(71,111,178,0.15); border-radius:8px; padding:8px; }
 .srng-chip-label { font-size:0.72rem; color:#9fc2ef; margin-bottom:3px; }
 .srng-chip-value { font-size:0.95rem; color:#edf6ff; font-weight:600; }
-.srng-table-wrap { border:1px solid rgba(255,255,255,0.14); border-radius:10px; overflow:auto; max-height: 33vh; }
+.srng-table-wrap { border:1px solid rgba(255,255,255,0.14); border-radius:10px; overflow:hidden; }
 .srng-generate-slot { display:flex; align-items:end; }
 .srng-generate-slot .srng-btn { width:100%; min-height:38px; }
 .srng-table-head {
@@ -344,8 +351,8 @@
   background: rgba(17, 36, 70, 0.62);
 }
 .srng-table-title { font-size:0.82rem; color:#cfe0f5; font-weight:700; }
-.srng-table { width:100%; border-collapse: collapse; font-size: 0.9rem; }
-.srng-table th, .srng-table td { padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left; }
+.srng-table { width:100%; border-collapse: collapse; font-size: 0.8rem; }
+.srng-table th, .srng-table td { padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left; }
 .srng-table th { position: sticky; top: 0; background:#112446; color:#cfe6ff; z-index: 1; }
 @media (max-width: 760px) {
   .srng-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -397,7 +404,7 @@
             </div>
             <div class="srng-pedagogy-item">
               <label>Sample Size (n) <span id="srngNValue">150</span></label>
-              <input id="srngNSlider" type="range" min="5" max="300" step="1" value="150"/>
+              <input id="srngNSlider" type="range" min="5" max="1000" step="1" value="150"/>
             </div>
           </div>
         </div>
@@ -419,8 +426,8 @@
         </div>
         <div class="srng-table-wrap">
           <div class="srng-table-head">
-            <span class="srng-table-title">Generated Samples (first 8 rows)</span>
-            <button class="srng-btn srng-copy" type="button" id="srngCopyBtn" disabled><i class="fas fa-copy"></i> Copy to Clipboard</button>
+            <span class="srng-table-title">Generated Samples (first 10 rows)</span>
+            <button class="srng-btn srng-copy" type="button" id="srngCopyBtn" disabled><i class="fas fa-copy"></i> Copy</button>
           </div>
           <table class="srng-table">
             <thead><tr><th>#</th><th>Sample Value</th></tr></thead>
@@ -447,18 +454,13 @@
       tbody.innerHTML = '<tr><td colspan="2" style="color:#9fb5cc;">No samples generated yet.</td></tr>';
       return;
     }
-    const displayedRows = values.slice(0, 8);
+    const displayedRows = values.slice(0, 10);
     const frag = document.createDocumentFragment();
     displayedRows.forEach((v, idx) => {
       const tr = document.createElement("tr");
       tr.innerHTML = `<td>${idx + 1}</td><td>${v.toFixed(decimals)}</td>`;
       frag.appendChild(tr);
     });
-    if (values.length > displayedRows.length) {
-      const moreTr = document.createElement("tr");
-      moreTr.innerHTML = `<td colspan="2" style="color:#9fb5cc;">Showing first 8 rows of ${values.length} generated values.</td>`;
-      frag.appendChild(moreTr);
-    }
     tbody.appendChild(frag);
   }
 
@@ -477,16 +479,15 @@
   }
 
   let srngHistogram = null;
-  function renderHistogram(values, previousValues = []) {
+  function renderHistogram(values) {
     const containerId = "srngHistogram";
     if (!values.length || typeof window.Highcharts === "undefined") return;
-    const allValues = previousValues.length ? values.concat(previousValues) : values;
-    const min = Math.min(...allValues);
-    const max = Math.max(...allValues);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
     const binsCount = Math.max(8, Math.min(24, Math.round(Math.sqrt(values.length))));
     const span = Math.max(1e-9, max - min);
     const width = span / binsCount;
-    const bins = Array.from({ length: binsCount }, (_, i) => ({ start: min + i * width, end: min + (i + 1) * width, count: 0, prevCount: 0 }));
+    const bins = Array.from({ length: binsCount }, (_, i) => ({ start: min + i * width, end: min + (i + 1) * width, count: 0 }));
 
     values.forEach((v) => {
       let idx = Math.floor((v - min) / width);
@@ -494,18 +495,8 @@
       bins[idx].count += 1;
     });
 
-    previousValues.forEach((v) => {
-      let idx = Math.floor((v - min) / width);
-      idx = Math.max(0, Math.min(binsCount - 1, idx));
-      bins[idx].prevCount += 1;
-    });
-
     const points = bins.map((b) => ({
       y: b.count,
-      custom: { start: b.start, end: b.end },
-    }));
-    const prevPoints = bins.map((b) => ({
-      y: b.prevCount,
       custom: { start: b.start, end: b.end },
     }));
 
@@ -520,14 +511,7 @@
       title: { text: null },
       credits: { enabled: false },
       exporting: { enabled: false },
-      legend: {
-        enabled: true,
-        align: "right",
-        verticalAlign: "top",
-        y: 0,
-        itemStyle: { color: "#cfe0f5", fontSize: "10px", fontWeight: "600" },
-        itemHoverStyle: { color: "#e6f0ff" },
-      },
+      legend: { enabled: false },
       xAxis: {
         labels: { enabled: false },
         lineColor: "rgba(255,255,255,0.2)",
@@ -543,35 +527,18 @@
         gridLineColor: "rgba(255,255,255,0.08)",
       },
       tooltip: {
-        shared: true,
+        shared: false,
         backgroundColor: "rgba(6, 12, 24, 0.92)",
         style: { color: "#e7f2ff" },
         formatter: function () {
-          const pointsForBin = this.points || [];
-          const samplePoint = pointsForBin[0];
-          const start = samplePoint?.point?.custom?.start;
-          const end = samplePoint?.point?.custom?.end;
-          let html = `<b>Range:</b> ${Number(start).toFixed(3)} to ${Number(end).toFixed(3)}`;
-          pointsForBin.forEach((p) => {
-            html += `<br/><span style="color:${p.color}">${p.series.name}:</span> ${p.y}`;
-          });
-          return html;
+          const start = this.point?.custom?.start;
+          const end = this.point?.custom?.end;
+          return `<b>Range:</b> ${Number(start).toFixed(3)} to ${Number(end).toFixed(3)}<br/><span style="color:${this.color}">Count:</span> ${this.y}`;
         },
       },
       plotOptions: { column: { borderWidth: 0, pointPadding: 0.05, groupPadding: 0.06, grouping: false } },
       series: [
         { name: "Current", data: points, color: "rgba(124, 183, 255, 0.86)", pointWidth: 22, zIndex: 2 },
-        ...(previousValues.length
-          ? [{
-              name: "Previous overlay",
-              data: prevPoints,
-              color: "rgba(216, 234, 255, 0.32)",
-              borderColor: "rgba(216, 234, 255, 0.45)",
-              borderWidth: 1,
-              pointWidth: 14,
-              zIndex: 3,
-            }]
-          : []),
       ],
     });
   }
@@ -731,12 +698,6 @@
       const n = Math.max(1, Math.min(5000, Number.isFinite(nRaw) ? nRaw : 150));
       const decimals = Math.max(0, Math.min(10, Number.isFinite(decimalsRaw) ? decimalsRaw : 4));
 
-      if (isInteractive && latestValues.length) {
-        previousValues = [...latestValues];
-      } else if (!isInteractive) {
-        previousValues = [];
-      }
-
       latestValues = [];
       for (let i = 0; i < n; i += 1) {
         const value = config.sampleOne(params);
@@ -745,14 +706,13 @@
 
       renderTable(latestValues, decimals);
       renderStats(latestValues, decimals);
-      renderHistogram(latestValues, previousValues);
+      renderHistogram(latestValues);
       copyBtn.disabled = latestValues.length === 0;
-      const shown = Math.min(8, latestValues.length);
+      const shown = Math.min(10, latestValues.length);
       setStatus(`${isInteractive ? "Interactive update" : "Generated"} ${latestValues.length} samples from ${config.name}. Showing ${shown} rows.`);
     }
 
     let latestValues = [];
-    let previousValues = [];
     generateBtn.addEventListener("click", () => runGeneration(false));
 
     if (isNormal) {
@@ -766,7 +726,7 @@
       const sampleSizeInput = document.getElementById("srngSampleSize");
       sampleSizeInput.addEventListener("input", () => {
         const parsed = parseInt(sampleSizeInput.value, 10);
-        if (Number.isFinite(parsed)) nSlider.value = String(Math.max(5, Math.min(300, parsed)));
+        if (Number.isFinite(parsed)) nSlider.value = String(Math.max(5, Math.min(1000, parsed)));
         syncPedagogyValues();
       });
     } else {

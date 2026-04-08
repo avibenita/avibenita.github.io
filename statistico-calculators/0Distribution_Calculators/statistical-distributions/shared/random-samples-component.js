@@ -377,11 +377,14 @@
   padding: 8px 10px;
   border-bottom:1px solid rgba(255,255,255,0.12);
   background: rgba(17, 36, 70, 0.62);
+  position: sticky;
+  top: 0;
+  z-index: 3;
 }
 .srng-table-title { font-size:0.82rem; color:#cfe0f5; font-weight:700; }
 .srng-table { width:100%; border-collapse: collapse; font-size: 0.8rem; }
 .srng-table th, .srng-table td { padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left; }
-.srng-table th { position: sticky; top: 0; background:#112446; color:#cfe6ff; z-index: 1; }
+.srng-table th { position: sticky; top: 40px; background:#112446; color:#cfe6ff; z-index: 2; }
 @media (max-width: 760px) {
   .srng-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .srng-pedagogy-grid { grid-template-columns:1fr; }

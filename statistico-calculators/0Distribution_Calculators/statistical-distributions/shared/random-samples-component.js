@@ -294,7 +294,7 @@
   padding: 4px 10px;
   cursor: pointer;
 }
-.srng-grid { display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:12px; }
+.srng-grid { display:grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:12px; }
 .srng-label { display:block; font-size:0.82rem; color:#b8d8ff; margin-bottom:6px; }
 .srng-readonly {
   border: 1px solid rgba(255,255,255,0.16);
@@ -332,6 +332,8 @@
 .srng-chip-label { font-size:0.72rem; color:#9fc2ef; margin-bottom:3px; }
 .srng-chip-value { font-size:0.95rem; color:#edf6ff; font-weight:600; }
 .srng-table-wrap { border:1px solid rgba(255,255,255,0.14); border-radius:10px; overflow:auto; max-height: 33vh; }
+.srng-generate-slot { display:flex; align-items:end; }
+.srng-generate-slot .srng-btn { width:100%; min-height:38px; }
 .srng-table-head {
   display:flex;
   align-items:center;
@@ -372,15 +374,15 @@
           <div><span class="srng-label">Parameters</span><div class="srng-readonly" id="srngParamText">-</div></div>
           <div>
             <label class="srng-label" for="srngSampleSize">Sample Size (n)</label>
-            <input id="srngSampleSize" class="input-field" type="number" min="1" max="5000" step="1" value="30"/>
+            <input id="srngSampleSize" class="input-field" type="number" min="1" max="5000" step="1" value="150"/>
           </div>
           <div>
             <label class="srng-label" for="srngDecimals">Decimals</label>
             <input id="srngDecimals" class="input-field" type="number" min="0" max="10" step="1" value="4"/>
           </div>
-        </div>
-        <div class="srng-actions">
-          <button class="srng-btn srng-generate" type="button" id="srngGenerateBtn"><i class="fas fa-bolt"></i> Generate</button>
+          <div class="srng-generate-slot">
+            <button class="srng-btn srng-generate" type="button" id="srngGenerateBtn"><i class="fas fa-bolt"></i> Generate</button>
+          </div>
         </div>
         <div class="srng-pedagogy" id="srngPedagogy">
           <h4 class="srng-pedagogy-title">Interactive Pedagogic Sliders</h4>
@@ -394,8 +396,8 @@
               <input id="srngStdSlider" type="range" min="0.1" max="5" step="0.1" value="1"/>
             </div>
             <div class="srng-pedagogy-item">
-              <label>Sample Size (n) <span id="srngNValue">30</span></label>
-              <input id="srngNSlider" type="range" min="5" max="300" step="1" value="30"/>
+              <label>Sample Size (n) <span id="srngNValue">150</span></label>
+              <input id="srngNSlider" type="range" min="5" max="300" step="1" value="150"/>
             </div>
           </div>
         </div>
@@ -695,7 +697,7 @@
       if (!isNormal) return;
       const mean = parseFloat(meanSlider.value) || 0;
       const std = parseFloat(stdSlider.value) || 1;
-      const n = parseInt(nSlider.value, 10) || 30;
+      const n = parseInt(nSlider.value, 10) || 150;
       const meanValue = document.getElementById("srngMeanValue");
       const stdValue = document.getElementById("srngStdValue");
       const nValue = document.getElementById("srngNValue");
@@ -726,7 +728,7 @@
       }
       const nRaw = parseInt(document.getElementById("srngSampleSize").value, 10);
       const decimalsRaw = parseInt(document.getElementById("srngDecimals").value, 10);
-      const n = Math.max(1, Math.min(5000, Number.isFinite(nRaw) ? nRaw : 30));
+      const n = Math.max(1, Math.min(5000, Number.isFinite(nRaw) ? nRaw : 150));
       const decimals = Math.max(0, Math.min(10, Number.isFinite(decimalsRaw) ? decimalsRaw : 4));
 
       if (isInteractive && latestValues.length) {
@@ -788,7 +790,7 @@
         meanSlider.value = String(Number.isFinite(p.mean) ? p.mean : 0);
         stdSlider.max = String(Math.max(5, (Number.isFinite(p.stddev) ? p.stddev : 1) * 3));
         stdSlider.value = String(Number.isFinite(p.stddev) ? p.stddev : 1);
-        nSlider.value = document.getElementById("srngSampleSize").value || "30";
+        nSlider.value = document.getElementById("srngSampleSize").value || "150";
         syncPedagogyValues();
         runGeneration(true);
       }

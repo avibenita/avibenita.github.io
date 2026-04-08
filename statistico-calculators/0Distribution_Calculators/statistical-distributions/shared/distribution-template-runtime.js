@@ -163,11 +163,24 @@
     return { pdf, cdf };
   }
 
-  function renderCharts(cfg, params) {
+  function buildShadedPdfSeries(pdfSeries, shadeRange) {
+    if (!shadeRange || !Number.isFinite(shadeRange.min) || !Number.isFinite(shadeRange.max)) {
+      return [];
+    }
+    const lo = Math.min(shadeRange.min, shadeRange.max);
+    const hi = Math.max(shadeRange.min, shadeRange.max);
+    return pdfSeries.map(([x, y]) => (x >= lo && x <= hi ? [x, y] : [x, null]));
+  }
+
+  function renderCharts(cfg, params, shadeRange) {
     if (typeof window.Highcharts === "undefined") return;
     const rangeValue = $("chartRange")?.value || cfg.defaults.range;
     const domain = cfg.chartDomain(params, rangeValue);
     const series = buildSeries(cfg, params, domain);
+    const shadedPdf = buildShadedPdfSeries(series.pdf, {
+      min: Math.max(domain.min, shadeRange?.min ?? domain.min),
+      max: Math.min(domain.max, shadeRange?.max ?? domain.max),
+    });
 
     const base = {
       chart: { backgroundColor: "transparent" },
@@ -186,7 +199,17 @@
 
     pdfChart = window.Highcharts.chart("pdfChart", {
       ...base,
-      series: [{ name: "Probability Density", type: "line", data: series.pdf, color: "#ffa578", lineWidth: 2.5 }],
+      series: [
+        {
+          name: "Shaded Area",
+          type: "area",
+          data: shadedPdf,
+          color: "rgba(255, 165, 120, 0.28)",
+          lineWidth: 0,
+          marker: { enabled: false },
+        },
+        { name: "Probability Density", type: "line", data: series.pdf, color: "#ffa578", lineWidth: 2.5 },
+      ],
     });
     cdfChart = window.Highcharts.chart("cdfChart", {
       ...base,
@@ -196,6 +219,14 @@
       ...base,
       yAxis: [{ title: { text: null }, gridLineColor: "rgba(255,255,255,0.08)", labels: { style: { color: "#d2e3ff" } } }],
       series: [
+        {
+          name: "Shaded Area",
+          type: "area",
+          data: shadedPdf,
+          color: "rgba(255, 165, 120, 0.24)",
+          lineWidth: 0,
+          marker: { enabled: false },
+        },
         { name: "PDF", type: "line", data: series.pdf, color: "#ffa578", lineWidth: 2.5 },
         { name: "CDF", type: "line", data: series.cdf, color: "#7cc5ff", lineWidth: 2.5 },
       ],
@@ -221,6 +252,8 @@
     let expression = "";
     let explanation = "";
     let percentageText = "";
+    let shadeMin = Number.NEGATIVE_INFINITY;
+    let shadeMax = Number.POSITIVE_INFINITY;
 
     if (type === "probability") {
       const x = parseFloat($("xValue")?.value || "0");
@@ -229,6 +262,7 @@
       explanation = "Probability up to the specified x-value.";
       percentageText = `(${formatNum(result * 100, precision)}%)`;
       $("equationText").textContent = `${expression} = ${formatNum(result, precision)}`;
+      shadeMax = x;
     } else if (type === "between") {
       const a = parseFloat($("lowerBound")?.value || "0");
       const b = parseFloat($("upperBound")?.value || "0");
@@ -239,6 +273,8 @@
       explanation = "Probability between lower and upper bounds.";
       percentageText = `(${formatNum(result * 100, precision)}%)`;
       $("equationText").textContent = `${expression} = ${formatNum(result, precision)}`;
+      shadeMin = lo;
+      shadeMax = hi;
     } else {
       const p = Math.max(0, Math.min(1, parseFloat($("probability")?.value || "0.5")));
       result = cfg.inv(p, params);
@@ -246,6 +282,7 @@
       explanation = "Returned x-value at cumulative probability p.";
       percentageText = "";
       $("equationText").textContent = `X = ${formatNum(result, precision)}`;
+      shadeMax = result;
     }
 
     $("mainResult").textContent = formatNum(result, precision);
@@ -253,7 +290,7 @@
     $("explanationLine").textContent = explanation;
     $("percentageText").textContent = percentageText;
     updateStats(cfg, params, precision);
-    renderCharts(cfg, params);
+    renderCharts(cfg, params, { min: shadeMin, max: shadeMax });
   }
 
   function initTabs() {

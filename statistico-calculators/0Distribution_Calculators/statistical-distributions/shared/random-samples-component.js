@@ -354,6 +354,16 @@
 .srng-hist { height:145px; }
 .srng-stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .srng-chip { border:1px solid rgba(155,191,255,0.28); background: rgba(71,111,178,0.15); border-radius:8px; padding:8px; }
+.srng-chip.srng-pulse {
+  border-color: rgba(143, 206, 255, 0.7);
+  box-shadow: 0 0 0 1px rgba(143, 206, 255, 0.22) inset, 0 0 14px rgba(88, 166, 255, 0.24);
+  animation: srngChipPulse .45s ease;
+}
+@keyframes srngChipPulse {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
 .srng-chip-label { font-size:0.72rem; color:#9fc2ef; margin-bottom:3px; }
 .srng-chip-value { font-size:0.95rem; color:#edf6ff; font-weight:600; }
 .srng-table-wrap { border:1px solid rgba(255,255,255,0.14); border-radius:10px; overflow:hidden; }
@@ -703,6 +713,17 @@
     }
     function updateTeachingNote(changedKey) {
       if (!isNormal || !teachNoteEl) return;
+      const pulseStatChips = (ids) => {
+        ids.forEach((id) => {
+          const valEl = document.getElementById(id);
+          const chip = valEl ? valEl.closest(".srng-chip") : null;
+          if (!chip) return;
+          chip.classList.remove("srng-pulse");
+          // Restart CSS animation for repeated slider moves
+          void chip.offsetWidth;
+          chip.classList.add("srng-pulse");
+        });
+      };
       if (pedagogyMode !== "learn") {
         teachNoteEl.textContent = "Explore mode: sliders update the sample instantly.";
         lastSliderState = currentSliderState();
@@ -713,16 +734,19 @@
       if (changedKey === "mean") {
         const dir = curr.mean >= prev.mean ? "right" : "left";
         teachNoteEl.textContent = `Mean shift: center moved ${dir}; spread stays driven by sigma.`;
+        pulseStatChips(["srngStatMean"]);
       } else if (changedKey === "std") {
         const wider = curr.std >= prev.std;
         teachNoteEl.textContent = wider
           ? "Std dev increased: distribution is wider and the peak lowers."
           : "Std dev decreased: distribution is narrower and the peak rises.";
+        pulseStatChips(["srngStatStd"]);
       } else if (changedKey === "n") {
         const more = curr.n >= prev.n;
         teachNoteEl.textContent = more
           ? "Sample size increased: histogram should look smoother and more stable."
           : "Sample size decreased: histogram has more sampling noise.";
+        pulseStatChips(["srngStatMean", "srngStatStd", "srngStatMin", "srngStatMax"]);
       } else {
         teachNoteEl.textContent = "Move a slider to see what changed.";
       }

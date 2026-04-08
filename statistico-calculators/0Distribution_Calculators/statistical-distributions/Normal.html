@@ -286,6 +286,16 @@
             border-radius: 8px;
             padding: 8px;
         }
+        .random-stat-chip.random-pulse {
+            border-color: rgba(143, 206, 255, 0.7);
+            box-shadow: 0 0 0 1px rgba(143, 206, 255, 0.22) inset, 0 0 14px rgba(88, 166, 255, 0.24);
+            animation: randomChipPulse .45s ease;
+        }
+        @keyframes randomChipPulse {
+            0% { transform: scale(1); }
+            45% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
 
         .random-stat-label {
             font-size: 0.72rem;
@@ -2393,6 +2403,17 @@
         function updateRandomTeachingNote(changedKey) {
             const note = document.getElementById('randomTeachNote');
             if (!note) return;
+            const pulseStatChips = (ids) => {
+                ids.forEach((id) => {
+                    const valEl = document.getElementById(id);
+                    const chip = valEl ? valEl.closest('.random-stat-chip') : null;
+                    if (!chip) return;
+                    chip.classList.remove('random-pulse');
+                    // Restart CSS animation for repeated slider moves
+                    void chip.offsetWidth;
+                    chip.classList.add('random-pulse');
+                });
+            };
             const curr = currentRandomSliderState();
             const prev = randomLastSliderState || curr;
 
@@ -2405,14 +2426,17 @@
             if (changedKey === 'mean') {
                 const dir = curr.mean >= prev.mean ? 'right' : 'left';
                 note.textContent = `Mean shift: center moved ${dir}; spread stays driven by sigma.`;
+                pulseStatChips(['randomStatMean']);
             } else if (changedKey === 'std') {
                 note.textContent = curr.std >= prev.std
                     ? 'Std dev increased: distribution is wider and the peak lowers.'
                     : 'Std dev decreased: distribution is narrower and the peak rises.';
+                pulseStatChips(['randomStatStd']);
             } else if (changedKey === 'n') {
                 note.textContent = curr.n >= prev.n
                     ? 'Sample size increased: histogram should look smoother and more stable.'
                     : 'Sample size decreased: histogram has more sampling noise.';
+                pulseStatChips(['randomStatMean', 'randomStatStd', 'randomStatMin', 'randomStatMax']);
             } else {
                 note.textContent = 'Move a slider to see what changed.';
             }

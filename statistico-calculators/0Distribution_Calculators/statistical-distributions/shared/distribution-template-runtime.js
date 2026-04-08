@@ -172,6 +172,12 @@
     return pdfSeries.map(([x, y]) => (x >= lo && x <= hi ? [x, y] : [x, null]));
   }
 
+  function formatMarkerValue(v) {
+    const rounded = Number(v.toFixed(3));
+    if (Object.is(rounded, -0)) return "0";
+    return String(rounded);
+  }
+
   function buildPlotLines(markerValues) {
     const values = Array.isArray(markerValues) ? markerValues.filter((v) => Number.isFinite(v)) : [];
     return values.map((v, idx) => ({
@@ -181,7 +187,7 @@
       dashStyle: "Dash",
       zIndex: 5,
       label: {
-        text: values.length === 1 ? "x" : idx === 0 ? "a" : "b",
+        text: values.length === 1 ? `x = ${formatMarkerValue(v)}` : idx === 0 ? `a = ${formatMarkerValue(v)}` : `b = ${formatMarkerValue(v)}`,
         align: "right",
         y: -6,
         style: { color: "#ffd0d0", fontWeight: "700", fontSize: "10px" },

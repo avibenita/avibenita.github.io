@@ -172,7 +172,24 @@
     return pdfSeries.map(([x, y]) => (x >= lo && x <= hi ? [x, y] : [x, null]));
   }
 
-  function renderCharts(cfg, params, shadeRange) {
+  function buildPlotLines(markerValues) {
+    const values = Array.isArray(markerValues) ? markerValues.filter((v) => Number.isFinite(v)) : [];
+    return values.map((v, idx) => ({
+      value: v,
+      color: "rgba(255, 120, 120, 0.95)",
+      width: 2,
+      dashStyle: "Dash",
+      zIndex: 5,
+      label: {
+        text: values.length === 1 ? "x" : idx === 0 ? "a" : "b",
+        align: "right",
+        y: -6,
+        style: { color: "#ffd0d0", fontWeight: "700", fontSize: "10px" },
+      },
+    }));
+  }
+
+  function renderCharts(cfg, params, shadeRange, markerValues) {
     if (typeof window.Highcharts === "undefined") return;
     const rangeValue = $("chartRange")?.value || cfg.defaults.range;
     const domain = cfg.chartDomain(params, rangeValue);
@@ -183,13 +200,24 @@
     });
 
     const base = {
-      chart: { backgroundColor: "transparent" },
+      chart: { backgroundColor: "transparent", spacingBottom: 18 },
       title: { text: null },
       credits: { enabled: false },
       exporting: { enabled: false },
-      xAxis: { lineColor: "rgba(255,255,255,0.25)", labels: { style: { color: "#d2e3ff" } } },
+      xAxis: {
+        lineColor: "rgba(255,255,255,0.25)",
+        labels: { style: { color: "#d2e3ff" } },
+        plotLines: buildPlotLines(markerValues),
+      },
       yAxis: { title: { text: null }, gridLineColor: "rgba(255,255,255,0.08)", labels: { style: { color: "#d2e3ff" } } },
-      legend: { itemStyle: { color: "#d2e3ff" } },
+      legend: {
+        enabled: true,
+        floating: true,
+        align: "center",
+        verticalAlign: "top",
+        y: 6,
+        itemStyle: { color: "#d2e3ff", fontSize: "10px" },
+      },
       tooltip: { shared: true, backgroundColor: "rgba(8,18,34,0.94)", style: { color: "#f0f6ff" } },
     };
 
@@ -254,6 +282,7 @@
     let percentageText = "";
     let shadeMin = Number.NEGATIVE_INFINITY;
     let shadeMax = Number.POSITIVE_INFINITY;
+    let markerValues = [];
 
     if (type === "probability") {
       const x = parseFloat($("xValue")?.value || "0");
@@ -263,6 +292,7 @@
       percentageText = `(${formatNum(result * 100, precision)}%)`;
       $("equationText").textContent = `${expression} = ${formatNum(result, precision)}`;
       shadeMax = x;
+      markerValues = [x];
     } else if (type === "between") {
       const a = parseFloat($("lowerBound")?.value || "0");
       const b = parseFloat($("upperBound")?.value || "0");
@@ -275,6 +305,7 @@
       $("equationText").textContent = `${expression} = ${formatNum(result, precision)}`;
       shadeMin = lo;
       shadeMax = hi;
+      markerValues = [lo, hi];
     } else {
       const p = Math.max(0, Math.min(1, parseFloat($("probability")?.value || "0.5")));
       result = cfg.inv(p, params);
@@ -283,6 +314,7 @@
       percentageText = "";
       $("equationText").textContent = `X = ${formatNum(result, precision)}`;
       shadeMax = result;
+      markerValues = [result];
     }
 
     $("mainResult").textContent = formatNum(result, precision);
@@ -290,7 +322,7 @@
     $("explanationLine").textContent = explanation;
     $("percentageText").textContent = percentageText;
     updateStats(cfg, params, precision);
-    renderCharts(cfg, params, { min: shadeMin, max: shadeMax });
+    renderCharts(cfg, params, { min: shadeMin, max: shadeMax }, markerValues);
   }
 
   function initTabs() {

@@ -282,6 +282,7 @@
     let expression = "";
     let explanation = "";
     let percentageText = "";
+    const percentagePrecision = 1;
     let shadeMin = Number.NEGATIVE_INFINITY;
     let shadeMax = Number.POSITIVE_INFINITY;
     let markerValues = [];
@@ -291,7 +292,7 @@
       result = cfg.cdf(x, params);
       expression = `P(X <= ${formatNum(x, precision)})`;
       explanation = "Probability up to the specified x-value.";
-      percentageText = `(${formatNum(result * 100, precision)}%)`;
+      percentageText = `(${(result * 100).toFixed(percentagePrecision)}%)`;
       $("equationText").textContent = `${expression} = ${formatNum(result, precision)}`;
       shadeMax = x;
       markerValues = [x];
@@ -303,7 +304,7 @@
       result = Math.max(0, cfg.cdf(hi, params) - cfg.cdf(lo, params));
       expression = `P(${formatNum(lo, precision)} <= X <= ${formatNum(hi, precision)})`;
       explanation = "Probability between lower and upper bounds.";
-      percentageText = `(${formatNum(result * 100, precision)}%)`;
+      percentageText = `(${(result * 100).toFixed(percentagePrecision)}%)`;
       $("equationText").textContent = `${expression} = ${formatNum(result, precision)}`;
       shadeMin = lo;
       shadeMax = hi;
@@ -313,7 +314,7 @@
       result = cfg.inv(p, params);
       expression = `Quantile for p = ${formatNum(p, precision)}`;
       explanation = "Returned x-value at cumulative probability p.";
-      percentageText = "";
+      percentageText = `(${(p * 100).toFixed(percentagePrecision)}%)`;
       $("equationText").textContent = `X = ${formatNum(result, precision)}`;
       shadeMax = result;
       markerValues = [result];
@@ -322,7 +323,13 @@
     $("mainResult").textContent = formatNum(result, precision);
     $("heroExpression").textContent = expression;
     $("explanationLine").textContent = explanation;
-    $("percentageText").textContent = percentageText;
+    const equationEl = $("equationText");
+    const percentageEl = $("percentageText");
+    if (equationEl) equationEl.style.display = "none";
+    if (percentageEl) {
+      percentageEl.textContent = percentageText;
+      percentageEl.style.display = percentageText ? "inline" : "none";
+    }
     updateStats(cfg, params, precision);
     renderCharts(cfg, params, { min: shadeMin, max: shadeMax }, markerValues);
   }

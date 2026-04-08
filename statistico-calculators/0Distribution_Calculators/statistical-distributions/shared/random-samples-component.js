@@ -366,7 +366,7 @@
 }
 .srng-chip-label { font-size:0.72rem; color:#9fc2ef; margin-bottom:3px; }
 .srng-chip-value { font-size:0.95rem; color:#edf6ff; font-weight:600; }
-.srng-table-wrap { border:1px solid rgba(255,255,255,0.14); border-radius:10px; overflow:hidden; }
+.srng-table-wrap { border:1px solid rgba(255,255,255,0.14); border-radius:10px; overflow:auto; max-height: 33vh; }
 .srng-generate-slot { display:flex; align-items:end; }
 .srng-generate-slot .srng-btn { width:100%; min-height:38px; }
 .srng-table-head {
@@ -461,7 +461,7 @@
         </div>
         <div class="srng-table-wrap">
           <div class="srng-table-head">
-            <span class="srng-table-title">Generated Samples (first 10 rows)</span>
+            <span class="srng-table-title">Generated Samples (all rows)</span>
             <button class="srng-btn srng-copy" type="button" id="srngCopyBtn" disabled title="Ready to paste to Excel (one value per row)"><i class="fas fa-copy"></i> Copy</button>
           </div>
           <table class="srng-table">
@@ -489,9 +489,8 @@
       tbody.innerHTML = '<tr><td colspan="2" style="color:#9fb5cc;">No samples generated yet.</td></tr>';
       return;
     }
-    const displayedRows = values.slice(0, 10);
     const frag = document.createDocumentFragment();
-    displayedRows.forEach((v, idx) => {
+    values.forEach((v, idx) => {
       const tr = document.createElement("tr");
       tr.innerHTML = `<td>${idx + 1}</td><td>${v.toFixed(decimals)}</td>`;
       frag.appendChild(tr);
@@ -801,8 +800,7 @@
       renderStats(latestValues, decimals);
       renderHistogram(latestValues);
       copyBtn.disabled = latestValues.length === 0;
-      const shown = Math.min(10, latestValues.length);
-      setStatus(`${isInteractive ? "Interactive update" : "Generated"} ${latestValues.length} samples from ${config.name}. Showing ${shown} rows.`);
+      setStatus(`${isInteractive ? "Interactive update" : "Generated"} ${latestValues.length} samples from ${config.name}. Displaying all rows in a scrollable table.`);
     }
 
     let latestValues = [];

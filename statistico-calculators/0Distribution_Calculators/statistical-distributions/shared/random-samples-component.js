@@ -306,22 +306,35 @@
 }
 .srng-actions { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
 .srng-btn {
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 8px;
-  padding: 8px 12px;
+  border: 1px solid rgba(151, 190, 255, 0.28);
+  border-radius: 10px;
+  padding: 7px 11px;
   font-weight: 600;
+  font-size: 0.81rem;
   color: #eaf3ff;
-  background: rgba(88,120,180,0.25);
+  background: rgba(86, 126, 194, 0.14);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease;
   cursor: pointer;
 }
-.srng-btn.srng-generate { background: linear-gradient(135deg, #f39c7a, #7dbdff); color: #fff; border: none; }
+.srng-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(151, 190, 255, 0.45);
+  box-shadow: 0 8px 16px rgba(5, 12, 24, 0.35);
+}
+.srng-btn.srng-generate {
+  background: linear-gradient(135deg, rgba(116, 180, 255, 0.33), rgba(100, 152, 255, 0.22));
+  color: #eaf6ff;
+}
 .srng-btn.srng-copy {
-  background: linear-gradient(135deg, #28c76f, #1ba083);
-  color: #fff;
-  border: none;
-  padding: 5px 9px;
-  font-size: 0.78rem;
-  border-radius: 7px;
+  background: rgba(40, 199, 111, 0.14);
+  color: #cffff0;
+  border: 1px solid rgba(40, 199, 111, 0.42);
+  padding: 5px 8px;
+  font-size: 0.75rem;
+  border-radius: 8px;
+  box-shadow: none;
 }
 .srng-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .srng-status { margin-bottom:10px; font-size:0.85rem; color:#9dc7ff; min-height:1.1em; }
@@ -427,7 +440,7 @@
         <div class="srng-table-wrap">
           <div class="srng-table-head">
             <span class="srng-table-title">Generated Samples (first 10 rows)</span>
-            <button class="srng-btn srng-copy" type="button" id="srngCopyBtn" disabled><i class="fas fa-copy"></i> Copy</button>
+            <button class="srng-btn srng-copy" type="button" id="srngCopyBtn" disabled title="Ready to paste to Excel (one value per row)"><i class="fas fa-copy"></i> Copy</button>
           </div>
           <table class="srng-table">
             <thead><tr><th>#</th><th>Sample Value</th></tr></thead>

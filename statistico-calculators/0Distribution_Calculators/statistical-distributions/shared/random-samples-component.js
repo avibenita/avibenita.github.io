@@ -340,6 +340,11 @@
 .srng-status { margin-bottom:10px; font-size:0.85rem; color:#9dc7ff; min-height:1.1em; }
 .srng-pedagogy { border:1px solid rgba(255,255,255,0.14); border-radius:10px; background: rgba(10, 24, 48, 0.72); padding:10px; margin-bottom:12px; display:none; }
 .srng-pedagogy-title { margin:0 0 8px 0; font-size:0.86rem; color:#bcd9ff; font-weight:600; }
+.srng-pedagogy-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+.srng-mode-toggle { display:inline-flex; gap:4px; background: rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); border-radius:999px; padding:2px; }
+.srng-mode-btn { border:none; background:transparent; color:#b8d8ff; font-size:0.72rem; font-weight:600; padding:3px 8px; border-radius:999px; cursor:pointer; }
+.srng-mode-btn.active { background: rgba(124,183,255,0.26); color:#eaf6ff; }
+.srng-teach-note { margin:0 0 8px 0; font-size:0.76rem; color:#9fc2ef; min-height:1.1em; }
 .srng-pedagogy-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
 .srng-pedagogy-item label { display:flex; justify-content:space-between; font-size:0.78rem; color:#b8d8ff; margin-bottom:6px; }
 .srng-pedagogy-item input[type="range"] { width:100%; accent-color:#7dbdff; }
@@ -405,7 +410,14 @@
           </div>
         </div>
         <div class="srng-pedagogy" id="srngPedagogy">
-          <h4 class="srng-pedagogy-title">Interactive Pedagogic Sliders</h4>
+          <div class="srng-pedagogy-head">
+            <h4 class="srng-pedagogy-title">Interactive Pedagogic Sliders</h4>
+            <div class="srng-mode-toggle" id="srngModeToggle">
+              <button class="srng-mode-btn" type="button" data-srng-mode="explore">Explore</button>
+              <button class="srng-mode-btn active" type="button" data-srng-mode="learn">Learn</button>
+            </div>
+          </div>
+          <div class="srng-teach-note" id="srngTeachNote">Move a slider to see what changed.</div>
           <div class="srng-pedagogy-grid">
             <div class="srng-pedagogy-item">
               <label>Mean (mu) <span id="srngMeanValue">0.00</span></label>
@@ -668,10 +680,54 @@
     const meanSlider = document.getElementById("srngMeanSlider");
     const stdSlider = document.getElementById("srngStdSlider");
     const nSlider = document.getElementById("srngNSlider");
+    const teachNoteEl = document.getElementById("srngTeachNote");
+    const modeButtons = Array.from(modal.querySelectorAll("[data-srng-mode]"));
     const isNormal = config.name === "Normal Distribution";
+    let pedagogyMode = "learn";
+    let lastSliderState = null;
     const setStatus = (msg) => {
       statusEl.textContent = msg;
     };
+    const currentSliderState = () => ({
+      mean: parseFloat(meanSlider?.value) || 0,
+      std: parseFloat(stdSlider?.value) || 1,
+      n: parseInt(nSlider?.value, 10) || 150,
+    });
+    function setPedagogyMode(mode) {
+      pedagogyMode = mode === "explore" ? "explore" : "learn";
+      modeButtons.forEach((btn) => btn.classList.toggle("active", btn.dataset.srngMode === pedagogyMode));
+      if (!teachNoteEl) return;
+      teachNoteEl.textContent = pedagogyMode === "learn"
+        ? "Move a slider to see what changed."
+        : "Explore mode: sliders update the sample instantly.";
+    }
+    function updateTeachingNote(changedKey) {
+      if (!isNormal || !teachNoteEl) return;
+      if (pedagogyMode !== "learn") {
+        teachNoteEl.textContent = "Explore mode: sliders update the sample instantly.";
+        lastSliderState = currentSliderState();
+        return;
+      }
+      const curr = currentSliderState();
+      const prev = lastSliderState || curr;
+      if (changedKey === "mean") {
+        const dir = curr.mean >= prev.mean ? "right" : "left";
+        teachNoteEl.textContent = `Mean shift: center moved ${dir}; spread stays driven by sigma.`;
+      } else if (changedKey === "std") {
+        const wider = curr.std >= prev.std;
+        teachNoteEl.textContent = wider
+          ? "Std dev increased: distribution is wider and the peak lowers."
+          : "Std dev decreased: distribution is narrower and the peak rises.";
+      } else if (changedKey === "n") {
+        const more = curr.n >= prev.n;
+        teachNoteEl.textContent = more
+          ? "Sample size increased: histogram should look smoother and more stable."
+          : "Sample size decreased: histogram has more sampling noise.";
+      } else {
+        teachNoteEl.textContent = "Move a slider to see what changed.";
+      }
+      lastSliderState = curr;
+    }
 
     function syncPedagogyValues() {
       if (!isNormal) return;
@@ -730,9 +786,15 @@
 
     if (isNormal) {
       pedagogyPanel.style.display = "block";
+      setPedagogyMode("learn");
+      modeButtons.forEach((btn) => {
+        btn.addEventListener("click", () => setPedagogyMode(btn.dataset.srngMode));
+      });
       [meanSlider, stdSlider, nSlider].forEach((slider) => {
         slider.addEventListener("input", () => {
           syncPedagogyValues();
+          const changedKey = slider === meanSlider ? "mean" : slider === stdSlider ? "std" : "n";
+          updateTeachingNote(changedKey);
           runGeneration(true);
         });
       });
@@ -741,6 +803,7 @@
         const parsed = parseInt(sampleSizeInput.value, 10);
         if (Number.isFinite(parsed)) nSlider.value = String(Math.max(5, Math.min(1000, parsed)));
         syncPedagogyValues();
+        updateTeachingNote("n");
       });
     } else {
       pedagogyPanel.style.display = "none";
@@ -764,6 +827,9 @@
         stdSlider.max = String(Math.max(5, (Number.isFinite(p.stddev) ? p.stddev : 1) * 3));
         stdSlider.value = String(Number.isFinite(p.stddev) ? p.stddev : 1);
         nSlider.value = document.getElementById("srngSampleSize").value || "150";
+        lastSliderState = currentSliderState();
+        setPedagogyMode("learn");
+        updateTeachingNote();
         syncPedagogyValues();
         runGeneration(true);
       }

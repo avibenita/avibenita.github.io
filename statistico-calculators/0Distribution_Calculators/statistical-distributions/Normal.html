@@ -171,6 +171,41 @@
             color: #bcd9ff;
             font-weight: 600;
         }
+        .random-pedagogic-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .random-mode-toggle {
+            display: inline-flex;
+            gap: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 999px;
+            padding: 2px;
+        }
+        .random-mode-btn {
+            border: none;
+            background: transparent;
+            color: #b8d8ff;
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 999px;
+            cursor: pointer;
+        }
+        .random-mode-btn.active {
+            background: rgba(124, 183, 255, 0.26);
+            color: #eaf6ff;
+        }
+        .random-teach-note {
+            margin: 0 0 8px 0;
+            font-size: 0.76rem;
+            color: #9fc2ef;
+            min-height: 1.1em;
+        }
 
         .random-slider-grid {
             display: grid;
@@ -604,7 +639,14 @@
                 </div>
             </div>
             <div class="random-pedagogic">
-                <h4>Interactive Pedagogic Sliders</h4>
+                <div class="random-pedagogic-head">
+                    <h4>Interactive Pedagogic Sliders</h4>
+                    <div class="random-mode-toggle" id="randomModeToggle">
+                        <button class="random-mode-btn" type="button" data-random-mode="explore">Explore</button>
+                        <button class="random-mode-btn active" type="button" data-random-mode="learn">Learn</button>
+                    </div>
+                </div>
+                <div class="random-teach-note" id="randomTeachNote">Move a slider to see what changed.</div>
                 <div class="random-slider-grid">
                     <div class="random-slider-item">
                         <label>Mean (mu) <span id="pedagMeanValue">0.00</span></label>
@@ -811,6 +853,8 @@
         let currentCalcType = 'probability';
         let latestRandomSamples = [];
         let randomHistogramChart = null;
+        let randomPedagogyMode = 'learn';
+        let randomLastSliderState = null;
 
         // Store chart data for animations
         let chartDataStore = {
@@ -2269,6 +2313,9 @@
             stdSlider.max = String(Math.max(5, stddev * 3));
             stdSlider.value = String(stddev);
             nSlider.value = document.getElementById('randomSampleSize').value || '150';
+            randomLastSliderState = currentRandomSliderState();
+            setRandomPedagogyMode('learn');
+            updateRandomTeachingNote();
             syncPedagogicValues();
             bindPedagogicSliders();
 
@@ -2299,9 +2346,78 @@
                 if (!el) return;
                 el.addEventListener('input', () => {
                     syncPedagogicValues();
+                    const changedKey = id === 'pedagMeanSlider' ? 'mean' : id === 'pedagStdSlider' ? 'std' : 'n';
+                    updateRandomTeachingNote(changedKey);
                     generateRandomSamples(true);
                 });
             });
+            document.querySelectorAll('[data-random-mode]').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    setRandomPedagogyMode(btn.dataset.randomMode);
+                });
+            });
+            const sampleSizeInput = document.getElementById('randomSampleSize');
+            if (sampleSizeInput) {
+                sampleSizeInput.addEventListener('input', () => {
+                    const parsed = parseInt(sampleSizeInput.value, 10);
+                    if (Number.isFinite(parsed)) {
+                        const nSlider = document.getElementById('pedagNSlider');
+                        if (nSlider) nSlider.value = String(Math.max(5, Math.min(1000, parsed)));
+                    }
+                    syncPedagogicValues();
+                    updateRandomTeachingNote('n');
+                });
+            }
+        }
+
+        function currentRandomSliderState() {
+            return {
+                mean: parseFloat(document.getElementById('pedagMeanSlider')?.value) || 0,
+                std: parseFloat(document.getElementById('pedagStdSlider')?.value) || 1,
+                n: parseInt(document.getElementById('pedagNSlider')?.value, 10) || 150
+            };
+        }
+
+        function setRandomPedagogyMode(mode) {
+            randomPedagogyMode = mode === 'explore' ? 'explore' : 'learn';
+            document.querySelectorAll('[data-random-mode]').forEach((btn) => {
+                btn.classList.toggle('active', btn.dataset.randomMode === randomPedagogyMode);
+            });
+            const note = document.getElementById('randomTeachNote');
+            if (!note) return;
+            note.textContent = randomPedagogyMode === 'learn'
+                ? 'Move a slider to see what changed.'
+                : 'Explore mode: sliders update the sample instantly.';
+        }
+
+        function updateRandomTeachingNote(changedKey) {
+            const note = document.getElementById('randomTeachNote');
+            if (!note) return;
+            const curr = currentRandomSliderState();
+            const prev = randomLastSliderState || curr;
+
+            if (randomPedagogyMode !== 'learn') {
+                note.textContent = 'Explore mode: sliders update the sample instantly.';
+                randomLastSliderState = curr;
+                return;
+            }
+
+            if (changedKey === 'mean') {
+                const dir = curr.mean >= prev.mean ? 'right' : 'left';
+                note.textContent = `Mean shift: center moved ${dir}; spread stays driven by sigma.`;
+            } else if (changedKey === 'std') {
+                note.textContent = curr.std >= prev.std
+                    ? 'Std dev increased: distribution is wider and the peak lowers.'
+                    : 'Std dev decreased: distribution is narrower and the peak rises.';
+            } else if (changedKey === 'n') {
+                note.textContent = curr.n >= prev.n
+                    ? 'Sample size increased: histogram should look smoother and more stable.'
+                    : 'Sample size decreased: histogram has more sampling noise.';
+            } else {
+                note.textContent = 'Move a slider to see what changed.';
+            }
+
+            randomLastSliderState = curr;
         }
 
         function syncPedagogicValues() {

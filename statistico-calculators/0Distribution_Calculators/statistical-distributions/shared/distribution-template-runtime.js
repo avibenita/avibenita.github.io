@@ -200,7 +200,7 @@
     });
 
     const base = {
-      chart: { backgroundColor: "transparent", spacingBottom: 18 },
+      chart: { backgroundColor: "transparent", spacingBottom: 10, marginBottom: 52 },
       title: { text: null },
       credits: { enabled: false },
       exporting: { enabled: false },
@@ -212,10 +212,12 @@
       yAxis: { title: { text: null }, gridLineColor: "rgba(255,255,255,0.08)", labels: { style: { color: "#d2e3ff" } } },
       legend: {
         enabled: true,
-        floating: true,
+        floating: false,
         align: "center",
-        verticalAlign: "top",
-        y: 6,
+        verticalAlign: "bottom",
+        y: 0,
+        itemDistance: 16,
+        symbolWidth: 14,
         itemStyle: { color: "#d2e3ff", fontSize: "10px" },
       },
       tooltip: { shared: true, backgroundColor: "rgba(8,18,34,0.94)", style: { color: "#f0f6ff" } },

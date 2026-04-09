@@ -206,7 +206,7 @@
     });
 
     const base = {
-      chart: { backgroundColor: "transparent", spacingBottom: 10, marginBottom: 5, height: 350 },
+      chart: { backgroundColor: "transparent", spacingBottom: 10, marginBottom: 25, height: 350 },
       title: { text: null },
       credits: { enabled: false },
       exporting: { enabled: false },

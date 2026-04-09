@@ -457,5 +457,19 @@
     calculateAndRender();
   }
 
+  window.statisticoDistributionTemplate = {
+    detectDistribution,
+    getConfig: (key) => {
+      const resolvedKey = (key || detectDistribution() || "").toLowerCase();
+      return configs[resolvedKey] || null;
+    },
+    getParams: () => {
+      const key = detectDistribution();
+      const cfg = configs[key];
+      if (!cfg) return null;
+      return getParams(cfg);
+    },
+  };
+
   document.addEventListener("DOMContentLoaded", initDistributionTemplate);
 })();

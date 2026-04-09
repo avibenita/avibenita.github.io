@@ -65,6 +65,22 @@
       fallbackLabel,
     });
 
+    const templateBridge = window.statisticoDistributionTemplate;
+    const templateCfg = templateBridge?.getConfig?.();
+    if (templateCfg && Array.isArray(templateCfg.params) && typeof templateCfg.validate === "function" && typeof templateCfg.inv === "function") {
+      const paramIds = templateCfg.params.map((p) => p.id).filter(Boolean);
+      return {
+        name: String(templateCfg.title || "Template Distribution").replace(/\s*calculator\s*$/i, ""),
+        getParams: () =>
+          paramIds.reduce((acc, id) => {
+            acc[id] = getNumber(id);
+            return acc;
+          }, {}),
+        validate: (p) => templateCfg.validate(p),
+        sampleOne: (p) => templateCfg.inv(Math.random(), p),
+      };
+    }
+
     if (path.includes("normal.html")) {
       return {
         name: "Normal Distribution",
@@ -433,11 +449,11 @@
           <div class="srng-teach-note" id="srngTeachNote">Move a slider to see what changed.</div>
           <div class="srng-pedagogy-grid">
             <div class="srng-pedagogy-item">
-              <label>Mean (mu) <span id="srngMeanValue">0.00</span></label>
+              <label><span id="srngSlider1Label">Mean (mu)</span> <span id="srngMeanValue">0.00</span></label>
               <input id="srngMeanSlider" type="range" min="-10" max="10" step="0.1" value="0"/>
             </div>
             <div class="srng-pedagogy-item">
-              <label>Std Dev (sigma) <span id="srngStdValue">1.00</span></label>
+              <label><span id="srngSlider2Label">Std Dev (sigma)</span> <span id="srngStdValue">1.00</span></label>
               <input id="srngStdSlider" type="range" min="0.1" max="5" step="0.1" value="1"/>
             </div>
             <div class="srng-pedagogy-item">
@@ -634,31 +650,37 @@
     applyUnifiedCalculatorLayout();
 
     if (document.getElementById(COMPONENT_ID)) return;
-    if (document.querySelector(".random-generator-trigger")) return;
 
     const config = distConfigFromPath();
     if (!config) return;
 
-    const aboutBtn =
-      document.querySelector(".control-block-about button") ||
-      document.querySelector("button[onclick*=\"openAboutModal\"]") ||
-      document.querySelector(".about-btn");
-    const aboutContainer = aboutBtn ? aboutBtn.closest(".control-block-about") || aboutBtn.parentElement : null;
-    const insertionParent =
-      (aboutContainer && aboutContainer.parentElement) ||
-      document.querySelector(".control-panel-sections") ||
-      document.querySelector(".control-panel");
-    if (!insertionParent) return;
+    let triggerButton = document.querySelector(".random-generator-trigger");
+    if (!triggerButton) {
+      const aboutBtn =
+        document.querySelector(".control-block-about button") ||
+        document.querySelector("button[onclick*=\"openAboutModal\"]") ||
+        document.querySelector(".about-btn");
+      const aboutContainer = aboutBtn ? aboutBtn.closest(".control-block-about") || aboutBtn.parentElement : null;
+      const insertionParent =
+        (aboutContainer && aboutContainer.parentElement) ||
+        document.querySelector(".control-panel-sections") ||
+        document.querySelector(".control-panel");
+      if (!insertionParent) return;
 
-    const triggerWrap = document.createElement("div");
-    triggerWrap.className = "srng-button-wrap";
-    triggerWrap.innerHTML =
-      '<button type="button" class="srng-trigger"><i class="fas fa-dice"></i> Generate Random Numbers</button>';
+      const triggerWrap = document.createElement("div");
+      triggerWrap.className = "srng-button-wrap";
+      triggerWrap.innerHTML =
+        '<button type="button" class="srng-trigger"><i class="fas fa-dice"></i> Generate Random Numbers</button>';
 
-    if (aboutContainer && aboutContainer.parentElement === insertionParent) {
-      insertionParent.insertBefore(triggerWrap, aboutContainer);
+      if (aboutContainer && aboutContainer.parentElement === insertionParent) {
+        insertionParent.insertBefore(triggerWrap, aboutContainer);
+      } else {
+        insertionParent.appendChild(triggerWrap);
+      }
+      triggerButton = triggerWrap.querySelector("button");
     } else {
-      insertionParent.appendChild(triggerWrap);
+      triggerButton.removeAttribute("onclick");
+      triggerButton.classList.add("srng-trigger");
     }
 
     const modal = createComponentMarkup();
@@ -677,7 +699,7 @@
       document.body.style.overflow = "hidden";
     };
 
-    triggerWrap.querySelector("button").addEventListener("click", openModal);
+    triggerButton.addEventListener("click", openModal);
     modal.addEventListener("click", (e) => {
       if (e.target === modal || e.target.closest("[data-srng-close]")) closeModal();
     });
@@ -694,7 +716,14 @@
     const nSlider = document.getElementById("srngNSlider");
     const teachNoteEl = document.getElementById("srngTeachNote");
     const modeButtons = Array.from(modal.querySelectorAll("[data-srng-mode]"));
-    const isNormal = config.name === "Normal Distribution";
+    const templateDistributionKey = (document.body?.dataset?.distribution || "").toLowerCase();
+    const pedagogyKind =
+      config.name === "Normal Distribution"
+        ? "normal"
+        : config.name === "Uniform Distribution"
+          ? "uniform"
+          : "";
+    const hasPedagogy = Boolean(pedagogyKind) || Boolean(templateDistributionKey);
     let pedagogyMode = "learn";
     let lastSliderState = null;
     const setStatus = (msg) => {
@@ -705,6 +734,50 @@
       std: parseFloat(stdSlider?.value) || 1,
       n: parseInt(nSlider?.value, 10) || 150,
     });
+    function isOrderedBoundsSpec(spec) {
+      if (!spec) return false;
+      const lower = `${spec.key1} ${spec.label1}`.toLowerCase();
+      const upper = `${spec.key2} ${spec.label2}`.toLowerCase();
+      const lowerHints = ["min", "minimum", "lower", "left", "start", "(a)", " a "];
+      const upperHints = ["max", "maximum", "upper", "right", "end", "(b)", " b "];
+      const hasLower = lowerHints.some((h) => lower.includes(h));
+      const hasUpper = upperHints.some((h) => upper.includes(h));
+      return hasLower && hasUpper;
+    }
+    function labelForInputId(id, fallback) {
+      const input = document.getElementById(id);
+      const label = input?.closest(".input-group")?.querySelector("label");
+      if (!label) return fallback;
+      const clone = label.cloneNode(true);
+      clone.querySelectorAll("small").forEach((el) => el.remove());
+      const text = (clone.textContent || "").replace(/\s+/g, " ").trim();
+      return text || fallback;
+    }
+    function getPedagogySpec() {
+      if (pedagogyKind === "normal") {
+        return { key1: "mean", key2: "stddev", label1: "Mean (mu)", label2: "Std Dev (sigma)", orderedBounds: false };
+      }
+      if (pedagogyKind === "uniform") {
+        const params = config.getParams();
+        const keys = Object.keys(params || {});
+        return {
+          key1: keys[0] || "minValue",
+          key2: keys[1] || "maxValue",
+          label1: "Minimum (a)",
+          label2: "Maximum (b)",
+          orderedBounds: true,
+        };
+      }
+      if (!templateDistributionKey) return null;
+      const params = config.getParams();
+      const keys = Object.keys(params || {});
+      if (keys.length < 2) return null;
+      const label1 = labelForInputId(keys[0], keys[0]);
+      const label2 = labelForInputId(keys[1], keys[1]);
+      const spec = { key1: keys[0], key2: keys[1], label1, label2, orderedBounds: false };
+      spec.orderedBounds = isOrderedBoundsSpec(spec);
+      return spec;
+    }
     function setPedagogyMode(mode) {
       pedagogyMode = mode === "explore" ? "explore" : "learn";
       modeButtons.forEach((btn) => btn.classList.toggle("active", btn.dataset.srngMode === pedagogyMode));
@@ -714,7 +787,8 @@
         : "Explore mode: sliders update the sample instantly.";
     }
     function updateTeachingNote(changedKey) {
-      if (!isNormal || !teachNoteEl) return;
+      if (!hasPedagogy || !teachNoteEl) return;
+      const spec = getPedagogySpec();
       const pulseStatChips = (ids) => {
         ids.forEach((id) => {
           const valEl = document.getElementById(id);
@@ -735,13 +809,25 @@
       const prev = lastSliderState || curr;
       if (changedKey === "mean") {
         const dir = curr.mean >= prev.mean ? "right" : "left";
-        teachNoteEl.textContent = `Mean shift: center moved ${dir}; spread stays driven by sigma.`;
+        teachNoteEl.textContent = spec?.orderedBounds
+          ? `${spec.label1} changed: interval moved ${dir}.`
+          : (pedagogyKind === "normal"
+            ? `Mean shift: center moved ${dir}; spread stays driven by sigma.`
+            : `${spec?.label1 || "Parameter 1"} changed: distribution location/shape adjusted.`);
         pulseStatChips(["srngStatMean"]);
       } else if (changedKey === "std") {
         const wider = curr.std >= prev.std;
-        teachNoteEl.textContent = wider
-          ? "Std dev increased: distribution is wider and the peak lowers."
-          : "Std dev decreased: distribution is narrower and the peak rises.";
+        teachNoteEl.textContent = spec?.orderedBounds
+          ? wider
+            ? `${spec.label2} increased: interval widens.`
+            : `${spec.label2} decreased: interval narrows.`
+          : wider
+            ? (pedagogyKind === "normal"
+              ? "Std dev increased: distribution is wider and the peak lowers."
+              : `${spec?.label2 || "Parameter 2"} increased: distribution shape/spread changed.`)
+            : (pedagogyKind === "normal"
+              ? "Std dev decreased: distribution is narrower and the peak rises."
+              : `${spec?.label2 || "Parameter 2"} decreased: distribution shape/spread changed.`);
         pulseStatChips(["srngStatStd"]);
       } else if (changedKey === "n") {
         const more = curr.n >= prev.n;
@@ -756,10 +842,17 @@
     }
 
     function syncPedagogyValues() {
-      if (!isNormal) return;
-      const mean = parseFloat(meanSlider.value) || 0;
-      const std = parseFloat(stdSlider.value) || 1;
+      if (!hasPedagogy) return;
+      const spec = getPedagogySpec();
+      let mean = parseFloat(meanSlider.value) || 0;
+      let std = parseFloat(stdSlider.value) || 1;
       const n = parseInt(nSlider.value, 10) || 150;
+      if (spec?.orderedBounds) {
+        if (std <= mean) {
+          std = mean + 0.01;
+          stdSlider.value = String(std);
+        }
+      }
       const meanValue = document.getElementById("srngMeanValue");
       const stdValue = document.getElementById("srngStdValue");
       const nValue = document.getElementById("srngNValue");
@@ -767,15 +860,30 @@
       if (stdValue) stdValue.textContent = std.toFixed(2);
       if (nValue) nValue.textContent = String(n);
       document.getElementById("srngSampleSize").value = String(n);
-      document.getElementById("srngParamText").textContent = `mean=${mean.toFixed(3)}, stddev=${std.toFixed(3)}`;
+      if (spec) {
+        document.getElementById("srngParamText").textContent = `${spec.key1}=${mean.toFixed(3)}, ${spec.key2}=${std.toFixed(3)}`;
+      } else {
+        document.getElementById("srngParamText").textContent = `mean=${mean.toFixed(3)}, stddev=${std.toFixed(3)}`;
+      }
     }
 
     function getActiveParams() {
-      if (!isNormal) return config.getParams();
-      return {
-        mean: parseFloat(meanSlider.value) || 0,
-        stddev: parseFloat(stdSlider.value) || 1,
-      };
+      if (!hasPedagogy) return config.getParams();
+      const spec = getPedagogySpec();
+      if (!spec) return config.getParams();
+      if (spec.orderedBounds) {
+        let lower = parseFloat(meanSlider.value) || 0;
+        let upper = parseFloat(stdSlider.value) || 1;
+        if (upper <= lower) upper = lower + 0.01;
+        const params = config.getParams();
+        params[spec.key1] = lower;
+        params[spec.key2] = upper;
+        return params;
+      }
+      const params = config.getParams();
+      params[spec.key1] = parseFloat(meanSlider.value) || 0;
+      params[spec.key2] = parseFloat(stdSlider.value) || 1;
+      return params;
     }
 
     function runGeneration(isInteractive = false) {
@@ -809,9 +917,14 @@
     let latestValues = [];
     generateBtn.addEventListener("click", () => runGeneration(false));
 
-    if (isNormal) {
+    if (hasPedagogy) {
       pedagogyPanel.style.display = "block";
       setPedagogyMode("learn");
+      const slider1Label = document.getElementById("srngSlider1Label");
+      const slider2Label = document.getElementById("srngSlider2Label");
+      const initialSpec = getPedagogySpec();
+      if (slider1Label) slider1Label.textContent = initialSpec?.label1 || "Parameter 1";
+      if (slider2Label) slider2Label.textContent = initialSpec?.label2 || "Parameter 2";
       modeButtons.forEach((btn) => {
         btn.addEventListener("click", () => setPedagogyMode(btn.dataset.srngMode));
       });
@@ -831,7 +944,12 @@
         updateTeachingNote("n");
       });
     } else {
-      pedagogyPanel.style.display = "none";
+      // For template-based pages, prefer keeping sliders visible as a generic first-two-params control.
+      if (templateDistributionKey) {
+        pedagogyPanel.style.display = "block";
+      } else {
+        pedagogyPanel.style.display = "none";
+      }
     }
 
     copyBtn.addEventListener("click", () => {
@@ -841,23 +959,38 @@
     });
 
     const originalOpenModal = openModal;
-    triggerWrap.querySelector("button").removeEventListener("click", openModal);
-    triggerWrap.querySelector("button").addEventListener("click", () => {
+    triggerButton.removeEventListener("click", openModal);
+    triggerButton.addEventListener("click", () => {
       originalOpenModal();
-      if (isNormal) {
+      if (templateDistributionKey || pedagogyKind === "uniform" || pedagogyKind === "normal") {
+        pedagogyPanel.style.display = "block";
+      }
+      if (hasPedagogy) {
         const p = config.getParams();
-        meanSlider.min = String((Number.isFinite(p.mean) ? p.mean : 0) - 10);
-        meanSlider.max = String((Number.isFinite(p.mean) ? p.mean : 0) + 10);
-        meanSlider.value = String(Number.isFinite(p.mean) ? p.mean : 0);
-        stdSlider.max = String(Math.max(5, (Number.isFinite(p.stddev) ? p.stddev : 1) * 3));
-        stdSlider.value = String(Number.isFinite(p.stddev) ? p.stddev : 1);
+        const spec = getPedagogySpec();
+        const slider1Label = document.getElementById("srngSlider1Label");
+        const slider2Label = document.getElementById("srngSlider2Label");
+        if (slider1Label) slider1Label.textContent = spec?.label1 || "Parameter 1";
+        if (slider2Label) slider2Label.textContent = spec?.label2 || "Parameter 2";
+        const v1 = Number.isFinite(p?.[spec?.key1]) ? p[spec.key1] : 0;
+        const v2 = Number.isFinite(p?.[spec?.key2]) ? p[spec.key2] : 1;
+        const span = Math.max(1, Math.abs(v2 - v1), Math.abs(v1) * 0.5, Math.abs(v2) * 0.5);
+        meanSlider.min = String(v1 - span);
+        meanSlider.max = String(v1 + span);
+        meanSlider.step = "0.1";
+        meanSlider.value = String(v1);
+        stdSlider.min = spec?.orderedBounds ? String(v1 + 0.01) : String(v2 - span);
+        stdSlider.max = String(v2 + span);
+        stdSlider.step = "0.1";
+        stdSlider.value = String(v2);
         nSlider.value = document.getElementById("srngSampleSize").value || "150";
         lastSliderState = currentSliderState();
         setPedagogyMode("learn");
         updateTeachingNote();
         syncPedagogyValues();
-        runGeneration(true);
       }
+      // Preload histogram/table immediately on open for faster feedback.
+      runGeneration(true);
     });
   }
 

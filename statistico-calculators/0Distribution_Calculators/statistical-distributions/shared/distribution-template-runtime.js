@@ -6,9 +6,12 @@
   function detectDistribution() {
     const p = window.location.pathname.toLowerCase();
     if (distName) return distName;
+    if (p.includes("lognormal")) return "lognormaldistribution";
     if (p.includes("normal")) return "normaldistribution";
     if (p.includes("uniform")) return "uniformdistribution";
     if (p.includes("exponential")) return "exponentialdistribution";
+    if (p.includes("weibull")) return "weibulldistribution";
+    if (p.includes("beta")) return "betadistribution";
     return "";
   }
 
@@ -139,6 +142,154 @@
         const k = Number(rangeValue || 4);
         return { min: 0, max: Math.max(1e-6, k * m) };
       },
+    },
+    lognormaldistribution: {
+      title: "Log-Normal Distribution Calculator",
+      about: "About Log-Normal Distribution...",
+      params: [
+        { id: "mu", label: "Location Parameter (mu)", sub: "Mean of ln(X)", defaultValue: 0 },
+        { id: "sigma", label: "Scale Parameter (sigma)", sub: "Standard deviation of ln(X), must be greater than 0", defaultValue: 1 },
+      ],
+      rangeOptions: [
+        { value: "standard", label: "Standard" },
+        { value: "extended", label: "Extended" },
+        { value: "wide", label: "Wide Tail" },
+      ],
+      defaults: { range: "extended", precision: 3 },
+      stats: [
+        { key: "mu", label: "mu" },
+        { key: "sigma", label: "sigma" },
+        { key: "mean", label: "Mean" },
+        { key: "variance", label: "Variance" },
+      ],
+      contextInputs: {
+        probability:
+          '<div class="input-group"><label>X Value (x > 0)</label><input class="input-field" id="xValue" type="number" min="0.0001" step="0.1" value="1"/></div>',
+        between:
+          '<div class="mean-std-row"><div class="input-group"><label>Lower Bound (a)</label><input class="input-field" id="lowerBound" type="number" min="0.0001" step="0.1" value="0.5"/></div><div class="input-group"><label>Upper Bound (b)</label><input class="input-field" id="upperBound" type="number" min="0.0001" step="0.1" value="2"/></div></div>',
+        quantile:
+          '<div class="input-group"><label>Probability (0 to 1)</label><input class="input-field" id="probability" type="number" min="0" max="1" step="0.01" value="0.5"/></div>',
+      },
+      validate: (p) => Number.isFinite(p.mu) && Number.isFinite(p.sigma) && p.sigma > 0,
+      cdf: (x, p) => (x <= 0 ? 0 : window.jStat.lognormal.cdf(x, p.mu, p.sigma)),
+      pdf: (x, p) => (x <= 0 ? 0 : window.jStat.lognormal.pdf(x, p.mu, p.sigma)),
+      inv: (q, p) => {
+        const clamped = Math.min(1 - 1e-12, Math.max(1e-12, q));
+        return window.jStat.lognormal.inv(clamped, p.mu, p.sigma);
+      },
+      statsValues: (p) => ({
+        mu: p.mu,
+        sigma: p.sigma,
+        mean: Math.exp(p.mu + (p.sigma * p.sigma) / 2),
+        variance: (Math.exp(p.sigma * p.sigma) - 1) * Math.exp(2 * p.mu + p.sigma * p.sigma),
+      }),
+      chartDomain: (p, rangeValue) => {
+        const q = rangeValue === "wide" ? 0.999 : rangeValue === "standard" ? 0.95 : 0.99;
+        const maxByQuantile = window.jStat.lognormal.inv(q, p.mu, p.sigma);
+        const fallback = Math.exp(p.mu + 4 * p.sigma);
+        const max = Number.isFinite(maxByQuantile) && maxByQuantile > 0 ? maxByQuantile : fallback;
+        return { min: 0, max: Math.max(1e-6, max) };
+      },
+    },
+    weibulldistribution: {
+      title: "Weibull Distribution Calculator",
+      about: "About Weibull Distribution...",
+      params: [
+        { id: "shape", label: "Shape Parameter (k)", sub: "Shape controls hazard behavior, must be greater than 0", defaultValue: 2 },
+        { id: "scale", label: "Scale Parameter (lambda)", sub: "Scale controls spread, must be greater than 0", defaultValue: 1 },
+      ],
+      rangeOptions: [
+        { value: "standard", label: "Standard" },
+        { value: "extended", label: "Extended" },
+        { value: "wide", label: "Wide Tail" },
+      ],
+      defaults: { range: "extended", precision: 3 },
+      stats: [
+        { key: "shape", label: "Shape (k)" },
+        { key: "scale", label: "Scale (lambda)" },
+        { key: "mean", label: "Mean" },
+        { key: "variance", label: "Variance" },
+      ],
+      contextInputs: {
+        probability:
+          '<div class="input-group"><label>X Value (x >= 0)</label><input class="input-field" id="xValue" type="number" min="0" step="0.1" value="1"/></div>',
+        between:
+          '<div class="mean-std-row"><div class="input-group"><label>Lower Bound (a)</label><input class="input-field" id="lowerBound" type="number" min="0" step="0.1" value="0.5"/></div><div class="input-group"><label>Upper Bound (b)</label><input class="input-field" id="upperBound" type="number" min="0" step="0.1" value="2"/></div></div>',
+        quantile:
+          '<div class="input-group"><label>Probability (0 to 1)</label><input class="input-field" id="probability" type="number" min="0" max="1" step="0.01" value="0.5"/></div>',
+      },
+      validate: (p) => Number.isFinite(p.shape) && Number.isFinite(p.scale) && p.shape > 0 && p.scale > 0,
+      cdf: (x, p) => (x < 0 ? 0 : window.jStat.weibull.cdf(x, p.shape, p.scale)),
+      pdf: (x, p) => (x < 0 ? 0 : window.jStat.weibull.pdf(x, p.shape, p.scale)),
+      inv: (q, p) => {
+        const clamped = Math.min(1 - 1e-12, Math.max(1e-12, q));
+        return window.jStat.weibull.inv(clamped, p.shape, p.scale);
+      },
+      statsValues: (p) => {
+        const g1 = window.jStat.gammafn(1 + 1 / p.shape);
+        const g2 = window.jStat.gammafn(1 + 2 / p.shape);
+        const mean = p.scale * g1;
+        return {
+          shape: p.shape,
+          scale: p.scale,
+          mean,
+          variance: p.scale * p.scale * (g2 - g1 * g1),
+        };
+      },
+      chartDomain: (p, rangeValue) => {
+        const q = rangeValue === "wide" ? 0.995 : rangeValue === "standard" ? 0.9 : 0.97;
+        const maxByQuantile = window.jStat.weibull.inv(q, p.shape, p.scale);
+        const fallback = p.scale * 6;
+        const max = Number.isFinite(maxByQuantile) && maxByQuantile > 0 ? maxByQuantile : fallback;
+        return { min: 0, max: Math.max(1e-6, max) };
+      },
+    },
+    betadistribution: {
+      title: "Beta Distribution Calculator",
+      about: "About Beta Distribution...",
+      params: [
+        { id: "alpha", label: "Alpha (alpha)", sub: "First shape parameter, must be greater than 0", defaultValue: 2 },
+        { id: "beta", label: "Beta (beta)", sub: "Second shape parameter, must be greater than 0", defaultValue: 3 },
+      ],
+      rangeOptions: [
+        { value: "full", label: "0 to 1" },
+      ],
+      defaults: { range: "full", precision: 3 },
+      stats: [
+        { key: "alpha", label: "alpha" },
+        { key: "beta", label: "beta" },
+        { key: "mean", label: "Mean" },
+        { key: "variance", label: "Variance" },
+      ],
+      contextInputs: {
+        probability:
+          '<div class="input-group"><label>X Value (0 to 1)</label><input class="input-field" id="xValue" type="number" min="0" max="1" step="0.01" value="0.5"/></div>',
+        between:
+          '<div class="mean-std-row"><div class="input-group"><label>Lower Bound (a)</label><input class="input-field" id="lowerBound" type="number" min="0" max="1" step="0.01" value="0.2"/></div><div class="input-group"><label>Upper Bound (b)</label><input class="input-field" id="upperBound" type="number" min="0" max="1" step="0.01" value="0.8"/></div></div>',
+        quantile:
+          '<div class="input-group"><label>Probability (0 to 1)</label><input class="input-field" id="probability" type="number" min="0" max="1" step="0.01" value="0.5"/></div>',
+      },
+      validate: (p) => Number.isFinite(p.alpha) && Number.isFinite(p.beta) && p.alpha > 0 && p.beta > 0,
+      cdf: (x, p) => {
+        if (x <= 0) return 0;
+        if (x >= 1) return 1;
+        return window.jStat.beta.cdf(x, p.alpha, p.beta);
+      },
+      pdf: (x, p) => {
+        if (x < 0 || x > 1) return 0;
+        return window.jStat.beta.pdf(x, p.alpha, p.beta);
+      },
+      inv: (q, p) => {
+        const clamped = Math.min(1 - 1e-12, Math.max(1e-12, q));
+        return window.jStat.beta.inv(clamped, p.alpha, p.beta);
+      },
+      statsValues: (p) => ({
+        alpha: p.alpha,
+        beta: p.beta,
+        mean: p.alpha / (p.alpha + p.beta),
+        variance: (p.alpha * p.beta) / (((p.alpha + p.beta) ** 2) * (p.alpha + p.beta + 1)),
+      }),
+      chartDomain: () => ({ min: 0, max: 1 }),
     },
   };
 

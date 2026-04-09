@@ -188,9 +188,15 @@
       zIndex: 5,
       label: {
         text: values.length === 1 ? `x = ${formatMarkerValue(v)}` : idx === 0 ? `a = ${formatMarkerValue(v)}` : `b = ${formatMarkerValue(v)}`,
-        align: "right",
-        y: -6,
-        style: { color: "#ffd0d0", fontWeight: "700", fontSize: "10px" },
+        align: "left",
+        x: 6,
+        y: 12,
+        style: {
+          color: "#ffe3e3",
+          fontWeight: "800",
+          fontSize: "11px",
+          textOutline: "none",
+        },
       },
     }));
   }

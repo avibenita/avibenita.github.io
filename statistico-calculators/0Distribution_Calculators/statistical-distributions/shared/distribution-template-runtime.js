@@ -8,6 +8,7 @@
     if (distName) return distName;
     if (p.includes("normal")) return "normaldistribution";
     if (p.includes("uniform")) return "uniformdistribution";
+    if (p.includes("exponential")) return "exponentialdistribution";
     return "";
   }
 
@@ -95,6 +96,50 @@
         return { min: p.minValue - pad, max: p.maxValue + pad };
       },
     },
+    exponentialdistribution: {
+      title: "Exponential Distribution Calculator",
+      about: "About Exponential Distribution...",
+      params: [
+        { id: "lambda", label: "Rate Parameter (lambda)", sub: "Events per unit time (must be greater than 0)", defaultValue: 1 },
+      ],
+      rangeOptions: [
+        { value: "2", label: "2x mean" },
+        { value: "3", label: "3x mean" },
+        { value: "4", label: "4x mean" },
+        { value: "5", label: "5x mean" },
+        { value: "6", label: "6x mean" },
+      ],
+      defaults: { range: "4", precision: 3 },
+      stats: [
+        { key: "lambda", label: "Rate (lambda)" },
+        { key: "mean", label: "Mean" },
+        { key: "std", label: "Std Dev" },
+        { key: "variance", label: "Variance" },
+      ],
+      contextInputs: {
+        probability:
+          '<div class="input-group"><label>X Value (time)</label><input class="input-field" id="xValue" type="number" min="0" step="0.1" value="1"/></div>',
+        between:
+          '<div class="mean-std-row"><div class="input-group"><label>Lower Bound (a)</label><input class="input-field" id="lowerBound" type="number" min="0" step="0.1" value="0.5"/></div><div class="input-group"><label>Upper Bound (b)</label><input class="input-field" id="upperBound" type="number" min="0" step="0.1" value="2"/></div></div>',
+        quantile:
+          '<div class="input-group"><label>Probability (0 to 1)</label><input class="input-field" id="probability" type="number" min="0" max="1" step="0.01" value="0.5"/></div>',
+      },
+      validate: (p) => Number.isFinite(p.lambda) && p.lambda > 0,
+      cdf: (x, p) => window.jStat.exponential.cdf(x, p.lambda),
+      pdf: (x, p) => window.jStat.exponential.pdf(x, p.lambda),
+      inv: (q, p) => window.jStat.exponential.inv(q, p.lambda),
+      statsValues: (p) => ({
+        lambda: p.lambda,
+        mean: 1 / p.lambda,
+        std: 1 / p.lambda,
+        variance: 1 / (p.lambda * p.lambda),
+      }),
+      chartDomain: (p, rangeValue) => {
+        const m = 1 / Math.max(1e-9, p.lambda);
+        const k = Number(rangeValue || 4);
+        return { min: 0, max: Math.max(1e-6, k * m) };
+      },
+    },
   };
 
   function $(id) {
@@ -126,11 +171,14 @@
     return Number.isFinite(v) ? Number(v).toFixed(precision) : "--";
   }
 
-  function populateContextInput() {
+  function populateContextInput(cfg) {
     const wrap = $("inputSection");
     if (!wrap) return;
     const type = document.querySelector('input[name="calcType"]:checked')?.value || "probability";
-    if (type === "probability") {
+    const customMarkup = cfg?.contextInputs?.[type];
+    if (customMarkup) {
+      wrap.innerHTML = customMarkup;
+    } else if (type === "probability") {
       wrap.innerHTML = '<div class="input-group"><label>X Value</label><input class="input-field" id="xValue" type="number" step="0.1" value="0"/></div>';
     } else if (type === "between") {
       wrap.innerHTML = '<div class="mean-std-row"><div class="input-group"><label>Lower Bound (a)</label><input class="input-field" id="lowerBound" type="number" step="0.1" value="-1"/></div><div class="input-group"><label>Upper Bound (b)</label><input class="input-field" id="upperBound" type="number" step="0.1" value="1"/></div></div>';
@@ -394,7 +442,7 @@
       if (precision) precision.value = String(cfg.defaults.precision);
       const probRadio = document.querySelector('input[name="calcType"][value="probability"]');
       if (probRadio) probRadio.checked = true;
-      populateContextInput();
+      populateContextInput(cfg);
       setRadioSelection();
       calculateAndRender();
     });
@@ -443,7 +491,7 @@
 
     document.querySelectorAll('input[name="calcType"]').forEach((r) => {
       r.addEventListener("change", () => {
-        populateContextInput();
+        populateContextInput(cfg);
         setRadioSelection();
         calculateAndRender();
       });
@@ -452,7 +500,7 @@
     initTabs();
     initAboutModal();
     initReset(cfg);
-    populateContextInput();
+    populateContextInput(cfg);
     setRadioSelection();
     calculateAndRender();
   }

@@ -8,6 +8,7 @@
     if (distName) return distName;
     if (p.includes("lognormal")) return "lognormaldistribution";
     if (p.includes("normal")) return "normaldistribution";
+    if (p.includes("binomial")) return "binomialdistribution";
     if (p.includes("uniform")) return "uniformdistribution";
     if (p.includes("exponential")) return "exponentialdistribution";
     if (p.includes("weibull")) return "weibulldistribution";
@@ -291,6 +292,124 @@
       }),
       chartDomain: () => ({ min: 0, max: 1 }),
     },
+    binomialdistribution: {
+      title: "Binomial Distribution Calculator",
+      about: "About Binomial Distribution...",
+      params: [
+        { id: "trials", label: "Number of Trials (n)", sub: "Positive integer number of Bernoulli trials", defaultValue: 10 },
+        { id: "successProb", label: "Probability of Success (p)", sub: "Probability for each trial, between 0 and 1", defaultValue: 0.5 },
+      ],
+      rangeOptions: [
+        { value: "focused", label: "Focused" },
+        { value: "full", label: "Full (0-n)" },
+      ],
+      defaults: { range: "focused", precision: 3 },
+      stats: [
+        { key: "n", label: "n (Trials)" },
+        { key: "p", label: "p (Success)" },
+        { key: "mean", label: "Mean" },
+        { key: "variance", label: "Variance" },
+      ],
+      calcModes: [
+        { value: "probability", title: "Find P(X = k)", subtitle: "Probability of exactly k successes" },
+        { value: "cumulative", title: "Find P(X <= k)", subtitle: "Cumulative probability up to k successes" },
+        { value: "between", title: "Find P(a <= X <= b)", subtitle: "Probability between two success counts" },
+      ],
+      contextInputs: {
+        probability:
+          '<div class="input-group"><label>k Value (successes)</label><input class="input-field" id="kValue" type="number" min="0" step="1" value="5"/></div>',
+        cumulative:
+          '<div class="input-group"><label>k Value (successes)</label><input class="input-field" id="kValueCum" type="number" min="0" step="1" value="5"/></div>',
+        between:
+          '<div class="mean-std-row"><div class="input-group"><label>Lower Bound (a)</label><input class="input-field" id="lowerBound" type="number" min="0" step="1" value="3"/></div><div class="input-group"><label>Upper Bound (b)</label><input class="input-field" id="upperBound" type="number" min="0" step="1" value="7"/></div></div>',
+      },
+      validate: (p) =>
+        Number.isFinite(p.trials) &&
+        Number.isFinite(p.successProb) &&
+        Number.isInteger(p.trials) &&
+        p.trials > 0 &&
+        p.successProb >= 0 &&
+        p.successProb <= 1,
+      cdf: (x, p) => {
+        if (x < 0) return 0;
+        if (x >= p.trials) return 1;
+        return window.jStat.binomial.cdf(Math.floor(x), p.trials, p.successProb);
+      },
+      pdf: (x, p) => {
+        if (!Number.isInteger(x) || x < 0 || x > p.trials) return 0;
+        return window.jStat.binomial.pdf(x, p.trials, p.successProb);
+      },
+      statsValues: (p) => ({
+        n: p.trials,
+        p: p.successProb,
+        mean: p.trials * p.successProb,
+        variance: p.trials * p.successProb * (1 - p.successProb),
+      }),
+      chartDomain: (p, rangeValue) => {
+        if (rangeValue === "full") return { min: 0, max: p.trials };
+        const mean = p.trials * p.successProb;
+        const std = Math.sqrt(Math.max(0, p.trials * p.successProb * (1 - p.successProb)));
+        return {
+          min: Math.max(0, Math.floor(mean - 3 * std)),
+          max: Math.min(p.trials, Math.ceil(mean + 3 * std)),
+        };
+      },
+      discrete: true,
+      compute: ({ params, type, precision, getValue, formatNum, cfg }) => {
+        const n = params.trials;
+        const p = params.successProb;
+
+        if (type === "probability") {
+          const k = Math.round(getValue("kValue", Math.round(n / 2)));
+          const kc = Math.max(0, Math.min(n, k));
+          const result = cfg.pdf(kc, params);
+          return {
+            result,
+            expression: `P(X = ${kc})`,
+            explanation: "Probability of exactly k successes.",
+            percentageText: `(${(result * 100).toFixed(1)}%)`,
+            equationText: `P(X = ${kc}) = ${formatNum(result, precision)}`,
+            shadeMin: kc,
+            shadeMax: kc,
+            markerValues: [kc],
+          };
+        }
+
+        if (type === "cumulative") {
+          const k = Math.round(getValue("kValueCum", Math.round(n / 2)));
+          const kc = Math.max(0, Math.min(n, k));
+          const result = cfg.cdf(kc, params);
+          return {
+            result,
+            expression: `P(X <= ${kc})`,
+            explanation: "Cumulative probability up to and including k successes.",
+            percentageText: `(${(result * 100).toFixed(1)}%)`,
+            equationText: `P(X <= ${kc}) = ${formatNum(result, precision)}`,
+            shadeMin: 0,
+            shadeMax: kc,
+            markerValues: [kc],
+          };
+        }
+
+        const a = Math.round(getValue("lowerBound", Math.max(0, Math.floor(n * 0.3))));
+        const b = Math.round(getValue("upperBound", Math.min(n, Math.ceil(n * 0.7))));
+        const lo = Math.max(0, Math.min(n, Math.min(a, b)));
+        const hi = Math.max(0, Math.min(n, Math.max(a, b)));
+        const lowerProb = lo > 0 ? cfg.cdf(lo - 1, params) : 0;
+        const upperProb = cfg.cdf(hi, params);
+        const result = Math.max(0, upperProb - lowerProb);
+        return {
+          result,
+          expression: `P(${lo} <= X <= ${hi})`,
+          explanation: "Probability of successes falling between the bounds.",
+          percentageText: `(${(result * 100).toFixed(1)}%)`,
+          equationText: `P(${lo} <= X <= ${hi}) = ${formatNum(result, precision)}`,
+          shadeMin: lo,
+          shadeMax: hi,
+          markerValues: [lo, hi],
+        };
+      },
+    },
   };
 
   function $(id) {
@@ -322,6 +441,27 @@
     return Number.isFinite(v) ? Number(v).toFixed(precision) : "--";
   }
 
+  function initCalcModes(cfg) {
+    const wrap = document.querySelector(".radio-group");
+    if (!wrap) return;
+    const modes = cfg.calcModes || [
+      { value: "probability", title: "Find P(X <= x)", subtitle: "Probability up to a value" },
+      { value: "between", title: "Find P(a <= X <= b)", subtitle: "Probability between two values" },
+      { value: "quantile", title: "Find Value for Given Probability", subtitle: "Value at cumulative probability" },
+    ];
+    wrap.innerHTML = modes
+      .map(
+        (m, idx) => `<label class="radio-option">
+          <input ${idx === 0 ? "checked" : ""} name="calcType" type="radio" value="${m.value}"/>
+          <div>
+            <strong>${m.title}</strong>
+            <small style="color: #bbb; display: block; margin-top: 2px;">${m.subtitle}</small>
+          </div>
+        </label>`
+      )
+      .join("");
+  }
+
   function populateContextInput(cfg) {
     const wrap = $("inputSection");
     if (!wrap) return;
@@ -350,6 +490,17 @@
   }
 
   function buildSeries(cfg, params, domain) {
+    if (cfg.discrete) {
+      const minK = Math.max(0, Math.ceil(domain.min));
+      const maxK = Math.max(minK, Math.floor(domain.max));
+      const pdf = [];
+      const cdf = [];
+      for (let k = minK; k <= maxK; k += 1) {
+        pdf.push([k, cfg.pdf(k, params)]);
+        cdf.push([k, cfg.cdf(k, params)]);
+      }
+      return { pdf, cdf };
+    }
     const n = 220;
     const step = (domain.max - domain.min) / (n - 1);
     const pdf = [];
@@ -493,18 +644,44 @@
     let expression = "";
     let explanation = "";
     let percentageText = "";
-    const percentagePrecision = 1;
+    let equationText = "";
     let shadeMin = Number.NEGATIVE_INFINITY;
     let shadeMax = Number.POSITIVE_INFINITY;
     let markerValues = [];
 
-    if (type === "probability") {
+    if (typeof cfg.compute === "function") {
+      const payload = cfg.compute({
+        cfg,
+        params,
+        type,
+        precision,
+        getValue: (id, fallback) => {
+          const n = parseFloat($(id)?.value);
+          return Number.isFinite(n) ? n : fallback;
+        },
+        formatNum,
+      });
+      if (!payload || !Number.isFinite(payload.result)) {
+        $("mainResult").textContent = "Invalid input";
+        $("equationText").textContent = "Check parameter constraints.";
+        $("percentageText").textContent = "";
+        return;
+      }
+      result = payload.result;
+      expression = payload.expression || "";
+      explanation = payload.explanation || "";
+      percentageText = payload.percentageText || "";
+      equationText = payload.equationText || "";
+      shadeMin = Number.isFinite(payload.shadeMin) ? payload.shadeMin : shadeMin;
+      shadeMax = Number.isFinite(payload.shadeMax) ? payload.shadeMax : shadeMax;
+      markerValues = Array.isArray(payload.markerValues) ? payload.markerValues : [];
+    } else if (type === "probability") {
       const x = parseFloat($("xValue")?.value || "0");
       result = cfg.cdf(x, params);
       expression = `P(X <= ${formatNum(x, precision)})`;
       explanation = "Probability up to the specified x-value.";
-      percentageText = `(${(result * 100).toFixed(percentagePrecision)}%)`;
-      $("equationText").textContent = `${expression} = ${formatNum(result, precision)}`;
+      percentageText = `(${(result * 100).toFixed(1)}%)`;
+      equationText = `${expression} = ${formatNum(result, precision)}`;
       shadeMax = x;
       markerValues = [x];
     } else if (type === "between") {
@@ -515,8 +692,8 @@
       result = Math.max(0, cfg.cdf(hi, params) - cfg.cdf(lo, params));
       expression = `P(${formatNum(lo, precision)} <= X <= ${formatNum(hi, precision)})`;
       explanation = "Probability between lower and upper bounds.";
-      percentageText = `(${(result * 100).toFixed(percentagePrecision)}%)`;
-      $("equationText").textContent = `${expression} = ${formatNum(result, precision)}`;
+      percentageText = `(${(result * 100).toFixed(1)}%)`;
+      equationText = `${expression} = ${formatNum(result, precision)}`;
       shadeMin = lo;
       shadeMax = hi;
       markerValues = [lo, hi];
@@ -525,8 +702,8 @@
       result = cfg.inv(p, params);
       expression = `Quantile for p = ${formatNum(p, precision)}`;
       explanation = "Returned x-value at cumulative probability p.";
-      percentageText = `(${(p * 100).toFixed(percentagePrecision)}%)`;
-      $("equationText").textContent = `X = ${formatNum(result, precision)}`;
+      percentageText = `(${(p * 100).toFixed(1)}%)`;
+      equationText = `X = ${formatNum(result, precision)}`;
       shadeMax = result;
       markerValues = [result];
     }
@@ -536,7 +713,10 @@
     $("explanationLine").textContent = explanation;
     const equationEl = $("equationText");
     const percentageEl = $("percentageText");
-    if (equationEl) equationEl.style.display = "none";
+    if (equationEl) {
+      equationEl.textContent = equationText;
+      equationEl.style.display = "none";
+    }
     if (percentageEl) {
       percentageEl.textContent = percentageText;
       percentageEl.style.display = percentageText ? "inline" : "none";
@@ -639,6 +819,8 @@
       precision.value = String(cfg.defaults.precision);
       precision.addEventListener("change", calculateAndRender);
     }
+
+    initCalcModes(cfg);
 
     document.querySelectorAll('input[name="calcType"]').forEach((r) => {
       r.addEventListener("change", () => {

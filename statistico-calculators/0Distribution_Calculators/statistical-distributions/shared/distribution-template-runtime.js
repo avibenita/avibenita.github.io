@@ -878,6 +878,70 @@
       .join("");
   }
 
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function buildAutoAboutSections(cfg) {
+    const title = String(cfg.title || "Distribution").replace(/\s*Calculator\s*$/i, "");
+    const overview = cfg.about && cfg.about.startsWith("About ") ? cfg.about : `About ${title}`;
+    const paramsList = (cfg.params || [])
+      .map((p) => `<li><strong>${escapeHtml(p.label || p.id)}</strong> - ${escapeHtml(p.sub || "Parameter input")}</li>`)
+      .join("");
+    const modes =
+      cfg.calcModes || [
+        { title: "Find P(X <= x)", subtitle: "Probability up to a value" },
+        { title: "Find P(a <= X <= b)", subtitle: "Probability between two values" },
+        { title: "Find Value for Given Probability", subtitle: "Value at cumulative probability" },
+      ];
+    const modesList = modes.map((m) => `<li><strong>${escapeHtml(m.title)}</strong> - ${escapeHtml(m.subtitle || "")}</li>`).join("");
+    const statsList = (cfg.stats || []).map((s) => `<li>${escapeHtml(s.label || s.key)}</li>`).join("");
+    const chartText = cfg.discrete
+      ? "This is a discrete distribution. The PDF chart is rendered as lollipop stems/points, and CDF uses step lines."
+      : "This is a continuous distribution. PDF and CDF are rendered as smooth curves with dynamic shaded ranges.";
+
+    return `
+      <div class="about-section">
+        <h3><i class="fas fa-info-circle"></i> ${escapeHtml(overview)}</h3>
+        <p>Use this calculator to evaluate probabilities, cumulative values, and quantiles for the ${escapeHtml(title)}.</p>
+      </div>
+      <div class="about-section">
+        <h3><i class="fas fa-sliders-h"></i> Parameter Inputs</h3>
+        <ul>${paramsList || "<li>Distribution-specific parameters are shown in the input panel.</li>"}</ul>
+      </div>
+      <div class="about-section">
+        <h3><i class="fas fa-calculator"></i> Calculation Modes</h3>
+        <ul>${modesList}</ul>
+      </div>
+      <div class="about-section">
+        <h3><i class="fas fa-chart-bar"></i> Summary Statistics</h3>
+        <ul>${statsList || "<li>Key statistics update automatically based on the current parameters.</li>"}</ul>
+      </div>
+      <div class="about-section">
+        <h3><i class="fas fa-chart-area"></i> Chart Behavior</h3>
+        <p>${escapeHtml(chartText)}</p>
+      </div>
+    `;
+  }
+
+  function enhanceAboutModalContent(cfg) {
+    const modal = $("aboutModal");
+    const body = modal?.querySelector(".modal-body");
+    if (!modal || !body) return;
+    const raw = body.textContent || "";
+    const hasPlaceholder =
+      raw.includes("Template + Injected Math") ||
+      raw.includes("shared distribution template shell") ||
+      body.querySelectorAll(".about-section").length <= 1;
+    if (!hasPlaceholder) return;
+    body.innerHTML = buildAutoAboutSections(cfg);
+  }
+
   function parseFiniteOr(value, fallback) {
     const n = parseFloat(value);
     return Number.isFinite(n) ? n : fallback;
@@ -1502,6 +1566,7 @@
     });
 
     initTabs();
+    enhanceAboutModalContent(cfg);
     initAboutModal();
     initReset(cfg);
     populateContextInput(cfg);

@@ -6,6 +6,12 @@
   function detectDistribution() {
     const p = window.location.pathname.toLowerCase();
     if (distName) return distName;
+    if (p.includes("poisson")) return "poissondistribution";
+    if (p.includes("geometric")) return "geometricdistribution";
+    if (p.includes("hypergeometric")) return "hypergeometricdistribution";
+    if (p.includes("chisquare")) return "chisquaredistribution";
+    if (p.includes("fdistribution")) return "fdistribution";
+    if (p.includes("tdistribution")) return "tdistribution";
     if (p.includes("lognormal")) return "lognormaldistribution";
     if (p.includes("normal")) return "normaldistribution";
     if (p.includes("binomial")) return "binomialdistribution";
@@ -292,6 +298,416 @@
       }),
       chartDomain: () => ({ min: 0, max: 1 }),
     },
+    poissondistribution: {
+      title: "Poisson Distribution Calculator",
+      about: "About Poisson Distribution...",
+      params: [{ id: "lambda", label: "Rate Parameter (lambda)", sub: "Average events per interval, must be greater than 0", defaultValue: 3 }],
+      rangeOptions: [
+        { value: "focused", label: "Focused" },
+        { value: "full", label: "Full Tail" },
+      ],
+      defaults: { range: "focused", precision: 3 },
+      stats: [
+        { key: "lambda", label: "lambda" },
+        { key: "mean", label: "Mean" },
+        { key: "variance", label: "Variance" },
+        { key: "std", label: "Std Dev" },
+      ],
+      calcModes: [
+        { value: "probability", title: "Find P(X = k)", subtitle: "Probability of exactly k events" },
+        { value: "cumulative", title: "Find P(X <= k)", subtitle: "Cumulative probability up to k events" },
+        { value: "between", title: "Find P(a <= X <= b)", subtitle: "Probability between two event counts" },
+      ],
+      contextInputs: {
+        probability:
+          '<div class="input-group"><label>k Value (events)</label><input class="input-field" id="kValue" type="number" min="0" step="1" value="3"/></div>',
+        cumulative:
+          '<div class="input-group"><label>k Value (events)</label><input class="input-field" id="kValueCum" type="number" min="0" step="1" value="5"/></div>',
+        between:
+          '<div class="mean-std-row"><div class="input-group"><label>Lower Bound (a)</label><input class="input-field" id="lowerBound" type="number" min="0" step="1" value="2"/></div><div class="input-group"><label>Upper Bound (b)</label><input class="input-field" id="upperBound" type="number" min="0" step="1" value="6"/></div></div>',
+      },
+      validate: (p) => Number.isFinite(p.lambda) && p.lambda > 0,
+      cdf: (x, p) => {
+        if (x < 0) return 0;
+        return window.jStat.poisson.cdf(Math.floor(x), p.lambda);
+      },
+      pdf: (x, p) => {
+        if (!Number.isInteger(x) || x < 0) return 0;
+        return window.jStat.poisson.pdf(x, p.lambda);
+      },
+      statsValues: (p) => ({ lambda: p.lambda, mean: p.lambda, variance: p.lambda, std: Math.sqrt(p.lambda) }),
+      chartDomain: (p, rangeValue) => {
+        const s = Math.sqrt(p.lambda);
+        if (rangeValue === "full") return { min: 0, max: Math.max(15, Math.ceil(p.lambda + 6 * s)) };
+        return { min: 0, max: Math.max(8, Math.ceil(p.lambda + 4 * s)) };
+      },
+      discrete: true,
+      compute: ({ params, type, precision, getValue, formatNum, cfg }) => {
+        if (type === "probability") {
+          const k = Math.max(0, Math.round(getValue("kValue", 3)));
+          const result = cfg.pdf(k, params);
+          return {
+            result,
+            expression: `P(X = ${k})`,
+            explanation: "Probability of exactly k events.",
+            percentageText: `(${(result * 100).toFixed(1)}%)`,
+            equationText: `P(X = ${k}) = ${formatNum(result, precision)}`,
+            shadeMin: k,
+            shadeMax: k,
+            markerValues: [k],
+          };
+        }
+        if (type === "cumulative") {
+          const k = Math.max(0, Math.round(getValue("kValueCum", 5)));
+          const result = cfg.cdf(k, params);
+          return {
+            result,
+            expression: `P(X <= ${k})`,
+            explanation: "Cumulative probability up to k events.",
+            percentageText: `(${(result * 100).toFixed(1)}%)`,
+            equationText: `P(X <= ${k}) = ${formatNum(result, precision)}`,
+            shadeMin: 0,
+            shadeMax: k,
+            markerValues: [k],
+          };
+        }
+        const a = Math.max(0, Math.round(getValue("lowerBound", 2)));
+        const b = Math.max(0, Math.round(getValue("upperBound", 6)));
+        const lo = Math.min(a, b);
+        const hi = Math.max(a, b);
+        const lowerProb = lo > 0 ? cfg.cdf(lo - 1, params) : 0;
+        const upperProb = cfg.cdf(hi, params);
+        const result = Math.max(0, upperProb - lowerProb);
+        return {
+          result,
+          expression: `P(${lo} <= X <= ${hi})`,
+          explanation: "Probability between event count bounds.",
+          percentageText: `(${(result * 100).toFixed(1)}%)`,
+          equationText: `P(${lo} <= X <= ${hi}) = ${formatNum(result, precision)}`,
+          shadeMin: lo,
+          shadeMax: hi,
+          markerValues: [lo, hi],
+        };
+      },
+    },
+    geometricdistribution: {
+      title: "Geometric Distribution Calculator",
+      about: "About Geometric Distribution...",
+      params: [{ id: "successProb", label: "Success Probability (p)", sub: "Probability of success per trial (0 < p <= 1)", defaultValue: 0.5 }],
+      rangeOptions: [
+        { value: "focused", label: "Focused" },
+        { value: "wide", label: "Wide" },
+      ],
+      defaults: { range: "focused", precision: 3 },
+      stats: [
+        { key: "p", label: "p" },
+        { key: "mean", label: "Mean" },
+        { key: "variance", label: "Variance" },
+        { key: "std", label: "Std Dev" },
+      ],
+      calcModes: [
+        { value: "probability", title: "Find P(X = k)", subtitle: "Exactly k trials until first success" },
+        { value: "cumulative", title: "Find P(X <= k)", subtitle: "At most k trials until first success" },
+        { value: "between", title: "Find P(a <= X <= b)", subtitle: "Trials until first success within range" },
+      ],
+      contextInputs: {
+        probability:
+          '<div class="input-group"><label>k Value (trials)</label><input class="input-field" id="kValue" type="number" min="1" step="1" value="3"/></div>',
+        cumulative:
+          '<div class="input-group"><label>k Value (trials)</label><input class="input-field" id="kValueCum" type="number" min="1" step="1" value="5"/></div>',
+        between:
+          '<div class="mean-std-row"><div class="input-group"><label>Lower Bound (a)</label><input class="input-field" id="lowerBound" type="number" min="1" step="1" value="2"/></div><div class="input-group"><label>Upper Bound (b)</label><input class="input-field" id="upperBound" type="number" min="1" step="1" value="6"/></div></div>',
+      },
+      validate: (p) => Number.isFinite(p.successProb) && p.successProb > 0 && p.successProb <= 1,
+      cdf: (x, p) => {
+        const k = Math.floor(x);
+        if (k < 1) return 0;
+        return 1 - Math.pow(1 - p.successProb, k);
+      },
+      pdf: (x, p) => {
+        if (!Number.isInteger(x) || x < 1) return 0;
+        return Math.pow(1 - p.successProb, x - 1) * p.successProb;
+      },
+      statsValues: (p) => ({
+        p: p.successProb,
+        mean: 1 / p.successProb,
+        variance: (1 - p.successProb) / (p.successProb * p.successProb),
+        std: Math.sqrt((1 - p.successProb) / (p.successProb * p.successProb)),
+      }),
+      chartDomain: (p, rangeValue) => {
+        const q = rangeValue === "wide" ? 0.995 : 0.97;
+        const k = Math.log(1 - q) / Math.log(1 - p.successProb);
+        return { min: 1, max: Math.max(8, Math.ceil(k)) };
+      },
+      discrete: true,
+      compute: ({ params, type, precision, getValue, formatNum, cfg }) => {
+        if (type === "probability") {
+          const k = Math.max(1, Math.round(getValue("kValue", 3)));
+          const result = cfg.pdf(k, params);
+          return {
+            result,
+            expression: `P(X = ${k})`,
+            explanation: "Probability first success occurs on trial k.",
+            percentageText: `(${(result * 100).toFixed(1)}%)`,
+            equationText: `P(X = ${k}) = ${formatNum(result, precision)}`,
+            shadeMin: k,
+            shadeMax: k,
+            markerValues: [k],
+          };
+        }
+        if (type === "cumulative") {
+          const k = Math.max(1, Math.round(getValue("kValueCum", 5)));
+          const result = cfg.cdf(k, params);
+          return {
+            result,
+            expression: `P(X <= ${k})`,
+            explanation: "Probability first success occurs by trial k.",
+            percentageText: `(${(result * 100).toFixed(1)}%)`,
+            equationText: `P(X <= ${k}) = ${formatNum(result, precision)}`,
+            shadeMin: 1,
+            shadeMax: k,
+            markerValues: [k],
+          };
+        }
+        const a = Math.max(1, Math.round(getValue("lowerBound", 2)));
+        const b = Math.max(1, Math.round(getValue("upperBound", 6)));
+        const lo = Math.min(a, b);
+        const hi = Math.max(a, b);
+        const result = Math.max(0, cfg.cdf(hi, params) - cfg.cdf(lo - 1, params));
+        return {
+          result,
+          expression: `P(${lo} <= X <= ${hi})`,
+          explanation: "Probability first success occurs within the interval.",
+          percentageText: `(${(result * 100).toFixed(1)}%)`,
+          equationText: `P(${lo} <= X <= ${hi}) = ${formatNum(result, precision)}`,
+          shadeMin: lo,
+          shadeMax: hi,
+          markerValues: [lo, hi],
+        };
+      },
+    },
+    hypergeometricdistribution: {
+      title: "Hypergeometric Distribution Calculator",
+      about: "About Hypergeometric Distribution...",
+      params: [
+        { id: "populationSize", label: "Population Size (N)", sub: "Total finite population size", defaultValue: 50 },
+        { id: "successStates", label: "Success States (K)", sub: "Number of successes in population", defaultValue: 20 },
+        { id: "draws", label: "Sample Size (n)", sub: "Number of draws without replacement", defaultValue: 10 },
+      ],
+      rangeOptions: [{ value: "full", label: "Full Support" }],
+      defaults: { range: "full", precision: 3 },
+      stats: [
+        { key: "N", label: "N" },
+        { key: "K", label: "K" },
+        { key: "n", label: "n" },
+        { key: "mean", label: "Mean" },
+      ],
+      calcModes: [
+        { value: "probability", title: "Find P(X = k)", subtitle: "Exactly k successes in sample" },
+        { value: "cumulative", title: "Find P(X <= k)", subtitle: "At most k successes in sample" },
+        { value: "between", title: "Find P(a <= X <= b)", subtitle: "Successes in sample within interval" },
+      ],
+      contextInputs: {
+        probability:
+          '<div class="input-group"><label>k Value (successes)</label><input class="input-field" id="kValue" type="number" min="0" step="1" value="5"/></div>',
+        cumulative:
+          '<div class="input-group"><label>k Value (successes)</label><input class="input-field" id="kValueCum" type="number" min="0" step="1" value="8"/></div>',
+        between:
+          '<div class="mean-std-row"><div class="input-group"><label>Lower Bound (a)</label><input class="input-field" id="lowerBound" type="number" min="0" step="1" value="3"/></div><div class="input-group"><label>Upper Bound (b)</label><input class="input-field" id="upperBound" type="number" min="0" step="1" value="7"/></div></div>',
+      },
+      validate: (p) =>
+        Number.isFinite(p.populationSize) &&
+        Number.isFinite(p.successStates) &&
+        Number.isFinite(p.draws) &&
+        Number.isInteger(p.populationSize) &&
+        Number.isInteger(p.successStates) &&
+        Number.isInteger(p.draws) &&
+        p.populationSize > 0 &&
+        p.successStates >= 0 &&
+        p.draws > 0 &&
+        p.successStates <= p.populationSize &&
+        p.draws <= p.populationSize,
+      cdf: (x, p) => window.jStat.hypgeom.cdf(Math.floor(x), p.populationSize, p.successStates, p.draws),
+      pdf: (x, p) => {
+        if (!Number.isInteger(x)) return 0;
+        return window.jStat.hypgeom.pdf(x, p.populationSize, p.successStates, p.draws);
+      },
+      statsValues: (p) => {
+        const mean = (p.draws * p.successStates) / p.populationSize;
+        return { N: p.populationSize, K: p.successStates, n: p.draws, mean };
+      },
+      chartDomain: (p) => {
+        const minK = Math.max(0, p.draws - (p.populationSize - p.successStates));
+        const maxK = Math.min(p.draws, p.successStates);
+        return { min: minK, max: maxK };
+      },
+      discrete: true,
+      compute: ({ params, type, precision, getValue, formatNum, cfg }) => {
+        const minK = Math.max(0, params.draws - (params.populationSize - params.successStates));
+        const maxK = Math.min(params.draws, params.successStates);
+        const clampK = (v) => Math.min(maxK, Math.max(minK, Math.round(v)));
+        if (type === "probability") {
+          const k = clampK(getValue("kValue", Math.round((minK + maxK) / 2)));
+          const result = cfg.pdf(k, params);
+          return {
+            result,
+            expression: `P(X = ${k})`,
+            explanation: "Probability of exactly k sampled successes.",
+            percentageText: `(${(result * 100).toFixed(1)}%)`,
+            equationText: `P(X = ${k}) = ${formatNum(result, precision)}`,
+            shadeMin: k,
+            shadeMax: k,
+            markerValues: [k],
+          };
+        }
+        if (type === "cumulative") {
+          const k = clampK(getValue("kValueCum", maxK));
+          const result = cfg.cdf(k, params);
+          return {
+            result,
+            expression: `P(X <= ${k})`,
+            explanation: "Cumulative probability up to k sampled successes.",
+            percentageText: `(${(result * 100).toFixed(1)}%)`,
+            equationText: `P(X <= ${k}) = ${formatNum(result, precision)}`,
+            shadeMin: minK,
+            shadeMax: k,
+            markerValues: [k],
+          };
+        }
+        const a = clampK(getValue("lowerBound", minK));
+        const b = clampK(getValue("upperBound", maxK));
+        const lo = Math.min(a, b);
+        const hi = Math.max(a, b);
+        const result = Math.max(0, cfg.cdf(hi, params) - cfg.cdf(lo - 1, params));
+        return {
+          result,
+          expression: `P(${lo} <= X <= ${hi})`,
+          explanation: "Probability sampled successes fall in the interval.",
+          percentageText: `(${(result * 100).toFixed(1)}%)`,
+          equationText: `P(${lo} <= X <= ${hi}) = ${formatNum(result, precision)}`,
+          shadeMin: lo,
+          shadeMax: hi,
+          markerValues: [lo, hi],
+        };
+      },
+    },
+    chisquaredistribution: {
+      title: "Chi-Square Distribution Calculator",
+      about: "About Chi-Square Distribution...",
+      params: [{ id: "df", label: "Degrees of Freedom (nu)", sub: "Controls shape, must be greater than 0", defaultValue: 10 }],
+      rangeOptions: [
+        { value: "standard", label: "Standard" },
+        { value: "wide", label: "Wide Tail" },
+      ],
+      defaults: { range: "standard", precision: 3 },
+      stats: [
+        { key: "df", label: "df" },
+        { key: "mean", label: "Mean" },
+        { key: "variance", label: "Variance" },
+        { key: "skewness", label: "Skewness" },
+      ],
+      contextInputs: {
+        probability:
+          '<div class="input-group"><label>X Value (x >= 0)</label><input class="input-field" id="xValue" type="number" min="0" step="0.1" value="8"/></div>',
+        between:
+          '<div class="mean-std-row"><div class="input-group"><label>Lower Bound (a)</label><input class="input-field" id="lowerBound" type="number" min="0" step="0.1" value="6"/></div><div class="input-group"><label>Upper Bound (b)</label><input class="input-field" id="upperBound" type="number" min="0" step="0.1" value="14"/></div></div>',
+        quantile:
+          '<div class="input-group"><label>Probability (0 to 1)</label><input class="input-field" id="probability" type="number" min="0" max="1" step="0.01" value="0.95"/></div>',
+      },
+      validate: (p) => Number.isFinite(p.df) && p.df > 0,
+      cdf: (x, p) => (x <= 0 ? 0 : window.jStat.chisquare.cdf(x, p.df)),
+      pdf: (x, p) => (x < 0 ? 0 : window.jStat.chisquare.pdf(x, p.df)),
+      inv: (q, p) => window.jStat.chisquare.inv(Math.min(1 - 1e-12, Math.max(1e-12, q)), p.df),
+      statsValues: (p) => ({ df: p.df, mean: p.df, variance: 2 * p.df, skewness: Math.sqrt(8 / p.df) }),
+      chartDomain: (p, rangeValue) => {
+        const q = rangeValue === "wide" ? 0.999 : 0.995;
+        const max = window.jStat.chisquare.inv(q, p.df);
+        const fallback = p.df + 6 * Math.sqrt(2 * p.df);
+        return { min: 0, max: Number.isFinite(max) ? max : fallback };
+      },
+    },
+    fdistribution: {
+      title: "F Distribution Calculator",
+      about: "About F Distribution...",
+      params: [
+        { id: "df1", label: "Numerator df (df1)", sub: "Degrees of freedom in numerator", defaultValue: 10 },
+        { id: "df2", label: "Denominator df (df2)", sub: "Degrees of freedom in denominator", defaultValue: 15 },
+      ],
+      rangeOptions: [
+        { value: "standard", label: "Standard" },
+        { value: "wide", label: "Wide Tail" },
+      ],
+      defaults: { range: "standard", precision: 3 },
+      stats: [
+        { key: "df1", label: "df1" },
+        { key: "df2", label: "df2" },
+        { key: "mean", label: "Mean" },
+        { key: "variance", label: "Variance" },
+      ],
+      contextInputs: {
+        probability:
+          '<div class="input-group"><label>X Value (x > 0)</label><input class="input-field" id="xValue" type="number" min="0.0001" step="0.1" value="1.2"/></div>',
+        between:
+          '<div class="mean-std-row"><div class="input-group"><label>Lower Bound (a)</label><input class="input-field" id="lowerBound" type="number" min="0.0001" step="0.1" value="0.8"/></div><div class="input-group"><label>Upper Bound (b)</label><input class="input-field" id="upperBound" type="number" min="0.0001" step="0.1" value="2.0"/></div></div>',
+        quantile:
+          '<div class="input-group"><label>Probability (0 to 1)</label><input class="input-field" id="probability" type="number" min="0" max="1" step="0.01" value="0.95"/></div>',
+      },
+      validate: (p) => Number.isFinite(p.df1) && Number.isFinite(p.df2) && p.df1 > 0 && p.df2 > 0,
+      cdf: (x, p) => (x <= 0 ? 0 : window.jStat.centralF.cdf(x, p.df1, p.df2)),
+      pdf: (x, p) => (x <= 0 ? 0 : window.jStat.centralF.pdf(x, p.df1, p.df2)),
+      inv: (q, p) => window.jStat.centralF.inv(Math.min(1 - 1e-12, Math.max(1e-12, q)), p.df1, p.df2),
+      statsValues: (p) => {
+        const mean = p.df2 > 2 ? p.df2 / (p.df2 - 2) : NaN;
+        const variance =
+          p.df2 > 4 ? (2 * p.df2 * p.df2 * (p.df1 + p.df2 - 2)) / (p.df1 * (p.df2 - 2) * (p.df2 - 2) * (p.df2 - 4)) : NaN;
+        return { df1: p.df1, df2: p.df2, mean, variance };
+      },
+      chartDomain: (p, rangeValue) => {
+        const q = rangeValue === "wide" ? 0.999 : 0.995;
+        const max = window.jStat.centralF.inv(q, p.df1, p.df2);
+        return { min: 0, max: Number.isFinite(max) ? max : 5 };
+      },
+    },
+    tdistribution: {
+      title: "t Distribution Calculator",
+      about: "About t Distribution...",
+      params: [{ id: "df", label: "Degrees of Freedom (nu)", sub: "Controls tail heaviness, must be greater than 0", defaultValue: 10 }],
+      rangeOptions: [
+        { value: "standard", label: "Standard" },
+        { value: "wide", label: "Wide" },
+      ],
+      defaults: { range: "standard", precision: 3 },
+      stats: [
+        { key: "df", label: "df" },
+        { key: "mean", label: "Mean" },
+        { key: "variance", label: "Variance" },
+        { key: "skewness", label: "Skewness" },
+      ],
+      contextInputs: {
+        probability:
+          '<div class="input-group"><label>X Value</label><input class="input-field" id="xValue" type="number" step="0.1" value="1.5"/></div>',
+        between:
+          '<div class="mean-std-row"><div class="input-group"><label>Lower Bound (a)</label><input class="input-field" id="lowerBound" type="number" step="0.1" value="-1"/></div><div class="input-group"><label>Upper Bound (b)</label><input class="input-field" id="upperBound" type="number" step="0.1" value="1"/></div></div>',
+        quantile:
+          '<div class="input-group"><label>Probability (0 to 1)</label><input class="input-field" id="probability" type="number" min="0" max="1" step="0.01" value="0.95"/></div>',
+      },
+      validate: (p) => Number.isFinite(p.df) && p.df > 0,
+      cdf: (x, p) => window.jStat.studentt.cdf(x, p.df),
+      pdf: (x, p) => window.jStat.studentt.pdf(x, p.df),
+      inv: (q, p) => window.jStat.studentt.inv(Math.min(1 - 1e-12, Math.max(1e-12, q)), p.df),
+      statsValues: (p) => ({
+        df: p.df,
+        mean: p.df > 1 ? 0 : NaN,
+        variance: p.df > 2 ? p.df / (p.df - 2) : NaN,
+        skewness: p.df > 3 ? 0 : NaN,
+      }),
+      chartDomain: (p, rangeValue) => {
+        const q = rangeValue === "wide" ? 0.999 : 0.995;
+        const x = window.jStat.studentt.inv(q, p.df);
+        const m = Number.isFinite(x) ? Math.abs(x) : 5;
+        return { min: -m, max: m };
+      },
+    },
     binomialdistribution: {
       title: "Binomial Distribution Calculator",
       about: "About Binomial Distribution...",
@@ -491,6 +907,15 @@
     if (cfg.discrete && (id === "kValue" || id === "kValueCum" || id === "lowerBound" || id === "upperBound")) {
       min = 0;
       max = Math.max(1, Math.round(params.trials || 10));
+      step = 1;
+    }
+
+    if (cfg === configs.hypergeometricdistribution && (id === "kValue" || id === "kValueCum" || id === "lowerBound" || id === "upperBound")) {
+      const N = Math.round(params.populationSize || 0);
+      const K = Math.round(params.successStates || 0);
+      const n = Math.round(params.draws || 0);
+      min = Math.max(0, n - (N - K));
+      max = Math.max(min, Math.min(n, K));
       step = 1;
     }
 
@@ -908,20 +1333,29 @@
     const aboutBtn = $("aboutBtn");
     if (aboutBtn) aboutBtn.innerHTML = `<i class="fas fa-info-circle"></i> ${cfg.about}`;
 
-    const groups = Array.from(document.querySelectorAll(".control-block-inputs .input-group"));
-    cfg.params.forEach((p, i) => {
-      const g = groups[i];
-      if (!g) return;
-      const label = g.querySelector("label");
-      const input = g.querySelector("input");
-      if (label) {
-        label.innerHTML = `${p.label}<small style="color: #bbb; font-weight: normal; display: block; margin-top: 2px;">${p.sub}</small>`;
-      }
-      if (input) {
-        input.id = p.id;
-        input.value = String(p.defaultValue);
-        input.addEventListener("input", calculateAndRender);
-      }
+    const inputsHost = document.querySelector(".control-block-inputs");
+    if (inputsHost) {
+      const inputGroupsHtml = cfg.params
+        .map(
+          (p) => `<div class="input-group">
+            <label>
+              ${p.label}
+              <small style="color: #bbb; font-weight: normal; display: block; margin-top: 2px;">${p.sub}</small>
+            </label>
+            <div class="input-row">
+              <input class="input-field" id="${p.id}" type="number" step="0.1" value="${p.defaultValue}"/>
+            </div>
+          </div>`
+        )
+        .join("");
+      inputsHost.innerHTML = `<div class="mean-std-row" style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px;">${inputGroupsHtml}</div>`;
+    }
+
+    cfg.params.forEach((p) => {
+      const input = $(p.id);
+      if (!input) return;
+      input.value = String(p.defaultValue);
+      input.addEventListener("input", calculateAndRender);
     });
 
     const range = $("chartRange");

@@ -106,6 +106,61 @@
       overflow:hidden;
     }
 
+    .app-required{
+      display:none;
+      place-items:center;
+      padding:18px;
+      min-height:calc(100vh - 120px);
+    }
+    .app-required-card{
+      width:min(760px, 94vw);
+      border:1px solid rgba(143,216,255,.3);
+      border-radius:18px;
+      background:linear-gradient(165deg, rgba(13,24,40,.92), rgba(8,16,30,.88));
+      box-shadow:var(--shadow);
+      padding:22px 20px;
+      display:grid;
+      gap:12px;
+      text-align:left;
+    }
+    .app-required-title{
+      margin:0;
+      font-size:1.35rem;
+      font-weight:800;
+      color:#f1f9ff;
+      letter-spacing:-.01em;
+    }
+    .app-required-sub{
+      margin:0;
+      color:var(--text-2);
+      font-size:.92rem;
+      line-height:1.55;
+    }
+    .app-required-list{
+      margin:0;
+      padding-left:18px;
+      color:var(--text-2);
+      font-size:.86rem;
+      line-height:1.5;
+    }
+    .app-required-actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .install-hint{
+      margin:0;
+      font-size:.8rem;
+      color:var(--text-3);
+    }
+    body.browser-blocked .main,
+    body.browser-blocked .footer-note{
+      display:none;
+    }
+    body.browser-blocked .app-required{
+      display:grid;
+    }
+
     .launcher{
       width:min(980px, 93vw);
       max-height:100%;
@@ -325,6 +380,24 @@
       </div>
     </div>
 
+    <section class="app-required" id="appRequiredGate" aria-live="polite">
+      <div class="app-required-card">
+        <h2 class="app-required-title"><i class="fa-solid fa-mobile-screen-button"></i> App install required</h2>
+        <p class="app-required-sub">The Hub Calculators launcher is app-only. Direct browser access is disabled by design. Install Statistico as a PWA, then open it from your Apps/Home Screen.</p>
+        <ol class="app-required-list">
+          <li>Click <strong>Install App</strong> below (or use browser menu: <em>Install app</em>).</li>
+          <li>After installation, open <strong>Statistico</strong> from your installed apps list.</li>
+          <li>Use this page only as the install gateway, not as the runtime launcher.</li>
+        </ol>
+        <div class="app-required-actions">
+          <button class="top-btn" id="installGateBtn"><i class="fa-solid fa-download"></i> Install App</button>
+          <a class="top-btn" href="../Statistico-Website/how-it-works.html"><i class="fa-solid fa-circle-question"></i> Install Help</a>
+          <a class="top-btn" href="../Statistico-Website/index-Calculators.html"><i class="fa-solid fa-arrow-left"></i> Back to Site</a>
+        </div>
+        <p class="install-hint" id="installHint">When install prompt is not available, use your browser menu to install this app.</p>
+      </div>
+    </section>
+
     <main class="main">
       <section class="launcher">
         <div class="hero">
@@ -392,12 +465,23 @@
       const emptyState = document.getElementById("emptyState");
       const countLabel = document.getElementById("countLabel");
       const installAppBtn = document.getElementById("installAppBtn");
+      const installGateBtn = document.getElementById("installGateBtn");
       const excelModeBtn = document.getElementById("excelModeBtn");
+      const installHint = document.getElementById("installHint");
       const params = new URLSearchParams(window.location.search);
       const actionParam = (params.get("action") || "").toLowerCase();
       const familyParam = (params.get("family") || "").toLowerCase();
+      const isStandaloneApp =
+        window.matchMedia("(display-mode: standalone)").matches ||
+        window.matchMedia("(display-mode: window-controls-overlay)").matches ||
+        window.navigator.standalone === true;
       let activeIndex = 0;
       let deferredInstallPrompt = null;
+      const installButtons = [installAppBtn, installGateBtn].filter(Boolean);
+
+      if (!isStandaloneApp) {
+        document.body.classList.add("browser-blocked");
+      }
 
       function visibleItems() {
         return items.filter((item) => item.style.display !== "none");
@@ -433,12 +517,19 @@
       async function triggerInstallFlow() {
         if (deferredInstallPrompt) {
           deferredInstallPrompt.prompt();
-          await deferredInstallPrompt.userChoice;
+          const choice = await deferredInstallPrompt.userChoice;
           deferredInstallPrompt = null;
-          installAppBtn.disabled = true;
+          installButtons.forEach((btn) => (btn.disabled = true));
+          if (installHint) {
+            installHint.textContent = choice?.outcome === "accepted"
+              ? "Install accepted. Open Statistico from your app list/home screen."
+              : "Install was dismissed. You can trigger it again from browser menu.";
+          }
           return;
         }
-        alert("Install prompt is not available yet. Use browser menu: Install app.");
+        if (installHint) {
+          installHint.textContent = "Install prompt unavailable here. Use browser menu: Install app.";
+        }
       }
 
       input.addEventListener("input", filterItems);
@@ -461,7 +552,7 @@
         }
       });
 
-      installAppBtn.addEventListener("click", triggerInstallFlow);
+      installButtons.forEach((btn) => btn.addEventListener("click", () => triggerInstallFlow().catch(() => {})));
       excelModeBtn.addEventListener("click", () => {
         window.location.href = "../Statistico-Website/index-Calculators.html?action=excel#launcher-entry";
       });
@@ -469,11 +560,11 @@
       window.addEventListener("beforeinstallprompt", (event) => {
         event.preventDefault();
         deferredInstallPrompt = event;
-        installAppBtn.disabled = false;
+        installButtons.forEach((btn) => (btn.disabled = false));
       });
       window.addEventListener("appinstalled", () => {
         deferredInstallPrompt = null;
-        installAppBtn.disabled = true;
+        installButtons.forEach((btn) => (btn.disabled = true));
       });
 
       if ("serviceWorker" in navigator) {
@@ -499,7 +590,9 @@
         window.location.href = "../Statistico-Website/index-Calculators.html?action=excel#launcher-entry";
       }
 
-      window.addEventListener("load", () => input.focus());
+      window.addEventListener("load", () => {
+        if (isStandaloneApp) input.focus();
+      });
     })();
   </script>
 </body>

@@ -153,6 +153,27 @@
       font-size:.8rem;
       color:var(--text-3);
     }
+    .install-status{
+      display:none;
+      margin:0;
+      border:1px solid rgba(143,216,255,.24);
+      border-radius:10px;
+      padding:9px 10px;
+      font-size:.81rem;
+      color:#dff4ff;
+      background:rgba(143,216,255,.08);
+    }
+    .install-status.show{ display:block; }
+    .install-status.warn{
+      border-color:rgba(255,190,120,.34);
+      background:rgba(255,190,120,.10);
+      color:#ffe7c7;
+    }
+    .install-status.ok{
+      border-color:rgba(124,245,188,.36);
+      background:rgba(124,245,188,.11);
+      color:#dffff0;
+    }
     .install-guide{
       display:none;
       margin-top:8px;
@@ -417,6 +438,7 @@
           <a class="top-btn" href="../Statistico-Website/index-Calculators.html"><i class="fa-solid fa-arrow-left"></i> Back to Site</a>
         </div>
         <p class="install-hint" id="installHint">If no popup appears: (1) click <strong>Open in app</strong> in the browser address bar if visible, or (2) use browser menu to install.</p>
+        <p class="install-status" id="installStatus" role="status" aria-live="polite"></p>
         <div class="install-guide" id="installGuide" role="status" aria-live="polite"></div>
       </div>
     </section>
@@ -492,6 +514,7 @@
       const excelModeBtn = document.getElementById("excelModeBtn");
       const installHint = document.getElementById("installHint");
       const installGuide = document.getElementById("installGuide");
+      const installStatus = document.getElementById("installStatus");
       const params = new URLSearchParams(window.location.search);
       const actionParam = (params.get("action") || "").toLowerCase();
       const familyParam = (params.get("family") || "").toLowerCase();
@@ -589,7 +612,16 @@
         installGuide.innerHTML = `<strong>${title}</strong><ul>${steps.map((s) => `<li>${s}</li>`).join("")}</ul>`;
         installGuide.classList.add("show");
       }
+      function setInstallStatus(message, tone) {
+        if (!installStatus) return;
+        installStatus.textContent = message;
+        installStatus.classList.remove("warn", "ok");
+        if (tone === "warn") installStatus.classList.add("warn");
+        if (tone === "ok") installStatus.classList.add("ok");
+        installStatus.classList.add("show");
+      }
       async function triggerInstallFlow() {
+        setInstallStatus("Checking install options for this browser...", "");
         if (deferredInstallPrompt) {
           deferredInstallPrompt.prompt();
           const choice = await deferredInstallPrompt.userChoice;
@@ -600,13 +632,21 @@
               ? "Install accepted. Now close this tab and open Statistico from your app list/home screen."
               : "Install was dismissed. Use browser menu > Install app to retry.";
           }
+          setInstallStatus(
+            choice?.outcome === "accepted"
+              ? "Install request accepted. Open Statistico from your apps list (not this browser tab)."
+              : "Install popup was closed. Use Open in app in the address bar or browser menu > Install app.",
+            choice?.outcome === "accepted" ? "ok" : "warn"
+          );
           if (installGuide) installGuide.classList.remove("show");
           return;
         }
         if (installHint) {
           installHint.textContent = "Install prompt unavailable here. If you see Open in app in the address bar, click it. Otherwise use browser menu > Install app.";
         }
+        setInstallStatus("No popup is available from this Chrome tab. Follow the manual steps below.", "warn");
         showInstallGuide();
+        installGuide?.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
 
       input.addEventListener("input", filterItems);

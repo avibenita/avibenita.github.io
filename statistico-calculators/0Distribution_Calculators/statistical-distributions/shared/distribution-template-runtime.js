@@ -1070,6 +1070,29 @@
     return String(rounded);
   }
 
+  function formatTooltipNumber(value, digits) {
+    if (!Number.isFinite(value)) return "--";
+    const fixed = Number(value).toFixed(digits);
+    return fixed.replace(/\.?0+$/, "");
+  }
+
+  function buildTooltipFormatter(cfg) {
+    const precisionControl = parseInt($("precision")?.value || "3", 10);
+    const valuePrecision = Math.max(2, Math.min(8, Number.isFinite(precisionControl) ? precisionControl : 3));
+    const xPrecision = cfg.discrete ? 0 : Math.max(2, Math.min(6, valuePrecision));
+
+    return function tooltipFormatter() {
+      const xText = formatTooltipNumber(this.x, xPrecision);
+      const points = this.points || (this.point ? [this.point] : []);
+      let html = `<span style="font-size:11px; color:#dbe9ff;">x = ${xText}</span>`;
+      points.forEach((pt) => {
+        if (!Number.isFinite(pt.y)) return;
+        html += `<br/><span style="color:${pt.color};">\u25CF</span> ${pt.series.name}: <b>${formatTooltipNumber(pt.y, valuePrecision)}</b>`;
+      });
+      return html;
+    };
+  }
+
   function buildPlotLines(markerValues) {
     const values = Array.isArray(markerValues) ? markerValues.filter((v) => Number.isFinite(v)) : [];
     return values.map((v, idx) => ({
@@ -1104,7 +1127,7 @@
     });
 
     const base = {
-      chart: { backgroundColor: "transparent", spacingBottom: 10, marginBottom: 35, height: 350 },
+      chart: { backgroundColor: "transparent", spacingBottom: 22, marginBottom: 82, height: 350 },
       title: { text: null },
       credits: { enabled: false },
       exporting: { enabled: false },
@@ -1120,12 +1143,18 @@
         floating: false,
         align: "center",
         verticalAlign: "bottom",
-        y: 0,
+        y: 26,
         itemDistance: 16,
         symbolWidth: 14,
         itemStyle: { color: "#d2e3ff", fontSize: "10px" },
       },
-      tooltip: { shared: true, backgroundColor: "rgba(8,18,34,0.94)", style: { color: "#f0f6ff" } },
+      tooltip: {
+        shared: true,
+        useHTML: true,
+        formatter: buildTooltipFormatter(cfg),
+        backgroundColor: "rgba(8,18,34,0.94)",
+        style: { color: "#f0f6ff" },
+      },
     };
 
     if (pdfChart) pdfChart.destroy();

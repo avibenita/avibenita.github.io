@@ -1112,8 +1112,9 @@
         lineColor: "rgba(255,255,255,0.25)",
         labels: { style: { color: "#d2e3ff" } },
         plotLines: buildPlotLines(markerValues),
+        title: { text: cfg.discrete ? "k (Discrete Outcomes)" : "x", style: { color: "#d2e3ff" } },
       },
-      yAxis: { title: { text: null }, gridLineColor: "rgba(255,255,255,0.08)", labels: { style: { color: "#d2e3ff" } } },
+      yAxis: { title: { text: "Probability", style: { color: "#d2e3ff" } }, gridLineColor: "rgba(255,255,255,0.08)", labels: { style: { color: "#d2e3ff" } } },
       legend: {
         enabled: true,
         floating: false,
@@ -1130,6 +1131,94 @@
     if (pdfChart) pdfChart.destroy();
     if (cdfChart) cdfChart.destroy();
     if (combinedChart) combinedChart.destroy();
+
+    if (cfg.discrete) {
+      const lollipopStems = [];
+      const shadedStems = [];
+      const lollipopPoints = [];
+      const shadedPoints = [];
+      const shadeMin = Number.isFinite(shadeRange?.min) ? shadeRange.min : Number.NEGATIVE_INFINITY;
+      const shadeMax = Number.isFinite(shadeRange?.max) ? shadeRange.max : Number.POSITIVE_INFINITY;
+
+      series.pdf.forEach(([x, y]) => {
+        lollipopStems.push([x, 0], [x, y], [null, null]);
+        lollipopPoints.push([x, y]);
+        if (x >= shadeMin && x <= shadeMax) {
+          shadedStems.push([x, 0], [x, y], [null, null]);
+          shadedPoints.push([x, y]);
+        }
+      });
+
+      pdfChart = window.Highcharts.chart("pdfChart", {
+        ...base,
+        series: [
+          {
+            name: "Selected Stems",
+            type: "line",
+            data: shadedStems,
+            color: "rgba(255, 165, 120, 0.9)",
+            lineWidth: 3,
+            marker: { enabled: false },
+            enableMouseTracking: false,
+          },
+          {
+            name: "PMF Stems",
+            type: "line",
+            data: lollipopStems,
+            color: "rgba(160, 200, 255, 0.55)",
+            lineWidth: 2,
+            marker: { enabled: false },
+            enableMouseTracking: false,
+          },
+          {
+            name: "Selected Points",
+            type: "scatter",
+            data: shadedPoints,
+            color: "#ffa578",
+            marker: { radius: 5, symbol: "circle", lineColor: "#ffd7c2", lineWidth: 1 },
+          },
+          {
+            name: "PMF (Lollipop)",
+            type: "scatter",
+            data: lollipopPoints,
+            color: "#7cc5ff",
+            marker: { radius: 4.5, symbol: "circle", lineColor: "#eaf4ff", lineWidth: 1 },
+          },
+        ],
+      });
+
+      cdfChart = window.Highcharts.chart("cdfChart", {
+        ...base,
+        series: [{ name: "Cumulative Probability (Step)", type: "line", step: "left", data: series.cdf, color: "#7cc5ff", lineWidth: 2.5 }],
+      });
+
+      combinedChart = window.Highcharts.chart("combinedChart", {
+        ...base,
+        series: [
+          {
+            name: "Selected Stems",
+            type: "line",
+            data: shadedStems,
+            color: "rgba(255, 165, 120, 0.75)",
+            lineWidth: 3,
+            marker: { enabled: false },
+            enableMouseTracking: false,
+          },
+          {
+            name: "PMF Stems",
+            type: "line",
+            data: lollipopStems,
+            color: "rgba(160, 200, 255, 0.45)",
+            lineWidth: 2,
+            marker: { enabled: false },
+            enableMouseTracking: false,
+          },
+          { name: "PMF Points", type: "scatter", data: lollipopPoints, color: "#7cc5ff", marker: { radius: 4, lineColor: "#eaf4ff", lineWidth: 1 } },
+          { name: "CDF (Step)", type: "line", step: "left", data: series.cdf, color: "#ffa578", lineWidth: 2.2 },
+        ],
+      });
+      return;
+    }
 
     pdfChart = window.Highcharts.chart("pdfChart", {
       ...base,
@@ -1151,7 +1240,7 @@
     });
     combinedChart = window.Highcharts.chart("combinedChart", {
       ...base,
-      yAxis: [{ title: { text: null }, gridLineColor: "rgba(255,255,255,0.08)", labels: { style: { color: "#d2e3ff" } } }],
+      yAxis: [{ title: { text: "Probability", style: { color: "#d2e3ff" } }, gridLineColor: "rgba(255,255,255,0.08)", labels: { style: { color: "#d2e3ff" } } }],
       series: [
         {
           name: "Shaded Area",

@@ -462,6 +462,122 @@
       .join("");
   }
 
+  function parseFiniteOr(value, fallback) {
+    const n = parseFloat(value);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function inferSliderBounds(cfg, params, inputEl) {
+    const id = inputEl.id || "";
+    const currentValue = parseFiniteOr(inputEl.value, 0);
+    let min = parseFiniteOr(inputEl.min, NaN);
+    let max = parseFiniteOr(inputEl.max, NaN);
+    let step = parseFiniteOr(inputEl.step, NaN);
+
+    if (!Number.isFinite(step) || step <= 0) {
+      step = cfg.discrete || id.toLowerCase().includes("kvalue") ? 1 : 0.1;
+    }
+
+    if (id === "probability") {
+      min = 0;
+      max = 1;
+      if (!Number.isFinite(step) || step <= 0) step = 0.01;
+    }
+
+    if (cfg.discrete && (id === "kValue" || id === "kValueCum" || id === "lowerBound" || id === "upperBound")) {
+      min = 0;
+      max = Math.max(1, Math.round(params.trials || 10));
+      step = 1;
+    }
+
+    if (id === "xValue" || id === "lowerBound" || id === "upperBound") {
+      const rangeValue = $("chartRange")?.value || cfg.defaults.range;
+      const domain = typeof cfg.chartDomain === "function" ? cfg.chartDomain(params, rangeValue) : null;
+      if (domain && Number.isFinite(domain.min) && Number.isFinite(domain.max) && domain.max > domain.min) {
+        if (!Number.isFinite(min)) min = domain.min;
+        if (!Number.isFinite(max)) max = domain.max;
+      }
+    }
+
+    if (!Number.isFinite(min)) min = currentValue - (cfg.discrete ? 10 : 5);
+    if (!Number.isFinite(max)) max = currentValue + (cfg.discrete ? 10 : 5);
+    if (max <= min) max = min + step;
+
+    return { min, max, step };
+  }
+
+  function addContextualInputSliders(cfg) {
+    const wrap = $("inputSection");
+    if (!wrap) return;
+    const params = getParams(cfg);
+    const inputFields = Array.from(wrap.querySelectorAll('input.input-field[type="number"]'));
+
+    inputFields.forEach((inputEl) => {
+      const parentGroup = inputEl.closest(".input-group");
+      if (!parentGroup) return;
+
+      const { min, max, step } = inferSliderBounds(cfg, params, inputEl);
+      const initialValue = clamp(parseFiniteOr(inputEl.value, min), min, max);
+      inputEl.value = String(initialValue);
+
+      const sliderWrap = document.createElement("div");
+      sliderWrap.style.marginTop = "8px";
+      sliderWrap.style.display = "grid";
+      sliderWrap.style.gap = "4px";
+
+      const sliderMeta = document.createElement("div");
+      sliderMeta.style.display = "flex";
+      sliderMeta.style.justifyContent = "space-between";
+      sliderMeta.style.fontSize = "0.75rem";
+      sliderMeta.style.color = "rgba(255,255,255,0.65)";
+
+      const sliderHint = document.createElement("span");
+      sliderHint.textContent = "Interactive slider";
+
+      const sliderValue = document.createElement("span");
+      sliderValue.style.fontWeight = "700";
+      sliderValue.style.color = "rgba(255,255,255,0.9)";
+
+      const sliderEl = document.createElement("input");
+      sliderEl.type = "range";
+      sliderEl.min = String(min);
+      sliderEl.max = String(max);
+      sliderEl.step = String(step);
+      sliderEl.value = String(initialValue);
+      sliderEl.style.width = "100%";
+      sliderEl.style.accentColor = "#ff9b73";
+
+      const updateSliderLabel = () => {
+        sliderValue.textContent = cfg.discrete || step >= 1 ? String(Math.round(parseFloat(sliderEl.value))) : Number(sliderEl.value).toFixed(3);
+      };
+
+      sliderMeta.appendChild(sliderHint);
+      sliderMeta.appendChild(sliderValue);
+      sliderWrap.appendChild(sliderMeta);
+      sliderWrap.appendChild(sliderEl);
+      parentGroup.appendChild(sliderWrap);
+      updateSliderLabel();
+
+      inputEl.addEventListener("input", () => {
+        const num = clamp(parseFiniteOr(inputEl.value, min), min, max);
+        sliderEl.value = String(num);
+        updateSliderLabel();
+      });
+
+      sliderEl.addEventListener("input", () => {
+        const raw = parseFloat(sliderEl.value);
+        const next = cfg.discrete || step >= 1 ? Math.round(raw) : raw;
+        inputEl.value = String(next);
+        updateSliderLabel();
+        inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    });
+  }
+
   function populateContextInput(cfg) {
     const wrap = $("inputSection");
     if (!wrap) return;
@@ -477,6 +593,7 @@
       wrap.innerHTML = '<div class="input-group"><label>Probability (0 to 1)</label><input class="input-field" id="probability" type="number" min="0" max="1" step="0.01" value="0.5"/></div>';
     }
     wrap.querySelectorAll("input").forEach((i) => i.addEventListener("input", calculateAndRender));
+    addContextualInputSliders(cfg);
   }
 
   function updateStats(cfg, params, precision) {

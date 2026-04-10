@@ -153,6 +153,24 @@
       font-size:.8rem;
       color:var(--text-3);
     }
+    .install-guide{
+      display:none;
+      margin-top:8px;
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:12px;
+      background:rgba(7,14,24,.58);
+      padding:10px 12px;
+      color:var(--text-2);
+      font-size:.82rem;
+      line-height:1.5;
+    }
+    .install-guide.show{ display:block; }
+    .install-guide strong{ color:#f2fbff; }
+    .install-guide ul{
+      margin:6px 0 0;
+      padding-left:18px;
+    }
+    .install-guide li{ margin:4px 0; }
     body.browser-blocked .main,
     body.browser-blocked .footer-note{
       display:none;
@@ -399,6 +417,7 @@
           <a class="top-btn" href="../Statistico-Website/index-Calculators.html"><i class="fa-solid fa-arrow-left"></i> Back to Site</a>
         </div>
         <p class="install-hint" id="installHint">If the install popup does not appear, open browser menu and select <em>Install app</em>. If already installed, open Statistico from your device app list.</p>
+        <div class="install-guide" id="installGuide" role="status" aria-live="polite"></div>
       </div>
     </section>
 
@@ -472,6 +491,7 @@
       const installGateBtn = document.getElementById("installGateBtn");
       const excelModeBtn = document.getElementById("excelModeBtn");
       const installHint = document.getElementById("installHint");
+      const installGuide = document.getElementById("installGuide");
       const params = new URLSearchParams(window.location.search);
       const actionParam = (params.get("action") || "").toLowerCase();
       const familyParam = (params.get("family") || "").toLowerCase();
@@ -518,6 +538,54 @@
         const href = item.getAttribute("href");
         if (href && href !== "#") window.location.href = href;
       }
+      function detectBrowserLabel() {
+        const ua = navigator.userAgent || "";
+        if (/Edg\//.test(ua)) return "edge";
+        if (/Chrome\//.test(ua) && !/Edg\//.test(ua)) return "chrome";
+        if (/Safari\//.test(ua) && !/Chrome\//.test(ua)) return "safari";
+        if (/Firefox\//.test(ua)) return "firefox";
+        return "other";
+      }
+      function showInstallGuide() {
+        if (!installGuide) return;
+        const browser = detectBrowserLabel();
+        let title = "Manual install steps";
+        let steps = [];
+        if (browser === "edge") {
+          steps = [
+            "In Edge, click the menu (⋯) in the top-right.",
+            "Choose Apps > Install this site as an app.",
+            "After install, open Statistico from Start Menu or Apps list.",
+          ];
+        } else if (browser === "chrome") {
+          steps = [
+            "In Chrome, click the menu (⋮) in the top-right.",
+            "Choose Install Statistico (or Save and share > Install page as app).",
+            "After install, open Statistico from Apps/Home Screen.",
+          ];
+        } else if (browser === "safari") {
+          title = "Manual install steps (Safari)";
+          steps = [
+            "On iPhone/iPad: tap Share and choose Add to Home Screen.",
+            "On macOS Safari: open this page in Dock via File > Add to Dock (if available).",
+            "Open Statistico from Home Screen/Dock after adding.",
+          ];
+        } else if (browser === "firefox") {
+          steps = [
+            "Firefox may not support this install flow on all platforms.",
+            "Use Edge or Chrome for one-click app install.",
+            "Then open Statistico from your installed apps list.",
+          ];
+        } else {
+          steps = [
+            "Use your browser menu and look for Install app / Add to Home Screen.",
+            "If option is missing, try Edge or Chrome.",
+            "After install, open Statistico from your installed apps list.",
+          ];
+        }
+        installGuide.innerHTML = `<strong>${title}</strong><ul>${steps.map((s) => `<li>${s}</li>`).join("")}</ul>`;
+        installGuide.classList.add("show");
+      }
       async function triggerInstallFlow() {
         if (deferredInstallPrompt) {
           deferredInstallPrompt.prompt();
@@ -529,11 +597,13 @@
               ? "Install accepted. Now close this tab and open Statistico from your app list/home screen."
               : "Install was dismissed. Use browser menu > Install app to retry.";
           }
+          if (installGuide) installGuide.classList.remove("show");
           return;
         }
         if (installHint) {
           installHint.textContent = "Install prompt unavailable here. Use browser menu > Install app (or Add to Home screen).";
         }
+        showInstallGuide();
       }
 
       input.addEventListener("input", filterItems);
@@ -589,7 +659,10 @@
       }
 
       if (actionParam === "install") {
-        triggerInstallFlow().catch(() => {});
+        setTimeout(() => {
+          triggerInstallFlow().catch(() => {});
+          if (!deferredInstallPrompt) showInstallGuide();
+        }, 250);
       } else if (actionParam === "excel") {
         window.location.href = "../Statistico-Website/index-Calculators.html?action=excel#launcher-entry";
       }

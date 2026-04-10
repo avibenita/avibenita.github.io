@@ -1402,16 +1402,18 @@
   function initAboutModal() {
     const modal = $("aboutModal");
     const openBtn = $("aboutBtn");
-    const closeBtn = $("closeAboutBtn");
-    if (!modal || !openBtn || !closeBtn) return;
+    const closeBtn = $("closeAboutBtn") || modal?.querySelector(".close-modal");
+    if (!modal || !openBtn) return;
     openBtn.addEventListener("click", () => {
       modal.classList.add("active");
       document.body.style.overflow = "hidden";
     });
-    closeBtn.addEventListener("click", () => {
-      modal.classList.remove("active");
-      document.body.style.overflow = "auto";
-    });
+    if (closeBtn) {
+      closeBtn.addEventListener("click", () => {
+        modal.classList.remove("active");
+        document.body.style.overflow = "auto";
+      });
+    }
     modal.addEventListener("click", (e) => {
       if (e.target === modal) {
         modal.classList.remove("active");
@@ -1519,6 +1521,21 @@
       if (!cfg) return null;
       return getParams(cfg);
     },
+  };
+
+  // Compatibility for legacy modal markup that still uses inline handlers.
+  window.openAboutModal = function openAboutModalCompat() {
+    const modal = $("aboutModal");
+    if (!modal) return;
+    modal.classList.add("active");
+    document.body.style.overflow = "hidden";
+  };
+
+  window.closeAboutModal = function closeAboutModalCompat() {
+    const modal = $("aboutModal");
+    if (!modal) return;
+    modal.classList.remove("active");
+    document.body.style.overflow = "auto";
   };
 
   document.addEventListener("DOMContentLoaded", initDistributionTemplate);

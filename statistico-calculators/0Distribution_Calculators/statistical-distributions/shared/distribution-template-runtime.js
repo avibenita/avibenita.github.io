@@ -1244,6 +1244,24 @@
 
   function renderCharts(cfg, params, shadeRange, markerValues) {
     if (typeof window.Highcharts === "undefined") return;
+    const isLightTheme = document.documentElement.getAttribute("data-theme") === "light";
+    const chartPalette = isLightTheme
+      ? {
+          axisLine: "rgba(20,65,110,0.35)",
+          axisText: "#2b557f",
+          grid: "rgba(20,65,110,0.12)",
+          legendText: "#315c88",
+          tooltipBg: "rgba(241,248,255,0.96)",
+          tooltipText: "#173f6c",
+        }
+      : {
+          axisLine: "rgba(255,255,255,0.25)",
+          axisText: "#d2e3ff",
+          grid: "rgba(255,255,255,0.08)",
+          legendText: "#d2e3ff",
+          tooltipBg: "rgba(8,18,34,0.94)",
+          tooltipText: "#f0f6ff",
+        };
     const rangeValue = $("chartRange")?.value || cfg.defaults.range;
     const domain = cfg.chartDomain(params, rangeValue);
     const series = buildSeries(cfg, params, domain);
@@ -1258,12 +1276,16 @@
       credits: { enabled: false },
       exporting: { enabled: false },
       xAxis: {
-        lineColor: "rgba(255,255,255,0.25)",
-        labels: { style: { color: "#d2e3ff" } },
+        lineColor: chartPalette.axisLine,
+        labels: { style: { color: chartPalette.axisText } },
         plotLines: buildPlotLines(markerValues),
-        title: { text: cfg.discrete ? "k (Discrete Outcomes)" : "x", style: { color: "#d2e3ff" } },
+        title: { text: cfg.discrete ? "k (Discrete Outcomes)" : "x", style: { color: chartPalette.axisText } },
       },
-      yAxis: { title: { text: "Probability", style: { color: "#d2e3ff" } }, gridLineColor: "rgba(255,255,255,0.08)", labels: { style: { color: "#d2e3ff" } } },
+      yAxis: {
+        title: { text: "Probability", style: { color: chartPalette.axisText } },
+        gridLineColor: chartPalette.grid,
+        labels: { style: { color: chartPalette.axisText } },
+      },
       legend: {
         enabled: true,
         floating: false,
@@ -1272,14 +1294,14 @@
         y: 26,
         itemDistance: 16,
         symbolWidth: 14,
-        itemStyle: { color: "#d2e3ff", fontSize: "10px" },
+        itemStyle: { color: chartPalette.legendText, fontSize: "10px" },
       },
       tooltip: {
         shared: true,
         useHTML: true,
         formatter: buildTooltipFormatter(cfg),
-        backgroundColor: "rgba(8,18,34,0.94)",
-        style: { color: "#f0f6ff" },
+        backgroundColor: chartPalette.tooltipBg,
+        style: { color: chartPalette.tooltipText },
       },
     };
 
@@ -1395,7 +1417,13 @@
     });
     combinedChart = window.Highcharts.chart("combinedChart", {
       ...base,
-      yAxis: [{ title: { text: "Probability", style: { color: "#d2e3ff" } }, gridLineColor: "rgba(255,255,255,0.08)", labels: { style: { color: "#d2e3ff" } } }],
+      yAxis: [
+        {
+          title: { text: "Probability", style: { color: chartPalette.axisText } },
+          gridLineColor: chartPalette.grid,
+          labels: { style: { color: chartPalette.axisText } },
+        },
+      ],
       series: [
         {
           name: "Shaded Area",

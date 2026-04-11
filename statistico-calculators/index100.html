@@ -1,31 +1,86 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+<meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#071422" />
+<link rel="manifest" href="./manifest.webmanifest?v=20260411-1">
 <title>Open Statistico Calculator Hub</title>
+<style>
+  :root{--bg:#071422;--bg2:#0b1d34;--card:#0f233f;--txt:#f4f8ff;--muted:#c7d8f2;--accent:#8fd8ff;--ok:#7cf5bc;--warn:#ffd089}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:radial-gradient(900px 450px at 20% -5%, rgba(143,216,255,.18), transparent 55%),linear-gradient(180deg,var(--bg),var(--bg2));color:var(--txt);min-height:100vh;display:grid;place-items:center;padding:22px}
+  .card{width:min(760px,95vw);background:linear-gradient(160deg,rgba(15,35,63,.96),rgba(9,24,44,.96));border:1px solid rgba(143,216,255,.3);border-radius:18px;padding:24px 22px;box-shadow:0 18px 40px rgba(0,0,0,.4)}
+  h1{margin:0 0 8px;font-size:clamp(1.5rem,3.2vw,2rem)}
+  .lead{margin:0 0 16px;color:var(--muted);line-height:1.55}
+  .status{margin:0 0 12px;padding:10px 12px;border-radius:12px;border:1px solid rgba(143,216,255,.26);background:rgba(143,216,255,.09);font-weight:600}
+  .status.ok{border-color:rgba(124,245,188,.35);background:rgba(124,245,188,.12);color:#dffff0}
+  .status.warn{border-color:rgba(255,208,137,.4);background:rgba(255,208,137,.12);color:#ffeed1}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 10px}
+  .btn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);color:var(--txt);border-radius:999px;padding:9px 13px;font-weight:700;font-size:.82rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:7px}
+  .btn:hover{border-color:rgba(143,216,255,.42);background:rgba(143,216,255,.14)}
+  .btn.primary{border-color:rgba(124,245,188,.45);background:rgba(124,245,188,.18)}
+  .panel{margin-top:12px;border:1px solid rgba(255,255,255,.13);border-radius:12px;padding:12px;background:rgba(6,15,28,.42)}
+  .panel h3{margin:0 0 8px;font-size:.98rem}
+  .panel ol{margin:0;padding-left:18px;color:var(--muted);line-height:1.55;font-size:.9rem}
+  .panel li{margin:4px 0}
+  .subnote{margin-top:8px;font-size:.8rem;color:var(--muted)}
+  code{background:rgba(255,255,255,.08);padding:2px 6px;border-radius:6px}
+</style>
 </head>
+<body>
+<main class="card">
+  <h1>Open Statistico Calculator Hub</h1>
+  <p class="lead">This URL is an install gateway. The real launcher opens from the installed app icon, not from a normal browser tab.</p>
 
-<body style="font-family:Arial;background:#0b1628;color:white;text-align:center;padding:40px">
+  <p id="installStatus" class="status">Checking app state...</p>
 
-<h1>Open Statistico Calculator Hub</h1>
+  <div class="actions">
+    <a class="btn primary" href="./hub.html">Open Launcher in Browser</a>
+    <button class="btn" id="openChromeAppsBtn" type="button">Open Chrome Apps Page</button>
+    <a class="btn" href="../Statistico-Website/how-it-works.html">Install Help</a>
+  </div>
 
-<p>If you see <b>Open in app</b> in the address bar, click it.</p>
-<p>If not, install the app from Chrome menu (⋮).</p>
-
-<br>
-
-<a href="hub.html" style="color:#8fd8ff;">Open hub in browser</a>
+  <section class="panel">
+    <h3>Fast path (least confusing)</h3>
+    <ol>
+      <li>If you see <strong>Open in app</strong> in Chrome address bar, click it.</li>
+      <li>If Chrome menu has no <strong>Install app</strong>, the app is already installed.</li>
+      <li>To make it visible in Start menu: open <code>chrome://apps</code>, right-click <strong>Statistico Calculator Hub</strong>, choose <strong>Create shortcuts...</strong>, and enable <strong>Start menu</strong>.</li>
+      <li>After that, open from Windows Start by searching <strong>Statistico</strong>.</li>
+    </ol>
+    <p class="subnote">If Start still does not show it: press Win+R, run <code>shell:AppsFolder</code>, then pin Statistico Calculator Hub to Start.</p>
+  </section>
+</main>
 
 <script>
-const isStandalone =
-  window.matchMedia('(display-mode: standalone)').matches ||
-  window.navigator.standalone === true;
+  const isStandalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.matchMedia("(display-mode: window-controls-overlay)").matches ||
+    window.navigator.standalone === true;
+  const statusEl = document.getElementById("installStatus");
+  const openChromeAppsBtn = document.getElementById("openChromeAppsBtn");
 
-if (isStandalone) {
-  window.location.replace('./hub.html');
-}
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./service-worker.js?v=20260411-1").catch(() => {});
+    });
+  }
+
+  if (isStandalone) {
+    if (statusEl) {
+      statusEl.textContent = "App mode detected. Opening launcher...";
+      statusEl.classList.add("ok");
+    }
+    setTimeout(() => window.location.replace("./hub.html"), 120);
+  } else if (statusEl) {
+    statusEl.textContent = "Browser mode detected. Use Open in app, or complete Start-menu shortcut steps below.";
+    statusEl.classList.add("warn");
+  }
+
+  openChromeAppsBtn?.addEventListener("click", () => {
+    window.location.href = "chrome://apps";
+  });
 </script>
-
 </body>
 </html>

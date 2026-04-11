@@ -878,14 +878,21 @@
       .join("");
   }
 
-  function initBackToHubButton() {
+  function getHeaderActionsContainer() {
     const header = document.querySelector(".header");
-    if (!header || header.querySelector(".hub-back-link")) return;
-    header.style.display = "flex";
-    header.style.alignItems = "center";
-    header.style.justifyContent = "space-between";
-    header.style.gap = "12px";
+    if (!header) return null;
+    let actions = header.querySelector(".header-actions");
+    if (!actions) {
+      actions = document.createElement("div");
+      actions.className = "header-actions";
+      header.appendChild(actions);
+    }
+    return actions;
+  }
 
+  function initBackToHubButton() {
+    const actions = getHeaderActionsContainer();
+    if (!actions || actions.querySelector(".hub-back-link")) return;
     const link = document.createElement("a");
     link.className = "hub-back-link";
     link.href = "../../hub.html";
@@ -903,7 +910,34 @@
     link.style.fontWeight = "700";
     link.style.whiteSpace = "nowrap";
     link.style.flexShrink = "0";
-    header.appendChild(link);
+    actions.appendChild(link);
+  }
+
+  function ensureThemeToggleComponent() {
+    if (window.StatisticoThemeToggle) return Promise.resolve();
+    return new Promise((resolve) => {
+      const existing = document.querySelector('script[data-st-theme="1"]');
+      if (existing) {
+        existing.addEventListener("load", () => resolve(), { once: true });
+        existing.addEventListener("error", () => resolve(), { once: true });
+        return;
+      }
+      const script = document.createElement("script");
+      script.dataset.stTheme = "1";
+      script.src = "../../shared/theme-toggle-component.js?v=20260411-2";
+      script.onload = () => resolve();
+      script.onerror = () => resolve();
+      document.head.appendChild(script);
+    });
+  }
+
+  function initThemeToggle() {
+    const actions = getHeaderActionsContainer();
+    if (!actions) return;
+    ensureThemeToggleComponent().then(() => {
+      if (!window.StatisticoThemeToggle) return;
+      window.StatisticoThemeToggle.mount({ container: actions });
+    });
   }
 
   function escapeHtml(value) {
@@ -1585,6 +1619,7 @@
 
     initCalcModes(cfg);
     initBackToHubButton();
+    initThemeToggle();
 
     document.querySelectorAll('input[name="calcType"]').forEach((r) => {
       r.addEventListener("change", () => {

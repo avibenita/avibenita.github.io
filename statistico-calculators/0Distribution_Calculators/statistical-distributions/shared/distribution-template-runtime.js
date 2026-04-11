@@ -878,6 +878,34 @@
       .join("");
   }
 
+  function initBackToHubButton() {
+    const header = document.querySelector(".header");
+    if (!header || header.querySelector(".hub-back-link")) return;
+    header.style.display = "flex";
+    header.style.alignItems = "center";
+    header.style.justifyContent = "space-between";
+    header.style.gap = "12px";
+
+    const link = document.createElement("a");
+    link.className = "hub-back-link";
+    link.href = "../../hub.html";
+    link.innerHTML = '<i class="fas fa-arrow-left"></i> Back to Hub';
+    link.style.display = "inline-flex";
+    link.style.alignItems = "center";
+    link.style.gap = "7px";
+    link.style.padding = "8px 12px";
+    link.style.borderRadius = "999px";
+    link.style.border = "1px solid rgba(255,255,255,0.22)";
+    link.style.background = "rgba(255,255,255,0.06)";
+    link.style.color = "#e7f2ff";
+    link.style.textDecoration = "none";
+    link.style.fontSize = "0.8rem";
+    link.style.fontWeight = "700";
+    link.style.whiteSpace = "nowrap";
+    link.style.flexShrink = "0";
+    header.appendChild(link);
+  }
+
   function escapeHtml(value) {
     return String(value ?? "")
       .replaceAll("&", "&amp;")
@@ -1556,6 +1584,7 @@
     }
 
     initCalcModes(cfg);
+    initBackToHubButton();
 
     document.querySelectorAll('input[name="calcType"]').forEach((r) => {
       r.addEventListener("change", () => {

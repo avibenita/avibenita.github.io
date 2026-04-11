@@ -1244,17 +1244,32 @@
 
   function renderCharts(cfg, params, shadeRange, markerValues) {
     if (typeof window.Highcharts === "undefined") return;
-    const isLightTheme = document.documentElement.getAttribute("data-theme") === "light";
+    const docTheme = document.documentElement.getAttribute("data-theme");
+    let isLightTheme = docTheme === "light";
+    if (!docTheme) {
+      const panel = document.querySelector(".visualization-panel");
+      const bg = panel ? window.getComputedStyle(panel).backgroundColor : "";
+      const m = bg && bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+      if (m) {
+        const r = Number(m[1]);
+        const g = Number(m[2]);
+        const b = Number(m[3]);
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        isLightTheme = luminance > 0.6;
+      }
+    }
     const chartPalette = isLightTheme
       ? {
+          chartBg: "#eef2f6",
           axisLine: "rgba(20,65,110,0.35)",
-          axisText: "#2b557f",
-          grid: "rgba(20,65,110,0.12)",
-          legendText: "#315c88",
+          axisText: "#1f4d7b",
+          grid: "rgba(20,65,110,0.18)",
+          legendText: "#234f7d",
           tooltipBg: "rgba(241,248,255,0.96)",
           tooltipText: "#173f6c",
         }
       : {
+          chartBg: "transparent",
           axisLine: "rgba(255,255,255,0.25)",
           axisText: "#d2e3ff",
           grid: "rgba(255,255,255,0.08)",
@@ -1271,18 +1286,21 @@
     });
 
     const base = {
-      chart: { backgroundColor: "transparent", spacingBottom: 22, marginBottom: 82, height: 350 },
+      chart: { backgroundColor: chartPalette.chartBg, spacingBottom: 22, marginBottom: 82, height: 350 },
       title: { text: null },
       credits: { enabled: false },
       exporting: { enabled: false },
       xAxis: {
         lineColor: chartPalette.axisLine,
+        tickColor: chartPalette.axisLine,
         labels: { style: { color: chartPalette.axisText } },
         plotLines: buildPlotLines(markerValues),
         title: { text: cfg.discrete ? "k (Discrete Outcomes)" : "x", style: { color: chartPalette.axisText } },
       },
       yAxis: {
         title: { text: "Probability", style: { color: chartPalette.axisText } },
+        lineColor: chartPalette.axisLine,
+        tickColor: chartPalette.axisLine,
         gridLineColor: chartPalette.grid,
         labels: { style: { color: chartPalette.axisText } },
       },
@@ -1295,6 +1313,7 @@
         itemDistance: 16,
         symbolWidth: 14,
         itemStyle: { color: chartPalette.legendText, fontSize: "10px" },
+        itemHiddenStyle: { color: isLightTheme ? "#7695b5" : "#7f93b0" },
       },
       tooltip: {
         shared: true,

@@ -64,8 +64,8 @@ const HUB_CATEGORY_TILES = [
     id: "model-relationships",
     title: "Model relationships",
     icon: "fa-chart-line",
-    color: "#3b82f6",
-    colorDark: "#1d4ed8",
+    color: "#0ea5e9",
+    colorDark: "#0369a1",
     tabStyle: "soft",
     subtitle: "Predict outcomes and estimate effects",
     modules: [
@@ -77,8 +77,8 @@ const HUB_CATEGORY_TILES = [
     id: "reduce-dimensions",
     title: "Reduce dimensions",
     icon: "fa-layer-group",
-    color: "#8b5cf6",
-    colorDark: "#6d28d9",
+    color: "#ec4899",
+    colorDark: "#be185d",
     tabStyle: "soft",
     subtitle: "Compress and reveal latent structure",
     modules: [

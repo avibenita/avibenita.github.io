@@ -37,27 +37,27 @@ const HUB_CATEGORY_TILES = [
     ]
   },
   {
-    id: "compare-groups",
-    title: "Compare groups",
+    id: "analyze-groups",
+    title: "Analyze Groups",
     icon: "fa-scale-balanced",
     color: "#10b981",
     colorDark: "#0f766e",
-    subtitle: "Compare means across groups",
-    subgroups: [
-      {
-        label: "Multi-group models",
-        modules: [
-          { id: "anova", label: "ANOVA", tip: "Compare means across 3+ groups with post-hoc support." },
-          { id: "mixed", label: "Mixed", tip: "Mixed-effects models for grouped or repeated-measures style data." }
-        ]
-      },
-      {
-        label: "Two-condition means",
-        modules: [
-          { id: "independent", label: "Independent Means", tip: "Compare two independent groups on a numeric outcome." },
-          { id: "dependent", label: "Repeated Means", tip: "Compare paired/repeated measurements for the same cases." }
-        ]
-      }
+    subtitle: "Compare groups using statistical models",
+    modules: [
+      { id: "anova", label: "ANOVA", tip: "Compare means across 3+ groups with post-hoc support." },
+      { id: "mixed", label: "Mixed", tip: "Mixed-effects models for grouped or repeated-measures style data." }
+    ]
+  },
+  {
+    id: "compare-means",
+    title: "Compare Means",
+    icon: "fa-arrows-left-right",
+    color: "#06b6d4",
+    colorDark: "#0e7490",
+    subtitle: "Compare means between conditions",
+    modules: [
+      { id: "independent", label: "Independent Means", tip: "Compare two independent groups on a numeric outcome." },
+      { id: "dependent", label: "Repeated Means", tip: "Compare paired/repeated measurements for the same cases." }
     ]
   },
   {

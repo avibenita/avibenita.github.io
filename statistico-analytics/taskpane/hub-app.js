@@ -216,17 +216,23 @@ const HUB_CLUSTER_META = {
   analytics: {
     eyebrow: "Statistico flagship",
     name: "Interactive Analytics",
-    tagline: "Core statistical modeling, comparisons, and discovery tools"
+    tagline: "Core statistical modeling, comparisons, and discovery tools",
+    color: "#1f6fff",
+    colorDark: "#1b56c8"
   },
   calculators: {
     eyebrow: "Statistico flagship",
     name: "Interactive Calculators",
-    tagline: "Purpose-built families for probability, planning, and conversion"
+    tagline: "Purpose-built families for probability, planning, and conversion",
+    color: "#ff7a1a",
+    colorDark: "#d96510"
   },
   applications: {
     eyebrow: "Statistico flagship",
     name: "Interactive Applications",
-    tagline: "Workflow-ready product clusters for operational use cases"
+    tagline: "Workflow-ready product clusters for operational use cases",
+    color: "#7e56ff",
+    colorDark: "#6542d2"
   }
 };
 let ACTIVE_CLUSTER = "analytics";
@@ -289,6 +295,9 @@ function renderCategoryTiles(query) {
   if (!holder) return;
   HUB_ACTIONS = {};
   var source = HUB_CLUSTER_TILES[ACTIVE_CLUSTER] || [];
+  var clusterMeta = HUB_CLUSTER_META[ACTIVE_CLUSTER] || HUB_CLUSTER_META.analytics;
+  var clusterColor = clusterMeta.color || "#1f6fff";
+  var clusterColorDark = clusterMeta.colorDark || clusterColor;
   var q = (query || "").trim().toLowerCase();
   var list = source.filter(function (c) {
     var mods = getCategoryModules(c);
@@ -297,8 +306,8 @@ function renderCategoryTiles(query) {
     return mods.some(function (m) { return m.label.toLowerCase().indexOf(q) >= 0; });
   });
   holder.innerHTML = list.map(function (c) {
-    var color = c.color || "#f97316";
-    var colorDark = c.colorDark || "#c2410c";
+    var color = clusterColor;
+    var colorDark = clusterColorDark;
     var icon = c.icon || "fa-table-cells-large";
     return (
       '<div class="category-tile" style="--cat-color:' + escapeHtml(color) + ";--cat-color-dark:" + escapeHtml(colorDark) + ';">' +

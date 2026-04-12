@@ -966,6 +966,23 @@
     const chartText = cfg.discrete
       ? "This is a discrete distribution. The PDF chart is rendered as lollipop stems/points, and CDF uses step lines."
       : "This is a continuous distribution. PDF and CDF are rendered as smooth curves with dynamic shaded ranges.";
+    const applications =
+      cfg.discrete
+        ? [
+            { icon: "fa-industry", title: "Quality Control", desc: "Model event counts and defect frequencies in repeated production intervals." },
+            { icon: "fa-network-wired", title: "Operations", desc: "Estimate probabilities for count-based outcomes in workflow and service systems." },
+            { icon: "fa-chart-line", title: "Risk Monitoring", desc: "Track threshold exceedance counts and rare-event likelihood over fixed windows." },
+            { icon: "fa-flask", title: "Experimental Counts", desc: "Analyze trial-based or interval-based count outcomes in scientific studies." },
+          ]
+        : [
+            { icon: "fa-clock", title: "Waiting-Time Analysis", desc: "Evaluate time-to-event behavior under distribution-specific assumptions." },
+            { icon: "fa-heartbeat", title: "Reliability & Survival", desc: "Model lifetimes, failure times, and event-time probabilities." },
+            { icon: "fa-chart-area", title: "Forecasting Inputs", desc: "Provide probability inputs for simulation, forecasting, and planning models." },
+            { icon: "fa-microscope", title: "Scientific Measurement", desc: "Assess uncertainty and expected ranges for continuous outcomes." },
+          ];
+    const appCards = applications
+      .map((a) => `<div class="application-item"><h4><i class="fas ${a.icon}"></i> ${escapeHtml(a.title)}</h4><p>${escapeHtml(a.desc)}</p></div>`)
+      .join("");
 
     return `
       <div class="about-section">
@@ -981,6 +998,10 @@
         <ul>${modesList}</ul>
       </div>
       <div class="about-section">
+        <h3><i class="fas fa-history"></i> Historical Context</h3>
+        <p>The ${escapeHtml(title)} is part of the core probability toolbox used in classical and modern statistical modeling. It is frequently taught as a foundational distribution because of its analytical tractability and practical relevance.</p>
+      </div>
+      <div class="about-section">
         <h3><i class="fas fa-chart-bar"></i> Summary Statistics</h3>
         <ul>${statsList || "<li>Key statistics update automatically based on the current parameters.</li>"}</ul>
       </div>
@@ -988,12 +1009,52 @@
         <h3><i class="fas fa-chart-area"></i> Chart Behavior</h3>
         <p>${escapeHtml(chartText)}</p>
       </div>
+      <div class="about-section">
+        <h3><i class="fas fa-globe"></i> Real-World Applications</h3>
+        <div class="applications-grid">${appCards}</div>
+      </div>
+      <div class="about-section">
+        <h3><i class="fas fa-tools"></i> Using This Calculator</h3>
+        <ul>
+          <li><strong>Set parameters:</strong> define the distribution shape/rate/location inputs.</li>
+          <li><strong>Choose mode:</strong> evaluate point, cumulative, interval, or quantile results.</li>
+          <li><strong>Interpret visuals:</strong> use PDF/CDF views to validate probability intuition.</li>
+          <li><strong>Adjust precision:</strong> tune numeric display for reporting or analysis detail.</li>
+        </ul>
+      </div>
     `;
+  }
+
+  function getAboutModalBody(modal) {
+    if (!modal) return null;
+    const direct = modal.querySelector(".modal-body");
+    if (direct) return direct;
+    const content = modal.querySelector(".about-content");
+    if (!content) return null;
+
+    let host = content.querySelector(".about-body");
+    if (!host) {
+      host = document.createElement("div");
+      host.className = "about-body";
+      const header = content.querySelector(".about-header");
+      if (header && header.parentNode === content) {
+        header.insertAdjacentElement("afterend", host);
+      } else {
+        content.appendChild(host);
+      }
+    }
+
+    const directSections = Array.from(content.children).filter((el) => el.classList && el.classList.contains("about-section"));
+    if (directSections.length) {
+      host.innerHTML = "";
+      directSections.forEach((section) => host.appendChild(section));
+    }
+    return host;
   }
 
   function enhanceAboutModalContent(cfg) {
     const modal = $("aboutModal");
-    const body = modal?.querySelector(".modal-body");
+    const body = getAboutModalBody(modal);
     if (!modal || !body) return;
     const raw = body.textContent || "";
     const hasPlaceholder =

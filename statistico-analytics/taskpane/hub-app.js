@@ -214,16 +214,19 @@ const HUB_CLUSTER_TILES = {
 };
 const HUB_CLUSTER_META = {
   analytics: {
-    name: "Statistico Interactive",
-    tagline: "Analytics, calculators, and applications ecosystem"
+    eyebrow: "Statistico flagship",
+    name: "Interactive Analytics",
+    tagline: "Core statistical modeling, comparisons, and discovery tools"
   },
   calculators: {
-    name: "Statistico Interactive",
-    tagline: "Calculator families for planning and estimation"
+    eyebrow: "Statistico flagship",
+    name: "Interactive Calculators",
+    tagline: "Purpose-built families for probability, planning, and conversion"
   },
   applications: {
-    name: "Statistico Interactive",
-    tagline: "Application clusters for future workflows"
+    eyebrow: "Statistico flagship",
+    name: "Interactive Applications",
+    tagline: "Workflow-ready product clusters for operational use cases"
   }
 };
 let ACTIVE_CLUSTER = "analytics";
@@ -432,8 +435,10 @@ function filterModules(q) {
 
 function syncClusterHeader() {
   var meta = HUB_CLUSTER_META[ACTIVE_CLUSTER] || HUB_CLUSTER_META.analytics;
+  var eyebrowEl = document.getElementById("hubBrandEyebrow");
   var nameEl = document.getElementById("hubBrandName");
   var tagEl = document.getElementById("hubBrandTagline");
+  if (eyebrowEl) eyebrowEl.textContent = meta.eyebrow || "Statistico flagship";
   if (nameEl) nameEl.textContent = meta.name;
   if (tagEl) tagEl.textContent = meta.tagline;
   document.querySelectorAll(".hub-nav-tab[data-cluster]").forEach(function (btn) {

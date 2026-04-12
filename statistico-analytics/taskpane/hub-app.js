@@ -66,6 +66,7 @@ const HUB_CATEGORY_TILES = [
     icon: "fa-chart-line",
     color: "#3b82f6",
     colorDark: "#1d4ed8",
+    tabStyle: "soft",
     subtitle: "Predict outcomes and estimate effects",
     modules: [
       { id: "regression", label: "Regression", tip: "Linear regression with coefficients, intervals, and diagnostics." },
@@ -78,6 +79,7 @@ const HUB_CATEGORY_TILES = [
     icon: "fa-layer-group",
     color: "#8b5cf6",
     colorDark: "#6d28d9",
+    tabStyle: "soft",
     subtitle: "Compress and reveal latent structure",
     modules: [
       { id: "factor", label: "Factor", tip: "Latent factor extraction and rotation for construct discovery." },
@@ -188,23 +190,25 @@ function getCategoryModules(category) {
 }
 
 function renderCategoryGroups(category) {
+  var tabStyle = category.tabStyle === "soft" ? "soft" : "pill";
   if (Array.isArray(category.subgroups) && category.subgroups.length) {
     return category.subgroups.map(function (g, idx) {
       return (
         '<div class="category-subgroup' + (idx > 0 ? " with-divider" : "") + '">' +
         '<div class="category-subgroup-label">' + escapeHtml(g.label || "") + "</div>" +
         '<div class="category-modules">' +
-        ((g.modules || []).map(renderCategoryModuleBtn).join("")) +
+        ((g.modules || []).map(function (m) { return renderCategoryModuleBtn(m, tabStyle); }).join("")) +
         "</div></div>"
       );
     }).join("");
   }
-  return '<div class="category-modules">' + getCategoryModules(category).map(renderCategoryModuleBtn).join("") + "</div>";
+  return '<div class="category-modules">' + getCategoryModules(category).map(function (m) { return renderCategoryModuleBtn(m, tabStyle); }).join("") + "</div>";
 }
 
-function renderCategoryModuleBtn(m) {
+function renderCategoryModuleBtn(m, tabStyle) {
   var tip = m.tip || m.label;
-  return '<button class="category-module-btn" data-module-id="' + escapeHtml(m.id) + '" data-tip="' + escapeHtml(tip) + '" title="' + escapeHtml(tip) + '" onclick="navigateToModule(\'' + escapeHtml(m.id) + '\')">' + escapeHtml(m.label) + "</button>";
+  var styleClass = tabStyle === "soft" ? " category-module-btn--soft" : "";
+  return '<button class="category-module-btn' + styleClass + '" data-module-id="' + escapeHtml(m.id) + '" data-tip="' + escapeHtml(tip) + '" title="' + escapeHtml(tip) + '" onclick="navigateToModule(\'' + escapeHtml(m.id) + '\')">' + escapeHtml(m.label) + "</button>";
 }
 
 var GROUP_COLORS = {

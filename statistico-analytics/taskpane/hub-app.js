@@ -142,6 +142,54 @@ const CALCULATOR_CATEGORY_TILES = [
         dialogUrl: "https://statistico.live/statistico-calculators/power-sample-size-calculator/index-calculator.html"
       }
     ]
+  },
+  {
+    id: "erlang-family",
+    title: "Call center staffing",
+    icon: "fa-headset",
+    color: "#f59e0b",
+    colorDark: "#b45309",
+    subtitle: "Erlang C and operational staffing design",
+    modules: [
+      {
+        id: "calc-erlang",
+        label: "Erlang C",
+        tip: "Open the call center staffing calculator family.",
+        dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=erlang"
+      }
+    ]
+  },
+  {
+    id: "qc-family",
+    title: "QC",
+    icon: "fa-chart-line",
+    color: "#14b8a6",
+    colorDark: "#0f766e",
+    subtitle: "Quality control and process capability tools",
+    modules: [
+      {
+        id: "calc-qc",
+        label: "QC Tools",
+        tip: "Open the QC calculator family.",
+        dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=qc"
+      }
+    ]
+  },
+  {
+    id: "effect-size-family",
+    title: "Effect size converter",
+    icon: "fa-right-left",
+    color: "#a855f7",
+    colorDark: "#7e22ce",
+    subtitle: "Translate effect metrics across test families",
+    modules: [
+      {
+        id: "calc-effect-size",
+        label: "Effect Size",
+        tip: "Open the effect-size conversion family.",
+        dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=effect"
+      }
+    ]
   }
 ];
 const APPLICATION_CATEGORY_TILES = [

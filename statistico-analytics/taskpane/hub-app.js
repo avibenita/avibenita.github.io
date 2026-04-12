@@ -217,22 +217,22 @@ const HUB_CLUSTER_META = {
     eyebrow: "Statistico flagship",
     name: "Interactive Analytics",
     tagline: "Core statistical modeling, comparisons, and discovery tools",
-    color: "#1f6fff",
-    colorDark: "#1b56c8"
+    color: "#22c55e",
+    colorDark: "#15803d"
   },
   calculators: {
     eyebrow: "Statistico flagship",
     name: "Interactive Calculators",
     tagline: "Purpose-built families for probability, planning, and conversion",
-    color: "#ff7a1a",
-    colorDark: "#d96510"
+    color: "#f4b183",
+    colorDark: "#c97a32"
   },
   applications: {
     eyebrow: "Statistico flagship",
     name: "Interactive Applications",
     tagline: "Workflow-ready product clusters for operational use cases",
-    color: "#7e56ff",
-    colorDark: "#6542d2"
+    color: "#c7b6ff",
+    colorDark: "#7d6bc7"
   }
 };
 let ACTIVE_CLUSTER = "analytics";
@@ -447,6 +447,7 @@ function syncClusterHeader() {
   var eyebrowEl = document.getElementById("hubBrandEyebrow");
   var nameEl = document.getElementById("hubBrandName");
   var tagEl = document.getElementById("hubBrandTagline");
+  document.documentElement.style.setProperty("--hub-brand-color", meta.colorDark || meta.color || "#f97316");
   if (eyebrowEl) eyebrowEl.textContent = meta.eyebrow || "Statistico flagship";
   if (nameEl) nameEl.textContent = meta.name;
   if (tagEl) tagEl.textContent = meta.tagline;

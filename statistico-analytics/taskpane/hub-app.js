@@ -112,12 +112,6 @@ const CALCULATOR_CATEGORY_TILES = [
         label: "Distribution Hub",
         tip: "Open the distribution family hub in a dialog.",
         dialogUrl: "https://statistico.live/statistico-calculators/0Distribution_Calculators/index-distribution.html"
-      },
-      {
-        id: "calc-normal",
-        label: "Normal",
-        tip: "Normal distribution tail and quantile calculator.",
-        dialogUrl: "https://statistico.live/statistico-calculators/0Distribution_Calculators/statistical-distributions/Normal.html"
       }
     ]
   },
@@ -153,8 +147,8 @@ const CALCULATOR_CATEGORY_TILES = [
     modules: [
       {
         id: "calc-erlang",
-        label: "Erlang C",
-        tip: "Open the call center staffing calculator family.",
+        label: "Erlang C & Simulation",
+        tip: "Open call-center staffing and simulation tools.",
         dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=erlang"
       }
     ]
@@ -225,14 +219,14 @@ const HUB_CLUSTER_META = {
     name: "Interactive Calculators",
     tagline: "Purpose-built families for probability, planning, and conversion",
     color: "#f4b183",
-    colorDark: "#c97a32"
+    colorDark: "#8a4f1c"
   },
   applications: {
     eyebrow: "Statistico flagship",
     name: "Interactive Applications",
     tagline: "Workflow-ready product clusters for operational use cases",
     color: "#c7b6ff",
-    colorDark: "#7d6bc7"
+    colorDark: "#4b3a86"
   }
 };
 let ACTIVE_CLUSTER = "analytics";

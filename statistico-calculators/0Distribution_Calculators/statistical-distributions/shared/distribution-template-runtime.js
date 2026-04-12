@@ -828,6 +828,196 @@
     },
   };
 
+  const DISTRIBUTION_HELP_DETAILS = {
+    uniformdistribution: {
+      intro:
+        "The Uniform distribution represents complete equiprobability across a finite interval [a, b]. Every value inside the interval has the same density, while values outside have zero density.",
+      historical:
+        "Uniform models are foundational in simulation, randomization, and Monte Carlo methods. They are often used as base generators for transforming random variables into more complex distributions.",
+      formulas: [
+        "PDF: f(x) = 1 / (b - a), for a <= x <= b",
+        "CDF: F(x) = (x - a) / (b - a), for a <= x <= b",
+        "Mean: (a + b) / 2, Variance: (b - a)^2 / 12"
+      ],
+      properties: [
+        "Flat density over [a, b]",
+        "Bounded support with finite tails",
+        "Skewness is zero (symmetric interval)",
+        "Useful baseline for uncertainty with hard bounds"
+      ]
+    },
+    binomialdistribution: {
+      intro:
+        "The Binomial distribution models the number of successes in n independent Bernoulli trials with success probability p. It is a core discrete model for repeated yes/no outcomes.",
+      historical:
+        "Binomial theory dates to early probability work by Jacob Bernoulli and became central in statistical inference for proportions, tests, and confidence intervals.",
+      formulas: [
+        "PMF: P(X = k) = C(n, k) * p^k * (1 - p)^(n - k)",
+        "Mean: n*p",
+        "Variance: n*p*(1 - p)"
+      ],
+      properties: [
+        "Discrete support: k = 0..n",
+        "Symmetric only when p = 0.5",
+        "Approaches Normal for large n with moderate p",
+        "Approaches Poisson when n is large and p is small"
+      ]
+    },
+    poissondistribution: {
+      intro:
+        "The Poisson distribution models counts of events in fixed intervals when events happen independently at a constant average rate lambda.",
+      historical:
+        "Introduced by Simeon Denis Poisson in the 19th century, this model became a standard for rare-event and arrival-count analysis in operations and sciences.",
+      formulas: [
+        "PMF: P(X = k) = e^(-lambda) * lambda^k / k!",
+        "Mean: lambda",
+        "Variance: lambda"
+      ],
+      properties: [
+        "Discrete nonnegative counts",
+        "Mean equals variance",
+        "Suitable for low-probability, high-opportunity event systems",
+        "Links directly to Exponential waiting-time models"
+      ]
+    },
+    geometricdistribution: {
+      intro:
+        "The Geometric distribution models the number of trials needed to get the first success in repeated independent Bernoulli trials.",
+      historical:
+        "Geometric waiting-time models are classic examples in introductory stochastic processes and underpin reliability and queueing abstractions.",
+      formulas: [
+        "PMF: P(X = k) = (1 - p)^(k - 1) * p, k >= 1",
+        "CDF: P(X <= k) = 1 - (1 - p)^k",
+        "Mean: 1 / p, Variance: (1 - p) / p^2"
+      ],
+      properties: [
+        "Discrete waiting-time model",
+        "Memoryless among discrete distributions",
+        "Right-skewed with heavier tail at small p",
+        "Natural for first-hit and first-defect questions"
+      ]
+    },
+    hypergeometricdistribution: {
+      intro:
+        "The Hypergeometric distribution models success counts when sampling without replacement from a finite population containing K successes out of N items.",
+      historical:
+        "This model appears in quality inspection, finite-population inference, and classical urn-problem probability.",
+      formulas: [
+        "PMF: P(X = k) = [C(K, k) * C(N-K, n-k)] / C(N, n)",
+        "Mean: n*(K/N)",
+        "Variance: n*(K/N)*(1-K/N)*((N-n)/(N-1))"
+      ],
+      properties: [
+        "Finite-support discrete model",
+        "Captures dependence induced by sampling without replacement",
+        "Includes finite population correction in variance",
+        "Common in audit and acceptance sampling"
+      ]
+    },
+    chisquaredistribution: {
+      intro:
+        "The Chi-Square distribution arises as the sum of squared independent standard normal variables. It is fundamental in variance inference and goodness-of-fit testing.",
+      historical:
+        "Pearson's chi-square work made this family central to contingency-table analysis and model fit diagnostics.",
+      formulas: [
+        "If Z_i ~ N(0,1), then X = sum(Z_i^2) ~ ChiSquare(df)",
+        "Mean: df",
+        "Variance: 2*df"
+      ],
+      properties: [
+        "Continuous and right-skewed",
+        "Support on x >= 0",
+        "Skew decreases as df increases",
+        "Core distribution for many test statistics"
+      ]
+    },
+    fdistribution: {
+      intro:
+        "The F distribution is the ratio of two scaled independent chi-square variables and is widely used in ANOVA and variance-ratio testing.",
+      historical:
+        "Associated with Ronald Fisher's work, the F family became central in experimental design and linear-model significance testing.",
+      formulas: [
+        "F = (U/df1) / (V/df2), with U and V independent chi-square variables",
+        "Mean exists for df2 > 2: df2/(df2 - 2)",
+        "Variance exists for df2 > 4"
+      ],
+      properties: [
+        "Continuous with support x > 0",
+        "Shape controlled by both df1 and df2",
+        "Right-tailed and often asymmetric",
+        "Used for model and variance comparisons"
+      ]
+    },
+    tdistribution: {
+      intro:
+        "The Student's t distribution models standardized means when population variance is unknown and sample size is limited.",
+      historical:
+        "Published by William Sealy Gosset ('Student') in 1908, t methods are a cornerstone of small-sample inference.",
+      formulas: [
+        "t = (Xbar - mu) / (S/sqrt(n))",
+        "Mean is 0 for df > 1",
+        "Variance is df/(df-2) for df > 2"
+      ],
+      properties: [
+        "Symmetric about zero",
+        "Heavier tails than Normal",
+        "Converges to Normal as df increases",
+        "Used for means, slopes, and confidence intervals"
+      ]
+    },
+    lognormaldistribution: {
+      intro:
+        "A variable is log-normal when its logarithm is normally distributed. It models positive quantities produced by multiplicative effects.",
+      historical:
+        "Log-normal behavior appears in economics, biology, and reliability where proportional growth and multiplicative shocks dominate.",
+      formulas: [
+        "If ln(X) ~ Normal(mu, sigma^2), then X is Log-Normal",
+        "Median: exp(mu)",
+        "Mean: exp(mu + sigma^2/2)"
+      ],
+      properties: [
+        "Strictly positive support",
+        "Strong right skew",
+        "Mean exceeds median due to tail weight",
+        "Useful for size, duration, and income-type variables"
+      ]
+    },
+    weibulldistribution: {
+      intro:
+        "The Weibull distribution is a flexible lifetime model where shape parameter k controls failure-rate behavior over time.",
+      historical:
+        "Popularized in reliability engineering, Weibull analysis is standard for durability testing and maintenance planning.",
+      formulas: [
+        "CDF: F(x) = 1 - exp(-(x/lambda)^k), x >= 0",
+        "PDF: f(x) = (k/lambda)*(x/lambda)^(k-1)*exp(-(x/lambda)^k)",
+        "Hazard rises for k>1, constant for k=1, declines for k<1"
+      ],
+      properties: [
+        "Continuous support on x >= 0",
+        "Can mimic several lifetime patterns",
+        "Includes Exponential as special case (k=1)",
+        "Common in reliability and survival modeling"
+      ]
+    },
+    betadistribution: {
+      intro:
+        "The Beta distribution models random variables bounded in [0,1], making it ideal for probabilities, rates, and proportions.",
+      historical:
+        "The family became central in Bayesian modeling as a conjugate prior for Bernoulli/binomial probabilities.",
+      formulas: [
+        "PDF: f(x) proportional to x^(alpha-1) * (1-x)^(beta-1), 0<=x<=1",
+        "Mean: alpha/(alpha+beta)",
+        "Variance: alpha*beta / [(alpha+beta)^2*(alpha+beta+1)]"
+      ],
+      properties: [
+        "Flexible bounded shapes (U, bell, skewed)",
+        "Controlled by alpha and beta",
+        "Naturally represents uncertainty on probabilities",
+        "Supports Bayesian updating workflows"
+      ]
+    }
+  };
+
   function $(id) {
     return document.getElementById(id);
   }
@@ -949,9 +1139,10 @@
       .replaceAll("'", "&#39;");
   }
 
-  function buildAutoAboutSections(cfg) {
+  function buildAutoAboutSections(cfg, distKey) {
     const title = String(cfg.title || "Distribution").replace(/\s*Calculator\s*$/i, "");
     const overview = cfg.about && cfg.about.startsWith("About ") ? cfg.about : `About ${title}`;
+    const detail = DISTRIBUTION_HELP_DETAILS[distKey] || {};
     const paramsList = (cfg.params || [])
       .map((p) => `<li><strong>${escapeHtml(p.label || p.id)}</strong> - ${escapeHtml(p.sub || "Parameter input")}</li>`)
       .join("");
@@ -983,11 +1174,24 @@
     const appCards = applications
       .map((a) => `<div class="application-item"><h4><i class="fas ${a.icon}"></i> ${escapeHtml(a.title)}</h4><p>${escapeHtml(a.desc)}</p></div>`)
       .join("");
+    const formulasList = (detail.formulas || [])
+      .map((line) => `• ${escapeHtml(line)}`)
+      .join("<br>");
+    const propertiesList = (detail.properties || [])
+      .map((line) => `<li>${escapeHtml(line)}</li>`)
+      .join("");
 
     return `
       <div class="about-section">
         <h3><i class="fas fa-info-circle"></i> ${escapeHtml(overview)}</h3>
-        <p>Use this calculator to evaluate probabilities, cumulative values, and quantiles for the ${escapeHtml(title)}.</p>
+        <p>${escapeHtml(detail.intro || `Use this calculator to evaluate probabilities, cumulative values, and quantiles for the ${title}.`)}</p>
+      </div>
+      <div class="about-section">
+        <h3><i class="fas fa-calculator"></i> Mathematical Form</h3>
+        <div class="formula-box">
+          <div class="formula-title">Key Formulas</div>
+          ${formulasList || "• Distribution-specific formulas are computed by the shared runtime."}
+        </div>
       </div>
       <div class="about-section">
         <h3><i class="fas fa-sliders-h"></i> Parameter Inputs</h3>
@@ -999,7 +1203,11 @@
       </div>
       <div class="about-section">
         <h3><i class="fas fa-history"></i> Historical Context</h3>
-        <p>The ${escapeHtml(title)} is part of the core probability toolbox used in classical and modern statistical modeling. It is frequently taught as a foundational distribution because of its analytical tractability and practical relevance.</p>
+        <p>${escapeHtml(detail.historical || `The ${title} is part of the core probability toolbox used in classical and modern statistical modeling.`)}</p>
+      </div>
+      <div class="about-section">
+        <h3><i class="fas fa-cogs"></i> Key Properties</h3>
+        <ul>${propertiesList || "<li>Shape, support, and tail behavior depend on the configured parameters.</li>"}</ul>
       </div>
       <div class="about-section">
         <h3><i class="fas fa-chart-bar"></i> Summary Statistics</h3>
@@ -1055,6 +1263,7 @@
   function enhanceAboutModalContent(cfg) {
     const modal = $("aboutModal");
     const body = getAboutModalBody(modal);
+    const distKey = detectDistribution();
     if (!modal || !body) return;
     const raw = body.textContent || "";
     const hasPlaceholder =
@@ -1062,7 +1271,7 @@
       raw.includes("shared distribution template shell") ||
       body.querySelectorAll(".about-section").length <= 1;
     if (!hasPlaceholder) return;
-    body.innerHTML = buildAutoAboutSections(cfg);
+    body.innerHTML = buildAutoAboutSections(cfg, distKey);
   }
 
   function parseFiniteOr(value, fallback) {

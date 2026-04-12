@@ -98,6 +98,88 @@ const HUB_CATEGORY_TILES = [
     ]
   }
 ];
+const CALCULATOR_CATEGORY_TILES = [
+  {
+    id: "distribution-tools",
+    title: "Distribution calculators",
+    icon: "fa-chart-area",
+    color: "#2563eb",
+    colorDark: "#1d4ed8",
+    subtitle: "Probability, quantiles, and tails for common distributions",
+    modules: [
+      {
+        id: "calc-distribution-hub",
+        label: "Distribution Hub",
+        tip: "Open the distribution family hub in a dialog.",
+        dialogUrl: "https://statistico.live/statistico-calculators/0Distribution_Calculators/index-distribution.html"
+      },
+      {
+        id: "calc-normal",
+        label: "Normal",
+        tip: "Normal distribution tail and quantile calculator.",
+        dialogUrl: "https://statistico.live/statistico-calculators/0Distribution_Calculators/statistical-distributions/Normal.html"
+      }
+    ]
+  },
+  {
+    id: "sample-planning",
+    title: "Sample planning",
+    icon: "fa-ruler-combined",
+    color: "#0ea5e9",
+    colorDark: "#0369a1",
+    subtitle: "Precision and power oriented sample size tools",
+    modules: [
+      {
+        id: "calc-precision",
+        label: "Precision",
+        tip: "Estimate sample size by target precision.",
+        dialogUrl: "https://statistico.live/statistico-calculators/Precision-Based%20-Sample/PrecisionSampleCalculator.html"
+      },
+      {
+        id: "calc-power",
+        label: "Power",
+        tip: "Power-based sample size calculator.",
+        dialogUrl: "https://statistico.live/statistico-calculators/power-sample-size-calculator/index-calculator.html"
+      }
+    ]
+  }
+];
+const APPLICATION_CATEGORY_TILES = [
+  {
+    id: "application-clusters",
+    title: "Applications",
+    icon: "fa-grid-2",
+    color: "#64748b",
+    colorDark: "#334155",
+    subtitle: "Cross-workflow apps that will expand beyond analytics and calculators",
+    modules: [
+      { id: "app-reports", label: "Reports", tip: "Coming soon: reporting workspace.", comingSoon: true },
+      { id: "app-automation", label: "Automation", tip: "Coming soon: automation workspace.", comingSoon: true },
+      { id: "app-insights", label: "Insights", tip: "Coming soon: insights workspace.", comingSoon: true }
+    ]
+  }
+];
+const HUB_CLUSTER_TILES = {
+  analytics: HUB_CATEGORY_TILES,
+  calculators: CALCULATOR_CATEGORY_TILES,
+  applications: APPLICATION_CATEGORY_TILES
+};
+const HUB_CLUSTER_META = {
+  analytics: {
+    name: "Statistico Interactive",
+    tagline: "Analytics, calculators, and applications ecosystem"
+  },
+  calculators: {
+    name: "Statistico Interactive",
+    tagline: "Calculator families for planning and estimation"
+  },
+  applications: {
+    name: "Statistico Interactive",
+    tagline: "Application clusters for future workflows"
+  }
+};
+let ACTIVE_CLUSTER = "analytics";
+let HUB_ACTIONS = {};
 
 /** Ensures Cluster appears even if a cached or older modules.config.json omits it (inserted after PCA). */
 var CLUSTER_MODULE_CARD = {
@@ -154,8 +236,10 @@ function renderCategoryTiles(query) {
   var holder = document.getElementById("categoryTiles");
   var noResults = document.getElementById("noResults");
   if (!holder) return;
+  HUB_ACTIONS = {};
+  var source = HUB_CLUSTER_TILES[ACTIVE_CLUSTER] || [];
   var q = (query || "").trim().toLowerCase();
-  var list = HUB_CATEGORY_TILES.filter(function (c) {
+  var list = source.filter(function (c) {
     var mods = getCategoryModules(c);
     if (!q) return true;
     if (c.title.toLowerCase().indexOf(q) >= 0) return true;
@@ -172,7 +256,7 @@ function renderCategoryTiles(query) {
       '<div class="category-title">' + escapeHtml(c.title) + "</div>" +
       "</div>" +
       '<div class="category-subtitle">' + escapeHtml(c.subtitle) + "</div>" +
-      renderCategoryGroups(c) +
+      renderCategoryGroups(c, ACTIVE_CLUSTER + ":" + c.id) +
       "</div>"
     );
   }).join("");
@@ -189,7 +273,7 @@ function getCategoryModules(category) {
   return [];
 }
 
-function renderCategoryGroups(category) {
+function renderCategoryGroups(category, scopePrefix) {
   var tabStyle = category.tabStyle === "soft" ? "soft" : "pill";
   if (Array.isArray(category.subgroups) && category.subgroups.length) {
     return category.subgroups.map(function (g, idx) {
@@ -197,18 +281,20 @@ function renderCategoryGroups(category) {
         '<div class="category-subgroup' + (idx > 0 ? " with-divider" : "") + '">' +
         '<div class="category-subgroup-label">' + escapeHtml(g.label || "") + "</div>" +
         '<div class="category-modules">' +
-        ((g.modules || []).map(function (m) { return renderCategoryModuleBtn(m, tabStyle); }).join("")) +
+        ((g.modules || []).map(function (m) { return renderCategoryModuleBtn(m, tabStyle, scopePrefix); }).join("")) +
         "</div></div>"
       );
     }).join("");
   }
-  return '<div class="category-modules">' + getCategoryModules(category).map(function (m) { return renderCategoryModuleBtn(m, tabStyle); }).join("") + "</div>";
+  return '<div class="category-modules">' + getCategoryModules(category).map(function (m) { return renderCategoryModuleBtn(m, tabStyle, scopePrefix); }).join("") + "</div>";
 }
 
-function renderCategoryModuleBtn(m, tabStyle) {
+function renderCategoryModuleBtn(m, tabStyle, scopePrefix) {
   var tip = m.tip || m.label;
   var styleClass = tabStyle === "soft" ? " category-module-btn--soft" : "";
-  return '<button class="category-module-btn' + styleClass + '" data-module-id="' + escapeHtml(m.id) + '" data-tip="' + escapeHtml(tip) + '" title="' + escapeHtml(tip) + '" onclick="navigateToModule(\'' + escapeHtml(m.id) + '\')">' + escapeHtml(m.label) + "</button>";
+  var actionKey = (String(scopePrefix || "scope") + ":" + String(m.id || "item")).replace(/[^a-zA-Z0-9:_-]/g, "-");
+  HUB_ACTIONS[actionKey] = m;
+  return '<button class="category-module-btn' + styleClass + '" data-module-id="' + escapeHtml(m.id) + '" data-tip="' + escapeHtml(tip) + '" title="' + escapeHtml(tip) + '" onclick="runHubModuleAction(\'' + escapeHtml(actionKey) + '\')">' + escapeHtml(m.label) + "</button>";
 }
 
 var GROUP_COLORS = {
@@ -294,6 +380,63 @@ document.addEventListener("click", function(e) {
 
 function filterModules(q) {
   renderCategoryTiles(q || "");
+}
+
+function syncClusterHeader() {
+  var meta = HUB_CLUSTER_META[ACTIVE_CLUSTER] || HUB_CLUSTER_META.analytics;
+  var nameEl = document.getElementById("hubBrandName");
+  var tagEl = document.getElementById("hubBrandTagline");
+  if (nameEl) nameEl.textContent = meta.name;
+  if (tagEl) tagEl.textContent = meta.tagline;
+  document.querySelectorAll(".hub-nav-tab[data-cluster]").forEach(function (btn) {
+    var active = btn.getAttribute("data-cluster") === ACTIVE_CLUSTER;
+    btn.classList.toggle("active", active);
+    if (active) btn.setAttribute("aria-current", "page");
+    else btn.removeAttribute("aria-current");
+  });
+  var range = document.getElementById("hubRangeSection");
+  var advisor = document.getElementById("advisorStrip");
+  var showAnalyticsOnly = ACTIVE_CLUSTER === "analytics";
+  if (range) range.style.display = showAnalyticsOnly ? "" : "none";
+  if (advisor) advisor.style.display = showAnalyticsOnly ? "" : "none";
+}
+
+function setHubCluster(clusterId) {
+  if (!HUB_CLUSTER_TILES[clusterId]) return;
+  ACTIVE_CLUSTER = clusterId;
+  syncClusterHeader();
+  closePopup();
+  filterModules("");
+}
+
+function openExternalDialogUrl(url, options) {
+  if (!url) return;
+  var dialogUrl = String(url);
+  dialogUrl += (dialogUrl.indexOf("?") >= 0 ? "&" : "?") + "fromHub=1&cb=" + Date.now();
+  var opts = options || { height: 90, width: 70, displayInIframe: false };
+  if (!Office || !Office.context || !Office.context.ui || typeof Office.context.ui.displayDialogAsync !== "function") {
+    window.open(dialogUrl, "_blank");
+    return;
+  }
+  Office.context.ui.displayDialogAsync(dialogUrl, opts, function (res) {
+    if (res.status === Office.AsyncResultStatus.Failed) {
+      console.error("Failed to open external dialog:", res.error && res.error.message);
+    }
+  });
+}
+
+function runHubModuleAction(actionKey) {
+  var module = HUB_ACTIONS[actionKey];
+  if (!module) return;
+  if (module.comingSoon) {
+    window.alert((module.label || "This module") + " is coming soon.");
+    return;
+  }
+  if (module.dialogUrl) {
+    openExternalDialogUrl(module.dialogUrl, module.dialogOptions);
+    return;
+  }
+  navigateToModule(module.id);
 }
 
 function getDialogsBaseUrl() {
@@ -1088,19 +1231,21 @@ function showError(msg) {
 window.navigateToModule = navigateToModule;
 window.filterModules = filterModules;
 window.showAdvisor = showAdvisor;
+window.setHubCluster = setHubCluster;
+window.runHubModuleAction = runHubModuleAction;
 
 Office.onReady(function(info) {
   if (info.host !== Office.HostType.Excel) {
     showError("This add-in is designed for Excel only.");
     return;
   }
+  syncClusterHeader();
+  renderCategoryTiles("");
   loadModulesConfig()
     .then(function(list) {
       MODULES = ensureClusterModule(list);
-      renderCategoryTiles("");
     })
     .catch(function(err) {
       console.error("Hub config load failed:", err);
-      showError("Could not load modules.config.json. Check the task pane URL and network.");
     });
 });

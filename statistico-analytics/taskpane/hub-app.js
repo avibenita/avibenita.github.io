@@ -209,7 +209,7 @@ const HUB_CLUSTER_TILES = {
 const HUB_CLUSTER_META = {
   analytics: {
     eyebrow: "Statistico flagship",
-    name: "Statistico\u2122 -Interactive",
+    name: "Interactive Analytics",
     tagline: "Core statistical modeling, comparisons, and discovery tools",
     color: "#22c55e",
     colorDark: "#15803d",
@@ -219,7 +219,7 @@ const HUB_CLUSTER_META = {
   },
   calculators: {
     eyebrow: "Statistico flagship",
-    name: "Statistico\u2122 -Interactive",
+    name: "Interactive Calculators",
     tagline: "Purpose-built families for probability, planning, and conversion",
     color: "#f4b183",
     colorDark: "#8a4f1c",
@@ -229,7 +229,7 @@ const HUB_CLUSTER_META = {
   },
   applications: {
     eyebrow: "Statistico flagship",
-    name: "Statistico\u2122 -Interactive",
+    name: "Interactive Applications",
     tagline: "Workflow-ready product clusters for operational use cases",
     color: "#c7b6ff",
     colorDark: "#4b3a86",
@@ -455,7 +455,7 @@ function syncClusterHeader() {
   document.documentElement.style.setProperty("--hub-brand-from", meta.brandFrom || meta.color || "#f97316");
   document.documentElement.style.setProperty("--hub-brand-to", meta.brandTo || meta.colorDark || meta.color || "#ea580c");
   if (eyebrowEl) eyebrowEl.textContent = meta.eyebrow || "Statistico flagship";
-  if (nameEl) nameEl.textContent = meta.name || "Statistico\u2122 -Interactive";
+  if (nameEl) nameEl.textContent = meta.name || "Interactive Analytics";
   if (tagEl) tagEl.textContent = meta.tagline;
   if (iconEl) iconEl.className = "fa-solid " + (meta.icon || "fa-chart-line");
   document.querySelectorAll(".hub-nav-tab[data-cluster]").forEach(function (btn) {

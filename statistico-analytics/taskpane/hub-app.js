@@ -209,24 +209,33 @@ const HUB_CLUSTER_TILES = {
 const HUB_CLUSTER_META = {
   analytics: {
     eyebrow: "Statistico flagship",
-    name: "Interactive Analytics",
+    name: "Statistico\u2122 -Interactive",
     tagline: "Core statistical modeling, comparisons, and discovery tools",
     color: "#22c55e",
-    colorDark: "#15803d"
+    colorDark: "#15803d",
+    icon: "fa-chart-line",
+    brandFrom: "#22c55e",
+    brandTo: "#15803d"
   },
   calculators: {
     eyebrow: "Statistico flagship",
-    name: "Interactive Calculators",
+    name: "Statistico\u2122 -Interactive",
     tagline: "Purpose-built families for probability, planning, and conversion",
     color: "#f4b183",
-    colorDark: "#8a4f1c"
+    colorDark: "#8a4f1c",
+    icon: "fa-calculator",
+    brandFrom: "#f4b183",
+    brandTo: "#c97a32"
   },
   applications: {
     eyebrow: "Statistico flagship",
-    name: "Interactive Applications",
+    name: "Statistico\u2122 -Interactive",
     tagline: "Workflow-ready product clusters for operational use cases",
     color: "#c7b6ff",
-    colorDark: "#4b3a86"
+    colorDark: "#4b3a86",
+    icon: "fa-layer-group",
+    brandFrom: "#c7b6ff",
+    brandTo: "#7d6bc7"
   }
 };
 let ACTIVE_CLUSTER = "analytics";
@@ -441,10 +450,14 @@ function syncClusterHeader() {
   var eyebrowEl = document.getElementById("hubBrandEyebrow");
   var nameEl = document.getElementById("hubBrandName");
   var tagEl = document.getElementById("hubBrandTagline");
+  var iconEl = document.querySelector(".hub-brand-icon i");
   document.documentElement.style.setProperty("--hub-brand-color", meta.colorDark || meta.color || "#f97316");
+  document.documentElement.style.setProperty("--hub-brand-from", meta.brandFrom || meta.color || "#f97316");
+  document.documentElement.style.setProperty("--hub-brand-to", meta.brandTo || meta.colorDark || meta.color || "#ea580c");
   if (eyebrowEl) eyebrowEl.textContent = meta.eyebrow || "Statistico flagship";
-  if (nameEl) nameEl.textContent = meta.name;
+  if (nameEl) nameEl.textContent = meta.name || "Statistico\u2122 -Interactive";
   if (tagEl) tagEl.textContent = meta.tagline;
+  if (iconEl) iconEl.className = "fa-solid " + (meta.icon || "fa-chart-line");
   document.querySelectorAll(".hub-nav-tab[data-cluster]").forEach(function (btn) {
     var active = btn.getAttribute("data-cluster") === ACTIVE_CLUSTER;
     btn.classList.toggle("active", active);

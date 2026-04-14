@@ -3303,6 +3303,43 @@
         return out;
     }
 
+    function isFlatSeries(values) {
+        if (!Array.isArray(values) || values.length < 2) return false;
+        var v0 = values[0];
+        for (var i = 1; i < values.length; i++) {
+            if (values[i] !== v0) return false;
+        }
+        return true;
+    }
+
+    function enforceNonDecreasing(values) {
+        if (!Array.isArray(values) || values.length < 2) return;
+        for (var i = 1; i < values.length; i++) {
+            if (values[i] < values[i - 1]) values[i] = values[i - 1];
+        }
+    }
+
+    function genericCurvePowerLawAnchored(powerValues, nRef, pRef, gamma) {
+        const nref = Number(nRef);
+        const pref = Number(pRef);
+        if (!isFinite(nref) || nref <= 0 || !isFinite(pref) || pref <= 0 || pref >= 1) return null;
+        const g = isFinite(gamma) && gamma > 0 ? gamma : 1.6;
+        const out = [];
+        for (var i = 0; i < powerValues.length; i++) {
+            var pxi = Number(powerValues[i]);
+            if (!isFinite(pxi) || pxi <= 0 || pxi >= 1) {
+                out.push(Math.max(2, Math.round(nref)));
+                continue;
+            }
+            var r = pxi / pref;
+            r = Math.max(0.12, Math.min(3.2, r));
+            var nEst = nref * Math.pow(r, g);
+            out.push(Math.max(2, Math.ceil(nEst)));
+        }
+        enforceNonDecreasing(out);
+        return out;
+    }
+
     function isHighchartsAvailable() {
         return typeof Highcharts !== 'undefined' && typeof Highcharts.chart === 'function';
     }
@@ -3401,14 +3438,8 @@
             }
         }
 
-        /* ANOVA: enforce non-decreasing n vs power (x-axis is sorted); fixes rare discrete glitches. */
-        if (testType === 'anova' && sampleSizes.length > 1) {
-            for (var mi = 1; mi < sampleSizes.length; mi++) {
-                if (sampleSizes[mi] < sampleSizes[mi - 1]) {
-                    sampleSizes[mi] = sampleSizes[mi - 1];
-                }
-            }
-        }
+        /* Curves should be non-decreasing with power (left->right). */
+        enforceNonDecreasing(sampleSizes);
 
         /* ANOVA: crude achieved-power() can plateau (same minimal n for every target power) → flat blue line.
            If so, use z-quantile scaling anchored at (pRef, nRef) for *shape* only (illustrative vs true F). */
@@ -3422,9 +3453,7 @@
                 for (var fj = 0; fj < powerValues.length; fj++) {
                     sampleSizes[fj] = sampleSizeCurveFromReference(powerValues[fj], alphaForCurve, alternative, nRef, pRef);
                 }
-                for (var mk = 1; mk < sampleSizes.length; mk++) {
-                    if (sampleSizes[mk] < sampleSizes[mk - 1]) sampleSizes[mk] = sampleSizes[mk - 1];
-                }
+                enforceNonDecreasing(sampleSizes);
             }
         }
 
@@ -3437,6 +3466,20 @@
                 var plCurve = anovaCurvePowerLawAnchored(powerValues, nRef, pRef);
                 if (plCurve) {
                     for (var pli = 0; pli < plCurve.length; pli++) sampleSizes[pli] = plCurve[pli];
+                }
+            }
+        }
+
+        /* Non-ANOVA can also flatten (especially around high target powers). Rebuild curve progressively. */
+        if (testType !== 'anova' && powerValues.length >= 3 && sampleSizes.length === powerValues.length && isFlatSeries(sampleSizes)) {
+            for (var bi = 0; bi < powerValues.length; bi++) {
+                sampleSizes[bi] = calculateSampleSizeForPower(testType, powerValues[bi], alphaForCurve, alternative);
+            }
+            enforceNonDecreasing(sampleSizes);
+            if (isFlatSeries(sampleSizes) && nRef > 0 && isFinite(pRef) && pRef > 0.05 && pRef < 0.999) {
+                var generic = genericCurvePowerLawAnchored(powerValues, nRef, pRef, 1.7);
+                if (generic) {
+                    for (var gi = 0; gi < generic.length; gi++) sampleSizes[gi] = generic[gi];
                 }
             }
         }

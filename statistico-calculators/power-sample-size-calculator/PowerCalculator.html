@@ -921,6 +921,23 @@
             font-size: 11px;
         }
 
+        .info-dot {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            margin-left: 5px;
+            border-radius: 50%;
+            font-size: 9px;
+            line-height: 1;
+            color: rgba(226, 232, 240, 0.88);
+            background: rgba(148, 163, 184, 0.18);
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            vertical-align: middle;
+            cursor: help;
+        }
+
         .power-unified-section--target {
             border-color: rgba(16, 185, 129, 0.25);
             background: linear-gradient(165deg, rgba(16, 185, 129, 0.09) 0%, rgba(255, 255, 255, 0.03) 60%, rgba(255, 255, 255, 0.02) 100%);
@@ -1045,6 +1062,31 @@
 
         .power-unified-section--design .test-params-section.active {
             display: block;
+        }
+
+        /* ANOVA often has one extra design line; compact mode prevents bottom clipping */
+        .app-shell.anova-compact .results-panel--study {
+            padding: 10px;
+            gap: 8px;
+        }
+        .app-shell.anova-compact .power-unified-section {
+            padding: 8px 8px 9px;
+            gap: 6px;
+        }
+        .app-shell.anova-compact .power-anova-effect-line {
+            margin-top: 5px;
+            padding: 6px 8px;
+            font-size: 10px;
+        }
+        .app-shell.anova-compact .results-panel--results {
+            gap: 8px;
+        }
+        .app-shell.anova-compact .chart-container {
+            min-height: 150px;
+        }
+        .app-shell.anova-compact #powerChart {
+            min-height: 150px;
+            height: 190px !important;
         }
 
         .power-field {
@@ -1783,6 +1825,12 @@
             background: rgba(29, 78, 216, 0.08);
         }
 
+        html.theme-embed-light .info-dot {
+            color: #1e293b;
+            background: rgba(148, 163, 184, 0.16);
+            border-color: rgba(100, 116, 139, 0.28);
+        }
+
         html.theme-embed-light .statistico-design-hint {
             background: rgba(37, 99, 235, 0.06);
             border-color: rgba(37, 99, 235, 0.22);
@@ -2030,14 +2078,14 @@
                 <div class="power-topbar">
                     <div class="power-unified-grid">
                         <div class="power-unified-section power-unified-section--assumptions">
-                            <div class="power-group-title">1 - Alpha and hypothesis</div>
+                            <div class="power-group-title">1 - Alpha and hypothesis <span class="info-dot" title="Significance level and tail setting used by the power calculation.">i</span></div>
                             <div class="power-fields-inline">
                                 <div class="power-field compact editable">
                                     <label>α (alpha)</label>
                                     <input type="number" id="alpha" value="0.05" min="0.001" max="0.5" step="0.001">
                                 </div>
                                 <div class="power-field editable" id="alternativeFieldWrap">
-                                    <label id="alternativeLabel">Hypothesis</label>
+                                    <label id="alternativeLabel">Hypothesis <span class="info-dot" title="Two-sided checks any deviation; one-sided checks one direction only.">i</span></label>
                                     <select id="alternative">
                                         <option value="two-sided">Two-sided</option>
                                         <option value="one-sided">One-sided</option>
@@ -2046,17 +2094,17 @@
                             </div>
                         </div>
                         <div class="power-unified-section power-unified-section--target">
-                            <div class="power-group-title">2 - Target Power</div>
+                            <div class="power-group-title">2 - Target Power <span class="info-dot" title="Desired probability of detecting the effect when it truly exists.">i</span></div>
                             <div class="power-field compact editable">
                                     <label class="label-with-badge">
                                         <span class="label-main">Power (1−β)</span>
-                                        <span class="power-target-badge">Target to achieve</span>
+                                        <span class="power-target-badge" title="Main planning goal used to solve required sample size.">Target to achieve</span>
                                     </label>
                                     <input type="number" id="power" value="0.80" min="0.1" max="0.99" step="0.01">
                             </div>
                         </div>
                         <div class="power-unified-section power-unified-section--design">
-                            <div class="power-group-title">3 - Study Design</div>
+                            <div class="power-group-title">3 - Study Design <span class="info-dot" title="Effect size and design assumptions from your planned or observed study setup.">i</span></div>
                             <!-- ── One-Sample Mean params ── -->
                             <div id="test-one-sample-mean-params" class="test-params-section active">
                                 <div class="power-fields-inline">
@@ -2117,7 +2165,7 @@
                                         <input type="number" id="effectSizeF" value="0.25" min="0.01" step="0.01">
                                     </div>
                                     <div class="power-field compact" id="powerFieldStudyN">
-                                        <label>Total N <span class="field-actual-tag">actual / optional</span> <span class="lock-icon" title="Locked when opened from ANOVA"><i class="fas fa-lock"></i></span></label>
+                                        <label>Total N <span class="field-actual-tag">actual / optional</span> <span class="info-dot" title="Observed study size (optional). Required N is computed separately below.">i</span> <span class="lock-icon" title="Locked when opened from ANOVA"><i class="fas fa-lock"></i></span></label>
                                         <input type="number" id="studyTotalN" value="" min="1" step="1" placeholder="—" title="Actual total N observed in your study (from ANOVA when opened from Statistico)">
                                     </div>
                                 </div>
@@ -2466,6 +2514,8 @@
         el.classList.add('active');
 
         currentTestType = el.dataset.test;
+        var shell = document.querySelector('.app-shell');
+        if (shell) shell.classList.toggle('anova-compact', currentTestType === 'anova');
 
         // Show correct param panel in configuration strip
         document.querySelectorAll('.test-params-section').forEach(p => p.classList.remove('active'));
@@ -3370,7 +3420,7 @@
                 chart: {
                     backgroundColor: 'transparent',
                     style: { fontFamily: 'Segoe UI' },
-                    height: 260,
+                    height: Math.max(170, chartEl ? (chartEl.clientHeight || 0) : 0),
                     spacingBottom: 18,
                     marginBottom: 64
                 },

@@ -875,6 +875,11 @@
             max-width: 32rem;
         }
 
+        .power-run-btn.needs-recalc {
+            box-shadow: 0 0 0 2px rgba(255, 159, 67, 0.4), 0 8px 18px rgba(255, 159, 67, 0.25);
+            filter: saturate(1.05);
+        }
+
         .power-noncentral-note {
             display: none;
             font-size: 11px;
@@ -1197,6 +1202,13 @@
             display: none;
         }
 
+        .decision-kpi-strip {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
         .decision-strip i {
             font-size: 0.95rem;
             flex-shrink: 0;
@@ -1218,10 +1230,6 @@
             font-size: 15px;
             color: #4ade80;
             font-weight: 700;
-        }
-
-        html.theme-embed-light .decision-strip strong {
-            color: #047857;
         }
 
         /* ── RESULTS PANEL (3 horizontal sections) ─────────────────────────── */
@@ -2001,7 +2009,7 @@
             <!-- Decision strip -->
             <div id="decisionStrip" class="decision-strip hidden">
                 <i class="fas fa-check-circle"></i>
-                <span id="decisionText"></span>
+                <div id="decisionText" class="decision-kpi-strip"></div>
             </div>
 
             <!-- Study panel -->
@@ -2109,7 +2117,7 @@
                                         <input type="number" id="effectSizeF" value="0.25" min="0.01" step="0.01">
                                     </div>
                                     <div class="power-field compact" id="powerFieldStudyN">
-                                        <label>Total N <span class="field-actual-tag">actual</span> <span class="lock-icon" title="Locked when opened from ANOVA"><i class="fas fa-lock"></i></span></label>
+                                        <label>Total N <span class="field-actual-tag">actual / optional</span> <span class="lock-icon" title="Locked when opened from ANOVA"><i class="fas fa-lock"></i></span></label>
                                         <input type="number" id="studyTotalN" value="" min="1" step="1" placeholder="—" title="Actual total N observed in your study (from ANOVA when opened from Statistico)">
                                     </div>
                                 </div>
@@ -2189,7 +2197,7 @@
                         <div class="result-card-sub" id="cardEffectLabel">—</div>
                     </div>
                     <div class="result-card">
-                        <div class="result-card-label">Total N</div>
+                        <div class="result-card-label">Total N Required</div>
                         <div class="result-card-value" id="cardTotalN">—</div>
                         <div class="result-card-sub">all participants</div>
                     </div>
@@ -2228,6 +2236,8 @@
     let statisticoStudyDesignLocked = false;
     /** Opened inside Statistico (iframe); enables header + “back to ANOVA” affordances */
     let statisticoEmbedFromHost = false;
+    let resultsFresh = false;
+    let suppressDirtyState = false;
 
     function isEmbedLightTheme() {
         return document.documentElement.classList.contains('theme-embed-light');
@@ -2265,6 +2275,57 @@
         var note = document.getElementById('powerNonCentralNote');
         if (!note) return;
         note.classList.toggle('visible', isNonCentralApplicableTest(currentTestType));
+    }
+
+    function markResultsFresh() {
+        resultsFresh = true;
+        var btn = document.getElementById('calcBtn');
+        if (btn) btn.classList.remove('needs-recalc');
+    }
+
+    function markResultsStale(reason) {
+        if (suppressDirtyState) return;
+        var cards = document.getElementById('resultsCardsSection');
+        var chart = document.getElementById('powerChart');
+        var hasVisibleResults = !!(cards && !cards.classList.contains('hidden'));
+        var hasVisibleChart = !!(chart && chart.style.display !== 'none');
+        if (!hasVisibleResults && !hasVisibleChart && !resultsFresh) return;
+
+        resultsFresh = false;
+
+        var btn = document.getElementById('calcBtn');
+        if (btn) btn.classList.add('needs-recalc');
+
+        var strip = document.getElementById('decisionStrip');
+        var stripText = document.getElementById('decisionText');
+        if (strip && stripText) {
+            strip.classList.remove('hidden');
+            stripText.innerHTML =
+                '<span class="kpi-item"><span class="kpi-label">Specs changed</span><span class="kpi-value">Recalculate</span></span>' +
+                '<span class="kpi-item"><span class="kpi-label">Status</span><span class="kpi-value">Pending</span></span>';
+        }
+
+        var placeholder = document.getElementById('resultsPlaceholder');
+        if (cards) cards.classList.add('hidden');
+        if (placeholder) placeholder.classList.remove('hidden');
+        var chartPlaceholder = document.getElementById('chartPlaceholder');
+        if (chart) chart.style.display = 'none';
+        if (chartPlaceholder) chartPlaceholder.style.display = '';
+    }
+
+    function wireRecalculateOnSpecChange() {
+        var root = document.querySelector('.power-topbar');
+        if (!root || root.getAttribute('data-recalc-wired') === '1') return;
+        root.setAttribute('data-recalc-wired', '1');
+        function onSpecChanged(e) {
+            var t = e.target;
+            if (!t) return;
+            if (t.matches('input, select')) {
+                markResultsStale('spec-change');
+            }
+        }
+        root.addEventListener('input', onSpecChanged);
+        root.addEventListener('change', onSpecChanged);
     }
 
     function updateHeaderDescription() {
@@ -2434,6 +2495,7 @@
         applyStatisticoAnovaLock();
         updatePowerAnovaEffectLine();
         updateStatisticoHeaderSubtitle();
+        markResultsStale('test-change');
     }
 
     // ── Mathematical Functions ──────────────────────────────────────────
@@ -2658,6 +2720,7 @@
             hideLoadingSpinner();
             displayResults(result, testType, alpha, power);
             createPowerCurve(testType, result);
+            markResultsFresh();
 
         } catch (error) {
             const elapsed = Date.now() - startTime;
@@ -3030,7 +3093,7 @@
         document.getElementById('cardEffectSize').textContent = result.effectSize.toFixed(3);
         document.getElementById('cardEffectLabel').textContent = effectLabels[testType] || '';
         document.getElementById('cardActualPower').textContent = 
-            result.actualPower ? (result.actualPower * 100).toFixed(1) : '—';
+            result.actualPower ? (result.actualPower * 100).toFixed(1) + '%' : '—';
     }
 
     /** Avoid stacked Highcharts instances on repeated Calculate (stale / wrong series). */
@@ -3304,7 +3367,13 @@
                     title: { text: 'Required Sample Size', style: { color: cText } },
                     labels: { style: { color: cText } }, min: 0, gridLineColor: cGrid, lineColor: cGrid, gridLineWidth: 1
                 },
-                chart: { backgroundColor: 'transparent', style: { fontFamily: 'Segoe UI' }, height: 300 },
+                chart: {
+                    backgroundColor: 'transparent',
+                    style: { fontFamily: 'Segoe UI' },
+                    height: 260,
+                    spacingBottom: 18,
+                    marginBottom: 64
+                },
                 legend: { itemStyle: { color: cText, fontSize: '11px' } },
                 series: [
                     {
@@ -3554,6 +3623,7 @@
     // ── Init ──────────────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function() {
         wirePowerSpinControls();
+        wireRecalculateOnSpecChange();
         // Try to parse URL parameters first
         const hasParams = parseURLParams();
 

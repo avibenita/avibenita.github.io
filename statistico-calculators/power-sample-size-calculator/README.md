@@ -4,13 +4,13 @@
 
 | File | Role |
 |------|------|
-| **`index-calculator.html`** | Main calculator — **edit this** for UI/logic. |
+| **`PowerCalculator.html`** | Main calculator — **edit this** for UI/logic. |
 | **`index-formulas.html`** | Formula reference (module switcher links here). |
 | `calculator-helper.js` | Build URLs with pre-filled query params. |
-| `SampleSizeCalculator.html` / `SampleSizeFormulas.html` | Legacy entry names; redirect (https → canonical `/statistico-calculators/.../`, `file:` → same folder). |
+| `SampleSizeFormulas.html` | Legacy entry name (if present); this folder now uses `PowerCalculator.html` as the single calculator entry. |
 
 **Repo layout:** This folder is the calculator package under `statistico-calculators/`.
 
-**Live site (GitHub Pages):** **`/statistico-calculators/power-sample-size-calculator/index-calculator.html`** (and `index-formulas.html`). ANOVA and links use this path.
+**Live site (GitHub Pages):** **`/statistico-calculators/power-sample-size-calculator/PowerCalculator.html`** (and `index-formulas.html`).
 
-**Local preview:** serve the repo root (or open `index-calculator.html` from disk); no embed copy step.
+**Local preview:** serve the repo root (or open `PowerCalculator.html` from disk); no embed copy step.

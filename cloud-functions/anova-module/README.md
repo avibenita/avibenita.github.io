@@ -24,7 +24,7 @@ Use the [Functions Framework](https://github.com/GoogleCloudPlatform/functions-f
 3. **Point the calculator at localhost.** Serve the repo over HTTP (e.g. `python -m http.server 8000` from the repo root) and open:
 
    ```text
-   http://localhost:8000/statistico-calculators/power-sample-size-calculator/index-calculator.html?anovaApi=http%3A%2F%2F127.0.0.1%3A8080
+   http://localhost:8000/statistico-calculators/power-sample-size-calculator/PowerCalculator.html?anovaApi=http%3A%2F%2F127.0.0.1%3A8080
    ```
 
    (`anovaApi` is the base URL only; the page appends `?num_groups=…&effect_size_f=…` itself. For a local Functions Framework instance the base is `http://127.0.0.1:8080` with **no** `/anova-module` path.)

@@ -133,7 +133,7 @@ const CALCULATOR_CATEGORY_TILES = [
         id: "calc-power",
         label: "Power",
         tip: "Power-based sample size calculator.",
-        dialogUrl: "https://statistico.live/statistico-calculators/power-sample-size-calculator/index-calculator.html"
+        dialogUrl: "https://statistico.live/statistico-calculators/power-sample-size-calculator/PowerCalculator.html"
       }
     ]
   },

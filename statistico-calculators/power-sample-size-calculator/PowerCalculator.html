@@ -2392,7 +2392,7 @@
                             </div>
                             <!-- ── ANOVA params ── -->
                             <div id="test-anova-params" class="test-params-section">
-                                <div class="power-fields-inline three">
+                                <div class="power-fields-inline">
                                     <div class="power-field compact" id="powerFieldNumGroups">
                                         <label>Groups (k) <span class="lock-icon" title="Locked when opened from ANOVA"><i class="fas fa-lock"></i></span></label>
                                         <input type="number" id="numGroups" value="3" min="2" max="10" step="1">
@@ -2400,10 +2400,6 @@
                                     <div class="power-field compact" id="powerFieldEffectF">
                                         <label>Effect size <span class="lock-icon" title="Locked when opened from ANOVA"><i class="fas fa-lock"></i></span> <em>f</em></label>
                                         <input type="number" id="effectSizeF" value="0.25" min="0.01" step="0.01">
-                                    </div>
-                                    <div class="power-field compact" id="powerFieldStudyN">
-                                        <label>Total N <span class="lock-icon" title="Locked when opened from ANOVA"><i class="fas fa-lock"></i></span></label>
-                                        <input type="number" id="studyTotalN" value="" min="1" step="1" placeholder="—" title="Actual total N observed in your study (from ANOVA when opened from Statistico)">
                                     </div>
                                 </div>
                                 <div class="power-anova-effect-line" id="powerAnovaEffectLine" aria-live="polite"></div>
@@ -2793,24 +2789,21 @@
         if (!statisticoEmbedFromHost || currentTestType !== 'anova') return;
         var sub = document.getElementById('headerSubtitle');
         if (!sub) return;
-        var nEl = document.getElementById('studyTotalN');
-        var nRaw = nEl ? parseInt(String(nEl.value).replace(/\D/g, ''), 10) : NaN;
-        var nPart = (isFinite(nRaw) && nRaw > 0) ? ' · study (N=' + nRaw + ')' : '';
-        sub.textContent = 'ANOVA (one-way)' + nPart;
+        sub.textContent = 'ANOVA (one-way)';
     }
 
     /**
-     * Lock k, f, and observed total N when opened from Statistico ANOVA (source=statistico).
+     * Lock k and f when opened from Statistico ANOVA (source=statistico).
      * Statistical targets (α, power, hypothesis) stay editable.
      */
     function applyStatisticoAnovaLock() {
-        var ids = ['numGroups', 'effectSizeF', 'studyTotalN'];
+        var ids = ['numGroups', 'effectSizeF'];
         var hint = document.getElementById('statisticoDesignHint');
         var lock = statisticoStudyDesignLocked && currentTestType === 'anova';
         if (hint) {
             hint.classList.toggle('visible', lock);
         }
-        ['powerFieldNumGroups', 'powerFieldEffectF', 'powerFieldStudyN'].forEach(function(wid) {
+        ['powerFieldNumGroups', 'powerFieldEffectF'].forEach(function(wid) {
             var wrap = document.getElementById(wid);
             if (wrap) wrap.classList.toggle('locked', lock);
         });
@@ -4020,7 +4013,6 @@
             case 'anova':
                 const numGroupsEl = document.getElementById('numGroups');
                 const effectSizeFEl = document.getElementById('effectSizeF');
-                const studyTotalNEl = document.getElementById('studyTotalN');
                 if (numGroupsEl && (params.has('numGroups') || params.has('k'))) {
                     const k = params.get('numGroups') || params.get('k');
                     numGroupsEl.value = parseInt(k);
@@ -4030,11 +4022,6 @@
                     const f = params.get('effectSizeF') || params.get('f');
                     effectSizeFEl.value = parseFloat(f);
                     console.log('Set effectSizeF to:', f);
-                }
-                if (studyTotalNEl && (params.has('studyTotalN') || params.has('totalN'))) {
-                    const tN = params.get('studyTotalN') || params.get('totalN');
-                    const ntot = parseInt(tN, 10);
-                    studyTotalNEl.value = (isFinite(ntot) && ntot > 0) ? String(ntot) : '';
                 }
                 break;
             case 'regression':
@@ -4087,11 +4074,6 @@
         if (fAnova) {
             fAnova.addEventListener('input', updatePowerAnovaEffectLine);
             fAnova.addEventListener('change', updatePowerAnovaEffectLine);
-        }
-        var nStudy = document.getElementById('studyTotalN');
-        if (nStudy) {
-            nStudy.addEventListener('input', updateStatisticoHeaderSubtitle);
-            nStudy.addEventListener('change', updateStatisticoHeaderSubtitle);
         }
         var backAnova = document.getElementById('statisticoBackToAnova');
         if (backAnova) {

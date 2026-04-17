@@ -844,7 +844,8 @@ const FOOTER_TEMPLATE = `
       </div>
       <div class="footer-section">
         <h4>Resources</h4>
-        <a href="javascript:void(0)" id="footer-link-why">Why Statistico?</a>
+        <a href="javascript:void(0)" id="footer-link-why">Why Another Package?</a>
+        <a href="javascript:void(0)" id="footer-link-how">How It Works</a>
         <a href="#" onclick="alert('Coming soon!')">Video Demos</a>
       </div>
       <div class="footer-section">
@@ -951,10 +952,12 @@ const FOOTER_TEMPLATE = `
     const links = getNavLinks();
     const footerHomeLink = document.getElementById('footer-link-home');
     const footerWhyLink = document.getElementById('footer-link-why');
+    const footerHowLink = document.getElementById('footer-link-how');
     const footerAddinsLink = document.getElementById('footer-link-addins');
 
     if (footerHomeLink) footerHomeLink.href = links.home;
     if (footerWhyLink) footerWhyLink.href = links.why;
+    if (footerHowLink) footerHowLink.href = links.how;
     if (footerAddinsLink) footerAddinsLink.href = links.addins;
   }
 

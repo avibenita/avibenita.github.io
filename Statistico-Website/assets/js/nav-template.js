@@ -720,6 +720,54 @@ body {
   padding-top: 88px;
 }
 
+/* Shared footer styles for all pages */
+footer#contact {
+  background: var(--site-surface-1, #1a1f2e);
+  border-top: 1px solid rgba(255, 165, 120, 0.12);
+  color: var(--site-text-secondary, rgba(255,255,255,0.82));
+  padding: 48px 0 20px;
+  margin-top: 24px;
+}
+
+footer#contact .container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+footer#contact .footer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+footer#contact .footer-section h4 {
+  color: rgb(255,165,120);
+  margin: 0 0 10px;
+  letter-spacing: 0.2px;
+}
+
+footer#contact .footer-section a {
+  display: block;
+  color: var(--site-text-secondary, rgba(255,255,255,0.82));
+  margin: 6px 0;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+footer#contact .footer-section a:hover {
+  color: rgb(255,165,120);
+}
+
+footer#contact .footer-bottom {
+  border-top: 1px solid rgba(255, 165, 120, 0.12);
+  margin-top: 16px;
+  padding-top: 14px;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
 @media (max-width: 768px) {
   .theme-toggle {
     display: none;
@@ -828,6 +876,11 @@ body {
 
   body {
     padding-top: 74px;
+  }
+
+  footer#contact .footer-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
   }
 }
 `;

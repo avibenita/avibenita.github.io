@@ -855,7 +855,7 @@ const FOOTER_TEMPLATE = `
         <a href="#" onclick="alert('Coming soon!')">Terms & Conditions</a>
       </div>
     </div>
-    <div class="footer-bottom">© 2025 Statistico™ Interactive Suite. Revolutionizing statistical computing, one analysis at a time.</div>
+    <div class="footer-bottom">© 2026 Statistico™ Interactive Suite. Revolutionizing statistical computing, one analysis at a time.</div>
   </div>
 </footer>
 `;

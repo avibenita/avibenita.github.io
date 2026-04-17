@@ -85,8 +85,8 @@ const NAV_TEMPLATE = `
                 </svg>
               </span>
               <span class="nav-dropdown-text">
-                <span class="nav-dropdown-title">Add-ins</span>
-                <span class="nav-dropdown-desc">Excel-native extensions</span>
+                <span class="nav-dropdown-title">Applications</span>
+                <span class="nav-dropdown-desc">Workflow-ready applications</span>
               </span>
               <span class="nav-dropdown-arrow" aria-hidden="true">&#8594;</span>
             </a>
@@ -840,7 +840,7 @@ const FOOTER_TEMPLATE = `
         <h4>Products</h4>
         <a href="https://www.metrics-institute.net/statistical-calculators" target="_blank">Statistical Calculators Hub</a>
         <a href="javascript:void(0)" id="footer-link-home"><span class="goldish">Statistico‑Interactive™</span></a>
-        <a href="javascript:void(0)" id="footer-link-addins">Excel Add‑ins</a>
+        <a href="javascript:void(0)" id="footer-link-addins">Applications</a>
       </div>
       <div class="footer-section">
         <h4>Resources</h4>

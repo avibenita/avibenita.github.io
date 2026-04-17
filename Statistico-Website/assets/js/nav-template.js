@@ -95,7 +95,7 @@ const NAV_TEMPLATE = `
       </li>
       <li class="nav-item nav-item--after-products">
         <a href="javascript:void(0)" class="nav-link" data-page="support" id="link-support">
-          Support
+          Contact
         </a>
       </li>
     </ul>
@@ -845,24 +845,13 @@ const FOOTER_TEMPLATE = `
       <div class="footer-section">
         <h4>Resources</h4>
         <a href="javascript:void(0)" id="footer-link-why">Why Statistico?</a>
-        <a href="#" onclick="alert('Coming soon!')">Documentation</a>
         <a href="#" onclick="alert('Coming soon!')">Video Demos</a>
-        <a href="javascript:void(0)" id="footer-link-support">Support</a>
       </div>
       <div class="footer-section">
         <h4>Company</h4>
         <a href="#" onclick="alert('Coming soon!')">About Us</a>
-        <a href="#" onclick="alert('Coming soon!')">Our Mission</a>
         <a href="#" onclick="alert('Coming soon!')">Contact</a>
         <a href="#" onclick="alert('Coming soon!')">Terms & Conditions</a>
-      </div>
-      <div class="footer-section">
-        <h4>Connect</h4>
-        <a href="#" onclick="alert('Coming soon!')">LinkedIn</a>
-        <a href="#" onclick="alert('Coming soon!')">Twitter</a>
-        <a href="#" onclick="alert('Coming soon!')">YouTube</a>
-        <a href="#" onclick="alert('Coming soon!')">Research Blog</a>
-        <a href="#" onclick="alert('Coming soon!')">Newsletter</a>
       </div>
     </div>
     <div class="footer-bottom">© 2025 Statistico™ Interactive Suite. Revolutionizing statistical computing, one analysis at a time.</div>
@@ -963,12 +952,10 @@ const FOOTER_TEMPLATE = `
     const footerHomeLink = document.getElementById('footer-link-home');
     const footerWhyLink = document.getElementById('footer-link-why');
     const footerAddinsLink = document.getElementById('footer-link-addins');
-    const footerSupportLink = document.getElementById('footer-link-support');
-    
+
     if (footerHomeLink) footerHomeLink.href = links.home;
     if (footerWhyLink) footerWhyLink.href = links.why;
     if (footerAddinsLink) footerAddinsLink.href = links.addins;
-    if (footerSupportLink) footerSupportLink.href = links.support;
   }
 
   // Initialize navigation functionality

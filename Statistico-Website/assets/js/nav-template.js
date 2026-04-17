@@ -891,9 +891,9 @@ const FOOTER_TEMPLATE = `
     <div class="footer-grid">
       <div class="footer-section">
         <h4>Products</h4>
-        <a href="https://www.metrics-institute.net/statistical-calculators" target="_blank">Statistical Calculators Hub</a>
-        <a href="javascript:void(0)" id="footer-link-home"><span class="goldish">Statistico‑Interactive™</span></a>
-        <a href="javascript:void(0)" id="footer-link-addins">Applications</a>
+        <a href="javascript:void(0)" id="footer-link-analytics">Statistico-Analytics-Hub™</a>
+        <a href="javascript:void(0)" id="footer-link-calculators">Statistico-Calculators-Hub™</a>
+        <a href="javascript:void(0)" id="footer-link-addins">Statistico-Applications-Hub™</a>
       </div>
       <div class="footer-section">
         <h4>Resources</h4>
@@ -1003,12 +1003,14 @@ const FOOTER_TEMPLATE = `
     
     // Wire up footer links
     const links = getNavLinks();
-    const footerHomeLink = document.getElementById('footer-link-home');
+    const footerAnalyticsLink = document.getElementById('footer-link-analytics');
+    const footerCalculatorsLink = document.getElementById('footer-link-calculators');
     const footerWhyLink = document.getElementById('footer-link-why');
     const footerHowLink = document.getElementById('footer-link-how');
     const footerAddinsLink = document.getElementById('footer-link-addins');
 
-    if (footerHomeLink) footerHomeLink.href = links.home;
+    if (footerAnalyticsLink) footerAnalyticsLink.href = links.analytics;
+    if (footerCalculatorsLink) footerCalculatorsLink.href = links.calculators;
     if (footerWhyLink) footerWhyLink.href = links.why;
     if (footerHowLink) footerHowLink.href = links.how;
     if (footerAddinsLink) footerAddinsLink.href = links.addins;

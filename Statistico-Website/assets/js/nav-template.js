@@ -12,8 +12,7 @@ function getNavLinks() {
     how: '/Statistico-Website/how-it-works.html',
     calculators: '/Statistico-Website/index-Calculators.html',
     analytics: '/Statistico-Website/index-Analytics.html',
-    addins: '/Statistico-Website/index-Addins.html',
-    support: '/Statistico-Website/Support/index.html'
+    addins: '/Statistico-Website/index-Addins.html'
   };
 }
 
@@ -96,8 +95,8 @@ const NAV_TEMPLATE = `
         </ul>
       </li>
       <li class="nav-item nav-item--after-products">
-        <a href="javascript:void(0)" class="nav-link" data-page="support" id="link-support">
-          Contact
+        <a href="javascript:void(0)" class="nav-link" data-page="about" id="link-about">
+          About Us
         </a>
       </li>
     </ul>
@@ -1039,7 +1038,7 @@ const FOOTER_TEMPLATE = `
     document.getElementById('link-calculators').href = links.calculators;
     document.getElementById('link-analytics').href = links.analytics;
     document.getElementById('link-addins').href = links.addins;
-    document.getElementById('link-support').href = links.support;
+    document.getElementById('link-about').href = links.about;
 
     // Products dropdown
     const productsItem = document.getElementById('nav-products-item');
@@ -1132,8 +1131,8 @@ const FOOTER_TEMPLATE = `
       activePage = 'analytics';
     } else if (currentFile === 'index-Addins.html') {
       activePage = 'addins';
-    } else if (currentPath.includes('Support')) {
-      activePage = 'support';
+    } else if (currentFile === 'about-us.html') {
+      activePage = 'about';
     }
     
     // Set active class

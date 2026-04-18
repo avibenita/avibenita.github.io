@@ -6,6 +6,7 @@
 function getNavLinks() {
   return {
     home: '/index.html',
+    about: '/Statistico-Website/about-us.html',
     why: '/Statistico-Website/why-another-package.html',
     how: '/Statistico-Website/how-it-works.html',
     calculators: '/Statistico-Website/index-Calculators.html',
@@ -903,7 +904,7 @@ const FOOTER_TEMPLATE = `
       </div>
       <div class="footer-section">
         <h4>Company</h4>
-        <a href="#" onclick="alert('Coming soon!')">About Us</a>
+        <a href="javascript:void(0)" id="footer-link-about">About Us</a>
         <a href="#" onclick="alert('Coming soon!')">Contact</a>
         <a href="#" onclick="alert('Coming soon!')">Terms & Conditions</a>
       </div>
@@ -1007,12 +1008,14 @@ const FOOTER_TEMPLATE = `
     const footerCalculatorsLink = document.getElementById('footer-link-calculators');
     const footerWhyLink = document.getElementById('footer-link-why');
     const footerHowLink = document.getElementById('footer-link-how');
+    const footerAboutLink = document.getElementById('footer-link-about');
     const footerAddinsLink = document.getElementById('footer-link-addins');
 
     if (footerAnalyticsLink) footerAnalyticsLink.href = links.analytics;
     if (footerCalculatorsLink) footerCalculatorsLink.href = links.calculators;
     if (footerWhyLink) footerWhyLink.href = links.why;
     if (footerHowLink) footerHowLink.href = links.how;
+    if (footerAboutLink) footerAboutLink.href = links.about;
     if (footerAddinsLink) footerAddinsLink.href = links.addins;
   }
 

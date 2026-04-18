@@ -173,6 +173,55 @@
       font-weight: 700;
     }
 
+    .hiw-inpage-nav-wrap {
+      position: sticky;
+      top: 86px;
+      z-index: 950;
+      padding: 10px 0 12px;
+      background: linear-gradient(180deg, rgba(4,12,26,.96), rgba(4,12,26,.86));
+      border-bottom: 1px solid rgba(120,200,255,.14);
+      backdrop-filter: blur(6px);
+    }
+
+    .hiw-inpage-nav {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 2px 0;
+      scrollbar-width: thin;
+    }
+
+    .hiw-inpage-nav a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 9px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(120,200,255,.2);
+      background: rgba(120,200,255,.06);
+      color: rgba(218,231,247,.92);
+      font-size: .82rem;
+      font-weight: 700;
+      white-space: nowrap;
+      transition: all .2s ease;
+    }
+
+    .hiw-inpage-nav a:hover {
+      background: rgba(120,200,255,.12);
+      color: rgba(244,250,255,.98);
+    }
+
+    .hiw-inpage-nav a.is-active {
+      background: linear-gradient(135deg, rgba(255,165,120,.28), rgba(120,200,255,.24));
+      border-color: rgba(255,165,120,.4);
+      color: rgba(255,240,225,.98);
+      box-shadow: 0 6px 16px rgba(0,0,0,.22);
+    }
+
+    .hiw-anchor-target {
+      scroll-margin-top: 160px;
+    }
+
     /* ── Animated 3-box flow diagram ── */
     .hiw-diagram-section {
       padding: 24px 0 72px;
@@ -893,6 +942,7 @@
 
     /* ── Responsive ── */
     @media (max-width: 900px) {
+      .hiw-inpage-nav-wrap { top: 74px; }
       .hiw-diagram { flex-direction: column; align-items: center; }
       .hiw-arrow {
         flex: 0 0 3px; width: 3px; height: 52px;
@@ -950,8 +1000,20 @@
       </div>
     </section>
 
+    <div class="hiw-inpage-nav-wrap" aria-label="On this page navigation">
+      <div class="container">
+        <nav class="hiw-inpage-nav" id="hiw-inpage-nav">
+          <a href="#hiw-install">Getting Started</a>
+          <a href="#hiw-flow">Flow</a>
+          <a href="#hiw-architecture">Under the Hood</a>
+          <a href="#hiw-security">Security</a>
+          <a href="#hiw-summary">Summary</a>
+        </nav>
+      </div>
+    </div>
+
     <!-- Getting into Statistico -->
-    <section class="hiw-install-section">
+    <section id="hiw-install" class="hiw-install-section hiw-anchor-target">
       <div class="container">
         <h2>Getting into Statistico</h2>
         <p class="section-sub">
@@ -1016,7 +1078,7 @@
     </section>
 
     <!-- Animated flow diagram -->
-    <section class="hiw-diagram-section">
+    <section id="hiw-flow" class="hiw-diagram-section hiw-anchor-target">
       <div class="container">
         <p class="section-label">The flow</p>
         <div class="hiw-diagram">
@@ -1134,7 +1196,7 @@
     </div>
 
     <!-- Architecture -->
-    <section class="hiw-arch-section">
+    <section id="hiw-architecture" class="hiw-arch-section hiw-anchor-target">
       <div class="container">
         <h2>Under the hood</h2>
         <div class="hiw-arch-grid">
@@ -1168,7 +1230,7 @@
     </section>
 
     <!-- Security -->
-    <section class="hiw-security-section">
+    <section id="hiw-security" class="hiw-security-section hiw-anchor-target">
       <div class="container">
         <h2>Security &amp; privacy</h2>
         <p class="section-sub">
@@ -1248,7 +1310,7 @@
     </section>
 
     <!-- Closing -->
-    <section class="hiw-closing">
+    <section id="hiw-summary" class="hiw-closing hiw-anchor-target">
       <div class="container">
         <div class="hiw-closing-card">
           <p>
@@ -1267,6 +1329,44 @@
 
   <div id="footer-placeholder"></div>
   <script src="assets/js/nav-template.js?v=2026-04-17-unified"></script>
+  <script>
+    (() => {
+      const nav = document.getElementById("hiw-inpage-nav");
+      if (!nav) return;
+
+      const links = Array.from(nav.querySelectorAll("a"));
+      const sections = links
+        .map((link) => document.querySelector(link.getAttribute("href")))
+        .filter(Boolean);
+
+      const setActive = (id) => {
+        links.forEach((link) => {
+          const isActive = link.getAttribute("href") === `#${id}`;
+          link.classList.toggle("is-active", isActive);
+          if (isActive) link.setAttribute("aria-current", "page");
+          else link.removeAttribute("aria-current");
+        });
+      };
+
+      if (sections[0]) setActive(sections[0].id);
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const visible = entries
+            .filter((entry) => entry.isIntersecting)
+            .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+          if (visible[0]) setActive(visible[0].target.id);
+        },
+        {
+          root: null,
+          rootMargin: "-30% 0px -55% 0px",
+          threshold: [0.2, 0.4, 0.6]
+        }
+      );
+
+      sections.forEach((section) => observer.observe(section));
+    })();
+  </script>
   <script>
     (() => {
       const openBtn = document.getElementById("hiw-open-slideshow");

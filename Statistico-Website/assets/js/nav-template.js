@@ -7,6 +7,7 @@ function getNavLinks() {
   return {
     home: '/index.html',
     about: '/Statistico-Website/about-us.html',
+    terms: '/Statistico-Website/terms-and-conditions.html',
     why: '/Statistico-Website/why-another-package.html',
     how: '/Statistico-Website/how-it-works.html',
     calculators: '/Statistico-Website/index-Calculators.html',
@@ -906,7 +907,7 @@ const FOOTER_TEMPLATE = `
         <h4>Company</h4>
         <a href="javascript:void(0)" id="footer-link-about">About Us</a>
         <a href="#" onclick="alert('Coming soon!')">Contact</a>
-        <a href="#" onclick="alert('Coming soon!')">Terms & Conditions</a>
+        <a href="javascript:void(0)" id="footer-link-terms">Terms & Conditions</a>
       </div>
     </div>
     <div class="footer-bottom">© 2026 Statistico™ Interactive Suite. Revolutionizing statistical computing, one analysis at a time.</div>
@@ -1009,6 +1010,7 @@ const FOOTER_TEMPLATE = `
     const footerWhyLink = document.getElementById('footer-link-why');
     const footerHowLink = document.getElementById('footer-link-how');
     const footerAboutLink = document.getElementById('footer-link-about');
+    const footerTermsLink = document.getElementById('footer-link-terms');
     const footerAddinsLink = document.getElementById('footer-link-addins');
 
     if (footerAnalyticsLink) footerAnalyticsLink.href = links.analytics;
@@ -1016,6 +1018,7 @@ const FOOTER_TEMPLATE = `
     if (footerWhyLink) footerWhyLink.href = links.why;
     if (footerHowLink) footerHowLink.href = links.how;
     if (footerAboutLink) footerAboutLink.href = links.about;
+    if (footerTermsLink) footerTermsLink.href = links.terms;
     if (footerAddinsLink) footerAddinsLink.href = links.addins;
   }
 

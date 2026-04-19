@@ -201,12 +201,12 @@ const APPLICATION_CATEGORY_TILES = [
     ]
   }
 ];
-const HUB_CLUSTER_TILES = {
+let HUB_CLUSTER_TILES = {
   analytics: HUB_CATEGORY_TILES,
   calculators: CALCULATOR_CATEGORY_TILES,
   applications: APPLICATION_CATEGORY_TILES
 };
-const HUB_CLUSTER_META = {
+let HUB_CLUSTER_META = {
   analytics: {
     eyebrow: "Statistico flagship",
     name: "Interactive Analytics",
@@ -238,6 +238,8 @@ const HUB_CLUSTER_META = {
     brandTo: "#7d6bc7"
   }
 };
+let HUB_VISIBLE_CLUSTERS = ["analytics", "calculators", "applications"];
+let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics"];
 let ACTIVE_CLUSTER = "analytics";
 let HUB_ACTIONS = {};
 
@@ -445,6 +447,60 @@ function filterModules(q) {
   renderCategoryTiles(q || "");
 }
 
+function getHubScopeName() {
+  try {
+    var params = new URLSearchParams(window.location.search || "");
+    var scope = (params.get("scope") || "").trim();
+    return scope || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function applyHubScopeConfig(scopeCfg) {
+  if (!scopeCfg || typeof scopeCfg !== "object") return;
+  if (scopeCfg.clusterTiles && typeof scopeCfg.clusterTiles === "object") {
+    HUB_CLUSTER_TILES = scopeCfg.clusterTiles;
+  }
+  if (scopeCfg.clusterMeta && typeof scopeCfg.clusterMeta === "object") {
+    HUB_CLUSTER_META = scopeCfg.clusterMeta;
+  }
+  if (Array.isArray(scopeCfg.visibleClusters) && scopeCfg.visibleClusters.length) {
+    HUB_VISIBLE_CLUSTERS = scopeCfg.visibleClusters.slice();
+  } else {
+    HUB_VISIBLE_CLUSTERS = Object.keys(HUB_CLUSTER_TILES);
+  }
+  if (Array.isArray(scopeCfg.rangeVisibleClusters)) {
+    HUB_RANGE_VISIBLE_CLUSTERS = scopeCfg.rangeVisibleClusters.slice();
+  }
+  document.querySelectorAll(".hub-nav-tab[data-cluster]").forEach(function (btn) {
+    var clusterId = btn.getAttribute("data-cluster");
+    var visible = HUB_VISIBLE_CLUSTERS.indexOf(clusterId) >= 0;
+    btn.style.display = visible ? "" : "none";
+  });
+  if (HUB_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) < 0) {
+    ACTIVE_CLUSTER = HUB_VISIBLE_CLUSTERS[0] || "analytics";
+  }
+}
+
+function loadHubScopeConfigIfAny() {
+  var scopeName = getHubScopeName();
+  if (!scopeName) return Promise.resolve();
+  var scopeUrl = new URL("hub-scopes/" + encodeURIComponent(scopeName) + ".json", window.location.href);
+  scopeUrl.searchParams.set("v", String(Date.now()));
+  return fetch(scopeUrl.toString(), { cache: "no-store" })
+    .then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    })
+    .then(function (cfg) {
+      applyHubScopeConfig(cfg || {});
+    })
+    .catch(function (err) {
+      console.warn("Hub scope load failed:", err);
+    });
+}
+
 function syncClusterHeader() {
   var meta = HUB_CLUSTER_META[ACTIVE_CLUSTER] || HUB_CLUSTER_META.analytics;
   var eyebrowEl = document.getElementById("hubBrandEyebrow");
@@ -466,7 +522,7 @@ function syncClusterHeader() {
   });
   var range = document.getElementById("hubRangeSection");
   var advisor = document.getElementById("advisorStrip");
-  var showAnalyticsOnly = ACTIVE_CLUSTER === "analytics";
+  var showAnalyticsOnly = HUB_RANGE_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) >= 0;
   if (range) range.style.display = showAnalyticsOnly ? "" : "none";
   if (advisor) advisor.style.display = showAnalyticsOnly ? "" : "none";
 }
@@ -1309,13 +1365,15 @@ Office.onReady(function(info) {
     showError("This add-in is designed for Excel only.");
     return;
   }
-  syncClusterHeader();
-  renderCategoryTiles("");
-  loadModulesConfig()
-    .then(function(list) {
-      MODULES = ensureClusterModule(list);
-    })
-    .catch(function(err) {
-      console.error("Hub config load failed:", err);
-    });
+  loadHubScopeConfigIfAny().then(function () {
+    syncClusterHeader();
+    renderCategoryTiles("");
+    loadModulesConfig()
+      .then(function(list) {
+        MODULES = ensureClusterModule(list);
+      })
+      .catch(function(err) {
+        console.error("Hub config load failed:", err);
+      });
+  });
 });

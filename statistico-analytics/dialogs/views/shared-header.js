@@ -518,6 +518,287 @@ const StatisticoHeader = {
     `;
   },
 
+  _isSharedSidebarModule() {
+    return ['univariate', 'correlations', 'independent', 'dependent', 'logistic', 'factor', 'pca', 'anova', 'power'].includes(this.module);
+  },
+
+  _isSidebarItemActive(item) {
+    if (item.active === true) return true;
+    if (item.view && item.view === this.currentView) return true;
+    if (Array.isArray(item.viewIn) && item.viewIn.includes(this.currentView)) return true;
+    return false;
+  },
+
+  _getSharedSidebarConfig() {
+    if (this.module === 'univariate') {
+      return {
+        logoIcon: 'fa-chart-bar',
+        logoSub: 'Univariate',
+        menuTitle: 'Menu',
+        groups: [
+          {
+            title: 'Core Descriptive',
+            items: [
+              { type: 'navigate', view: 'histogram', file: 'univariate/histogram-standalone.html', icon: 'fa-chart-column', label: 'Histogram' },
+              { type: 'navigate', view: 'boxplot', file: 'univariate/boxplot-standalone.html', icon: 'fa-chart-gantt', label: 'Box Plot' },
+              { type: 'navigate', view: 'cdf', file: 'univariate/cumulative-distribution.html', icon: 'fa-wave-square', label: 'CDF' },
+              { type: 'navigate', view: 'percentile', file: 'univariate/percentile-standalone.html', icon: 'fa-percent', label: 'Percentiles' },
+              { type: 'navigate', view: 'kernel', file: 'univariate/kernel-standalone.html', icon: 'fa-bezier-curve', label: 'Kernel Density' }
+            ]
+          },
+          {
+            title: 'Advanced Diagnostics',
+            items: [
+              { type: 'navigate', view: 'outliers', file: 'univariate/outliers-standalone.html', icon: 'fa-triangle-exclamation', label: 'Outliers' },
+              { type: 'navigate', view: 'normality', file: 'univariate/normality-standalone.html', icon: 'fa-wave-square', label: 'Normality Tests' },
+              { type: 'navigate', view: 'qqplot', file: 'univariate/qqplot-standalone.html', icon: 'fa-chart-line', label: 'PP-QQ Plots' },
+              { type: 'navigate', view: 'hypothesis', file: 'univariate/hypothesis-standalone.html', icon: 'fa-flask', label: 'Hypothesis' },
+              { type: 'navigate', view: 'confidence', file: 'univariate/confidence-standalone.html', icon: 'fa-ruler-horizontal', label: 'Confidence Intervals' }
+            ]
+          }
+        ]
+      };
+    }
+
+    if (this.module === 'correlations') {
+      return {
+        logoIcon: 'fa-chart-scatter',
+        logoSub: 'Correlations',
+        menuTitle: 'Menu',
+        groups: [
+          {
+            title: 'Analysis Views',
+            items: [
+              { type: 'navigate', viewIn: ['correlation-matrix'], file: 'correlations/correlation-results.html', icon: 'fa-table-cells', label: 'Matrix' },
+              { type: 'navigate', viewIn: ['correlation-network'], file: 'correlations/correlation-network.html', icon: 'fa-circle-nodes', label: 'Network' },
+              { type: 'navigate', viewIn: ['taylor-diagram'], file: 'correlations/correlation-taylor.html', icon: 'fa-compass-drafting', label: 'Taylor Diagram' },
+              { type: 'navigate', viewIn: ['partial-correlations'], file: 'correlations/correlation-partial.html', icon: 'fa-filter', label: 'Partial' },
+              { type: 'navigate', viewIn: ['reliability'], file: 'correlations/correlation-reliability.html', icon: 'fa-check-double', label: 'Reliability' },
+              { type: 'navigate', viewIn: ['descriptive-stats'], file: 'correlations/descriptive-stats.html', icon: 'fa-list-ol', label: 'Descriptives' }
+            ]
+          }
+        ]
+      };
+    }
+
+    if (this.module === 'independent') {
+      return {
+        logoIcon: 'fa-equals',
+        logoSub: 'Independent',
+        menuTitle: 'Menu',
+        groups: [{
+          title: 'Analysis',
+          items: [
+            { type: 'tab', tab: 'explore', icon: 'fa-chart-column', label: 'Explore', active: true },
+            { type: 'tab', tab: 'assumptions', icon: 'fa-shield-halved', label: 'Assumptions' },
+            { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: 'Results' },
+            { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effects' },
+            { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power' },
+            { type: 'tab', tab: 'report', icon: 'fa-file-lines', label: 'Report' }
+          ]
+        }]
+      };
+    }
+
+    if (this.module === 'dependent') {
+      return {
+        logoIcon: 'fa-clock-rotate-left',
+        logoSub: 'Dependent',
+        menuTitle: 'Menu',
+        groups: [{
+          title: 'Analysis',
+          items: [
+            { type: 'tab', tab: 'explore', icon: 'fa-chart-column', label: 'Explore', active: true },
+            { type: 'tab', tab: 'assumptions', icon: 'fa-shield-halved', label: 'Assumptions' },
+            { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: 'Results' },
+            { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effects' },
+            { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power' },
+            { type: 'tab', tab: 'report', icon: 'fa-file-lines', label: 'Report' }
+          ]
+        }]
+      };
+    }
+
+    if (this.module === 'logistic') {
+      return {
+        logoIcon: 'fa-chart-pie',
+        logoSub: 'Logistic',
+        menuTitle: 'Menu',
+        groups: [{
+          title: 'Analysis',
+          items: [
+            { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: 'Results', active: true },
+            { type: 'tab', tab: 'predictions', icon: 'fa-wand-magic-sparkles', label: 'Predictions' },
+            { type: 'tab', tab: 'diagnostics', icon: 'fa-stethoscope', label: 'Diagnostics' },
+            { type: 'tab', tab: 'roc', icon: 'fa-chart-area', label: 'ROC / AUC' },
+            { type: 'tab', tab: 'descriptives', icon: 'fa-chart-bar', label: 'Descriptives' },
+            { type: 'tab', tab: 'ai', icon: 'fa-brain', label: 'AI Assessment' }
+          ]
+        }]
+      };
+    }
+
+    if (this.module === 'factor') {
+      return {
+        logoIcon: 'fa-layer-group',
+        logoSub: 'Factor',
+        menuTitle: 'Menu',
+        groups: [{
+          title: 'Analysis',
+          items: [
+            { type: 'tab', tab: 'suitability', icon: 'fa-circle-check', label: 'Suitability', active: true },
+            { type: 'tab', tab: 'extraction', icon: 'fa-magnifying-glass-chart', label: 'Extraction' },
+            { type: 'tab', tab: 'rotation', icon: 'fa-arrows-rotate', label: 'Rotation' },
+            { type: 'tab', tab: 'diagnostics', icon: 'fa-stethoscope', label: 'Diagnostics' },
+            { type: 'tab', tab: 'scores', icon: 'fa-chart-scatter', label: 'Scores' },
+            { type: 'tab', tab: 'ai', icon: 'fa-brain', label: 'AI Summary' },
+            { type: 'tab', tab: 'viewdata', icon: 'fa-table', label: 'View Data' }
+          ]
+        }]
+      };
+    }
+
+    if (this.module === 'pca') {
+      return {
+        logoIcon: 'fa-chart-scatter',
+        logoSub: 'PCA',
+        menuTitle: 'Menu',
+        groups: [{
+          title: 'Principal Component Analysis',
+          items: [
+            { type: 'tab', tab: 'summary', icon: 'fa-clipboard-check', label: 'Summary', active: true },
+            { type: 'tab', tab: 'components', icon: 'fa-chart-line', label: 'Components' },
+            { type: 'tab', tab: 'loadings', icon: 'fa-table-columns', label: 'Component Loadings' },
+            { type: 'tab', tab: 'rotation', icon: 'fa-arrows-rotate', label: 'Rotation' },
+            { type: 'tab', tab: 'biplot', icon: 'fa-circle-dot', label: 'Biplot' },
+            { type: 'tab', tab: 'scoreplot', icon: 'fa-chart-scatter', label: 'Score Plot' },
+            { type: 'tab', tab: 'contribution', icon: 'fa-chart-column', label: 'Contribution Plot' },
+            { type: 'tab', tab: 'outliers', icon: 'fa-map-location-dot', label: 'Outlier Map' }
+          ]
+        }]
+      };
+    }
+
+    if (this.module === 'anova') {
+      return {
+        logoIcon: 'fa-table-cells',
+        logoSub: 'ANOVA',
+        menuTitle: 'Menu',
+        groups: [
+          {
+            title: 'Overview',
+            items: [{ type: 'tab', tab: 'overview', icon: 'fa-circle-info', label: 'Summary', active: true }]
+          },
+          {
+            title: 'Analysis',
+            items: [
+              { type: 'tab', tab: 'inference', icon: 'fa-table', label: 'Inference' },
+              { type: 'tab', tab: 'comparisons', icon: 'fa-code-compare', label: 'Comparisons' },
+              { type: 'tab', tab: 'diagnostics', icon: 'fa-shield-halved', label: 'Diagnostics' },
+              { type: 'tab', tab: 'visuals', icon: 'fa-chart-column', label: 'Visuals' }
+            ]
+          },
+          {
+            title: 'Output',
+            items: [{ type: 'tab', tab: 'report', icon: 'fa-file-lines', label: 'Report' }]
+          }
+        ]
+      };
+    }
+
+    if (this.module === 'power') {
+      return {
+        logoIcon: 'fa-bolt',
+        logoSub: 'Power',
+        menuTitle: 'Power Module',
+        groups: [
+          {
+            title: 'Test Type',
+            items: [
+              { type: 'js', id: 'sbMeans', onclick: "switchTest('means')", icon: 'fa-equals', label: 'Means (t-test)' },
+              { type: 'js', id: 'sbAnova', onclick: "switchTest('anova')", icon: 'fa-table', label: 'ANOVA', active: true },
+              { type: 'js', id: 'sbCorr', onclick: "switchTest('correlation')", icon: 'fa-arrow-trend-up', label: 'Correlation' },
+              { type: 'js', id: 'sbProp', onclick: "switchTest('proportion')", icon: 'fa-percent', label: 'Proportions' },
+              { type: 'js', id: 'sbReg', onclick: "switchTest('regression')", icon: 'fa-chart-line', label: 'Regression' }
+            ]
+          },
+          {
+            title: 'Mode',
+            items: [
+              { type: 'js', id: 'sbModePower', onclick: "setMode('power')", icon: 'fa-bolt', label: 'Compute Power', active: true },
+              { type: 'js', id: 'sbModeN', onclick: "setMode('n')", icon: 'fa-users', label: 'Find Sample Size' }
+            ]
+          }
+        ],
+        bottomDecimals: ['2', '3', '4'],
+        defaultDecimal: '3'
+      };
+    }
+
+    return null;
+  },
+
+  _renderSharedSidebar() {
+    const nav = document.getElementById('sidebarNav');
+    if (!nav || !this._isSharedSidebarModule()) return;
+    const cfg = this._getSharedSidebarConfig();
+    if (!cfg) return;
+
+    const groupsHtml = (cfg.groups || []).map((group) => {
+      const itemsHtml = (group.items || []).map((item) => {
+        const active = this._isSidebarItemActive(item) ? ' active' : '';
+        const idAttr = item.id ? ` id="${item.id}"` : '';
+        const dataTab = item.tab ? ` data-tab="${item.tab}"` : '';
+        const dataView = item.view ? ` data-view="${item.view}"` : '';
+
+        let onclick = '';
+        if (item.type === 'navigate' && item.file) {
+          onclick = `StatisticoHeader.navigateTo('${item.file}')`;
+        } else if (item.type === 'tab' && item.tab) {
+          onclick = `switchTab('${item.tab}')`;
+        } else if (item.type === 'js' && item.onclick) {
+          onclick = item.onclick;
+        }
+        const onclickAttr = onclick ? ` onclick="${onclick}"` : '';
+
+        return `<button class="sb-item${active}"${idAttr}${dataTab}${dataView}${onclickAttr}><i class="fa-solid ${item.icon || 'fa-circle'} sb-item-icon"></i><span class="sb-item-label">${item.label || ''}</span></button>`;
+      }).join('');
+
+      return `<div class="sb-group"><div class="sb-group-title">${group.title || ''}</div><div class="sb-items-rail">${itemsHtml}</div></div>`;
+    }).join('');
+
+    const bottomDecimals = cfg.bottomDecimals || ['auto', '0', '1', '2', '3', '4'];
+    const defaultDecimal = cfg.defaultDecimal || '2';
+    const optionsHtml = bottomDecimals.map((v) => `<option value="${v}" ${v === defaultDecimal ? 'selected' : ''}>${v === 'auto' ? 'Auto' : v}</option>`).join('');
+
+    nav.innerHTML = `
+      <div class="sb-logo">
+        <div class="sb-logo-icon"><i class="fa-solid ${cfg.logoIcon || 'fa-chart-line'}"></i></div>
+        <div class="sb-logo-text">
+          <span class="sb-logo-name">Statistico</span>
+          <span class="sb-logo-sub">${cfg.logoSub || this.module}</span>
+        </div>
+      </div>
+      <div class="sb-header">
+        <i class="fa-solid fa-bars-staggered sb-menu-icon"></i>
+        <span class="sb-menu-title">${cfg.menuTitle || 'Menu'}</span>
+        <button class="sb-toggle-btn" onclick="StatisticoHeader.toggleSidebar()" title="Collapse / expand">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+      </div>
+      <div class="sb-body">${groupsHtml}</div>
+      <div class="sb-bottom">
+        <div class="sb-bottom-row">
+          <i class="fa-solid fa-hashtag sb-bottom-icon"></i>
+          <span class="sb-bottom-label">Decimals:</span>
+          <select id="decimalSelect" class="sb-bottom-select" onchange="if (typeof setDecimalPrecision === 'function') setDecimalPrecision(); else if (typeof updateDecimalPrecision === 'function') updateDecimalPrecision();">
+            ${optionsHtml}
+          </select>
+        </div>
+      </div>
+    `;
+  },
+
   /**
    * Render dropdown menu items (kept for correlations and legacy).
    */
@@ -896,6 +1177,7 @@ const StatisticoHeader = {
       layout.appendChild(nav);
       layout.appendChild(rightCol);
     }
+    this._renderSharedSidebar();
     this._mountSidebarUtilities();
   },
 

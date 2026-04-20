@@ -553,6 +553,11 @@ let resultsDialog = null;
 let currentResults = null; // Store results globally for view switching
 const RESULT_DIALOG_OPTIONS = { height: 90, width: 70, displayInIframe: false };
 
+function releaseResultsDialogState() {
+    resultsDialog = null;
+    unlockTaskpaneUI();
+}
+
 // Theme management
 function setResultsTheme(theme) {
     localStorage.setItem('resultsTheme', theme);
@@ -735,6 +740,12 @@ function openResultsDialog(results) {
     console.log('📊 Storing results for column:', results.column, 'n:', results.n);
     localStorage.setItem('univariateResults', JSON.stringify(results));
     
+    // If a stale dialog reference is left behind by the host, clear it first.
+    if (resultsDialog) {
+        try { resultsDialog.close(); } catch (_e) {}
+        resultsDialog = null;
+    }
+
     // Lock taskpane UI
     lockTaskpaneUI();
     
@@ -747,13 +758,16 @@ function openResultsDialog(results) {
         (asyncResult) => {
             if (asyncResult.status === Office.AsyncResultStatus.Failed) {
                 showStatus('error', 'Failed to open histogram: ' + asyncResult.error.message);
+                releaseResultsDialogState();
             } else {
-                resultsDialog = asyncResult.value;
+                const dialog = asyncResult.value;
+                resultsDialog = dialog;
                 console.log('✅ Standalone histogram opened successfully');
                 
                 // Send data to standalone histogram
                 setTimeout(() => {
-                    if (resultsDialog) {
+                    if (dialog !== resultsDialog) return;
+                    if (dialog) {
                         const histogramData = {
                             values: results.rawData,
                             column: results.column,
@@ -762,7 +776,7 @@ function openResultsDialog(results) {
                         };
                         
                         console.log('📤 Sending data to histogram:', histogramData);
-                        resultsDialog.messageChild(JSON.stringify({
+                        dialog.messageChild(JSON.stringify({
                             action: 'loadData',
                             data: histogramData
                         }));
@@ -770,7 +784,7 @@ function openResultsDialog(results) {
                 }, 1000);
                 
                 // Add message handler for dialog close requests
-                resultsDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
+                dialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
                     try {
                         const message = JSON.parse(arg.message);
                         console.log('📩 Message from dialog:', message);
@@ -783,7 +797,8 @@ function openResultsDialog(results) {
                                 descriptive: results.descriptive,
                                 n: results.n
                             };
-                            resultsDialog.messageChild(JSON.stringify({
+                            if (dialog !== resultsDialog) return;
+                            dialog.messageChild(JSON.stringify({
                                 action: 'loadData',
                                 data: viewData
                             }));
@@ -792,11 +807,10 @@ function openResultsDialog(results) {
                             console.log('🔄 Switching to view:', message.view);
                             
                             // Close current dialog
-                            if (resultsDialog) {
+                            if (dialog === resultsDialog) {
                                 console.log('🔴 Closing current dialog...');
-                                resultsDialog.close();
-                                resultsDialog = null;
-                    unlockTaskpaneUI();
+                                dialog.close();
+                                releaseResultsDialogState();
                                 console.log('✅ Dialog closed');
                             }
                             
@@ -809,9 +823,10 @@ function openResultsDialog(results) {
                             }, 300);
                         } else if (message.action === 'close' || message.action === 'closeDialog') {
                             console.log('📤 Close dialog message received');
-                            resultsDialog.close();
-                            resultsDialog = null;
-                    unlockTaskpaneUI();
+                            if (dialog === resultsDialog) {
+                                dialog.close();
+                                releaseResultsDialogState();
+                            }
                         }
                     } catch (e) {
                         console.error('Error handling dialog message:', e);
@@ -819,10 +834,11 @@ function openResultsDialog(results) {
                 });
                 
                 // Handle dialog closing event
-                resultsDialog.addEventHandler(Office.EventType.DialogEventReceived, (arg) => {
+                dialog.addEventHandler(Office.EventType.DialogEventReceived, (arg) => {
                     console.log('Dialog event:', arg.error);
-                    resultsDialog = null;
-                    unlockTaskpaneUI();
+                    if (dialog === resultsDialog) {
+                        releaseResultsDialogState();
+                    }
                 });
             }
         }

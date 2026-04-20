@@ -923,15 +923,13 @@ const StatisticoHeader = {
         <i class="fa-solid fa-wand-magic-sparkles sb-bottom-icon"></i>
         <span class="sb-bottom-label">Utilities</span>
       </div>
-      ${hasView ? `
-        <button class="sb-bottom-btn sb-bottom-btn--data"
-                id="sbViewDataBtn"
-                onclick="StatisticoHeader._toggleViewData()"
-                title="Toggle between used observations and all observations">
-          <i class="fa-solid fa-eye"></i>
-          <span class="sb-item-label">View Data</span>
-        </button>
-      ` : ''}
+      <button class="sb-bottom-btn sb-bottom-btn--data ${hasView ? '' : 'sb-bottom-btn--disabled'}"
+              id="sbViewDataBtn"
+              ${hasView ? 'onclick="StatisticoHeader._toggleViewData()"' : 'disabled'}
+              title="${hasView ? 'Toggle between used observations and all observations' : 'View Data is not available for this page yet'}">
+        <i class="fa-solid fa-eye"></i>
+        <span class="sb-item-label">View Data</span>
+      </button>
       ${hasHtml ? `
         <button class="sb-bottom-btn sb-bottom-btn--html"
                 id="sbExportHtmlBtn"

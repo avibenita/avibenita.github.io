@@ -1212,24 +1212,20 @@ const StatisticoHeader = {
         <i class="fa-solid fa-eye"></i>
         <span class="sb-item-label">View Data</span>
       </button>
-      ${hasHtml ? `
-        <button class="sb-bottom-btn sb-bottom-btn--html"
-                id="sbExportHtmlBtn"
-                onclick="StatisticoHeader._pendingActions.exportHtml()"
-                title="Export complete report as standalone HTML file">
-          <i class="fa-solid fa-file-code"></i>
-          <span class="sb-item-label">HTML</span>
-        </button>
-      ` : ''}
-      ${hasJson ? `
-        <button class="sb-bottom-btn sb-bottom-btn--json"
-                id="sbExportJsonBtn"
-                onclick="StatisticoHeader._pendingActions.exportJson()"
-                title="Download results as JSON file">
-          <i class="fa-solid fa-download"></i>
-          <span class="sb-item-label">JSON</span>
-        </button>
-      ` : ''}
+      <button class="sb-bottom-btn sb-bottom-btn--html ${hasHtml ? '' : 'sb-bottom-btn--disabled'}"
+              id="sbExportHtmlBtn"
+              ${hasHtml ? 'onclick="StatisticoHeader._pendingActions.exportHtml()"' : 'disabled'}
+              title="${hasHtml ? 'Export complete report as standalone HTML file' : 'HTML export is not available for this page yet'}">
+        <i class="fa-solid fa-file-code"></i>
+        <span class="sb-item-label">HTML</span>
+      </button>
+      <button class="sb-bottom-btn sb-bottom-btn--json ${hasJson ? '' : 'sb-bottom-btn--disabled'}"
+              id="sbExportJsonBtn"
+              ${hasJson ? 'onclick="StatisticoHeader._pendingActions.exportJson()"' : 'disabled'}
+              title="${hasJson ? 'Download results as JSON file' : 'JSON export is not available for this page yet'}">
+        <i class="fa-solid fa-download"></i>
+        <span class="sb-item-label">JSON</span>
+      </button>
       <button class="sb-bottom-btn sb-bottom-btn--theme"
               id="sbThemeToggleBtn"
               onclick="StatisticoHeader.toggleTheme()"

@@ -7,6 +7,7 @@ function getNavLinks() {
   return {
     home: '/index.html',
     about: '/Statistico-Website/about-us.html',
+    contact: '/Statistico-Website/contact.html',
     terms: '/Statistico-Website/terms-and-conditions.html',
     why: '/Statistico-Website/why-another-package.html',
     how: '/Statistico-Website/how-it-works.html',
@@ -97,6 +98,11 @@ const NAV_TEMPLATE = `
       <li class="nav-item nav-item--after-products">
         <a href="javascript:void(0)" class="nav-link" data-page="about" id="link-about">
           About Us
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="javascript:void(0)" class="nav-link" data-page="contact" id="link-contact">
+          Contact
         </a>
       </li>
     </ul>
@@ -905,7 +911,7 @@ const FOOTER_TEMPLATE = `
       <div class="footer-section">
         <h4>Company</h4>
         <a href="javascript:void(0)" id="footer-link-about">About Us</a>
-        <a href="#" onclick="alert('Coming soon!')">Contact</a>
+        <a href="javascript:void(0)" id="footer-link-contact">Contact</a>
         <a href="javascript:void(0)" id="footer-link-terms">Terms & Conditions</a>
       </div>
     </div>
@@ -1009,6 +1015,7 @@ const FOOTER_TEMPLATE = `
     const footerWhyLink = document.getElementById('footer-link-why');
     const footerHowLink = document.getElementById('footer-link-how');
     const footerAboutLink = document.getElementById('footer-link-about');
+    const footerContactLink = document.getElementById('footer-link-contact');
     const footerTermsLink = document.getElementById('footer-link-terms');
     const footerAddinsLink = document.getElementById('footer-link-addins');
 
@@ -1017,6 +1024,7 @@ const FOOTER_TEMPLATE = `
     if (footerWhyLink) footerWhyLink.href = links.why;
     if (footerHowLink) footerHowLink.href = links.how;
     if (footerAboutLink) footerAboutLink.href = links.about;
+    if (footerContactLink) footerContactLink.href = links.contact;
     if (footerTermsLink) footerTermsLink.href = links.terms;
     if (footerAddinsLink) footerAddinsLink.href = links.addins;
   }
@@ -1039,6 +1047,7 @@ const FOOTER_TEMPLATE = `
     document.getElementById('link-analytics').href = links.analytics;
     document.getElementById('link-addins').href = links.addins;
     document.getElementById('link-about').href = links.about;
+    document.getElementById('link-contact').href = links.contact;
 
     // Products dropdown
     const productsItem = document.getElementById('nav-products-item');
@@ -1133,6 +1142,8 @@ const FOOTER_TEMPLATE = `
       activePage = 'addins';
     } else if (currentFile === 'about-us.html') {
       activePage = 'about';
+    } else if (currentFile === 'contact.html') {
+      activePage = 'contact';
     }
     
     // Set active class

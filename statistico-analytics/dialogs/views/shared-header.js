@@ -56,12 +56,20 @@ const StatisticoHeader = {
 
     try { localStorage.setItem('statistico-theme', theme); } catch(e) {}
 
-    // Update button label/icon if it exists
+    // Update top-bar theme button (if present)
     const btn = document.getElementById('themeToggleBtn');
     if (btn) {
       const icon  = btn.querySelector('.toggle-icon');
       const label = btn.querySelector('.toggle-label');
       if (icon)  icon.textContent  = theme === 'light' ? '☀️' : '🌙';
+      if (label) label.textContent = theme === 'light' ? 'Light' : 'Dark';
+    }
+    // Update sidebar utility theme button (if present)
+    const sidebarThemeBtn = document.getElementById('sbThemeToggleBtn');
+    if (sidebarThemeBtn) {
+      const icon = sidebarThemeBtn.querySelector('.sb-utility-theme-icon');
+      const label = sidebarThemeBtn.querySelector('.sb-utility-theme-label');
+      if (icon) icon.textContent = theme === 'light' ? '☀️' : '🌙';
       if (label) label.textContent = theme === 'light' ? 'Light' : 'Dark';
     }
     // Fire an event so individual pages can react (e.g. reflow Highcharts)
@@ -295,6 +303,9 @@ const StatisticoHeader = {
 
     const actionButtonsHtml = this._pendingActions ? this._renderActionButtons(this._pendingActions) : '';
 
+    // All sidebar-based modules hide the shared-header navrow to avoid duplicate navigation.
+    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate');
+
     const topHeader = `
       <div class="statistico-header">
         <div class="header-center">
@@ -305,21 +316,20 @@ const StatisticoHeader = {
           </div>
         </div>
         <div class="header-right">
-          ${actionButtonsHtml}
-          <button id="themeToggleBtn"
-                  class="theme-toggle-btn"
-                  onclick="StatisticoHeader.toggleTheme()"
-                  title="Toggle light / dark theme">
-            <span class="toggle-icon">${themeIcon}</span>
-            <div class="toggle-track"><div class="toggle-thumb"></div></div>
-            <span class="toggle-label">${themeLabel}</span>
-          </button>
+          ${hideNavrow ? '' : `
+            ${actionButtonsHtml}
+            <button id="themeToggleBtn"
+                    class="theme-toggle-btn"
+                    onclick="StatisticoHeader.toggleTheme()"
+                    title="Toggle light / dark theme">
+              <span class="toggle-icon">${themeIcon}</span>
+              <div class="toggle-track"><div class="toggle-thumb"></div></div>
+              <span class="toggle-label">${themeLabel}</span>
+            </button>
+          `}
         </div>
       </div>
     `;
-
-    // All sidebar-based modules hide the shared-header navrow to avoid duplicate navigation.
-    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate');
 
     const headerHTML = `
       <div class="statistico-shell">
@@ -680,8 +690,10 @@ const StatisticoHeader = {
     this._lastDataResult = result;
 
     // Mark button active
-    const btn = document.getElementById('headerViewDataBtn');
-    if (btn) btn.classList.add('header-action-btn--data-active');
+    const headerBtn = document.getElementById('headerViewDataBtn');
+    if (headerBtn) headerBtn.classList.add('header-action-btn--data-active');
+    const sidebarBtn = document.getElementById('sbViewDataBtn');
+    if (sidebarBtn) sidebarBtn.classList.add('sb-bottom-btn--active');
 
     this._buildDataModal(result, 'used');
   },
@@ -831,11 +843,17 @@ const StatisticoHeader = {
   _resetViewBtn() {
     this._viewDataMode = 'all';
     this._lastDataResult = null;
-    const btn = document.getElementById('headerViewDataBtn');
-    if (btn) {
-      btn.classList.remove('header-action-btn--data-active');
-      btn.innerHTML = `<i class="fa-solid fa-eye"></i> View Data`;
-      btn.title = 'View model data';
+    const headerBtn = document.getElementById('headerViewDataBtn');
+    if (headerBtn) {
+      headerBtn.classList.remove('header-action-btn--data-active');
+      headerBtn.innerHTML = `<i class="fa-solid fa-eye"></i> View Data`;
+      headerBtn.title = 'View model data';
+    }
+    const sidebarBtn = document.getElementById('sbViewDataBtn');
+    if (sidebarBtn) {
+      sidebarBtn.classList.remove('sb-bottom-btn--active');
+      sidebarBtn.innerHTML = `<i class="fa-solid fa-eye"></i><span class="sb-item-label">View Data</span>`;
+      sidebarBtn.title = 'View model data';
     }
   },
 
@@ -846,6 +864,7 @@ const StatisticoHeader = {
   registerActions({ getData, saveModel, exportHtml, exportJson, moduleName = 'Save model' } = {}) {
     this._pendingActions = { getData, saveModel, exportHtml, exportJson, moduleName };
     this.render();
+    this._mountSidebarUtilities();
   },
 
   /* ─────────────────────────────────────────────────────────────────
@@ -877,6 +896,69 @@ const StatisticoHeader = {
       layout.appendChild(nav);
       layout.appendChild(rightCol);
     }
+    this._mountSidebarUtilities();
+  },
+
+  _mountSidebarUtilities() {
+    const nav = document.getElementById('sidebarNav');
+    if (!nav) return;
+
+    const existing = document.getElementById('sbUtilities');
+    if (existing) existing.remove();
+
+    const currentTheme = this.getTheme();
+    const themeIcon = currentTheme === 'light' ? '☀️' : '🌙';
+    const themeLabel = currentTheme === 'light' ? 'Light' : 'Dark';
+
+    const actions = this._pendingActions || {};
+    const hasView = typeof actions.getData === 'function';
+    const hasHtml = typeof actions.exportHtml === 'function';
+    const hasJson = typeof actions.exportJson === 'function';
+
+    const utilities = document.createElement('div');
+    utilities.id = 'sbUtilities';
+    utilities.className = 'sb-bottom';
+    utilities.innerHTML = `
+      <div class="sb-bottom-row">
+        <i class="fa-solid fa-wand-magic-sparkles sb-bottom-icon"></i>
+        <span class="sb-bottom-label">Utilities</span>
+      </div>
+      ${hasView ? `
+        <button class="sb-bottom-btn sb-bottom-btn--data"
+                id="sbViewDataBtn"
+                onclick="StatisticoHeader._toggleViewData()"
+                title="Toggle between used observations and all observations">
+          <i class="fa-solid fa-eye"></i>
+          <span class="sb-item-label">View Data</span>
+        </button>
+      ` : ''}
+      ${hasHtml ? `
+        <button class="sb-bottom-btn sb-bottom-btn--html"
+                id="sbExportHtmlBtn"
+                onclick="StatisticoHeader._pendingActions.exportHtml()"
+                title="Export complete report as standalone HTML file">
+          <i class="fa-solid fa-file-code"></i>
+          <span class="sb-item-label">HTML</span>
+        </button>
+      ` : ''}
+      ${hasJson ? `
+        <button class="sb-bottom-btn sb-bottom-btn--json"
+                id="sbExportJsonBtn"
+                onclick="StatisticoHeader._pendingActions.exportJson()"
+                title="Download results as JSON file">
+          <i class="fa-solid fa-download"></i>
+          <span class="sb-item-label">JSON</span>
+        </button>
+      ` : ''}
+      <button class="sb-bottom-btn sb-bottom-btn--theme"
+              id="sbThemeToggleBtn"
+              onclick="StatisticoHeader.toggleTheme()"
+              title="Toggle light / dark theme">
+        <span class="sb-utility-theme-icon">${themeIcon}</span>
+        <span class="sb-item-label sb-utility-theme-label">${themeLabel}</span>
+      </button>
+    `;
+    nav.appendChild(utilities);
   },
 
   /**

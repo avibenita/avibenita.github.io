@@ -1043,46 +1043,53 @@
     // DOM loaded
     window.addEventListener('DOMContentLoaded', function() {
       console.log('?? DOM Content Loaded');
+
       // Fallback for non-Office embed
       setTimeout(function() {
         if (dataReady) return;
         try {
           var stored = localStorage.getItem('univariateResults');
-          if (stored) { handleDataReceived(JSON.parse(stored)); return; }
-        } catch(e) {}
+          if (stored) {
+            handleDataReceived(JSON.parse(stored));
+            return;
+          }
+        } catch (e) {}
         if (typeof loadSampleData === 'function') loadSampleData();
       }, 400);
-      const initHeader = () => {
+
+      const initHeader = function() {
         if (typeof StatisticoHeader !== 'undefined') {
           StatisticoHeader.init('outliers', 'Variable', 0);
-      if (typeof StatisticoHeader !== 'undefined') { StatisticoHeader.initSidebarPage(); StatisticoHeader.updateTitle('Outliers Detection'); };
+          StatisticoHeader.initSidebarPage();
+          StatisticoHeader.updateTitle('Outliers Detection');
           setTimeout(fitLayout, 150);
           console.log('? Shared header initialized');
-        } else {
-          setTimeout(initHeader, 100);
+          return;
         }
+        setTimeout(initHeader, 100);
       };
       initHeader();
-      
+
       let attempts = 0;
       const maxAttempts = 50; // 5 seconds max wait
-      
-      const checkAndInit = () => {
+
+      const checkAndInit = function() {
         attempts++;
-        
         if (checkLibraries()) {
           if (typeof Office === 'undefined') {
             console.log('?? Office.js not available - loading sample data');
-            setTimeout(() => {
+            setTimeout(function() {
               if (!dataReady) loadSampleData();
             }, 500);
           }
-        } else if (attempts < maxAttempts) {
-          setTimeout(checkAndInit, 100);
-        } else {
-          console.warn('?? Libraries failed to load after 5s, loading sample data anyway');
-          loadSampleData();
+          return;
         }
+        if (attempts < maxAttempts) {
+          setTimeout(checkAndInit, 100);
+          return;
+        }
+        console.warn('?? Libraries failed to load after 5s, loading sample data anyway');
+        loadSampleData();
       };
       setTimeout(checkAndInit, 100);
     });

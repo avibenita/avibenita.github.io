@@ -1136,15 +1136,26 @@ const StatisticoHeader = {
     const persisted = this.getDecimalPreference();
     const selected = decimalOptions.includes(persisted) ? persisted : (cfg?.defaultDecimal || '2');
     const optionsHtml = decimalOptions.map((v) => `<option value="${v}" ${v === selected ? 'selected' : ''}>${v === 'auto' ? 'Auto' : v}</option>`).join('');
+    const menuItemsHtml = decimalOptions.map((v) => {
+      const label = v === 'auto' ? 'Auto' : v;
+      return `<button class="header-decimals-option ${v === selected ? 'active' : ''}" onclick="StatisticoHeader.selectDecimalOption('${v}')">${label}</button>`;
+    }).join('');
     const theme = this.getTheme();
     const themeIcon = theme === 'light' ? '☀️' : '🌙';
 
     return `
       <div class="header-global-controls">
-        <label class="header-decimals-label" for="decimalSelect">Decimals Precision</label>
-        <select id="decimalSelect" class="header-decimals-select" onchange="StatisticoHeader.onDecimalChange(this.value)">
+        <label class="header-decimals-label" for="headerDecimalBtn">Decimals Precision</label>
+        <select id="decimalSelect" class="header-decimals-hidden-select" onchange="StatisticoHeader.onDecimalChange(this.value)">
           ${optionsHtml}
         </select>
+        <div class="header-decimals-wrap">
+          <button id="headerDecimalBtn" class="header-decimals-btn" onclick="StatisticoHeader.toggleDecimalMenu()" title="Change decimal precision">
+            <span id="headerDecimalValue">${selected === 'auto' ? 'Auto' : selected}</span>
+            <i class="fa-solid fa-chevron-down"></i>
+          </button>
+          <div id="headerDecimalMenu" class="header-decimals-menu">${menuItemsHtml}</div>
+        </div>
         <button id="headerThemeBtn" class="header-theme-btn" onclick="StatisticoHeader.toggleTheme()" title="Toggle light / dark theme">
           <span id="headerThemeLabel">Theme</span>
           <span id="headerThemeIcon">${themeIcon}</span>
@@ -1313,6 +1324,16 @@ const StatisticoHeader = {
     this._installDecimalOverride();
     const headerSelect = document.getElementById('decimalSelect');
     if (headerSelect && headerSelect.value !== normalized) headerSelect.value = normalized;
+    const headerValue = document.getElementById('headerDecimalValue');
+    if (headerValue) headerValue.textContent = normalized === 'auto' ? 'Auto' : normalized;
+    const headerMenu = document.getElementById('headerDecimalMenu');
+    if (headerMenu) {
+      headerMenu.querySelectorAll('.header-decimals-option').forEach((btn) => {
+        const valueText = (btn.textContent || '').trim();
+        const optionValue = valueText.toLowerCase() === 'auto' ? 'auto' : valueText;
+        btn.classList.toggle('active', optionValue === normalized);
+      });
+    }
 
     const numericValue = normalized === 'auto' ? null : String(Math.max(0, parseInt(normalized, 10) || 0));
     const localSelect = document.getElementById('decimals');
@@ -1341,6 +1362,22 @@ const StatisticoHeader = {
 
   onDecimalChange(value) {
     this.applyDecimalPreferenceToPage(value, { isUserChange: true });
+  },
+
+  toggleDecimalMenu() {
+    const menu = document.getElementById('headerDecimalMenu');
+    if (!menu) return;
+    menu.classList.toggle('show');
+  },
+
+  closeDecimalMenu() {
+    const menu = document.getElementById('headerDecimalMenu');
+    if (menu) menu.classList.remove('show');
+  },
+
+  selectDecimalOption(value) {
+    this.onDecimalChange(value);
+    this.closeDecimalMenu();
   },
 
   /* ─────────────────────────────────────────────────────────────────
@@ -1448,6 +1485,15 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (e.key === 'F5') {
       e.preventDefault();
       StatisticoHeader.refreshView();
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('headerDecimalMenu');
+    const btn = document.getElementById('headerDecimalBtn');
+    if (!menu || !btn) return;
+    if (!menu.contains(e.target) && !btn.contains(e.target)) {
+      StatisticoHeader.closeDecimalMenu();
     }
   });
 });

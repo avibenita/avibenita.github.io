@@ -514,6 +514,7 @@
     
     let chart, originalData = [], sortedData = [], cdfData = [];
     let currentDecimals = 0;
+    let forcedDecimals = null; // null = auto
     let valueSlider;
     let theoreticalVisible = false;
     let headerInitialized = false;
@@ -651,10 +652,11 @@
       
       // Determine decimal places for formatting
       const range = sortedData[n - 1] - sortedData[0];
-      if (range < 1) currentDecimals = 4;
-      else if (range < 10) currentDecimals = 3;
-      else if (range < 100) currentDecimals = 2;
-      else currentDecimals = 1;
+      let autoDecimals = 1;
+      if (range < 1) autoDecimals = 4;
+      else if (range < 10) autoDecimals = 3;
+      else if (range < 100) autoDecimals = 2;
+      currentDecimals = forcedDecimals === null ? autoDecimals : forcedDecimals;
       
       // Update quartile boxes
       document.getElementById('q1-value').textContent = q1.toFixed(currentDecimals);
@@ -842,6 +844,14 @@
       if (valueSlider) {
         valueSlider.set(value);
       }
+    }
+
+    function setDecimalPrecision() {
+      const select = document.getElementById('decimalSelect');
+      if (!select) return;
+      const selected = String(select.value || 'auto');
+      forcedDecimals = selected === 'auto' ? null : Math.max(0, parseInt(selected, 10) || 0);
+      if (originalData && originalData.length) processData(originalData);
     }
     
     function onDistributionChange() {

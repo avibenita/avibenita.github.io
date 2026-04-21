@@ -791,7 +791,7 @@ const StatisticoHeader = {
         <div class="sb-bottom-row">
           <i class="fa-solid fa-hashtag sb-bottom-icon"></i>
           <span class="sb-bottom-label">Decimals:</span>
-          <select id="decimalSelect" class="sb-bottom-select" onchange="if (typeof setDecimalPrecision === 'function') setDecimalPrecision(); else if (typeof updateDecimalPrecision === 'function') updateDecimalPrecision();">
+          <select id="decimalSelect" class="sb-bottom-select" onchange="StatisticoHeader.onDecimalChange(this.value)">
             ${optionsHtml}
           </select>
         </div>
@@ -1148,6 +1148,43 @@ const StatisticoHeader = {
     this._mountSidebarUtilities();
   },
 
+  getDecimalPreference() {
+    try { return localStorage.getItem('statistico-decimals') || 'auto'; } catch (e) { return 'auto'; }
+  },
+
+  setDecimalPreference(value) {
+    const normalized = value === undefined || value === null || value === '' ? 'auto' : String(value);
+    try { localStorage.setItem('statistico-decimals', normalized); } catch (e) {}
+    return normalized;
+  },
+
+  applyDecimalPreferenceToPage(value) {
+    const normalized = this.setDecimalPreference(value);
+    const sidebarSelect = document.getElementById('decimalSelect');
+    if (sidebarSelect && sidebarSelect.value !== normalized) sidebarSelect.value = normalized;
+
+    const numericValue = normalized === 'auto' ? null : String(Math.max(0, parseInt(normalized, 10) || 0));
+    const localSelect = document.getElementById('decimals');
+    if (localSelect && numericValue !== null && localSelect.value !== numericValue) {
+      localSelect.value = numericValue;
+      if (typeof window.updateVisualization === 'function') window.updateVisualization();
+    }
+    const legacySelect = document.getElementById('decimalsSelect');
+    if (legacySelect && numericValue !== null && legacySelect.value !== numericValue) {
+      legacySelect.value = numericValue;
+      if (typeof window.updateDecimals === 'function') window.updateDecimals(numericValue);
+    }
+
+    if (typeof window.setDecimalPrecision === 'function') window.setDecimalPrecision();
+    else if (typeof window.updateDecimalPrecision === 'function') window.updateDecimalPrecision();
+
+    document.dispatchEvent(new CustomEvent('statistico-decimals-changed', { detail: { value: normalized } }));
+  },
+
+  onDecimalChange(value) {
+    this.applyDecimalPreferenceToPage(value);
+  },
+
   /* ─────────────────────────────────────────────────────────────────
      Shared Sidebar Utilities
      Used by modules that include a vertical .sb-nav sidebar.
@@ -1179,6 +1216,8 @@ const StatisticoHeader = {
     }
     this._renderSharedSidebar();
     this._mountSidebarUtilities();
+    const persistedDecimals = this.getDecimalPreference();
+    setTimeout(() => this.applyDecimalPreferenceToPage(persistedDecimals), 0);
   },
 
   _mountSidebarUtilities() {

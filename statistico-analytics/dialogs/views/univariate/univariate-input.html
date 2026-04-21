@@ -183,6 +183,15 @@
       Office.context.ui.messageParent(s);
     }
 
+    let _requestDataRetryTimer = null;
+
+    function stopRequestDataRetry() {
+      if (_requestDataRetryTimer) {
+        clearInterval(_requestDataRetryTimer);
+        _requestDataRetryTimer = null;
+      }
+    }
+
     Office.onReady(() => {
       if (EMBED) {
         document.body.classList.add('cfg-embed');
@@ -201,6 +210,13 @@
         );
       }
       send({ action: 'ready' });
+      _requestDataRetryTimer = setInterval(() => {
+        if (STATE.headers && STATE.headers.length) {
+          stopRequestDataRetry();
+          return;
+        }
+        send({ action: 'requestData' });
+      }, 500);
       // Fallback: hydrate from shared storage if Office message is missed.
       setTimeout(() => {
         if (STATE.headers && STATE.headers.length) return;
@@ -236,6 +252,8 @@
 
       buildColumnStats();
       renderVariableTable();
+      stopRequestDataRetry();
+      send({ action: 'dataApplied' });
 
       if (STATE.savedSpec) {
         const savedIdx   = STATE.savedSpec.columnIndex;

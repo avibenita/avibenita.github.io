@@ -7,6 +7,7 @@ let univariateResultsDialog = null;
 let univariateCurrentResults = null;
 let pendingUnivariateViewUrl = null;
 let _uniEmbedMessageHandler = null;
+let _univariateDialogDataPump = null;
 const RESULT_DIALOG_OPTIONS = { height: 90, width: 70, displayInIframe: false };
 
 function notifyConfigDialogClosed() {
@@ -83,10 +84,18 @@ function detachUniEmbedListener() {
 
 function hideUnivariateConfigEmbed() {
   detachUniEmbedListener();
+  stopUnivariateDialogDataPump();
   setUnivariateConfigVisible(false);
   const frame = document.getElementById('univariateConfigFrame');
   if (frame) {
     try { frame.src = 'about:blank'; } catch (_e) {}
+  }
+}
+
+function stopUnivariateDialogDataPump() {
+  if (_univariateDialogDataPump) {
+    clearInterval(_univariateDialogDataPump);
+    _univariateDialogDataPump = null;
   }
 }
 
@@ -140,6 +149,7 @@ function attachUniEmbedListener() {
 // ─── OPEN CONFIG: DIALOG FALLBACK ────────────────────────────────────────────
 function openUnivariateBuilderDialog() {
   if (!univariateRangeData || univariateRangeData.length < 2) return;
+  stopUnivariateDialogDataPump();
   if (univariateDialog) {
     try { univariateDialog.close(); } catch (_e) {}
     univariateDialog = null;
@@ -168,29 +178,48 @@ function openUnivariateBuilderDialog() {
         return;
       }
       univariateDialog = asyncResult.value;
+      let runHandled = false;
+      let dataApplied = false;
+      let pumpAttempts = 0;
       // Retry sends because Office dialogs sometimes miss the first payload after reopen.
       [550, 1200, 2000].forEach((delay) => setTimeout(sendDialogData, delay));
+      _univariateDialogDataPump = setInterval(() => {
+        if (!univariateDialog || dataApplied || pumpAttempts >= 10) {
+          stopUnivariateDialogDataPump();
+          return;
+        }
+        pumpAttempts += 1;
+        sendDialogData();
+      }, 700);
       univariateDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
         try {
           const message = JSON.parse(arg.message || '{}');
           if (message.action === 'ready' || message.action === 'requestData') {
             sendDialogData();
+          } else if (message.action === 'dataApplied') {
+            dataApplied = true;
+            stopUnivariateDialogDataPump();
           } else if (message.action === 'univariateResults') {
+            if (runHandled) return;
+            runHandled = true;
             sessionStorage.setItem('univariateModelSpec', JSON.stringify(message.spec || {}));
             univariateDialog.close();
             univariateDialog = null;
+            stopUnivariateDialogDataPump();
             notifyConfigDialogClosed();
             updateButtonState();
             setTimeout(() => openResultsDialog(message.data), 380);
           } else if (message.action === 'close') {
             univariateDialog.close();
             univariateDialog = null;
+            stopUnivariateDialogDataPump();
             notifyConfigDialogClosed();
           }
         } catch (_e) {}
       });
       univariateDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
         univariateDialog = null;
+        stopUnivariateDialogDataPump();
         notifyConfigDialogClosed();
       });
     }

@@ -105,8 +105,8 @@
   'use strict';
 
   const SAVE_BTN_TEXT = 'Save this Configuration';
-  const SAVE_BTN_TIP = 'Save this configuration.';
-  const LOAD_BTN_TIP = 'Open saved configurations.';
+  const SAVE_BTN_TIP = 'Save configuration.';
+  const LOAD_BTN_TIP = 'Open saved configs.';
   const LOAD_BTN_TEXT = (count) => count > 0 ? `Saved configs (${count})...` : 'Saved configs...';
 
   function escHtml(s) {
@@ -130,11 +130,13 @@
     if (saveBtn) {
       saveBtn.title = SAVE_BTN_TIP;
       saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> ' + SAVE_BTN_TEXT;
+      saveBtn.removeAttribute('data-tip');
       saveBtn.setAttribute('data-st-tip', SAVE_BTN_TIP);
     }
     if (loadBtn) {
       loadBtn.title = LOAD_BTN_TIP;
       loadBtn.innerHTML = '<i class="fa-solid fa-folder-open"></i> ' + LOAD_BTN_TEXT(count);
+      loadBtn.removeAttribute('data-tip');
       loadBtn.setAttribute('data-st-tip', LOAD_BTN_TIP);
       loadBtn.disabled = count === 0;
     }

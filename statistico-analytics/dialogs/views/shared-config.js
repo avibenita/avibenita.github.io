@@ -104,6 +104,11 @@
 (function () {
   'use strict';
 
+  const SAVE_BTN_TEXT = 'Save this Configuration';
+  const SAVE_BTN_TIP = 'Save this exact configuration so you can reuse the same selected variable(s), trim/filter, transform, and options.';
+  const LOAD_BTN_TIP = 'Open saved configurations. Each saved item keeps the exact setup that was active when it was saved.';
+  const LOAD_BTN_TEXT = (count) => count > 0 ? `Saved configs (${count})...` : 'Saved configs...';
+
   function escHtml(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
@@ -116,6 +121,43 @@
     try { localStorage.setItem(storageKey, JSON.stringify(arr)); } catch (_) {}
   }
 
+  function syncConfigButtons(storageKey) {
+    if (!storageKey) return;
+    const saveBtn = document.getElementById('btnSaveConfig');
+    const loadBtn = document.getElementById('btnLoadPrev');
+    const count = getSavedList(storageKey).length;
+
+    if (saveBtn) {
+      saveBtn.title = SAVE_BTN_TIP;
+      saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> ' + SAVE_BTN_TEXT;
+      saveBtn.setAttribute('data-st-tip', SAVE_BTN_TIP);
+    }
+    if (loadBtn) {
+      loadBtn.title = LOAD_BTN_TIP;
+      loadBtn.innerHTML = '<i class="fa-solid fa-folder-open"></i> ' + LOAD_BTN_TEXT(count);
+      loadBtn.setAttribute('data-st-tip', LOAD_BTN_TIP);
+      loadBtn.disabled = count === 0;
+    }
+    if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
+      window.StatisticoTooltip.refresh();
+    }
+  }
+
+  function detectStorageKey() {
+    if (typeof window.STORAGE_KEY === 'string' && window.STORAGE_KEY) return window.STORAGE_KEY;
+    const keys = Object.keys(window)
+      .filter((k) => /^STORAGE_KEY_/.test(k))
+      .map((k) => window[k])
+      .filter((v) => typeof v === 'string' && /config/i.test(v));
+    const unique = Array.from(new Set(keys));
+    return unique.length === 1 ? unique[0] : null;
+  }
+
+  function autoSyncConfigButtons() {
+    const key = detectStorageKey();
+    if (key) syncConfigButtons(key);
+  }
+
   /* ── Prompt dialog (replaces blocked window.prompt) ──────────────────── */
   function showCfgPrompt(title, label, defaultVal, onConfirm) {
     if (document.getElementById('cfgPromptOverlay')) return;
@@ -124,8 +166,8 @@
     overlay.className = 'cfg-prompt-overlay';
     overlay.innerHTML =
       '<div class="cfg-prompt-box">' +
-        '<div class="cfg-prompt-title"><i class="fa-solid fa-floppy-disk"></i>' + escHtml(title) + '</div>' +
-        '<div class="cfg-prompt-label">' + escHtml(label) + '</div>' +
+        '<div class="cfg-prompt-title"><i class="fa-solid fa-floppy-disk"></i>' + escHtml(SAVE_BTN_TEXT) + '</div>' +
+        '<div class="cfg-prompt-label">' + escHtml('Configuration name') + '</div>' +
         '<input class="cfg-prompt-input" id="cfgPromptInput" type="text" value="' + escHtml(defaultVal) + '" />' +
         '<div class="cfg-prompt-actions">' +
           '<button class="cfg-btn cancel" id="cfgPromptCancel"><i class="fa-solid fa-times"></i> Cancel</button>' +
@@ -186,7 +228,7 @@
     overlay.innerHTML =
       '<div class="cfg-saved-modal">' +
         '<div class="cfg-saved-modal-head">' +
-          '<span><i class="fa-solid fa-list-ul"></i>Saved Configurations</span>' +
+          '<span><i class="fa-solid fa-list-ul"></i>Saved configs</span>' +
           '<button class="cfg-saved-close" id="cfgSavedClose" title="Close">&#x2715;</button>' +
         '</div>' +
         '<div class="cfg-saved-list" id="cfgSavedList">' + listHtml + '</div>' +
@@ -202,6 +244,7 @@
 
     // Store the onLoad callback for use by item clicks
     CfgSave._pendingLoad[storageKey] = onLoad;
+    syncConfigButtons(storageKey);
 
     overlay.querySelector('#cfgSavedClose').addEventListener('click', function () { overlay.remove(); });
     overlay.querySelector('#cfgSavedCloseBtn').addEventListener('click', function () { overlay.remove(); });
@@ -219,6 +262,7 @@
     if (!item) return;
     var cb = _pendingLoad[storageKey];
     if (cb) cb(item);
+    syncConfigButtons(storageKey);
   }
 
   function _deleteById(event, storageKey, id) {
@@ -231,6 +275,7 @@
     var cb = _pendingLoad[storageKey];
     // rebuild meta fn not stored – just reopen without meta (still shows names)
     showCfgSavedList(storageKey, null, cb);
+    syncConfigButtons(storageKey);
   }
 
   /* ── Save a config entry ─────────────────────────────────────────────── */
@@ -245,6 +290,7 @@
     saved.unshift(entry);
     if (saved.length > 20) saved = saved.slice(0, 20);
     putSavedList(storageKey, saved);
+    syncConfigButtons(storageKey);
     if (onDone) onDone(entry);
   }
 
@@ -256,8 +302,19 @@
     showPrompt:       showCfgPrompt,
     showSavedList:    showCfgSavedList,
     saveCfgEntry:     saveCfgEntry,
+    syncConfigButtons: syncConfigButtons,
     _loadById:        _loadById,
     _deleteById:      _deleteById,
     _pendingLoad:     _pendingLoad
   };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      autoSyncConfigButtons();
+      setTimeout(autoSyncConfigButtons, 300);
+      setTimeout(autoSyncConfigButtons, 1200);
+    });
+  } else {
+    autoSyncConfigButtons();
+  }
 })();

@@ -199,6 +199,18 @@ function openUnivariateBuilderDialog() {
           } else if (message.action === 'dataApplied') {
             dataApplied = true;
             stopUnivariateDialogDataPump();
+          } else if (message.action === 'univariateResultsReady') {
+            if (runHandled) return;
+            const stored = consumeUnivariateResultsFromStorage();
+            if (!stored || !stored.data) return;
+            runHandled = true;
+            sessionStorage.setItem('univariateModelSpec', JSON.stringify(stored.spec || {}));
+            univariateDialog.close();
+            univariateDialog = null;
+            stopUnivariateDialogDataPump();
+            notifyConfigDialogClosed();
+            updateButtonState();
+            setTimeout(() => openResultsDialog(stored.data), 380);
           } else if (message.action === 'univariateResults') {
             if (runHandled) return;
             runHandled = true;
@@ -247,6 +259,18 @@ function sendDialogData() {
       payload: { headers, rows, address: univariateRangeAddress, savedSpec }
     }));
   } catch (_e) {}
+}
+
+function consumeUnivariateResultsFromStorage() {
+  try {
+    const raw = localStorage.getItem('univariateRunResultPayload');
+    if (!raw) return null;
+    const payload = JSON.parse(raw);
+    if (!payload || !payload.data) return null;
+    return payload;
+  } catch (_e) {
+    return null;
+  }
 }
 
 function queueResultsViewSwitch(viewPath) {

@@ -1300,6 +1300,83 @@ const StatisticoHeader = {
 
     const timestamp = () => new Date().toISOString().slice(0, 19).replace(/[-T:]/g, '');
     const safeName = (name) => String(name || 'Variable').replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 30);
+    const esc = (value) => String(value ?? '').replace(/[<>&"]/g, (m) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[m]));
+
+    const computeStats = (values) => {
+      const numeric = (values || []).filter((v) => Number.isFinite(v));
+      if (!numeric.length) return null;
+      const sorted = [...numeric].sort((a, b) => a - b);
+      const n = sorted.length;
+      const mean = sorted.reduce((a, b) => a + b, 0) / n;
+      const variance = n > 1 ? sorted.reduce((acc, v) => acc + (v - mean) ** 2, 0) / (n - 1) : 0;
+      const q = (p) => {
+        const pos = (n - 1) * p;
+        const base = Math.floor(pos);
+        const rest = pos - base;
+        return sorted[base + 1] !== undefined
+          ? sorted[base] + rest * (sorted[base + 1] - sorted[base])
+          : sorted[base];
+      };
+      return {
+        n,
+        mean,
+        sd: Math.sqrt(variance),
+        min: sorted[0],
+        q1: q(0.25),
+        median: q(0.5),
+        q3: q(0.75),
+        max: sorted[n - 1]
+      };
+    };
+
+    const getUnivariateMenuItems = () => {
+      const cfg = this._getSharedSidebarConfig ? this._getSharedSidebarConfig() : null;
+      const groups = (cfg && Array.isArray(cfg.groups)) ? cfg.groups : [];
+      const items = [];
+      groups.forEach((group) => {
+        (group.items || []).forEach((item) => {
+          if (item.type === 'navigate' && item.label) {
+            items.push({ id: item.view || item.file || item.label, label: item.label });
+          }
+        });
+      });
+      return items;
+    };
+
+    const pickReportSections = (sections, onConfirm) => {
+      const existing = document.getElementById('stReportExportOverlay');
+      if (existing) existing.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'stReportExportOverlay';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:2147483300;display:flex;align-items:center;justify-content:center;padding:16px;';
+      const listHtml = sections.map((s) => `
+        <label style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid #e5e7eb;">
+          <input type="checkbox" data-section-id="${esc(s.id)}" checked />
+          <span>${esc(s.label)}</span>
+        </label>
+      `).join('');
+      overlay.innerHTML = `
+        <div style="width:min(560px,95vw);max-height:80vh;overflow:hidden;background:#fff;border-radius:12px;border:1px solid #cbd5e1;box-shadow:0 12px 32px rgba(15,23,42,.3);display:flex;flex-direction:column;">
+          <div style="padding:12px 14px;border-bottom:1px solid #e2e8f0;font-weight:700;">Export Long HTML Report</div>
+          <div style="padding:10px 14px;color:#475569;font-size:12px;">Select the menu sections to include in the report:</div>
+          <div style="padding:0 14px 10px;overflow:auto;">${listHtml}</div>
+          <div style="padding:10px 14px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px;">
+            <button id="stReportCancelBtn" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;cursor:pointer;">Cancel</button>
+            <button id="stReportExportBtn" style="padding:8px 12px;border:1px solid #f97316;border-radius:8px;background:#f97316;color:#fff;cursor:pointer;">Export HTML</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      const close = () => overlay.remove();
+      overlay.querySelector('#stReportCancelBtn').addEventListener('click', close);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+      overlay.querySelector('#stReportExportBtn').addEventListener('click', () => {
+        const checked = Array.from(overlay.querySelectorAll('input[data-section-id]:checked')).map((el) => el.getAttribute('data-section-id'));
+        if (!checked.length) return;
+        close();
+        onConfirm(checked);
+      });
+    };
 
     return {
       getData: () => getFallbackData(),
@@ -1319,13 +1396,35 @@ const StatisticoHeader = {
       exportHtml: () => {
         const data = getFallbackData();
         if (!data) { alert('No data available for export yet.'); return; }
-        const escapedVar = String(data.headers[0]).replace(/[<>&"]/g, (m) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[m]));
-        const rows = data.allRows.map((r, i) => `<tr><td>${i + 1}</td><td>${r[0] ?? ''}</td></tr>`).join('');
-        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapedVar} - Univariate Export</title><style>body{font-family:Segoe UI,Arial,sans-serif;padding:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:6px 8px;text-align:left}th{background:#f3f4f6}</style></head><body><h2>Univariate Export</h2><p><strong>Variable:</strong> ${escapedVar} &nbsp; <strong>n:</strong> ${data.allRows.length}</p><table><thead><tr><th>#</th><th>${escapedVar}</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
-        downloadBlob(
-          new Blob([html], { type: 'text/html' }),
-          `Univariate_${safeName(data.headers[0])}_${timestamp()}.html`
-        );
+        const sections = getUnivariateMenuItems();
+        if (!sections.length) {
+          alert('No report sections available from the current menu.');
+          return;
+        }
+        pickReportSections(sections, (selectedIds) => {
+          const selected = sections.filter((s) => selectedIds.includes(String(s.id)));
+          const values = data.allRows.map((r) => Number(r[0])).filter((v) => Number.isFinite(v));
+          const stats = computeStats(values);
+          const escapedVar = esc(data.headers[0]);
+          const toc = selected.map((s, i) => `<li><a href="#sec_${i + 1}">${esc(s.label)}</a></li>`).join('');
+          const statTable = stats ? `
+            <table><thead><tr><th>n</th><th>Mean</th><th>SD</th><th>Min</th><th>Q1</th><th>Median</th><th>Q3</th><th>Max</th></tr></thead>
+            <tbody><tr><td>${stats.n}</td><td>${stats.mean.toFixed(4)}</td><td>${stats.sd.toFixed(4)}</td><td>${stats.min.toFixed(4)}</td><td>${stats.q1.toFixed(4)}</td><td>${stats.median.toFixed(4)}</td><td>${stats.q3.toFixed(4)}</td><td>${stats.max.toFixed(4)}</td></tr></tbody></table>
+          ` : '<p>No numeric summary available.</p>';
+          const sectionBlocks = selected.map((s, i) => `
+            <section id="sec_${i + 1}">
+              <h2>${i + 1}. ${esc(s.label)}</h2>
+              <p>This section is included from the selected menu items for <strong>${escapedVar}</strong>.</p>
+              ${statTable}
+            </section>
+          `).join('');
+          const dataRows = data.allRows.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r[0] ?? '')}</td></tr>`).join('');
+          const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapedVar} - Long Report</title><style>body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:980px;margin:auto;color:#0f172a}h1{margin-bottom:4px}h2{margin-top:28px}table{border-collapse:collapse;width:100%;margin-top:8px}th,td{border:1px solid #d1d5db;padding:6px 8px;text-align:left}th{background:#f3f4f6}nav{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}section{page-break-inside:avoid}.meta{color:#475569;font-size:13px}</style></head><body><h1>Univariate Long Report</h1><p class="meta"><strong>Variable:</strong> ${escapedVar} &nbsp;&middot;&nbsp; <strong>n:</strong> ${data.allRows.length} &nbsp;&middot;&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</p><nav><strong>Included sections</strong><ol>${toc}</ol></nav>${sectionBlocks}<section id="raw_data"><h2>Appendix: Data Table</h2><table><thead><tr><th>#</th><th>${escapedVar}</th></tr></thead><tbody>${dataRows}</tbody></table></section></body></html>`;
+          downloadBlob(
+            new Blob([html], { type: 'text/html' }),
+            `Univariate_LongReport_${safeName(data.headers[0])}_${timestamp()}.html`
+          );
+        });
       }
     };
   },

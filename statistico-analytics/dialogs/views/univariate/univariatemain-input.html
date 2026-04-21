@@ -141,11 +141,11 @@
       <!-- Footer -->
       <div class="cfg-footer">
         <button class="cfg-btn cancel" onclick="cancel()"><i class="fa-solid fa-times"></i> Cancel</button>
-        <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Load a previously saved configuration">
-          <i class="fa-solid fa-clock-rotate-left"></i> Load previous…
+        <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Open saved templates">
+          <i class="fa-solid fa-folder-open"></i> Templates
         </button>
-        <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" disabled title="Save current configuration">
-          <i class="fa-solid fa-floppy-disk"></i> Save configuration
+        <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" disabled title="Save this setup to reuse with other variables or datasets">
+          <i class="fa-solid fa-floppy-disk"></i> Save Template
         </button>
         <button class="cfg-btn run" id="runBtn" onclick="runAnalysis()" disabled>
           <i class="fa-solid fa-play"></i> Run Full Analysis
@@ -289,7 +289,11 @@
       const saveBtn = document.getElementById('btnSaveConfig');
       if (saveBtn) saveBtn.disabled = !ok;
       const loadBtn = document.getElementById('btnLoadPrev');
-      if (loadBtn) loadBtn.disabled = !(typeof CfgSave !== 'undefined' && CfgSave.getSavedList('unimain-config').length > 0);
+      const templatesCount = (typeof CfgSave !== 'undefined') ? CfgSave.getSavedList(STORAGE_KEY_UNIMAIN).length : 0;
+      if (loadBtn) {
+        loadBtn.disabled = templatesCount === 0;
+        loadBtn.innerHTML = `<i class="fa-solid fa-folder-open"></i> Templates${templatesCount > 0 ? ` (${templatesCount})` : ''}`;
+      }
     }
 
     const STORAGE_KEY_UNIMAIN = 'unimain-config';
@@ -301,7 +305,10 @@
       const transform = document.querySelector('input[name="transform"]:checked')?.value || 'none';
       const trimMin   = parseInt(document.getElementById('trimMin').value);
       const trimMax   = parseInt(document.getElementById('trimMax').value);
-      CfgSave.showPrompt('Save configuration', 'Configuration name', colName, function(name) {
+      const suggestedName = transform === 'none'
+        ? `${colName} - raw distribution`
+        : `${colName} - ${transform} transform`;
+      CfgSave.showPrompt('Save Analysis Template', 'Template name', suggestedName, function(name) {
         CfgSave.saveCfgEntry(STORAGE_KEY_UNIMAIN, name, {
           columnIndex: idx, columnName: colName, transform, trimMin, trimMax
         }, function() { onVariableSelect(); });

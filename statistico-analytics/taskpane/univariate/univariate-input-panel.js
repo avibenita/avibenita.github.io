@@ -148,6 +148,15 @@ function openUnivariateBuilderDialog() {
     try { univariateResultsDialog.close(); } catch (_e) {}
     univariateResultsDialog = null;
   }
+  try {
+    const payload = {
+      headers: univariateRangeData[0] || [],
+      rows: univariateRangeData.slice(1),
+      address: univariateRangeAddress,
+      savedSpec: JSON.parse(sessionStorage.getItem('univariateModelSpec') || 'null')
+    };
+    localStorage.setItem('univariateConfigPayload', JSON.stringify(payload));
+  } catch (_e) {}
   const dialogUrl = `${getDialogsBaseUrl()}univariate/univariate-input.html?v=${Date.now()}`;
   Office.context.ui.displayDialogAsync(
     dialogUrl,
@@ -198,6 +207,11 @@ function sendDialogData() {
   const headers = univariateRangeData[0] || [];
   const rows = univariateRangeData.slice(1);
   const savedSpec = JSON.parse(sessionStorage.getItem('univariateModelSpec') || 'null');
+  try {
+    localStorage.setItem('univariateConfigPayload', JSON.stringify({
+      headers, rows, address: univariateRangeAddress, savedSpec
+    }));
+  } catch (_e) {}
   try {
     univariateDialog.messageChild(JSON.stringify({
       type: 'UNIVARIATE_DATA',

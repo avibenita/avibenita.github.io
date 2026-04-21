@@ -172,6 +172,18 @@
         onMessageFromParent
       );
       send({ action: 'ready' });
+      // Fallback: hydrate from shared storage if Office message is missed.
+      setTimeout(() => {
+        if (STATE.headers && STATE.headers.length) return;
+        try {
+          const raw = localStorage.getItem('univariateConfigPayload');
+          if (!raw) return;
+          const payload = JSON.parse(raw);
+          if (payload && Array.isArray(payload.headers) && Array.isArray(payload.rows)) {
+            applyPayload(payload);
+          }
+        } catch (_e) {}
+      }, 700);
     });
 
     function onMessageFromParent(arg) {
@@ -330,7 +342,9 @@
       }
       data = applyTransform(data, transform);
       const results = calculateStatistics(data, STATE.address, colName, transform, trimMin, trimMax);
-      send({ action:'univariateResults', spec:{columnIndex:idx,columnName:colName,trimMin,trimMax,transform}, data:results });
+      const message = { action:'univariateResults', spec:{columnIndex:idx,columnName:colName,trimMin,trimMax,transform}, data:results };
+      send(message);
+      setTimeout(() => send(message), 200);
     }
 
     function applyTransform(data, t) {

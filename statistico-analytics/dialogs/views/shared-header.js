@@ -1141,8 +1141,8 @@ const StatisticoHeader = {
 
     return `
       <div class="header-global-controls">
-        <label class="header-decimals-label" for="headerDecimalSelect">Decimals Precision</label>
-        <select id="headerDecimalSelect" class="header-decimals-select" onchange="StatisticoHeader.onDecimalChange(this.value)">
+        <label class="header-decimals-label" for="decimalSelect">Decimals Precision</label>
+        <select id="decimalSelect" class="header-decimals-select" onchange="StatisticoHeader.onDecimalChange(this.value)">
           ${optionsHtml}
         </select>
         <button id="headerThemeBtn" class="header-theme-btn" onclick="StatisticoHeader.toggleTheme()" title="Toggle light / dark theme">
@@ -1311,10 +1311,8 @@ const StatisticoHeader = {
   applyDecimalPreferenceToPage(value, options = {}) {
     const normalized = this.setDecimalPreference(value);
     this._installDecimalOverride();
-    const headerSelect = document.getElementById('headerDecimalSelect');
+    const headerSelect = document.getElementById('decimalSelect');
     if (headerSelect && headerSelect.value !== normalized) headerSelect.value = normalized;
-    const sidebarSelect = document.getElementById('decimalSelect');
-    if (sidebarSelect && sidebarSelect.value !== normalized) sidebarSelect.value = normalized;
 
     const numericValue = normalized === 'auto' ? null : String(Math.max(0, parseInt(normalized, 10) || 0));
     const localSelect = document.getElementById('decimals');

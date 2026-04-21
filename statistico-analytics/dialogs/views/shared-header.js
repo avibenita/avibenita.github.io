@@ -1143,15 +1143,28 @@ const StatisticoHeader = {
    * Call this right after StatisticoHeader.init().
    */
   registerActions({ getData, saveModel, exportHtml, exportJson, moduleName = 'Save model' } = {}) {
-    this._pendingActions = { getData, saveModel, exportHtml, exportJson, moduleName };
+    const incoming = { getData, saveModel, exportHtml, exportJson, moduleName };
+    this._pendingActions = this._mergeActionsWithFallback(incoming);
     this.render();
     this._mountSidebarUtilities();
   },
 
+  _mergeActionsWithFallback(actions) {
+    if (this.module !== 'univariate') return actions;
+    const fallback = this._buildUnivariateFallbackActions();
+    return {
+      ...fallback,
+      ...actions,
+      moduleName: actions.moduleName || fallback.moduleName || 'Save model'
+    };
+  },
+
   _ensureDefaultActions() {
-    if (this._pendingActions) return;
     if (this.module === 'univariate') {
-      this._pendingActions = this._buildUnivariateFallbackActions();
+      const existing = this._pendingActions || {};
+      this._pendingActions = this._mergeActionsWithFallback(existing);
+    } else if (this._pendingActions) {
+      return;
     }
   },
 

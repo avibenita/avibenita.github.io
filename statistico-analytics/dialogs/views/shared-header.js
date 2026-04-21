@@ -1276,8 +1276,24 @@ const StatisticoHeader = {
     return normalized;
   },
 
-  applyDecimalPreferenceToPage(value) {
+  _installDecimalOverride() {
+    if (typeof Number.prototype.__statisticoToFixedOriginal === 'function') return;
+    Number.prototype.__statisticoToFixedOriginal = Number.prototype.toFixed;
+    Number.prototype.toFixed = function (digits) {
+      try {
+        const pref = localStorage.getItem('statistico-decimals') || 'auto';
+        if (pref !== 'auto') {
+          const forced = Math.max(0, parseInt(pref, 10) || 0);
+          return Number.prototype.__statisticoToFixedOriginal.call(this, forced);
+        }
+      } catch (e) {}
+      return Number.prototype.__statisticoToFixedOriginal.call(this, digits);
+    };
+  },
+
+  applyDecimalPreferenceToPage(value, options = {}) {
     const normalized = this.setDecimalPreference(value);
+    this._installDecimalOverride();
     const sidebarSelect = document.getElementById('decimalSelect');
     if (sidebarSelect && sidebarSelect.value !== normalized) sidebarSelect.value = normalized;
 
@@ -1293,14 +1309,21 @@ const StatisticoHeader = {
       if (typeof window.updateDecimals === 'function') window.updateDecimals(numericValue);
     }
 
-    if (typeof window.setDecimalPrecision === 'function') window.setDecimalPrecision();
-    else if (typeof window.updateDecimalPrecision === 'function') window.updateDecimalPrecision();
+    const hasSetter = typeof window.setDecimalPrecision === 'function';
+    const hasUpdater = typeof window.updateDecimalPrecision === 'function';
+    if (hasSetter) window.setDecimalPrecision();
+    else if (hasUpdater) window.updateDecimalPrecision();
+    else if (options && options.isUserChange) {
+      // Some pages use hardcoded toFixed(...) only. Reload once to re-render with the shared override.
+      window.location.reload();
+      return;
+    }
 
     document.dispatchEvent(new CustomEvent('statistico-decimals-changed', { detail: { value: normalized } }));
   },
 
   onDecimalChange(value) {
-    this.applyDecimalPreferenceToPage(value);
+    this.applyDecimalPreferenceToPage(value, { isUserChange: true });
   },
 
   /* ─────────────────────────────────────────────────────────────────
@@ -1336,6 +1359,7 @@ const StatisticoHeader = {
     this._ensureDefaultActions();
     this._mountSidebarUtilities();
     const persistedDecimals = this.getDecimalPreference();
+    this._installDecimalOverride();
     setTimeout(() => this.applyDecimalPreferenceToPage(persistedDecimals), 0);
   },
 

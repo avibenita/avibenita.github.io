@@ -105,8 +105,8 @@
   'use strict';
 
   const SAVE_BTN_TEXT = 'Save this Configuration';
-  const SAVE_BTN_TIP = 'Save this exact configuration so you can reuse it later.';
-  const LOAD_BTN_TIP = 'Open saved configurations. Each saved item stores the exact setup that was active when it was saved.';
+  const SAVE_BTN_TIP = 'Save this configuration.';
+  const LOAD_BTN_TIP = 'Open saved configurations.';
   const LOAD_BTN_TEXT = (count) => count > 0 ? `Saved configs (${count})...` : 'Saved configs...';
 
   function escHtml(s) {

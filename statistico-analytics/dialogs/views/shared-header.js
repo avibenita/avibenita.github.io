@@ -56,7 +56,13 @@ const StatisticoHeader = {
 
     try { localStorage.setItem('statistico-theme', theme); } catch(e) {}
 
-    // Update top-bar theme button (if present)
+    // Update compact header theme control (if present)
+    const headerThemeIcon = document.getElementById('headerThemeIcon');
+    const headerThemeLabel = document.getElementById('headerThemeLabel');
+    if (headerThemeIcon) headerThemeIcon.textContent = theme === 'light' ? '☀️' : '🌙';
+    if (headerThemeLabel) headerThemeLabel.textContent = theme === 'light' ? 'Light' : 'Dark';
+
+    // Backward-compatible top-bar theme button (if present)
     const btn = document.getElementById('themeToggleBtn');
     if (btn) {
       const icon  = btn.querySelector('.toggle-icon');
@@ -297,11 +303,8 @@ const StatisticoHeader = {
       'power': 'Power & Sample Size'
     };
     
-    const currentTheme = this.getTheme();
-    const themeIcon    = currentTheme === 'light' ? '☀️' : '🌙';
-    const themeLabel   = currentTheme === 'light' ? 'Light' : 'Dark';
-
     const actionButtonsHtml = this._pendingActions ? this._renderActionButtons(this._pendingActions) : '';
+    const headerGlobalControls = this._renderHeaderGlobalControls();
 
     // All sidebar-based modules hide the shared-header navrow to avoid duplicate navigation.
     const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate');
@@ -316,17 +319,8 @@ const StatisticoHeader = {
           </div>
         </div>
         <div class="header-right">
-          ${hideNavrow ? '' : `
-            ${actionButtonsHtml}
-            <button id="themeToggleBtn"
-                    class="theme-toggle-btn"
-                    onclick="StatisticoHeader.toggleTheme()"
-                    title="Toggle light / dark theme">
-              <span class="toggle-icon">${themeIcon}</span>
-              <div class="toggle-track"><div class="toggle-thumb"></div></div>
-              <span class="toggle-label">${themeLabel}</span>
-            </button>
-          `}
+          ${hideNavrow ? '' : actionButtonsHtml}
+          ${headerGlobalControls}
         </div>
       </div>
     `;
@@ -767,10 +761,6 @@ const StatisticoHeader = {
       return `<div class="sb-group"><div class="sb-group-title">${group.title || ''}</div><div class="sb-items-rail">${itemsHtml}</div></div>`;
     }).join('');
 
-    const bottomDecimals = cfg.bottomDecimals || ['auto', '0', '1', '2', '3', '4'];
-    const defaultDecimal = cfg.defaultDecimal || '2';
-    const optionsHtml = bottomDecimals.map((v) => `<option value="${v}" ${v === defaultDecimal ? 'selected' : ''}>${v === 'auto' ? 'Auto' : v}</option>`).join('');
-
     nav.innerHTML = `
       <div class="sb-logo">
         <div class="sb-logo-icon"><i class="fa-solid ${cfg.logoIcon || 'fa-chart-line'}"></i></div>
@@ -787,15 +777,6 @@ const StatisticoHeader = {
         </button>
       </div>
       <div class="sb-body">${groupsHtml}</div>
-      <div class="sb-bottom">
-        <div class="sb-bottom-row">
-          <i class="fa-solid fa-hashtag sb-bottom-icon"></i>
-          <span class="sb-bottom-label">Decimals:</span>
-          <select id="decimalSelect" class="sb-bottom-select" onchange="StatisticoHeader.onDecimalChange(this.value)">
-            ${optionsHtml}
-          </select>
-        </div>
-      </div>
     `;
   },
 
@@ -1149,6 +1130,29 @@ const StatisticoHeader = {
     this._mountSidebarUtilities();
   },
 
+  _renderHeaderGlobalControls() {
+    const cfg = this._getSharedSidebarConfig ? this._getSharedSidebarConfig() : null;
+    const decimalOptions = cfg?.bottomDecimals || ['auto', '0', '1', '2', '3', '4'];
+    const persisted = this.getDecimalPreference();
+    const selected = decimalOptions.includes(persisted) ? persisted : (cfg?.defaultDecimal || '2');
+    const optionsHtml = decimalOptions.map((v) => `<option value="${v}" ${v === selected ? 'selected' : ''}>${v === 'auto' ? 'Auto' : v}</option>`).join('');
+    const theme = this.getTheme();
+    const themeIcon = theme === 'light' ? '☀️' : '🌙';
+
+    return `
+      <div class="header-global-controls">
+        <label class="header-decimals-label" for="headerDecimalSelect">Decimals Precision</label>
+        <select id="headerDecimalSelect" class="header-decimals-select" onchange="StatisticoHeader.onDecimalChange(this.value)">
+          ${optionsHtml}
+        </select>
+        <button id="headerThemeBtn" class="header-theme-btn" onclick="StatisticoHeader.toggleTheme()" title="Toggle light / dark theme">
+          <span id="headerThemeLabel">Theme</span>
+          <span id="headerThemeIcon">${themeIcon}</span>
+        </button>
+      </div>
+    `;
+  },
+
   _mergeActionsWithFallback(actions) {
     if (this.module !== 'univariate') return actions;
     const fallback = this._buildUnivariateFallbackActions();
@@ -1307,6 +1311,8 @@ const StatisticoHeader = {
   applyDecimalPreferenceToPage(value, options = {}) {
     const normalized = this.setDecimalPreference(value);
     this._installDecimalOverride();
+    const headerSelect = document.getElementById('headerDecimalSelect');
+    if (headerSelect && headerSelect.value !== normalized) headerSelect.value = normalized;
     const sidebarSelect = document.getElementById('decimalSelect');
     if (sidebarSelect && sidebarSelect.value !== normalized) sidebarSelect.value = normalized;
 
@@ -1383,10 +1389,6 @@ const StatisticoHeader = {
     const existing = document.getElementById('sbUtilities');
     if (existing) existing.remove();
 
-    const currentTheme = this.getTheme();
-    const themeIcon = currentTheme === 'light' ? '☀️' : '🌙';
-    const themeLabel = currentTheme === 'light' ? 'Light' : 'Dark';
-
     const actions = this._pendingActions || {};
     const hasView = typeof actions.getData === 'function';
     const hasHtml = typeof actions.exportHtml === 'function';
@@ -1420,13 +1422,6 @@ const StatisticoHeader = {
               title="${hasJson ? 'Download results as JSON file' : 'JSON export is not available for this page yet'}">
         <i class="fa-solid fa-download"></i>
         <span class="sb-item-label">JSON</span>
-      </button>
-      <button class="sb-bottom-btn sb-bottom-btn--theme"
-              id="sbThemeToggleBtn"
-              onclick="StatisticoHeader.toggleTheme()"
-              title="Toggle light / dark theme">
-        <span class="sb-utility-theme-icon">${themeIcon}</span>
-        <span class="sb-item-label sb-utility-theme-label">${themeLabel}</span>
       </button>
     `;
     nav.appendChild(utilities);

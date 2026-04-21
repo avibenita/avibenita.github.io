@@ -31,7 +31,7 @@
     if (document.getElementById(scriptId)) return;
     const script = document.createElement('script');
     script.id = scriptId;
-    script.src = resolveAssetUrl('src/shared/js/tooltip-template.js?v=20260420a');
+    script.src = resolveAssetUrl('src/shared/js/tooltip-template.js?v=20260420b');
     script.async = true;
     script.onload = initTooltip;
     document.head.appendChild(script);
@@ -128,13 +128,15 @@
     const count = getSavedList(storageKey).length;
 
     if (saveBtn) {
-      saveBtn.title = SAVE_BTN_TIP;
+      saveBtn.removeAttribute('title');
+      saveBtn.setAttribute('aria-label', SAVE_BTN_TIP);
       saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> ' + SAVE_BTN_TEXT;
       saveBtn.removeAttribute('data-tip');
       saveBtn.setAttribute('data-st-tip', SAVE_BTN_TIP);
     }
     if (loadBtn) {
-      loadBtn.title = LOAD_BTN_TIP;
+      loadBtn.removeAttribute('title');
+      loadBtn.setAttribute('aria-label', LOAD_BTN_TIP);
       loadBtn.innerHTML = '<i class="fa-solid fa-folder-open"></i> ' + LOAD_BTN_TEXT(count);
       loadBtn.removeAttribute('data-tip');
       loadBtn.setAttribute('data-st-tip', LOAD_BTN_TIP);

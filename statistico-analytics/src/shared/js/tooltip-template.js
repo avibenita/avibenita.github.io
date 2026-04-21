@@ -65,7 +65,7 @@
   }
 
   function prepareElement(el) {
-    if (!el || el.getAttribute(SCRIPT_FLAG) === '1') return;
+    if (!el) return;
     const text = resolveText(el);
     if (!text) return;
     if (!el.getAttribute('data-st-tip')) el.setAttribute('data-st-tip', text);

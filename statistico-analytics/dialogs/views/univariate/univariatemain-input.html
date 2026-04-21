@@ -91,6 +91,7 @@
                 <input type="range" id="trimMax" class="cfg-slider" min="51" max="100" value="100" step="1" oninput="onTrimChange()"/>
                 <span class="cfg-slider-val" id="trimMaxVal">100%</span>
               </div>
+              <div class="cfg-hint" id="trimResultN">Resulting n: --</div>
             </div>
           </div>
 
@@ -226,16 +227,12 @@
       stopRequestDataRetry();
       send({ action: 'dataApplied' });
 
-      if (STATE.savedSpec) {
-        const savedIdx   = STATE.savedSpec.columnIndex;
-        const savedRadio = document.querySelector(`input[name="selectedColumn"][value="${savedIdx}"]`);
-        if (savedRadio && !savedRadio.disabled) savedRadio.checked = true;
-        document.getElementById('trimMin').value = STATE.savedSpec.trimMin ?? 0;
-        document.getElementById('trimMax').value = STATE.savedSpec.trimMax ?? 100;
-        const radio = document.querySelector(`input[name="transform"][value="${STATE.savedSpec.transform || 'none'}"]`);
-        if (radio) radio.checked = true;
-        onTrimChange();
-      }
+      document.querySelectorAll('input[name="selectedColumn"]').forEach((radio) => { radio.checked = false; });
+      document.getElementById('trimMin').value = 0;
+      document.getElementById('trimMax').value = 100;
+      const defaultTransform = document.querySelector('input[name="transform"][value="none"]');
+      if (defaultTransform) defaultTransform.checked = true;
+      onTrimChange();
       onVariableSelect();
 
       document.getElementById('loadingSpinner').style.display = 'none';
@@ -291,6 +288,7 @@
       if (typeof CfgSave !== 'undefined' && typeof CfgSave.syncConfigButtons === 'function') {
         CfgSave.syncConfigButtons(STORAGE_KEY_UNIMAIN);
       }
+      updateTrimResultN();
     }
 
     const STORAGE_KEY_UNIMAIN = 'unimain-config';
@@ -339,6 +337,41 @@
         document.getElementById('trimMax').value = parseInt(minV)+1;
         document.getElementById('trimMaxVal').textContent = `${parseInt(minV)+1}%`;
       }
+      updateTrimResultN();
+    }
+
+    function updateTrimResultN() {
+      const out = document.getElementById('trimResultN');
+      if (!out) return;
+      const sel = document.querySelector('input[name="selectedColumn"]:checked');
+      if (!sel) {
+        out.textContent = 'Resulting n: --';
+        return;
+      }
+      const idx = parseInt(sel.value, 10);
+      if (!Number.isInteger(idx)) {
+        out.textContent = 'Resulting n: --';
+        return;
+      }
+      const values = STATE.rows
+        .map((row) => row[idx])
+        .filter((v) => v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v)))
+        .map((v) => parseFloat(v));
+      if (!values.length) {
+        out.textContent = 'Resulting n: 0';
+        return;
+      }
+
+      const trimMin = parseInt(document.getElementById('trimMin').value, 10) || 0;
+      const trimMax = parseInt(document.getElementById('trimMax').value, 10) || 100;
+      let count = values.length;
+      if (trimMin > 0 || trimMax < 100) {
+        const sorted = [...values].sort((a, b) => a - b);
+        const minVal = sorted[Math.floor((sorted.length - 1) * trimMin / 100)];
+        const maxVal = sorted[Math.floor((sorted.length - 1) * trimMax / 100)];
+        count = values.filter((v) => v >= minVal && v <= maxVal).length;
+      }
+      out.textContent = `Resulting n: ${count}`;
     }
 
     function runAnalysis() {

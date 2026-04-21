@@ -1156,14 +1156,61 @@ const StatisticoHeader = {
   },
 
   _buildUnivariateFallbackActions() {
+    const coerceNumericVector = (input) => {
+      if (!Array.isArray(input)) return [];
+      if (!input.length) return [];
+      const source = Array.isArray(input[0]) ? input.map((r) => (Array.isArray(r) ? r[0] : r)) : input;
+      return source
+        .map((v) => (v === null || v === undefined || v === '' ? null : Number(v)))
+        .filter((v) => v === null || Number.isFinite(v));
+    };
+
+    const pickValues = (obj) => {
+      if (!obj || typeof obj !== 'object') return [];
+      return coerceNumericVector(
+        obj.rawData ||
+        obj.values ||
+        obj.data?.rawData ||
+        obj.data?.values ||
+        obj.data ||
+        obj.series ||
+        []
+      );
+    };
+
     const getFallbackData = () => {
       try {
-        const raw = localStorage.getItem('univariateResults');
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        const values = Array.isArray(parsed?.rawData) ? parsed.rawData : [];
+        let parsed = null;
+        try {
+          const raw = localStorage.getItem('univariateResults');
+          if (raw) parsed = JSON.parse(raw);
+        } catch (e) {}
+        if (!parsed) {
+          try {
+            const rawSession = sessionStorage.getItem('univariateResults');
+            if (rawSession) parsed = JSON.parse(rawSession);
+          } catch (e) {}
+        }
+        if (!parsed && window.__statisticoLastUnivariateData && typeof window.__statisticoLastUnivariateData === 'object') {
+          parsed = window.__statisticoLastUnivariateData;
+        }
+
+        let values = pickValues(parsed || {});
+        if (!values.length) {
+          values = coerceNumericVector(
+            window.currentDataArray ||
+            window.originalData ||
+            window.currentData ||
+            window.data ||
+            []
+          );
+        }
         if (!values.length) return null;
-        const varName = parsed.column || this.variableName || 'Variable';
+
+        const varName =
+          (parsed && (parsed.column || parsed.variableName || parsed.variable || parsed.colName)) ||
+          this.variableName ||
+          'Variable';
         const allRows = values.map((v) => [v === null || v === undefined ? null : v]);
         return {
           headers: [varName],

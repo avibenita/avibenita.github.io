@@ -140,6 +140,14 @@ function attachUniEmbedListener() {
 // ─── OPEN CONFIG: DIALOG FALLBACK ────────────────────────────────────────────
 function openUnivariateBuilderDialog() {
   if (!univariateRangeData || univariateRangeData.length < 2) return;
+  if (univariateDialog) {
+    try { univariateDialog.close(); } catch (_e) {}
+    univariateDialog = null;
+  }
+  if (univariateResultsDialog) {
+    try { univariateResultsDialog.close(); } catch (_e) {}
+    univariateResultsDialog = null;
+  }
   const dialogUrl = `${getDialogsBaseUrl()}univariate/univariate-input.html?v=${Date.now()}`;
   Office.context.ui.displayDialogAsync(
     dialogUrl,
@@ -151,7 +159,8 @@ function openUnivariateBuilderDialog() {
         return;
       }
       univariateDialog = asyncResult.value;
-      setTimeout(sendDialogData, 550);
+      // Retry sends because Office dialogs sometimes miss the first payload after reopen.
+      [550, 1200, 2000].forEach((delay) => setTimeout(sendDialogData, delay));
       univariateDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
         try {
           const message = JSON.parse(arg.message || '{}');
@@ -189,10 +198,12 @@ function sendDialogData() {
   const headers = univariateRangeData[0] || [];
   const rows = univariateRangeData.slice(1);
   const savedSpec = JSON.parse(sessionStorage.getItem('univariateModelSpec') || 'null');
-  univariateDialog.messageChild(JSON.stringify({
-    type: 'UNIVARIATE_DATA',
-    payload: { headers, rows, address: univariateRangeAddress, savedSpec }
-  }));
+  try {
+    univariateDialog.messageChild(JSON.stringify({
+      type: 'UNIVARIATE_DATA',
+      payload: { headers, rows, address: univariateRangeAddress, savedSpec }
+    }));
+  } catch (_e) {}
 }
 
 function queueResultsViewSwitch(viewPath) {

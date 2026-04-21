@@ -1148,6 +1148,77 @@ const StatisticoHeader = {
     this._mountSidebarUtilities();
   },
 
+  _ensureDefaultActions() {
+    if (this._pendingActions) return;
+    if (this.module === 'univariate') {
+      this._pendingActions = this._buildUnivariateFallbackActions();
+    }
+  },
+
+  _buildUnivariateFallbackActions() {
+    const getFallbackData = () => {
+      try {
+        const raw = localStorage.getItem('univariateResults');
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const values = Array.isArray(parsed?.rawData) ? parsed.rawData : [];
+        if (!values.length) return null;
+        const varName = parsed.column || this.variableName || 'Variable';
+        const allRows = values.map((v) => [v === null || v === undefined ? null : v]);
+        return {
+          headers: [varName],
+          allRows,
+          usedRows: allRows,
+          fullRange: null,
+          usedRange: null,
+          columnRoles: ['y'],
+          notice: null
+        };
+      } catch (e) {
+        return null;
+      }
+    };
+
+    const downloadBlob = (blob, filename) => {
+      const url = URL.createObjectURL(blob);
+      const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+    };
+
+    const timestamp = () => new Date().toISOString().slice(0, 19).replace(/[-T:]/g, '');
+    const safeName = (name) => String(name || 'Variable').replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 30);
+
+    return {
+      getData: () => getFallbackData(),
+      exportJson: () => {
+        const data = getFallbackData();
+        if (!data) { alert('No data available for export yet.'); return; }
+        const payload = {
+          variableName: data.headers[0],
+          sampleSize: data.allRows.length,
+          values: data.allRows.map((r) => r[0])
+        };
+        downloadBlob(
+          new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
+          `Univariate_${safeName(data.headers[0])}_${timestamp()}.json`
+        );
+      },
+      exportHtml: () => {
+        const data = getFallbackData();
+        if (!data) { alert('No data available for export yet.'); return; }
+        const escapedVar = String(data.headers[0]).replace(/[<>&"]/g, (m) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[m]));
+        const rows = data.allRows.map((r, i) => `<tr><td>${i + 1}</td><td>${r[0] ?? ''}</td></tr>`).join('');
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapedVar} - Univariate Export</title><style>body{font-family:Segoe UI,Arial,sans-serif;padding:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:6px 8px;text-align:left}th{background:#f3f4f6}</style></head><body><h2>Univariate Export</h2><p><strong>Variable:</strong> ${escapedVar} &nbsp; <strong>n:</strong> ${data.allRows.length}</p><table><thead><tr><th>#</th><th>${escapedVar}</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+        downloadBlob(
+          new Blob([html], { type: 'text/html' }),
+          `Univariate_${safeName(data.headers[0])}_${timestamp()}.html`
+        );
+      }
+    };
+  },
+
   getDecimalPreference() {
     try { return localStorage.getItem('statistico-decimals') || 'auto'; } catch (e) { return 'auto'; }
   },
@@ -1215,6 +1286,7 @@ const StatisticoHeader = {
       layout.appendChild(rightCol);
     }
     this._renderSharedSidebar();
+    this._ensureDefaultActions();
     this._mountSidebarUtilities();
     const persistedDecimals = this.getDecimalPreference();
     setTimeout(() => this.applyDecimalPreferenceToPage(persistedDecimals), 0);

@@ -552,6 +552,7 @@ function openExternalDialogUrl(url, options) {
 }
 
 function runHubModuleAction(actionKey) {
+  dismissHubButtonTooltips();
   var module = HUB_ACTIONS[actionKey];
   if (!module) return;
   if (module.comingSoon) {
@@ -563,6 +564,17 @@ function runHubModuleAction(actionKey) {
     return;
   }
   navigateToModule(module.id);
+}
+
+function dismissHubButtonTooltips() {
+  try {
+    document.querySelectorAll(".category-module-btn").forEach(function (btn) {
+      btn.blur();
+    });
+    if (document.activeElement && typeof document.activeElement.blur === "function") {
+      document.activeElement.blur();
+    }
+  } catch (_e) {}
 }
 
 function getDialogsBaseUrl() {
@@ -1375,5 +1387,9 @@ Office.onReady(function(info) {
       .catch(function(err) {
         console.error("Hub config load failed:", err);
       });
+  });
+  window.addEventListener("blur", dismissHubButtonTooltips);
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) dismissHubButtonTooltips();
   });
 });

@@ -1203,11 +1203,15 @@ const StatisticoHeader = {
   _mergeActionsWithFallback(actions) {
     if (this.module !== 'univariate') return actions;
     const fallback = this._buildUnivariateFallbackActions();
-    return {
+    const merged = {
       ...fallback,
       ...actions,
       moduleName: actions.moduleName || fallback.moduleName || 'Save model'
     };
+    // Always use shared univariate HTML exporter (section checklist + long report),
+    // even if a page registers its own exportHtml.
+    merged.exportHtml = fallback.exportHtml;
+    return merged;
   },
 
   _ensureDefaultActions() {

@@ -1,4 +1,50 @@
 /* ═══════════════════════════════════════════════════════════════════════════
+   shared tooltip bootstrap
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  function resolveAssetUrl(relPath) {
+    const { origin, pathname } = window.location;
+    if (pathname.includes('/dialogs/views/')) {
+      return `${origin}${pathname.split('/dialogs/views/')[0]}/${relPath}`;
+    }
+    if (pathname.includes('/taskpane/')) {
+      return `${origin}${pathname.split('/taskpane/')[0]}/${relPath}`;
+    }
+    return `${origin}/${relPath}`;
+  }
+
+  function initTooltip() {
+    if (window.StatisticoTooltip && typeof window.StatisticoTooltip.init === 'function') {
+      window.StatisticoTooltip.init();
+      window.StatisticoTooltip.refresh();
+    }
+  }
+
+  function ensureTooltipScript() {
+    if (window.StatisticoTooltip) {
+      initTooltip();
+      return;
+    }
+    const scriptId = 'st-tooltip-template-script';
+    if (document.getElementById(scriptId)) return;
+    const script = document.createElement('script');
+    script.id = scriptId;
+    script.src = resolveAssetUrl('src/shared/js/tooltip-template.js?v=20260420a');
+    script.async = true;
+    script.onload = initTooltip;
+    document.head.appendChild(script);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensureTooltipScript);
+  } else {
+    ensureTooltipScript();
+  }
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════════
    shared-config.js  –  Theme toggle + utilities for config dialogs
    VERSION: 2026-03-09-003
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -89,6 +135,9 @@
         '</div>' +
       '</div>';
     document.body.appendChild(overlay);
+    if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
+      window.StatisticoTooltip.refresh(overlay);
+    }
     var input = overlay.querySelector('#cfgPromptInput');
     input.focus(); input.select();
     function confirm() {
@@ -147,6 +196,9 @@
       '</div>';
 
     document.body.appendChild(overlay);
+    if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
+      window.StatisticoTooltip.refresh(overlay);
+    }
 
     // Store the onLoad callback for use by item clicks
     CfgSave._pendingLoad[storageKey] = onLoad;

@@ -359,7 +359,7 @@ function renderCategoryModuleBtn(m, tabStyle, scopePrefix) {
   var styleClass = tabStyle === "soft" ? " category-module-btn--soft" : "";
   var actionKey = (String(scopePrefix || "scope") + ":" + String(m.id || "item")).replace(/[^a-zA-Z0-9:_-]/g, "-");
   HUB_ACTIONS[actionKey] = m;
-  return '<button class="category-module-btn' + styleClass + '" data-module-id="' + escapeHtml(m.id) + '" data-tip="' + escapeHtml(tip) + '" title="' + escapeHtml(tip) + '" onclick="runHubModuleAction(\'' + escapeHtml(actionKey) + '\')">' + escapeHtml(m.label) + "</button>";
+  return '<button class="category-module-btn' + styleClass + '" data-module-id="' + escapeHtml(m.id) + '" data-st-tip="' + escapeHtml(tip) + '" onclick="runHubModuleAction(\'' + escapeHtml(actionKey) + '\')">' + escapeHtml(m.label) + "</button>";
 }
 
 var GROUP_COLORS = {
@@ -445,6 +445,9 @@ document.addEventListener("click", function(e) {
 
 function filterModules(q) {
   renderCategoryTiles(q || "");
+  if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === "function") {
+    window.StatisticoTooltip.refresh();
+  }
 }
 
 function getHubScopeName() {
@@ -1380,6 +1383,10 @@ Office.onReady(function(info) {
   loadHubScopeConfigIfAny().then(function () {
     syncClusterHeader();
     renderCategoryTiles("");
+    if (window.StatisticoTooltip && typeof window.StatisticoTooltip.init === "function") {
+      window.StatisticoTooltip.init();
+      window.StatisticoTooltip.refresh();
+    }
     loadModulesConfig()
       .then(function(list) {
         MODULES = ensureClusterModule(list);

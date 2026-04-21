@@ -6,6 +6,39 @@
 
 console.log('📦 Loading shared-header.js VERSION 2026-03-08-024 (sidebar-correlations-univariate)');
 
+(function () {
+  function resolveAssetUrl(relPath) {
+    const { origin, pathname } = window.location;
+    if (pathname.includes('/dialogs/views/')) {
+      return `${origin}${pathname.split('/dialogs/views/')[0]}/${relPath}`;
+    }
+    if (pathname.includes('/taskpane/')) {
+      return `${origin}${pathname.split('/taskpane/')[0]}/${relPath}`;
+    }
+    return `${origin}/${relPath}`;
+  }
+
+  function initTooltip() {
+    if (window.StatisticoTooltip && typeof window.StatisticoTooltip.init === 'function') {
+      window.StatisticoTooltip.init();
+      window.StatisticoTooltip.refresh();
+    }
+  }
+
+  if (window.StatisticoTooltip) {
+    initTooltip();
+    return;
+  }
+  if (document.getElementById('st-tooltip-template-script')) return;
+
+  const script = document.createElement('script');
+  script.id = 'st-tooltip-template-script';
+  script.src = resolveAssetUrl('src/shared/js/tooltip-template.js?v=20260420a');
+  script.async = true;
+  script.onload = initTooltip;
+  document.head.appendChild(script);
+})();
+
 const StatisticoHeader = {
   currentView: 'histogram',
   variableName: 'Variable',
@@ -368,6 +401,9 @@ const StatisticoHeader = {
       footer.innerHTML = `&copy; ${new Date().getFullYear()} Statistico &mdash; All rights reserved.`;
       const frame = document.querySelector('.laptop-frame') || document.body;
       frame.appendChild(footer);
+    }
+    if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
+      window.StatisticoTooltip.refresh();
     }
   },
   
@@ -1460,6 +1496,9 @@ const StatisticoHeader = {
       </button>
     `;
     nav.appendChild(utilities);
+    if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
+      window.StatisticoTooltip.refresh();
+    }
   },
 
   /**

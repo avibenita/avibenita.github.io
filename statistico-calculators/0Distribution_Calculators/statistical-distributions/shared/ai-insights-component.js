@@ -415,5 +415,19 @@
     p.cache = {}; // invalidate cache when state changes
   }
 
+  // Auto-init any aiInsightsMount element as soon as the DOM is ready
+  // so the button appears even before the first calculation runs.
+  function autoInit() {
+    ['aiInsightsMount'].forEach(id => {
+      if (document.getElementById(id)) initPanel(id);
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', autoInit);
+  } else {
+    autoInit();
+  }
+
   window.StatisticoAIInsights = { update };
 })();

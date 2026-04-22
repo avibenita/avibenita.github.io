@@ -7,6 +7,20 @@
 console.log('📦 Loading shared-header.js VERSION 2026-03-08-024 (sidebar-correlations-univariate)');
 
 (function () {
+  function sanitizeDialogHostInfoParam() {
+    try {
+      if (!window.location || !window.location.search) return;
+      const url = new URL(window.location.href);
+      if (!url.searchParams.has('_host_Info')) return;
+      url.searchParams.delete('_host_Info');
+      const nextQuery = url.searchParams.toString();
+      const cleanUrl = `${url.pathname}${nextQuery ? `?${nextQuery}` : ''}${url.hash || ''}`;
+      window.history.replaceState({}, document.title, cleanUrl);
+    } catch (e) {}
+  }
+
+  sanitizeDialogHostInfoParam();
+
   function resolveAssetUrl(relPath) {
     const { origin, pathname } = window.location;
     if (pathname.includes('/dialogs/views/')) {

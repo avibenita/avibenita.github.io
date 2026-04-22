@@ -1611,12 +1611,56 @@ const StatisticoHeader = {
           const selected = sections.filter((s) => selectedIds.includes(String(s.id)));
           const escapedVar = esc(data.headers[0]);
           const toc = selected.map((s, i) => `<li><a href="#sec_${i + 1}">${esc(s.label)}</a></li>`).join('');
+
+          // ── Progress overlay ──────────────────────────────────────────────
+          const progressOverlay = document.createElement('div');
+          progressOverlay.id = 'stExportProgressOverlay';
+          progressOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2147483400;display:flex;align-items:center;justify-content:center;padding:16px;';
+          progressOverlay.innerHTML = `
+            <div style="min-width:280px;max-width:440px;padding:16px 18px;border-radius:12px;border:1px solid rgba(148,163,184,.4);background:#111827;color:#e5e7eb;box-shadow:0 12px 28px rgba(2,6,23,.5);display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span id="stExportSpinner" style="width:16px;height:16px;border:2px solid rgba(148,163,184,.3);border-top-color:#f97316;border-radius:999px;display:inline-block;animation:stExSpin .75s linear infinite;flex-shrink:0;"></span>
+                <span id="stExportProgressLabel" style="font-size:13px;font-weight:600;letter-spacing:.2px;">Preparing export…</span>
+              </div>
+              <div style="height:4px;background:rgba(148,163,184,.2);border-radius:4px;overflow:hidden;">
+                <div id="stExportProgressBar" style="height:100%;width:0%;background:#f97316;border-radius:4px;transition:width .3s ease;"></div>
+              </div>
+              <div id="stExportProgressSub" style="font-size:11px;color:#94a3b8;"></div>
+            </div>
+            <style>@keyframes stExSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
+          `;
+          document.body.appendChild(progressOverlay);
+
+          const setProgress = (done, total, label) => {
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+            const bar = document.getElementById('stExportProgressBar');
+            const lbl = document.getElementById('stExportProgressLabel');
+            const sub = document.getElementById('stExportProgressSub');
+            if (bar) bar.style.width = pct + '%';
+            if (lbl && label) lbl.textContent = label;
+            if (sub) sub.textContent = `${done} of ${total} sections captured`;
+          };
+          const closeProgress = () => {
+            const el = document.getElementById('stExportProgressOverlay');
+            if (el) el.remove();
+          };
+          // ─────────────────────────────────────────────────────────────────
+
           (async () => {
-            const snapshotResults = await Promise.all(selected.map((s) => {
-              if (!s.file) return Promise.resolve({ ok: false, snapshotHtml: '', noFile: true });
-              const url = appendQueryParam(this.resolveDialogUrl(s.file), 'embed', '1');
-              return captureSectionSnapshot(url);
-            }));
+            const total = selected.length;
+            const snapshotResults = [];
+            for (let i = 0; i < total; i += 1) {
+              const s = selected[i];
+              setProgress(i, total, `Capturing: ${esc(s.label)}…`);
+              if (!s.file) {
+                snapshotResults.push({ ok: false, snapshotHtml: '', noFile: true });
+              } else {
+                const url = appendQueryParam(this.resolveDialogUrl(s.file), 'embed', '1');
+                snapshotResults.push(await captureSectionSnapshot(url));
+              }
+            }
+            setProgress(total, total, 'Building report…');
+
             const builtSections = selected.map((s, i) => {
               const snap = snapshotResults[i] || { ok: false, snapshotHtml: '' };
               if (!s.file || snap.noFile) {
@@ -1636,11 +1680,12 @@ const StatisticoHeader = {
               `;
             });
             const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapedVar} - Long Report</title><style>body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:1120px;margin:auto;color:#0f172a}h1{margin-bottom:4px}h2{margin-top:28px}nav{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}section{page-break-inside:avoid;border-top:1px solid #e2e8f0;padding-top:14px}.meta{color:#475569;font-size:13px}.report-frame{width:100%;height:760px;border:1px solid #d1d5db;border-radius:10px;background:#fff}a{color:#0ea5e9;text-decoration:none}a:hover{text-decoration:underline}</style></head><body><h1>Univariate Long Report</h1><p class="meta"><strong>Variable:</strong> ${escapedVar} &nbsp;&middot;&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</p><nav><strong>Included sections</strong><ol>${toc}</ol></nav>${builtSections.join('')}</body></html>`;
+            closeProgress();
             downloadBlob(
               new Blob([html], { type: 'text/html' }),
               `Univariate_LongReport_${safeName(data.headers[0])}_${timestamp()}.html`
             );
-          })();
+          })().catch(() => closeProgress());
         });
       }
     };

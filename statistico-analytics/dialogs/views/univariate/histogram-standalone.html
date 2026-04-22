@@ -402,6 +402,44 @@
       opacity: 0.7;
       flex: 0 0 auto;
     }
+
+    .dialog-loading-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(12, 22, 36, 0.72);
+      z-index: 9999;
+      transition: opacity .2s ease;
+    }
+    .dialog-loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .dialog-loading-card {
+      min-width: 220px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(120, 200, 255, 0.35);
+      background: rgba(20, 31, 47, 0.96);
+      color: #e5e7eb;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 26px rgba(0,0,0,.45);
+    }
+    .dialog-loading-spin {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid rgba(148, 163, 184, 0.35);
+      border-top-color: #78c8ff;
+      animation: dlgSpin .8s linear infinite;
+    }
+    @keyframes dlgSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   </style>
   <style>
     html,body{height:100%!important;overflow:hidden!important;}
@@ -411,6 +449,12 @@
   </style>
 </head>
 <body>
+  <div class="dialog-loading-overlay" id="dialogLoadingOverlay">
+    <div class="dialog-loading-card">
+      <span class="dialog-loading-spin"></span>
+      <span id="dialogLoadingText">Loading results...</span>
+    </div>
+  </div>
   <!-- ++ Sidebar Navigation ++ -->
   <nav class="sb-nav" id="sidebarNav">
     <div class="sb-logo">
@@ -602,6 +646,25 @@
     let originalMin = 0;
     let originalMax = 100;
     let currentDecimals = 2;
+    let _dialogLoadingTimer = null;
+
+    function showDialogLoading(message) {
+      const overlay = document.getElementById('dialogLoadingOverlay');
+      const text = document.getElementById('dialogLoadingText');
+      if (text && message) text.textContent = message;
+      if (overlay) overlay.classList.remove('hidden');
+      if (_dialogLoadingTimer) clearTimeout(_dialogLoadingTimer);
+      _dialogLoadingTimer = setTimeout(() => hideDialogLoading(), 12000);
+    }
+
+    function hideDialogLoading() {
+      if (_dialogLoadingTimer) {
+        clearTimeout(_dialogLoadingTimer);
+        _dialogLoadingTimer = null;
+      }
+      const overlay = document.getElementById('dialogLoadingOverlay');
+      if (overlay) overlay.classList.add('hidden');
+    }
 
     var SR = window.StatisticoRuntime;
     var runtime = SR.createRuntime();
@@ -644,6 +707,7 @@
 
     SR.whenDomReady(function () {
       console.log('?? DOM Content Loaded');
+      showDialogLoading('Loading results...');
       SR.applyUrlThemeOverride();
 
       StatisticoHeader.init('histogram', 'Variable', 0);
@@ -686,7 +750,8 @@
       const message = JSON.parse(arg.message);
       
       if (message.theme) { applyTheme(message.theme); return; }
-            if (message.action === 'loadData') {
+      if (message.action === 'loadData') {
+        showDialogLoading('Loading results...');
         handleDataReceived(message.data);
       }
     }
@@ -764,8 +829,10 @@
         console.log('?? Creating histogram...');
         createHistogram();
         console.log('? Histogram created');
+        hideDialogLoading();
       } catch (error) {
         console.error('? Error in handleDataReceived:', error);
+        hideDialogLoading();
         alert('Error handling data: ' + error.message);
       }
     }

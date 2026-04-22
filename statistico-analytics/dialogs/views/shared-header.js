@@ -1305,6 +1305,78 @@ const StatisticoHeader = {
     const timestamp = () => new Date().toISOString().slice(0, 19).replace(/[-T:]/g, '');
     const safeName = (name) => String(name || 'Variable').replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 30);
     const esc = (value) => String(value ?? '').replace(/[<>&"]/g, (m) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[m]));
+    const escAttr = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const absolutize = (value, baseUrl) => {
+      if (!value) return value;
+      const raw = String(value).trim();
+      if (!raw || raw.startsWith('#') || raw.startsWith('data:') || raw.startsWith('javascript:')) return raw;
+      try { return new URL(raw, baseUrl).href; } catch (e) { return raw; }
+    };
+    const normalizeAssetUrls = (root, baseUrl) => {
+      if (!root) return;
+      ['href', 'src', 'poster'].forEach((attr) => {
+        root.querySelectorAll(`[${attr}]`).forEach((el) => {
+          const raw = el.getAttribute(attr);
+          if (!raw) return;
+          el.setAttribute(attr, absolutize(raw, baseUrl));
+        });
+      });
+    };
+    const extractRichSnapshot = (doc, sourceUrl) => {
+      const headClone = (doc.head ? doc.head.cloneNode(true) : document.createElement('head'));
+      headClone.querySelectorAll('script, noscript').forEach((n) => n.remove());
+      normalizeAssetUrls(headClone, sourceUrl);
+
+      const bodyClone = (doc.body ? doc.body.cloneNode(true) : document.createElement('body'));
+      bodyClone.querySelectorAll('script, noscript').forEach((n) => n.remove());
+      normalizeAssetUrls(bodyClone, sourceUrl);
+      bodyClone.querySelectorAll('#header-container, .statistico-shell, .sb-nav, #sidebarNav, .statistico-footer').forEach((n) => n.remove());
+
+      const primary =
+        bodyClone.querySelector('.right-col') ||
+        bodyClone.querySelector('.main-content') ||
+        bodyClone.querySelector('.content') ||
+        bodyClone.querySelector('.container') ||
+        bodyClone;
+
+      const payload = primary === bodyClone ? bodyClone.innerHTML : primary.outerHTML;
+      return `<!DOCTYPE html><html><head><meta charset="utf-8"><base href="${escAttr(sourceUrl)}">${headClone.innerHTML}</head><body>${payload}</body></html>`;
+    };
+    const captureSectionSnapshot = (url) => new Promise((resolve) => {
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'position:fixed;left:-99999px;top:-99999px;width:1360px;height:900px;opacity:0;pointer-events:none;';
+      iframe.setAttribute('aria-hidden', 'true');
+      let settled = false;
+      let timer = null;
+      const finish = (snapshotHtml, ok) => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        try { iframe.remove(); } catch (e) {}
+        resolve({ snapshotHtml, ok });
+      };
+      const tryCapture = (startedAt) => {
+        try {
+          const doc = iframe.contentDocument;
+          if (!doc) return finish('', false);
+          const hasRenderable = !!doc.querySelector('svg, canvas, .highcharts-root, .highcharts-container, .chart, table');
+          if (hasRenderable || (Date.now() - startedAt) > 9000) {
+            const snapshot = extractRichSnapshot(doc, url);
+            finish(snapshot, true);
+            return;
+          }
+          setTimeout(() => tryCapture(startedAt), 250);
+        } catch (e) {
+          finish('', false);
+        }
+      };
+      iframe.addEventListener('load', () => {
+        setTimeout(() => tryCapture(Date.now()), 500);
+      }, { once: true });
+      timer = setTimeout(() => finish('', false), 15000);
+      iframe.src = url;
+      document.body.appendChild(iframe);
+    });
 
     const computeStats = (values) => {
       const numeric = (values || []).filter((v) => Number.isFinite(v));
@@ -1516,21 +1588,36 @@ const StatisticoHeader = {
           const selected = sections.filter((s) => selectedIds.includes(String(s.id)));
           const escapedVar = esc(data.headers[0]);
           const toc = selected.map((s, i) => `<li><a href="#sec_${i + 1}">${esc(s.label)}</a></li>`).join('');
-          const sectionBlocks = selected.map((s, i) => `
-            <section id="sec_${i + 1}">
-              <h2>${i + 1}. ${esc(s.label)}</h2>
-              ${s.file ? `
-                <p class="meta">Rich page view for this section.</p>
-                <iframe class="report-frame" src="${esc(this.resolveDialogUrl(s.file))}"></iframe>
-                <p class="meta"><a href="${esc(this.resolveDialogUrl(s.file))}" target="_blank" rel="noopener">Open ${esc(s.label)} in a new tab</a></p>
-              ` : `<p class="meta">No page file mapped for this section.</p>`}
-            </section>
-          `).join('');
-          const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapedVar} - Long Report</title><style>body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:1120px;margin:auto;color:#0f172a}h1{margin-bottom:4px}h2{margin-top:28px}nav{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}section{page-break-inside:avoid;border-top:1px solid #e2e8f0;padding-top:14px}.meta{color:#475569;font-size:13px}.report-frame{width:100%;height:760px;border:1px solid #d1d5db;border-radius:10px;background:#fff}a{color:#0ea5e9;text-decoration:none}a:hover{text-decoration:underline}</style></head><body><h1>Univariate Long Report</h1><p class="meta"><strong>Variable:</strong> ${escapedVar} &nbsp;&middot;&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</p><nav><strong>Included sections</strong><ol>${toc}</ol></nav>${sectionBlocks}</body></html>`;
-          downloadBlob(
-            new Blob([html], { type: 'text/html' }),
-            `Univariate_LongReport_${safeName(data.headers[0])}_${timestamp()}.html`
-          );
+          (async () => {
+            const builtSections = [];
+            for (let i = 0; i < selected.length; i += 1) {
+              const s = selected[i];
+              if (!s.file) {
+                builtSections.push(`
+                  <section id="sec_${i + 1}">
+                    <h2>${i + 1}. ${esc(s.label)}</h2>
+                    <p class="meta">No page file mapped for this section.</p>
+                  </section>
+                `);
+                continue;
+              }
+              const url = this.resolveDialogUrl(s.file);
+              const snap = await captureSectionSnapshot(url);
+              builtSections.push(`
+                <section id="sec_${i + 1}">
+                  <h2>${i + 1}. ${esc(s.label)}</h2>
+                  <p class="meta">${snap.ok ? 'Embedded rich page snapshot.' : 'Could not snapshot this page; open directly in a new tab.'}</p>
+                  ${snap.ok ? `<iframe class="report-frame" srcdoc="${escAttr(snap.snapshotHtml)}"></iframe>` : ''}
+                  <p class="meta"><a href="${esc(url)}" target="_blank" rel="noopener">Open ${esc(s.label)} in a new tab</a></p>
+                </section>
+              `);
+            }
+            const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapedVar} - Long Report</title><style>body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:1120px;margin:auto;color:#0f172a}h1{margin-bottom:4px}h2{margin-top:28px}nav{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}section{page-break-inside:avoid;border-top:1px solid #e2e8f0;padding-top:14px}.meta{color:#475569;font-size:13px}.report-frame{width:100%;height:760px;border:1px solid #d1d5db;border-radius:10px;background:#fff}a{color:#0ea5e9;text-decoration:none}a:hover{text-decoration:underline}</style></head><body><h1>Univariate Long Report</h1><p class="meta"><strong>Variable:</strong> ${escapedVar} &nbsp;&middot;&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</p><nav><strong>Included sections</strong><ol>${toc}</ol></nav>${builtSections.join('')}</body></html>`;
+            downloadBlob(
+              new Blob([html], { type: 'text/html' }),
+              `Univariate_LongReport_${safeName(data.headers[0])}_${timestamp()}.html`
+            );
+          })();
         });
       }
     };

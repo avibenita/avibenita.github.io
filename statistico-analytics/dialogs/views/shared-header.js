@@ -1340,7 +1340,7 @@ const StatisticoHeader = {
       groups.forEach((group) => {
         (group.items || []).forEach((item) => {
           if (item.type === 'navigate' && item.label) {
-            items.push({ id: item.view || item.file || item.label, label: item.label });
+            items.push({ id: item.view || item.file || item.label, label: item.label, file: item.file || null });
           }
         });
       });
@@ -1514,18 +1514,19 @@ const StatisticoHeader = {
         }
         pickReportSections(sections, (selectedIds) => {
           const selected = sections.filter((s) => selectedIds.includes(String(s.id)));
-          const values = data.allRows.map((r) => Number(r[0])).filter((v) => Number.isFinite(v));
-          const stats = computeStats(values);
           const escapedVar = esc(data.headers[0]);
           const toc = selected.map((s, i) => `<li><a href="#sec_${i + 1}">${esc(s.label)}</a></li>`).join('');
           const sectionBlocks = selected.map((s, i) => `
             <section id="sec_${i + 1}">
               <h2>${i + 1}. ${esc(s.label)}</h2>
-              ${sectionSpecificHtml(String(s.id), s.label, values, stats, data.headers[0])}
+              ${s.file ? `
+                <p class="meta">Rich page view for this section.</p>
+                <iframe class="report-frame" src="${esc(this.resolveDialogUrl(s.file))}"></iframe>
+                <p class="meta"><a href="${esc(this.resolveDialogUrl(s.file))}" target="_blank" rel="noopener">Open ${esc(s.label)} in a new tab</a></p>
+              ` : `<p class="meta">No page file mapped for this section.</p>`}
             </section>
           `).join('');
-          const dataRows = data.allRows.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r[0] ?? '')}</td></tr>`).join('');
-          const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapedVar} - Long Report</title><style>body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:980px;margin:auto;color:#0f172a}h1{margin-bottom:4px}h2{margin-top:28px}table{border-collapse:collapse;width:100%;margin-top:8px}th,td{border:1px solid #d1d5db;padding:6px 8px;text-align:left}th{background:#f3f4f6}nav{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}section{page-break-inside:avoid}.meta{color:#475569;font-size:13px}</style></head><body><h1>Univariate Long Report</h1><p class="meta"><strong>Variable:</strong> ${escapedVar} &nbsp;&middot;&nbsp; <strong>n:</strong> ${data.allRows.length} &nbsp;&middot;&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</p><nav><strong>Included sections</strong><ol>${toc}</ol></nav>${sectionBlocks}<section id="raw_data"><h2>Appendix: Data Table</h2><table><thead><tr><th>#</th><th>${escapedVar}</th></tr></thead><tbody>${dataRows}</tbody></table></section></body></html>`;
+          const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapedVar} - Long Report</title><style>body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:1120px;margin:auto;color:#0f172a}h1{margin-bottom:4px}h2{margin-top:28px}nav{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}section{page-break-inside:avoid;border-top:1px solid #e2e8f0;padding-top:14px}.meta{color:#475569;font-size:13px}.report-frame{width:100%;height:760px;border:1px solid #d1d5db;border-radius:10px;background:#fff}a{color:#0ea5e9;text-decoration:none}a:hover{text-decoration:underline}</style></head><body><h1>Univariate Long Report</h1><p class="meta"><strong>Variable:</strong> ${escapedVar} &nbsp;&middot;&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</p><nav><strong>Included sections</strong><ol>${toc}</ol></nav>${sectionBlocks}</body></html>`;
           downloadBlob(
             new Blob([html], { type: 'text/html' }),
             `Univariate_LongReport_${safeName(data.headers[0])}_${timestamp()}.html`

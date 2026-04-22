@@ -8,7 +8,60 @@ let univariateCurrentResults = null;
 let pendingUnivariateViewUrl = null;
 let _uniEmbedMessageHandler = null;
 let _univariateDialogDataPump = null;
-const RESULT_DIALOG_OPTIONS = { height: 90, width: 70, displayInIframe: false };
+let _univariateLoadingFallbackTimer = null;
+// Use iframe-hosted dialogs when available to avoid showing popup URL bars.
+const RESULT_DIALOG_OPTIONS = { height: 90, width: 70, displayInIframe: true };
+
+function showUnivariateResultsLoading(message = 'Loading results...') {
+  if (_univariateLoadingFallbackTimer) {
+    clearTimeout(_univariateLoadingFallbackTimer);
+    _univariateLoadingFallbackTimer = null;
+  }
+  let overlay = document.getElementById('uniResultsLoadingOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'uniResultsLoadingOverlay';
+    overlay.style.cssText = [
+      'position:fixed',
+      'inset:0',
+      'background:rgba(15,23,42,.46)',
+      'backdrop-filter:blur(1px)',
+      'z-index:2147483000',
+      'display:flex',
+      'align-items:center',
+      'justify-content:center'
+    ].join(';');
+    overlay.innerHTML = `
+      <div style="min-width:240px;max-width:420px;padding:16px 18px;border-radius:12px;border:1px solid rgba(148,163,184,.45);background:#111827;color:#e5e7eb;box-shadow:0 12px 28px rgba(2,6,23,.45);display:flex;align-items:center;gap:12px;">
+        <span style="width:18px;height:18px;border:2px solid rgba(148,163,184,.35);border-top-color:#22c55e;border-radius:999px;display:inline-block;animation:uniSpin .8s linear infinite;"></span>
+        <span id="uniResultsLoadingText" style="font-size:13px;font-weight:600;letter-spacing:.2px;">${message}</span>
+      </div>
+    `;
+    if (!document.getElementById('uniResultsLoadingStyle')) {
+      const style = document.createElement('style');
+      style.id = 'uniResultsLoadingStyle';
+      style.textContent = '@keyframes uniSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}';
+      document.head.appendChild(style);
+    }
+    document.body.appendChild(overlay);
+  } else {
+    overlay.style.display = 'flex';
+    const text = document.getElementById('uniResultsLoadingText');
+    if (text) text.textContent = message;
+  }
+  _univariateLoadingFallbackTimer = setTimeout(() => {
+    hideUnivariateResultsLoading();
+  }, 15000);
+}
+
+function hideUnivariateResultsLoading() {
+  if (_univariateLoadingFallbackTimer) {
+    clearTimeout(_univariateLoadingFallbackTimer);
+    _univariateLoadingFallbackTimer = null;
+  }
+  const overlay = document.getElementById('uniResultsLoadingOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
 
 function notifyConfigDialogClosed() {
   if (typeof window.onUnivariateConfigDialogClosed === 'function') {
@@ -288,6 +341,7 @@ function queueResultsViewSwitch(viewPath) {
 
 // ─── RESULTS DIALOG ──────────────────────────────────────────────────────────
 function openResultsDialog(results) {
+  showUnivariateResultsLoading('Opening results dialog...');
   univariateCurrentResults = results;
   localStorage.removeItem('univariateResults');
   localStorage.setItem('univariateResults', JSON.stringify(results));
@@ -299,6 +353,7 @@ function openResultsDialog(results) {
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error('Failed to open histogram:', asyncResult.error.message);
+        hideUnivariateResultsLoading();
         return;
       }
       const dialog = asyncResult.value;
@@ -323,12 +378,15 @@ function openResultsDialog(results) {
         try {
           const message = JSON.parse(arg.message);
           if (message.status === 'ready') {
+            hideUnivariateResultsLoading();
             sendData();
           } else if (message.action === 'switchView') {
             if (dialog !== univariateResultsDialog) return;
+            showUnivariateResultsLoading('Loading selected view...');
             queueResultsViewSwitch(message.view);
           } else if (message.action === 'close' || message.action === 'closeDialog') {
             pendingUnivariateViewUrl = null;
+            hideUnivariateResultsLoading();
             if (dialog === univariateResultsDialog) {
               dialog.close();
               univariateResultsDialog = null;
@@ -338,6 +396,7 @@ function openResultsDialog(results) {
       });
 
       dialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
+        hideUnivariateResultsLoading();
         if (dialog === univariateResultsDialog) {
           univariateResultsDialog = null;
         }
@@ -352,12 +411,14 @@ function openResultsDialog(results) {
 }
 
 function openNewView(dialogUrl, results) {
+  showUnivariateResultsLoading('Loading selected view...');
   Office.context.ui.displayDialogAsync(
     dialogUrl,
     RESULT_DIALOG_OPTIONS,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error('Failed to switch univariate view:', asyncResult.error && asyncResult.error.message);
+        hideUnivariateResultsLoading();
         return;
       }
       const dialog = asyncResult.value;
@@ -382,12 +443,15 @@ function openNewView(dialogUrl, results) {
         try {
           const message = JSON.parse(arg.message);
           if (message.status === 'ready') {
+            hideUnivariateResultsLoading();
             sendData();
           } else if (message.action === 'switchView') {
             if (dialog !== univariateResultsDialog) return;
+            showUnivariateResultsLoading('Loading selected view...');
             queueResultsViewSwitch(message.view);
           } else if (message.action === 'close' || message.action === 'closeDialog') {
             pendingUnivariateViewUrl = null;
+            hideUnivariateResultsLoading();
             if (dialog === univariateResultsDialog) {
               dialog.close();
               univariateResultsDialog = null;
@@ -397,6 +461,7 @@ function openNewView(dialogUrl, results) {
       });
 
       dialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
+        hideUnivariateResultsLoading();
         if (dialog === univariateResultsDialog) {
           univariateResultsDialog = null;
         }

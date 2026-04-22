@@ -1608,7 +1608,7 @@ const StatisticoHeader = {
                   <h2>${i + 1}. ${esc(s.label)}</h2>
                   <p class="meta">${snap.ok ? 'Embedded rich page snapshot.' : 'Could not snapshot this page; open directly in a new tab.'}</p>
                   ${snap.ok ? `<iframe class="report-frame" srcdoc="${escAttr(snap.snapshotHtml)}"></iframe>` : ''}
-                  <p class="meta"><a href="${esc(url)}" target="_blank" rel="noopener">Open ${esc(s.label)} in a new tab</a></p>
+                  ${snap.ok ? '' : '<p class="meta">Section preview unavailable in this export.</p>'}
                 </section>
               `);
             }

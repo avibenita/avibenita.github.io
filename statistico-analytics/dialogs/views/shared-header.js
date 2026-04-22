@@ -1322,6 +1322,15 @@ const StatisticoHeader = {
         });
       });
     };
+    const appendQueryParam = (url, key, value) => {
+      try {
+        const u = new URL(url, window.location.href);
+        u.searchParams.set(key, value);
+        return u.href;
+      } catch (e) {
+        return url;
+      }
+    };
     const extractRichSnapshot = (doc, sourceUrl) => {
       const headClone = (doc.head ? doc.head.cloneNode(true) : document.createElement('head'));
       headClone.querySelectorAll('script, noscript').forEach((n) => n.remove());
@@ -1340,7 +1349,7 @@ const StatisticoHeader = {
         bodyClone;
 
       const payload = primary === bodyClone ? bodyClone.innerHTML : primary.outerHTML;
-      return `<!DOCTYPE html><html><head><meta charset="utf-8"><base href="${escAttr(sourceUrl)}">${headClone.innerHTML}</head><body>${payload}</body></html>`;
+      return `<!DOCTYPE html><html><head><meta charset="utf-8">${headClone.innerHTML}</head><body>${payload}</body></html>`;
     };
     const captureSectionSnapshot = (url) => new Promise((resolve) => {
       const iframe = document.createElement('iframe');
@@ -1373,7 +1382,7 @@ const StatisticoHeader = {
       iframe.addEventListener('load', () => {
         setTimeout(() => tryCapture(Date.now()), 500);
       }, { once: true });
-      timer = setTimeout(() => finish('', false), 15000);
+      timer = setTimeout(() => finish('', false), 6000);
       iframe.src = url;
       document.body.appendChild(iframe);
     });
@@ -1589,29 +1598,29 @@ const StatisticoHeader = {
           const escapedVar = esc(data.headers[0]);
           const toc = selected.map((s, i) => `<li><a href="#sec_${i + 1}">${esc(s.label)}</a></li>`).join('');
           (async () => {
-            const builtSections = [];
-            for (let i = 0; i < selected.length; i += 1) {
-              const s = selected[i];
-              if (!s.file) {
-                builtSections.push(`
+            const snapshotResults = await Promise.all(selected.map((s) => {
+              if (!s.file) return Promise.resolve({ ok: false, snapshotHtml: '', noFile: true });
+              const url = appendQueryParam(this.resolveDialogUrl(s.file), 'embed', '1');
+              return captureSectionSnapshot(url);
+            }));
+            const builtSections = selected.map((s, i) => {
+              const snap = snapshotResults[i] || { ok: false, snapshotHtml: '' };
+              if (!s.file || snap.noFile) {
+                return `
                   <section id="sec_${i + 1}">
                     <h2>${i + 1}. ${esc(s.label)}</h2>
                     <p class="meta">No page file mapped for this section.</p>
                   </section>
-                `);
-                continue;
+                `;
               }
-              const url = this.resolveDialogUrl(s.file);
-              const snap = await captureSectionSnapshot(url);
-              builtSections.push(`
+              return `
                 <section id="sec_${i + 1}">
                   <h2>${i + 1}. ${esc(s.label)}</h2>
-                  <p class="meta">${snap.ok ? 'Embedded rich page snapshot.' : 'Could not snapshot this page; open directly in a new tab.'}</p>
+                  <p class="meta">${snap.ok ? 'Embedded rich page snapshot.' : 'Section preview unavailable in this export.'}</p>
                   ${snap.ok ? `<iframe class="report-frame" srcdoc="${escAttr(snap.snapshotHtml)}"></iframe>` : ''}
-                  ${snap.ok ? '' : '<p class="meta">Section preview unavailable in this export.</p>'}
                 </section>
-              `);
-            }
+              `;
+            });
             const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapedVar} - Long Report</title><style>body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:1120px;margin:auto;color:#0f172a}h1{margin-bottom:4px}h2{margin-top:28px}nav{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}section{page-break-inside:avoid;border-top:1px solid #e2e8f0;padding-top:14px}.meta{color:#475569;font-size:13px}.report-frame{width:100%;height:760px;border:1px solid #d1d5db;border-radius:10px;background:#fff}a{color:#0ea5e9;text-decoration:none}a:hover{text-decoration:underline}</style></head><body><h1>Univariate Long Report</h1><p class="meta"><strong>Variable:</strong> ${escapedVar} &nbsp;&middot;&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</p><nav><strong>Included sections</strong><ol>${toc}</ol></nav>${builtSections.join('')}</body></html>`;
             downloadBlob(
               new Blob([html], { type: 'text/html' }),

@@ -255,11 +255,89 @@
             font-size: 0.76rem;
             background: rgba(7, 20, 34, 0.92);
         }
+
+        /* ── Hamburger button (shown only on mobile) ── */
+        .menu-toggle {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            background: rgba(120,200,255,0.1);
+            border: 1px solid rgba(120,200,255,0.25);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 1rem;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        /* ── Overlay backdrop (mobile sidebar) ── */
+        .sidebar-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            z-index: 98;
+        }
+        .sidebar-backdrop.open { display: block; }
+
+        /* ── Medium screens: narrower sidebar ── */
+        @media (max-width: 1024px) {
+            .top-header { grid-template-columns: 180px 1fr 140px; }
+            .app { grid-template-columns: 220px 1fr; }
+        }
+
+        /* ── Mobile: full-width workspace + slide-out drawer ── */
+        @media (max-width: 767px) {
+            html, body { overflow: auto; }
+
+            .shell { grid-template-rows: 56px 1fr 30px; }
+
+            .top-header {
+                grid-template-columns: 40px 1fr auto;
+                gap: 6px;
+                padding: 0 8px;
+            }
+            .brand { display: none; }
+            .mode-chip { display: none; }
+            .menu-toggle { display: flex; }
+            .header-title { font-size: clamp(1rem, 4vw, 1.4rem); }
+
+            .app {
+                grid-template-columns: 1fr;
+                gap: 0;
+                padding: 6px;
+                overflow: auto;
+            }
+
+            /* Drawer */
+            .sidebar {
+                position: fixed;
+                top: 56px;
+                left: 0;
+                width: min(280px, 85vw);
+                height: calc(100dvh - 56px - 30px);
+                z-index: 99;
+                border-radius: 0 14px 14px 0;
+                transform: translateX(-105%);
+                transition: transform 0.25s cubic-bezier(.4,0,.2,1);
+                overflow-y: auto;
+            }
+            .sidebar.drawer-open { transform: translateX(0); }
+
+            .workspace {
+                height: calc(100dvh - 56px - 30px - 12px);
+                min-height: 0;
+            }
+        }
     </style>
 </head>
 <body>
 <div class="shell">
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
     <header class="top-header">
+        <button class="menu-toggle" id="menuToggle" aria-label="Toggle navigation"><i class="fa-solid fa-bars"></i></button>
         <div class="brand"><i class="fa-solid fa-flask-vial"></i> Distribution Suite</div>
         <div class="header-title"><i class="fa-solid fa-chart-line"></i> Normal Distribution Calculator</div>
         <div class="mode-chip">Interactive Mode</div>
@@ -325,7 +403,24 @@
         var buttons = document.querySelectorAll(".dist-btn");
         var frame = document.getElementById("distFrame");
         var title = document.querySelector(".header-title");
-        var cacheVersion = "20260405b";
+        var sidebar = document.querySelector(".sidebar");
+        var backdrop = document.getElementById("sidebarBackdrop");
+        var menuToggle = document.getElementById("menuToggle");
+        var cacheVersion = "20260422c";
+
+        /* ── Mobile drawer ── */
+        function openDrawer() {
+            sidebar.classList.add("drawer-open");
+            backdrop.classList.add("open");
+        }
+        function closeDrawer() {
+            sidebar.classList.remove("drawer-open");
+            backdrop.classList.remove("open");
+        }
+        menuToggle.addEventListener("click", function () {
+            sidebar.classList.contains("drawer-open") ? closeDrawer() : openDrawer();
+        });
+        backdrop.addEventListener("click", closeDrawer);
 
         function withCacheVersion(url) {
             return url + (url.indexOf("?") >= 0 ? "&" : "?") + "v=" + cacheVersion;
@@ -341,9 +436,7 @@
                     style.textContent = ".header { display: none !important; }";
                     doc.head.appendChild(style);
                 }
-            } catch (e) {
-                // Ignore if cross-origin in future calculators.
-            }
+            } catch (e) {}
         }
 
         function applyNormalLayoutProfile() {
@@ -362,14 +455,22 @@
                         ".container { margin: 0 !important; padding: 10px !important; border-radius: 12px !important; }",
                         ".main-content {",
                         "  display: grid !important;",
-                        "  grid-template-columns: minmax(320px, 34%) 1fr !important;",
+                        "  grid-template-columns: minmax(300px, 34%) 1fr !important;",
                         "  gap: 14px !important;",
                         "  align-items: start !important;",
                         "}",
                         ".control-panel, .controls-panel, .input-panel { width: 100% !important; max-width: none !important; }",
                         ".visualization-panel, .results-panel { width: 100% !important; max-width: none !important; min-height: 0 !important; }",
-                        "@media (max-width: 1200px) {",
-                        "  .main-content { grid-template-columns: minmax(300px, 34%) 1fr !important; }",
+                        "@media (max-width: 900px) {",
+                        "  .main-content { grid-template-columns: 1fr !important; overflow-y: auto !important; }",
+                        "  html, body { overflow: auto !important; }",
+                        "}",
+                        "@media (max-width: 600px) {",
+                        "  .container { padding: 6px !important; }",
+                        "  .result-hero { flex-direction: column !important; }",
+                        "  .result-hero-right { min-width: 0 !important; width: 100% !important; }",
+                        "  .embedded-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }",
+                        "  .tabs { flex-wrap: wrap !important; }",
                         "}"
                     ].join("");
                     doc.head.appendChild(style);
@@ -384,9 +485,7 @@
                         el.textContent = "Results";
                     }
                 });
-            } catch (e) {
-                // Ignore cross-origin / transient errors.
-            }
+            } catch (e) {}
         }
 
         frame.addEventListener("load", function () {
@@ -401,6 +500,7 @@
                 frame.src = withCacheVersion(btn.getAttribute("data-src"));
                 var label = btn.textContent.trim();
                 title.innerHTML = '<i class="fa-solid fa-chart-line"></i> ' + label + ' Calculator';
+                closeDrawer();
             });
         });
 

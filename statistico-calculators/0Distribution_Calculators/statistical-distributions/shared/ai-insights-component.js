@@ -1,312 +1,419 @@
+/**
+ * Statistico AI Interpretation Component
+ * Calls Google Gemini API to generate context-aware statistical interpretation.
+ * API key stored in localStorage; users enter it once.
+ */
 (function () {
-    const panelRegistry = new Map();
+  'use strict';
 
-    function formatPct(value) {
-        return `${(value * 100).toFixed(1)}%`;
+  // ── Config ─────────────────────────────────────────────────────────────────
+  const MODEL     = 'gemini-2.0-flash';
+  const API_BASE  = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
+  const KEY_STORE = 'statistico-gemini-key';
+
+  // ── Per-panel state ────────────────────────────────────────────────────────
+  const panelRegistry = new Map(); // targetId → { state, activeTab, modalId, cache }
+
+  // ── Tiny helpers ───────────────────────────────────────────────────────────
+  function safeNum(v, fb) { return Number.isFinite(v) ? v : (fb !== undefined ? fb : 0); }
+  function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function getApiKey() { try { return (localStorage.getItem(KEY_STORE) || '').trim(); } catch { return ''; } }
+  function setApiKey(k) { try { localStorage.setItem(KEY_STORE, (k || '').trim()); } catch {} }
+
+  // ── Prompt builder ─────────────────────────────────────────────────────────
+  function buildPrompt(state, tab) {
+    const dist     = state.distributionName || (document.body?.dataset?.distribution || 'distribution').replace(/distribution$/i, ' Distribution');
+    const calcType = state.calcType || 'probability';
+    const result   = safeNum(state.result);
+    const params   = state.params || {};
+
+    const lines = [`Distribution: ${dist}`, `Query type: ${calcType}`, `Result: ${result.toFixed(6)}`];
+    if (state.xValue   != null) lines.push(`x value: ${safeNum(state.xValue).toFixed(4)}`);
+    if (state.lowerBound != null) lines.push(`Lower bound: ${safeNum(state.lowerBound).toFixed(4)}`);
+    if (state.upperBound != null) lines.push(`Upper bound: ${safeNum(state.upperBound).toFixed(4)}`);
+    if (state.mean      != null) lines.push(`Mean: ${safeNum(state.mean).toFixed(4)}`);
+    if (state.stddev    != null) lines.push(`Std dev: ${safeNum(state.stddev, 1).toFixed(4)}`);
+    Object.entries(params).forEach(([k, v]) => { if (Number.isFinite(v)) lines.push(`${k}: ${v}`); });
+
+    const context = lines.join('\n');
+    const tasks = {
+      interpret: 'Write a clear, precise 2–3 sentence statistical interpretation of these results that a practitioner would find useful. Be specific about what the number means.',
+      teach:     'Explain the key statistical concept illustrated by these results in 2–3 sentences aimed at a student learning statistics. Use a helpful analogy if appropriate.',
+      apply:     'Describe a concrete real-world scenario in 2–3 sentences where this exact calculation would be used and why it matters.'
+    };
+
+    return `You are a concise statistics expert embedded in an interactive calculator.\n\nCurrent calculator state:\n${context}\n\nTask: ${tasks[tab] || tasks.interpret}\n\nRespond with plain text only. No markdown, no bullet points, no headers.`;
+  }
+
+  // ── Gemini API call ────────────────────────────────────────────────────────
+  async function callGemini(prompt, apiKey) {
+    const resp = await fetch(`${API_BASE}?key=${encodeURIComponent(apiKey)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 300, temperature: 0.6 }
+      })
+    });
+    if (!resp.ok) {
+      let msg = `HTTP ${resp.status}`;
+      try { const e = await resp.json(); msg = e?.error?.message || msg; } catch {}
+      throw new Error(msg);
     }
+    const data = await resp.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error('Empty response from API.');
+    return text.trim();
+  }
 
-    function safeNum(value, fallback = 0) {
-        return Number.isFinite(value) ? value : fallback;
-    }
+  // ── Self-contained CSS ─────────────────────────────────────────────────────
+  function injectStyles() {
+    if (document.getElementById('st-ai-insights-css')) return;
+    const el = document.createElement('style');
+    el.id = 'st-ai-insights-css';
+    el.textContent = `
+      /* ── Inline trigger button ── */
+      .st-ai-trigger {
+        display: inline-flex; align-items: center; gap: 7px;
+        background: linear-gradient(135deg, rgba(120,165,255,.18), rgba(242,162,119,.14));
+        border: 1px solid rgba(120,200,255,.32);
+        border-radius: 8px; padding: 7px 12px; cursor: pointer;
+        color: #d8edff; font-size: 0.82rem; font-weight: 600;
+        transition: background .2s, border-color .2s, transform .15s;
+        width: 100%;
+      }
+      .st-ai-trigger:hover { background: linear-gradient(135deg,rgba(120,165,255,.28),rgba(242,162,119,.22)); border-color: rgba(120,200,255,.55); transform: translateY(-1px); }
+      .st-ai-trigger i { color: #f2a277; font-size: 0.9rem; }
+      .st-ai-trigger .st-ai-badge { margin-left: auto; background: rgba(242,162,119,.18); border: 1px solid rgba(242,162,119,.3); border-radius: 999px; padding: 2px 7px; font-size: 0.7rem; color: #f2c59a; }
 
-    function insightLabel(score) {
-        if (score < 35) return 'Neutral';
-        if (score < 60) return 'Informative';
-        if (score < 80) return 'Strong';
-        return 'Highly informative';
-    }
+      /* ── Modal overlay ── */
+      .st-ai-modal {
+        display: none; position: fixed; inset: 0; z-index: 2147483500;
+        align-items: center; justify-content: center; padding: 16px;
+        background: rgba(4,12,26,.62); backdrop-filter: blur(3px);
+      }
+      .st-ai-modal.open { display: flex; }
 
-    function clamp(value, min, max) {
-        return Math.max(min, Math.min(max, value));
-    }
+      /* ── Dialog box ── */
+      .st-ai-dialog {
+        width: min(560px, 95vw); max-height: 80vh; overflow: hidden;
+        background: linear-gradient(155deg,#0c1e38,#091525);
+        border: 1px solid rgba(120,200,255,.28); border-radius: 14px;
+        box-shadow: 0 24px 56px rgba(2,8,20,.65); display: flex; flex-direction: column;
+      }
 
-    function buildLines(state, tab) {
-        const calcType = state.calcType || 'probability';
-        const mean = safeNum(state.mean);
-        const stddev = safeNum(state.stddev, 1);
-        const result = safeNum(state.result);
-        const z = stddev > 0 ? (result - mean) / stddev : 0;
-        const probability = safeNum(state.probability, 0.5);
-        const leftTail = safeNum(state.leftTail, probability);
-        const rightTail = safeNum(state.rightTail, 1 - leftTail);
-        const absZ = Math.abs(z);
+      /* Header */
+      .st-ai-head {
+        display: flex; align-items: center; gap: 10px;
+        padding: 12px 14px; border-bottom: 1px solid rgba(120,200,255,.18);
+        background: linear-gradient(90deg,rgba(16,32,60,.9),rgba(10,24,48,.9));
+        flex-shrink: 0;
+      }
+      .st-ai-head-title { font-size: 0.93rem; font-weight: 700; color: #d8edff; display: flex; align-items: center; gap: 7px; }
+      .st-ai-head-title i { color: #f2a277; }
+      .st-ai-model-chip { font-size: 0.68rem; background: rgba(120,200,255,.12); border: 1px solid rgba(120,200,255,.25); border-radius: 999px; padding: 2px 7px; color: #9ab1cc; }
+      .st-ai-close { margin-left: auto; background: none; border: none; color: #9ab1cc; cursor: pointer; font-size: 1rem; padding: 2px 4px; border-radius: 5px; transition: color .2s; }
+      .st-ai-close:hover { color: #f2a277; }
 
-        if (tab === 'teach') {
-            return [
-                `Unusualness is determined by distance from the mean in sigma units; here that distance is ${absZ.toFixed(3)}σ.`,
-                'Increasing sigma spreads the curve, so the same x becomes less extreme.',
-                'CDF answers "how much is below", while PDF answers "how dense values are near this point."'
-            ];
-        }
+      /* Tabs */
+      .st-ai-tabs { display: flex; gap: 4px; padding: 10px 14px 0; flex-shrink: 0; border-bottom: 1px solid rgba(120,200,255,.12); }
+      .st-ai-tab {
+        padding: 6px 12px; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+        background: none; border: none; border-bottom: 2px solid transparent;
+        color: #7a9ab8; margin-bottom: -1px; transition: color .18s, border-color .18s;
+      }
+      .st-ai-tab:hover { color: #b8d8f0; }
+      .st-ai-tab.active { color: #f2a277; border-bottom-color: #f2a277; }
 
-        if (tab === 'apply') {
-            if (calcType === 'quantile') {
-                return [
-                    `This cutoff corresponds to the ${formatPct(probability)} percentile used in threshold-based decisions.`,
-                    `${(1 - probability) < 0.05 ? 'It is in a tail region often used for critical-value rules.' : 'It remains inside the broad central region, not a strict critical cutoff.'}`,
-                    `Reference position: z = ${z.toFixed(3)}.`
-                ];
-            }
+      /* Content area */
+      .st-ai-body { padding: 14px; overflow-y: auto; flex: 1; }
 
-            if (calcType === 'between') {
-                return [
-                    `This interval captures ${formatPct(leftTail)} to ${formatPct(safeNum(state.upperTailCdf, leftTail + result))}, i.e. ${formatPct(result)} total coverage.`,
-                    'Use this directly for acceptance bands, tolerance windows, or risk envelopes.',
-                    `${result < 0.5 ? 'Coverage is relatively narrow, so misses outside the interval are common.' : 'Coverage is broad, so misses outside the interval are less common.'}`
-                ];
-            }
+      /* State chip row */
+      .st-ai-state-row {
+        display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px;
+      }
+      .st-ai-chip {
+        font-size: 0.7rem; padding: 2px 7px; border-radius: 999px;
+        background: rgba(120,200,255,.1); border: 1px solid rgba(120,200,255,.22); color: #9ab1cc;
+      }
 
-            return [
-                `If treated as a right-tail cutoff, this point implies a one-sided p-value of about ${rightTail.toFixed(4)}.`,
-                `${rightTail < 0.05 ? 'This would cross conventional significance thresholds in a right-tailed test.' : 'This is above common significance thresholds, so it is not decision-critical in a right-tailed test.'}`,
-                `Reference position: z = ${z.toFixed(3)}.`
-            ];
-        }
+      /* Response text */
+      .st-ai-response {
+        font-size: 0.88rem; line-height: 1.65; color: #c8dff5; min-height: 48px;
+      }
+      .st-ai-response.loading { color: #7a9ab8; font-style: italic; }
+      .st-ai-response.error { color: #f97777; }
 
-        if (calcType === 'quantile') {
-            return [
-                `${formatPct(probability)} of observations are expected at or below x = ${result.toFixed(3)}.`,
-                `Only ${formatPct(1 - probability)} remain above this threshold, so it is ${probability > 0.9 || probability < 0.1 ? 'tail-oriented' : 'centrally positioned'}.`,
-                `This maps to z = ${z.toFixed(3)} (${z >= 0 ? 'above' : 'below'} the mean).`
-            ];
-        }
+      /* Loading dots animation */
+      .st-ai-dots::after {
+        content: '';
+        animation: stAiDots 1.4s steps(4, end) infinite;
+      }
+      @keyframes stAiDots { 0%{content:'.'} 33%{content:'..'} 66%{content:'...'} 100%{content:''} }
 
-        if (calcType === 'between') {
-            const lower = safeNum(state.lowerBound);
-            const upper = safeNum(state.upperBound);
-            return [
-                `The interval [${lower.toFixed(3)}, ${upper.toFixed(3)}] contains ${formatPct(result)} of modeled outcomes.`,
-                `Outside-interval probability is ${formatPct(1 - result)}, so this range is ${result >= 0.8 ? 'high-coverage' : 'moderate-coverage'}.`,
-                'This directly supports interval-based quality and risk decisions.'
-            ];
-        }
+      /* Regenerate + settings row */
+      .st-ai-actions {
+        display: flex; align-items: center; gap: 8px; margin-top: 12px;
+        padding-top: 10px; border-top: 1px solid rgba(120,200,255,.14);
+      }
+      .st-ai-regen-btn {
+        display: flex; align-items: center; gap: 6px;
+        padding: 6px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+        background: rgba(120,165,255,.14); border: 1px solid rgba(120,165,255,.3); color: #a8c8f0;
+        transition: background .2s;
+      }
+      .st-ai-regen-btn:hover { background: rgba(120,165,255,.25); }
+      .st-ai-key-btn {
+        margin-left: auto; padding: 5px 10px; border-radius: 7px; font-size: 0.73rem;
+        background: none; border: 1px solid rgba(120,200,255,.2); color: #6a8aaa; cursor: pointer;
+        transition: color .2s, border-color .2s;
+      }
+      .st-ai-key-btn:hover { color: #9ab1cc; border-color: rgba(120,200,255,.4); }
 
-        const x = safeNum(state.xValue);
-        return [
-            `At x = ${x.toFixed(3)}, the model places ${formatPct(leftTail)} at or below this point and ${formatPct(rightTail)} above it.`,
-            `${rightTail < 0.1 ? 'This sits in a relatively rare upper region.' : 'This remains within a commonly observed region.'}`,
-            `Standardized position is z = ${z.toFixed(3)} relative to mean ${mean.toFixed(3)}.`
-        ];
-    }
+      /* API key setup panel */
+      .st-ai-key-panel {
+        background: rgba(10,22,42,.85); border: 1px solid rgba(120,200,255,.22); border-radius: 10px;
+        padding: 14px; margin-bottom: 12px;
+      }
+      .st-ai-key-panel h4 { font-size: 0.84rem; color: #ffd2b2; margin: 0 0 6px; }
+      .st-ai-key-panel p { font-size: 0.78rem; color: #8aabcc; margin: 0 0 10px; line-height: 1.5; }
+      .st-ai-key-panel a { color: #78c8ff; }
+      .st-ai-key-row { display: flex; gap: 7px; }
+      .st-ai-key-input {
+        flex: 1; padding: 6px 10px; border-radius: 7px; font-size: 0.8rem;
+        background: rgba(255,255,255,.06); border: 1px solid rgba(120,200,255,.25); color: #d8edff;
+        outline: none;
+      }
+      .st-ai-key-input:focus { border-color: rgba(120,200,255,.55); }
+      .st-ai-key-save {
+        padding: 6px 14px; border-radius: 7px; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+        background: #f97316; border: none; color: #fff; transition: opacity .2s;
+      }
+      .st-ai-key-save:hover { opacity: .85; }
+    `;
+    document.head.appendChild(el);
+  }
 
-    function computeInsightScore(state) {
-        const calcType = state.calcType || 'probability';
-        const mean = safeNum(state.mean);
-        const stddev = safeNum(state.stddev, 1);
-        const result = safeNum(state.result);
-        const leftTail = safeNum(state.leftTail, calcType === 'quantile' ? safeNum(state.probability, 0.5) : result);
-        const rightTail = safeNum(state.rightTail, 1 - leftTail);
-        const z = stddev > 0 ? (result - mean) / stddev : 0;
-        const absZ = Math.abs(z);
+  // ── Build state summary chips ──────────────────────────────────────────────
+  function buildStateChips(state) {
+    const chips = [];
+    const dist = (state.distributionName || document.body?.dataset?.distribution || '').replace(/distribution$/i,'');
+    if (dist) chips.push(dist.trim() || 'Distribution');
+    if (state.calcType) chips.push(state.calcType);
+    if (state.mean      != null) chips.push(`μ = ${safeNum(state.mean).toFixed(3)}`);
+    if (state.stddev    != null) chips.push(`σ = ${safeNum(state.stddev,1).toFixed(3)}`);
+    if (state.xValue    != null) chips.push(`x = ${safeNum(state.xValue).toFixed(3)}`);
+    if (state.result    != null) chips.push(`result = ${safeNum(state.result).toFixed(4)}`);
+    return chips.map(c => `<span class="st-ai-chip">${esc(c)}</span>`).join('');
+  }
 
-        let score = 18 + absZ * 26;
-        const tail = Math.min(leftTail, rightTail);
-        if (tail < 0.1) score += 8;
-        if (tail < 0.05) score += 10;
-        if (tail < 0.01) score += 12;
-        if (calcType === 'between') score = 22 + (1 - safeNum(state.result)) * 55;
-        if (calcType === 'quantile') score += 6;
-        return Math.round(clamp(score, 8, 100));
-    }
+  // ── Modal creation ─────────────────────────────────────────────────────────
+  function ensureModal(targetId) {
+    const panel = panelRegistry.get(targetId);
+    if (!panel) return null;
+    const existing = document.getElementById(panel.modalId);
+    if (existing) return existing;
 
-    function getPanel(targetId) {
-        return panelRegistry.get(targetId);
-    }
-
-    function closeModal(targetId) {
-        const panel = getPanel(targetId);
-        if (!panel) return;
-        const modal = document.getElementById(panel.modalId);
-        if (!modal) return;
-        modal.classList.remove('open');
-        modal.setAttribute('aria-hidden', 'true');
-    }
-
-    function openModal(targetId) {
-        const panel = getPanel(targetId);
-        if (!panel) return;
-        const modal = document.getElementById(panel.modalId);
-        if (!modal) return;
-        modal.classList.add('open');
-        modal.setAttribute('aria-hidden', 'false');
-    }
-
-    function renderPanel(targetId) {
-        const panel = getPanel(targetId);
-        if (!panel) return;
-
-        const mount = document.getElementById(targetId);
-        const modal = document.getElementById(panel.modalId);
-        if (!mount || !modal) return;
-
-        const lines = buildLines(panel.state, panel.activeTab);
-        const score = computeInsightScore(panel.state);
-        const scoreLabel = insightLabel(score);
-
-        const inlineScoreEl = mount.querySelector('.ai-inline-score');
-        const content = modal.querySelector('.ai-panel-content');
-        const scoreValueEl = modal.querySelector('.ai-score-value');
-        const scoreLabelEl = modal.querySelector('.ai-score-label');
-        const scoreBarEl = modal.querySelector('.ai-score-fill');
-        const subheadEl = modal.querySelector('.ai-subhead');
-        const premiumPillEl = modal.querySelector('.ai-premium-pill');
-        const unlockWrapEl = modal.querySelector('.ai-unlock-wrap');
-        const unlockBtnEl = modal.querySelector('.ai-unlock-btn');
-
-        if (!inlineScoreEl || !content || !scoreValueEl || !scoreLabelEl || !scoreBarEl || !subheadEl || !premiumPillEl || !unlockWrapEl || !unlockBtnEl) return;
-
-        inlineScoreEl.textContent = panel.isPremiumUnlocked
-            ? `Insight strength: ${score}/100`
-            : `AI+ locked • preview active`;
-
-        if (panel.isPremiumUnlocked) {
-            content.innerHTML = lines.map(line => `<div class="ai-line">${line}</div>`).join('');
-            premiumPillEl.textContent = 'AI+ Enabled';
-            premiumPillEl.classList.add('enabled');
-            unlockWrapEl.style.display = 'none';
-        } else {
-            const firstLine = lines[0] || 'Preview insight unavailable.';
-            const secondLine = lines[1] || 'Unlock AI+ for decision-ready depth and workflow mapping.';
-            content.innerHTML = `
-                <div class="ai-line">${firstLine}</div>
-                <div class="ai-line locked">${secondLine}</div>
-            `;
-            premiumPillEl.textContent = 'AI+ Locked';
-            premiumPillEl.classList.remove('enabled');
-            unlockWrapEl.style.display = 'block';
-        }
-
-        scoreValueEl.textContent = `${score} / 100`;
-        scoreLabelEl.textContent = scoreLabel;
-        scoreBarEl.style.width = `${score}%`;
-        subheadEl.textContent = panel.activeTab === 'interpret'
-            ? 'Decision-focused reading of the current result'
-            : panel.activeTab === 'teach'
-                ? 'Compact conceptual guidance tied to current state'
-                : 'Workflow bridge for practical statistical use';
-
-        modal.querySelectorAll('.ai-tab-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.tab === panel.activeTab);
-        });
-    }
-
-    function ensureModal(targetId) {
-        const panel = getPanel(targetId);
-        if (!panel) return null;
-        const existing = document.getElementById(panel.modalId);
-        if (existing) return existing;
-
-        const modal = document.createElement('div');
-        modal.id = panel.modalId;
-        modal.className = 'ai-insights-modal';
-        modal.setAttribute('aria-hidden', 'true');
-        modal.innerHTML = `
-            <div class="ai-insights-backdrop" data-ai-close></div>
-            <div class="ai-insights-dialog" role="dialog" aria-modal="true" aria-label="AI insights">
-                <div class="ai-panel-head">
-                    <span class="ai-title"><i class="fas fa-sparkles"></i> Insight Lens</span>
-                    <span class="ai-premium-pill">AI+ Locked</span>
-                    <button class="ai-close-btn" type="button" aria-label="Close insights"><i class="fas fa-times"></i></button>
-                </div>
-                <div class="ai-subhead"></div>
-                <div class="ai-tabs">
-                    <button class="ai-tab-btn active" data-tab="interpret" type="button">Interpret</button>
-                    <button class="ai-tab-btn" data-tab="teach" type="button">Teach</button>
-                    <button class="ai-tab-btn" data-tab="apply" type="button">Apply</button>
-                </div>
-                <div class="ai-panel-content"></div>
-                <div class="ai-unlock-wrap">
-                    <div class="ai-unlock-note">Premium reasoning includes deeper interpretation, teaching clarity, and applied workflow guidance.</div>
-                    <button class="ai-unlock-btn" type="button">Unlock AI+ insights</button>
-                </div>
-                <div class="ai-score-wrap">
-                    <div class="ai-score-head">
-                        <span>Insight strength</span>
-                        <span class="ai-score-value">0 / 100</span>
-                    </div>
-                    <div class="ai-score-track"><div class="ai-score-fill"></div></div>
-                    <div class="ai-score-label">Neutral</div>
-                </div>
+    const modal = document.createElement('div');
+    modal.id = panel.modalId;
+    modal.className = 'st-ai-modal';
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = `
+      <div class="st-ai-dialog" role="dialog" aria-modal="true" aria-label="AI Interpretation">
+        <div class="st-ai-head">
+          <span class="st-ai-head-title"><i class="fas fa-sparkles"></i> AI Interpretation</span>
+          <span class="st-ai-model-chip">${MODEL}</span>
+          <button class="st-ai-close" type="button" aria-label="Close"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="st-ai-tabs">
+          <button class="st-ai-tab active" data-tab="interpret" type="button">Interpret</button>
+          <button class="st-ai-tab" data-tab="teach" type="button">Teach</button>
+          <button class="st-ai-tab" data-tab="apply" type="button">Apply</button>
+        </div>
+        <div class="st-ai-body">
+          <div class="st-ai-state-row" id="${targetId}-chips"></div>
+          <div class="st-ai-key-panel" id="${targetId}-key-panel" style="display:none;">
+            <h4><i class="fas fa-key"></i> Gemini API Key</h4>
+            <p>Enter your free Google Gemini API key to enable AI interpretations.<br>
+               Get one at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a> — no credit card required.</p>
+            <div class="st-ai-key-row">
+              <input class="st-ai-key-input" type="password" placeholder="AIza..." id="${targetId}-key-input" autocomplete="off" />
+              <button class="st-ai-key-save" id="${targetId}-key-save" type="button">Save</button>
             </div>
-        `;
+          </div>
+          <div class="st-ai-response" id="${targetId}-response">Press a tab to generate an interpretation.</div>
+          <div class="st-ai-actions">
+            <button class="st-ai-regen-btn" id="${targetId}-regen" type="button"><i class="fas fa-rotate-right"></i> Regenerate</button>
+            <button class="st-ai-key-btn" id="${targetId}-key-btn" type="button"><i class="fas fa-key"></i> API Key</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
 
-        document.body.appendChild(modal);
+    // Close handlers
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal(targetId); });
+    modal.querySelector('.st-ai-close').addEventListener('click', () => closeModal(targetId));
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(targetId); });
 
-        modal.querySelectorAll('.ai-tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const current = getPanel(targetId);
-                if (!current) return;
-                current.activeTab = btn.dataset.tab;
-                renderPanel(targetId);
-            });
-        });
-
-        modal.querySelectorAll('[data-ai-close]').forEach(el => {
-            el.addEventListener('click', () => closeModal(targetId));
-        });
-
-        const closeBtn = modal.querySelector('.ai-close-btn');
-        if (closeBtn) closeBtn.addEventListener('click', () => closeModal(targetId));
-
-        const unlockBtn = modal.querySelector('.ai-unlock-btn');
-        if (unlockBtn) {
-            unlockBtn.addEventListener('click', () => {
-                const current = getPanel(targetId);
-                if (!current) return;
-                current.isPremiumUnlocked = true;
-                renderPanel(targetId);
-            });
-        }
-
-        return modal;
-    }
-
-    function initPanel(targetId) {
-        const mount = document.getElementById(targetId);
-        if (!mount) return;
-
-        if (!panelRegistry.has(targetId)) {
-            panelRegistry.set(targetId, {
-                state: {},
-                activeTab: 'interpret',
-                modalId: `aiInsightsModal-${targetId}`,
-                isPremiumUnlocked: false
-            });
-        }
-
-        mount.innerHTML = `
-            <div class="ai-inline-trigger">
-                <button class="ai-open-btn" type="button">
-                    <i class="fas fa-sparkles"></i>
-                    Insight Lens
-                </button>
-                <span class="ai-inline-score">Insight strength: --</span>
-            </div>
-        `;
-
-        ensureModal(targetId);
-
-        const openBtn = mount.querySelector('.ai-open-btn');
-        if (openBtn) {
-            openBtn.addEventListener('click', () => openModal(targetId));
-        }
-    }
-
-    function update(targetId, state) {
-        if (!document.getElementById(targetId)) return;
-        initPanel(targetId);
-        const panel = getPanel(targetId);
-        if (!panel) return;
-        panel.state = state || {};
-        renderPanel(targetId);
-    }
-
-    document.addEventListener('keydown', (event) => {
-        if (event.key !== 'Escape') return;
-        panelRegistry.forEach((_value, key) => closeModal(key));
+    // Tabs
+    modal.querySelectorAll('.st-ai-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        modal.querySelectorAll('.st-ai-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const p = panelRegistry.get(targetId);
+        if (p) { p.activeTab = btn.dataset.tab; p.cache = {}; }
+        runInterpretation(targetId);
+      });
     });
 
-    window.StatisticoAIInsights = {
-        update
-    };
+    // Regenerate
+    modal.querySelector(`#${targetId}-regen`).addEventListener('click', () => {
+      const p = panelRegistry.get(targetId);
+      if (p) p.cache = {};
+      runInterpretation(targetId);
+    });
+
+    // API key toggle
+    modal.querySelector(`#${targetId}-key-btn`).addEventListener('click', () => {
+      const kp = modal.querySelector(`#${targetId}-key-panel`);
+      const showing = kp.style.display !== 'none';
+      kp.style.display = showing ? 'none' : 'block';
+      if (!showing) {
+        const inp = modal.querySelector(`#${targetId}-key-input`);
+        inp.value = getApiKey();
+        inp.focus();
+      }
+    });
+
+    // Save key
+    modal.querySelector(`#${targetId}-key-save`).addEventListener('click', () => {
+      const key = modal.querySelector(`#${targetId}-key-input`).value.trim();
+      if (!key) return;
+      setApiKey(key);
+      modal.querySelector(`#${targetId}-key-panel`).style.display = 'none';
+      const p = panelRegistry.get(targetId);
+      if (p) p.cache = {};
+      runInterpretation(targetId);
+    });
+
+    return modal;
+  }
+
+  // ── Open / close ───────────────────────────────────────────────────────────
+  function closeModal(targetId) {
+    const p = panelRegistry.get(targetId);
+    if (!p) return;
+    const m = document.getElementById(p.modalId);
+    if (m) { m.classList.remove('open'); m.setAttribute('aria-hidden','true'); }
+  }
+
+  function openModal(targetId) {
+    const p = panelRegistry.get(targetId);
+    if (!p) return;
+    const m = ensureModal(targetId);
+    if (!m) return;
+    m.classList.add('open');
+    m.setAttribute('aria-hidden','false');
+
+    // Show key panel if no key stored yet
+    const kp = m.querySelector(`#${targetId}-key-panel`);
+    const keyExists = !!getApiKey();
+    if (!keyExists && kp) {
+      kp.style.display = 'block';
+      const inp = m.querySelector(`#${targetId}-key-input`);
+      if (inp) inp.focus();
+    }
+
+    // Refresh chips
+    const chips = m.querySelector(`#${targetId}-chips`);
+    if (chips) chips.innerHTML = buildStateChips(p.state);
+
+    if (keyExists) runInterpretation(targetId);
+  }
+
+  // ── Run AI call ────────────────────────────────────────────────────────────
+  async function runInterpretation(targetId) {
+    const p = panelRegistry.get(targetId);
+    if (!p) return;
+    const m = document.getElementById(p.modalId);
+    if (!m) return;
+
+    const apiKey = getApiKey();
+    const respEl = m.querySelector(`#${targetId}-response`);
+    if (!respEl) return;
+
+    if (!apiKey) {
+      respEl.className = 'st-ai-response error';
+      respEl.textContent = 'No API key configured. Click "API Key" below to add one.';
+      return;
+    }
+
+    // Cache hit
+    const cacheKey = p.activeTab + JSON.stringify(p.state);
+    if (p.cache && p.cache[cacheKey]) {
+      respEl.className = 'st-ai-response';
+      respEl.textContent = p.cache[cacheKey];
+      return;
+    }
+
+    // Loading state
+    respEl.className = 'st-ai-response loading';
+    respEl.innerHTML = '<span class="st-ai-dots">Generating interpretation</span>';
+
+    // Refresh chips
+    const chips = m.querySelector(`#${targetId}-chips`);
+    if (chips) chips.innerHTML = buildStateChips(p.state);
+
+    try {
+      const prompt = buildPrompt(p.state, p.activeTab);
+      const text = await callGemini(prompt, apiKey);
+      if (!p.cache) p.cache = {};
+      p.cache[cacheKey] = text;
+      respEl.className = 'st-ai-response';
+      respEl.textContent = text;
+    } catch (err) {
+      respEl.className = 'st-ai-response error';
+      respEl.textContent = `Error: ${err.message}`;
+    }
+  }
+
+  // ── Panel init ─────────────────────────────────────────────────────────────
+  function initPanel(targetId) {
+    const mount = document.getElementById(targetId);
+    if (!mount) return;
+
+    if (!panelRegistry.has(targetId)) {
+      panelRegistry.set(targetId, {
+        state: {}, activeTab: 'interpret',
+        modalId: `st-ai-modal-${targetId}`, cache: {}
+      });
+    }
+
+    injectStyles();
+
+    mount.innerHTML = `
+      <button class="st-ai-trigger" type="button" id="${targetId}-open-btn">
+        <i class="fas fa-sparkles"></i>
+        Get AI Interpretation
+        <span class="st-ai-badge">Gemini</span>
+      </button>
+    `;
+
+    ensureModal(targetId);
+
+    mount.querySelector(`#${targetId}-open-btn`).addEventListener('click', () => openModal(targetId));
+  }
+
+  // ── Public API ─────────────────────────────────────────────────────────────
+  function update(targetId, state) {
+    if (!document.getElementById(targetId)) return;
+    initPanel(targetId);
+    const p = panelRegistry.get(targetId);
+    if (!p) return;
+    p.state = state || {};
+    p.cache = {}; // invalidate cache when state changes
+  }
+
+  window.StatisticoAIInsights = { update };
 })();

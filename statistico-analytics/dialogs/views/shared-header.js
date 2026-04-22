@@ -1354,9 +1354,9 @@ const StatisticoHeader = {
       overlay.id = 'stReportExportOverlay';
       overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:2147483300;display:flex;align-items:center;justify-content:center;padding:16px;';
       const listHtml = sections.map((s) => `
-        <label style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid #e5e7eb;">
+        <label style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid #e5e7eb;color:#0f172a;font-size:14px;font-weight:600;">
           <input type="checkbox" data-section-id="${esc(s.id)}" checked />
-          <span>${esc(s.label)}</span>
+          <span style="color:#0f172a;">${esc(s.label)}</span>
         </label>
       `).join('');
       overlay.innerHTML = `
@@ -1380,6 +1380,113 @@ const StatisticoHeader = {
         close();
         onConfirm(checked);
       });
+    };
+
+    const percentile = (sorted, p) => {
+      if (!sorted.length) return null;
+      const pos = (sorted.length - 1) * p;
+      const base = Math.floor(pos);
+      const rest = pos - base;
+      return sorted[base + 1] !== undefined
+        ? sorted[base] + rest * (sorted[base + 1] - sorted[base])
+        : sorted[base];
+    };
+
+    const sectionSpecificHtml = (sectionId, sectionLabel, values, stats, variableName) => {
+      const sorted = [...values].sort((a, b) => a - b);
+      const n = values.length;
+      const commonStatsTable = stats ? `
+        <table><thead><tr><th>n</th><th>Mean</th><th>SD</th><th>Min</th><th>Q1</th><th>Median</th><th>Q3</th><th>Max</th></tr></thead>
+        <tbody><tr><td>${stats.n}</td><td>${stats.mean.toFixed(4)}</td><td>${stats.sd.toFixed(4)}</td><td>${stats.min.toFixed(4)}</td><td>${stats.q1.toFixed(4)}</td><td>${stats.median.toFixed(4)}</td><td>${stats.q3.toFixed(4)}</td><td>${stats.max.toFixed(4)}</td></tr></tbody></table>
+      ` : '<p>No numeric summary available.</p>';
+
+      if (sectionId === 'histogram') {
+        if (!n) return '<p>No data for histogram.</p>';
+        const bins = Math.max(5, Math.min(12, Math.round(Math.sqrt(n))));
+        const min = sorted[0];
+        const max = sorted[sorted.length - 1];
+        const width = (max - min) / bins || 1;
+        const counts = Array.from({ length: bins }, () => 0);
+        values.forEach((v) => {
+          const idx = Math.min(bins - 1, Math.max(0, Math.floor((v - min) / width)));
+          counts[idx] += 1;
+        });
+        const rows = counts.map((c, i) => {
+          const lo = min + i * width;
+          const hi = i === bins - 1 ? max : lo + width;
+          return `<tr><td>${lo.toFixed(4)} - ${hi.toFixed(4)}</td><td>${c}</td></tr>`;
+        }).join('');
+        return `<p>Histogram distribution for <strong>${esc(variableName)}</strong>.</p><table><thead><tr><th>Bin range</th><th>Frequency</th></tr></thead><tbody>${rows}</tbody></table>`;
+      }
+
+      if (sectionId === 'boxplot') {
+        return `<p>Box plot five-number summary and spread indicators.</p>${commonStatsTable}`;
+      }
+
+      if (sectionId === 'cdf') {
+        const points = [0.1, 0.25, 0.5, 0.75, 0.9].map((p) => {
+          const x = percentile(sorted, p);
+          return `<tr><td>${(p * 100).toFixed(0)}%</td><td>${x !== null ? x.toFixed(4) : '--'}</td></tr>`;
+        }).join('');
+        return `<p>Cumulative distribution checkpoints.</p><table><thead><tr><th>Percentile</th><th>Value</th></tr></thead><tbody>${points}</tbody></table>`;
+      }
+
+      if (sectionId === 'percentile') {
+        const points = [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99].map((p) => {
+          const x = percentile(sorted, p);
+          return `<tr><td>P${(p * 100).toFixed(0)}</td><td>${x !== null ? x.toFixed(4) : '--'}</td></tr>`;
+        }).join('');
+        return `<p>Detailed percentile table.</p><table><thead><tr><th>Percentile</th><th>Value</th></tr></thead><tbody>${points}</tbody></table>`;
+      }
+
+      if (sectionId === 'kernel') {
+        return `<p>Kernel density section (smoothed distribution overview).</p>${commonStatsTable}`;
+      }
+
+      if (sectionId === 'outliers') {
+        if (!stats) return '<p>No outlier analysis available.</p>';
+        const iqr = stats.q3 - stats.q1;
+        const lower = stats.q1 - 1.5 * iqr;
+        const upper = stats.q3 + 1.5 * iqr;
+        const outliers = values.filter((v) => v < lower || v > upper);
+        const outRows = outliers.length ? outliers.map((v, i) => `<tr><td>${i + 1}</td><td>${v.toFixed(4)}</td></tr>`).join('') : '<tr><td colspan="2">No outliers detected.</td></tr>';
+        return `<p>IQR-based outlier detection (fences: ${lower.toFixed(4)} to ${upper.toFixed(4)}).</p><table><thead><tr><th>#</th><th>Outlier value</th></tr></thead><tbody>${outRows}</tbody></table>`;
+      }
+
+      if (sectionId === 'normality') {
+        if (!stats || stats.sd === 0) return '<p>Normality metrics unavailable.</p>';
+        const m3 = values.reduce((acc, v) => acc + Math.pow(v - stats.mean, 3), 0) / n;
+        const m4 = values.reduce((acc, v) => acc + Math.pow(v - stats.mean, 4), 0) / n;
+        const skew = m3 / Math.pow(stats.sd, 3);
+        const kurt = (m4 / Math.pow(stats.sd, 4)) - 3;
+        return `<p>Distribution shape diagnostics.</p><table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody><tr><td>Skewness</td><td>${skew.toFixed(4)}</td></tr><tr><td>Excess Kurtosis</td><td>${kurt.toFixed(4)}</td></tr></tbody></table>`;
+      }
+
+      if (sectionId === 'qqplot') {
+        const samples = [0.1, 0.25, 0.5, 0.75, 0.9].map((p) => {
+          const obs = percentile(sorted, p);
+          return `<tr><td>${(p * 100).toFixed(0)}%</td><td>${obs !== null ? obs.toFixed(4) : '--'}</td></tr>`;
+        }).join('');
+        return `<p>Quantile comparison points for PP/QQ interpretation.</p><table><thead><tr><th>Quantile</th><th>Observed value</th></tr></thead><tbody>${samples}</tbody></table>`;
+      }
+
+      if (sectionId === 'hypothesis') {
+        if (!stats || n < 2) return '<p>Hypothesis summary unavailable.</p>';
+        const se = stats.sd / Math.sqrt(n);
+        const t = se ? stats.mean / se : 0;
+        return `<p>One-sample hypothesis snapshot (H0: mean = 0).</p><table><thead><tr><th>Statistic</th><th>Value</th></tr></thead><tbody><tr><td>Mean</td><td>${stats.mean.toFixed(4)}</td></tr><tr><td>SE</td><td>${se.toFixed(4)}</td></tr><tr><td>t-stat</td><td>${t.toFixed(4)}</td></tr></tbody></table>`;
+      }
+
+      if (sectionId === 'confidence') {
+        if (!stats || n < 2) return '<p>Confidence interval unavailable.</p>';
+        const se = stats.sd / Math.sqrt(n);
+        const z = 1.96;
+        const lo = stats.mean - z * se;
+        const hi = stats.mean + z * se;
+        return `<p>95% confidence interval for the mean.</p><table><thead><tr><th>Mean</th><th>Lower</th><th>Upper</th></tr></thead><tbody><tr><td>${stats.mean.toFixed(4)}</td><td>${lo.toFixed(4)}</td><td>${hi.toFixed(4)}</td></tr></tbody></table>`;
+      }
+
+      return `<p>${esc(sectionLabel)} summary.</p>${commonStatsTable}`;
     };
 
     return {
@@ -1411,15 +1518,10 @@ const StatisticoHeader = {
           const stats = computeStats(values);
           const escapedVar = esc(data.headers[0]);
           const toc = selected.map((s, i) => `<li><a href="#sec_${i + 1}">${esc(s.label)}</a></li>`).join('');
-          const statTable = stats ? `
-            <table><thead><tr><th>n</th><th>Mean</th><th>SD</th><th>Min</th><th>Q1</th><th>Median</th><th>Q3</th><th>Max</th></tr></thead>
-            <tbody><tr><td>${stats.n}</td><td>${stats.mean.toFixed(4)}</td><td>${stats.sd.toFixed(4)}</td><td>${stats.min.toFixed(4)}</td><td>${stats.q1.toFixed(4)}</td><td>${stats.median.toFixed(4)}</td><td>${stats.q3.toFixed(4)}</td><td>${stats.max.toFixed(4)}</td></tr></tbody></table>
-          ` : '<p>No numeric summary available.</p>';
           const sectionBlocks = selected.map((s, i) => `
             <section id="sec_${i + 1}">
               <h2>${i + 1}. ${esc(s.label)}</h2>
-              <p>This section is included from the selected menu items for <strong>${escapedVar}</strong>.</p>
-              ${statTable}
+              ${sectionSpecificHtml(String(s.id), s.label, values, stats, data.headers[0])}
             </section>
           `).join('');
           const dataRows = data.allRows.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r[0] ?? '')}</td></tr>`).join('');

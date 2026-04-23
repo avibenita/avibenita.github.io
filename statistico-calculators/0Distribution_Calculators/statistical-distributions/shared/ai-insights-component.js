@@ -7,12 +7,19 @@
   'use strict';
 
   // ── Config ─────────────────────────────────────────────────────────────────
-  const MODEL     = 'gemini-1.5-flash';
-  const API_BASE  = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
+  // Try models in order until one succeeds (free-tier availability varies by region/key)
+  const MODELS = [
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-flash',
+    'gemini-1.0-pro',
+  ];
+  const API_VER  = 'v1beta';
+  const API_HOST = 'https://generativelanguage.googleapis.com';
   const KEY_STORE = 'statistico-gemini-key';
 
   // ── Per-panel state ────────────────────────────────────────────────────────
   const panelRegistry = new Map(); // targetId → { state, activeTab, modalId, cache }
+  let _activeModel = MODELS[0]; // updated after first successful call
 
   // ── Tiny helpers ───────────────────────────────────────────────────────────
   function safeNum(v, fb) { return Number.isFinite(v) ? v : (fb !== undefined ? fb : 0); }
@@ -45,25 +52,43 @@
     return `You are a concise statistics expert embedded in an interactive calculator.\n\nCurrent calculator state:\n${context}\n\nTask: ${tasks[tab] || tasks.interpret}\n\nRespond with plain text only. No markdown, no bullet points, no headers.`;
   }
 
-  // ── Gemini API call ────────────────────────────────────────────────────────
+  // ── Gemini API call (tries each model in MODELS until one succeeds) ────────
   async function callGemini(prompt, apiKey) {
-    const resp = await fetch(`${API_BASE}?key=${encodeURIComponent(apiKey)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 300, temperature: 0.6 }
-      })
-    });
-    if (!resp.ok) {
-      let msg = `HTTP ${resp.status}`;
-      try { const e = await resp.json(); msg = e?.error?.message || msg; } catch {}
-      throw new Error(msg);
+    let lastErr = null;
+    for (const model of MODELS) {
+      const url = `${API_HOST}/${API_VER}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      try {
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { maxOutputTokens: 300, temperature: 0.6 }
+          })
+        });
+        if (!resp.ok) {
+          let msg = `HTTP ${resp.status}`;
+          try { const e = await resp.json(); msg = e?.error?.message || msg; } catch {}
+          // If model not found, try next; otherwise throw immediately
+          if (resp.status === 404 || (msg && msg.toLowerCase().includes('not found'))) {
+            lastErr = new Error(msg); continue;
+          }
+          throw new Error(msg);
+        }
+        const data = await resp.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) throw new Error('Empty response from API.');
+        // Store whichever model succeeded so the chip updates
+        _activeModel = model;
+        return text.trim();
+      } catch (err) {
+        if (err.message && err.message.toLowerCase().includes('not found')) {
+          lastErr = err; continue;
+        }
+        throw err;
+      }
     }
-    const data = await resp.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error('Empty response from API.');
-    return text.trim();
+    throw lastErr || new Error('No available Gemini model found for this API key.');
   }
 
   // ── Self-contained CSS ─────────────────────────────────────────────────────
@@ -222,7 +247,7 @@
       <div class="st-ai-dialog" role="dialog" aria-modal="true" aria-label="AI Interpretation">
         <div class="st-ai-head">
           <span class="st-ai-head-title"><i class="fas fa-sparkles"></i> AI Interpretation</span>
-          <span class="st-ai-model-chip">${MODEL}</span>
+          <span class="st-ai-model-chip" id="${targetId}-model-chip">${_activeModel}</span>
           <button class="st-ai-close" type="button" aria-label="Close"><i class="fas fa-times"></i></button>
         </div>
         <div class="st-ai-tabs">
@@ -372,6 +397,9 @@
       p.cache[cacheKey] = text;
       respEl.className = 'st-ai-response';
       respEl.textContent = text;
+      // Update model chip to show whichever model actually responded
+      const chipEl = m.querySelector(`#${targetId}-model-chip`);
+      if (chipEl) chipEl.textContent = _activeModel;
     } catch (err) {
       respEl.className = 'st-ai-response error';
       respEl.textContent = `Error: ${err.message}`;

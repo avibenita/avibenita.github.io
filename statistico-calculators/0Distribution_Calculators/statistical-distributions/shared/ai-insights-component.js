@@ -220,8 +220,47 @@
         padding: 6px 14px; border-radius: 7px; font-size: 0.8rem; font-weight: 600; cursor: pointer;
         background: #f97316; border: none; color: #fff; transition: opacity .2s;
       }
-      .st-ai-key-save:hover { opacity: .85; }
-    `;
+      /* Copy button */
+      .st-ai-copy-btn {
+        display: flex; align-items: center; gap: 6px;
+        padding: 6px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+        background: rgba(120,200,255,.1); border: 1px solid rgba(120,200,255,.25); color: #a8c8f0;
+        transition: background .2s;
+      }
+      .st-ai-copy-btn:hover { background: rgba(120,200,255,.22); }
+      .st-ai-copy-btn.copied { color: #6ee7b7; border-color: rgba(110,231,183,.4); background: rgba(110,231,183,.1); }
+
+      /* Full-view toggle */
+      .st-ai-fullview-btn {
+        display: flex; align-items: center; gap: 6px;
+        padding: 6px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+        background: rgba(242,162,119,.12); border: 1px solid rgba(242,162,119,.28); color: #f2c59a;
+        transition: background .2s;
+      }
+      .st-ai-fullview-btn:hover { background: rgba(242,162,119,.22); }
+
+      /* Full-view expanded panel */
+      .st-ai-fullview-panel { display: none; }
+      .st-ai-fullview-panel.open { display: block; }
+      .st-ai-section {
+        margin-bottom: 14px; padding: 12px 14px;
+        background: rgba(255,255,255,.04); border: 1px solid rgba(120,200,255,.14); border-radius: 9px;
+      }
+      .st-ai-section-head {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 8px;
+      }
+      .st-ai-section-label {
+        font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+        color: #f2a277;
+      }
+      .st-ai-section-copy {
+        background: none; border: none; color: #5a7a9a; cursor: pointer; font-size: 0.78rem; padding: 2px 6px; border-radius: 5px;
+      }
+      .st-ai-section-copy:hover { color: #9ab1cc; }
+      .st-ai-section-text { font-size: 0.87rem; line-height: 1.65; color: #c8dff5; }
+      .st-ai-section-text.loading { color: #7a9ab8; font-style: italic; }
+      .st-ai-section-text.error { color: #f97777; }
     document.head.appendChild(el);
   }
 
@@ -273,8 +312,21 @@
             </div>
           </div>
           <div class="st-ai-response" id="${targetId}-response">Press a tab to generate an interpretation.</div>
+          <!-- Full-view panel: all 3 sections at once -->
+          <div class="st-ai-fullview-panel" id="${targetId}-fullview">
+            ${['interpret','teach','apply'].map(tab => `
+            <div class="st-ai-section" id="${targetId}-fv-${tab}">
+              <div class="st-ai-section-head">
+                <span class="st-ai-section-label">${tab}</span>
+                <button class="st-ai-section-copy" data-fv-copy="${tab}" type="button" title="Copy"><i class="fas fa-copy"></i></button>
+              </div>
+              <div class="st-ai-section-text loading st-ai-dots" id="${targetId}-fv-text-${tab}">Generating</div>
+            </div>`).join('')}
+          </div>
           <div class="st-ai-actions">
             <button class="st-ai-regen-btn" id="${targetId}-regen" type="button"><i class="fas fa-rotate-right"></i> Regenerate</button>
+            <button class="st-ai-copy-btn" id="${targetId}-copy" type="button"><i class="fas fa-copy"></i> Copy</button>
+            <button class="st-ai-fullview-btn" id="${targetId}-fullview-btn" type="button"><i class="fas fa-expand"></i> Full View</button>
             <button class="st-ai-key-btn" id="${targetId}-key-btn" type="button"><i class="fas fa-key"></i> API Key</button>
           </div>
         </div>
@@ -302,7 +354,56 @@
     modal.querySelector(`#${targetId}-regen`).addEventListener('click', () => {
       const p = panelRegistry.get(targetId);
       if (p) p.cache = {};
-      runInterpretation(targetId);
+      const fvOpen = modal.querySelector(`#${targetId}-fullview`).classList.contains('open');
+      if (fvOpen) runFullView(targetId, true);
+      else runInterpretation(targetId);
+    });
+
+    // Copy current tab text
+    modal.querySelector(`#${targetId}-copy`).addEventListener('click', () => {
+      const respEl = modal.querySelector(`#${targetId}-response`);
+      const text = respEl ? respEl.textContent : '';
+      if (!text || text === 'Press a tab to generate an interpretation.') return;
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = modal.querySelector(`#${targetId}-copy`);
+        btn.classList.add('copied');
+        btn.innerHTML = '<i class="fas fa-check"></i> Copied';
+        setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = '<i class="fas fa-copy"></i> Copy'; }, 2000);
+      }).catch(() => {});
+    });
+
+    // Per-section copy in full view
+    modal.querySelectorAll('[data-fv-copy]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.getAttribute('data-fv-copy');
+        const textEl = modal.querySelector(`#${targetId}-fv-text-${tab}`);
+        const text = textEl ? textEl.textContent : '';
+        navigator.clipboard.writeText(text).then(() => {
+          btn.innerHTML = '<i class="fas fa-check"></i>';
+          setTimeout(() => { btn.innerHTML = '<i class="fas fa-copy"></i>'; }, 2000);
+        }).catch(() => {});
+      });
+    });
+
+    // Full View toggle
+    modal.querySelector(`#${targetId}-fullview-btn`).addEventListener('click', () => {
+      const fvPanel = modal.querySelector(`#${targetId}-fullview`);
+      const singleResp = modal.querySelector(`#${targetId}-response`);
+      const tabsEl = modal.querySelector('.st-ai-tabs');
+      const btn = modal.querySelector(`#${targetId}-fullview-btn`);
+      const isOpen = fvPanel.classList.contains('open');
+      if (isOpen) {
+        fvPanel.classList.remove('open');
+        singleResp.style.display = '';
+        tabsEl.style.display = '';
+        btn.innerHTML = '<i class="fas fa-expand"></i> Full View';
+      } else {
+        fvPanel.classList.add('open');
+        singleResp.style.display = 'none';
+        tabsEl.style.display = 'none';
+        btn.innerHTML = '<i class="fas fa-compress"></i> Collapse';
+        runFullView(targetId, false);
+      }
     });
 
     // API key toggle
@@ -412,7 +513,47 @@
     }
   }
 
-  // ── Panel init ─────────────────────────────────────────────────────────────
+  // ── Run all 3 tabs for full view ────────────────────────────────────────────
+  async function runFullView(targetId, forceRefresh) {
+    const p = panelRegistry.get(targetId);
+    if (!p) return;
+    const m = document.getElementById(p.modalId);
+    if (!m) return;
+    const apiKey = getApiKey();
+    if (!apiKey) return;
+
+    const tabs = ['interpret', 'teach', 'apply'];
+    if (forceRefresh) p.cache = {};
+
+    await Promise.all(tabs.map(async tab => {
+      const textEl = m.querySelector(`#${targetId}-fv-text-${tab}`);
+      if (!textEl) return;
+
+      const cacheKey = tab + JSON.stringify(p.state);
+      if (!forceRefresh && p.cache && p.cache[cacheKey]) {
+        textEl.className = 'st-ai-section-text';
+        textEl.textContent = p.cache[cacheKey];
+        return;
+      }
+
+      textEl.className = 'st-ai-section-text loading st-ai-dots';
+      textEl.textContent = 'Generating';
+      try {
+        const text = await callGemini(buildPrompt(p.state, tab), apiKey);
+        if (!p.cache) p.cache = {};
+        p.cache[cacheKey] = text;
+        textEl.className = 'st-ai-section-text';
+        textEl.textContent = text;
+        const chip = m.querySelector(`#${targetId}-model-chip`);
+        if (chip) chip.textContent = _activeModel;
+      } catch (err) {
+        textEl.className = 'st-ai-section-text error';
+        textEl.textContent = `Error: ${err.message}`;
+      }
+    }));
+  }
+
+
   function initPanel(targetId) {
     const mount = document.getElementById(targetId);
     if (!mount) return;

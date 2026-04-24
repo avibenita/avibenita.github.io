@@ -7,15 +7,16 @@
   'use strict';
 
   // ── Config ─────────────────────────────────────────────────────────────────
-  // Try models in order until one succeeds (free-tier availability varies by region/key)
-  const MODELS = [
-    'gemini-1.5-flash-latest',
-    'gemini-1.5-flash',
-    'gemini-1.0-pro',
+  // Groq hosts Llama models with CORS + free tier (14 400 req/day)
+  // Get a free key at https://console.groq.com
+  const GROQ_URL   = 'https://api.groq.com/openai/v1/chat/completions';
+  const MODELS     = [
+    'llama-3.1-8b-instant',   // fast, free
+    'llama3-8b-8192',         // fallback
+    'llama-3.3-70b-versatile', // more capable fallback
   ];
-  const API_VER  = 'v1beta';
-  const API_HOST = 'https://generativelanguage.googleapis.com';
-  const KEY_STORE = 'statistico-gemini-key';
+  const KEY_STORE  = 'statistico-groq-key';
+  const KEY_URL    = 'https://console.groq.com/keys';
 
   // ── Per-panel state ────────────────────────────────────────────────────────
   const panelRegistry = new Map(); // targetId → { state, activeTab, modalId, cache }
@@ -52,43 +53,48 @@
     return `You are a concise statistics expert embedded in an interactive calculator.\n\nCurrent calculator state:\n${context}\n\nTask: ${tasks[tab] || tasks.interpret}\n\nRespond with plain text only. No markdown, no bullet points, no headers.`;
   }
 
-  // ── Gemini API call (tries each model in MODELS until one succeeds) ────────
+  // ── Groq / Llama API call ──────────────────────────────────────────────────
   async function callGemini(prompt, apiKey) {
     let lastErr = null;
     for (const model of MODELS) {
-      const url = `${API_HOST}/${API_VER}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
       try {
-        const resp = await fetch(url, {
+        const resp = await fetch(GROQ_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { maxOutputTokens: 300, temperature: 0.6 }
+            model,
+            messages: [
+              { role: 'system', content: 'You are a concise statistics expert embedded in an interactive calculator. Respond with plain text only — no markdown, no bullet points, no headers.' },
+              { role: 'user', content: prompt }
+            ],
+            max_tokens: 300,
+            temperature: 0.6
           })
         });
         if (!resp.ok) {
           let msg = `HTTP ${resp.status}`;
           try { const e = await resp.json(); msg = e?.error?.message || msg; } catch {}
-          // If model not found, try next; otherwise throw immediately
           if (resp.status === 404 || (msg && msg.toLowerCase().includes('not found'))) {
             lastErr = new Error(msg); continue;
           }
           throw new Error(msg);
         }
         const data = await resp.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const text = data?.choices?.[0]?.message?.content;
         if (!text) throw new Error('Empty response from API.');
-        // Store whichever model succeeded so the chip updates
         _activeModel = model;
         return text.trim();
       } catch (err) {
-        if (err.message && err.message.toLowerCase().includes('not found')) {
+        if (err.message && (err.message.toLowerCase().includes('not found') || err.message.toLowerCase().includes('does not exist'))) {
           lastErr = err; continue;
         }
         throw err;
       }
     }
-    throw lastErr || new Error('No available Gemini model found for this API key.');
+    throw lastErr || new Error('No available Llama model found for this API key.');
   }
 
   // ── Self-contained CSS ─────────────────────────────────────────────────────
@@ -258,9 +264,9 @@
         <div class="st-ai-body">
           <div class="st-ai-state-row" id="${targetId}-chips"></div>
           <div class="st-ai-key-panel" id="${targetId}-key-panel" style="display:none;">
-            <h4><i class="fas fa-key"></i> Gemini API Key</h4>
-            <p>Enter your free Google Gemini API key to enable AI interpretations.<br>
-               Get one at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a> — no credit card required.</p>
+            <h4><i class="fas fa-key"></i> Groq API Key (free)</h4>
+            <p>Enter your free Groq API key to enable Llama AI interpretations.<br>
+               Get one at <a href="${KEY_URL}" target="_blank" rel="noopener">console.groq.com</a> — free tier, no credit card required.</p>
             <div class="st-ai-key-row">
               <input class="st-ai-key-input" type="password" placeholder="AIza..." id="${targetId}-key-input" autocomplete="off" />
               <button class="st-ai-key-save" id="${targetId}-key-save" type="button">Save</button>

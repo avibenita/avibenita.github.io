@@ -108,14 +108,15 @@
         display: inline-flex; align-items: center; gap: 7px;
         background: linear-gradient(135deg, rgba(120,165,255,.18), rgba(242,162,119,.14));
         border: 1px solid rgba(120,200,255,.32);
-        border-radius: 8px; padding: 7px 12px; cursor: pointer;
+        border-radius: 8px; padding: 7px 18px; cursor: pointer;
         color: #d8edff; font-size: 0.82rem; font-weight: 600;
         transition: background .2s, border-color .2s, transform .15s;
-        width: 100%;
       }
       .st-ai-trigger:hover { background: linear-gradient(135deg,rgba(120,165,255,.28),rgba(242,162,119,.22)); border-color: rgba(120,200,255,.55); transform: translateY(-1px); }
       .st-ai-trigger i { color: #f2a277; font-size: 0.9rem; }
-      .st-ai-trigger .st-ai-badge { margin-left: auto; background: rgba(242,162,119,.18); border: 1px solid rgba(242,162,119,.3); border-radius: 999px; padding: 2px 7px; font-size: 0.7rem; color: #f2c59a; }
+      .st-ai-trigger .st-ai-badge { background: rgba(242,162,119,.18); border: 1px solid rgba(242,162,119,.3); border-radius: 999px; padding: 2px 7px; font-size: 0.7rem; color: #f2c59a; }
+      /* Wrapper to center the trigger */
+      #aiInsightsMount { display: flex; justify-content: center; }
 
       /* ── Modal overlay ── */
       .st-ai-modal {
@@ -571,7 +572,7 @@
       <button class="st-ai-trigger" type="button" id="${targetId}-open-btn">
         <i class="fas fa-sparkles"></i>
         Get AI Interpretation
-        <span class="st-ai-badge">Gemini</span>
+        <span class="st-ai-badge">Llama</span>
       </button>
     `;
 

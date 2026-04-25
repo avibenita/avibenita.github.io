@@ -601,10 +601,21 @@
 
   // Auto-init any aiInsightsMount element as soon as the DOM is ready
   // so the button appears even before the first calculation runs.
+  // Also flush any state queued by the runtime (which loads before this script).
   function autoInit() {
     ['aiInsightsMount'].forEach(id => {
       if (document.getElementById(id)) initPanel(id);
     });
+    // Flush state queued by distribution-template-runtime before this script loaded
+    if (window.__statAIStateQueue) {
+      const q = window.__statAIStateQueue;
+      window.__statAIStateQueue = null;
+      const p = panelRegistry.get('aiInsightsMount');
+      if (p) {
+        p.state = q;
+        p.cache = {};
+      }
+    }
   }
 
   if (document.readyState === 'loading') {

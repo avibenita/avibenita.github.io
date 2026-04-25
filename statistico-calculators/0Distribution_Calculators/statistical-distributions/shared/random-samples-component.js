@@ -669,8 +669,10 @@
 
       const triggerWrap = document.createElement("div");
       triggerWrap.className = "srng-button-wrap";
+      const distLabel = (config.name || 'this distribution').replace(/\s*distribution\s*$/i, '').trim();
+      const triggerTitle = `Generate random samples from the ${distLabel} distribution`;
       triggerWrap.innerHTML =
-        '<button type="button" class="srng-trigger"><i class="fas fa-dice"></i> Generate Random Numbers</button>';
+        `<button type="button" class="srng-trigger" title="${triggerTitle}"><i class="fas fa-dice"></i> Generate Random Numbers</button>`;
 
       if (aboutContainer && aboutContainer.parentElement === insertionParent) {
         insertionParent.insertBefore(triggerWrap, aboutContainer);
@@ -681,6 +683,10 @@
     } else {
       triggerButton.removeAttribute("onclick");
       triggerButton.classList.add("srng-trigger");
+      if (!triggerButton.title) {
+        const distLabel = (config.name || 'this distribution').replace(/\s*distribution\s*$/i, '').trim();
+        triggerButton.title = `Generate random samples from the ${distLabel} distribution`;
+      }
     }
 
     const modal = createComponentMarkup();

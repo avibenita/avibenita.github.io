@@ -262,6 +262,7 @@
       .st-ai-section-text { font-size: 0.87rem; line-height: 1.65; color: #c8dff5; }
       .st-ai-section-text.loading { color: #7a9ab8; font-style: italic; }
       .st-ai-section-text.error { color: #f97777; }
+    `;
     document.head.appendChild(el);
   }
 

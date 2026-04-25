@@ -10,7 +10,8 @@
   // URL of your deployed Cloudflare Worker (update after deployment)
   const WORKER_URL  = 'https://statistico-ai.avibenita.workers.dev';
   const LICENSE_KEY_STORE = 'statistico-license-key';
-  const BUY_URL     = 'https://statistico.live/premium'; // your sales page
+  const BUY_URL     = 'https://statistico.live/premium';
+  const DEV_MODE    = true; // ← set false to re-enable paywall // your sales page
 
   // ── Per-panel state ────────────────────────────────────────────────────────
   const panelRegistry = new Map(); // targetId → { state, activeTab, modalId, cache }
@@ -19,7 +20,10 @@
   // ── Tiny helpers ───────────────────────────────────────────────────────────
   function safeNum(v, fb) { return Number.isFinite(v) ? v : (fb !== undefined ? fb : 0); }
   function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-  function getLicenseKey() { try { return (localStorage.getItem(LICENSE_KEY_STORE) || '').trim(); } catch { return ''; } }
+  function getLicenseKey() {
+    if (DEV_MODE) return 'DEV';
+    try { return (localStorage.getItem(LICENSE_KEY_STORE) || '').trim(); } catch { return ''; }
+  }
   function setLicenseKey(k) { try { localStorage.setItem(LICENSE_KEY_STORE, (k || '').trim().toUpperCase()); } catch {} }
   function clearLicenseKey() { try { localStorage.removeItem(LICENSE_KEY_STORE); } catch {} }
 
@@ -57,6 +61,33 @@
 
   // ── Worker API call ────────────────────────────────────────────────────────
   async function callWorker(prompt, licenseKey) {
+    // DEV_MODE: call Groq directly so no Worker deployment is needed for testing
+    if (DEV_MODE) {
+      const models = ['llama-3.1-8b-instant', 'llama3-8b-8192', 'llama-3.3-70b-versatile'];
+      const key = atob('Z3NrX0xmVHdFRUFTYjVoY3l4Z2JteTF4V0dkeWIzRlk5WmRyYlNvZmJLTXNja2d4NUNTUzFnTlY=');
+      let lastErr = null;
+      for (const model of models) {
+        try {
+          const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+            body: JSON.stringify({ model, messages: [
+              { role: 'system', content: 'You are a concise statistics expert. Respond with plain text only.' },
+              { role: 'user', content: prompt }
+            ], max_tokens: 300, temperature: 0.6 })
+          });
+          if (!r.ok) { const e = await r.json().catch(()=>({})); lastErr = new Error(e?.error?.message || `HTTP ${r.status}`); if (r.status === 404) continue; throw lastErr; }
+          const d = await r.json();
+          const text = d?.choices?.[0]?.message?.content?.trim();
+          if (!text) { lastErr = new Error('Empty response'); continue; }
+          _activeModel = model;
+          return text;
+        } catch (err) { lastErr = err; if (err.message?.includes('not found')) continue; throw err; }
+      }
+      throw lastErr || new Error('No model available');
+    }
+
+    // PRODUCTION: route through Worker
     const resp = await fetch(WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

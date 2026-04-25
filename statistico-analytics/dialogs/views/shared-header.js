@@ -1821,12 +1821,33 @@ const StatisticoHeader = {
 
     const existing = document.getElementById('sbUtilities');
     if (existing) existing.remove();
+    const existingAi = document.getElementById('sbAiSection');
+    if (existingAi) existingAi.remove();
 
     const actions = this._pendingActions || {};
     const hasView = typeof actions.getData === 'function';
     const hasHtml = typeof actions.exportHtml === 'function';
     const hasJson = typeof actions.exportJson === 'function';
 
+    // ── AI pill — above utilities, univariate only (not hypothesis) ────────
+    if (this.module === 'univariate' && this.currentView !== 'hypothesis') {
+      const aiSection = document.createElement('div');
+      aiSection.id = 'sbAiSection';
+      aiSection.className = 'sb-ai-section-wrap';
+      aiSection.innerHTML = `
+        <button class="sb-ai-sidebar-pill"
+                id="sbAiBtn"
+                onclick="StatisticoHeader._sbAiGlobalInterpret()"
+                title="Full variable analysis — synthesises all diagnostics into one report">
+          <i class="fa-solid fa-brain"></i>
+          <span>Full Analysis</span>
+          <sup class="sb-ai-sup">AI</sup>
+        </button>
+      `;
+      nav.appendChild(aiSection);
+    }
+
+    // ── Utilities ──────────────────────────────────────────────────────────
     const utilities = document.createElement('div');
     utilities.id = 'sbUtilities';
     utilities.className = 'sb-bottom';
@@ -1856,14 +1877,6 @@ const StatisticoHeader = {
         <i class="fa-solid fa-download"></i>
         <span class="sb-item-label">JSON</span>
       </button>
-      ${this.module === 'univariate' && this.currentView !== 'hypothesis' ? `
-      <button class="sb-bottom-btn sb-bottom-btn--ai"
-              id="sbAiBtn"
-              onclick="StatisticoHeader._sbAiGlobalInterpret()"
-              title="Full variable analysis — synthesises all diagnostics into one report">
-        <i class="fa-solid fa-brain"></i>
-        <span class="sb-item-label">Full Analysis</span>
-      </button>` : ''}
     `;
     nav.appendChild(utilities);
     if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
@@ -1945,7 +1958,7 @@ const StatisticoHeader = {
     const btn = document.getElementById('sbAiBtn');
     if (btn) {
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span class="sb-item-label">Thinking…</span>';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking…</span>';
     }
     try {
       const prompt = this._buildStructuredPrompt(this.currentView, 'full');
@@ -1958,7 +1971,7 @@ const StatisticoHeader = {
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-brain"></i><span class="sb-item-label">Full Analysis</span>';
+        btn.innerHTML = '<i class="fa-solid fa-brain"></i><span>Full Analysis</span><sup class="sb-ai-sup">AI</sup>';
       }
     }
   },

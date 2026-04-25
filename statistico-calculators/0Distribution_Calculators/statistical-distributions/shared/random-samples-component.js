@@ -252,11 +252,52 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
   transition: all 0.25s ease;
   text-align:center;
+  position: relative;
 }
 .srng-trigger:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(46, 204, 113, 0.3);
   border-color: rgba(46, 204, 113, 0.9);
+}
+/* ── Custom tooltip ── */
+.srng-trigger[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.92);
+  background: #0a1628;
+  color: #c8e0ff;
+  font-size: 0.73rem;
+  font-weight: 500;
+  line-height: 1.45;
+  padding: 6px 11px;
+  border-radius: 7px;
+  border: 1px solid rgba(100,170,255,0.22);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.55);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .18s ease, transform .18s ease;
+  z-index: 9999;
+}
+.srng-trigger[data-tooltip]::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: rgba(100,170,255,0.22);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .18s ease;
+  z-index: 9999;
+}
+.srng-trigger[data-tooltip]:hover::after,
+.srng-trigger[data-tooltip]:hover::before {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
 }
 .srng-layout-standard .about-action-btn,
 .srng-layout-standard .about-btn,
@@ -672,7 +713,7 @@
       const distLabel = (config.name || 'this distribution').replace(/\s*distribution\s*$/i, '').trim();
       const triggerTitle = `Generate random samples from the ${distLabel} distribution`;
       triggerWrap.innerHTML =
-        `<button type="button" class="srng-trigger" title="${triggerTitle}"><i class="fas fa-dice"></i> Generate Random Numbers</button>`;
+        `<button type="button" class="srng-trigger" data-tooltip="${triggerTitle}"><i class="fas fa-dice"></i> Generate Random Numbers</button>`;
 
       if (aboutContainer && aboutContainer.parentElement === insertionParent) {
         insertionParent.insertBefore(triggerWrap, aboutContainer);
@@ -683,9 +724,9 @@
     } else {
       triggerButton.removeAttribute("onclick");
       triggerButton.classList.add("srng-trigger");
-      if (!triggerButton.title) {
+      if (!triggerButton.title && !triggerButton.dataset.tooltip) {
         const distLabel = (config.name || 'this distribution').replace(/\s*distribution\s*$/i, '').trim();
-        triggerButton.title = `Generate random samples from the ${distLabel} distribution`;
+        triggerButton.dataset.tooltip = `Generate random samples from the ${distLabel} distribution`;
       }
     }
 

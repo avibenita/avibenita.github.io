@@ -1,32 +1,26 @@
 /**
  * Statistico AI Interpretation Component
- * Calls Google Gemini API to generate context-aware statistical interpretation.
- * API key stored in localStorage; users enter it once.
+ * Calls Groq / Llama API to generate context-aware statistical interpretation.
  */
 (function () {
   'use strict';
 
   // ── Config ─────────────────────────────────────────────────────────────────
-  // Groq hosts Llama models with CORS + free tier (14 400 req/day)
-  // Get a free key at https://console.groq.com
-  const GROQ_URL   = 'https://api.groq.com/openai/v1/chat/completions';
-  const MODELS     = [
-    'llama-3.1-8b-instant',   // fast, free
-    'llama3-8b-8192',         // fallback
-    'llama-3.3-70b-versatile', // more capable fallback
+  const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+  const MODELS   = [
+    'llama-3.1-8b-instant',
+    'llama3-8b-8192',
+    'llama-3.3-70b-versatile',
   ];
-  const KEY_STORE  = 'statistico-groq-key';
-  const KEY_URL    = 'https://console.groq.com/keys';
+  const API_KEY  = atob('Z3NrX0xmVHdFRUFTYjVoY3l4Z2JteTF4V0dkeWIzRlk5WmRyYlNvZmJLTXNja2d4NUNTUzFnTlY=');
 
   // ── Per-panel state ────────────────────────────────────────────────────────
   const panelRegistry = new Map(); // targetId → { state, activeTab, modalId, cache }
-  let _activeModel = MODELS[0]; // updated after first successful call
+  let _activeModel = MODELS[0];
 
   // ── Tiny helpers ───────────────────────────────────────────────────────────
   function safeNum(v, fb) { return Number.isFinite(v) ? v : (fb !== undefined ? fb : 0); }
   function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-  function getApiKey() { try { return (localStorage.getItem(KEY_STORE) || '').trim(); } catch { return ''; } }
-  function setApiKey(k) { try { localStorage.setItem(KEY_STORE, (k || '').trim()); } catch {} }
 
   // ── Prompt builder ─────────────────────────────────────────────────────────
   function buildPrompt(state, tab) {
@@ -61,7 +55,7 @@
   }
 
   // ── Groq / Llama API call ──────────────────────────────────────────────────
-  async function callGemini(prompt, apiKey) {
+  async function callGemini(prompt) {
     let lastErr = null;
     for (const model of MODELS) {
       try {
@@ -69,7 +63,7 @@
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
+            'Authorization': `Bearer ${API_KEY}`
           },
           body: JSON.stringify({
             model,
@@ -311,15 +305,6 @@
         </div>
         <div class="st-ai-body">
           <div class="st-ai-state-row" id="${targetId}-chips"></div>
-          <div class="st-ai-key-panel" id="${targetId}-key-panel" style="display:none;">
-            <h4><i class="fas fa-key"></i> Groq API Key (free)</h4>
-            <p>Enter your free Groq API key to enable Llama AI interpretations.<br>
-               Get one at <a href="${KEY_URL}" target="_blank" rel="noopener">console.groq.com</a> — free tier, no credit card required.</p>
-            <div class="st-ai-key-row">
-              <input class="st-ai-key-input" type="password" placeholder="AIza..." id="${targetId}-key-input" autocomplete="off" />
-              <button class="st-ai-key-save" id="${targetId}-key-save" type="button">Save</button>
-            </div>
-          </div>
           <div class="st-ai-response" id="${targetId}-response">Press a tab to generate an interpretation.</div>
           <!-- Full-view panel: all 3 sections at once -->
           <div class="st-ai-fullview-panel" id="${targetId}-fullview">
@@ -336,7 +321,6 @@
             <button class="st-ai-regen-btn" id="${targetId}-regen" type="button"><i class="fas fa-rotate-right"></i> Regenerate</button>
             <button class="st-ai-copy-btn" id="${targetId}-copy" type="button"><i class="fas fa-copy"></i> Copy</button>
             <button class="st-ai-fullview-btn" id="${targetId}-fullview-btn" type="button"><i class="fas fa-expand"></i> Full View</button>
-            <button class="st-ai-key-btn" id="${targetId}-key-btn" type="button"><i class="fas fa-key"></i> API Key</button>
           </div>
         </div>
       </div>
@@ -415,28 +399,7 @@
       }
     });
 
-    // API key toggle
-    modal.querySelector(`#${targetId}-key-btn`).addEventListener('click', () => {
-      const kp = modal.querySelector(`#${targetId}-key-panel`);
-      const showing = kp.style.display !== 'none';
-      kp.style.display = showing ? 'none' : 'block';
-      if (!showing) {
-        const inp = modal.querySelector(`#${targetId}-key-input`);
-        inp.value = getApiKey();
-        inp.focus();
-      }
-    });
-
-    // Save key
-    modal.querySelector(`#${targetId}-key-save`).addEventListener('click', () => {
-      const key = modal.querySelector(`#${targetId}-key-input`).value.trim();
-      if (!key) return;
-      setApiKey(key);
-      modal.querySelector(`#${targetId}-key-panel`).style.display = 'none';
-      const p = panelRegistry.get(targetId);
-      if (p) p.cache = {};
-      runInterpretation(targetId);
-    });
+    // API key toggle — removed (key is embedded)
 
     return modal;
   }
@@ -457,20 +420,11 @@
     m.classList.add('open');
     m.setAttribute('aria-hidden','false');
 
-    // Show key panel if no key stored yet
-    const kp = m.querySelector(`#${targetId}-key-panel`);
-    const keyExists = !!getApiKey();
-    if (!keyExists && kp) {
-      kp.style.display = 'block';
-      const inp = m.querySelector(`#${targetId}-key-input`);
-      if (inp) inp.focus();
-    }
-
     // Refresh chips
     const chips = m.querySelector(`#${targetId}-chips`);
     if (chips) chips.innerHTML = buildStateChips(p.state);
 
-    if (keyExists) runInterpretation(targetId);
+    runInterpretation(targetId);
   }
 
   // ── Run AI call ────────────────────────────────────────────────────────────
@@ -480,15 +434,8 @@
     const m = document.getElementById(p.modalId);
     if (!m) return;
 
-    const apiKey = getApiKey();
     const respEl = m.querySelector(`#${targetId}-response`);
     if (!respEl) return;
-
-    if (!apiKey) {
-      respEl.className = 'st-ai-response error';
-      respEl.textContent = 'No API key configured. Click "API Key" below to add one.';
-      return;
-    }
 
     // Cache hit
     const cacheKey = p.activeTab + JSON.stringify(p.state);
@@ -508,7 +455,7 @@
 
     try {
       const prompt = buildPrompt(p.state, p.activeTab);
-      const text = await callGemini(prompt, apiKey);
+      const text = await callGemini(prompt);
       if (!p.cache) p.cache = {};
       p.cache[cacheKey] = text;
       respEl.className = 'st-ai-response';
@@ -528,8 +475,6 @@
     if (!p) return;
     const m = document.getElementById(p.modalId);
     if (!m) return;
-    const apiKey = getApiKey();
-    if (!apiKey) return;
 
     const tabs = ['interpret', 'teach', 'apply'];
     if (forceRefresh) p.cache = {};
@@ -548,7 +493,7 @@
       textEl.className = 'st-ai-section-text loading st-ai-dots';
       textEl.textContent = 'Generating';
       try {
-        const text = await callGemini(buildPrompt(p.state, tab), apiKey);
+        const text = await callGemini(buildPrompt(p.state, tab));
         if (!p.cache) p.cache = {};
         p.cache[cacheKey] = text;
         textEl.className = 'st-ai-section-text';

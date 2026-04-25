@@ -1,26 +1,27 @@
 /**
  * Statistico AI Interpretation Component
- * Calls Groq / Llama API to generate context-aware statistical interpretation.
+ * Routes prompts through a Cloudflare Worker that validates a license key
+ * and proxies to Groq / Llama. The Groq key never touches the browser.
  */
 (function () {
   'use strict';
 
   // ── Config ─────────────────────────────────────────────────────────────────
-  const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-  const MODELS   = [
-    'llama-3.1-8b-instant',
-    'llama3-8b-8192',
-    'llama-3.3-70b-versatile',
-  ];
-  const API_KEY  = atob('Z3NrX0xmVHdFRUFTYjVoY3l4Z2JteTF4V0dkeWIzRlk5WmRyYlNvZmJLTXNja2d4NUNTUzFnTlY=');
+  // URL of your deployed Cloudflare Worker (update after deployment)
+  const WORKER_URL  = 'https://statistico-ai.avibenita.workers.dev';
+  const LICENSE_KEY_STORE = 'statistico-license-key';
+  const BUY_URL     = 'https://statistico.live/premium'; // your sales page
 
   // ── Per-panel state ────────────────────────────────────────────────────────
   const panelRegistry = new Map(); // targetId → { state, activeTab, modalId, cache }
-  let _activeModel = MODELS[0];
+  let _activeModel = 'llama-3.1-8b-instant';
 
   // ── Tiny helpers ───────────────────────────────────────────────────────────
   function safeNum(v, fb) { return Number.isFinite(v) ? v : (fb !== undefined ? fb : 0); }
   function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function getLicenseKey() { try { return (localStorage.getItem(LICENSE_KEY_STORE) || '').trim(); } catch { return ''; } }
+  function setLicenseKey(k) { try { localStorage.setItem(LICENSE_KEY_STORE, (k || '').trim().toUpperCase()); } catch {} }
+  function clearLicenseKey() { try { localStorage.removeItem(LICENSE_KEY_STORE); } catch {} }
 
   // ── Prompt builder ─────────────────────────────────────────────────────────
   function buildPrompt(state, tab) {
@@ -54,48 +55,25 @@
     return `You are a concise statistics expert embedded in an interactive calculator.\n\nCurrent calculator state:\n${context}\n\nTask: ${tasks[tab] || tasks.interpret}\n\nRespond with plain text only. No markdown, no bullet points, no headers.`;
   }
 
-  // ── Groq / Llama API call ──────────────────────────────────────────────────
-  async function callGemini(prompt) {
-    let lastErr = null;
-    for (const model of MODELS) {
-      try {
-        const resp = await fetch(GROQ_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${API_KEY}`
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: 'system', content: 'You are a concise statistics expert embedded in an interactive calculator. Respond with plain text only — no markdown, no bullet points, no headers.' },
-              { role: 'user', content: prompt }
-            ],
-            max_tokens: 300,
-            temperature: 0.6
-          })
-        });
-        if (!resp.ok) {
-          let msg = `HTTP ${resp.status}`;
-          try { const e = await resp.json(); msg = e?.error?.message || msg; } catch {}
-          if (resp.status === 404 || (msg && msg.toLowerCase().includes('not found'))) {
-            lastErr = new Error(msg); continue;
-          }
-          throw new Error(msg);
-        }
-        const data = await resp.json();
-        const text = data?.choices?.[0]?.message?.content;
-        if (!text) throw new Error('Empty response from API.');
-        _activeModel = model;
-        return text.trim();
-      } catch (err) {
-        if (err.message && (err.message.toLowerCase().includes('not found') || err.message.toLowerCase().includes('does not exist'))) {
-          lastErr = err; continue;
-        }
+  // ── Worker API call ────────────────────────────────────────────────────────
+  async function callWorker(prompt, licenseKey) {
+    const resp = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, licenseKey }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const code = data?.code;
+      if (code === 'NO_KEY' || code === 'INVALID_KEY') {
+        const err = new Error(data.error || 'Invalid license key');
+        err.code = code;
         throw err;
       }
+      throw new Error(data?.error || `Server error ${resp.status}`);
     }
-    throw lastErr || new Error('No available Llama model found for this API key.');
+    if (data.model) _activeModel = data.model;
+    return data.text;
   }
 
   // ── Self-contained CSS ─────────────────────────────────────────────────────
@@ -203,15 +181,25 @@
       }
       .st-ai-key-btn:hover { color: #9ab1cc; border-color: rgba(120,200,255,.4); }
 
-      /* API key setup panel */
-      .st-ai-key-panel {
-        background: rgba(10,22,42,.85); border: 1px solid rgba(120,200,255,.22); border-radius: 10px;
-        padding: 14px; margin-bottom: 12px;
+      /* ── License / unlock panel ── */
+      .st-ai-unlock-panel {
+        background: linear-gradient(135deg, rgba(10,22,42,.95), rgba(16,30,56,.95));
+        border: 1px solid rgba(242,162,119,.35); border-radius: 12px;
+        padding: 18px 16px; margin-bottom: 12px; text-align: center;
       }
-      .st-ai-key-panel h4 { font-size: 0.84rem; color: #ffd2b2; margin: 0 0 6px; }
-      .st-ai-key-panel p { font-size: 0.78rem; color: #8aabcc; margin: 0 0 10px; line-height: 1.5; }
-      .st-ai-key-panel a { color: #78c8ff; }
-      .st-ai-key-row { display: flex; gap: 7px; }
+      .st-ai-unlock-panel .st-ai-unlock-icon { font-size: 1.6rem; margin-bottom: 8px; }
+      .st-ai-unlock-panel h4 { font-size: 0.92rem; color: #ffd2b2; margin: 0 0 5px; font-weight: 700; }
+      .st-ai-unlock-panel p  { font-size: 0.78rem; color: #8aabcc; margin: 0 0 12px; line-height: 1.5; }
+      .st-ai-buy-btn {
+        display: inline-flex; align-items: center; gap: 7px;
+        background: linear-gradient(135deg, #f97316, #ef4444); border: none; border-radius: 8px;
+        padding: 9px 22px; font-size: 0.82rem; font-weight: 700; color: #fff; cursor: pointer;
+        text-decoration: none; transition: opacity .2s, transform .15s;
+      }
+      .st-ai-buy-btn:hover { opacity: .88; transform: translateY(-1px); }
+      .st-ai-key-toggle { background: none; border: none; color: #78c8ff; font-size: 0.74rem; cursor: pointer; margin-top: 10px; display: block; text-align: center; width: 100%; }
+      .st-ai-key-toggle:hover { text-decoration: underline; }
+      .st-ai-key-row { display: flex; gap: 7px; margin-top: 10px; }
       .st-ai-key-input {
         flex: 1; padding: 6px 10px; border-radius: 7px; font-size: 0.8rem;
         background: rgba(255,255,255,.06); border: 1px solid rgba(120,200,255,.25); color: #d8edff;
@@ -305,6 +293,22 @@
         </div>
         <div class="st-ai-body">
           <div class="st-ai-state-row" id="${targetId}-chips"></div>
+          <!-- Unlock panel — shown when no valid license key is stored -->
+          <div class="st-ai-unlock-panel" id="${targetId}-unlock" style="display:none;">
+            <div class="st-ai-unlock-icon">✨</div>
+            <h4>AI Interpretation — Premium Feature</h4>
+            <p>Unlock instant AI-powered interpretations, teaching explanations,<br>and real-world application examples for every calculation.</p>
+            <a class="st-ai-buy-btn" href="${BUY_URL}" target="_blank" rel="noopener">
+              <i class="fas fa-star"></i> Get Premium Access
+            </a>
+            <button class="st-ai-key-toggle" id="${targetId}-key-toggle" type="button">Already have a license key?</button>
+            <div id="${targetId}-key-row" style="display:none;">
+              <div class="st-ai-key-row">
+                <input class="st-ai-key-input" type="text" placeholder="STAT-XXXX-XXXX-XXXX" id="${targetId}-key-input" autocomplete="off" spellcheck="false" />
+                <button class="st-ai-key-save" id="${targetId}-key-save" type="button">Activate</button>
+              </div>
+            </div>
+          </div>
           <div class="st-ai-response" id="${targetId}-response">Press a tab to generate an interpretation.</div>
           <!-- Full-view panel: all 3 sections at once -->
           <div class="st-ai-fullview-panel" id="${targetId}-fullview">
@@ -399,12 +403,50 @@
       }
     });
 
-    // API key toggle — removed (key is embedded)
+    // License key toggle ("Already have a key?")
+    const keyToggle = modal.querySelector(`#${targetId}-key-toggle`);
+    const keyRow    = modal.querySelector(`#${targetId}-key-row`);
+    if (keyToggle && keyRow) {
+      keyToggle.addEventListener('click', () => {
+        const visible = keyRow.style.display !== 'none';
+        keyRow.style.display = visible ? 'none' : 'block';
+        keyToggle.textContent = visible ? 'Already have a license key?' : 'Hide';
+        if (!visible) modal.querySelector(`#${targetId}-key-input`)?.focus();
+      });
+    }
+
+    // Activate license key
+    const keySave = modal.querySelector(`#${targetId}-key-save`);
+    if (keySave) {
+      keySave.addEventListener('click', () => {
+        const inp = modal.querySelector(`#${targetId}-key-input`);
+        const key = (inp?.value || '').trim().toUpperCase();
+        if (!key) return;
+        setLicenseKey(key);
+        const p = panelRegistry.get(targetId);
+        if (p) p.cache = {};
+        showUnlockPanel(targetId, false);
+        runInterpretation(targetId);
+      });
+    }
 
     return modal;
   }
 
   // ── Open / close ───────────────────────────────────────────────────────────
+  function showUnlockPanel(targetId, show) {
+    const m = document.getElementById(panelRegistry.get(targetId)?.modalId);
+    if (!m) return;
+    const unlock  = m.querySelector(`#${targetId}-unlock`);
+    const respEl  = m.querySelector(`#${targetId}-response`);
+    const tabs    = m.querySelector('.st-ai-tabs');
+    const actions = m.querySelector('.st-ai-actions');
+    if (unlock)  unlock.style.display  = show ? 'block' : 'none';
+    if (respEl)  respEl.style.display  = show ? 'none'  : '';
+    if (tabs)    tabs.style.display    = show ? 'none'  : '';
+    if (actions) actions.style.display = show ? 'none'  : '';
+  }
+
   function closeModal(targetId) {
     const p = panelRegistry.get(targetId);
     if (!p) return;
@@ -424,7 +466,13 @@
     const chips = m.querySelector(`#${targetId}-chips`);
     if (chips) chips.innerHTML = buildStateChips(p.state);
 
-    runInterpretation(targetId);
+    const key = getLicenseKey();
+    if (!key) {
+      showUnlockPanel(targetId, true);
+    } else {
+      showUnlockPanel(targetId, false);
+      runInterpretation(targetId);
+    }
   }
 
   // ── Run AI call ────────────────────────────────────────────────────────────
@@ -433,6 +481,9 @@
     if (!p) return;
     const m = document.getElementById(p.modalId);
     if (!m) return;
+
+    const licenseKey = getLicenseKey();
+    if (!licenseKey) { showUnlockPanel(targetId, true); return; }
 
     const respEl = m.querySelector(`#${targetId}-response`);
     if (!respEl) return;
@@ -455,15 +506,26 @@
 
     try {
       const prompt = buildPrompt(p.state, p.activeTab);
-      const text = await callGemini(prompt);
+      const text = await callWorker(prompt, licenseKey);
       if (!p.cache) p.cache = {};
       p.cache[cacheKey] = text;
       respEl.className = 'st-ai-response';
       respEl.textContent = text;
-      // Update model chip to show whichever model actually responded
       const chipEl = m.querySelector(`#${targetId}-model-chip`);
       if (chipEl) chipEl.textContent = _activeModel;
     } catch (err) {
+      if (err.code === 'NO_KEY' || err.code === 'INVALID_KEY') {
+        clearLicenseKey();
+        showUnlockPanel(targetId, true);
+        // Show error hint inside unlock panel
+        const keyRow = m.querySelector(`#${targetId}-key-row`);
+        const keyToggle = m.querySelector(`#${targetId}-key-toggle`);
+        if (keyRow) keyRow.style.display = 'block';
+        if (keyToggle) keyToggle.textContent = 'Hide';
+        const inp = m.querySelector(`#${targetId}-key-input`);
+        if (inp) { inp.style.borderColor = '#ef4444'; inp.placeholder = 'Key not recognised — try again'; inp.focus(); }
+        return;
+      }
       respEl.className = 'st-ai-response error';
       respEl.textContent = `Error: ${err.message}`;
     }
@@ -475,6 +537,8 @@
     if (!p) return;
     const m = document.getElementById(p.modalId);
     if (!m) return;
+    const licenseKey = getLicenseKey();
+    if (!licenseKey) { showUnlockPanel(targetId, true); return; }
 
     const tabs = ['interpret', 'teach', 'apply'];
     if (forceRefresh) p.cache = {};
@@ -493,7 +557,7 @@
       textEl.className = 'st-ai-section-text loading st-ai-dots';
       textEl.textContent = 'Generating';
       try {
-        const text = await callGemini(buildPrompt(p.state, tab));
+        const text = await callWorker(buildPrompt(p.state, tab), licenseKey);
         if (!p.cache) p.cache = {};
         p.cache[cacheKey] = text;
         textEl.className = 'st-ai-section-text';
@@ -501,6 +565,9 @@
         const chip = m.querySelector(`#${targetId}-model-chip`);
         if (chip) chip.textContent = _activeModel;
       } catch (err) {
+        if (err.code === 'NO_KEY' || err.code === 'INVALID_KEY') {
+          clearLicenseKey(); showUnlockPanel(targetId, true); return;
+        }
         textEl.className = 'st-ai-section-text error';
         textEl.textContent = `Error: ${err.message}`;
       }

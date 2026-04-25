@@ -2048,7 +2048,7 @@ ${baseStats}${extra}
 
 Task: ${instruction}
 
-Keep the response to 3–5 clear sentences. Use plain language suitable for a data analyst. Do not use markdown or bullet points — respond with flowing prose only.`;
+Write 3–4 well-developed paragraphs. The first paragraph should summarise the key finding for this view. Subsequent paragraphs should cover: what the statistics suggest about the underlying distribution or population, any noteworthy patterns, risks or caveats the analyst should consider, and recommended next steps or further analyses. Use plain prose — no markdown, no bullet points, no headers.`;
   },
 
   /**
@@ -2071,10 +2071,10 @@ Keep the response to 3–5 clear sentences. Use plain language suitable for a da
             body: JSON.stringify({
               model,
               messages: [
-                { role: 'system', content: 'You are a concise statistics expert. Respond with plain prose only — no markdown, no bullet points.' },
+                { role: 'system', content: 'You are an expert statistician providing in-depth interpretation of analysis results. Write in clear, flowing prose — no markdown, no bullet points, no headers. Be thorough and informative.' },
                 { role: 'user',   content: prompt }
               ],
-              max_tokens: 400,
+              max_tokens: 800,
               temperature: 0.5
             })
           });

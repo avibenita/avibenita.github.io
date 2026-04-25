@@ -271,8 +271,8 @@
     const dist = (state.distributionName || document.body?.dataset?.distribution || '').replace(/distribution$/i,'');
     if (dist) chips.push(dist.trim() || 'Distribution');
     if (state.calcType) chips.push(state.calcType);
-    if (state.mean      != null) chips.push(`μ = ${safeNum(state.mean).toFixed(3)}`);
-    if (state.stddev    != null) chips.push(`σ = ${safeNum(state.stddev,1).toFixed(3)}`);
+    if (state.mean      != null) chips.push(`mean = ${safeNum(state.mean).toFixed(3)}`);
+    if (state.stddev    != null) chips.push(`sd = ${safeNum(state.stddev,1).toFixed(3)}`);
     if (state.xValue    != null) chips.push(`x = ${safeNum(state.xValue).toFixed(3)}`);
     if (state.result    != null) chips.push(`result = ${safeNum(state.result).toFixed(4)}`);
     return chips.map(c => `<span class="st-ai-chip">${esc(c)}</span>`).join('');

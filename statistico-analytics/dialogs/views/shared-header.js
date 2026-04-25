@@ -1812,6 +1812,7 @@ const StatisticoHeader = {
     const persistedDecimals = this.getDecimalPreference();
     this._installDecimalOverride();
     setTimeout(() => this.applyDecimalPreferenceToPage(persistedDecimals), 0);
+    setTimeout(() => this._injectPerViewAiButton(), 0);
   },
 
   _mountSidebarUtilities() {
@@ -1859,9 +1860,9 @@ const StatisticoHeader = {
       <button class="sb-bottom-btn sb-bottom-btn--ai"
               id="sbAiBtn"
               onclick="StatisticoHeader._sbAiGlobalInterpret()"
-              title="AI Insights — get an AI interpretation of the current view">
+              title="Full variable analysis — synthesises all diagnostics into one report">
         <i class="fa-solid fa-brain"></i>
-        <span class="sb-item-label">AI Insights</span>
+        <span class="sb-item-label">Full Analysis</span>
       </button>` : ''}
     `;
     nav.appendChild(utilities);
@@ -1882,178 +1883,201 @@ const StatisticoHeader = {
   // ── Global AI Interpretation (univariate sidebar) ────────────────────────
 
   /**
-   * Collect view-specific data and build a context-aware prompt, then call
-   * the AI service and show the result in an overlay panel.
+   * Inject a contextual floating "Explain this view" button into .right-col.
+   * Only shown for univariate views that are not hypothesis.
    */
-  async _sbAiGlobalInterpret() {
-    const view = this.currentView;
-    const btn  = document.getElementById('sbAiBtn');
+  _injectPerViewAiButton() {
+    if (this.module !== 'univariate' || this.currentView === 'hypothesis') return;
+    if (document.getElementById('sbAiFloatBtn')) return;
 
+    const rightCol = document.querySelector('.right-col');
+    if (!rightCol) return;
+
+    const viewLabels = {
+      histogram: 'Histogram', boxplot: 'Box Plot', cdf: 'CDF',
+      percentile: 'Percentiles', kernel: 'Kernel Density',
+      outliers: 'Outliers', normality: 'Normality Tests',
+      qqplot: 'QQ / PP Plots', confidence: 'Confidence Intervals'
+    };
+    const label = viewLabels[this.currentView] || 'View';
+
+    const btn = document.createElement('button');
+    btn.id = 'sbAiFloatBtn';
+    btn.className = 'sb-ai-float-btn';
+    btn.title = `AI Insight — ${label}`;
+    btn.innerHTML = `<i class="fa-solid fa-brain"></i><span>Explain ${label}</span>`;
+    btn.addEventListener('click', () => StatisticoHeader._sbAiPerViewInterpret());
+
+    rightCol.style.position = 'relative';
+    rightCol.appendChild(btn);
+  },
+
+  /**
+   * Per-view AI: explains the current chart/analysis in a structured format.
+   */
+  async _sbAiPerViewInterpret() {
+    const btn = document.getElementById('sbAiFloatBtn');
     if (btn) {
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span class="sb-item-label">Thinking…</span>';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking…</span>';
     }
-
     try {
-      const prompt = this._buildUnivariateAiPrompt(view);
-      if (!prompt) {
-        this._showAiOverlay('<p>No analysis data is available yet. Please run the analysis first.</p>', view);
-        return;
-      }
-      const text = await this._callAiForSidebar(prompt);
-      this._showAiOverlay(text, view);
+      const prompt = this._buildStructuredPrompt(this.currentView, 'per-view');
+      if (!prompt) { this._showAiOverlay(null, this.currentView); return; }
+      const raw = await this._callAiForSidebar(prompt);
+      const sections = this._parseAiStructured(raw);
+      this._showAiOverlay(sections, this.currentView, 'per-view');
     } catch (err) {
-      this._showAiOverlay(`<p style="color:#f87171"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'AI request failed.'}</p>`, view);
+      this._showAiOverlay({ error: err.message || 'AI request failed.' }, this.currentView, 'per-view');
     } finally {
+      const viewLabels = { histogram:'Histogram',boxplot:'Box Plot',cdf:'CDF',percentile:'Percentiles',kernel:'Kernel Density',outliers:'Outliers',normality:'Normality Tests',qqplot:'QQ / PP Plots',confidence:'Confidence Intervals' };
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-brain"></i><span class="sb-item-label">AI Insights</span>';
+        btn.innerHTML = `<i class="fa-solid fa-brain"></i><span>Explain ${viewLabels[this.currentView] || 'View'}</span>`;
       }
     }
   },
 
   /**
-   * Collect descriptive stats and any view-specific results, then build a
-   * natural-language prompt for the current univariate view.
-   * Returns null when no data is available.
+   * Full-analysis AI: synthesises all available diagnostics into one narrative.
    */
-  _buildUnivariateAiPrompt(view) {
-    // ── Common descriptive stats ───────────────────────────────────────────
-    let parsed = null;
-    try {
-      const raw = localStorage.getItem('univariateResults');
-      if (raw) parsed = JSON.parse(raw);
-    } catch (_) {}
-    if (!parsed) {
-      try {
-        const raw = sessionStorage.getItem('univariateResults');
-        if (raw) parsed = JSON.parse(raw);
-      } catch (_) {}
+  async _sbAiGlobalInterpret() {
+    const btn = document.getElementById('sbAiBtn');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span class="sb-item-label">Thinking…</span>';
     }
+    try {
+      const prompt = this._buildStructuredPrompt(this.currentView, 'full');
+      if (!prompt) { this._showAiOverlay(null, this.currentView, 'full'); return; }
+      const raw = await this._callAiForSidebar(prompt);
+      const sections = this._parseAiStructured(raw);
+      this._showAiOverlay(sections, this.currentView, 'full');
+    } catch (err) {
+      this._showAiOverlay({ error: err.message || 'AI request failed.' }, this.currentView, 'full');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-brain"></i><span class="sb-item-label">Full Analysis</span>';
+      }
+    }
+  },
 
-    // Grab numeric data vector
+  // ── Data helpers ─────────────────────────────────────────────────────────
+
+  _getUnivariateDescriptives() {
+    let parsed = null;
+    try { const r = localStorage.getItem('univariateResults'); if (r) parsed = JSON.parse(r); } catch (_) {}
+    if (!parsed) { try { const r = sessionStorage.getItem('univariateResults'); if (r) parsed = JSON.parse(r); } catch (_) {} }
+
     const coerce = (arr) => {
       if (!Array.isArray(arr)) return [];
       const src = Array.isArray(arr[0]) ? arr.map((r) => (Array.isArray(r) ? r[0] : r)) : arr;
       return src.map((v) => (v === null || v === undefined || v === '' ? null : Number(v))).filter((v) => v === null || Number.isFinite(v));
     };
-    const raw = (parsed
+    const values = (parsed
       ? coerce(parsed.rawData || parsed.values || parsed.data?.rawData || parsed.data?.values || parsed.data || [])
-      : coerce(window.currentDataArray || window.originalData || window.data || []));
-    const values = (raw || []).filter((v) => v !== null && Number.isFinite(v));
+      : coerce(window.currentDataArray || window.originalData || window.data || [])
+    ).filter((v) => v !== null && Number.isFinite(v));
 
-    if (!values.length && !parsed) return null;
+    if (!values.length) return null;
 
-    // Basic descriptives
-    const n   = values.length;
-    const varName =
-      (parsed && (parsed.column || parsed.variableName || parsed.variable || parsed.colName)) ||
-      this.variableName || 'Variable';
+    const n    = values.length;
+    const mean = values.reduce((a, b) => a + b, 0) / n;
+    const sd   = Math.sqrt(values.reduce((a, v) => a + (v - mean) ** 2, 0) / (n - 1));
+    const srt  = [...values].sort((a, b) => a - b);
+    const med  = srt[Math.floor(n * 0.5)];
+    const q1   = srt[Math.floor(n * 0.25)];
+    const q3   = srt[Math.floor(n * 0.75)];
+    const iqr  = q3 - q1;
+    let skew = null, kurt = null;
+    if (n >= 3 && sd > 0) skew = (n / ((n - 1) * (n - 2))) * values.reduce((a, v) => a + ((v - mean) / sd) ** 3, 0);
+    if (n >= 4 && sd > 0) kurt = ((n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3))) * values.reduce((a, v) => a + ((v - mean) / sd) ** 4, 0) - (3 * (n - 1) ** 2) / ((n - 2) * (n - 3));
 
-    let mean = null, sd = null, med = null, q1 = null, q3 = null,
-        minV = null, maxV = null, skew = null, kurt = null;
+    const varName = (parsed && (parsed.column || parsed.variableName || parsed.variable || parsed.colName)) || this.variableName || 'Variable';
+    const f = (v, dp = 3) => (v === null || !Number.isFinite(v)) ? 'N/A' : Number(v).toFixed(dp);
 
-    if (n >= 2) {
-      mean = values.reduce((a, b) => a + b, 0) / n;
-      sd   = Math.sqrt(values.reduce((a, v) => a + (v - mean) ** 2, 0) / (n - 1));
-      const sorted = [...values].sort((a, b) => a - b);
-      med  = sorted[Math.floor(n * 0.5)];
-      q1   = sorted[Math.floor(n * 0.25)];
-      q3   = sorted[Math.floor(n * 0.75)];
-      minV = sorted[0]; maxV = sorted[n - 1];
-      if (n >= 3 && sd > 0) {
-        skew = (n / ((n - 1) * (n - 2))) * values.reduce((a, v) => a + ((v - mean) / sd) ** 3, 0);
-      }
-      if (n >= 4 && sd > 0) {
-        kurt = ((n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3))) *
-               values.reduce((a, v) => a + ((v - mean) / sd) ** 4, 0) -
-               (3 * (n - 1) ** 2) / ((n - 2) * (n - 3));
-      }
-    }
-
-    const f = (v, dp = 4) => (v === null || v === undefined || !Number.isFinite(v)) ? 'N/A' : Number(v).toFixed(dp);
-
-    const baseStats = [
-      `Variable: ${varName}`,
-      `n = ${n}`,
-      n >= 2 ? `Mean = ${f(mean)}, SD = ${f(sd)}` : '',
-      n >= 2 ? `Median = ${f(med)}, Q1 = ${f(q1)}, Q3 = ${f(q3)}` : '',
-      n >= 2 ? `Min = ${f(minV)}, Max = ${f(maxV)}` : '',
-      skew !== null ? `Skewness = ${f(skew)}, Excess Kurtosis = ${f(kurt)}` : ''
-    ].filter(Boolean).join('\n');
-
-    // ── View-specific context ─────────────────────────────────────────────
-    const viewLabels = {
-      histogram:   'Interactive Histogram',
-      boxplot:     'Box Plot Analysis',
-      cdf:         'Cumulative Distribution Function',
-      percentile:  'Percentile Analysis',
-      kernel:      'Kernel Density Estimation',
-      outliers:    'Outlier Detection',
-      normality:   'Normality Tests',
-      qqplot:      'PP-QQ Plot Analysis',
-      confidence:  'Confidence Intervals'
-    };
-    const viewLabel = viewLabels[view] || view;
-
-    let extra = '';
-
-    // Normality view: attach test results
-    if (view === 'normality' && window.currentNormalityResults) {
-      const tests = window.currentNormalityResults;
-      const lines = [];
-      Object.entries(tests).forEach(([name, r]) => {
-        if (r && (r.statistic !== undefined || r.pValue !== undefined)) {
-          lines.push(`${name}: statistic=${f(r.statistic)}, p=${f(r.pValue)}, ${r.significant ? 'SIGNIFICANT (non-normal)' : 'not significant (normal)'}`);
-        }
-      });
-      if (lines.length) extra = '\nNormality Test Results:\n' + lines.join('\n');
-    }
-
-    // Outliers view: attach outlier summary
-    if (view === 'outliers' && window.currentOutliersData) {
-      const od = window.currentOutliersData;
-      const cnt = od.outliers ? od.outliers.length : (od.count ?? '?');
-      extra = `\nOutlier detection results: ${cnt} outlier(s) detected (method: ${od.method || 'unknown'}).`;
-      if (od.bounds) extra += ` Bounds: lower=${f(od.bounds.lower)}, upper=${f(od.bounds.upper)}.`;
-    }
-
-    // Confidence interval view
-    if (view === 'confidence' && window.currentCIResults) {
-      const ci = window.currentCIResults;
-      extra = `\nConfidence Interval: [${f(ci.lower)}, ${f(ci.upper)}], level=${ci.level || 95}%, method=${ci.method || 'unknown'}.`;
-      if (ci.estimate !== undefined) extra += ` Point estimate=${f(ci.estimate)}.`;
-    }
-
-    const viewInstructions = {
-      histogram:  'Describe the distribution shape (symmetry, modality, spread), highlight any notable features, and explain what the histogram reveals about the data.',
-      boxplot:    'Interpret the box plot: discuss the median, IQR, whisker length, and any visible skewness. Mention what the spread suggests.',
-      cdf:        'Interpret the cumulative distribution: describe how rapidly the distribution accumulates, any plateaus, and what the CDF reveals about the variable.',
-      percentile: 'Interpret the percentile structure of the data: discuss the spread between percentiles, identify any concentration or dispersion of values.',
-      kernel:     'Interpret the kernel density estimate: identify peaks (modes), tail behaviour, and discuss whether the distribution departs from normality.',
-      outliers:   'Interpret the outlier analysis: discuss the number and severity of outliers, what detection method is used, and practical implications.',
-      normality:  'Interpret the normality test results: state the overall conclusion across tests, note any discrepancies between tests, and discuss implications for downstream analysis.',
-      qqplot:     'Interpret the QQ/PP plot: describe how closely the points follow the reference line, identify systematic deviations, and conclude on distributional conformity.',
-      confidence: 'Interpret the confidence interval: explain the precision and width, what the bounds imply about the population parameter, and any practical significance.'
-    };
-    const instruction = viewInstructions[view] ||
-      'Provide a concise expert interpretation of the analysis for this view.';
-
-    return `You are a statistical expert embedded in a univariate analysis tool.
-
-Current analysis view: ${viewLabel}
-
-Descriptive Statistics:
-${baseStats}${extra}
-
-Task: ${instruction}
-
-Write 3–4 well-developed paragraphs. The first paragraph should summarise the key finding for this view. Subsequent paragraphs should cover: what the statistics suggest about the underlying distribution or population, any noteworthy patterns, risks or caveats the analyst should consider, and recommended next steps or further analyses. Use plain prose — no markdown, no bullet points, no headers.`;
+    return { n, varName, mean, sd, med, q1, q3, iqr, min: srt[0], max: srt[n-1], skew, kurt, f };
   },
 
+  // ── Prompt builders ──────────────────────────────────────────────────────
+
   /**
-   * Call the Groq AI directly (dev mode) or via the Cloudflare Worker (prod).
+   * Build a view-specific or full-analysis prompt that elicits structured,
+   * decisive "Statistico voice" output.
    */
+  _buildStructuredPrompt(view, mode) {
+    const d = this._getUnivariateDescriptives();
+    if (!d) return null;
+
+    const { n, varName, mean, sd, med, q1, q3, iqr, min, max, skew, kurt, f } = d;
+
+    const statsBlock = [
+      `Variable: ${varName}  |  n = ${n}`,
+      `Mean = ${f(mean)},  SD = ${f(sd)},  Median = ${f(med)}`,
+      `Q1 = ${f(q1)},  Q3 = ${f(q3)},  IQR = ${f(iqr)}`,
+      `Min = ${f(min)},  Max = ${f(max)}`,
+      skew !== null ? `Skewness = ${f(skew)},  Excess Kurtosis = ${f(kurt)}` : ''
+    ].filter(Boolean).join('\n');
+
+    // View-specific supplemental data
+    let extra = '';
+    if (view === 'normality' && window.currentNormalityResults) {
+      const lines = [];
+      Object.entries(window.currentNormalityResults).forEach(([name, r]) => {
+        if (r && r.pValue !== undefined) lines.push(`${name}: p=${f(r.pValue, 4)}, ${r.significant ? 'NON-NORMAL' : 'normal'}`);
+      });
+      if (lines.length) extra = '\nNormality Tests:\n' + lines.join('\n');
+    }
+    if (view === 'outliers' && window.currentOutliersData) {
+      const od = window.currentOutliersData;
+      extra = `\nOutliers detected: ${od.outliers?.length ?? od.count ?? '?'} (method: ${od.method || 'unknown'})`;
+      if (od.bounds) extra += `, bounds: [${f(od.bounds.lower)}, ${f(od.bounds.upper)}]`;
+    }
+    if (view === 'confidence' && window.currentCIResults) {
+      const ci = window.currentCIResults;
+      extra = `\nCI: [${f(ci.lower)}, ${f(ci.upper)}], level = ${ci.level || 95}%, method = ${ci.method || 'unknown'}`;
+      if (ci.estimate !== undefined) extra += `, estimate = ${f(ci.estimate)}`;
+    }
+
+    const viewFocus = {
+      histogram:  'distribution shape, symmetry, modality, and what drives the spread',
+      boxplot:    'median, IQR, whisker symmetry, and box plot evidence of skewness',
+      cdf:        'how quickly probability accumulates, any plateaus, and what the CDF reveals',
+      percentile: 'spread across percentile bands and where values concentrate',
+      kernel:     'peaks (modes), tail behaviour, and departure from a normal bell curve',
+      outliers:   'number, severity and practical meaning of the detected outliers',
+      normality:  'overall normality verdict across all tests and downstream implications',
+      qqplot:     'how tightly points follow the reference line and systematic deviations',
+      confidence: 'interval width, precision, and what the bounds imply for the population'
+    };
+
+    const systemMsg = mode === 'full'
+      ? 'You are a senior statistician writing a full-variable diagnostic report.'
+      : `You are a senior statistician explaining the ${view} analysis of one variable.`;
+
+    const taskMsg = mode === 'full'
+      ? `Write a full-variable diagnostic report integrating ALL available statistics. Focus on: ${Object.values(viewFocus).join('; ')}.`
+      : `Interpret the ${viewFocus[view] || view} using the statistics below.`;
+
+    return `${systemMsg}
+
+STATISTICS:
+${statsBlock}${extra}
+
+TASK: ${taskMsg}
+
+Reply ONLY in this exact format (no extra text, no markdown, no headers outside the labels):
+
+CONCLUSION: [One decisive sentence — the single most important finding, use exact numbers]
+EVIDENCE: [fact 1 with number and arrow interpretation] | [fact 2] | [fact 3] | [fact 4 if relevant]
+INTERPRETATION: [2–3 sentences — what the pattern means for the data, no hedging words like "likely" or "may"]
+IMPLICATIONS: [implication 1] | [implication 2] | [implication 3 if relevant]
+ACTION: [action 1] | [action 2] | [action 3 if relevant]`;
+  },
+
+  // ── AI API call ──────────────────────────────────────────────────────────
+
   async _callAiForSidebar(prompt) {
     const DEV_MODE    = true;
     const WORKER_URL  = 'https://statistico-ai.avibenita.workers.dev';
@@ -2071,11 +2095,11 @@ Write 3–4 well-developed paragraphs. The first paragraph should summarise the 
             body: JSON.stringify({
               model,
               messages: [
-                { role: 'system', content: 'You are an expert statistician providing in-depth interpretation of analysis results. Write in clear, flowing prose — no markdown, no bullet points, no headers. Be thorough and informative.' },
+                { role: 'system', content: 'You are an expert statistician. Always follow the exact output format requested. Be decisive, use exact numbers, avoid hedging.' },
                 { role: 'user',   content: prompt }
               ],
-              max_tokens: 800,
-              temperature: 0.5
+              max_tokens: 600,
+              temperature: 0.3
             })
           });
           if (!r.ok) { const e = await r.json().catch(() => ({})); lastErr = new Error(e?.error?.message || `HTTP ${r.status}`); if (r.status === 404) continue; throw lastErr; }
@@ -2088,7 +2112,6 @@ Write 3–4 well-developed paragraphs. The first paragraph should summarise the 
       throw lastErr || new Error('No AI model available');
     }
 
-    // Production: route through Worker
     const resp = await fetch(WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2099,30 +2122,100 @@ Write 3–4 well-developed paragraphs. The first paragraph should summarise the 
     return data.text;
   },
 
+  // ── Response parser ──────────────────────────────────────────────────────
+
   /**
-   * Render the AI interpretation in a slide-in side panel attached to the
-   * right edge of the sidebar.
+   * Parse the structured CONCLUSION / EVIDENCE / INTERPRETATION / IMPLICATIONS / ACTION
+   * format into a plain object. Handles pipe-separated list items.
    */
-  _showAiOverlay(rawText, view) {
+  _parseAiStructured(raw) {
+    if (!raw) return null;
+    const sectionKeys = ['CONCLUSION', 'EVIDENCE', 'INTERPRETATION', 'IMPLICATIONS', 'ACTION'];
+    const result = {};
+    const lines = raw.split('\n');
+    let current = null;
+    const buf = [];
+
+    const flush = () => {
+      if (!current) return;
+      const joined = buf.join(' ').trim();
+      if (['EVIDENCE', 'IMPLICATIONS', 'ACTION'].includes(current)) {
+        result[current] = joined.split('|').map((s) => s.trim()).filter(Boolean);
+      } else {
+        result[current] = joined;
+      }
+    };
+
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      let matched = false;
+      for (const key of sectionKeys) {
+        if (trimmed.toUpperCase().startsWith(key + ':')) {
+          flush(); current = key; buf.length = 0;
+          buf.push(trimmed.slice(key.length + 1).trim());
+          matched = true; break;
+        }
+      }
+      if (!matched && current) buf.push(trimmed);
+    });
+    flush();
+    return Object.keys(result).length ? result : { INTERPRETATION: raw };
+  },
+
+  // ── Overlay renderer ─────────────────────────────────────────────────────
+
+  _showAiOverlay(sections, view, mode = 'per-view') {
     const existing = document.getElementById('sbAiOverlay');
     if (existing) existing.remove();
 
     const viewLabels = {
-      histogram: 'Histogram', boxplot: 'Box Plot', cdf: 'CDF',
-      percentile: 'Percentiles', kernel: 'Kernel Density',
-      outliers: 'Outliers', normality: 'Normality', qqplot: 'QQ/PP Plots',
-      confidence: 'Confidence Intervals'
+      histogram:'Histogram', boxplot:'Box Plot', cdf:'CDF', percentile:'Percentiles',
+      kernel:'Kernel Density', outliers:'Outliers', normality:'Normality Tests',
+      qqplot:'QQ / PP Plots', confidence:'Confidence Intervals'
     };
-    const title = viewLabels[view] || 'Analysis';
+    const viewLabel = viewLabels[view] || view;
+    const title = mode === 'full' ? 'Full Variable Analysis' : `AI Insight — ${viewLabel}`;
+    const titleIcon = mode === 'full' ? 'fa-brain' : 'fa-lightbulb';
 
-    // Format plain-text paragraphs into HTML
-    const isHtml = rawText.trim().startsWith('<');
     let bodyHtml;
-    if (isHtml) {
-      bodyHtml = rawText;
+
+    if (!sections) {
+      bodyHtml = '<p class="sb-ai-empty">No analysis data available. Run the analysis first.</p>';
+    } else if (sections.error) {
+      bodyHtml = `<p class="sb-ai-empty sb-ai-error"><i class="fa-solid fa-triangle-exclamation"></i> ${sections.error}</p>`;
     } else {
-      bodyHtml = rawText.split(/\n\n+/).filter((p) => p.trim())
-        .map((p) => `<p>${p.trim().replace(/\n/g, ' ')}</p>`).join('');
+      const renderList = (items) =>
+        Array.isArray(items)
+          ? `<ul class="sb-ai-list">${items.map((i) => `<li>${i}</li>`).join('')}</ul>`
+          : `<p>${items}</p>`;
+
+      bodyHtml = `
+        ${sections.CONCLUSION ? `
+        <div class="sb-ai-section sb-ai-section--conclusion">
+          <div class="sb-ai-section-label">Conclusion</div>
+          <div class="sb-ai-section-body">${sections.CONCLUSION}</div>
+        </div>` : ''}
+        ${sections.EVIDENCE ? `
+        <div class="sb-ai-section sb-ai-section--evidence">
+          <div class="sb-ai-section-label">Key Evidence</div>
+          <div class="sb-ai-section-body">${renderList(sections.EVIDENCE)}</div>
+        </div>` : ''}
+        ${sections.INTERPRETATION ? `
+        <div class="sb-ai-section sb-ai-section--interpretation">
+          <div class="sb-ai-section-label">Interpretation</div>
+          <div class="sb-ai-section-body">${sections.INTERPRETATION}</div>
+        </div>` : ''}
+        ${sections.IMPLICATIONS ? `
+        <div class="sb-ai-section sb-ai-section--implications">
+          <div class="sb-ai-section-label">Implications</div>
+          <div class="sb-ai-section-body">${renderList(sections.IMPLICATIONS)}</div>
+        </div>` : ''}
+        ${sections.ACTION ? `
+        <div class="sb-ai-section sb-ai-section--action">
+          <div class="sb-ai-section-label">Recommended Actions</div>
+          <div class="sb-ai-section-body">${renderList(sections.ACTION)}</div>
+        </div>` : ''}
+      `;
     }
 
     const overlay = document.createElement('div');
@@ -2131,17 +2224,14 @@ Write 3–4 well-developed paragraphs. The first paragraph should summarise the 
     overlay.innerHTML = `
       <div class="sb-ai-panel">
         <div class="sb-ai-header">
-          <span class="sb-ai-title"><i class="fa-solid fa-brain"></i> AI Insights — ${title}</span>
+          <span class="sb-ai-title"><i class="fa-solid ${titleIcon}"></i> ${title}</span>
           <button class="sb-ai-close" onclick="document.getElementById('sbAiOverlay').remove()" title="Close">&times;</button>
         </div>
         <div class="sb-ai-body">${bodyHtml}</div>
         <div class="sb-ai-footer">AI interpretations are decision aids — verify critical findings with domain experts.</div>
       </div>
     `;
-
-    // Close on backdrop click
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-
     document.body.appendChild(overlay);
     requestAnimationFrame(() => overlay.classList.add('sb-ai-overlay--visible'));
   }

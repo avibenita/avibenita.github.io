@@ -35,12 +35,19 @@
     const result   = safeNum(state.result);
     const params   = state.params || {};
 
-    const lines = [`Distribution: ${dist}`, `Query type: ${calcType}`, `Result: ${result.toFixed(6)}`];
-    if (state.xValue   != null) lines.push(`x value: ${safeNum(state.xValue).toFixed(4)}`);
-    if (state.lowerBound != null) lines.push(`Lower bound: ${safeNum(state.lowerBound).toFixed(4)}`);
-    if (state.upperBound != null) lines.push(`Upper bound: ${safeNum(state.upperBound).toFixed(4)}`);
-    if (state.mean      != null) lines.push(`Mean: ${safeNum(state.mean).toFixed(4)}`);
-    if (state.stddev    != null) lines.push(`Std dev: ${safeNum(state.stddev, 1).toFixed(4)}`);
+    const lines = [
+      `Distribution: ${dist}`,
+      `Query type: ${calcType}`,
+      `Expression: ${state.expression || ''}`,
+      `Result: ${result}`,
+      `Explanation: ${state.explanation || ''}`,
+    ];
+    if (Number.isFinite(state.xValue))    lines.push(`x value: ${state.xValue}`);
+    if (Number.isFinite(state.lowerBound)) lines.push(`Lower bound: ${state.lowerBound}`);
+    if (Number.isFinite(state.upperBound)) lines.push(`Upper bound: ${state.upperBound}`);
+    if (Number.isFinite(state.mean))       lines.push(`Mean: ${state.mean}`);
+    if (Number.isFinite(state.stddev))     lines.push(`Std dev: ${state.stddev}`);
+    // Include all numeric params from the distribution config
     Object.entries(params).forEach(([k, v]) => { if (Number.isFinite(v)) lines.push(`${k}: ${v}`); });
 
     const context = lines.join('\n');

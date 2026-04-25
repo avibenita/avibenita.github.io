@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Precision-Based Sample Size Calculator</title>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/modules/annotations.js"></script>
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    <script src="https://code.highcharts.com/modules/export-data.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
+    <style>
+        :root {
+            --surface-0: #0c1624; /* page background */
+            --surface-1: #1a1f2e; /* cards / panels - warmer dark gray-blue */
+            --surface-2: #242938; /* chart / results boxes */
+            --border: #2d3748; /* softer border color */
+            --accent-1: rgb(255,165,120); /* warm orange */
+            --accent-2: rgb(120,200,255); /* cyan blue */
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255,255,255,0.8);
+            --text-muted: rgba(255,255,255,0.6);
+            --panel-bg: var(--surface-1);
+            --panel-radius: 10px;
+            --panel-shadow: 0px 4px 20px rgba(0, 0, 0, 0.4);
+            --header-bg: var(--surface-0);
+            --header-color: var(--accent-1);
+            --highlight-bg: rgba(255, 165, 120, 0.2);
+            --highlight-text: var(--accent-1);
+            --primary-blue: var(--accent-1);
+            --primary-blue-hover: rgb(230,140,90);
+            --success-green: #27ae60;
+            --warning-orange: #f39c12;
+            --danger-red: #e74c3c;
+            --purple: #9b59b6;
+            --pad: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--surface-0);
+            color: var(--text-primary);
+        }
+
+        #main-wrapper {
+            width: 100%;
+            height: 100vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .main-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .content-wrapper {
+            flex: 1;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            height: 100%;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, var(--header-bg) 0%, #1a1a2e 100%);
+            border-radius: var(--panel-radius);
+            box-shadow: var(--panel-shadow);
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: var(--header-color);
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .header p {
+            color: #bbb;
+            font-size: 1.1rem;
+            font-weight: 300;
+        }
+
+        .hub-back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 14px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.07);
+            color: #f1f7ff;
+            text-decoration: none;
+            font-size: 0.84rem;
+            font-weight: 700;
+        }
+
+        .hub-back-btn:hover {
+            background: rgba(120,200,255,0.18);
+            border-color: rgba(120,200,255,0.45);
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 30px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .control-panel-wrapper,
+        .visualization-panel-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .control-panel {
+            background: var(--panel-bg);
+            border-radius: var(--panel-radius);
+            box-shadow: var(--panel-shadow);
+            padding: 25px;
+            min-height: 750px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .visualization-panel {
+            background: var(--panel-bg);
+            border-radius: var(--panel-radius);
+            box-shadow: var(--panel-shadow);
+            padding: 25px;
+            min-height: 750px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-title {
+            font-size: 1.4rem;
+            color: var(--header-color);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0,0,0,0.3);
+            padding: 15px 20px;
+            border-radius: var(--panel-radius);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .calculation-mode {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .mode-title {
+            font-size: 1.1rem;
+            color: var(--warning-orange);
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .mode-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #555;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.05);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .mode-btn.active {
+            border-color: var(--primary-blue);
+            background: rgba(52, 152, 219, 0.2);
+            color: var(--primary-blue);
+        }
+
+        .mode-btn:hover {
+            border-color: var(--primary-blue);
+            background: rgba(52, 152, 219, 0.1);
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #e8e8e8;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #555;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            font-size: 1rem;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            background: rgba(255,255,255,0.15);
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.3);
+        }
+
+        .select-field {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #555;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            font-size: 1rem;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .select-field:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            background: rgba(255,255,255,0.15);
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.3);
+        }
+
+        .select-field option {
+            background: #484b57;
+            color: white;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, #2c3e50 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, var(--primary-blue-hover) 0%, #34495e 100%);
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success-green) 0%, #16a085 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #2ecc71 0%, #17a2b8 100%);
+            transform: translateY(-2px);
+        }
+
+        .parameters-section {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            color: var(--highlight-text);
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .results-section {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .result-item {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 6px;
+            border-left: 4px solid var(--success-green);
+        }
+
+        .result-label {
+            font-weight: 600;
+            color: var(--highlight-text);
+            margin-bottom: 5px;
+        }
+
+        .result-value {
+            font-size: 1.3rem;
+            color: white;
+            font-weight: 600;
+        }
+
+        .result-secondary {
+            font-size: 0.9rem;
+            color: #b0b0b0;
+            margin-top: 5px;
+        }
+
+        .info-box {
+            background: rgba(52, 152, 219, 0.1);
+            border: 1px solid rgba(52, 152, 219, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .info-box h4 {
+            color: var(--primary-blue);
+            margin-bottom: 10px;
+        }
+
+        .info-box p {
+            font-size: 0.9rem;
+            line-height: 1.4;
+            color: #e0e0e0;
+        }
+
+        .chart-container {
+            flex: 1;
+            margin-top: 20px;
+            min-height: 400px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .row .input-group {
+            flex: 1;
+        }
+
+        .quick-presets {
+            background: rgba(155, 89, 182, 0.1);
+            border: 1px solid rgba(155, 89, 182, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .preset-btn {
+            padding: 8px 12px;
+            margin: 4px;
+            border: 1px solid var(--purple);
+            border-radius: 6px;
+            background: rgba(155, 89, 182, 0.1);
+            color: var(--purple);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .preset-btn:hover {
+            background: rgba(155, 89, 182, 0.2);
+            border-color: #9b59b6;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .row {
+                flex-direction: column;
+            }
+            
+            .mode-toggle {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-crosshairs"></i> Precision-Based Sample Size Calculator</h1>
+            <p>Calculate sample sizes based on desired precision (margin of error) and confidence intervals</p>
+            <p>Works both ways: Sample Size ↔ Margin of Error</p>
+            <a class="hub-back-btn" href="../hub.html">
+                <i class="fas fa-arrow-left"></i> Back to Hub
+            </a>
+        </div>
+
+        <div class="main-content">
+            <div class="control-panel-wrapper">
+                <div class="control-panel">
+                    <h2 class="panel-title">
+                        <i class="fas fa-sliders-h"></i>
+                        Calculation Parameters
+                    </h2>
+
+                    <div class="calculation-mode">
+                        <h3 class="mode-title">Calculation Direction</h3>
+                        <div class="mode-toggle">
+                            <div class="mode-btn active" id="sampleSizeMode" onclick="switchMode('sampleSize')">
+                                <i class="fas fa-arrow-right"></i> Sample Size
+                            </div>
+                            <div class="mode-btn" id="marginErrorMode" onclick="switchMode('marginError')">
+                                <i class="fas fa-arrow-left"></i> Margin of Error
+                            </div>
+                        </div>
+                        <p style="font-size: 0.9rem; color: #b0b0b0;">
+                            <span id="modeDescription">Calculate required sample size from desired margin of error</span>
+                        </p>
+                    </div>
+
+                    <div class="parameters-section">
+                        <h3 class="section-title">Estimation Type</h3>
+                        <div class="input-group">
+                            <label for="estimationType">What are you estimating?</label>
+                            <select id="estimationType" class="select-field" onchange="updateParameterFields()">
+                                <option value="mean">Population Mean (μ)</option>
+                                <option value="proportion">Population Proportion (p)</option>
+                                <option value="difference-means">Difference of Means (μ₁ - μ₂)</option>
+                                <option value="difference-proportions">Difference of Proportions (p₁ - p₂)</option>
+                            </select>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="confidenceLevel">Confidence Level (%)</label>
+                            <select id="confidenceLevel" class="select-field">
+                                <option value="90">90% (α = 0.10)</option>
+                                <option value="95" selected>95% (α = 0.05)</option>
+                                <option value="99">99% (α = 0.01)</option>
+                                <option value="99.9">99.9% (α = 0.001)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Sample Size Mode Parameters -->
+                    <div id="sampleSizeParams" class="parameters-section">
+                        <h3 class="section-title">Target Precision</h3>
+                        
+                        <div class="input-group">
+                            <label for="marginOfError" id="marginLabel">Desired Margin of Error (E)</label>
+                            <input type="number" id="marginOfError" class="input-field" value="5" min="0.001" step="0.001">
+                        </div>
+
+                        <div id="meanParams">
+                            <div class="input-group">
+                                <label for="populationSD">Population Standard Deviation (σ)</label>
+                                <input type="number" id="populationSD" class="input-field" value="10" min="0.001" step="0.001">
+                            </div>
+                        </div>
+
+                        <div id="proportionParams" class="hidden">
+                            <div class="input-group">
+                                <label for="expectedProportion">Expected Proportion (p)</label>
+                                <input type="number" id="expectedProportion" class="input-field" value="0.5" min="0.01" max="0.99" step="0.01">
+                            </div>
+                        </div>
+
+                        <div class="quick-presets">
+                            <h4 style="color: var(--purple); margin-bottom: 10px;"><i class="fas fa-magic"></i> Quick Presets</h4>
+                            <div id="meanPresets">
+                                <button class="preset-btn" onclick="setPreset('mean', 1, 5)">High Precision (E=1, σ=5)</button>
+                                <button class="preset-btn" onclick="setPreset('mean', 2, 10)">Medium Precision (E=2, σ=10)</button>
+                                <button class="preset-btn" onclick="setPreset('mean', 5, 15)">Low Precision (E=5, σ=15)</button>
+                            </div>
+                            <div id="proportionPresets" class="hidden">
+                                <button class="preset-btn" onclick="setPreset('proportion', 0.01, null)">±1% (E=0.01)</button>
+                                <button class="preset-btn" onclick="setPreset('proportion', 0.03, null)">±3% (E=0.03)</button>
+                                <button class="preset-btn" onclick="setPreset('proportion', 0.05, null)">±5% (E=0.05)</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Margin of Error Mode Parameters -->
+                    <div id="marginErrorParams" class="parameters-section hidden">
+                        <h3 class="section-title">Known Sample Size</h3>
+                        
+                        <div class="input-group">
+                            <label for="knownSampleSize">Sample Size (n)</label>
+                            <input type="number" id="knownSampleSize" class="input-field" value="100" min="1" step="1">
+                        </div>
+
+                        <div id="meanParams2">
+                            <div class="input-group">
+                                <label for="populationSD2">Population Standard Deviation (σ)</label>
+                                <input type="number" id="populationSD2" class="input-field" value="10" min="0.001" step="0.001">
+                            </div>
+                        </div>
+
+                        <div id="proportionParams2" class="hidden">
+                            <div class="input-group">
+                                <label for="expectedProportion2">Expected Proportion (p)</label>
+                                <input type="number" id="expectedProportion2" class="input-field" value="0.5" min="0.01" max="0.99" step="0.01">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="calculate()" id="calculateBtn">
+                        <i class="fas fa-calculator"></i>
+                        Calculate Sample Size
+                    </button>
+                </div>
+            </div>
+
+            <div class="visualization-panel-wrapper">
+                <div class="visualization-panel">
+                    <h2 class="panel-title">
+                        <i class="fas fa-chart-area"></i>
+                        Results & Analysis
+                    </h2>
+
+                    <div id="results" class="results-section">
+                        <div class="result-item">
+                            <div class="result-label" id="mainResultLabel">Required Sample Size</div>
+                            <div class="result-value" id="mainResult">-</div>
+                            <div class="result-secondary" id="mainResultSecondary"></div>
+                        </div>
+                        <div class="result-item">
+                            <div class="result-label">Confidence Interval Width</div>
+                            <div class="result-value" id="intervalWidth">-</div>
+                            <div class="result-secondary" id="intervalWidthSecondary"></div>
+                        </div>
+                        <div class="result-item">
+                            <div class="result-label">Critical Value (z)</div>
+                            <div class="result-value" id="criticalValue">-</div>
+                            <div class="result-secondary" id="criticalValueSecondary"></div>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <div id="precisionChart"></div>
+                    </div>
+
+                    <div class="info-box">
+                        <h4><i class="fas fa-info-circle"></i> Interpretation</h4>
+                        <p id="interpretationText">Configure your parameters and click calculate to see the precision analysis.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'sampleSize';
+        let currentEstimationType = 'mean';
+
+        // Mathematical functions
+        function normalInverse(p) {
+            // Beasley-Springer-Moro algorithm
+            const a = [0, -3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+            const b = [0, -5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+            const c = [0, -7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+            const d = [0, 7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+
+            if (p < 0 || p > 1) return NaN;
+            if (p === 0) return -Infinity;
+            if (p === 1) return Infinity;
+
+            let q = p - 0.5;
+            if (Math.abs(q) <= 0.42) {
+                let r = q * q;
+                return q * (((((a[6] * r + a[5]) * r + a[4]) * r + a[3]) * r + a[2]) * r + a[1]) * r + a[0] /
+                    (((((b[5] * r + b[4]) * r + b[3]) * r + b[2]) * r + b[1]) * r + 1);
+            }
+
+            let r = p < 0.5 ? p : 1 - p;
+            r = Math.sqrt(-Math.log(r));
+            
+            let val = (((c[4] * r + c[3]) * r + c[2]) * r + c[1]) * r + c[0];
+            val /= ((d[3] * r + d[2]) * r + d[1]) * r + 1;
+            
+            return p < 0.5 ? -val : val;
+        }
+
+        function switchMode(mode) {
+            currentMode = mode;
+            
+            // Update button states
+            document.getElementById('sampleSizeMode').classList.toggle('active', mode === 'sampleSize');
+            document.getElementById('marginErrorMode').classList.toggle('active', mode === 'marginError');
+            
+            // Update parameter sections
+            document.getElementById('sampleSizeParams').classList.toggle('hidden', mode !== 'sampleSize');
+            document.getElementById('marginErrorParams').classList.toggle('hidden', mode !== 'marginError');
+            
+            // Update description and button text
+            if (mode === 'sampleSize') {
+                document.getElementById('modeDescription').textContent = 'Calculate required sample size from desired margin of error';
+                document.getElementById('calculateBtn').innerHTML = '<i class="fas fa-calculator"></i> Calculate Sample Size';
+                document.getElementById('mainResultLabel').textContent = 'Required Sample Size';
+            } else {
+                document.getElementById('modeDescription').textContent = 'Calculate expected margin of error from known sample size';
+                document.getElementById('calculateBtn').innerHTML = '<i class="fas fa-calculator"></i> Calculate Margin of Error';
+                document.getElementById('mainResultLabel').textContent = 'Margin of Error';
+            }
+        }
+
+        function updateParameterFields() {
+            currentEstimationType = document.getElementById('estimationType').value;
+            
+            // Update visibility based on estimation type
+            const isMean = currentEstimationType === 'mean' || currentEstimationType === 'difference-means';
+            const isProportion = currentEstimationType === 'proportion' || currentEstimationType === 'difference-proportions';
+            
+            // Sample size mode parameters
+            document.getElementById('meanParams').classList.toggle('hidden', !isMean);
+            document.getElementById('proportionParams').classList.toggle('hidden', !isProportion);
+            document.getElementById('meanPresets').classList.toggle('hidden', !isMean);
+            document.getElementById('proportionPresets').classList.toggle('hidden', !isProportion);
+            
+            // Margin of error mode parameters
+            document.getElementById('meanParams2').classList.toggle('hidden', !isMean);
+            document.getElementById('proportionParams2').classList.toggle('hidden', !isProportion);
+            
+            // Update margin label
+            const marginLabel = document.getElementById('marginLabel');
+            if (currentEstimationType === 'proportion' || currentEstimationType === 'difference-proportions') {
+                marginLabel.textContent = 'Desired Margin of Error (E) - as proportion';
+            } else {
+                marginLabel.textContent = 'Desired Margin of Error (E) - same units as mean';
+            }
+        }
+
+        function setPreset(type, margin, sigma) {
+            if (type === 'mean') {
+                document.getElementById('marginOfError').value = margin;
+                document.getElementById('populationSD').value = sigma;
+            } else if (type === 'proportion') {
+                document.getElementById('marginOfError').value = margin;
+                document.getElementById('expectedProportion').value = 0.5;
+            }
+        }
+
+        function calculate() {
+            try {
+                const confidenceLevel = parseFloat(document.getElementById('confidenceLevel').value);
+                const alpha = (100 - confidenceLevel) / 100;
+                const zValue = normalInverse(1 - alpha/2);
+                
+                let result = {};
+                
+                if (currentMode === 'sampleSize') {
+                    result = calculateSampleSize(zValue, alpha);
+                } else {
+                    result = calculateMarginOfError(zValue, alpha);
+                }
+                
+                displayResults(result, zValue, confidenceLevel);
+                createChart(result, zValue);
+                updateInterpretation(result, confidenceLevel);
+                
+            } catch (error) {
+                alert('Error in calculation: ' + error.message);
+            }
+        }
+
+        function calculateSampleSize(zValue, alpha) {
+            const marginOfError = parseFloat(document.getElementById('marginOfError').value);
+            
+            switch(currentEstimationType) {
+                case 'mean':
+                    const sigma = parseFloat(document.getElementById('populationSD').value);
+                    const n = Math.pow(zValue * sigma / marginOfError, 2);
+                    return {
+                        sampleSize: Math.ceil(n),
+                        marginOfError: marginOfError,
+                        type: 'Population Mean',
+                        standardError: sigma / Math.sqrt(Math.ceil(n)),
+                        intervalWidth: 2 * marginOfError,
+                        parameter: sigma
+                    };
+                    
+                case 'proportion':
+                    const p = parseFloat(document.getElementById('expectedProportion').value);
+                    const nProp = Math.pow(zValue, 2) * p * (1 - p) / Math.pow(marginOfError, 2);
+                    return {
+                        sampleSize: Math.ceil(nProp),
+                        marginOfError: marginOfError,
+                        type: 'Population Proportion',
+                        standardError: Math.sqrt(p * (1 - p) / Math.ceil(nProp)),
+                        intervalWidth: 2 * marginOfError,
+                        parameter: p
+                    };
+                    
+                case 'difference-means':
+                    const sigma1 = parseFloat(document.getElementById('populationSD').value);
+                    const nDiffMean = 2 * Math.pow(zValue * sigma1 * Math.sqrt(2) / marginOfError, 2);
+                    return {
+                        sampleSize: Math.ceil(nDiffMean / 2),
+                        totalSampleSize: Math.ceil(nDiffMean),
+                        marginOfError: marginOfError,
+                        type: 'Difference of Means',
+                        standardError: sigma1 * Math.sqrt(2 / (nDiffMean / 2)),
+                        intervalWidth: 2 * marginOfError,
+                        parameter: sigma1
+                    };
+                    
+                case 'difference-proportions':
+                    const p1 = parseFloat(document.getElementById('expectedProportion').value);
+                    const p2 = 0.5; // Conservative estimate for p2
+                    const nDiffProp = Math.pow(zValue, 2) * (p1 * (1 - p1) + p2 * (1 - p2)) / Math.pow(marginOfError, 2);
+                    return {
+                        sampleSize: Math.ceil(nDiffProp),
+                        totalSampleSize: Math.ceil(2 * nDiffProp),
+                        marginOfError: marginOfError,
+                        type: 'Difference of Proportions',
+                        standardError: Math.sqrt((p1 * (1 - p1) + p2 * (1 - p2)) / nDiffProp),
+                        intervalWidth: 2 * marginOfError,
+                        parameter: p1
+                    };
+            }
+        }
+
+        function calculateMarginOfError(zValue, alpha) {
+            const sampleSize = parseInt(document.getElementById('knownSampleSize').value);
+            
+            switch(currentEstimationType) {
+                case 'mean':
+                    const sigma = parseFloat(document.getElementById('populationSD2').value);
+                    const marginOfError = zValue * sigma / Math.sqrt(sampleSize);
+                    return {
+                        sampleSize: sampleSize,
+                        marginOfError: marginOfError,
+                        type: 'Population Mean',
+                        standardError: sigma / Math.sqrt(sampleSize),
+                        intervalWidth: 2 * marginOfError,
+                        parameter: sigma
+                    };
+                    
+                case 'proportion':
+                    const p = parseFloat(document.getElementById('expectedProportion2').value);
+                    const marginOfErrorProp = zValue * Math.sqrt(p * (1 - p) / sampleSize);
+                    return {
+                        sampleSize: sampleSize,
+                        marginOfError: marginOfErrorProp,
+                        type: 'Population Proportion',
+                        standardError: Math.sqrt(p * (1 - p) / sampleSize),
+                        intervalWidth: 2 * marginOfErrorProp,
+                        parameter: p
+                    };
+                    
+                case 'difference-means':
+                    const sigma1 = parseFloat(document.getElementById('populationSD2').value);
+                    const marginOfErrorDiffMean = zValue * sigma1 * Math.sqrt(2 / sampleSize);
+                    return {
+                        sampleSize: sampleSize,
+                        totalSampleSize: 2 * sampleSize,
+                        marginOfError: marginOfErrorDiffMean,
+                        type: 'Difference of Means',
+                        standardError: sigma1 * Math.sqrt(2 / sampleSize),
+                        intervalWidth: 2 * marginOfErrorDiffMean,
+                        parameter: sigma1
+                    };
+                    
+                case 'difference-proportions':
+                    const p1 = parseFloat(document.getElementById('expectedProportion2').value);
+                    const p2 = 0.5; // Conservative estimate
+                    const marginOfErrorDiffProp = zValue * Math.sqrt((p1 * (1 - p1) + p2 * (1 - p2)) / sampleSize);
+                    return {
+                        sampleSize: sampleSize,
+                        totalSampleSize: 2 * sampleSize,
+                        marginOfError: marginOfErrorDiffProp,
+                        type: 'Difference of Proportions',
+                        standardError: Math.sqrt((p1 * (1 - p1) + p2 * (1 - p2)) / sampleSize),
+                        intervalWidth: 2 * marginOfErrorDiffProp,
+                        parameter: p1
+                    };
+            }
+        }
+
+        function displayResults(result, zValue, confidenceLevel) {
+            if (currentMode === 'sampleSize') {
+                document.getElementById('mainResult').textContent = result.totalSampleSize ? 
+                    `n = ${result.sampleSize} per group` : `n = ${result.sampleSize}`;
+                document.getElementById('mainResultSecondary').textContent = result.totalSampleSize ? 
+                    `Total sample size: ${result.totalSampleSize}` : `Single sample`;
+            } else {
+                const marginText = currentEstimationType.includes('proportion') ? 
+                    `±${(result.marginOfError * 100).toFixed(2)}%` : 
+                    `±${result.marginOfError.toFixed(3)}`;
+                document.getElementById('mainResult').textContent = marginText;
+                document.getElementById('mainResultSecondary').textContent = `Standard Error: ${result.standardError.toFixed(4)}`;
+            }
+            
+            document.getElementById('intervalWidth').textContent = currentEstimationType.includes('proportion') ? 
+                `${(result.intervalWidth * 100).toFixed(2)}%` : 
+                result.intervalWidth.toFixed(3);
+            document.getElementById('intervalWidthSecondary').textContent = `Full width of ${confidenceLevel}% CI`;
+            
+            document.getElementById('criticalValue').textContent = zValue.toFixed(3);
+            document.getElementById('criticalValueSecondary').textContent = `${confidenceLevel}% confidence level`;
+        }
+
+        function createChart(result, zValue) {
+            const chartTitle = currentMode === 'sampleSize' ? 
+                'Sample Size vs Margin of Error' : 
+                'Margin of Error vs Sample Size';
+            
+            let xData = [], yData = [];
+            
+            if (currentMode === 'sampleSize') {
+                // Show how margin of error changes with different sample sizes
+                for (let n = Math.max(10, Math.floor(result.sampleSize * 0.3)); n <= result.sampleSize * 2; n += Math.max(1, Math.floor(result.sampleSize * 0.05))) {
+                    xData.push(n);
+                    let margin;
+                    if (currentEstimationType === 'mean') {
+                        margin = zValue * result.parameter / Math.sqrt(n);
+                    } else {
+                        margin = zValue * Math.sqrt(result.parameter * (1 - result.parameter) / n);
+                    }
+                    yData.push(margin);
+                }
+            } else {
+                // Show how sample size affects margin of error
+                const maxN = result.sampleSize * 3;
+                for (let n = 10; n <= maxN; n += Math.max(1, Math.floor(maxN * 0.02))) {
+                    xData.push(n);
+                    let margin;
+                    if (currentEstimationType === 'mean') {
+                        margin = zValue * result.parameter / Math.sqrt(n);
+                    } else {
+                        margin = zValue * Math.sqrt(result.parameter * (1 - result.parameter) / n);
+                    }
+                    yData.push(margin);
+                }
+            }
+
+            Highcharts.chart('precisionChart', {
+                title: {
+                    text: chartTitle,
+                    style: { color: '#ffc0c0' }
+                },
+                xAxis: {
+                    title: { text: 'Sample Size (n)', style: { color: '#e8e8e8' } },
+                    labels: { style: { color: '#e8e8e8' } },
+                    gridLineColor: '#555'
+                },
+                yAxis: {
+                    title: { 
+                        text: currentEstimationType.includes('proportion') ? 'Margin of Error (proportion)' : 'Margin of Error', 
+                        style: { color: '#e8e8e8' } 
+                    },
+                    labels: { style: { color: '#e8e8e8' } },
+                    gridLineColor: '#555'
+                },
+                chart: {
+                    backgroundColor: 'transparent',
+                    style: { fontFamily: 'Segoe UI' }
+                },
+                legend: { itemStyle: { color: '#e8e8e8' } },
+                series: [{
+                    name: 'Precision Curve',
+                    data: xData.map((x, i) => [x, yData[i]]),
+                    type: 'line',
+                    color: 'rgb(255,165,120)',
+                    lineWidth: 3
+                }, {
+                    name: currentMode === 'sampleSize' ? 'Target Sample Size' : 'Current Sample Size',
+                    data: [[result.sampleSize, 0], [result.sampleSize, Math.max(...yData)]],
+                    type: 'line',
+                    color: '#e74c3c',
+                    dashStyle: 'dash',
+                    lineWidth: 2
+                }, {
+                    name: currentMode === 'sampleSize' ? 'Target Margin' : 'Current Margin',
+                    data: [[Math.min(...xData), result.marginOfError], [Math.max(...xData), result.marginOfError]],
+                    type: 'line',
+                    color: '#27ae60',
+                    dashStyle: 'dash',
+                    lineWidth: 2
+                }],
+                plotOptions: {
+                    series: {
+                        marker: { enabled: false }
+                    }
+                }
+            });
+        }
+
+        function updateInterpretation(result, confidenceLevel) {
+            let interpretation = '';
+            
+            if (currentMode === 'sampleSize') {
+                if (currentEstimationType === 'mean') {
+                    interpretation = `To estimate the population mean with a margin of error of ±${result.marginOfError} and ${confidenceLevel}% confidence, you need ${result.sampleSize} participants. `;
+                } else if (currentEstimationType === 'proportion') {
+                    interpretation = `To estimate the population proportion with a margin of error of ±${(result.marginOfError * 100).toFixed(1)}% and ${confidenceLevel}% confidence, you need ${result.sampleSize} participants. `;
+                } else if (currentEstimationType === 'difference-means') {
+                    interpretation = `To estimate the difference between two means with a margin of error of ±${result.marginOfError} and ${confidenceLevel}% confidence, you need ${result.sampleSize} participants per group (total N = ${result.totalSampleSize}). `;
+                } else {
+                    interpretation = `To estimate the difference between two proportions with a margin of error of ±${(result.marginOfError * 100).toFixed(1)}% and ${confidenceLevel}% confidence, you need ${result.sampleSize} participants per group (total N = ${result.totalSampleSize}). `;
+                }
+                interpretation += `The confidence interval will span ${currentEstimationType.includes('proportion') ? (result.intervalWidth * 100).toFixed(1) + '%' : result.intervalWidth.toFixed(3)} units total.`;
+            } else {
+                if (currentEstimationType === 'mean') {
+                    interpretation = `With ${result.sampleSize} participants, your ${confidenceLevel}% confidence interval for the population mean will have a margin of error of ±${result.marginOfError.toFixed(3)}. `;
+                } else if (currentEstimationType === 'proportion') {
+                    interpretation = `With ${result.sampleSize} participants, your ${confidenceLevel}% confidence interval for the population proportion will have a margin of error of ±${(result.marginOfError * 100).toFixed(2)}%. `;
+                } else if (currentEstimationType === 'difference-means') {
+                    interpretation = `With ${result.sampleSize} participants per group (total N = ${result.totalSampleSize}), your ${confidenceLevel}% confidence interval for the difference of means will have a margin of error of ±${result.marginOfError.toFixed(3)}. `;
+                } else {
+                    interpretation = `With ${result.sampleSize} participants per group (total N = ${result.totalSampleSize}), your ${confidenceLevel}% confidence interval for the difference of proportions will have a margin of error of ±${(result.marginOfError * 100).toFixed(2)}%. `;
+                }
+                interpretation += `The total width of your confidence interval will be ${currentEstimationType.includes('proportion') ? (result.intervalWidth * 100).toFixed(1) + '%' : result.intervalWidth.toFixed(3)}.`;
+            }
+            
+            document.getElementById('interpretationText').textContent = interpretation;
+        }
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            updateParameterFields();
+        });
+    </script>
+</body>
+</html> 
+</html> 

@@ -1826,6 +1826,28 @@
     }
     updateStats(cfg, params, precision);
     renderCharts(cfg, params, { min: shadeMin, max: shadeMax }, markerValues);
+
+    // Feed current calculator state to the AI insights component
+    if (window.StatisticoAIInsights && typeof window.StatisticoAIInsights.update === 'function') {
+      const aiState = {
+        distributionName: cfg.title || key,
+        calcType: type,
+        result: result,
+        expression: expression,
+        explanation: explanation,
+        params: Object.assign({}, params),
+        xValue: parseFloat($('xValue')?.value),
+        lowerBound: parseFloat($('lowerBound')?.value),
+        upperBound: parseFloat($('upperBound')?.value),
+        probability: parseFloat($('probability')?.value),
+        // common param aliases the prompt builder looks for
+        mean:   Number.isFinite(params.mean)     ? params.mean   :
+                Number.isFinite(params.mu)        ? params.mu     : undefined,
+        stddev: Number.isFinite(params.stddev)   ? params.stddev :
+                Number.isFinite(params.sigma)     ? params.sigma  : undefined,
+      };
+      window.StatisticoAIInsights.update('aiInsightsMount', aiState);
+    }
   }
 
   function initTabs() {

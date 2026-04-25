@@ -1918,7 +1918,7 @@ const StatisticoHeader = {
     btn.id = 'sbAiFloatBtn';
     btn.className = 'sb-ai-float-btn';
     btn.title = `AI Insight — ${label}`;
-    btn.innerHTML = `<i class="fa-solid fa-brain"></i><span>Explain ${label}</span>`;
+    btn.innerHTML = `<i class="fa-solid fa-brain"></i><span>Explain ${label}</span><sup class="sb-ai-sup">AI</sup>`;
     btn.addEventListener('click', () => StatisticoHeader._sbAiPerViewInterpret());
 
     rightCol.style.position = 'relative';
@@ -1946,7 +1946,7 @@ const StatisticoHeader = {
       const viewLabels = { histogram:'Histogram',boxplot:'Box Plot',cdf:'CDF',percentile:'Percentiles',kernel:'Kernel Density',outliers:'Outliers',normality:'Normality Tests',qqplot:'QQ / PP Plots',confidence:'Confidence Intervals' };
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-brain"></i><span>Explain ${viewLabels[this.currentView] || 'View'}</span>`;
+        btn.innerHTML = `<i class="fa-solid fa-brain"></i><span>Explain ${viewLabels[this.currentView] || 'View'}</span><sup class="sb-ai-sup">AI</sup>`;
       }
     }
   },

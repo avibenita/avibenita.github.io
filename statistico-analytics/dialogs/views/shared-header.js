@@ -2013,11 +2013,129 @@ const StatisticoHeader = {
     return { n, varName, mean, sd, med, q1, q3, iqr, min: srt[0], max: srt[n-1], skew, kurt, f };
   },
 
+  /**
+   * Read live DOM / window values from the active view so the AI can
+   * comment on the exact state the user sees (slider positions, results).
+   */
+  _collectViewData(view) {
+    const el  = (id) => document.getElementById(id);
+    const txt = (id) => { const e = el(id); return e ? (e.textContent || e.value || '').trim() : null; };
+    const val = (id) => { const e = el(id); return e ? e.value : null; };
+    const d   = {};
+
+    if (view === 'histogram') {
+      d.binMethod      = val('binningMethod');
+      d.numBins        = val('numBins');
+      d.showNormalCurve = el('showNormalCurve')?.checked ? 'yes' : 'no';
+      d.leftTrunc      = val('leftTruncation');
+      d.rightTrunc     = val('rightTruncation');
+      d.remainingN     = txt('remainingN');
+      d.mean           = txt('stat-mean');
+      d.stddev         = txt('stat-stddev');
+      d.skewness       = txt('stat-skewness');
+      d.kurtosis       = txt('stat-kurtosis');
+      d.min            = txt('stat-min');
+      d.q25            = txt('stat-q25');
+      d.median         = txt('stat-median');
+      d.q75            = txt('stat-q75');
+      d.max            = txt('stat-max');
+    }
+
+    if (view === 'kernel') {
+      d.kernelType = val('kernelType');
+      d.bandwidth  = val('bandwidth');
+      d.mean       = txt('statMean');
+      d.stddev     = txt('statStdDev');
+      d.min        = txt('statMin');
+      d.max        = txt('statMax');
+    }
+
+    if (view === 'cdf') {
+      d.distributionOverlay = val('distribution-select') || 'none';
+      d.q1     = txt('q1-value');
+      d.median = txt('median-value');
+      d.avg    = txt('avg-value');
+      d.q3     = txt('q3-value');
+      d.p95    = txt('p95-value');
+      d.currentX  = txt('x-value');
+      d.currentFx = txt('probability');
+    }
+
+    if (view === 'percentile') {
+      d.percentileQueried = val('percentile-value') || val('percentile-slider');
+      d.result = txt('arrow-text');
+      const active = document.querySelector('.method-option.active, [data-method].active');
+      d.method = active?.dataset?.method || null;
+    }
+
+    if (view === 'normality' && window.currentNormalityResults) {
+      d.tests     = window.currentNormalityResults;
+      d.passCount = txt('pass-count');
+      d.failCount = txt('fail-count');
+      d.alpha     = txt('significance');
+    }
+
+    if (view === 'outliers') {
+      d.outlierSummary = txt('outlierCount');
+      const mBtn = document.querySelector('.method-btn.active, [class*="method"][class*="active"]');
+      d.method = mBtn?.textContent?.trim() || null;
+    }
+
+    if (view === 'confidence') {
+      d.lcl          = txt('stat-lcl');
+      d.center       = txt('stat-center');
+      d.ucl          = txt('stat-ucl');
+      d.confidenceLevel = txt('stat-confidence');
+      d.method       = txt('stat-method');
+      d.pointEstimate = txt('point-estimate');
+      d.marginError  = txt('margin-error');
+    }
+
+    if (view === 'qqplot') {
+      const qqRadio = document.querySelector('input[name="plotType"]:checked');
+      d.plotType    = qqRadio?.value || 'qq';
+      d.distribution = val('distributionSelect');
+    }
+
+    if (view === 'boxplot') {
+      d.footerNote = txt('boxplot-footer');
+    }
+
+    return d;
+  },
+
   // ── Prompt builders ──────────────────────────────────────────────────────
 
   /**
-   * Build a view-specific or full-analysis prompt that elicits structured,
-   * decisive "Statistico voice" output.
+   * Controls reference for each view — passed to AI so it can describe
+   * how the user interacts with this view.
+   */
+  _viewControlsDoc() {
+    return {
+      histogram: `Controls available: (1) Binning Method dropdown (Manual / Sturges / Scott / Freedman-Diaconis) — changes how bars are grouped; (2) Bin Count slider (1–50, only active in Manual mode) — drag to increase/decrease bar count; (3) Show Normal Curve checkbox — toggles a theoretical normal overlay on the histogram; (4) Left/Right Truncation sliders — trim extreme observations by percentile to focus on the core distribution.`,
+
+      boxplot: `The box plot renders automatically from the data. The left chart includes all data points (with outliers marked as dots beyond the whiskers); the right chart shows the same distribution with outliers excluded, so the core spread is more visible. No manual sliders — navigate to other views using the sidebar.`,
+
+      cdf: `Controls available: (1) Distribution overlay dropdown (None / Normal / Log-Normal / Exponential / Uniform) — adds a theoretical CDF curve for visual comparison; (2) Toggle Distribution button — shows or hides the theoretical overlay; (3) Value slider (noUiSlider) — drag the marker along the x-axis to read F(x), the cumulative probability at any point; (4) Quartile shortcut cards (Q1, Median, Q3, P95) — click to jump the slider to those key positions.`,
+
+      percentile: `Controls available: (1) Interpolation method radios (SAS / Excel-inclusive / Excel-exclusive / Nearest Rank) — different algorithms for computing a percentile from discrete data; (2) Percentile slider (0–100) — drag to query any percentile; (3) Percentile input field — type a value directly; (4) Preset buttons (P25, P50, P75, P90) — one-click common percentiles.`,
+
+      kernel: `Controls available: (1) Kernel Type dropdown (Gaussian / Epanechnikov / Triangular / Uniform) — shape of the smoothing kernel; Gaussian is the standard choice; (2) Bandwidth slider (0.1–3) — controls smoothness: low bandwidth = spiky/noisy curve; high bandwidth = over-smoothed; (3) Reset button — returns bandwidth to auto-selected default.`,
+
+      outliers: `Controls available: (1) Detection method buttons (IQR / Z-Score / Grubbs / MAD) — each uses a different statistical criterion; IQR uses 1.5×IQR fence; Z-Score uses standard deviation multiples; Grubbs is a formal significance test; MAD is robust to non-normality; (2) Sort order buttons (By Index / By Value) — reorder the outlier table; (3) Toggle Table button — show or hide the detailed outlier list.`,
+
+      normality: `Controls available: (1) Alpha slider (0.01–0.15) — sets the significance threshold for all six tests simultaneously; drag left for stricter evidence of non-normality, right for more lenient. The gauge and pass/fail counts update in real time. Six tests run in parallel: Shapiro-Wilk, Anderson-Darling, Kolmogorov-Smirnov, Cramér-von Mises, D'Agostino-Pearson, and Jarque-Bera.`,
+
+      qqplot: `Controls available: (1) Plot type radios (QQ / PP) — QQ plot compares quantiles; PP plot compares cumulative probabilities; (2) Distribution dropdown (Normal / Exponential / Uniform / Log-Normal / Gamma / Weibull) — the theoretical distribution to compare against. Points close to the diagonal line indicate a good fit. The detrended panel below shows residuals from the line.`,
+
+      confidence: `Controls available: (1) Method radios (Classical / Bootstrap) — classical uses t/chi-squared formulas; bootstrap resamples the data; (2) Parameter radios (Mean / Std Dev / Median / Percentile when bootstrap) — what population parameter to estimate; (3) Confidence level selector (90% / 95% / 99%) plus a fine-grained alpha slider; (4) Bootstrap iterations input — higher = more accurate but slower; (5) Optional finite population size — applies finite population correction.`
+    };
+  },
+
+  /**
+   * Build a view-specific or full-analysis prompt.
+   * Per-view mode produces two-part output: HOW TO USE + RESULTS.
+   * Full-analysis mode produces the five-section structured report.
    */
   _buildStructuredPrompt(view, mode) {
     const d = this._getUnivariateDescriptives();
@@ -2033,60 +2151,76 @@ const StatisticoHeader = {
       skew !== null ? `Skewness = ${f(skew)},  Excess Kurtosis = ${f(kurt)}` : ''
     ].filter(Boolean).join('\n');
 
-    // View-specific supplemental data
-    let extra = '';
-    if (view === 'normality' && window.currentNormalityResults) {
-      const lines = [];
-      Object.entries(window.currentNormalityResults).forEach(([name, r]) => {
-        if (r && r.pValue !== undefined) lines.push(`${name}: p=${f(r.pValue, 4)}, ${r.significant ? 'NON-NORMAL' : 'normal'}`);
-      });
-      if (lines.length) extra = '\nNormality Tests:\n' + lines.join('\n');
-    }
-    if (view === 'outliers' && window.currentOutliersData) {
-      const od = window.currentOutliersData;
-      extra = `\nOutliers detected: ${od.outliers?.length ?? od.count ?? '?'} (method: ${od.method || 'unknown'})`;
-      if (od.bounds) extra += `, bounds: [${f(od.bounds.lower)}, ${f(od.bounds.upper)}]`;
-    }
-    if (view === 'confidence' && window.currentCIResults) {
-      const ci = window.currentCIResults;
-      extra = `\nCI: [${f(ci.lower)}, ${f(ci.upper)}], level = ${ci.level || 95}%, method = ${ci.method || 'unknown'}`;
-      if (ci.estimate !== undefined) extra += `, estimate = ${f(ci.estimate)}`;
-    }
+    // Collect live view state
+    const viewData = this._collectViewData(view);
+    const controlsDoc = this._viewControlsDoc();
 
-    const viewFocus = {
-      histogram:  'distribution shape, symmetry, modality, and what drives the spread',
-      boxplot:    'median, IQR, whisker symmetry, and box plot evidence of skewness',
-      cdf:        'how quickly probability accumulates, any plateaus, and what the CDF reveals',
-      percentile: 'spread across percentile bands and where values concentrate',
-      kernel:     'peaks (modes), tail behaviour, and departure from a normal bell curve',
-      outliers:   'number, severity and practical meaning of the detected outliers',
-      normality:  'overall normality verdict across all tests and downstream implications',
-      qqplot:     'how tightly points follow the reference line and systematic deviations',
-      confidence: 'interval width, precision, and what the bounds imply for the population'
-    };
+    // Serialise live view data for the AI
+    const viewDataLines = Object.entries(viewData)
+      .filter(([, v]) => v !== null && v !== undefined && v !== '')
+      .map(([k, v]) => {
+        if (typeof v === 'object') {
+          // normality tests object
+          return Object.entries(v).filter(([, r]) => r?.pValue !== undefined)
+            .map(([name, r]) => `  ${name}: p=${f(r.pValue, 4)}, ${r.significant ? 'NON-NORMAL' : 'normal'}`)
+            .join('\n');
+        }
+        return `  ${k}: ${v}`;
+      })
+      .join('\n');
 
-    const systemMsg = mode === 'full'
-      ? 'You are a senior statistician writing a full-variable diagnostic report.'
-      : `You are a senior statistician explaining the ${view} analysis of one variable.`;
+    if (mode === 'full') {
+      const viewFocus = {
+        histogram:'distribution shape', boxplot:'spread and outliers via box plot',
+        cdf:'cumulative probability', percentile:'percentile structure',
+        kernel:'kernel density peaks and tails', outliers:'outlier count and severity',
+        normality:'normality test results', qqplot:'distributional fit from QQ/PP',
+        confidence:'confidence interval width and precision'
+      };
+      return `You are a senior statistician writing a full-variable diagnostic report.
 
-    const taskMsg = mode === 'full'
-      ? `Write a full-variable diagnostic report integrating ALL available statistics. Focus on: ${Object.values(viewFocus).join('; ')}.`
-      : `Interpret the ${viewFocus[view] || view} using the statistics below.`;
+DESCRIPTIVE STATISTICS:
+${statsBlock}
 
-    return `${systemMsg}
+TASK: Write a full-variable diagnostic report integrating ALL available statistics. Cover: ${Object.values(viewFocus).join('; ')}.
 
-STATISTICS:
-${statsBlock}${extra}
-
-TASK: ${taskMsg}
-
-Reply ONLY in this exact format (no extra text, no markdown, no headers outside the labels):
-
+Reply ONLY in this exact format:
 CONCLUSION: [One decisive sentence — the single most important finding, use exact numbers]
-EVIDENCE: [fact 1 with number and arrow interpretation] | [fact 2] | [fact 3] | [fact 4 if relevant]
-INTERPRETATION: [2–3 sentences — what the pattern means for the data, no hedging words like "likely" or "may"]
-IMPLICATIONS: [implication 1] | [implication 2] | [implication 3 if relevant]
-ACTION: [action 1] | [action 2] | [action 3 if relevant]`;
+EVIDENCE: [fact 1 with number and arrow] | [fact 2] | [fact 3] | [fact 4]
+INTERPRETATION: [2–3 sentences, no hedging, use exact numbers]
+IMPLICATIONS: [implication 1] | [implication 2] | [implication 3]
+ACTION: [action 1] | [action 2] | [action 3]`;
+    }
+
+    // Per-view: two-part output
+    const viewName = { histogram:'Histogram', boxplot:'Box Plot', cdf:'Cumulative Distribution Function',
+      percentile:'Percentile Calculator', kernel:'Kernel Density Estimation', outliers:'Outlier Detection',
+      normality:'Normality Tests', qqplot:'QQ / PP Plot', confidence:'Confidence Intervals' }[view] || view;
+
+    return `You are a senior statistician embedded in a univariate analysis tool. The user is looking at the ${viewName} view.
+
+CONTROLS FOR THIS VIEW:
+${controlsDoc[view] || 'No specific controls documented.'}
+
+CURRENT VIEW STATE (live values):
+${viewDataLines || '  (no live values available — use descriptive statistics below)'}
+
+DESCRIPTIVE STATISTICS:
+${statsBlock}
+
+TASK: Produce TWO sections:
+
+1. HOW TO USE: In 2 sentences, explain what this view shows and which slider/control is most impactful for exploring the data. Be specific — name the control and describe the effect.
+
+2. RESULTS INTERPRETATION: Give a precise, decisive interpretation of what the data shows in this view. Use the live view state and descriptive statistics. Be direct — state facts with exact numbers.
+
+Reply ONLY in this exact format (no extra text):
+ABOUT: [2 sentences — what this view reveals + which control to try first and why]
+CONCLUSION: [One decisive sentence with exact numbers]
+EVIDENCE: [fact 1 with number and meaning] | [fact 2] | [fact 3]
+INTERPRETATION: [2 sentences — decisive, no hedging words]
+IMPLICATIONS: [implication 1] | [implication 2]
+ACTION: [action 1] | [action 2]`;
   },
 
   // ── AI API call ──────────────────────────────────────────────────────────
@@ -2143,7 +2277,7 @@ ACTION: [action 1] | [action 2] | [action 3 if relevant]`;
    */
   _parseAiStructured(raw) {
     if (!raw) return null;
-    const sectionKeys = ['CONCLUSION', 'EVIDENCE', 'INTERPRETATION', 'IMPLICATIONS', 'ACTION'];
+    const sectionKeys = ['ABOUT', 'CONCLUSION', 'EVIDENCE', 'INTERPRETATION', 'IMPLICATIONS', 'ACTION'];
     const result = {};
     const lines = raw.split('\n');
     let current = null;
@@ -2203,6 +2337,12 @@ ACTION: [action 1] | [action 2] | [action 3 if relevant]`;
           : `<p>${items}</p>`;
 
       bodyHtml = `
+        ${sections.ABOUT ? `
+        <div class="sb-ai-section sb-ai-section--about">
+          <div class="sb-ai-section-label"><i class="fa-solid fa-circle-info"></i> How to use this view</div>
+          <div class="sb-ai-section-body">${sections.ABOUT}</div>
+        </div>
+        <div class="sb-ai-divider"></div>` : ''}
         ${sections.CONCLUSION ? `
         <div class="sb-ai-section sb-ai-section--conclusion">
           <div class="sb-ai-section-label">Conclusion</div>

@@ -1952,17 +1952,30 @@ const StatisticoHeader = {
   },
 
   /**
-   * Full-analysis AI: synthesises all available diagnostics into one narrative.
+   * Full-analysis AI: sweeps all 9 views via hidden iframes, aggregates their
+   * real computed data, then synthesises into one diagnostic report.
    */
   async _sbAiGlobalInterpret() {
     const btn = document.getElementById('sbAiBtn');
-    if (btn) {
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking…</span>';
-    }
+
+    const setLabel = (html) => {
+      if (btn) btn.innerHTML = html;
+    };
+
+    if (btn) btn.disabled = true;
+    setLabel('<i class="fa-solid fa-spinner fa-spin"></i><span>Loading views…</span>');
+
     try {
-      const prompt = this._buildStructuredPrompt(this.currentView, 'full');
+      // Sweep all views via invisible iframes
+      const allData = await this._collectAllViewsViaIframes((done, total, label) => {
+        setLabel(`<i class="fa-solid fa-spinner fa-spin"></i><span>${done}/${total} — ${label}</span>`);
+      });
+
+      setLabel('<i class="fa-solid fa-brain fa-spin"></i><span>Thinking…</span>');
+
+      const prompt = this._buildStructuredPrompt(this.currentView, 'full', allData);
       if (!prompt) { this._showAiOverlay(null, this.currentView, 'full'); return; }
+
       const raw = await this._callAiForSidebar(prompt);
       const sections = this._parseAiStructured(raw);
       this._showAiOverlay(sections, this.currentView, 'full');
@@ -2105,6 +2118,207 @@ const StatisticoHeader = {
   },
 
   // ── Prompt builders ──────────────────────────────────────────────────────
+
+  /**
+   * Spin a hidden iframe for every non-hypothesis univariate view, wait for
+   * the page to render its results (data loads from localStorage), extract
+   * the key values, then resolve with the aggregated object.
+   *
+   * @param {Function} onProgress  - called with (completed, total, viewLabel)
+   * @returns {Promise<Object>}    - same shape as _collectAllViewsData()
+   */
+  async _collectAllViewsViaIframes(onProgress) {
+    const views = [
+      { id: 'histogram',  url: 'univariate/histogram-standalone.html'     },
+      { id: 'boxplot',    url: 'univariate/boxplot-standalone.html'        },
+      { id: 'cdf',        url: 'univariate/cumulative-distribution.html'   },
+      { id: 'percentile', url: 'univariate/percentile-standalone.html'     },
+      { id: 'kernel',     url: 'univariate/kernel-standalone.html'         },
+      { id: 'outliers',   url: 'univariate/outliers-standalone.html'       },
+      { id: 'normality',  url: 'univariate/normality-standalone.html'      },
+      { id: 'qqplot',     url: 'univariate/qqplot-standalone.html'         },
+      { id: 'confidence', url: 'univariate/confidence-standalone.html'     }
+    ];
+    const labels = {
+      histogram:'Histogram', boxplot:'Box Plot', cdf:'CDF', percentile:'Percentiles',
+      kernel:'Kernel Density', outliers:'Outliers', normality:'Normality Tests',
+      qqplot:'QQ / PP Plots', confidence:'Confidence Intervals'
+    };
+
+    const total = views.length;
+    let done = 0;
+    const allData = {};
+
+    // Run in parallel batches of 3 to keep it fast without hammering the browser
+    const batchSize = 3;
+    for (let i = 0; i < views.length; i += batchSize) {
+      const batch = views.slice(i, i + batchSize);
+      await Promise.all(batch.map(async (view) => {
+        const url = this.resolveDialogUrl(view.url);
+        const data = await this._captureViewDataFromIframe(url, view.id);
+        if (data && Object.keys(data).length) allData[view.id] = data;
+        done++;
+        if (onProgress) onProgress(done, total, labels[view.id] || view.id);
+      }));
+    }
+
+    return allData;
+  },
+
+  /**
+   * Load one view URL in a hidden iframe, wait for results to render,
+   * then extract the data values from its document / window.
+   * Resolves with null on timeout or error.
+   *
+   * @param {string} url
+   * @param {string} viewId
+   * @returns {Promise<Object|null>}
+   */
+  _captureViewDataFromIframe(url, viewId) {
+    return new Promise((resolve) => {
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'position:fixed;left:-99999px;top:-99999px;width:1360px;height:900px;opacity:0;pointer-events:none;';
+      iframe.setAttribute('aria-hidden', 'true');
+      let settled = false;
+
+      const finish = (data) => {
+        if (settled) return;
+        settled = true;
+        try { iframe.remove(); } catch (_) {}
+        resolve(data);
+      };
+
+      const tryExtract = (startedAt) => {
+        try {
+          const doc = iframe.contentDocument;
+          const win = iframe.contentWindow;
+          if (!doc || !win) return finish(null);
+
+          // Wait until the results are visible or the page has had enough time
+          const resultsReady = !!(
+            doc.querySelector('.results-container.show, .main-content, .right-col') &&
+            (doc.querySelector('svg, canvas, .highcharts-root, table') ||
+             (Date.now() - startedAt) > 5000)
+          );
+
+          if (resultsReady || (Date.now() - startedAt) > 9000) {
+            finish(this._extractViewDataFromIframe(doc, win, viewId));
+          } else {
+            setTimeout(() => tryExtract(startedAt), 300);
+          }
+        } catch (_) {
+          finish(null);
+        }
+      };
+
+      iframe.addEventListener('load', () => setTimeout(() => tryExtract(Date.now()), 800), { once: true });
+      setTimeout(() => finish(null), 12000);   // hard cap per view
+
+      iframe.src = url;
+      document.body.appendChild(iframe);
+    });
+  },
+
+  /**
+   * Read DOM elements and window globals from an iframe's document/window.
+   * Mirror of _collectViewData but operates on an external doc/win pair.
+   */
+  _extractViewDataFromIframe(doc, win, viewId) {
+    const txt = (id) => { const e = doc.getElementById(id); return e ? (e.textContent || '').trim() || null : null; };
+    const val = (id) => { const e = doc.getElementById(id); return e ? e.value || null : null; };
+    const d   = {};
+
+    if (viewId === 'histogram') {
+      d.mean      = txt('stat-mean');
+      d.stddev    = txt('stat-stddev');
+      d.skewness  = txt('stat-skewness');
+      d.kurtosis  = txt('stat-kurtosis');
+      d.min       = txt('stat-min');
+      d.q25       = txt('stat-q25');
+      d.median    = txt('stat-median');
+      d.q75       = txt('stat-q75');
+      d.max       = txt('stat-max');
+      d.binMethod = val('binningMethod');
+      d.numBins   = val('numBins');
+      d.remainingN = txt('remainingN');
+      d.showNormalCurve = doc.getElementById('showNormalCurve')?.checked ? 'yes' : 'no';
+    }
+
+    if (viewId === 'kernel') {
+      d.kernelType = val('kernelType');
+      d.bandwidth  = val('bandwidth');
+      d.mean       = txt('statMean');
+      d.stddev     = txt('statStdDev');
+      d.min        = txt('statMin');
+      d.max        = txt('statMax');
+    }
+
+    if (viewId === 'cdf') {
+      d.q1              = txt('q1-value');
+      d.median          = txt('median-value');
+      d.avg             = txt('avg-value');
+      d.q3              = txt('q3-value');
+      d.p95             = txt('p95-value');
+      d.distributionOverlay = val('distribution-select') || 'none';
+    }
+
+    if (viewId === 'percentile') {
+      d.percentileQueried = val('percentile-value') || val('percentile-slider');
+      d.result   = txt('arrow-text');
+      const active = doc.querySelector('.method-option.active, [data-method].active');
+      d.method   = active?.dataset?.method || null;
+    }
+
+    if (viewId === 'normality') {
+      d.passCount = txt('pass-count');
+      d.failCount = txt('fail-count');
+      d.alpha     = txt('significance');
+      if (win.currentNormalityResults) d.tests = win.currentNormalityResults;
+    }
+
+    if (viewId === 'outliers') {
+      d.summary = txt('outlierCount');
+      const mBtn = doc.querySelector('.method-btn.active, button[class*="method"][class*="active"]');
+      d.method  = mBtn?.textContent?.trim() || null;
+      if (win.currentOutliersData) {
+        const od = win.currentOutliersData;
+        d.count       = od.outliers?.length ?? od.count;
+        d.method      = d.method || od.method;
+        if (od.bounds) { d.lowerBound = od.bounds.lower; d.upperBound = od.bounds.upper; }
+      }
+    }
+
+    if (viewId === 'confidence') {
+      d.lcl            = txt('stat-lcl');
+      d.ucl            = txt('stat-ucl');
+      d.center         = txt('stat-center');
+      d.confidenceLevel = txt('stat-confidence');
+      d.method         = txt('stat-method');
+      d.pointEstimate  = txt('point-estimate');
+      d.marginError    = txt('margin-error');
+      if (win.currentCIResults) {
+        const ci = win.currentCIResults;
+        d.lcl    = d.lcl    || String(ci.lower);
+        d.ucl    = d.ucl    || String(ci.upper);
+        d.level  = ci.level;
+        d.method = d.method || ci.method;
+        d.estimate = ci.estimate;
+      }
+    }
+
+    if (viewId === 'qqplot') {
+      const qqRadio = doc.querySelector('input[name="plotType"]:checked');
+      d.plotType    = qqRadio?.value || 'qq';
+      d.distribution = val('distributionSelect');
+    }
+
+    if (viewId === 'boxplot') {
+      d.footerNote = txt('boxplot-footer');
+    }
+
+    // Return null if nothing was captured (page didn't load results)
+    return Object.values(d).some((v) => v !== null && v !== undefined) ? d : null;
+  },
 
   /**
    * Collect results from ALL views that have been computed this session.
@@ -2346,7 +2560,7 @@ const StatisticoHeader = {
    * Per-view mode produces two-part output: HOW TO USE + RESULTS.
    * Full-analysis mode produces the five-section structured report.
    */
-  _buildStructuredPrompt(view, mode) {
+  _buildStructuredPrompt(view, mode, preCollectedData = null) {
     const d = this._getUnivariateDescriptives();
     if (!d) return null;
 
@@ -2379,8 +2593,8 @@ const StatisticoHeader = {
       .join('\n');
 
     if (mode === 'full') {
-      // Collect everything available across ALL views
-      const allData = this._collectAllViewsData();
+      // Use iframe-swept data if provided, otherwise fall back to live DOM scan
+      const allData = preCollectedData || this._collectAllViewsData();
       const allDataBlock = this._formatAllViewsData(allData, f);
 
       return `You are a senior statistician writing a full-variable diagnostic report that synthesises ALL available analysis results.

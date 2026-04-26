@@ -261,7 +261,7 @@ const NAV_STYLE = `
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(255,165,120,0.32);
+  color: rgba(255,165,120,0.18);
   line-height: 1;
   user-select: none;
   pointer-events: none;
@@ -324,12 +324,12 @@ const NAV_STYLE = `
 
 /* Home: minimal weight */
 .nav-link[data-page="home"] {
-  opacity: 0.6;
+  opacity: 0.35;
   font-weight: 400;
   font-size: 0.85rem;
 }
 
-.nav-link[data-page="home"]:hover { opacity: 1; }
+.nav-link[data-page="home"]:hover { opacity: 0.75; }
 
 /* Hidden items (About, Contact) — kept in DOM for link wiring */
 .nav-item--hidden {
@@ -380,9 +380,10 @@ const NAV_STYLE = `
 }
 
 .nav-link.active {
-  background: rgba(255,165,120,0.10);
-  color: rgba(255,215,195,1);
-  box-shadow: none;
+  background: rgba(120,200,255,0.14);
+  color: rgba(200,238,255,1);
+  border: 1px solid rgba(120,200,255,0.22);
+  box-shadow: 0 0 10px rgba(120,200,255,0.1);
 }
 
 .nav-link.active::before {
@@ -433,10 +434,10 @@ const NAV_STYLE = `
 }
 
 :root[data-theme="light"] .nav-link.active {
-  background: rgba(37,99,235,0.08);
+  background: rgba(37,99,235,0.10);
   color: rgba(30,58,138,0.95);
-  border-color: rgba(37,99,235,0.22);
-  box-shadow: none;
+  border-color: rgba(37,99,235,0.24);
+  box-shadow: 0 0 10px rgba(37,99,235,0.08);
 }
 
 .nav-link--product {

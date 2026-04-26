@@ -31,7 +31,37 @@ const NAV_TEMPLATE = `
           Home
         </a>
       </li>
-      <li class="nav-item">
+
+      <!-- Products group with "Statistico Suite" label above -->
+      <li class="nav-item nav-item--products-group">
+        <span class="nav-products-label">Statistico Suite</span>
+        <div class="nav-products-row">
+          <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="2" y="2" width="12" height="12" rx="2"/>
+              <line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/>
+              <line x1="5" y1="11" x2="8" y2="11"/>
+            </svg>
+            Calculators
+          </a>
+          <a href="javascript:void(0)" class="nav-link nav-link--product-core" data-page="analytics" id="link-analytics">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="1,12 5,7 8,10 11,5 15,3"/>
+            </svg>
+            Analytics
+          </a>
+          <a href="javascript:void(0)" class="nav-link nav-link--product-lite" data-page="addins" id="link-addins">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="1" width="10" height="14" rx="1.5"/>
+              <line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/>
+              <line x1="6" y1="11" x2="8.5" y2="11"/>
+            </svg>
+            Applications
+          </a>
+        </div>
+      </li>
+
+      <li class="nav-item nav-item--sep-left">
         <a href="javascript:void(0)" class="nav-link" data-page="why" id="link-why">
           Why Statistico?
         </a>
@@ -46,43 +76,13 @@ const NAV_TEMPLATE = `
           FAQ
         </a>
       </li>
-      <li class="nav-item nav-item--product-start">
-        <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators">
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="2" y="2" width="12" height="12" rx="2"/>
-            <line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/>
-            <line x1="5" y1="11" x2="8" y2="11"/>
-          </svg>
-          Calculators
-        </a>
+
+      <!-- Hidden from main nav; kept for routing/footer -->
+      <li class="nav-item nav-item--hidden" aria-hidden="true">
+        <a href="javascript:void(0)" class="nav-link" data-page="about" id="link-about" tabindex="-1">About Us</a>
       </li>
-      <li class="nav-item">
-        <a href="javascript:void(0)" class="nav-link nav-link--product-core" data-page="analytics" id="link-analytics">
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <polyline points="1,12 5,7 8,10 11,5 15,3"/>
-          </svg>
-          Analytics
-        </a>
-      </li>
-      <li class="nav-item">
-        <a href="javascript:void(0)" class="nav-link nav-link--product-lite" data-page="addins" id="link-addins">
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="3" y="1" width="10" height="14" rx="1.5"/>
-            <line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/>
-            <line x1="6" y1="11" x2="8.5" y2="11"/>
-          </svg>
-          Applications
-        </a>
-      </li>
-      <li class="nav-item nav-item--after-products">
-        <a href="javascript:void(0)" class="nav-link" data-page="about" id="link-about">
-          About Us
-        </a>
-      </li>
-      <li class="nav-item">
-        <a href="javascript:void(0)" class="nav-link" data-page="contact" id="link-contact">
-          Contact
-        </a>
+      <li class="nav-item nav-item--hidden" aria-hidden="true">
+        <a href="javascript:void(0)" class="nav-link" data-page="contact" id="link-contact" tabindex="-1">Contact</a>
       </li>
     </ul>
 
@@ -229,6 +229,78 @@ const NAV_STYLE = `
   opacity: 1;
   box-shadow: 0 0 10px rgba(120,200,255,0.22);
   pointer-events: none;
+}
+
+/* ── Products group with label ── */
+.nav-item--products-group {
+  margin-left: 12px;
+  padding-left: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  position: relative;
+}
+
+.nav-item--products-group::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 38px;
+  background: linear-gradient(180deg, rgba(160,220,255,0.58), rgba(255,182,140,0.72));
+  box-shadow: 0 0 10px rgba(120,200,255,0.22);
+  pointer-events: none;
+}
+
+.nav-products-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(255,165,120,0.5);
+  line-height: 1;
+  user-select: none;
+  pointer-events: none;
+}
+
+.nav-products-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.nav-products-row .nav-link {
+  min-height: 34px;
+  padding: 5px 10px;
+  font-size: 0.83rem;
+}
+
+/* Separator before "Why Statistico?" */
+.nav-item--sep-left {
+  margin-left: 12px;
+  padding-left: 12px;
+  position: relative;
+}
+
+.nav-item--sep-left::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 32px;
+  background: linear-gradient(180deg, rgba(160,220,255,0.58), rgba(255,182,140,0.72));
+  box-shadow: 0 0 10px rgba(120,200,255,0.22);
+  pointer-events: none;
+}
+
+/* Hidden items (About, Contact) — kept in DOM for link wiring */
+.nav-item--hidden {
+  display: none !important;
 }
 
 .nav-link {
@@ -818,6 +890,37 @@ footer#contact .footer-bottom {
   .nav-item--after-products::before {
     display: none;
   }
+
+  .nav-item--products-group {
+    margin-left: 0;
+    padding-left: 0;
+    width: 100%;
+  }
+
+  .nav-item--products-group::before { display: none; }
+
+  .nav-products-label { display: none; }
+
+  .nav-products-row {
+    flex-direction: column;
+    width: 100%;
+    gap: 4px;
+  }
+
+  .nav-products-row .nav-link {
+    width: 100%;
+    min-height: 44px;
+    padding: 12px 16px;
+    font-size: 0.95rem;
+    justify-content: center;
+  }
+
+  .nav-item--sep-left {
+    margin-left: 0;
+    padding-left: 0;
+  }
+
+  .nav-item--sep-left::before { display: none; }
 
   .nav-link {
     width: 100%;

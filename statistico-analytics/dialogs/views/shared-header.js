@@ -1808,7 +1808,7 @@ const StatisticoHeader = {
 
             if (fmt === 'pdf') {
               // Open in new tab then trigger browser print-to-PDF
-              const win = window.open('', '_blank');
+              const win = window.open('about:blank', '_blank');
               if (win) {
                 win.document.open();
                 win.document.write(html);
@@ -1823,10 +1823,15 @@ const StatisticoHeader = {
             } else {
               // HTML (default)
               if (openAfter) {
-                const blob = new Blob([html], { type: 'text/html' });
-                const blobUrl = URL.createObjectURL(blob);
-                window.open(blobUrl, '_blank');
-                setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+                const win = window.open('about:blank', '_blank');
+                if (win) {
+                  win.document.open();
+                  win.document.write(html);
+                  win.document.close();
+                } else {
+                  // Popup blocked — fall back to download
+                  downloadBlob(new Blob([html], { type: 'text/html' }), `${fileName}.html`);
+                }
               } else {
                 downloadBlob(new Blob([html], { type: 'text/html' }), `${fileName}.html`);
               }

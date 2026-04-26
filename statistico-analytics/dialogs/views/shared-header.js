@@ -1512,75 +1512,24 @@ const StatisticoHeader = {
 
       overlay.innerHTML = `
         <div style="width:min(560px,95vw);max-height:88vh;background:#fff;border-radius:14px;border:1px solid #cbd5e1;box-shadow:0 16px 40px rgba(15,23,42,.32);display:flex;flex-direction:column;overflow:hidden;">
-
-          <!-- Header -->
           <div style="padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;">
             <i class="fa-solid fa-file-export" style="color:#f97316;font-size:16px;"></i>
             <span style="font-size:15px;font-weight:700;color:#0f172a;">Export Report</span>
           </div>
-
-          <!-- Format pills -->
-          <div style="padding:14px 18px 10px;border-bottom:1px solid #f1f5f9;">
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:8px;">Format</div>
-            <div id="stFormatPills" style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button data-fmt="html"  style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;border:2px solid #f97316;background:#fff7ed;color:#c2410c;font-size:13px;font-weight:600;cursor:pointer;">
-                <i class="fa-solid fa-file-code"></i> HTML
-              </button>
-              <button data-fmt="pdf"   style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;border:2px solid transparent;background:#f1f5f9;color:#475569;font-size:13px;font-weight:600;cursor:pointer;">
-                <i class="fa-solid fa-file-pdf"></i> PDF
-              </button>
-              <button data-fmt="word"  style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;border:2px solid transparent;background:#f1f5f9;color:#475569;font-size:13px;font-weight:600;cursor:pointer;">
-                <i class="fa-solid fa-file-word"></i> Word
-              </button>
-              <button data-fmt="ppt"   style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;border:2px solid transparent;background:#f1f5f9;color:#94a3b8;font-size:13px;font-weight:600;cursor:not-allowed;opacity:.55;" disabled title="PowerPoint export — coming soon">
-                <i class="fa-solid fa-file-powerpoint"></i> PPT <span style="font-size:10px;background:#e2e8f0;border-radius:4px;padding:1px 5px;margin-left:2px;">Soon</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Sections list -->
           <div style="padding:10px 18px 4px;">
             <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:6px;">Sections to include</div>
           </div>
           <div style="padding:0 18px 8px;overflow-y:auto;flex:1;">${sectionListHtml}</div>
-
-          <!-- Footer -->
-          <div style="padding:12px 18px;border-top:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-            <label id="stOpenAfterExportLabel" style="display:flex;align-items:center;gap:7px;font-size:13px;color:#475569;cursor:pointer;user-select:none;">
-              <input type="checkbox" id="stOpenAfterExport" style="accent-color:#f97316;cursor:pointer;" />
-              Open after export
-            </label>
-            <div style="display:flex;gap:8px;">
-              <button id="stReportCancelBtn" style="padding:8px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;">Cancel</button>
-              <button id="stReportExportBtn" style="padding:8px 16px;border:1px solid #f97316;border-radius:8px;background:#f97316;color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
-                <i class="fa-solid fa-file-export"></i> Export
-              </button>
-            </div>
+          <div style="padding:12px 18px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px;">
+            <button id="stReportCancelBtn" style="padding:8px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;">Cancel</button>
+            <button id="stReportExportBtn" style="padding:8px 16px;border:1px solid #f97316;border-radius:8px;background:#f97316;color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
+              <i class="fa-solid fa-file-export"></i> Export HTML
+            </button>
           </div>
         </div>
       `;
 
       document.body.appendChild(overlay);
-
-      // Format pill selection
-      let selectedFmt = 'html';
-      const pills = overlay.querySelectorAll('#stFormatPills button[data-fmt]');
-      const selectFmt = (fmt) => {
-        selectedFmt = fmt;
-        pills.forEach((p) => {
-          const active = p.getAttribute('data-fmt') === fmt;
-          p.style.border        = active ? '2px solid #f97316' : '2px solid transparent';
-          p.style.background    = active ? '#fff7ed' : '#f1f5f9';
-          p.style.color         = active ? '#c2410c' : (p.disabled ? '#94a3b8' : '#475569');
-        });
-        // PDF doesn't need "open after export" (browser print dialog handles it)
-        const openLabel = overlay.querySelector('#stOpenAfterExportLabel');
-        if (openLabel) openLabel.style.display = fmt === 'pdf' ? 'none' : 'flex';
-      };
-      pills.forEach((p) => {
-        if (!p.disabled) p.addEventListener('click', () => selectFmt(p.getAttribute('data-fmt')));
-      });
-
       const close = () => overlay.remove();
       overlay.querySelector('#stReportCancelBtn').addEventListener('click', close);
       overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
@@ -1588,9 +1537,8 @@ const StatisticoHeader = {
         const checked = Array.from(overlay.querySelectorAll('input[data-section-id]:checked'))
                              .map((el) => el.getAttribute('data-section-id'));
         if (!checked.length) return;
-        const openAfter = overlay.querySelector('#stOpenAfterExport')?.checked ?? false;
         close();
-        onConfirm(checked, selectedFmt, openAfter);
+        onConfirm(checked);
       });
     };
 
@@ -1724,7 +1672,7 @@ const StatisticoHeader = {
           alert('No report sections available from the current menu.');
           return;
         }
-        pickReportSections(sections, (selectedIds, fmt, openAfter) => {
+        pickReportSections(sections, (selectedIds) => {
           const selected = sections.filter((s) => selectedIds.includes(String(s.id)));
           const escapedVar = esc(data.headers[0]);
           const toc = selected.map((s, i) => `<li><a href="#sec_${i + 1}">${esc(s.label)}</a></li>`).join('');
@@ -1809,68 +1757,10 @@ const StatisticoHeader = {
             const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapedVar} - Long Report</title><style>${reportCss}</style></head><body>${reportBody}</body></html>`;
 
             closeProgress();
-
-            const fileName = `Univariate_Report_${safeName(data.headers[0])}_${timestamp()}`;
-
-            // ── Helper: open HTML in the system's default browser ────────────
-            const openInExternalBrowser = (htmlContent) => {
-              try {
-                if (typeof Office !== 'undefined' && Office.context && Office.context.ui &&
-                    typeof Office.context.ui.openBrowserWindow === 'function') {
-                  // Encode as data URI so no hosting is needed
-                  const dataUri = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent);
-                  Office.context.ui.openBrowserWindow(dataUri);
-                  return true;
-                }
-              } catch (_) {}
-              return false;
-            };
-
-            // ── Helper: show report in a full-screen in-page overlay ─────────
-            const openInPageViewer = (htmlContent, title) => {
-              const existing = document.getElementById('stReportViewerOverlay');
-              if (existing) existing.remove();
-              const viewer = document.createElement('div');
-              viewer.id = 'stReportViewerOverlay';
-              viewer.style.cssText = 'position:fixed;inset:0;z-index:2147483500;background:#0f172a;display:flex;flex-direction:column;';
-              viewer.innerHTML = `
-                <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;background:#1e293b;border-bottom:1px solid rgba(148,163,184,.2);flex-shrink:0;">
-                  <span style="color:#e2e8f0;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;">
-                    <i class="fa-solid fa-file-lines" style="color:#f97316;"></i> ${esc(title)}
-                  </span>
-                  <div style="display:flex;gap:8px;">
-                    <button id="stViewerPrintBtn" style="padding:5px 12px;border-radius:6px;border:1px solid rgba(148,163,184,.3);background:transparent;color:#94a3b8;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;">
-                      <i class="fa-solid fa-print"></i> Print / PDF
-                    </button>
-                    <button id="stViewerCloseBtn" style="padding:5px 12px;border-radius:6px;border:1px solid rgba(148,163,184,.3);background:transparent;color:#94a3b8;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;">
-                      <i class="fa-solid fa-xmark"></i> Close
-                    </button>
-                  </div>
-                </div>
-                <iframe id="stReportViewerFrame" style="flex:1;border:none;background:#fff;"></iframe>
-              `;
-              document.body.appendChild(viewer);
-              viewer.querySelector('#stReportViewerFrame').srcdoc = htmlContent;
-              viewer.querySelector('#stViewerCloseBtn').addEventListener('click', () => viewer.remove());
-              viewer.querySelector('#stViewerPrintBtn').addEventListener('click', () => {
-                try { viewer.querySelector('#stReportViewerFrame').contentWindow.print(); } catch (_) {}
-              });
-            };
-            // ─────────────────────────────────────────────────────────────────
-
-            if (fmt === 'pdf') {
-              if (!openInExternalBrowser(html)) openInPageViewer(html, `${data.headers[0]} — Long Report`);
-            } else if (fmt === 'word') {
-              const wordHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${escapedVar} - Long Report</title><style>${reportCss}@page{size:A4;margin:2cm}</style></head><body>${reportBody}</body></html>`;
-              downloadBlob(new Blob([wordHtml], { type: 'application/msword' }), `${fileName}.doc`);
-            } else {
-              // HTML (default)
-              if (openAfter) {
-                if (!openInExternalBrowser(html)) openInPageViewer(html, `${data.headers[0]} — Long Report`);
-              } else {
-                downloadBlob(new Blob([html], { type: 'text/html' }), `${fileName}.html`);
-              }
-            }
+            downloadBlob(
+              new Blob([html], { type: 'text/html' }),
+              `Univariate_Report_${safeName(data.headers[0])}_${timestamp()}.html`
+            );
           })().catch(() => closeProgress());
         });
       }

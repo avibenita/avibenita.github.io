@@ -1262,31 +1262,34 @@ const StatisticoHeader = {
 
     const getFallbackData = () => {
       try {
+        // Prefer live in-memory globals over potentially stale localStorage
+        const liveValues = coerceNumericVector(
+          window.currentDataArray ||
+          window.originalData ||
+          window.currentData ||
+          window.data ||
+          []
+        );
+
         let parsed = null;
-        try {
-          const raw = localStorage.getItem('univariateResults');
-          if (raw) parsed = JSON.parse(raw);
-        } catch (e) {}
-        if (!parsed) {
+        if (!liveValues.length) {
+          // No live data — fall back to storage
           try {
-            const rawSession = sessionStorage.getItem('univariateResults');
-            if (rawSession) parsed = JSON.parse(rawSession);
+            const raw = localStorage.getItem('univariateResults');
+            if (raw) parsed = JSON.parse(raw);
           } catch (e) {}
-        }
-        if (!parsed && window.__statisticoLastUnivariateData && typeof window.__statisticoLastUnivariateData === 'object') {
-          parsed = window.__statisticoLastUnivariateData;
+          if (!parsed) {
+            try {
+              const rawSession = sessionStorage.getItem('univariateResults');
+              if (rawSession) parsed = JSON.parse(rawSession);
+            } catch (e) {}
+          }
+          if (!parsed && window.__statisticoLastUnivariateData && typeof window.__statisticoLastUnivariateData === 'object') {
+            parsed = window.__statisticoLastUnivariateData;
+          }
         }
 
-        let values = pickValues(parsed || {});
-        if (!values.length) {
-          values = coerceNumericVector(
-            window.currentDataArray ||
-            window.originalData ||
-            window.currentData ||
-            window.data ||
-            []
-          );
-        }
+        let values = liveValues.length ? liveValues : pickValues(parsed || {});
         if (!values.length) return null;
 
         const varName =
@@ -1649,6 +1652,9 @@ const StatisticoHeader = {
           (async () => {
             const total = selected.length;
             const snapshotResults = [];
+
+            // Ensure every iframe sees the current session's live data
+            this._syncLiveDataToStorage();
             for (let i = 0; i < total; i += 1) {
               const s = selected[i];
               setProgress(i, total, `Capturing: ${esc(s.label)}…`);
@@ -2117,6 +2123,55 @@ const StatisticoHeader = {
     return d;
   },
 
+  /**
+   * Write the current page's live in-memory data to localStorage so that
+   * any iframe spawned for export or AI analysis picks up the correct data
+   * rather than a stale or sample-data fallback.
+   *
+   * Priority: live window globals → DOM stat cells → existing localStorage.
+   * If nothing is found, localStorage is left unchanged.
+   */
+  _syncLiveDataToStorage() {
+    try {
+      // 1. Try live in-memory arrays (set by individual view pages after data loads)
+      const coerce = (arr) => {
+        if (!Array.isArray(arr)) return [];
+        const src = Array.isArray(arr[0]) ? arr.map((r) => (Array.isArray(r) ? r[0] : r)) : arr;
+        return src.map((v) => (v === null || v === undefined || v === '' ? null : Number(v)))
+                  .filter((v) => v === null || Number.isFinite(v));
+      };
+
+      const liveValues = coerce(
+        window.currentDataArray || window.originalData || window.currentData || window.data || []
+      ).filter((v) => v !== null && Number.isFinite(v));
+
+      if (!liveValues.length) return;   // nothing to write — leave storage as-is
+
+      // 2. Get variable name from the header or page globals
+      const varName = this.variableName ||
+        document.getElementById('headerVariableName')?.textContent?.trim() ||
+        window.currentVariableName || 'Variable';
+
+      // 3. Merge into existing stored object so we don't lose keys other views need
+      let existing = {};
+      try { const r = localStorage.getItem('univariateResults'); if (r) existing = JSON.parse(r); } catch (_) {}
+
+      const fresh = {
+        ...existing,
+        values:       liveValues,
+        rawData:      liveValues,
+        data:         liveValues,
+        variableName: varName,
+        column:       varName,
+        colName:      varName,
+        _syncedAt:    Date.now()
+      };
+
+      localStorage.setItem('univariateResults', JSON.stringify(fresh));
+      try { sessionStorage.setItem('univariateResults', JSON.stringify(fresh)); } catch (_) {}
+    } catch (_) {}
+  },
+
   // ── Prompt builders ──────────────────────────────────────────────────────
 
   /**
@@ -2148,6 +2203,9 @@ const StatisticoHeader = {
     const total = views.length;
     let done = 0;
     const allData = {};
+
+    // Ensure iframes see the current session's data, not a stale fallback
+    this._syncLiveDataToStorage();
 
     // Run in parallel batches of 3 to keep it fast without hammering the browser
     const batchSize = 3;

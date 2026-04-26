@@ -844,6 +844,107 @@ body {
   margin-bottom: 16px !important;
 }
 
+/* ===== Light-mode page content overrides (global, applied to all pages) ===== */
+
+/* Hero section backgrounds */
+:root[data-theme="light"] .hiw-hero,
+:root[data-theme="light"] .faq-hero {
+  background:
+    radial-gradient(ellipse at 15% 0%,  rgba(255,165,120,.18), transparent 40%),
+    radial-gradient(ellipse at 85% 95%, rgba(120,200,255,.14), transparent 40%),
+    linear-gradient(180deg, #eef5ff 0%, #e4effe 60%, #dae8fc 100%) !important;
+}
+
+:root[data-theme="light"] .about-hero {
+  background:
+    radial-gradient(ellipse at 16% 0%,  rgba(255,165,120,.18), transparent 40%),
+    radial-gradient(ellipse at 84% 95%, rgba(120,200,255,.14), transparent 40%),
+    linear-gradient(180deg, #eef5ff 0%, #e4effe 60%, #dae8fc 100%) !important;
+}
+
+/* Page hero h1 (hardcoded white in dark mode) */
+:root[data-theme="light"] .hiw-hero h1,
+:root[data-theme="light"] .about-hero h1 {
+  color: #0f172a !important;
+  text-shadow: none !important;
+}
+
+/* Page hero subtitle / body text */
+:root[data-theme="light"] .hiw-hero-sub {
+  color: rgba(15,23,42,.75) !important;
+}
+
+:root[data-theme="light"] .about-hero p {
+  color: rgba(15,23,42,.72) !important;
+}
+
+/* Hero badges / kickers */
+:root[data-theme="light"] .hiw-hero .page-kicker,
+:root[data-theme="light"] .faq-hero .page-kicker,
+:root[data-theme="light"] .about-hero .page-kicker {
+  background: rgba(37,99,235,.07);
+  border-color: rgba(37,99,235,.24);
+  color: rgba(37,99,235,.88);
+}
+
+:root[data-theme="light"] .hiw-badge {
+  background: linear-gradient(135deg, rgba(255,165,120,.14), rgba(120,200,255,.1));
+  border-color: rgba(180,83,9,.3);
+  color: rgba(146,64,14,.9);
+}
+
+/* Sticky progress nav (how-it-works) */
+:root[data-theme="light"] .hiw-progress-wrap {
+  background: linear-gradient(180deg, rgba(238,245,255,.97), rgba(228,240,255,.93)) !important;
+  border-bottom-color: rgba(15,23,42,.1);
+}
+
+:root[data-theme="light"] .hiw-progress-step {
+  color: rgba(15,23,42,.52);
+}
+
+:root[data-theme="light"] .hiw-progress-step:hover {
+  color: rgba(15,23,42,.86);
+}
+
+:root[data-theme="light"] .hiw-progress-step.is-active {
+  color: rgba(37,99,235,.92) !important;
+}
+
+:root[data-theme="light"] .hiw-progress-dot {
+  background: rgba(15,23,42,.11);
+  border-color: rgba(15,23,42,.10);
+  box-shadow: inset 0 0 0 2px rgba(238,245,255,.9);
+}
+
+:root[data-theme="light"] .hiw-progress-step.is-active .hiw-progress-dot {
+  background: linear-gradient(135deg, rgba(255,140,80,.9), rgba(37,99,235,.85));
+  border-color: rgba(37,99,235,.35);
+  box-shadow: 0 0 0 4px rgba(37,99,235,.08), 0 0 12px rgba(37,99,235,.15);
+}
+
+/* how-it-works slide modal */
+:root[data-theme="light"] .hiw-modal-panel {
+  background: linear-gradient(160deg, #f8fbff, #eef5ff) !important;
+  border-color: rgba(37,99,235,.2);
+}
+
+/* FAQ search bar */
+:root[data-theme="light"] .faq-search-wrap {
+  background: rgba(255,255,255,.88);
+  border-color: rgba(15,23,42,.16);
+}
+
+:root[data-theme="light"] .faq-search-wrap:focus-within {
+  background: rgba(255,255,255,.97);
+  border-color: rgba(37,99,235,.38);
+}
+
+/* FAQ accordion hover border */
+:root[data-theme="light"] .faq-item:hover {
+  border-color: rgba(15,23,42,.18) !important;
+}
+
 /* Shared footer styles for all pages */
 footer#contact {
   background: var(--site-surface-1, #1a1f2e);

@@ -22,7 +22,7 @@ const NAV_TEMPLATE = `
 <nav class="sticky-nav" id="stickyNav">
   <div class="nav-container">
     <a href="javascript:void(0)" class="nav-logo" id="nav-logo-link">
-      <span class="goldish">Statistico<span class="brand-tm">™</span><span class="brand-sub">Interactive</span></span>
+      <span class="goldish">Statistico™-Interactive</span>
     </a>
 
     <ul class="nav-menu" id="navMenu">

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Navigation Template - Inline approach (no fetch required)
  */
 
@@ -32,9 +32,9 @@ const NAV_TEMPLATE = `
         </a>
       </li>
 
-      <!-- Products group with "Statistico Suite" label above -->
+      <!-- Products group with "Statistico™-Interactive Suite" label above -->
       <li class="nav-item nav-item--products-group">
-        <span class="nav-products-label">Statistico Suite</span>
+        <span class="nav-products-label">Statistico™-Interactive Suite</span>
         <div class="nav-products-row">
           <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -63,7 +63,7 @@ const NAV_TEMPLATE = `
 
       <li class="nav-item nav-item--sep-left">
         <a href="javascript:void(0)" class="nav-link" data-page="why" id="link-why">
-          Why Statistico?
+          Why Statistico™-Interactive?
         </a>
       </li>
       <li class="nav-item">
@@ -278,7 +278,7 @@ const NAV_STYLE = `
   font-size: 0.83rem;
 }
 
-/* Separator before "Why Statistico?" */
+/* Separator before "Why Statistico™-Interactive?" */
 .nav-item--sep-left {
   margin-left: 12px;
   padding-left: 12px;
@@ -1014,7 +1014,7 @@ const FOOTER_TEMPLATE = `
         <a href="javascript:void(0)" id="footer-link-terms">Terms & Conditions</a>
       </div>
     </div>
-    <div class="footer-bottom">© 2026 Statistico™ Interactive Suite. Revolutionizing statistical computing, one analysis at a time.</div>
+    <div class="footer-bottom">© 2026 Statistico™-Interactive Suite. Revolutionizing statistical computing, one analysis at a time.</div>
   </div>
 </footer>
 `;

@@ -1,5 +1,5 @@
 /**
- * Statistico™ Component Loader
+ * Statistico™-Interactive Component Loader
  * Loads shared navigation and footer components
  */
 

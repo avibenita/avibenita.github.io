@@ -1312,6 +1312,12 @@ const StatisticoHeader = {
     };
 
     const downloadBlob = (blob, filename) => {
+      // msSaveOrOpenBlob works in WebView2 / Office Add-in without triggering
+      // the "open this blob link" dialog that URL.createObjectURL causes
+      if (typeof window.navigator !== 'undefined' && typeof window.navigator.msSaveOrOpenBlob === 'function') {
+        window.navigator.msSaveOrOpenBlob(blob, filename);
+        return;
+      }
       const url = URL.createObjectURL(blob);
       const a = Object.assign(document.createElement('a'), { href: url, download: filename });
       document.body.appendChild(a);
@@ -1806,6 +1812,20 @@ const StatisticoHeader = {
 
             const fileName = `Univariate_Report_${safeName(data.headers[0])}_${timestamp()}`;
 
+            // ── Helper: open HTML in the system's default browser ────────────
+            const openInExternalBrowser = (htmlContent) => {
+              try {
+                if (typeof Office !== 'undefined' && Office.context && Office.context.ui &&
+                    typeof Office.context.ui.openBrowserWindow === 'function') {
+                  // Encode as data URI so no hosting is needed
+                  const dataUri = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent);
+                  Office.context.ui.openBrowserWindow(dataUri);
+                  return true;
+                }
+              } catch (_) {}
+              return false;
+            };
+
             // ── Helper: show report in a full-screen in-page overlay ─────────
             const openInPageViewer = (htmlContent, title) => {
               const existing = document.getElementById('stReportViewerOverlay');
@@ -1827,34 +1847,26 @@ const StatisticoHeader = {
                     </button>
                   </div>
                 </div>
-                <iframe id="stReportViewerFrame" style="flex:1;border:none;background:#fff;" srcdoc=""></iframe>
+                <iframe id="stReportViewerFrame" style="flex:1;border:none;background:#fff;"></iframe>
               `;
               document.body.appendChild(viewer);
-              // Set srcdoc after append to avoid encoding issues with very large HTML
               viewer.querySelector('#stReportViewerFrame').srcdoc = htmlContent;
               viewer.querySelector('#stViewerCloseBtn').addEventListener('click', () => viewer.remove());
               viewer.querySelector('#stViewerPrintBtn').addEventListener('click', () => {
-                const frame = viewer.querySelector('#stReportViewerFrame');
-                try { frame.contentWindow.print(); } catch (_) {
-                  // Fallback: open about:blank and print from there
-                  const pw = window.open('about:blank', '_blank');
-                  if (pw) { pw.document.open(); pw.document.write(htmlContent); pw.document.close(); setTimeout(() => pw.print(), 400); }
-                }
+                try { viewer.querySelector('#stReportViewerFrame').contentWindow.print(); } catch (_) {}
               });
             };
             // ─────────────────────────────────────────────────────────────────
 
             if (fmt === 'pdf') {
-              // Show in-page viewer; user prints to PDF from the Print button
-              openInPageViewer(html, `${data.headers[0]} — Long Report`);
+              if (!openInExternalBrowser(html)) openInPageViewer(html, `${data.headers[0]} — Long Report`);
             } else if (fmt === 'word') {
-              // Word-compatible HTML download (.doc)
               const wordHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${escapedVar} - Long Report</title><style>${reportCss}@page{size:A4;margin:2cm}</style></head><body>${reportBody}</body></html>`;
               downloadBlob(new Blob([wordHtml], { type: 'application/msword' }), `${fileName}.doc`);
             } else {
               // HTML (default)
               if (openAfter) {
-                openInPageViewer(html, `${data.headers[0]} — Long Report`);
+                if (!openInExternalBrowser(html)) openInPageViewer(html, `${data.headers[0]} — Long Report`);
               } else {
                 downloadBlob(new Blob([html], { type: 'text/html' }), `${fileName}.html`);
               }

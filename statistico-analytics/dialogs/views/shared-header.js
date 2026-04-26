@@ -1368,7 +1368,7 @@ const StatisticoHeader = {
       const payload = primary === bodyClone ? bodyClone.innerHTML : primary.outerHTML;
       return `<!DOCTYPE html><html><head><meta charset="utf-8">${headClone.innerHTML}</head><body>${payload}</body></html>`;
     };
-    const captureSectionSnapshot = (url) => new Promise((resolve) => {
+    const captureSectionSnapshot = (url, liveData) => new Promise((resolve) => {
       const iframe = document.createElement('iframe');
       iframe.style.cssText = 'position:fixed;left:-99999px;top:-99999px;width:1360px;height:900px;opacity:0;pointer-events:none;';
       iframe.setAttribute('aria-hidden', 'true');
@@ -1397,7 +1397,14 @@ const StatisticoHeader = {
         }
       };
       iframe.addEventListener('load', () => {
-        setTimeout(() => tryCapture(Date.now()), 500);
+        // Inject live data to override any sample-data fallback loaded by the page
+        try {
+          if (liveData && typeof iframe.contentWindow.handleDataReceived === 'function') {
+            iframe.contentWindow.handleDataReceived(liveData);
+          }
+        } catch (_) {}
+        // Wait longer after data injection so charts have time to re-render
+        setTimeout(() => tryCapture(Date.now()), liveData ? 1800 : 500);
       }, { once: true });
       timer = setTimeout(() => finish('', false), 6000);
       iframe.src = url;
@@ -1655,6 +1662,10 @@ const StatisticoHeader = {
 
             // Ensure every iframe sees the current session's live data
             this._syncLiveDataToStorage();
+
+            // Read it back as the payload to inject directly into each iframe
+            let liveData = null;
+            try { const r = localStorage.getItem('univariateResults'); if (r) liveData = JSON.parse(r); } catch (_) {}
             for (let i = 0; i < total; i += 1) {
               const s = selected[i];
               setProgress(i, total, `Capturing: ${esc(s.label)}…`);
@@ -1662,7 +1673,7 @@ const StatisticoHeader = {
                 snapshotResults.push({ ok: false, snapshotHtml: '', noFile: true });
               } else {
                 const url = appendQueryParam(this.resolveDialogUrl(s.file), 'embed', '1');
-                snapshotResults.push(await captureSectionSnapshot(url));
+                snapshotResults.push(await captureSectionSnapshot(url, liveData));
               }
             }
             setProgress(total, total, 'Building report…');
@@ -2207,13 +2218,17 @@ const StatisticoHeader = {
     // Ensure iframes see the current session's data, not a stale fallback
     this._syncLiveDataToStorage();
 
+    // Read the live data payload once so all iframes get the same injection
+    let liveData = null;
+    try { const r = localStorage.getItem('univariateResults'); if (r) liveData = JSON.parse(r); } catch (_) {}
+
     // Run in parallel batches of 3 to keep it fast without hammering the browser
     const batchSize = 3;
     for (let i = 0; i < views.length; i += batchSize) {
       const batch = views.slice(i, i + batchSize);
       await Promise.all(batch.map(async (view) => {
         const url = this.resolveDialogUrl(view.url);
-        const data = await this._captureViewDataFromIframe(url, view.id);
+        const data = await this._captureViewDataFromIframe(url, view.id, liveData);
         if (data && Object.keys(data).length) allData[view.id] = data;
         done++;
         if (onProgress) onProgress(done, total, labels[view.id] || view.id);
@@ -2232,7 +2247,7 @@ const StatisticoHeader = {
    * @param {string} viewId
    * @returns {Promise<Object|null>}
    */
-  _captureViewDataFromIframe(url, viewId) {
+  _captureViewDataFromIframe(url, viewId, liveData) {
     return new Promise((resolve) => {
       const iframe = document.createElement('iframe');
       iframe.style.cssText = 'position:fixed;left:-99999px;top:-99999px;width:1360px;height:900px;opacity:0;pointer-events:none;';
@@ -2269,7 +2284,15 @@ const StatisticoHeader = {
         }
       };
 
-      iframe.addEventListener('load', () => setTimeout(() => tryExtract(Date.now()), 800), { once: true });
+      iframe.addEventListener('load', () => {
+        // Inject live data to override any sample-data fallback loaded by the page
+        try {
+          if (liveData && typeof iframe.contentWindow.handleDataReceived === 'function') {
+            iframe.contentWindow.handleDataReceived(liveData);
+          }
+        } catch (_) {}
+        setTimeout(() => tryExtract(Date.now()), liveData ? 1800 : 800);
+      }, { once: true });
       setTimeout(() => finish(null), 12000);   // hard cap per view
 
       iframe.src = url;

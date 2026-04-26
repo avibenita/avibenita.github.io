@@ -1356,7 +1356,40 @@ const StatisticoHeader = {
       const bodyClone = (doc.body ? doc.body.cloneNode(true) : document.createElement('body'));
       bodyClone.querySelectorAll('script, noscript').forEach((n) => n.remove());
       normalizeAssetUrls(bodyClone, sourceUrl);
+
+      // Remove navigation / shell chrome
       bodyClone.querySelectorAll('#header-container, .statistico-shell, .sb-nav, #sidebarNav, .statistico-footer').forEach((n) => n.remove());
+
+      // Remove interactive control panels entirely
+      bodyClone.querySelectorAll([
+        '.controls', '.controls-bar', '.controls-row', '.controls-wrapper',
+        '.control-group', '.control-panel', '.range-control', '.range-sliders',
+        '.filter-controls', '.chart-controls', '.toolbar-controls',
+        '.sb-ai-float-btn',                // per-view AI floating button
+        '.sb-ai-overlay',                  // AI overlay if open
+        '.reset-button', '.clear-button',  // action buttons
+        '.panel-heading .icon-btn',        // chart icon buttons (reset, expand…)
+        '.panel-heading button',
+        'button[onclick]',                 // all onclick buttons in content
+        '.loading-overlay', '#dialogLoading'
+      ].join(', ')).forEach((n) => n.remove());
+
+      // Disable (hide) individual form widgets that survived the above
+      bodyClone.querySelectorAll(
+        'select, input[type="range"], input[type="checkbox"], input[type="radio"], input[type="number"], input[type="text"]'
+      ).forEach((n) => n.remove());
+
+      // Inject a tiny style so any lingering interactive element is invisible and
+      // the snapshot renders cleanly without blank gaps
+      const snapshotStyle = document.createElement('style');
+      snapshotStyle.textContent = `
+        button { display: none !important; }
+        select, input { display: none !important; }
+        .controls, .control-group, .range-control { display: none !important; }
+        .highcharts-exporting-group, .highcharts-button { display: none !important; }
+        .sb-ai-float-btn, .sb-ai-overlay { display: none !important; }
+      `;
+      bodyClone.prepend(snapshotStyle);
 
       const primary =
         bodyClone.querySelector('.right-col') ||

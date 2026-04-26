@@ -239,7 +239,7 @@ const NAV_STYLE = `
   padding: 8px 12px;
   color: rgba(255,255,255,0.92);
   text-decoration: none;
-  font-weight: 700;
+  font-weight: 500;
   font-size: 0.88rem;
   border-radius: 16px;
   position: relative;
@@ -277,7 +277,6 @@ const NAV_STYLE = `
 .nav-link.active {
   background: rgba(255,165,120,0.10);
   color: rgba(255,215,195,1);
-  border: 1px solid rgba(255,165,120,0.22);
   box-shadow: none;
 }
 
@@ -336,22 +335,25 @@ const NAV_STYLE = `
 }
 
 .nav-link--product {
-  border: 1px solid rgba(255,165,120,0.2);
-  background: rgba(255,165,120,0.06);
-  box-shadow: inset 0 0 0 1px rgba(255,165,120,0.04);
+  font-weight: 700;
+  border: 1px solid rgba(255,165,120,0.28);
+  background: rgba(255,165,120,0.08);
+  box-shadow: inset 0 0 0 1px rgba(255,165,120,0.05);
 }
 
 .nav-link--product-lite {
-  background: rgba(255,165,120,0.05);
-  border-color: rgba(255,165,120,0.18);
+  font-weight: 700;
+  background: rgba(255,165,120,0.06);
+  border: 1px solid rgba(255,165,120,0.22);
   color: rgba(255,239,231,0.9);
 }
 
 .nav-link--product-core {
-  background: rgba(120,200,255,0.10);
-  border-color: rgba(120,200,255,0.42);
-  box-shadow: inset 0 0 0 1px rgba(120,200,255,0.16);
-  color: rgba(236,246,255,0.98);
+  font-weight: 700;
+  background: rgba(120,200,255,0.14);
+  border: 1px solid rgba(120,200,255,0.55);
+  box-shadow: inset 0 0 0 1px rgba(120,200,255,0.18), 0 0 14px rgba(120,200,255,0.12);
+  color: rgba(200,238,255,1);
 }
 
 .nav-link--product:hover {
@@ -359,8 +361,9 @@ const NAV_STYLE = `
 }
 
 .nav-link--product-core:hover {
-  background: rgba(120,200,255,0.16);
-  box-shadow: inset 0 0 0 1px rgba(120,200,255,0.24);
+  background: rgba(120,200,255,0.20);
+  border-color: rgba(120,200,255,0.65);
+  box-shadow: inset 0 0 0 1px rgba(120,200,255,0.28), 0 0 18px rgba(120,200,255,0.16);
 }
 
 .nav-link-tag {

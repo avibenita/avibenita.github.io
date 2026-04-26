@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Navigation Template - Inline approach (no fetch required)
  */
 
@@ -22,7 +22,7 @@ const NAV_TEMPLATE = `
 <nav class="sticky-nav" id="stickyNav">
   <div class="nav-container">
     <a href="javascript:void(0)" class="nav-logo" id="nav-logo-link">
-      <span class="goldish">Statistico™-Interactive</span>
+      <span class="goldish">Statistico<span class="brand-tm">™</span><span class="brand-sub">Interactive</span></span>
     </a>
 
     <ul class="nav-menu" id="navMenu">
@@ -195,6 +195,30 @@ const NAV_STYLE = `
 .nav-logo:hover {
   transform: translateY(-1px);
   filter: brightness(1.12);
+}
+
+/* ── Brand name typography ── */
+.brand-tm {
+  font-size: 0.5em;
+  vertical-align: super;
+  line-height: 0;
+}
+
+.brand-sub {
+  font-size: 0.42em;
+  position: relative;
+  top: 0.35em;
+  margin-left: 7px;
+  font-weight: 500;
+  opacity: 0.85;
+  -webkit-text-fill-color: rgba(120, 200, 255, 0.92);
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+}
+
+:root[data-theme="light"] .brand-sub {
+  -webkit-text-fill-color: rgba(29, 78, 216, 0.78);
 }
 
 .nav-menu {

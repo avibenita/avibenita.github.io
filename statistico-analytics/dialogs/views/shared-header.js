@@ -2107,6 +2107,215 @@ const StatisticoHeader = {
   // ── Prompt builders ──────────────────────────────────────────────────────
 
   /**
+   * Collect results from ALL views that have been computed this session.
+   * Works regardless of which view is currently active — reads every
+   * available global and DOM element across the full univariate suite.
+   */
+  _collectAllViewsData() {
+    const el  = (id) => document.getElementById(id);
+    const txt = (id) => { const e = el(id); return e ? (e.textContent || '').trim() || null : null; };
+    const val = (id) => { const e = el(id); return e ? e.value || null : null; };
+    const out = {};
+
+    // ── Histogram ─────────────────────────────────────────────────────────
+    const histMean = txt('stat-mean');
+    if (histMean) {
+      out.histogram = {
+        binMethod:     val('binningMethod'),
+        numBins:       val('numBins'),
+        normalOverlay: el('showNormalCurve')?.checked ? 'yes' : 'no',
+        leftTrunc:     val('leftTruncation'),
+        rightTrunc:    val('rightTruncation'),
+        remainingN:    txt('remainingN'),
+        mean:          histMean,
+        stddev:        txt('stat-stddev'),
+        skewness:      txt('stat-skewness'),
+        kurtosis:      txt('stat-kurtosis'),
+        min:           txt('stat-min'),
+        q25:           txt('stat-q25'),
+        median:        txt('stat-median'),
+        q75:           txt('stat-q75'),
+        max:           txt('stat-max')
+      };
+    }
+
+    // ── Kernel density ────────────────────────────────────────────────────
+    const kdeMean = txt('statMean');
+    if (kdeMean) {
+      out.kernel = {
+        kernelType: val('kernelType'),
+        bandwidth:  val('bandwidth'),
+        mean:       kdeMean,
+        stddev:     txt('statStdDev'),
+        min:        txt('statMin'),
+        max:        txt('statMax')
+      };
+    }
+
+    // ── CDF ───────────────────────────────────────────────────────────────
+    const cdfQ1 = txt('q1-value');
+    if (cdfQ1) {
+      out.cdf = {
+        distributionOverlay: val('distribution-select') || 'none',
+        q1:      cdfQ1,
+        median:  txt('median-value'),
+        avg:     txt('avg-value'),
+        q3:      txt('q3-value'),
+        p95:     txt('p95-value'),
+        currentX:  txt('x-value'),
+        currentFx: txt('probability')
+      };
+    }
+
+    // ── Percentile ────────────────────────────────────────────────────────
+    const pctResult = txt('arrow-text');
+    if (pctResult) {
+      const activeMethod = document.querySelector('.method-option.active, [data-method].active');
+      out.percentile = {
+        percentileQueried: val('percentile-value') || val('percentile-slider'),
+        result:  pctResult,
+        method:  activeMethod?.dataset?.method || null
+      };
+    }
+
+    // ── Normality ─────────────────────────────────────────────────────────
+    if (window.currentNormalityResults) {
+      out.normality = {
+        alpha:      txt('significance'),
+        passCount:  txt('pass-count'),
+        failCount:  txt('fail-count'),
+        tests:      window.currentNormalityResults
+      };
+    }
+
+    // ── Outliers ──────────────────────────────────────────────────────────
+    const outlierSummary = txt('outlierCount');
+    if (outlierSummary) {
+      const mBtn = document.querySelector('.method-btn.active, [class*="method"][class*="active"]');
+      out.outliers = {
+        summary: outlierSummary,
+        method:  mBtn?.textContent?.trim() || null
+      };
+    }
+    if (window.currentOutliersData) {
+      const od = window.currentOutliersData;
+      out.outliers = out.outliers || {};
+      out.outliers.count  = od.outliers?.length ?? od.count;
+      out.outliers.method = out.outliers.method || od.method;
+      if (od.bounds) { out.outliers.lowerBound = od.bounds.lower; out.outliers.upperBound = od.bounds.upper; }
+    }
+
+    // ── Confidence intervals ───────────────────────────────────────────────
+    const ciLcl = txt('stat-lcl');
+    if (ciLcl) {
+      out.confidence = {
+        lcl:              ciLcl,
+        center:           txt('stat-center'),
+        ucl:              txt('stat-ucl'),
+        confidenceLevel:  txt('stat-confidence'),
+        method:           txt('stat-method'),
+        pointEstimate:    txt('point-estimate'),
+        marginError:      txt('margin-error')
+      };
+    }
+    if (window.currentCIResults) {
+      const ci = window.currentCIResults;
+      out.confidence = out.confidence || {};
+      Object.assign(out.confidence, {
+        lcl: ci.lower, ucl: ci.upper, level: ci.level, method: ci.method, estimate: ci.estimate
+      });
+    }
+
+    // ── QQ / PP ───────────────────────────────────────────────────────────
+    const qqRadio = document.querySelector('input[name="plotType"]:checked');
+    if (qqRadio || el('distributionSelect')) {
+      out.qqplot = {
+        plotType:     qqRadio?.value || 'qq',
+        distribution: val('distributionSelect')
+      };
+    }
+
+    return out;
+  },
+
+  /**
+   * Serialise the collected cross-view data into a readable text block
+   * for insertion into the AI prompt.
+   */
+  _formatAllViewsData(allData, f) {
+    if (!allData || !Object.keys(allData).length) return null;
+    const lines = [];
+
+    if (allData.histogram) {
+      const h = allData.histogram;
+      lines.push('[ Histogram ]');
+      if (h.mean)      lines.push(`  Mean=${h.mean}, SD=${h.stddev}, Skewness=${h.skewness}, Kurtosis=${h.kurtosis}`);
+      if (h.min)       lines.push(`  Min=${h.min}, Q25=${h.q25}, Median=${h.median}, Q75=${h.q75}, Max=${h.max}`);
+      if (h.binMethod) lines.push(`  Binning: ${h.binMethod}${h.numBins ? ', bins=' + h.numBins : ''}`);
+      if (h.remainingN) lines.push(`  Data after truncation: n=${h.remainingN}`);
+    }
+
+    if (allData.kernel) {
+      const k = allData.kernel;
+      lines.push('[ Kernel Density ]');
+      if (k.kernelType) lines.push(`  Kernel: ${k.kernelType}, Bandwidth: ${k.bandwidth}`);
+      if (k.mean)       lines.push(`  Mean=${k.mean}, SD=${k.stddev}, Range=[${k.min}, ${k.max}]`);
+    }
+
+    if (allData.cdf) {
+      const c = allData.cdf;
+      lines.push('[ CDF ]');
+      if (c.q1)   lines.push(`  Q1=${c.q1}, Median=${c.median}, Mean=${c.avg}, Q3=${c.q3}, P95=${c.p95}`);
+      if (c.currentX && c.currentFx) lines.push(`  At x=${c.currentX}: F(x)=${c.currentFx}`);
+      if (c.distributionOverlay && c.distributionOverlay !== 'none') lines.push(`  Overlay: ${c.distributionOverlay}`);
+    }
+
+    if (allData.percentile) {
+      const p = allData.percentile;
+      lines.push('[ Percentile ]');
+      if (p.percentileQueried) lines.push(`  P${p.percentileQueried} = ${p.result} (method: ${p.method || 'unknown'})`);
+    }
+
+    if (allData.normality) {
+      const n = allData.normality;
+      lines.push('[ Normality Tests ]');
+      lines.push(`  Alpha=${n.alpha || '0.05'}, Pass=${n.passCount || '?'}, Fail=${n.failCount || '?'}`);
+      if (n.tests && typeof n.tests === 'object') {
+        Object.entries(n.tests).forEach(([name, r]) => {
+          if (r?.pValue !== undefined) {
+            const fp = (v) => (Number.isFinite(v) ? Number(v).toFixed(4) : 'N/A');
+            lines.push(`  ${name}: p=${fp(r.pValue)} → ${r.significant ? 'NON-NORMAL' : 'normal'}`);
+          }
+        });
+      }
+    }
+
+    if (allData.outliers) {
+      const o = allData.outliers;
+      lines.push('[ Outliers ]');
+      const cnt = o.count ?? o.summary ?? '?';
+      lines.push(`  Detected: ${cnt}${o.method ? ' (method: ' + o.method + ')' : ''}`);
+      if (o.lowerBound !== undefined) lines.push(`  Bounds: [${f(o.lowerBound)}, ${f(o.upperBound)}]`);
+    }
+
+    if (allData.confidence) {
+      const ci = allData.confidence;
+      lines.push('[ Confidence Interval ]');
+      const lcl = ci.lcl ?? ci.lower; const ucl = ci.ucl ?? ci.upper;
+      if (lcl) lines.push(`  CI: [${f(lcl)}, ${f(ucl)}], level=${ci.confidenceLevel || ci.level || '95%'}, method=${ci.method || '?'}`);
+      if (ci.pointEstimate || ci.estimate) lines.push(`  Estimate=${ci.pointEstimate || f(ci.estimate)}, Margin=${ci.marginError || '?'}`);
+    }
+
+    if (allData.qqplot) {
+      const q = allData.qqplot;
+      lines.push('[ QQ/PP Plot ]');
+      lines.push(`  Type: ${q.plotType?.toUpperCase() || 'QQ'}, compared against: ${q.distribution || 'Normal'}`);
+    }
+
+    return lines.join('\n');
+  },
+
+  /**
    * Controls reference for each view — passed to AI so it can describe
    * how the user interacts with this view.
    */
@@ -2170,24 +2379,24 @@ const StatisticoHeader = {
       .join('\n');
 
     if (mode === 'full') {
-      const viewFocus = {
-        histogram:'distribution shape', boxplot:'spread and outliers via box plot',
-        cdf:'cumulative probability', percentile:'percentile structure',
-        kernel:'kernel density peaks and tails', outliers:'outlier count and severity',
-        normality:'normality test results', qqplot:'distributional fit from QQ/PP',
-        confidence:'confidence interval width and precision'
-      };
-      return `You are a senior statistician writing a full-variable diagnostic report.
+      // Collect everything available across ALL views
+      const allData = this._collectAllViewsData();
+      const allDataBlock = this._formatAllViewsData(allData, f);
+
+      return `You are a senior statistician writing a full-variable diagnostic report that synthesises ALL available analysis results.
 
 DESCRIPTIVE STATISTICS:
 ${statsBlock}
 
-TASK: Write a full-variable diagnostic report integrating ALL available statistics. Cover: ${Object.values(viewFocus).join('; ')}.
+RESULTS FROM COMPLETED ANALYSES:
+${allDataBlock || '(No additional view results available — base statistics only)'}
+
+TASK: Write a comprehensive diagnostic report integrating every piece of evidence above. Where specific test results or computed values exist, cite them with exact numbers. Do not repeat the same fact twice. Produce a unified narrative: what is the defining characteristic of this variable, what do the diagnostics collectively confirm, what are the practical consequences, and what should the analyst do next.
 
 Reply ONLY in this exact format:
 CONCLUSION: [One decisive sentence — the single most important finding, use exact numbers]
-EVIDENCE: [fact 1 with number and arrow] | [fact 2] | [fact 3] | [fact 4]
-INTERPRETATION: [2–3 sentences, no hedging, use exact numbers]
+EVIDENCE: [fact 1 with number and source view] | [fact 2] | [fact 3] | [fact 4] | [fact 5 if available]
+INTERPRETATION: [3 sentences — decisive synthesis across all diagnostics, use exact numbers, no hedging]
 IMPLICATIONS: [implication 1] | [implication 2] | [implication 3]
 ACTION: [action 1] | [action 2] | [action 3]`;
     }

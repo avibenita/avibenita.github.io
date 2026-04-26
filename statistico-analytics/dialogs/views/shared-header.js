@@ -1357,37 +1357,42 @@ const StatisticoHeader = {
       bodyClone.querySelectorAll('script, noscript').forEach((n) => n.remove());
       normalizeAssetUrls(bodyClone, sourceUrl);
 
-      // Remove navigation / shell chrome
+      // Remove navigation / shell chrome (these have no place in a static report)
       bodyClone.querySelectorAll('#header-container, .statistico-shell, .sb-nav, #sidebarNav, .statistico-footer').forEach((n) => n.remove());
 
-      // Remove interactive control panels entirely
-      bodyClone.querySelectorAll([
-        '.controls', '.controls-bar', '.controls-row', '.controls-wrapper',
-        '.control-group', '.control-panel', '.range-control', '.range-sliders',
-        '.filter-controls', '.chart-controls', '.toolbar-controls',
-        '.sb-ai-float-btn',                // per-view AI floating button
-        '.sb-ai-overlay',                  // AI overlay if open
-        '.reset-button', '.clear-button',  // action buttons
-        '.panel-heading .icon-btn',        // chart icon buttons (reset, expand…)
-        '.panel-heading button',
-        'button[onclick]',                 // all onclick buttons in content
-        '.loading-overlay', '#dialogLoading'
-      ].join(', ')).forEach((n) => n.remove());
+      // Remove overlays that don't belong in a static snapshot
+      bodyClone.querySelectorAll('.sb-ai-float-btn, .sb-ai-overlay, .loading-overlay, #dialogLoading').forEach((n) => n.remove());
 
-      // Disable (hide) individual form widgets that survived the above
-      bodyClone.querySelectorAll(
-        'select, input[type="range"], input[type="checkbox"], input[type="radio"], input[type="number"], input[type="text"]'
-      ).forEach((n) => n.remove());
+      // Disable all interactive form elements so they look & act frozen
+      bodyClone.querySelectorAll('button, select, input, textarea').forEach((el) => {
+        el.setAttribute('disabled', 'disabled');
+        el.setAttribute('tabindex', '-1');
+        // Strip live event attributes so nothing fires if JS somehow runs
+        ['onclick','onchange','oninput','onmousedown','onmouseup','onfocus','onblur','onkeydown','onkeyup'].forEach((ev) => el.removeAttribute(ev));
+      });
 
-      // Inject a tiny style so any lingering interactive element is invisible and
-      // the snapshot renders cleanly without blank gaps
+      // Inject snapshot stylesheet: visually disable controls, block all pointer events
       const snapshotStyle = document.createElement('style');
       snapshotStyle.textContent = `
-        button { display: none !important; }
-        select, input { display: none !important; }
-        .controls, .control-group, .range-control { display: none !important; }
+        /* Snapshot: interactive elements are visible but frozen */
+        button, select, input, textarea {
+          pointer-events: none !important;
+          cursor: default !important;
+          opacity: 0.48 !important;
+          filter: grayscale(30%) !important;
+          user-select: none !important;
+        }
+        button:hover, select:hover, input:hover {
+          background: inherit !important;
+          box-shadow: none !important;
+          transform: none !important;
+        }
+        /* Hide Highcharts export / context-menu button */
         .highcharts-exporting-group, .highcharts-button { display: none !important; }
+        /* Hide the AI floating button and any open overlay */
         .sb-ai-float-btn, .sb-ai-overlay { display: none !important; }
+        /* Loading screen */
+        .loading-overlay, #dialogLoading { display: none !important; }
       `;
       bodyClone.prepend(snapshotStyle);
 

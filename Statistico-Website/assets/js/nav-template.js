@@ -32,23 +32,24 @@ const NAV_TEMPLATE = `
         </a>
       </li>
 
-      <!-- Products group with "Statistico™-Interactive Suite" label above -->
+      <!-- Products group — segmented control -->
       <li class="nav-item nav-item--products-group">
-        <span class="nav-products-label">Statistico™-Interactive Suite</span>
-        <div class="nav-products-row">
+        <span class="nav-products-label">Suite</span>
+        <div class="nav-products-row" id="nav-products-row">
+          <div class="nav-products-slider" id="nav-products-slider"></div>
           <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <rect x="2" y="2" width="12" height="12" rx="2"/>
               <line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/>
               <line x1="5" y1="11" x2="8" y2="11"/>
             </svg>
-            Calculators Hub
+            Calculators
           </a>
           <a href="javascript:void(0)" class="nav-link nav-link--product-core" data-page="analytics" id="link-analytics">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <polyline points="1,12 5,7 8,10 11,5 15,3"/>
             </svg>
-            Analytics Hub
+            Analytics
           </a>
           <a href="javascript:void(0)" class="nav-link nav-link--product-lite" data-page="addins" id="link-addins">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -56,14 +57,14 @@ const NAV_TEMPLATE = `
               <line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/>
               <line x1="6" y1="11" x2="8.5" y2="11"/>
             </svg>
-            Applications Hub
+            Applications
           </a>
         </div>
       </li>
 
       <li class="nav-item nav-item--sep-left">
         <a href="javascript:void(0)" class="nav-link" data-page="why" id="link-why">
-          Why Statistico™-Interactive?
+          Why
         </a>
       </li>
       <li class="nav-item">
@@ -232,31 +233,20 @@ const NAV_STYLE = `
   position: relative;
 }
 
+/* legacy separator classes — kept for compatibility but lines removed */
 .nav-item--product-start,
 .nav-item--after-products {
-  margin-left: 12px;
-  padding-left: 12px;
+  margin-left: 8px;
 }
 
 .nav-item--product-start::before,
 .nav-item--after-products::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 2px;
-  height: 32px;
-  background: linear-gradient(180deg, rgba(160,220,255,0.58), rgba(255,182,140,0.72));
-  opacity: 1;
-  box-shadow: 0 0 10px rgba(120,200,255,0.22);
-  pointer-events: none;
+  display: none;
 }
 
 /* ── Products group with label ── */
 .nav-item--products-group {
-  margin-left: 12px;
-  padding-left: 14px;
+  margin-left: 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -264,61 +254,82 @@ const NAV_STYLE = `
   position: relative;
 }
 
-.nav-item--products-group::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 2px;
-  height: 38px;
-  background: linear-gradient(180deg, rgba(160,220,255,0.58), rgba(255,182,140,0.72));
-  box-shadow: 0 0 10px rgba(120,200,255,0.22);
-  pointer-events: none;
-}
+.nav-item--products-group::before { display: none; }
 
 .nav-products-label {
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
+  font-size: 0.56rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(255,165,120,0.5);
+  color: rgba(255,165,120,0.32);
   line-height: 1;
   user-select: none;
   pointer-events: none;
 }
 
+/* Segmented control bar */
 .nav-products-row {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   align-items: center;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 18px;
+  padding: 3px;
+  position: relative;
+}
+
+/* Sliding highlight */
+.nav-products-slider {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  height: calc(100% - 6px);
+  border-radius: 13px;
+  background: rgba(120,200,255,0.16);
+  box-shadow: 0 0 12px rgba(120,200,255,0.14);
+  transition: transform 0.22s cubic-bezier(0.34,1.2,0.64,1), width 0.22s cubic-bezier(0.34,1.2,0.64,1), opacity 0.18s ease;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, width;
+}
+
+.nav-products-row:hover .nav-products-slider { opacity: 1; }
+
+/* Product links inside segmented control — no individual borders */
+.nav-products-row .nav-link--product,
+.nav-products-row .nav-link--product-core,
+.nav-products-row .nav-link--product-lite {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  position: relative;
+  z-index: 1;
+  transition: color 0.15s ease;
 }
 
 .nav-products-row .nav-link {
   min-height: 34px;
-  padding: 5px 10px;
+  padding: 5px 11px;
   font-size: 0.83rem;
 }
 
-/* Separator before "Why Statistico™-Interactive?" */
+/* Separator before "Why" — spacing only, no line */
 .nav-item--sep-left {
-  margin-left: 12px;
-  padding-left: 12px;
+  margin-left: 20px;
   position: relative;
 }
 
-.nav-item--sep-left::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 2px;
-  height: 32px;
-  background: linear-gradient(180deg, rgba(160,220,255,0.58), rgba(255,182,140,0.72));
-  box-shadow: 0 0 10px rgba(120,200,255,0.22);
-  pointer-events: none;
+.nav-item--sep-left::before { display: none; }
+
+/* Home: minimal weight */
+.nav-link[data-page="home"] {
+  opacity: 0.6;
+  font-weight: 400;
+  font-size: 0.85rem;
 }
+
+.nav-link[data-page="home"]:hover { opacity: 1; }
 
 /* Hidden items (About, Contact) — kept in DOM for link wiring */
 .nav-item--hidden {
@@ -1176,8 +1187,47 @@ const FOOTER_TEMPLATE = `
       navMenu.classList.toggle('active');
     });
 
+    // ── Segmented-control slider ────────────────────────────────────────
+    const productsRow    = document.getElementById('nav-products-row');
+    const productsSlider = document.getElementById('nav-products-slider');
+
+    if (productsRow && productsSlider) {
+      const productLinks = productsRow.querySelectorAll('.nav-link');
+
+      function positionSlider(link) {
+        const rowRect  = productsRow.getBoundingClientRect();
+        const linkRect = link.getBoundingClientRect();
+        productsSlider.style.width = linkRect.width + 'px';
+        productsSlider.style.transform = 'translateX(' + (linkRect.left - rowRect.left - 3) + 'px)';
+      }
+
+      productLinks.forEach(function(link) {
+        link.addEventListener('mouseenter', function() { positionSlider(link); });
+      });
+
+      productsRow.addEventListener('mouseleave', function() {
+        const active = productsRow.querySelector('.nav-link.active');
+        if (active) { positionSlider(active); }
+        else         { productsSlider.style.opacity = '0'; }
+      });
+
+      // Pin slider on active product on load (called after setActivePage)
+      window.pinProductSlider = function() {
+        const active = productsRow.querySelector('.nav-link.active');
+        if (active) {
+          positionSlider(active);
+          productsSlider.style.opacity = '1';
+        }
+      };
+    }
+    // ──────────────────────────────────────────────────────────────────
+
     // Set active page
     setActivePage();
+    // Pin slider after active page is set
+    requestAnimationFrame(function() {
+      if (typeof window.pinProductSlider === 'function') window.pinProductSlider();
+    });
 
     // Scroll effect
     window.addEventListener('scroll', function() {

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Navigation Template - Inline approach (no fetch required)
  */
 
@@ -261,7 +261,7 @@ const NAV_STYLE = `
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(255,165,120,0.18);
+  color: rgba(255,165,120,0.42);
   line-height: 1;
   user-select: none;
   pointer-events: none;
@@ -324,12 +324,12 @@ const NAV_STYLE = `
 
 /* Home: minimal weight */
 .nav-link[data-page="home"] {
-  opacity: 0.35;
+  opacity: 0.55;
   font-weight: 400;
   font-size: 0.85rem;
 }
 
-.nav-link[data-page="home"]:hover { opacity: 0.75; }
+.nav-link[data-page="home"]:hover { opacity: 0.9; }
 
 /* Hidden items (About, Contact) — kept in DOM for link wiring */
 .nav-item--hidden {

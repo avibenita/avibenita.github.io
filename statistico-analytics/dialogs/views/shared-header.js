@@ -1806,32 +1806,55 @@ const StatisticoHeader = {
 
             const fileName = `Univariate_Report_${safeName(data.headers[0])}_${timestamp()}`;
 
+            // ── Helper: show report in a full-screen in-page overlay ─────────
+            const openInPageViewer = (htmlContent, title) => {
+              const existing = document.getElementById('stReportViewerOverlay');
+              if (existing) existing.remove();
+              const viewer = document.createElement('div');
+              viewer.id = 'stReportViewerOverlay';
+              viewer.style.cssText = 'position:fixed;inset:0;z-index:2147483500;background:#0f172a;display:flex;flex-direction:column;';
+              viewer.innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;background:#1e293b;border-bottom:1px solid rgba(148,163,184,.2);flex-shrink:0;">
+                  <span style="color:#e2e8f0;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;">
+                    <i class="fa-solid fa-file-lines" style="color:#f97316;"></i> ${esc(title)}
+                  </span>
+                  <div style="display:flex;gap:8px;">
+                    <button id="stViewerPrintBtn" style="padding:5px 12px;border-radius:6px;border:1px solid rgba(148,163,184,.3);background:transparent;color:#94a3b8;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                      <i class="fa-solid fa-print"></i> Print / PDF
+                    </button>
+                    <button id="stViewerCloseBtn" style="padding:5px 12px;border-radius:6px;border:1px solid rgba(148,163,184,.3);background:transparent;color:#94a3b8;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                      <i class="fa-solid fa-xmark"></i> Close
+                    </button>
+                  </div>
+                </div>
+                <iframe id="stReportViewerFrame" style="flex:1;border:none;background:#fff;" srcdoc=""></iframe>
+              `;
+              document.body.appendChild(viewer);
+              // Set srcdoc after append to avoid encoding issues with very large HTML
+              viewer.querySelector('#stReportViewerFrame').srcdoc = htmlContent;
+              viewer.querySelector('#stViewerCloseBtn').addEventListener('click', () => viewer.remove());
+              viewer.querySelector('#stViewerPrintBtn').addEventListener('click', () => {
+                const frame = viewer.querySelector('#stReportViewerFrame');
+                try { frame.contentWindow.print(); } catch (_) {
+                  // Fallback: open about:blank and print from there
+                  const pw = window.open('about:blank', '_blank');
+                  if (pw) { pw.document.open(); pw.document.write(htmlContent); pw.document.close(); setTimeout(() => pw.print(), 400); }
+                }
+              });
+            };
+            // ─────────────────────────────────────────────────────────────────
+
             if (fmt === 'pdf') {
-              // Open in new tab then trigger browser print-to-PDF
-              const win = window.open('about:blank', '_blank');
-              if (win) {
-                win.document.open();
-                win.document.write(html);
-                win.document.close();
-                win.addEventListener('load', () => setTimeout(() => win.print(), 400));
-              }
+              // Show in-page viewer; user prints to PDF from the Print button
+              openInPageViewer(html, `${data.headers[0]} — Long Report`);
             } else if (fmt === 'word') {
               // Word-compatible HTML download (.doc)
               const wordHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${escapedVar} - Long Report</title><style>${reportCss}@page{size:A4;margin:2cm}</style></head><body>${reportBody}</body></html>`;
               downloadBlob(new Blob([wordHtml], { type: 'application/msword' }), `${fileName}.doc`);
-              if (openAfter) alert('Word file downloaded. Open it from your Downloads folder.');
             } else {
               // HTML (default)
               if (openAfter) {
-                const win = window.open('about:blank', '_blank');
-                if (win) {
-                  win.document.open();
-                  win.document.write(html);
-                  win.document.close();
-                } else {
-                  // Popup blocked — fall back to download
-                  downloadBlob(new Blob([html], { type: 'text/html' }), `${fileName}.html`);
-                }
+                openInPageViewer(html, `${data.headers[0]} — Long Report`);
               } else {
                 downloadBlob(new Blob([html], { type: 'text/html' }), `${fileName}.html`);
               }

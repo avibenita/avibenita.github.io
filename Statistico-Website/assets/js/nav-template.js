@@ -199,26 +199,24 @@ const NAV_STYLE = `
 
 /* ── Brand name typography ── */
 .brand-tm {
-  font-size: 0.5em;
+  font-size: 0.55em;
   vertical-align: super;
   line-height: 0;
 }
 
 .brand-sub {
-  font-size: 0.42em;
-  position: relative;
-  top: 0.35em;
-  margin-left: 7px;
+  font-size: 0.8em;
+  margin-left: 2px;
   font-weight: 500;
-  opacity: 0.85;
-  -webkit-text-fill-color: rgba(120, 200, 255, 0.92);
+  vertical-align: baseline;
+  -webkit-text-fill-color: rgba(120, 200, 255, 0.88);
   background: none !important;
   -webkit-background-clip: unset !important;
   background-clip: unset !important;
 }
 
 :root[data-theme="light"] .brand-sub {
-  -webkit-text-fill-color: rgba(29, 78, 216, 0.78);
+  -webkit-text-fill-color: rgba(29, 78, 216, 0.75);
 }
 
 .nav-menu {

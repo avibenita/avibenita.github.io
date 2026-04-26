@@ -829,6 +829,21 @@ body {
   padding-top: 88px;
 }
 
+/* Hero section breathing room — gap between nav and hero, and hero and next section */
+.hiw-hero,
+.faq-hero,
+.about-hero {
+  padding-top: 112px !important;
+  padding-bottom: 100px !important;
+  margin-bottom: 16px !important;
+}
+
+.hero {
+  padding-top: 80px !important;
+  padding-bottom: 64px !important;
+  margin-bottom: 16px !important;
+}
+
 /* Shared footer styles for all pages */
 footer#contact {
   background: var(--site-surface-1, #1a1f2e);

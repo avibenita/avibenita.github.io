@@ -13,7 +13,8 @@ function getNavLinks() {
     how: '/Statistico-Website/how-it-works.html',
     calculators: '/Statistico-Website/index-Calculators.html',
     analytics: '/Statistico-Website/index-Analytics.html',
-    addins: '/Statistico-Website/index-Addins.html'
+    addins: '/Statistico-Website/index-Addins.html',
+    faq: '/Statistico-Website/faq.html',
   };
 }
 
@@ -38,6 +39,11 @@ const NAV_TEMPLATE = `
       <li class="nav-item">
         <a href="javascript:void(0)" class="nav-link" data-page="how" id="link-how">
           How It Works
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="javascript:void(0)" class="nav-link" data-page="faq" id="link-faq">
+          FAQ
         </a>
       </li>
       <li class="nav-item nav-item--product-start nav-item--dropdown" id="nav-products-item">

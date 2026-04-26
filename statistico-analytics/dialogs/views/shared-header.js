@@ -963,8 +963,8 @@ const StatisticoHeader = {
       if (exportHtml) {
         html += `<button class="header-action-btn header-action-btn--html"
                          onclick="StatisticoHeader._pendingActions.exportHtml()"
-                         title="Export complete report as standalone HTML file">
-                   <i class="fa-solid fa-file-code"></i> HTML
+                         title="Export full analysis as HTML, PDF, or Word">
+                   <i class="fa-solid fa-file-export"></i> Export Report
                  </button>`;
       }
       if (exportJson) {
@@ -1495,33 +1495,96 @@ const StatisticoHeader = {
       if (existing) existing.remove();
       const overlay = document.createElement('div');
       overlay.id = 'stReportExportOverlay';
-      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:2147483300;display:flex;align-items:center;justify-content:center;padding:16px;';
-      const listHtml = sections.map((s) => `
-        <label style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid #e5e7eb;color:#0f172a;font-size:14px;font-weight:600;">
-          <input type="checkbox" data-section-id="${esc(s.id)}" checked />
-          <span style="color:#0f172a;">${esc(s.label)}</span>
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2147483300;display:flex;align-items:center;justify-content:center;padding:16px;';
+
+      const sectionListHtml = sections.map((s) => `
+        <label style="display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid #e5e7eb;color:#0f172a;font-size:13px;cursor:pointer;">
+          <input type="checkbox" data-section-id="${esc(s.id)}" checked style="cursor:pointer;accent-color:#f97316;" />
+          <span>${esc(s.label)}</span>
         </label>
       `).join('');
+
       overlay.innerHTML = `
-        <div style="width:min(560px,95vw);max-height:80vh;overflow:hidden;background:#fff;border-radius:12px;border:1px solid #cbd5e1;box-shadow:0 12px 32px rgba(15,23,42,.3);display:flex;flex-direction:column;">
-          <div style="padding:12px 14px;border-bottom:1px solid #e2e8f0;font-weight:700;">Export Long HTML Report</div>
-          <div style="padding:10px 14px;color:#475569;font-size:12px;">Select the menu sections to include in the report:</div>
-          <div style="padding:0 14px 10px;overflow:auto;">${listHtml}</div>
-          <div style="padding:10px 14px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px;">
-            <button id="stReportCancelBtn" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;cursor:pointer;">Cancel</button>
-            <button id="stReportExportBtn" style="padding:8px 12px;border:1px solid #f97316;border-radius:8px;background:#f97316;color:#fff;cursor:pointer;">Export HTML</button>
+        <div style="width:min(560px,95vw);max-height:88vh;background:#fff;border-radius:14px;border:1px solid #cbd5e1;box-shadow:0 16px 40px rgba(15,23,42,.32);display:flex;flex-direction:column;overflow:hidden;">
+
+          <!-- Header -->
+          <div style="padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;">
+            <i class="fa-solid fa-file-export" style="color:#f97316;font-size:16px;"></i>
+            <span style="font-size:15px;font-weight:700;color:#0f172a;">Export Report</span>
+          </div>
+
+          <!-- Format pills -->
+          <div style="padding:14px 18px 10px;border-bottom:1px solid #f1f5f9;">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:8px;">Format</div>
+            <div id="stFormatPills" style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button data-fmt="html"  style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;border:2px solid #f97316;background:#fff7ed;color:#c2410c;font-size:13px;font-weight:600;cursor:pointer;">
+                <i class="fa-solid fa-file-code"></i> HTML
+              </button>
+              <button data-fmt="pdf"   style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;border:2px solid transparent;background:#f1f5f9;color:#475569;font-size:13px;font-weight:600;cursor:pointer;">
+                <i class="fa-solid fa-file-pdf"></i> PDF
+              </button>
+              <button data-fmt="word"  style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;border:2px solid transparent;background:#f1f5f9;color:#475569;font-size:13px;font-weight:600;cursor:pointer;">
+                <i class="fa-solid fa-file-word"></i> Word
+              </button>
+              <button data-fmt="ppt"   style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;border:2px solid transparent;background:#f1f5f9;color:#94a3b8;font-size:13px;font-weight:600;cursor:not-allowed;opacity:.55;" disabled title="PowerPoint export — coming soon">
+                <i class="fa-solid fa-file-powerpoint"></i> PPT <span style="font-size:10px;background:#e2e8f0;border-radius:4px;padding:1px 5px;margin-left:2px;">Soon</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Sections list -->
+          <div style="padding:10px 18px 4px;">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:6px;">Sections to include</div>
+          </div>
+          <div style="padding:0 18px 8px;overflow-y:auto;flex:1;">${sectionListHtml}</div>
+
+          <!-- Footer -->
+          <div style="padding:12px 18px;border-top:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+            <label id="stOpenAfterExportLabel" style="display:flex;align-items:center;gap:7px;font-size:13px;color:#475569;cursor:pointer;user-select:none;">
+              <input type="checkbox" id="stOpenAfterExport" style="accent-color:#f97316;cursor:pointer;" />
+              Open after export
+            </label>
+            <div style="display:flex;gap:8px;">
+              <button id="stReportCancelBtn" style="padding:8px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;">Cancel</button>
+              <button id="stReportExportBtn" style="padding:8px 16px;border:1px solid #f97316;border-radius:8px;background:#f97316;color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                <i class="fa-solid fa-file-export"></i> Export
+              </button>
+            </div>
           </div>
         </div>
       `;
+
       document.body.appendChild(overlay);
+
+      // Format pill selection
+      let selectedFmt = 'html';
+      const pills = overlay.querySelectorAll('#stFormatPills button[data-fmt]');
+      const selectFmt = (fmt) => {
+        selectedFmt = fmt;
+        pills.forEach((p) => {
+          const active = p.getAttribute('data-fmt') === fmt;
+          p.style.border        = active ? '2px solid #f97316' : '2px solid transparent';
+          p.style.background    = active ? '#fff7ed' : '#f1f5f9';
+          p.style.color         = active ? '#c2410c' : (p.disabled ? '#94a3b8' : '#475569');
+        });
+        // PDF doesn't need "open after export" (browser print dialog handles it)
+        const openLabel = overlay.querySelector('#stOpenAfterExportLabel');
+        if (openLabel) openLabel.style.display = fmt === 'pdf' ? 'none' : 'flex';
+      };
+      pills.forEach((p) => {
+        if (!p.disabled) p.addEventListener('click', () => selectFmt(p.getAttribute('data-fmt')));
+      });
+
       const close = () => overlay.remove();
       overlay.querySelector('#stReportCancelBtn').addEventListener('click', close);
       overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
       overlay.querySelector('#stReportExportBtn').addEventListener('click', () => {
-        const checked = Array.from(overlay.querySelectorAll('input[data-section-id]:checked')).map((el) => el.getAttribute('data-section-id'));
+        const checked = Array.from(overlay.querySelectorAll('input[data-section-id]:checked'))
+                             .map((el) => el.getAttribute('data-section-id'));
         if (!checked.length) return;
+        const openAfter = overlay.querySelector('#stOpenAfterExport')?.checked ?? false;
         close();
-        onConfirm(checked);
+        onConfirm(checked, selectedFmt, openAfter);
       });
     };
 
@@ -1655,7 +1718,7 @@ const StatisticoHeader = {
           alert('No report sections available from the current menu.');
           return;
         }
-        pickReportSections(sections, (selectedIds) => {
+        pickReportSections(sections, (selectedIds, fmt, openAfter) => {
           const selected = sections.filter((s) => selectedIds.includes(String(s.id)));
           const escapedVar = esc(data.headers[0]);
           const toc = selected.map((s, i) => `<li><a href="#sec_${i + 1}">${esc(s.label)}</a></li>`).join('');
@@ -1734,12 +1797,40 @@ const StatisticoHeader = {
                 </section>
               `;
             });
-            const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapedVar} - Long Report</title><style>body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:1120px;margin:auto;color:#0f172a}h1{margin-bottom:4px}h2{margin-top:28px}nav{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}section{page-break-inside:avoid;border-top:1px solid #e2e8f0;padding-top:14px}.meta{color:#475569;font-size:13px}.report-frame{width:100%;height:760px;border:1px solid #d1d5db;border-radius:10px;background:#fff}a{color:#0ea5e9;text-decoration:none}a:hover{text-decoration:underline}</style></head><body><h1>Univariate Long Report</h1><p class="meta"><strong>Variable:</strong> ${escapedVar} &nbsp;&middot;&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</p><nav><strong>Included sections</strong><ol>${toc}</ol></nav>${builtSections.join('')}</body></html>`;
+
+            const reportCss = `body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:1120px;margin:auto;color:#0f172a}h1{margin-bottom:4px}h2{margin-top:28px}nav{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}section{page-break-inside:avoid;border-top:1px solid #e2e8f0;padding-top:14px}.meta{color:#475569;font-size:13px}.report-frame{width:100%;height:760px;border:1px solid #d1d5db;border-radius:10px;background:#fff}a{color:#0ea5e9;text-decoration:none}a:hover{text-decoration:underline}`;
+            const reportBody = `<h1>Univariate Long Report</h1><p class="meta"><strong>Variable:</strong> ${escapedVar} &nbsp;&middot;&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</p><nav><strong>Included sections</strong><ol>${toc}</ol></nav>${builtSections.join('')}`;
+            const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapedVar} - Long Report</title><style>${reportCss}</style></head><body>${reportBody}</body></html>`;
+
             closeProgress();
-            downloadBlob(
-              new Blob([html], { type: 'text/html' }),
-              `Univariate_LongReport_${safeName(data.headers[0])}_${timestamp()}.html`
-            );
+
+            const fileName = `Univariate_Report_${safeName(data.headers[0])}_${timestamp()}`;
+
+            if (fmt === 'pdf') {
+              // Open in new tab then trigger browser print-to-PDF
+              const win = window.open('', '_blank');
+              if (win) {
+                win.document.open();
+                win.document.write(html);
+                win.document.close();
+                win.addEventListener('load', () => setTimeout(() => win.print(), 400));
+              }
+            } else if (fmt === 'word') {
+              // Word-compatible HTML download (.doc)
+              const wordHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${escapedVar} - Long Report</title><style>${reportCss}@page{size:A4;margin:2cm}</style></head><body>${reportBody}</body></html>`;
+              downloadBlob(new Blob([wordHtml], { type: 'application/msword' }), `${fileName}.doc`);
+              if (openAfter) alert('Word file downloaded. Open it from your Downloads folder.');
+            } else {
+              // HTML (default)
+              if (openAfter) {
+                const blob = new Blob([html], { type: 'text/html' });
+                const blobUrl = URL.createObjectURL(blob);
+                window.open(blobUrl, '_blank');
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+              } else {
+                downloadBlob(new Blob([html], { type: 'text/html' }), `${fileName}.html`);
+              }
+            }
           })().catch(() => closeProgress());
         });
       }
@@ -1921,9 +2012,9 @@ const StatisticoHeader = {
       <button class="sb-bottom-btn sb-bottom-btn--html ${hasHtml ? '' : 'sb-bottom-btn--disabled'}"
               id="sbExportHtmlBtn"
               ${hasHtml ? 'onclick="StatisticoHeader._pendingActions.exportHtml()"' : 'disabled'}
-              title="${hasHtml ? 'Export complete report as standalone HTML file' : 'HTML export is not available for this page yet'}">
-        <i class="fa-solid fa-file-code"></i>
-        <span class="sb-item-label">HTML</span>
+              title="${hasHtml ? 'Export full analysis as HTML, PDF, or Word' : 'Export Report is not available for this page yet'}">
+        <i class="fa-solid fa-file-export"></i>
+        <span class="sb-item-label">Export Report</span>
       </button>
       <button class="sb-bottom-btn sb-bottom-btn--json ${hasJson ? '' : 'sb-bottom-btn--disabled'}"
               id="sbExportJsonBtn"

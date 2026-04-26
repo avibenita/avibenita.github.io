@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Navigation Template - Inline approach (no fetch required)
  */
 
@@ -1048,7 +1048,7 @@ const FOOTER_TEMPLATE = `
         <a href="javascript:void(0)" id="footer-link-terms">Terms & Conditions</a>
       </div>
     </div>
-    <div class="footer-bottom">© 2026 Statistico™-Interactive Suite. Revolutionizing statistical computing, one analysis at a time.</div>
+    <div class="footer-bottom">© 2026 Statistico™ Suite. Revolutionizing statistical computing, one analysis at a time.</div>
   </div>
 </footer>
 `;

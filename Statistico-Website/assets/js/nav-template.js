@@ -42,13 +42,13 @@ const NAV_TEMPLATE = `
               <line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/>
               <line x1="5" y1="11" x2="8" y2="11"/>
             </svg>
-            Calculators
+            Calculators Hub
           </a>
           <a href="javascript:void(0)" class="nav-link nav-link--product-core" data-page="analytics" id="link-analytics">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <polyline points="1,12 5,7 8,10 11,5 15,3"/>
             </svg>
-            Analytics
+            Analytics Hub
           </a>
           <a href="javascript:void(0)" class="nav-link nav-link--product-lite" data-page="addins" id="link-addins">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -56,7 +56,7 @@ const NAV_TEMPLATE = `
               <line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/>
               <line x1="6" y1="11" x2="8.5" y2="11"/>
             </svg>
-            Applications
+            Applications Hub
           </a>
         </div>
       </li>

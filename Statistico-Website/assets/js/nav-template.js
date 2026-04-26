@@ -46,60 +46,33 @@ const NAV_TEMPLATE = `
           FAQ
         </a>
       </li>
-      <li class="nav-item nav-item--product-start nav-item--dropdown" id="nav-products-item">
-        <button class="nav-link nav-link--product-parent" id="nav-products-btn" aria-haspopup="true" aria-expanded="false">
-          Platform
-          <span class="nav-dropdown-caret" aria-hidden="true">&#8964;</span>
-        </button>
-        <ul class="nav-dropdown" id="nav-products-dropdown" role="menu">
-          <li class="nav-dropdown-header" role="presentation">Statistico Platform</li>
-          <li role="none">
-            <a href="javascript:void(0)" class="nav-dropdown-item" data-page="calculators" id="link-calculators" role="menuitem">
-              <span class="nav-dropdown-icon">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="2" y="2" width="12" height="12" rx="2"/>
-                  <line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/>
-                  <line x1="5" y1="11" x2="8" y2="11"/>
-                </svg>
-              </span>
-              <span class="nav-dropdown-text">
-                <span class="nav-dropdown-title">Calculators Hub</span>
-                <span class="nav-dropdown-desc">Statistical calculators &amp; tools</span>
-              </span>
-              <span class="nav-dropdown-arrow" aria-hidden="true">&#8594;</span>
-            </a>
-          </li>
-          <li role="none">
-            <a href="javascript:void(0)" class="nav-dropdown-item" data-page="analytics" id="link-analytics" role="menuitem">
-              <span class="nav-dropdown-icon">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="1,12 5,7 8,10 11,5 15,3"/>
-                </svg>
-              </span>
-              <span class="nav-dropdown-text">
-                <span class="nav-dropdown-title">Analytics Suite</span>
-                <span class="nav-dropdown-desc">Interactive statistical analysis</span>
-              </span>
-              <span class="nav-dropdown-arrow" aria-hidden="true">&#8594;</span>
-            </a>
-          </li>
-          <li role="none">
-            <a href="javascript:void(0)" class="nav-dropdown-item" data-page="addins" id="link-addins" role="menuitem">
-              <span class="nav-dropdown-icon">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="3" y="1" width="10" height="14" rx="1.5"/>
-                  <line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/>
-                  <line x1="6" y1="11" x2="8.5" y2="11"/>
-                </svg>
-              </span>
-              <span class="nav-dropdown-text">
-                <span class="nav-dropdown-title">Applications</span>
-                <span class="nav-dropdown-desc">Workflow-ready applications</span>
-              </span>
-              <span class="nav-dropdown-arrow" aria-hidden="true">&#8594;</span>
-            </a>
-          </li>
-        </ul>
+      <li class="nav-item nav-item--product-start">
+        <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="2" y="2" width="12" height="12" rx="2"/>
+            <line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/>
+            <line x1="5" y1="11" x2="8" y2="11"/>
+          </svg>
+          Calculators
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="javascript:void(0)" class="nav-link nav-link--product-core" data-page="analytics" id="link-analytics">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="1,12 5,7 8,10 11,5 15,3"/>
+          </svg>
+          Analytics
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="javascript:void(0)" class="nav-link nav-link--product-lite" data-page="addins" id="link-addins">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="1" width="10" height="14" rx="1.5"/>
+            <line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/>
+            <line x1="6" y1="11" x2="8.5" y2="11"/>
+          </svg>
+          Applications
+        </a>
       </li>
       <li class="nav-item nav-item--after-products">
         <a href="javascript:void(0)" class="nav-link" data-page="about" id="link-about">
@@ -302,10 +275,10 @@ const NAV_STYLE = `
 }
 
 .nav-link.active {
-  background: linear-gradient(180deg, rgba(244,174,132,0.9) 0%, rgba(232,157,112,0.86) 100%);
-  color: white;
-  border: 1px solid rgba(255, 204, 178, 0.42);
-  box-shadow: 0 4px 12px rgba(232,157,112,0.2);
+  background: rgba(255,165,120,0.10);
+  color: rgba(255,215,195,1);
+  border: 1px solid rgba(255,165,120,0.22);
+  box-shadow: none;
 }
 
 .nav-link.active::before {
@@ -356,9 +329,10 @@ const NAV_STYLE = `
 }
 
 :root[data-theme="light"] .nav-link.active {
-  background: linear-gradient(180deg, rgba(37,99,235,0.95) 0%, rgba(29,78,216,0.9) 100%);
-  border-color: rgba(30,64,175,0.32);
-  box-shadow: 0 4px 12px rgba(37,99,235,0.24);
+  background: rgba(37,99,235,0.08);
+  color: rgba(30,58,138,0.95);
+  border-color: rgba(37,99,235,0.22);
+  box-shadow: none;
 }
 
 .nav-link--product {
@@ -435,10 +409,23 @@ const NAV_STYLE = `
   color: #fff;
 }
 
-.nav-link--product-parent.active {
-  background: linear-gradient(180deg, rgba(244,174,132,0.9) 0%, rgba(232,157,112,0.86) 100%);
-  color: white;
-  border-color: rgba(255,204,178,0.42);
+/* active state for inline product links — keeps their tinted border, adds warm glow */
+.nav-link--product.active {
+  background: rgba(255,165,120,0.15);
+  border-color: rgba(255,165,120,0.38);
+  color: rgba(255,220,200,1);
+}
+
+.nav-link--product-core.active {
+  background: rgba(120,200,255,0.16);
+  border-color: rgba(120,200,255,0.46);
+  color: rgba(200,235,255,1);
+}
+
+.nav-link--product-lite.active {
+  background: rgba(255,165,120,0.11);
+  border-color: rgba(255,165,120,0.28);
+  color: rgba(255,220,200,1);
 }
 
 .nav-dropdown-caret {
@@ -1049,29 +1036,12 @@ const FOOTER_TEMPLATE = `
     document.getElementById('link-home').href = links.home;
     document.getElementById('link-why').href = links.why;
     document.getElementById('link-how').href = links.how;
+    document.getElementById('link-faq').href = links.faq;
     document.getElementById('link-calculators').href = links.calculators;
     document.getElementById('link-analytics').href = links.analytics;
     document.getElementById('link-addins').href = links.addins;
     document.getElementById('link-about').href = links.about;
     document.getElementById('link-contact').href = links.contact;
-
-    // Products dropdown
-    const productsItem = document.getElementById('nav-products-item');
-    const productsBtn  = document.getElementById('nav-products-btn');
-    function openDropdown()  { productsItem.dataset.open = 'true';  productsBtn.setAttribute('aria-expanded', 'true'); }
-    function closeDropdown() { delete productsItem.dataset.open;    productsBtn.setAttribute('aria-expanded', 'false'); }
-
-    productsBtn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      productsItem.dataset.open === 'true' ? closeDropdown() : openDropdown();
-    });
-
-    // Close on outside click
-    document.addEventListener('click', function() { closeDropdown(); });
-    productsItem.addEventListener('click', function(e) { e.stopPropagation(); });
-
-    // Close on Escape
-    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeDropdown(); });
 
     // Mobile menu toggle
     mobileToggle.addEventListener('click', function() {
@@ -1140,6 +1110,8 @@ const FOOTER_TEMPLATE = `
       activePage = 'why';
     } else if (currentFile === 'how-it-works.html') {
       activePage = 'how';
+    } else if (currentFile === 'faq.html') {
+      activePage = 'faq';
     } else if (currentFile === 'index-Calculators.html') {
       activePage = 'calculators';
     } else if (currentFile === 'index-Analytics.html') {
@@ -1158,16 +1130,6 @@ const FOOTER_TEMPLATE = `
       if (link.getAttribute('data-page') === activePage) {
         link.classList.add('active');
       }
-    });
-
-    // Also mark dropdown items and the Products button active
-    const productPages = ['calculators', 'analytics', 'addins'];
-    const productsBtn = document.getElementById('nav-products-btn');
-    if (productsBtn) {
-      productsBtn.classList.toggle('active', productPages.includes(activePage));
-    }
-    document.querySelectorAll('.nav-dropdown-item').forEach(item => {
-      item.classList.toggle('active', item.getAttribute('data-page') === activePage);
     });
   }
 

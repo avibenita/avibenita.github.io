@@ -413,7 +413,30 @@ const StatisticoHeader = {
       const footer = document.createElement('div');
       footer.className = 'statistico-footer';
       const yr = new Date().getFullYear();
-      footer.innerHTML = `&copy; ${yr} Statistico &mdash; All rights reserved. <a class="statistico-footer-site-link" href="https://avibenita.github.io/" title="Visit the Statistico website" onclick="(function(e){e.preventDefault();var u='https://avibenita.github.io/';try{if(typeof Office!=='undefined'&&Office.context&&Office.context.ui&&Office.context.ui.openBrowserWindow){Office.context.ui.openBrowserWindow(u);}else{window.open(u,'_blank','noopener,noreferrer');}}catch(_){window.open(u,'_blank','noopener,noreferrer');}})(event)"><i class='fas fa-arrow-up-right-from-square' style='font-size:9px'></i>&nbsp;statistico.live</a>`;
+
+      const copy = document.createTextNode(`\u00a9 ${yr} Statistico \u2014 All rights reserved.\u00a0`);
+      footer.appendChild(copy);
+
+      const siteLink = document.createElement('a');
+      siteLink.className = 'statistico-footer-site-link';
+      siteLink.href = 'https://avibenita.github.io/';
+      siteLink.title = 'Visit the Statistico website';
+      siteLink.innerHTML = '<i class="fas fa-arrow-up-right-from-square"></i>\u00a0statistico.live';
+      siteLink.addEventListener('click', function (e) {
+        e.preventDefault();
+        const url = 'https://avibenita.github.io/';
+        try {
+          if (typeof Office !== 'undefined' && Office.context && Office.context.ui && Office.context.ui.openBrowserWindow) {
+            Office.context.ui.openBrowserWindow(url);
+          } else {
+            window.open(url, '_blank', 'noopener,noreferrer');
+          }
+        } catch (_) {
+          window.open(url, '_blank', 'noopener,noreferrer');
+        }
+      });
+      footer.appendChild(siteLink);
+
       const frame = document.querySelector('.laptop-frame') || document.body;
       frame.appendChild(footer);
     }

@@ -410,7 +410,7 @@ const StatisticoHeader = {
 
     // Inject website link into the footer (create footer if absent)
     (function injectSiteLink() {
-      const SITE_URL = 'https://avibenita.github.io/';
+      const SITE_URL = 'https://avibenita.github.io/Statistico-Website/index.html';
       const LINK_CLASS = 'statistico-footer-site-link';
 
       function openSite(e) {

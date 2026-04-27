@@ -1108,7 +1108,7 @@
     if (!actions || actions.querySelector(".site-external-link")) return;
     const link = document.createElement("a");
     link.className = "site-external-link";
-    link.href = "https://avibenita.github.io/";
+    link.href = "https://avibenita.github.io/Statistico-Website/index.html";
     link.target = "_blank";
     link.rel = "noopener noreferrer";
     link.title = "Visit the Statistico website";

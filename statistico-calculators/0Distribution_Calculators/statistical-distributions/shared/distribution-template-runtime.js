@@ -1103,6 +1103,43 @@
     actions.appendChild(link);
   }
 
+  function initWebsiteLink() {
+    const actions = getHeaderActionsContainer();
+    if (!actions || actions.querySelector(".site-external-link")) return;
+    const link = document.createElement("a");
+    link.className = "site-external-link";
+    link.href = "https://avibenita.github.io/";
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.title = "Visit the Statistico website";
+    link.innerHTML = '<i class="fas fa-arrow-up-right-from-square" style="font-size:0.72rem"></i> statistico.live';
+    link.style.display = "inline-flex";
+    link.style.alignItems = "center";
+    link.style.gap = "5px";
+    link.style.padding = "8px 12px";
+    link.style.borderRadius = "999px";
+    link.style.border = "1px solid rgba(255,255,255,0.13)";
+    link.style.background = "rgba(255,255,255,0.04)";
+    link.style.color = "rgba(210,228,248,0.58)";
+    link.style.textDecoration = "none";
+    link.style.fontSize = "0.78rem";
+    link.style.fontWeight = "600";
+    link.style.whiteSpace = "nowrap";
+    link.style.flexShrink = "0";
+    link.style.transition = "border-color .18s, background .18s, color .18s";
+    link.addEventListener("mouseenter", () => {
+      link.style.borderColor = "rgba(255,165,120,0.38)";
+      link.style.background = "rgba(255,165,120,0.10)";
+      link.style.color = "rgba(255,210,175,0.92)";
+    });
+    link.addEventListener("mouseleave", () => {
+      link.style.borderColor = "rgba(255,255,255,0.13)";
+      link.style.background = "rgba(255,255,255,0.04)";
+      link.style.color = "rgba(210,228,248,0.58)";
+    });
+    actions.appendChild(link);
+  }
+
   function ensureThemeToggleComponent() {
     if (window.StatisticoThemeToggle) return Promise.resolve();
     return new Promise((resolve) => {
@@ -1961,6 +1998,7 @@
 
     initCalcModes(cfg);
     initBackToHubButton();
+    initWebsiteLink();
     initThemeToggle();
 
     document.querySelectorAll('input[name="calcType"]').forEach((r) => {

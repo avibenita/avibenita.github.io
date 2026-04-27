@@ -412,7 +412,8 @@ const StatisticoHeader = {
     if (!document.querySelector('.statistico-footer')) {
       const footer = document.createElement('div');
       footer.className = 'statistico-footer';
-      footer.innerHTML = `&copy; ${new Date().getFullYear()} Statistico &mdash; All rights reserved.`;
+      const yr = new Date().getFullYear();
+      footer.innerHTML = `&copy; ${yr} Statistico &mdash; All rights reserved. <a class="statistico-footer-site-link" href="https://avibenita.github.io/" title="Visit the Statistico website" onclick="(function(e){e.preventDefault();var u='https://avibenita.github.io/';try{if(typeof Office!=='undefined'&&Office.context&&Office.context.ui&&Office.context.ui.openBrowserWindow){Office.context.ui.openBrowserWindow(u);}else{window.open(u,'_blank','noopener,noreferrer');}}catch(_){window.open(u,'_blank','noopener,noreferrer');}})(event)"><i class='fas fa-arrow-up-right-from-square' style='font-size:9px'></i>&nbsp;statistico.live</a>`;
       const frame = document.querySelector('.laptop-frame') || document.body;
       frame.appendChild(footer);
     }

@@ -413,19 +413,6 @@ const StatisticoHeader = {
       const SITE_URL = 'https://avibenita.github.io/Statistico-Website/index.html';
       const LINK_CLASS = 'statistico-footer-site-link';
 
-      function openSite(e) {
-        e.preventDefault();
-        try {
-          if (typeof Office !== 'undefined' && Office.context && Office.context.ui && Office.context.ui.openBrowserWindow) {
-            Office.context.ui.openBrowserWindow(SITE_URL);
-          } else {
-            window.open(SITE_URL, '_blank', 'noopener,noreferrer');
-          }
-        } catch (_) {
-          window.open(SITE_URL, '_blank', 'noopener,noreferrer');
-        }
-      }
-
       let footer = document.querySelector('.statistico-footer');
       if (!footer) {
         footer = document.createElement('div');
@@ -436,16 +423,16 @@ const StatisticoHeader = {
         frame.appendChild(footer);
       }
 
-      // Add site link only once
+      // Add site link only once — use target="_blank" so WebView2 passes it to the system browser
       if (!footer.querySelector('.' + LINK_CLASS)) {
-        const sep = document.createTextNode('\u00a0\u00a0');
-        footer.appendChild(sep);
+        footer.appendChild(document.createTextNode('\u00a0\u00a0'));
         const link = document.createElement('a');
         link.className = LINK_CLASS;
         link.href = SITE_URL;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
         link.title = 'Visit the Statistico website';
         link.innerHTML = '<i class="fas fa-arrow-up-right-from-square"></i>\u00a0statistico.live';
-        link.addEventListener('click', openSite);
         footer.appendChild(link);
       }
     })();

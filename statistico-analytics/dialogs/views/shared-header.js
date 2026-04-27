@@ -408,38 +408,47 @@ const StatisticoHeader = {
     // Trigger view-name slide-in animation
     this.revealViewName();
 
-    // Inject "All rights reserved" footer at the bottom of the frame (once)
-    if (!document.querySelector('.statistico-footer')) {
-      const footer = document.createElement('div');
-      footer.className = 'statistico-footer';
-      const yr = new Date().getFullYear();
+    // Inject website link into the footer (create footer if absent)
+    (function injectSiteLink() {
+      const SITE_URL = 'https://avibenita.github.io/';
+      const LINK_CLASS = 'statistico-footer-site-link';
 
-      const copy = document.createTextNode(`\u00a9 ${yr} Statistico \u2014 All rights reserved.\u00a0`);
-      footer.appendChild(copy);
-
-      const siteLink = document.createElement('a');
-      siteLink.className = 'statistico-footer-site-link';
-      siteLink.href = 'https://avibenita.github.io/';
-      siteLink.title = 'Visit the Statistico website';
-      siteLink.innerHTML = '<i class="fas fa-arrow-up-right-from-square"></i>\u00a0statistico.live';
-      siteLink.addEventListener('click', function (e) {
+      function openSite(e) {
         e.preventDefault();
-        const url = 'https://avibenita.github.io/';
         try {
           if (typeof Office !== 'undefined' && Office.context && Office.context.ui && Office.context.ui.openBrowserWindow) {
-            Office.context.ui.openBrowserWindow(url);
+            Office.context.ui.openBrowserWindow(SITE_URL);
           } else {
-            window.open(url, '_blank', 'noopener,noreferrer');
+            window.open(SITE_URL, '_blank', 'noopener,noreferrer');
           }
         } catch (_) {
-          window.open(url, '_blank', 'noopener,noreferrer');
+          window.open(SITE_URL, '_blank', 'noopener,noreferrer');
         }
-      });
-      footer.appendChild(siteLink);
+      }
 
-      const frame = document.querySelector('.laptop-frame') || document.body;
-      frame.appendChild(footer);
-    }
+      let footer = document.querySelector('.statistico-footer');
+      if (!footer) {
+        footer = document.createElement('div');
+        footer.className = 'statistico-footer';
+        const yr = new Date().getFullYear();
+        footer.appendChild(document.createTextNode(`\u00a9 ${yr} Statistico-Interactive\u2122 \u2014 All rights reserved`));
+        const frame = document.querySelector('.laptop-frame') || document.body;
+        frame.appendChild(footer);
+      }
+
+      // Add site link only once
+      if (!footer.querySelector('.' + LINK_CLASS)) {
+        const sep = document.createTextNode('\u00a0\u00a0');
+        footer.appendChild(sep);
+        const link = document.createElement('a');
+        link.className = LINK_CLASS;
+        link.href = SITE_URL;
+        link.title = 'Visit the Statistico website';
+        link.innerHTML = '<i class="fas fa-arrow-up-right-from-square"></i>\u00a0statistico.live';
+        link.addEventListener('click', openSite);
+        footer.appendChild(link);
+      }
+    })();
     if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
       window.StatisticoTooltip.refresh();
     }

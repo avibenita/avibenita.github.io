@@ -682,7 +682,9 @@
           activeText: '#ffffff',
           headerBg: 'linear-gradient(160deg,#0d3b1e 0%,#071a0c 100%)',
           iconBg: 'linear-gradient(135deg,#22c55e,#15803d)',
-          iconShadow: '0 2px 6px rgba(34,197,94,0.30)'
+          iconShadow: '0 2px 6px rgba(34,197,94,0.30)',
+          listIconBg: 'rgba(34,197,94,0.13)',
+          listIconColor: '#15803d'
         },
         calculators:  {
           bg: '#ffffcc',
@@ -690,7 +692,9 @@
           activeText: '#7a5200',
           headerBg: 'linear-gradient(160deg,#2e1d00 0%,#120c00 100%)',
           iconBg: 'linear-gradient(135deg,#fde047,#ca8a04)',
-          iconShadow: '0 2px 6px rgba(202,138,4,0.35)'
+          iconShadow: '0 2px 6px rgba(202,138,4,0.35)',
+          listIconBg: '#ffffcc',
+          listIconColor: '#7a5200'
         },
         applications: {
           bg: 'linear-gradient(135deg,#c7b6ff 0%,#7d6bc7 100%)',
@@ -698,7 +702,9 @@
           activeText: '#ffffff',
           headerBg: 'linear-gradient(160deg,#1e1040 0%,#0d0820 100%)',
           iconBg: 'linear-gradient(135deg,#c7b6ff,#7d6bc7)',
-          iconShadow: '0 2px 6px rgba(125,107,199,0.35)'
+          iconShadow: '0 2px 6px rgba(125,107,199,0.35)',
+          listIconBg: 'rgba(125,107,199,0.13)',
+          listIconColor: '#5b21b6'
         }
       };
 
@@ -711,9 +717,9 @@
 
         /* Active tab text colour (dark for light pills like yellow) */
         var active = tabsRow.querySelector('.hub-nav-tab.active');
-        if (active) active.style.color = s.activeText;
+        if (active) active.style.setProperty('color', s.activeText, 'important');
         /* Reset inline color on inactive tabs so CSS class colors apply */
-        tabsRow.querySelectorAll('.hub-nav-tab:not(.active)').forEach(function(t) { t.style.color = ''; });
+        tabsRow.querySelectorAll('.hub-nav-tab:not(.active)').forEach(function(t) { t.style.removeProperty('color'); });
 
         /* Header card background (bypasses color-mix which WebView2 doesn't support) */
         var brandCard = document.querySelector('.hub-brand');
@@ -724,7 +730,16 @@
         if (brandIcon) {
           brandIcon.style.background = s.iconBg;
           brandIcon.style.boxShadow  = s.iconShadow;
+          var brandI = brandIcon.querySelector('i');
+          if (brandI) brandI.style.color = s.activeText;
         }
+
+        /* All list/category icons — match tab colour */
+        document.querySelectorAll('.module-icon, .category-icon').forEach(function(icon) {
+          icon.style.setProperty('background', s.listIconBg, 'important');
+          var sym = icon.querySelector('i');
+          if (sym) sym.style.setProperty('color', s.listIconColor, 'important');
+        });
       }
 
       function getActiveCluster() {
@@ -763,6 +778,14 @@
           applyClusterStyle(active.dataset.cluster || 'analytics');
         }
       }).observe(tabsRow, { subtree: true, attributeFilter: ['class'] });
+
+      /* Re-apply icon colours whenever hub content re-renders */
+      var contentPanel = document.getElementById('hubContent') || document.querySelector('.hub-content-panel');
+      if (contentPanel) {
+        new MutationObserver(function() {
+          applyClusterStyle(getActiveCluster());
+        }).observe(contentPanel, { childList: true, subtree: true });
+      }
 
       /* Initial pin after layout */
       requestAnimationFrame(function() {

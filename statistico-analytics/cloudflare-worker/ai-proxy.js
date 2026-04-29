@@ -47,30 +47,37 @@ export default {
     }
 
     /* ── Forward to Groq ──────────────────────────────────────── */
-    let body;
     try {
-      body = await request.json();
-    } catch {
-      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-        status: 400,
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+        });
+      }
+
+      const groqRes = await fetch(GROQ_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${env.GROQ_KEY}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      const data = await groqRes.json();
+
+      return new Response(JSON.stringify(data), {
+        status: groqRes.status,
+        headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+      });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: err.message || 'Internal proxy error' }), {
+        status: 502,
         headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
       });
     }
-
-    const groqRes = await fetch(GROQ_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${env.GROQ_KEY}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    const data = await groqRes.json();
-
-    return new Response(JSON.stringify(data), {
-      status: groqRes.status,
-      headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-    });
   },
 };

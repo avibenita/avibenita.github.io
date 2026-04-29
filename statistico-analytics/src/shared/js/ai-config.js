@@ -6,4 +6,4 @@
  *
  * Example:  https://statistico-ai.your-subdomain.workers.dev/
  */
-window.AI_PROXY_URL = 'https://statistico-ai.YOUR_SUBDOMAIN.workers.dev/';
+window.AI_PROXY_URL = 'https://statistico-ai.statistico.workers.dev/';

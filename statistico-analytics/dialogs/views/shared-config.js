@@ -109,7 +109,7 @@
   const SAVE_BTN_TIP_HTML =
     '<strong class="st-tt-title"><i class="fa-solid fa-floppy-disk" style="margin-right:5px;opacity:.85;"></i>Save this Configuration</strong>' +
     '<span class="st-tt-body">Stores your current setup — selected variables, method, and all options — so you can reload it instantly without re-entering anything.</span>' +
-    '<span class="st-tt-hint">Configs are saved locally in your browser.</span>';
+    '<span class="st-tt-hint">Saved in your browser (localStorage), not in the workbook. Will not transfer to other devices or browsers.</span>';
   const LOAD_BTN_TIP = 'Browse saved configurations';
   const LOAD_BTN_TIP_HTML =
     '<strong class="st-tt-title"><i class="fa-solid fa-folder-open" style="margin-right:5px;opacity:.85;"></i>Saved Configurations</strong>' +

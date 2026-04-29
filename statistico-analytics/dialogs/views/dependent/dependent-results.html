@@ -13,11 +13,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260309c" />
   <script src="../shared-header.js?v=20260421a"></script>
 
-  <script>
-    // AI API Key configuration (Groq)
-    window.AI_API_KEY = 'YOUR_GROQ_API_KEY_HERE';
-    console.log('?? AI API Key set:', window.AI_API_KEY && window.AI_API_KEY !== 'YOUR_API_KEY_PLACEHOLDER' ? 'YES (***' + window.AI_API_KEY.slice(-4) + ')' : 'NO - Key not configured');
-  </script>
+  <script src="../../../src/shared/js/ai-config.js?v=20260429a"></script>
   <style>
     :root{--surface-0:#0c1624;--surface-1:#1a1f2e;--surface-2:#242938;--border:#2d3748;--accent-1:rgb(255,165,120);--accent-2:rgb(120,200,255);--text-primary:#fff;--text-secondary:rgba(255,255,255,.82);--text-muted:rgba(255,255,255,.62);--panel-radius:10px;--panel-shadow:0 4px 20px rgba(0,0,0,.4);}
     /* ── Light Theme ── */
@@ -1393,9 +1389,9 @@
         return;
       }
       
-      console.log('?? Checking API key...', window.AI_API_KEY ? 'Present' : 'Missing');
-      if (!window.AI_API_KEY || window.AI_API_KEY === 'YOUR_API_KEY_PLACEHOLDER') {
-        showAISummary('AI API key not configured. Please set up your Groq API key.');
+      
+      if (!window.AI_PROXY_URL || window.AI_PROXY_URL.includes('YOUR_SUBDOMAIN')) {
+        showAISummary('AI proxy not configured. Please deploy the Cloudflare Worker and update ai-config.js.');
         return;
       }
       
@@ -1417,12 +1413,9 @@
         const userPrompt = `Summarize this 2-group comparison analysis:\n\n${JSON.stringify(payload, null, 2)}\n\nProvide a brief, clear summary highlighting: 1) group descriptives, 2) assumption tests, 3) primary test result, 4) effect size, 5) interpretation.`;
         
         console.log('?? Calling Groq API...');
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        const response = await fetch(window.AI_PROXY_URL, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${window.AI_API_KEY}`
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             model: 'llama-3.3-70b-versatile',
             messages: [

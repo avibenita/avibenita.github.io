@@ -13,11 +13,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260309c" />
   <script src="../shared-header.js?v=20260421a"></script>
 
-  <script>
-    // AI API Key configuration (Groq)
-    window.AI_API_KEY = 'YOUR_GROQ_API_KEY_HERE';
-    console.log('?? AI API Key set:', window.AI_API_KEY && window.AI_API_KEY !== 'YOUR_API_KEY_PLACEHOLDER' ? 'YES (***' + window.AI_API_KEY.slice(-4) + ')' : 'NO - Key not configured');
-  </script>
+  <script src="../../../src/shared/js/ai-config.js?v=20260429a"></script>
   <style>
     :root{--surface-0:#0c1624;--surface-1:#1a1f2e;--surface-2:#242938;--border:#6b7280;--accent-1:rgb(255,165,120);--accent-2:rgb(120,200,255);--text-primary:#fff;--text-secondary:rgba(255,255,255,.82);--text-muted:rgba(255,255,255,.62);--panel-radius:10px;--panel-shadow:0px 4px 20px rgba(0,0,0,.4);}
     /* ── Light Theme ── */
@@ -2545,15 +2541,10 @@
       const error = document.getElementById('aiSummaryError');
       
       // Validate API key
-      if (!window.AI_API_KEY || window.AI_API_KEY === 'YOUR_API_KEY_PLACEHOLDER') {
-        error.innerHTML = '<strong>Configuration Error:</strong> AI API key not configured. Please contact support.';
-        error.style.display = 'block';
-        content.style.display = 'none';
-        loading.style.display = 'none';
-        panel.style.display = 'block';
-        
-        // Switch to Report tab
-        document.querySelectorAll('.tab-button').forEach(function(t) { t.classList.remove('active'); });
+      if (!window.AI_PROXY_URL || window.AI_PROXY_URL.includes('YOUR_SUBDOMAIN')) {
+        showAISummary('AI proxy not configured. Please deploy the Cloudflare Worker and update ai-config.js.');
+        return;
+      });
         document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
         switchTab('report');
         document.getElementById('tab-report').classList.add('active');
@@ -2626,12 +2617,9 @@ ${JSON.stringify(payload, null, 2)}`;
       console.log('?? Full AI Payload being sent:', JSON.stringify(payload, null, 2));
       
       try {
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        const response = await fetch(window.AI_PROXY_URL, {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${window.AI_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             model: 'llama-3.3-70b-versatile',
             messages: [

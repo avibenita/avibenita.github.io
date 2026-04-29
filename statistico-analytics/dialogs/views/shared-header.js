@@ -2809,47 +2809,32 @@ ACTION: [action 1] | [action 2]`;
   // ── AI API call ──────────────────────────────────────────────────────────
 
   async _callAiForSidebar(prompt) {
-    const DEV_MODE    = true;
-    const WORKER_URL  = 'https://statistico-ai.avibenita.workers.dev';
-    const LICENSE_KEY = (() => { try { return (localStorage.getItem('statistico-license-key') || '').trim() || 'DEV'; } catch (_) { return 'DEV'; } })();
+    const PROXY_URL = 'https://statistico-ai.statistico.workers.dev/';
 
-    if (DEV_MODE) {
-      const models = ['llama-3.1-8b-instant', 'llama3-8b-8192', 'llama-3.3-70b-versatile'];
-      const key = atob('Z3NrX0xmVHdFRUFTYjVoY3l4Z2JteTF4V0dkeWIzRlk5WmRyYlNvZmJLTXNja2d4NUNTUzFnTlY=');
-      let lastErr = null;
-      for (const model of models) {
-        try {
-          const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-            body: JSON.stringify({
-              model,
-              messages: [
-                { role: 'system', content: 'You are an expert statistician. Always follow the exact output format requested. Be decisive, use exact numbers, avoid hedging.' },
-                { role: 'user',   content: prompt }
-              ],
-              max_tokens: 600,
-              temperature: 0.3
-            })
-          });
-          if (!r.ok) { const e = await r.json().catch(() => ({})); lastErr = new Error(e?.error?.message || `HTTP ${r.status}`); if (r.status === 404) continue; throw lastErr; }
-          const d = await r.json();
-          const text = d?.choices?.[0]?.message?.content?.trim();
-          if (!text) { lastErr = new Error('Empty response'); continue; }
-          return text;
-        } catch (err) { lastErr = err; if (err.message?.includes('not found')) continue; throw err; }
-      }
-      throw lastErr || new Error('No AI model available');
+    let lastErr = null;
+    for (const model of ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'llama3-8b-8192']) {
+      try {
+        const r = await fetch(PROXY_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: 'You are an expert statistician. Always follow the exact output format requested. Be decisive, use exact numbers, avoid hedging.' },
+              { role: 'user',   content: prompt }
+            ],
+            max_tokens: 600,
+            temperature: 0.3
+          })
+        });
+        if (!r.ok) { const e = await r.json().catch(() => ({})); lastErr = new Error(e?.error?.message || `HTTP ${r.status}`); if (r.status === 404) continue; throw lastErr; }
+        const d = await r.json();
+        const text = d?.choices?.[0]?.message?.content?.trim();
+        if (!text) { lastErr = new Error('Empty response'); continue; }
+        return text;
+      } catch (err) { lastErr = err; if (err.message?.includes('not found')) continue; throw err; }
     }
-
-    const resp = await fetch(WORKER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, licenseKey: LICENSE_KEY })
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data?.error || `Server error ${resp.status}`);
-    return data.text;
+    throw lastErr || new Error('No AI model available');
   },
 
   // ── Response parser ──────────────────────────────────────────────────────

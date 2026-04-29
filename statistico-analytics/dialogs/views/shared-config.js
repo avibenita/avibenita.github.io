@@ -105,8 +105,16 @@
   'use strict';
 
   const SAVE_BTN_TEXT = 'Save this Configuration';
-  const SAVE_BTN_TIP = 'Save configuration.';
-  const LOAD_BTN_TIP = 'Open saved configs.';
+  const SAVE_BTN_TIP = 'Save this configuration';
+  const SAVE_BTN_TIP_HTML =
+    '<strong class="st-tt-title"><i class="fa-solid fa-floppy-disk" style="margin-right:5px;opacity:.85;"></i>Save this Configuration</strong>' +
+    '<span class="st-tt-body">Stores your current setup — selected variables, method, and all options — so you can reload it instantly without re-entering anything.</span>' +
+    '<span class="st-tt-hint">Configs are saved locally in your browser.</span>';
+  const LOAD_BTN_TIP = 'Browse saved configurations';
+  const LOAD_BTN_TIP_HTML =
+    '<strong class="st-tt-title"><i class="fa-solid fa-folder-open" style="margin-right:5px;opacity:.85;"></i>Saved Configurations</strong>' +
+    '<span class="st-tt-body">Browse and restore previously saved setups. Selecting one reloads all your variables, method, and options in one click.</span>' +
+    '<span class="st-tt-hint">Only configs saved from this analysis type are shown.</span>';
   const LOAD_BTN_TEXT = (count) => count > 0 ? `Saved configs (${count})...` : 'Saved configs...';
 
   function escHtml(s) {
@@ -133,6 +141,7 @@
       saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> ' + SAVE_BTN_TEXT;
       saveBtn.removeAttribute('data-tip');
       saveBtn.setAttribute('data-st-tip', SAVE_BTN_TIP);
+      saveBtn.setAttribute('data-st-tip-html', SAVE_BTN_TIP_HTML);
     }
     if (loadBtn) {
       loadBtn.removeAttribute('title');
@@ -140,6 +149,7 @@
       loadBtn.innerHTML = '<i class="fa-solid fa-folder-open"></i> ' + LOAD_BTN_TEXT(count);
       loadBtn.removeAttribute('data-tip');
       loadBtn.setAttribute('data-st-tip', LOAD_BTN_TIP);
+      loadBtn.setAttribute('data-st-tip-html', LOAD_BTN_TIP_HTML);
       loadBtn.disabled = count === 0;
     }
     if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {

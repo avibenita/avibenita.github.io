@@ -18,15 +18,15 @@
         position: fixed;
         z-index: 2147483000;
         max-width: 280px;
-        min-width: 120px;
-        padding: 8px 10px;
+        min-width: 140px;
+        padding: 9px 11px;
         border-radius: 8px;
         background: #0f172a;
         color: #f8fafc;
         border: 1px solid rgba(255,255,255,.16);
-        font-size: 12px;
-        font-weight: 600;
-        line-height: 1.35;
+        font-size: 11.5px;
+        font-weight: 400;
+        line-height: 1.45;
         box-shadow: 0 8px 20px rgba(0,0,0,.28);
         pointer-events: none;
         opacity: 0;
@@ -38,9 +38,172 @@
         opacity: 1;
         transform: translateY(0);
       }
+      .st-tt-title {
+        display: block;
+        font-size: 12px;
+        font-weight: 700;
+        color: #ffffff;
+        margin-bottom: 4px;
+        letter-spacing: .01em;
+      }
+      .st-tt-body {
+        display: block;
+        font-size: 11px;
+        color: rgba(248,250,252,0.78);
+        line-height: 1.5;
+      }
+      .st-tt-hint {
+        display: block;
+        margin-top: 5px;
+        font-size: 10.5px;
+        color: rgba(248,250,252,0.48);
+        font-style: italic;
+      }
     `;
     document.head.appendChild(style);
   }
+
+  function ensureTooltipNode() {
+    let node = document.getElementById(TOOLTIP_ID);
+    if (node) return node;
+    node = document.createElement('div');
+    node.id = TOOLTIP_ID;
+    node.className = 'st-tooltip';
+    node.setAttribute('role', 'tooltip');
+    node.setAttribute('data-visible', '0');
+    document.body.appendChild(node);
+    return node;
+  }
+
+  function resolveText(el) {
+    if (!el) return '';
+    return (
+      el.getAttribute('data-st-tip') ||
+      el.getAttribute('data-tip') ||
+      el.getAttribute('title') ||
+      ''
+    ).trim();
+  }
+
+  function resolveHtml(el) {
+    if (!el) return '';
+    return (el.getAttribute('data-st-tip-html') || '').trim();
+  }
+
+  function prepareElement(el) {
+    if (!el) return;
+    const text = resolveText(el);
+    const html = resolveHtml(el);
+    if (!text && !html) return;
+    if (!el.getAttribute('data-st-tip') && text) el.setAttribute('data-st-tip', text);
+    if (el.getAttribute('title')) {
+      el.setAttribute('data-st-title-orig', el.getAttribute('title'));
+      el.removeAttribute('title');
+    }
+    el.setAttribute(SCRIPT_FLAG, '1');
+  }
+
+  function positionTooltip(anchor, node) {
+    const margin = 8;
+    const rect = anchor.getBoundingClientRect();
+    const nodeRect = node.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    let top = rect.bottom + margin;
+    const leftCentered = rect.left + (rect.width / 2) - (nodeRect.width / 2);
+    let left = Math.max(margin, Math.min(leftCentered, vw - nodeRect.width - margin));
+
+    if (top + nodeRect.height > vh - margin) {
+      top = rect.top - nodeRect.height - margin;
+      if (top < margin) {
+        top = Math.max(margin, vh - nodeRect.height - margin);
+      }
+    }
+
+    node.style.left = `${Math.round(left)}px`;
+    node.style.top = `${Math.round(top)}px`;
+  }
+
+  function showFor(anchor) {
+    if (!anchor) return;
+    prepareElement(anchor);
+    const html = resolveHtml(anchor);
+    const text = resolveText(anchor);
+    if (!html && !text) return;
+    const node = ensureTooltipNode();
+    if (html) {
+      node.innerHTML = html;
+    } else {
+      node.textContent = text;
+    }
+    node.setAttribute('data-visible', '0');
+    node.style.left = '-9999px';
+    node.style.top = '-9999px';
+    requestAnimationFrame(() => {
+      positionTooltip(anchor, node);
+      node.setAttribute('data-visible', '1');
+    });
+    activeAnchor = anchor;
+  }
+
+  function hide() {
+    const node = document.getElementById(TOOLTIP_ID);
+    if (node) node.setAttribute('data-visible', '0');
+    activeAnchor = null;
+  }
+
+  function closestTooltipAnchor(target) {
+    if (!target || !target.closest) return null;
+    return target.closest('[data-st-tip], [data-st-tip-html], [data-tip], [title]');
+  }
+
+  function init() {
+    ensureStyle();
+    ensureTooltipNode();
+
+    document.querySelectorAll('[data-st-tip], [data-st-tip-html], [data-tip], [title]').forEach(prepareElement);
+
+    document.addEventListener('mouseover', function (ev) {
+      const anchor = closestTooltipAnchor(ev.target);
+      if (!anchor) return;
+      showFor(anchor);
+    });
+
+    document.addEventListener('mouseout', function (ev) {
+      const anchor = closestTooltipAnchor(ev.target);
+      if (!anchor) return;
+      const to = ev.relatedTarget;
+      if (to && anchor.contains(to)) return;
+      if (activeAnchor === anchor) hide();
+    });
+
+    document.addEventListener('focusin', function (ev) {
+      const anchor = closestTooltipAnchor(ev.target);
+      if (!anchor) return;
+      showFor(anchor);
+    });
+
+    document.addEventListener('focusout', function (ev) {
+      const anchor = closestTooltipAnchor(ev.target);
+      if (!anchor) return;
+      if (activeAnchor === anchor) hide();
+    });
+
+    window.addEventListener('scroll', hide, true);
+    window.addEventListener('blur', hide);
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) hide();
+    });
+  }
+
+  function refresh(scope) {
+    const root = scope && scope.querySelectorAll ? scope : document;
+    root.querySelectorAll('[data-st-tip], [data-st-tip-html], [data-tip], [title]').forEach(prepareElement);
+  }
+
+  window.StatisticoTooltip = { init, refresh, hide };
+})();
 
   function ensureTooltipNode() {
     let node = document.getElementById(TOOLTIP_ID);

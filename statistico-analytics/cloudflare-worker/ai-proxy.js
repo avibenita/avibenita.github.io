@@ -58,23 +58,34 @@ export default {
         });
       }
 
-      const groqRes = await fetch(GROQ_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${env.GROQ_KEY}`,
-        },
-        body: JSON.stringify(body),
-      });
+      let groqRes;
+      try {
+        groqRes = await fetch(GROQ_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${env.GROQ_KEY}`,
+          },
+          body: JSON.stringify(body),
+        });
+      } catch (fetchErr) {
+        return new Response(JSON.stringify({ error: `Network error reaching Groq: ${fetchErr.message}` }), {
+          status: 502,
+          headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+        });
+      }
 
-      const data = await groqRes.json();
+      /* Groq may return non-JSON on some errors — safe-parse */
+      const rawText = await groqRes.text();
+      let data;
+      try { data = JSON.parse(rawText); } catch { data = { error: rawText || `Groq returned HTTP ${groqRes.status} with empty body` }; }
 
       return new Response(JSON.stringify(data), {
         status: groqRes.status,
         headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
       });
     } catch (err) {
-      return new Response(JSON.stringify({ error: err.message || 'Internal proxy error' }), {
+      return new Response(JSON.stringify({ error: `Proxy error: ${err.message}` }), {
         status: 502,
         headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
       });

@@ -47,7 +47,7 @@ console.log('📦 Loading shared-header.js VERSION 2026-03-08-024 (sidebar-corre
 
   const script = document.createElement('script');
   script.id = 'st-tooltip-template-script';
-  script.src = resolveAssetUrl('src/shared/js/tooltip-template.js?v=20260429a');
+  script.src = resolveAssetUrl('src/shared/js/tooltip-template.js?v=20260429c');
   script.async = true;
   script.onload = initTooltip;
   document.head.appendChild(script);

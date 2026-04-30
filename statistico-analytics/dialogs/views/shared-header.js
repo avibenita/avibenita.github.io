@@ -3018,7 +3018,7 @@ Always follow the exact output format requested.` },
           <span class="sb-ai-signal-value">${meta.primarySignal}</span>
         </div>` : ''}
         ${sections.ABOUT ? `
-        <div class="sb-ai-section sb-ai-section--about">
+        <div class="sb-ai-section sb-ai-section--about sb-ai-about-hero">
           <div class="sb-ai-section-body sb-ai-about-line">${sections.ABOUT}</div>
         </div>
         <div class="sb-ai-divider"></div>` : ''}
@@ -3042,19 +3042,28 @@ Always follow the exact output format requested.` },
 
         ${/* ── Insight Guide sections (per-view explain mode) ── */ ''}
         ${sections.CONTROLS ? `
-        <div class="sb-ai-section sb-ai-section--controls">
-          <div class="sb-ai-section-label"><i class="fa-solid fa-sliders"></i> How to Interact</div>
-          <div class="sb-ai-section-body">${renderList(sections.CONTROLS)}</div>
+        <div class="sb-ai-section sb-ai-section--controls sb-ai-collapsible">
+          <div class="sb-ai-collapsible-hdr" data-target="sb-ctrl">
+            <span><i class="fa-solid fa-sliders"></i> How to Interact</span>
+            <i class="fa-solid fa-chevron-down sb-ai-chevron"></i>
+          </div>
+          <div class="sb-ai-collapsible-body" id="sb-ctrl">${renderList(sections.CONTROLS)}</div>
         </div>` : ''}
         ${sections.PATTERNS ? `
-        <div class="sb-ai-section sb-ai-section--patterns">
-          <div class="sb-ai-section-label"><i class="fa-solid fa-chart-line"></i> What to Look For</div>
-          <div class="sb-ai-section-body">${renderList(sections.PATTERNS)}</div>
+        <div class="sb-ai-section sb-ai-section--patterns sb-ai-collapsible">
+          <div class="sb-ai-collapsible-hdr" data-target="sb-patt">
+            <span><i class="fa-solid fa-chart-line"></i> What to Look For</span>
+            <i class="fa-solid fa-chevron-down sb-ai-chevron"></i>
+          </div>
+          <div class="sb-ai-collapsible-body" id="sb-patt">${renderList(sections.PATTERNS)}</div>
         </div>` : ''}
         ${sections.READING ? `
-        <div class="sb-ai-section sb-ai-section--reading">
-          <div class="sb-ai-section-label"><i class="fa-solid fa-magnifying-glass-chart"></i> Current Reading</div>
-          <div class="sb-ai-section-body sb-ai-insight-body">${sections.READING}</div>
+        <div class="sb-ai-section sb-ai-section--reading sb-ai-collapsible">
+          <div class="sb-ai-collapsible-hdr" data-target="sb-read">
+            <span><i class="fa-solid fa-magnifying-glass-chart"></i> Current Reading</span>
+            <i class="fa-solid fa-chevron-down sb-ai-chevron"></i>
+          </div>
+          <div class="sb-ai-collapsible-body" id="sb-read"><p class="sb-ai-insight-body">${sections.READING}</p></div>
         </div>` : ''}
 
         ${/* ── Full-view structure ── */ ''}
@@ -3119,7 +3128,16 @@ Always follow the exact output format requested.` },
         <div class="sb-ai-footer">AI interpretations are decision aids — verify critical findings with domain experts.</div>
       </div>
     `;
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) { overlay.remove(); return; }
+      const hdr = e.target.closest('.sb-ai-collapsible-hdr');
+      if (!hdr) return;
+      const id   = hdr.dataset.target;
+      const body = document.getElementById(id);
+      if (!body) return;
+      const open = body.classList.toggle('sb-ai-collapsible-body--open');
+      hdr.querySelector('.sb-ai-chevron')?.classList.toggle('sb-ai-chevron--open', open);
+    });
     document.body.appendChild(overlay);
     requestAnimationFrame(() => overlay.classList.add('sb-ai-overlay--visible'));
   }

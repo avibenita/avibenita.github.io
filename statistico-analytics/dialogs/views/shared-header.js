@@ -2014,7 +2014,7 @@ const StatisticoHeader = {
     btn.id = 'sbAiFloatBtn';
     btn.className = 'sb-ai-float-btn';
     btn.title = `AI Insight — ${label}`;
-    btn.innerHTML = `<i class="fa-solid fa-brain"></i><span>Explain ${label}</span><sup class="sb-ai-sup">AI</sup>`;
+    btn.innerHTML = `<i class="fa-solid fa-compass"></i><span>Guide: ${label}</span><sup class="sb-ai-sup">AI</sup>`;
     btn.addEventListener('click', () => StatisticoHeader._sbAiPerViewInterpret());
 
     rightCol.style.position = 'relative';
@@ -2042,7 +2042,7 @@ const StatisticoHeader = {
       const viewLabels = { histogram:'Histogram',boxplot:'Box Plot',cdf:'CDF',percentile:'Percentiles',kernel:'Kernel Density',outliers:'Outliers',normality:'Normality Tests',qqplot:'QQ / PP Plots',confidence:'Confidence Intervals' };
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-brain"></i><span>Explain ${viewLabels[this.currentView] || 'View'}</span><sup class="sb-ai-sup">AI</sup>`;
+        btn.innerHTML = `<i class="fa-solid fa-compass"></i><span>Guide: ${viewLabels[this.currentView] || 'View'}</span><sup class="sb-ai-sup">AI</sup>`;
       }
     }
   },
@@ -2858,35 +2858,42 @@ IMPLICATIONS: [analytical implication 1] | [analytical implication 2] | [analyti
 ACTION: [conditional step 1] | [conditional step 2] | [conditional step 3]`;
     }
 
-    // Per-view prompt
+    // ── Per-view: Insight Guide (elaborate view explanation + controls guidance) ──
     const viewName = { histogram:'Histogram', boxplot:'Box Plot', cdf:'Cumulative Distribution Function',
       percentile:'Percentile Calculator', kernel:'Kernel Density Estimation', outliers:'Outlier Detection',
       normality:'Normality Tests', qqplot:'QQ / PP Plot', confidence:'Confidence Intervals' }[view] || view;
 
-    return `You are a senior statistical analyst. You have been given pre-computed diagnostic signals — your role is to translate them into clear human insight, not to recompute or verify them.
+    const controlsDoc = this._viewControlsDoc();
 
-DIAGNOSTIC SIGNALS (pre-computed, authoritative):
-${signalsJson}
+    return `You are explaining the "${viewName}" view inside Statistico, a statistical analytics platform, to a data practitioner who has just opened this view.
 
-RAW STATISTICS (cite exact numbers where useful):
-${statsBlock}
+CONTROLS FOR THIS VIEW:
+${controlsDoc[view] || 'No specific controls documented.'}
 
-CURRENT VIEW: ${viewName}
-LIVE VIEW STATE:
+CURRENT DATA STATE (live values from this view):
 ${viewDataLines || '  (no live values)'}
 
-CRITICAL RULES:
-- Do NOT question or recompute the signals
-- If normality_status = "not_tested", you MUST NOT imply normality or non-normality
-- Use cautious language ("suggests", "indicates") unless certainty_level is "confirmed" or "rejected"
-- Do NOT mention formula names or ratios (do not say "CV", "IQR/SD ratio", "skewness value") — describe the patterns in plain analytical language
-- Do NOT repeat the same idea across sections
+DESCRIPTIVE STATISTICS:
+n = ${n}, Mean = ${f(mean)}, SD = ${f(sd)}, Median = ${f(med)}, Skewness = ${skew !== null ? f(skew) : 'n/a'}
 
-Reply ONLY in this exact format — each key on its own line, no extra text:
-ABOUT: [1 sentence — what this view specifically reveals about the pattern in these signals]
-INSIGHT: [2–3 sentences — translate signals into natural analytical insight; describe what the pattern means, not how it was computed; raise heterogeneity hypothesis if risk is "possible"]
-MEANS: [2 sentences — what this pattern means for method choice, modelling assumptions, or conclusions the analyst can draw]
-NEXT: [conditional step — "If X, run Y or consider Z"] | [second conditional step] | [third if clearly needed]`;
+YOUR TASK:
+1. Explain what this view reveals — specifically and concretely, not generically.
+2. Describe each control and give a practical tip on when and how to use it effectively.
+3. List the key patterns a practitioner should look for in this view and what each pattern indicates analytically.
+4. Give a brief 1–2 sentence reading of what this specific data currently shows in this view.
+
+RULES:
+- Be concrete and specific to this view type — not a generic stats lesson
+- For controls: name each one, say what it does, and give a practical usage tip
+- For patterns: describe the visual/statistical pattern, then explain its analytical meaning
+- Do NOT mention other views or suggest navigating elsewhere
+- Do NOT be vague — every sentence should give actionable information
+
+Reply ONLY in this exact format — each key on its own line:
+ABOUT: [2–3 sentences — what specific analytical question this view answers and what kind of information it exposes that other views do not]
+CONTROLS: [Control name: what it does + when to use it] | [next control] | [next control if applicable]
+PATTERNS: [Pattern description → what it means analytically] | [next pattern] | [next pattern] | [next pattern if applicable]
+READING: [1–2 sentences — what the current data state in this view specifically shows, using exact numbers where available]`;
   },
 
   // ── AI API call ──────────────────────────────────────────────────────────
@@ -2942,7 +2949,8 @@ Always follow the exact output format requested.` },
     if (!raw) return null;
     // Full-view keys + per-view keys (union)
     const sectionKeys = ['ABOUT', 'CONCLUSION', 'EVIDENCE', 'INTERPRETATION', 'IMPLICATIONS', 'ACTION',
-                         'INSIGHT', 'MEANS', 'NEXT', 'STRENGTH'];
+                         'INSIGHT', 'MEANS', 'NEXT', 'STRENGTH',
+                         'CONTROLS', 'PATTERNS', 'READING'];
     const result = {};
     const lines = raw.split('\n');
     let current = null;
@@ -2951,7 +2959,7 @@ Always follow the exact output format requested.` },
     const flush = () => {
       if (!current) return;
       const joined = buf.join(' ').trim();
-      if (['EVIDENCE', 'IMPLICATIONS', 'ACTION', 'NEXT'].includes(current)) {
+      if (['EVIDENCE', 'IMPLICATIONS', 'ACTION', 'NEXT', 'CONTROLS', 'PATTERNS'].includes(current)) {
         result[current] = joined.split('|').map((s) => s.trim()).filter(Boolean);
       } else {
         result[current] = joined;
@@ -2986,8 +2994,10 @@ Always follow the exact output format requested.` },
       qqplot:'QQ / PP Plots', confidence:'Confidence Intervals'
     };
     const viewLabel = viewLabels[view] || view;
-    const title = mode === 'full' ? 'Full Variable Analysis' : `AI Insight — ${viewLabel}`;
-    const titleIcon = mode === 'full' ? 'fa-brain' : 'fa-lightbulb';
+    const title = mode === 'full' ? 'Full Variable Analysis'
+      : mode === 'per-view' ? `Insight Guide — ${viewLabel}`
+      : `AI Insight — ${viewLabel}`;
+    const titleIcon = mode === 'full' ? 'fa-brain' : 'fa-compass';
 
     let bodyHtml;
 
@@ -3002,7 +3012,7 @@ Always follow the exact output format requested.` },
           : `<p>${items}</p>`;
 
       bodyHtml = `
-        ${meta?.primarySignal ? `
+        ${(meta?.primarySignal && mode !== 'per-view') ? `
         <div class="sb-ai-primary-signal">
           <span class="sb-ai-signal-label">Primary Signal</span>
           <span class="sb-ai-signal-value">${meta.primarySignal}</span>
@@ -3028,6 +3038,23 @@ Always follow the exact output format requested.` },
         <div class="sb-ai-section sb-ai-section--next">
           <div class="sb-ai-section-label">What to Check Next</div>
           <div class="sb-ai-section-body">${renderList(sections.NEXT)}</div>
+        </div>` : ''}
+
+        ${/* ── Insight Guide sections (per-view explain mode) ── */ ''}
+        ${sections.CONTROLS ? `
+        <div class="sb-ai-section sb-ai-section--controls">
+          <div class="sb-ai-section-label"><i class="fa-solid fa-sliders"></i> How to Interact</div>
+          <div class="sb-ai-section-body">${renderList(sections.CONTROLS)}</div>
+        </div>` : ''}
+        ${sections.PATTERNS ? `
+        <div class="sb-ai-section sb-ai-section--patterns">
+          <div class="sb-ai-section-label"><i class="fa-solid fa-chart-line"></i> What to Look For</div>
+          <div class="sb-ai-section-body">${renderList(sections.PATTERNS)}</div>
+        </div>` : ''}
+        ${sections.READING ? `
+        <div class="sb-ai-section sb-ai-section--reading">
+          <div class="sb-ai-section-label"><i class="fa-solid fa-magnifying-glass-chart"></i> Current Reading</div>
+          <div class="sb-ai-section-body sb-ai-insight-body">${sections.READING}</div>
         </div>` : ''}
 
         ${/* ── Full-view structure ── */ ''}
@@ -3058,7 +3085,7 @@ Always follow the exact output format requested.` },
         </div>` : ''}
 
         ${/* ── Insight Strength: JS-computed for per-view, AI-parsed for full ── */ ''}
-        ${(() => {
+        ${mode !== 'per-view' ? (() => {
           const jsLevel = meta?.strengthLevel;
           const raw     = !jsLevel ? sections.STRENGTH : null;
           const level   = jsLevel
@@ -3075,7 +3102,7 @@ Always follow the exact output format requested.` },
             <span class="sb-ai-strength-note">${note}</span>
           </div>
         </div>`;
-        })()}
+        })() : ''}
       `;
     }
 

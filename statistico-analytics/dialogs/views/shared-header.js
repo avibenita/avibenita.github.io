@@ -2726,12 +2726,20 @@ const StatisticoHeader = {
 
     const { n, varName, mean, sd, med, q1, q3, iqr, min, max, skew, kurt, f } = d;
 
+    // Derived comparative ratios for richer AI reasoning
+    const cv     = (mean !== 0 && sd !== null) ? f(Math.abs(sd / mean), 3) : null;
+    const mmGap  = (sd > 0 && mean !== null && med !== null) ? f((mean - med) / sd, 3) : null;
+    const iqrSd  = (sd > 0 && iqr !== null) ? f(iqr / sd, 3) : null;
+
     const statsBlock = [
       `Variable: ${varName}  |  n = ${n}`,
       `Mean = ${f(mean)},  SD = ${f(sd)},  Median = ${f(med)}`,
       `Q1 = ${f(q1)},  Q3 = ${f(q3)},  IQR = ${f(iqr)}`,
       `Min = ${f(min)},  Max = ${f(max)}`,
-      skew !== null ? `Skewness = ${f(skew)},  Excess Kurtosis = ${f(kurt)}` : ''
+      skew !== null ? `Skewness = ${f(skew)},  Excess Kurtosis = ${f(kurt)}` : '',
+      cv     !== null ? `CV (SD/|mean|) = ${cv}` : '',
+      mmGap  !== null ? `Mean–Median gap = ${mmGap} SD units` : '',
+      iqrSd  !== null ? `IQR/SD = ${iqrSd}  (1.35 = normal baseline)` : '',
     ].filter(Boolean).join('\n');
 
     // Collect live view state
@@ -2780,30 +2788,26 @@ ACTION: [action 1] | [action 2] | [action 3]`;
       percentile:'Percentile Calculator', kernel:'Kernel Density Estimation', outliers:'Outlier Detection',
       normality:'Normality Tests', qqplot:'QQ / PP Plot', confidence:'Confidence Intervals' }[view] || view;
 
-    return `You are a senior statistician embedded in a univariate analysis tool. The user is looking at the ${viewName} view.
+    return `You are analysing the ${viewName} view for this variable.
 
-CONTROLS FOR THIS VIEW:
-${controlsDoc[view] || 'No specific controls documented.'}
-
-CURRENT VIEW STATE (live values):
-${viewDataLines || '  (no live values available — use descriptive statistics below)'}
+CURRENT VIEW STATE (live computed values):
+${viewDataLines || '  (no live values — use descriptive statistics below)'}
 
 DESCRIPTIVE STATISTICS:
 ${statsBlock}
 
-TASK: Produce TWO sections:
+TASK: Generate a concise, high-value analytical insight for this specific view. Focus on what is non-obvious. Use exact numbers. Do NOT repeat the same idea across sections. Do NOT mention any UI elements.
 
-1. HOW TO USE: In 2 sentences, explain what this view shows and which slider/control is most impactful for exploring the data. Be specific — name the control and describe the effect.
+Think first: "What would a skilled analyst notice here that a beginner would miss?"
 
-2. RESULTS INTERPRETATION: Give a precise, decisive interpretation of what the data shows in this view. Use the live view state and descriptive statistics. Be direct — state facts with exact numbers.
-
-Reply ONLY in this exact format (no extra text):
-ABOUT: [2 sentences — what this view reveals + which control to try first and why]
-CONCLUSION: [One decisive sentence with exact numbers]
-EVIDENCE: [fact 1 with number and meaning] | [fact 2] | [fact 3]
-INTERPRETATION: [2 sentences — decisive, no hedging words]
-IMPLICATIONS: [implication 1] | [implication 2]
-ACTION: [action 1] | [action 2]`;
+Reply ONLY in this exact format (no extra text, no blank lines between sections):
+ABOUT: [1–2 sentences — what specific analytical question this view answers for this data, and what the most important pattern visible here is]
+CONCLUSION: [One decisive sentence — the single most important non-obvious finding, with exact numbers]
+EVIDENCE: [specific fact with number] | [specific fact with number] | [specific fact with number]
+INTERPRETATION: [2 sentences — diagnostic synthesis using comparative reasoning; what the pattern suggests about the data structure]
+IMPLICATIONS: [analytical implication 1] | [analytical implication 2]
+ACTION: [statistical next step 1 — a test or analysis, not a UI action] | [statistical next step 2]
+STRENGTH: [Low / Moderate / High] — [one sentence justifying the confidence level based on sample size and evidence consistency]`;
   },
 
   // ── AI API call ──────────────────────────────────────────────────────────
@@ -2820,10 +2824,26 @@ ACTION: [action 1] | [action 2]`;
           body: JSON.stringify({
             model,
             messages: [
-              { role: 'system', content: 'You are an expert statistician. Always follow the exact output format requested. Be decisive, use exact numbers, avoid hedging.' },
+              { role: 'system', content: `You are a senior statistical analyst embedded inside Statistico, a professional analytics platform used by data practitioners.
+Your task is to generate high-value analytical insights — NOT basic descriptions or textbook summaries.
+
+FORBIDDEN (strictly enforced):
+- Repeating the same idea across sections (even with different wording)
+- Stating obvious facts without adding interpretive meaning (e.g. do not say "the distribution is symmetric" — say what that symmetry implies)
+- Explaining basic statistical concepts (users already know what mean/SD mean)
+- Mentioning UI elements, sliders, charts, buttons, or any interface actions
+- Hedging language ("may", "might suggest", "could be") unless citing genuine uncertainty
+
+REQUIRED:
+- Be decisive. Use exact numbers from the data provided.
+- Prioritize interpretation, diagnosis, and decision-support value.
+- Apply comparative reasoning: SD relative to mean (CV), mean–median gap in SD units, IQR/SD ratio vs 1.35 normal baseline.
+- Before writing, ask yourself: "What would a skilled analyst notice that a beginner would miss?"
+
+Always follow the exact output format requested.` },
               { role: 'user',   content: prompt }
             ],
-            max_tokens: 600,
+            max_tokens: 700,
             temperature: 0.3
           })
         });
@@ -2845,7 +2865,7 @@ ACTION: [action 1] | [action 2]`;
    */
   _parseAiStructured(raw) {
     if (!raw) return null;
-    const sectionKeys = ['ABOUT', 'CONCLUSION', 'EVIDENCE', 'INTERPRETATION', 'IMPLICATIONS', 'ACTION'];
+    const sectionKeys = ['ABOUT', 'CONCLUSION', 'EVIDENCE', 'INTERPRETATION', 'IMPLICATIONS', 'ACTION', 'STRENGTH'];
     const result = {};
     const lines = raw.split('\n');
     let current = null;
@@ -2907,13 +2927,13 @@ ACTION: [action 1] | [action 2]`;
       bodyHtml = `
         ${sections.ABOUT ? `
         <div class="sb-ai-section sb-ai-section--about">
-          <div class="sb-ai-section-label"><i class="fa-solid fa-circle-info"></i> How to use this view</div>
+          <div class="sb-ai-section-label"><i class="fa-solid fa-circle-info"></i> This View</div>
           <div class="sb-ai-section-body">${sections.ABOUT}</div>
         </div>
         <div class="sb-ai-divider"></div>` : ''}
         ${sections.CONCLUSION ? `
         <div class="sb-ai-section sb-ai-section--conclusion">
-          <div class="sb-ai-section-label">Conclusion</div>
+          <div class="sb-ai-section-label">Core Insight</div>
           <div class="sb-ai-section-body">${sections.CONCLUSION}</div>
         </div>` : ''}
         ${sections.EVIDENCE ? `
@@ -2923,19 +2943,33 @@ ACTION: [action 1] | [action 2]`;
         </div>` : ''}
         ${sections.INTERPRETATION ? `
         <div class="sb-ai-section sb-ai-section--interpretation">
-          <div class="sb-ai-section-label">Interpretation</div>
+          <div class="sb-ai-section-label">Diagnostic Interpretation</div>
           <div class="sb-ai-section-body">${sections.INTERPRETATION}</div>
         </div>` : ''}
         ${sections.IMPLICATIONS ? `
         <div class="sb-ai-section sb-ai-section--implications">
-          <div class="sb-ai-section-label">Implications</div>
+          <div class="sb-ai-section-label">Analytical Implications</div>
           <div class="sb-ai-section-body">${renderList(sections.IMPLICATIONS)}</div>
         </div>` : ''}
         ${sections.ACTION ? `
         <div class="sb-ai-section sb-ai-section--action">
-          <div class="sb-ai-section-label">Recommended Actions</div>
+          <div class="sb-ai-section-label">Next Analytical Steps</div>
           <div class="sb-ai-section-body">${renderList(sections.ACTION)}</div>
         </div>` : ''}
+        ${sections.STRENGTH ? (() => {
+          const raw = sections.STRENGTH;
+          const level = /^high/i.test(raw) ? 'high' : /^low/i.test(raw) ? 'low' : 'moderate';
+          const label = level.charAt(0).toUpperCase() + level.slice(1);
+          const note  = raw.replace(/^(high|moderate|low)\s*[—–-]?\s*/i, '');
+          return `<div class="sb-ai-divider"></div>
+        <div class="sb-ai-section sb-ai-section--strength">
+          <div class="sb-ai-section-label">Insight Strength</div>
+          <div class="sb-ai-section-body sb-ai-strength-body">
+            <span class="sb-ai-strength-badge sb-ai-strength-${level}">${label}</span>
+            <span class="sb-ai-strength-note">${note}</span>
+          </div>
+        </div>`;
+        })() : ''}
       `;
     }
 

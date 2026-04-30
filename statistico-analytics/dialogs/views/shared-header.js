@@ -2035,9 +2035,9 @@ const StatisticoHeader = {
       if (!prompt) { this._showAiOverlay(null, this.currentView); return; }
       const raw = await this._callAiForSidebar(prompt);
       const sections = this._parseAiStructured(raw);
-      this._showAiOverlay(sections, this.currentView, 'per-view');
+      this._showAiOverlay(sections, this.currentView, 'per-view', this._lastAiMeta);
     } catch (err) {
-      this._showAiOverlay({ error: err.message || 'AI request failed.' }, this.currentView, 'per-view');
+      this._showAiOverlay({ error: err.message || 'AI request failed.' }, this.currentView, 'per-view', this._lastAiMeta);
     } finally {
       const viewLabels = { histogram:'Histogram',boxplot:'Box Plot',cdf:'CDF',percentile:'Percentiles',kernel:'Kernel Density',outliers:'Outliers',normality:'Normality Tests',qqplot:'QQ / PP Plots',confidence:'Confidence Intervals' };
       if (btn) {
@@ -2726,32 +2726,99 @@ const StatisticoHeader = {
 
     const { n, varName, mean, sd, med, q1, q3, iqr, min, max, skew, kurt, f } = d;
 
-    // Derived comparative ratios for richer AI reasoning
-    const cv     = (mean !== 0 && sd !== null) ? f(Math.abs(sd / mean), 3) : null;
-    const mmGap  = (sd > 0 && mean !== null && med !== null) ? f((mean - med) / sd, 3) : null;
-    const iqrSd  = (sd > 0 && iqr !== null) ? f(iqr / sd, 3) : null;
+    // ── Step 1: Compute numeric ratios ───────────────────────────────────────
+    const cvNum    = (mean !== 0 && sd > 0) ? Math.abs(sd / mean) : null;
+    const mmGapNum = sd > 0 ? (mean - med) / sd : null;
+    const iqrSdNum = sd > 0 ? iqr / sd : null;
 
+    // ── Step 2: Derive diagnostic signals (JS decides truth) ─────────────────
+    const symmetry =
+      mmGapNum !== null && skew !== null
+        ? (Math.abs(mmGapNum) < 0.1 && Math.abs(skew) < 0.2 ? 'strong'
+          : Math.abs(mmGapNum) < 0.25 && Math.abs(skew) < 0.5 ? 'moderate'
+          : 'low')
+        : 'unknown';
+
+    const dispersion =
+      cvNum !== null
+        ? (cvNum > 0.5 ? 'high' : cvNum > 0.25 ? 'moderate' : 'low')
+        : 'unknown';
+
+    const middleSpread =
+      iqrSdNum !== null
+        ? (iqrSdNum > 1.5 ? 'wide' : iqrSdNum > 1.2 ? 'slightly_elevated' : 'normal')
+        : 'unknown';
+
+    const tailBehavior =
+      kurt !== null
+        ? (kurt > 1 ? 'heavy' : kurt < -1 ? 'light' : 'normal')
+        : 'unknown';
+
+    const heterogeneityRisk =
+      (dispersion === 'high' && middleSpread === 'wide') ? 'possible' : 'unlikely';
+
+    // Normality status — only "confirmed" or "rejected" if formal tests were run
+    const viewData = this._collectViewData(view);
+    let normalityStatus = 'not_tested';
+    if (viewData && typeof viewData === 'object' && viewData.normalityTests) {
+      const tests = Object.values(viewData.normalityTests).filter((r) => r?.pValue !== undefined);
+      if (tests.length > 0) {
+        normalityStatus = tests.some((r) => r.significant) ? 'rejected' : 'confirmed';
+      }
+    }
+
+    // ── Step 3: JS-computed Insight Strength (AI does NOT decide this) ───────
+    const strengthLevel =
+      (symmetry === 'strong' && dispersion === 'low' && normalityStatus !== 'rejected') ? 'High'
+      : (symmetry === 'low' || dispersion === 'high' || normalityStatus === 'rejected') ? 'Low'
+      : 'Moderate';
+
+    const strengthNote =
+      strengthLevel === 'High'
+        ? `Symmetry indicators align consistently and spread is well-controlled (n=${n}).`
+        : strengthLevel === 'Low'
+        ? `${symmetry === 'low' ? 'Distributional asymmetry' : 'High variability'} limits confidence; formal testing is required to go further (n=${n}).`
+        : `Symmetry is ${symmetry} but ${dispersion === 'high' ? 'high dispersion reduces confidence in distributional assumptions' : normalityStatus === 'not_tested' ? 'normality has not been formally tested' : 'mixed evidence exists'} (n=${n}).`;
+
+    // ── Step 4: JS-computed Primary Signal (cognitive anchor for the panel) ──
+    const sigParts = [];
+    if (symmetry === 'strong') sigParts.push('Strong symmetry');
+    else if (symmetry === 'moderate') sigParts.push('Moderate symmetry');
+    else if (symmetry === 'low') sigParts.push('Asymmetric distribution');
+    if (dispersion === 'high') sigParts.push('high dispersion');
+    else if (dispersion === 'moderate') sigParts.push('moderate spread');
+    else if (dispersion === 'low') sigParts.push('tight concentration');
+    if (heterogeneityRisk === 'possible') sigParts.push('heterogeneity suspected');
+    if (normalityStatus === 'rejected') sigParts.push('non-normality confirmed');
+    const primarySignal = sigParts.join(' · ');
+
+    // Store meta so _showAiOverlay can display JS-computed values
+    this._lastAiMeta = { primarySignal, strengthLevel, strengthNote };
+
+    // ── Step 5: Build signals block for AI (AI translates, not computes) ─────
     const statsBlock = [
       `Variable: ${varName}  |  n = ${n}`,
       `Mean = ${f(mean)},  SD = ${f(sd)},  Median = ${f(med)}`,
       `Q1 = ${f(q1)},  Q3 = ${f(q3)},  IQR = ${f(iqr)}`,
       `Min = ${f(min)},  Max = ${f(max)}`,
       skew !== null ? `Skewness = ${f(skew)},  Excess Kurtosis = ${f(kurt)}` : '',
-      cv     !== null ? `CV (SD/|mean|) = ${cv}` : '',
-      mmGap  !== null ? `Mean–Median gap = ${mmGap} SD units` : '',
-      iqrSd  !== null ? `IQR/SD = ${iqrSd}  (1.35 = normal baseline)` : '',
     ].filter(Boolean).join('\n');
 
-    // Collect live view state
-    const viewData = this._collectViewData(view);
-    const controlsDoc = this._viewControlsDoc();
+    const signalsJson = JSON.stringify({
+      symmetry,
+      dispersion,
+      middle_spread:       middleSpread,
+      tail_behavior:       tailBehavior,
+      heterogeneity_risk:  heterogeneityRisk,
+      normality_status:    normalityStatus,
+      sample_size:         n,
+    }, null, 2);
 
-    // Serialise live view data for the AI
+    // Serialise live view state for additional context
     const viewDataLines = Object.entries(viewData)
       .filter(([, v]) => v !== null && v !== undefined && v !== '')
       .map(([k, v]) => {
         if (typeof v === 'object') {
-          // normality tests object
           return Object.entries(v).filter(([, r]) => r?.pValue !== undefined)
             .map(([name, r]) => `  ${name}: p=${f(r.pValue, 4)}, ${r.significant ? 'NON-NORMAL' : 'normal'}`)
             .join('\n');
@@ -2761,49 +2828,65 @@ const StatisticoHeader = {
       .join('\n');
 
     if (mode === 'full') {
-      // Use iframe-swept data if provided, otherwise fall back to live DOM scan
       const allData = preCollectedData || this._collectAllViewsData();
       const allDataBlock = this._formatAllViewsData(allData, f);
 
       return `You are a senior statistician writing a full-variable diagnostic report that synthesises ALL available analysis results.
 
-DESCRIPTIVE STATISTICS:
+DIAGNOSTIC SIGNALS (pre-computed, authoritative):
+${signalsJson}
+
+RAW STATISTICS (cite numbers when useful):
 ${statsBlock}
 
 RESULTS FROM COMPLETED ANALYSES:
 ${allDataBlock || '(No additional view results available — base statistics only)'}
 
-TASK: Write a comprehensive diagnostic report integrating every piece of evidence above. Where specific test results or computed values exist, cite them with exact numbers. Do not repeat the same fact twice. Produce a unified narrative: what is the defining characteristic of this variable, what do the diagnostics collectively confirm, what are the practical consequences, and what should the analyst do next.
+RULES:
+- If normality_status = "not_tested", do NOT conclude normality or non-normality
+- Do NOT recompute or question the signals
+- Do NOT repeat the same fact across sections
+- Do NOT mention formula names (CV, IQR/SD, etc.) — describe patterns in plain language
+
+TASK: Write a comprehensive diagnostic report. Synthesise signals and results into a unified narrative. Where test results exist, cite exact numbers. Cover: the defining characteristic, what diagnostics collectively confirm, practical consequences, and what to do next.
 
 Reply ONLY in this exact format:
-CONCLUSION: [One decisive sentence — the single most important finding, use exact numbers]
-EVIDENCE: [fact 1 with number and source view] | [fact 2] | [fact 3] | [fact 4] | [fact 5 if available]
-INTERPRETATION: [3 sentences — decisive synthesis across all diagnostics, use exact numbers, no hedging]
-IMPLICATIONS: [implication 1] | [implication 2] | [implication 3]
-ACTION: [action 1] | [action 2] | [action 3]`;
+CONCLUSION: [One decisive sentence — the single most important finding]
+EVIDENCE: [specific finding with number] | [specific finding] | [specific finding] | [specific finding]
+INTERPRETATION: [3 sentences — unified synthesis, plain language, no formula names]
+IMPLICATIONS: [analytical implication 1] | [analytical implication 2] | [analytical implication 3]
+ACTION: [conditional step 1] | [conditional step 2] | [conditional step 3]`;
     }
 
-    // Per-view: collapsed 5-section structure
+    // Per-view prompt
     const viewName = { histogram:'Histogram', boxplot:'Box Plot', cdf:'Cumulative Distribution Function',
       percentile:'Percentile Calculator', kernel:'Kernel Density Estimation', outliers:'Outlier Detection',
       normality:'Normality Tests', qqplot:'QQ / PP Plot', confidence:'Confidence Intervals' }[view] || view;
 
-    return `You are analysing the ${viewName} view for this variable.
+    return `You are a senior statistical analyst. You have been given pre-computed diagnostic signals — your role is to translate them into clear human insight, not to recompute or verify them.
 
-CURRENT VIEW STATE (live computed values):
-${viewDataLines || '  (no live values — use descriptive statistics below)'}
+DIAGNOSTIC SIGNALS (pre-computed, authoritative):
+${signalsJson}
 
-DESCRIPTIVE STATISTICS:
+RAW STATISTICS (cite exact numbers where useful):
 ${statsBlock}
 
-Think first: "What would a skilled analyst notice here that a beginner would miss?"
+CURRENT VIEW: ${viewName}
+LIVE VIEW STATE:
+${viewDataLines || '  (no live values)'}
 
-Reply ONLY in this exact format — each key on its own line, no extra text, no blank lines:
-ABOUT: [Exactly 1 sentence — what specific analytical question this view answers for this data right now]
-INSIGHT: [2–3 sentences — the core non-obvious finding with exact numbers; apply comparative reasoning (CV, mean–median gap in SD units, IQR/SD vs 1.35 normal baseline); if dispersion is large or heterogeneity is likely, say so explicitly]
-MEANS: [2 sentences — decision-oriented: what this finding means for statistical method choice, modelling assumptions, or conclusions the analyst can draw]
-NEXT: [specific statistical test or analysis, not a UI action] | [second specific follow-up] | [third if clearly warranted]
-STRENGTH: [Low / Moderate / High] — [one sentence: justify using sample size, consistency of evidence, and any limits on interpretation]`;
+CRITICAL RULES:
+- Do NOT question or recompute the signals
+- If normality_status = "not_tested", you MUST NOT imply normality or non-normality
+- Use cautious language ("suggests", "indicates") unless certainty_level is "confirmed" or "rejected"
+- Do NOT mention formula names or ratios (do not say "CV", "IQR/SD ratio", "skewness value") — describe the patterns in plain analytical language
+- Do NOT repeat the same idea across sections
+
+Reply ONLY in this exact format — each key on its own line, no extra text:
+ABOUT: [1 sentence — what this view specifically reveals about the pattern in these signals]
+INSIGHT: [2–3 sentences — translate signals into natural analytical insight; describe what the pattern means, not how it was computed; raise heterogeneity hypothesis if risk is "possible"]
+MEANS: [2 sentences — what this pattern means for method choice, modelling assumptions, or conclusions the analyst can draw]
+NEXT: [conditional step — "If X, run Y or consider Z"] | [second conditional step] | [third if clearly needed]`;
   },
 
   // ── AI API call ──────────────────────────────────────────────────────────
@@ -2821,20 +2904,16 @@ STRENGTH: [Low / Moderate / High] — [one sentence: justify using sample size, 
             model,
             messages: [
               { role: 'system', content: `You are a senior statistical analyst embedded inside Statistico, a professional analytics platform used by data practitioners.
-Your task is to generate high-value analytical insights — NOT basic descriptions or textbook summaries.
+Your task is to translate pre-computed diagnostic signals into clear, human analytical insight.
 
-FORBIDDEN (strictly enforced):
-- Repeating the same idea across sections (even with different wording)
-- Stating obvious facts without adding interpretive meaning (e.g. do not say "the distribution is symmetric" — say what that symmetry implies)
-- Explaining basic statistical concepts (users already know what mean/SD mean)
-- Mentioning UI elements, sliders, charts, buttons, or any interface actions
-- Hedging language ("may", "might suggest", "could be") unless citing genuine uncertainty
-
-REQUIRED:
-- Be decisive. Use exact numbers from the data provided.
-- Prioritize interpretation, diagnosis, and decision-support value.
-- Apply comparative reasoning: SD relative to mean (CV), mean–median gap in SD units, IQR/SD ratio vs 1.35 normal baseline.
-- Before writing, ask yourself: "What would a skilled analyst notice that a beginner would miss?"
+CRITICAL RULES (strictly enforced):
+- Do NOT recompute or question the signals you are given — they are authoritative
+- If normality_status = "not_tested", you MUST NOT imply normality or non-normality
+- Use cautious language ("suggests", "indicates", "appears to") unless certainty is "confirmed" or "rejected"
+- Do NOT mention formula names or ratio names (e.g. do not say "CV", "IQR/SD ratio", "skewness value") — describe patterns in plain language
+- Do NOT repeat the same idea across sections
+- Do NOT give UI instructions or mention charts, sliders, or interface elements
+- "What to Check Next" must use conditional reasoning ("If X, then run Y") — not a plain test list
 
 Always follow the exact output format requested.` },
               { role: 'user',   content: prompt }
@@ -2897,7 +2976,7 @@ Always follow the exact output format requested.` },
 
   // ── Overlay renderer ─────────────────────────────────────────────────────
 
-  _showAiOverlay(sections, view, mode = 'per-view') {
+  _showAiOverlay(sections, view, mode = 'per-view', meta = null) {
     const existing = document.getElementById('sbAiOverlay');
     if (existing) existing.remove();
 
@@ -2923,13 +3002,18 @@ Always follow the exact output format requested.` },
           : `<p>${items}</p>`;
 
       bodyHtml = `
+        ${meta?.primarySignal ? `
+        <div class="sb-ai-primary-signal">
+          <span class="sb-ai-signal-label">Primary Signal</span>
+          <span class="sb-ai-signal-value">${meta.primarySignal}</span>
+        </div>` : ''}
         ${sections.ABOUT ? `
         <div class="sb-ai-section sb-ai-section--about">
           <div class="sb-ai-section-body sb-ai-about-line">${sections.ABOUT}</div>
         </div>
         <div class="sb-ai-divider"></div>` : ''}
 
-        ${/* ── Per-view new structure ── */ ''}
+        ${/* ── Per-view structure ── */ ''}
         ${sections.INSIGHT ? `
         <div class="sb-ai-section sb-ai-section--insight">
           <div class="sb-ai-section-label"><i class="fa-solid fa-brain"></i> AI Insight</div>
@@ -2946,7 +3030,7 @@ Always follow the exact output format requested.` },
           <div class="sb-ai-section-body">${renderList(sections.NEXT)}</div>
         </div>` : ''}
 
-        ${/* ── Full-view legacy structure ── */ ''}
+        ${/* ── Full-view structure ── */ ''}
         ${sections.CONCLUSION ? `
         <div class="sb-ai-section sb-ai-section--conclusion">
           <div class="sb-ai-section-label">Core Finding</div>
@@ -2973,11 +3057,16 @@ Always follow the exact output format requested.` },
           <div class="sb-ai-section-body">${renderList(sections.ACTION)}</div>
         </div>` : ''}
 
-        ${sections.STRENGTH ? (() => {
-          const raw = sections.STRENGTH;
-          const level = /^high/i.test(raw) ? 'high' : /^low/i.test(raw) ? 'low' : 'moderate';
-          const label = level.charAt(0).toUpperCase() + level.slice(1);
-          const note  = raw.replace(/^(high|moderate|low)\s*[—–-]?\s*/i, '');
+        ${/* ── Insight Strength: JS-computed for per-view, AI-parsed for full ── */ ''}
+        ${(() => {
+          const jsLevel = meta?.strengthLevel;
+          const raw     = !jsLevel ? sections.STRENGTH : null;
+          const level   = jsLevel
+            ? jsLevel.toLowerCase()
+            : raw ? (/^high/i.test(raw) ? 'high' : /^low/i.test(raw) ? 'low' : 'moderate') : null;
+          const label   = level ? (level.charAt(0).toUpperCase() + level.slice(1)) : null;
+          const note    = meta?.strengthNote || (raw ? raw.replace(/^(high|moderate|low)\s*[—–-]?\s*/i, '') : null);
+          if (!level) return '';
           return `<div class="sb-ai-divider"></div>
         <div class="sb-ai-section sb-ai-section--strength">
           <div class="sb-ai-section-label">Insight Strength</div>
@@ -2986,7 +3075,7 @@ Always follow the exact output format requested.` },
             <span class="sb-ai-strength-note">${note}</span>
           </div>
         </div>`;
-        })() : ''}
+        })()}
       `;
     }
 

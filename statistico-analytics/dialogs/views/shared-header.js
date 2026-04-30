@@ -2783,7 +2783,7 @@ IMPLICATIONS: [implication 1] | [implication 2] | [implication 3]
 ACTION: [action 1] | [action 2] | [action 3]`;
     }
 
-    // Per-view: two-part output
+    // Per-view: collapsed 5-section structure
     const viewName = { histogram:'Histogram', boxplot:'Box Plot', cdf:'Cumulative Distribution Function',
       percentile:'Percentile Calculator', kernel:'Kernel Density Estimation', outliers:'Outlier Detection',
       normality:'Normality Tests', qqplot:'QQ / PP Plot', confidence:'Confidence Intervals' }[view] || view;
@@ -2796,18 +2796,14 @@ ${viewDataLines || '  (no live values — use descriptive statistics below)'}
 DESCRIPTIVE STATISTICS:
 ${statsBlock}
 
-TASK: Generate a concise, high-value analytical insight for this specific view. Focus on what is non-obvious. Use exact numbers. Do NOT repeat the same idea across sections. Do NOT mention any UI elements.
-
 Think first: "What would a skilled analyst notice here that a beginner would miss?"
 
-Reply ONLY in this exact format (no extra text, no blank lines between sections):
-ABOUT: [1–2 sentences — what specific analytical question this view answers for this data, and what the most important pattern visible here is]
-CONCLUSION: [One decisive sentence — the single most important non-obvious finding, with exact numbers]
-EVIDENCE: [specific fact with number] | [specific fact with number] | [specific fact with number]
-INTERPRETATION: [2 sentences — diagnostic synthesis using comparative reasoning; what the pattern suggests about the data structure]
-IMPLICATIONS: [analytical implication 1] | [analytical implication 2]
-ACTION: [statistical next step 1 — a test or analysis, not a UI action] | [statistical next step 2]
-STRENGTH: [Low / Moderate / High] — [one sentence justifying the confidence level based on sample size and evidence consistency]`;
+Reply ONLY in this exact format — each key on its own line, no extra text, no blank lines:
+ABOUT: [Exactly 1 sentence — what specific analytical question this view answers for this data right now]
+INSIGHT: [2–3 sentences — the core non-obvious finding with exact numbers; apply comparative reasoning (CV, mean–median gap in SD units, IQR/SD vs 1.35 normal baseline); if dispersion is large or heterogeneity is likely, say so explicitly]
+MEANS: [2 sentences — decision-oriented: what this finding means for statistical method choice, modelling assumptions, or conclusions the analyst can draw]
+NEXT: [specific statistical test or analysis, not a UI action] | [second specific follow-up] | [third if clearly warranted]
+STRENGTH: [Low / Moderate / High] — [one sentence: justify using sample size, consistency of evidence, and any limits on interpretation]`;
   },
 
   // ── AI API call ──────────────────────────────────────────────────────────
@@ -2865,7 +2861,9 @@ Always follow the exact output format requested.` },
    */
   _parseAiStructured(raw) {
     if (!raw) return null;
-    const sectionKeys = ['ABOUT', 'CONCLUSION', 'EVIDENCE', 'INTERPRETATION', 'IMPLICATIONS', 'ACTION', 'STRENGTH'];
+    // Full-view keys + per-view keys (union)
+    const sectionKeys = ['ABOUT', 'CONCLUSION', 'EVIDENCE', 'INTERPRETATION', 'IMPLICATIONS', 'ACTION',
+                         'INSIGHT', 'MEANS', 'NEXT', 'STRENGTH'];
     const result = {};
     const lines = raw.split('\n');
     let current = null;
@@ -2874,7 +2872,7 @@ Always follow the exact output format requested.` },
     const flush = () => {
       if (!current) return;
       const joined = buf.join(' ').trim();
-      if (['EVIDENCE', 'IMPLICATIONS', 'ACTION'].includes(current)) {
+      if (['EVIDENCE', 'IMPLICATIONS', 'ACTION', 'NEXT'].includes(current)) {
         result[current] = joined.split('|').map((s) => s.trim()).filter(Boolean);
       } else {
         result[current] = joined;
@@ -2894,7 +2892,7 @@ Always follow the exact output format requested.` },
       if (!matched && current) buf.push(trimmed);
     });
     flush();
-    return Object.keys(result).length ? result : { INTERPRETATION: raw };
+    return Object.keys(result).length ? result : { INSIGHT: raw };
   },
 
   // ── Overlay renderer ─────────────────────────────────────────────────────
@@ -2927,14 +2925,32 @@ Always follow the exact output format requested.` },
       bodyHtml = `
         ${sections.ABOUT ? `
         <div class="sb-ai-section sb-ai-section--about">
-          <div class="sb-ai-section-label"><i class="fa-solid fa-circle-info"></i> This View</div>
-          <div class="sb-ai-section-body">${sections.ABOUT}</div>
+          <div class="sb-ai-section-body sb-ai-about-line">${sections.ABOUT}</div>
         </div>
         <div class="sb-ai-divider"></div>` : ''}
+
+        ${/* ── Per-view new structure ── */ ''}
+        ${sections.INSIGHT ? `
+        <div class="sb-ai-section sb-ai-section--insight">
+          <div class="sb-ai-section-label"><i class="fa-solid fa-brain"></i> AI Insight</div>
+          <div class="sb-ai-section-body sb-ai-insight-body">${sections.INSIGHT}</div>
+        </div>` : ''}
+        ${sections.MEANS ? `
+        <div class="sb-ai-section sb-ai-section--means">
+          <div class="sb-ai-section-label">What This Means</div>
+          <div class="sb-ai-section-body">${sections.MEANS}</div>
+        </div>` : ''}
+        ${sections.NEXT ? `
+        <div class="sb-ai-section sb-ai-section--next">
+          <div class="sb-ai-section-label">What to Check Next</div>
+          <div class="sb-ai-section-body">${renderList(sections.NEXT)}</div>
+        </div>` : ''}
+
+        ${/* ── Full-view legacy structure ── */ ''}
         ${sections.CONCLUSION ? `
         <div class="sb-ai-section sb-ai-section--conclusion">
-          <div class="sb-ai-section-label">Core Insight</div>
-          <div class="sb-ai-section-body">${sections.CONCLUSION}</div>
+          <div class="sb-ai-section-label">Core Finding</div>
+          <div class="sb-ai-section-body sb-ai-insight-body">${sections.CONCLUSION}</div>
         </div>` : ''}
         ${sections.EVIDENCE ? `
         <div class="sb-ai-section sb-ai-section--evidence">
@@ -2956,6 +2972,7 @@ Always follow the exact output format requested.` },
           <div class="sb-ai-section-label">Next Analytical Steps</div>
           <div class="sb-ai-section-body">${renderList(sections.ACTION)}</div>
         </div>` : ''}
+
         ${sections.STRENGTH ? (() => {
           const raw = sections.STRENGTH;
           const level = /^high/i.test(raw) ? 'high' : /^low/i.test(raw) ? 'low' : 'moderate';

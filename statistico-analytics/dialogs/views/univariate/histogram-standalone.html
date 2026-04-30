@@ -1110,8 +1110,21 @@
       // Determine if animation should be enabled
       const enableAnimation = !isSliderMoving;
       
-      // Create chart � height:null means Highcharts uses container height.
-      // fitLayout() sets the container heights first, then reflow() sizes the chart.
+      // Pre-compute chart overlay positions (mean, median, IQR)
+      const _overlayStats = calculateDescriptiveStats(currentData);
+      const _overlayRange = max - min || 1;
+      const _toCat = function(v) { return ((v - min) / _overlayRange) * (numBins - 1); };
+      const _chartPlotLines = [
+        { color: '#ff9b66', width: 2, dashStyle: 'Solid', value: _toCat(_overlayStats.mean),
+          label: { text: '\u00d8', style: { color: '#ff9b66', fontSize: '11px', fontWeight: '700' }, align: 'left', x: 3, y: 14 } },
+        { color: '#53d6a1', width: 2, dashStyle: 'ShortDash', value: _toCat(_overlayStats.median),
+          label: { text: 'Md', style: { color: '#53d6a1', fontSize: '10px', fontWeight: '700' }, align: 'left', x: 3, y: 28 } }
+      ];
+      const _chartPlotBands = [
+        { color: 'rgba(120,199,255,.07)', from: _toCat(_overlayStats.q1), to: _toCat(_overlayStats.q3) }
+      ];
+
+      // Create chart
       const chartContainer = document.getElementById('histogram-chart');
       const dynamicHeight = null; // controlled by fitLayout() + reflow()
 
@@ -1143,23 +1156,8 @@
             style: { color: '#ffffff', fontSize: '10px' }
           },
           gridLineColor: '#2d3748',
-          plotLines: (function() {
-            const s = calculateDescriptiveStats(currentData);
-            const range = max - min || 1;
-            const toCat = v => ((v - min) / range) * (numBins - 1);
-            return [
-              { color: '#ff9b66', width: 2, dashStyle: 'Solid', value: toCat(s.mean),
-                label: { text: '\u00d8', style: { color: '#ff9b66', fontSize: '11px', fontWeight: '700' }, align: 'left', x: 3, y: 14 } },
-              { color: '#53d6a1', width: 2, dashStyle: 'ShortDash', value: toCat(s.median),
-                label: { text: 'Md', style: { color: '#53d6a1', fontSize: '10px', fontWeight: '700' }, align: 'left', x: 3, y: 28 } }
-            ];
-          })(),
-          plotBands: (function() {
-            const s = calculateDescriptiveStats(currentData);
-            const range = max - min || 1;
-            const toCat = v => ((v - min) / range) * (numBins - 1);
-            return [{ color: 'rgba(120,199,255,.07)', from: toCat(s.q1), to: toCat(s.q3) }];
-          })()
+          plotLines: _chartPlotLines,
+          plotBands: _chartPlotBands
         },
         yAxis: {
           title: {

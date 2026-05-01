@@ -22,7 +22,8 @@ const NAV_TEMPLATE = `
 <nav class="sticky-nav" id="stickyNav">
   <div class="nav-container">
     <a href="javascript:void(0)" class="nav-logo" id="nav-logo-link">
-      <span class="goldish">Statistico™-Interactive</span>
+      <img src="assets/img/logo-dark.png" alt="Statistico Interactive" class="nav-logo-img nav-logo--dark" />
+      <img src="assets/img/logo-light.png" alt="Statistico Interactive" class="nav-logo-img nav-logo--light" />
     </a>
 
     <ul class="nav-menu" id="navMenu">
@@ -172,31 +173,31 @@ const NAV_STYLE = `
 }
 
 .nav-logo {
-  font-size: 1rem;
-  font-weight: 800;
-  color: rgb(255,165,120);
   text-decoration: none;
-  background: linear-gradient(45deg, rgb(255,165,120), #ffffff);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  transition: all 0.2s ease;
-  text-shadow: 0 2px 8px rgba(91, 68, 56, 0.3);
+  display: flex;
+  align-items: center;
   margin-right: 22px;
-  line-height: 1.02;
+  transition: opacity 0.2s ease;
+  flex-shrink: 0;
 }
 
-.nav-logo .goldish {
-  font-size: inherit;
-  font-weight: inherit;
-  color: inherit !important;
-  text-shadow: none;
+.nav-logo:hover { opacity: 0.85; }
+
+.nav-logo-img {
+  height: 38px;
+  width: auto;
+  display: block;
 }
 
-.nav-logo:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.12);
-}
+/* Dark mode: show dark logo, hide light */
+.nav-logo--dark  { display: block; }
+.nav-logo--light { display: none; }
+
+/* Light mode: show light logo, hide dark */
+:root[data-theme="light"] .nav-logo--dark  { display: none; }
+:root[data-theme="light"] .nav-logo--light { display: block; }
+
+.nav-logo .goldish { display: none; }
 
 /* ── Brand name typography ── */
 .brand-tm {
@@ -390,12 +391,7 @@ const NAV_STYLE = `
   opacity: 0;
 }
 
-:root[data-theme="light"] .nav-logo {
-  background: linear-gradient(45deg, #b45309, #1d4ed8);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
+:root[data-theme="light"] .nav-logo { background: none; }
 
 :root[data-theme="light"] .nav-link {
   color: rgba(15, 23, 42, 0.9);
@@ -804,9 +800,8 @@ const NAV_STYLE = `
   border-radius: 13px;
 }
 
-.sticky-nav.scrolled .nav-logo {
-  font-size: 0.94rem;
-}
+.sticky-nav.scrolled .nav-logo { opacity: 1; }
+.sticky-nav.scrolled .nav-logo-img { height: 32px; }
 
 .mobile-toggle {
   display: none;

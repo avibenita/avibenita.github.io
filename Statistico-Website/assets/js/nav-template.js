@@ -168,8 +168,8 @@ const NAV_STYLE = `
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 24px;
-  min-height: 76px;
+  padding: 6px 24px;
+  min-height: 84px;
 }
 
 .nav-logo {
@@ -184,8 +184,9 @@ const NAV_STYLE = `
 .nav-logo:hover { opacity: 0.85; }
 
 .nav-logo-img {
-  height: 52px;
-  width: auto;
+  height: 64px !important;
+  width: auto !important;
+  max-height: 64px;
   display: block;
 }
 
@@ -801,7 +802,7 @@ const NAV_STYLE = `
 }
 
 .sticky-nav.scrolled .nav-logo { opacity: 1; }
-.sticky-nav.scrolled .nav-logo-img { height: 44px; }
+.sticky-nav.scrolled .nav-logo-img { height: 52px !important; max-height: 52px; }
 
 .mobile-toggle {
   display: none;

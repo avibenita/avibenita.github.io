@@ -7,7 +7,7 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
-  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
   <link rel="stylesheet" href="../shared-header.css?v=20260430a">
   <script src="../shared-header.js?v=20260430a"></script>
   
@@ -29,13 +29,7 @@
       setTimeout(() => {
         if (typeof Highcharts !== 'undefined')
           Highcharts.charts.forEach(c => c && c.reflow && c.reflow());
-        if (typeof Plotly !== 'undefined')
-          document.querySelectorAll('.plotly-graph-div').forEach(el => { try { Plotly.relayout(el, {}); } catch(e) {} });
       }, 50);
-    }
-    window.addEventListener('resize', fitLayout);
-
-    // API Key injected during deployment via GitHub Actions
     // See .github/workflows/deploy.yml
            
   </script>
@@ -1787,8 +1781,6 @@
       setTimeout(() => {
         if (typeof Highcharts !== 'undefined')
           Highcharts.charts.forEach(c => c && c.reflow && c.reflow());
-        if (typeof Plotly !== 'undefined')
-          document.querySelectorAll('.plotly-graph-div').forEach(el => { try { Plotly.relayout(el, {}); } catch(e) {} });
       }, 50);
     }
     window.addEventListener('resize', fitLayout);
@@ -2638,186 +2630,143 @@
     }
 
     function updateChart() {
-      if (typeof Plotly === 'undefined') {
-        console.error('Plotly not available');
+      if (typeof Highcharts === 'undefined') {
+        console.error('Highcharts not available');
         return;
       }
 
       const slider = document.getElementById('alphaChartSlider');
       const alpha = slider ? parseFloat(slider.value) : currentAlpha;
-      
+
       // Get current test results
       const testStat = parseFloat(document.getElementById('result-stat-value').textContent) || 0;
-      const pValue = parseFloat(document.getElementById('result-pvalue').textContent) || 0;
+      const pValue   = parseFloat(document.getElementById('result-pvalue').textContent) || 0;
       const orientation = document.getElementById('result-orientation').textContent || 'Two-tailed';
-      const testType = document.getElementById('result-test-type').textContent || '';
-      
-      // Calculate critical values for the given alpha
-      let critLeft, critRight;
+      const testType    = document.getElementById('result-test-type').textContent || '';
+
+      // Critical values
+      let critLeft = null, critRight = null;
       if (orientation === 'Two-tailed') {
-        critLeft = normalInv(alpha / 2);
+        critLeft  = normalInv(alpha / 2);
         critRight = normalInv(1 - alpha / 2);
       } else if (orientation === 'Left-tailed') {
-        critLeft = normalInv(alpha);
-        critRight = null;
-      } else { // Right-tailed
-        critLeft = null;
+        critLeft  = normalInv(alpha);
+      } else {
         critRight = normalInv(1 - alpha);
       }
 
-      // Generate distribution curve
-      const x = [];
-      const y = [];
-      for (let i = -4; i <= 4; i += 0.05) {
-        x.push(i);
-        y.push(normalPDF(i));
+      // Distribution data: -4 … +4 in steps of 0.04
+      const pts = [];
+      for (let v = -4; v <= 4; v += 0.04) {
+        pts.push([parseFloat(v.toFixed(4)), normalPDF(v)]);
       }
 
-      // Create traces
-      const traces = [];
-
-      // Main distribution curve
-      traces.push({
-        x: x,
-        y: y,
-        type: 'scatter',
-        mode: 'lines',
-        name: 'Distribution',
-        line: { color: 'rgb(120,200,255)', width: 3 },
-        fill: 'tozeroy',
-        fillcolor: 'rgba(120,200,255,0.1)'
-      });
-
-      // Rejection regions
+      // Build Highcharts zones to shade rejection regions
+      const zones = [];
       if (orientation === 'Two-tailed') {
-        // Left rejection region
-        const xLeft = x.filter(v => v <= critLeft);
-        const yLeft = xLeft.map(v => normalPDF(v));
-        traces.push({
-          x: xLeft,
-          y: yLeft,
-          type: 'scatter',
-          mode: 'lines',
-          name: 'Rejection Region (Left)',
-          line: { width: 0 },
-          fill: 'tozeroy',
-          fillcolor: 'rgba(255,100,100,0.3)',
-          showlegend: false
-        });
-
-        // Right rejection region
-        const xRight = x.filter(v => v >= critRight);
-        const yRight = xRight.map(v => normalPDF(v));
-        traces.push({
-          x: xRight,
-          y: yRight,
-          type: 'scatter',
-          mode: 'lines',
-          name: 'Rejection Region (Right)',
-          line: { width: 0 },
-          fill: 'tozeroy',
-          fillcolor: 'rgba(255,100,100,0.3)',
-          showlegend: false
-        });
+        zones.push({ value: critLeft,  color: 'rgba(255,100,100,0.9)', fillColor: 'rgba(255,100,100,0.28)' });
+        zones.push({ value: critRight, color: 'rgba(120,200,255,0.9)', fillColor: 'rgba(120,200,255,0.10)' });
+        zones.push({                   color: 'rgba(255,100,100,0.9)', fillColor: 'rgba(255,100,100,0.28)' });
       } else if (orientation === 'Left-tailed') {
-        const xLeft = x.filter(v => v <= critLeft);
-        const yLeft = xLeft.map(v => normalPDF(v));
-        traces.push({
-          x: xLeft,
-          y: yLeft,
-          type: 'scatter',
-          mode: 'lines',
-          name: 'Rejection Region',
-          line: { width: 0 },
-          fill: 'tozeroy',
-          fillcolor: 'rgba(255,100,100,0.3)',
-          showlegend: false
-        });
-      } else { // Right-tailed
-        const xRight = x.filter(v => v >= critRight);
-        const yRight = xRight.map(v => normalPDF(v));
-        traces.push({
-          x: xRight,
-          y: yRight,
-          type: 'scatter',
-          mode: 'lines',
-          name: 'Rejection Region',
-          line: { width: 0 },
-          fill: 'tozeroy',
-          fillcolor: 'rgba(255,100,100,0.3)',
-          showlegend: false
-        });
+        zones.push({ value: critLeft,  color: 'rgba(255,100,100,0.9)', fillColor: 'rgba(255,100,100,0.28)' });
+        zones.push({                   color: 'rgba(120,200,255,0.9)', fillColor: 'rgba(120,200,255,0.10)' });
+      } else {
+        zones.push({ value: critRight, color: 'rgba(120,200,255,0.9)', fillColor: 'rgba(120,200,255,0.10)' });
+        zones.push({                   color: 'rgba(255,100,100,0.9)', fillColor: 'rgba(255,100,100,0.28)' });
       }
 
-      // Critical value lines
+      // Build plotLines (critical values + test statistic)
+      const plotLines = [];
       if (critLeft !== null) {
-        traces.push({
-          x: [critLeft, critLeft],
-          y: [0, normalPDF(critLeft)],
-          type: 'scatter',
-          mode: 'lines',
-          name: `Critical Left (${critLeft.toFixed(3)})`,
-          line: { color: 'rgb(255,165,120)', width: 2, dash: 'dash' }
+        plotLines.push({
+          value: critLeft, color: 'rgb(255,165,120)', width: 2, dashStyle: 'Dash',
+          label: { text: `Crit ${critLeft.toFixed(3)}`, style: { color: 'rgb(255,165,120)', fontSize: '11px' }, rotation: 0, y: 16 }
         });
       }
-
       if (critRight !== null) {
-        traces.push({
-          x: [critRight, critRight],
-          y: [0, normalPDF(critRight)],
-          type: 'scatter',
-          mode: 'lines',
-          name: `Critical Right (${critRight.toFixed(3)})`,
-          line: { color: 'rgb(255,165,120)', width: 2, dash: 'dash' }
+        plotLines.push({
+          value: critRight, color: 'rgb(255,165,120)', width: 2, dashStyle: 'Dash',
+          label: { text: `Crit ${critRight.toFixed(3)}`, style: { color: 'rgb(255,165,120)', fontSize: '11px' }, rotation: 0, y: 16 }
         });
       }
-
-      // Test statistic line
       if (testStat !== 0) {
-        traces.push({
-          x: [testStat, testStat],
-          y: [0, normalPDF(testStat)],
-          type: 'scatter',
-          mode: 'lines+markers',
-          name: `Test Statistic (${testStat.toFixed(3)})`,
-          line: { color: 'rgb(255,215,0)', width: 3 },
-          marker: { size: 10, color: 'rgb(255,215,0)' }
+        plotLines.push({
+          value: testStat, color: 'rgb(255,215,0)', width: 3,
+          label: { text: `z = ${testStat.toFixed(3)}`, style: { color: 'rgb(255,215,0)', fontSize: '11px', fontWeight: '700' }, rotation: 0, y: 30 }
         });
       }
 
-      const layout = {
-        title: {
-          text: `${testType}<br><sub>Test Statistic: ${testStat.toFixed(4)} | P-Value: ${pValue.toFixed(4)} | ?: ${alpha.toFixed(2)}</sub>`,
-          font: { color: 'white', size: 15 }
-        },
-        xaxis: {
-          title: 'Test Statistic',
-          gridcolor: 'rgba(255,255,255,0.1)',
-          color: 'white',
-          titlefont: { size: 12 }
-        },
-        yaxis: {
-          title: 'Probability Density',
-          gridcolor: 'rgba(255,255,255,0.1)',
-          color: 'white',
-          titlefont: { size: 12 }
-        },
-        plot_bgcolor: 'rgba(0,0,0,0)',
-        paper_bgcolor: 'rgba(0,0,0,0)',
-        legend: {
-          font: { color: 'white', size: 11 },
-          bgcolor: 'rgba(26,31,46,0.8)'
-        },
-        margin: { t: 70, b: 50, l: 55, r: 35 }
-      };
-
-      Plotly.newPlot('chart', traces, layout, { responsive: true });
+      const existing = Highcharts.charts.find(c => c && c.renderTo && c.renderTo.id === 'chart');
+      if (existing) {
+        existing.series[0].setData(pts, false);
+        existing.series[0].update({ zoneAxis: 'x', zones }, false);
+        existing.xAxis[0].update({ plotLines }, false);
+        existing.setTitle({
+          text: `${testType}`,
+          style: { color: 'rgba(255,255,255,0.9)', fontSize: '14px', fontWeight: '700' }
+        }, {
+          text: `z = ${testStat.toFixed(4)} &nbsp;|&nbsp; p = ${pValue.toFixed(4)} &nbsp;|&nbsp; \u03B1 = ${alpha.toFixed(2)}`,
+          style: { color: 'rgba(200,220,255,0.7)', fontSize: '12px' }
+        }, false);
+        existing.redraw();
+      } else {
+        Highcharts.chart('chart', {
+          chart: {
+            type: 'area',
+            backgroundColor: 'transparent',
+            animation: false,
+            style: { fontFamily: "'Segoe UI', Tahoma, sans-serif" }
+          },
+          title: {
+            text: testType,
+            style: { color: 'rgba(255,255,255,0.9)', fontSize: '14px', fontWeight: '700' }
+          },
+          subtitle: {
+            text: `z = ${testStat.toFixed(4)} &nbsp;|&nbsp; p = ${pValue.toFixed(4)} &nbsp;|&nbsp; \u03B1 = ${alpha.toFixed(2)}`,
+            style: { color: 'rgba(200,220,255,0.7)', fontSize: '12px' },
+            useHTML: true
+          },
+          xAxis: {
+            title: { text: 'Test Statistic', style: { color: 'rgba(255,255,255,0.7)' } },
+            labels: { style: { color: 'rgba(255,255,255,0.6)' } },
+            gridLineColor: 'rgba(255,255,255,0.07)',
+            lineColor: 'rgba(255,255,255,0.15)',
+            tickColor: 'rgba(255,255,255,0.15)',
+            plotLines
+          },
+          yAxis: {
+            title: { text: 'Probability Density', style: { color: 'rgba(255,255,255,0.7)' } },
+            labels: { style: { color: 'rgba(255,255,255,0.6)' } },
+            gridLineColor: 'rgba(255,255,255,0.07)'
+          },
+          legend: { enabled: false },
+          credits: { enabled: false },
+          tooltip: {
+            formatter: function () {
+              return `<b>z = ${this.x.toFixed(3)}</b><br>f(z) = ${this.y.toFixed(4)}`;
+            },
+            backgroundColor: 'rgba(26,31,46,0.92)',
+            borderColor: 'rgba(120,200,255,0.3)',
+            style: { color: '#fff' }
+          },
+          series: [{
+            data: pts,
+            zoneAxis: 'x',
+            zones,
+            marker: { enabled: false },
+            lineWidth: 2.5,
+            fillOpacity: 1
+          }]
+        });
+      }
 
       // Update explanation
       const explanation = document.getElementById('chartExplanation');
       const reject = pValue < alpha;
-      const decision = reject ? '<strong style="color: rgb(255,100,100);">Reject H\u2080</strong>' : '<strong style="color: rgb(100,255,100);">Fail to Reject H\u2080</strong>';
-      
+      const decision = reject
+        ? '<strong style="color: rgb(255,100,100);">Reject H\u2080</strong>'
+        : '<strong style="color: rgb(100,255,100);">Fail to Reject H\u2080</strong>';
+
       explanation.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 8px;">
           <div style="font-size: 14px; font-weight: 700; color: var(--accent-1); margin-bottom: 4px;">
@@ -2826,16 +2775,12 @@
           <div style="display: grid; grid-template-columns: 140px 1fr; gap: 8px; font-size: 13px;">
             <div style="color: var(--text-muted);">Test:</div>
             <div>${orientation} ${testType}</div>
-            
             <div style="color: var(--text-muted);">Alpha Level:</div>
             <div>&alpha; = ${alpha.toFixed(2)} <span style="color: var(--accent-2);">(${(100 * (1 - alpha)).toFixed(0)}% confidence)</span></div>
-            
             <div style="color: var(--text-muted);">Test Statistic:</div>
             <div style="font-weight: 600; color: rgb(255,215,0);">${testStat.toFixed(4)}</div>
-            
             <div style="color: var(--text-muted);">P-Value:</div>
             <div style="font-weight: 600; color: var(--accent-2);">${pValue.toFixed(4)}</div>
-            
             <div style="color: var(--text-muted);">Decision:</div>
             <div style="font-size: 14px;">${decision}</div>
           </div>

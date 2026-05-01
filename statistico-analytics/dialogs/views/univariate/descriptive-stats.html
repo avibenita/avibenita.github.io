@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <title>Descriptive Statistics</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts-more.js"></script>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
@@ -108,9 +108,8 @@
     .detail-label { color: rgba(255, 255, 255, 0.7); }
     .detail-value { font-weight: 500; }
     
-    /* D3 Chart Styles */
-    .histogram-bar { fill: #74b9ff; stroke: #0984e3; stroke-width: 1px; }
-    .histogram-bar:hover { fill: #0984e3; }
+    /* Highcharts histogram container */
+    #histogram-container { width: 100%; min-height: 220px; }
     .normal-curve { fill: none; stroke: yellow; stroke-width: 2px; stroke-dasharray: 5, 5; }
     .axis text { fill: white; font-size: 10px; }
     .axis path, .axis line { stroke: #999; }
@@ -812,94 +811,107 @@
       return result;
     }
 
-    // Render histogram using D3.js
+    // Render histogram using Highcharts
     function renderHistogram() {
       if (!selectedRow || !selectedRow.vector) return;
-      
-      const container = document.getElementById('histogram-container');
-      const width = container.clientWidth;
-      const height = container.clientHeight * 0.8;
-      
-      d3.select('#histogram-container').selectAll('*').remove();
-      
-      const svg = d3.select('#histogram-container')
-        .append('svg')
-        .attr('width', width)
-        .attr('height', height);
-      
-      const margin = { top: 15, right: 25, bottom: 40, left: 40 };
-      const innerWidth = width - margin.left - margin.right;
-      const innerHeight = height - margin.top - margin.bottom;
-      
-      const g = svg.append('g')
-        .attr('transform', `translate(${margin.left},${margin.top})`);
-      
+
       const histData = generateHistogramData(selectedRow.vector, numBins);
-      
-      const x = d3.scaleBand()
-        .domain(histData.map(d => d.bin))
-        .range([0, innerWidth])
-        .padding(0.1);
-      
-      const maxCount = d3.max(histData, d => d.count);
-      const y = d3.scaleLinear()
-        .domain([0, maxCount + (maxCount * 0.1)])
-        .range([innerHeight, 0]);
-      
-      const xAxis = g.append('g')
-        .attr('class', 'axis')
-        .attr('transform', `translate(0,${innerHeight})`)
-        .call(d3.axisBottom(x).tickValues(x.domain().filter((d, i) => i % 2 === 0)))
-        .selectAll('text')
-        .style('text-anchor', 'end')
-        .attr('dx', '-.8em')
-        .attr('dy', '.15em')
-        .attr('font-size', '8px')
-        .attr('transform', 'rotate(-45)');
-      
-      const yAxis = g.append('g')
-        .attr('class', 'axis')
-        .call(d3.axisLeft(y).ticks(5));
-      
-      g.append('g')
-        .attr('class', 'grid')
-        .attr('transform', `translate(0,${innerHeight})`)
-        .call(d3.axisBottom(x).tickSize(-innerHeight).tickFormat(''));
-      
-      g.append('g')
-        .attr('class', 'grid')
-        .call(d3.axisLeft(y).ticks(5).tickSize(-innerWidth).tickFormat(''));
-      
-      g.selectAll('.histogram-bar')
-        .data(histData)
-        .enter().append('rect')
-        .attr('class', 'histogram-bar')
-        .attr('x', d => x(d.bin))
-        .attr('width', x.bandwidth())
-        .attr('y', d => y(d.count))
-        .attr('height', d => innerHeight - y(d.count));
-      
+      const categories = histData.map(d => d.bin);
+      const counts     = histData.map(d => d.count);
+      const maxCount   = Math.max(...counts);
+
+      // Normal curve series (scaled to histogram height)
+      let normalSeries = null;
       if (showNormal) {
-        const normalData = generateNormalCurve(selectedRow.Mean, selectedRow.StdDev, 
-          d3.min(selectedRow.vector), d3.max(selectedRow.vector));
-        
-        const maxNormalY = d3.max(normalData, d => d.y);
-        const normalScale = maxCount / maxNormalY * 0.8;
-        
-        const xScale = d3.scaleLinear()
-          .domain([d3.min(selectedRow.vector), d3.max(selectedRow.vector)])
-          .range([0, innerWidth]);
-        
-        const line = d3.line()
-          .x(d => xScale(d.x))
-          .y(d => y(d.y * normalScale))
-          .curve(d3.curveCardinal);
-        
-        g.append('path')
-          .datum(normalData)
-          .attr('class', 'normal-curve')
-          .attr('d', line);
+        const minV = Math.min(...selectedRow.vector);
+        const maxV = Math.max(...selectedRow.vector);
+        const normalData = generateNormalCurve(selectedRow.Mean, selectedRow.StdDev, minV, maxV);
+        const maxNormalY = Math.max(...normalData.map(d => d.y));
+        const scale      = maxCount / maxNormalY * 0.85;
+
+        // Map normal curve x values to category axis positions (floating index)
+        const range = maxV - minV;
+        const binWidth = range / numBins;
+        const normalPoints = normalData.map(d => {
+          const idx = (d.x - minV) / binWidth - 0.5;
+          return [idx, d.y * scale];
+        });
+        normalSeries = {
+          type: 'spline',
+          name: 'Normal curve',
+          data: normalPoints,
+          color: 'rgba(255,165,120,0.9)',
+          lineWidth: 2,
+          marker: { enabled: false },
+          enableMouseTracking: false
+        };
       }
+
+      const series = [{
+        type: 'column',
+        name: 'Count',
+        data: counts,
+        color: 'rgba(120,200,255,0.75)',
+        borderColor: 'rgba(120,200,255,0.35)',
+        borderWidth: 1,
+        groupPadding: 0,
+        pointPadding: 0.05
+      }];
+      if (normalSeries) series.push(normalSeries);
+
+      const existing = Highcharts.charts.find(c => c && c.renderTo && c.renderTo.id === 'histogram-container');
+      if (existing) {
+        existing.xAxis[0].setCategories(categories, false);
+        existing.series[0].setData(counts, false);
+        if (showNormal && existing.series[1]) {
+          existing.series[1].setData(normalSeries.data, false);
+          existing.series[1].setVisible(true, false);
+        } else if (!showNormal && existing.series[1]) {
+          existing.series[1].setVisible(false, false);
+        }
+        existing.redraw();
+        return;
+      }
+
+      Highcharts.chart('histogram-container', {
+        chart: {
+          backgroundColor: 'transparent',
+          animation: false,
+          style: { fontFamily: "'Segoe UI', Tahoma, sans-serif" },
+          marginTop: 10
+        },
+        title: { text: '' },
+        xAxis: {
+          categories,
+          labels: {
+            rotation: -45,
+            style: { color: 'rgba(255,255,255,0.6)', fontSize: '9px' },
+            step: Math.ceil(numBins / 8)
+          },
+          gridLineColor: 'rgba(255,255,255,0.07)',
+          lineColor: 'rgba(255,255,255,0.15)',
+          tickColor: 'rgba(255,255,255,0.15)'
+        },
+        yAxis: {
+          title: { text: 'Count', style: { color: 'rgba(255,255,255,0.6)', fontSize: '11px' } },
+          labels: { style: { color: 'rgba(255,255,255,0.6)' } },
+          gridLineColor: 'rgba(255,255,255,0.07)'
+        },
+        legend: { enabled: false },
+        credits: { enabled: false },
+        tooltip: {
+          formatter: function () {
+            return `<b>${this.x}</b><br>Count: <b>${this.y}</b>`;
+          },
+          backgroundColor: 'rgba(26,31,46,0.92)',
+          borderColor: 'rgba(120,200,255,0.3)',
+          style: { color: '#fff' }
+        },
+        plotOptions: {
+          column: { pointPadding: 0.05, groupPadding: 0, borderRadius: 2 }
+        },
+        series
+      });
     }
 
     // Modal functions

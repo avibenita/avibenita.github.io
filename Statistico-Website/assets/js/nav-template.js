@@ -222,8 +222,8 @@ const NAV_STYLE = `
 /* SVG element colours – dark mode (default) */
 .nl-title { fill: #ffffff; }
 .nl-sub   { fill: rgba(0, 196, 204, 0.48); }
-.nl-div   { stroke: rgba(255,255,255,0.88); stroke-width: 1; }
-.nl-sep   { stroke: rgba(255,255,255,0.88); stroke-width: 0.9; }
+.nl-div   { stroke: rgba(255,255,255,0.18); stroke-width: 1; }
+.nl-sep   { stroke: rgba(0, 196, 204, 0.35); stroke-width: 0.9; }
 
 /* SVG element colours – light mode */
 :root[data-theme="light"] .nl-title { fill: #06152a; }
@@ -299,7 +299,7 @@ const NAV_STYLE = `
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.32);
+  color: yellow;
   line-height: 1;
   user-select: none;
   pointer-events: none;

@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Correlation Matrix Demo</title>
+<style>
+  :root {
+    --surface-0: #0c1624;
+    --surface-1: #1a1f2e;
+    --surface-2: #242938;
+    --border: #2d3748;
+    --accent-1: rgb(255,165,120);
+    --accent-2: rgb(120,200,255);
+    --text-primary: #ffffff;
+    --text-muted: rgba(255,255,255,0.5);
+    --pos-strong: #22c55e;
+    --pos-mid:    #86efac;
+    --pos-weak:   #d1fae5;
+    --neg-weak:   #fecaca;
+    --neg-mid:    #f87171;
+    --neg-strong: #ef4444;
+    --zero:       #2d3748;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--surface-0);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: var(--text-primary);
+    overflow: hidden;
+  }
+
+  .wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 10px 14px 8px;
+    gap: 8px;
+  }
+
+  /* ── Header ── */
+  .demo-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .demo-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--accent-1);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  .demo-vars {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .var-chip {
+    font-size: 0.62rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 20px;
+    background: rgba(120,200,255,0.12);
+    color: var(--accent-2);
+    border: 1px solid rgba(120,200,255,0.22);
+    white-space: nowrap;
+  }
+
+  /* ── Matrix ── */
+  .matrix-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+  }
+
+  .matrix-grid {
+    display: grid;
+    gap: 3px;
+  }
+
+  .cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: default;
+    transition: transform .12s, box-shadow .12s;
+    position: relative;
+    user-select: none;
+  }
+  .cell:hover {
+    transform: scale(1.08);
+    z-index: 10;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.35), 0 4px 14px rgba(0,0,0,0.5);
+  }
+
+  /* Diagonal label cells */
+  .cell.diag {
+    background: var(--surface-2);
+    color: var(--accent-2);
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: .03em;
+    text-align: center;
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: rgba(15,23,42,0.96);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 7px;
+    padding: 6px 10px;
+    font-size: 0.72rem;
+    color: #fff;
+    white-space: nowrap;
+    z-index: 999;
+    opacity: 0;
+    transition: opacity .12s;
+    line-height: 1.6;
+  }
+  .tooltip.visible { opacity: 1; }
+  .tooltip .tt-r { font-weight: 800; }
+  .tooltip .tt-label { color: rgba(255,255,255,0.6); font-weight: 400; }
+
+  /* ── Legend ── */
+  .legend {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: center;
+    padding-bottom: 2px;
+  }
+  .legend-label { font-size: 0.6rem; color: var(--text-muted); }
+  .legend-bar {
+    width: 120px;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(to right, #ef4444, #2d3748, #22c55e);
+  }
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <div class="demo-header">
+    <div class="demo-title">Correlation Matrix</div>
+    <div class="demo-vars" id="varChips"></div>
+  </div>
+
+  <div class="matrix-wrap">
+    <div class="matrix-grid" id="matrixGrid"></div>
+  </div>
+
+  <div class="legend">
+    <span class="legend-label">−1</span>
+    <div class="legend-bar"></div>
+    <span class="legend-label">+1</span>
+  </div>
+
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+(function () {
+
+  /* ── Demo data ── */
+  const vars = ['Height', 'Weight', 'Age', 'Rest HR', 'VO₂ Max'];
+  const short = ['Ht', 'Wt', 'Age', 'HR', 'VO₂'];
+
+  /* Symmetric correlation matrix (lower-tri = upper-tri) */
+  const r = [
+    [ 1.00,  0.72, -0.08, -0.21,  0.34],
+    [ 0.72,  1.00,  0.19,  0.38, -0.51],
+    [-0.08,  0.19,  1.00,  0.43, -0.67],
+    [-0.21,  0.38,  0.43,  1.00, -0.74],
+    [ 0.34, -0.51, -0.67, -0.74,  1.00]
+  ];
+
+  const n = vars.length;
+
+  /* ── Colour mapping ── */
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function lerpRgb(c1, c2, t) {
+    return [lerp(c1[0],c2[0],t), lerp(c1[1],c2[1],t), lerp(c1[2],c2[2],t)];
+  }
+  const NEG   = [239, 68,  68];   // #ef4444
+  const ZERO  = [ 45, 55,  72];   // #2d3748
+  const POS   = [ 34,197,  94];   // #22c55e
+  const DIAG  = [ 36, 41,  56];
+
+  function rToColor(val) {
+    if (Math.abs(val) < 0.01) return `rgb(${ZERO.join(',')})`;
+    const c = val > 0 ? lerpRgb(ZERO, POS, val) : lerpRgb(ZERO, NEG, -val);
+    return `rgb(${c.map(Math.round).join(',')})`;
+  }
+  function rToTextColor(val) {
+    return Math.abs(val) > 0.45 ? '#fff' : 'rgba(255,255,255,0.72)';
+  }
+
+  /* ── Build variable chips ── */
+  const chipsEl = document.getElementById('varChips');
+  vars.forEach(function(v) {
+    const chip = document.createElement('span');
+    chip.className = 'var-chip';
+    chip.textContent = v;
+    chipsEl.appendChild(chip);
+  });
+
+  /* ── Build grid ── */
+  const grid = document.getElementById('matrixGrid');
+
+  /* Calculate cell size to fill space */
+  function calcSize() {
+    const avail = Math.min(window.innerWidth - 28, window.innerHeight - 90);
+    return Math.floor((avail - (n - 1) * 3) / n);
+  }
+
+  function buildGrid() {
+    const sz = calcSize();
+    grid.style.gridTemplateColumns = `repeat(${n}, ${sz}px)`;
+    grid.innerHTML = '';
+
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell' + (i === j ? ' diag' : '');
+        cell.style.width  = sz + 'px';
+        cell.style.height = sz + 'px';
+
+        if (i === j) {
+          cell.style.background = `rgb(${DIAG.join(',')})`;
+          cell.textContent = short[i];
+        } else {
+          const val = r[i][j];
+          cell.style.background = rToColor(val);
+          cell.style.color = rToTextColor(val);
+          cell.textContent = val.toFixed(2);
+          cell.dataset.i = i;
+          cell.dataset.j = j;
+        }
+        grid.appendChild(cell);
+      }
+    }
+  }
+
+  buildGrid();
+  window.addEventListener('resize', buildGrid);
+
+  /* ── Tooltip ── */
+  const tip = document.getElementById('tooltip');
+
+  function interp(val) {
+    const a = Math.abs(val);
+    if (a >= 0.70) return val > 0 ? 'strong positive' : 'strong negative';
+    if (a >= 0.40) return val > 0 ? 'moderate positive' : 'moderate negative';
+    if (a >= 0.20) return val > 0 ? 'weak positive' : 'weak negative';
+    return 'negligible';
+  }
+
+  document.addEventListener('mousemove', function (e) {
+    const cell = e.target.closest('.cell:not(.diag)');
+    if (!cell) { tip.classList.remove('visible'); return; }
+
+    const i = +cell.dataset.i, j = +cell.dataset.j;
+    const val = r[i][j];
+
+    tip.innerHTML =
+      `<span class="tt-label">${vars[i]} × ${vars[j]}</span><br>` +
+      `r = <span class="tt-r" style="color:${val > 0 ? '#4ade80' : '#f87171'}">${val.toFixed(2)}</span>` +
+      ` &nbsp;·&nbsp; ${interp(val)}`;
+
+    const x = e.clientX + 12, y = e.clientY - 40;
+    tip.style.left = Math.min(x, window.innerWidth - 200) + 'px';
+    tip.style.top  = Math.max(6, y) + 'px';
+    tip.classList.add('visible');
+  });
+
+  document.addEventListener('mouseleave', function () {
+    tip.classList.remove('visible');
+  });
+
+})();
+</script>
+</body>
+</html>

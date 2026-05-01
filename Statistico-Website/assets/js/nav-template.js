@@ -184,10 +184,11 @@ const NAV_STYLE = `
 .nav-logo:hover { opacity: 0.85; }
 
 .nav-logo-img {
-  height: 64px !important;
+  height: 56px !important;
   width: auto !important;
-  max-height: 64px;
+  max-height: 56px;
   display: block;
+  object-fit: contain;
 }
 
 /* Dark mode: show dark logo, hide light */
@@ -802,7 +803,7 @@ const NAV_STYLE = `
 }
 
 .sticky-nav.scrolled .nav-logo { opacity: 1; }
-.sticky-nav.scrolled .nav-logo-img { height: 52px !important; max-height: 52px; }
+.sticky-nav.scrolled .nav-logo-img { height: 44px !important; max-height: 44px; }
 
 .mobile-toggle {
   display: none;

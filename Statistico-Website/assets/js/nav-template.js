@@ -221,9 +221,9 @@ const NAV_STYLE = `
 
 /* SVG element colours – dark mode (default) */
 .nl-title { fill: #ffffff; }
-.nl-sub   { fill: rgba(0, 196, 204, 0.60); }
+.nl-sub   { fill: rgba(0, 196, 204, 0.28); }
 .nl-div   { stroke: rgba(255,255,255,0.18); stroke-width: 1; }
-.nl-sep   { stroke: rgba(0, 196, 204, 0.45); stroke-width: 0.9; }
+.nl-sep   { stroke: rgba(0, 196, 204, 0.20); stroke-width: 0.9; }
 
 /* SVG element colours – light mode */
 :root[data-theme="light"] .nl-title { fill: #06152a; }

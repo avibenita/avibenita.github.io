@@ -105,13 +105,19 @@ const NAV_TEMPLATE = `
           FAQ
         </a>
       </li>
+      <li class="nav-item">
+        <a href="javascript:void(0)" class="nav-link nav-link--contact-subtle" data-page="contact" id="link-contact">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="1" y="3" width="14" height="10" rx="1.5"/>
+            <polyline points="1,4 8,9 15,4"/>
+          </svg>
+          Contact
+        </a>
+      </li>
 
       <!-- Hidden from main nav; kept for routing/footer -->
       <li class="nav-item nav-item--hidden" aria-hidden="true">
         <a href="javascript:void(0)" class="nav-link" data-page="about" id="link-about" tabindex="-1">About Us</a>
-      </li>
-      <li class="nav-item nav-item--hidden" aria-hidden="true">
-        <a href="javascript:void(0)" class="nav-link" data-page="contact" id="link-contact" tabindex="-1">Contact</a>
       </li>
     </ul>
 
@@ -382,9 +388,31 @@ const NAV_STYLE = `
 
 .nav-link[data-page="home"]:hover { opacity: 1; }
 
-/* Hidden items (About, Contact) — kept in DOM for link wiring */
+/* Hidden items (About) — kept in DOM for link wiring */
 .nav-item--hidden {
   display: none !important;
+}
+
+/* Subtle Contact link */
+.nav-link--contact-subtle {
+  opacity: 0.52;
+  font-size: 0.80rem;
+  font-weight: 400;
+  gap: 6px;
+  padding: 6px 10px;
+  min-height: 36px;
+  border-radius: 12px;
+  color: rgba(255,255,255,0.75);
+}
+.nav-link--contact-subtle:hover {
+  opacity: 1;
+  color: #ffffff;
+}
+:root[data-theme="light"] .nav-link--contact-subtle {
+  color: rgba(15,23,42,0.62);
+}
+:root[data-theme="light"] .nav-link--contact-subtle:hover {
+  color: rgba(15,23,42,0.92);
 }
 
 .nav-link {

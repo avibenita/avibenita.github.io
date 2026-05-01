@@ -65,7 +65,7 @@ const NAV_TEMPLATE = `
         <span class="nav-products-label">Suite</span>
         <div class="nav-products-row" id="nav-products-row">
           <div class="nav-products-slider" id="nav-products-slider"></div>
-          <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators">
+          <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators" title="Statistico Calculators Hub">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <rect x="2" y="2" width="12" height="12" rx="2"/>
               <line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/>
@@ -73,13 +73,13 @@ const NAV_TEMPLATE = `
             </svg>
             Calculators
           </a>
-          <a href="javascript:void(0)" class="nav-link nav-link--product-core" data-page="analytics" id="link-analytics">
+          <a href="javascript:void(0)" class="nav-link nav-link--product-core" data-page="analytics" id="link-analytics" title="Statistico Analytics Hub">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <polyline points="1,12 5,7 8,10 11,5 15,3"/>
             </svg>
             Analytics
           </a>
-          <a href="javascript:void(0)" class="nav-link nav-link--product-lite" data-page="addins" id="link-addins">
+          <a href="javascript:void(0)" class="nav-link nav-link--product-lite" data-page="addins" id="link-addins" title="Statistico Applications Hub">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <rect x="3" y="1" width="10" height="14" rx="1.5"/>
               <line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/>

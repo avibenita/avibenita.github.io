@@ -311,7 +311,7 @@ const NAV_STYLE = `
   gap: 2px;
   align-items: center;
   background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,165,120,0.45);
   border-radius: 18px;
   padding: 3px;
   position: relative;

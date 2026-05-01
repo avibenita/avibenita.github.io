@@ -21,9 +21,36 @@ function getNavLinks() {
 const NAV_TEMPLATE = `
 <nav class="sticky-nav" id="stickyNav">
   <div class="nav-container">
-    <a href="javascript:void(0)" class="nav-logo" id="nav-logo-link">
-      <img src="assets/img/logo-dark.png" alt="Statistico Interactive" class="nav-logo-img nav-logo--dark" />
-      <img src="assets/img/logo-light.png" alt="Statistico Interactive" class="nav-logo-img nav-logo--light" />
+    <a href="javascript:void(0)" class="nav-logo" id="nav-logo-link" aria-label="Statistico Interactive">
+      <svg class="nav-logo-svg" viewBox="0 0 192 44" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+        <defs>
+          <linearGradient id="nl-arc" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#4f8eff"/>
+            <stop offset="100%" stop-color="#1a56d6"/>
+          </linearGradient>
+          <linearGradient id="nl-bar" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#00e0cc"/>
+            <stop offset="100%" stop-color="#00a8b5"/>
+          </linearGradient>
+        </defs>
+        <!-- S top arc -->
+        <path d="M 32,9 C 32,5 27,3 21,3 C 13,3 8,8 8,14 C 8,20 13,22 21,22" stroke="url(#nl-arc)" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+        <!-- S bottom arc -->
+        <path d="M 21,22 C 29,22 36,24 36,30 C 36,37 30,41 22,41 C 14,41 10,37 10,33" stroke="url(#nl-arc)" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+        <!-- 4 ascending bars -->
+        <rect x="11" y="29" width="4" height="11" rx="1.2" fill="url(#nl-bar)"/>
+        <rect x="17" y="24" width="4" height="16" rx="1.2" fill="url(#nl-bar)"/>
+        <rect x="23" y="19" width="4" height="21" rx="1.2" fill="url(#nl-bar)"/>
+        <rect x="29" y="14" width="4" height="26" rx="1.2" fill="url(#nl-bar)"/>
+        <!-- Vertical divider -->
+        <line x1="50" y1="9" x2="50" y2="35" class="nl-div"/>
+        <!-- STATISTICO -->
+        <text x="60" y="22" class="nl-title" font-family="Segoe UI,Arial,sans-serif" font-weight="800" font-size="17" letter-spacing="2">STATISTICO</text>
+        <!-- INTERACTIVE with flanking lines -->
+        <line x1="60" y1="30" x2="74" y2="30" class="nl-sep"/>
+        <text x="125" y="37" class="nl-sub" font-family="Segoe UI,Arial,sans-serif" font-weight="500" font-size="8" letter-spacing="2.5" text-anchor="middle">INTERACTIVE</text>
+        <line x1="176" y1="30" x2="190" y2="30" class="nl-sep"/>
+      </svg>
     </a>
 
     <ul class="nav-menu" id="navMenu">
@@ -183,22 +210,29 @@ const NAV_STYLE = `
 
 .nav-logo:hover { opacity: 0.85; }
 
-.nav-logo-img {
-  height: 56px !important;
-  width: auto !important;
-  max-height: 56px;
+/* SVG inline logo */
+.nav-logo-svg {
+  height: 44px;
+  width: auto;
   display: block;
-  object-fit: contain;
+  overflow: visible;
 }
 
-/* Dark mode: show dark logo, hide light */
-.nav-logo--dark  { display: block; }
-.nav-logo--light { display: none; }
+/* SVG element colours – dark mode (default) */
+.nl-title { fill: #ffffff; }
+.nl-sub   { fill: #00c4cc; }
+.nl-div   { stroke: rgba(255,255,255,0.18); stroke-width: 1; }
+.nl-sep   { stroke: #00c4cc; stroke-width: 0.9; }
 
-/* Light mode: show light logo, hide dark */
-:root[data-theme="light"] .nav-logo--dark  { display: none; }
-:root[data-theme="light"] .nav-logo--light { display: block; }
+/* SVG element colours – light mode */
+:root[data-theme="light"] .nl-title { fill: #06152a; }
+:root[data-theme="light"] .nl-sub   { fill: #0077a8; }
+:root[data-theme="light"] .nl-div   { stroke: rgba(0,0,0,0.15); }
+:root[data-theme="light"] .nl-sep   { stroke: #0077a8; }
 
+/* Hide old image-based logo remnants */
+.nav-logo-img  { display: none !important; }
+.nav-logo--dark, .nav-logo--light { display: none !important; }
 .nav-logo .goldish { display: none; }
 
 /* ── Brand name typography ── */
@@ -803,7 +837,7 @@ const NAV_STYLE = `
 }
 
 .sticky-nav.scrolled .nav-logo { opacity: 1; }
-.sticky-nav.scrolled .nav-logo-img { height: 44px !important; max-height: 44px; }
+.sticky-nav.scrolled .nav-logo-svg { height: 36px; }
 
 .mobile-toggle {
   display: none;

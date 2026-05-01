@@ -184,7 +184,7 @@ const NAV_STYLE = `
 .nav-logo:hover { opacity: 0.85; }
 
 .nav-logo-img {
-  height: 38px;
+  height: 52px;
   width: auto;
   display: block;
 }
@@ -801,7 +801,7 @@ const NAV_STYLE = `
 }
 
 .sticky-nav.scrolled .nav-logo { opacity: 1; }
-.sticky-nav.scrolled .nav-logo-img { height: 32px; }
+.sticky-nav.scrolled .nav-logo-img { height: 44px; }
 
 .mobile-toggle {
   display: none;

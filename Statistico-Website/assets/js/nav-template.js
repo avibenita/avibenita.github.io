@@ -220,10 +220,10 @@ const NAV_STYLE = `
 }
 
 /* SVG element colours – dark mode (default) */
-.nl-title { fill: #ffffff; }
-.nl-sub   { fill: rgba(0, 196, 204, 0.48); }
-.nl-div   { stroke: rgba(255,255,255,0.18); stroke-width: 1; }
-.nl-sep   { stroke: rgba(0, 196, 204, 0.35); stroke-width: 0.9; }
+.nl-title { fill: rgb(255,165,120); }
+.nl-sub   { fill: rgba(255,165,120,0.50); }
+.nl-div   { stroke: rgba(255,165,120,0.20); stroke-width: 1; }
+.nl-sep   { stroke: rgba(255,165,120,0.35); stroke-width: 0.9; }
 
 /* SVG element colours – light mode */
 :root[data-theme="light"] .nl-title { fill: #06152a; }

@@ -1,27 +1,350 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Correlation Matrix Demo</title>
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
+
+  <!-- Highcharts + regression (scatter popup) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/regression/2.0.1/regression.min.js"></script>
+
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #0c1624; }
-    iframe { width: 100%; height: 100%; border: none; display: block; }
+    :root {
+      --surface-0: #0c1624;
+      --surface-1: #1a1f2e;
+      --surface-2: #242938;
+      --border:    #2d3748;
+      --accent-1:  rgb(255,165,120);
+      --accent-2:  rgb(120,200,255);
+      --text-primary:   #fff;
+      --text-secondary: rgba(255,255,255,0.8);
+      --text-muted:     rgba(255,255,255,0.5);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body { height: 100%; overflow: hidden; background: var(--surface-0); color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+    .container { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── Controls bar ── */
+    .controls {
+      flex: 0 0 auto;
+      background: var(--surface-1);
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    }
+    .control-group {
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+      background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+      border-radius: 9px; padding: 6px 12px;
+    }
+    .control-group > label { font-size: 12px; color: var(--text-secondary); font-weight: 600; white-space: nowrap; }
+
+    .radio-bar {
+      display: flex; gap: 3px; background: rgba(0,0,0,0.25);
+      padding: 3px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.07);
+    }
+    .radio-bar label {
+      padding: 4px 11px; border-radius: 5px; cursor: pointer; transition: all .2s;
+      font-size: 12px; font-weight: 600; color: var(--text-secondary); white-space: nowrap;
+    }
+    .radio-bar label:hover { background: rgba(255,165,120,0.12); color: var(--accent-1); }
+    .radio-bar input[type="radio"] { display: none; }
+    .radio-bar label:has(input:checked) {
+      background: var(--accent-1); color: var(--surface-0);
+      font-weight: 700; box-shadow: 0 2px 6px rgba(255,165,120,0.35);
+    }
+
+    .view-toggle { display: flex; gap: 3px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.07); border-radius: 7px; padding: 3px; }
+    .view-toggle button {
+      border: none; background: transparent; color: var(--text-secondary);
+      font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 5px; cursor: pointer; transition: all .2s;
+    }
+    .view-toggle button:hover { background: rgba(255,165,120,0.12); color: var(--accent-1); }
+    .view-toggle button.active { background: var(--accent-1); color: var(--surface-0); box-shadow: 0 2px 6px rgba(255,165,120,0.35); }
+
+    input[type="range"] { width: 120px; height: 6px; border-radius: 3px; outline: none; -webkit-appearance: none;
+      background: linear-gradient(90deg, var(--surface-2) 0%, var(--accent-1) 100%); }
+    input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); cursor: pointer; box-shadow: 0 2px 6px rgba(255,165,120,0.4); }
+    input[type="range"]::-moz-range-thumb { width: 15px; height: 15px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); cursor: pointer; border: none; }
+
+    .slider-label { font-size: 12px; color: var(--text-secondary); font-weight: 600; white-space: nowrap; }
+    .slider-value { font-size: 12px; color: var(--accent-1); font-weight: 700; min-width: 32px; text-align: right; }
+
+    .checkbox-label {
+      display: flex; align-items: center; gap: 6px; cursor: pointer;
+      font-size: 12px; font-weight: 600; color: var(--text-secondary);
+      padding: 3px 6px; border-radius: 5px; transition: background .2s;
+    }
+    .checkbox-label:hover { background: rgba(255,165,120,0.1); color: var(--accent-1); }
+    .checkbox-label input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent-1); }
+    .checkbox-label:has(input:checked) { color: var(--accent-1); font-weight: 700; }
+
+    /* ── Scroll hint ── */
+    .scroll-hint {
+      background: linear-gradient(135deg, rgba(255,165,120,0.08), rgba(120,200,255,0.08));
+      padding: 7px 14px; border-radius: 6px; margin-bottom: 10px; font-size: 11px;
+      color: var(--text-secondary); border: 1px solid rgba(255,165,120,0.2); text-align: center;
+    }
+    .scroll-hint i { color: var(--accent-1); margin-right: 5px; }
+
+    /* ── Table ── */
+    .table-wrap { flex: 1; min-height: 0; overflow: auto; padding: 10px 14px; }
+
+    .table-container {
+      border: 1px solid var(--border); border-radius: 8px; overflow: auto;
+      background: var(--surface-1);
+    }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--surface-1); }
+    thead { position: sticky; top: 0; z-index: 10; }
+    thead th {
+      position: sticky; top: 0;
+      background: linear-gradient(135deg, var(--surface-2), #2d3545);
+      padding: 13px 16px; text-align: center; font-weight: 700; font-size: 14px;
+      color: var(--accent-2); border-bottom: 2px solid var(--accent-2);
+      border-right: 1px solid var(--border); white-space: nowrap;
+    }
+    thead th:first-child { position: sticky; left: 0; z-index: 11; text-align: left; min-width: 110px; }
+
+    tbody tr:nth-child(even) { background: rgba(36,41,56,0.5); }
+    tbody tr:hover { background: rgba(255,165,120,0.06); }
+    tbody td { padding: 12px 16px; text-align: center; font-size: 14px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    tbody td:first-child { position: sticky; left: 0; background: inherit; font-weight: 700; text-align: left; color: var(--accent-2); z-index: 2; min-width: 130px; font-size: 14px; }
+    tbody tr:nth-child(even) td:first-child { background: rgba(36,41,56,0.5); }
+    tbody tr:hover td:first-child { background: rgba(255,165,120,0.06); }
+
+    .corr-value { font-weight: 700; font-size: 15px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+    .p-value { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+    .n-value  { font-size: 11px; color: var(--text-muted); font-style: italic; margin-top: 2px; }
+
+    .diagonal-cell { background: transparent !important; position: relative; }
+    .diagonal-cell .corr-value { color: var(--accent-2); text-decoration: none; cursor: default; }
+    .diagonal-cell::after { content: ''; position: absolute; inset: 0; border: 1px solid rgba(120,200,255,0.25); pointer-events: none; }
+
+    .threshold-highlight { background: linear-gradient(135deg, rgba(255,165,120,0.2), rgba(120,200,255,0.2)) !important;
+      animation: pulse-hl 2s ease-in-out infinite; }
+    @keyframes pulse-hl { 0%,100% { box-shadow: inset 0 0 8px rgba(255,165,120,0.3); } 50% { box-shadow: inset 0 0 14px rgba(255,165,120,0.5); } }
+
+    /* ── Heatmap ── */
+    .heatmap-container { border: 1px solid var(--border); border-radius: 8px; overflow: auto; background: var(--surface-1); }
+    .heatmap-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    .heatmap-table thead th {
+      position: sticky; top: 0; z-index: 10;
+      background: linear-gradient(135deg, var(--surface-2), #2d3545);
+      padding: 13px 16px; text-align: center; font-weight: 700; font-size: 14px;
+      color: var(--accent-1); border-bottom: 2px solid var(--accent-1); border-right: 1px solid var(--border); white-space: nowrap;
+    }
+    .heatmap-table thead th:first-child { position: sticky; left: 0; z-index: 11; text-align: left; min-width: 130px; }
+    .heatmap-table tbody td {
+      padding: 13px 16px; text-align: center; font-size: 14px; font-weight: 700;
+      border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); color: #0c1624;
+    }
+    .heatmap-table tbody td:first-child { position: sticky; left: 0; background: var(--surface-1); color: var(--accent-2); font-weight: 700; text-align: left; z-index: 2; min-width: 130px; }
+    .heatmap-cell.threshold-highlight { outline: 2px solid rgba(255,165,120,0.9); outline-offset: -2px; box-shadow: inset 0 0 8px rgba(255,165,120,0.5); }
+
+    /* ── Scatter Modal ── */
+    .scatter-modal {
+      display: none; position: fixed; z-index: 9999; inset: 0;
+      background: rgba(0,0,0,0.65); align-items: center; justify-content: center; padding: 20px;
+    }
+    .scatter-modal-content {
+      background: var(--surface-1); border: 2px solid var(--border); border-radius: 12px;
+      width: 90%; max-width: 880px; max-height: 90vh; overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5); display: flex; flex-direction: column;
+    }
+    .scatter-modal-header {
+      padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border); color: var(--accent-1); font-weight: 600;
+    }
+    .scatter-modal-body { padding: 10px 14px 12px; overflow: auto; }
+    .scatter-close { cursor: pointer; font-size: 20px; color: var(--text-secondary); }
+
+    .scatter-chart { width: 100%; height: 280px; background: rgba(0,0,0,0.15); border: 1px solid var(--border); border-radius: 8px; position: relative; }
+    .scatter-stats { display: grid; grid-template-columns: repeat(4, minmax(110px,1fr)); gap: 7px; margin-bottom: 8px; }
+    .scatter-stat { background: rgba(255,255,255,0.06); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; text-align: center; }
+    .scatter-stat-value { font-size: 17px; font-weight: 700; color: var(--accent-1); }
+    .scatter-stat-value.adjusted::after { content: "*"; margin-left: 4px; color: var(--accent-2); font-weight: 700; }
+    .scatter-stat-label { font-size: 11px; color: var(--text-muted); }
+
+    .scatter-controls { display: grid; grid-template-columns: repeat(3, minmax(160px,1fr)); gap: 9px; margin-top: 9px; }
+    .scatter-panel { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
+    .scatter-panel-title { display: flex; align-items: center; gap: 6px; font-weight: 600; margin-bottom: 5px; color: var(--accent-1); font-size: 11px; }
+
+    .scatter-slider { margin-bottom: 6px; width: 100%; min-width: 0; }
+    .scatter-slider-header { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); margin-bottom: 3px; }
+    .scatter-slider input[type="range"] { width: 100%; }
+
+    .scatter-buttons { display: flex; flex-wrap: wrap; gap: 4px; }
+    .scatter-btn {
+      background: rgba(255,255,255,0.08); border: 1px solid var(--border);
+      color: var(--text-secondary); padding: 3px 7px; border-radius: 5px; font-size: 11px; cursor: pointer;
+    }
+    .scatter-btn.active { color: var(--surface-0); background: var(--accent-1); border-color: var(--accent-1); font-weight: 600; }
+
+    .fit-equation { margin-top: 6px; padding: 4px 8px; border-radius: 5px;
+      background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+      color: var(--text-secondary); font-size: 11px; text-align: center; min-height: 24px;
+      display: flex; align-items: center; justify-content: center; word-break: break-word; }
+
+    .scatter-axis-toggle { display: flex; gap: 4px; margin-bottom: 5px; }
+    .scatter-axis-toggle .scatter-btn { flex: 1; }
+    .axis-grid { display: flex; flex-direction: column; gap: 5px; }
+    .axis-row  { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+
+    @media (max-width: 700px) { .scatter-controls { grid-template-columns: 1fr; } .axis-row { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
 
-<iframe
-  id="cm-frame"
-  src="https://statistico.live/statistico-analytics/dialogs/views/correlations/correlation-matrix.html"
-  allowfullscreen
-  title="Statistico Correlation Matrix – Live Demo">
-</iframe>
+<!-- ── Scatter Modal ── -->
+<div id="scatterModal" class="scatter-modal" role="dialog" aria-hidden="true">
+  <div class="scatter-modal-content">
+    <div class="scatter-modal-header">
+      <span id="scatterTitle">Scatter Plot</span>
+      <span class="scatter-close" onclick="closeScatterModal()">&times;</span>
+    </div>
+    <div class="scatter-modal-body">
+      <div class="scatter-stats">
+        <div class="scatter-stat"><div class="scatter-stat-value" id="scatterN">--</div><div class="scatter-stat-label">Observations</div></div>
+        <div class="scatter-stat"><div class="scatter-stat-value" id="scatterR">--</div><div class="scatter-stat-label">Correlation (r)</div></div>
+        <div class="scatter-stat"><div class="scatter-stat-value" id="scatterP">--</div><div class="scatter-stat-label">p-value</div></div>
+        <div class="scatter-stat"><div class="scatter-stat-value" id="scatterR2">--</div><div class="scatter-stat-label">R²</div></div>
+      </div>
+      <div id="scatterChart" class="scatter-chart"></div>
+      <div class="scatter-controls">
+        <div class="scatter-panel">
+          <div class="scatter-panel-title"><i class="fas fa-sliders-h"></i>Axis Controls</div>
+          <div class="axis-grid">
+            <div class="axis-row">
+              <div class="scatter-slider">
+                <div class="scatter-slider-header"><span>X Min</span><span id="xMinVal">--</span></div>
+                <input type="range" id="xMinRange" oninput="updateAxisRange('x','min',this.value)">
+              </div>
+              <div class="scatter-slider">
+                <div class="scatter-slider-header"><span>X Max</span><span id="xMaxVal">--</span></div>
+                <input type="range" id="xMaxRange" oninput="updateAxisRange('x','max',this.value)">
+              </div>
+            </div>
+            <div class="axis-row">
+              <div class="scatter-slider">
+                <div class="scatter-slider-header"><span>Y Min</span><span id="yMinVal">--</span></div>
+                <input type="range" id="yMinRange" oninput="updateAxisRange('y','min',this.value)">
+              </div>
+              <div class="scatter-slider">
+                <div class="scatter-slider-header"><span>Y Max</span><span id="yMaxVal">--</span></div>
+                <input type="range" id="yMaxRange" oninput="updateAxisRange('y','max',this.value)">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="scatter-panel">
+          <div class="scatter-panel-title"><i class="fas fa-wave-square"></i>Curve Fitting</div>
+          <div class="scatter-buttons">
+            <button class="scatter-btn active" id="fit-none"        onclick="applyFit('none')">None</button>
+            <button class="scatter-btn"        id="fit-linear"      onclick="applyFit('linear')">Linear</button>
+            <button class="scatter-btn"        id="fit-polynomial"  onclick="applyFit('polynomial')">Poly</button>
+            <button class="scatter-btn"        id="fit-exponential" onclick="applyFit('exponential')">Exp</button>
+            <button class="scatter-btn"        id="fit-logarithmic" onclick="applyFit('logarithmic')">Log</button>
+            <button class="scatter-btn"        id="fit-power"       onclick="applyFit('power')">Power</button>
+          </div>
+          <div class="fit-equation" id="fitEquation">Equation: —</div>
+        </div>
+        <div class="scatter-panel">
+          <div class="scatter-panel-title"><i class="fas fa-exchange-alt"></i>Axis Transforms</div>
+          <div class="scatter-axis-toggle">
+            <button class="scatter-btn active" id="transform-x-tab" onclick="setTransformAxis('x')">X-Axis</button>
+            <button class="scatter-btn"        id="transform-y-tab" onclick="setTransformAxis('y')">Y-Axis</button>
+          </div>
+          <div class="scatter-buttons">
+            <button class="scatter-btn active" id="transform-none"    onclick="applyTransformation('none')">None</button>
+            <button class="scatter-btn"        id="transform-ln"      onclick="applyTransformation('ln')">ln</button>
+            <button class="scatter-btn"        id="transform-inverse" onclick="applyTransformation('inverse')">1/x</button>
+            <button class="scatter-btn"        id="transform-sqrt"    onclick="applyTransformation('sqrt')">√</button>
+            <button class="scatter-btn"        id="transform-square"  onclick="applyTransformation('square')">x²</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main ── -->
+<div class="container">
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="control-group">
+      <label>Correlation Type:</label>
+      <div class="radio-bar">
+        <label><input type="radio" name="corrType" value="Pearson"  checked onchange="recalculate()"><span>Pearson</span></label>
+        <label><input type="radio" name="corrType" value="Spearman"        onchange="recalculate()"><span>Spearman</span></label>
+        <label><input type="radio" name="corrType" value="Kendall"         onchange="recalculate()"><span>Kendall</span></label>
+        <label><input type="radio" name="corrType" value="Biweight"        onchange="recalculate()"><span>Biweight</span></label>
+      </div>
+    </div>
+    <div class="control-group">
+      <label>View:</label>
+      <div class="view-toggle">
+        <button type="button" id="viewTableBtn"   class="active" onclick="setMatrixView('table')">Table</button>
+        <button type="button" id="viewHeatmapBtn"            onclick="setMatrixView('heatmap')">Heatmap</button>
+      </div>
+    </div>
+    <div class="control-group">
+      <span class="slider-label">Highlight r &#8805;</span>
+      <input type="range" id="thresholdSlider" min="0" max="1" step="0.05" value="0" oninput="updateThreshold(this.value)">
+      <span class="slider-value" id="thresholdValue">0.00</span>
+    </div>
+    <div class="control-group">
+      <label class="checkbox-label"><input type="checkbox" id="showPValue" checked onchange="toggleDisplay()"><span>p-value</span></label>
+      <label class="checkbox-label"><input type="checkbox" id="showN"      checked onchange="toggleDisplay()"><span>N</span></label>
+    </div>
+  </div>
+
+  <!-- Scrollable content area -->
+  <div class="table-wrap">
+    <div class="scroll-hint">
+      <i class="fa-solid fa-arrows-left-right"></i>
+      Click any cell to view scatter plot &nbsp;|&nbsp; Scroll horizontally for all variables
+    </div>
+
+    <!-- Table view -->
+    <div id="tableView">
+      <div class="table-container">
+        <table id="correlationTable">
+          <thead id="tableHead"></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Heatmap view -->
+    <div id="heatmapView" style="display:none;">
+      <div class="heatmap-container">
+        <table id="heatmapTable" class="heatmap-table">
+          <thead id="heatmapHead"></thead>
+          <tbody id="heatmapBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
 
 <script>
 (function () {
-  /* ── Seeded PRNG (LCG) for reproducible demo data ── */
+  /* ════════════════════════════════════════════════════════════════
+     DEMO DATA
+     5 fitness variables, n = 80, seeded PRNG for reproducibility
+  ════════════════════════════════════════════════════════════════ */
   var _s = 1337;
   function rng() { _s = (_s * 1664525 + 1013904223) >>> 0; return _s / 4294967296; }
   function randn() {
@@ -30,58 +353,554 @@
   }
   function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
 
-  /* ── Demo dataset ──────────────────────────────────────────
-     7 fitness / physiological variables, n = 80.
-     Driven by 3 latent factors so correlations are realistic:
-       size    → Height ↑  Weight ↑  BMI slight ↑
-       fitness → Weight ↓  RestHR ↓  VO₂max ↑
-       aging   → Age ↑     RestHR ↑  VO₂max ↓  Systolic ↑
-  ─────────────────────────────────────────────────────────── */
-  var headers = ['Height', 'Weight', 'Age', 'RestHR', 'VO2max', 'BMI', 'Systolic'];
-  var rows = [];
+  var HEADERS = ['Height', 'Weight', 'Age', 'RestHR', 'VO2max'];
+  var ROWS = (function () {
+    var rows = [];
+    for (var i = 0; i < 80; i++) {
+      var size    = randn();
+      var fitness = randn();
+      var aging   = randn();
+      var height   = clamp(Math.round((170 + 10 * size  + 2 * randn()) * 10) / 10, 148, 205);
+      var weight   = clamp(Math.round((72  + 11 * size  - 4 * fitness + 3 * aging + 3 * randn()) * 10) / 10, 45, 130);
+      var age      = clamp(Math.round( 38  + 10 * aging + 5 * randn()), 18, 72);
+      var resthr   = clamp(Math.round( 68  - 8 * fitness + 4 * aging + 5 * randn()), 44, 98);
+      var bmi      = weight / Math.pow(height / 100, 2);
+      var vo2max   = clamp(Math.round((46  - 7 * aging  + 9 * fitness - bmi * 0.3 + 4 * randn()) * 10) / 10, 18, 74);
+      rows.push({ Height: height, Weight: weight, Age: age, RestHR: resthr, VO2max: vo2max });
+    }
+    return rows;
+  })();
 
-  for (var i = 0; i < 80; i++) {
-    var size    = randn();
-    var fitness = randn();
-    var aging   = randn();
+  /* ════════════════════════════════════════════════════════════════
+     STATE
+  ════════════════════════════════════════════════════════════════ */
+  var currentType   = 'Pearson';
+  var currentMatrix = null;
+  var currentView   = 'table';
 
-    var height   = clamp(Math.round((170 + 10 * size  + 2  * randn()) * 10) / 10, 148, 205);
-    var weight   = clamp(Math.round((72  + 11 * size  - 4  * fitness + 3 * aging + 3 * randn()) * 10) / 10, 45, 130);
-    var age      = clamp(Math.round( 38  + 10 * aging + 5  * randn()), 18, 72);
-    var bmi      = clamp(Math.round((weight / Math.pow(height / 100, 2) + 0.4 * randn()) * 10) / 10, 16, 42);
-    var resthr   = clamp(Math.round( 68  - 8  * fitness + 4 * aging + 5 * randn()), 44, 98);
-    var vo2max   = clamp(Math.round((46  - 7  * aging  + 9 * fitness - size * 1.5 + 4 * randn()) * 10) / 10, 18, 74);
-    var systolic = clamp(Math.round( 118 + 7  * aging  + 3 * bmi * 0.4 - 4 * fitness + 5 * randn()), 88, 178);
+  var scatterState = {
+    chart: null, xVar: '', yVar: '', rawPoints: [],
+    fitType: 'none', xTransform: 'none', yTransform: 'none',
+    activeTransformAxis: 'x', xRange: null, yRange: null, xRangeFull: null, yRangeFull: null
+  };
 
-    rows.push({
-      Height: height, Weight: weight, Age: age,
-      RestHR: resthr, VO2max: vo2max, BMI: bmi, Systolic: systolic
+  /* ════════════════════════════════════════════════════════════════
+     BUILD MATRIX
+  ════════════════════════════════════════════════════════════════ */
+  function buildCorrelationMatrix() {
+    var matrix = calculateCorrelationMatrix(ROWS, HEADERS, currentType);
+    currentMatrix = matrix;
+
+    var thead = document.getElementById('tableHead');
+    var tbody = document.getElementById('tableBody');
+    thead.innerHTML = '';
+    tbody.innerHTML  = '';
+
+    // Header row
+    var hr = document.createElement('tr');
+    var corner = document.createElement('th'); corner.textContent = 'Variable'; hr.appendChild(corner);
+    HEADERS.forEach(function (col) {
+      var th = document.createElement('th'); th.textContent = col; hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+
+    // Data rows
+    HEADERS.forEach(function (rowCol, i) {
+      var row = document.createElement('tr');
+      var rowTh = document.createElement('td'); rowTh.textContent = rowCol; row.appendChild(rowTh);
+      HEADERS.forEach(function (colCol, j) {
+        var td = document.createElement('td');
+        var corrData = matrix[i][j];
+        var isDiag = (i === j);
+        if (isDiag) td.classList.add('diagonal-cell');
+
+        var cv = document.createElement('div');
+        cv.className = 'corr-value';
+        cv.textContent = corrData.r.toFixed(3);
+        cv.setAttribute('data-corr', corrData.r);
+        if (!isDiag) {
+          (function (ri, ci, rd) {
+            cv.addEventListener('click', function () { openScatterModal(HEADERS[ri], HEADERS[ci], rd.r); });
+          })(i, j, corrData);
+        }
+        td.appendChild(cv);
+
+        if (!isDiag && corrData.p !== null) {
+          var pv = document.createElement('div'); pv.className = 'p-value';
+          pv.textContent = 'p = ' + corrData.p.toFixed(4); td.appendChild(pv);
+        }
+        if (!isDiag) {
+          var nv = document.createElement('div'); nv.className = 'n-value';
+          nv.textContent = 'N = ' + corrData.n; td.appendChild(nv);
+        }
+        row.appendChild(td);
+      });
+      tbody.appendChild(row);
+    });
+
+    buildHeatmapMatrix(HEADERS, matrix);
+    toggleDisplay();
+    applyThresholdFilter();
+  }
+
+  function buildHeatmapMatrix(headers, matrix) {
+    var head = document.getElementById('heatmapHead');
+    var body = document.getElementById('heatmapBody');
+    head.innerHTML = ''; body.innerHTML = '';
+
+    var hr = document.createElement('tr');
+    var corner = document.createElement('th'); corner.textContent = 'Variable'; hr.appendChild(corner);
+    headers.forEach(function (col) { var th = document.createElement('th'); th.textContent = col; hr.appendChild(th); });
+    head.appendChild(hr);
+
+    headers.forEach(function (rowCol, i) {
+      var row = document.createElement('tr');
+      var rowTh = document.createElement('td'); rowTh.textContent = rowCol; row.appendChild(rowTh);
+      headers.forEach(function (colCol, j) {
+        var td = document.createElement('td');
+        var val = matrix[i][j].r;
+        td.classList.add('heatmap-cell');
+        if (i === j) td.classList.add('diagonal-cell');
+        td.setAttribute('data-corr', val);
+        td.textContent = val.toFixed(2);
+        td.style.background = getHeatmapColor(val);
+        td.style.color       = getHeatmapTextColor(val);
+        row.appendChild(td);
+      });
+      body.appendChild(row);
     });
   }
 
-  /* ── Inject data into iframe once it has loaded ── */
-  var frame = document.getElementById('cm-frame');
+  function getHeatmapColor(v) {
+    v = Math.max(-1, Math.min(1, v));
+    var intensity = Math.abs(v);
+    var lightness = 20 + (1 - intensity) * 55;
+    return v >= 0 ? 'hsl(24,85%,' + lightness + '%)' : 'hsl(200,75%,' + lightness + '%)';
+  }
+  function getHeatmapTextColor(v) { return Math.abs(v) > 0.45 ? '#0c1624' : '#e7edf8'; }
 
-  function sendData() {
-    try {
-      frame.contentWindow.postMessage(
-        { type: 'CORRELATION_DATA', payload: { headers: headers, data: rows } },
-        '*'
-      );
-    } catch (e) {}
+  /* ════════════════════════════════════════════════════════════════
+     CONTROLS
+  ════════════════════════════════════════════════════════════════ */
+  function recalculate() {
+    var sel = document.querySelector('input[name="corrType"]:checked');
+    currentType = sel ? sel.value : 'Pearson';
+    buildCorrelationMatrix();
   }
 
-  frame.addEventListener('load', function () {
-    /* First attempt shortly after load; retry in case the view's
-       postMessage listener registers slightly later. */
-    setTimeout(sendData, 350);
-    setTimeout(sendData, 1400);
+  function setMatrixView(view) {
+    currentView = view;
+    document.getElementById('tableView').style.display   = view === 'table'   ? 'block' : 'none';
+    document.getElementById('heatmapView').style.display = view === 'heatmap' ? 'block' : 'none';
+    document.getElementById('viewTableBtn').classList.toggle('active',   view === 'table');
+    document.getElementById('viewHeatmapBtn').classList.toggle('active', view === 'heatmap');
+  }
+
+  function toggleDisplay() {
+    var showP = document.getElementById('showPValue').checked;
+    var showN = document.getElementById('showN').checked;
+    document.querySelectorAll('.p-value').forEach(function (el) { el.style.display = showP ? 'block' : 'none'; });
+    document.querySelectorAll('.n-value').forEach(function (el) { el.style.display = showN ? 'block' : 'none'; });
+  }
+
+  function updateThreshold(value) {
+    document.getElementById('thresholdValue').textContent = parseFloat(value).toFixed(2);
+    applyThresholdFilter();
+  }
+
+  function applyThresholdFilter() {
+    var threshold = parseFloat(document.getElementById('thresholdSlider').value);
+    document.querySelectorAll('tbody td').forEach(function (cell) {
+      var cvEl = cell.querySelector('.corr-value');
+      if (cvEl) {
+        var cv = parseFloat(cvEl.getAttribute('data-corr'));
+        var isDiag = cell.classList.contains('diagonal-cell');
+        cell.classList.toggle('threshold-highlight',
+          Math.abs(cv) >= threshold && !isDiag && Math.abs(Math.abs(cv)-1) > 0.001 && threshold > 0);
+      }
+    });
+    document.querySelectorAll('.heatmap-cell').forEach(function (cell) {
+      var cv = parseFloat(cell.getAttribute('data-corr'));
+      var isDiag = cell.classList.contains('diagonal-cell');
+      cell.classList.toggle('threshold-highlight',
+        Math.abs(cv) >= threshold && !isDiag && Math.abs(Math.abs(cv)-1) > 0.001 && threshold > 0);
+    });
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     SCATTER MODAL
+  ════════════════════════════════════════════════════════════════ */
+  function openScatterModal(xVar, yVar, initialR) {
+    scatterState.xVar = xVar;
+    scatterState.yVar = yVar;
+    scatterState.rawPoints = ROWS.map(function (row) {
+      return [row[xVar], row[yVar]];
+    }).filter(function (p) { return isFinite(p[0]) && isFinite(p[1]); });
+
+    scatterState.xTransform = 'none';
+    scatterState.yTransform = 'none';
+    scatterState.fitType = 'none';
+    scatterState.xRange = null;
+    scatterState.yRange = null;
+
+    document.getElementById('scatterTitle').textContent = xVar + '  \u00d7  ' + yVar;
+    resetScatterControls();
+    refreshScatter();
+
+    var modal = document.getElementById('scatterModal');
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeScatterModal() {
+    var modal = document.getElementById('scatterModal');
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+  }
+  window.closeScatterModal = closeScatterModal;
+
+  document.getElementById('scatterModal').addEventListener('click', function (e) {
+    if (e.target === this) closeScatterModal();
   });
 
-  /* Fallback for slow connections / cached loads */
-  setTimeout(sendData, 3500);
+  function resetScatterControls() {
+    ['fit-none','fit-linear','fit-polynomial','fit-exponential','fit-logarithmic','fit-power'].forEach(function (id) {
+      document.getElementById(id).classList.remove('active');
+    });
+    document.getElementById('fit-none').classList.add('active');
+    setTransformAxis('x');
+    ['transform-none','transform-ln','transform-inverse','transform-sqrt','transform-square'].forEach(function (id) {
+      document.getElementById(id).classList.remove('active');
+    });
+    document.getElementById('transform-none').classList.add('active');
+  }
+
+  function transformValue(value, type) {
+    if (!isFinite(value)) return null;
+    switch (type) {
+      case 'ln':      return value > 0 ? Math.log(value) : null;
+      case 'inverse': return value !== 0 ? 1 / value : null;
+      case 'sqrt':    return value >= 0 ? Math.sqrt(value) : null;
+      case 'square':  return value * value;
+      default:        return value;
+    }
+  }
+
+  function getTransformedPoints() {
+    return scatterState.rawPoints
+      .map(function (p) { return [transformValue(p[0], scatterState.xTransform), transformValue(p[1], scatterState.yTransform)]; })
+      .filter(function (p) { return p[0] !== null && p[1] !== null && isFinite(p[0]) && isFinite(p[1]); });
+  }
+
+  function getVisiblePoints() {
+    var pts = getTransformedPoints();
+    if (!scatterState.xRange || !scatterState.yRange) return pts;
+    var xMin = Math.min(scatterState.xRange.min, scatterState.xRange.max);
+    var xMax = Math.max(scatterState.xRange.min, scatterState.xRange.max);
+    var yMin = Math.min(scatterState.yRange.min, scatterState.yRange.max);
+    var yMax = Math.max(scatterState.yRange.min, scatterState.yRange.max);
+    return pts.filter(function (p) { return p[0] >= xMin && p[0] <= xMax && p[1] >= yMin && p[1] <= yMax; });
+  }
+
+  function refreshScatter() {
+    var pts = getTransformedPoints();
+    renderScatterChart(pts);
+    initAxisControls(pts);
+    var vis = getVisiblePoints();
+    updateScatterStats(vis);
+    applyFit(scatterState.fitType, vis);
+  }
+
+  function updateScatterStats(points) {
+    var n  = points.length;
+    var xs = points.map(function (p) { return p[0]; });
+    var ys = points.map(function (p) { return p[1]; });
+    var r  = calculatePearson(xs, ys);
+    var r2 = r * r;
+    var p  = calculatePValue(r, n);
+    setScatterStat('scatterN',  n);
+    setScatterStat('scatterR',  isFinite(r)  ? r.toFixed(4)       : '--');
+    setScatterStat('scatterP',  isFinite(p)  ? p.toExponential(2) : '--');
+    setScatterStat('scatterR2', isFinite(r2) ? r2.toFixed(4)      : '--');
+  }
+
+  function setScatterStat(id, value) {
+    var el = document.getElementById(id);
+    el.textContent = value;
+    el.classList.toggle('adjusted', isScatterAdjusted());
+  }
+
+  function isScatterAdjusted() {
+    return hasAxisOverrides() || scatterState.xTransform !== 'none' || scatterState.yTransform !== 'none' || scatterState.fitType !== 'none';
+  }
+
+  function hasAxisOverrides() {
+    if (!scatterState.xRange || !scatterState.yRange || !scatterState.xRangeFull || !scatterState.yRangeFull) return false;
+    var eps = 1e-9;
+    return Math.abs(scatterState.xRange.min - scatterState.xRangeFull.min) > eps ||
+           Math.abs(scatterState.xRange.max - scatterState.xRangeFull.max) > eps ||
+           Math.abs(scatterState.yRange.min - scatterState.yRangeFull.min) > eps ||
+           Math.abs(scatterState.yRange.max - scatterState.yRangeFull.max) > eps;
+  }
+
+  function calculatePearson(x, y) {
+    if (x.length < 2) return NaN;
+    var mX = x.reduce(function(a,b){return a+b;},0)/x.length;
+    var mY = y.reduce(function(a,b){return a+b;},0)/y.length;
+    var num=0, denX=0, denY=0;
+    for (var i=0; i<x.length; i++) { var dx=x[i]-mX, dy=y[i]-mY; num+=dx*dy; denX+=dx*dx; denY+=dy*dy; }
+    return (denX===0||denY===0) ? NaN : num/Math.sqrt(denX*denY);
+  }
+
+  function calculatePValue(r, n) {
+    if (!isFinite(r) || n < 3) return NaN;
+    var t = r * Math.sqrt((n-2) / (1 - r*r));
+    return 2 * (1 - tDistCDF(Math.abs(t), n-2));
+  }
+
+  function renderScatterChart(points) {
+    var series = [{ type: 'scatter', name: 'Observations', data: points, color: 'rgba(255,165,120,0.75)', marker: { radius: 4 } }];
+    if (!scatterState.chart) {
+      scatterState.chart = Highcharts.chart('scatterChart', {
+        chart: { type: 'scatter', backgroundColor: 'transparent', zoomType: 'xy' },
+        title: { text: '' },
+        xAxis: { title: { text: scatterState.xVar, style: { color: '#fff' } }, labels: { style: { color: '#aaa' } }, gridLineColor: 'rgba(255,255,255,0.08)' },
+        yAxis: { title: { text: scatterState.yVar, style: { color: '#fff' } }, labels: { style: { color: '#aaa' } }, gridLineColor: 'rgba(255,255,255,0.08)' },
+        legend: { itemStyle: { color: '#fff' } },
+        credits: { enabled: false },
+        tooltip: { pointFormat: '{point.x:.2f}, {point.y:.2f}' },
+        series: series
+      });
+    } else {
+      while (scatterState.chart.series.length) scatterState.chart.series[0].remove(false);
+      series.forEach(function (s) { scatterState.chart.addSeries(s, false); });
+      scatterState.chart.xAxis[0].setTitle({ text: scatterState.xVar });
+      scatterState.chart.yAxis[0].setTitle({ text: scatterState.yVar });
+      scatterState.chart.redraw();
+    }
+  }
+
+  function initAxisControls(points) {
+    if (!points.length) return;
+    var xs = points.map(function(p){return p[0];}), ys = points.map(function(p){return p[1];});
+    var minX=Math.min.apply(null,xs), maxX=Math.max.apply(null,xs);
+    var minY=Math.min.apply(null,ys), maxY=Math.max.apply(null,ys);
+    scatterState.xRange=scatterState.xRangeFull={ min:minX, max:maxX };
+    scatterState.yRange=scatterState.yRangeFull={ min:minY, max:maxY };
+    setupAxisRange('xMinRange','xMinVal',minX,maxX,minX);
+    setupAxisRange('xMaxRange','xMaxVal',minX,maxX,maxX);
+    setupAxisRange('yMinRange','yMinVal',minY,maxY,minY);
+    setupAxisRange('yMaxRange','yMaxVal',minY,maxY,maxY);
+    updateChartExtremes();
+  }
+
+  function setupAxisRange(id, labelId, min, max, value) {
+    var inp = document.getElementById(id);
+    inp.min=min; inp.max=max; inp.step=(max-min)/100||1; inp.value=value;
+    document.getElementById(labelId).textContent = Number(value).toFixed(2);
+  }
+
+  function updateAxisRange(axis, which, value) {
+    var val = parseFloat(value);
+    if (axis==='x') { scatterState.xRange[which]=val; document.getElementById(which==='min'?'xMinVal':'xMaxVal').textContent=val.toFixed(2); }
+    else             { scatterState.yRange[which]=val; document.getElementById(which==='min'?'yMinVal':'yMaxVal').textContent=val.toFixed(2); }
+    var vis = getVisiblePoints(); updateScatterStats(vis); applyFit(scatterState.fitType, vis); updateChartExtremes();
+  }
+  window.updateAxisRange = updateAxisRange;
+
+  function updateChartExtremes() {
+    if (!scatterState.chart) return;
+    scatterState.chart.xAxis[0].setExtremes(Math.min(scatterState.xRange.min,scatterState.xRange.max),Math.max(scatterState.xRange.min,scatterState.xRange.max),false);
+    scatterState.chart.yAxis[0].setExtremes(Math.min(scatterState.yRange.min,scatterState.yRange.max),Math.max(scatterState.yRange.min,scatterState.yRange.max),false);
+    scatterState.chart.redraw();
+  }
+
+  function applyFit(type, pointsOverride) {
+    scatterState.fitType = type;
+    ['fit-none','fit-linear','fit-polynomial','fit-exponential','fit-logarithmic','fit-power'].forEach(function(id){document.getElementById(id).classList.remove('active');});
+    document.getElementById('fit-'+type).classList.add('active');
+    if (!scatterState.chart) return;
+    var pts = pointsOverride || getVisiblePoints();
+    var fitResult = buildFitSeries(pts, type);
+    var existing = scatterState.chart.series.find ? scatterState.chart.series.find(function(s){return s.name==='Fit';}) : null;
+    if (existing) existing.remove(false);
+    if (fitResult && fitResult.series) scatterState.chart.addSeries(fitResult.series, false);
+    document.getElementById('fitEquation').textContent = (type==='none'||!fitResult||!fitResult.equation) ? 'Equation: \u2014' : 'Equation: '+fitResult.equation;
+    scatterState.chart.redraw();
+  }
+  window.applyFit = applyFit;
+
+  function buildFitSeries(points, type) {
+    if (type==='none'||points.length<2||typeof regression==='undefined') return null;
+    var model;
+    if (type==='linear')      model=regression.linear(points);
+    if (type==='polynomial')  model=regression.polynomial(points,{order:2});
+    if (type==='exponential') model=regression.exponential(points);
+    if (type==='logarithmic') model=regression.logarithmic(points);
+    if (type==='power')       model=regression.power(points);
+    if (!model||!model.predict) return null;
+    var xs=points.map(function(p){return p[0];}), minX=Math.min.apply(null,xs), maxX=Math.max.apply(null,xs);
+    var line=[];
+    for (var i=0;i<=50;i++) { var x=minX+(maxX-minX)*(i/50); var y=model.predict(x)[1]; if(isFinite(y))line.push([x,y]); }
+    return { series:{ name:'Fit', type:'line', data:line, color:'rgba(120,200,255,0.9)', marker:{enabled:false}, lineWidth:2 }, equation:model.string||null };
+  }
+
+  function setTransformAxis(axis) {
+    scatterState.activeTransformAxis = axis;
+    document.getElementById('transform-x-tab').classList.toggle('active', axis==='x');
+    document.getElementById('transform-y-tab').classList.toggle('active', axis==='y');
+    updateTransformButtons();
+  }
+  window.setTransformAxis = setTransformAxis;
+
+  function applyTransformation(type) {
+    if (scatterState.activeTransformAxis==='x') scatterState.xTransform=type;
+    else scatterState.yTransform=type;
+    updateTransformButtons();
+    refreshScatter();
+  }
+  window.applyTransformation = applyTransformation;
+
+  function updateTransformButtons() {
+    var at = scatterState.activeTransformAxis==='x' ? scatterState.xTransform : scatterState.yTransform;
+    ['transform-none','transform-ln','transform-inverse','transform-sqrt','transform-square'].forEach(function(id){document.getElementById(id).classList.remove('active');});
+    document.getElementById('transform-'+at).classList.add('active');
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     CORRELATION CALCULATIONS  (self-contained, no jStat needed)
+  ════════════════════════════════════════════════════════════════ */
+  function calculateCorrelationMatrix(data, headers, type) {
+    var n = headers.length, matrix = [];
+    for (var i=0;i<n;i++) {
+      matrix[i]=[];
+      for (var j=0;j<n;j++) {
+        var col1 = data.map(function(row){return row[headers[i]];});
+        var col2 = data.map(function(row){return row[headers[j]];});
+        if (i===j) { matrix[i][j]={ r:1, p:0, n:col1.filter(function(v){return typeof v==='number'&&!isNaN(v);}).length }; }
+        else if (type==='Spearman')  { matrix[i][j]=calculateSpearmanCorr(col1,col2); }
+        else if (type==='Kendall')   { matrix[i][j]=calculateKendallCorr(col1,col2); }
+        else if (type==='Biweight')  { matrix[i][j]=calculateBiweightCorr(col1,col2); }
+        else                          { matrix[i][j]=calculatePearsonCorr(col1,col2); }
+      }
+    }
+    return matrix;
+  }
+
+  function calculatePearsonCorr(x, y) {
+    var pairs=x.map(function(xi,i){return[xi,y[i]];}).filter(function(p){return typeof p[0]==='number'&&typeof p[1]==='number'&&!isNaN(p[0])&&!isNaN(p[1]);});
+    var n=pairs.length;
+    if(n<2) return {r:0,p:null,n:0};
+    var xV=pairs.map(function(p){return p[0];}), yV=pairs.map(function(p){return p[1];});
+    var mX=xV.reduce(function(a,b){return a+b;},0)/n, mY=yV.reduce(function(a,b){return a+b;},0)/n;
+    var num=0,denX=0,denY=0;
+    for(var i=0;i<n;i++){var dx=xV[i]-mX,dy=yV[i]-mY;num+=dx*dy;denX+=dx*dx;denY+=dy*dy;}
+    var r=(denX===0||denY===0)?0:num/Math.sqrt(denX*denY);
+    var t=r*Math.sqrt(n-2)/Math.sqrt(1-r*r);
+    return {r:r, p:2*(1-tDistCDF(Math.abs(t),n-2)), n:n};
+  }
+
+  function calculateSpearmanCorr(x, y) {
+    var pairs=x.map(function(xi,i){return[xi,y[i]];}).filter(function(p){return typeof p[0]==='number'&&typeof p[1]==='number'&&!isNaN(p[0])&&!isNaN(p[1]);});
+    var n=pairs.length;
+    if(n<2) return {r:0,p:null,n:0};
+    return calculatePearsonCorr(getRanks(pairs.map(function(p){return p[0];})), getRanks(pairs.map(function(p){return p[1];})));
+  }
+
+  function calculateKendallCorr(x, y) {
+    var pairs=x.map(function(xi,i){return[xi,y[i]];}).filter(function(p){return typeof p[0]==='number'&&typeof p[1]==='number'&&!isNaN(p[0])&&!isNaN(p[1]);});
+    var n=pairs.length;
+    if(n<2) return {r:0,p:null,n:0};
+    var concordant=0,discordant=0;
+    for(var i=0;i<n-1;i++) for(var j=i+1;j<n;j++){var dx=pairs[j][0]-pairs[i][0],dy=pairs[j][1]-pairs[i][1];if(dx*dy>0)concordant++;else if(dx*dy<0)discordant++;}
+    var tau=(concordant-discordant)/(n*(n-1)/2);
+    var z=tau*Math.sqrt(n*(n-1)/(2*(2*n+5)/9));
+    return {r:tau, p:2*(1-normalCDF(Math.abs(z))), n:n};
+  }
+
+  function calculateBiweightCorr(x, y) {
+    var pairs=x.map(function(xi,i){return[xi,y[i]];}).filter(function(p){return typeof p[0]==='number'&&typeof p[1]==='number'&&isFinite(p[0])&&isFinite(p[1]);});
+    var n=pairs.length;
+    if(n<2) return {r:0,p:null,n:0};
+    var xs=pairs.map(function(p){return p[0];}),ys=pairs.map(function(p){return p[1];});
+    var medX=arrMedian(xs),medY=arrMedian(ys),madX=arrMad(xs,medX),madY=arrMad(ys,medY);
+    if(madX===0||madY===0) return {r:0,p:null,n:n};
+    var wX=xs.map(function(v){var u=(v-medX)/(9*madX);return Math.abs(u)<1?Math.pow(1-u*u,2):0;});
+    var wY=ys.map(function(v){var u=(v-medY)/(9*madY);return Math.abs(u)<1?Math.pow(1-u*u,2):0;});
+    var xP=xs.map(function(v,i){return(v-medX)*wX[i];}),yP=ys.map(function(v,i){return(v-medY)*wY[i];});
+    var num=xP.reduce(function(s,v,i){return s+v*yP[i];},0);
+    var denX=Math.sqrt(xP.reduce(function(s,v){return s+v*v;},0)),denY=Math.sqrt(yP.reduce(function(s,v){return s+v*v;},0));
+    var r=(denX===0||denY===0)?0:num/(denX*denY);
+    var t=r*Math.sqrt(n-2)/Math.sqrt(1-r*r);
+    return {r:r, p:2*(1-tDistCDF(Math.abs(t),n-2)), n:n};
+  }
+
+  function getRanks(arr) {
+    var sorted=arr.map(function(val,idx){return{val:val,idx:idx};}).sort(function(a,b){return a.val-b.val;});
+    var ranks=new Array(arr.length);
+    for(var i=0;i<sorted.length;i++){
+      var j=i;
+      while(j<sorted.length-1&&sorted[j].val===sorted[j+1].val)j++;
+      var avgRank=(i+j+2)/2;
+      for(var k=i;k<=j;k++)ranks[sorted[k].idx]=avgRank;
+      i=j;
+    }
+    return ranks;
+  }
+
+  function arrMedian(arr){var s=arr.slice().sort(function(a,b){return a-b;}),m=Math.floor(s.length/2);return s.length%2===0?(s[m-1]+s[m])/2:s[m];}
+  function arrMad(arr,med){return arrMedian(arr.map(function(v){return Math.abs(v-med);}));}
+
+  function tDistCDF(t,df){var x=df/(df+t*t);return 1-0.5*regularizedIncompleteBeta(df/2,0.5,x);}
+  function regularizedIncompleteBeta(a,b,x){
+    if(x<=0)return 0;if(x>=1)return 1;
+    var lbeta=lgamma(a)+lgamma(b)-lgamma(a+b);
+    var front=Math.exp(Math.log(x)*a+Math.log(1-x)*b-lbeta)/a;
+    return front*betaCF(a,b,x);
+  }
+  function betaCF(a,b,x){
+    var MAXIT=200,EPS=3e-7,FPMIN=1e-30,qab=a+b,qap=a+1,qam=a-1,c=1,d=1-qab*x/qap;
+    if(Math.abs(d)<FPMIN)d=FPMIN; d=1/d; var h=d;
+    for(var m=1;m<=MAXIT;m++){
+      var m2=2*m,aa=m*(b-m)*x/((qam+m2)*(a+m2));
+      d=1+aa*d;if(Math.abs(d)<FPMIN)d=FPMIN; c=1+aa/c;if(Math.abs(c)<FPMIN)c=FPMIN; d=1/d; h*=d*c;
+      aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));
+      d=1+aa*d;if(Math.abs(d)<FPMIN)d=FPMIN; c=1+aa/c;if(Math.abs(c)<FPMIN)c=FPMIN; d=1/d;
+      var del=d*c; h*=del; if(Math.abs(del-1)<EPS)break;
+    }
+    return h;
+  }
+  function lgamma(z){
+    var g=7,c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,-176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+    if(z<0.5)return Math.log(Math.PI/Math.sin(Math.PI*z))-lgamma(1-z);
+    z-=1; var x=c[0];
+    for(var i=1;i<g+2;i++)x+=c[i]/(z+i);
+    var t=z+g+0.5;
+    return 0.5*Math.log(2*Math.PI)+(z+0.5)*Math.log(t)-t+Math.log(x);
+  }
+  function normalCDF(x){return 0.5*(1+erf(x/Math.sqrt(2)));}
+  function erf(x){
+    var sign=x>=0?1:-1; x=Math.abs(x);
+    var a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+    var t=1/(1+p*x);
+    return sign*(1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x));
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     EXPOSE GLOBALS NEEDED BY INLINE onclick HANDLERS
+  ════════════════════════════════════════════════════════════════ */
+  window.recalculate     = recalculate;
+  window.setMatrixView   = setMatrixView;
+  window.toggleDisplay   = toggleDisplay;
+  window.updateThreshold = updateThreshold;
+
+  /* ════════════════════════════════════════════════════════════════
+     INIT — render immediately
+  ════════════════════════════════════════════════════════════════ */
+  buildCorrelationMatrix();
+  setMatrixView('table');
+
 })();
 </script>
-
 </body>
 </html>

@@ -212,23 +212,24 @@ const NAV_STYLE = `
 
 /* SVG inline logo */
 .nav-logo-svg {
-  height: 44px;
+  height: 54px;
   width: auto;
   display: block;
   overflow: visible;
+  margin-top: 4px;
 }
 
 /* SVG element colours – dark mode (default) */
 .nl-title { fill: #ffffff; }
-.nl-sub   { fill: #00c4cc; }
+.nl-sub   { fill: rgba(0, 196, 204, 0.60); }
 .nl-div   { stroke: rgba(255,255,255,0.18); stroke-width: 1; }
-.nl-sep   { stroke: #00c4cc; stroke-width: 0.9; }
+.nl-sep   { stroke: rgba(0, 196, 204, 0.45); stroke-width: 0.9; }
 
 /* SVG element colours – light mode */
 :root[data-theme="light"] .nl-title { fill: #06152a; }
-:root[data-theme="light"] .nl-sub   { fill: #0077a8; }
+:root[data-theme="light"] .nl-sub   { fill: rgba(0, 119, 168, 0.60); }
 :root[data-theme="light"] .nl-div   { stroke: rgba(0,0,0,0.15); }
-:root[data-theme="light"] .nl-sep   { stroke: #0077a8; }
+:root[data-theme="light"] .nl-sep   { stroke: rgba(0, 119, 168, 0.45); }
 
 /* Hide old image-based logo remnants */
 .nav-logo-img  { display: none !important; }

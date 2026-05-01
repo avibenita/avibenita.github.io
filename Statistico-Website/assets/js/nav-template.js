@@ -62,7 +62,7 @@ const NAV_TEMPLATE = `
 
       <!-- Products group — segmented control -->
       <li class="nav-item nav-item--products-group">
-        <span class="nav-products-label">Suite</span>
+        <span class="nav-products-label">Statistico Suite</span>
         <div class="nav-products-row" id="nav-products-row">
           <div class="nav-products-slider" id="nav-products-slider"></div>
           <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators" title="Statistico Calculators Hub">
@@ -221,9 +221,9 @@ const NAV_STYLE = `
 
 /* SVG element colours – dark mode (default) */
 .nl-title { fill: #ffffff; }
-.nl-sub   { fill: rgba(0, 196, 204, 0.28); }
+.nl-sub   { fill: rgba(0, 196, 204, 0.48); }
 .nl-div   { stroke: rgba(255,255,255,0.18); stroke-width: 1; }
-.nl-sep   { stroke: rgba(0, 196, 204, 0.20); stroke-width: 0.9; }
+.nl-sep   { stroke: rgba(0, 196, 204, 0.35); stroke-width: 0.9; }
 
 /* SVG element colours – light mode */
 :root[data-theme="light"] .nl-title { fill: #06152a; }
@@ -296,10 +296,10 @@ const NAV_STYLE = `
 
 .nav-products-label {
   font-size: 0.56rem;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(255,165,120,0.72);
+  color: rgba(255,255,255,0.32);
   line-height: 1;
   user-select: none;
   pointer-events: none;

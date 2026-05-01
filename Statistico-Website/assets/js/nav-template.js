@@ -346,6 +346,19 @@ const NAV_STYLE = `
   transition: color 0.15s ease;
 }
 
+/* Orange separators between the 3 families */
+.nav-products-row .nav-link--product::after,
+.nav-products-row .nav-link--product-core::after {
+  content: '';
+  position: absolute;
+  right: -2px;
+  top: 20%;
+  height: 60%;
+  width: 1px;
+  background: rgba(255,165,120,0.40);
+  pointer-events: none;
+}
+
 .nav-products-row .nav-link {
   min-height: 34px;
   padding: 5px 11px;

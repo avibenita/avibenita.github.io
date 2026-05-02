@@ -332,7 +332,7 @@ const NAV_STYLE = `
   border: 1px solid rgba(255,165,120,0.45);
   border-radius: 18px;
   /* extra top padding to keep content clear of the overlapping label */
-  padding: 14px 3px 3px;
+  padding: 6px 3px 3px;
   overflow: visible;  /* allow the "core" micro-badge on Analytics to peek above */
   position: relative;
 }
@@ -383,6 +383,12 @@ const NAV_STYLE = `
   min-height: 34px;
   padding: 5px 11px;
   font-size: 0.83rem;
+}
+
+/* Analytics needs extra top padding to accommodate the "Core Product" label */
+.nav-products-row .nav-link--product-core {
+  padding-top: 20px;
+  min-height: 42px;
 }
 
 /* Separator before "Why" — spacing only, no line */
@@ -551,24 +557,24 @@ const NAV_STYLE = `
   font-size: 1.05rem;
   letter-spacing: 0.07em;
   position: relative;
-  padding-top: 18px;
 }
 
-/* "Core Product" label above the Analytics text */
+/* "Core Product" label — always visible above the Analytics text */
 .nav-link--product-core::before {
   content: "Core Product";
   position: absolute;
   top: 4px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 0.48rem;
+  font-size: 0.50rem;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(255,165,120,0.75);
+  color: rgba(255,165,120,0.88);
   white-space: nowrap;
   pointer-events: none;
   font-style: italic;
+  z-index: 5;
 }
 
 .nav-link--product:hover {

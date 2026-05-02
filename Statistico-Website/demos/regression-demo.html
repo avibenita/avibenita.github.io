@@ -54,14 +54,27 @@
       box-shadow: 0 0 6px rgba(120,200,255,0.5);
     }
 
+    .hdr-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 3px;
+    }
+    .hdr-right-label {
+      font-size: 8.5px;
+      font-weight: 700;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.28);
+    }
     .toggles {
       display: flex;
       gap: 12px;
       align-items: center;
     }
 
-    /* Custom checkbox */
-    .cb-label {
+    /* ── Radio buttons ── */
+    .rb-label {
       display: flex;
       align-items: center;
       gap: 6px;
@@ -69,39 +82,36 @@
       user-select: none;
       font-size: 11px;
       font-weight: 600;
-      color: rgba(255,255,255,0.5);
+      color: rgba(255,255,255,0.45);
       transition: color 0.15s;
       letter-spacing: 0.03em;
     }
-    .cb-label:hover { color: rgba(255,255,255,0.8); }
-    .cb-label input[type="checkbox"] { display: none; }
-    .cb-box {
+    .rb-label:hover { color: rgba(255,255,255,0.82); }
+    .rb-label input[type="radio"] { display: none; }
+    .rb-ring {
       width: 14px; height: 14px;
-      border-radius: 3px;
+      border-radius: 50%;
       border: 1.5px solid rgba(255,255,255,0.2);
       background: rgba(255,255,255,0.04);
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
       transition: all 0.15s;
     }
-    .cb-box::after {
+    .rb-ring::after {
       content: '';
-      display: block;
-      width: 4px; height: 7px;
-      border: 2px solid transparent;
-      border-top: none; border-left: none;
-      transform: rotate(45deg) translate(-1px, -1px);
-      transition: border-color 0.15s;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: transparent;
+      transition: background 0.15s;
     }
-    .cb-label input:checked ~ .cb-box {
-      background: rgba(120,200,255,0.18);
-      border-color: rgba(120,200,255,0.6);
-      box-shadow: 0 0 6px rgba(120,200,255,0.25);
+    .rb-label input:checked ~ .rb-ring {
+      border-color: rgba(120,200,255,0.65);
+      box-shadow: 0 0 7px rgba(120,200,255,0.28);
     }
-    .cb-label input:checked ~ .cb-box::after {
-      border-color: #78c8ff;
+    .rb-label input:checked ~ .rb-ring::after {
+      background: #78c8ff;
     }
-    .cb-label input:checked ~ .cb-text {
+    .rb-label input:checked ~ .rb-text {
       color: #78c8ff;
     }
 
@@ -206,7 +216,9 @@
     }
     table.ct td:first-child { text-align: left; }
     table.ct tr:hover td { background: rgba(120,200,255,0.05); }
-    table.ct tr.dim td { opacity: 0.28; }
+    /* highlight the active-predictor row */
+    table.ct tr.active-pred td { background: rgba(120,200,255,0.07); }
+    table.ct tr.active-pred td:first-child { border-left: 3px solid rgba(120,200,255,0.55); color: #78c8ff; font-weight: 700; }
 
     .dot {
       display: inline-block;
@@ -244,22 +256,25 @@
   <!-- Header -->
   <div class="hdr">
     <div class="hdr-title">Multiple Regression &nbsp;·&nbsp; Salary Prediction</div>
-    <div class="toggles">
-      <label class="cb-label">
-        <input type="checkbox" id="cb-experience" data-pred="experience" checked onchange="toggle(this)">
-        <span class="cb-box"></span>
-        <span class="cb-text">Experience</span>
-      </label>
-      <label class="cb-label">
-        <input type="checkbox" id="cb-education" data-pred="education" checked onchange="toggle(this)">
-        <span class="cb-box"></span>
-        <span class="cb-text">Education</span>
-      </label>
-      <label class="cb-label">
-        <input type="checkbox" id="cb-industry" data-pred="industry" checked onchange="toggle(this)">
-        <span class="cb-box"></span>
-        <span class="cb-text">Industry</span>
-      </label>
+    <div class="hdr-right">
+      <div class="hdr-right-label">X Axis Predictor</div>
+      <div class="toggles">
+        <label class="rb-label">
+          <input type="radio" name="xpred" value="experience" checked onchange="setXPred('experience')">
+          <span class="rb-ring"></span>
+          <span class="rb-text">Experience</span>
+        </label>
+        <label class="rb-label">
+          <input type="radio" name="xpred" value="education" onchange="setXPred('education')">
+          <span class="rb-ring"></span>
+          <span class="rb-text">Education</span>
+        </label>
+        <label class="rb-label">
+          <input type="radio" name="xpred" value="industry" onchange="setXPred('industry')">
+          <span class="rb-ring"></span>
+          <span class="rb-text">Industry</span>
+        </label>
+      </div>
     </div>
   </div>
 
@@ -331,10 +346,10 @@ function randNorm() {
 const N = 80;
 const IND_LABELS  = ['Other', 'Healthcare', 'Tech', 'Finance'];
 const IND_COLORS  = [
-  'rgba(148,163,184,0.82)',   // Other    – slate
-  'rgba(74,222,128,0.82)',    // Healthcare – green
-  'rgba(120,200,255,0.82)',   // Tech     – cyan
-  'rgba(251,191,36,0.82)'    // Finance  – gold
+  'rgba(148,163,184,0.82)',
+  'rgba(74,222,128,0.82)',
+  'rgba(120,200,255,0.82)',
+  'rgba(251,191,36,0.82)'
 ];
 const EDU_LABELS = ['HS', 'Bachelor', 'Master', 'PhD'];
 
@@ -441,18 +456,12 @@ function pc(p) {
 function fp(p) { return p < 0.001 ? '< .001' : p.toFixed(3); }
 
 // ─────────────────────────────────────────────────────────────
-// OLS
+// OLS  (always all three predictors)
 // ─────────────────────────────────────────────────────────────
-function ols(preds) {
-  const X = obs.map(d => {
-    const row = [1];
-    if (preds.includes('experience')) row.push(d.exp);
-    if (preds.includes('education'))  row.push(d.edu);
-    if (preds.includes('industry'))   row.push(d.ind);
-    return row;
-  });
+function ols() {
+  const X = obs.map(d => [1, d.exp, d.edu, d.ind]);
   const y  = obs.map(d => d.salary);
-  const p  = X[0].length;
+  const p  = 4; // intercept + 3 predictors
   const Xt = trans(X);
   const XtXinv = minv(mmul(Xt, X));
   if (!XtXinv) return null;
@@ -460,12 +469,12 @@ function ols(preds) {
 
   const yhat = X.map(row => row.reduce((s, v, j) => s + v * beta[j], 0));
   const resid = y.map((v, i) => v - yhat[i]);
-  const ybar = y.reduce((s, v) => s + v, 0) / N;
-  const SST  = y.reduce((s, v) => s + (v - ybar) ** 2, 0);
-  const SSE  = resid.reduce((s, v) => s + v * v, 0);
-  const df_e = N - p, df_r = p - 1;
-  const MSE  = SSE / df_e;
-  const r2   = 1 - SSE / SST;
+  const ybar  = y.reduce((s, v) => s + v, 0) / N;
+  const SST   = y.reduce((s, v) => s + (v - ybar) ** 2, 0);
+  const SSE   = resid.reduce((s, v) => s + v * v, 0);
+  const df_e  = N - p, df_r = p - 1;
+  const MSE   = SSE / df_e;
+  const r2    = 1 - SSE / SST;
   const adjR2 = 1 - (1 - r2) * (N - 1) / df_e;
   const fStat = (SST - SSE) / df_r / MSE;
   const fPval = 1 - fCDF(fStat, df_r, df_e);
@@ -473,63 +482,62 @@ function ols(preds) {
   const tStats = beta.map((b, j) => b / coefSE[j]);
   const pVals  = tStats.map(t => p2tail(t));
   return { beta, coefSE, tStats, pVals, r2, adjR2, fStat, fPval,
-           rmse: Math.sqrt(MSE), MSE, XtXinv, preds };
+           rmse: Math.sqrt(MSE), MSE, XtXinv };
 }
 
 // ─────────────────────────────────────────────────────────────
-// STATE
-// ─────────────────────────────────────────────────────────────
-const active = new Set(['experience', 'education', 'industry']);
-let hc = null;
-
-// ─────────────────────────────────────────────────────────────
-// TOGGLE
-// ─────────────────────────────────────────────────────────────
-function toggle(cb) {
-  const pred = cb.dataset.pred;
-  if (!cb.checked) {
-    if (active.size === 1) { cb.checked = true; return; }  // keep at least one
-    active.delete(pred);
-  } else {
-    active.add(pred);
-  }
-  render();
-}
-
-// ─────────────────────────────────────────────────────────────
-// RENDER STATS PANEL
+// PREDICTOR METADATA
 // ─────────────────────────────────────────────────────────────
 const PRED_META = {
-  experience: { label: 'Experience (yrs)',   color: '#78c8ff' },
-  education:  { label: 'Education (level)',  color: '#a78bfa' },
-  industry:   { label: 'Industry (score)',   color: '#4ade80' }
+  experience: { label: 'Experience (yrs)', xLabel: 'Experience (years)', field: 'exp', col: 1, range: [0, 30],   color: '#78c8ff' },
+  education:  { label: 'Education (level)', xLabel: 'Education (level)', field: 'edu', col: 2, range: [0, 3],    color: '#a78bfa' },
+  industry:   { label: 'Industry (score)', xLabel: 'Industry (score)',  field: 'ind', col: 3, range: [0, 3],    color: '#4ade80'  }
 };
 const ALL_PREDS = ['experience', 'education', 'industry'];
 
-function renderStats(fit) {
+// Pre-compute column means
+const means = {
+  exp: obs.reduce((s, d) => s + d.exp, 0) / N,
+  edu: obs.reduce((s, d) => s + d.edu, 0) / N,
+  ind: obs.reduce((s, d) => s + d.ind, 0) / N
+};
+
+// ─────────────────────────────────────────────────────────────
+// STATE  — full model is fixed; only the X axis changes
+// ─────────────────────────────────────────────────────────────
+let xAxisPred = 'experience';
+let hc = null;
+const fullFit = ols();   // computed once, never recomputed
+
+// ─────────────────────────────────────────────────────────────
+// RADIO HANDLER
+// ─────────────────────────────────────────────────────────────
+function setXPred(pred) {
+  xAxisPred = pred;
+  renderChart();      // stats panel is untouched
+  highlightActiveRow();
+}
+
+// ─────────────────────────────────────────────────────────────
+// RENDER STATS PANEL  (called once at startup)
+// ─────────────────────────────────────────────────────────────
+function renderStats() {
+  const fit = fullFit;
   const setVal = (id, val, cls) => {
     const el = document.getElementById(id);
     el.textContent = val;
     el.className = 'fit-val' + (cls ? ' ' + cls : '');
   };
 
-  if (!fit) {
-    ['r2','ar2','rmse','fstat','fpval'].forEach(id => setVal(id, '—'));
-    document.getElementById('ctbody').innerHTML =
-      '<tr><td colspan="6" style="color:rgba(255,255,255,0.25);text-align:center;padding:10px;">No predictors selected</td></tr>';
-    return;
-  }
-
-  setVal('r2',    fit.r2.toFixed(3),   fit.r2 > 0.65 ? 'g' : fit.r2 > 0.35 ? 'w' : 'b');
-  setVal('ar2',   fit.adjR2.toFixed(3),fit.adjR2 > 0.65 ? 'g' : fit.adjR2 > 0.35 ? 'w' : 'b');
+  setVal('r2',    fit.r2.toFixed(3),    fit.r2 > 0.65 ? 'g' : fit.r2 > 0.35 ? 'w' : 'b');
+  setVal('ar2',   fit.adjR2.toFixed(3), fit.adjR2 > 0.65 ? 'g' : fit.adjR2 > 0.35 ? 'w' : 'b');
   setVal('rmse',  fit.rmse.toFixed(2));
   setVal('fstat', fit.fStat.toFixed(1), fit.fPval < 0.001 ? 'g' : fit.fPval < 0.05 ? 'w' : 'b');
   setVal('fpval', fp(fit.fPval), pc(fit.fPval));
 
-  const preds = fit.preds;
   let rows = '';
 
-  // Intercept
+  // Intercept row
   const [b0, se0, t0, p0] = [fit.beta[0], fit.coefSE[0], fit.tStats[0], fit.pVals[0]];
   rows += `<tr>
     <td style="color:rgba(255,255,255,0.45);font-style:italic;font-size:10px;">(Intercept)</td>
@@ -540,41 +548,47 @@ function renderStats(fit) {
     <td class="stars">${stars(p0)}</td>
   </tr>`;
 
-  let idx = 1;
-  ALL_PREDS.forEach(pred => {
+  ALL_PREDS.forEach((pred, i) => {
     const m = PRED_META[pred];
-    if (preds.includes(pred)) {
-      const [b, se, t, p] = [fit.beta[idx], fit.coefSE[idx], fit.tStats[idx], fit.pVals[idx]];
-      rows += `<tr>
-        <td><span class="dot" style="background:${m.color}"></span>${m.label}</td>
-        <td>${b.toFixed(2)}</td>
-        <td>${se.toFixed(2)}</td>
-        <td>${t.toFixed(2)}</td>
-        <td class="${pc(p)}">${fp(p)}</td>
-        <td class="stars">${stars(p)}</td>
-      </tr>`;
-      idx++;
-    } else {
-      rows += `<tr class="dim">
-        <td><span class="dot" style="background:${m.color};opacity:0.3"></span>${m.label}</td>
-        <td>—</td><td>—</td><td>—</td><td>—</td><td></td>
-      </tr>`;
-    }
+    const idx = i + 1;  // beta[0] = intercept
+    const [b, se, t, p] = [fit.beta[idx], fit.coefSE[idx], fit.tStats[idx], fit.pVals[idx]];
+    rows += `<tr id="coef-row-${pred}">
+      <td><span class="dot" style="background:${m.color}"></span>${m.label}</td>
+      <td>${b.toFixed(2)}</td>
+      <td>${se.toFixed(2)}</td>
+      <td>${t.toFixed(2)}</td>
+      <td class="${pc(p)}">${fp(p)}</td>
+      <td class="stars">${stars(p)}</td>
+    </tr>`;
   });
+
   document.getElementById('ctbody').innerHTML = rows;
+  highlightActiveRow();
+}
+
+function highlightActiveRow() {
+  ALL_PREDS.forEach(pred => {
+    const row = document.getElementById('coef-row-' + pred);
+    if (row) row.className = pred === xAxisPred ? 'active-pred' : '';
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
-// RENDER CHART
+// RENDER CHART  (called on boot and on every radio change)
 // ─────────────────────────────────────────────────────────────
-function renderChart(fit) {
-  // Scatter by industry
+function renderChart() {
+  const fit  = fullFit;
+  const meta = PRED_META[xAxisPred];
+  const others = ALL_PREDS.filter(p => p !== xAxisPred);
+
+  // Scatter by industry, x = selected predictor
   const byInd = [[], [], [], []];
   obs.forEach(d => byInd[d.ind].push({
-    x: d.exp,
+    x: d[meta.field],
     y: d.salary,
     eduLabel: EDU_LABELS[d.edu],
-    indLabel: IND_LABELS[d.ind]
+    indLabel: IND_LABELS[d.ind],
+    exp: d.exp, edu: d.edu, ind: d.ind
   }));
 
   const scatterSeries = IND_LABELS.map((lbl, i) => ({
@@ -587,67 +601,68 @@ function renderChart(fit) {
     tooltip: {
       pointFormatter: function () {
         return `<span style="color:${IND_COLORS[this.series.index]}">●</span> <b>${this.indLabel}</b><br>
-          Experience: <b>${this.x.toFixed(1)} yrs</b><br>
-          Education: <b>${this.eduLabel}</b><br>
+          ${meta.label}: <b>${this.x.toFixed(meta.field === 'exp' ? 1 : 0)}</b><br>
+          Education: <b>${EDU_LABELS[this.edu]}</b><br>
           Salary: <b>$${this.y.toFixed(1)}k</b>`;
       }
     }
   }));
 
-  let ciSeries = [], lineSeries = [];
+  // Fitted line: vary xAxisPred, hold others at their mean
+  const lineData = [], bandData = [];
+  const [xMin, xMax] = meta.range;
+  const steps = 60;
 
-  if (fit && fit.preds.includes('experience')) {
-    const meanEdu = obs.reduce((s, d) => s + d.edu, 0) / N;
-    const meanInd = obs.reduce((s, d) => s + d.ind, 0) / N;
-    const lineData = [], bandData = [];
+  for (let s = 0; s <= steps; s++) {
+    const xVal = xMin + (xMax - xMin) * s / steps;
+    // Build xv = [1, exp, edu, ind] with selected predictor varying
+    const xv = [1, means.exp, means.edu, means.ind];
+    xv[meta.col] = xVal;
 
-    for (let s = 0; s <= 60; s++) {
-      const exp = s * 30 / 60;
-      const xv = [1];
-      if (fit.preds.includes('experience')) xv.push(exp);
-      if (fit.preds.includes('education'))  xv.push(meanEdu);
-      if (fit.preds.includes('industry'))   xv.push(meanInd);
+    const yhat = xv.reduce((acc, v, j) => acc + v * fit.beta[j], 0);
 
-      const yhat = xv.reduce((acc, v, j) => acc + v * fit.beta[j], 0);
+    const XtXinvX = fit.XtXinv.map(row => row.reduce((acc, v, k) => acc + v * xv[k], 0));
+    const varFit  = XtXinvX.reduce((acc, v, k) => acc + v * xv[k], 0) * fit.MSE;
+    const hw      = 1.96 * Math.sqrt(Math.max(0, varFit));
 
-      // Confidence interval for E[y|x]
-      const XtXinvX = fit.XtXinv.map(row => row.reduce((acc, v, k) => acc + v * xv[k], 0));
-      const varFit  = XtXinvX.reduce((acc, v, k) => acc + v * xv[k], 0) * fit.MSE;
-      const hw      = 1.96 * Math.sqrt(Math.max(0, varFit));
-
-      lineData.push([exp, yhat]);
-      bandData.push([exp, yhat - hw, yhat + hw]);
-    }
-
-    ciSeries = [{
-      type: 'arearange',
-      name: '95% CI',
-      data: bandData,
-      color: 'rgba(120,200,255,0.13)',
-      fillOpacity: 1,
-      lineWidth: 0,
-      marker: { enabled: false },
-      enableMouseTracking: false,
-      zIndex: 1
-    }];
-    lineSeries = [{
-      type: 'line',
-      name: 'Fitted (mean covariates)',
-      data: lineData,
-      color: 'rgba(120,200,255,0.92)',
-      lineWidth: 2.5,
-      marker: { enabled: false },
-      zIndex: 4,
-      enableMouseTracking: false
-    }];
+    lineData.push([xVal, yhat]);
+    bandData.push([xVal, yhat - hw, yhat + hw]);
   }
+
+  const ciSeries = [{
+    type: 'arearange',
+    name: '95% CI',
+    data: bandData,
+    color: 'rgba(120,200,255,0.13)',
+    fillOpacity: 1,
+    lineWidth: 0,
+    marker: { enabled: false },
+    enableMouseTracking: false,
+    zIndex: 1
+  }];
+  const lineSeries = [{
+    type: 'line',
+    name: 'Fitted (mean covariates)',
+    data: lineData,
+    color: 'rgba(120,200,255,0.92)',
+    lineWidth: 2.5,
+    marker: { enabled: false },
+    zIndex: 4,
+    enableMouseTracking: false
+  }];
 
   const allSeries = [...ciSeries, ...scatterSeries, ...lineSeries];
 
+  // Subtitle: "Controlling for X, Z"
+  const subtitle = others.length
+    ? `Controlling for: ${others.map(p => PRED_META[p].label).join(', ')} (at sample mean)`
+    : '';
+
   if (hc) {
-    // Remove old series and add new ones with animation
     while (hc.series.length) hc.series[0].remove(false);
     allSeries.forEach(s => hc.addSeries(s, false));
+    hc.xAxis[0].update({ title: { text: meta.xLabel }, min: xMin, max: xMax }, false);
+    hc.setTitle(null, { text: subtitle }, false);
     hc.redraw({ duration: 350 });
     return;
   }
@@ -656,22 +671,20 @@ function renderChart(fit) {
     chart: {
       backgroundColor: 'transparent',
       animation: { duration: 450 },
-      style: { fontFamily: "'Segoe UI', system-ui, sans-serif" },
-      events: {
-        render: function () {
-          // Keep chart filling its container
-          this.reflow();
-        }
-      }
+      style: { fontFamily: "'Segoe UI', system-ui, sans-serif" }
     },
     title: { text: '' },
+    subtitle: {
+      text: subtitle,
+      style: { color: 'rgba(255,255,255,0.45)', fontSize: '10.5px', fontStyle: 'italic' }
+    },
     xAxis: {
-      title: { text: 'Experience (years)', style: { color: 'rgba(255,255,255,0.55)', fontSize: '11px' } },
+      title: { text: meta.xLabel, style: { color: 'rgba(255,255,255,0.55)', fontSize: '11px' } },
       labels: { style: { color: 'rgba(255,255,255,0.45)', fontSize: '10px' } },
       gridLineColor: 'rgba(255,255,255,0.055)',
       lineColor: 'rgba(255,255,255,0.12)',
       tickColor: 'rgba(255,255,255,0.12)',
-      min: 0, max: 30
+      min: xMin, max: xMax
     },
     yAxis: {
       title: { text: 'Annual Salary ($k)', style: { color: 'rgba(255,255,255,0.55)', fontSize: '11px' } },
@@ -708,19 +721,11 @@ function renderChart(fit) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// MAIN RENDER
+// BOOT
 // ─────────────────────────────────────────────────────────────
-function render() {
-  const preds = [...active];
-  const fit   = ols(preds);
-  renderStats(fit);
-  renderChart(fit);
-}
+renderStats();    // once — never changes
+renderChart();    // initial draw
 
-// Boot
-render();
-
-// Reflow on window resize
 window.addEventListener('resize', () => { if (hc) hc.reflow(); });
 </script>
 </body>

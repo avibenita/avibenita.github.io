@@ -69,7 +69,7 @@ const NAV_TEMPLATE = `
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <polyline points="1,12 5,7 8,10 11,5 15,3"/>
             </svg>
-            Analytics <span class="analytics-star" aria-hidden="true">★</span>
+            Analytics
           </a>
           <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators" title="Statistico Calculators Hub">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -548,34 +548,27 @@ const NAV_STYLE = `
   border: 1px solid rgba(255,165,120,0.70);
   box-shadow: inset 0 0 0 1px rgba(255,165,120,0.20), 0 0 18px rgba(255,165,120,0.22);
   color: rgba(255,210,180,1);
-  font-size: 1.05rem;      /* noticeably larger than sibling buttons (0.83rem) */
+  font-size: 1.05rem;
+  letter-spacing: 0.07em;
   position: relative;
-  padding-top: 18px;       /* room for the "CORE PRODUCT" micro-label */
+  padding-top: 18px;
 }
 
-/* "CORE PRODUCT" label floating inside the button, above the main text */
+/* "Core Product" label above the Analytics text */
 .nav-link--product-core::before {
-  content: "CORE PRODUCT";
+  content: "Core Product";
   position: absolute;
   top: 4px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 0.42rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
+  font-size: 0.48rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #ffb17d;
+  color: rgba(255,165,120,0.75);
   white-space: nowrap;
   pointer-events: none;
-  opacity: 0.95;
-}
-
-.analytics-star {
-  font-size: 0.65rem;
-  color: #ffb17d;
-  vertical-align: super;
-  margin-left: 1px;
-  opacity: 0.9;
+  font-style: italic;
 }
 
 .nav-link--product:hover {

@@ -3145,7 +3145,7 @@
         <!-- Tab: Residual Overview -->
         <!-- Tab: Model Visualization -->
         <div id="tab-model-viz" class="tab-content">
-          <div style="display:flex;flex-direction:column;height:100%;padding:12px 16px 10px;gap:0;">
+          <div style="display:flex;flex-direction:column;height:100%;padding:12px 16px 10px;gap:0;overflow:hidden;">
 
             <!-- Loading state -->
             <div id="modelVizLoading" style="text-align:center;padding:60px 20px;color:var(--text-muted);">
@@ -3154,28 +3154,49 @@
             </div>
 
             <!-- Content -->
-            <div id="modelVizContent" style="display:none;flex-direction:column;flex:1;min-height:0;gap:8px;">
+            <div id="modelVizContent" style="display:none;flex-direction:column;flex:1;min-height:0;gap:9px;">
 
-              <!-- ROW 1 · Predictor checkboxes -->
-              <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.07);">
-                <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-right:4px;">Predictors</span>
-                <div id="modelVizCbRow" style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;"></div>
-                <span style="margin-left:6px;font-size:9.5px;color:var(--text-muted);opacity:0.6;">
-                  <i class="fa-solid fa-circle-info"></i>&nbsp;Unchecked predictors held at mean
-                </span>
+              <!-- ROW 1 · Title + X-axis selector -->
+              <div style="flex-shrink:0;border-bottom:1px solid rgba(255,255,255,0.07);padding-bottom:9px;">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+
+                  <!-- Left: explanation -->
+                  <div>
+                    <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:3px;">
+                      Partial Effect Plot
+                    </div>
+                    <div style="font-size:11px;color:var(--text-muted);max-width:460px;line-height:1.5;">
+                      Shows the relationship between the selected predictor and <strong id="mvYLabel" style="color:var(--accent-1);">Y</strong>,
+                      with all other predictors held at their sample mean.
+                      The shaded band is the <strong style="color:rgba(120,200,255,0.8);">95% confidence interval</strong> for the fitted line.
+                    </div>
+                  </div>
+
+                  <!-- Right: predictor selector -->
+                  <div style="flex-shrink:0;">
+                    <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:var(--text-muted);margin-bottom:6px;">
+                      <i class="fa-solid fa-arrow-right-arrow-left" style="margin-right:4px;"></i>X Axis Predictor
+                    </div>
+                    <div id="modelVizCbRow" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+                  </div>
+                </div>
               </div>
 
               <!-- ROW 2 · Fit stat cards (horizontal) -->
-              <div id="modelVizFitRow" style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;"></div>
+              <div id="modelVizFitRow" style="display:flex;gap:7px;flex-shrink:0;flex-wrap:wrap;"></div>
 
-              <!-- ROW 3 · Coefficient table (compact, full-width) -->
-              <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:7px;padding:7px 12px;flex-shrink:0;overflow-x:auto;">
-                <table id="modelVizCoefTable" style="width:100%;border-collapse:collapse;font-size:10.5px;white-space:nowrap;"></table>
-                <div style="font-size:8px;color:var(--text-muted);margin-top:4px;opacity:0.7;">*** p&lt;0.001 &nbsp;** p&lt;0.01 &nbsp;* p&lt;0.05 &nbsp;. p&lt;0.1</div>
+              <!-- ROW 3 · Coefficient table -->
+              <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;flex-shrink:0;overflow-x:auto;">
+                <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px;">
+                  <span style="font-size:9px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--accent-2);">Full Model Coefficients</span>
+                  <span style="font-size:9px;color:var(--text-muted);font-style:italic;">The highlighted row is the predictor currently plotted</span>
+                </div>
+                <table id="modelVizCoefTable" style="width:100%;border-collapse:collapse;font-size:11.5px;white-space:nowrap;"></table>
+                <div style="font-size:8px;color:var(--text-muted);margin-top:4px;opacity:0.65;">Significance: *** p&lt;0.001 &nbsp;** p&lt;0.01 &nbsp;* p&lt;0.05 &nbsp;. p&lt;0.1</div>
               </div>
 
-              <!-- ROW 4 · Chart (dominant, fills remaining space) -->
-              <div style="flex:1;min-height:220px;position:relative;">
+              <!-- ROW 4 · Chart (dominant) -->
+              <div style="flex:1;min-height:200px;position:relative;">
                 <div id="modelVizChart" style="position:absolute;inset:0;"></div>
               </div>
 
@@ -9033,13 +9054,301 @@
     }
 
     // ============================================================================
-    // MODEL VISUALIZATION TAB
+    // MODEL VISUALIZATION TAB  (partial-effect, full model, radio-style selector)
     // ============================================================================
 
     let _modelVizChart = null;
-    const _mvActive = new Set();   // currently checked predictor indices (into globalXnVars)
+    let _mvSelectedIdx = 0;   // index into globalXnVars currently shown on X axis
 
     function loadModelVizTab() {
+      const res = window.regressionResults;
+      const dat = window.regressionData;
+
+      if (!res || !dat) {
+        document.getElementById('modelVizLoading').innerHTML =
+          '<i class="fa-solid fa-triangle-exclamation" style="font-size:36px;color:var(--accent-danger,#f87171);margin-bottom:12px;display:block;"></i>' +
+          '<p>No regression results available. Run a model first.</p>';
+        return;
+      }
+      const xnVars = window.globalXnVars || [];
+      if (xnVars.length === 0) {
+        document.getElementById('modelVizLoading').innerHTML =
+          '<i class="fa-solid fa-triangle-exclamation" style="font-size:36px;color:var(--accent-danger,#f87171);margin-bottom:12px;display:block;"></i>' +
+          '<p>No numeric predictors found.</p>';
+        return;
+      }
+
+      // Update Y label in explanation
+      const yVar = window.globalYVar || 'Y';
+      const yLbl = document.getElementById('mvYLabel');
+      if (yLbl) yLbl.textContent = yVar;
+
+      _mvSelectedIdx = 0;
+
+      // Build radio-pill row
+      const cbRow = document.getElementById('modelVizCbRow');
+      cbRow.innerHTML = xnVars.map((v, i) => `
+        <button id="mvpill${i}" onclick="onModelVizSelect(${i})"
+          style="${_mvPillStyle(i === 0)}">${v}</button>`).join('');
+
+      // Reveal content
+      document.getElementById('modelVizLoading').style.display = 'none';
+      document.getElementById('modelVizContent').style.display = 'flex';
+
+      _mvRefresh();
+    }
+
+    function _mvPillStyle(active) {
+      return active
+        ? 'padding:5px 13px;border-radius:20px;border:1.5px solid rgba(120,200,255,0.6);background:rgba(120,200,255,0.16);color:#78c8ff;font-size:11.5px;font-weight:700;cursor:pointer;transition:all .18s;box-shadow:0 0 8px rgba(120,200,255,0.22);letter-spacing:0.02em;'
+        : 'padding:5px 13px;border-radius:20px;border:1.5px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.45);font-size:11.5px;font-weight:600;cursor:pointer;transition:all .18s;letter-spacing:0.02em;';
+    }
+
+    function onModelVizSelect(idx) {
+      const xnVars = window.globalXnVars || [];
+      _mvSelectedIdx = idx;
+      // Update pill styles
+      xnVars.forEach((_, i) => {
+        const btn = document.getElementById('mvpill' + i);
+        if (btn) btn.style.cssText = _mvPillStyle(i === idx);
+      });
+      _mvRefresh();
+    }
+
+    function _mvRefresh() {
+      const res    = window.regressionResults;
+      const dat    = window.regressionData;
+      const xnVars = window.globalXnVars || [];
+      const yVar   = window.globalYVar   || 'Y';
+      if (!res || !dat) return;
+
+      const n      = dat.yVector.length;
+      const incl   = dat.intercept === 1 || dat.intercept === true;
+      const nPreds = dat.xMatrix[0].length;
+      const xIdx   = _mvSelectedIdx;
+      const xName  = xnVars[xIdx] || `X${xIdx + 1}`;
+
+      // Column means for all predictors
+      const means = Array.from({ length: nPreds }, (_, j) =>
+        dat.xMatrix.reduce((s, r) => s + r[j], 0) / n);
+
+      // Stats from full model
+      _mvRenderFitRow(res);
+      _mvRenderCoefTable(res, xIdx, xnVars, incl);
+
+      // Chart data
+      const xCol = dat.xMatrix.map(r => r[xIdx]);
+      const xMin = Math.min(...xCol), xMax = Math.max(...xCol);
+      const beta = res.coefficients;
+      const MSE  = res.MSE;
+
+      // Compute XtXinv for CI bands
+      const Xfull  = dat.xMatrix.map(r => incl ? [1, ...r] : [...r]);
+      const kk     = Xfull[0].length;
+      const XtXmat = Array.from({ length: kk }, (_, i) =>
+        Array.from({ length: kk }, (_, j) => Xfull.reduce((s, row) => s + row[i] * row[j], 0)));
+      const XtXinv = _mvMatInv(XtXmat);
+
+      // Scatter
+      const scatterData = dat.yVector.map((y, i) => ({ x: xCol[i], y }));
+
+      // Fitted line + CI (vary xIdx, hold others at mean)
+      const lineData = [], bandData = [];
+      for (let s = 0; s <= 60; s++) {
+        const x    = xMin + (xMax - xMin) * s / 60;
+        const xVec = incl ? [1] : [];
+        means.forEach((m, j) => xVec.push(j === xIdx ? x : m));
+        const yhat = xVec.reduce((acc, v, j) => acc + v * beta[j], 0);
+        let hw = 0;
+        if (XtXinv) {
+          const Ax = XtXinv.map(row => row.reduce((acc, v, k) => acc + v * xVec[k], 0));
+          hw = 1.96 * Math.sqrt(Math.max(0, Ax.reduce((acc, v, k) => acc + v * xVec[k], 0) * MSE));
+        }
+        lineData.push([x, yhat]);
+        bandData.push([x, yhat - hw, yhat + hw]);
+      }
+
+      // Chart subtitle: "controlling for X, Z"
+      const others = xnVars.filter((_, i) => i !== xIdx);
+      const subtitle = others.length
+        ? `Controlling for: ${others.join(', ')} (at sample mean)`
+        : 'Simple linear regression';
+
+      _mvRenderChart(scatterData, lineData, bandData, xName, yVar, subtitle);
+    }
+
+    function _mvRenderFitRow(res) {
+      function fmtP(p) { return p < 0.001 ? '< .001' : p.toFixed(3); }
+      function qCol(v, lo, hi) { return v >= hi ? '#4ade80' : v >= lo ? '#fbbf24' : '#f87171'; }
+      function pCol(p) { return p < 0.01 ? '#4ade80' : p < 0.05 ? '#a3e635' : p < 0.1 ? '#fbbf24' : 'rgba(255,255,255,0.4)'; }
+
+      const cells = [
+        { label: 'R²',        sub: 'Variance explained',        val: (res.R2    ||0).toFixed(3), color: qCol(res.R2    ||0, 0.3, 0.65) },
+        { label: 'Adj. R²',   sub: 'Penalised for predictors',  val: (res.R2_adj||0).toFixed(3), color: qCol(res.R2_adj||0, 0.3, 0.65) },
+        { label: 'F-statistic',sub:'Overall model significance', val: (res.F_stat||0).toFixed(2), color: (res.F_pvalue||1)<0.001?'#4ade80':'#fbbf24' },
+        { label: 'p (F-test)', sub: 'Is the model significant?', val: fmtP(res.F_pvalue||1),       color: pCol(res.F_pvalue||1) },
+        { label: 'RMSE',       sub: 'Avg. prediction error',     val: (res.RMSE  ||0).toFixed(3), color: 'rgba(255,255,255,0.85)' },
+        { label: 'n',          sub: 'Observations',              val: String(res.n||0),            color: 'rgba(255,255,255,0.85)' },
+      ];
+
+      document.getElementById('modelVizFitRow').innerHTML = cells.map(c => `
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;min-width:80px;flex:1;display:flex;flex-direction:column;gap:2px;">
+          <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:0.03em;">${c.label}</div>
+          <div style="font-size:19px;font-weight:800;color:${c.color};font-variant-numeric:tabular-nums;line-height:1.15;">${c.val}</div>
+          <div style="font-size:9px;color:rgba(255,255,255,0.28);margin-top:1px;">${c.sub}</div>
+        </div>`).join('');
+    }
+
+    function _mvRenderCoefTable(res, xAxisIdx, xnVars, incl) {
+      function fmtP(p) { return p < 0.001 ? '< .001' : p.toFixed(3); }
+      function pCol(p) { return p < 0.01 ? '#4ade80' : p < 0.05 ? '#a3e635' : p < 0.1 ? '#fbbf24' : 'rgba(255,255,255,0.38)'; }
+      function stars(p){ return p<0.001?'***':p<0.01?'**':p<0.05?'*':p<0.1?'.':''; }
+
+      const varNames = window.regressionVariableNames || xnVars;
+      const allNames = incl ? ['(Intercept)', ...varNames] : varNames;
+      const { coefficients: beta, std_errors: se, t_values: tv, p_values: pv } = res;
+
+      const thS = 'text-align:right;font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:rgba(255,255,255,0.3);padding:3px 10px 5px;border-bottom:1px solid rgba(255,255,255,0.09);';
+      const tdS = 'text-align:right;padding:5px 10px;font-variant-numeric:tabular-nums;font-size:12px;';
+
+      const thead = `<thead><tr>
+        <th style="${thS};text-align:left;">Predictor</th>
+        <th style="${thS}">Coefficient (β̂)</th>
+        <th style="${thS}">Std. Error</th>
+        <th style="${thS}">t-value</th>
+        <th style="${thS}">p-value</th>
+        <th style="${thS}"></th>
+      </tr></thead>`;
+
+      const rows = allNames.map((name, i) => {
+        const isInt  = name === '(Intercept)' || name === 'Intercept';
+        const isXpred = !isInt && (varNames.indexOf(name) === xAxisIdx);
+        const rowBg  = isXpred ? 'background:rgba(120,200,255,0.07);' : '';
+        const lbord  = isXpred ? 'border-left:3px solid rgba(120,200,255,0.55);' : 'border-left:3px solid transparent;';
+        const nameS  = isInt
+          ? 'color:rgba(255,255,255,0.42);font-style:italic;font-size:11px;'
+          : isXpred ? 'color:#78c8ff;font-weight:700;font-size:12px;' : 'color:rgba(255,255,255,0.78);font-size:12px;';
+        const p = pv[i];
+        return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);${rowBg}${lbord}">
+          <td style="text-align:left;padding:5px 10px;${nameS}">${isXpred ? '→ ' : ''}${name}</td>
+          <td style="${tdS}color:rgba(255,255,255,0.82);">${beta[i].toFixed(4)}</td>
+          <td style="${tdS}color:rgba(255,255,255,0.55);">${se[i].toFixed(4)}</td>
+          <td style="${tdS}color:rgba(255,255,255,0.75);">${tv[i].toFixed(3)}</td>
+          <td style="${tdS}font-weight:${p<0.05?'700':'400'};color:${pCol(p)};">${fmtP(p)}</td>
+          <td style="padding:5px 6px;color:#fbbf24;font-size:10px;font-weight:700;">${stars(p)}</td>
+        </tr>`;
+      }).join('');
+
+      document.getElementById('modelVizCoefTable').innerHTML = thead + `<tbody>${rows}</tbody>`;
+    }
+
+    function _mvRenderChart(scatterData, lineData, bandData, xName, yName, subtitle) {
+      const series = [
+        {
+          type: 'arearange', name: '95% CI',
+          data: bandData,
+          color: 'rgba(120,200,255,0.11)', fillOpacity: 1, lineWidth: 0,
+          marker: { enabled: false }, enableMouseTracking: false, zIndex: 1
+        },
+        {
+          type: 'scatter', name: 'Observed data',
+          data: scatterData,
+          color: 'rgba(120,200,255,0.78)',
+          marker: { radius: 4.5, symbol: 'circle' },
+          zIndex: 3,
+          tooltip: {
+            pointFormatter: function () {
+              return `<b>${xName}:</b> ${this.x.toFixed(3)}<br><b>${yName}:</b> ${this.y.toFixed(3)}`;
+            }
+          }
+        },
+        {
+          type: 'line', name: 'Partial effect (others at mean)',
+          data: lineData,
+          color: 'rgba(120,200,255,0.92)',
+          lineWidth: 2.5, marker: { enabled: false }, zIndex: 4,
+          enableMouseTracking: false
+        }
+      ];
+
+      if (_modelVizChart) {
+        while (_modelVizChart.series.length) _modelVizChart.series[0].remove(false);
+        series.forEach(s => _modelVizChart.addSeries(s, false));
+        _modelVizChart.xAxis[0].update({ title: { text: xName } }, false);
+        _modelVizChart.yAxis[0].update({ title: { text: yName } }, false);
+        _modelVizChart.setTitle(null, { text: subtitle }, false);
+        _modelVizChart.redraw({ duration: 300 });
+        return;
+      }
+
+      _modelVizChart = Highcharts.chart('modelVizChart', {
+        chart: {
+          backgroundColor: 'transparent',
+          animation: { duration: 400 },
+          style: { fontFamily: "'Segoe UI', system-ui, sans-serif" }
+        },
+        title: { text: '' },
+        subtitle: {
+          text: subtitle,
+          style: { color: 'rgba(255,255,255,0.35)', fontSize: '10px', fontStyle: 'italic' }
+        },
+        xAxis: {
+          title: { text: xName, style: { color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: '600' } },
+          labels: { style: { color: 'rgba(255,255,255,0.45)', fontSize: '11px' } },
+          gridLineColor: 'rgba(255,255,255,0.055)',
+          lineColor: 'rgba(255,255,255,0.15)', tickColor: 'rgba(255,255,255,0.15)'
+        },
+        yAxis: {
+          title: { text: yName, style: { color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: '600' } },
+          labels: { style: { color: 'rgba(255,255,255,0.45)', fontSize: '11px' } },
+          gridLineColor: 'rgba(255,255,255,0.055)'
+        },
+        legend: {
+          itemStyle: { color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: '600' },
+          itemHoverStyle: { color: '#fff' },
+          backgroundColor: 'transparent', borderWidth: 0
+        },
+        credits: { enabled: false },
+        tooltip: {
+          useHTML: true,
+          backgroundColor: 'rgba(10,14,22,0.94)',
+          borderColor: 'rgba(120,200,255,0.3)',
+          style: { color: '#e0e8f0', fontSize: '12px' },
+          headerFormat: ''
+        },
+        series
+      });
+    }
+
+    // Backward-compat stubs
+    function renderModelVizChart() { _mvRefresh(); }
+    function renderModelVizStats(res) { _mvRenderFitRow(res); }
+
+    // Gauss-Jordan matrix inverse
+    function _mvMatInv(M) {
+      const n = M.length;
+      const aug = M.map((row, i) => [
+        ...row, ...Array.from({ length: n }, (_, j) => i === j ? 1 : 0)
+      ]);
+      for (let col = 0; col < n; col++) {
+        let mx = col;
+        for (let row = col + 1; row < n; row++)
+          if (Math.abs(aug[row][col]) > Math.abs(aug[mx][col])) mx = row;
+        [aug[col], aug[mx]] = [aug[mx], aug[col]];
+        const piv = aug[col][col];
+        if (Math.abs(piv) < 1e-14) return null;
+        for (let j = 0; j < 2 * n; j++) aug[col][j] /= piv;
+        for (let row = 0; row < n; row++) {
+          if (row !== col) {
+            const f = aug[row][col];
+            for (let j = 0; j < 2 * n; j++) aug[row][j] -= f * aug[col][j];
+          }
+        }
+      }
+      return aug.map(r => r.slice(n));
+    }
+
+  </script>
       const res = window.regressionResults;
       const dat = window.regressionData;
 

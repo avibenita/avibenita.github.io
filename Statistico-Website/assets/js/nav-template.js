@@ -77,7 +77,7 @@ const NAV_TEMPLATE = `
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <polyline points="1,12 5,7 8,10 11,5 15,3"/>
             </svg>
-            Analytics
+            Analytics <span class="analytics-star" aria-hidden="true">★</span>
           </a>
           <a href="javascript:void(0)" class="nav-link nav-link--product-lite" data-page="addins" id="link-addins" title="Statistico Applications Hub">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -509,10 +509,10 @@ const NAV_STYLE = `
 }
 
 :root[data-theme="light"] .nav-link--product-core {
-  background: rgba(37, 99, 235, 0.1);
-  border-color: rgba(37, 99, 235, 0.26);
-  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
-  color: rgba(30, 58, 138, 0.95);
+  background: rgba(220, 100, 40, 0.10);
+  border-color: rgba(220, 100, 40, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(220, 100, 40, 0.12), 0 0 12px rgba(220, 100, 40, 0.14);
+  color: rgba(160, 55, 10, 0.95);
 }
 
 :root[data-theme="light"] .nav-link-tag {
@@ -544,28 +544,19 @@ const NAV_STYLE = `
 
 .nav-link--product-core {
   font-weight: 700;
-  background: rgba(120,200,255,0.14);
-  border: 1px solid rgba(120,200,255,0.55);
-  box-shadow: inset 0 0 0 1px rgba(120,200,255,0.18), 0 0 18px rgba(120,200,255,0.22);
-  color: rgba(200,238,255,1);
-  font-size: 0.88rem;     /* slightly larger than siblings */
+  background: rgba(255,165,120,0.16);
+  border: 1px solid rgba(255,165,120,0.70);
+  box-shadow: inset 0 0 0 1px rgba(255,165,120,0.20), 0 0 18px rgba(255,165,120,0.22);
+  color: rgba(255,210,180,1);
+  font-size: 0.88rem;
   position: relative;
 }
 
-/* "CORE" micro-badge above the Analytics pill */
-.nav-link--product-core::after {
-  content: "core";
-  position: absolute;
-  top: -9px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.44rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #ff9a6c;
-  pointer-events: none;
-  white-space: nowrap;
+.analytics-star {
+  font-size: 0.65rem;
+  color: #ffb17d;
+  vertical-align: super;
+  margin-left: 1px;
   opacity: 0.9;
 }
 

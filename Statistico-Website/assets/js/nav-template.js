@@ -294,12 +294,13 @@ const NAV_STYLE = `
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 0;
   position: relative;
 }
 
 .nav-item--products-group::before { display: none; }
 
+/* Label sits on top of the pill border like a fieldset legend */
 .nav-products-label {
   font-size: 0.56rem;
   font-weight: 500;
@@ -309,6 +310,17 @@ const NAV_STYLE = `
   line-height: 1;
   user-select: none;
   pointer-events: none;
+  position: relative;
+  z-index: 2;
+  /* background masks the border behind the text */
+  background: #0a1730;
+  padding: 0 7px;
+  /* pull the row up so the border aligns with the text's vertical midpoint */
+  margin-bottom: -5px;
+}
+
+:root[data-theme="light"] .nav-products-label {
+  background: #f0f6ff;
 }
 
 /* Segmented control bar */
@@ -319,7 +331,8 @@ const NAV_STYLE = `
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,165,120,0.45);
   border-radius: 18px;
-  padding: 3px;
+  /* extra top padding to keep content clear of the overlapping label */
+  padding: 8px 3px 3px;
   position: relative;
 }
 

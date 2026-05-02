@@ -65,6 +65,12 @@ const NAV_TEMPLATE = `
         <span class="nav-products-label">Statistico Suite</span>
         <div class="nav-products-row" id="nav-products-row">
           <div class="nav-products-slider" id="nav-products-slider"></div>
+          <a href="javascript:void(0)" class="nav-link nav-link--product-core" data-page="analytics" id="link-analytics" title="Statistico Analytics Hub">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="1,12 5,7 8,10 11,5 15,3"/>
+            </svg>
+            Analytics <span class="analytics-star" aria-hidden="true">★</span>
+          </a>
           <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators" title="Statistico Calculators Hub">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <rect x="2" y="2" width="12" height="12" rx="2"/>
@@ -72,12 +78,6 @@ const NAV_TEMPLATE = `
               <line x1="5" y1="11" x2="8" y2="11"/>
             </svg>
             Calculators
-          </a>
-          <a href="javascript:void(0)" class="nav-link nav-link--product-core" data-page="analytics" id="link-analytics" title="Statistico Analytics Hub">
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polyline points="1,12 5,7 8,10 11,5 15,3"/>
-            </svg>
-            Analytics <span class="analytics-star" aria-hidden="true">★</span>
           </a>
           <a href="javascript:void(0)" class="nav-link nav-link--product-lite" data-page="addins" id="link-addins" title="Statistico Applications Hub">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -332,7 +332,7 @@ const NAV_STYLE = `
   border: 1px solid rgba(255,165,120,0.45);
   border-radius: 18px;
   /* extra top padding to keep content clear of the overlapping label */
-  padding: 8px 3px 3px;
+  padding: 14px 3px 3px;
   overflow: visible;  /* allow the "core" micro-badge on Analytics to peek above */
   position: relative;
 }
@@ -548,8 +548,26 @@ const NAV_STYLE = `
   border: 1px solid rgba(255,165,120,0.70);
   box-shadow: inset 0 0 0 1px rgba(255,165,120,0.20), 0 0 18px rgba(255,165,120,0.22);
   color: rgba(255,210,180,1);
-  font-size: 0.88rem;
+  font-size: 1.05rem;      /* noticeably larger than sibling buttons (0.83rem) */
   position: relative;
+  padding-top: 18px;       /* room for the "CORE PRODUCT" micro-label */
+}
+
+/* "CORE PRODUCT" label floating inside the button, above the main text */
+.nav-link--product-core::before {
+  content: "CORE PRODUCT";
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.42rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ffb17d;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0.95;
 }
 
 .analytics-star {

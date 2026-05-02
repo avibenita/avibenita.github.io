@@ -2698,6 +2698,10 @@
                 <i class="fa-solid fa-chart-scatter sb-item-icon" style="color:#18223a"></i>
                 <span class="sb-item-label">Model Visualization</span>
               </button>
+              <button class="sb-item" onclick="switchTab('partial-grid')" data-tab="partial-grid">
+                <i class="fa-solid fa-border-all sb-item-icon" style="color:#18223a"></i>
+                <span class="sb-item-label">Partial Reg. Plots</span>
+              </button>
               <button class="sb-item" onclick="switchTab('residuals')" data-tab="residuals">
                 <i class="fa-solid fa-gauge-high sb-item-icon" style="color:#18223a"></i>
                 <span class="sb-item-label">Residual Overview</span>
@@ -3201,6 +3205,43 @@
               </div>
 
             </div><!-- /content -->
+          </div>
+        </div>
+
+        <!-- Tab: Partial Regression Grid (Added Variable Plots) -->
+        <div id="tab-partial-grid" class="tab-content">
+          <div style="display:flex;flex-direction:column;height:100%;padding:12px 16px 10px;gap:0;overflow:hidden;">
+
+            <!-- Loading state -->
+            <div id="pgLoading" style="text-align:center;padding:60px 20px;color:var(--text-muted);">
+              <i class="fa-solid fa-spinner fa-spin" style="font-size:40px;margin-bottom:15px;display:block;"></i>
+              <p>Loading visualization…</p>
+            </div>
+
+            <!-- Content -->
+            <div id="pgContent" style="display:none;flex-direction:column;flex:1;min-height:0;gap:9px;">
+
+              <!-- Header -->
+              <div style="flex-shrink:0;border-bottom:1px solid rgba(255,255,255,0.07);padding-bottom:9px;">
+                <div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:4px;letter-spacing:-0.01em;">
+                  Added Variable Plots
+                </div>
+                <div style="font-size:12px;color:rgba(255,255,255,0.68);max-width:640px;line-height:1.65;">
+                  Each panel isolates the <strong style="color:var(--accent-1);">unique contribution</strong> of one predictor
+                  after removing the shared effect of all others. The X axis shows residuals of the predictor regressed on the
+                  remaining predictors; the Y axis shows residuals of
+                  <strong id="pgYLabel" style="color:var(--accent-2);">Y</strong> regressed on the remaining predictors.
+                  The fitted line's slope equals the full-model OLS coefficient β̂ for that predictor.
+                  <span style="color:#4ade80;">Green</span> = p&lt;0.05 &nbsp;
+                  <span style="color:#fbbf24;">Amber</span> = p&lt;0.1 &nbsp;
+                  <span style="color:rgba(255,100,100,0.85);">Red</span> = not significant.
+                </div>
+              </div>
+
+              <!-- Scrollable grid of charts -->
+              <div id="pgGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(265px,1fr));gap:12px;overflow-y:auto;flex:1;padding-right:4px;padding-bottom:4px;"></div>
+
+            </div><!-- /pgContent -->
           </div>
         </div>
 
@@ -3891,6 +3932,7 @@
         'ix-details':        'Interactions \u2013 Details',
         'predictions':       'Predictions',
         'model-viz':         'Model Visualization',
+        'partial-grid':      'Added Variable Plots',
         'residuals':         'Residual Overview',
         'res-plots':         'Residual Plots',
         'res-influential':   'Influential Cases',
@@ -3951,6 +3993,9 @@
       } else if (tabName === 'model-viz' && !window.modelVizLoaded) {
         window.modelVizLoaded = true;
         loadModelVizTab();
+      } else if (tabName === 'partial-grid' && !window.partialGridLoaded) {
+        window.partialGridLoaded = true;
+        loadPartialGridTab();
       } else if (tabName === 'res-plots' && !window.resPlotsLoaded) {
         loadResPlots();
       } else if (tabName === 'res-influential' && !window.resInfluentialLoaded) {
@@ -9323,6 +9368,166 @@
     // Backward-compat stubs
     function renderModelVizChart() { _mvRefresh(); }
     function renderModelVizStats(res) { _mvRenderFitRow(res); }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  PARTIAL REGRESSION GRID  (Added Variable Plots)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** OLS residuals: y - X·β  (Xmat includes intercept column) */
+    function _pgOlsResiduals(Xmat, y) {
+      const k = Xmat[0].length;
+      const XtX = Array.from({ length: k }, (_, i) =>
+        Array.from({ length: k }, (_, j) =>
+          Xmat.reduce((s, r) => s + r[i] * r[j], 0)));
+      const XtXinv = _mvMatInv(XtX);
+      if (!XtXinv) return y.map(() => 0);
+      const Xty = Array.from({ length: k }, (_, i) =>
+        Xmat.reduce((s, r, ri) => s + r[i] * y[ri], 0));
+      const beta = XtXinv.map(row => row.reduce((s, v, j) => s + v * Xty[j], 0));
+      return y.map((yi, i) => yi - Xmat[i].reduce((s, v, j) => s + v * beta[j], 0));
+    }
+
+    function loadPartialGridTab() {
+      const res = window.regressionResults;
+      const dat = window.regressionData;
+
+      function pgErr(msg) {
+        document.getElementById('pgLoading').innerHTML =
+          '<i class="fa-solid fa-triangle-exclamation" style="font-size:36px;color:var(--accent-danger,#f87171);margin-bottom:12px;display:block;"></i>' +
+          '<p>' + msg + '</p>';
+      }
+
+      if (!res || !dat) { pgErr('No regression results available. Run a model first.'); return; }
+
+      const xnVars = window.globalXnVars || [];
+      if (xnVars.length === 0) { pgErr('No numeric predictors found.'); return; }
+
+      const yVar  = window.globalYVar || 'Y';
+      const incl  = dat.intercept === 1 || dat.intercept === true;
+      const yVec  = dat.yVector;
+      const xMat  = dat.xMatrix;
+
+      // Update Y label in explanation
+      const pgYLbl = document.getElementById('pgYLabel');
+      if (pgYLbl) pgYLbl.textContent = yVar;
+
+      // Build a grid cell per predictor
+      const pgGrid = document.getElementById('pgGrid');
+      pgGrid.innerHTML = xnVars.map((name, i) =>
+        `<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:6px 4px 4px;">
+           <div id="pgc${i}" style="height:220px;"></div>
+         </div>`
+      ).join('');
+
+      // Reveal content
+      document.getElementById('pgLoading').style.display = 'none';
+      document.getElementById('pgContent').style.display = 'flex';
+
+      // Render charts after DOM update
+      setTimeout(() => {
+        function sigColor(p) {
+          return p < 0.001 ? '#4ade80'
+               : p < 0.01  ? '#86efac'
+               : p < 0.05  ? '#fbbf24'
+               : 'rgba(255,100,100,0.82)';
+        }
+        function stars(p) {
+          return p < 0.001 ? '***' : p < 0.01 ? '**' : p < 0.05 ? '*' : p < 0.1 ? '.' : 'ns';
+        }
+
+        xnVars.forEach((xName, xIdx) => {
+          // X_other: all columns except xIdx, with prepended intercept
+          const Xother = xMat.map(row => {
+            const r = [1];
+            row.forEach((v, j) => { if (j !== xIdx) r.push(v); });
+            return r;
+          });
+
+          const eY  = _pgOlsResiduals(Xother, yVec);
+          const eXi = _pgOlsResiduals(Xother, xMat.map(r => r[xIdx]));
+
+          const scatter = eXi.map((x, i) => ({ x, y: eY[i] }));
+
+          // Fitted line slope = full-model coefficient for this predictor
+          const betaIdx = incl ? xIdx + 1 : xIdx;
+          const beta_i  = res.coefficients[betaIdx];
+          const p_i     = res.p_values[betaIdx];
+          const se_i    = res.std_errors[betaIdx];
+          const minX    = Math.min(...eXi);
+          const maxX    = Math.max(...eXi);
+          const lineData = [[minX, beta_i * minX], [maxX, beta_i * maxX]];
+
+          const sc = sigColor(p_i);
+
+          const axStyle  = { color: 'rgba(255,255,255,0.50)', fontSize: '9.5px' };
+          const ttlStyle = (fz, op) => ({ color: `rgba(255,255,255,${op})`, fontSize: fz });
+
+          Highcharts.chart(`pgc${xIdx}`, {
+            chart: {
+              backgroundColor: 'transparent',
+              animation: false,
+              style: { fontFamily: "'Segoe UI', system-ui, sans-serif" },
+              margin: [40, 12, 44, 46],
+              spacing: [4, 4, 4, 4]
+            },
+            title: {
+              text: xName,
+              style: { color: 'rgba(255,255,255,0.90)', fontSize: '12.5px', fontWeight: '700' },
+              margin: 2
+            },
+            subtitle: {
+              text: `β̂ = ${beta_i.toFixed(4)} ± ${se_i.toFixed(4)} &nbsp; p ${p_i < 0.001 ? '&lt; .001' : '= ' + p_i.toFixed(3)} <b>${stars(p_i)}</b>`,
+              useHTML: true,
+              style: { color: sc, fontSize: '10.5px', fontWeight: '600' }
+            },
+            xAxis: {
+              title: { text: `e(${xName} | others)`, style: { color: 'rgba(255,255,255,0.50)', fontSize: '9.5px' } },
+              labels: { style: axStyle },
+              gridLineColor: 'rgba(255,255,255,0.04)',
+              lineColor: 'rgba(255,255,255,0.12)',
+              tickColor: 'rgba(255,255,255,0.12)',
+              plotLines: [{ value: 0, color: 'rgba(255,255,255,0.12)', width: 1, zIndex: 2 }]
+            },
+            yAxis: {
+              title: { text: `e(${yVar} | others)`, style: { color: 'rgba(255,255,255,0.50)', fontSize: '9.5px' } },
+              labels: { style: axStyle },
+              gridLineColor: 'rgba(255,255,255,0.04)',
+              plotLines: [{ value: 0, color: 'rgba(255,255,255,0.12)', width: 1, zIndex: 2 }]
+            },
+            legend: { enabled: false },
+            credits: { enabled: false },
+            exporting: { enabled: false },
+            tooltip: {
+              backgroundColor: 'rgba(10,14,22,0.94)',
+              borderColor: 'rgba(120,200,255,0.3)',
+              style: { color: '#e0e8f0', fontSize: '11px' },
+              headerFormat: '',
+              pointFormatter() {
+                return `<b>e(${xName}):</b> ${this.x.toFixed(3)}<br><b>e(${yVar}):</b> ${this.y.toFixed(3)}`;
+              }
+            },
+            series: [
+              {
+                type: 'scatter',
+                data: scatter,
+                color: 'rgba(120,200,255,0.52)',
+                marker: { radius: 3, symbol: 'circle' },
+                zIndex: 3
+              },
+              {
+                type: 'line',
+                data: lineData,
+                color: sc,
+                lineWidth: 2.2,
+                marker: { enabled: false },
+                enableMouseTracking: false,
+                zIndex: 4
+              }
+            ]
+          });
+        });
+      }, 80);
+    }
 
     // Gauss-Jordan matrix inverse
     function _mvMatInv(M) {

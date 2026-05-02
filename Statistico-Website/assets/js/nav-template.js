@@ -333,6 +333,7 @@ const NAV_STYLE = `
   border-radius: 18px;
   /* extra top padding to keep content clear of the overlapping label */
   padding: 8px 3px 3px;
+  overflow: visible;  /* allow the "core" micro-badge on Analytics to peek above */
   position: relative;
 }
 
@@ -545,8 +546,27 @@ const NAV_STYLE = `
   font-weight: 700;
   background: rgba(120,200,255,0.14);
   border: 1px solid rgba(120,200,255,0.55);
-  box-shadow: inset 0 0 0 1px rgba(120,200,255,0.18), 0 0 14px rgba(120,200,255,0.12);
+  box-shadow: inset 0 0 0 1px rgba(120,200,255,0.18), 0 0 18px rgba(120,200,255,0.22);
   color: rgba(200,238,255,1);
+  font-size: 0.88rem;     /* slightly larger than siblings */
+  position: relative;
+}
+
+/* "CORE" micro-badge above the Analytics pill */
+.nav-link--product-core::after {
+  content: "core";
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.44rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ff9a6c;
+  pointer-events: none;
+  white-space: nowrap;
+  opacity: 0.9;
 }
 
 .nav-link--product:hover {

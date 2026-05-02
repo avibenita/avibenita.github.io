@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Regression Demo – Statistico</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts-more.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d1117;
+      color: #e0e8f0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .shell {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding: 10px 14px 8px;
+    }
+
+    /* ── Header ── */
+    .hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      padding-bottom: 8px;
+      margin-bottom: 8px;
+      border-bottom: 1px solid rgba(120,200,255,0.14);
+    }
+
+    .hdr-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: rgba(120,200,255,0.85);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .hdr-title::before {
+      content: '';
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #78c8ff, #a78bfa);
+      box-shadow: 0 0 6px rgba(120,200,255,0.5);
+    }
+
+    .toggles {
+      display: flex;
+      gap: 5px;
+    }
+
+    .tog {
+      padding: 3px 11px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.04);
+      color: rgba(255,255,255,0.35);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s;
+      letter-spacing: 0.03em;
+      user-select: none;
+    }
+    .tog.on {
+      background: rgba(120,200,255,0.14);
+      color: #78c8ff;
+      border-color: rgba(120,200,255,0.45);
+      box-shadow: 0 0 8px rgba(120,200,255,0.18);
+    }
+    .tog:hover { border-color: rgba(120,200,255,0.35); color: rgba(120,200,255,0.7); }
+
+    /* ── Main grid ── */
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 255px;
+      gap: 10px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ── Chart ── */
+    .chart-wrap { min-height: 0; position: relative; }
+    #rc { width: 100%; height: 100%; }
+
+    /* ── Stats panel ── */
+    .panel {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(120,200,255,0.1);
+      border-radius: 8px;
+      padding: 9px 11px;
+    }
+
+    .card-title {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: rgba(120,200,255,0.5);
+      margin-bottom: 7px;
+    }
+
+    /* Model fit grid */
+    .fit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 4px;
+    }
+
+    .fit-cell {
+      background: rgba(255,255,255,0.035);
+      border: 1px solid rgba(255,255,255,0.055);
+      border-radius: 5px;
+      padding: 5px 7px;
+      display: flex;
+      flex-direction: column;
+    }
+    .fit-lbl {
+      font-size: 8.5px;
+      color: rgba(255,255,255,0.35);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 1px;
+    }
+    .fit-val {
+      font-size: 14px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: #78c8ff;
+      line-height: 1.1;
+    }
+    .fit-val.g { color: #4ade80; }
+    .fit-val.w { color: #fbbf24; }
+    .fit-val.b { color: #f87171; }
+
+    /* Coefficient table */
+    .coef-wrap { flex: 1; overflow: hidden; }
+
+    table.ct {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10.5px;
+    }
+    table.ct th {
+      font-size: 8.5px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.3);
+      text-align: right;
+      padding: 2px 4px 4px;
+      border-bottom: 1px solid rgba(255,255,255,0.09);
+    }
+    table.ct th:first-child { text-align: left; }
+
+    table.ct td {
+      text-align: right;
+      padding: 4.5px 4px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-variant-numeric: tabular-nums;
+      color: rgba(255,255,255,0.72);
+      white-space: nowrap;
+    }
+    table.ct td:first-child { text-align: left; }
+    table.ct tr:hover td { background: rgba(120,200,255,0.05); }
+    table.ct tr.dim td { opacity: 0.28; }
+
+    .dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      margin-right: 4px;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+    .stars { color: #fbbf24; font-size: 9.5px; font-weight: 700; }
+    .pg  { color: #4ade80; font-weight: 700; }
+    .pw  { color: #a3e635; }
+    .pm  { color: #fbbf24; }
+    .pns { color: rgba(255,255,255,0.32); }
+
+    .sig-note {
+      font-size: 8.5px;
+      color: rgba(255,255,255,0.22);
+      padding-top: 5px;
+      letter-spacing: 0.02em;
+    }
+
+    .footer-note {
+      font-size: 9px;
+      color: rgba(255,255,255,0.18);
+      text-align: right;
+      flex-shrink: 0;
+      padding-top: 2px;
+    }
+  </style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Header -->
+  <div class="hdr">
+    <div class="hdr-title">Multiple Regression &nbsp;·&nbsp; Salary Prediction</div>
+    <div class="toggles">
+      <button class="tog on" data-pred="experience" onclick="toggle(this)">Experience</button>
+      <button class="tog on" data-pred="education"  onclick="toggle(this)">Education</button>
+      <button class="tog on" data-pred="industry"   onclick="toggle(this)">Industry</button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- Chart -->
+    <div class="chart-wrap">
+      <div id="rc"></div>
+    </div>
+
+    <!-- Stats panel -->
+    <div class="panel">
+
+      <!-- Model fit -->
+      <div class="card">
+        <div class="card-title">Model Fit &nbsp;<span id="n-lbl" style="font-weight:400;color:rgba(255,255,255,0.25);letter-spacing:0;">(n = 80)</span></div>
+        <div class="fit-grid">
+          <div class="fit-cell"><div class="fit-lbl">R²</div><div class="fit-val" id="r2">—</div></div>
+          <div class="fit-cell"><div class="fit-lbl">Adj. R²</div><div class="fit-val" id="ar2">—</div></div>
+          <div class="fit-cell"><div class="fit-lbl">RMSE ($k)</div><div class="fit-val" id="rmse">—</div></div>
+          <div class="fit-cell" style="grid-column:span 2"><div class="fit-lbl">F-statistic</div><div class="fit-val" id="fstat">—</div></div>
+          <div class="fit-cell"><div class="fit-lbl">p(F)</div><div class="fit-val" id="fpval">—</div></div>
+        </div>
+      </div>
+
+      <!-- Coefficients -->
+      <div class="card coef-wrap">
+        <div class="card-title">Coefficients</div>
+        <table class="ct">
+          <thead>
+            <tr>
+              <th>Predictor</th>
+              <th>β̂</th>
+              <th>SE</th>
+              <th>t</th>
+              <th>p</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="ctbody"></tbody>
+        </table>
+        <div class="sig-note">*** p&lt;0.001 &nbsp;** p&lt;0.01 &nbsp;* p&lt;0.05 &nbsp;. p&lt;0.1</div>
+      </div>
+
+      <div class="footer-note">80 synthetic salary records &nbsp;·&nbsp; Statistico</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// SEEDED PRNG
+// ─────────────────────────────────────────────────────────────
+let seed = 58321;
+function lcg() {
+  seed = (seed * 1664525 + 1013904223) & 0xffffffff;
+  return (seed >>> 0) / 0xffffffff;
+}
+function randNorm() {
+  return Math.sqrt(-2 * Math.log(lcg() + 1e-12)) * Math.cos(2 * Math.PI * lcg());
+}
+
+// ─────────────────────────────────────────────────────────────
+// GENERATE DATA
+// salary ($k) = 28 + 3.2·exp + 9·edu + 10·ind + ε(0,11²)
+// ─────────────────────────────────────────────────────────────
+const N = 80;
+const IND_LABELS  = ['Other', 'Healthcare', 'Tech', 'Finance'];
+const IND_COLORS  = [
+  'rgba(148,163,184,0.82)',   // Other    – slate
+  'rgba(74,222,128,0.82)',    // Healthcare – green
+  'rgba(120,200,255,0.82)',   // Tech     – cyan
+  'rgba(251,191,36,0.82)'    // Finance  – gold
+];
+const EDU_LABELS = ['HS', 'Bachelor', 'Master', 'PhD'];
+
+const obs = [];
+for (let i = 0; i < N; i++) {
+  const exp = Math.round(lcg() * 30 * 10) / 10;
+  const er  = lcg();
+  const edu = er < 0.25 ? 0 : er < 0.65 ? 1 : er < 0.90 ? 2 : 3;
+  const ir  = lcg();
+  const ind = ir < 0.20 ? 0 : ir < 0.45 ? 1 : ir < 0.75 ? 2 : 3;
+  const salary = 28 + 3.2 * exp + 9 * edu + 10 * ind + randNorm() * 11;
+  obs.push({ exp, edu, ind, salary: Math.round(salary * 10) / 10 });
+}
+
+// ─────────────────────────────────────────────────────────────
+// MATRIX UTILITIES
+// ─────────────────────────────────────────────────────────────
+function mmul(A, B) {
+  const r = A.length, mid = B.length, c = B[0].length;
+  return Array.from({length: r}, (_, i) =>
+    Array.from({length: c}, (_, j) =>
+      A[i].reduce((s, _, k) => s + A[i][k] * B[k][j], 0)));
+}
+function trans(A) { return A[0].map((_, j) => A.map(r => r[j])); }
+function minv(M) {
+  const n = M.length;
+  const aug = M.map((row, i) => [
+    ...row,
+    ...Array.from({length: n}, (_, j) => i === j ? 1 : 0)
+  ]);
+  for (let col = 0; col < n; col++) {
+    let mx = col;
+    for (let row = col + 1; row < n; row++)
+      if (Math.abs(aug[row][col]) > Math.abs(aug[mx][col])) mx = row;
+    [aug[col], aug[mx]] = [aug[mx], aug[col]];
+    const piv = aug[col][col];
+    if (Math.abs(piv) < 1e-14) return null;
+    for (let j = 0; j < 2 * n; j++) aug[col][j] /= piv;
+    for (let row = 0; row < n; row++) {
+      if (row !== col) {
+        const f = aug[row][col];
+        for (let j = 0; j < 2 * n; j++) aug[row][j] -= f * aug[col][j];
+      }
+    }
+  }
+  return aug.map(r => r.slice(n));
+}
+
+// ─────────────────────────────────────────────────────────────
+// STATISTICS
+// ─────────────────────────────────────────────────────────────
+function normalCDF(z) {
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const d = 0.3989423 * Math.exp(-z * z / 2);
+  const p = 1 - d * t * (0.319381530 + t * (-0.356563782 +
+    t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  return z > 0 ? p : 1 - p;
+}
+function p2tail(t) { return 2 * (1 - normalCDF(Math.abs(t))); }
+
+function gammaLn(x) {
+  const c = [76.18009172947146, -86.50532032941677, 24.01409824083091,
+    -1.231739572450155, 1.208650973866179e-3, -5.395239384953e-6];
+  let y = x, tmp = x + 5.5;
+  tmp -= (x + 0.5) * Math.log(tmp);
+  let s = 1.000000000190015;
+  c.forEach(v => { y++; s += v / y; });
+  return -tmp + Math.log(2.5066282746310005 * s / x);
+}
+function betaCF(x, a, b) {
+  let c = 1, d = 1 - (a + b) * x / (a + 1);
+  if (Math.abs(d) < 1e-30) d = 1e-30;
+  d = 1 / d; let h = d;
+  for (let m = 1; m <= 200; m++) {
+    let aa = m * (b - m) * x / ((a + 2*m-1) * (a + 2*m));
+    d = 1 + aa * d; if (Math.abs(d) < 1e-30) d = 1e-30;
+    c = 1 + aa / c; if (Math.abs(c) < 1e-30) c = 1e-30;
+    d = 1 / d; h *= d * c;
+    aa = -(a + m) * (a + b + m) * x / ((a + 2*m) * (a + 2*m + 1));
+    d = 1 + aa * d; if (Math.abs(d) < 1e-30) d = 1e-30;
+    c = 1 + aa / c; if (Math.abs(c) < 1e-30) c = 1e-30;
+    d = 1 / d; const del = d * c; h *= del;
+    if (Math.abs(del - 1) < 1e-10) break;
+  }
+  return h;
+}
+function betaInc(x, a, b) {
+  if (x <= 0) return 0; if (x >= 1) return 1;
+  if (x > (a + 1) / (a + b + 2)) return 1 - betaInc(1 - x, b, a);
+  const lb = gammaLn(a) + gammaLn(b) - gammaLn(a + b);
+  return Math.exp(a * Math.log(x) + b * Math.log(1 - x) - lb) / a * betaCF(x, a, b);
+}
+function fCDF(x, d1, d2) {
+  if (x <= 0) return 0;
+  return betaInc(d1 * x / (d1 * x + d2), d1 / 2, d2 / 2);
+}
+
+function stars(p) {
+  return p < 0.001 ? '***' : p < 0.01 ? '**' : p < 0.05 ? '*' : p < 0.1 ? '.' : '';
+}
+function pc(p) {
+  return p < 0.01 ? 'pg' : p < 0.05 ? 'pw' : p < 0.1 ? 'pm' : 'pns';
+}
+function fp(p) { return p < 0.001 ? '< .001' : p.toFixed(3); }
+
+// ─────────────────────────────────────────────────────────────
+// OLS
+// ─────────────────────────────────────────────────────────────
+function ols(preds) {
+  const X = obs.map(d => {
+    const row = [1];
+    if (preds.includes('experience')) row.push(d.exp);
+    if (preds.includes('education'))  row.push(d.edu);
+    if (preds.includes('industry'))   row.push(d.ind);
+    return row;
+  });
+  const y  = obs.map(d => d.salary);
+  const p  = X[0].length;
+  const Xt = trans(X);
+  const XtXinv = minv(mmul(Xt, X));
+  if (!XtXinv) return null;
+  const beta = mmul(XtXinv, mmul(Xt, y.map(v => [v]))).map(r => r[0]);
+
+  const yhat = X.map(row => row.reduce((s, v, j) => s + v * beta[j], 0));
+  const resid = y.map((v, i) => v - yhat[i]);
+  const ybar = y.reduce((s, v) => s + v, 0) / N;
+  const SST  = y.reduce((s, v) => s + (v - ybar) ** 2, 0);
+  const SSE  = resid.reduce((s, v) => s + v * v, 0);
+  const df_e = N - p, df_r = p - 1;
+  const MSE  = SSE / df_e;
+  const r2   = 1 - SSE / SST;
+  const adjR2 = 1 - (1 - r2) * (N - 1) / df_e;
+  const fStat = (SST - SSE) / df_r / MSE;
+  const fPval = 1 - fCDF(fStat, df_r, df_e);
+  const coefSE = XtXinv.map((row, j) => Math.sqrt(Math.max(0, row[j] * MSE)));
+  const tStats = beta.map((b, j) => b / coefSE[j]);
+  const pVals  = tStats.map(t => p2tail(t));
+  return { beta, coefSE, tStats, pVals, r2, adjR2, fStat, fPval,
+           rmse: Math.sqrt(MSE), MSE, XtXinv, preds };
+}
+
+// ─────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────
+const active = new Set(['experience', 'education', 'industry']);
+let hc = null;
+
+// ─────────────────────────────────────────────────────────────
+// TOGGLE
+// ─────────────────────────────────────────────────────────────
+function toggle(btn) {
+  const pred = btn.dataset.pred;
+  if (active.has(pred)) {
+    if (active.size === 1) return;   // keep at least one
+    active.delete(pred);
+    btn.classList.remove('on');
+  } else {
+    active.add(pred);
+    btn.classList.add('on');
+  }
+  render();
+}
+
+// ─────────────────────────────────────────────────────────────
+// RENDER STATS PANEL
+// ─────────────────────────────────────────────────────────────
+const PRED_META = {
+  experience: { label: 'Experience (yrs)',   color: '#78c8ff' },
+  education:  { label: 'Education (level)',  color: '#a78bfa' },
+  industry:   { label: 'Industry (score)',   color: '#4ade80' }
+};
+const ALL_PREDS = ['experience', 'education', 'industry'];
+
+function renderStats(fit) {
+  const setVal = (id, val, cls) => {
+    const el = document.getElementById(id);
+    el.textContent = val;
+    el.className = 'fit-val' + (cls ? ' ' + cls : '');
+  };
+
+  if (!fit) {
+    ['r2','ar2','rmse','fstat','fpval'].forEach(id => setVal(id, '—'));
+    document.getElementById('ctbody').innerHTML =
+      '<tr><td colspan="6" style="color:rgba(255,255,255,0.25);text-align:center;padding:10px;">No predictors selected</td></tr>';
+    return;
+  }
+
+  setVal('r2',    fit.r2.toFixed(3),   fit.r2 > 0.65 ? 'g' : fit.r2 > 0.35 ? 'w' : 'b');
+  setVal('ar2',   fit.adjR2.toFixed(3),fit.adjR2 > 0.65 ? 'g' : fit.adjR2 > 0.35 ? 'w' : 'b');
+  setVal('rmse',  fit.rmse.toFixed(2));
+  setVal('fstat', fit.fStat.toFixed(1), fit.fPval < 0.001 ? 'g' : fit.fPval < 0.05 ? 'w' : 'b');
+  setVal('fpval', fp(fit.fPval), pc(fit.fPval));
+
+  const preds = fit.preds;
+  let rows = '';
+
+  // Intercept
+  const [b0, se0, t0, p0] = [fit.beta[0], fit.coefSE[0], fit.tStats[0], fit.pVals[0]];
+  rows += `<tr>
+    <td style="color:rgba(255,255,255,0.45);font-style:italic;font-size:10px;">(Intercept)</td>
+    <td>${b0.toFixed(2)}</td>
+    <td>${se0.toFixed(2)}</td>
+    <td>${t0.toFixed(2)}</td>
+    <td class="${pc(p0)}">${fp(p0)}</td>
+    <td class="stars">${stars(p0)}</td>
+  </tr>`;
+
+  let idx = 1;
+  ALL_PREDS.forEach(pred => {
+    const m = PRED_META[pred];
+    if (preds.includes(pred)) {
+      const [b, se, t, p] = [fit.beta[idx], fit.coefSE[idx], fit.tStats[idx], fit.pVals[idx]];
+      rows += `<tr>
+        <td><span class="dot" style="background:${m.color}"></span>${m.label}</td>
+        <td>${b.toFixed(2)}</td>
+        <td>${se.toFixed(2)}</td>
+        <td>${t.toFixed(2)}</td>
+        <td class="${pc(p)}">${fp(p)}</td>
+        <td class="stars">${stars(p)}</td>
+      </tr>`;
+      idx++;
+    } else {
+      rows += `<tr class="dim">
+        <td><span class="dot" style="background:${m.color};opacity:0.3"></span>${m.label}</td>
+        <td>—</td><td>—</td><td>—</td><td>—</td><td></td>
+      </tr>`;
+    }
+  });
+  document.getElementById('ctbody').innerHTML = rows;
+}
+
+// ─────────────────────────────────────────────────────────────
+// RENDER CHART
+// ─────────────────────────────────────────────────────────────
+function renderChart(fit) {
+  // Scatter by industry
+  const byInd = [[], [], [], []];
+  obs.forEach(d => byInd[d.ind].push({
+    x: d.exp,
+    y: d.salary,
+    eduLabel: EDU_LABELS[d.edu],
+    indLabel: IND_LABELS[d.ind]
+  }));
+
+  const scatterSeries = IND_LABELS.map((lbl, i) => ({
+    type: 'scatter',
+    name: lbl,
+    data: byInd[i],
+    color: IND_COLORS[i],
+    marker: { radius: 4, symbol: 'circle' },
+    zIndex: 3,
+    tooltip: {
+      pointFormatter: function () {
+        return `<span style="color:${IND_COLORS[this.series.index]}">●</span> <b>${this.indLabel}</b><br>
+          Experience: <b>${this.x.toFixed(1)} yrs</b><br>
+          Education: <b>${this.eduLabel}</b><br>
+          Salary: <b>$${this.y.toFixed(1)}k</b>`;
+      }
+    }
+  }));
+
+  let ciSeries = [], lineSeries = [];
+
+  if (fit && fit.preds.includes('experience')) {
+    const meanEdu = obs.reduce((s, d) => s + d.edu, 0) / N;
+    const meanInd = obs.reduce((s, d) => s + d.ind, 0) / N;
+    const lineData = [], bandData = [];
+
+    for (let s = 0; s <= 60; s++) {
+      const exp = s * 30 / 60;
+      const xv = [1];
+      if (fit.preds.includes('experience')) xv.push(exp);
+      if (fit.preds.includes('education'))  xv.push(meanEdu);
+      if (fit.preds.includes('industry'))   xv.push(meanInd);
+
+      const yhat = xv.reduce((acc, v, j) => acc + v * fit.beta[j], 0);
+
+      // Confidence interval for E[y|x]
+      const XtXinvX = fit.XtXinv.map(row => row.reduce((acc, v, k) => acc + v * xv[k], 0));
+      const varFit  = XtXinvX.reduce((acc, v, k) => acc + v * xv[k], 0) * fit.MSE;
+      const hw      = 1.96 * Math.sqrt(Math.max(0, varFit));
+
+      lineData.push([exp, yhat]);
+      bandData.push([exp, yhat - hw, yhat + hw]);
+    }
+
+    ciSeries = [{
+      type: 'arearange',
+      name: '95% CI',
+      data: bandData,
+      color: 'rgba(120,200,255,0.13)',
+      fillOpacity: 1,
+      lineWidth: 0,
+      marker: { enabled: false },
+      enableMouseTracking: false,
+      zIndex: 1
+    }];
+    lineSeries = [{
+      type: 'line',
+      name: 'Fitted (mean covariates)',
+      data: lineData,
+      color: 'rgba(120,200,255,0.92)',
+      lineWidth: 2.5,
+      marker: { enabled: false },
+      zIndex: 4,
+      enableMouseTracking: false
+    }];
+  }
+
+  const allSeries = [...ciSeries, ...scatterSeries, ...lineSeries];
+
+  if (hc) {
+    // Remove old series and add new ones with animation
+    while (hc.series.length) hc.series[0].remove(false);
+    allSeries.forEach(s => hc.addSeries(s, false));
+    hc.redraw({ duration: 350 });
+    return;
+  }
+
+  hc = Highcharts.chart('rc', {
+    chart: {
+      backgroundColor: 'transparent',
+      animation: { duration: 450 },
+      style: { fontFamily: "'Segoe UI', system-ui, sans-serif" },
+      events: {
+        render: function () {
+          // Keep chart filling its container
+          this.reflow();
+        }
+      }
+    },
+    title: { text: '' },
+    xAxis: {
+      title: { text: 'Experience (years)', style: { color: 'rgba(255,255,255,0.55)', fontSize: '11px' } },
+      labels: { style: { color: 'rgba(255,255,255,0.45)', fontSize: '10px' } },
+      gridLineColor: 'rgba(255,255,255,0.055)',
+      lineColor: 'rgba(255,255,255,0.12)',
+      tickColor: 'rgba(255,255,255,0.12)',
+      min: 0, max: 30
+    },
+    yAxis: {
+      title: { text: 'Annual Salary ($k)', style: { color: 'rgba(255,255,255,0.55)', fontSize: '11px' } },
+      labels: {
+        style: { color: 'rgba(255,255,255,0.45)', fontSize: '10px' },
+        formatter: function () { return '$' + this.value + 'k'; }
+      },
+      gridLineColor: 'rgba(255,255,255,0.055)'
+    },
+    legend: {
+      layout: 'horizontal',
+      align: 'left',
+      verticalAlign: 'bottom',
+      itemStyle: { color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '600' },
+      itemHoverStyle: { color: '#fff' },
+      backgroundColor: 'transparent',
+      borderWidth: 0,
+      symbolRadius: 4,
+      margin: 6
+    },
+    credits: { enabled: false },
+    tooltip: {
+      useHTML: true,
+      backgroundColor: 'rgba(10,14,22,0.94)',
+      borderColor: 'rgba(120,200,255,0.25)',
+      style: { color: '#e0e8f0', fontSize: '11px' },
+      headerFormat: ''
+    },
+    plotOptions: {
+      scatter: { jitter: { x: 0.05 } }
+    },
+    series: allSeries
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// MAIN RENDER
+// ─────────────────────────────────────────────────────────────
+function render() {
+  const preds = [...active];
+  const fit   = ols(preds);
+  renderStats(fit);
+  renderChart(fit);
+}
+
+// Boot
+render();
+
+// Reflow on window resize
+window.addEventListener('resize', () => { if (hc) hc.reflow(); });
+</script>
+</body>
+</html>

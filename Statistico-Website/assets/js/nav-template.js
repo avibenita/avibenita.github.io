@@ -67,13 +67,6 @@ const NAV_TEMPLATE = `
           <div class="nav-products-slider" id="nav-products-slider"></div>
           <a href="javascript:void(0)" class="nav-link nav-link--product-core" data-page="analytics" id="link-analytics" title="Statistico Analytics Hub">
             <span class="core-product-badge">Core Product</span>
-            <svg class="ai-icon" viewBox="0 0 17 13" width="17" height="13" aria-hidden="true">
-              <rect class="ai-b ai-b1" x="1"    y="0" width="2.5" height="13" rx="0.8"/>
-              <rect class="ai-b ai-b2" x="4.8"  y="0" width="2.5" height="13" rx="0.8"/>
-              <rect class="ai-b ai-b3" x="8.6"  y="0" width="2.5" height="13" rx="0.8"/>
-              <rect class="ai-b ai-b4" x="12.4" y="0" width="2.5" height="13" rx="0.8"/>
-              <circle class="ai-dot" cx="0" cy="0" r="1.6"/>
-            </svg>
             Analytics
           </a>
           <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators" title="Statistico Calculators Hub">

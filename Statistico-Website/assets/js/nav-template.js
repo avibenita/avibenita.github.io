@@ -66,6 +66,7 @@ const NAV_TEMPLATE = `
         <div class="nav-products-row" id="nav-products-row">
           <div class="nav-products-slider" id="nav-products-slider"></div>
           <a href="javascript:void(0)" class="nav-link nav-link--product-core" data-page="analytics" id="link-analytics" title="Statistico Analytics Hub">
+            <span class="core-product-badge">Core Product</span>
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <polyline points="1,12 5,7 8,10 11,5 15,3"/>
             </svg>
@@ -371,9 +372,13 @@ const NAV_STYLE = `
   position: relative;
   z-index: 2;
   transition: color 0.15s ease;
-  padding-top: 20px;
-  min-height: 42px;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 14px;
 }
+
+/* Remove the ::before approach entirely — label is a real element now */
+.nav-link--product-core::before { content: none; }
 
 /* Orange separators between the 3 families */
 .nav-products-row .nav-link--product::after,
@@ -562,22 +567,18 @@ const NAV_STYLE = `
   position: relative;
 }
 
-/* "Core Product" label — always visible above the Analytics text */
-.nav-link--product-core::before {
-  content: "Core Product";
-  position: absolute;
-  top: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.50rem;
+/* "Core Product" label — real element, always visible */
+.core-product-badge {
+  display: block;
+  font-size: 0.48rem;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: rgba(255,165,120,0.88);
   white-space: nowrap;
-  pointer-events: none;
   font-style: italic;
-  z-index: 5;
+  line-height: 1;
+  pointer-events: none;
 }
 
 .nav-link--product:hover {

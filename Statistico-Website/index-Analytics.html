@@ -2062,12 +2062,29 @@
     const modalTitle = document.getElementById('wsModalTitle');
     const modalClose = document.getElementById('wsModalClose');
 
-    function openModal(url, title) {
-      modalTitle.textContent = title + ' — Workspace Preview';
-      modalFrame.src = '';
-      requestAnimationFrame(() => { modalFrame.src = url + '?embed=1'; });
-      backdrop.classList.add('open');
-      document.body.style.overflow = 'hidden';
+    function openWorkspaceWindow(url, title) {
+      const fullUrl = url.indexOf('?') >= 0 ? url + '&embed=1' : url + '?embed=1';
+      const width = Math.min(1360, Math.round(window.screen.availWidth * 0.88));
+      const height = Math.min(860, Math.round(window.screen.availHeight * 0.86));
+      const left = Math.max(0, Math.round((window.screen.availWidth - width) / 2 + (window.screenX || 0)));
+      const top = Math.max(0, Math.round((window.screen.availHeight - height) / 2 + (window.screenY || 0)));
+      const features = [
+        'popup=yes',
+        'resizable=yes',
+        'scrollbars=yes',
+        'toolbar=no',
+        'menubar=no',
+        'location=no',
+        'status=no',
+        `width=${width}`,
+        `height=${height}`,
+        `left=${left}`,
+        `top=${top}`
+      ].join(',');
+      const win = window.open(fullUrl, 'StatisticoWorkspacePreview', features);
+      if (win) {
+        win.focus();
+      }
     }
     function closeModal() {
       backdrop.classList.remove('open');
@@ -2077,7 +2094,7 @@
     if (modalClose) modalClose.addEventListener('click', closeModal);
     if (backdrop)   backdrop.addEventListener('click', e => { if (e.target === backdrop) closeModal(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-    window._wsOpen = btn => openModal(btn.dataset.wsUrl, btn.dataset.wsTitle);
+    window._wsOpen = btn => openWorkspaceWindow(btn.dataset.wsUrl, btn.dataset.wsTitle);
 
     // ── Render helpers ────────────────────────────────────────────────
     function renderLeft(key) {
@@ -2090,7 +2107,7 @@
         <ul class="cap-includes">${m.inc.map(i => `<li>${i}</li>`).join('')}</ul>
         <div class="cap-section-label">Best for</div>
         <div class="cap-tags">${m.best.map(t => `<span class="cap-tag">${t}</span>`).join('')}</div>
-        <button class="cap-cta" data-ws-url="${m.url}" data-ws-title="${m.title}" onclick="window._wsOpen&&window._wsOpen(this)">Open in Workspace <i class="fa-solid fa-up-right-from-square"></i></button>`;
+        <button class="cap-cta" data-ws-url="${m.url}" data-ws-title="${m.title}" onclick="window._wsOpen&&window._wsOpen(this)">Open Standalone Window <i class="fa-solid fa-up-right-from-square"></i></button>`;
     }
 
     function renderTabs(key, active) {

@@ -67,7 +67,6 @@ const NAV_TEMPLATE = `
           <div class="nav-products-slider" id="nav-products-slider"></div>
           <a href="javascript:void(0)" class="nav-link nav-link--product-core" data-page="analytics" id="link-analytics" title="Statistico Analytics Hub">
             <span class="core-product-badge">Core Product</span>
-            <i class="fa-solid fa-chart-area" aria-hidden="true" style="font-size:12px;"></i>
             Analytics
           </a>
           <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators" title="Statistico Calculators Hub">

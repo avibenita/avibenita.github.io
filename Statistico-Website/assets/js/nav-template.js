@@ -355,8 +355,8 @@ const NAV_STYLE = `
 .nav-products-row:hover .nav-products-slider { opacity: 1; }
 
 /* Product links inside segmented control — no individual borders */
+/* Shared reset for non-core product links */
 .nav-products-row .nav-link--product,
-.nav-products-row .nav-link--product-core,
 .nav-products-row .nav-link--product-lite {
   border: none;
   background: transparent;
@@ -364,6 +364,15 @@ const NAV_STYLE = `
   position: relative;
   z-index: 1;
   transition: color 0.15s ease;
+}
+
+/* Analytics (core) keeps its own colours — only add layout/position here */
+.nav-products-row .nav-link--product-core {
+  position: relative;
+  z-index: 2;
+  transition: color 0.15s ease;
+  padding-top: 20px;
+  min-height: 42px;
 }
 
 /* Orange separators between the 3 families */
@@ -383,12 +392,6 @@ const NAV_STYLE = `
   min-height: 34px;
   padding: 5px 11px;
   font-size: 0.83rem;
-}
-
-/* Analytics needs extra top padding to accommodate the "Core Product" label */
-.nav-products-row .nav-link--product-core {
-  padding-top: 20px;
-  min-height: 42px;
 }
 
 /* Separator before "Why" — spacing only, no line */

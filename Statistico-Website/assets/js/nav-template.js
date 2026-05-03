@@ -1301,7 +1301,7 @@ const FOOTER_TEMPLATE = `
         <h4>Resources</h4>
         <a href="javascript:void(0)" id="footer-link-why">Why Another Package?</a>
         <a href="javascript:void(0)" id="footer-link-how">How It Works</a>
-        <a href="#" onclick="alert('Coming soon!')">Video Demos</a>
+        <a href="#" id="footer-link-faq">FAQ</a>
       </div>
       <div class="footer-section">
         <h4>Company</h4>
@@ -1439,6 +1439,7 @@ const FOOTER_TEMPLATE = `
     document.getElementById('link-why').href = links.why;
     document.getElementById('link-how').href = links.how;
     document.getElementById('link-faq').href = links.faq;
+    document.getElementById('footer-link-faq').href = links.faq;
     document.getElementById('link-calculators').href = links.calculators;
     document.getElementById('link-analytics').href = links.analytics;
     document.getElementById('link-addins').href = links.addins;

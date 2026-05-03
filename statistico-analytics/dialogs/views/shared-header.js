@@ -918,12 +918,27 @@ const StatisticoHeader = {
     if (filename.startsWith('http')) return filename;
     const { origin, pathname } = window.location;
     const marker = '/dialogs/views/';
+    const preserveParams = ['embed', 'theme', 'demo'];
+    const appendPreservedParams = (url) => {
+      try {
+        const out = new URL(url, window.location.href);
+        const current = new URLSearchParams(window.location.search);
+        preserveParams.forEach((key) => {
+          if (current.has(key) && !out.searchParams.has(key)) {
+            out.searchParams.set(key, current.get(key));
+          }
+        });
+        return out.href;
+      } catch (e) {
+        return url;
+      }
+    };
     const idx = pathname.indexOf(marker);
     if (idx !== -1) {
       const rootPath = pathname.slice(0, idx);
-      return `${origin}${rootPath}${marker}${filename}`;
+      return appendPreservedParams(`${origin}${rootPath}${marker}${filename}`);
     }
-    return `./${filename}`;
+    return appendPreservedParams(`./${filename}`);
   },
   
   /**

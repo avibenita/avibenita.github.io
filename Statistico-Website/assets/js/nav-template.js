@@ -113,7 +113,7 @@ const NAV_TEMPLATE = `
         </a>
       </li>
 
-      <!-- Hidden from main nav; kept for routing/footer -->
+      <!-- Hidden from main nav; kept for routing/ -->
       <li class="nav-item nav-item--hidden" aria-hidden="true">
         <a href="javascript:void(0)" class="nav-link" data-page="about" id="link-about" tabindex="-1">About Us</a>
       </li>

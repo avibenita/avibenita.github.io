@@ -66,7 +66,7 @@ const NAV_TEMPLATE = `
         <div class="nav-products-row" id="nav-products-row">
           <div class="nav-products-slider" id="nav-products-slider"></div>
           <a href="javascript:void(0)" class="nav-link nav-link--product-core" data-page="analytics" id="link-analytics" title="Statistico Analytics Hub">
-            <span class="core-product-badge">Core Product</span>
+            <span class="core-product-badge">★ Core Product</span>
             Analytics
           </a>
           <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators" title="Statistico Calculators Hub">
@@ -520,9 +520,9 @@ const NAV_STYLE = `
 }
 
 :root[data-theme="light"] .nav-link--product-core {
-  background: rgba(220, 100, 40, 0.10);
-  border-color: rgba(220, 100, 40, 0.45);
-  box-shadow: inset 0 0 0 1px rgba(220, 100, 40, 0.12), 0 0 12px rgba(220, 100, 40, 0.14);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
   color: rgba(160, 55, 10, 0.95);
 }
 
@@ -555,9 +555,9 @@ const NAV_STYLE = `
 
 .nav-link--product-core {
   font-weight: 700;
-  background: rgba(255,165,120,0.16);
-  border: 1px solid rgba(255,165,120,0.70);
-  box-shadow: inset 0 0 0 1px rgba(255,165,120,0.20), 0 0 18px rgba(255,165,120,0.22);
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
   color: rgba(255,210,180,1);
   font-size: 1.05rem;
   letter-spacing: 0.07em;

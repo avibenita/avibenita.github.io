@@ -1285,18 +1285,69 @@
     }
 
     /* ── Capability Preview Panel ───────────────────────────────── */
-    .cap-section { padding: 40px 0 56px; }
+    .cap-section {
+      --cap-link-x: 50%;
+      --cap-accent: rgba(255,165,120,.78);
+      position: relative;
+      padding: 40px 0 56px;
+    }
+    .cap-section::before {
+      content: "";
+      position: absolute;
+      top: -18px;
+      left: var(--cap-link-x);
+      width: 2px;
+      height: 54px;
+      transform: translateX(-50%);
+      background: linear-gradient(180deg, rgba(255,165,120,0), var(--cap-accent), rgba(120,200,255,.55));
+      box-shadow: 0 0 16px rgba(255,165,120,.38);
+      opacity: .85;
+      pointer-events: none;
+    }
 
     .cap-intro { text-align: center; margin-bottom: 28px; }
     .cap-intro h3 { font-size: 1.35rem; font-weight: 800; color: #fff; margin: 0 0 6px; }
     .cap-intro p  { font-size: 0.9rem; color: rgba(255,255,255,0.5); margin: 0; }
+    .cap-selected-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding: 5px 13px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(255,165,120,.16), rgba(120,200,255,.08));
+      border: 1px solid rgba(255,165,120,.36);
+      color: rgba(255,214,176,.96);
+      font-size: .72rem;
+      font-weight: 800;
+      letter-spacing: .10em;
+      text-transform: uppercase;
+      box-shadow: 0 0 18px rgba(255,165,120,.12);
+    }
+    .cap-selected-pill i { color: rgba(255,165,120,.92); }
 
     .cap-panel {
+      position: relative;
       display: flex; gap: 0;
       background: linear-gradient(160deg, rgba(20,30,48,.97), rgba(12,20,34,.99));
-      border: 1px solid rgba(255,165,120,.18);
+      border: 1px solid rgba(255, 165, 120, 0.92);
       border-radius: 20px; overflow: hidden; min-height: 500px;
-      box-shadow: 0 20px 60px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.04);
+      box-shadow:
+        0 0 0 2px rgba(255, 165, 120, 0.22),
+        0 2px 14px rgba(255, 165, 120, 0.38),
+        0 20px 60px rgba(0,0,0,.45),
+        inset 0 0 0 1px rgba(255,255,255,.04);
+    }
+    .cap-panel::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, rgba(255,165,120,.08), var(--cap-accent), rgba(120,200,255,.55), rgba(255,165,120,.08));
+      opacity: .9;
+      z-index: 2;
     }
     .cap-left {
       width: 300px; flex-shrink: 0;
@@ -1529,6 +1580,10 @@
   <section class="cap-section" id="module-cap-section">
     <div class="container">
       <div class="cap-intro">
+        <div class="cap-selected-pill" id="capSelectedPill">
+          <i class="fa-solid fa-location-dot"></i>
+          <span id="capSelectedText">Selected: Explore Data / Univariate</span>
+        </div>
         <h3>Module Capability Preview</h3>
         <p>Select a module above — key capabilities and selected analytical views are shown below.</p>
       </div>
@@ -2054,6 +2109,8 @@
     const capLeft  = document.getElementById('capLeft');
     const capTabs  = document.getElementById('capTabs');
     const capChart = document.getElementById('capChart');
+    const capSection = document.getElementById('module-cap-section');
+    const capSelectedText = document.getElementById('capSelectedText');
     if (!capLeft) return;
 
     // ── Modal logic ───────────────────────────────────────────────────
@@ -2285,6 +2342,24 @@
         <button class="cap-cta" data-ws-url="${m.url}" data-ws-title="${m.title}" onclick="window._wsOpen&&window._wsOpen(this)">Open Standalone Window <i class="fa-solid fa-up-right-from-square"></i></button>`;
     }
 
+    function syncSelectedState(key) {
+      const m = MODS[key]; if (!m) return;
+      const selectedChip = document.querySelector(`.family-chip[data-module="${key}"]`);
+      document.querySelectorAll('.family-chip[data-module]').forEach(chip => {
+        chip.classList.toggle('is-active', chip === selectedChip);
+      });
+      document.querySelectorAll('.family-node').forEach(node => {
+        node.classList.toggle('has-active', !!node.querySelector('.family-chip.is-active'));
+      });
+      if (capSelectedText) capSelectedText.textContent = `Selected: ${m.cat} / ${m.title}`;
+      if (selectedChip && capSection) {
+        const chipRect = selectedChip.getBoundingClientRect();
+        const sectionRect = capSection.getBoundingClientRect();
+        const x = chipRect.left + chipRect.width / 2 - sectionRect.left;
+        capSection.style.setProperty('--cap-link-x', `${Math.max(24, Math.min(sectionRect.width - 24, x))}px`);
+      }
+    }
+
     function renderTabs(key, active) {
       const m = MODS[key]; if (!m) return;
       capTabs.innerHTML = m.views.map(v =>
@@ -2316,6 +2391,7 @@
     // ── Public entry point ────────────────────────────────────────────
     window.showCapModule = function(key) {
       if (!MODS[key]) return;
+      syncSelectedState(key);
       renderLeft(key);
       setView(key, MODS[key].views[0]);
       document.getElementById('module-cap-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });

@@ -67,9 +67,7 @@ const NAV_TEMPLATE = `
           <div class="nav-products-slider" id="nav-products-slider"></div>
           <a href="javascript:void(0)" class="nav-link nav-link--product-core" data-page="analytics" id="link-analytics" title="Statistico Analytics Hub">
             <span class="core-product-badge">Core Product</span>
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M1,13 C1,7 6,2 8,2 C10,2 15,7 15,13"/>
-            </svg>
+            <i class="fa-solid fa-chart-area" aria-hidden="true" style="font-size:12px;"></i>
             Analytics
           </a>
           <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators" title="Statistico Calculators Hub">

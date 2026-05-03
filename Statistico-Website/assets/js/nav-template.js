@@ -68,7 +68,7 @@ const NAV_TEMPLATE = `
           <a href="javascript:void(0)" class="nav-link nav-link--product-core" data-page="analytics" id="link-analytics" title="Statistico Analytics Hub">
             <span class="core-product-badge">Core Product</span>
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polyline points="1,12 5,7 8,10 11,5 15,3"/>
+              <path d="M1,13 C3.5,13 5,2 8,2 C11,2 12.5,13 15,13"/>
             </svg>
             Analytics
           </a>

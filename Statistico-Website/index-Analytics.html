@@ -1331,6 +1331,40 @@
     .cap-placeholder i { font-size: 38px; margin-bottom: 14px; color: rgba(255,165,120,.22); }
     .cap-placeholder p { margin: 0 0 6px; font-size: .92rem; color: rgba(255,255,255,.48); }
     .cap-placeholder-sub { font-size: .80rem !important; color: rgba(255,255,255,.28) !important; max-width: 300px; }
+
+    /* ── Workspace modal ─────────────────────────────────────────── */
+    .ws-modal-backdrop {
+      position: fixed; inset: 0; z-index: 9000;
+      background: rgba(4,10,20,.82); backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity .25s ease;
+    }
+    .ws-modal-backdrop.open { opacity: 1; pointer-events: all; }
+    .ws-modal {
+      width: 92vw; height: 88vh; max-width: 1400px;
+      background: #0d1624;
+      border: 1px solid rgba(255,165,120,.25);
+      border-radius: 18px; overflow: hidden;
+      display: flex; flex-direction: column;
+      box-shadow: 0 32px 96px rgba(0,0,0,.75);
+      transform: translateY(18px) scale(.97);
+      transition: transform .28s cubic-bezier(.22,.68,0,1.1);
+    }
+    .ws-modal-backdrop.open .ws-modal { transform: none; }
+    .ws-modal-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 18px; background: rgba(14,22,37,.95);
+      border-bottom: 1px solid rgba(255,255,255,.07); flex-shrink: 0;
+    }
+    .ws-modal-title { font-size: .84rem; font-weight: 700; color: rgba(255,190,130,.9); }
+    .ws-modal-close {
+      width: 32px; height: 32px; border-radius: 8px; border: 1px solid rgba(255,255,255,.15);
+      background: transparent; color: rgba(255,255,255,.6); cursor: pointer;
+      font-size: 1rem; display: flex; align-items: center; justify-content: center;
+      transition: all .15s; font-family: inherit;
+    }
+    .ws-modal-close:hover { background: rgba(255,80,60,.18); border-color: rgba(255,80,60,.4); color: #fff; }
+    .ws-modal-frame { flex: 1; width: 100%; border: none; }
     @media (max-width: 768px) {
       .cap-panel { flex-direction: column; }
       .cap-left  { width: 100%; border-right: none; border-bottom: 1px solid rgba(255,255,255,.07); }
@@ -1501,6 +1535,17 @@
       </div>
     </div>
   </section>
+
+  <!-- Workspace modal -->
+  <div class="ws-modal-backdrop" id="wsModalBackdrop" role="dialog" aria-modal="true" aria-label="Workspace preview">
+    <div class="ws-modal">
+      <div class="ws-modal-bar">
+        <span class="ws-modal-title" id="wsModalTitle">Workspace Preview</span>
+        <button class="ws-modal-close" id="wsModalClose" title="Close">✕</button>
+      </div>
+      <iframe class="ws-modal-frame" id="wsModalFrame" title="Statistico workspace preview" allowfullscreen></iframe>
+    </div>
+  </div>
 
   <!-- Hidden: existing iframe kept so legacy JS references don't crash -->
   <div style="display:none" aria-hidden="true">
@@ -2005,6 +2050,29 @@
     const capChart = document.getElementById('capChart');
     if (!capLeft) return;
 
+    // ── Modal logic ───────────────────────────────────────────────────
+    const backdrop   = document.getElementById('wsModalBackdrop');
+    const modalFrame = document.getElementById('wsModalFrame');
+    const modalTitle = document.getElementById('wsModalTitle');
+    const modalClose = document.getElementById('wsModalClose');
+
+    function openModal(url, title) {
+      modalTitle.textContent = title + ' — Workspace Preview';
+      modalFrame.src = '';
+      requestAnimationFrame(() => { modalFrame.src = url + '?embed=1'; });
+      backdrop.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeModal() {
+      backdrop.classList.remove('open');
+      document.body.style.overflow = '';
+      setTimeout(() => { modalFrame.src = ''; }, 300);
+    }
+    if (modalClose) modalClose.addEventListener('click', closeModal);
+    if (backdrop)   backdrop.addEventListener('click', e => { if (e.target === backdrop) closeModal(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+    window._wsOpen = btn => openModal(btn.dataset.wsUrl, btn.dataset.wsTitle);
+
     // ── Render helpers ────────────────────────────────────────────────
     function renderLeft(key) {
       const m = MODS[key]; if (!m) return;
@@ -2016,7 +2084,7 @@
         <ul class="cap-includes">${m.inc.map(i => `<li>${i}</li>`).join('')}</ul>
         <div class="cap-section-label">Best for</div>
         <div class="cap-tags">${m.best.map(t => `<span class="cap-tag">${t}</span>`).join('')}</div>
-        <a href="${m.url}?embed=1" target="_blank" class="cap-cta">Open in Workspace <i class="fa-solid fa-arrow-up-right-from-square"></i></a>`;
+        <button class="cap-cta" data-ws-url="${m.url}" data-ws-title="${m.title}" onclick="window._wsOpen&&window._wsOpen(this)">Open in Workspace <i class="fa-solid fa-up-right-from-square"></i></button>`;
     }
 
     function renderTabs(key, active) {

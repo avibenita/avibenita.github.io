@@ -113,7 +113,7 @@ const NAV_TEMPLATE = `
         </a>
       </li>
 
-      <!-- Hidden from main nav; kept for routing/footer -->
+      <!-- Hidden from main nav; kept for routing/ -->
       <li class="nav-item nav-item--hidden" aria-hidden="true">
         <a href="javascript:void(0)" class="nav-link" data-page="about" id="link-about" tabindex="-1">About Us</a>
       </li>
@@ -1301,7 +1301,7 @@ const FOOTER_TEMPLATE = `
         <h4>Resources</h4>
         <a href="javascript:void(0)" id="footer-link-why">Why Another Package?</a>
         <a href="javascript:void(0)" id="footer-link-how">How It Works</a>
-        <a href="#" onclick="alert('Coming soon!')">Video Demos</a>
+        <a href="#" onclick="alert('Coming soon!')">FAQ</a>
       </div>
       <div class="footer-section">
         <h4>Company</h4>

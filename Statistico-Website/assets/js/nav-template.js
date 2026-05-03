@@ -388,7 +388,7 @@ const NAV_STYLE = `
   pointer-events: none;
 }
 
-.nav-products-row .nav-link {
+.nav-products-row .nav-link:not(.nav-link--product-core) {
   min-height: 34px;
   padding: 5px 11px;
   font-size: 0.83rem;
@@ -1174,7 +1174,7 @@ footer#contact .footer-bottom {
     gap: 4px;
   }
 
-  .nav-products-row .nav-link {
+  .nav-products-row .nav-link:not(.nav-link--product-core) {
     width: 100%;
     min-height: 44px;
     padding: 12px 16px;

@@ -974,18 +974,22 @@
     Office.initialize = function (reason) {
       console.log('? Normality Tests - Office.js initialized:', reason);
       
-      // Add message handler
-      Office.context.ui.addHandlerAsync(
-        Office.EventType.DialogParentMessageReceived,
-        onMessageReceived,
-        (result) => {
-          if (result.status === Office.AsyncResultStatus.Succeeded) {
-            console.log('? Message handler added successfully');
-          } else {
-            console.error('? Failed to add message handler:', result.error);
+      // Add message handler only inside an Office dialog host.
+      if (Office.context && Office.context.ui) {
+        Office.context.ui.addHandlerAsync(
+          Office.EventType.DialogParentMessageReceived,
+          onMessageReceived,
+          (result) => {
+            if (result.status === Office.AsyncResultStatus.Succeeded) {
+              console.log('? Message handler added successfully');
+            } else {
+              console.error('? Failed to add message handler:', result.error);
+            }
           }
-        }
-      );
+        );
+      } else {
+        loadSampleData();
+      }
       
       // Send ready status to parent
       setTimeout(() => {
@@ -1056,7 +1060,7 @@
       
       const checkAndInit = () => {
         if (checkLibraries()) {
-          if (typeof Office === 'undefined') {
+          if (typeof Office === 'undefined' || !Office.context) {
             loadSampleData();
           }
         } else {

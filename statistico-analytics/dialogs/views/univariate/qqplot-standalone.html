@@ -488,11 +488,15 @@
     Office.initialize = function (reason) {
       console.log('? QQ/PP Plot - Office.js initialized:', reason);
       
-      // Listen for messages from parent
-      Office.context.ui.addHandlerAsync(
-        Office.EventType.DialogParentMessageReceived,
-        onMessageReceived
-      );
+      // Listen for messages from parent only inside an Office dialog host.
+      if (Office.context && Office.context.ui) {
+        Office.context.ui.addHandlerAsync(
+          Office.EventType.DialogParentMessageReceived,
+          onMessageReceived
+        );
+      } else {
+        loadSampleData();
+      }
       
       // Send ready signal to parent (taskpane will respond with data)
       setTimeout(() => {
@@ -561,7 +565,7 @@
         
         if (checkLibraries()) {
           // Libraries loaded - check if Office.js is available
-          if (typeof Office === 'undefined') {
+          if (typeof Office === 'undefined' || !Office.context) {
             console.log('?? Office.js not available - loading sample data immediately');
             setTimeout(() => {
               if (!dataReady) loadSampleData();

@@ -6,7 +6,13 @@
   <title>Correlation Analysis</title>
 
   <!-- Office.js -->
-  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script>
+    if (new URLSearchParams(location.search).get('embed') !== '1') {
+      document.write('<script src="https://appsforoffice.microsoft.com/lib/1\/hosted\/office.js"><\/script>');
+    } else {
+      window.Office = window.Office || {};
+    }
+  </script>
 
   <!-- Font Awesome -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
@@ -1154,10 +1160,42 @@
      INITIALIZATION
   ════════════════════════════════════════════ */
   const isInIframe = window.self !== window.top;
+  const isHubEmbedDemo = new URLSearchParams(location.search).get('embed') === '1'
+    && new URLSearchParams(location.search).get('demo') === '1';
+
+  function createDemoCorrelationData() {
+    let seed = 20260504;
+    function rnd() {
+      seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5;
+      return (seed >>> 0) / 0xFFFFFFFF;
+    }
+    function normal(mean, sd) {
+      const u1 = Math.max(1e-10, rnd()), u2 = rnd();
+      return mean + sd * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    }
+    const headers = ['Ad Spend', 'Traffic', 'Revenue', 'Satisfaction', 'Churn Risk'];
+    const data = Array.from({ length: 72 }, () => {
+      const market = normal(0, 1);
+      const campaign = normal(0, 1);
+      const service = normal(0, 1);
+      return {
+        'Ad Spend': +(72 + 12 * market + 7 * campaign + normal(0, 5)).toFixed(2),
+        'Traffic': +(410 + 65 * market + 42 * campaign + normal(0, 28)).toFixed(2),
+        'Revenue': +(125 + 18 * market + 11 * campaign + 9 * service + normal(0, 7)).toFixed(2),
+        'Satisfaction': +(74 + 9 * service - 3 * market + normal(0, 5)).toFixed(2),
+        'Churn Risk': +(38 - 8 * service - 4 * market + normal(0, 6)).toFixed(2)
+      };
+    });
+    return { headers, data, source: 'correlation-demo' };
+  }
 
   if (isInIframe) {
     // Running embedded — listen for postMessage
     window.addEventListener('message', function(event) {
+      if (isHubEmbedDemo) {
+        if (event.data && event.data.type === 'THEME_CHANGE') applyTheme(event.data.theme);
+        return;
+      }
       if (event.data && event.data.type === 'CORRELATION_DATA') {
         correlationData = event.data.payload;
         // Persist so other correlation views can read it via sessionStorage
@@ -1170,20 +1208,40 @@
 
     // Fallback: sessionStorage
     document.addEventListener('DOMContentLoaded', function() {
-      setTimeout(function() {
-        if (!correlationData) {
-          const stored = sessionStorage.getItem('correlationData');
-          if (stored) {
-            try { correlationData = JSON.parse(stored); renderMatrix(); } catch(e) {}
-          }
+      if (typeof StatisticoHeader !== 'undefined') {
+        try {
+          StatisticoHeader.init('correlation-matrix', 'Correlation Analysis', 0, 'correlations');
+          StatisticoHeader.initSidebarPage();
+          StatisticoHeader.updateTitle('Correlation Matrix');
+          registerHeaderActions();
+        } catch (e) {
+          console.warn('Embedded correlation header init skipped:', e);
         }
-      }, 1000);
+      }
+      loadEmbeddedCorrelationData();
     });
 
     function applyTheme(theme) {
       if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
       else document.documentElement.removeAttribute('data-theme');
     }
+
+    function loadEmbeddedCorrelationData() {
+      if (correlationData) return;
+      if (isHubEmbedDemo) {
+        correlationData = createDemoCorrelationData();
+        try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch(e) {}
+        renderMatrix();
+        return;
+      }
+      let stored = null;
+      try { stored = sessionStorage.getItem('correlationData'); } catch (e) {}
+      if (stored) {
+        try { correlationData = JSON.parse(stored); renderMatrix(); return; } catch(e) {}
+      }
+    }
+
+    loadEmbeddedCorrelationData();
 
   } else {
     // Standalone Office dialog

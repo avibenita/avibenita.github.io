@@ -22,19 +22,45 @@ const NAV_TEMPLATE = `
 <nav class="sticky-nav" id="stickyNav">
   <div class="nav-container">
     <a href="javascript:void(0)" class="nav-logo" id="nav-logo-link" aria-label="Statistico Interactive">
-      <img
-        class="nav-logo-img nav-logo-img--dark"
-        src="/Statistico-Website/assets/img/statistico-interactive-transparent-darkmark.svg"
-        alt="Statistico Interactive"
-        decoding="async"
-      />
-      <img
-        class="nav-logo-img nav-logo-img--light"
-        src="/Statistico-Website/assets/img/statistico-interactive-transparent-lightmark.svg"
-        alt=""
-        aria-hidden="true"
-        decoding="async"
-      />
+      <svg class="nav-logo-svg" viewBox="0 0 260 84" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Statistico Interactive">
+        <defs>
+          <linearGradient id="navLogoBlue" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#2d76ff"/>
+            <stop offset="100%" stop-color="#0ea5e9"/>
+          </linearGradient>
+          <linearGradient id="navLogoTeal" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#51f0dc"/>
+            <stop offset="100%" stop-color="#00a8b5"/>
+          </linearGradient>
+          <filter id="navLogoGlow" x="-120%" y="-120%" width="340%" height="340%">
+            <feGaussianBlur stdDeviation="3.2" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+
+        <g class="nav-logo-mark">
+          <path d="M58 15 C58 6 47 2 35 2 C19 2 8 12 8 25 C8 37 19 43 35 43"
+                stroke="url(#navLogoBlue)" stroke-width="10" fill="none" stroke-linecap="round"/>
+          <path d="M35 43 C51 43 64 49 64 61 C64 75 51 82 35 82 C20 82 10 75 9 64"
+                stroke="url(#navLogoBlue)" stroke-width="10" fill="none" stroke-linecap="round"/>
+          <rect x="18" y="51" width="8" height="24" rx="2" fill="url(#navLogoTeal)"/>
+          <rect x="30" y="43" width="8" height="32" rx="2" fill="url(#navLogoTeal)"/>
+          <rect x="42" y="34" width="8" height="41" rx="2" fill="url(#navLogoTeal)"/>
+          <rect x="54" y="25" width="8" height="50" rx="2" fill="url(#navLogoTeal)"/>
+          <g class="nav-logo-breathe" filter="url(#navLogoGlow)">
+            <circle class="nav-logo-breathe-halo" cx="41" cy="21" r="10"/>
+            <circle class="nav-logo-breathe-core" cx="41" cy="21" r="4.5"/>
+          </g>
+        </g>
+
+        <text x="84" y="37" class="nav-logo-title" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="800" letter-spacing="9">STATISTICO</text>
+        <line x1="86" y1="55" x2="129" y2="55" class="nav-logo-sep"/>
+        <text x="171" y="63" class="nav-logo-subtitle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="7" text-anchor="middle">INTERACTIVE</text>
+        <line x1="213" y1="55" x2="256" y2="55" class="nav-logo-sep"/>
+      </svg>
     </a>
 
     <ul class="nav-menu" id="navMenu">
@@ -203,28 +229,75 @@ const NAV_STYLE = `
 
 .nav-logo:hover { opacity: 0.85; }
 
-.nav-logo-img {
+.nav-logo-svg {
   position: absolute;
   left: 0;
   top: 50%;
   width: 260px;
-  height: 173px;
+  height: 84px;
   max-width: none;
   transform: translateY(-50%);
-  object-fit: contain;
-  object-position: left center;
   display: block;
-  transition: opacity 0.2s ease, height 0.3s ease, width 0.3s ease;
+  overflow: visible;
+  transition: height 0.3s ease, width 0.3s ease;
 }
 
-.nav-logo-img--light { opacity: 0; }
-.nav-logo-img--dark { opacity: 1; }
+.nav-logo-title,
+.nav-logo-subtitle {
+  fill: #ffffff;
+}
 
-:root[data-theme="light"] .nav-logo-img--dark { opacity: 0; }
-:root[data-theme="light"] .nav-logo-img--light { opacity: 1; }
+.nav-logo-subtitle {
+  opacity: 0.96;
+}
+
+.nav-logo-sep {
+  stroke: rgba(255,255,255,0.72);
+  stroke-width: 1.4;
+}
+
+.nav-logo-breathe-halo {
+  fill: none;
+  stroke: rgba(255,255,255,0.72);
+  stroke-width: 2;
+  transform-origin: 41px 21px;
+  animation: navLogoBreatheHalo 2.7s ease-in-out infinite;
+}
+
+.nav-logo-breathe-core {
+  fill: #ffffff;
+  transform-origin: 41px 21px;
+  animation: navLogoBreatheCore 2.7s ease-in-out infinite;
+}
+
+@keyframes navLogoBreatheCore {
+  0%, 100% { transform: scale(0.42); opacity: 1; }
+  50% { transform: scale(1.18); opacity: 0.96; }
+}
+
+@keyframes navLogoBreatheHalo {
+  0%, 100% { transform: scale(0.38); opacity: 0; }
+  50% { transform: scale(1.08); opacity: 0.8; }
+}
+
+:root[data-theme="light"] .nav-logo-title,
+:root[data-theme="light"] .nav-logo-subtitle {
+  fill: #06152a;
+}
+
+:root[data-theme="light"] .nav-logo-sep {
+  stroke: rgba(6,21,42,0.55);
+}
+
+:root[data-theme="light"] .nav-logo-breathe-halo {
+  stroke: rgba(6,21,42,0.58);
+}
+
+:root[data-theme="light"] .nav-logo-breathe-core {
+  fill: #06152a;
+}
 
 /* Hide legacy logo remnants */
-.nav-logo-svg { display: none !important; }
 .nav-logo--dark, .nav-logo--light { display: none !important; }
 .nav-logo .goldish { display: none; }
 
@@ -945,9 +1018,9 @@ const NAV_STYLE = `
   height: 58px;
 }
 
-.sticky-nav.scrolled .nav-logo-img {
+.sticky-nav.scrolled .nav-logo-svg {
   width: 210px;
-  height: 140px;
+  height: 68px;
 }
 
 .mobile-toggle {

@@ -57,9 +57,7 @@ const NAV_TEMPLATE = `
         </g>
 
         <text x="88" y="37" class="nav-logo-title" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="800" letter-spacing="7">STATISTICO</text>
-        <line x1="90" y1="59" x2="139" y2="59" class="nav-logo-sep"/>
-        <text x="190" y="63" class="nav-logo-subtitle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="6" text-anchor="middle">INTERACTIVE</text>
-        <line x1="241" y1="59" x2="290" y2="59" class="nav-logo-sep"/>
+        <text x="190" y="63" class="nav-logo-subtitle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="4" text-anchor="middle">-- INTERACTIVE --</text>
       </svg>
     </a>
 
@@ -251,11 +249,6 @@ const NAV_STYLE = `
   opacity: 0.96;
 }
 
-.nav-logo-sep {
-  stroke: rgba(255,255,255,0.72);
-  stroke-width: 1.4;
-}
-
 .nav-logo-breathe-halo {
   fill: none;
   stroke: rgba(255,255,255,0.72);
@@ -283,10 +276,6 @@ const NAV_STYLE = `
 :root[data-theme="light"] .nav-logo-title,
 :root[data-theme="light"] .nav-logo-subtitle {
   fill: #06152a;
-}
-
-:root[data-theme="light"] .nav-logo-sep {
-  stroke: rgba(6,21,42,0.55);
 }
 
 :root[data-theme="light"] .nav-logo-breathe-halo {

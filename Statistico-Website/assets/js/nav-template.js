@@ -219,8 +219,8 @@ const NAV_STYLE = `
   align-items: center;
   justify-content: flex-start;
   margin-right: 22px;
-  width: 260px;
-  height: 78px;
+  width: 200px;
+  height: 58px;
   transition: opacity 0.2s ease;
   flex-shrink: 0;
   position: relative;
@@ -233,8 +233,8 @@ const NAV_STYLE = `
   position: absolute;
   left: 0;
   top: 50%;
-  width: 260px;
-  height: 84px;
+  width: 200px;
+  height: 65px;
   max-width: none;
   transform: translateY(-50%);
   display: block;
@@ -1014,13 +1014,13 @@ const NAV_STYLE = `
 
 .sticky-nav.scrolled .nav-logo {
   opacity: 1;
-  width: 210px;
-  height: 58px;
+  width: 170px;
+  height: 46px;
 }
 
 .sticky-nav.scrolled .nav-logo-svg {
-  width: 210px;
-  height: 68px;
+  width: 170px;
+  height: 55px;
 }
 
 .mobile-toggle {

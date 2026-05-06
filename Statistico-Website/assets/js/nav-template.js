@@ -32,13 +32,6 @@ const NAV_TEMPLATE = `
             <stop offset="0%" stop-color="#51f0dc"/>
             <stop offset="100%" stop-color="#00a8b5"/>
           </linearGradient>
-          <filter id="navLogoGlow" x="-120%" y="-120%" width="340%" height="340%">
-            <feGaussianBlur stdDeviation="3.2" result="blur"/>
-            <feMerge>
-              <feMergeNode in="blur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
         </defs>
 
         <g class="nav-logo-mark">
@@ -50,14 +43,14 @@ const NAV_TEMPLATE = `
           <rect x="30" y="43" width="8" height="32" rx="2" fill="url(#navLogoTeal)"/>
           <rect x="42" y="34" width="8" height="41" rx="2" fill="url(#navLogoTeal)"/>
           <rect x="54" y="25" width="8" height="50" rx="2" fill="url(#navLogoTeal)"/>
-          <g class="nav-logo-breathe" filter="url(#navLogoGlow)">
-            <circle class="nav-logo-breathe-halo" cx="41" cy="21" r="10"/>
-            <circle class="nav-logo-breathe-core" cx="41" cy="21" r="4.5"/>
-          </g>
         </g>
 
         <text x="88" y="37" class="nav-logo-title" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="800" letter-spacing="7">STATISTICO</text>
-        <text x="190" y="63" class="nav-logo-subtitle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="4" text-anchor="middle">-- INTERACTIVE --</text>
+        <g class="nav-logo-subtitle-row">
+          <line class="nav-logo-subline" x1="92" y1="63" x2="118" y2="63"/>
+          <text x="191" y="68" class="nav-logo-subtitle" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="800" letter-spacing="4.6" text-anchor="middle">INTERACTIVE</text>
+          <line class="nav-logo-subline" x1="264" y1="63" x2="292" y2="63"/>
+        </g>
       </svg>
     </a>
 
@@ -249,28 +242,11 @@ const NAV_STYLE = `
   opacity: 0.96;
 }
 
-.nav-logo-breathe-halo {
-  fill: none;
-  stroke: rgba(255,255,255,0.72);
-  stroke-width: 2;
-  transform-origin: 41px 21px;
-  animation: navLogoBreatheHalo 2.7s ease-in-out infinite;
-}
-
-.nav-logo-breathe-core {
-  fill: #ffffff;
-  transform-origin: 41px 21px;
-  animation: navLogoBreatheCore 2.7s ease-in-out infinite;
-}
-
-@keyframes navLogoBreatheCore {
-  0%, 100% { transform: scale(0.42); opacity: 1; }
-  50% { transform: scale(1.18); opacity: 0.96; }
-}
-
-@keyframes navLogoBreatheHalo {
-  0%, 100% { transform: scale(0.38); opacity: 0; }
-  50% { transform: scale(1.08); opacity: 0.8; }
+.nav-logo-subline {
+  stroke: #ffffff;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  opacity: 0.9;
 }
 
 :root[data-theme="light"] .nav-logo-title,
@@ -278,12 +254,9 @@ const NAV_STYLE = `
   fill: #06152a;
 }
 
-:root[data-theme="light"] .nav-logo-breathe-halo {
-  stroke: rgba(6,21,42,0.58);
-}
-
-:root[data-theme="light"] .nav-logo-breathe-core {
-  fill: #06152a;
+:root[data-theme="light"] .nav-logo-subline {
+  stroke: #06152a;
+  opacity: 0.82;
 }
 
 /* Hide legacy logo remnants */

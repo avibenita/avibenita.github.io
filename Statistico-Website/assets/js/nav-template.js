@@ -32,6 +32,11 @@ const NAV_TEMPLATE = `
             <stop offset="0%" stop-color="#51f0dc"/>
             <stop offset="100%" stop-color="#00a8b5"/>
           </linearGradient>
+          <radialGradient id="navLogoSlider" cx="35%" cy="30%" r="70%">
+            <stop offset="0%" stop-color="#d7f3ff"/>
+            <stop offset="52%" stop-color="#6fb7ff"/>
+            <stop offset="100%" stop-color="#2d76ff"/>
+          </radialGradient>
         </defs>
 
         <g class="nav-logo-mark">
@@ -49,7 +54,8 @@ const NAV_TEMPLATE = `
         <g class="nav-logo-subtitle-row">
           <line class="nav-logo-subline" x1="92" y1="63" x2="118" y2="63"/>
           <text x="191" y="68" class="nav-logo-subtitle" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="800" letter-spacing="4.6" text-anchor="middle">INTERACTIVE</text>
-          <line class="nav-logo-subline" x1="264" y1="63" x2="292" y2="63"/>
+          <line class="nav-logo-subline" x1="264" y1="63" x2="296" y2="63"/>
+          <circle class="nav-logo-slider-knob" cx="282" cy="63" r="5.2"/>
         </g>
       </svg>
     </a>
@@ -249,6 +255,24 @@ const NAV_STYLE = `
   opacity: 0.9;
 }
 
+.nav-logo-slider-knob {
+  fill: url(#navLogoSlider);
+  stroke: rgba(255,255,255,0.74);
+  stroke-width: 1;
+  filter: drop-shadow(0 0 4px rgba(111,183,255,.62));
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.nav-logo:hover .nav-logo-slider-knob {
+  animation: navLogoSliderNudge .9s ease-in-out;
+}
+
+@keyframes navLogoSliderNudge {
+  0%, 100% { transform: translateX(0); }
+  45% { transform: translateX(7px); }
+}
+
 :root[data-theme="light"] .nav-logo-title,
 :root[data-theme="light"] .nav-logo-subtitle {
   fill: #06152a;
@@ -257,6 +281,10 @@ const NAV_STYLE = `
 :root[data-theme="light"] .nav-logo-subline {
   stroke: #06152a;
   opacity: 0.82;
+}
+
+:root[data-theme="light"] .nav-logo-slider-knob {
+  stroke: rgba(6,21,42,0.42);
 }
 
 /* Hide legacy logo remnants */

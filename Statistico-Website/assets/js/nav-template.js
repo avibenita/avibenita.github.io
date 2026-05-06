@@ -22,35 +22,19 @@ const NAV_TEMPLATE = `
 <nav class="sticky-nav" id="stickyNav">
   <div class="nav-container">
     <a href="javascript:void(0)" class="nav-logo" id="nav-logo-link" aria-label="Statistico Interactive">
-      <svg class="nav-logo-svg" viewBox="0 0 192 44" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
-        <defs>
-          <linearGradient id="nl-arc" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stop-color="#4f8eff"/>
-            <stop offset="100%" stop-color="#1a56d6"/>
-          </linearGradient>
-          <linearGradient id="nl-bar" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stop-color="#00e0cc"/>
-            <stop offset="100%" stop-color="#00a8b5"/>
-          </linearGradient>
-        </defs>
-        <!-- S top arc -->
-        <path d="M 32,9 C 32,5 27,3 21,3 C 13,3 8,8 8,14 C 8,20 13,22 21,22" stroke="url(#nl-arc)" stroke-width="4.5" fill="none" stroke-linecap="round"/>
-        <!-- S bottom arc -->
-        <path d="M 21,22 C 29,22 36,24 36,30 C 36,37 30,41 22,41 C 14,41 10,37 10,33" stroke="url(#nl-arc)" stroke-width="4.5" fill="none" stroke-linecap="round"/>
-        <!-- 4 ascending bars -->
-        <rect x="11" y="29" width="4" height="11" rx="1.2" fill="url(#nl-bar)"/>
-        <rect x="17" y="24" width="4" height="16" rx="1.2" fill="url(#nl-bar)"/>
-        <rect x="23" y="19" width="4" height="21" rx="1.2" fill="url(#nl-bar)"/>
-        <rect x="29" y="14" width="4" height="26" rx="1.2" fill="url(#nl-bar)"/>
-        <!-- Vertical divider -->
-        <line x1="50" y1="9" x2="50" y2="35" class="nl-div"/>
-        <!-- STATISTICO -->
-        <text x="60" y="22" class="nl-title" font-family="Segoe UI,Arial,sans-serif" font-weight="800" font-size="17" letter-spacing="2">STATISTICO</text>
-        <!-- INTERACTIVE with flanking lines -->
-        <line x1="60" y1="30" x2="74" y2="30" class="nl-sep"/>
-        <text x="125" y="37" class="nl-sub" font-family="Segoe UI,Arial,sans-serif" font-weight="500" font-size="8" letter-spacing="2.5" text-anchor="middle">INTERACTIVE</text>
-        <line x1="176" y1="30" x2="190" y2="30" class="nl-sep"/>
-      </svg>
+      <img
+        class="nav-logo-img nav-logo-img--dark"
+        src="/Statistico-Website/assets/img/statistico-interactive-transparent-darkmark.svg"
+        alt="Statistico Interactive"
+        decoding="async"
+      />
+      <img
+        class="nav-logo-img nav-logo-img--light"
+        src="/Statistico-Website/assets/img/statistico-interactive-transparent-lightmark.svg"
+        alt=""
+        aria-hidden="true"
+        decoding="async"
+      />
     </a>
 
     <ul class="nav-menu" id="navMenu">
@@ -207,36 +191,39 @@ const NAV_STYLE = `
   text-decoration: none;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   margin-right: 22px;
+  width: 190px;
+  height: 66px;
   transition: opacity 0.2s ease;
   flex-shrink: 0;
+  position: relative;
 }
 
 .nav-logo:hover { opacity: 0.85; }
 
-/* SVG inline logo */
-.nav-logo-svg {
-  height: 54px;
-  width: auto;
+.nav-logo-img {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 190px;
+  height: 66px;
+  max-width: 100%;
+  transform: translateY(-50%);
+  object-fit: contain;
+  object-position: left center;
   display: block;
-  overflow: visible;
-  margin-top: 4px;
+  transition: opacity 0.2s ease, height 0.3s ease, width 0.3s ease;
 }
 
-/* SVG element colours – dark mode (default) */
-.nl-title { fill: rgb(255,165,120); }
-.nl-sub   { fill: rgba(255,165,120,0.50); }
-.nl-div   { stroke: rgba(255,165,120,0.20); stroke-width: 1; }
-.nl-sep   { stroke: rgba(255,165,120,0.35); stroke-width: 0.9; }
+.nav-logo-img--light { opacity: 0; }
+.nav-logo-img--dark { opacity: 1; }
 
-/* SVG element colours – light mode */
-:root[data-theme="light"] .nl-title { fill: #06152a; }
-:root[data-theme="light"] .nl-sub   { fill: rgba(0, 119, 168, 0.60); }
-:root[data-theme="light"] .nl-div   { stroke: rgba(0,0,0,0.15); }
-:root[data-theme="light"] .nl-sep   { stroke: rgba(0, 119, 168, 0.45); }
+:root[data-theme="light"] .nav-logo-img--dark { opacity: 0; }
+:root[data-theme="light"] .nav-logo-img--light { opacity: 1; }
 
-/* Hide old image-based logo remnants */
-.nav-logo-img  { display: none !important; }
+/* Hide legacy logo remnants */
+.nav-logo-svg { display: none !important; }
 .nav-logo--dark, .nav-logo--light { display: none !important; }
 .nav-logo .goldish { display: none; }
 
@@ -951,8 +938,15 @@ const NAV_STYLE = `
   border-radius: 13px;
 }
 
-.sticky-nav.scrolled .nav-logo { opacity: 1; }
-.sticky-nav.scrolled .nav-logo-svg { height: 36px; }
+.sticky-nav.scrolled .nav-logo {
+  opacity: 1;
+  height: 48px;
+}
+
+.sticky-nav.scrolled .nav-logo-img {
+  width: 150px;
+  height: 48px;
+}
 
 .mobile-toggle {
   display: none;

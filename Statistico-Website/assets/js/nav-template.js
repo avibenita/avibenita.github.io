@@ -22,7 +22,7 @@ const NAV_TEMPLATE = `
 <nav class="sticky-nav" id="stickyNav">
   <div class="nav-container">
     <a href="javascript:void(0)" class="nav-logo" id="nav-logo-link" aria-label="Statistico Interactive">
-      <svg class="nav-logo-svg" viewBox="0 0 300 84" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Statistico Interactive">
+      <svg class="nav-logo-svg" viewBox="0 -6 300 96" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Statistico Interactive">
         <defs>
           <linearGradient id="navLogoBlue" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stop-color="#2d76ff"/>
@@ -57,9 +57,9 @@ const NAV_TEMPLATE = `
         </g>
 
         <text x="88" y="37" class="nav-logo-title" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="800" letter-spacing="7">STATISTICO</text>
-        <line x1="90" y1="55" x2="138" y2="55" class="nav-logo-sep"/>
-        <text x="190" y="63" class="nav-logo-subtitle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="6" text-anchor="middle">INTERACTIVE</text>
-        <line x1="242" y1="55" x2="290" y2="55" class="nav-logo-sep"/>
+        <text x="190" y="62" class="nav-logo-subtitle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="6" text-anchor="middle">INTERACTIVE</text>
+        <line x1="90" y1="72" x2="138" y2="72" class="nav-logo-sep"/>
+        <line x1="242" y1="72" x2="290" y2="72" class="nav-logo-sep"/>
       </svg>
     </a>
 
@@ -234,7 +234,7 @@ const NAV_STYLE = `
   left: 0;
   top: 50%;
   width: 230px;
-  height: 65px;
+  height: 70px;
   max-width: none;
   transform: translateY(-50%);
   display: block;
@@ -1020,7 +1020,7 @@ const NAV_STYLE = `
 
 .sticky-nav.scrolled .nav-logo-svg {
   width: 190px;
-  height: 55px;
+  height: 60px;
 }
 
 .mobile-toggle {

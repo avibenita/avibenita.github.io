@@ -22,7 +22,7 @@ const NAV_TEMPLATE = `
 <nav class="sticky-nav" id="stickyNav">
   <div class="nav-container">
     <a href="javascript:void(0)" class="nav-logo" id="nav-logo-link" aria-label="Statistico Interactive">
-      <svg class="nav-logo-svg" viewBox="0 0 260 84" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Statistico Interactive">
+      <svg class="nav-logo-svg" viewBox="0 0 300 84" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Statistico Interactive">
         <defs>
           <linearGradient id="navLogoBlue" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stop-color="#2d76ff"/>
@@ -56,10 +56,10 @@ const NAV_TEMPLATE = `
           </g>
         </g>
 
-        <text x="84" y="37" class="nav-logo-title" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="800" letter-spacing="9">STATISTICO</text>
-        <line x1="86" y1="55" x2="129" y2="55" class="nav-logo-sep"/>
-        <text x="171" y="63" class="nav-logo-subtitle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="7" text-anchor="middle">INTERACTIVE</text>
-        <line x1="213" y1="55" x2="256" y2="55" class="nav-logo-sep"/>
+        <text x="88" y="37" class="nav-logo-title" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="800" letter-spacing="7">STATISTICO</text>
+        <line x1="90" y1="55" x2="138" y2="55" class="nav-logo-sep"/>
+        <text x="190" y="63" class="nav-logo-subtitle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="6" text-anchor="middle">INTERACTIVE</text>
+        <line x1="242" y1="55" x2="290" y2="55" class="nav-logo-sep"/>
       </svg>
     </a>
 
@@ -219,7 +219,7 @@ const NAV_STYLE = `
   align-items: center;
   justify-content: flex-start;
   margin-right: 22px;
-  width: 200px;
+  width: 230px;
   height: 58px;
   transition: opacity 0.2s ease;
   flex-shrink: 0;
@@ -233,7 +233,7 @@ const NAV_STYLE = `
   position: absolute;
   left: 0;
   top: 50%;
-  width: 200px;
+  width: 230px;
   height: 65px;
   max-width: none;
   transform: translateY(-50%);
@@ -1014,12 +1014,12 @@ const NAV_STYLE = `
 
 .sticky-nav.scrolled .nav-logo {
   opacity: 1;
-  width: 170px;
+  width: 190px;
   height: 46px;
 }
 
 .sticky-nav.scrolled .nav-logo-svg {
-  width: 170px;
+  width: 190px;
   height: 55px;
 }
 

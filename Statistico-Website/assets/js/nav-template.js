@@ -57,9 +57,9 @@ const NAV_TEMPLATE = `
         </g>
 
         <text x="88" y="37" class="nav-logo-title" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="800" letter-spacing="7">STATISTICO</text>
-        <text x="190" y="62" class="nav-logo-subtitle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="6" text-anchor="middle">INTERACTIVE</text>
-        <line x1="90" y1="72" x2="138" y2="72" class="nav-logo-sep"/>
-        <line x1="242" y1="72" x2="290" y2="72" class="nav-logo-sep"/>
+        <line x1="90" y1="59" x2="139" y2="59" class="nav-logo-sep"/>
+        <text x="190" y="63" class="nav-logo-subtitle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="6" text-anchor="middle">INTERACTIVE</text>
+        <line x1="241" y1="59" x2="290" y2="59" class="nav-logo-sep"/>
       </svg>
     </a>
 
@@ -224,7 +224,7 @@ const NAV_STYLE = `
   transition: opacity 0.2s ease;
   flex-shrink: 0;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .nav-logo:hover { opacity: 0.85; }

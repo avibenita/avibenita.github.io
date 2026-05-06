@@ -193,11 +193,12 @@ const NAV_STYLE = `
   align-items: center;
   justify-content: flex-start;
   margin-right: 22px;
-  width: 190px;
-  height: 66px;
+  width: 260px;
+  height: 78px;
   transition: opacity 0.2s ease;
   flex-shrink: 0;
   position: relative;
+  overflow: hidden;
 }
 
 .nav-logo:hover { opacity: 0.85; }
@@ -206,9 +207,9 @@ const NAV_STYLE = `
   position: absolute;
   left: 0;
   top: 50%;
-  width: 190px;
-  height: 66px;
-  max-width: 100%;
+  width: 260px;
+  height: 173px;
+  max-width: none;
   transform: translateY(-50%);
   object-fit: contain;
   object-position: left center;
@@ -940,12 +941,13 @@ const NAV_STYLE = `
 
 .sticky-nav.scrolled .nav-logo {
   opacity: 1;
-  height: 48px;
+  width: 210px;
+  height: 58px;
 }
 
 .sticky-nav.scrolled .nav-logo-img {
-  width: 150px;
-  height: 48px;
+  width: 210px;
+  height: 140px;
 }
 
 .mobile-toggle {

@@ -1529,6 +1529,54 @@
     drawNetwork(correlationData.headers, matrix);
   }
 
+  function buildNetworkLayoutLinks(varNames, matrix, visibleLinks) {
+    const parent = new Map(varNames.map(name => [name, name]));
+    const find = name => {
+      let root = parent.get(name);
+      while (root !== parent.get(root)) root = parent.get(root);
+      let cur = name;
+      while (cur !== root) {
+        const next = parent.get(cur);
+        parent.set(cur, root);
+        cur = next;
+      }
+      return root;
+    };
+    const union = (a, b) => {
+      const ra = find(a);
+      const rb = find(b);
+      if (ra !== rb) parent.set(rb, ra);
+    };
+
+    visibleLinks.forEach(link => union(link.source, link.target));
+    const groups = new Map();
+    varNames.forEach(name => {
+      const root = find(name);
+      if (!groups.has(root)) groups.set(root, []);
+      groups.get(root).push(name);
+    });
+    const components = Array.from(groups.values()).sort((a, b) => b.length - a.length);
+    if (components.length <= 1) return visibleLinks;
+
+    const layoutLinks = visibleLinks.slice();
+    const mainComponent = components[0];
+    components.slice(1).forEach(component => {
+      let best = null;
+      mainComponent.forEach(source => {
+        component.forEach(target => {
+          const i = varNames.indexOf(source);
+          const j = varNames.indexOf(target);
+          const value = i >= 0 && j >= 0 ? matrix[i][j].r : null;
+          if (value !== null && (!best || Math.abs(value) > Math.abs(best.value))) {
+            best = { source, target, value };
+          }
+        });
+      });
+      if (best) layoutLinks.push({ ...best, layoutOnly: true });
+    });
+    return layoutLinks;
+  }
+
   function drawNetwork(varNames, matrix) {
     if (typeof d3 === 'undefined') {
       document.getElementById('networkCanvas').innerHTML =
@@ -1556,12 +1604,20 @@
       }
     }
 
+    const layoutLinks = buildNetworkLayoutLinks(varNames, matrix, links);
+
     if (networkSimulation) networkSimulation.stop();
 
+    // Invisible layout links keep disconnected components close without
+    // displaying correlations below the selected threshold.
     networkSimulation = d3.forceSimulation(nodes)
-      .force('link',      d3.forceLink(links).id(d => d.id).distance(d => 160 * (1 - Math.abs(d.value))))
-      .force('charge',    d3.forceManyBody().strength(-400))
+      .force('link',      d3.forceLink(layoutLinks).id(d => d.id)
+        .distance(d => d.layoutOnly ? 130 : Math.max(42, 160 * (1 - Math.abs(d.value))))
+        .strength(d => d.layoutOnly ? 0.08 : 0.9))
+      .force('charge',    d3.forceManyBody().strength(-340))
       .force('center',    d3.forceCenter(W / 2, H / 2))
+      .force('x',         d3.forceX(W / 2).strength(0.045))
+      .force('y',         d3.forceY(H / 2).strength(0.045))
       .force('collision', d3.forceCollide().radius(38));
 
     const g = svg.append('g');

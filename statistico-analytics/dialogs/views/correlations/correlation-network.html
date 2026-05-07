@@ -404,6 +404,13 @@
             <span>Show r</span>
           </label>
         </div>
+
+        <div class="control-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="showOnlyConnected" onchange="toggleOnlyConnectedVariables()">
+            <span>Only connected variables</span>
+          </label>
+        </div>
       </div>
 
       <div id="networkLoadingMessage" class="loading">
@@ -422,6 +429,7 @@
     let networkSimulation = null;
     let networkThreshold = 0;
     let showCorr = true;
+    let showOnlyConnected = false;
     let currentMatrix = null;
     let currentVarNames = null;
 
@@ -608,21 +616,39 @@
         .attr("width", width)
         .attr("height", height);
 
+      const connectedNames = new Set();
+      for (let i = 0; i < varNames.length; i++) {
+        for (let j = i + 1; j < varNames.length; j++) {
+          const value = matrix[i][j].r;
+          if (value !== null && Number.isFinite(value) && Math.abs(value) >= networkThreshold) {
+            connectedNames.add(varNames[i]);
+            connectedNames.add(varNames[j]);
+          }
+        }
+      }
+      const displayVarNames = showOnlyConnected
+        ? varNames.filter(name => connectedNames.has(name))
+        : varNames;
+
       // Create nodes
-      const nodes = varNames.map(name => ({ id: name }));
+      const nodes = displayVarNames.map(name => ({ id: name }));
 
       // Create all pairwise links. Weak correlations are drawn faintly so
       // every variable remains connected while stronger relationships stand out.
       const links = [];
-      for (let i = 0; i < varNames.length; i++) {
-        for (let j = i + 1; j < varNames.length; j++) {
-          const value = matrix[i][j].r;
+      for (let i = 0; i < displayVarNames.length; i++) {
+        for (let j = i + 1; j < displayVarNames.length; j++) {
+          const sourceName = displayVarNames[i];
+          const targetName = displayVarNames[j];
+          const sourceIndex = varNames.indexOf(sourceName);
+          const targetIndex = varNames.indexOf(targetName);
+          const value = matrix[sourceIndex][targetIndex].r;
           if (value !== null && Number.isFinite(value)) {
             links.push({
-              source: varNames[i],
-              target: varNames[j],
+              source: sourceName,
+              target: targetName,
               value: value,
-              isStrong: Math.abs(value) >= 0.3
+              isStrong: Math.abs(value) >= networkThreshold
             });
           }
         }
@@ -630,7 +656,7 @@
 
       console.log(`?? Network: ${nodes.length} nodes, ${links.length} links`);
 
-      const layoutLinks = buildNetworkLayoutLinks(varNames, matrix, links);
+      const layoutLinks = links;
 
       // Create force simulation. Strong invisible layout links keep
       // disconnected components visually close without displaying
@@ -744,7 +770,7 @@
     function updateNetworkThreshold(value) {
       networkThreshold = parseFloat(value);
       document.getElementById('networkThresholdValue').textContent = value;
-      applyNetworkThreshold(networkThreshold);
+      if (currentVarNames && currentMatrix) drawNetwork(currentVarNames, currentMatrix);
     }
 
     function applyNetworkThreshold(threshold) {
@@ -759,6 +785,11 @@
       if (window.networkElements) {
         window.networkElements.linkLabels.style("display", showCorr ? "block" : "none");
       }
+    }
+
+    function toggleOnlyConnectedVariables() {
+      showOnlyConnected = document.getElementById('showOnlyConnected').checked;
+      if (currentVarNames && currentMatrix) drawNetwork(currentVarNames, currentMatrix);
     }
 
     /**

@@ -1072,6 +1072,12 @@
                 <span>Show r values</span>
               </label>
             </div>
+            <div class="control-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="showOnlyConnectedNetworkNodes" onchange="toggleOnlyConnectedNetworkNodes()">
+                <span>Only connected variables</span>
+              </label>
+            </div>
             <div class="control-group" style="margin-left:auto;">
               <span style="font-size:12px;color:var(--text-muted);">Drag nodes to rearrange &nbsp;|&nbsp; Scroll to zoom</span>
             </div>
@@ -1154,6 +1160,7 @@
   let networkSimulation  = null;
   let networkThreshold   = 0.3;
   let showNetCorrValues  = true;
+  let showOnlyConnectedNetworkNodes = false;
   window.networkRendered = false;
 
   /* ════════════════════════════════════════════
@@ -1529,7 +1536,7 @@
     drawNetwork(correlationData.headers, matrix);
   }
 
-  function buildNetworkLayoutLinks(varNames, matrix, visibleLinks) {
+  function buildNetworkLayoutLinks(varNames, matrix, visibleLinks, matrixVarNames = varNames) {
     const parent = new Map(varNames.map(name => [name, name]));
     const find = name => {
       let root = parent.get(name);
@@ -1564,9 +1571,9 @@
       let best = null;
       mainComponent.forEach(source => {
         component.forEach(target => {
-          const i = varNames.indexOf(source);
-          const j = varNames.indexOf(target);
-          const value = i >= 0 && j >= 0 ? matrix[i][j].r : null;
+          const sourceIndex = matrixVarNames.indexOf(source);
+          const targetIndex = matrixVarNames.indexOf(target);
+          const value = sourceIndex >= 0 && targetIndex >= 0 ? matrix[sourceIndex][targetIndex].r : null;
           if (value !== null && (!best || Math.abs(value) > Math.abs(best.value))) {
             best = { source, target, value };
           }
@@ -1592,19 +1599,28 @@
 
     const svg = d3.select('#networkSVG').attr('width', W).attr('height', H);
 
-    // Build nodes and links
-    const nodes = varNames.map(name => ({ id: name }));
     const links = [];
+    const connectedNames = new Set();
     for (let i = 0; i < varNames.length; i++) {
       for (let j = i + 1; j < varNames.length; j++) {
         const r = matrix[i][j].r;
         if (r !== null && Math.abs(r) >= networkThreshold) {
           links.push({ source: varNames[i], target: varNames[j], value: r });
+          connectedNames.add(varNames[i]);
+          connectedNames.add(varNames[j]);
         }
       }
     }
 
-    const layoutLinks = buildNetworkLayoutLinks(varNames, matrix, links);
+    const displayVarNames = showOnlyConnectedNetworkNodes
+      ? varNames.filter(name => connectedNames.has(name))
+      : varNames;
+    const displayNameSet = new Set(displayVarNames);
+    const displayLinks = links.filter(link => displayNameSet.has(link.source) && displayNameSet.has(link.target));
+
+    // Build nodes and links
+    const nodes = displayVarNames.map(name => ({ id: name }));
+    const layoutLinks = buildNetworkLayoutLinks(displayVarNames, matrix, displayLinks, varNames);
 
     if (networkSimulation) networkSimulation.stop();
 
@@ -1636,13 +1652,13 @@
       .attr('pointer-events', 'none');
 
     // Links
-    const link = g.append('g').selectAll('line').data(links).enter().append('line')
+    const link = g.append('g').selectAll('line').data(displayLinks).enter().append('line')
       .attr('stroke', d => d.value >= 0 ? 'rgba(120,200,255,0.75)' : 'rgba(255,165,120,0.75)')
       .attr('stroke-width', d => Math.max(1, Math.abs(d.value) * 6))
       .attr('stroke-opacity', 0.75);
 
     // Link labels
-    const linkLabels = g.append('g').selectAll('text').data(links).enter().append('text')
+    const linkLabels = g.append('g').selectAll('text').data(displayLinks).enter().append('text')
       .attr('font-size', 10)
       .attr('fill', 'rgba(255,255,255,0.72)')
       .attr('text-anchor', 'middle')
@@ -1707,6 +1723,14 @@
     showNetCorrValues = document.getElementById('showNetCorrValues').checked;
     if (window.networkElements) {
       window.networkElements.linkLabels.style('display', showNetCorrValues ? null : 'none');
+    }
+  }
+
+  function toggleOnlyConnectedNetworkNodes() {
+    showOnlyConnectedNetworkNodes = document.getElementById('showOnlyConnectedNetworkNodes').checked;
+    if (correlationData && window.networkRendered) {
+      const matrix = calculateCorrelationMatrix(correlationData.data, correlationData.headers, currentType);
+      drawNetwork(correlationData.headers, matrix);
     }
   }
 

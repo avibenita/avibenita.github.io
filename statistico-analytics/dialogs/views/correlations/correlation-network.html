@@ -693,8 +693,7 @@
             links.push({
               source: sourceName,
               target: targetName,
-              value: value,
-              isStrong: Math.abs(value) >= networkThreshold
+              value: value
             });
           }
         }
@@ -738,15 +737,12 @@
         .enter().append("line")
         .attr("class", "network-link")
         .attr("stroke", d => d.value > 0 ? "var(--accent-2)" : "var(--accent-1)")
-        .attr("stroke-width", d => d.isStrong ? Math.abs(d.value) * 5 : 0.8)
-        .attr("stroke-dasharray", d => d.isStrong ? null : "3 7")
-        .attr("data-value", d => Math.abs(d.value))
-        .style("stroke-opacity", d => d.isStrong ? 0.62 : 0.16);
+        .attr("data-value", d => Math.abs(d.value));
 
       // Link labels
       const linkLabels = g.append("g")
         .selectAll("text")
-        .data(links.filter(d => d.isStrong))
+        .data(links)
         .enter().append("text")
         .attr("class", "network-corr-label")
         .text(d => d.value.toFixed(2))
@@ -822,7 +818,12 @@
     function updateNetworkThreshold(value) {
       networkThreshold = parseFloat(value);
       document.getElementById('networkThresholdValue').textContent = networkThreshold.toFixed(2);
-      scheduleNetworkRedraw();
+      updateDisconnectedVariablesSummary(getDisconnectedVariableNames());
+      if (showOnlyConnected) {
+        scheduleNetworkRedraw();
+      } else {
+        applyNetworkThreshold(networkThreshold);
+      }
     }
 
     function scheduleNetworkRedraw() {
@@ -846,6 +847,21 @@
       summary.classList.add('is-visible');
     }
 
+    function getDisconnectedVariableNames() {
+      if (!currentVarNames || !currentMatrix) return [];
+      const connectedNames = new Set();
+      for (let i = 0; i < currentVarNames.length; i++) {
+        for (let j = i + 1; j < currentVarNames.length; j++) {
+          const value = currentMatrix[i][j].r;
+          if (value !== null && Number.isFinite(value) && Math.abs(value) >= networkThreshold) {
+            connectedNames.add(currentVarNames[i]);
+            connectedNames.add(currentVarNames[j]);
+          }
+        }
+      }
+      return currentVarNames.filter(name => !connectedNames.has(name));
+    }
+
     function applyNetworkChartScale(animate = true) {
       if (!networkSvgSelection || !networkZoomBehavior) return;
       const { width, height } = networkViewport;
@@ -867,14 +883,20 @@
     function applyNetworkThreshold(threshold) {
       if (!window.networkElements) return;
       const { link, linkLabels } = window.networkElements;
-      link.classed("dimmed", d => Math.abs(d.value) < threshold);
-      linkLabels.classed("dimmed", d => Math.abs(d.value) < threshold);
+      link
+        .attr("stroke-width", d => Math.abs(d.value) >= threshold ? Math.abs(d.value) * 5 : 0.8)
+        .attr("stroke-dasharray", d => Math.abs(d.value) >= threshold ? null : "3 7")
+        .style("stroke-opacity", d => Math.abs(d.value) >= threshold ? 0.62 : 0.16)
+        .classed("dimmed", d => Math.abs(d.value) < threshold);
+      linkLabels
+        .style("display", d => showCorr && Math.abs(d.value) >= threshold ? "block" : "none")
+        .classed("dimmed", d => Math.abs(d.value) < threshold);
     }
 
     function toggleCorrValues() {
       showCorr = document.getElementById('showCorrValues').checked;
       if (window.networkElements) {
-        window.networkElements.linkLabels.style("display", showCorr ? "block" : "none");
+        applyNetworkThreshold(networkThreshold);
       }
     }
 

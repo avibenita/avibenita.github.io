@@ -66,6 +66,9 @@
       .media-showcase-error.is-visible {
         display: block;
       }
+      .media-showcase-frame.has-error {
+        opacity: .18;
+      }
       .media-showcase-caption {
         position: absolute;
         left: 18px;
@@ -224,7 +227,7 @@
           <source src="${item.src}" type="video/mp4">
         </video>
         <div class="media-showcase-error" data-media-error>
-          This video could not be displayed by the browser. Check that the MP4 uses web-compatible H.264/AAC encoding.
+          This video could not be displayed. Check that the MP4 is valid and uses browser-compatible H.264/AAC encoding.
         </div>`;
     }
     return `<img class="media-showcase-frame" src="${item.src}" alt="${item.title || 'Module slide'}" loading="lazy">`;
@@ -286,9 +289,16 @@
       const video = container.querySelector('.media-showcase-frame');
       const error = container.querySelector('[data-media-error]');
       if (video && video.tagName === 'VIDEO') {
-        video.addEventListener('error', () => {
+        const showVideoError = () => {
+          video.classList.add('has-error');
           if (error) error.classList.add('is-visible');
-        }, { once: true });
+        };
+        video.addEventListener('error', showVideoError, { once: true });
+        window.setTimeout(() => {
+          if (video.readyState === 0 || !Number.isFinite(video.duration)) {
+            showVideoError();
+          }
+        }, 2400);
         video.load();
         const playAttempt = video.play();
         if (playAttempt && typeof playAttempt.catch === 'function') {

@@ -104,6 +104,27 @@
       flex-wrap:wrap;
     }
 
+    .network-disconnected-summary{
+      display:none;
+      margin:-6px 0 12px;
+      padding:10px 14px;
+      border-radius:10px;
+      border:1px solid rgba(255,165,120,0.22);
+      background:rgba(255,165,120,0.07);
+      color:var(--text-secondary);
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    .network-disconnected-summary.is-visible{
+      display:block;
+    }
+
+    .network-disconnected-summary strong{
+      color:var(--accent-1);
+      font-weight:700;
+    }
+
     .control-group{
       display:flex;
       align-items:center;
@@ -393,9 +414,15 @@
     <div class="results-container">
       <div class="controls">
         <div class="control-group">
-          <span class="slider-label">Highlight r ?</span>
+          <span class="slider-label">Highlight |r| &ge;</span>
           <input type="range" id="networkThresholdSlider" min="0" max="1" step="0.05" value="0" oninput="updateNetworkThreshold(this.value)">
           <span class="slider-value" id="networkThresholdValue">0.00</span>
+        </div>
+
+        <div class="control-group">
+          <span class="slider-label">Chart size</span>
+          <input type="range" id="networkChartScaleSlider" min="0.7" max="1.8" step="0.05" value="1" oninput="updateNetworkChartScale(this.value)">
+          <span class="slider-value" id="networkChartScaleValue">1.00x</span>
         </div>
 
         <div class="control-group">
@@ -412,6 +439,8 @@
           </label>
         </div>
       </div>
+
+      <div id="networkDisconnectedSummary" class="network-disconnected-summary"></div>
 
       <div id="networkLoadingMessage" class="loading">
         <i class="fa-solid fa-spinner"></i>
@@ -430,6 +459,12 @@
     let networkThreshold = 0;
     let showCorr = true;
     let showOnlyConnected = false;
+    let networkChartScale = 1;
+    let thresholdRedrawTimer = null;
+    let networkZoomBehavior = null;
+    let networkSvgSelection = null;
+    let networkViewport = { width: 0, height: 0 };
+    const networkNodePositions = new Map();
     let currentMatrix = null;
     let currentVarNames = null;
 
@@ -629,9 +664,20 @@
       const displayVarNames = showOnlyConnected
         ? varNames.filter(name => connectedNames.has(name))
         : varNames;
+      updateDisconnectedVariablesSummary(varNames.filter(name => !connectedNames.has(name)));
 
-      // Create nodes
-      const nodes = displayVarNames.map(name => ({ id: name }));
+      // Create nodes from prior positions when possible to reduce repaint jitter.
+      const nodes = displayVarNames.map((name, index) => {
+        const previous = networkNodePositions.get(name);
+        if (previous) return { id: name, x: previous.x, y: previous.y };
+        const angle = (index / Math.max(1, displayVarNames.length)) * Math.PI * 2;
+        const radius = Math.min(width, height) * 0.18;
+        return {
+          id: name,
+          x: width / 2 + Math.cos(angle) * radius,
+          y: height / 2 + Math.sin(angle) * radius
+        };
+      });
 
       // Create all pairwise links. Weak correlations are drawn faintly so
       // every variable remains connected while stronger relationships stand out.
@@ -680,6 +726,10 @@
           g.attr("transform", event.transform);
         });
       svg.call(zoom);
+      networkZoomBehavior = zoom;
+      networkSvgSelection = svg;
+      networkViewport = { width, height };
+      applyNetworkChartScale(false);
 
       // Draw links
       const link = g.append("g")
@@ -743,6 +793,8 @@
         labels
           .attr("x", d => d.x)
           .attr("y", d => d.y);
+
+        nodes.forEach(d => networkNodePositions.set(d.id, { x: d.x, y: d.y }));
       });
 
       // Store references
@@ -769,8 +821,47 @@
 
     function updateNetworkThreshold(value) {
       networkThreshold = parseFloat(value);
-      document.getElementById('networkThresholdValue').textContent = value;
-      if (currentVarNames && currentMatrix) drawNetwork(currentVarNames, currentMatrix);
+      document.getElementById('networkThresholdValue').textContent = networkThreshold.toFixed(2);
+      scheduleNetworkRedraw();
+    }
+
+    function scheduleNetworkRedraw() {
+      window.clearTimeout(thresholdRedrawTimer);
+      thresholdRedrawTimer = window.setTimeout(() => {
+        if (currentVarNames && currentMatrix) drawNetwork(currentVarNames, currentMatrix);
+      }, 140);
+    }
+
+    function updateDisconnectedVariablesSummary(disconnectedNames) {
+      const summary = document.getElementById('networkDisconnectedSummary');
+      if (!summary) return;
+      if (!disconnectedNames.length || networkThreshold <= 0) {
+        summary.classList.remove('is-visible');
+        summary.innerHTML = '';
+        return;
+      }
+      const names = disconnectedNames.slice(0, 12).join(', ');
+      const suffix = disconnectedNames.length > 12 ? `, +${disconnectedNames.length - 12} more` : '';
+      summary.innerHTML = `<strong>${showOnlyConnected ? 'Hidden' : 'Disconnected'} at |r| &ge; ${networkThreshold.toFixed(2)}:</strong> ${names}${suffix}`;
+      summary.classList.add('is-visible');
+    }
+
+    function applyNetworkChartScale(animate = true) {
+      if (!networkSvgSelection || !networkZoomBehavior) return;
+      const { width, height } = networkViewport;
+      const transform = d3.zoomIdentity
+        .translate((width * (1 - networkChartScale)) / 2, (height * (1 - networkChartScale)) / 2)
+        .scale(networkChartScale);
+      networkSvgSelection
+        .transition()
+        .duration(animate ? 180 : 0)
+        .call(networkZoomBehavior.transform, transform);
+    }
+
+    function updateNetworkChartScale(value) {
+      networkChartScale = parseFloat(value);
+      document.getElementById('networkChartScaleValue').textContent = `${networkChartScale.toFixed(2)}x`;
+      applyNetworkChartScale();
     }
 
     function applyNetworkThreshold(threshold) {
@@ -789,7 +880,7 @@
 
     function toggleOnlyConnectedVariables() {
       showOnlyConnected = document.getElementById('showOnlyConnected').checked;
-      if (currentVarNames && currentMatrix) drawNetwork(currentVarNames, currentMatrix);
+      scheduleNetworkRedraw();
     }
 
     /**

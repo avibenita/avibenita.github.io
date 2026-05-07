@@ -611,16 +611,18 @@
       // Create nodes
       const nodes = varNames.map(name => ({ id: name }));
 
-      // Create links (only if |r| >= 0.3 to avoid clutter)
+      // Create all pairwise links. Weak correlations are drawn faintly so
+      // every variable remains connected while stronger relationships stand out.
       const links = [];
       for (let i = 0; i < varNames.length; i++) {
         for (let j = i + 1; j < varNames.length; j++) {
           const value = matrix[i][j].r;
-          if (value !== null && Math.abs(value) >= 0.3) {
+          if (value !== null && Number.isFinite(value)) {
             links.push({
               source: varNames[i],
               target: varNames[j],
-              value: value
+              value: value,
+              isStrong: Math.abs(value) >= 0.3
             });
           }
         }
@@ -653,19 +655,6 @@
         });
       svg.call(zoom);
 
-      const helperLinks = layoutLinks.filter(d => d.layoutOnly);
-
-      // Draw faint below-threshold helper links first so isolated nodes do
-      // not look disconnected from the visible correlation structure.
-      const helperLink = g.append("g")
-        .selectAll("line")
-        .data(helperLinks)
-        .enter().append("line")
-        .attr("stroke", "rgba(120,200,255,0.22)")
-        .attr("stroke-width", 1.4)
-        .attr("stroke-dasharray", "4 7")
-        .attr("pointer-events", "none");
-
       // Draw links
       const link = g.append("g")
         .selectAll("line")
@@ -673,13 +662,15 @@
         .enter().append("line")
         .attr("class", "network-link")
         .attr("stroke", d => d.value > 0 ? "var(--accent-2)" : "var(--accent-1)")
-        .attr("stroke-width", d => Math.abs(d.value) * 5)
-        .attr("data-value", d => Math.abs(d.value));
+        .attr("stroke-width", d => d.isStrong ? Math.abs(d.value) * 5 : 0.8)
+        .attr("stroke-dasharray", d => d.isStrong ? null : "3 7")
+        .attr("data-value", d => Math.abs(d.value))
+        .style("stroke-opacity", d => d.isStrong ? 0.62 : 0.16);
 
       // Link labels
       const linkLabels = g.append("g")
         .selectAll("text")
-        .data(links)
+        .data(links.filter(d => d.isStrong))
         .enter().append("text")
         .attr("class", "network-corr-label")
         .text(d => d.value.toFixed(2))
@@ -709,12 +700,6 @@
 
       // Update positions
       networkSimulation.on("tick", () => {
-        helperLink
-          .attr("x1", d => d.source.x)
-          .attr("y1", d => d.source.y)
-          .attr("x2", d => d.target.x)
-          .attr("y2", d => d.target.y);
-
         link
           .attr("x1", d => d.source.x)
           .attr("y1", d => d.source.y)

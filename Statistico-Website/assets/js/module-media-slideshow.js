@@ -39,6 +39,7 @@
         display: block;
         object-fit: contain;
         background: rgba(0,0,0,.24);
+        animation: mediaShowcaseFadeIn .42s cubic-bezier(.22, .61, .36, 1) both;
       }
       .media-showcase-empty {
         height: 100%;
@@ -84,6 +85,7 @@
         background: rgba(5,12,24,.74);
         border: 1px solid rgba(255,255,255,.10);
         backdrop-filter: blur(12px);
+        animation: mediaShowcaseCaptionIn .38s cubic-bezier(.22, .61, .36, 1) both;
       }
       .media-showcase-counter {
         color: rgba(214,238,255,.82);
@@ -126,6 +128,7 @@
         background:
           radial-gradient(circle at 18% 0%, rgba(255,165,120,.14), transparent 42%),
           linear-gradient(160deg, rgba(255,255,255,.06), rgba(255,255,255,.025));
+        animation: mediaShowcaseCopyIn .36s cubic-bezier(.22, .61, .36, 1) both;
       }
       .media-showcase-eyebrow {
         margin: 0 0 8px;
@@ -167,12 +170,49 @@
         cursor: pointer;
         text-align: left;
         font: inherit;
+        transition: transform .2s ease, border-color .2s ease, background .2s ease, color .2s ease, box-shadow .2s ease;
       }
       .media-showcase-thumb.is-active {
         border-color: rgba(255,165,120,.62);
         background: linear-gradient(145deg, rgba(255,165,120,.16), rgba(120,200,255,.08));
         color: #fff;
         box-shadow: 0 0 0 1px rgba(255,165,120,.14), 0 10px 24px rgba(0,0,0,.18);
+      }
+      .media-showcase-thumb:hover {
+        transform: translateX(2px);
+        border-color: rgba(120,200,255,.34);
+      }
+      @keyframes mediaShowcaseFadeIn {
+        from {
+          opacity: 0;
+          transform: scale(.985);
+          filter: blur(8px) saturate(.9);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+          filter: blur(0) saturate(1);
+        }
+      }
+      @keyframes mediaShowcaseCopyIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes mediaShowcaseCaptionIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
       .media-showcase-thumb-icon {
         width: 38px;

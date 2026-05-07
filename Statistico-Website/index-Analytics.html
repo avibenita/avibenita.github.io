@@ -2301,6 +2301,7 @@
 
   <!-- Component Loader -->
   <script src="assets/js/nav-template.js?v=2026-05-06-logo-slider-cue"></script>
+  <script src="assets/js/module-media-slideshow.js?v=2026-05-07-corr-media-showcase"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       const DEMO_MAP = {
@@ -3074,6 +3075,30 @@
     const slideCopy = document.getElementById('viewSlideCopy');
     const slideChart = document.getElementById('viewSlideChart');
     const slideTabs = document.getElementById('viewSlideTabs');
+    const MODULE_MEDIA_SHOWCASES = {
+      correlations: {
+        title: 'Correlation Analysis Media Tour',
+        eyebrow: 'Correlation module walkthrough',
+        description: 'A reusable MP4/PNG media showcase for module tours. Add more items to this manifest as new files are added to the module media folder.',
+        items: [
+          {
+            title: 'Correlation Matrix Workflow',
+            src: 'assets/MP4s/Corr/Corr10.mp4',
+            description: 'Introduce the core correlation workspace: matrix review, coefficient scanning, p-values, and the interaction pattern users follow before opening detailed relationship views.'
+          },
+          {
+            title: 'Relationship Exploration',
+            src: 'assets/MP4s/Corr/Corr20.mp4',
+            description: 'Show the richer correlation experience, including follow-up views and the visual workflow that turns pairwise associations into interpretable exploration.'
+          }
+        ]
+      }
+    };
+
+    function moduleMediaShowcase(key) {
+      const showcase = MODULE_MEDIA_SHOWCASES[key];
+      return showcase && showcase.items && showcase.items.length ? showcase : null;
+    }
 
     function openWorkspaceWindow(url, title, moduleKey) {
       const fullUrl = moduleKey === 'correlations' || moduleKey === 'univariate'
@@ -3217,7 +3242,7 @@
           <button type="button" class="cap-cta" id="capSlideLaunchBtn">
             Launch Slide View <i class="fa-solid fa-up-right-from-square"></i>
           </button>
-          <p>Open the focused slide view to browse the main analytical screens for ${m.title}.</p>
+          <p>${moduleMediaShowcase(key) ? `Open the media slideshow for ${m.title}, including MP4 walkthroughs and image slides.` : `Open the focused slide view to browse the main analytical screens for ${m.title}.`}</p>
         </div>`;
       const launchBtn = document.getElementById('capSlideLaunchBtn');
       if (launchBtn) launchBtn.addEventListener('click', () => openSlideView(key, activeViewName));
@@ -3244,6 +3269,12 @@
     function renderSlideTabs(key, active) {
       const m = MODS[key]; if (!m) return;
       if (!slideTabs) return;
+      if (moduleMediaShowcase(key)) {
+        slideTabs.innerHTML = '';
+        slideTabs.style.display = 'none';
+        return;
+      }
+      slideTabs.style.display = '';
       slideTabs.innerHTML = m.views.map(v =>
         `<button class="cap-tab${v === active ? ' active' : ''}" data-view="${v}">
           <i class="fa-solid ${iconForView(v)}"></i>
@@ -3287,6 +3318,11 @@
     function renderActualView(target, key, view) {
       clearChart();
       target.innerHTML = '';
+      const mediaShowcase = moduleMediaShowcase(key);
+      if (mediaShowcase && window.StatisticoMediaSlideshow) {
+        window.StatisticoMediaSlideshow.render(target, mediaShowcase);
+        return;
+      }
       if (key === 'univariate') {
         if      (view === 'Histogram')    renderHistogram(target);
         else if (view === 'Box Plot')     renderBoxPlot(target);
@@ -3311,8 +3347,9 @@
       activeViewName = view;
       const m = MODS[key]; if (!m) return;
       const slide = slideInfo(key, view);
-      if (slideTitle) slideTitle.textContent = `${m.title} / ${view}`;
-      if (slideCopy) slideCopy.textContent = slide.copy;
+      const mediaShowcase = moduleMediaShowcase(key);
+      if (slideTitle) slideTitle.textContent = mediaShowcase ? mediaShowcase.title : `${m.title} / ${view}`;
+      if (slideCopy) slideCopy.textContent = mediaShowcase ? (mediaShowcase.description || m.sub) : slide.copy;
       renderActualView(slideChart, key, view);
       renderSlideTabs(key, view);
     }

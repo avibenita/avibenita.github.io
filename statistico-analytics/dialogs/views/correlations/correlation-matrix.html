@@ -1625,6 +1625,16 @@
     // Zoom
     svg.call(d3.zoom().scaleExtent([0.25, 4]).on('zoom', e => g.attr('transform', e.transform)));
 
+    const helperLinks = layoutLinks.filter(d => d.layoutOnly);
+
+    // Draw faint below-threshold helper links first so isolated nodes do not
+    // look disconnected from the visible correlation structure.
+    const helperLink = g.append('g').selectAll('line').data(helperLinks).enter().append('line')
+      .attr('stroke', 'rgba(120,200,255,0.22)')
+      .attr('stroke-width', 1.4)
+      .attr('stroke-dasharray', '4 7')
+      .attr('pointer-events', 'none');
+
     // Links
     const link = g.append('g').selectAll('line').data(links).enter().append('line')
       .attr('stroke', d => d.value >= 0 ? 'rgba(120,200,255,0.75)' : 'rgba(255,165,120,0.75)')
@@ -1664,6 +1674,9 @@
       .attr('dy', 36);
 
     networkSimulation.on('tick', () => {
+      helperLink
+        .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
       link
         .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
         .attr('x2', d => d.target.x).attr('y2', d => d.target.y);

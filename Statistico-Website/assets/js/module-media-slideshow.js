@@ -49,6 +49,23 @@
         text-align: center;
         padding: 24px;
       }
+      .media-showcase-error {
+        position: absolute;
+        inset: auto 18px 86px 18px;
+        z-index: 3;
+        display: none;
+        padding: 11px 13px;
+        border-radius: 14px;
+        border: 1px solid rgba(239,68,68,.34);
+        background: rgba(127,29,29,.72);
+        color: rgba(254,226,226,.96);
+        font-size: .78rem;
+        line-height: 1.4;
+        backdrop-filter: blur(10px);
+      }
+      .media-showcase-error.is-visible {
+        display: block;
+      }
       .media-showcase-caption {
         position: absolute;
         left: 18px;
@@ -202,7 +219,13 @@
       return '<div class="media-showcase-empty">Add MP4 or PNG entries to this module media manifest.</div>';
     }
     if (mediaType(item) === 'video') {
-      return `<video class="media-showcase-frame" src="${item.src}" controls playsinline preload="metadata"></video>`;
+      return `
+        <video class="media-showcase-frame" controls autoplay muted loop playsinline preload="auto">
+          <source src="${item.src}" type="video/mp4">
+        </video>
+        <div class="media-showcase-error" data-media-error>
+          This video could not be displayed by the browser. Check that the MP4 uses web-compatible H.264/AAC encoding.
+        </div>`;
     }
     return `<img class="media-showcase-frame" src="${item.src}" alt="${item.title || 'Module slide'}" loading="lazy">`;
   }
@@ -259,6 +282,22 @@
           draw();
         });
       });
+
+      const video = container.querySelector('.media-showcase-frame');
+      const error = container.querySelector('[data-media-error]');
+      if (video && video.tagName === 'VIDEO') {
+        video.addEventListener('error', () => {
+          if (error) error.classList.add('is-visible');
+        }, { once: true });
+        video.load();
+        const playAttempt = video.play();
+        if (playAttempt && typeof playAttempt.catch === 'function') {
+          playAttempt.catch(() => {
+            video.muted = true;
+            video.play().catch(() => {});
+          });
+        }
+      }
     }
 
     draw();

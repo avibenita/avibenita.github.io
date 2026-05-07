@@ -950,6 +950,14 @@ const StatisticoHeader = {
     // Persist module data in sessionStorage so the destination page can restore it.
     if (window.correlationData) {
       try { sessionStorage.setItem('correlationData', JSON.stringify(window.correlationData)); } catch(e) {}
+    } else {
+      try {
+        const storedCorrelationData = sessionStorage.getItem('correlationData');
+        if (storedCorrelationData) {
+          window.correlationData = JSON.parse(storedCorrelationData);
+          sessionStorage.setItem('correlationData', storedCorrelationData);
+        }
+      } catch(e) {}
     }
     if (window.regressionData) {
       try { sessionStorage.setItem('regressionNavData', JSON.stringify(window.regressionData)); } catch(e) {}

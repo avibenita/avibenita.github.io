@@ -281,17 +281,41 @@ const StatisticoHeader = {
     }
   },
 
-  _getBrandLogoSrc() {
-    const scriptSrc = (document.currentScript && document.currentScript.src)
-      || Array.from(document.scripts || [])
-        .map((script) => script.src || '')
-        .find((src) => src.indexOf('shared-header.js') !== -1)
-      || window.location.href;
-    try {
-      return new URL('../../../Statistico-Website/assets/img/logo-dark.png', scriptSrc).href;
-    } catch (_) {
-      return '../../../../Statistico-Website/assets/img/logo-dark.png';
-    }
+  _getBrandLogoSvg() {
+    return `
+      <svg class="sb-logo-svg" viewBox="0 -6 300 96" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Statistico Interactive">
+        <defs>
+          <linearGradient id="sbLogoBlue" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#2d76ff"/>
+            <stop offset="100%" stop-color="#0ea5e9"/>
+          </linearGradient>
+          <linearGradient id="sbLogoTeal" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#51f0dc"/>
+            <stop offset="100%" stop-color="#00a8b5"/>
+          </linearGradient>
+          <radialGradient id="sbLogoSlider" cx="35%" cy="30%" r="70%">
+            <stop offset="0%" stop-color="#d7f3ff"/>
+            <stop offset="52%" stop-color="#6fb7ff"/>
+            <stop offset="100%" stop-color="#2d76ff"/>
+          </radialGradient>
+        </defs>
+        <g class="sb-logo-mark">
+          <path d="M58 15 C58 6 47 2 35 2 C19 2 8 12 8 25 C8 37 19 43 35 43" stroke="url(#sbLogoBlue)" stroke-width="10" fill="none" stroke-linecap="round"/>
+          <path d="M35 43 C51 43 64 49 64 61 C64 75 51 82 35 82 C20 82 10 75 9 64" stroke="url(#sbLogoBlue)" stroke-width="10" fill="none" stroke-linecap="round"/>
+          <rect x="18" y="51" width="8" height="24" rx="2" fill="url(#sbLogoTeal)"/>
+          <rect x="30" y="43" width="8" height="32" rx="2" fill="url(#sbLogoTeal)"/>
+          <rect x="42" y="34" width="8" height="41" rx="2" fill="url(#sbLogoTeal)"/>
+          <rect x="54" y="25" width="8" height="50" rx="2" fill="url(#sbLogoTeal)"/>
+        </g>
+        <text x="88" y="37" class="sb-logo-title" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="800" letter-spacing="7">STATISTICO</text>
+        <g class="sb-logo-subtitle-row">
+          <line class="sb-logo-subline" x1="92" y1="63" x2="118" y2="63"/>
+          <text x="191" y="68" class="sb-logo-subtitle" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="800" letter-spacing="4.6" text-anchor="middle">INTERACTIVE</text>
+          <line class="sb-logo-subline" x1="264" y1="63" x2="296" y2="63"/>
+          <circle class="sb-logo-slider-knob" cx="282" cy="63" r="5.2"/>
+        </g>
+      </svg>
+    `;
   },
 
   _getModuleDisplayName() {
@@ -414,7 +438,6 @@ const StatisticoHeader = {
       'power': 'Power & Sample Size'
     };
     const moduleName = moduleNames[this.module] || this._getModuleDisplayName();
-    const brandLogoSrc = this._getBrandLogoSrc();
     
     const actionButtonsHtml = this._pendingActions ? this._renderActionButtons(this._pendingActions) : '';
     const headerGlobalControls = this._renderHeaderGlobalControls();
@@ -971,12 +994,12 @@ const StatisticoHeader = {
       return `<div class="sb-group"><div class="sb-group-title">${group.title || ''}</div><div class="sb-items-rail">${itemsHtml}</div></div>`;
     }).join('');
 
-    const brandLogoSrc = this._getBrandLogoSrc();
+    const brandLogoSvg = this._getBrandLogoSvg();
 
     nav.innerHTML = `
       <div class="sb-logo">
         <div class="sb-logo-icon">
-          <img class="sb-logo-img" src="${brandLogoSrc}" alt="Statistico Interactive" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+          ${brandLogoSvg}
           <i class="fa-solid ${cfg.logoIcon || 'fa-chart-line'}" style="display:none;"></i>
         </div>
       </div>

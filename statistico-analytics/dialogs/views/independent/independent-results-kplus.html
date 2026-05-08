@@ -143,16 +143,21 @@
     .posthoc-group-options label{display:inline-flex;align-items:center;gap:5px;cursor:pointer;}
     #posthocRefGroup{height:34px;width:100%;padding:0 9px;border-radius:6px;background:rgba(15,23,42,.95);border:1px solid rgba(120,200,255,.45);color:#fff;font-size:13px;font-weight:700;}
     @media (max-width: 980px){.posthoc-menu{grid-template-columns:repeat(2,minmax(150px,1fr));}}
-    .inference-row{display:flex;align-items:center;justify-content:flex-start;gap:10px;flex-wrap:nowrap;min-width:max-content;}
+    .inference-row{display:flex;align-items:center;justify-content:flex-start;gap:10px;flex-wrap:nowrap;min-width:max-content;width:100%;}
     .inference-card{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;justify-content:flex-start;padding:0;border:0;border-radius:0;background:transparent;min-width:max-content;}
-    .inference-card#primaryTestWrap{flex:0 0 auto;min-width:180px;max-width:200px;}
+    .inference-card--framework{flex:1 1 auto;width:100%;}
+    .inference-card#primaryTestWrap{display:none!important;}
     .inference-title{display:none;}
-    .fw-radio-group{display:flex;border:0;border-radius:0;overflow:hidden;min-width:320px;gap:5px;}
+    .fw-radio-group{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));border:0;border-radius:0;overflow:visible;min-width:480px;width:100%;gap:10px;}
     .fw-radio-group input{display:none;}
-    .fw-radio{padding:8px 14px;color:#fff;font-size:13px;font-weight:800;cursor:pointer;user-select:none;border:3px solid transparent;box-shadow:0 2px 6px rgba(0,0,0,0.1);text-transform:uppercase;letter-spacing:0.4px;opacity:0.6;flex:1;text-align:center;position:relative;}
+    .fw-radio{min-height:62px;padding:12px 16px 12px 34px;color:#fff;font-size:13px;font-weight:800;cursor:pointer;user-select:none;border:3px solid transparent;box-shadow:0 2px 6px rgba(0,0,0,0.1);text-transform:uppercase;letter-spacing:0.4px;opacity:0.68;flex:1;text-align:left;position:relative;display:flex;flex-direction:column;justify-content:center;gap:5px;}
     .fw-radio:last-of-type{border-right:3px solid transparent;}
     .fw-radio.active{opacity:1;box-shadow:0 3px 10px rgba(0,0,0,0.3);transform:translateY(-2px);transition:all 0.2s ease;border-color:currentColor;}
-    .fw-radio.active::before{content:'*';position:absolute;left:6px;top:50%;transform:translateY(-50%);font-size:16px;font-weight:900;}
+    .fw-radio::before{content:'';position:absolute;left:10px;top:15px;width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.76);background:rgba(255,255,255,.08);}
+    .fw-radio.active::before{background:#fff;box-shadow:inset 0 0 0 3px currentColor;}
+    .fw-radio-main{font-size:14px;line-height:1.05;}
+    .fw-radio-method{font-size:11px;font-weight:800;letter-spacing:.2px;text-transform:none;color:rgba(255,255,255,.82);}
+    .fw-radio.active .fw-radio-method{color:#fff;}
     .fw-radio#setFrameworkParam{background:#4a90e2;color:#fff;}
     .fw-radio#setFrameworkParam.active{background:#2e5f8a;border-color:#4a90e2;}
     .fw-radio#setFrameworkNon{background:#26a69a;color:#fff;}
@@ -305,17 +310,23 @@
         <div class="inference-row">
 
           <!-- Inference Type (left) -->
-          <div class="inference-card" style="flex:0 0 auto;">
+          <div class="inference-card inference-card--framework">
             <div class="inference-title">Inference type</div>
             <div class="fw-radio-group" role="radiogroup" aria-label="Inference type">
               <input id="fwParametric" type="radio" name="frameworkMode" value="parametric" checked/>
-              <label for="fwParametric" id="setFrameworkParam" class="fw-radio active">Parametric (means)</label>
+              <label for="fwParametric" id="setFrameworkParam" class="fw-radio active">
+                <span class="fw-radio-main">Parametric (means)</span>
+                <span class="fw-radio-method" id="parametricMethodText">Method used: One-way ANOVA</span>
+              </label>
               <input id="fwNonparametric" type="radio" name="frameworkMode" value="nonparametric"/>
-              <label for="fwNonparametric" id="setFrameworkNon" class="fw-radio">Non-parametric (ranks)</label>
+              <label for="fwNonparametric" id="setFrameworkNon" class="fw-radio">
+                <span class="fw-radio-main">Non-parametric (ranks)</span>
+                <span class="fw-radio-method" id="nonparametricMethodText">Method used: Kruskal-Wallis</span>
+              </label>
             </div>
           </div>
 
-          <!-- Test Method (right) -->
+          <!-- Hidden canonical test method; visible method names live under each test type. -->
           <div class="inference-card" id="primaryTestWrap" style="flex:1 1 auto;min-width:280px;">
             <div class="inference-title">Test method</div>
             <select id="setPrimaryTest" style="width:100%;height:42px;font-size:14px;padding:0 12px;border-radius:10px;border:1px solid rgba(120,200,255,.45);background:rgba(15,23,42,.95);color:#fff;font-weight:600;">
@@ -928,7 +939,11 @@
       if (rp) rp.checked = primaryFramework === "parametric";
       if (rn) rn.checked = primaryFramework === "nonparametric";
       var primaryTestWrap = document.getElementById("primaryTestWrap");
-      if (primaryTestWrap) primaryTestWrap.style.display = "flex";
+      if (primaryTestWrap) primaryTestWrap.style.display = "none";
+      var parametricMethodText = document.getElementById("parametricMethodText");
+      var nonparametricMethodText = document.getElementById("nonparametricMethodText");
+      if (parametricMethodText) parametricMethodText.textContent = "Method used: One-way ANOVA";
+      if (nonparametricMethodText) nonparametricMethodText.textContent = "Method used: Kruskal-Wallis";
       var testSel = document.getElementById("setPrimaryTest");
       if (testSel) testSel.className = primaryFramework === "nonparametric" ? "nonparametric" : "parametric";
       document.querySelectorAll(".stat-panel-heading").forEach(function(h){

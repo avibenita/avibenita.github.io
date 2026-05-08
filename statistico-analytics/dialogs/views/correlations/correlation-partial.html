@@ -392,6 +392,7 @@
       display:flex;
       gap:15px;
       align-items:center;
+      flex-wrap:wrap;
     }
 
     .matrix-controls label{
@@ -407,6 +408,56 @@
       accent-color:var(--accent-1);
     }
 
+    .view-toggle{
+      display:flex;
+      gap:3px;
+      background:rgba(0,0,0,0.25);
+      border:1px solid rgba(255,255,255,0.07);
+      border-radius:7px;
+      padding:3px;
+    }
+
+    .view-toggle button{
+      border:0;
+      background:transparent;
+      color:var(--text-secondary);
+      font-size:13px;
+      font-weight:700;
+      padding:5px 14px;
+      border-radius:5px;
+      cursor:pointer;
+      transition:all .2s ease;
+    }
+
+    .view-toggle button.active{
+      background:var(--accent-1);
+      color:var(--surface-0);
+      box-shadow:0 2px 8px rgba(255,165,120,.35);
+    }
+
+    .highlight-control{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:6px 12px;
+      border:1px solid var(--border);
+      border-radius:8px;
+      background:rgba(255,255,255,.04);
+    }
+
+    .highlight-control input[type="range"]{
+      width:130px;
+      accent-color:var(--accent-1);
+    }
+
+    .highlight-value{
+      color:var(--accent-1);
+      font-weight:800;
+      min-width:42px;
+      text-align:right;
+      font-size:13px;
+    }
+
     /* Table Styles */
     .table-container{
       overflow:auto;
@@ -416,6 +467,7 @@
 
     table{
       width:100%;
+      min-width:900px;
       border-collapse:collapse;
     }
 
@@ -491,6 +543,29 @@
       background:linear-gradient(135deg, rgba(255,165,120,0.3), rgba(255,165,120,0.2))!important;
       border:2px solid var(--accent-1)!important;
       box-shadow:0 0 15px rgba(255,165,120,0.4);
+    }
+
+    td.threshold-highlight{
+      background:linear-gradient(135deg, rgba(255,165,120,0.26), rgba(120,200,255,0.14))!important;
+      box-shadow:inset 0 0 12px rgba(255,165,120,.36);
+    }
+
+    .heatmap-container{
+      overflow:auto;
+      border-radius:8px;
+      border:1px solid var(--border);
+      background:var(--surface-1);
+    }
+
+    .heatmap-table{
+      width:100%;
+      min-width:900px;
+      border-collapse:collapse;
+    }
+
+    .heatmap-table td{
+      color:#07111f;
+      font-weight:800;
     }
 
     /* Modal Styles */
@@ -806,6 +881,18 @@
           <h3>Partial Correlation Matrix</h3>
           <div class="matrix-controls">
             <label>
+              <span>View:</span>
+              <span class="view-toggle">
+                <button type="button" id="partialTableBtn" class="active" onclick="setPartialMatrixView('table')">Table</button>
+                <button type="button" id="partialHeatmapBtn" onclick="setPartialMatrixView('heatmap')">Heatmap</button>
+              </span>
+            </label>
+            <label class="highlight-control">
+              <span>Highlight r &ge;</span>
+              <input id="partialThresholdSlider" type="range" min="0" max="1" step="0.05" value="0" oninput="updatePartialThreshold(this.value)">
+              <span class="highlight-value" id="partialThresholdValue">0.00</span>
+            </label>
+            <label>
               <input id="togglePval" type="checkbox"/>
               <span>Show p-values</span>
             </label>
@@ -827,6 +914,14 @@
               <tr id="headerRow"></tr>
             </thead>
             <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+        <div class="heatmap-container" id="partialHeatmapContainer" style="display:none;">
+          <table id="partialHeatmapTable" class="heatmap-table">
+            <thead>
+              <tr id="partialHeatmapHeader"></tr>
+            </thead>
+            <tbody id="partialHeatmapBody"></tbody>
           </table>
         </div>
       </div>
@@ -885,6 +980,8 @@
     let precomputedCorrelationMatrix = null;
     let precomputedNMatrix = null;
     let variableRoles = [];
+    let partialMatrixView = 'table';
+    let partialThreshold = 0;
 
     // Initialize Office.js
     Office.onReady(function(info) {
@@ -1172,6 +1269,32 @@
       return variableNames.map((_, index) => index).filter(index => !controls.includes(index) && !excluded.includes(index));
     }
 
+    function setPartialMatrixView(view) {
+      partialMatrixView = view === 'heatmap' ? 'heatmap' : 'table';
+      const tableContainer = document.getElementById('tableContainer');
+      const heatmapContainer = document.getElementById('partialHeatmapContainer');
+      const tableBtn = document.getElementById('partialTableBtn');
+      const heatmapBtn = document.getElementById('partialHeatmapBtn');
+      if (tableContainer) tableContainer.style.display = partialMatrixView === 'table' ? 'block' : 'none';
+      if (heatmapContainer) heatmapContainer.style.display = partialMatrixView === 'heatmap' ? 'block' : 'none';
+      if (tableBtn) tableBtn.classList.toggle('active', partialMatrixView === 'table');
+      if (heatmapBtn) heatmapBtn.classList.toggle('active', partialMatrixView === 'heatmap');
+    }
+
+    function updatePartialThreshold(value) {
+      partialThreshold = Math.max(0, Math.min(1, parseFloat(value) || 0));
+      const label = document.getElementById('partialThresholdValue');
+      if (label) label.textContent = partialThreshold.toFixed(2);
+      applyPartialThreshold();
+    }
+
+    function applyPartialThreshold() {
+      document.querySelectorAll('#correlationTable td[data-corr], #partialHeatmapTable td[data-corr]').forEach(cell => {
+        const corr = Math.abs(parseFloat(cell.dataset.corr || '0'));
+        cell.classList.toggle('threshold-highlight', partialThreshold > 0 && corr >= partialThreshold);
+      });
+    }
+
     function updateExplanationCard() {
       const controlNames = getControlIndices().map(index => variableNames[index]);
       const excludedNames = getExcludedIndices().map(index => variableNames[index]);
@@ -1374,11 +1497,12 @@
         <th></th>
         ${nonControlIndices.map(idx => `<th>${variableNames[idx]}</th>`).join('')}
       `;
+      buildPartialHeatmap(nonControlIndices, controlIndices);
 
       if (nonControlIndices.length < 2) {
         tableBody.innerHTML = `<tr><td colspan="${Math.max(1, nonControlIndices.length + 1)}">At least two non-control, non-excluded variables are required.</td></tr>`;
         loading.style.display = 'none';
-        tableContainer.style.display = 'block';
+        setPartialMatrixView(partialMatrixView);
         return;
       }
       
@@ -1401,6 +1525,7 @@
             td.textContent = '1.000';
           } else {
             const result = calculatePartialCorrelation(varIdx, var2Idx, controlIndices);
+            if (result.correlation !== null) td.dataset.corr = String(result.correlation);
             
             // Correlation value (clickable)
             const corrSpan = document.createElement('span');
@@ -1444,7 +1569,49 @@
       
       // Show table
       loading.style.display = 'none';
-      tableContainer.style.display = 'block';
+      setPartialMatrixView(partialMatrixView);
+      applyPartialThreshold();
+    }
+
+    function buildPartialHeatmap(nonControlIndices, controlIndices) {
+      const head = document.getElementById('partialHeatmapHeader');
+      const body = document.getElementById('partialHeatmapBody');
+      if (!head || !body) return;
+
+      head.innerHTML = `
+        <th></th>
+        ${nonControlIndices.map(idx => `<th>${variableNames[idx]}</th>`).join('')}
+      `;
+      body.innerHTML = '';
+
+      nonControlIndices.forEach((rowIdx, i) => {
+        const tr = document.createElement('tr');
+        const rowHead = document.createElement('td');
+        rowHead.textContent = variableNames[rowIdx];
+        tr.appendChild(rowHead);
+
+        nonControlIndices.forEach((colIdx, j) => {
+          const td = document.createElement('td');
+          if (i === j) {
+            td.textContent = '1.000';
+            td.style.background = 'rgba(120,200,255,0.18)';
+          } else {
+            const result = calculatePartialCorrelation(rowIdx, colIdx, controlIndices);
+            const corr = result.correlation;
+            td.textContent = corr !== null ? corr.toFixed(3) : '.';
+            if (corr !== null) {
+              td.dataset.corr = String(corr);
+              const intensity = Math.min(1, Math.abs(corr));
+              const alpha = 0.18 + intensity * 0.62;
+              td.style.background = corr >= 0
+                ? `rgba(120,200,255,${alpha})`
+                : `rgba(255,165,120,${alpha})`;
+            }
+          }
+          tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      });
     }
 
     /**

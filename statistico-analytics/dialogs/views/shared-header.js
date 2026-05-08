@@ -633,7 +633,7 @@ const StatisticoHeader = {
           {
             title: 'Analysis Views',
             items: [
-              { type: 'navigate', viewIn: ['correlation-matrix'], file: 'correlations/correlation-results.html', icon: 'fa-table-cells', label: 'Matrix' },
+              { type: 'navigate', viewIn: ['correlation-matrix'], file: 'correlations/correlation-matrix.html', icon: 'fa-table-cells', label: 'Matrix' },
               { type: 'navigate', viewIn: ['correlation-network'], file: 'correlations/correlation-network.html', icon: 'fa-circle-nodes', label: 'Network' },
               { type: 'navigate', viewIn: ['taylor-diagram'], file: 'correlations/correlation-taylor.html', icon: 'fa-compass-drafting', label: 'Taylor Diagram' },
               { type: 'navigate', viewIn: ['partial-correlations'], file: 'correlations/correlation-partial.html', icon: 'fa-filter', label: 'Partial' },

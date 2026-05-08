@@ -2864,9 +2864,16 @@ const StatisticoHeader = {
         connectedNames.add(pair.y);
       }
     });
-    const controls = Array.from(document.querySelectorAll('#controlCheckboxes input[type="checkbox"]:checked'))
-      .map((input) => input.value || input.dataset?.varName || input.parentElement?.textContent?.trim())
-      .filter(Boolean);
+    let savedPartialRoles = null;
+    try { savedPartialRoles = JSON.parse(sessionStorage.getItem('partialCorrelationRoles') || 'null'); } catch (e) {}
+    const controls = (Array.isArray(window.partialControlVariables) ? window.partialControlVariables
+      : Array.isArray(savedPartialRoles?.controls) ? savedPartialRoles.controls
+      : Array.from(document.querySelectorAll('#controlCheckboxes input[type="checkbox"]:checked')))
+        .map((input) => typeof input === 'string' ? input : (input.value || input.dataset?.varName || input.parentElement?.textContent?.trim()))
+        .filter(Boolean);
+    const excluded = Array.isArray(window.partialExcludedVariables) ? window.partialExcludedVariables
+      : Array.isArray(savedPartialRoles?.excluded) ? savedPartialRoles.excluded
+      : [];
     const pca = window.pcaData ? {
       firstComponentVariance: window.pcaData.firstComponentVariance,
       eigenvalues: window.pcaData.eigenvalues
@@ -2880,7 +2887,7 @@ const StatisticoHeader = {
         disconnected: dataset.headers.filter((name) => !connectedNames.has(name))
       },
       descriptives,
-      partial: { controls },
+      partial: { controls, excluded },
       reliability,
       pca
     };
@@ -2913,6 +2920,10 @@ const StatisticoHeader = {
     if (allData.partial?.controls?.length) {
       lines.push('[ Partial Correlations ]');
       lines.push(`  Current control variables=${allData.partial.controls.join(', ')}`);
+      if (allData.partial.excluded?.length) lines.push(`  Excluded variables=${allData.partial.excluded.join(', ')}`);
+    } else if (allData.partial?.excluded?.length) {
+      lines.push('[ Partial Correlations ]');
+      lines.push(`  Excluded variables=${allData.partial.excluded.join(', ')}`);
     }
     if (allData.descriptives?.length) {
       lines.push('[ Descriptives ]');
@@ -3030,7 +3041,7 @@ const StatisticoHeader = {
     return {
       'correlation-matrix': 'Matrix view shows all pairwise correlations. Sort or scan for strongest positive and negative relationships, then use Network/Partial/Reliability for follow-up.',
       'correlation-network': 'Network view highlights relationships above the threshold, can show only connected variables, and uses chart scale to inspect dense graphs.',
-      'partial-correlations': 'Partial view recalculates pairwise correlations while controlling selected variables. Use it to check whether a relationship persists after confounders are held constant.',
+      'partial-correlations': 'Partial view recalculates pairwise correlations while controlling selected variables and omitting excluded variables. Use it to check whether a relationship persists after confounders are held constant.',
       reliability: 'Reliability view evaluates whether selected variables behave like a consistent scale using alpha, omega, item-total correlations, alpha-if-deleted, and PCA dimensionality cues.',
       'taylor-diagram': 'Taylor view compares variables against a reference using correlation, standard deviation, and centered RMSE-style geometry.',
       'descriptive-stats': 'Descriptives summarize each variable before interpreting the correlation structure.'

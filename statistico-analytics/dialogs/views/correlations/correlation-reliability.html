@@ -65,6 +65,7 @@
     :root[data-theme="light"] tbody tr:hover { background: rgba(37,99,235,0.06); }
     :root[data-theme="light"] td, :root[data-theme="light"] th { border-color: var(--border); color: var(--text-primary); }
     :root[data-theme="light"] .results-container { background: var(--surface-0); }
+    :root[data-theme="light"] .alpha-deleted-col { background: rgba(37,99,235,0.08); }
 
     * {
       margin: 0;
@@ -212,7 +213,8 @@
 
     #item-stats {
       border-collapse: collapse;
-      width: 100%;
+      width: min(100%, 1180px);
+      margin: 0 auto;
       position: relative;
       font-size: 13px;
     }
@@ -230,6 +232,56 @@
       text-align: center;
     }
 
+    #item-stats th {
+      user-select: none;
+    }
+
+    #item-stats th button {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    #item-stats th button::after {
+      content: "sort";
+      color: rgba(255,255,255,0.42);
+      font-size: 10px;
+    }
+
+    #item-stats th.sorted-asc button::after { content: "asc"; color: var(--accent-1); }
+    #item-stats th.sorted-desc button::after { content: "desc"; color: var(--accent-1); }
+
+    #item-stats.hide-descriptives .descriptive-col {
+      display: none;
+    }
+
+    .alpha-deleted-col {
+      background: rgba(255,165,120,0.10);
+      color: var(--accent-1);
+      font-weight: 800;
+      box-shadow: inset 2px 0 0 rgba(255,165,120,0.45), inset -2px 0 0 rgba(255,165,120,0.45);
+    }
+
+    #item-stats th.alpha-deleted-col {
+      background: linear-gradient(135deg, rgba(255,165,120,0.35), rgba(255,165,120,0.14));
+      color: #fff;
+    }
+
+    .alpha-deleted-col.alpha-low {
+      color: #ffb4a0;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 3px;
+    }
+
     #item-stats tbody tr:nth-child(even) {
       background-color: rgba(255, 255, 255, 0.05);
     }
@@ -242,6 +294,25 @@
       max-height: 300px;
       overflow-y: auto;
       position: relative;
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .table-option {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+    }
+
+    .table-option input {
+      width: 15px;
+      height: 15px;
+      accent-color: var(--accent-1);
     }
 
     select {
@@ -387,20 +458,24 @@
       <div class="panel-row">
         <div class="panel">
           <div class="panel-heading">
-            Item Statistics
+            <span>Item Statistics</span>
+            <label class="table-option" for="showDescriptiveColumns">
+              <input id="showDescriptiveColumns" type="checkbox" onchange="toggleDescriptiveColumns(this.checked)">
+              <span>Show Mean / SD</span>
+            </label>
           </div>
           <div class="panel-body">
             <div class="stats-container">
               <div class="table-scroll-wrapper">
-                <table id="item-stats" class="table table-striped">
+                <table id="item-stats" class="table table-striped hide-descriptives">
                   <thead>
                     <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.3);">
-                      <th>Item</th>
-                      <th>Mean</th>
-                      <th>SD</th>
-                      <th>Item-Total Corr</th>
-                      <th>Alpha if Deleted</th>
-                      <th>N if Deleted</th>
+                      <th data-sort-key="item"><button type="button" onclick="sortReliabilityTable('item')">Item</button></th>
+                      <th data-sort-key="mean" class="descriptive-col"><button type="button" onclick="sortReliabilityTable('mean')">Mean</button></th>
+                      <th data-sort-key="sd" class="descriptive-col"><button type="button" onclick="sortReliabilityTable('sd')">SD</button></th>
+                      <th data-sort-key="itemTotalCorr"><button type="button" onclick="sortReliabilityTable('itemTotalCorr')">Item-Total Corr</button></th>
+                      <th data-sort-key="alphaIfDeleted" class="alpha-deleted-col"><button type="button" onclick="sortReliabilityTable('alphaIfDeleted')">Alpha if Deleted</button></th>
+                      <th data-sort-key="nIfDeleted"><button type="button" onclick="sortReliabilityTable('nIfDeleted')">N if Deleted</button></th>
                     </tr>
                   </thead>
                   <tbody id="stats-body"></tbody>
@@ -436,6 +511,8 @@
     let lastData = [], lastVarNames = [];
     let originalRawData = [];
     let pcaData = null;
+    let reliabilityTableRows = [];
+    let reliabilitySort = { key: null, direction: 'asc' };
 
     // Office.js initialization
     Office.onReady(() => {
@@ -633,23 +710,20 @@
       document.getElementById("item-count").textContent = validIndices.length;
       document.getElementById("subject-count").textContent = numSubjects;
 
-      // Populate table
-      const tableBody = document.getElementById("stats-body");
-      tableBody.innerHTML = "";
+      reliabilityTableRows = [];
       for (let i = 0; i < numItems; i++) {
         const nValue = nIfDeleted[i];
-        const nDisplay = isNaN(nValue) ? 'N/A' : nValue;
-        const nStyle = nValue > numSubjects ? 'color: #2ecc71; font-weight: bold;' : '';
-        
-        tableBody.innerHTML += `<tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
-          <td>${varnames[i]}</td>
-          <td>${itemMeans[i].toFixed(2)}</td>
-          <td>${itemSDs[i].toFixed(2)}</td>
-          <td>${itemTotalCorrs[i].toFixed(2)}</td>
-          <td>${alphaIfDeleted[i].toFixed(3)}</td>
-          <td style="${nStyle}">${nDisplay}</td>
-        </tr>`;
+        reliabilityTableRows.push({
+          item: varnames[i],
+          mean: itemMeans[i],
+          sd: itemSDs[i],
+          itemTotalCorr: itemTotalCorrs[i],
+          alphaIfDeleted: alphaIfDeleted[i],
+          nIfDeleted: nValue,
+          nImproves: nValue > numSubjects
+        });
       }
+      renderReliabilityTable();
 
       storePCAData(cleanedData);
       renderGauge(alpha);
@@ -666,10 +740,94 @@
         StatisticoHeader.initSidebarPage(); StatisticoHeader.updateTitle('Reliability Coefficients');;
     }
 
+    function toggleDescriptiveColumns(show) {
+      const table = document.getElementById('item-stats');
+      if (!table) return;
+      table.classList.toggle('hide-descriptives', !show);
+    }
+
+    function sortReliabilityTable(key) {
+      reliabilitySort = {
+        key,
+        direction: reliabilitySort.key === key && reliabilitySort.direction === 'asc' ? 'desc' : 'asc'
+      };
+      renderReliabilityTable();
+    }
+
+    function renderReliabilityTable() {
+      const tableBody = document.getElementById("stats-body");
+      if (!tableBody) return;
+
+      const rows = reliabilityTableRows.slice();
+      if (reliabilitySort.key) {
+        rows.sort((a, b) => {
+          const key = reliabilitySort.key;
+          const aValue = a[key];
+          const bValue = b[key];
+          const direction = reliabilitySort.direction === 'asc' ? 1 : -1;
+
+          if (typeof aValue === 'string' || typeof bValue === 'string') {
+            return String(aValue).localeCompare(String(bValue)) * direction;
+          }
+
+          const aFinite = Number.isFinite(aValue);
+          const bFinite = Number.isFinite(bValue);
+          if (!aFinite && !bFinite) return 0;
+          if (!aFinite) return 1;
+          if (!bFinite) return -1;
+          return (aValue - bValue) * direction;
+        });
+      }
+
+      tableBody.innerHTML = rows.map(row => {
+        const alphaClass = Number.isFinite(row.alphaIfDeleted) && row.alphaIfDeleted <= 0 ? ' alpha-low' : '';
+        const nStyle = row.nImproves ? 'color: #2ecc71; font-weight: bold;' : '';
+        return `<tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+          <td>${escapeHTML(row.item)}</td>
+          <td class="descriptive-col">${formatStat(row.mean, 2)}</td>
+          <td class="descriptive-col">${formatStat(row.sd, 2)}</td>
+          <td>${formatStat(row.itemTotalCorr, 2)}</td>
+          <td class="alpha-deleted-col${alphaClass}" title="${getAlphaDeletedTitle(row.alphaIfDeleted)}">${formatStat(row.alphaIfDeleted, 3)}</td>
+          <td style="${nStyle}">${Number.isFinite(row.nIfDeleted) ? row.nIfDeleted : 'N/A'}</td>
+        </tr>`;
+      }).join('');
+
+      document.querySelectorAll('#item-stats th').forEach(th => {
+        th.classList.remove('sorted-asc', 'sorted-desc');
+        if (th.dataset.sortKey === reliabilitySort.key) {
+          th.classList.add(reliabilitySort.direction === 'asc' ? 'sorted-asc' : 'sorted-desc');
+        }
+      });
+    }
+
+    function formatStat(value, digits) {
+      return Number.isFinite(value) ? value.toFixed(digits) : 'N/A';
+    }
+
+    function getAlphaDeletedTitle(value) {
+      if (!Number.isFinite(value)) return 'Alpha could not be calculated after deleting this item.';
+      if (value <= 0) return 'Alpha if deleted is zero or negative; check item coding and dimensionality.';
+      return 'Cronbach alpha recalculated after deleting this item.';
+    }
+
+    function escapeHTML(str) {
+      return String(str).replace(/[&<>"']/g, match => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[match]));
+    }
+
     function cronbachAlpha(matrix) {
+      if (!Array.isArray(matrix) || matrix.length < 2 || !Array.isArray(matrix[0]) || matrix[0].length < 2) {
+        return NaN;
+      }
       const k = matrix[0].length;
       const transpose = m => m[0].map((_, i) => m.map(row => row[i]));
       const variance = arr => {
+        if (!Array.isArray(arr) || arr.length < 2) return NaN;
         const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
         return arr.reduce((sum, x) => sum + Math.pow(x - avg, 2), 0) / (arr.length - 1);
       };
@@ -677,10 +835,17 @@
       const itemVars = items.map(variance);
       const totalScores = matrix.map(row => row.reduce((a, b) => a + b));
       const totalVar = variance(totalScores);
-      return (k / (k - 1)) * (1 - itemVars.reduce((a, b) => a + b) / totalVar);
+      if (!Number.isFinite(totalVar) || totalVar <= 0 || itemVars.some(v => !Number.isFinite(v))) {
+        return NaN;
+      }
+      const alpha = (k / (k - 1)) * (1 - itemVars.reduce((a, b) => a + b) / totalVar);
+      return Number.isFinite(alpha) ? alpha : NaN;
     }
 
     function cronbachAlphaStandardized(matrix) {
+      if (!Array.isArray(matrix) || matrix.length < 2 || !Array.isArray(matrix[0]) || matrix[0].length < 2) {
+        return NaN;
+      }
       const k = matrix[0].length;
       const transpose = m => m[0].map((_, i) => m.map(row => row[i]));
       const correlation = (x, y) => {
@@ -689,18 +854,24 @@
         const cov = x.map((xi, i) => (xi - mx) * (y[i] - my)).reduce((a, b) => a + b, 0);
         const sx = Math.sqrt(x.map(xi => (xi - mx) ** 2).reduce((a, b) => a + b, 0));
         const sy = Math.sqrt(y.map(yi => (yi - my) ** 2).reduce((a, b) => a + b, 0));
-        return cov / (sx * sy);
+        const r = cov / (sx * sy);
+        return Number.isFinite(r) ? r : NaN;
       };
       const items = transpose(matrix);
       let rSum = 0, count = 0;
       for (let i = 0; i < k; i++) {
         for (let j = i + 1; j < k; j++) {
-          rSum += correlation(items[i], items[j]);
-          count++;
+          const r = correlation(items[i], items[j]);
+          if (Number.isFinite(r)) {
+            rSum += r;
+            count++;
+          }
         }
       }
+      if (count === 0) return NaN;
       const rBar = rSum / count;
-      return (k * rBar) / (1 + (k - 1) * rBar);
+      const alpha = (k * rBar) / (1 + (k - 1) * rBar);
+      return Number.isFinite(alpha) ? alpha : NaN;
     }
 
     function getEigenvaluesFromCov(cov) {

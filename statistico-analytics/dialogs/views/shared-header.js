@@ -425,10 +425,10 @@ const StatisticoHeader = {
     const topHeader = `
       <div class="statistico-header">
         <div class="header-left">
-          <div class="header-logo">
-            <img class="header-logo-img" src="${brandLogoSrc}" alt="Statistico Interactive" onerror="this.style.display='none';this.parentElement.classList.add('header-logo--fallback');" />
+          <div class="header-module-frame">
+            <div class="header-module-kicker">Module</div>
+            <div class="header-module-name" id="headerModuleName">${moduleName}</div>
           </div>
-          <div class="header-module-name" id="headerModuleName">${moduleName}</div>
         </div>
         <div class="header-center">
           <div class="header-view-name" id="headerViewName">${viewTitles[this.currentView] || 'Analysis'}</div>

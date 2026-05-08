@@ -53,6 +53,40 @@ console.log('📦 Loading shared-header.js VERSION 2026-03-08-024 (sidebar-corre
   document.head.appendChild(script);
 })();
 
+if (typeof window !== 'undefined' && typeof window.switchTab !== 'function') {
+  window.switchTab = function switchSharedSidebarTab(tab) {
+    if (!tab) return;
+
+    const tabTitles = {
+      explore: 'Explore',
+      assumptions: 'Assumptions',
+      results: 'Results',
+      posthoc: 'Post-hoc',
+      effects: 'Effects',
+      power: 'Power',
+      report: 'Report'
+    };
+
+    if (tabTitles[tab] && typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader.updateTitle === 'function') {
+      StatisticoHeader.updateTitle(tabTitles[tab]);
+    }
+
+    document.querySelectorAll('.sb-item[data-tab]').forEach((button) => {
+      button.classList.toggle('active', button.dataset.tab === tab);
+    });
+
+    document.querySelectorAll('.tab-panel').forEach((panel) => {
+      panel.classList.toggle('active', panel.id === `tab-${tab}`);
+    });
+
+    const fitLayout =
+      window.fitIndependentLayout ||
+      window.fitDependentLayout ||
+      window.fitLayout;
+    if (typeof fitLayout === 'function') requestAnimationFrame(fitLayout);
+  };
+}
+
 const StatisticoHeader = {
   currentView: 'histogram',
   variableName: 'Variable',

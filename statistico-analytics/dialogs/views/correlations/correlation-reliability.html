@@ -260,7 +260,7 @@
       background: rgba(255, 255, 255, 0.1);
       border-radius: 8px;
       padding: 8px;
-      height: 120px;
+      min-height: 142px;
       position: relative;
     }
 
@@ -274,6 +274,34 @@
     .gauge {
       width: 100%;
     }
+
+    .gauge-legend {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: -2px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      flex-wrap: wrap;
+    }
+
+    .gauge-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    .gauge-legend-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    .gauge-legend-swatch.low { background: #e74c3c; }
+    .gauge-legend-swatch.mid { background: #f1c40f; }
+    .gauge-legend-swatch.high { background: #2ecc71; }
 
     #item-stats {
       border-collapse: collapse;
@@ -478,6 +506,7 @@
               <span>Reliability Analysis</span>
               <label for="alpha-mode" style="font-size: 14px; font-weight: normal; display: flex; align-items: center; gap: 8px;">
                 Mode:
+                <span class="info-balloon" tabindex="0" data-info="Regular uses the raw item variances and covariances. Standardized first puts items on a common scale, which is useful when items use different units or ranges.">i</span>
                 <select id="alpha-mode" style="font-size: 14px; padding: 4px 8px; min-width: 140px;">
                   <option value="raw">Regular</option>
                   <option value="standardized">Standardized</option>
@@ -514,6 +543,11 @@
                 <div class="gauge-container">
                   <div class="gauge-title">Cronbach alpha</div>
                   <div id="reliability-gauge" class="gauge"></div>
+                  <div class="gauge-legend" aria-label="Cronbach alpha guide">
+                    <span class="gauge-legend-item"><span class="gauge-legend-swatch low"></span> Low &lt; .70</span>
+                    <span class="gauge-legend-item"><span class="gauge-legend-swatch mid"></span> Review .70-.80</span>
+                    <span class="gauge-legend-item"><span class="gauge-legend-swatch high"></span> Strong &ge; .80</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -590,6 +624,7 @@
     let pcaData = null;
     let reliabilityTableRows = [];
     let reliabilitySort = { key: null, direction: 'asc' };
+    let reliabilityResultsForAI = null;
 
     // Office.js initialization
     Office.onReady(() => {
@@ -781,6 +816,15 @@
         : NaN;
 
       const omega = calculateOmegaFromPCA(cleanedData);
+      reliabilityResultsForAI = {
+        mode: isStandardized ? 'standardized' : 'regular',
+        alpha,
+        omega,
+        validItems: validIndices.length,
+        totalItems: numItems,
+        subjects: numSubjects,
+        zeroVarianceItems: zeroVarianceIndices.map(idx => varnames[idx])
+      };
       
       document.getElementById("alpha-value").textContent = validIndices.length > 1 ? alpha.toFixed(3) : "N/A";
       document.getElementById("omega-value").textContent = omega.toFixed(3);
@@ -815,6 +859,148 @@
       const sampleSize = numSubjects;
       StatisticoHeader.init('reliability', 'Reliability Coefficients', sampleSize, 'correlations');
         StatisticoHeader.initSidebarPage(); StatisticoHeader.updateTitle('Reliability Coefficients');;
+      setTimeout(injectReliabilityAiButtons, 0);
+    }
+
+    function injectReliabilityAiButtons() {
+      const nav = document.getElementById('sidebarNav');
+      if (nav && !document.getElementById('sbReliabilityAiSection')) {
+        const aiSection = document.createElement('div');
+        aiSection.id = 'sbReliabilityAiSection';
+        aiSection.className = 'sb-ai-section-wrap';
+        aiSection.innerHTML = `
+          <button class="sb-ai-sidebar-pill"
+                  id="sbReliabilityAiBtn"
+                  onclick="requestReliabilityAI('full')"
+                  title="Full reliability AI analysis">
+            <i class="fa-solid fa-brain"></i>
+            <span>Full Analysis</span>
+            <sup class="sb-ai-sup">AI</sup>
+          </button>
+        `;
+        nav.appendChild(aiSection);
+      }
+
+      const rightCol = document.querySelector('.right-col');
+      if (rightCol && !document.getElementById('sbReliabilityAiFloatBtn')) {
+        const btn = document.createElement('button');
+        btn.id = 'sbReliabilityAiFloatBtn';
+        btn.className = 'sb-ai-float-btn';
+        btn.title = 'AI Insight - Reliability';
+        btn.innerHTML = '<i class="fa-solid fa-compass"></i><span>Guide: Reliability</span><sup class="sb-ai-sup">AI</sup>';
+        btn.addEventListener('click', () => requestReliabilityAI('guide'));
+        rightCol.style.position = 'relative';
+        rightCol.appendChild(btn);
+      }
+    }
+
+    async function requestReliabilityAI(mode) {
+      if (!reliabilityResultsForAI) {
+        alert('Run the reliability analysis first.');
+        return;
+      }
+
+      const btn = mode === 'full'
+        ? document.getElementById('sbReliabilityAiBtn')
+        : document.getElementById('sbReliabilityAiFloatBtn');
+      const originalHtml = btn ? btn.innerHTML : '';
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = mode === 'full'
+          ? '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking...</span>'
+          : '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking...</span>';
+      }
+
+      try {
+        const prompt = buildReliabilityAiPrompt(mode);
+        const raw = await StatisticoHeader._callAiForSidebar(prompt);
+        const sections = StatisticoHeader._parseAiStructured(raw);
+        StatisticoHeader._showAiOverlay(sections, 'reliability', mode === 'full' ? 'full' : 'per-view');
+      } catch (err) {
+        StatisticoHeader._showAiOverlay({ error: err.message || 'AI request failed.' }, 'reliability', mode === 'full' ? 'full' : 'per-view');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        }
+      }
+    }
+
+    function buildReliabilityAiPrompt(mode) {
+      const payload = getReliabilityAiPayload();
+      const itemLines = payload.items.map(row =>
+        `${row.item}: item-total=${row.itemTotalCorr}, alpha-if-deleted=${row.alphaIfDeleted}, n=${row.nIfDeleted}`
+      ).join('\n');
+      const pcaLine = payload.pca
+        ? `PCA first component variance=${payload.pca.firstComponentVariance}; eigenvalues=${payload.pca.eigenvalues.join(', ')}`
+        : 'PCA data unavailable';
+
+      if (mode === 'guide') {
+        return `You are explaining the Reliability Coefficients view to an analyst.
+Return exactly these labels:
+ABOUT:
+INSIGHT:
+MEANS:
+NEXT:
+
+Data:
+Mode=${payload.mode}
+Cronbach alpha=${payload.alpha}
+McDonald omega=${payload.omega}
+Items=${payload.validItems}/${payload.totalItems}; Subjects=${payload.subjects}
+Zero-variance items=${payload.zeroVarianceItems.join(', ') || 'none'}
+${pcaLine}
+Item diagnostics:
+${itemLines}
+
+Keep it concise and practical. Explain how to read alpha, omega, alpha-if-deleted, and PCA scree for this exact result.`;
+      }
+
+      return `You are writing a full AI assessment for a Reliability Coefficients result.
+Return exactly these labels:
+CONCLUSION:
+EVIDENCE:
+INTERPRETATION:
+IMPLICATIONS:
+ACTION:
+
+Data:
+Mode=${payload.mode}
+Cronbach alpha=${payload.alpha}
+McDonald omega=${payload.omega}
+Items=${payload.validItems}/${payload.totalItems}; Subjects=${payload.subjects}
+Zero-variance items=${payload.zeroVarianceItems.join(', ') || 'none'}
+${pcaLine}
+Item diagnostics:
+${itemLines}
+
+Use exact values. Focus on scale consistency, problematic items, dimensionality, and next analytical checks.`;
+    }
+
+    function getReliabilityAiPayload() {
+      const f = (value, digits = 3) => Number.isFinite(value) ? Number(value).toFixed(digits) : 'N/A';
+      return {
+        mode: reliabilityResultsForAI?.mode || (document.getElementById("alpha-mode")?.value || 'regular'),
+        alpha: f(reliabilityResultsForAI?.alpha),
+        omega: f(reliabilityResultsForAI?.omega),
+        validItems: reliabilityResultsForAI?.validItems ?? reliabilityTableRows.length,
+        totalItems: reliabilityResultsForAI?.totalItems ?? reliabilityTableRows.length,
+        subjects: reliabilityResultsForAI?.subjects ?? lastData.length,
+        zeroVarianceItems: reliabilityResultsForAI?.zeroVarianceItems || [],
+        items: reliabilityTableRows.map(row => ({
+          item: row.item,
+          mean: f(row.mean, 2),
+          sd: f(row.sd, 2),
+          itemTotalCorr: f(row.itemTotalCorr, 2),
+          alphaIfDeleted: f(row.alphaIfDeleted),
+          nIfDeleted: Number.isFinite(row.nIfDeleted) ? row.nIfDeleted : 'N/A'
+        })),
+        pca: pcaData ? {
+          firstComponentVariance: f(pcaData.firstComponentVariance, 1) + '%',
+          eigenvalues: (pcaData.eigenvalues || []).slice(0, 6).map(v => f(v, 2))
+        } : null
+      };
     }
 
     function toggleDescriptiveColumns(show) {

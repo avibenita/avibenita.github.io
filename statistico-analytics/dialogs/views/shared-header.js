@@ -627,6 +627,67 @@ const StatisticoHeader = {
     return false;
   },
 
+  _getSidebarItemDescription(item) {
+    if (!item) return '';
+    if (item.description) return item.description;
+
+    const key = String(item.tab || item.view || item.label || item.id || '').toLowerCase();
+    const descriptions = {
+      explore: 'Review variables and descriptive shape.',
+      assumptions: 'Check model requirements before inference.',
+      results: 'Read the main test outcome.',
+      posthoc: 'Compare groups after an omnibus test.',
+      effects: 'Estimate practical magnitude.',
+      power: 'Assess sensitivity and required sample size.',
+      report: 'Generate an APA-ready summary.',
+      predictions: 'Score cases and inspect predicted risk.',
+      diagnostics: 'Inspect fit, residuals, and warnings.',
+      roc: 'Evaluate classification performance.',
+      descriptives: 'Summarize variables before modeling.',
+      ai: 'Get a concise AI interpretation.',
+      suitability: 'Check whether factor analysis is appropriate.',
+      extraction: 'Choose factors and extraction details.',
+      rotation: 'Simplify the loading structure.',
+      scores: 'Inspect computed factor scores.',
+      viewdata: 'Open the analysis data table.',
+      summary: 'See the main analysis snapshot.',
+      components: 'Review retained components.',
+      loadings: 'Inspect variable contributions.',
+      biplot: 'Map scores and loadings together.',
+      scoreplot: 'Visualize cases in component space.',
+      contribution: 'Rank variable influence.',
+      outliers: 'Flag unusual observations.',
+      overview: 'Start with the analysis summary.',
+      inference: 'Review statistical tests.',
+      comparisons: 'Inspect pairwise contrasts.',
+      visuals: 'Explore charts and patterns.',
+      'correlation-matrix': 'Scan pairwise relationships.',
+      'correlation-network': 'View relationship structure.',
+      'taylor-diagram': 'Compare agreement with a reference.',
+      'partial-correlations': 'Control variables and compare residual links.',
+      reliability: 'Evaluate internal consistency.',
+      'descriptive-stats': 'Summarize variables and distributions.',
+      histogram: 'View distribution and frequency.',
+      boxplot: 'Compare spread and outliers.',
+      cdf: 'Inspect cumulative distribution.',
+      percentile: 'Find percentile cut points.',
+      kernel: 'Smooth the density estimate.',
+      normality: 'Test distributional normality.',
+      qqplot: 'Compare quantiles to a reference.',
+      hypothesis: 'Run a one-sample test.',
+      confidence: 'Estimate interval uncertainty.',
+      sbmeans: 'Power for mean comparisons.',
+      sbanova: 'Power for ANOVA tests.',
+      sbcorr: 'Power for correlations.',
+      sbprop: 'Power for proportions.',
+      sbreg: 'Power for regression models.',
+      sbmodepower: 'Compute achieved or planned power.',
+      sbmoden: 'Find sample size for target power.'
+    };
+
+    return descriptions[key] || 'Open this analysis section.';
+  },
+
   _getSharedSidebarConfig() {
     if (this.module === 'univariate') {
       return {
@@ -864,8 +925,9 @@ const StatisticoHeader = {
           onclick = item.onclick;
         }
         const onclickAttr = onclick ? ` onclick="${onclick}"` : '';
+        const description = this._getSidebarItemDescription(item);
 
-        return `<button class="sb-item${active}"${idAttr}${dataTab}${dataView}${onclickAttr}><i class="fa-solid ${item.icon || 'fa-circle'} sb-item-icon"></i><span class="sb-item-label">${item.label || ''}</span></button>`;
+        return `<button class="sb-item${active}"${idAttr}${dataTab}${dataView}${onclickAttr}><i class="fa-solid ${item.icon || 'fa-circle'} sb-item-icon"></i><span class="sb-item-copy"><span class="sb-item-label">${item.label || ''}</span><span class="sb-item-description">${description}</span></span></button>`;
       }).join('');
 
       return `<div class="sb-group"><div class="sb-group-title">${group.title || ''}</div><div class="sb-items-rail">${itemsHtml}</div></div>`;

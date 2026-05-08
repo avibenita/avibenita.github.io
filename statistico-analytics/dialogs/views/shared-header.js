@@ -646,20 +646,26 @@ const StatisticoHeader = {
     }
 
     if (this.module === 'independent') {
+      const independentItems = [
+        { type: 'tab', tab: 'explore', icon: 'fa-chart-column', label: 'Explore', active: true },
+        { type: 'tab', tab: 'assumptions', icon: 'fa-shield-halved', label: 'Assumptions' },
+        { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: 'Results' }
+      ];
+      if (this.currentView === 'independent-results-kplus') {
+        independentItems.push({ type: 'tab', tab: 'posthoc', icon: 'fa-table-cells', label: 'Post-hoc' });
+      }
+      independentItems.push(
+        { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effects' },
+        { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power' },
+        { type: 'tab', tab: 'report', icon: 'fa-file-lines', label: 'Report' }
+      );
       return {
         logoIcon: 'fa-equals',
         logoSub: 'Independent',
         menuTitle: 'Menu',
         groups: [{
           title: 'Analysis',
-          items: [
-            { type: 'tab', tab: 'explore', icon: 'fa-chart-column', label: 'Explore', active: true },
-            { type: 'tab', tab: 'assumptions', icon: 'fa-shield-halved', label: 'Assumptions' },
-            { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: 'Results' },
-            { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effects' },
-            { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power' },
-            { type: 'tab', tab: 'report', icon: 'fa-file-lines', label: 'Report' }
-          ]
+          items: independentItems
         }]
       };
     }

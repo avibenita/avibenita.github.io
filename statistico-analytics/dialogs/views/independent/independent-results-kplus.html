@@ -132,6 +132,17 @@
     #setPosthocWrap,#setCorrectionWrap{min-width:180px;max-width:220px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;}
     #setPosthocWrap label,#setCorrectionWrap label{white-space:nowrap;line-height:1;margin-bottom:0;font-size:12px;}
     #setPosthocMethod,#setPosthocCorrection{height:36px;min-width:150px;padding:0 10px;border-radius:6px;border:2px solid #5c6bc0;background:#fff;color:#1e293b;font-size:14px;font-weight:700;cursor:pointer;}
+    .posthoc-menu{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:10px;margin-bottom:12px;padding:12px;border:1px solid rgba(120,200,255,.28);border-radius:10px;background:linear-gradient(135deg,rgba(15,23,42,.62),rgba(30,41,59,.44));}
+    .posthoc-menu-card{min-width:0;padding:10px 12px;border:1px solid rgba(148,163,184,.22);border-radius:8px;background:rgba(255,255,255,.035);display:flex;flex-direction:column;gap:6px;}
+    .posthoc-menu-card-title{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.55px;color:var(--accent-2);}
+    .posthoc-menu-card-sub{font-size:11px;line-height:1.35;color:rgba(255,255,255,.58);}
+    .posthoc-control-slot{display:flex;flex-direction:column;gap:4px;}
+    .posthoc-control-slot #setPosthocWrap,.posthoc-control-slot #setCorrectionWrap{display:flex!important;min-width:0;max-width:none;width:100%;gap:5px;}
+    .posthoc-control-slot #setPosthocMethod,.posthoc-control-slot #setPosthocCorrection{width:100%;min-width:0;border-color:rgba(120,200,255,.45);background:rgba(15,23,42,.95);color:#fff;}
+    .posthoc-group-options{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;font-weight:700;color:var(--text-secondary);}
+    .posthoc-group-options label{display:inline-flex;align-items:center;gap:5px;cursor:pointer;}
+    #posthocRefGroup{height:34px;width:100%;padding:0 9px;border-radius:6px;background:rgba(15,23,42,.95);border:1px solid rgba(120,200,255,.45);color:#fff;font-size:13px;font-weight:700;}
+    @media (max-width: 980px){.posthoc-menu{grid-template-columns:repeat(2,minmax(150px,1fr));}}
     .inference-row{display:flex;align-items:center;justify-content:flex-start;gap:10px;flex-wrap:nowrap;min-width:max-content;}
     .inference-card{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;justify-content:flex-start;padding:0;border:0;border-radius:0;background:transparent;min-width:max-content;}
     .inference-card#primaryTestWrap{flex:0 0 auto;min-width:180px;max-width:200px;}
@@ -652,20 +663,36 @@
           <div class="stat-panel">
             <div class="stat-panel-heading parametric" id="posthocHeading">
               Post-hoc Pairwise Comparisons
-              <div style="float:right;display:inline-flex;gap:8px;align-items:center;font-size:13px;font-weight:600;text-transform:none;">
-                <span style="opacity:0.8;">Group by:</span>
-                <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
-                  <input type="radio" name="posthocGrouping" value="all" checked onchange="updatePosthocDisplay()"> All pairs
-                </label>
-                <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
-                  <input type="radio" name="posthocGrouping" value="ref" onchange="updatePosthocDisplay()"> vs Reference
-                </label>
-                <select id="posthocRefGroup" style="height:28px;padding:0 8px;border-radius:4px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:13px;display:none;" onchange="updatePosthocDisplay()">
-                  <option value="">Select group...</option>
-                </select>
-              </div>
             </div>
             <div class="stat-panel-body" style="padding:8px;">
+              <div class="posthoc-menu" aria-label="Post-hoc setup">
+                <div class="posthoc-menu-card">
+                  <div class="posthoc-menu-card-title">Method</div>
+                  <div class="posthoc-control-slot" id="posthocMethodSlot"></div>
+                  <div class="posthoc-menu-card-sub">Choose the pairwise test for the selected framework.</div>
+                </div>
+                <div class="posthoc-menu-card">
+                  <div class="posthoc-menu-card-title">p Adjustment</div>
+                  <div class="posthoc-control-slot" id="posthocCorrectionSlot"></div>
+                  <div class="posthoc-menu-card-sub">Control family-wise error or false discovery rate.</div>
+                </div>
+                <div class="posthoc-menu-card">
+                  <div class="posthoc-menu-card-title">Display</div>
+                  <div class="posthoc-group-options">
+                    <label><input type="radio" name="posthocGrouping" value="all" checked onchange="updatePosthocDisplay()"> All pairs</label>
+                    <label><input type="radio" name="posthocGrouping" value="ref" onchange="updatePosthocDisplay()"> vs reference</label>
+                  </div>
+                  <div class="posthoc-menu-card-sub">Show every contrast or focus on one reference group.</div>
+                </div>
+                <div class="posthoc-menu-card">
+                  <div class="posthoc-menu-card-title">Reference</div>
+                  <select id="posthocRefGroup" onchange="updatePosthocDisplay()">
+                    <option value="">Select group...</option>
+                  </select>
+                  <div class="posthoc-menu-card-sub">Used only when "vs reference" is selected.</div>
+                </div>
+              </div>
+
               <!-- Omnibus Warning -->
               <div id="posthocWarning" style="display:none;padding:8px 12px;margin-bottom:12px;background:rgba(251,191,36,.15);border-left:3px solid #fbbf24;border-radius:4px;">
                 <span style="font-size:14px;color:#fbbf24;font-weight:600;">Omnibus test not significant (p > alpha). Interpret post-hoc comparisons with caution.</span>
@@ -872,6 +899,14 @@
       setDisplay("setPosthocWrap", true); setDisplay("setCorrectionWrap", true);
       setDisplay("setHypWrap", true);
       refreshHypothesisFrames();
+    }
+    function organizePosthocMenu(){
+      var methodSlot = document.getElementById("posthocMethodSlot");
+      var correctionSlot = document.getElementById("posthocCorrectionSlot");
+      var methodWrap = document.getElementById("setPosthocWrap");
+      var correctionWrap = document.getElementById("setCorrectionWrap");
+      if (methodSlot && methodWrap && methodWrap.parentNode !== methodSlot) methodSlot.appendChild(methodWrap);
+      if (correctionSlot && correctionWrap && correctionWrap.parentNode !== correctionSlot) correctionSlot.appendChild(correctionWrap);
     }
     function updatePosthocOptions(){
       var sel = document.getElementById("setPosthocMethod");
@@ -2202,6 +2237,7 @@
       if (rp) rp.addEventListener("change", function(){ if (rp.checked) { setFrameworkButtons("parametric"); notifySettingsChanged(); } });
       if (rn) rn.addEventListener("change", function(){ if (rn.checked) { setFrameworkButtons("nonparametric"); notifySettingsChanged(); } });
       setFrameworkButtons(primaryFramework);
+      organizePosthocMenu();
       refreshSettingsVisibility();
       Office.onReady(function(){
         // Close modal when clicking outside

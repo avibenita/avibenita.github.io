@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('📦 Loading shared-header.js VERSION 2026-03-08-024 (sidebar-correlations-univariate)');
+console.log('Loading shared-header.js VERSION 2026-05-08-025 (encoding-header-footer)');
 
 (function () {
   function sanitizeDialogHostInfoParam() {
@@ -452,7 +452,7 @@ const StatisticoHeader = {
         footer = document.createElement('div');
         footer.className = 'statistico-footer';
         const yr = new Date().getFullYear();
-        footer.appendChild(document.createTextNode(`\u00a9 ${yr} Statistico-Interactive\u2122 \u2014 All rights reserved`));
+        footer.appendChild(document.createTextNode(`${yr} Statistico-Interactive (TM) - All rights reserved`));
         const frame = document.querySelector('.laptop-frame') || document.body;
         frame.appendChild(footer);
       }
@@ -466,7 +466,7 @@ const StatisticoHeader = {
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
         link.title = 'Visit the Statistico website';
-        link.innerHTML = '<i class="fas fa-arrow-up-right-from-square"></i>\u00a0statistico.live';
+        link.innerHTML = '<i class="fas fa-arrow-up-right-from-square"></i> statistico.live';
         footer.appendChild(link);
       }
     })();
@@ -2262,6 +2262,8 @@ const StatisticoHeader = {
     if (existing) existing.remove();
     const existingAi = document.getElementById('sbAiSection');
     if (existingAi) existingAi.remove();
+    const existingProductFooter = document.getElementById('sbProductFooter');
+    if (existingProductFooter) existingProductFooter.remove();
 
     const actions = this._pendingActions || {};
     const hasView = typeof actions.getData === 'function';
@@ -2319,6 +2321,16 @@ const StatisticoHeader = {
       </button>
     `;
     nav.appendChild(utilities);
+
+    const productFooter = document.createElement('div');
+    productFooter.id = 'sbProductFooter';
+    productFooter.className = 'sb-product-footer';
+    productFooter.innerHTML = `
+      <span>Statistico</span>
+      <a href="https://avibenita.github.io/Statistico-Website/index.html" target="_blank" rel="noopener noreferrer">statistico.live</a>
+    `;
+    nav.appendChild(productFooter);
+
     if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
       window.StatisticoTooltip.refresh();
     }

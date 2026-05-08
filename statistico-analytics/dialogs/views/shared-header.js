@@ -428,10 +428,7 @@ const StatisticoHeader = {
           <div class="header-logo">
             <img class="header-logo-img" src="${brandLogoSrc}" alt="Statistico Interactive" onerror="this.style.display='none';this.parentElement.classList.add('header-logo--fallback');" />
           </div>
-          <div class="header-module">
-            <div class="header-brand">Statistico</div>
-            <div class="header-module-name" id="headerModuleName">${moduleName}</div>
-          </div>
+          <div class="header-module-name" id="headerModuleName">${moduleName}</div>
         </div>
         <div class="header-center">
           <div class="header-view-name" id="headerViewName">${viewTitles[this.currentView] || 'Analysis'}</div>
@@ -975,17 +972,12 @@ const StatisticoHeader = {
     }).join('');
 
     const brandLogoSrc = this._getBrandLogoSrc();
-    const moduleName = cfg.logoSub || this._getModuleDisplayName();
 
     nav.innerHTML = `
       <div class="sb-logo">
         <div class="sb-logo-icon">
           <img class="sb-logo-img" src="${brandLogoSrc}" alt="Statistico Interactive" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
           <i class="fa-solid ${cfg.logoIcon || 'fa-chart-line'}" style="display:none;"></i>
-        </div>
-        <div class="sb-logo-text">
-          <span class="sb-logo-name">Statistico</span>
-          <span class="sb-logo-sub">${moduleName}</span>
         </div>
       </div>
       <div class="sb-header">

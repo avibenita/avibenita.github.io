@@ -280,6 +280,36 @@ const StatisticoHeader = {
       this.hideModificationNotice();
     }
   },
+
+  _getBrandLogoSrc() {
+    const scriptSrc = (document.currentScript && document.currentScript.src)
+      || Array.from(document.scripts || [])
+        .map((script) => script.src || '')
+        .find((src) => src.indexOf('shared-header.js') !== -1)
+      || window.location.href;
+    try {
+      return new URL('../../../Statistico-Website/assets/img/logo-dark.png', scriptSrc).href;
+    } catch (_) {
+      return '../../../../Statistico-Website/assets/img/logo-dark.png';
+    }
+  },
+
+  _getModuleDisplayName() {
+    const moduleNames = {
+      'univariate': 'Univariate',
+      'correlations': 'Correlations',
+      'regression': 'Regression',
+      'independent': 'Independent Means',
+      'dependent': 'Dependent Means',
+      'logistic': 'Logistic Regression',
+      'factor': 'Factor Analysis',
+      'pca': 'PCA',
+      'cluster': 'Cluster Analysis',
+      'anova': 'ANOVA',
+      'power': 'Power & Sample Size'
+    };
+    return moduleNames[this.module] || this.module || 'Analytics';
+  },
   
   showModificationNotice() {
     let notice = document.getElementById('header-modification-notice');
@@ -383,6 +413,8 @@ const StatisticoHeader = {
       'anova': 'ANOVA',
       'power': 'Power & Sample Size'
     };
+    const moduleName = moduleNames[this.module] || this._getModuleDisplayName();
+    const brandLogoSrc = this._getBrandLogoSrc();
     
     const actionButtonsHtml = this._pendingActions ? this._renderActionButtons(this._pendingActions) : '';
     const headerGlobalControls = this._renderHeaderGlobalControls();
@@ -392,6 +424,15 @@ const StatisticoHeader = {
 
     const topHeader = `
       <div class="statistico-header">
+        <div class="header-left">
+          <div class="header-logo">
+            <img class="header-logo-img" src="${brandLogoSrc}" alt="Statistico Interactive" onerror="this.style.display='none';this.parentElement.classList.add('header-logo--fallback');" />
+          </div>
+          <div class="header-module">
+            <div class="header-brand">Statistico</div>
+            <div class="header-module-name" id="headerModuleName">${moduleName}</div>
+          </div>
+        </div>
         <div class="header-center">
           <div class="header-view-name" id="headerViewName">${viewTitles[this.currentView] || 'Analysis'}</div>
           <div class="header-variable">
@@ -933,12 +974,18 @@ const StatisticoHeader = {
       return `<div class="sb-group"><div class="sb-group-title">${group.title || ''}</div><div class="sb-items-rail">${itemsHtml}</div></div>`;
     }).join('');
 
+    const brandLogoSrc = this._getBrandLogoSrc();
+    const moduleName = cfg.logoSub || this._getModuleDisplayName();
+
     nav.innerHTML = `
       <div class="sb-logo">
-        <div class="sb-logo-icon"><i class="fa-solid ${cfg.logoIcon || 'fa-chart-line'}"></i></div>
+        <div class="sb-logo-icon">
+          <img class="sb-logo-img" src="${brandLogoSrc}" alt="Statistico Interactive" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+          <i class="fa-solid ${cfg.logoIcon || 'fa-chart-line'}" style="display:none;"></i>
+        </div>
         <div class="sb-logo-text">
           <span class="sb-logo-name">Statistico</span>
-          <span class="sb-logo-sub">${cfg.logoSub || this.module}</span>
+          <span class="sb-logo-sub">${moduleName}</span>
         </div>
       </div>
       <div class="sb-header">

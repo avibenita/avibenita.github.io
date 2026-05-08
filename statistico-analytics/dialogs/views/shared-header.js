@@ -2380,18 +2380,25 @@ const StatisticoHeader = {
     const hasJson = typeof actions.exportJson === 'function';
 
     // ── AI pill — above utilities ─────────────────────────────────────────
-    if ((this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations') {
+    const supportsIndependentAi = this.module === 'independent';
+    const supportsSharedAi = (this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations' || supportsIndependentAi;
+    if (supportsSharedAi) {
       const aiSection = document.createElement('div');
       aiSection.id = 'sbAiSection';
       aiSection.className = 'sb-ai-section-wrap';
       const isCorrelation = this.module === 'correlations';
+      const aiClick = supportsIndependentAi ? 'StatisticoHeader._sbAiIndependentInterpret()' : 'StatisticoHeader._sbAiGlobalInterpret()';
+      const aiTitle = supportsIndependentAi
+        ? 'AI statistical summary for this independent means analysis'
+        : (isCorrelation ? 'Full correlation analysis - synthesises all correlation views into one report' : 'Full variable analysis - synthesises all diagnostics into one report');
+      const aiLabel = supportsIndependentAi ? 'AI Summary' : 'Full Analysis';
       aiSection.innerHTML = `
         <button class="sb-ai-sidebar-pill"
                 id="sbAiBtn"
-                onclick="StatisticoHeader._sbAiGlobalInterpret()"
-                title="${isCorrelation ? 'Full correlation analysis - synthesises all correlation views into one report' : 'Full variable analysis - synthesises all diagnostics into one report'}">
+                onclick="${aiClick}"
+                title="${aiTitle}">
           <i class="fa-solid fa-brain"></i>
-          <span>Full Analysis</span>
+          <span>${aiLabel}</span>
           <sup class="sb-ai-sup">AI</sup>
         </button>
       `;
@@ -2461,11 +2468,23 @@ const StatisticoHeader = {
    * Only shown for univariate views that are not hypothesis.
    */
   _injectPerViewAiButton() {
-    if (!((this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations')) return;
+    if (!((this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations' || this.module === 'independent')) return;
     if (document.getElementById('sbAiFloatBtn')) return;
 
     const rightCol = document.querySelector('.right-col');
     if (!rightCol) return;
+
+    if (this.module === 'independent') {
+      const btn = document.createElement('button');
+      btn.id = 'sbAiFloatBtn';
+      btn.className = 'sb-ai-float-btn';
+      btn.title = 'AI Summary';
+      btn.innerHTML = '<i class="fa-solid fa-brain"></i><span>AI Summary</span><sup class="sb-ai-sup">AI</sup>';
+      btn.addEventListener('click', () => StatisticoHeader._sbAiIndependentInterpret());
+      rightCol.style.position = 'relative';
+      rightCol.appendChild(btn);
+      return;
+    }
 
     const viewLabels = this.module === 'correlations'
       ? this._correlationViewLabels()
@@ -2486,6 +2505,30 @@ const StatisticoHeader = {
 
     rightCol.style.position = 'relative';
     rightCol.appendChild(btn);
+  },
+
+  async _sbAiIndependentInterpret() {
+    const sidebarBtn = document.getElementById('sbAiBtn');
+    const floatBtn = document.getElementById('sbAiFloatBtn');
+    const setBusy = (busy) => {
+      [sidebarBtn, floatBtn].forEach((btn) => {
+        if (!btn) return;
+        btn.disabled = busy;
+        btn.innerHTML = busy
+          ? '<i class="fa-solid fa-spinner fa-spin"></i><span>Generating...</span>'
+          : '<i class="fa-solid fa-brain"></i><span>AI Summary</span><sup class="sb-ai-sup">AI</sup>';
+      });
+    };
+    setBusy(true);
+    try {
+      if (typeof window.generateAISummary === 'function') {
+        await window.generateAISummary();
+      } else {
+        alert('AI summary is not available for this view yet.');
+      }
+    } finally {
+      setBusy(false);
+    }
   },
 
   /**

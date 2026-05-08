@@ -10,8 +10,8 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260508k" />
-  <script src="../shared-header.js?v=20260508k"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260508l" />
+  <script src="../shared-header.js?v=20260508l"></script>
 
   <script src="../../../src/shared/js/ai-config.js?v=20260429a"></script>
   <style>
@@ -1437,7 +1437,7 @@
 
     async function generateAISummary() {
       console.log('AI Summary button clicked');
-      const btn = document.getElementById('aiSummaryBtn');
+      const btn = document.getElementById('aiSummaryBtn') || document.getElementById('sbAiBtn') || document.getElementById('sbAiFloatBtn');
       if (!btn) {
         console.error('AI button not found');
         return;
@@ -1503,6 +1503,7 @@
         btn.innerHTML = '<i class="fa-solid fa-brain"></i> AI Summary';
       }
     }
+    window.generateAISummary = generateAISummary;
     
     function showAISummary(content) {
       const modal = document.getElementById('aiSummaryModal');
@@ -1604,9 +1605,17 @@
           getData: () => {
             if (!window.independentRangeData || !window.independentRangeData.length) return null;
             const headers = window.independentRangeData[0] || [];
-            const allRows = window.independentRangeData.slice(1).map(r => headers.map((_, i) => r[i] ?? ''));
             const s = (lastBundle && lastBundle.setup) || {};
-            return { headers, allRows, usedRows: allRows, address: s.address || '' };
+            const selectedVars = Array.isArray(s.selectedColumns) && s.selectedColumns.length
+              ? s.selectedColumns
+              : [s.groupA, s.groupB, s.valueColumn, s.groupColumn].filter(Boolean);
+            const selectedIndexes = selectedVars
+              .map(name => headers.indexOf(name))
+              .filter(idx => idx >= 0);
+            const indexes = selectedIndexes.length ? selectedIndexes : headers.map((_, i) => i);
+            const viewHeaders = indexes.map(i => headers[i]);
+            const allRows = window.independentRangeData.slice(1).map(r => indexes.map(i => r[i] ?? ''));
+            return { headers: viewHeaders, allRows, usedRows: allRows, address: s.address || '', notice: 'Showing selected analysis variables only.' };
           },
           exportHtml: () => exportHtml(),
           moduleName: 'Save independent means model'

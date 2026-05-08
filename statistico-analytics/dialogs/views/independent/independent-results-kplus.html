@@ -10,8 +10,8 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260508k" />
-  <script src="../shared-header.js?v=20260508k"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260508l" />
+  <script src="../shared-header.js?v=20260508l"></script>
 
   <script src="../../../src/shared/js/ai-config.js?v=20260429a"></script>
   <style>
@@ -2227,9 +2227,17 @@
           getData: () => {
             if (!window.independentRangeData || !window.independentRangeData.length) return null;
             const headers = window.independentRangeData[0] || [];
-            const allRows = window.independentRangeData.slice(1).map(r => headers.map((_, i) => r[i] ?? ''));
             const s = (lastBundle && lastBundle.setup) || {};
-            return { headers, allRows, usedRows: allRows, address: s.address || '' };
+            const selectedVars = Array.isArray(s.selectedColumns) && s.selectedColumns.length
+              ? s.selectedColumns
+              : [s.valueColumn, s.groupColumn].filter(Boolean);
+            const selectedIndexes = selectedVars
+              .map(name => headers.indexOf(name))
+              .filter(idx => idx >= 0);
+            const indexes = selectedIndexes.length ? selectedIndexes : headers.map((_, i) => i);
+            const viewHeaders = indexes.map(i => headers[i]);
+            const allRows = window.independentRangeData.slice(1).map(r => indexes.map(i => r[i] ?? ''));
+            return { headers: viewHeaders, allRows, usedRows: allRows, address: s.address || '', notice: 'Showing selected analysis variables only.' };
           },
           exportHtml: () => exportHtml(),
           moduleName: 'Save independent means model'
@@ -2592,8 +2600,23 @@
     /**
      * Generate AI summary by calling Groq API
      */
+    function showAISummary(message) {
+      const panel = document.getElementById('aiSummaryPanel');
+      const loading = document.getElementById('aiSummaryLoading');
+      const content = document.getElementById('aiSummaryContent');
+      const error = document.getElementById('aiSummaryError');
+      if (panel) panel.style.display = 'block';
+      if (loading) loading.style.display = 'none';
+      if (content) content.style.display = 'none';
+      if (error) {
+        error.innerHTML = message;
+        error.style.display = 'block';
+      }
+      switchTab('report');
+    }
+
     async function generateAISummary() {
-      const btn = document.getElementById('aiSummaryBtn');
+      const btn = document.getElementById('aiSummaryBtn') || document.getElementById('sbAiBtn') || document.getElementById('sbAiFloatBtn');
       const panel = document.getElementById('aiSummaryPanel');
       const loading = document.getElementById('aiSummaryLoading');
       const content = document.getElementById('aiSummaryContent');
@@ -2623,8 +2646,10 @@
       }
       
       // Show loading state
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+      }
       panel.style.display = 'block';
       loading.style.display = 'block';
       content.style.display = 'none';
@@ -2711,10 +2736,13 @@ ${JSON.stringify(payload, null, 2)}`;
         content.style.display = 'none';
         loading.style.display = 'none';
       } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-brain"></i> AI Summary';
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-brain"></i> AI Summary';
+        }
       }
     }
+    window.generateAISummary = generateAISummary;
     
     /**
      * Format AI response with proper styling

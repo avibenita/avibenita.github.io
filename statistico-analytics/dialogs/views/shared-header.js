@@ -1258,6 +1258,17 @@ const StatisticoHeader = {
   },
 
   _mergeActionsWithFallback(actions) {
+    if (this.module === 'correlations') {
+      const fallback = this._buildCorrelationFallbackActions();
+      return {
+        ...fallback,
+        ...actions,
+        moduleName: actions.moduleName || fallback.moduleName || 'Save correlation model',
+        getData: actions.getData || fallback.getData,
+        exportJson: actions.exportJson || fallback.exportJson,
+        exportHtml: actions.exportHtml || fallback.exportHtml
+      };
+    }
     if (this.module !== 'univariate') return actions;
     const fallback = this._buildUnivariateFallbackActions();
     const merged = {
@@ -1275,9 +1286,95 @@ const StatisticoHeader = {
     if (this.module === 'univariate') {
       const existing = this._pendingActions || {};
       this._pendingActions = this._mergeActionsWithFallback(existing);
+    } else if (this.module === 'correlations') {
+      const existing = this._pendingActions || {};
+      this._pendingActions = this._mergeActionsWithFallback(existing);
     } else if (this._pendingActions) {
       return;
     }
+  },
+
+  _buildCorrelationFallbackActions() {
+    const safeName = (name) => String(name || 'Correlations').replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 40);
+    const timestamp = () => new Date().toISOString().slice(0, 19).replace(/[-T:]/g, '');
+    const downloadBlob = (blob, filename) => {
+      if (typeof window.navigator !== 'undefined' && typeof window.navigator.msSaveOrOpenBlob === 'function') {
+        window.navigator.msSaveOrOpenBlob(blob, filename);
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+    };
+    const esc = (value) => String(value ?? '').replace(/[<>&"]/g, (m) => ({ '<':'&lt;', '>':'&gt;', '&':'&amp;', '"':'&quot;' }[m]));
+    const getCorrelationData = () => {
+      if (window.correlationData && window.correlationData.headers && window.correlationData.data) return window.correlationData;
+      try {
+        const stored = sessionStorage.getItem('correlationData');
+        if (stored) return JSON.parse(stored);
+      } catch (e) {}
+      try {
+        const stored = localStorage.getItem('correlationData') || localStorage.getItem('correlationResults');
+        if (stored) return JSON.parse(stored);
+      } catch (e) {}
+      return null;
+    };
+    const getFallbackData = () => {
+      const payload = getCorrelationData();
+      if (!payload || !Array.isArray(payload.headers) || !Array.isArray(payload.data)) return null;
+      const headers = payload.headers.slice();
+      const rows = payload.data.map((row) => headers.map((header) => row && typeof row === 'object' ? row[header] : null));
+      return {
+        headers,
+        allRows: rows,
+        usedRows: rows,
+        fullRange: null,
+        usedRange: null,
+        columnRoles: headers.map(() => 'variable'),
+        notice: null
+      };
+    };
+    const buildHtmlReport = () => {
+      const data = getFallbackData();
+      if (!data) return null;
+      const rows = data.allRows.slice(0, 500).map((row) => `<tr>${row.map((cell) => `<td>${esc(cell)}</td>`).join('')}</tr>`).join('');
+      const head = data.headers.map((header) => `<th>${esc(header)}</th>`).join('');
+      const title = this.currentTitle || 'Correlation Analysis';
+      return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)} Report</title><style>
+        body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:1180px;margin:auto;color:#0f172a}
+        h1{margin-bottom:4px} .meta{color:#475569;font-size:13px;margin-bottom:18px}
+        table{border-collapse:collapse;width:100%;font-size:12px} th,td{border:1px solid #d1d5db;padding:6px 8px;text-align:center}
+        th{background:#f1f5f9} tr:nth-child(even){background:#f8fafc}
+      </style></head><body>
+        <h1>${esc(title)} Report</h1>
+        <p class="meta">Variables: ${data.headers.length} &middot; Rows: ${data.allRows.length} &middot; Generated: ${new Date().toLocaleString()}</p>
+        <h2>Data Snapshot</h2>
+        <table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table>
+        ${data.allRows.length > 500 ? '<p class="meta">Only the first 500 rows are shown in this static report.</p>' : ''}
+      </body></html>`;
+    };
+    return {
+      moduleName: 'Correlation analysis',
+      getData: getFallbackData,
+      exportJson: () => {
+        const payload = getCorrelationData();
+        if (!payload) { alert('No correlation data available for export yet.'); return; }
+        downloadBlob(
+          new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
+          `Correlation_Data_${timestamp()}.json`
+        );
+      },
+      exportHtml: () => {
+        const html = buildHtmlReport();
+        if (!html) { alert('No correlation data available for export yet.'); return; }
+        downloadBlob(
+          new Blob([html], { type: 'text/html' }),
+          `Correlation_Report_${safeName(this.currentTitle)}_${timestamp()}.html`
+        );
+      }
+    };
   },
 
   _buildUnivariateFallbackActions() {
@@ -1948,16 +2045,17 @@ const StatisticoHeader = {
     const hasHtml = typeof actions.exportHtml === 'function';
     const hasJson = typeof actions.exportJson === 'function';
 
-    // ── AI pill — above utilities, univariate only (not hypothesis) ────────
-    if (this.module === 'univariate' && this.currentView !== 'hypothesis') {
+    // ── AI pill — above utilities ─────────────────────────────────────────
+    if ((this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations') {
       const aiSection = document.createElement('div');
       aiSection.id = 'sbAiSection';
       aiSection.className = 'sb-ai-section-wrap';
+      const isCorrelation = this.module === 'correlations';
       aiSection.innerHTML = `
         <button class="sb-ai-sidebar-pill"
                 id="sbAiBtn"
                 onclick="StatisticoHeader._sbAiGlobalInterpret()"
-                title="Full variable analysis — synthesises all diagnostics into one report">
+                title="${isCorrelation ? 'Full correlation analysis - synthesises all correlation views into one report' : 'Full variable analysis - synthesises all diagnostics into one report'}">
           <i class="fa-solid fa-brain"></i>
           <span>Full Analysis</span>
           <sup class="sb-ai-sup">AI</sup>
@@ -2019,18 +2117,20 @@ const StatisticoHeader = {
    * Only shown for univariate views that are not hypothesis.
    */
   _injectPerViewAiButton() {
-    if (this.module !== 'univariate' || this.currentView === 'hypothesis') return;
+    if (!((this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations')) return;
     if (document.getElementById('sbAiFloatBtn')) return;
 
     const rightCol = document.querySelector('.right-col');
     if (!rightCol) return;
 
-    const viewLabels = {
-      histogram: 'Histogram', boxplot: 'Box Plot', cdf: 'CDF',
-      percentile: 'Percentiles', kernel: 'Kernel Density',
-      outliers: 'Outliers', normality: 'Normality Tests',
-      qqplot: 'QQ / PP Plots', confidence: 'Confidence Intervals'
-    };
+    const viewLabels = this.module === 'correlations'
+      ? this._correlationViewLabels()
+      : {
+        histogram: 'Histogram', boxplot: 'Box Plot', cdf: 'CDF',
+        percentile: 'Percentiles', kernel: 'Kernel Density',
+        outliers: 'Outliers', normality: 'Normality Tests',
+        qqplot: 'QQ / PP Plots', confidence: 'Confidence Intervals'
+      };
     const label = viewLabels[this.currentView] || 'View';
 
     const btn = document.createElement('button');
@@ -2054,7 +2154,9 @@ const StatisticoHeader = {
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking…</span>';
     }
     try {
-      const prompt = this._buildStructuredPrompt(this.currentView, 'per-view');
+      const prompt = this.module === 'correlations'
+        ? this._buildCorrelationStructuredPrompt(this.currentView, 'per-view')
+        : this._buildStructuredPrompt(this.currentView, 'per-view');
       if (!prompt) { this._showAiOverlay(null, this.currentView); return; }
       const raw = await this._callAiForSidebar(prompt);
       const sections = this._parseAiStructured(raw);
@@ -2062,7 +2164,9 @@ const StatisticoHeader = {
     } catch (err) {
       this._showAiOverlay({ error: err.message || 'AI request failed.' }, this.currentView, 'per-view', this._lastAiMeta);
     } finally {
-      const viewLabels = { histogram:'Histogram',boxplot:'Box Plot',cdf:'CDF',percentile:'Percentiles',kernel:'Kernel Density',outliers:'Outliers',normality:'Normality Tests',qqplot:'QQ / PP Plots',confidence:'Confidence Intervals' };
+      const viewLabels = this.module === 'correlations'
+        ? this._correlationViewLabels()
+        : { histogram:'Histogram',boxplot:'Box Plot',cdf:'CDF',percentile:'Percentiles',kernel:'Kernel Density',outliers:'Outliers',normality:'Normality Tests',qqplot:'QQ / PP Plots',confidence:'Confidence Intervals' };
       if (btn) {
         btn.disabled = false;
         btn.innerHTML = `<i class="fa-solid fa-compass"></i><span>Guide: ${viewLabels[this.currentView] || 'View'}</span><sup class="sb-ai-sup">AI</sup>`;
@@ -2082,17 +2186,20 @@ const StatisticoHeader = {
     };
 
     if (btn) btn.disabled = true;
-    setLabel('<i class="fa-solid fa-spinner fa-spin"></i><span>Loading views…</span>');
+    setLabel(`<i class="fa-solid fa-spinner fa-spin"></i><span>${this.module === 'correlations' ? 'Collecting views…' : 'Loading views…'}</span>`);
 
     try {
-      // Sweep all views via invisible iframes
-      const allData = await this._collectAllViewsViaIframes((done, total, label) => {
-        setLabel(`<i class="fa-solid fa-spinner fa-spin"></i><span>${done}/${total} — ${label}</span>`);
-      });
+      const allData = this.module === 'correlations'
+        ? this._collectAllCorrelationViewsData()
+        : await this._collectAllViewsViaIframes((done, total, label) => {
+            setLabel(`<i class="fa-solid fa-spinner fa-spin"></i><span>${done}/${total} — ${label}</span>`);
+          });
 
       setLabel('<i class="fa-solid fa-brain fa-spin"></i><span>Thinking…</span>');
 
-      const prompt = this._buildStructuredPrompt(this.currentView, 'full', allData);
+      const prompt = this.module === 'correlations'
+        ? this._buildCorrelationStructuredPrompt(this.currentView, 'full', allData)
+        : this._buildStructuredPrompt(this.currentView, 'full', allData);
       if (!prompt) { this._showAiOverlay(null, this.currentView, 'full'); return; }
 
       const raw = await this._callAiForSidebar(prompt);
@@ -2635,6 +2742,187 @@ const StatisticoHeader = {
     return out;
   },
 
+  _correlationViewLabels() {
+    return {
+      'correlation-matrix': 'Matrix',
+      'correlation-network': 'Network',
+      'partial-correlations': 'Partial',
+      reliability: 'Reliability',
+      'taylor-diagram': 'Taylor Diagram',
+      'descriptive-stats': 'Descriptives',
+      correlations: 'Correlations'
+    };
+  },
+
+  _getCorrelationDataset() {
+    let payload = window.correlationData || null;
+    if (!payload) {
+      try {
+        const stored = sessionStorage.getItem('correlationData');
+        if (stored) payload = JSON.parse(stored);
+      } catch (e) {}
+    }
+    if (!payload) {
+      try {
+        const stored = localStorage.getItem('correlationData') || localStorage.getItem('correlationResults');
+        if (stored) payload = JSON.parse(stored);
+      } catch (e) {}
+    }
+    if (!payload || !Array.isArray(payload.headers) || !Array.isArray(payload.data)) return null;
+    const headers = payload.headers.slice();
+    const rows = payload.data
+      .map((row) => headers.map((header) => Number(row?.[header])))
+      .filter((row) => row.some((value) => Number.isFinite(value)));
+    if (!headers.length || !rows.length) return null;
+    return { headers, rows, raw: payload };
+  },
+
+  _pearsonFromPairs(x, y) {
+    const pairs = x.map((xi, i) => [Number(xi), Number(y[i])]).filter(([xi, yi]) => Number.isFinite(xi) && Number.isFinite(yi));
+    const n = pairs.length;
+    if (n < 2) return null;
+    const xs = pairs.map((p) => p[0]);
+    const ys = pairs.map((p) => p[1]);
+    const mx = xs.reduce((a, b) => a + b, 0) / n;
+    const my = ys.reduce((a, b) => a + b, 0) / n;
+    const num = xs.reduce((acc, xi, i) => acc + (xi - mx) * (ys[i] - my), 0);
+    const den = Math.sqrt(xs.reduce((acc, xi) => acc + (xi - mx) ** 2, 0) * ys.reduce((acc, yi) => acc + (yi - my) ** 2, 0));
+    if (!den) return null;
+    return { r: num / den, n };
+  },
+
+  _computeCorrelationMatrixData(dataset) {
+    if (!dataset) return null;
+    const cols = dataset.headers.map((_, idx) => dataset.rows.map((row) => row[idx]));
+    const pairs = [];
+    for (let i = 0; i < dataset.headers.length; i += 1) {
+      for (let j = i + 1; j < dataset.headers.length; j += 1) {
+        const result = this._pearsonFromPairs(cols[i], cols[j]);
+        if (result) {
+          pairs.push({
+            x: dataset.headers[i],
+            y: dataset.headers[j],
+            r: result.r,
+            abs: Math.abs(result.r),
+            n: result.n
+          });
+        }
+      }
+    }
+    pairs.sort((a, b) => b.abs - a.abs);
+    const avgAbs = pairs.length ? pairs.reduce((acc, p) => acc + p.abs, 0) / pairs.length : null;
+    return { pairs, strongest: pairs.slice(0, 10), avgAbs };
+  },
+
+  _computeCorrelationDescriptives(dataset) {
+    if (!dataset) return [];
+    const f = (v, d = 3) => Number.isFinite(v) ? Number(v).toFixed(d) : 'N/A';
+    return dataset.headers.map((header, idx) => {
+      const values = dataset.rows.map((row) => row[idx]).filter((v) => Number.isFinite(v));
+      const n = values.length;
+      if (!n) return { variable: header, n: 0 };
+      const sorted = values.slice().sort((a, b) => a - b);
+      const mean = values.reduce((a, b) => a + b, 0) / n;
+      const sd = n > 1 ? Math.sqrt(values.reduce((acc, v) => acc + (v - mean) ** 2, 0) / (n - 1)) : 0;
+      return { variable: header, n, mean: f(mean), sd: f(sd), min: f(sorted[0]), max: f(sorted[n - 1]) };
+    });
+  },
+
+  _computeCorrelationReliability(dataset) {
+    if (!dataset || dataset.headers.length < 2 || dataset.rows.length < 2) return null;
+    const completeRows = dataset.rows.filter((row) => row.every((value) => Number.isFinite(value)));
+    if (completeRows.length < 2) return null;
+    const variance = (arr) => {
+      if (!arr || arr.length < 2) return NaN;
+      const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+      return arr.reduce((acc, v) => acc + (v - mean) ** 2, 0) / (arr.length - 1);
+    };
+    const itemVars = dataset.headers.map((_, idx) => variance(completeRows.map((row) => row[idx])));
+    const totalScores = completeRows.map((row) => row.reduce((acc, v) => acc + v, 0));
+    const totalVar = variance(totalScores);
+    const k = dataset.headers.length;
+    const alpha = Number.isFinite(totalVar) && totalVar > 0 && itemVars.every(Number.isFinite)
+      ? (k / (k - 1)) * (1 - itemVars.reduce((a, b) => a + b, 0) / totalVar)
+      : NaN;
+    const matrix = this._computeCorrelationMatrixData(dataset);
+    const avgR = matrix?.pairs?.length ? matrix.pairs.reduce((acc, p) => acc + p.r, 0) / matrix.pairs.length : NaN;
+    const standardizedAlpha = Number.isFinite(avgR) ? (k * avgR) / (1 + (k - 1) * avgR) : NaN;
+    return { alpha, standardizedAlpha, items: k, subjects: completeRows.length };
+  },
+
+  _collectAllCorrelationViewsData() {
+    const dataset = this._getCorrelationDataset();
+    if (!dataset) return null;
+    const matrix = this._computeCorrelationMatrixData(dataset);
+    const descriptives = this._computeCorrelationDescriptives(dataset);
+    const reliability = this._computeCorrelationReliability(dataset);
+    const threshold = Number(document.getElementById('networkThresholdSlider')?.value || window.networkThreshold || 0.3);
+    const connectedNames = new Set();
+    (matrix?.pairs || []).forEach((pair) => {
+      if (pair.abs >= threshold) {
+        connectedNames.add(pair.x);
+        connectedNames.add(pair.y);
+      }
+    });
+    const controls = Array.from(document.querySelectorAll('#controlCheckboxes input[type="checkbox"]:checked'))
+      .map((input) => input.value || input.dataset?.varName || input.parentElement?.textContent?.trim())
+      .filter(Boolean);
+    const pca = window.pcaData ? {
+      firstComponentVariance: window.pcaData.firstComponentVariance,
+      eigenvalues: window.pcaData.eigenvalues
+    } : null;
+    return {
+      data: { variables: dataset.headers, rows: dataset.rows.length },
+      matrix,
+      network: {
+        threshold,
+        connected: connectedNames.size,
+        disconnected: dataset.headers.filter((name) => !connectedNames.has(name))
+      },
+      descriptives,
+      partial: { controls },
+      reliability,
+      pca
+    };
+  },
+
+  _formatCorrelationViewsData(allData) {
+    if (!allData) return null;
+    const f = (value, digits = 3) => Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : 'N/A';
+    const lines = [];
+    lines.push(`[ Data ] Variables=${allData.data.variables.length}; Rows=${allData.data.rows}`);
+    if (allData.matrix) {
+      lines.push('[ Matrix ]');
+      lines.push(`  Pair count=${allData.matrix.pairs.length}; Average |r|=${f(allData.matrix.avgAbs)}`);
+      allData.matrix.strongest.slice(0, 6).forEach((pair) => {
+        lines.push(`  ${pair.x} vs ${pair.y}: r=${f(pair.r)}, n=${pair.n}`);
+      });
+    }
+    if (allData.network) {
+      lines.push('[ Network ]');
+      lines.push(`  Threshold |r|>=${f(allData.network.threshold, 2)}; Connected variables=${allData.network.connected}; Disconnected=${allData.network.disconnected.join(', ') || 'none'}`);
+    }
+    if (allData.reliability) {
+      lines.push('[ Reliability ]');
+      lines.push(`  Cronbach alpha=${f(allData.reliability.alpha)}; Standardized alpha=${f(allData.reliability.standardizedAlpha)}; Items=${allData.reliability.items}; Subjects=${allData.reliability.subjects}`);
+    }
+    if (allData.pca) {
+      lines.push('[ PCA / Taylor dimensionality cue ]');
+      lines.push(`  First component variance=${f(allData.pca.firstComponentVariance, 1)}%; Eigenvalues=${(allData.pca.eigenvalues || []).slice(0, 6).map((v) => f(v, 2)).join(', ')}`);
+    }
+    if (allData.partial?.controls?.length) {
+      lines.push('[ Partial Correlations ]');
+      lines.push(`  Current control variables=${allData.partial.controls.join(', ')}`);
+    }
+    if (allData.descriptives?.length) {
+      lines.push('[ Descriptives ]');
+      allData.descriptives.slice(0, 8).forEach((d) => {
+        lines.push(`  ${d.variable}: n=${d.n}, mean=${d.mean}, sd=${d.sd}, range=[${d.min}, ${d.max}]`);
+      });
+    }
+    return lines.join('\n');
+  },
+
   /**
    * Serialise the collected cross-view data into a readable text block
    * for insertion into the AI prompt.
@@ -2736,6 +3024,67 @@ const StatisticoHeader = {
 
       confidence: `Controls available: (1) Method radios (Classical / Bootstrap) — classical uses t/chi-squared formulas; bootstrap resamples the data; (2) Parameter radios (Mean / Std Dev / Median / Percentile when bootstrap) — what population parameter to estimate; (3) Confidence level selector (90% / 95% / 99%) plus a fine-grained alpha slider; (4) Bootstrap iterations input — higher = more accurate but slower; (5) Optional finite population size — applies finite population correction.`
     };
+  },
+
+  _correlationControlsDoc() {
+    return {
+      'correlation-matrix': 'Matrix view shows all pairwise correlations. Sort or scan for strongest positive and negative relationships, then use Network/Partial/Reliability for follow-up.',
+      'correlation-network': 'Network view highlights relationships above the threshold, can show only connected variables, and uses chart scale to inspect dense graphs.',
+      'partial-correlations': 'Partial view recalculates pairwise correlations while controlling selected variables. Use it to check whether a relationship persists after confounders are held constant.',
+      reliability: 'Reliability view evaluates whether selected variables behave like a consistent scale using alpha, omega, item-total correlations, alpha-if-deleted, and PCA dimensionality cues.',
+      'taylor-diagram': 'Taylor view compares variables against a reference using correlation, standard deviation, and centered RMSE-style geometry.',
+      'descriptive-stats': 'Descriptives summarize each variable before interpreting the correlation structure.'
+    };
+  },
+
+  _buildCorrelationStructuredPrompt(view, mode, preCollectedData = null) {
+    const allData = preCollectedData || this._collectAllCorrelationViewsData();
+    if (!allData) return null;
+    const dataBlock = this._formatCorrelationViewsData(allData);
+    const labels = this._correlationViewLabels();
+    const viewLabel = labels[view] || labels.correlations;
+    const controls = this._correlationControlsDoc();
+
+    if (mode === 'full') {
+      return `You are a senior statistician writing a full correlation-analysis report that synthesises ALL available correlation views.
+
+RESULTS FROM ALL CORRELATION VIEWS:
+${dataBlock}
+
+RULES:
+- Treat the data above as authoritative.
+- Synthesize Matrix, Network, Descriptives, Reliability, Partial controls, and PCA/Taylor dimensionality cues when present.
+- Cite exact values where useful.
+- Do not overclaim causality; these are associations.
+- Mention disconnected variables or weak reliability if present.
+
+Reply ONLY in this exact format:
+CONCLUSION: [One decisive sentence - the single most important correlation finding]
+EVIDENCE: [specific numeric finding] | [specific numeric finding] | [specific numeric finding] | [specific numeric finding]
+INTERPRETATION: [3 sentences - unified synthesis across the views]
+IMPLICATIONS: [analytical implication 1] | [analytical implication 2] | [analytical implication 3]
+ACTION: [next step 1] | [next step 2] | [next step 3]`;
+    }
+
+    return `You are explaining the "${viewLabel}" correlation view to a data analyst.
+
+WHAT THIS VIEW DOES:
+${controls[view] || controls['correlation-matrix']}
+
+ALL AVAILABLE CORRELATION RESULTS:
+${dataBlock}
+
+RULES:
+- Explain this current view first, but use the broader results as context.
+- Be practical and concise.
+- Do not overclaim causality.
+- Mention exact values when they clarify the reading.
+
+Reply ONLY in this exact format:
+ABOUT: [2-3 sentences explaining what this view answers]
+INSIGHT: [specific insight for this current view using exact numbers]
+MEANS: [plain-language interpretation]
+NEXT: [next check] | [next check] | [next check]`;
   },
 
   /**
@@ -3014,10 +3363,11 @@ Always follow the exact output format requested.` },
     const viewLabels = {
       histogram:'Histogram', boxplot:'Box Plot', cdf:'CDF', percentile:'Percentiles',
       kernel:'Kernel Density', outliers:'Outliers', normality:'Normality Tests',
-      qqplot:'QQ / PP Plots', confidence:'Confidence Intervals'
+      qqplot:'QQ / PP Plots', confidence:'Confidence Intervals',
+      ...this._correlationViewLabels()
     };
     const viewLabel = viewLabels[view] || view;
-    const title = mode === 'full' ? 'Full Variable Analysis'
+    const title = mode === 'full' ? (this.module === 'correlations' ? 'Full Correlation Analysis' : 'Full Variable Analysis')
       : mode === 'per-view' ? `Insight Guide — ${viewLabel}`
       : `AI Insight — ${viewLabel}`;
     const titleIcon = mode === 'full' ? 'fa-brain' : 'fa-compass';

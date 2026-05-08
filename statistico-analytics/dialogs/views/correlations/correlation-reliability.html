@@ -21,7 +21,7 @@
   
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260504a">
-  <script src="../shared-header.js?v=20260508a"></script>
+  <script src="../shared-header.js?v=20260508c"></script>
 
   <style>
     :root {
@@ -854,148 +854,6 @@
       const sampleSize = numSubjects;
       StatisticoHeader.init('reliability', 'Reliability Coefficients', sampleSize, 'correlations');
         StatisticoHeader.initSidebarPage(); StatisticoHeader.updateTitle('Reliability Coefficients');;
-      setTimeout(injectReliabilityAiButtons, 0);
-    }
-
-    function injectReliabilityAiButtons() {
-      const nav = document.getElementById('sidebarNav');
-      if (nav && !document.getElementById('sbReliabilityAiSection')) {
-        const aiSection = document.createElement('div');
-        aiSection.id = 'sbReliabilityAiSection';
-        aiSection.className = 'sb-ai-section-wrap';
-        aiSection.innerHTML = `
-          <button class="sb-ai-sidebar-pill"
-                  id="sbReliabilityAiBtn"
-                  onclick="requestReliabilityAI('full')"
-                  title="Full reliability AI analysis">
-            <i class="fa-solid fa-brain"></i>
-            <span>Full Analysis</span>
-            <sup class="sb-ai-sup">AI</sup>
-          </button>
-        `;
-        nav.appendChild(aiSection);
-      }
-
-      const rightCol = document.querySelector('.right-col');
-      if (rightCol && !document.getElementById('sbReliabilityAiFloatBtn')) {
-        const btn = document.createElement('button');
-        btn.id = 'sbReliabilityAiFloatBtn';
-        btn.className = 'sb-ai-float-btn';
-        btn.title = 'AI Insight - Reliability';
-        btn.innerHTML = '<i class="fa-solid fa-compass"></i><span>Guide: Reliability</span><sup class="sb-ai-sup">AI</sup>';
-        btn.addEventListener('click', () => requestReliabilityAI('guide'));
-        rightCol.style.position = 'relative';
-        rightCol.appendChild(btn);
-      }
-    }
-
-    async function requestReliabilityAI(mode) {
-      if (!reliabilityResultsForAI) {
-        alert('Run the reliability analysis first.');
-        return;
-      }
-
-      const btn = mode === 'full'
-        ? document.getElementById('sbReliabilityAiBtn')
-        : document.getElementById('sbReliabilityAiFloatBtn');
-      const originalHtml = btn ? btn.innerHTML : '';
-
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = mode === 'full'
-          ? '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking...</span>'
-          : '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking...</span>';
-      }
-
-      try {
-        const prompt = buildReliabilityAiPrompt(mode);
-        const raw = await StatisticoHeader._callAiForSidebar(prompt);
-        const sections = StatisticoHeader._parseAiStructured(raw);
-        StatisticoHeader._showAiOverlay(sections, 'reliability', mode === 'full' ? 'full' : 'per-view');
-      } catch (err) {
-        StatisticoHeader._showAiOverlay({ error: err.message || 'AI request failed.' }, 'reliability', mode === 'full' ? 'full' : 'per-view');
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = originalHtml;
-        }
-      }
-    }
-
-    function buildReliabilityAiPrompt(mode) {
-      const payload = getReliabilityAiPayload();
-      const itemLines = payload.items.map(row =>
-        `${row.item}: item-total=${row.itemTotalCorr}, alpha-if-deleted=${row.alphaIfDeleted}, n=${row.nIfDeleted}`
-      ).join('\n');
-      const pcaLine = payload.pca
-        ? `PCA first component variance=${payload.pca.firstComponentVariance}; eigenvalues=${payload.pca.eigenvalues.join(', ')}`
-        : 'PCA data unavailable';
-
-      if (mode === 'guide') {
-        return `You are explaining the Reliability Coefficients view to an analyst.
-Return exactly these labels:
-ABOUT:
-INSIGHT:
-MEANS:
-NEXT:
-
-Data:
-Mode=${payload.mode}
-Cronbach alpha=${payload.alpha}
-McDonald omega=${payload.omega}
-Items=${payload.validItems}/${payload.totalItems}; Subjects=${payload.subjects}
-Zero-variance items=${payload.zeroVarianceItems.join(', ') || 'none'}
-${pcaLine}
-Item diagnostics:
-${itemLines}
-
-Keep it concise and practical. Explain how to read alpha, omega, alpha-if-deleted, and PCA scree for this exact result.`;
-      }
-
-      return `You are writing a full AI assessment for a Reliability Coefficients result.
-Return exactly these labels:
-CONCLUSION:
-EVIDENCE:
-INTERPRETATION:
-IMPLICATIONS:
-ACTION:
-
-Data:
-Mode=${payload.mode}
-Cronbach alpha=${payload.alpha}
-McDonald omega=${payload.omega}
-Items=${payload.validItems}/${payload.totalItems}; Subjects=${payload.subjects}
-Zero-variance items=${payload.zeroVarianceItems.join(', ') || 'none'}
-${pcaLine}
-Item diagnostics:
-${itemLines}
-
-Use exact values. Focus on scale consistency, problematic items, dimensionality, and next analytical checks.`;
-    }
-
-    function getReliabilityAiPayload() {
-      const f = (value, digits = 3) => Number.isFinite(value) ? Number(value).toFixed(digits) : 'N/A';
-      return {
-        mode: reliabilityResultsForAI?.mode || (document.getElementById("alpha-mode")?.value || 'regular'),
-        alpha: f(reliabilityResultsForAI?.alpha),
-        omega: f(reliabilityResultsForAI?.omega),
-        validItems: reliabilityResultsForAI?.validItems ?? reliabilityTableRows.length,
-        totalItems: reliabilityResultsForAI?.totalItems ?? reliabilityTableRows.length,
-        subjects: reliabilityResultsForAI?.subjects ?? lastData.length,
-        zeroVarianceItems: reliabilityResultsForAI?.zeroVarianceItems || [],
-        items: reliabilityTableRows.map(row => ({
-          item: row.item,
-          mean: f(row.mean, 2),
-          sd: f(row.sd, 2),
-          itemTotalCorr: f(row.itemTotalCorr, 2),
-          alphaIfDeleted: f(row.alphaIfDeleted),
-          nIfDeleted: Number.isFinite(row.nIfDeleted) ? row.nIfDeleted : 'N/A'
-        })),
-        pca: pcaData ? {
-          firstComponentVariance: f(pcaData.firstComponentVariance, 1) + '%',
-          eigenvalues: (pcaData.eigenvalues || []).slice(0, 6).map(v => f(v, 2))
-        } : null
-      };
     }
 
     function toggleDescriptiveColumns(show) {
@@ -1250,6 +1108,7 @@ Use exact values. Focus on scale consistency, problematic items, dimensionality,
           explained,
           firstComponentVariance: explained[0] || 0
         };
+        window.pcaData = pcaData;
 
         console.log("PCA data calculated successfully:");
         console.log("  Eigenvalues:", eigenvalues);

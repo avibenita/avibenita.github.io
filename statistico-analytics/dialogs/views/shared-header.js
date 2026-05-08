@@ -1266,7 +1266,7 @@ const StatisticoHeader = {
         moduleName: actions.moduleName || fallback.moduleName || 'Save correlation model',
         getData: actions.getData || fallback.getData,
         exportJson: actions.exportJson || fallback.exportJson,
-        exportHtml: actions.exportHtml || fallback.exportHtml
+        exportHtml: fallback.exportHtml
       };
     }
     if (this.module !== 'univariate') return actions;
@@ -1309,6 +1309,31 @@ const StatisticoHeader = {
       setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
     };
     const esc = (value) => String(value ?? '').replace(/[<>&"]/g, (m) => ({ '<':'&lt;', '>':'&gt;', '&':'&amp;', '"':'&quot;' }[m]));
+    const escAttr = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const absolutize = (value, baseUrl) => {
+      if (!value) return value;
+      const raw = String(value).trim();
+      if (!raw || raw.startsWith('#') || raw.startsWith('data:') || raw.startsWith('javascript:')) return raw;
+      try { return new URL(raw, baseUrl).href; } catch (e) { return raw; }
+    };
+    const normalizeAssetUrls = (root, baseUrl) => {
+      if (!root) return;
+      ['href', 'src', 'poster'].forEach((attr) => {
+        root.querySelectorAll(`[${attr}]`).forEach((el) => {
+          const raw = el.getAttribute(attr);
+          if (raw) el.setAttribute(attr, absolutize(raw, baseUrl));
+        });
+      });
+    };
+    const appendQueryParam = (url, key, value) => {
+      try {
+        const u = new URL(url, window.location.href);
+        u.searchParams.set(key, value);
+        return u.href;
+      } catch (e) {
+        return url;
+      }
+    };
     const getCorrelationData = () => {
       if (window.correlationData && window.correlationData.headers && window.correlationData.data) return window.correlationData;
       try {
@@ -1336,24 +1361,119 @@ const StatisticoHeader = {
         notice: null
       };
     };
-    const buildHtmlReport = () => {
-      const data = getFallbackData();
-      if (!data) return null;
+    const getCorrelationMenuItems = () => ([
+      { id: 'matrix', label: 'Correlation Matrix', file: 'correlations/correlation-matrix.html' },
+      { id: 'network', label: 'Correlation Network', file: 'correlations/correlation-network.html' },
+      { id: 'taylor', label: 'Taylor Diagram', file: 'correlations/correlation-taylor.html' },
+      { id: 'partial', label: 'Partial Correlations', file: 'correlations/correlation-partial.html' },
+      { id: 'reliability', label: 'Reliability Coefficients', file: 'correlations/correlation-reliability.html' },
+      { id: 'descriptives', label: 'Descriptive Statistics', file: 'correlations/descriptive-stats.html' }
+    ]);
+    const pickReportSections = (sections, onConfirm) => {
+      const existing = document.getElementById('stReportExportOverlay');
+      if (existing) existing.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'stReportExportOverlay';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2147483300;display:flex;align-items:center;justify-content:center;padding:16px;';
+      const sectionListHtml = sections.map((s) => `
+        <label style="display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid #e5e7eb;color:#0f172a;font-size:13px;cursor:pointer;">
+          <input type="checkbox" data-section-id="${esc(s.id)}" checked style="cursor:pointer;accent-color:#f97316;" />
+          <span>${esc(s.label)}</span>
+        </label>
+      `).join('');
+      overlay.innerHTML = `
+        <div style="width:min(560px,95vw);max-height:88vh;background:#fff;border-radius:14px;border:1px solid #cbd5e1;box-shadow:0 16px 40px rgba(15,23,42,.32);display:flex;flex-direction:column;overflow:hidden;">
+          <div style="padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;">
+            <i class="fa-solid fa-file-export" style="color:#f97316;font-size:16px;"></i>
+            <span style="font-size:15px;font-weight:700;color:#0f172a;">Export Report</span>
+          </div>
+          <div style="padding:10px 18px 4px;">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:6px;">Sections to include</div>
+          </div>
+          <div style="padding:0 18px 8px;overflow-y:auto;flex:1;">${sectionListHtml}</div>
+          <div style="padding:12px 18px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px;">
+            <button id="stReportCancelBtn" style="padding:8px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;">Cancel</button>
+            <button id="stReportExportBtn" style="padding:8px 16px;border:1px solid #f97316;border-radius:8px;background:#f97316;color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
+              <i class="fa-solid fa-file-export"></i> Export HTML
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      const close = () => overlay.remove();
+      overlay.querySelector('#stReportCancelBtn').addEventListener('click', close);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+      overlay.querySelector('#stReportExportBtn').addEventListener('click', () => {
+        const checked = Array.from(overlay.querySelectorAll('input[data-section-id]:checked'))
+          .map((el) => el.getAttribute('data-section-id'));
+        if (!checked.length) return;
+        close();
+        onConfirm(checked);
+      });
+    };
+    const extractRichSnapshot = (doc, sourceUrl) => {
+      const headClone = doc.head ? doc.head.cloneNode(true) : document.createElement('head');
+      headClone.querySelectorAll('script, noscript').forEach((n) => n.remove());
+      normalizeAssetUrls(headClone, sourceUrl);
+      const bodyClone = doc.body ? doc.body.cloneNode(true) : document.createElement('body');
+      bodyClone.querySelectorAll('script, noscript').forEach((n) => n.remove());
+      normalizeAssetUrls(bodyClone, sourceUrl);
+      bodyClone.querySelectorAll('#header-container, .statistico-shell, .sb-nav, #sidebarNav, .statistico-footer, .sb-ai-float-btn, .sb-ai-overlay, .loading-overlay, #dialogLoading').forEach((n) => n.remove());
+      bodyClone.querySelectorAll('button, select, input, textarea').forEach((el) => {
+        el.setAttribute('disabled', 'disabled');
+        el.setAttribute('tabindex', '-1');
+        ['onclick','onchange','oninput','onmousedown','onmouseup','onfocus','onblur','onkeydown','onkeyup'].forEach((ev) => el.removeAttribute(ev));
+      });
+      const snapshotStyle = document.createElement('style');
+      snapshotStyle.textContent = 'button,select,input,textarea{pointer-events:none!important;cursor:default!important;opacity:.55!important;filter:grayscale(25%)!important}.highcharts-exporting-group,.highcharts-button,.sb-ai-float-btn,.sb-ai-overlay,.loading,#loadingMessage{display:none!important}';
+      bodyClone.prepend(snapshotStyle);
+      const primary = bodyClone.querySelector('.right-col') || bodyClone.querySelector('.container') || bodyClone;
+      const payload = primary === bodyClone ? bodyClone.innerHTML : primary.outerHTML;
+      return `<!DOCTYPE html><html><head><meta charset="utf-8">${headClone.innerHTML}</head><body>${payload}</body></html>`;
+    };
+    const captureSectionSnapshot = (url, liveData) => new Promise((resolve) => {
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'position:fixed;left:-99999px;top:-99999px;width:1360px;height:900px;opacity:0;pointer-events:none;';
+      iframe.setAttribute('aria-hidden', 'true');
+      let settled = false;
+      let timer = null;
+      const finish = (snapshotHtml, ok) => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        try { iframe.remove(); } catch (e) {}
+        resolve({ snapshotHtml, ok });
+      };
+      const tryCapture = (startedAt) => {
+        try {
+          const doc = iframe.contentDocument;
+          if (!doc) return finish('', false);
+          const hasRenderable = !!doc.querySelector('svg, canvas, .highcharts-root, .highcharts-container, table');
+          if (hasRenderable || (Date.now() - startedAt) > 9000) {
+            finish(extractRichSnapshot(doc, url), true);
+          } else {
+            setTimeout(() => tryCapture(startedAt), 250);
+          }
+        } catch (e) {
+          finish('', false);
+        }
+      };
+      iframe.addEventListener('load', () => {
+        try {
+          if (liveData && typeof iframe.contentWindow.handleDataReceived === 'function') {
+            iframe.contentWindow.handleDataReceived(liveData);
+          }
+        } catch (_) {}
+        setTimeout(() => tryCapture(Date.now()), liveData ? 1800 : 800);
+      }, { once: true });
+      timer = setTimeout(() => finish('', false), 12000);
+      iframe.src = url;
+      document.body.appendChild(iframe);
+    });
+    const fallbackDataSection = (data) => {
       const rows = data.allRows.slice(0, 500).map((row) => `<tr>${row.map((cell) => `<td>${esc(cell)}</td>`).join('')}</tr>`).join('');
       const head = data.headers.map((header) => `<th>${esc(header)}</th>`).join('');
-      const title = this.currentTitle || 'Correlation Analysis';
-      return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)} Report</title><style>
-        body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:1180px;margin:auto;color:#0f172a}
-        h1{margin-bottom:4px} .meta{color:#475569;font-size:13px;margin-bottom:18px}
-        table{border-collapse:collapse;width:100%;font-size:12px} th,td{border:1px solid #d1d5db;padding:6px 8px;text-align:center}
-        th{background:#f1f5f9} tr:nth-child(even){background:#f8fafc}
-      </style></head><body>
-        <h1>${esc(title)} Report</h1>
-        <p class="meta">Variables: ${data.headers.length} &middot; Rows: ${data.allRows.length} &middot; Generated: ${new Date().toLocaleString()}</p>
-        <h2>Data Snapshot</h2>
-        <table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table>
-        ${data.allRows.length > 500 ? '<p class="meta">Only the first 500 rows are shown in this static report.</p>' : ''}
-      </body></html>`;
+      return `<section><h2>Data Snapshot</h2><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table>${data.allRows.length > 500 ? '<p class="meta">Only the first 500 rows are shown.</p>' : ''}</section>`;
     };
     return {
       moduleName: 'Correlation analysis',
@@ -1367,12 +1487,75 @@ const StatisticoHeader = {
         );
       },
       exportHtml: () => {
-        const html = buildHtmlReport();
-        if (!html) { alert('No correlation data available for export yet.'); return; }
-        downloadBlob(
-          new Blob([html], { type: 'text/html' }),
-          `Correlation_Report_${safeName(this.currentTitle)}_${timestamp()}.html`
-        );
+        const data = getFallbackData();
+        const liveData = getCorrelationData();
+        if (!data || !liveData) { alert('No correlation data available for export yet.'); return; }
+        const sections = getCorrelationMenuItems();
+        pickReportSections(sections, (selectedIds) => {
+          const selected = sections.filter((s) => selectedIds.includes(String(s.id)));
+          const toc = selected.map((s, i) => `<li><a href="#sec_${i + 1}">${esc(s.label)}</a></li>`).join('');
+
+          const progressOverlay = document.createElement('div');
+          progressOverlay.id = 'stExportProgressOverlay';
+          progressOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2147483400;display:flex;align-items:center;justify-content:center;padding:16px;';
+          progressOverlay.innerHTML = `
+            <div style="min-width:280px;max-width:440px;padding:16px 18px;border-radius:12px;border:1px solid rgba(148,163,184,.4);background:#111827;color:#e5e7eb;box-shadow:0 12px 28px rgba(2,6,23,.5);display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span id="stExportSpinner" style="width:16px;height:16px;border:2px solid rgba(148,163,184,.3);border-top-color:#f97316;border-radius:999px;display:inline-block;animation:stExSpin .75s linear infinite;flex-shrink:0;"></span>
+                <span id="stExportProgressLabel" style="font-size:13px;font-weight:600;letter-spacing:.2px;">Preparing export...</span>
+              </div>
+              <div style="height:4px;background:rgba(148,163,184,.2);border-radius:4px;overflow:hidden;">
+                <div id="stExportProgressBar" style="height:100%;width:0%;background:#f97316;border-radius:4px;transition:width .3s ease;"></div>
+              </div>
+              <div id="stExportProgressSub" style="font-size:11px;color:#94a3b8;"></div>
+            </div>
+            <style>@keyframes stExSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
+          `;
+          document.body.appendChild(progressOverlay);
+          const setProgress = (done, total, label) => {
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+            const bar = document.getElementById('stExportProgressBar');
+            const lbl = document.getElementById('stExportProgressLabel');
+            const sub = document.getElementById('stExportProgressSub');
+            if (bar) bar.style.width = pct + '%';
+            if (lbl && label) lbl.textContent = label;
+            if (sub) sub.textContent = `${done} of ${total} sections captured`;
+          };
+          const closeProgress = () => {
+            const el = document.getElementById('stExportProgressOverlay');
+            if (el) el.remove();
+          };
+
+          (async () => {
+            try { sessionStorage.setItem('correlationData', JSON.stringify(liveData)); } catch (_) {}
+            const snapshotResults = [];
+            for (let i = 0; i < selected.length; i += 1) {
+              const s = selected[i];
+              setProgress(i, selected.length, `Capturing: ${esc(s.label)}...`);
+              const url = appendQueryParam(this.resolveDialogUrl(s.file), 'embed', '1');
+              snapshotResults.push(await captureSectionSnapshot(url, liveData));
+            }
+            setProgress(selected.length, selected.length, 'Building report...');
+            const builtSections = selected.map((s, i) => {
+              const snap = snapshotResults[i] || { ok: false, snapshotHtml: '' };
+              return `
+                <section id="sec_${i + 1}">
+                  <h2>${i + 1}. ${esc(s.label)}</h2>
+                  <p class="meta">${snap.ok ? 'Embedded rich page snapshot.' : 'Section preview unavailable in this export.'}</p>
+                  ${snap.ok ? `<iframe class="report-frame" srcdoc="${escAttr(snap.snapshotHtml)}"></iframe>` : ''}
+                </section>
+              `;
+            });
+            const reportCss = `body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:1120px;margin:auto;color:#0f172a}h1{margin-bottom:4px}h2{margin-top:28px}nav{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}section{page-break-inside:avoid;border-top:1px solid #e2e8f0;padding-top:14px}.meta{color:#475569;font-size:13px}.report-frame{width:100%;height:760px;border:1px solid #d1d5db;border-radius:10px;background:#fff}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #d1d5db;padding:6px 8px;text-align:center}th{background:#f1f5f9}a{color:#0ea5e9;text-decoration:none}a:hover{text-decoration:underline}`;
+            const reportBody = `<h1>Correlation Long Report</h1><p class="meta"><strong>Variables:</strong> ${data.headers.length} &nbsp;&middot;&nbsp; <strong>Rows:</strong> ${data.allRows.length} &nbsp;&middot;&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</p><nav><strong>Included sections</strong><ol>${toc}</ol></nav>${builtSections.join('')}${fallbackDataSection(data)}`;
+            const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Correlation Long Report</title><style>${reportCss}</style></head><body>${reportBody}</body></html>`;
+            closeProgress();
+            downloadBlob(
+              new Blob([html], { type: 'text/html' }),
+              `Correlation_Report_${safeName(this.currentTitle || 'Correlation')}_${timestamp()}.html`
+            );
+          })().catch(() => closeProgress());
+        });
       }
     };
   },

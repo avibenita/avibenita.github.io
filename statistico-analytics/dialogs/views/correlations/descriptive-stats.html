@@ -81,17 +81,19 @@
     }
     
     html,body{height:100%;margin:0;padding:0;}
-    body{background:var(--surface-0);color:var(--text-primary);font-family:'Segoe UI', Tahoma, sans-serif;overflow-x:hidden;display:flex;flex-direction:column;min-height:100vh;}
-    .wrap{display:flex;flex-direction:column;gap:10px;padding:10px;flex:1;min-height:0;overflow-y:auto;box-sizing:border-box;}
+    body{background:var(--surface-0);color:var(--text-primary);font-family:'Segoe UI', Tahoma, sans-serif;overflow:hidden;display:flex;flex-direction:column;min-height:100vh;}
+    .wrap{display:flex;flex-direction:column;gap:10px;padding:10px;flex:1 1 auto;min-height:0;overflow:hidden;box-sizing:border-box;}
     .card{width:100%;background:var(--surface-1);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.35);overflow:hidden;display:flex;flex-direction:column;}
-    #stats-card{flex:0 0 auto;}
+    #stats-card{flex:1 1 auto;min-height:0;}
+    .wrap.histogram-visible #stats-card{flex:0 1 42%;min-height:160px;}
     #histogram-panel{flex:1 1 0;min-height:360px;display:none;}
+    .wrap.histogram-visible #histogram-panel{min-height:360px;}
     .card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;color:var(--accent-1);font-weight:700;letter-spacing:.2px;flex-shrink:0;border-bottom:1px solid var(--border);}
     .card-body{padding:10px;flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;}
     .control-group {display: flex;align-items: center;gap: 10px;}
     .decimal-control {display: flex;align-items: center;gap: 5px;}
     .decimal-control label {font-size: 14px;color: var(--text-secondary);font-weight: 500;}
-    .table-wrap{border:1px solid var(--border);border-radius:8px;background:var(--surface-2);flex-shrink:0;}
+    .table-wrap{border:1px solid var(--border);border-radius:8px;background:var(--surface-2);flex:1 1 auto;min-height:0;overflow:auto;}
     #stats-table{width:100%;min-width:820px;border-collapse:collapse;table-layout:auto;}
     #stats-table th,#stats-table td{padding:12px 14px;border:1px solid rgba(255,255,255,.18);box-sizing:border-box;text-align:right;font-size:14px;line-height:20px;height:44px;white-space:nowrap;}
     #stats-table th:first-child,#stats-table td:first-child{text-align:left;min-width:140px;max-width:200px;overflow:hidden;text-overflow:ellipsis;}
@@ -156,6 +158,7 @@
     
     @keyframes pulseHighlight { 0% { background-color: rgba(255, 255, 0, 0.5); } 50% { background-color: rgba(255, 255, 0, 0); } 100% { background-color: rgba(255, 255, 0, 0.5); } }
     .animated-critical { animation: pulseHighlight 0.8s ease-in-out; }
+  </style>
   <style>
     html,body{height:100%!important;overflow:hidden!important;}
     body{display:flex!important;flex-direction:column!important;}
@@ -196,7 +199,7 @@
   <!-- ++ Right column ++ -->
   <div class="right-col">
     <div id="header-container"></div>
-  <div class="wrap">
+  <div class="wrap" id="descriptivesWrap">
     <!-- Panel 1: Stats table -->
     <section class="card" id="stats-card">
       <div class="card-head">
@@ -783,6 +786,7 @@
           const panel = document.getElementById('histogram-panel');
           panel.style.display = 'flex';
           panel.classList.add('active');
+          document.getElementById('descriptivesWrap')?.classList.add('histogram-visible');
           updateSummaryTable();
           // Let the browser compute the panel's dimensions before rendering
           requestAnimationFrame(() => renderHistogram());
@@ -835,6 +839,7 @@
       const panel = document.getElementById('histogram-panel');
       panel.style.display = 'flex';
       panel.classList.add('active');
+      document.getElementById('descriptivesWrap')?.classList.add('histogram-visible');
       updateSummaryTable();
       requestAnimationFrame(() => renderHistogram());
       if (document.getElementById('normality-modal').style.display === 'block') {
@@ -1550,14 +1555,14 @@
       const params = new URLSearchParams(window.location.search);
       const moduleOverride = params.get('module');
       
-      // Only initialize header if NOT in iframe mode (standalone mode)
-      const isInIframe = window.self !== window.top;
-      if (!isInIframe && typeof StatisticoHeader !== 'undefined') {
+      // Keep the shared header visible in the live view; export snapshots use embed=1.
+      const isEmbed = params.get('embed') === '1';
+      if (!isEmbed && typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.init('descriptive-stats', 'Descriptive Statistics', 0, 'correlations');
         StatisticoHeader.initSidebarPage();
         StatisticoHeader.updateTitle('Descriptive Statistics');
-      } else if (isInIframe) {
-        console.log('📦 Running in iframe mode - header hidden');
+      } else if (isEmbed) {
+        console.log('📦 Running in export embed mode - header hidden');
       }
 
       console.log('🔄 Descriptive Statistics page loaded');

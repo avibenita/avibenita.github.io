@@ -534,6 +534,7 @@ const StatisticoHeader = {
     if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
       window.StatisticoTooltip.refresh();
     }
+    setTimeout(() => this._injectPerViewAiButton(), 0);
   },
   
   /**
@@ -678,7 +679,7 @@ const StatisticoHeader = {
   },
 
   _isSharedSidebarModule() {
-    return ['univariate', 'correlations', 'independent', 'dependent', 'logistic', 'factor', 'pca', 'anova', 'power'].includes(this.module);
+    return ['univariate', 'correlations', 'independent', 'dependent', 'logistic', 'factor', 'pca', 'anova', 'power', 'regression'].includes(this.module);
   },
 
   _isSidebarItemActive(item) {
@@ -2475,7 +2476,7 @@ const StatisticoHeader = {
    * Only shown for univariate views that are not hypothesis.
    */
   _injectPerViewAiButton() {
-    if (!((this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations' || this.module === 'independent')) return;
+    if (!this._supportsInsightGuide()) return;
     if (document.getElementById('sbAiFloatBtn')) return;
 
     const rightCol = document.querySelector('.right-col');
@@ -2493,25 +2494,201 @@ const StatisticoHeader = {
       return;
     }
 
-    const viewLabels = this.module === 'correlations'
-      ? this._correlationViewLabels()
-      : {
-        histogram: 'Histogram', boxplot: 'Box Plot', cdf: 'CDF',
-        percentile: 'Percentiles', kernel: 'Kernel Density',
-        outliers: 'Outliers', normality: 'Normality Tests',
-        qqplot: 'QQ / PP Plots', confidence: 'Confidence Intervals'
-      };
-    const label = viewLabels[this.currentView] || 'View';
+    const label = this._getInsightGuideLabel();
 
     const btn = document.createElement('button');
     btn.id = 'sbAiFloatBtn';
     btn.className = 'sb-ai-float-btn';
-    btn.title = `AI Insight — ${label}`;
-    btn.innerHTML = `<i class="fa-solid fa-compass"></i><span>Guide: ${label}</span><sup class="sb-ai-sup">AI</sup>`;
+    btn.title = `Start explaining the ${label} view`;
+    btn.innerHTML = `<i class="fa-solid fa-compass"></i><span>Explain View</span><sup class="sb-ai-sup">AI</sup>`;
     btn.addEventListener('click', () => StatisticoHeader._sbAiPerViewInterpret());
 
     rightCol.style.position = 'relative';
     rightCol.appendChild(btn);
+  },
+
+  _supportsInsightGuide() {
+    if (this.module === 'univariate') return true;
+    return this._isSharedSidebarModule();
+  },
+
+  _getUnivariateViewLabels() {
+    return {
+      histogram: 'Histogram',
+      boxplot: 'Box Plot',
+      cdf: 'CDF',
+      percentile: 'Percentiles',
+      kernel: 'Kernel Density',
+      outliers: 'Outliers',
+      normality: 'Normality Tests',
+      qqplot: 'QQ / PP Plots',
+      confidence: 'Confidence Intervals',
+      hypothesis: 'Hypothesis'
+    };
+  },
+
+  _getInsightGuideViewKey() {
+    if (this.module === 'univariate' || this.module === 'correlations') return this.currentView;
+    if (this.module === 'independent') return `independent-${this._getIndependentActiveTab()}`;
+    const activeSidebar = document.querySelector('.sb-item.active[data-tab], .sb-item.active[id]');
+    const tab = activeSidebar?.dataset?.tab || activeSidebar?.id || this._getIndependentActiveTab();
+    return `${this.module}-${tab || this.currentView || 'view'}`;
+  },
+
+  _getInsightGuideLabel() {
+    const key = this._getInsightGuideViewKey();
+    const labels = {
+      ...this._getUnivariateViewLabels(),
+      ...this._correlationViewLabels(),
+      ...this._independentViewLabels(),
+      ...this._genericModuleViewLabels()
+    };
+    return labels[key] || labels[this.currentView] || key.replace(/^[^-]+-/, '').replace(/[-_]/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
+  },
+
+  _genericModuleViewLabels() {
+    return {
+      'dependent-explore': 'Explore',
+      'dependent-assumptions': 'Assumptions',
+      'dependent-results': 'Results',
+      'dependent-effects': 'Effects',
+      'dependent-power': 'Power',
+      'dependent-report': 'Report',
+      'logistic-results': 'Results',
+      'logistic-predictions': 'Predictions',
+      'logistic-diagnostics': 'Diagnostics',
+      'logistic-roc': 'ROC / AUC',
+      'logistic-descriptives': 'Descriptives',
+      'logistic-ai': 'AI Assessment',
+      'factor-suitability': 'Suitability',
+      'factor-extraction': 'Extraction',
+      'factor-rotation': 'Rotation',
+      'factor-diagnostics': 'Diagnostics',
+      'factor-scores': 'Scores',
+      'factor-ai': 'AI Summary',
+      'factor-viewdata': 'View Data',
+      'pca-summary': 'Summary',
+      'pca-components': 'Components',
+      'pca-loadings': 'Component Loadings',
+      'pca-rotation': 'Rotation',
+      'pca-biplot': 'Biplot',
+      'pca-scoreplot': 'Score Plot',
+      'pca-contribution': 'Contribution Plot',
+      'pca-outliers': 'Outlier Map',
+      'anova-overview': 'Summary',
+      'anova-inference': 'Inference',
+      'anova-comparisons': 'Comparisons',
+      'anova-diagnostics': 'Diagnostics',
+      'anova-visuals': 'Visuals',
+      'anova-report': 'Report',
+      'power-sbMeans': 'Means Power',
+      'power-sbAnova': 'ANOVA Power',
+      'power-sbCorr': 'Correlation Power',
+      'power-sbProp': 'Proportion Power',
+      'power-sbReg': 'Regression Power',
+      'regression-results': 'Regression Results',
+      'regression-overview': 'Results Overview',
+      'regression-detail': 'Results Detail',
+      'regression-diagnostics': 'Diagnostics',
+      'regression-residuals': 'Residuals'
+    };
+  },
+
+  _genericModuleControlsDoc(key) {
+    const moduleName = this._getModuleDisplayName();
+    const label = this._getInsightGuideLabel();
+    const docs = {
+      'dependent-explore': 'Review paired or repeated-measures descriptives, missingness, and within-subject patterns before interpreting the test.',
+      'dependent-assumptions': 'Check normality of differences, sphericity or related diagnostics, and the recommended testing route.',
+      'dependent-results': 'Read the paired/repeated-measures test statistic, p-value, confidence interval, and decision against alpha.',
+      'dependent-effects': 'Use the effect-size panel to distinguish practical magnitude from statistical significance.',
+      'dependent-power': 'Inspect power or required sample size calculations when available.',
+      'dependent-report': 'Use the report view for publication-ready wording and consistency checks.',
+      'logistic-results': 'Review coefficient direction, odds ratios, uncertainty intervals, and significance together.',
+      'logistic-predictions': 'Inspect predicted probabilities and classification behavior for meaningful changes in risk.',
+      'logistic-diagnostics': 'Use fit and residual diagnostics to check calibration, leverage, and model stability.',
+      'logistic-roc': 'Read ROC/AUC as discrimination performance, and compare threshold trade-offs.',
+      'factor-suitability': 'Check KMO, Bartlett, determinant, and correlation adequacy before trusting factor extraction.',
+      'factor-extraction': 'Review eigenvalues, variance explained, communalities, and extraction choice.',
+      'factor-rotation': 'Inspect rotated loadings to see whether factors become interpretable and simple.',
+      'factor-diagnostics': 'Check residuals, model fit, cross-loadings, and problematic variables.',
+      'pca-summary': 'Review sample adequacy, total variance, and the high-level component solution.',
+      'pca-components': 'Use scree/eigenvalue views to judge how many components are worth retaining.',
+      'pca-loadings': 'Inspect which variables define each component and whether loadings are clean or mixed.',
+      'pca-biplot': 'Read variables and observations together to understand direction, clustering, and separation.',
+      'pca-scoreplot': 'Inspect observation scores for clusters, gradients, and unusual cases.',
+      'pca-contribution': 'Identify variables or observations that dominate component structure.',
+      'pca-outliers': 'Use distance or leverage maps to flag unusual observations.',
+      'anova-overview': 'Review model setup, group structure, alpha, and high-level conclusion.',
+      'anova-inference': 'Read omnibus statistics, p-values, degrees of freedom, and variance decomposition.',
+      'anova-comparisons': 'Inspect post-hoc contrasts and correction methods to locate group differences.',
+      'anova-diagnostics': 'Check residual assumptions, variance homogeneity, and influential patterns.',
+      'anova-visuals': 'Use group plots to compare means, spread, intervals, and outliers visually.',
+      'anova-report': 'Use report wording to verify the statistical story is coherent and complete.'
+    };
+    return docs[key] || `This ${moduleName} ${label} view summarizes the active analysis section. Use the visible controls, tables, and plots to understand the current model state and diagnostics.`;
+  },
+
+  _collectGenericInsightSnapshot() {
+    const activePanel = document.querySelector('.tab-panel.active, .tab-content.active, .panel.active, section.active') ||
+      document.querySelector('.right-col .view-container') ||
+      document.querySelector('.right-col') ||
+      document.body;
+    const clean = (text) => (text || '').replace(/\s+/g, ' ').trim();
+    const visibleText = clean(activePanel?.innerText || '').slice(0, 2600);
+    const controls = Array.from((activePanel || document).querySelectorAll('button, select, input[type="radio"], input[type="checkbox"], input[type="range"]'))
+      .map((el) => clean(el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || el.id || el.name || el.value))
+      .filter(Boolean)
+      .slice(0, 18);
+    let payload = null;
+    if (typeof window.buildAIPayload === 'function') {
+      try { payload = window.buildAIPayload(); } catch (_) { payload = null; }
+    }
+    return {
+      visibleText,
+      controls,
+      payload: payload ? JSON.stringify(payload).slice(0, 2200) : ''
+    };
+  },
+
+  _buildGenericInsightGuidePrompt(viewKey) {
+    const label = this._getInsightGuideLabel();
+    const moduleName = this._getModuleDisplayName();
+    const controlsDoc = this._genericModuleControlsDoc(viewKey);
+    const snapshot = this._collectGenericInsightSnapshot();
+    this._lastAiMeta = { primarySignal: `${moduleName} - ${label}` };
+
+    return `You are explaining the "${label}" view inside the ${moduleName} module of Statistico.
+
+WHAT THIS VIEW DOES:
+${controlsDoc}
+
+VISIBLE STATE FROM THE CURRENT VIEW:
+${snapshot.visibleText || '(No visible text captured.)'}
+
+VISIBLE CONTROLS:
+${snapshot.controls.length ? snapshot.controls.map((c) => `- ${c}`).join('\n') : '(No visible controls captured.)'}
+
+COMPUTED PAYLOAD WHEN AVAILABLE:
+${snapshot.payload || '(No structured payload exposed by this page.)'}
+
+YOUR TASK:
+1. Explain what this specific view reveals.
+2. Describe how to interact with the available controls or table/chart elements.
+3. List the patterns a practitioner should look for in this view.
+4. Give a brief reading of the current visible state without inventing values.
+
+RULES:
+- Keep the explanation specific to this active view, not the full module.
+- Do not infer causality.
+- If values are absent, describe what to inspect rather than inventing numbers.
+- Keep each section concise and practical.
+
+Reply ONLY in this exact format:
+ABOUT: [2-3 sentences explaining what this view answers]
+CONTROLS: [Control or interaction: what it does + when to use it] | [next control/interaction] | [next control/interaction]
+PATTERNS: [Pattern description -> what it means analytically] | [next pattern] | [next pattern]
+READING: [1-2 sentences about what the currently visible state suggests, using exact values only if present]`;
   },
 
   async _sbAiIndependentInterpret() {
@@ -2724,9 +2901,10 @@ Computed independent-means payload:
 ${JSON.stringify(compact, null, 2)}
 
 Reply ONLY in this exact format:
-INSIGHT: [One concise insight about this tab]
-MEANS: [2-3 sentences explaining what this tab means analytically]
-NEXT: [conditional next check 1] | [conditional next check 2] | [conditional next check 3]`;
+ABOUT: [2-3 sentences explaining what this view answers]
+CONTROLS: [Control or interaction: what it does + when to use it] | [next control/interaction] | [next control/interaction]
+PATTERNS: [Pattern description -> what it means analytically] | [next pattern] | [next pattern]
+READING: [1-2 sentences about what the current tab shows, using exact values where available]`;
   },
 
   /**
@@ -2736,25 +2914,25 @@ NEXT: [conditional next check 1] | [conditional next check 2] | [conditional nex
     const btn = document.getElementById('sbAiFloatBtn');
     if (btn) {
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking…</span>';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Explaining view...</span>';
     }
+    const viewKey = this._getInsightGuideViewKey();
     try {
       const prompt = this.module === 'correlations'
         ? this._buildCorrelationStructuredPrompt(this.currentView, 'per-view')
-        : this._buildStructuredPrompt(this.currentView, 'per-view');
-      if (!prompt) { this._showAiOverlay(null, this.currentView); return; }
+        : this.module === 'univariate'
+          ? this._buildStructuredPrompt(this.currentView, 'per-view')
+          : this._buildGenericInsightGuidePrompt(viewKey);
+      if (!prompt) { this._showAiOverlay(null, viewKey); return; }
       const raw = await this._callAiForSidebar(prompt);
       const sections = this._parseAiStructured(raw);
-      this._showAiOverlay(sections, this.currentView, 'per-view', this._lastAiMeta);
+      this._showAiOverlay(sections, viewKey, 'per-view', this._lastAiMeta);
     } catch (err) {
-      this._showAiOverlay({ error: err.message || 'AI request failed.' }, this.currentView, 'per-view', this._lastAiMeta);
+      this._showAiOverlay({ error: err.message || 'AI request failed.' }, viewKey, 'per-view', this._lastAiMeta);
     } finally {
-      const viewLabels = this.module === 'correlations'
-        ? this._correlationViewLabels()
-        : { histogram:'Histogram',boxplot:'Box Plot',cdf:'CDF',percentile:'Percentiles',kernel:'Kernel Density',outliers:'Outliers',normality:'Normality Tests',qqplot:'QQ / PP Plots',confidence:'Confidence Intervals' };
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-compass"></i><span>Guide: ${viewLabels[this.currentView] || 'View'}</span><sup class="sb-ai-sup">AI</sup>`;
+        btn.innerHTML = '<i class="fa-solid fa-compass"></i><span>Explain View</span><sup class="sb-ai-sup">AI</sup>';
       }
     }
   },
@@ -3618,7 +3796,9 @@ NEXT: [conditional next check 1] | [conditional next check 2] | [conditional nex
 
       qqplot: `Controls available: (1) Plot type radios (QQ / PP) — QQ plot compares quantiles; PP plot compares cumulative probabilities; (2) Distribution dropdown (Normal / Exponential / Uniform / Log-Normal / Gamma / Weibull) — the theoretical distribution to compare against. Points close to the diagonal line indicate a good fit. The detrended panel below shows residuals from the line.`,
 
-      confidence: `Controls available: (1) Method radios (Classical / Bootstrap) — classical uses t/chi-squared formulas; bootstrap resamples the data; (2) Parameter radios (Mean / Std Dev / Median / Percentile when bootstrap) — what population parameter to estimate; (3) Confidence level selector (90% / 95% / 99%) plus a fine-grained alpha slider; (4) Bootstrap iterations input — higher = more accurate but slower; (5) Optional finite population size — applies finite population correction.`
+      confidence: `Controls available: (1) Method radios (Classical / Bootstrap) — classical uses t/chi-squared formulas; bootstrap resamples the data; (2) Parameter radios (Mean / Std Dev / Median / Percentile when bootstrap) — what population parameter to estimate; (3) Confidence level selector (90% / 95% / 99%) plus a fine-grained alpha slider; (4) Bootstrap iterations input — higher = more accurate but slower; (5) Optional finite population size — applies finite population correction.`,
+
+      hypothesis: `Controls available: hypothesis-test setup fields define the null and alternative hypothesis, alpha sets the decision threshold, and test-specific inputs determine the statistic and p-value. Use this view to connect the formal decision rule to the practical interpretation of the sample evidence.`
     };
   },
 
@@ -3678,9 +3858,9 @@ RULES:
 
 Reply ONLY in this exact format:
 ABOUT: [2-3 sentences explaining what this view answers]
-INSIGHT: [specific insight for this current view using exact numbers]
-MEANS: [plain-language interpretation]
-NEXT: [next check] | [next check] | [next check]`;
+CONTROLS: [Control or interaction: what it does + when to use it] | [next control/interaction] | [next control/interaction]
+PATTERNS: [Pattern description -> what it means analytically] | [next pattern] | [next pattern]
+READING: [1-2 sentences about what the current correlation results suggest, using exact values where available]`;
   },
 
   /**
@@ -3887,7 +4067,7 @@ CRITICAL RULES (strictly enforced):
 - Use cautious language ("suggests", "indicates", "appears to") unless certainty is "confirmed" or "rejected"
 - Do NOT mention formula names or ratio names (e.g. do not say "CV", "IQR/SD ratio", "skewness value") — describe patterns in plain language
 - Do NOT repeat the same idea across sections
-- Do NOT give UI instructions or mention charts, sliders, or interface elements
+- Do NOT give UI instructions or mention charts, sliders, or interface elements unless the user prompt explicitly asks for CONTROLS / PATTERNS guidance
 - "What to Check Next" must use conditional reasoning ("If X, then run Y") — not a plain test list
 
 Always follow the exact output format requested.` },
@@ -3961,7 +4141,8 @@ Always follow the exact output format requested.` },
       kernel:'Kernel Density', outliers:'Outliers', normality:'Normality Tests',
       qqplot:'QQ / PP Plots', confidence:'Confidence Intervals',
       ...this._correlationViewLabels(),
-      ...this._independentViewLabels()
+      ...this._independentViewLabels(),
+      ...this._genericModuleViewLabels()
     };
     const viewLabel = viewLabels[view] || view;
     const title = mode === 'full'

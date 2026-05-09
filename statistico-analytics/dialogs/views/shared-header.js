@@ -2525,8 +2525,9 @@ const StatisticoHeader = {
   async _sbAiIndependentInterpret() {
     const sidebarBtn = document.getElementById('sbAiBtn');
     const floatBtn = document.getElementById('sbAiFloatBtn');
+    const legacyBtn = document.getElementById('aiSummaryBtn');
     const setBusy = (busy) => {
-      [sidebarBtn, floatBtn].forEach((btn) => {
+      [sidebarBtn, floatBtn, legacyBtn].forEach((btn) => {
         if (!btn) return;
         btn.disabled = busy;
         btn.innerHTML = busy
@@ -2536,14 +2537,93 @@ const StatisticoHeader = {
     };
     setBusy(true);
     try {
-      if (typeof window.generateAISummary === 'function') {
-        await window.generateAISummary();
-      } else {
-        alert('AI summary is not available for this view yet.');
-      }
+      this._lastAiMeta = null;
+      const payload = this._getIndependentAiPayload();
+      const prompt = this._buildIndependentStructuredPrompt(payload);
+      if (!prompt) { this._showAiOverlay(null, this.currentView, 'full'); return; }
+      const raw = await this._callAiForSidebar(prompt);
+      const sections = this._parseAiStructured(raw);
+      this._showAiOverlay(sections, this.currentView, 'full', this._lastAiMeta);
+    } catch (err) {
+      this._showAiOverlay({ error: err.message || 'AI request failed.' }, this.currentView, 'full', this._lastAiMeta);
     } finally {
       setBusy(false);
     }
+  },
+
+  _getIndependentAiPayload() {
+    if (typeof window.buildAIPayload !== 'function') return null;
+    try {
+      return window.buildAIPayload();
+    } catch (err) {
+      console.error('Failed to build independent AI payload:', err);
+      return null;
+    }
+  },
+
+  _compactIndependentAiPayload(payload) {
+    const compact = JSON.parse(JSON.stringify(payload || {}));
+    if (compact.groups?.variables?.length > 12) {
+      compact.groups.variables = compact.groups.variables.slice(0, 12);
+      compact.groups.variablesTruncated = true;
+    }
+    if (compact.posthoc?.rows?.length > 20) {
+      compact.posthoc.totalRows = compact.posthoc.rows.length;
+      compact.posthoc.rows = compact.posthoc.rows.slice(0, 20);
+      compact.posthoc.rowsTruncated = true;
+    }
+    return compact;
+  },
+
+  _independentPrimarySignal(payload) {
+    if (!payload) return '';
+    const f = (value, digits = 3) => Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : 'N/A';
+    const compareMode = payload.design?.compareMode || '';
+    const designMode = compareMode === 'k-plus' || Number(payload.design?.k) > 2 || (payload.groups?.variables?.length || 0) > 2
+      ? 'k-plus'
+      : 'two-group';
+    if (designMode === 'k-plus') {
+      const primary = payload.results?.decision?.primary || {};
+      const effect = payload.effects?.kplus || {};
+      const effectValue = effect.eta2 ?? effect.omega2 ?? effect.epsilon2;
+      const effectLabel = effect.eta2 !== undefined ? 'eta2' : effect.omega2 !== undefined ? 'omega2' : 'epsilon2';
+      return `${payload.design?.k || payload.groups?.variables?.length || 'K'} groups · ${primary.test || 'primary test'} p=${f(primary.p, 4)} · ${effectLabel}=${f(effectValue)}`;
+    }
+    const framework = payload.design?.primaryFramework || payload.setup?.framework || 'primary';
+    const p = framework === 'nonparametric'
+      ? payload.results?.nonparametric?.mannWhitneyU?.p
+      : payload.results?.parametric?.welch?.p ?? payload.results?.parametric?.student?.p;
+    const effect = payload.effects?.hedgesG ?? payload.effects?.cliffsDelta ?? payload.effects?.rankBiserial;
+    return `2 groups · ${framework} p=${f(p, 4)} · effect=${f(effect)}`;
+  },
+
+  _buildIndependentStructuredPrompt(payload) {
+    if (!payload) return null;
+    const compact = this._compactIndependentAiPayload(payload);
+    const primarySignal = this._independentPrimarySignal(payload);
+    this._lastAiMeta = {
+      primarySignal,
+      strengthLevel: null,
+      strengthNote: null
+    };
+
+    return `You are interpreting a Statistico Independent Means analysis from pre-computed results.
+
+Do not recompute any statistic. Use only the values in the JSON. Be conservative: independent group comparisons do not imply causality.
+If a field is null or unavailable, do not invent it. If assumptions are mixed, say that interpretation depends on the robust/nonparametric result.
+
+Primary signal: ${primarySignal || 'available in JSON'}
+
+Computed independent-means payload:
+${JSON.stringify(compact, null, 2)}
+
+Reply ONLY in this exact format:
+CONCLUSION: [One decisive sentence - the single most important independent-means finding]
+EVIDENCE: [specific group or test finding with number] | [specific assumption or robustness finding] | [specific effect-size or post-hoc finding] | [specific sample/design finding]
+INTERPRETATION: [3 sentences - unified synthesis in plain language, no causality claims]
+IMPLICATIONS: [analytical implication 1] | [analytical implication 2] | [analytical implication 3]
+ACTION: [conditional next step 1] | [conditional next step 2] | [conditional next step 3]
+STRENGTH: [High, Moderate, or Low - short reason based on p-values, effect size, assumptions, and sample balance]`;
   },
 
   /**
@@ -3780,7 +3860,8 @@ Always follow the exact output format requested.` },
       ...this._correlationViewLabels()
     };
     const viewLabel = viewLabels[view] || view;
-    const title = mode === 'full' ? (this.module === 'correlations' ? 'Full Correlation Analysis' : 'Full Variable Analysis')
+    const title = mode === 'full'
+      ? (this.module === 'correlations' ? 'Full Correlation Analysis' : (this.module === 'independent' ? 'Independent Means Analysis' : 'Full Variable Analysis'))
       : mode === 'per-view' ? `Insight Guide — ${viewLabel}`
       : `AI Insight — ${viewLabel}`;
     const titleIcon = mode === 'full' ? 'fa-brain' : 'fa-compass';

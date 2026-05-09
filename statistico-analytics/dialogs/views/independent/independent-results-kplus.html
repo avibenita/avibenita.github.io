@@ -11,7 +11,7 @@
   
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260508o" />
-  <script src="../shared-header.js?v=20260508o"></script>
+  <script src="../shared-header.js?v=20260509a"></script>
 
   <script src="../../../src/shared/js/ai-config.js?v=20260429a"></script>
   <style>
@@ -2596,6 +2596,7 @@
       console.log('AI Payload built:', payload);
       return payload;
     }
+    window.buildAIPayload = buildAIPayload;
     
     /**
      * Generate AI summary by calling Groq API
@@ -2616,131 +2617,10 @@
     }
 
     async function generateAISummary() {
-      const btn = document.getElementById('aiSummaryBtn') || document.getElementById('sbAiBtn') || document.getElementById('sbAiFloatBtn');
-      const panel = document.getElementById('aiSummaryPanel');
-      const loading = document.getElementById('aiSummaryLoading');
-      const content = document.getElementById('aiSummaryContent');
-      const error = document.getElementById('aiSummaryError');
-      
-      // Validate API key
-      if (!window.AI_PROXY_URL || window.AI_PROXY_URL.includes('YOUR_SUBDOMAIN')) {
-        showAISummary('AI proxy not configured. Please deploy the Cloudflare Worker and update ai-config.js.');
-        return;
+      if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader._sbAiIndependentInterpret === 'function') {
+        return StatisticoHeader._sbAiIndependentInterpret();
       }
-      
-      // Build payload
-      const payload = buildAIPayload();
-      if (!payload) {
-        error.innerHTML = '<strong>Data Error:</strong> No results available to summarize. Please run an analysis first.';
-        error.style.display = 'block';
-        content.style.display = 'none';
-        loading.style.display = 'none';
-        panel.style.display = 'block';
-        
-        // Switch to Report tab
-        document.querySelectorAll('.tab-button').forEach(function(t) { t.classList.remove('active'); });
-        document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
-        switchTab('report');
-        document.getElementById('tab-report').classList.add('active');
-        return;
-      }
-      
-      // Show loading state
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
-      }
-      panel.style.display = 'block';
-      loading.style.display = 'block';
-      content.style.display = 'none';
-      error.style.display = 'none';
-      
-      // Switch to Report tab
-      document.querySelectorAll('.tab-button').forEach(function(t) { t.classList.remove('active'); });
-      document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
-      switchTab('report');
-      document.getElementById('tab-report').classList.add('active');
-      
-      // Conservative AI prompt
-      const systemPrompt = `You are a statistical reporting assistant for Statistico-Interactive (TM). Your role is to:
-1. Summarize validated statistical results conservatively
-2. NEVER infer causality or speculate beyond the data
-3. NEVER give advice or recommend actions
-4. Only interpret fields that are not null
-5. Use precise statistical language
-6. Format output in clear sections with proper APA-style reporting
-7. Focus on the PRIMARY test indicated in setup.framework (parametric = ANOVA/Welch, nonparametric = Kruskal-Wallis)
-8. If the primary test has null values, report what data IS available
-9. For p-values: if p < 0.001, report as "p < .001" (APA style), otherwise report the actual value
-10. Include group means and standard deviations when available
-11. Report Levene's test results if available (for homogeneity of variance assumption)
-12. Include post-hoc test results if available
-
-Respond with:
-- Executive Summary (3-5 bullet points)
-- Detailed Interpretation (one paragraph, academic style)
-- APA-Ready Text (copy-paste ready for publications)`;
-
-      const userPrompt = `Analyze the following independent means analysis results and provide a conservative statistical interpretation.
-
-IMPORTANT: The user requested a ${payload.setup.framework} analysis. Focus on the ${payload.setup.omnibus} test results. If those values are null, report on whatever test results ARE available.
-
-FORMATTING NOTES:
-- Report p < .001 when p-value is 0 or very small (< 0.001)
-- Include group means: ${payload.groups.variables.map(g => g.label + ' (M=' + (g.mean ? g.mean.toFixed(2) : 'N/A') + ', SD=' + (g.sd ? g.sd.toFixed(2) : 'N/A') + ')').join(', ')}
-- Levene's test p = ${payload.assumptions && payload.assumptions.homogeneity && payload.assumptions.homogeneity.levene && isFinite(payload.assumptions.homogeneity.levene.p) ? payload.assumptions.homogeneity.levene.p.toFixed(3) : 'not available'}
-
-Data:
-${JSON.stringify(payload, null, 2)}`;
-      
-      console.log('Full AI Payload being sent:', JSON.stringify(payload, null, 2));
-      
-      try {
-        const response = await fetch(window.AI_PROXY_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt }
-            ],
-            temperature: 0.3,
-            max_tokens: 2000
-          })
-        });
-        
-        if (!response.ok) {
-          throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        const aiText = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-        
-        if (!aiText) {
-          throw new Error('No content received from AI');
-        }
-        
-        // Format and display AI summary
-        content.innerHTML = formatAISummary(aiText);
-        content.style.display = 'block';
-        loading.style.display = 'none';
-        error.style.display = 'none';
-        
-        console.log('? AI Summary generated successfully');
-        
-      } catch (err) {
-        console.error('AI Summary error:', err);
-        error.innerHTML = `<strong>API Error:</strong> ${err.message}<br/><span style="font-size:10px;opacity:0.8;">Check console for details.</span>`;
-        error.style.display = 'block';
-        content.style.display = 'none';
-        loading.style.display = 'none';
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-brain"></i> AI Summary';
-        }
-      }
+      showAISummary('AI summary is not available for this view yet.');
     }
     window.generateAISummary = generateAISummary;
     

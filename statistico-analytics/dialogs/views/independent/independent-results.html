@@ -11,7 +11,7 @@
   
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260508o" />
-  <script src="../shared-header.js?v=20260508o"></script>
+  <script src="../shared-header.js?v=20260509a"></script>
 
   <script src="../../../src/shared/js/ai-config.js?v=20260429a"></script>
   <style>
@@ -1436,72 +1436,10 @@
     requestAnimationFrame(fitIndependentLayout);
 
     async function generateAISummary() {
-      console.log('AI Summary button clicked');
-      const btn = document.getElementById('aiSummaryBtn') || document.getElementById('sbAiBtn') || document.getElementById('sbAiFloatBtn');
-      if (!btn) {
-        console.error('AI button not found');
-        return;
+      if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader._sbAiIndependentInterpret === 'function') {
+        return StatisticoHeader._sbAiIndependentInterpret();
       }
-      
-      
-      if (!window.AI_PROXY_URL || window.AI_PROXY_URL.includes('YOUR_SUBDOMAIN')) {
-        showAISummary('AI proxy not configured. Please deploy the Cloudflare Worker and update ai-config.js.');
-        return;
-      }
-      
-      console.log('Checking lastBundle...', lastBundle ? 'Present' : 'Missing');
-      if (!lastBundle) {
-        showAISummary('No analysis results available to summarize. Please run an analysis first.');
-        return;
-      }
-      
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
-      
-      try {
-        const payload = buildAIPayload();
-        console.log('AI Payload:', payload);
-        
-        const systemPrompt = `You are a statistical expert. Provide a concise, professional summary of the independent t-test/Mann-Whitney U analysis results. Format p-values as "p < .001" when p < 0.001. Include group means and standard deviations. Include assumption test results (normality, homogeneity of variance). Use APA style where appropriate.`;
-        
-        const userPrompt = `Summarize this 2-group comparison analysis:\n\n${JSON.stringify(payload, null, 2)}\n\nProvide a brief, clear summary highlighting: 1) group descriptives, 2) assumption tests, 3) primary test result, 4) effect size, 5) interpretation.`;
-        
-        console.log('Calling Groq API...');
-        const response = await fetch(window.AI_PROXY_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt }
-            ],
-            temperature: 0.3,
-            max_tokens: 1000
-          })
-        });
-        
-        console.log('Response status:', response.status);
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('API error:', errorText);
-          throw new Error(`API error ${response.status}: ${errorText}`);
-        }
-        
-        const data = await response.json();
-        console.log('API response received');
-        const summary = data.choices[0].message.content;
-        
-        // Display in modal
-        showAISummary(summary);
-        
-      } catch (error) {
-        console.error('AI Summary error:', error);
-        showAISummary(`Error generating AI summary:\n\n${error.message}`);
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-brain"></i> AI Summary';
-      }
+      showAISummary('AI summary is not available for this view yet.');
     }
     window.generateAISummary = generateAISummary;
     
@@ -1589,6 +1527,7 @@
         }
       };
     }
+    window.buildAIPayload = buildAIPayload;
 
     function saveCurrentModel(){ sendToHost("saveIndependentModel", lastBundle||{}); }
     function exportHtml(){

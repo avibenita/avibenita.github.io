@@ -2494,8 +2494,8 @@ const StatisticoHeader = {
       const btn = document.createElement('button');
       btn.id = 'sbAiFloatBtn';
       btn.className = 'sb-ai-float-btn sb-ai-float-btn--tab';
-      btn.title = 'AI insight for the active Independent Means tab';
-      btn.innerHTML = '<i class="fa-solid fa-compass"></i><span>Tab Insight</span><sup class="sb-ai-sup">AI</sup>';
+      btn.title = 'Start explaining the active Independent Means view';
+      btn.innerHTML = '<i class="fa-solid fa-compass"></i><span>Explain View</span><sup class="sb-ai-sup">AI</sup>';
       btn.addEventListener('click', () => StatisticoHeader._sbAiIndependentTabInterpret());
       rightCol.style.position = 'relative';
       rightCol.appendChild(btn);
@@ -2568,7 +2568,7 @@ const StatisticoHeader = {
     const btn = document.getElementById('sbAiFloatBtn');
     if (btn) {
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Reading tab...</span>';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Explaining view...</span>';
     }
     try {
       this._lastAiMeta = null;
@@ -2585,7 +2585,7 @@ const StatisticoHeader = {
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-compass"></i><span>Tab Insight</span><sup class="sb-ai-sup">AI</sup>';
+        btn.innerHTML = '<i class="fa-solid fa-compass"></i><span>Explain View</span><sup class="sb-ai-sup">AI</sup>';
       }
     }
   },

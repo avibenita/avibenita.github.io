@@ -2454,15 +2454,6 @@ const StatisticoHeader = {
     `;
     nav.appendChild(utilities);
 
-    const productFooter = document.createElement('div');
-    productFooter.id = 'sbProductFooter';
-    productFooter.className = 'sb-product-footer';
-    productFooter.innerHTML = `
-      <span>Statistico</span>
-      <a href="https://avibenita.github.io/Statistico-Website/index.html" target="_blank" rel="noopener noreferrer">statistico.live</a>
-    `;
-    nav.appendChild(productFooter);
-
     if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
       window.StatisticoTooltip.refresh();
     }

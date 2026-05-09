@@ -2406,15 +2406,16 @@ const StatisticoHeader = {
       const aiTitle = supportsIndependentAi
         ? 'AI statistical summary for this independent means analysis'
         : (isCorrelation ? 'Full correlation analysis - synthesises all correlation views into one report' : 'Full variable analysis - synthesises all diagnostics into one report');
-      const aiLabel = supportsIndependentAi ? 'AI Summary' : 'Full Analysis';
+      const aiLabel = supportsIndependentAi ? 'Full AI Analysis' : 'Full Analysis';
+      const aiBadge = supportsIndependentAi ? 'ALL' : 'AI';
       aiSection.innerHTML = `
-        <button class="sb-ai-sidebar-pill"
+        <button class="sb-ai-sidebar-pill ${supportsIndependentAi ? 'sb-ai-sidebar-pill--full' : ''}"
                 id="sbAiBtn"
                 onclick="${aiClick}"
                 title="${aiTitle}">
-          <i class="fa-solid fa-brain"></i>
+          <i class="fa-solid ${supportsIndependentAi ? 'fa-layer-group' : 'fa-brain'}"></i>
           <span>${aiLabel}</span>
-          <sup class="sb-ai-sup">AI</sup>
+          <sup class="sb-ai-sup">${aiBadge}</sup>
         </button>
       `;
       nav.appendChild(aiSection);
@@ -2492,10 +2493,10 @@ const StatisticoHeader = {
     if (this.module === 'independent') {
       const btn = document.createElement('button');
       btn.id = 'sbAiFloatBtn';
-      btn.className = 'sb-ai-float-btn';
-      btn.title = 'AI Summary';
-      btn.innerHTML = '<i class="fa-solid fa-brain"></i><span>AI Summary</span><sup class="sb-ai-sup">AI</sup>';
-      btn.addEventListener('click', () => StatisticoHeader._sbAiIndependentInterpret());
+      btn.className = 'sb-ai-float-btn sb-ai-float-btn--tab';
+      btn.title = 'AI insight for the active Independent Means tab';
+      btn.innerHTML = '<i class="fa-solid fa-compass"></i><span>Tab Insight</span><sup class="sb-ai-sup">AI</sup>';
+      btn.addEventListener('click', () => StatisticoHeader._sbAiIndependentTabInterpret());
       rightCol.style.position = 'relative';
       rightCol.appendChild(btn);
       return;
@@ -2527,13 +2528,14 @@ const StatisticoHeader = {
     const floatBtn = document.getElementById('sbAiFloatBtn');
     const legacyBtn = document.getElementById('aiSummaryBtn');
     const setBusy = (busy) => {
-      [sidebarBtn, floatBtn, legacyBtn].forEach((btn) => {
+      [sidebarBtn, legacyBtn].forEach((btn) => {
         if (!btn) return;
         btn.disabled = busy;
         btn.innerHTML = busy
           ? '<i class="fa-solid fa-spinner fa-spin"></i><span>Generating...</span>'
-          : '<i class="fa-solid fa-brain"></i><span>AI Summary</span><sup class="sb-ai-sup">AI</sup>';
+          : '<i class="fa-solid fa-layer-group"></i><span>Full AI Analysis</span><sup class="sb-ai-sup">ALL</sup>';
       });
+      if (floatBtn) floatBtn.disabled = busy;
     };
     setBusy(true);
     try {
@@ -2549,6 +2551,50 @@ const StatisticoHeader = {
     } finally {
       setBusy(false);
     }
+  },
+
+  async _sbAiIndependentTabInterpret() {
+    const btn = document.getElementById('sbAiFloatBtn');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Reading tab...</span>';
+    }
+    try {
+      this._lastAiMeta = null;
+      const payload = this._getIndependentAiPayload();
+      const activeTab = this._getIndependentActiveTab();
+      const prompt = this._buildIndependentTabPrompt(payload, activeTab);
+      if (!prompt) { this._showAiOverlay(null, `independent-${activeTab}`, 'per-view'); return; }
+      const raw = await this._callAiForSidebar(prompt);
+      const sections = this._parseAiStructured(raw);
+      this._showAiOverlay(sections, `independent-${activeTab}`, 'per-view', this._lastAiMeta);
+    } catch (err) {
+      const activeTab = this._getIndependentActiveTab();
+      this._showAiOverlay({ error: err.message || 'AI request failed.' }, `independent-${activeTab}`, 'per-view', this._lastAiMeta);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-compass"></i><span>Tab Insight</span><sup class="sb-ai-sup">AI</sup>';
+      }
+    }
+  },
+
+  _independentViewLabels() {
+    return {
+      'independent-setup': 'Setup',
+      'independent-explore': 'Explore',
+      'independent-assumptions': 'Assumptions',
+      'independent-results': 'Results',
+      'independent-posthoc': 'Post-hoc',
+      'independent-effects': 'Effects',
+      'independent-power': 'Power',
+      'independent-report': 'Report'
+    };
+  },
+
+  _getIndependentActiveTab() {
+    const panel = document.querySelector('.tab-panel.active[id^="tab-"]');
+    return panel?.id?.replace(/^tab-/, '') || 'results';
   },
 
   _getIndependentAiPayload() {
@@ -2624,6 +2670,43 @@ INTERPRETATION: [3 sentences - unified synthesis in plain language, no causality
 IMPLICATIONS: [analytical implication 1] | [analytical implication 2] | [analytical implication 3]
 ACTION: [conditional next step 1] | [conditional next step 2] | [conditional next step 3]
 STRENGTH: [High, Moderate, or Low - short reason based on p-values, effect size, assumptions, and sample balance]`;
+  },
+
+  _buildIndependentTabPrompt(payload, tab) {
+    if (!payload) return null;
+    const compact = this._compactIndependentAiPayload(payload);
+    const labels = this._independentViewLabels();
+    const label = labels[`independent-${tab}`] || 'Current Tab';
+    const focusMap = {
+      setup: 'analysis design, selected framework, alpha, confidence, and comparison setup',
+      explore: 'group descriptives, sample sizes, balance, means, medians, spread, and missingness',
+      assumptions: 'normality, homogeneity, recommendation, and whether the selected framework is robust',
+      results: 'primary parametric/nonparametric test result, p-value, confidence interval, and decision',
+      posthoc: 'pairwise post-hoc comparisons, correction method, and which groups differ',
+      effects: 'effect sizes and practical magnitude, not only statistical significance',
+      power: 'power and sample-size information if available; otherwise explain the limitation',
+      report: 'publication-ready interpretation and consistency across reported results'
+    };
+
+    this._lastAiMeta = {
+      primarySignal: `${label} tab`,
+      strengthLevel: null,
+      strengthNote: null
+    };
+
+    return `You are interpreting only the active "${label}" tab of a Statistico Independent Means analysis.
+
+Focus on: ${focusMap[tab] || focusMap.results}.
+Use the JSON only as supporting computed data. Do not turn this into the full all-tabs analysis; keep it local to this tab.
+Do not infer causality. If a value is null or unavailable, say it is not available.
+
+Computed independent-means payload:
+${JSON.stringify(compact, null, 2)}
+
+Reply ONLY in this exact format:
+INSIGHT: [One concise insight about this tab]
+MEANS: [2-3 sentences explaining what this tab means analytically]
+NEXT: [conditional next check 1] | [conditional next check 2] | [conditional next check 3]`;
   },
 
   /**
@@ -3857,7 +3940,8 @@ Always follow the exact output format requested.` },
       histogram:'Histogram', boxplot:'Box Plot', cdf:'CDF', percentile:'Percentiles',
       kernel:'Kernel Density', outliers:'Outliers', normality:'Normality Tests',
       qqplot:'QQ / PP Plots', confidence:'Confidence Intervals',
-      ...this._correlationViewLabels()
+      ...this._correlationViewLabels(),
+      ...this._independentViewLabels()
     };
     const viewLabel = viewLabels[view] || view;
     const title = mode === 'full'

@@ -2541,6 +2541,17 @@ const StatisticoHeader = {
     try {
       this._lastAiMeta = null;
       const payload = this._getIndependentAiPayload();
+      const browsedViews = this._independentFullAnalysisViews(payload);
+      for (let i = 0; i < browsedViews.length; i += 1) {
+        const label = browsedViews[i];
+        [sidebarBtn, legacyBtn].forEach((btn) => {
+          if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>${i + 1}/${browsedViews.length} - ${label}</span>`;
+        });
+        await new Promise((resolve) => setTimeout(resolve, 90));
+      }
+      [sidebarBtn, legacyBtn].forEach((btn) => {
+        if (btn) btn.innerHTML = '<i class="fa-solid fa-brain fa-spin"></i><span>Synthesizing all views...</span>';
+      });
       const prompt = this._buildIndependentStructuredPrompt(payload);
       if (!prompt) { this._showAiOverlay(null, this.currentView, 'full'); return; }
       const raw = await this._callAiForSidebar(prompt);
@@ -2597,6 +2608,21 @@ const StatisticoHeader = {
     return panel?.id?.replace(/^tab-/, '') || 'results';
   },
 
+  _independentFullAnalysisViews(payload) {
+    const hasPosthoc = !!(payload?.posthoc?.available || payload?.posthoc?.rows?.length);
+    const hasPower = payload?.power?.available !== false;
+    return [
+      'Setup',
+      'Explore',
+      'Assumptions',
+      'Results',
+      ...(hasPosthoc ? ['Post-hoc'] : []),
+      'Effects',
+      ...(hasPower ? ['Power'] : []),
+      'Report'
+    ];
+  },
+
   _getIndependentAiPayload() {
     if (typeof window.buildAIPayload !== 'function') return null;
     try {
@@ -2647,8 +2673,10 @@ const StatisticoHeader = {
     if (!payload) return null;
     const compact = this._compactIndependentAiPayload(payload);
     const primarySignal = this._independentPrimarySignal(payload);
+    const viewsBrowsed = this._independentFullAnalysisViews(payload);
     this._lastAiMeta = {
       primarySignal,
+      viewsBrowsed,
       strengthLevel: null,
       strengthNote: null
     };
@@ -2659,6 +2687,7 @@ Do not recompute any statistic. Use only the values in the JSON. Be conservative
 If a field is null or unavailable, do not invent it. If assumptions are mixed, say that interpretation depends on the robust/nonparametric result.
 
 Primary signal: ${primarySignal || 'available in JSON'}
+Views browsed for this full analysis: ${viewsBrowsed.join(', ')}
 
 Computed independent-means payload:
 ${JSON.stringify(compact, null, 2)}
@@ -3967,6 +3996,13 @@ Always follow the exact output format requested.` },
         <div class="sb-ai-primary-signal">
           <span class="sb-ai-signal-label">Primary Signal</span>
           <span class="sb-ai-signal-value">${meta.primarySignal}</span>
+        </div>` : ''}
+        ${(meta?.viewsBrowsed?.length && mode !== 'per-view') ? `
+        <div class="sb-ai-views-browsed">
+          <div class="sb-ai-views-label"><i class="fa-solid fa-layer-group"></i> Views Browsed</div>
+          <div class="sb-ai-view-chips">
+            ${meta.viewsBrowsed.map((label) => `<span class="sb-ai-view-chip">${label}</span>`).join('')}
+          </div>
         </div>` : ''}
         ${sections.ABOUT ? `
         <div class="sb-ai-section sb-ai-section--about sb-ai-about-hero">

@@ -72,9 +72,11 @@ const NAV_TEMPLATE = `
         <span class="nav-products-label">Statistico Suite</span>
         <div class="nav-products-row" id="nav-products-row">
           <div class="nav-products-slider" id="nav-products-slider"></div>
-          <a href="javascript:void(0)" class="nav-link nav-link--product-core" data-page="analytics" id="link-analytics" title="Statistico Analytics Hub">
-            <span class="core-product-badge">★ Core Product</span>
-            Analytics
+                    <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="analytics" id="link-analytics" title="Statistico Analytics Hub">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="2,11 5.5,7 9.5,9.5 14,4"/>
+            </svg>
+            Analytics Hub
           </a>
           <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators" title="Statistico Calculators Hub">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -382,7 +384,7 @@ const NAV_STYLE = `
   border-radius: 18px;
   /* extra top padding to keep content clear of the overlapping label */
   padding: 6px 3px 3px;
-  overflow: visible;  /* allow the "core" micro-badge on Analytics to peek above */
+  overflow: visible;
   position: relative;
 }
 
@@ -404,7 +406,7 @@ const NAV_STYLE = `
 .nav-products-row:hover .nav-products-slider { opacity: 1; }
 
 /* Product links inside segmented control — no individual borders */
-/* Shared reset for non-core product links */
+/* Shared reset for segmented Suite links */
 .nav-products-row .nav-link--product,
 .nav-products-row .nav-link--product-lite {
   border: none;
@@ -413,24 +415,13 @@ const NAV_STYLE = `
   position: relative;
   z-index: 1;
   transition: color 0.15s ease;
+  min-height: 34px;
+  padding: 5px 11px;
+  font-size: 0.83rem;
 }
-
-/* Analytics (core) keeps its own colours — only add layout/position here */
-.nav-products-row .nav-link--product-core {
-  position: relative;
-  z-index: 2;
-  transition: color 0.15s ease;
-  flex-direction: column;
-  gap: 1px;
-  padding: 5px 14px;
-}
-
-/* Remove the ::before approach entirely — label is a real element now */
-.nav-link--product-core::before { content: none; }
 
 /* Orange separators between the 3 families */
-.nav-products-row .nav-link--product::after,
-.nav-products-row .nav-link--product-core::after {
+.nav-products-row .nav-link--product::after {
   content: '';
   position: absolute;
   right: -2px;
@@ -439,12 +430,6 @@ const NAV_STYLE = `
   width: 1px;
   background: rgba(255,165,120,0.40);
   pointer-events: none;
-}
-
-.nav-products-row .nav-link:not(.nav-link--product-core) {
-  min-height: 34px;
-  padding: 5px 11px;
-  font-size: 0.83rem;
 }
 
 /* Separator before "Why" — spacing only, no line */
@@ -570,13 +555,6 @@ const NAV_STYLE = `
   color: rgba(30, 41, 59, 0.92);
 }
 
-:root[data-theme="light"] .nav-link--product-core {
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
-  color: rgba(160, 55, 10, 0.95);
-}
-
 :root[data-theme="light"] .nav-link-tag {
   border-color: rgba(180, 83, 9, 0.3);
   background: rgba(180, 83, 9, 0.1);
@@ -602,31 +580,6 @@ const NAV_STYLE = `
   background: rgba(255,165,120,0.06);
   border: 1px solid rgba(255,165,120,0.22);
   color: rgba(255,239,231,0.9);
-}
-
-.nav-link--product-core {
-  font-weight: 700;
-  background: transparent;
-  border: 1px solid transparent;
-  box-shadow: none;
-  color: rgba(255,210,180,1);
-  font-size: 1.05rem;
-  letter-spacing: 0.07em;
-  position: relative;
-}
-
-/* "Core Product" label — real element, always visible */
-.core-product-badge {
-  display: block;
-  font-size: 0.48rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: rgba(255,165,120,0.88);
-  white-space: nowrap;
-  font-style: italic;
-  line-height: 1;
-  pointer-events: none;
 }
 
 /* ── Analytics animated icon ── */
@@ -662,12 +615,6 @@ const NAV_STYLE = `
 
 .nav-link--product:hover {
   background: rgba(255,165,120,0.14);
-}
-
-.nav-link--product-core:hover {
-  background: rgba(120,200,255,0.20);
-  border-color: rgba(120,200,255,0.65);
-  box-shadow: inset 0 0 0 1px rgba(120,200,255,0.28), 0 0 18px rgba(120,200,255,0.16);
 }
 
 .nav-link-tag {
@@ -721,12 +668,6 @@ const NAV_STYLE = `
   background: rgba(255,165,120,0.15);
   border-color: rgba(255,165,120,0.38);
   color: rgba(255,220,200,1);
-}
-
-.nav-link--product-core.active {
-  background: rgba(120,200,255,0.16);
-  border-color: rgba(120,200,255,0.46);
-  color: rgba(200,235,255,1);
 }
 
 .nav-link--product-lite.active {
@@ -1262,7 +1203,7 @@ footer#contact .footer-bottom {
     gap: 4px;
   }
 
-  .nav-products-row .nav-link:not(.nav-link--product-core) {
+  .nav-products-row > .nav-link {
     width: 100%;
     min-height: 44px;
     padding: 12px 16px;

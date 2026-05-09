@@ -1360,7 +1360,7 @@ const FOOTER_TEMPLATE = `
         <h4>Resources</h4>
         <a href="javascript:void(0)" id="footer-link-why">Why Another Package?</a>
         <a href="javascript:void(0)" id="footer-link-how">How It Works</a>
-        <a href="#" id="footer-link-faq">FAQ</a>
+        <a href="javascript:void(0)" id="footer-link-faq">FAQ</a>
       </div>
       <div class="footer-section">
         <h4>Company</h4>
@@ -1468,6 +1468,7 @@ const FOOTER_TEMPLATE = `
     const footerCalculatorsLink = document.getElementById('footer-link-calculators');
     const footerWhyLink = document.getElementById('footer-link-why');
     const footerHowLink = document.getElementById('footer-link-how');
+    const footerFaqLink = document.getElementById('footer-link-faq');
     const footerAboutLink = document.getElementById('footer-link-about');
     const footerContactLink = document.getElementById('footer-link-contact');
     const footerTermsLink = document.getElementById('footer-link-terms');
@@ -1477,6 +1478,7 @@ const FOOTER_TEMPLATE = `
     if (footerCalculatorsLink) footerCalculatorsLink.href = links.calculators;
     if (footerWhyLink) footerWhyLink.href = links.why;
     if (footerHowLink) footerHowLink.href = links.how;
+    if (footerFaqLink) footerFaqLink.href = links.faq;
     if (footerAboutLink) footerAboutLink.href = links.about;
     if (footerContactLink) footerContactLink.href = links.contact;
     if (footerTermsLink) footerTermsLink.href = links.terms;

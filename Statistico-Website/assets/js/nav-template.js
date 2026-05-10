@@ -69,7 +69,7 @@ const NAV_TEMPLATE = `
 
       <!-- Products group — segmented control -->
       <li class="nav-item nav-item--products-group">
-        <span class="nav-products-label">Statistico Suite</span>
+        <span class="nav-products-label">Statistico™ Platform</span>
         <div class="nav-products-row" id="nav-products-row">
           <div class="nav-products-slider" id="nav-products-slider"></div>
                     <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="analytics" id="link-analytics" title="Statistico Analytics Suite">
@@ -435,7 +435,7 @@ const NAV_STYLE = `
 .nav-products-row:hover .nav-products-slider { opacity: 1; }
 
 /* Product links inside segmented control — no individual borders */
-/* Shared reset for segmented Suite links */
+/* Shared reset for segmented Platform links */
 .nav-products-row .nav-link--product,
 .nav-products-row .nav-link--product-lite {
   border: none;
@@ -1352,7 +1352,7 @@ const FOOTER_TEMPLATE = `
         <a href="javascript:void(0)" id="footer-link-terms">Terms & Conditions</a>
       </div>
     </div>
-    <div class="footer-bottom">© 2026 Statistico™ Suite. Revolutionizing statistical computing, one analysis at a time.</div>
+    <div class="footer-bottom">© 2026 Statistico™ Platform. Revolutionizing statistical computing, one analysis at a time.</div>
   </div>
 </footer>
 `;

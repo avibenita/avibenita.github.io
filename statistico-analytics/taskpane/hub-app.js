@@ -509,28 +509,14 @@ function syncClusterHeader() {
   var eyebrowEl = document.getElementById("hubBrandEyebrow");
   var nameEl = document.getElementById("hubBrandName");
   var tagEl = document.getElementById("hubBrandTagline");
-  var imgEl = document.getElementById("hubBrandIconImg");
-  var iconEl = document.getElementById("hubBrandIconFa") || document.querySelector(".hub-brand-icon i");
+  var iconEl = document.querySelector(".hub-brand-icon i");
   document.documentElement.style.setProperty("--hub-brand-color", meta.colorDark || meta.color || "#f97316");
   document.documentElement.style.setProperty("--hub-brand-from", meta.brandFrom || meta.color || "#f97316");
   document.documentElement.style.setProperty("--hub-brand-to", meta.brandTo || meta.colorDark || meta.color || "#ea580c");
   if (eyebrowEl) eyebrowEl.textContent = meta.eyebrow || "Statistico flagship";
   if (nameEl) nameEl.textContent = meta.name || "Interactive Analytics";
   if (tagEl) tagEl.textContent = meta.tagline;
-  var useSiteFavicon = ACTIVE_CLUSTER === "analytics";
-  if (imgEl && iconEl) {
-    if (useSiteFavicon) {
-      imgEl.style.display = "block";
-      iconEl.style.display = "none";
-    } else {
-      imgEl.style.display = "none";
-      iconEl.style.display = "";
-      iconEl.className = "fa-solid " + (meta.icon || "fa-chart-line");
-    }
-  } else if (iconEl) {
-    iconEl.style.display = "";
-    iconEl.className = "fa-solid " + (meta.icon || "fa-chart-line");
-  }
+  if (iconEl) iconEl.className = "fa-solid " + (meta.icon || "fa-chart-line");
   document.querySelectorAll(".hub-nav-tab[data-cluster]").forEach(function (btn) {
     var active = btn.getAttribute("data-cluster") === ACTIVE_CLUSTER;
     btn.classList.toggle("active", active);

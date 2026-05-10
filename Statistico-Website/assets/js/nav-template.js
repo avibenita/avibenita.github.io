@@ -73,9 +73,7 @@ const NAV_TEMPLATE = `
         <div class="nav-products-row" id="nav-products-row">
           <div class="nav-products-slider" id="nav-products-slider"></div>
                     <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="analytics" id="link-analytics" title="Statistico Analytics Hub">
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polyline points="2,11 5.5,7 9.5,9.5 14,4"/>
-            </svg>
+            <img class="nav-suite-favicon" src="/favicon-max.svg?v=2026-05-07-red-contour" width="15" height="15" alt="" aria-hidden="true" decoding="async" />
             Analytics Hub
           </a>
           <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators" title="Statistico Calculators Hub">
@@ -418,6 +416,19 @@ const NAV_STYLE = `
   min-height: 34px;
   padding: 5px 11px;
   font-size: 0.83rem;
+}
+
+.nav-products-row .nav-link--product[data-page="analytics"] {
+  font-size: 0.98rem;
+  font-weight: 750;
+}
+
+.nav-products-row .nav-suite-favicon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  display: block;
+  object-fit: contain;
 }
 
 /* Orange separators between the 3 families */

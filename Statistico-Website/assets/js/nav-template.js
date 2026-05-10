@@ -44,10 +44,10 @@ const NAV_TEMPLATE = `
                 stroke="url(#navLogoBlue)" stroke-width="10" fill="none" stroke-linecap="round"/>
           <path d="M35 43 C51 43 64 49 64 61 C64 75 51 82 35 82 C20 82 10 75 9 64"
                 stroke="url(#navLogoBlue)" stroke-width="10" fill="none" stroke-linecap="round"/>
-          <rect x="18" y="51" width="8" height="24" rx="2" fill="url(#navLogoTeal)"/>
-          <rect x="30" y="43" width="8" height="32" rx="2" fill="url(#navLogoTeal)"/>
-          <rect x="42" y="34" width="8" height="41" rx="2" fill="url(#navLogoTeal)"/>
-          <rect x="54" y="25" width="8" height="50" rx="2" fill="url(#navLogoTeal)"/>
+          <rect class="nav-logo-bar nav-logo-bar--1" x="18" y="51" width="8" height="24" rx="2" fill="url(#navLogoTeal)"/>
+          <rect class="nav-logo-bar nav-logo-bar--2" x="30" y="43" width="8" height="32" rx="2" fill="url(#navLogoTeal)"/>
+          <rect class="nav-logo-bar nav-logo-bar--3" x="42" y="34" width="8" height="41" rx="2" fill="url(#navLogoTeal)"/>
+          <rect class="nav-logo-bar nav-logo-bar--4" x="54" y="25" width="8" height="50" rx="2" fill="url(#navLogoTeal)"/>
         </g>
 
         <text x="88" y="37" class="nav-logo-title" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="800" letter-spacing="7">STATISTICO</text>
@@ -262,6 +262,37 @@ const NAV_STYLE = `
   filter: drop-shadow(0 0 4px rgba(111,183,255,.62));
   transform-box: fill-box;
   transform-origin: center;
+}
+
+/* Logo mark: bars grow upward on load (ease-out curve, staggered) */
+.nav-logo-bar {
+  transform: scaleY(0);
+  transform-origin: bottom center;
+  transform-box: fill-box;
+  animation: navLogoBarGrow 0.72s cubic-bezier(0.22, 0.82, 0.28, 1) forwards;
+}
+.nav-logo-bar--1 { animation-delay: 0.06s; }
+.nav-logo-bar--2 { animation-delay: 0.14s; }
+.nav-logo-bar--3 { animation-delay: 0.22s; }
+.nav-logo-bar--4 { animation-delay: 0.30s; }
+
+@keyframes navLogoBarGrow {
+  from {
+    transform: scaleY(0);
+    opacity: 0.92;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-logo-bar {
+    animation: none !important;
+    transform: scaleY(1) !important;
+    opacity: 1 !important;
+  }
 }
 
 .nav-logo:hover .nav-logo-slider-knob {

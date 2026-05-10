@@ -72,9 +72,9 @@ const NAV_TEMPLATE = `
         <span class="nav-products-label">Statistico Suite</span>
         <div class="nav-products-row" id="nav-products-row">
           <div class="nav-products-slider" id="nav-products-slider"></div>
-                    <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="analytics" id="link-analytics" title="Statistico Analytics Hub">
+                    <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="analytics" id="link-analytics" title="Statistico Analytics Suite">
             <img class="nav-suite-favicon" src="/favicon-max.svg?v=2026-05-07-red-contour" width="15" height="15" alt="" aria-hidden="true" decoding="async" />
-            Analytics Hub
+            Analytics Suite
           </a>
           <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators" title="Statistico Calculators Hub">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1304,7 +1304,7 @@ const FOOTER_TEMPLATE = `
     <div class="footer-grid">
       <div class="footer-section">
         <h4>Products</h4>
-        <a href="javascript:void(0)" id="footer-link-analytics">Statistico-Analytics-Hub™</a>
+        <a href="javascript:void(0)" id="footer-link-analytics">Statistico-Analytics-Suite™</a>
         <a href="javascript:void(0)" id="footer-link-calculators">Statistico-Calculators-Hub™</a>
         <a href="javascript:void(0)" id="footer-link-addins">Statistico-Applications-Hub™</a>
       </div>

@@ -1,5 +1,5 @@
-﻿/**
- * ds-guide.js  ג€“  Data Structure Guide panel
+/**
+ * ds-guide.js    Data Structure Guide panel
  * Renders a role-coloured mini-grid and one-line rule for each input module.
  * Usage: DsGuide.render('independent', 'dsGuideContainer');
  */
@@ -8,9 +8,9 @@
 
   var CONFIGS = {
     independent: {
-      badge: 'Wide format ג€” each column is a group',
+      badge: 'Wide format  each column is a group',
       rule:  'Each column = one group. Rows are independent observations of the same outcome variable.',
-      note:  'Unlike SPSS, groups are NOT stacked in one column ג€” each group has its own column.',
+      note:  'Unlike SPSS, groups are NOT stacked in one column  each group has its own column.',
       cols: [
         { label: 'Engineers', role: 'group', roleLabel: 'Group' },
         { label: 'Sales',     role: 'group', roleLabel: 'Group' },
@@ -25,9 +25,9 @@
     },
 
     'independent-two': {
-      badge: 'Wide format ג€” each column is a group',
+      badge: 'Wide format  each column is a group',
       rule:  'Each column = one group. Rows are independent observations of the same outcome variable.',
-      note:  'Unlike SPSS, groups are NOT stacked in one column ג€” each group has its own column.',
+      note:  'Unlike SPSS, groups are NOT stacked in one column  each group has its own column.',
       cols: [
         { label: 'Control', role: 'group', roleLabel: 'Group' },
         { label: 'Treatment', role: 'group', roleLabel: 'Group' }
@@ -40,9 +40,9 @@
     },
 
     dependent: {
-      badge: 'Wide format ג€” each column is a timepoint',
+      badge: 'Wide format  each column is a timepoint',
       rule:  'Each row = the same subject measured twice. Each column = one timepoint.',
-      note:  'Unlike SPSS, timepoints are NOT stacked in one column ג€” each timepoint has its own column.',
+      note:  'Unlike SPSS, timepoints are NOT stacked in one column  each timepoint has its own column.',
       cols: [
         { label: 'Before', role: 'meas', roleLabel: 'Timepoint' },
         { label: 'After',  role: 'meas', roleLabel: 'Timepoint' }
@@ -55,9 +55,9 @@
     },
 
     'dependent-kplus': {
-      badge: 'Wide format ג€” each column is a timepoint',
+      badge: 'Wide format  each column is a timepoint',
       rule:  'Each row = the same subject. Each column = one timepoint or condition.',
-      note:  'Unlike SPSS, timepoints are NOT stacked in one column ג€” each timepoint has its own column.',
+      note:  'Unlike SPSS, timepoints are NOT stacked in one column  each timepoint has its own column.',
       cols: [
         { label: 'Time 1', role: 'meas', roleLabel: 'Timepoint' },
         { label: 'Time 2', role: 'meas', roleLabel: 'Timepoint' },
@@ -71,7 +71,7 @@
     },
 
     anova: {
-      badge: 'Wide format ג€” outcome + grouping columns',
+      badge: 'Wide format  outcome + grouping columns',
       rule:  'One numeric outcome column. Two grouping columns, each containing category labels.',
       note:  'This matches SPSS GLM format. R/Python typically use long (stacked) format instead.',
       cols: [
@@ -87,7 +87,7 @@
     },
 
     'anova-oneway': {
-      badge: 'Wide format ג€” outcome + one grouping column',
+      badge: 'Wide format  outcome + one grouping column',
       rule:  'One numeric outcome column. One grouping column containing category labels.',
       note:  'This matches SPSS GLM format. R/Python typically use long (stacked) format instead.',
       cols: [
@@ -102,7 +102,7 @@
     },
 
     mixed: {
-      badge: 'ג  Long format ג€” one row per measurement',
+      badge: '  Long format  one row per measurement',
       rule:  'Multiple rows per subject. Each row = one occasion. Outcome, group, time, and subject ID all in separate columns.',
       note:  'This matches SPSS Mixed Models format. Wide (one column per timepoint) is not supported here.',
       isLong: true,
@@ -176,7 +176,7 @@
   }
 
   /**
-   * Wire hover highlights ג€” hovering a role header dims the others.
+   * Wire hover highlights  hovering a role header dims the others.
    */
   function wireHover(container) {
     var cells = container.querySelectorAll('[data-role]');
@@ -203,7 +203,7 @@
   /**
    * Render the guide into the given container element or ID.
    * @param {'independent'|'independent-two'|'dependent'|'anova'|'mixed'} type
-   * @param {string|HTMLElement} target  ג€“ element or element ID
+   * @param {string|HTMLElement} target   element or element ID
    * @param {{ collapsed?: boolean }} [opts]
    */
   function render(type, target, opts) {
@@ -236,7 +236,7 @@
 
   /**
    * Convenience: re-render when the user switches between compare modes.
-   * @param {'two-vars'|'k-plus'} compareMode  ג€“ value of the dataMode radio
+   * @param {'two-vars'|'k-plus'} compareMode   value of the dataMode radio
    * @param {string|HTMLElement}  target
    */
   function renderIndependent(compareMode, target, opts) {

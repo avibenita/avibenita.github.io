@@ -1056,10 +1056,109 @@
       display: flex; justify-content: flex-end; gap: 8px;
     }
     .mx-saved-modal-foot .cfg-btn { min-width: 80px; font-size: 12px; padding: 6px 14px; }
+
+    /* ================================================================
+       ADVANCED OPTIONS – fixed slide-in popup panel
+    ================================================================ */
+    .mx-opts-col {
+      position: fixed;
+      top: 0; right: 0;
+      width: 240px;
+      height: 100%;
+      display: flex !important;
+      flex-direction: column;
+      gap: 0;
+      padding: 0;
+      overflow: hidden;
+      background: var(--cfg-bg);
+      border-left: 1px solid var(--cfg-border);
+      box-shadow: -6px 0 32px rgba(0,0,0,.35);
+      transform: translateX(110%);
+      transition: transform .28s cubic-bezier(.22,.82,.28,1);
+      z-index: 600;
+    }
+    .mx-opts-col.open {
+      transform: translateX(0);
+    }
+
+    /* Popup header */
+    .adv-popup-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--cfg-border);
+      background: var(--cfg-surface2);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--cfg-text2);
+    }
+    .adv-popup-head .fa-sliders { font-size: 12px; color: #7c3aed; }
+    .adv-popup-close {
+      margin-left: auto;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--cfg-text2);
+      font-size: 14px;
+      padding: 3px 7px;
+      border-radius: 5px;
+      line-height: 1;
+      transition: background .12s, color .12s;
+    }
+    .adv-popup-close:hover { background: rgba(255,255,255,.1); color: var(--cfg-text); }
+    [data-theme="light"] .adv-popup-close:hover { background: rgba(0,0,0,.07); }
+
+    /* Popup scrollable body */
+    .adv-popup-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Backdrop */
+    .mx-adv-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.38);
+      z-index: 599;
+    }
+    .mx-adv-backdrop.open { display: block; }
+
+    /* Trigger button in header */
+    .adv-open-btn {
+      margin-left: 8px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border: 1px solid var(--cfg-border);
+      border-radius: 6px;
+      background: var(--cfg-surface2);
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: var(--cfg-text2);
+      transition: background .12s, border-color .12s;
+    }
+    .adv-open-btn:hover { background: var(--cfg-surface3, var(--cfg-surface2)); border-color: #7c3aed; color: #7c3aed; }
+    .adv-open-btn .fa-sliders { font-size: 11px; }
   </style>
 </head>
 
 <body>
+<!-- Advanced Options backdrop -->
+<div id="advBackdrop" class="mx-adv-backdrop"></div>
+
 <div class="cfg-shell">
 
   <!-- -- Header --------------------------------------------------------- -->
@@ -1069,6 +1168,11 @@
     </div>
     <span class="cfg-header-title">Linear Mixed Model</span>
     <span class="cfg-meta-badge" id="metaBadge"></span>
+
+    <button class="adv-open-btn" id="btnAdvOpts" type="button" title="Advanced Options">
+      <i class="fa-solid fa-sliders"></i>
+      <span>Options</span>
+    </button>
 
     <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Toggle theme">
       <span class="cfg-toggle-icon">&#x1F319;</span>
@@ -1277,17 +1381,20 @@
 
       </div><!-- /mx-model-col -->
 
-      <!-- -- RIGHT: options ------------------------------------ -->
-      <div class="mx-opts-col">
+      <!-- -- RIGHT: Advanced Options popup panel --------------- -->
+      <div class="mx-opts-col" id="advPanel">
 
-      <!-- Advanced options (collapsed by default) -->
-      <div class="adv-wrap" id="advWrap">
-        <button class="adv-toggle" id="advToggle" type="button">
+        <!-- Popup header -->
+        <div class="adv-popup-head">
           <i class="fa-solid fa-sliders"></i>
           Advanced Options
-          <i class="fa-solid fa-chevron-down adv-chevron"></i>
-        </button>
-        <div class="adv-body">
+          <button class="adv-popup-close" id="advPanelClose" type="button" title="Close">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <!-- Scrollable content -->
+        <div class="adv-popup-body">
 
         <!-- Estimation -->
         <div class="opt-section">
@@ -1419,10 +1526,9 @@
             </div>
           </div>
         </div>
-        </div><!-- /adv-body -->
-      </div><!-- /adv-wrap -->
+        </div><!-- /adv-popup-body -->
 
-      </div><!-- /mx-opts-col -->
+      </div><!-- /mx-opts-col / advPanel -->
     </div><!-- /mx-layout -->
 
     <!-- -- Footer --------------------------------------------- -->
@@ -1794,10 +1900,7 @@ function toggleTheme() {
 }
 
 (function() {
-  try {
-    var saved = localStorage.getItem('statistico-theme') || 'light';
-    applyTheme(saved);
-  } catch(e) { applyTheme('light'); }
+  applyTheme('light');
 })();
 
 // ============================================================================
@@ -2952,14 +3055,24 @@ document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.mx-zone-body').forEach(wireDropZone);
   if (typeof DsGuide !== 'undefined') DsGuide.render('mixed', 'dsGuideContainer', { collapsed: true });
 
-  // Advanced options toggle
-  var advWrap   = document.getElementById('advWrap');
-  var advToggle = document.getElementById('advToggle');
-  if (advToggle && advWrap) {
-    advToggle.addEventListener('click', function() {
-      advWrap.classList.toggle('open');
-    });
+  // Advanced Options popup
+  var advPanel    = document.getElementById('advPanel');
+  var advBackdrop = document.getElementById('advBackdrop');
+  var btnAdvOpts  = document.getElementById('btnAdvOpts');
+  var advClose    = document.getElementById('advPanelClose');
+
+  function openAdvPanel() {
+    if (advPanel)    advPanel.classList.add('open');
+    if (advBackdrop) advBackdrop.classList.add('open');
   }
+  function closeAdvPanel() {
+    if (advPanel)    advPanel.classList.remove('open');
+    if (advBackdrop) advBackdrop.classList.remove('open');
+  }
+
+  if (btnAdvOpts)  btnAdvOpts.addEventListener('click', openAdvPanel);
+  if (advClose)    advClose.addEventListener('click', closeAdvPanel);
+  if (advBackdrop) advBackdrop.addEventListener('click', closeAdvPanel);
 
   // Suggestion panel buttons
   var btnAccept  = document.getElementById('btnAcceptSugg');

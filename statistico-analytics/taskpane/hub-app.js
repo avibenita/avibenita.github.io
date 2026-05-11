@@ -840,7 +840,7 @@ function openRegressionConfigFromHub() {
   setSelectedModuleCard("regression", true);
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + "regression/regression-input.html?v=" + Date.now(),
-    { height: 90, width: 30, displayInIframe: false },
+    { height: 88, width: 25, displayInIframe: false },
     function (res) {
       if (res.status === Office.AsyncResultStatus.Failed) {
         console.error("Could not open regression config:", res.error && res.error.message);
@@ -884,7 +884,7 @@ function openAnovaConfigFromHub() {
   setSelectedModuleCard("anova", true);
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + "anova/anova-input.html?v=" + Date.now(),
-    { height: 88, width: 26, displayInIframe: false },
+    { height: 88, width: 25, displayInIframe: false },
     function (res) {
       if (res.status === Office.AsyncResultStatus.Failed) {
         finishHubAnovaFlow();
@@ -1162,7 +1162,7 @@ function openPcaConfigFromHub() {
   return openBuilderDialogFromHub({
     moduleId: "pca",
     dialogPath: "factor/factor-input.html?mode=pca",
-    dialogOptions: { height: 90, width: 30, displayInIframe: false },
+    dialogOptions: { height: 88, width: 25, displayInIframe: false },
     dataType: "FACTOR_DATA",
     payloadBuilder: function (gr) {
       var saved = null;
@@ -1184,7 +1184,7 @@ function openMixedConfigFromHub() {
   return openBuilderDialogFromHub({
     moduleId: "mixed",
     dialogPath: "mixed/mixed-input.html",
-    dialogOptions: { height: 92, width: 30, displayInIframe: false },
+    dialogOptions: { height: 88, width: 25, displayInIframe: false },
     dataType: "MIXED_DATA",
     payloadBuilder: function (gr) {
       var saved = null;

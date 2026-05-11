@@ -19,7 +19,7 @@ function openAnovaBuilder() {
   if (!anovaRangeData || anovaRangeData.length < 2) return;
   Office.context.ui.displayDialogAsync(
     `${getDialogsBaseUrl()}anova/anova-input.html?v=${Date.now()}`,
-    { height: 88, width: 26, displayInIframe: false },
+    { height: 88, width: 25, displayInIframe: false },
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       anovaDialog = asyncResult.value;

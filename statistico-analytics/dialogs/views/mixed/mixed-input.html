@@ -150,7 +150,6 @@
       line-height: 1.2;
     }
     .mx-var-miss { color: #f97316; font-weight: 600; }
-    .mx-var-cat  { color: #7c3aed; }
 
     /* Variable column summary bar */
     .mx-vars-summary {
@@ -1403,26 +1402,6 @@
     }
     .mx-chip { flex-wrap: wrap; white-space: normal; }
 
-    .mx-var-ribbon {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      align-items: center;
-      margin-top: 3px;
-    }
-    .mx-vribbon {
-      font-size: 8px;
-      font-weight: 800;
-      letter-spacing: .04em;
-      padding: 1px 6px;
-      border-radius: 4px;
-      border: 1px solid transparent;
-    }
-    .mx-vribbon-num  { background: rgba(59,130,246,.12); border-color: rgba(59,130,246,.28); color: #1d4ed8; }
-    .mx-vribbon-cat  { background: rgba(147,51,234,.1);  border-color: rgba(147,51,234,.22); color: #6b21a8; }
-    .mx-vribbon-id   { background: rgba(34,197,94,.12);   border-color: rgba(34,197,94,.25); color: #15803d; }
-    .mx-vribbon-warn { background: rgba(239,68,68,.12);   border-color: rgba(239,68,68,.25); color: #dc2626; }
-
     .mx-advanced-details {
       border: 1px solid var(--cfg-border);
       border-radius: 10px;
@@ -2361,34 +2340,27 @@ function renderVarsList() {
 
     var nValid = v.validCount || 0;
     var nMiss  = v.missing   || 0;
-    var nLevels = (!isNum && v.categories) ? v.categories.length : 0;
+    var nNumCell = v.numeric || 0;
+    var nStrCell = v.string  || 0;
 
-    var statsParts = [
-      'n=' + nValid,
-      isNum
-        ? '<span class="mx-var-cat" style="color:#0369a1">numerical</span>'
-        : '<span class="mx-var-cat">' + (nLevels > 0 ? nLevels + ' levels' : 'categorical') + '</span>'
-    ];
-    if (nMiss > 0) statsParts.push('<span class="mx-var-miss">miss=' + nMiss + '</span>');
-    var statsHtml = statsParts.join(' \u00B7 ');
+    var missPart = nMiss > 0
+      ? '<span class="mx-var-miss">miss=' + nMiss + '</span>'
+      : 'miss=' + nMiss;
+    var statsHtml =
+      'n=' + nValid +
+      ' \u00B7 num=' + nNumCell +
+      ' \u00B7 string=' + nStrCell +
+      ' \u00B7 ' + missPart;
 
     var secondRow = role
       ? '<span class="var-role-tag var-role-tag-' + role + '">' + roleLabels[role] + '</span>'
       : '<span class="mx-var-stats">' + statsHtml + '</span>';
-
-    var hints = typeof mxGetNameHints === 'function' ? mxGetNameHints(v.name) : {};
-    var ribbons = '<span class="mx-vribbon ' + (isNum ? 'mx-vribbon-num' : 'mx-vribbon-cat') + '">' +
-      (isNum ? '123 continuous' : 'ABC categorical') + '</span>';
-    if (hints.isIdLike) ribbons += '<span class="mx-vribbon mx-vribbon-id" title="Could be a cluster / subject ID">ID?</span>';
-    if (nMiss > 0) ribbons += '<span class="mx-vribbon mx-vribbon-warn" title="Missing cells">\u26A0 miss</span>';
-    var ribbonRow = '<div class="mx-var-ribbon">' + ribbons + '</div>';
 
     row.innerHTML =
       '<div class="mx-var-icon '+ (isNum ? 'num' : 'str') +'">' + (isNum ? 'N' : 'C') + '</div>' +
       '<div class="mx-var-body">' +
         '<span class="mx-var-name" title="'+ escHtml(v.name) +'">'+ escHtml(v.name) +'</span>' +
         secondRow +
-        ribbonRow +
       '</div>';
 
     row.addEventListener('dragstart', onVarDragStart);

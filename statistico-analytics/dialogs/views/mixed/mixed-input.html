@@ -151,6 +151,24 @@
     .mx-var-miss { color: #f97316; font-weight: 600; }
     .mx-var-cat  { color: #7c3aed; }
 
+    /* Variable column summary bar */
+    .mx-vars-summary {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      padding: 3px 2px;
+    }
+    .mx-vars-summary-badge {
+      font-size: 9.5px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      letter-spacing: .2px;
+    }
+    .mx-vsb-num  { background: rgba(79,195,247,.12); color: #0369a1; border: 1px solid rgba(79,195,247,.3); }
+    .mx-vsb-cat  { background: rgba(167,139,250,.12); color: #6d28d9; border: 1px solid rgba(167,139,250,.3); }
+    .mx-vsb-miss { background: rgba(249,115,22,.1);  color: #c2410c; border: 1px solid rgba(249,115,22,.25); }
+
     /* -- Zone card ---------------------------------------------- */
     .mx-zone-card {
       border: 1px solid var(--cfg-border);
@@ -1318,6 +1336,7 @@
           <i class="fa-solid fa-hand-pointer"></i>
           Drag variables to the model zones
         </div>
+        <div class="mx-vars-summary" id="varsSummary"></div>
         <div class="mx-vars-box" id="varsList">
           <div style="padding:16px;text-align:center;font-size:12px;color:var(--cfg-text3);font-style:italic;">
             No data loaded yet.
@@ -2007,7 +2026,8 @@ function toggleTheme() {
 // VARIABLE RENDERING
 // ============================================================================
 function renderVarsList() {
-  var box = qs('varsList');
+  var box     = qs('varsList');
+  var summary = qs('varsSummary');
   if (!box) return;
 
   var used = getUsedNames();
@@ -2015,7 +2035,22 @@ function renderVarsList() {
 
   if (STATE.variables.length === 0) {
     box.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;color:var(--cfg-text3);font-style:italic;">No data loaded.</div>';
+    if (summary) summary.innerHTML = '';
     return;
+  }
+
+  // Compute column-type counts for summary bar
+  var nNumerical   = 0, nCategorical = 0, nWithMissing = 0;
+  STATE.variables.forEach(function(v) {
+    if (v.numeric > v.string) nNumerical++;   else nCategorical++;
+    if ((v.missing || 0) > 0) nWithMissing++;
+  });
+  if (summary) {
+    var sbHtml = '<span class="mx-vars-summary-badge mx-vsb-num">' + nNumerical + ' numerical</span>' +
+                 '<span class="mx-vars-summary-badge mx-vsb-cat">' + nCategorical + ' categorical</span>';
+    if (nWithMissing > 0)
+      sbHtml += '<span class="mx-vars-summary-badge mx-vsb-miss">' + nWithMissing + ' with missing</span>';
+    summary.innerHTML = sbHtml;
   }
 
   box.innerHTML = '';
@@ -2031,11 +2066,15 @@ function renderVarsList() {
 
     var nValid = v.validCount || 0;
     var nMiss  = v.missing   || 0;
-    var nCat   = (!isNum && v.categories) ? v.categories.length : 0;
+    var nLevels = (!isNum && v.categories) ? v.categories.length : 0;
 
-    var statsParts = ['n=' + nValid];
-    if (nMiss  > 0) statsParts.push('<span class="mx-var-miss">miss=' + nMiss + '</span>');
-    if (nCat   > 0) statsParts.push('<span class="mx-var-cat">' + nCat + ' levels</span>');
+    var statsParts = [
+      'n=' + nValid,
+      isNum
+        ? '<span class="mx-var-cat" style="color:#0369a1">numerical</span>'
+        : '<span class="mx-var-cat">' + (nLevels > 0 ? nLevels + ' levels' : 'categorical') + '</span>'
+    ];
+    if (nMiss > 0) statsParts.push('<span class="mx-var-miss">miss=' + nMiss + '</span>');
     var statsHtml = statsParts.join(' \u00B7 ');
 
     var secondRow = role
@@ -2043,7 +2082,7 @@ function renderVarsList() {
       : '<span class="mx-var-stats">' + statsHtml + '</span>';
 
     row.innerHTML =
-      '<div class="mx-var-icon '+ (isNum ? 'num' : 'str') +'">' + (isNum ? 'N' : 'S') + '</div>' +
+      '<div class="mx-var-icon '+ (isNum ? 'num' : 'str') +'">' + (isNum ? 'N' : 'C') + '</div>' +
       '<div class="mx-var-body">' +
         '<span class="mx-var-name" title="'+ escHtml(v.name) +'">'+ escHtml(v.name) +'</span>' +
         secondRow +

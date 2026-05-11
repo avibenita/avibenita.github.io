@@ -110,7 +110,7 @@ function openIndependentBuilderDialog() {
   if (!independentRangeData || independentRangeData.length < 2) return;
   Office.context.ui.displayDialogAsync(
     `${getDialogsBaseUrl()}independent/independent-input.html?v=${Date.now()}`,
-    { height: 88, width: 25, displayInIframe: false },
+    { height: 70, width: 25, displayInIframe: false },
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       independentDialog = asyncResult.value;
@@ -788,7 +788,7 @@ function openIndependentResultsDialog() {
   console.log("Opening results page:", resultsPage);
   Office.context.ui.displayDialogAsync(
     `${getDialogsBaseUrl()}independent/${resultsPage}?v=${Date.now()}`,
-    { height: 90, width: 70, displayInIframe: false },
+    { height: 72, width: 70, displayInIframe: false },
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       independentDialog = asyncResult.value;

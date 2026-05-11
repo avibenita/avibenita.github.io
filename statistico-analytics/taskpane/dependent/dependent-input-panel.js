@@ -48,7 +48,7 @@ function openDependentBuilder() {
   console.log("Opening configuration dialog...");
   Office.context.ui.displayDialogAsync(
     `${getDialogsBaseUrl()}dependent/dependent-input.html?v=${Date.now()}`,
-    { height: 88, width: 25, displayInIframe: false },
+    { height: 70, width: 25, displayInIframe: false },
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       dependentDialog = asyncResult.value;
@@ -1232,7 +1232,7 @@ function openDependentResultsDialog() {
   console.log("Opening results page:", resultsPage);
   Office.context.ui.displayDialogAsync(
     `${getDialogsBaseUrl()}dependent/${resultsPage}?v=${Date.now()}`,
-    { height: 90, width: 70, displayInIframe: false },
+    { height: 72, width: 70, displayInIframe: false },
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       dependentDialog = asyncResult.value;

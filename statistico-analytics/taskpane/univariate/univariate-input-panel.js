@@ -10,7 +10,7 @@ let _uniEmbedMessageHandler = null;
 let _univariateDialogDataPump = null;
 let _univariateLoadingFallbackTimer = null;
 // Use iframe-hosted dialogs when available to avoid showing popup URL bars.
-const RESULT_DIALOG_OPTIONS = { height: 90, width: 70, displayInIframe: true };
+const RESULT_DIALOG_OPTIONS = { height: 72, width: 70, displayInIframe: true };
 
 function showUnivariateResultsLoading(message = 'Loading results...') {
   if (_univariateLoadingFallbackTimer) {
@@ -223,7 +223,7 @@ function openUnivariateBuilderDialog() {
   const dialogUrl = `${getDialogsBaseUrl()}univariate/univariate-input.html?v=${Date.now()}`;
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    { height: 88, width: 25, displayInIframe: false },
+    { height: 70, width: 25, displayInIframe: false },
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error('Failed to open univariate config dialog:', asyncResult.error.message);

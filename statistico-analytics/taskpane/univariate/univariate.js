@@ -551,7 +551,7 @@ function calculateKurtosis(data, mean, stdDev) {
  */
 let resultsDialog = null;
 let currentResults = null; // Store results globally for view switching
-const RESULT_DIALOG_OPTIONS = { height: 90, width: 70, displayInIframe: false };
+const RESULT_DIALOG_OPTIONS = { height: 72, width: 70, displayInIframe: false };
 
 function releaseResultsDialogState() {
     resultsDialog = null;

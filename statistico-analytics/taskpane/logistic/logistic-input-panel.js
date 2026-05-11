@@ -50,7 +50,7 @@ function openLogisticModelBuilder() {
 
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    { height: 88, width: 25, displayInIframe: false },
+    { height: 70, width: 25, displayInIframe: false },
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error("Failed to open model builder:", asyncResult.error);
@@ -114,7 +114,7 @@ function openLogisticResultsDialog() {
 
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    { height: 90, width: 70, displayInIframe: false },
+    { height: 72, width: 70, displayInIframe: false },
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error("Failed to open logistic dialog:", asyncResult.error);

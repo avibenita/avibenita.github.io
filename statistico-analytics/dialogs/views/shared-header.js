@@ -330,7 +330,8 @@ const StatisticoHeader = {
       'pca': 'PCA',
       'cluster': 'Cluster Analysis',
       'anova': 'ANOVA',
-      'power': 'Power & Sample Size'
+      'power': 'Power & Sample Size',
+      'mixed-model': 'Linear Mixed Model'
     };
     return moduleNames[this.module] || this.module || 'Analytics';
   },
@@ -421,7 +422,14 @@ const StatisticoHeader = {
       'independent-results-kplus': 'Independent Means (K+ Groups)',
       // Dependent means / repeated measures views
       'dependent-results': 'Dependent Means (Paired)',
-      'dependent-results-kplus': 'Repeated Measures (3+ Timepoints)'
+      'dependent-results-kplus': 'Repeated Measures (3+ Timepoints)',
+      // Mixed model views
+      'overview': 'Overview',
+      'model-effects': 'Model Effects',
+      'marginal-means': 'Marginal Means',
+      'diagnostics': 'Diagnostics',
+      'advanced': 'Advanced',
+      'model-structure': 'Model Structure'
     };
 
     const moduleNames = {
@@ -435,7 +443,8 @@ const StatisticoHeader = {
       'pca': 'PCA',
       'cluster': 'Cluster Analysis',
       'anova': 'ANOVA',
-      'power': 'Power & Sample Size'
+      'power': 'Power & Sample Size',
+      'mixed-model': 'Linear Mixed Model'
     };
     const moduleName = moduleNames[this.module] || this._getModuleDisplayName();
     
@@ -443,7 +452,7 @@ const StatisticoHeader = {
     const headerGlobalControls = this._renderHeaderGlobalControls();
 
     // All sidebar-based modules hide the shared-header navrow to avoid duplicate navigation.
-    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate');
+    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate' || this.module === 'mixed-model');
 
     const topHeader = `
       <div class="statistico-header">

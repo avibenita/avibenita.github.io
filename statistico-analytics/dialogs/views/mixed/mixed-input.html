@@ -1333,17 +1333,6 @@
       min-width: 7.5rem;
       flex-shrink: 0;
     }
-    .mx-live-sentence {
-      font-size: 12px;
-      font-style: italic;
-      line-height: 1.45;
-      color: var(--cfg-text);
-      margin: 4px 0 2px;
-      padding: 7px 10px;
-      border-radius: 8px;
-      background: rgba(249,115,22,.06);
-      border: 1px solid rgba(249,115,22,.12);
-    }
     .mx-rnd-explain {
       font-size: 11px;
       color: var(--cfg-text2);
@@ -1486,10 +1475,6 @@
     }
     .mx-footer-actions .cfg-btn.run { flex: 1 1 220px; max-width: none; }
 
-    [data-theme="light"] .mx-live-sentence {
-      background: rgba(249,115,22,.07);
-      border-color: rgba(249,115,22,.18);
-    }
   </style>
 </head>
 
@@ -1590,7 +1575,6 @@
             <div id="prevRepRow" style="display:none;"><strong>Time / wave:</strong> <span id="prevRepeated"></span></div>
             <div><strong>Model type:</strong> <span id="prevModelType">—</span></div>
           </div>
-          <p class="mx-live-sentence" id="liveSentence">Configure your model using the numbered steps below.</p>
           <p class="mx-rnd-explain" id="rndInterceptExplain" style="display:none;"></p>
           <div class="mx-formula-block">
             <div class="mx-formula-label">Formal notation (lmer-style)</div>
@@ -2390,32 +2374,6 @@ function mxLookupVar(name) {
   return null;
 }
 
-function formatPredListEnglish(parts) {
-  if (!parts || parts.length === 0) return '';
-  if (parts.length === 1) return parts[0];
-  return parts.slice(0, -1).join(', ') + ', and ' + parts[parts.length - 1];
-}
-
-function buildLiveSentencePlain(a) {
-  if (!a.dep)
-    return 'Follow steps 1\u20133 for outcome, predictors, and clustering. Step 5 holds interactions and random slopes until you need them.';
-  var preds = [];
-  a.fix.forEach(function(x){ preds.push(x); });
-  a.cov.forEach(function(x){ preds.push(x); });
-  a.interactions.forEach(function(i){ preds.push(i.v1 + ' and ' + i.v2 + ' together'); });
-
-  if (preds.length === 0) {
-    if (!a.rnd) return a.dep + ' is selected. Add predictors (step 2) and a cluster ID (step 3).';
-    return a.dep + ' is selected with clustering by ' + a.rnd + '. Add at least one predictor in step 2.';
-  }
-
-  var predStr = formatPredListEnglish(preds);
-  var s = a.dep + ' is predicted by ' + predStr;
-  if (a.rnd) s += ', with rows grouped by ' + a.rnd + '.';
-  else s += '. Pick a cluster ID in step 3 so observations inside each cluster stay correlated.';
-  return s;
-}
-
 function getFormalFormulaPlainText() {
   var a = STATE.assignments;
   var lhs = a.dep || 'outcome';
@@ -2853,9 +2811,6 @@ function updateEquation() {
     else if (a.randomSlopes.length > 0) pmt.textContent = 'Mixed model with random slopes';
     else pmt.textContent = 'Random-intercept mixed model';
   }
-
-  var ls = qs('liveSentence');
-  if (ls) ls.textContent = buildLiveSentencePlain(a);
 
   var ri = qs('rndInterceptExplain');
   if (ri) {

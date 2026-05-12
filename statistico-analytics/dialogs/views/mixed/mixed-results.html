@@ -114,8 +114,12 @@
     .tab-content.active {
       display:flex; flex-direction:column; flex:1; min-height:0;
       overflow-y:auto; overflow-x:hidden; padding:16px 18px;
+      gap: 14px;
       animation: fadeIn .2s ease;
     }
+    /* Remove margin-bottom from sections inside tab-content so gap drives spacing */
+    .tab-content .mm-section { margin-bottom: 0; }
+    .tab-content .insight-cards-row { padding-bottom: 0; }
     @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
 
     /* ── KPI strip ── */
@@ -723,7 +727,7 @@
                   <!-- Compact significance table -->
                   <div class="mm-section">
                     <div class="mm-section-header">
-                      <span><i class="fa-solid fa-lock"></i> Significance of Fixed Effects</span>
+                      <span><i class="fa-solid fa-square-poll-vertical"></i> Significance of Fixed Effects</span>
                       <button class="collapse-toggle" onclick="toggleSection('ovFixedBody','ovFixedToggle')" id="ovFixedToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
                     </div>
                     <div class="mm-section-body collapsible-content" id="ovFixedBody">
@@ -733,7 +737,13 @@
                             <th>Predictor</th>
                             <th>F</th>
                             <th>Sig.</th>
-                            <th>Effect Size (η²<sub>p</sub>)</th>
+                            <th>Effect Size (η²<sub>p</sub>)
+                              <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
+                                <span class="metric-tip">Partial eta-squared — proportion of variance explained by each predictor after controlling for others.<br>
+                                  Negligible &lt; .01 · Small ≥ .01 · Medium ≥ .06 · Large ≥ .14 (Cohen, 1988).<br>
+                                  Bar length is scaled so Large (.14) fills ~60% of the bar.</span>
+                              </span>
+                            </th>
                           </tr></thead>
                           <tbody id="ovFixedBody_rows">
                             <tr><td colspan="4" class="awaiting-state" style="padding:20px;text-align:center;font-style:italic;">Awaiting results…</td></tr>
@@ -746,10 +756,16 @@
                     </div>
                   </div>
 
-                  <!-- Effect-size visualization -->
+                  <!-- Coefficient plot -->
                   <div class="mm-section" id="ovEffectsSection" style="display:none;">
                     <div class="mm-section-header">
-                      <span><i class="fa-solid fa-chart-bar"></i> Effect Size at a Glance</span>
+                      <span><i class="fa-solid fa-arrows-left-right"></i> Predictor Coefficients (B)</span>
+                    </div>
+                    <div style="padding:4px 14px 6px;font-size:.72rem;color:var(--text-muted);border-bottom:1px solid var(--border);">
+                      Unstandardized regression coefficient (B) with 95% confidence interval.
+                      Bar extends left (negative effect) or right (positive effect) from zero.
+                      <span style="color:var(--success);font-weight:600;">Green = significant</span> ·
+                      <span style="color:rgba(255,255,255,.3);font-weight:600;">Grey = not significant</span>
                     </div>
                     <div class="mm-section-body padded" id="ovEffectsBody"></div>
                   </div>
@@ -2325,44 +2341,66 @@
     const rows  = coefs.filter(r => (r.parameter ?? r.name ?? '').toLowerCase() !== 'intercept');
     if (!rows.length) return;
     section.style.display = '';
-    body.innerHTML = rows.map(r => {
-      const pval     = r.pval ?? r.p ?? r.Sig ?? r.sig;
-      const p        = parseFloat(pval ?? 1);
-      const est      = parseFloat(r.estimate ?? r.coef ?? 0);
-      const ciL      = parseFloat(r.ciLow  ?? r.lower95 ?? r.CI_L ?? est);
-      const ciH      = parseFloat(r.ciHigh ?? r.upper95 ?? r.CI_U ?? est);
-      const isSig    = p < 0.05;
-      const name     = r.parameter ?? r.name ?? r.term ?? '—';
-      const pCls     = pClass(pval);
-      const sigLabel = p < 0.001 ? '***' : p < 0.01 ? '**' : p < 0.05 ? '*' : 'ns';
-      const sigColor = isSig ? 'var(--success)' : 'var(--text-muted)';
-      // Normalise estimate bar: positive = right, negative = left; cap at ±3 SE
-      const se    = parseFloat(r.se ?? r.stderr ?? 1) || 1;
-      const normE = Math.max(-1, Math.min(1, est / (3 * se)));
-      const barW  = Math.abs(normE * 50).toFixed(1);
-      const barL  = normE < 0 ? (50 - parseFloat(barW)).toFixed(1) : '50';
-      const barColor = isSig ? 'var(--success)' : 'rgba(255,255,255,.2)';
-      return `
-        <div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);">
-          <div style="width:130px;font-size:.78rem;font-weight:600;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${name}">${name}</div>
-          <div style="flex:1;position:relative;height:10px;background:rgba(255,255,255,.06);border-radius:99px;overflow:hidden;">
-            <div style="position:absolute;top:0;left:50%;width:1px;height:100%;background:rgba(255,255,255,.15);"></div>
-            <div style="position:absolute;top:0;left:${barL}%;width:${barW}%;height:100%;background:${barColor};border-radius:99px;"></div>
-          </div>
-          <div style="width:54px;font-size:.72rem;font-weight:700;text-align:right;color:${sigColor};">${fmt(est)}</div>
-          <div style="width:62px;font-size:.68rem;color:var(--text-muted);white-space:nowrap;">[${fmt(ciL)}, ${fmt(ciH)}]</div>
-          <div class="${pCls}" style="width:40px;font-size:.72rem;font-weight:700;text-align:right;">${sigLabel}</div>
-        </div>`;
-    }).join('');
-    // Add axis label
-    body.insertAdjacentHTML('afterbegin',
-      `<div style="display:flex;align-items:center;gap:10px;padding:0 0 4px;font-size:.66rem;color:var(--text-muted);">
-         <div style="width:130px;"></div>
-         <div style="flex:1;display:flex;justify-content:space-between;padding:0 1px;">
-           <span>← negative</span><span style="margin:0 auto;">estimate (B)</span><span>positive →</span>
-         </div>
-         <div style="width:54px;"></div><div style="width:62px;">95% CI</div><div style="width:40px;"></div>
-       </div>`);
+
+    // Determine shared scale: max(|est| + |se|*2) across all rows, so bars are comparable
+    const maxAbs = rows.reduce((mx, r) => {
+      const e  = Math.abs(parseFloat(r.estimate ?? r.coef ?? 0));
+      const se = Math.abs(parseFloat(r.se ?? r.stderr ?? 0));
+      return Math.max(mx, e + se * 2);
+    }, 0) || 1;
+
+    // Column header
+    body.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;padding:3px 0 5px;border-bottom:1px solid rgba(255,255,255,.1);">
+        <div style="width:140px;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Predictor</div>
+        <div style="flex:1;font-size:.66rem;color:var(--text-muted);text-align:center;letter-spacing:.03em;">
+          ← Negative effect &nbsp;│&nbsp; <strong style="color:rgba(255,255,255,.5);">0</strong> &nbsp;│&nbsp; Positive effect →
+        </div>
+        <div style="width:52px;font-size:.66rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:right;">B</div>
+        <div style="width:80px;font-size:.66rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">95% CI</div>
+        <div style="width:36px;font-size:.66rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:right;">p</div>
+      </div>` +
+      rows.map(r => {
+        const pval  = r.pval ?? r.p ?? r.Sig ?? r.sig;
+        const p     = parseFloat(pval ?? 1);
+        const est   = parseFloat(r.estimate ?? r.coef ?? 0);
+        const ciL   = parseFloat(r.ciLow  ?? r.lower95 ?? r.CI_L ?? est);
+        const ciH   = parseFloat(r.ciHigh ?? r.upper95 ?? r.CI_U ?? est);
+        const isSig = p < 0.05;
+        const name  = r.parameter ?? r.name ?? r.term ?? '—';
+        const sigLabel = p < 0.001 ? '< .001' : p < 0.01 ? fmtP(pval) : fmtP(pval);
+        const estColor = isSig ? (est >= 0 ? 'var(--success)' : 'var(--danger)') : 'rgba(255,255,255,.35)';
+        const barColor = isSig ? (est >= 0 ? 'rgba(74,222,128,.7)' : 'rgba(251,113,133,.7)') : 'rgba(255,255,255,.15)';
+        const ciColor  = isSig ? (est >= 0 ? 'rgba(74,222,128,.25)' : 'rgba(251,113,133,.2)')  : 'rgba(255,255,255,.06)';
+
+        // All positions as % of the 0–100 bar where 50% = zero
+        const scale   = 50 / maxAbs;
+        const estPct  = 50 + est * scale;
+        const ciLPct  = Math.max(0, Math.min(100, 50 + ciL * scale));
+        const ciHPct  = Math.max(0, Math.min(100, 50 + ciH * scale));
+        const ciLeft  = Math.min(ciLPct, ciHPct).toFixed(1);
+        const ciWidth = Math.abs(ciHPct - ciLPct).toFixed(1);
+        const estLeft = (est >= 0 ? 50 : estPct).toFixed(1);
+        const estW    = Math.abs(estPct - 50).toFixed(1);
+
+        return `
+          <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);">
+            <div style="width:140px;font-size:.78rem;font-weight:600;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${name}">${name}</div>
+            <div style="flex:1;position:relative;height:14px;">
+              <!-- track -->
+              <div style="position:absolute;inset:3px 0;background:rgba(255,255,255,.05);border-radius:99px;"></div>
+              <!-- zero line -->
+              <div style="position:absolute;top:0;left:50%;width:2px;height:100%;background:rgba(255,255,255,.25);transform:translateX(-50%);"></div>
+              <!-- CI band -->
+              <div style="position:absolute;top:2px;bottom:2px;left:${ciLeft}%;width:${ciWidth}%;background:${ciColor};border-radius:99px;"></div>
+              <!-- estimate bar -->
+              <div style="position:absolute;top:3px;bottom:3px;left:${estLeft}%;width:${estW}%;background:${barColor};border-radius:99px;min-width:2px;"></div>
+            </div>
+            <div style="width:52px;font-size:.76rem;font-weight:700;text-align:right;color:${estColor};">${fmt(est)}</div>
+            <div style="width:80px;font-size:.68rem;color:var(--text-muted);white-space:nowrap;">[${fmt(ciL)}, ${fmt(ciH)}]</div>
+            <div class="${pClass(pval)}" style="width:36px;font-size:.72rem;font-weight:700;text-align:right;">${fmtP(pval)}</div>
+          </div>`;
+      }).join('');
   }
 
   /* ─────────────────────────────────────────────────────────────

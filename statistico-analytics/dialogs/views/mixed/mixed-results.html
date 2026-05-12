@@ -429,7 +429,7 @@
     /* ── Overview: Insight cards row ── */
     .insight-cards-row {
       display: flex; gap: 8px;
-      padding: 8px 12px 0;
+      padding: 8px 12px 10px;
     }
     .insight-card {
       flex: 1; min-width: 0;
@@ -437,9 +437,9 @@
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 10px 14px;
-      display: flex; align-items: center; gap: 12px;
+      display: flex; align-items: flex-start; gap: 12px;
     }
-    .insight-card-icon { font-size: 1.3rem; flex-shrink: 0; }
+    .insight-card-icon { font-size: 1.3rem; flex-shrink: 0; padding-top: 2px; }
     .insight-card-body { flex: 1; min-width: 0; }
     .insight-card-label {
       font-size: .68rem; text-transform: uppercase;
@@ -447,6 +447,20 @@
     }
     .insight-card-value { font-size: .92rem; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
     .insight-card-sub   { font-size: .70rem; color: var(--text-muted); margin-top: 2px; }
+    .insight-card-tags  { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .ic-tag {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: .65rem; font-weight: 600; padding: 2px 7px;
+      border-radius: 99px; white-space: nowrap;
+    }
+    .ic-tag.sig   { background: rgba(74,222,128,.15); color: #4ade80; border: 1px solid rgba(74,222,128,.3); }
+    .ic-tag.ns    { background: rgba(255,255,255,.06); color: var(--text-muted); border: 1px solid var(--border); }
+    .ic-tag.info  { background: rgba(167,139,250,.12); color: var(--accent-3); border: 1px solid rgba(167,139,250,.25); }
+    .ic-tag.warn  { background: rgba(251,191,36,.12);  color: var(--warning);  border: 1px solid rgba(251,191,36,.3); }
+    html[data-theme="light"] .ic-tag.sig  { background: #dcfce7; color: #15803d; border-color: #86efac; }
+    html[data-theme="light"] .ic-tag.ns   { background: #f1f5f9; color: #64748b; border-color: #cbd5e1; }
+    html[data-theme="light"] .ic-tag.info { background: #ede9fe; color: #6d28d9; border-color: #c4b5fd; }
+    html[data-theme="light"] .ic-tag.warn { background: #fef3c7; color: #b45309; border-color: #fcd34d; }
 
     /* ── Overview: Technical Details accordion ── */
     .tech-accordion {
@@ -1624,13 +1638,13 @@
     const row = document.getElementById('insightCardsRow');
     if (!row) return;
 
-    // Card 1: Fixed effects
+    // ── Card 1: Fixed effects ────────────────────────────────
     const typeIII    = (d.typeIII || []).filter(r =>
       (r.source ?? r.effect ?? r.Source ?? '').toLowerCase() !== 'intercept');
     const sigCount   = typeIII.filter(r => parseFloat(r.pval ?? r.p ?? r.sig ?? 1) < 0.05).length;
     const totalCount = typeIII.length;
-    const sigIcon  = sigCount > 0 ? 'fa-circle-check'   : 'fa-circle-xmark';
-    const sigColor = sigCount > 0 ? 'var(--success)'    : 'var(--danger)';
+    const sigIcon  = sigCount > 0 ? 'fa-circle-check' : 'fa-circle-xmark';
+    const sigColor = sigCount > 0 ? 'var(--success)'  : 'var(--danger)';
     const sigVal   = sigCount === 0 ? 'No significant effects'
                    : sigCount === totalCount ? `All ${totalCount} effects significant`
                    : `${sigCount} of ${totalCount} significant`;
@@ -1638,34 +1652,59 @@
       const p = parseFloat(r.pval ?? r.p ?? r.sig ?? 1); return p < mn ? p : mn;
     }, 1);
     const sigSub = sigCount > 0 ? `Smallest p = ${fmtP(smallestP)}` : 'p ≥ .05 for all predictors';
+    // Per-predictor tags
+    const predTags = typeIII.map(r => {
+      const name = r.source ?? r.effect ?? r.Source ?? '?';
+      const p    = parseFloat(r.pval ?? r.p ?? r.sig ?? 1);
+      const cls  = p < 0.001 ? 'sig' : p < 0.05 ? 'sig' : 'ns';
+      const star = p < 0.001 ? ' ***' : p < 0.01 ? ' **' : p < 0.05 ? ' *' : '';
+      return `<span class="ic-tag ${cls}">${name}${star}</span>`;
+    }).join('');
 
-    // Card 2: ICC / clustering
-    const iccVal   = parseFloat(d.ICC ?? d.icc ?? 0);
-    const iccPct   = (iccVal * 100).toFixed(1) + '%';
-    let iccSub, iccColor, iccIcon;
+    // ── Card 2: ICC / clustering ─────────────────────────────
+    const iccVal  = parseFloat(d.ICC ?? d.icc ?? 0);
+    const iccPct  = (iccVal * 100).toFixed(1) + '%';
+    let iccSub, iccColor, iccIcon, iccTagCls;
     if (iccVal < 0.05) {
       iccSub = 'Negligible — OLS may suffice';
-      iccColor = 'var(--text-muted)'; iccIcon = 'fa-circle-dot';
+      iccColor = 'var(--text-muted)'; iccIcon = 'fa-circle-dot'; iccTagCls = 'ns';
     } else if (iccVal < 0.10) {
       iccSub = 'Modest — multilevel advisable';
-      iccColor = 'var(--warning)'; iccIcon = 'fa-circle-half-stroke';
+      iccColor = 'var(--warning)'; iccIcon = 'fa-circle-half-stroke'; iccTagCls = 'warn';
     } else if (iccVal < 0.30) {
       iccSub = 'Moderate — multilevel justified';
-      iccColor = 'var(--warning)'; iccIcon = 'fa-circle-half-stroke';
+      iccColor = 'var(--warning)'; iccIcon = 'fa-circle-half-stroke'; iccTagCls = 'warn';
     } else {
       iccSub = 'Substantial — multilevel recommended';
-      iccColor = 'var(--success)'; iccIcon = 'fa-circle';
+      iccColor = 'var(--success)'; iccIcon = 'fa-circle'; iccTagCls = 'sig';
     }
+    const groupVar = d.subjectVar ?? d.groupVar ?? d.subject ?? null;
+    const nObs     = d.n ?? d.N ?? null;
+    const nGroups  = d.nGroups ?? d.numGroups ?? null;
+    const iccTags  = [
+      groupVar ? `<span class="ic-tag info"><i class="fa-solid fa-layer-group" style="font-size:.6rem"></i> ${groupVar}</span>` : '',
+      (nObs && nGroups) ? `<span class="ic-tag ns">n = ${nObs} in ${nGroups} groups</span>` : '',
+      `<span class="ic-tag ${iccTagCls}">${iccPct} between-group</span>`,
+    ].filter(Boolean).join('');
 
-    // Card 3: Convergence / estimation
-    const converged  = d.converged !== false;
-    const convIcon   = converged ? 'fa-circle-check' : 'fa-triangle-exclamation';
-    const convColor  = converged ? 'var(--success)'  : 'var(--danger)';
-    const iters      = d.iterations ?? d.iters ?? d.Iterations;
-    const convVal    = converged
+    // ── Card 3: Convergence / estimation ────────────────────
+    const converged = d.converged !== false;
+    const convIcon  = converged ? 'fa-circle-check' : 'fa-triangle-exclamation';
+    const convColor = converged ? 'var(--success)'  : 'var(--danger)';
+    const iters     = d.iterations ?? d.iters ?? d.Iterations;
+    const convVal   = converged
       ? (iters != null ? `Converged (${iters} iters)` : 'Converged')
       : 'Did not converge';
-    const convSub    = `${d.method ?? 'REML'} · ${d.covStructure ?? d.covarianceStructure ?? 'VC'}`;
+    const method    = d.method ?? 'REML';
+    const covStr    = d.covStructure ?? d.covarianceStructure ?? 'VC';
+    const dfMethod  = d.dfMethod ?? d.DFMethod ?? null;
+    const aic       = d.AIC != null ? fmt(d.AIC) : null;
+    const convTags  = [
+      `<span class="ic-tag info">${method}</span>`,
+      `<span class="ic-tag info">${covStr}</span>`,
+      dfMethod ? `<span class="ic-tag ns">DF: ${dfMethod}</span>` : '',
+      aic ? `<span class="ic-tag ns">AIC ${aic}</span>` : '',
+    ].filter(Boolean).join('');
 
     row.innerHTML = `
       <div class="insight-card">
@@ -1674,6 +1713,7 @@
           <div class="insight-card-label">Fixed Effects</div>
           <div class="insight-card-value">${sigVal}</div>
           <div class="insight-card-sub">${sigSub}</div>
+          ${predTags ? `<div class="insight-card-tags">${predTags}</div>` : ''}
         </div>
       </div>
       <div class="insight-card">
@@ -1682,6 +1722,7 @@
           <div class="insight-card-label">Clustering (ICC)</div>
           <div class="insight-card-value">${iccPct}</div>
           <div class="insight-card-sub">${iccSub}</div>
+          ${iccTags ? `<div class="insight-card-tags">${iccTags}</div>` : ''}
         </div>
       </div>
       <div class="insight-card">
@@ -1689,7 +1730,8 @@
         <div class="insight-card-body">
           <div class="insight-card-label">Estimation</div>
           <div class="insight-card-value">${convVal}</div>
-          <div class="insight-card-sub">${convSub}</div>
+          <div class="insight-card-sub">${method} · ${covStr}</div>
+          ${convTags ? `<div class="insight-card-tags">${convTags}</div>` : ''}
         </div>
       </div>`;
   }

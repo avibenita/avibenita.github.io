@@ -426,6 +426,53 @@
     .icc-bar-track { background:rgba(255,255,255,.08); border-radius:99px; height:10px; flex:1; overflow:hidden; }
     .icc-bar-fill  { height:100%; border-radius:99px; background:linear-gradient(90deg,var(--accent-1),var(--accent-3)); transition:width .5s ease; }
 
+    /* ── Overview: Insight cards row ── */
+    .insight-cards-row {
+      display: flex; gap: 8px;
+      padding: 8px 12px 0;
+    }
+    .insight-card {
+      flex: 1; min-width: 0;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .insight-card-icon { font-size: 1.3rem; flex-shrink: 0; }
+    .insight-card-body { flex: 1; min-width: 0; }
+    .insight-card-label {
+      font-size: .68rem; text-transform: uppercase;
+      letter-spacing: .06em; color: var(--text-muted); margin-bottom: 2px;
+    }
+    .insight-card-value { font-size: .92rem; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
+    .insight-card-sub   { font-size: .70rem; color: var(--text-muted); margin-top: 2px; }
+
+    /* ── Overview: Technical Details accordion ── */
+    .tech-accordion {
+      margin: 0; border: none;
+      border-top: 1px solid var(--border);
+      background: transparent;
+    }
+    .tech-accordion > summary {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 14px;
+      cursor: pointer; list-style: none; user-select: none;
+      font-size: .78rem; font-weight: 600;
+      color: var(--text-muted);
+      background: var(--surface-2);
+    }
+    .tech-accordion > summary::-webkit-details-marker { display: none; }
+    .tech-accordion > summary .tech-acc-chevron {
+      margin-left: auto; font-size: .65rem;
+      transition: transform .2s; color: var(--text-muted);
+    }
+    .tech-accordion[open] > summary .tech-acc-chevron { transform: rotate(180deg); }
+    .tech-accordion-hint {
+      font-size: .68rem; font-weight: 400;
+      color: var(--text-muted); opacity: .7;
+    }
+
     /* ── Model Structure Diagram ── */
     #msdModal { background: rgba(0,0,0,.6); }
     .msd-popup-btn {
@@ -646,7 +693,7 @@
                 ══════════════════════════════════════════════════════ -->
                 <div id="tab-overview" class="tab-content active">
 
-                  <!-- Conclusion card (Insight mode) -->
+                  <!-- LAYER 1: Conclusion card -->
                   <div class="conclusion-card" id="conclusionCard">
                     <div class="conclusion-header"><i class="fa-solid fa-lightbulb"></i> Model Conclusion</div>
                     <div class="conclusion-body">
@@ -656,124 +703,10 @@
                     </div>
                   </div>
 
-                  <!-- ── Model Structure Diagram ─────────────────────── -->
-                  <!-- Moved to popup modal — triggered from toolbar button -->
+                  <!-- LAYER 1: Insight cards (fixed effects, ICC, convergence) -->
+                  <div class="insight-cards-row" id="insightCardsRow"></div>
 
-                  <!-- KPI strip -->
-                  <div class="kpi-strip" id="kpiStrip">
-                    <div class="kpi-card" style="border-top:3px solid var(--accent-1);">
-                      <div class="kpi-label">−2LL <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">−2 Log Likelihood (deviance). Basis for model comparison. Lower = better fit. Use Δ−2LL ~ χ² to compare nested models.</span></span></div>
-                      <div class="kpi-value" id="kpi2LL">…</div>
-                    </div>
-                    <div class="kpi-card" style="border-top:3px solid var(--accent-1);">
-                      <div class="kpi-label">AIC <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Akaike Information Criterion = −2LL + 2k. Penalises for number of parameters. Lower is better. Preferred for prediction.</span></span></div>
-                      <div class="kpi-value" id="kpiAIC">…</div>
-                    </div>
-                    <div class="kpi-card" style="border-top:3px solid var(--accent-1);">
-                      <div class="kpi-label">BIC <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Bayesian Information Criterion = −2LL + k·ln(n). Penalises more heavily than AIC in large samples. Lower is better.</span></span></div>
-                      <div class="kpi-value" id="kpiBIC">…</div>
-                    </div>
-                    <div class="kpi-card" style="border-top:3px solid var(--warning);">
-                      <div class="kpi-label">ICC <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Intraclass Correlation Coefficient. Proportion of total variance due to between-group differences. ≥ 0.10 justifies multilevel model; ≥ 0.30 indicates strong clustering.</span></span></div>
-                      <div class="kpi-value" id="kpiICC">…</div>
-                    </div>
-                    <div class="kpi-card" style="border-top:3px solid var(--text-muted);">
-                      <div class="kpi-label">n / Groups <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Total observations (n) and number of Level-2 groups. Fewer than 5 groups may yield unreliable variance estimates.</span></span></div>
-                      <div class="kpi-value" id="kpiN">…</div>
-                    </div>
-                  </div>
-
-                  <!-- Stats panels row -->
-                  <div class="stats-row">
-
-                    <div class="stat-panel">
-                      <div class="stat-panel-heading"><i class="fa-solid fa-info-circle"></i> Sample Information</div>
-                      <div class="stat-panel-body">
-                        <div class="stat-field"><span class="stat-label">Total Observations:</span>     <span class="stat-value" id="sN">…</span></div>
-                        <div class="stat-field"><span class="stat-label">Number of Groups:</span>        <span class="stat-value" id="sGroups">…</span></div>
-                        <div class="stat-field"><span class="stat-label">Avg Obs per Group: <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Average number of observations per Level-2 group. Highly unbalanced designs (large variation here) may affect model convergence and SE accuracy.</span></span></span>       <span class="stat-value" id="sOPG">…</span></div>
-                        <div class="stat-field"><span class="stat-label">Fixed Predictors: <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Number of fixed-effect predictors (excluding intercept). These are population-level effects assumed constant across all groups.</span></span></span>        <span class="stat-value" id="sFP">…</span></div>
-                        <div class="stat-field"><span class="stat-label">Random Effects: <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Number of random-effect terms (e.g. random intercept, random slopes). Each adds a variance component to the model.</span></span></span>          <span class="stat-value" id="sRE">…</span></div>
-                      </div>
-                    </div>
-
-                    <div class="stat-panel">
-                      <div class="stat-panel-heading"><i class="fa-solid fa-chart-bar"></i> Model Fit (Information Criteria)</div>
-                      <div class="stat-panel-body">
-                        <div class="stat-field">
-                          <span class="stat-label">−2 Log Likelihood:
-                            <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
-                              <span class="metric-tip">Deviance. Lower values indicate better fit. Compare nested models via likelihood ratio test (Δ−2LL ~ χ²).</span>
-                            </span>
-                          </span>
-                          <span class="stat-value" id="s2LL">…</span>
-                        </div>
-                        <div class="stat-field">
-                          <span class="stat-label">AIC:
-                            <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
-                              <span class="metric-tip">Akaike Information Criterion. Balances fit and number of parameters. Lower is better.</span>
-                            </span>
-                          </span>
-                          <span class="stat-value" id="sAIC">…</span>
-                        </div>
-                        <div class="stat-field">
-                          <span class="stat-label">AICc:
-                            <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
-                              <span class="metric-tip">AIC corrected for small samples: AIC + 2k(k+1)/(n−k−1). Use AICc instead of AIC when n/k &lt; 40.</span>
-                            </span>
-                          </span>
-                          <span class="stat-value" id="sAICc">…</span>
-                        </div>
-                        <div class="stat-field">
-                          <span class="stat-label">BIC:
-                            <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
-                              <span class="metric-tip">Bayesian Information Criterion = −2LL + k·ln(n). Penalises more than AIC for additional parameters, especially in large samples. Lower is better.</span>
-                            </span>
-                          </span>
-                          <span class="stat-value" id="sBIC">…</span>
-                        </div>
-                        <div class="stat-field">
-                          <span class="stat-label">CAIC:
-                            <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
-                              <span class="metric-tip">Consistent AIC = −2LL + k·(ln(n)+1). Imposes an even stronger penalty than BIC. Used in SPSS Mixed output.</span>
-                            </span>
-                          </span>
-                          <span class="stat-value" id="sCAIC">…</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="stat-panel" data-show-from="analyst">
-                      <div class="stat-panel-heading"><i class="fa-solid fa-calculator"></i> Estimation</div>
-                      <div class="stat-panel-body">
-                        <div class="stat-field"><span class="stat-label">Method: <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">REML (Restricted Maximum Likelihood) is preferred for estimating variance components — it removes bias from fixed effects. ML is needed when comparing models with different fixed effects using LRT.</span></span></span>             <span class="stat-value" id="sMethod">…</span></div>
-                        <div class="stat-field"><span class="stat-label">Iterations:</span>          <span class="stat-value" id="sIter">…</span></div>
-                        <div class="stat-field"><span class="stat-label">Converged: <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Whether the optimisation algorithm reached a stable solution. Non-convergence suggests model is over-parameterised, or data are too sparse.</span></span></span>            <span class="stat-value" id="sConv">…</span></div>
-                        <div class="stat-field"><span class="stat-label">Covariance Structure: <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Assumed structure of the residual covariance matrix. VC = independent residuals (default). CS = compound symmetry (equal correlations). AR(1) = autoregressive for repeated measures.</span></span></span> <span class="stat-value" id="sCovStruct">…</span></div>
-                        <div class="stat-field"><span class="stat-label">DF Method: <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Method for approximating denominator degrees of freedom for fixed-effect tests. Satterthwaite (default) adjusts for variance heterogeneity. Kenward-Roger is more accurate but computationally intensive.</span></span></span>            <span class="stat-value" id="sDFMethod">…</span></div>
-                      </div>
-                    </div>
-
-                  </div><!-- /stats-row -->
-
-                  <!-- ICC panel -->
-                  <div class="mm-section">
-                    <div class="mm-section-header">
-                      <span><i class="fa-solid fa-layer-group"></i> Intraclass Correlation Coefficient (ICC)</span>
-                      <button class="collapse-toggle" onclick="toggleSection('iccBody','iccToggle')" id="iccToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
-                    </div>
-                    <div class="mm-section-body padded collapsible-content" id="iccBody">
-                      <div class="insight-panel">
-                        <p class="insight-title"><i class="fa-solid fa-circle-info"></i> What ICC tells you</p>
-                        <p class="insight-text" id="iccInterpret">The ICC quantifies the proportion of total variance attributable to between-group differences. ICC ≥ 0.10 justifies a multilevel approach; ICC ≥ 0.30 indicates substantial clustering.</p>
-                      </div>
-                      <div id="iccTableContainer">
-                        <div class="awaiting-state"><i class="fa-solid fa-hourglass-half"></i><p>Awaiting model results…</p></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Type III Tests of Fixed Effects (overview snippet) -->
+                  <!-- LAYER 2: Type III Tests — most important result, shown first -->
                   <div class="mm-section">
                     <div class="mm-section-header">
                       <span><i class="fa-solid fa-lock"></i> Type III Tests of Fixed Effects</span>
@@ -784,7 +717,9 @@
                         <table class="mm-table" id="ovFixedTable">
                           <thead><tr>
                             <th>Source</th><th>Numerator DF</th><th>Denominator DF</th>
-                            <th>F</th><th>Sig.</th><th>η²<sub>p</sub></th>
+                            <th>F</th><th>Sig.</th>
+                            <th data-show-from="analyst">η²<sub>p</sub></th>
+                            <th data-show-from="analyst">ω²<sub>p</sub></th>
                           </tr></thead>
                           <tbody id="ovFixedBody_rows">
                             <tr><td colspan="6" class="awaiting-state" style="padding:20px;text-align:center;font-style:italic;">Awaiting results…</td></tr>
@@ -796,6 +731,131 @@
                       </div>
                     </div>
                   </div>
+
+                  <!-- LAYER 3: Technical Details — collapsed by default -->
+                  <details class="tech-accordion" id="techDetailsAccordion">
+                    <summary class="tech-accordion-summary">
+                      <i class="fa-solid fa-flask" style="font-size:.75rem;"></i>
+                      Technical Details
+                      <span class="tech-accordion-hint">KPIs · Sample · Fit Indices · ICC</span>
+                      <i class="fa-solid fa-chevron-down tech-acc-chevron"></i>
+                    </summary>
+
+                    <!-- KPI strip -->
+                    <div class="kpi-strip" id="kpiStrip">
+                      <div class="kpi-card" style="border-top:3px solid var(--accent-1);">
+                        <div class="kpi-label">−2LL <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">−2 Log Likelihood (deviance). Basis for model comparison. Lower = better fit. Use Δ−2LL ~ χ² to compare nested models.</span></span></div>
+                        <div class="kpi-value" id="kpi2LL">…</div>
+                      </div>
+                      <div class="kpi-card" style="border-top:3px solid var(--accent-1);">
+                        <div class="kpi-label">AIC <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Akaike Information Criterion = −2LL + 2k. Penalises for number of parameters. Lower is better. Preferred for prediction.</span></span></div>
+                        <div class="kpi-value" id="kpiAIC">…</div>
+                      </div>
+                      <div class="kpi-card" style="border-top:3px solid var(--accent-1);">
+                        <div class="kpi-label">BIC <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Bayesian Information Criterion = −2LL + k·ln(n). Penalises more heavily than AIC in large samples. Lower is better.</span></span></div>
+                        <div class="kpi-value" id="kpiBIC">…</div>
+                      </div>
+                      <div class="kpi-card" style="border-top:3px solid var(--warning);">
+                        <div class="kpi-label">ICC <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Intraclass Correlation Coefficient. Proportion of total variance due to between-group differences. ≥ 0.10 justifies multilevel model; ≥ 0.30 indicates strong clustering.</span></span></div>
+                        <div class="kpi-value" id="kpiICC">…</div>
+                      </div>
+                      <div class="kpi-card" style="border-top:3px solid var(--text-muted);">
+                        <div class="kpi-label">n / Groups <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Total observations (n) and number of Level-2 groups. Fewer than 5 groups may yield unreliable variance estimates.</span></span></div>
+                        <div class="kpi-value" id="kpiN">…</div>
+                      </div>
+                    </div>
+
+                    <!-- Stats panels row -->
+                    <div class="stats-row">
+
+                      <div class="stat-panel">
+                        <div class="stat-panel-heading"><i class="fa-solid fa-info-circle"></i> Sample Information</div>
+                        <div class="stat-panel-body">
+                          <div class="stat-field"><span class="stat-label">Total Observations:</span>     <span class="stat-value" id="sN">…</span></div>
+                          <div class="stat-field"><span class="stat-label">Number of Groups:</span>        <span class="stat-value" id="sGroups">…</span></div>
+                          <div class="stat-field"><span class="stat-label">Avg Obs per Group: <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Average number of observations per Level-2 group. Highly unbalanced designs (large variation here) may affect model convergence and SE accuracy.</span></span></span>       <span class="stat-value" id="sOPG">…</span></div>
+                          <div class="stat-field"><span class="stat-label">Fixed Predictors: <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Number of fixed-effect predictors (excluding intercept). These are population-level effects assumed constant across all groups.</span></span></span>        <span class="stat-value" id="sFP">…</span></div>
+                          <div class="stat-field"><span class="stat-label">Random Effects: <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Number of random-effect terms (e.g. random intercept, random slopes). Each adds a variance component to the model.</span></span></span>          <span class="stat-value" id="sRE">…</span></div>
+                        </div>
+                      </div>
+
+                      <div class="stat-panel">
+                        <div class="stat-panel-heading"><i class="fa-solid fa-chart-bar"></i> Model Fit (Information Criteria)</div>
+                        <div class="stat-panel-body">
+                          <div class="stat-field">
+                            <span class="stat-label">−2 Log Likelihood:
+                              <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
+                                <span class="metric-tip">Deviance. Lower values indicate better fit. Compare nested models via likelihood ratio test (Δ−2LL ~ χ²).</span>
+                              </span>
+                            </span>
+                            <span class="stat-value" id="s2LL">…</span>
+                          </div>
+                          <div class="stat-field">
+                            <span class="stat-label">AIC:
+                              <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
+                                <span class="metric-tip">Akaike Information Criterion. Balances fit and number of parameters. Lower is better.</span>
+                              </span>
+                            </span>
+                            <span class="stat-value" id="sAIC">…</span>
+                          </div>
+                          <div class="stat-field">
+                            <span class="stat-label">AICc:
+                              <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
+                                <span class="metric-tip">AIC corrected for small samples: AIC + 2k(k+1)/(n−k−1). Use AICc instead of AIC when n/k &lt; 40.</span>
+                              </span>
+                            </span>
+                            <span class="stat-value" id="sAICc">…</span>
+                          </div>
+                          <div class="stat-field">
+                            <span class="stat-label">BIC:
+                              <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
+                                <span class="metric-tip">Bayesian Information Criterion = −2LL + k·ln(n). Penalises more than AIC for additional parameters, especially in large samples. Lower is better.</span>
+                              </span>
+                            </span>
+                            <span class="stat-value" id="sBIC">…</span>
+                          </div>
+                          <div class="stat-field">
+                            <span class="stat-label">CAIC:
+                              <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
+                                <span class="metric-tip">Consistent AIC = −2LL + k·(ln(n)+1). Imposes an even stronger penalty than BIC. Used in SPSS Mixed output.</span>
+                              </span>
+                            </span>
+                            <span class="stat-value" id="sCAIC">…</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="stat-panel" data-show-from="analyst">
+                        <div class="stat-panel-heading"><i class="fa-solid fa-calculator"></i> Estimation</div>
+                        <div class="stat-panel-body">
+                          <div class="stat-field"><span class="stat-label">Method: <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">REML (Restricted Maximum Likelihood) is preferred for estimating variance components — it removes bias from fixed effects. ML is needed when comparing models with different fixed effects using LRT.</span></span></span>             <span class="stat-value" id="sMethod">…</span></div>
+                          <div class="stat-field"><span class="stat-label">Iterations:</span>          <span class="stat-value" id="sIter">…</span></div>
+                          <div class="stat-field"><span class="stat-label">Converged: <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Whether the optimisation algorithm reached a stable solution. Non-convergence suggests model is over-parameterised, or data are too sparse.</span></span></span>            <span class="stat-value" id="sConv">…</span></div>
+                          <div class="stat-field"><span class="stat-label">Covariance Structure: <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Assumed structure of the residual covariance matrix. VC = independent residuals (default). CS = compound symmetry (equal correlations). AR(1) = autoregressive for repeated measures.</span></span></span> <span class="stat-value" id="sCovStruct">…</span></div>
+                          <div class="stat-field"><span class="stat-label">DF Method: <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Method for approximating denominator degrees of freedom for fixed-effect tests. Satterthwaite (default) adjusts for variance heterogeneity. Kenward-Roger is more accurate but computationally intensive.</span></span></span>            <span class="stat-value" id="sDFMethod">…</span></div>
+                        </div>
+                      </div>
+
+                    </div><!-- /stats-row -->
+
+                    <!-- ICC panel -->
+                    <div class="mm-section" style="margin:0;border-left:none;border-right:none;border-bottom:none;border-radius:0;">
+                      <div class="mm-section-header">
+                        <span><i class="fa-solid fa-layer-group"></i> Intraclass Correlation Coefficient (ICC)</span>
+                        <button class="collapse-toggle" onclick="toggleSection('iccBody','iccToggle')" id="iccToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                      </div>
+                      <div class="mm-section-body padded collapsible-content" id="iccBody">
+                        <div class="insight-panel">
+                          <p class="insight-title"><i class="fa-solid fa-circle-info"></i> What ICC tells you</p>
+                          <p class="insight-text" id="iccInterpret">The ICC quantifies the proportion of total variance attributable to between-group differences. ICC ≥ 0.10 justifies a multilevel approach; ICC ≥ 0.30 indicates substantial clustering.</p>
+                        </div>
+                        <div id="iccTableContainer">
+                          <div class="awaiting-state"><i class="fa-solid fa-hourglass-half"></i><p>Awaiting model results…</p></div>
+                        </div>
+                      </div>
+                    </div>
+
+                  </details><!-- /tech-accordion -->
 
                 </div><!-- /tab-overview -->
 
@@ -1513,6 +1573,7 @@
 
     // populate everything
     renderKPIs(d);
+    renderInsightCards(d);
     renderSampleInfo(d);
     renderFitInfo(d);
     renderEstimationInfo(d);
@@ -1554,6 +1615,83 @@
     const ng = d.nGroups ?? d.numGroups ?? '—';
     const n  = d.n ?? d.N ?? '—';
     setText('kpiN', `${n} / ${ng}`);
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     OVERVIEW INSIGHT CARDS  (Layer 1 — quick narrative answer)
+  ───────────────────────────────────────────────────────────── */
+  function renderInsightCards(d) {
+    const row = document.getElementById('insightCardsRow');
+    if (!row) return;
+
+    // Card 1: Fixed effects
+    const typeIII    = (d.typeIII || []).filter(r =>
+      (r.source ?? r.effect ?? r.Source ?? '').toLowerCase() !== 'intercept');
+    const sigCount   = typeIII.filter(r => parseFloat(r.pval ?? r.p ?? r.sig ?? 1) < 0.05).length;
+    const totalCount = typeIII.length;
+    const sigIcon  = sigCount > 0 ? 'fa-circle-check'   : 'fa-circle-xmark';
+    const sigColor = sigCount > 0 ? 'var(--success)'    : 'var(--danger)';
+    const sigVal   = sigCount === 0 ? 'No significant effects'
+                   : sigCount === totalCount ? `All ${totalCount} effects significant`
+                   : `${sigCount} of ${totalCount} significant`;
+    const smallestP = typeIII.reduce((mn, r) => {
+      const p = parseFloat(r.pval ?? r.p ?? r.sig ?? 1); return p < mn ? p : mn;
+    }, 1);
+    const sigSub = sigCount > 0 ? `Smallest p = ${fmtP(smallestP)}` : 'p ≥ .05 for all predictors';
+
+    // Card 2: ICC / clustering
+    const iccVal   = parseFloat(d.ICC ?? d.icc ?? 0);
+    const iccPct   = (iccVal * 100).toFixed(1) + '%';
+    let iccSub, iccColor, iccIcon;
+    if (iccVal < 0.05) {
+      iccSub = 'Negligible — OLS may suffice';
+      iccColor = 'var(--text-muted)'; iccIcon = 'fa-circle-dot';
+    } else if (iccVal < 0.10) {
+      iccSub = 'Modest — multilevel advisable';
+      iccColor = 'var(--warning)'; iccIcon = 'fa-circle-half-stroke';
+    } else if (iccVal < 0.30) {
+      iccSub = 'Moderate — multilevel justified';
+      iccColor = 'var(--warning)'; iccIcon = 'fa-circle-half-stroke';
+    } else {
+      iccSub = 'Substantial — multilevel recommended';
+      iccColor = 'var(--success)'; iccIcon = 'fa-circle';
+    }
+
+    // Card 3: Convergence / estimation
+    const converged  = d.converged !== false;
+    const convIcon   = converged ? 'fa-circle-check' : 'fa-triangle-exclamation';
+    const convColor  = converged ? 'var(--success)'  : 'var(--danger)';
+    const iters      = d.iterations ?? d.iters ?? d.Iterations;
+    const convVal    = converged
+      ? (iters != null ? `Converged (${iters} iters)` : 'Converged')
+      : 'Did not converge';
+    const convSub    = `${d.method ?? 'REML'} · ${d.covStructure ?? d.covarianceStructure ?? 'VC'}`;
+
+    row.innerHTML = `
+      <div class="insight-card">
+        <i class="fa-solid ${sigIcon} insight-card-icon" style="color:${sigColor}"></i>
+        <div class="insight-card-body">
+          <div class="insight-card-label">Fixed Effects</div>
+          <div class="insight-card-value">${sigVal}</div>
+          <div class="insight-card-sub">${sigSub}</div>
+        </div>
+      </div>
+      <div class="insight-card">
+        <i class="fa-solid ${iccIcon} insight-card-icon" style="color:${iccColor}"></i>
+        <div class="insight-card-body">
+          <div class="insight-card-label">Clustering (ICC)</div>
+          <div class="insight-card-value">${iccPct}</div>
+          <div class="insight-card-sub">${iccSub}</div>
+        </div>
+      </div>
+      <div class="insight-card">
+        <i class="fa-solid ${convIcon} insight-card-icon" style="color:${convColor}"></i>
+        <div class="insight-card-body">
+          <div class="insight-card-label">Estimation</div>
+          <div class="insight-card-value">${convVal}</div>
+          <div class="insight-card-sub">${convSub}</div>
+        </div>
+      </div>`;
   }
 
   /* ─────────────────────────────────────────────────────────────

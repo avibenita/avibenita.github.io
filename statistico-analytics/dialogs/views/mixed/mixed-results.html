@@ -560,7 +560,7 @@
               <i class="fa-solid fa-table-cells-large sb-item-icon"></i>
               <span class="sb-item-label">Overview</span>
             </button>
-            <button class="sb-item" onclick="setDepth('analyst'); switchTab('overview')" id="detailedViewBtn">
+            <button class="sb-item" onclick="setDepth('analyst')" id="detailedViewBtn">
               <i class="fa-solid fa-microscope sb-item-icon"></i>
               <span class="sb-item-label">Detailed View</span>
             </button>
@@ -3561,15 +3561,25 @@
      DEPTH (Insight / Analyst)
   ───────────────────────────────────────────────────────────── */
   const DEPTH_RANK = { insight:0, analyst:1 };
+  let _depthNavigation = false;
 
   window.setDepth = function(depth) {
     _depth = depth;
     document.querySelectorAll('.depth-btn').forEach(b =>
       b.classList.toggle('active', b.dataset.depth === depth));
-    // Mark "Detailed View" when analyst mode is active (soft highlight only)
+
     const dvBtn = document.getElementById('detailedViewBtn');
-    if (dvBtn) dvBtn.classList.toggle('is-depth', depth === 'analyst');
+    if (dvBtn) {
+      dvBtn.classList.toggle('active', depth === 'analyst');
+      dvBtn.classList.remove('is-depth');
+    }
+
     applyDepth(depth);
+
+    // Always navigate to overview to show analyst-level content
+    _depthNavigation = true;
+    switchTab('overview');
+    _depthNavigation = false;
   };
 
   function applyDepth(depth) {
@@ -3604,6 +3614,14 @@
   };
 
   window.switchTab = function(name) {
+    // Navigating to overview directly (not via setDepth) resets analyst depth
+    if (name === 'overview' && !_depthNavigation && _depth === 'analyst') {
+      _depth = 'insight';
+      const dvBtn = document.getElementById('detailedViewBtn');
+      if (dvBtn) dvBtn.classList.remove('active', 'is-depth');
+      applyDepth('insight');
+    }
+
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     const tab = document.getElementById(`tab-${name}`);
     if (tab) tab.classList.add('active');
@@ -3611,11 +3629,18 @@
     document.querySelectorAll('.sb-item[data-tab]').forEach(b =>
       b.classList.toggle('active', b.dataset.tab === name));
 
+    // When on the overview tab in analyst depth, keep Detailed View active
+    // and Overview visually deactivated so the sidebar reflects the real state
+    if (name === 'overview' && _depth === 'analyst') {
+      const dvBtn = document.getElementById('detailedViewBtn');
+      const ovBtn = document.getElementById('overviewBtn');
+      if (dvBtn) dvBtn.classList.add('active');
+      if (ovBtn) ovBtn.classList.remove('active');
+    }
+
     if (typeof StatisticoHeader !== 'undefined' && TAB_TITLES[name]) {
       StatisticoHeader.updateTitle(TAB_TITLES[name]);
     }
-
-    // Depth selector now lives in the sidebar — nothing to show/hide here
 
     // Lazy-load heavy tabs
     if (name === 'diagnostics' && !window._residualsLoaded)   { loadResidualsTab();    window._residualsLoaded = true; }

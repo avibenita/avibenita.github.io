@@ -2349,6 +2349,13 @@
       setText('ovFixedFootnote', `a. Dependent Variable: ${d.outcome ?? d.y ?? '—'}`);
       return;
     }
+    // Calmer palette for effect sizes
+    const ETA_PALETTE = {
+      large:      { bar: 'rgba(110,231,183,.55)', text: '#6ee7b7', label: 'Large'      },
+      medium:     { bar: 'rgba(253,211,77,.50)',  text: '#fcd34d', label: 'Medium'     },
+      small:      { bar: 'rgba(147,197,253,.55)', text: '#93c5fd', label: 'Small'      },
+      negligible: { bar: 'rgba(148,163,184,.30)', text: '#94a3b8', label: 'Negligible' },
+    };
     tbody.innerHTML = typeIII.map(r => {
       const F     = parseFloat(r.F ?? r.f ?? r.Fvalue);
       const dfN   = parseFloat(r.numDF ?? r.df1);
@@ -2357,25 +2364,23 @@
       const eta2  = etaSquaredPartial(F, dfN, dfD);
       const etaFmt = !isNaN(eta2) ? fmt(eta2) : '—';
       const etaPct = !isNaN(eta2) ? Math.min(100, eta2 * 100 / 0.14 * 60).toFixed(1) : '0';
-      const etaLabel = !isNaN(eta2)
-        ? (eta2 >= 0.14 ? 'Large' : eta2 >= 0.06 ? 'Medium' : eta2 >= 0.01 ? 'Small' : 'Negligible')
-        : '';
-      const barColor = !isNaN(eta2)
-        ? (eta2 >= 0.14 ? 'var(--success)' : eta2 >= 0.06 ? 'var(--warning)' : 'var(--accent-1)')
-        : 'var(--border)';
+      const pal  = !isNaN(eta2)
+        ? (eta2 >= 0.14 ? ETA_PALETTE.large : eta2 >= 0.06 ? ETA_PALETTE.medium
+           : eta2 >= 0.01 ? ETA_PALETTE.small : ETA_PALETTE.negligible)
+        : ETA_PALETTE.negligible;
       const src = r.source ?? r.effect ?? r.Source ?? '—';
       return `
         <tr>
           <td class="coef-cell">${src}</td>
           <td>${fmt(F)}</td>
           <td class="${pClass(pval)}">${fmtP(pval)} ${sigStars(pval)}</td>
-          <td style="min-width:140px;">
-            <div style="display:flex;align-items:center;gap:7px;">
-              <div style="flex:1;height:7px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden;">
-                <div style="width:${etaPct}%;height:100%;background:${barColor};border-radius:99px;transition:width .4s;"></div>
+          <td style="min-width:160px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="flex:1;height:6px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden;">
+                <div style="width:${etaPct}%;height:100%;background:${pal.bar};border-radius:99px;transition:width .4s;"></div>
               </div>
-              <span style="font-size:.72rem;font-weight:600;color:${barColor};white-space:nowrap;">${etaFmt}</span>
-              <span style="font-size:.68rem;color:var(--text-muted);white-space:nowrap;">${etaLabel}</span>
+              <span style="font-size:.72rem;font-weight:600;color:${pal.text};white-space:nowrap;min-width:32px;">${etaFmt}</span>
+              <span style="font-size:.67rem;color:var(--text-muted);white-space:nowrap;">${pal.label}</span>
             </div>
           </td>
         </tr>`;
@@ -2392,23 +2397,31 @@
     if (!rows.length) return;
     section.style.display = '';
 
-    // Determine shared scale: max(|est| + |se|*2) across all rows, so bars are comparable
+    // Shared scale: widest CI span sets the range
     const maxAbs = rows.reduce((mx, r) => {
-      const e  = Math.abs(parseFloat(r.estimate ?? r.coef ?? 0));
-      const se = Math.abs(parseFloat(r.se ?? r.stderr ?? 0));
-      return Math.max(mx, e + se * 2);
+      const ciL = Math.abs(parseFloat(r.ciLow  ?? r.lower95 ?? r.CI_L ?? 0));
+      const ciH = Math.abs(parseFloat(r.ciHigh ?? r.upper95 ?? r.CI_U ?? 0));
+      return Math.max(mx, ciL, ciH);
     }, 0) || 1;
+    const scale = 46 / maxAbs;   // 46% each side, leaving 4% padding
 
-    // Column header
+    // Calmer palette: soft muted tones
+    const SIG_POS  = { line: 'rgba(110,231,183,.7)', dot: '#6ee7b7', text: '#6ee7b7' };
+    const SIG_NEG  = { line: 'rgba(252,165,165,.7)', dot: '#fca5a5', text: '#fca5a5' };
+    const NOT_SIG  = { line: 'rgba(148,163,184,.4)', dot: '#94a3b8', text: '#94a3b8' };
+
     body.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;padding:3px 0 5px;border-bottom:1px solid rgba(255,255,255,.1);">
-        <div style="width:140px;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Predictor</div>
-        <div style="flex:1;font-size:.66rem;color:var(--text-muted);text-align:center;letter-spacing:.03em;">
-          ← Negative effect &nbsp;│&nbsp; <strong style="color:rgba(255,255,255,.5);">0</strong> &nbsp;│&nbsp; Positive effect →
+      <!-- Column headers -->
+      <div style="display:flex;align-items:center;gap:10px;padding:4px 0 6px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:2px;">
+        <div style="width:130px;font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);">Predictor</div>
+        <div style="flex:1;position:relative;font-size:.64rem;color:var(--text-muted);display:flex;justify-content:space-between;padding:0 2px;">
+          <span>←</span>
+          <span style="position:absolute;left:50%;transform:translateX(-50%);font-weight:700;color:rgba(255,255,255,.4);">0</span>
+          <span>→</span>
         </div>
-        <div style="width:52px;font-size:.66rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:right;">B</div>
-        <div style="width:80px;font-size:.66rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">95% CI</div>
-        <div style="width:36px;font-size:.66rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:right;">p</div>
+        <div style="width:48px;font-size:.64rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:right;">B</div>
+        <div style="width:90px;font-size:.64rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:center;">95% CI</div>
+        <div style="width:38px;font-size:.64rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:right;">p</div>
       </div>` +
       rows.map(r => {
         const pval  = r.pval ?? r.p ?? r.Sig ?? r.sig;
@@ -2418,42 +2431,36 @@
         const ciH   = parseFloat(r.ciHigh ?? r.upper95 ?? r.CI_U ?? est);
         const isSig = p < 0.05;
         const name  = r.parameter ?? r.name ?? r.term ?? '—';
-        const sigLabel = p < 0.001 ? '< .001' : p < 0.01 ? fmtP(pval) : fmtP(pval);
-        const estColor = isSig ? (est >= 0 ? 'var(--success)' : 'var(--danger)') : 'rgba(255,255,255,.35)';
-        const barColor = isSig ? (est >= 0 ? 'rgba(74,222,128,.75)' : 'rgba(251,113,133,.75)') : 'rgba(255,255,255,.18)';
+        const pal   = isSig ? (est >= 0 ? SIG_POS : SIG_NEG) : NOT_SIG;
 
-        // All positions as % of the 0–100 bar where 50% = zero
-        const scale   = 50 / maxAbs;
-        const estPct  = 50 + est * scale;
-        const ciLPct  = Math.max(0, Math.min(100, 50 + ciL * scale));
-        const ciHPct  = Math.max(0, Math.min(100, 50 + ciH * scale));
-        const ciLeft  = Math.min(ciLPct, ciHPct).toFixed(1);
-        const ciWidth = Math.abs(ciHPct - ciLPct).toFixed(1);
-        const estLeft = (est >= 0 ? 50 : estPct).toFixed(1);
-        const estW    = Math.abs(estPct - 50).toFixed(1);
-
-        // CI tick positions
-        const ciLTick = Math.max(0, Math.min(100, 50 + ciL * scale)).toFixed(1);
-        const ciHTick = Math.max(0, Math.min(100, 50 + ciH * scale)).toFixed(1);
+        // Positions (50% = zero)
+        const estPct  = Math.max(2, Math.min(98, 50 + est  * scale)).toFixed(1);
+        const ciLPct  = Math.max(2, Math.min(98, 50 + ciL  * scale)).toFixed(1);
+        const ciHPct  = Math.max(2, Math.min(98, 50 + ciH  * scale)).toFixed(1);
+        const ciLineL = Math.min(parseFloat(ciLPct), parseFloat(ciHPct)).toFixed(1);
+        const ciLineW = Math.abs(parseFloat(ciHPct) - parseFloat(ciLPct)).toFixed(1);
 
         return `
-          <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);">
-            <div style="width:140px;font-size:.78rem;font-weight:600;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${name}">${name}</div>
-            <div style="flex:1;position:relative;height:14px;">
-              <!-- track -->
-              <div style="position:absolute;inset:4px 0;background:rgba(255,255,255,.06);border-radius:99px;"></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04);">
+            <div style="width:130px;font-size:.77rem;font-weight:600;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${name}">${name}</div>
+            <!-- Forest plot track -->
+            <div style="flex:1;position:relative;height:20px;">
+              <!-- subtle track -->
+              <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:rgba(255,255,255,.06);transform:translateY(-50%);"></div>
               <!-- zero line -->
-              <div style="position:absolute;top:0;left:50%;width:2px;height:100%;background:rgba(255,255,255,.3);transform:translateX(-50%);"></div>
-              <!-- estimate bar (one color only) -->
-              <div style="position:absolute;top:3px;bottom:3px;left:${estLeft}%;width:${estW}%;background:${barColor};border-radius:99px;min-width:2px;"></div>
-              <!-- CI tick left -->
-              <div style="position:absolute;top:1px;bottom:1px;left:${ciLTick}%;width:2px;background:rgba(255,255,255,.45);border-radius:1px;transform:translateX(-50%);"></div>
-              <!-- CI tick right -->
-              <div style="position:absolute;top:1px;bottom:1px;left:${ciHTick}%;width:2px;background:rgba(255,255,255,.45);border-radius:1px;transform:translateX(-50%);"></div>
+              <div style="position:absolute;top:15%;left:50%;width:1px;height:70%;background:rgba(255,255,255,.22);transform:translateX(-50%);"></div>
+              <!-- CI horizontal line -->
+              <div style="position:absolute;top:50%;left:${ciLineL}%;width:${ciLineW}%;height:2px;background:${pal.line};transform:translateY(-50%);border-radius:1px;"></div>
+              <!-- CI left cap -->
+              <div style="position:absolute;top:30%;left:${ciLPct}%;width:1.5px;height:40%;background:${pal.line};transform:translateX(-50%);border-radius:1px;"></div>
+              <!-- CI right cap -->
+              <div style="position:absolute;top:30%;left:${ciHPct}%;width:1.5px;height:40%;background:${pal.line};transform:translateX(-50%);border-radius:1px;"></div>
+              <!-- Estimate dot -->
+              <div style="position:absolute;top:50%;left:${estPct}%;width:9px;height:9px;background:${pal.dot};border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 2px rgba(0,0,0,.4);"></div>
             </div>
-            <div style="width:52px;font-size:.76rem;font-weight:700;text-align:right;color:${estColor};">${fmt(est)}</div>
-            <div style="width:80px;font-size:.68rem;color:var(--text-muted);white-space:nowrap;">[${fmt(ciL)}, ${fmt(ciH)}]</div>
-            <div class="${pClass(pval)}" style="width:36px;font-size:.72rem;font-weight:700;text-align:right;">${fmtP(pval)}</div>
+            <div style="width:48px;font-size:.75rem;font-weight:700;text-align:right;color:${pal.text};">${fmt(est)}</div>
+            <div style="width:90px;font-size:.67rem;color:var(--text-muted);text-align:center;white-space:nowrap;">[${fmt(ciL)}, ${fmt(ciH)}]</div>
+            <div class="${pClass(pval)}" style="width:38px;font-size:.71rem;font-weight:700;text-align:right;">${fmtP(pval)}</div>
           </div>`;
       }).join('');
   }

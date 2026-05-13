@@ -229,9 +229,9 @@
     }
     .mm-section-header {
       display:flex; justify-content:space-between; align-items:center;
-      background:var(--surface-2); padding:7px 12px;
-      font-size:.84rem; font-weight:700; text-transform:uppercase; letter-spacing:.4px;
-      color:var(--accent-3); border-bottom:1px solid var(--border);
+      background:rgba(255,255,255,.03); padding:5px 12px;
+      font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.4px;
+      color:var(--text-muted); border-bottom:1px solid rgba(255,255,255,.07);
     }
     .mm-section-body { padding:0; }
     .mm-section-body.padded { padding:10px 14px; }
@@ -248,10 +248,45 @@
       text-transform:uppercase; letter-spacing:.6px; color:var(--accent-1);
       border-bottom:1px solid rgba(167,139,250,.25);
     }
-    .conclusion-body { padding:14px 20px 12px; }
-    .conclusion-verdict { font-size:1.2rem; font-weight:700; color:var(--text-primary); margin:0 0 6px; }
-    .conclusion-detail  { font-size:.96rem; color:var(--text-secondary); line-height:1.6; margin:0 0 10px; }
+    .conclusion-body { padding:12px 18px 10px; }
+    .conclusion-verdict { font-size:1.05rem; font-weight:700; color:var(--text-primary); margin:0 0 8px; }
+    .conclusion-bullets {
+      list-style:none; margin:0 0 10px; padding:0;
+      display:flex; flex-direction:column; gap:5px;
+    }
+    .conclusion-bullets li {
+      display:flex; align-items:flex-start; gap:8px;
+      font-size:.84rem; color:var(--text-secondary); line-height:1.4;
+    }
+    .cb-dot { flex-shrink:0; width:8px; height:8px; border-radius:50%; margin-top:3px; }
+    .cb-dot.sig  { background:#6ee7b7; }
+    .cb-dot.ns   { background:#94a3b8; }
+    .cb-dot.warn { background:#fcd34d; }
     .conclusion-microtags { display:flex; flex-wrap:wrap; gap:5px; }
+
+    /* ── Key Findings strip ── */
+    .key-findings-strip {
+      display:none; flex-direction:column; gap:0;
+      margin:0; border-radius:8px; overflow:hidden;
+      border:1px solid rgba(255,255,255,.08);
+    }
+    .key-findings-strip.visible { display:flex; }
+    .kf-header {
+      font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em;
+      color:var(--text-muted); padding:5px 14px; background:rgba(255,255,255,.03);
+      border-bottom:1px solid rgba(255,255,255,.06);
+    }
+    .kf-item {
+      display:flex; align-items:center; gap:12px;
+      padding:8px 14px; border-bottom:1px solid rgba(255,255,255,.05);
+      font-size:.82rem; color:var(--text-secondary); background:var(--surface-2);
+    }
+    .kf-item:last-child { border-bottom:none; }
+    .kf-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+    .kf-dot.sig  { background:#6ee7b7; box-shadow:0 0 6px rgba(110,231,183,.5); }
+    .kf-dot.ns   { background:#475569; }
+    .kf-dot.warn { background:#fcd34d; }
+    .kf-text strong { color:var(--text-primary); }
     .microtag {
       display:inline-flex; align-items:center; gap:4px;
       padding:3px 10px; border-radius:99px; font-size:.82rem; font-weight:700; border:1px solid;
@@ -767,13 +802,18 @@
                     <div class="conclusion-header"><i class="fa-solid fa-lightbulb"></i> Model Conclusion</div>
                     <div class="conclusion-body">
                       <p class="conclusion-verdict" id="conclusionVerdict">Awaiting results…</p>
-                      <p class="conclusion-detail"  id="conclusionDetail"></p>
+                      <ul class="conclusion-bullets" id="conclusionBullets"></ul>
                       <div class="conclusion-microtags" id="conclusionTags"></div>
                     </div>
                   </div>
 
                   <!-- Important predictors + clustering summary -->
                   <div class="insight-cards-row" id="insightCardsRow"></div>
+
+                  <!-- Key Findings strip -->
+                  <div class="key-findings-strip" id="keyFindingsStrip">
+                    <div class="kf-header">Key Findings</div>
+                  </div>
 
                   <!-- Compact significance table -->
                   <div class="mm-section">
@@ -785,8 +825,7 @@
                         <table class="mm-table" id="ovFixedTable">
                           <thead><tr>
                             <th>Predictor</th>
-                            <th>F</th>
-                            <th>Sig.</th>
+                            <th>p-value</th>
                             <th>Effect Size (η²<sub>p</sub>)
                               <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
                                 <span class="metric-tip">Partial eta-squared — proportion of variance explained by each predictor after controlling for others.<br>
@@ -796,7 +835,7 @@
                             </th>
                           </tr></thead>
                           <tbody id="ovFixedBody_rows">
-                            <tr><td colspan="4" class="awaiting-state" style="padding:20px;text-align:center;font-style:italic;">Awaiting results…</td></tr>
+                            <tr><td colspan="3" class="awaiting-state" style="padding:20px;text-align:center;font-style:italic;">Awaiting results…</td></tr>
                           </tbody>
                         </table>
                       </div>
@@ -812,10 +851,10 @@
                       <span><i class="fa-solid fa-arrows-left-right"></i> Predictor Coefficients (B)</span>
                     </div>
                     <div style="padding:4px 14px 6px;font-size:.72rem;color:var(--text-muted);border-bottom:1px solid var(--border);">
-                      Unstandardized regression coefficient (B) with 95% confidence interval.
-                      Bar extends left (negative effect) or right (positive effect) from zero.
-                      <span style="color:var(--success);font-weight:600;">Green = significant</span> ·
-                      <span style="color:rgba(255,255,255,.3);font-weight:600;">Grey = not significant</span>
+                      Unstandardized coefficient (B) with 95% CI. Dot = estimate, line = confidence interval.
+                      <span style="color:#6ee7b7;font-weight:600;">Mint = significant</span> ·
+                      <span style="color:#fca5a5;font-weight:600;">Rose = significant negative</span> ·
+                      <span style="color:#94a3b8;font-weight:600;">Slate = not significant</span>
                     </div>
                     <div class="mm-section-body padded" id="ovEffectsBody"></div>
                   </div>
@@ -1551,6 +1590,7 @@
     // populate everything
     renderKPIs(d);
     renderInsightCards(d);
+    renderKeyFindings(d);
     renderSampleInfo(d);
     renderFitInfo(d);
     renderEstimationInfo(d);
@@ -1602,64 +1642,134 @@
     const row = document.getElementById('insightCardsRow');
     if (!row) return;
 
-    // ── Card 1: Important predictors ────────────────────────
-    const typeIII    = (d.typeIII || []).filter(r =>
+    // ── Card 1: Strongest Predictor ─────────────────────────
+    const typeIII = (d.typeIII || []).filter(r =>
       (r.source ?? r.effect ?? r.Source ?? '').toLowerCase() !== 'intercept');
-    const sigCount   = typeIII.filter(r => parseFloat(r.pval ?? r.p ?? r.sig ?? 1) < 0.05).length;
-    const totalCount = typeIII.length;
-    const sigIcon  = sigCount > 0 ? 'fa-circle-check' : 'fa-circle-xmark';
-    const sigColor = sigCount > 0 ? 'var(--success)'  : 'var(--danger)';
-    const sigVal   = sigCount === 0 ? 'No significant effects'
-                   : sigCount === totalCount ? `All ${totalCount} effects significant`
-                   : `${sigCount} of ${totalCount} significant`;
-    const smallestP = typeIII.reduce((mn, r) => {
-      const p = parseFloat(r.pval ?? r.p ?? r.sig ?? 1); return p < mn ? p : mn;
-    }, 1);
-    const sigSub = sigCount > 0 ? `Smallest p = ${fmtP(smallestP)}` : 'p ≥ .05 for all predictors';
-    const predTags = typeIII.map(r => {
-      const name = r.source ?? r.effect ?? r.Source ?? '?';
-      const p    = parseFloat(r.pval ?? r.p ?? r.sig ?? 1);
-      const cls  = p < 0.05 ? 'sig' : 'ns';
-      const star = p < 0.001 ? ' ***' : p < 0.01 ? ' **' : p < 0.05 ? ' *' : '';
-      return `<span class="ic-tag ${cls}">${name}${star}</span>`;
-    }).join('');
-
-    // ── Card 2: Clustering interpretation ───────────────────
-    const iccVal = parseFloat(d.ICC ?? d.icc ?? 0);
-    const iccPct = (iccVal * 100).toFixed(1) + '%';
-    let iccSub, iccColor, iccIcon;
-    if (iccVal < 0.05) {
-      iccSub = 'Negligible between-group variance — standard regression may suffice';
-      iccColor = 'var(--text-muted)'; iccIcon = 'fa-circle-dot';
-    } else if (iccVal < 0.10) {
-      iccSub = 'Modest clustering — a multilevel model is advisable';
-      iccColor = 'var(--warning)'; iccIcon = 'fa-circle-half-stroke';
-    } else if (iccVal < 0.30) {
-      iccSub = 'Moderate clustering — multilevel modelling is justified';
-      iccColor = 'var(--warning)'; iccIcon = 'fa-circle-half-stroke';
-    } else {
-      iccSub = 'Substantial clustering — multilevel model is strongly recommended';
-      iccColor = 'var(--success)'; iccIcon = 'fa-circle';
-    }
-
-    row.innerHTML = `
+    const sorted  = [...typeIII].sort((a, b) =>
+      parseFloat(a.pval ?? a.p ?? 1) - parseFloat(b.pval ?? b.p ?? 1));
+    const top    = sorted[0];
+    let card1HTML;
+    if (top) {
+      const name  = top.source ?? top.effect ?? top.Source ?? '—';
+      const p     = parseFloat(top.pval ?? top.p ?? top.sig ?? 1);
+      const F     = parseFloat(top.F ?? top.f ?? 0);
+      const dfN   = parseFloat(top.numDF ?? top.df1);
+      const dfD   = parseFloat(top.denDF ?? top.df2);
+      const eta2  = etaSquaredPartial(F, dfN, dfD);
+      const sLbl  = !isNaN(eta2)
+        ? (eta2 >= 0.14 ? 'Large' : eta2 >= 0.06 ? 'Medium' : eta2 >= 0.01 ? 'Small' : 'Negligible')
+        : '';
+      const isSig  = p < .05;
+      const dotClr = isSig ? '#6ee7b7' : '#94a3b8';
+      const valTxt = isSig ? name : 'None significant';
+      const sub1   = isSig
+        ? `${sLbl ? sLbl + ' effect · ' : ''}p = ${fmtP(p)}`
+        : `Smallest p = ${fmtP(p)}`;
+      card1HTML = `
       <div class="insight-card">
-        <i class="fa-solid ${sigIcon} insight-card-icon" style="color:${sigColor}"></i>
+        <svg width="22" height="22" viewBox="0 0 22 22" style="flex-shrink:0;margin-top:2px;">
+          <circle cx="11" cy="11" r="10" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="2"/>
+          <circle cx="11" cy="11" r="4" fill="${dotClr}"/>
+        </svg>
         <div class="insight-card-body">
-          <div class="insight-card-label">Important Predictors</div>
-          <div class="insight-card-value">${sigVal}</div>
-          <div class="insight-card-sub">${sigSub}</div>
-          ${predTags ? `<div class="insight-card-tags">${predTags}</div>` : ''}
-        </div>
-      </div>
-      <div class="insight-card">
-        <i class="fa-solid ${iccIcon} insight-card-icon" style="color:${iccColor}"></i>
-        <div class="insight-card-body">
-          <div class="insight-card-label">Clustering (ICC = ${iccPct})</div>
-          <div class="insight-card-value">${iccVal < 0.05 ? 'Negligible' : iccVal < 0.10 ? 'Modest' : iccVal < 0.30 ? 'Moderate' : 'Substantial'}</div>
-          <div class="insight-card-sub">${iccSub}</div>
+          <div class="insight-card-label">Strongest Predictor</div>
+          <div class="insight-card-value" style="color:${dotClr};">${valTxt}</div>
+          <div class="insight-card-sub">${isSig ? (sLbl ? sLbl + ' positive effect detected' : 'Effect detected') : 'No significant predictors'}</div>
+          <div class="insight-card-sub" style="margin-top:2px;">${sub1}</div>
         </div>
       </div>`;
+    } else {
+      card1HTML = `
+      <div class="insight-card">
+        <i class="fa-solid fa-circle-xmark insight-card-icon" style="color:#94a3b8"></i>
+        <div class="insight-card-body">
+          <div class="insight-card-label">Strongest Predictor</div>
+          <div class="insight-card-value">No data</div>
+        </div>
+      </div>`;
+    }
+
+    // ── Card 2: Clustering — mini variance-partition bar + ICC ──
+    const iccVal  = parseFloat(d.ICC ?? d.icc ?? 0);
+    const iccPct  = (iccVal * 100).toFixed(1);
+    const withinP = (100 - parseFloat(iccPct)).toFixed(1);
+    const iccLbl  = iccVal < .05 ? 'Negligible' : iccVal < .10 ? 'Modest' : iccVal < .30 ? 'Moderate' : 'Substantial';
+    const iccSub  = iccVal < .05 ? 'Between-group variance < 5%'
+                  : iccVal < .10 ? 'Some clustering present'
+                  : iccVal < .30 ? 'Multilevel structure justified'
+                  : 'Strong clustering — LMM strongly advised';
+    const iccClr  = iccVal < .05 ? '#94a3b8' : iccVal < .10 ? '#fcd34d' : '#6ee7b7';
+    const card2HTML = `
+      <div class="insight-card">
+        <svg width="36" height="36" viewBox="0 0 36 36" style="flex-shrink:0;">
+          <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="5"/>
+          <circle cx="18" cy="18" r="15" fill="none" stroke="${iccClr}" stroke-width="5"
+            stroke-dasharray="${(iccVal * 94.25).toFixed(1)} 94.25"
+            stroke-linecap="round" transform="rotate(-90 18 18)" opacity=".8"/>
+          <text x="18" y="22" text-anchor="middle" font-size="8" font-weight="700"
+            fill="${iccClr}">${iccPct}%</text>
+        </svg>
+        <div class="insight-card-body">
+          <div class="insight-card-label">Clustering (ICC)</div>
+          <div class="insight-card-value" style="color:${iccClr};">${iccLbl}</div>
+          <div class="insight-card-sub">${iccSub}</div>
+          <div style="margin-top:6px;height:5px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden;">
+            <div style="height:100%;width:${iccPct}%;background:${iccClr};opacity:.75;transition:width .5s;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:.62rem;color:var(--text-muted);margin-top:2px;">
+            <span>Between: ${iccPct}%</span><span>Within: ${withinP}%</span>
+          </div>
+        </div>
+      </div>`;
+
+    row.innerHTML = card1HTML + card2HTML;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     KEY FINDINGS STRIP  (between insight cards and table)
+  ───────────────────────────────────────────────────────────── */
+  function renderKeyFindings(d) {
+    const strip = document.getElementById('keyFindingsStrip');
+    if (!strip) return;
+
+    const typeIII = (d.typeIII || []).filter(r =>
+      (r.source ?? r.effect ?? r.Source ?? '').toLowerCase() !== 'intercept');
+    const outcome = d.outcome ?? d.y ?? 'the outcome';
+    const icc     = parseFloat(d.ICC ?? d.icc ?? 0);
+
+    const items = [];
+    const sorted = [...typeIII].sort((a, b) =>
+      parseFloat(a.pval ?? a.p ?? 1) - parseFloat(b.pval ?? b.p ?? 1));
+
+    for (const r of sorted) {
+      const name = r.source ?? r.effect ?? r.Source ?? '?';
+      const p    = parseFloat(r.pval ?? r.p ?? 1);
+      const F    = parseFloat(r.F ?? r.f ?? 0);
+      const dfN  = parseFloat(r.numDF ?? r.df1);
+      const dfD  = parseFloat(r.denDF ?? r.df2);
+      const eta2 = etaSquaredPartial(F, dfN, dfD);
+      const sLbl = !isNaN(eta2)
+        ? (eta2 >= 0.14 ? 'large' : eta2 >= 0.06 ? 'medium' : eta2 >= 0.01 ? 'small' : '')
+        : '';
+      if (p < .05) {
+        items.push({ cls:'sig',  text:`<strong>${name}</strong> strongly predicts ${outcome}${sLbl ? ' — ' + sLbl + ' effect' : ''} (p = ${fmtP(p)})` });
+      } else {
+        items.push({ cls:'ns',   text:`<strong>${name}</strong> showed no measurable association (p = ${fmtP(p)})` });
+      }
+    }
+    // Clustering finding
+    if (icc < .05) {
+      items.push({ cls:'ns',   text:`Clustering contribution was negligible (ICC ≈ ${(icc*100).toFixed(1)}%)` });
+    } else {
+      items.push({ cls:'warn', text:`Group clustering detected — ICC = ${(icc*100).toFixed(1)}%` });
+    }
+
+    if (!items.length) return;
+    strip.innerHTML = `<div class="kf-header">Key Findings</div>` +
+      items.map(it =>
+        `<div class="kf-item"><div class="kf-dot ${it.cls}"></div><div class="kf-text">${it.text}</div></div>`
+      ).join('');
+    strip.classList.add('visible');
   }
 
   /* ─────────────────────────────────────────────────────────────
@@ -2345,7 +2455,7 @@
     if (!tbody) return;
     const typeIII = d.typeIII || [];
     if (!typeIII.length) {
-      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">No Type III data available.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">No Type III data available.</td></tr>`;
       setText('ovFixedFootnote', `a. Dependent Variable: ${d.outcome ?? d.y ?? '—'}`);
       return;
     }
@@ -2372,7 +2482,6 @@
       return `
         <tr>
           <td class="coef-cell">${src}</td>
-          <td>${fmt(F)}</td>
           <td class="${pClass(pval)}">${fmtP(pval)} ${sigStars(pval)}</td>
           <td style="min-width:160px;">
             <div style="display:flex;align-items:center;gap:8px;">
@@ -2632,30 +2741,57 @@
     const card = document.getElementById('conclusionCard');
     if (!card) return;
 
-    // Best-fitting p-value: use overall model LRT or smallest fixed effect p
-    const smallestP = (d.typeIII || []).reduce((mn, r) => {
-      const p = parseFloat(r.pval ?? r.p ?? 1);
-      return p < mn ? p : mn;
-    }, 1);
+    const typeIII = (d.typeIII || []).filter(r =>
+      (r.source ?? r.effect ?? r.Source ?? '').toLowerCase() !== 'intercept');
+    const icc    = parseFloat(d.ICC ?? d.icc ?? 0);
+    const iccPct = (icc * 100).toFixed(1);
+    const outcome = d.outcome ?? d.y ?? 'the outcome';
 
-    const hasSig = smallestP < .05;
-    const icc = parseFloat(d.ICC ?? d.icc ?? 0);
-    const method = d.method ?? 'REML';
+    // Sort: significant first (by p), then non-significant
+    const sorted = [...typeIII].sort((a, b) =>
+      parseFloat(a.pval ?? a.p ?? 1) - parseFloat(b.pval ?? b.p ?? 1));
+    const hasSig = sorted.length > 0 && parseFloat(sorted[0]?.pval ?? sorted[0]?.p ?? 1) < .05;
 
+    // Headline verdict (short)
     setText('conclusionVerdict',
-      hasSig ? `Significant fixed effects detected (p = ${fmtP(smallestP)})`
-             : `No significant fixed effects detected (smallest p = ${fmtP(smallestP)})`);
+      hasSig ? 'Significant predictor effects detected'
+             : 'No significant effects found');
 
-    setText('conclusionDetail',
-      `Model fitted via ${method}. ICC = ${(icc*100).toFixed(1)}% of variance attributable to group-level clustering. ` +
-      `AIC = ${fmt(d.AIC)}, BIC = ${fmt(d.BIC)}, based on n = ${d.n ?? '—'} observations in ${d.nGroups ?? '—'} groups.`);
+    // Bullet findings
+    const bullets = [];
+    for (const r of sorted) {
+      const name = r.source ?? r.effect ?? r.Source ?? '?';
+      const p    = parseFloat(r.pval ?? r.p ?? 1);
+      const F    = parseFloat(r.F ?? r.f ?? 0);
+      const dfN  = parseFloat(r.numDF ?? r.df1);
+      const dfD  = parseFloat(r.denDF ?? r.df2);
+      const eta2 = etaSquaredPartial(F, dfN, dfD);
+      const sizeLabel = !isNaN(eta2)
+        ? (eta2 >= 0.14 ? 'large' : eta2 >= 0.06 ? 'medium' : eta2 >= 0.01 ? 'small' : 'negligible')
+        : '';
+      if (p < .05) {
+        bullets.push({ cls:'sig', text:`<strong>${name}</strong> significantly predicts ${outcome} (p = ${fmtP(p)}${sizeLabel ? ', ' + sizeLabel + ' effect' : ''})` });
+      } else {
+        bullets.push({ cls:'ns',  text:`<strong>${name}</strong> was not significant (p = ${fmtP(p)})` });
+      }
+    }
+    // ICC bullet
+    if (icc < .05)      bullets.push({ cls:'ns',   text:`Clustering was negligible — ICC ≈ ${iccPct}%` });
+    else if (icc < .10) bullets.push({ cls:'warn',  text:`Modest group clustering detected — ICC = ${iccPct}%` });
+    else if (icc < .30) bullets.push({ cls:'warn',  text:`Moderate group clustering — ICC = ${iccPct}%` });
+    else                bullets.push({ cls:'sig',   text:`Substantial clustering — ICC = ${iccPct}%` });
 
+    const bulletsEl = document.getElementById('conclusionBullets');
+    if (bulletsEl) {
+      bulletsEl.innerHTML = bullets.map(b =>
+        `<li><span class="cb-dot ${b.cls}"></span><span>${b.text}</span></li>`).join('');
+    }
+
+    // Micro-tags (keep compact)
     const tags = [];
-    if (hasSig)      tags.push({ cls:'microtag-sig',    icon:'✓', label:'Significant' });
-    else             tags.push({ cls:'microtag-ns',     icon:'✗', label:'Non-significant' });
-    if (icc >= .30)  tags.push({ cls:'microtag-strong', icon:'📊', label:`ICC ${(icc*100).toFixed(0)}% — Strong Clustering` });
-    else if (icc >= .10) tags.push({ cls:'microtag-mod', icon:'📊', label:`ICC ${(icc*100).toFixed(0)}% — Moderate Clustering` });
-    else             tags.push({ cls:'microtag-weak',   icon:'📊', label:`ICC ${(icc*100).toFixed(0)}% — Weak Clustering` });
+    if (hasSig) tags.push({ cls:'microtag-sig', icon:'✓', label:'Effects Found' });
+    else        tags.push({ cls:'microtag-ns',  icon:'✗', label:'No Effects' });
+    if (icc >= .10)           tags.push({ cls:'microtag-mod', icon:'⬡', label:`ICC ${iccPct}%` });
     if (d.converged === false) tags.push({ cls:'microtag-ns', icon:'⚠', label:'Did Not Converge' });
 
     const tagsEl = document.getElementById('conclusionTags');

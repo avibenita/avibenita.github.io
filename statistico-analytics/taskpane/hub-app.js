@@ -22,7 +22,7 @@ let hubIndependentFlowActive = false;
 let hubIndependentDialog = null;
 let hubCorrelationFlowActive = false;
 let hubCorrelationDialog = null;
-const HUB_RESULT_DIALOG_OPTIONS = { height: 72, width: 70, displayInIframe: false };
+const HUB_RESULT_DIALOG_OPTIONS = { height: 90, width: 70, displayInIframe: false };
 const HUB_CATEGORY_TILES = [
   {
     id: "explore-data",

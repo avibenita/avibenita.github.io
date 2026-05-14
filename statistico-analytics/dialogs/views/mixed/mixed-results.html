@@ -1608,45 +1608,25 @@
 
     /* ── View Data ──────────────────────────────────────────────────── */
     function _mm_getData() {
-      // Prefer raw observation vectors (sent via Case 705)
-      if (_rawData) {
-        const outcome   = _modelSpec?.y || _results?.outcome || 'Outcome';
-        const subject   = _modelSpec?.subject || 'Subject';
-        const fixed     = Array.isArray(_modelSpec?.fixed) ? _modelSpec.fixed : [];
-        const headers   = [outcome, subject, ...fixed];
-        const fixedVecs = _rawData.fixedVectors || {};
-        const outVec    = _rawData.outcomeVector || [];
-        const subVec    = _rawData.subjectVector || [];
-        const n         = Math.max(outVec.length, subVec.length);
-        const allRows   = [];
-        for (let i = 0; i < n; i++) {
-          allRows.push([
-            outVec[i] ?? null,
-            subVec[i] ?? null,
-            ...fixed.map(f => (fixedVecs[f] || [])[i] ?? null)
-          ]);
-        }
-        const usedRows = allRows.filter(r => r[0] !== null && r[0] !== undefined && r[0] !== '');
-        return { headers, usedRows, allRows, columnRoles: { [outcome]: 'outcome', [subject]: 'grouping' } };
+      if (!_rawData) return null;
+      const outcome   = _modelSpec?.y   || _modelSpec?.dep  || _results?.outcome || 'Outcome';
+      const subject   = _modelSpec?.rep || _modelSpec?.rnd  || _modelSpec?.subject || 'Subject';
+      const fixed     = Array.isArray(_modelSpec?.fix) ? _modelSpec.fix : [];
+      const headers   = [outcome, subject, ...fixed];
+      const fixedVecs = _rawData.fixedVectors || {};
+      const outVec    = _rawData.outcomeVector || [];
+      const subVec    = _rawData.subjectVector || [];
+      const n         = Math.max(outVec.length, subVec.length);
+      const allRows   = [];
+      for (let i = 0; i < n; i++) {
+        allRows.push([
+          outVec[i] ?? null,
+          subVec[i] ?? null,
+          ...fixed.map(f => (fixedVecs[f] || [])[i] ?? null)
+        ]);
       }
-      // Fallback: show fixed-effects coefficient table from _results
-      if (_results) {
-        const coefs = _results.fixedEffects ?? _results.coefficients ?? [];
-        if (coefs.length) {
-          const headers = ['Predictor', 'B', 'SE', 't', 'p', 'Lower 95%', 'Upper 95%'];
-          const allRows = coefs.map(e => [
-            e.predictor ?? e.term,
-            e.B ?? e.b ?? e.estimate,
-            e.SE ?? e.se,
-            e.t ?? e.tValue,
-            e.p ?? e.pValue,
-            e.lower95 ?? e.lowerCI,
-            e.upper95 ?? e.upperCI
-          ]);
-          return { headers, usedRows: allRows, allRows, columnRoles: {} };
-        }
-      }
-      return null;
+      const usedRows = allRows.filter(r => r[0] !== null && r[0] !== undefined && r[0] !== '');
+      return { headers, usedRows, allRows, columnRoles: { [outcome]: 'outcome', [subject]: 'grouping' } };
     }
 
     /* ── Export JSON ────────────────────────────────────────────────── */
@@ -1825,10 +1805,8 @@ ${body}
     /* ── Re-register whenever _results / _rawData state changes ─────── */
     function _registerMixedActions() {
       if (typeof StatisticoHeader === 'undefined') return;
-      // View Data enabled as soon as results arrive (shows coef table);
-      // upgrades automatically to raw observations once _rawData arrives.
       StatisticoHeader.registerActions({
-        getData:    (_results || _rawData) ? _mm_getData    : undefined,
+        getData:    _rawData  ? _mm_getData    : undefined,
         exportHtml: _results               ? _mm_exportHtml : undefined,
         exportJson: _mm_exportJson,
       });
@@ -4572,33 +4550,86 @@ ${body}
   /* ─────────────────────────────────────────────────────────────
      AI INTERPRET
   ───────────────────────────────────────────────────────────── */
-  window.requestMixedModelAI = function() {
+  window.requestMixedModelAI = async function() {
     if (!_results) return;
 
-    // Brief toast so users know the AI request was sent to the host
-    const toast = document.createElement('div');
-    toast.style.cssText = [
-      'position:fixed;bottom:20px;left:50%;transform:translateX(-50%)',
-      'background:#1e1b4b;color:#c4b5fd;border:1px solid #6366f1',
-      'border-radius:8px;padding:10px 18px;font-size:12px;font-weight:600',
-      'display:flex;align-items:center;gap:8px;z-index:2147483500',
-      'box-shadow:0 4px 16px rgba(99,102,241,.35);pointer-events:none'
-    ].join(';');
-    toast.innerHTML = `<span style="width:12px;height:12px;border:2px solid rgba(196,181,253,.3);border-top-color:#a78bfa;border-radius:50%;display:inline-block;animation:spin .75s linear infinite;"></span> Sending to AI\u2026`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3500);
+    const btn     = document.getElementById('sbAiBtn');
+    const origHtml = btn ? btn.innerHTML : '';
 
-    sendToHost('requestMixedModelAI', {
-      aic:              _results.AIC,
-      bic:              _results.BIC,
-      neg2LL:           _results.neg2LL,
-      icc:              _results.ICC ?? _results.icc,
-      typeIII:          _results.typeIII,
-      fixedEffects:     _results.fixedEffects,
-      varianceComponents: _results.varianceComponents,
-      r2m:              _results.r2m,
-      r2c:              _results.r2c,
-    });
+    // If the shared-header AI infrastructure is available, use it directly
+    if (typeof StatisticoHeader !== 'undefined' &&
+        typeof StatisticoHeader._callAiForSidebar === 'function') {
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-brain fa-spin"></i><span>Analysing\u2026</span>';
+      }
+
+      try {
+        const r       = _results;
+        const outcome = r.outcome ?? r.y ?? 'Outcome';
+
+        const payload = {
+          outcome,
+          method:             r.method             ?? 'REML',
+          covarianceStructure:r.covStructure        ?? r.covarianceStructure ?? 'VC',
+          dfMethod:           r.dfMethod            ?? 'Satterthwaite',
+          n:                  r.n                   ?? r.N,
+          nGroups:            r.nGroups             ?? r.numGroups,
+          converged:          r.converged,
+          AIC:                r.AIC,   BIC: r.BIC,  ICC: r.ICC ?? r.icc,
+          r2_marginal:        r.r2m,   r2_conditional: r.r2c,
+          typeIII:            r.typeIII,
+          fixedEffects:       r.fixedEffects        ?? r.coefficients,
+          varianceComponents: r.varianceComponents  ?? r.randomEffects,
+        };
+
+        const prompt =
+`You are interpreting a Linear Mixed Model (LMM) analysis computed by Statistico.
+Do NOT recompute any statistic. Use only the values in the JSON below.
+Use cautious language ("suggests", "indicates") unless evidence is clear.
+If a field is null, do not mention it.
+
+Outcome: ${outcome}
+JSON:
+${JSON.stringify(payload, null, 2)}
+
+Reply ONLY in this exact format (no extra lines, no markdown):
+CONCLUSION: [One decisive sentence — the single most important LMM finding]
+EVIDENCE: [key fixed-effect finding with stat] | [ICC/variance finding] | [model-fit finding] | [convergence or assumption finding]
+INTERPRETATION: [3 sentences — unified synthesis in plain language, no causality claims]
+IMPLICATIONS: [analytical implication 1] | [analytical implication 2] | [analytical implication 3]
+ACTION: [next step 1] | [next step 2] | [next step 3]
+STRENGTH: [High, Moderate, or Low — short reason based on p-values, ICC, convergence, n]`;
+
+        const raw      = await StatisticoHeader._callAiForSidebar(prompt);
+        const sections = StatisticoHeader._parseAiStructured(raw);
+        StatisticoHeader._showAiOverlay(sections, 'mixed-model', 'full');
+
+      } catch (err) {
+        StatisticoHeader._showAiOverlay(
+          { error: err.message || 'AI request failed.' }, 'mixed-model', 'full');
+      } finally {
+        if (btn) {
+          btn.disabled  = false;
+          btn.innerHTML = origHtml || '<i class="fa-solid fa-brain"></i><span>Full Analysis</span><sup class="sb-ai-sup">AI</sup>';
+        }
+      }
+
+    } else {
+      // Fallback: fire to host (VB6 path)
+      sendToHost('requestMixedModelAI', {
+        aic:               _results.AIC,
+        bic:               _results.BIC,
+        neg2LL:            _results.neg2LL,
+        icc:               _results.ICC ?? _results.icc,
+        typeIII:           _results.typeIII,
+        fixedEffects:      _results.fixedEffects,
+        varianceComponents:_results.varianceComponents,
+        r2m:               _results.r2m,
+        r2c:               _results.r2c,
+      });
+    }
   };
 
   /* ─────────────────────────────────────────────────────────────
@@ -5367,6 +5398,23 @@ ${body}
                 console.warn('No modelSpec.dep — cannot compute'); return;
               }
               _modelSpec = spec;   // store so renderModelDiagram can reach it
+
+              // Populate _rawData from spreadsheet rows so View Data works
+              const _depIdx = headers.indexOf(spec.dep || spec.y || '');
+              const _repIdx = headers.indexOf(spec.rep || spec.subject || spec.rnd || '');
+              const _fixVars = (spec.fix || []).concat(spec.cov || []);
+              if (_depIdx >= 0) {
+                _rawData = {
+                  outcomeVector: rows.map(r => r[_depIdx]),
+                  subjectVector: _repIdx >= 0 ? rows.map(r => r[_repIdx]) : [],
+                  fixedVectors:  {}
+                };
+                _fixVars.forEach(f => {
+                  const fi = headers.indexOf(f);
+                  if (fi >= 0) _rawData.fixedVectors[f] = rows.map(r => r[fi]);
+                });
+              }
+
               try {
                 const results = computeMixedModel(headers, rows, spec);
                 receiveMixedModelResults(results);

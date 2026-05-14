@@ -283,7 +283,7 @@ const StatisticoHeader = {
 
   _getBrandLogoSvg() {
     return `
-      <svg class="sb-logo-svg" viewBox="0 -6 300 96" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Statistico Interactive">
+      <svg class="sb-logo-svg" viewBox="0 -6 300 110" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Statistico Interactive">
         <defs>
           <linearGradient id="sbLogoBlue" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stop-color="#2d76ff"/>
@@ -298,8 +298,18 @@ const StatisticoHeader = {
             <stop offset="52%" stop-color="#6fb7ff"/>
             <stop offset="100%" stop-color="#2d76ff"/>
           </radialGradient>
+          <!-- Reflection: fades from 28% opacity at the baseline to transparent -->
+          <linearGradient id="sbReflectFade" x1="0" y1="82" x2="0" y2="110" gradientUnits="userSpaceOnUse">
+            <stop offset="0%"   stop-color="white" stop-opacity="0.28"/>
+            <stop offset="100%" stop-color="white" stop-opacity="0"/>
+          </linearGradient>
+          <mask id="sbReflectMask" maskUnits="userSpaceOnUse">
+            <rect x="0" y="82" width="72" height="28" fill="url(#sbReflectFade)"/>
+          </mask>
         </defs>
-        <g class="sb-logo-mark">
+
+        <!-- Logo mark (S-curve + bar chart) -->
+        <g id="sbLogoMark" class="sb-logo-mark">
           <path d="M58 15 C58 6 47 2 35 2 C19 2 8 12 8 25 C8 37 19 43 35 43" stroke="url(#sbLogoBlue)" stroke-width="10" fill="none" stroke-linecap="round"/>
           <path d="M35 43 C51 43 64 49 64 61 C64 75 51 82 35 82 C20 82 10 75 9 64" stroke="url(#sbLogoBlue)" stroke-width="10" fill="none" stroke-linecap="round"/>
           <rect x="18" y="51" width="8" height="24" rx="2" fill="url(#sbLogoTeal)"/>
@@ -307,6 +317,12 @@ const StatisticoHeader = {
           <rect x="42" y="34" width="8" height="41" rx="2" fill="url(#sbLogoTeal)"/>
           <rect x="54" y="25" width="8" height="50" rx="2" fill="url(#sbLogoTeal)"/>
         </g>
+
+        <!-- Reflection: flip at y=82 (bottom of S), fade out downward -->
+        <g mask="url(#sbReflectMask)">
+          <use href="#sbLogoMark" xlink:href="#sbLogoMark" transform="translate(0,164) scale(1,-1)"/>
+        </g>
+
         <text x="88" y="37" class="sb-logo-title" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="800" letter-spacing="7">STATISTICO</text>
         <g class="sb-logo-subtitle-row">
           <line class="sb-logo-subline" x1="92" y1="63" x2="118" y2="63"/>

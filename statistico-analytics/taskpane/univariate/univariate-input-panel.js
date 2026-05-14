@@ -9,8 +9,7 @@ let pendingUnivariateViewUrl = null;
 let _uniEmbedMessageHandler = null;
 let _univariateDialogDataPump = null;
 let _univariateLoadingFallbackTimer = null;
-// Use iframe-hosted dialogs when available to avoid showing popup URL bars.
-const RESULT_DIALOG_OPTIONS = { height: 72, width: 70, displayInIframe: true };
+// Dialog dimensions are defined in dialog-sizes.js (DIALOG_SIZES)
 
 function showUnivariateResultsLoading(message = 'Loading results...') {
   if (_univariateLoadingFallbackTimer) {
@@ -223,7 +222,7 @@ function openUnivariateBuilderDialog() {
   const dialogUrl = `${getDialogsBaseUrl()}univariate/univariate-input.html?v=${Date.now()}`;
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    { height: 70, width: 25, displayInIframe: false },
+    DIALOG_SIZES.SETUP,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error('Failed to open univariate config dialog:', asyncResult.error.message);
@@ -349,7 +348,7 @@ function openResultsDialog(results) {
   const dialogUrl = `${getDialogsBaseUrl()}univariate/histogram-standalone.html`;
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    RESULT_DIALOG_OPTIONS,
+    DIALOG_SIZES.RESULTS_IFRAME,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error('Failed to open histogram:', asyncResult.error.message);
@@ -414,7 +413,7 @@ function openNewView(dialogUrl, results) {
   showUnivariateResultsLoading('Loading selected view...');
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    RESULT_DIALOG_OPTIONS,
+    DIALOG_SIZES.RESULTS_IFRAME,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error('Failed to switch univariate view:', asyncResult.error && asyncResult.error.message);

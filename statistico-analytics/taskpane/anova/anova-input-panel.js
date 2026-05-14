@@ -19,7 +19,7 @@ function openAnovaBuilder() {
   if (!anovaRangeData || anovaRangeData.length < 2) return;
   Office.context.ui.displayDialogAsync(
     `${getDialogsBaseUrl()}anova/anova-input.html?v=${Date.now()}`,
-    { height: 70, width: 25, displayInIframe: false },
+    DIALOG_SIZES.SETUP,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       anovaDialog = asyncResult.value;
@@ -617,7 +617,7 @@ function buildReport_rm(anova, levels, alpha) {
 function openAnovaResultsDialog() {
   Office.context.ui.displayDialogAsync(
     `${getDialogsBaseUrl()}anova/anova-results.html?v=${Date.now()}`,
-    { height: 72, width: 72, displayInIframe: false },
+    DIALOG_SIZES.RESULTS_ANOVA,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       anovaDialog = asyncResult.value;

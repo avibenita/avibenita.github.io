@@ -157,8 +157,8 @@ function openClusterSetupDialog() {
   if (!clusterRangeData || clusterRangeData.length < 2) return;
   const dlg = clusterCfg().dialog || {};
   const setupFile = dlg.setupFilename || "cluster/cluster-setup-dialog.html";
-  const hPct = dlg.setupHeightPercent != null ? Number(dlg.setupHeightPercent) : 66;
-  const wPct = dlg.setupWidthPercent != null ? Number(dlg.setupWidthPercent) : 56;
+  const hPct = dlg.setupHeightPercent != null ? Number(dlg.setupHeightPercent) : DIALOG_SIZES.SETUP.height;
+  const wPct = dlg.setupWidthPercent != null ? Number(dlg.setupWidthPercent) : DIALOG_SIZES.SETUP.width;
   const dialogUrl = `${getDialogsBaseUrl()}${setupFile}?v=${Date.now()}`;
 
   Office.context.ui.displayDialogAsync(
@@ -654,8 +654,8 @@ function openClusterResultsDialogOnly() {
   const dlg = clusterCfg().dialog || {};
   const resultsFile = dlg.resultsFilename || "cluster/cluster-analysis.html";
   const dialogUrl = `${getDialogsBaseUrl()}${resultsFile}?v=${Date.now()}`;
-  const hPct = dlg.heightPercent != null ? Number(dlg.heightPercent) : 90;
-  const wPct = dlg.widthPercent != null ? Number(dlg.widthPercent) : 70;
+  const hPct = dlg.heightPercent != null ? Number(dlg.heightPercent) : DIALOG_SIZES.RESULTS.height;
+  const wPct = dlg.widthPercent != null ? Number(dlg.widthPercent) : DIALOG_SIZES.RESULTS.width;
 
   Office.context.ui.displayDialogAsync(
     dialogUrl,

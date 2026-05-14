@@ -86,11 +86,8 @@ export class BaseAnalyticsOffice extends BaseAnalyticsModule {
    * @param {Object} results - Results to pass to dialog
    */
   openDialog(url, results) {
-    const dialogOptions = {
-      height: 80,    // 80% of screen height
-      width: 60,     // 60% of screen width
-      displayInIframe: false
-    };
+    const dialogOptions = (window.DIALOG_SIZES && window.DIALOG_SIZES.BASE_ANALYTICS)
+      || { height: 80, width: 60, displayInIframe: false };
 
     Office.context.ui.displayDialogAsync(
       url,

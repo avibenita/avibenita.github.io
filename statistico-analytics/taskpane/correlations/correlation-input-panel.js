@@ -98,7 +98,7 @@ function openCorrelationConfig() {
   
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    { height: 70, width: 25, displayInIframe: false },
+    DIALOG_SIZES.SETUP,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error('Failed to open dialog:', asyncResult.error);
@@ -233,7 +233,7 @@ function openCorrelationResultDialog(viewType, matrixData) {
   
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    { height: 76, width: 70, displayInIframe: false },
+    DIALOG_SIZES.RESULTS_CORRELATION,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         const error = asyncResult.error;
@@ -307,7 +307,7 @@ function handleSwitchView(viewFilename) {
   setTimeout(() => {
     Office.context.ui.displayDialogAsync(
       dialogUrl,
-      { height: 76, width: 70, displayInIframe: false },
+      DIALOG_SIZES.RESULTS_CORRELATION,
       (asyncResult) => {
         if (asyncResult.status === Office.AsyncResultStatus.Failed) {
           const error = asyncResult.error;

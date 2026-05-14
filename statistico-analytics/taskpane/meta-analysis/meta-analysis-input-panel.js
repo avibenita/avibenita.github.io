@@ -28,7 +28,7 @@ function onRangeDataLoaded(values, address) {
 function openMetaBuilder() {
   const url = window.location.origin + window.location.pathname.replace("meta-analysis.html", "../../dialogs/views/meta-analysis/meta-input.html");
   
-  Office.context.ui.displayDialogAsync(url, {height: 70, width: 25}, (result) => {
+  Office.context.ui.displayDialogAsync(url, DIALOG_SIZES.SETUP, (result) => {
     if (result.status === Office.AsyncResultStatus.Failed) {
       console.error("Failed to open meta builder dialog:", result.error.message);
       return;
@@ -285,7 +285,7 @@ function openMetaResultsDialog(bundle) {
   
   const url = window.location.origin + window.location.pathname.replace("meta-analysis.html", "../../dialogs/views/meta-analysis/meta-results.html");
   
-  Office.context.ui.displayDialogAsync(url, {height: 72, width: 70}, (result) => {
+  Office.context.ui.displayDialogAsync(url, DIALOG_SIZES.RESULTS, (result) => {
     if (result.status === Office.AsyncResultStatus.Failed) {
       console.error("Failed to open results dialog:", result.error.message);
       return;

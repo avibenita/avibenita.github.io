@@ -22,7 +22,7 @@ let hubIndependentFlowActive = false;
 let hubIndependentDialog = null;
 let hubCorrelationFlowActive = false;
 let hubCorrelationDialog = null;
-const HUB_RESULT_DIALOG_OPTIONS = { height: 90, width: 70, displayInIframe: false };
+// Dialog dimensions are defined in dialog-sizes.js (DIALOG_SIZES)
 const HUB_CATEGORY_TILES = [
   {
     id: "explore-data",
@@ -542,7 +542,7 @@ function openExternalDialogUrl(url, options) {
   if (!url) return;
   var dialogUrl = String(url);
   dialogUrl += (dialogUrl.indexOf("?") >= 0 ? "&" : "?") + "fromHub=1&cb=" + Date.now();
-  var opts = options || { height: 72, width: 70, displayInIframe: false };
+  var opts = options || DIALOG_SIZES.RESULTS;
   if (!Office || !Office.context || !Office.context.ui || typeof Office.context.ui.displayDialogAsync !== "function") {
     window.open(dialogUrl, "_blank");
     return;
@@ -659,7 +659,7 @@ function queueHubResultsViewSwitch(viewPath) {
 }
 
 function openHubUnivariateResultsAt(dialogUrl, results) {
-  Office.context.ui.displayDialogAsync(dialogUrl, HUB_RESULT_DIALOG_OPTIONS, function (asyncResult) {
+  Office.context.ui.displayDialogAsync(dialogUrl, DIALOG_SIZES.RESULTS_HUB, function (asyncResult) {
     if (asyncResult.status === Office.AsyncResultStatus.Failed) {
       console.error("Failed to open univariate results:", asyncResult.error && asyncResult.error.message);
       finishHubUnivariateFlow();
@@ -723,7 +723,7 @@ function openUnivariateConfigFromHub() {
   setSelectedModuleCard("univariate", true);
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + "univariate/univariate-input.html?v=" + Date.now(),
-    { height: 70, width: 25, displayInIframe: false },
+    DIALOG_SIZES.SETUP,
     function (asyncResult) {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error("Failed to open univariate config dialog:", asyncResult.error && asyncResult.error.message);
@@ -799,7 +799,7 @@ function sendRegressionResultsDataFromHub() {
 function openRegressionResultsFromHub() {
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + "regression/regression-coefficients.html?cb=" + Date.now(),
-    { height: 72, width: 70, displayInIframe: false },
+    DIALOG_SIZES.RESULTS,
     function (res) {
       if (res.status === Office.AsyncResultStatus.Failed) {
         console.error("Could not open regression results:", res.error && res.error.message);
@@ -840,7 +840,7 @@ function openRegressionConfigFromHub() {
   setSelectedModuleCard("regression", true);
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + "regression/regression-input.html?v=" + Date.now(),
-    { height: 70, width: 25, displayInIframe: false },
+    DIALOG_SIZES.SETUP,
     function (res) {
       if (res.status === Office.AsyncResultStatus.Failed) {
         console.error("Could not open regression config:", res.error && res.error.message);
@@ -884,7 +884,7 @@ function openAnovaConfigFromHub() {
   setSelectedModuleCard("anova", true);
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + "anova/anova-input.html?v=" + Date.now(),
-    { height: 70, width: 25, displayInIframe: false },
+    DIALOG_SIZES.SETUP,
     function (res) {
       if (res.status === Office.AsyncResultStatus.Failed) {
         finishHubAnovaFlow();
@@ -939,7 +939,7 @@ function openIndependentConfigFromHub() {
   setSelectedModuleCard("independent", true);
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + "independent/independent-input.html?v=" + Date.now(),
-    { height: 70, width: 25, displayInIframe: false },
+    DIALOG_SIZES.SETUP,
     function (res) {
       if (res.status === Office.AsyncResultStatus.Failed) {
         finishHubIndependentFlow();
@@ -994,7 +994,7 @@ function openCorrelationConfigFromHub() {
   setSelectedModuleCard("correlations", true);
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + "correlations/correlation-config.html?v=" + Date.now(),
-    { height: 70, width: 25, displayInIframe: false },
+    DIALOG_SIZES.SETUP,
     function (res) {
       if (res.status === Office.AsyncResultStatus.Failed) {
         finishHubCorrelationFlow();
@@ -1041,7 +1041,7 @@ function openBuilderDialogFromHub(options) {
   setSelectedModuleCard(options.moduleId, true);
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + options.dialogPath + (options.dialogPath.indexOf("?") >= 0 ? "&" : "?") + "v=" + Date.now(),
-    options.dialogOptions || { height: 70, width: 25, displayInIframe: false },
+    options.dialogOptions || DIALOG_SIZES.SETUP,
     function (res) {
       if (res.status === Office.AsyncResultStatus.Failed) {
         setSelectedModuleCard(options.moduleId, false);
@@ -1099,7 +1099,7 @@ function openDependentConfigFromHub() {
   return openBuilderDialogFromHub({
     moduleId: "dependent",
     dialogPath: "dependent/dependent-input.html",
-    dialogOptions: { height: 70, width: 25, displayInIframe: false },
+    dialogOptions: DIALOG_SIZES.SETUP,
     dataType: "DEPENDENT_DATA",
     payloadBuilder: function (gr) {
       var saved = null;
@@ -1118,7 +1118,7 @@ function openFactorConfigFromHub() {
   return openBuilderDialogFromHub({
     moduleId: "factor",
     dialogPath: "factor/factor-input.html",
-    dialogOptions: { height: 70, width: 25, displayInIframe: false },
+    dialogOptions: DIALOG_SIZES.SETUP,
     dataType: "FACTOR_DATA",
     payloadBuilder: function (gr) {
       var saved = null;
@@ -1140,7 +1140,7 @@ function openLogisticConfigFromHub() {
   return openBuilderDialogFromHub({
     moduleId: "logistic",
     dialogPath: "logistic/logistic-input.html",
-    dialogOptions: { height: 70, width: 25, displayInIframe: false },
+    dialogOptions: DIALOG_SIZES.SETUP,
     dataType: "LOGISTIC_DATA",
     payloadBuilder: function (gr) {
       var saved = null;
@@ -1162,7 +1162,7 @@ function openPcaConfigFromHub() {
   return openBuilderDialogFromHub({
     moduleId: "pca",
     dialogPath: "factor/factor-input.html?mode=pca",
-    dialogOptions: { height: 70, width: 25, displayInIframe: false },
+    dialogOptions: DIALOG_SIZES.SETUP,
     dataType: "FACTOR_DATA",
     payloadBuilder: function (gr) {
       var saved = null;
@@ -1184,7 +1184,7 @@ function openMixedConfigFromHub() {
   return openBuilderDialogFromHub({
     moduleId: "mixed",
     dialogPath: "mixed/mixed-input.html",
-    dialogOptions: { height: 98, width: 40, displayInIframe: false },
+    dialogOptions: DIALOG_SIZES.MIXED_CONFIG_HUB,
     dataType: "MIXED_DATA",
     payloadBuilder: function (gr) {
       var saved = null;
@@ -1204,7 +1204,7 @@ function openMetaConfigFromHub() {
   return openBuilderDialogFromHub({
     moduleId: "meta-analysis",
     dialogPath: "meta-analysis/meta-input.html",
-    dialogOptions: { height: 70, width: 25, displayInIframe: false },
+    dialogOptions: DIALOG_SIZES.SETUP,
     dataType: "META_DATA",
     payloadBuilder: function (gr) {
       var saved = null;
@@ -1251,8 +1251,8 @@ function openClusterConfigFromHub() {
       Office.context.ui.displayDialogAsync(
         getDialogsBaseUrl() + "cluster/cluster-setup-dialog.html?v=" + Date.now(),
         {
-          height: Number((moduleConfig.dialog && moduleConfig.dialog.setupHeightPercent) || 66),
-          width: Number((moduleConfig.dialog && moduleConfig.dialog.setupWidthPercent) || 56),
+          height: Number((moduleConfig.dialog && moduleConfig.dialog.setupHeightPercent) || DIALOG_SIZES.SETUP.height),
+          width: Number((moduleConfig.dialog && moduleConfig.dialog.setupWidthPercent) || DIALOG_SIZES.SETUP.width),
           displayInIframe: false
         },
         function (res) {

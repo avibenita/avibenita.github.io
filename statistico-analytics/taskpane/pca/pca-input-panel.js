@@ -48,7 +48,7 @@ function openPcaModelBuilder() {
 
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    { height: 70, width: 25, displayInIframe: false },
+    DIALOG_SIZES.SETUP,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error("Failed to open PCA builder:", asyncResult.error);
@@ -503,7 +503,7 @@ function openPcaResultsDialog() {
 
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    { height: 72, width: 70, displayInIframe: false },
+    DIALOG_SIZES.RESULTS,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error("Failed to open PCA dialog:", asyncResult.error);

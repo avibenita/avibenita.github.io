@@ -4560,10 +4560,24 @@ ${body}
     if (typeof StatisticoHeader !== 'undefined' &&
         typeof StatisticoHeader._callAiForSidebar === 'function') {
 
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-brain fa-spin"></i><span>Analysing\u2026</span>';
+      if (btn) btn.disabled = true;
+
+      // Cycle through the views being collected (mirrors univariate progress UX)
+      const _aiViews = [
+        'Overview', 'Model Effects', 'Coefficients',
+        'Variance Components', 'Marginal Means', 'Information Criteria'
+      ].filter((_, i) => {
+        // Only include Marginal Means if EMM data is available
+        if (i === 4) return Object.keys(typeof _emmData !== 'undefined' ? _emmData : {}).length > 0;
+        return true;
+      });
+
+      for (let _vi = 0; _vi < _aiViews.length; _vi++) {
+        if (btn) btn.innerHTML =
+          `<i class="fa-solid fa-spinner fa-spin"></i><span>${_vi + 1}/${_aiViews.length} \u2014 ${_aiViews[_vi]}</span>`;
+        await new Promise(r => setTimeout(r, 180));
       }
+      if (btn) btn.innerHTML = '<i class="fa-solid fa-brain fa-spin"></i><span>Thinking\u2026</span>';
 
       try {
         const r       = _results;

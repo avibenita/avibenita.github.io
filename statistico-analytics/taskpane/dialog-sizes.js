@@ -14,16 +14,16 @@ const DIALOG_SIZES = window.DIALOG_SIZES = {
   SETUP:               { height: 70, width: 25, displayInIframe: false },
 
   // Standard results dialogs (most modules)
-  RESULTS:             { height: 72, width: 70, displayInIframe: false },
+  RESULTS:             { height: 92, width: 70, displayInIframe: false },
 
   // Hub univariate results (wider vertical footprint)
   RESULTS_HUB:         { height: 90, width: 70, displayInIframe: false },
 
   // Correlation matrix results (taller than standard)
-  RESULTS_CORRELATION: { height: 76, width: 70, displayInIframe: false },
+  RESULTS_CORRELATION: { height: 92, width: 70, displayInIframe: false },
 
   // ANOVA results (slightly wider than standard)
-  RESULTS_ANOVA:       { height: 72, width: 72, displayInIframe: false },
+  RESULTS_ANOVA:       { height: 92, width: 72, displayInIframe: false },
 
   // Mixed model: full-width input builder dialog
   MIXED_BUILDER:       { height: 90, width: 95, displayInIframe: false },
@@ -32,7 +32,7 @@ const DIALOG_SIZES = window.DIALOG_SIZES = {
   MIXED_CONFIG_HUB:    { height: 98, width: 40, displayInIframe: false },
 
   // Regression model builder (standalone regression.html)
-  REGRESSION_BUILDER:  { height: 72, width: 30, displayInIframe: false },
+  REGRESSION_BUILDER:  { height: 92, width: 30, displayInIframe: false },
 
   // base-analytics-office.js generic openDialog
   BASE_ANALYTICS:      { height: 80, width: 60, displayInIframe: false },

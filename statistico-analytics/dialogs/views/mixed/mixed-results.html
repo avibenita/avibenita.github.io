@@ -1608,25 +1608,45 @@
 
     /* ── View Data ──────────────────────────────────────────────────── */
     function _mm_getData() {
-      if (!_rawData) return null;
-      const outcome   = _modelSpec?.y || _results?.outcome || 'Outcome';
-      const subject   = _modelSpec?.subject || 'Subject';
-      const fixed     = Array.isArray(_modelSpec?.fixed) ? _modelSpec.fixed : [];
-      const headers   = [outcome, subject, ...fixed];
-      const fixedVecs = _rawData.fixedVectors || {};
-      const outVec    = _rawData.outcomeVector || [];
-      const subVec    = _rawData.subjectVector || [];
-      const n         = Math.max(outVec.length, subVec.length);
-      const allRows   = [];
-      for (let i = 0; i < n; i++) {
-        allRows.push([
-          outVec[i] ?? null,
-          subVec[i] ?? null,
-          ...fixed.map(f => (fixedVecs[f] || [])[i] ?? null)
-        ]);
+      // Prefer raw observation vectors (sent via Case 705)
+      if (_rawData) {
+        const outcome   = _modelSpec?.y || _results?.outcome || 'Outcome';
+        const subject   = _modelSpec?.subject || 'Subject';
+        const fixed     = Array.isArray(_modelSpec?.fixed) ? _modelSpec.fixed : [];
+        const headers   = [outcome, subject, ...fixed];
+        const fixedVecs = _rawData.fixedVectors || {};
+        const outVec    = _rawData.outcomeVector || [];
+        const subVec    = _rawData.subjectVector || [];
+        const n         = Math.max(outVec.length, subVec.length);
+        const allRows   = [];
+        for (let i = 0; i < n; i++) {
+          allRows.push([
+            outVec[i] ?? null,
+            subVec[i] ?? null,
+            ...fixed.map(f => (fixedVecs[f] || [])[i] ?? null)
+          ]);
+        }
+        const usedRows = allRows.filter(r => r[0] !== null && r[0] !== undefined && r[0] !== '');
+        return { headers, usedRows, allRows, columnRoles: { [outcome]: 'outcome', [subject]: 'grouping' } };
       }
-      const usedRows = allRows.filter(r => r[0] !== null && r[0] !== undefined && r[0] !== '');
-      return { headers, usedRows, allRows, columnRoles: { [outcome]: 'outcome', [subject]: 'grouping' } };
+      // Fallback: show fixed-effects coefficient table from _results
+      if (_results) {
+        const coefs = _results.fixedEffects ?? _results.coefficients ?? [];
+        if (coefs.length) {
+          const headers = ['Predictor', 'B', 'SE', 't', 'p', 'Lower 95%', 'Upper 95%'];
+          const allRows = coefs.map(e => [
+            e.predictor ?? e.term,
+            e.B ?? e.b ?? e.estimate,
+            e.SE ?? e.se,
+            e.t ?? e.tValue,
+            e.p ?? e.pValue,
+            e.lower95 ?? e.lowerCI,
+            e.upper95 ?? e.upperCI
+          ]);
+          return { headers, usedRows: allRows, allRows, columnRoles: {} };
+        }
+      }
+      return null;
     }
 
     /* ── Export JSON ────────────────────────────────────────────────── */
@@ -1671,125 +1691,124 @@
       console.log('Mixed-model JSON exported:', payload);
     }
 
-    /* ── Export HTML — section picker → data-driven report ─────────── */
+    /* ── Export HTML — section picker → DOM snapshot of each tab ───── */
     function _mm_exportHtml() {
       if (!_results) { alert('Run the model first to export a report.'); return; }
       if (typeof StatisticoHeader.pickReportSections !== 'function') {
         alert('Export not available in this version.'); return;
       }
-      const r       = _results;
-      const outcome = r.outcome ?? r.y ?? 'Outcome';
-
+      const outcome = _results.outcome ?? _results.y ?? 'Outcome';
       const ALL_SECTIONS = [
-        { id: 'summary',      label: 'Model Summary' },
-        { id: 'effects',      label: 'Fixed Effects (Type III)' },
-        { id: 'coefficients', label: 'Predictor Coefficients' },
-        { id: 'variance',     label: 'Variance Components' },
-        { id: 'ic',           label: 'Information Criteria' },
-        { id: 'lrt',          label: 'Likelihood Ratio Tests' },
-        { id: 'means',        label: 'Estimated Marginal Means' },
-      ];
-      const emmObj = (typeof _emmData !== 'undefined') ? _emmData : {};
-      const sections = ALL_SECTIONS.filter(s => {
-        if (s.id === 'lrt'   && !(r.lrt && r.lrt.length))      return false;
-        if (s.id === 'means' && !Object.keys(emmObj).length)    return false;
-        return true;
-      });
+        { id: 'overview',        label: 'Overview' },
+        { id: 'model-effects',   label: 'Model Effects' },
+        { id: 'marginal-means',  label: 'Marginal Means' },
+        { id: 'diagnostics',     label: 'Diagnostics' },
+        { id: 'advanced',        label: 'Advanced' },
+        { id: 'model-structure', label: 'Model Structure' },
+      ].filter(s => !!document.getElementById('tab-' + s.id));
 
-      StatisticoHeader.pickReportSections(sections, (selectedIds) => {
-        const selected = sections.filter(s => selectedIds.includes(s.id));
+      StatisticoHeader.pickReportSections(ALL_SECTIONS, async (selectedIds) => {
+        const selected = ALL_SECTIONS.filter(s => selectedIds.includes(s.id));
+        const originalTab = document.querySelector('.sb-item.active[data-tab]')?.dataset?.tab || 'overview';
 
-        function buildSection(s) {
-          switch (s.id) {
-            case 'summary': {
-              const items = [
-                ['Outcome',           r.outcome ?? r.y],
-                ['N (observations)',  r.n ?? r.N],
-                ['Groups',            r.nGroups ?? r.numGroups],
-                ['Method',            r.method ?? 'REML'],
-                ['Cov. Structure',    r.covStructure ?? r.covarianceStructure ?? 'VC'],
-                ['AIC',               _fmtV(r.AIC)],
-                ['BIC',               _fmtV(r.BIC)],
-                ['ICC',               _fmtV(r.ICC ?? r.icc)],
-                ['R² Marginal',       _fmtV(r.r2m)],
-                ['R² Conditional',    _fmtV(r.r2c)],
-                ['Converged',         r.converged ? 'Yes' : 'No'],
-              ];
-              return _tbl(['Parameter', 'Value'], items.map(([k, v]) => _tdRow([k, v ?? '—'])), 'No summary data.');
-            }
-            case 'effects': {
-              const rows = (r.typeIII || []).map(e =>
-                _tdRow([e.predictor ?? e.effect ?? e.term, _fmtV(e.F ?? e.f), _fmtV(e.df1 ?? e.numDf), _fmtV(e.df2 ?? e.denDf), _fmtV(e.p ?? e.pValue)]));
-              return _tbl(['Predictor', 'F', 'df1', 'df2', 'p'], rows, 'No Type III results.');
-            }
-            case 'coefficients': {
-              const rows = (r.fixedEffects ?? r.coefficients ?? []).map(e =>
-                _tdRow([e.predictor ?? e.term, _fmtV(e.B ?? e.b ?? e.estimate), _fmtV(e.SE ?? e.se), _fmtV(e.t ?? e.tValue), _fmtV(e.p ?? e.pValue), _fmtV(e.lower95 ?? e.lowerCI), _fmtV(e.upper95 ?? e.upperCI)]));
-              return _tbl(['Predictor', 'B', 'SE', 't', 'p', 'CI Lower', 'CI Upper'], rows, 'No coefficient data.');
-            }
-            case 'variance': {
-              const rows = (r.varianceComponents ?? r.randomEffects ?? []).map(e =>
-                _tdRow([e.component ?? e.term, _fmtV(e.variance ?? e.estimate), _fmtV(e.pct ?? e.percent)]));
-              return _tbl(['Component', 'Variance', '%'], rows, 'No variance components.');
-            }
-            case 'ic': {
-              const items = [
-                ['-2 Log Likelihood', _fmtV(r.neg2LL ?? r.deviance)],
-                ['AIC',               _fmtV(r.AIC)],
-                ['AICc',              _fmtV(r.AICc)],
-                ['BIC',               _fmtV(r.BIC)],
-                ['CAIC',              _fmtV(r.CAIC)],
-                ['HQIC',              _fmtV(r.HQIC)],
-              ];
-              return _tbl(['Criterion', 'Value'], items.map(([k, v]) => _tdRow([k, v])), 'No IC data.');
-            }
-            case 'lrt': {
-              const rows = (r.lrt || []).map(e =>
-                _tdRow([e.model ?? e.term ?? '', _fmtV(e.df), _fmtV(e.AIC), _fmtV(e.BIC), _fmtV(e.LRT ?? e.chisq), _fmtV(e.p ?? e.pValue)]));
-              return _tbl(['Model', 'df', 'AIC', 'BIC', 'LRT', 'p'], rows, 'No LRT data.');
-            }
-            case 'means': {
-              const parts = Object.entries(emmObj).map(([factor, d]) => {
-                const means = d.means || d.emm || [];
-                const rows  = means.map(e =>
-                  _tdRow([e.level ?? e[factor] ?? e.label, _fmtV(e.emmean ?? e.mean), _fmtV(e.SE ?? e.se), _fmtV(e.lower?.CL ?? e.lowerCI), _fmtV(e.upper?.CL ?? e.upperCI)]));
-                return rows.length ? `<h3>${_esc(factor)}</h3>${_tbl(['Level', 'EMM', 'SE', 'Lower CI', 'Upper CI'], rows, '')}` : '';
-              }).filter(Boolean);
-              return parts.length ? parts.join('') : '<p>No marginal means available.</p>';
-            }
-            default: return '<p>No content.</p>';
+        // ── Progress overlay ──────────────────────────────────────────
+        const prog = document.createElement('div');
+        prog.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:2147483400;display:flex;align-items:center;justify-content:center;';
+        prog.innerHTML = `
+          <div style="min-width:300px;max-width:420px;padding:18px 20px;border-radius:12px;background:#111827;color:#e5e7eb;box-shadow:0 12px 28px rgba(2,6,23,.5);display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="width:16px;height:16px;border:2px solid rgba(148,163,184,.3);border-top-color:#f97316;border-radius:50%;display:inline-block;animation:spin .75s linear infinite;flex-shrink:0;"></span>
+              <span id="mmExpLbl" style="font-size:13px;font-weight:600;">Preparing export\u2026</span>
+            </div>
+            <div style="height:4px;background:rgba(148,163,184,.2);border-radius:4px;overflow:hidden;">
+              <div id="mmExpBar" style="height:100%;width:0%;background:#f97316;border-radius:4px;transition:width .3s ease;"></div>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(prog);
+        const setProgress = (n, total, lbl) => {
+          const bar = prog.querySelector('#mmExpBar');
+          const el  = prog.querySelector('#mmExpLbl');
+          if (bar) bar.style.width = `${Math.round(n / total * 100)}%`;
+          if (el)  el.textContent  = lbl;
+        };
+
+        // ── Collect page styles to embed in the report ────────────────
+        const inlineCSS = Array.from(document.querySelectorAll('style'))
+          .map(s => s.textContent).join('\n');
+        const linkTags  = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+          .map(l => `<link rel="stylesheet" href="${new URL(l.getAttribute('href') || '', location.href).href}">`)
+          .join('\n');
+
+        // ── Switch to each tab, wait, clone content ───────────────────
+        const captures = [];
+        for (let i = 0; i < selected.length; i++) {
+          const s = selected[i];
+          setProgress(i, selected.length + 1, `Capturing ${s.label}\u2026`);
+          window.switchTab(s.id);
+          // Diagnostics lazy-loads residuals; give it extra time
+          await new Promise(r => setTimeout(r, s.id === 'diagnostics' ? 2500 : 700));
+
+          const tabEl = document.getElementById('tab-' + s.id);
+          if (tabEl) {
+            const clone = tabEl.cloneNode(true);
+            clone.querySelectorAll('script, noscript, .loading-overlay, #dialogLoading, .sb-ai-float-btn, .sb-ai-overlay').forEach(el => el.remove());
+            clone.querySelectorAll('button, select, input, textarea').forEach(el => {
+              el.setAttribute('disabled', 'disabled');
+              el.style.cssText += ';pointer-events:none!important;opacity:.55!important;cursor:default!important;';
+              ['onclick','onchange','oninput','onmousedown','onmouseup'].forEach(ev => el.removeAttribute(ev));
+            });
+            captures.push({ label: s.label, html: clone.innerHTML });
           }
         }
 
-        const ts   = new Date().toLocaleString();
-        const toc  = selected.map((s, i) => `<li><a href="#sec_${i + 1}">${_esc(s.label)}</a></li>`).join('');
-        const body = selected.map((s, i) => `
+        // ── Restore original tab ──────────────────────────────────────
+        window.switchTab(originalTab);
+        setProgress(selected.length, selected.length + 1, 'Building document\u2026');
+        await new Promise(r => setTimeout(r, 100));
+
+        // ── Assemble the standalone HTML document ─────────────────────
+        const ts  = new Date().toLocaleString();
+        const toc = selected.map((s, i) => `<li><a href="#sec_${i + 1}">${_esc(s.label)}</a></li>`).join('');
+        const body = captures.map((c, i) => `
         <section id="sec_${i + 1}">
-          <h2>${_esc(s.label)}</h2>
-          ${buildSection(s)}
+          <h2 class="rpt-h2">${_esc(c.label)}</h2>
+          <div class="tab-content active rpt-tab">${c.html}</div>
         </section>`).join('');
 
-        const htmlDoc = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Mixed Model Report \u2014 ${_esc(outcome)}</title>
+        const htmlDoc = `<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8">
+<title>Mixed Model Report \u2014 ${_esc(outcome)}</title>
+${linkTags}
 <style>
-  body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:24px 32px;max-width:960px;margin:auto}
-  h1{font-size:20px;border-bottom:2px solid #6366f1;padding-bottom:6px;color:#1e1b4b}
-  h2{font-size:14px;margin-top:28px;color:#374151;border-left:3px solid #6366f1;padding-left:8px}
-  h3{font-size:12px;color:#6366f1;margin:12px 0 4px} a{color:#6366f1}
-  table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12px}
-  th{background:#f1f5f9;color:#475569;text-align:left;padding:5px 8px;border:1px solid #e2e8f0;font-size:11px;text-transform:uppercase;letter-spacing:.3px}
-  td{padding:5px 8px;border:1px solid #e2e8f0} tr:nth-child(even) td{background:#f8fafc}
-  .toc{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;margin:12px 0 20px}
-  .toc ol{margin:4px 0 0 16px;padding:0;font-size:12px}
-  .no-data{color:#94a3b8;font-style:italic;font-size:12px}
-  .footer{margin-top:32px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px}
-  section{margin-top:24px}
-</style></head><body>
-<h1>Linear Mixed Model \u2014 ${_esc(outcome)}</h1>
-<p style="color:#64748b;font-size:11px">Generated ${_esc(ts)} \u00b7 Statistico Interactive</p>
-<div class="toc"><strong>Table of Contents</strong><ol>${toc}</ol></div>
+${inlineCSS}
+/* ── Report layout overrides ─────────────────────────────── */
+body { background: #0f172a !important; margin: 0; padding: 24px 32px; overflow: auto !important; }
+.tab-content, .tab-content.active, .rpt-tab { display: block !important; opacity: 1 !important; }
+.rpt-h2 { font-family: Arial, sans-serif; font-size: 14px; margin: 28px 0 10px;
+          color: #c4b5fd; border-left: 3px solid #6366f1; padding-left: 8px; }
+h1.rpt-title { font-family: Arial, sans-serif; font-size: 20px;
+               border-bottom: 2px solid #6366f1; padding-bottom: 8px; color: #e2e8f0; }
+.rpt-toc { font-family: Arial, sans-serif; background: rgba(99,102,241,.08);
+           border: 1px solid rgba(99,102,241,.3); border-radius: 8px;
+           padding: 12px 16px; margin: 12px 0 20px; color: #e2e8f0; }
+.rpt-toc ol { margin: 4px 0 0 16px; padding: 0; font-size: 12px; }
+.rpt-toc a { color: #a78bfa; }
+.rpt-footer { margin-top: 32px; font-size: 10px; color: #64748b;
+              border-top: 1px solid rgba(148,163,184,.2); padding-top: 8px;
+              font-family: Arial, sans-serif; }
+section { margin-top: 24px; }
+button, select, input, textarea { pointer-events: none !important; cursor: default !important; opacity: .45 !important; }
+</style>
+</head><body>
+<h1 class="rpt-title">Linear Mixed Model \u2014 ${_esc(outcome)}</h1>
+<p style="font-family:Arial,sans-serif;color:#64748b;font-size:11px;margin:4px 0 16px">Generated ${_esc(ts)} \u00b7 Statistico Interactive</p>
+<div class="rpt-toc"><strong>Table of Contents</strong><ol>${toc}</ol></div>
 ${body}
-<div class="footer">Statistico Interactive (TM) \u00b7 statistico.live</div>
+<div class="rpt-footer">Statistico Interactive (TM) \u00b7 statistico.live</div>
 </body></html>`;
+
+        prog.remove();
 
         const blob = new Blob([htmlDoc], { type: 'text/html' });
         const url  = URL.createObjectURL(blob);
@@ -1806,9 +1825,11 @@ ${body}
     /* ── Re-register whenever _results / _rawData state changes ─────── */
     function _registerMixedActions() {
       if (typeof StatisticoHeader === 'undefined') return;
+      // View Data enabled as soon as results arrive (shows coef table);
+      // upgrades automatically to raw observations once _rawData arrives.
       StatisticoHeader.registerActions({
-        getData:    _rawData ? _mm_getData    : undefined,
-        exportHtml: _results ? _mm_exportHtml : undefined,
+        getData:    (_results || _rawData) ? _mm_getData    : undefined,
+        exportHtml: _results               ? _mm_exportHtml : undefined,
         exportJson: _mm_exportJson,
       });
       if (typeof StatisticoHeader.setAiReady === 'function') {
@@ -4553,16 +4574,30 @@ ${body}
   ───────────────────────────────────────────────────────────── */
   window.requestMixedModelAI = function() {
     if (!_results) return;
+
+    // Brief toast so users know the AI request was sent to the host
+    const toast = document.createElement('div');
+    toast.style.cssText = [
+      'position:fixed;bottom:20px;left:50%;transform:translateX(-50%)',
+      'background:#1e1b4b;color:#c4b5fd;border:1px solid #6366f1',
+      'border-radius:8px;padding:10px 18px;font-size:12px;font-weight:600',
+      'display:flex;align-items:center;gap:8px;z-index:2147483500',
+      'box-shadow:0 4px 16px rgba(99,102,241,.35);pointer-events:none'
+    ].join(';');
+    toast.innerHTML = `<span style="width:12px;height:12px;border:2px solid rgba(196,181,253,.3);border-top-color:#a78bfa;border-radius:50%;display:inline-block;animation:spin .75s linear infinite;"></span> Sending to AI\u2026`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3500);
+
     sendToHost('requestMixedModelAI', {
-      aic: _results.AIC,
-      bic: _results.BIC,
-      neg2LL: _results.neg2LL,
-      icc: _results.ICC ?? _results.icc,
-      typeIII: _results.typeIII,
-      fixedEffects: _results.fixedEffects,
+      aic:              _results.AIC,
+      bic:              _results.BIC,
+      neg2LL:           _results.neg2LL,
+      icc:              _results.ICC ?? _results.icc,
+      typeIII:          _results.typeIII,
+      fixedEffects:     _results.fixedEffects,
       varianceComponents: _results.varianceComponents,
-      r2m: _results.r2m,
-      r2c: _results.r2c,
+      r2m:              _results.r2m,
+      r2c:              _results.r2c,
     });
   };
 

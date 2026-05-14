@@ -1397,6 +1397,73 @@ const StatisticoHeader = {
     this._mountSidebarUtilities();
   },
 
+  /**
+   * Enable or disable the AI pill button in the sidebar.
+   * Call setAiReady(false) on load and setAiReady(true) once results arrive.
+   */
+  setAiReady(ready) {
+    const btn = document.getElementById('sbAiBtn');
+    if (!btn) return;
+    if (ready) {
+      btn.removeAttribute('disabled');
+    } else {
+      btn.setAttribute('disabled', 'disabled');
+    }
+  },
+
+  /**
+   * Show a section picker overlay so the user can choose which sections to
+   * include in an exported report.  Same UI as the internal univariate /
+   * correlation pickers; exposed here so individual result pages can call it
+   * directly without going through a fallback builder.
+   *
+   * @param {Array<{id:string, label:string}>} sections
+   * @param {function(string[]): void} onConfirm  receives array of selected ids
+   */
+  pickReportSections(sections, onConfirm) {
+    const esc = (value) => String(value ?? '').replace(/[<>&"]/g, (m) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[m]));
+    const existing = document.getElementById('stReportExportOverlay');
+    if (existing) existing.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'stReportExportOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2147483300;display:flex;align-items:center;justify-content:center;padding:16px;';
+    const sectionListHtml = sections.map((s) => `
+      <label style="display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid #e5e7eb;color:#0f172a;font-size:13px;cursor:pointer;">
+        <input type="checkbox" data-section-id="${esc(s.id)}" checked style="cursor:pointer;accent-color:#f97316;" />
+        <span>${esc(s.label)}</span>
+      </label>
+    `).join('');
+    overlay.innerHTML = `
+      <div style="width:min(560px,95vw);max-height:88vh;background:#fff;border-radius:14px;border:1px solid #cbd5e1;box-shadow:0 16px 40px rgba(15,23,42,.32);display:flex;flex-direction:column;overflow:hidden;">
+        <div style="padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;">
+          <i class="fa-solid fa-file-export" style="color:#f97316;font-size:16px;"></i>
+          <span style="font-size:15px;font-weight:700;color:#0f172a;">Export Report</span>
+        </div>
+        <div style="padding:10px 18px 4px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:6px;">Sections to include</div>
+        </div>
+        <div style="padding:0 18px 8px;overflow-y:auto;flex:1;">${sectionListHtml}</div>
+        <div style="padding:12px 18px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px;">
+          <button id="stReportCancelBtn" style="padding:8px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;">Cancel</button>
+          <button id="stReportExportBtn" style="padding:8px 16px;border:1px solid #f97316;border-radius:8px;background:#f97316;color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
+            <i class="fa-solid fa-file-export"></i> Export HTML
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.querySelector('#stReportCancelBtn').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('#stReportExportBtn').addEventListener('click', () => {
+      const checked = Array.from(overlay.querySelectorAll('input[data-section-id]:checked'))
+        .map((el) => el.getAttribute('data-section-id'));
+      if (!checked.length) return;
+      close();
+      onConfirm(checked);
+    });
+  },
+
   _renderHeaderGlobalControls() {
     const cfg = this._getSharedSidebarConfig ? this._getSharedSidebarConfig() : null;
     const decimalOptions = cfg?.bottomDecimals || ['auto', '0', '1', '2', '3', '4'];

@@ -283,7 +283,7 @@ const StatisticoHeader = {
 
   _getBrandLogoSvg() {
     return `
-      <svg class="sb-logo-svg" viewBox="0 -6 300 110" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Statistico Interactive">
+      <svg class="sb-logo-svg" viewBox="0 -6 300 122" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Statistico Interactive">
         <defs>
           <linearGradient id="sbLogoBlue" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stop-color="#2d76ff"/>
@@ -298,13 +298,14 @@ const StatisticoHeader = {
             <stop offset="52%" stop-color="#6fb7ff"/>
             <stop offset="100%" stop-color="#2d76ff"/>
           </radialGradient>
-          <!-- Reflection: fades from 28% opacity at the baseline to transparent -->
-          <linearGradient id="sbReflectFade" x1="0" y1="82" x2="0" y2="110" gradientUnits="userSpaceOnUse">
-            <stop offset="0%"   stop-color="white" stop-opacity="0.28"/>
+          <!-- Reflection: fades from strong opacity at the baseline to transparent -->
+          <linearGradient id="sbReflectFade" x1="0" y1="82" x2="0" y2="122" gradientUnits="userSpaceOnUse">
+            <stop offset="0%"   stop-color="white" stop-opacity="0.65"/>
+            <stop offset="55%"  stop-color="white" stop-opacity="0.22"/>
             <stop offset="100%" stop-color="white" stop-opacity="0"/>
           </linearGradient>
           <mask id="sbReflectMask" maskUnits="userSpaceOnUse">
-            <rect x="0" y="82" width="72" height="28" fill="url(#sbReflectFade)"/>
+            <rect x="0" y="82" width="72" height="40" fill="url(#sbReflectFade)"/>
           </mask>
         </defs>
 

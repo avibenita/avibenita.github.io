@@ -1589,6 +1589,100 @@
   document.addEventListener('DOMContentLoaded', function() {
     if (typeof StatisticoHeader === 'undefined') return;
     StatisticoHeader.registerActions({
+
+      /* ── View Data ────────────────────────────────────────────────── */
+      getData: () => {
+        if (!_rawData) return null;
+        const outcome = _modelSpec?.y || _results?.outcome || 'Outcome';
+        const subject = _modelSpec?.subject || 'Subject';
+        const fixed   = Array.isArray(_modelSpec?.fixed) ? _modelSpec.fixed : [];
+        const headers = [outcome, subject, ...fixed];
+        const fixedVecs = _rawData.fixedVectors || {};
+        const outVec    = _rawData.outcomeVector || [];
+        const subVec    = _rawData.subjectVector || [];
+        const n = Math.max(outVec.length, subVec.length);
+        const allRows = [];
+        for (let i = 0; i < n; i++) {
+          allRows.push([
+            outVec[i] ?? null,
+            subVec[i] ?? null,
+            ...fixed.map(f => (fixedVecs[f] || [])[i] ?? null)
+          ]);
+        }
+        const usedRows = allRows.filter(r => r[0] !== null && r[0] !== undefined && r[0] !== '');
+        return { headers, usedRows, allRows, columnRoles: { [outcome]: 'outcome', [subject]: 'grouping' } };
+      },
+
+      /* ── Export Report ────────────────────────────────────────────── */
+      exportHtml: () => {
+        if (!_results) { alert('No results available yet. Run the model first.'); return; }
+        const r = _results;
+        const outcome  = r.outcome ?? r.y ?? 'Outcome';
+        const ts       = new Date().toLocaleString();
+        const esc      = (s) => String(s ?? '—').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const fmtV     = (v) => (v === null || v === undefined) ? '—' : (typeof v === 'number' ? v.toFixed(3) : v);
+        const tableRow = (cells) => `<tr>${cells.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`;
+        const thRow    = (cells) => `<tr>${cells.map(c=>`<th>${esc(c)}</th>`).join('')}</tr>`;
+
+        const typeIIIRows = (r.typeIII || []).map(e =>
+          tableRow([e.predictor ?? e.effect ?? e.term, fmtV(e.F ?? e.f), fmtV(e.df1 ?? e.numDf), fmtV(e.df2 ?? e.denDf), fmtV(e.p ?? e.pValue)])
+        ).join('');
+        const coefRows = (r.fixedEffects ?? r.coefficients ?? []).map(e =>
+          tableRow([e.predictor ?? e.term, fmtV(e.B ?? e.b ?? e.estimate), fmtV(e.SE ?? e.se), fmtV(e.t ?? e.tValue), fmtV(e.p ?? e.pValue), fmtV(e.lower95 ?? e.lowerCI), fmtV(e.upper95 ?? e.upperCI)])
+        ).join('');
+        const vcRows = (r.varianceComponents ?? r.randomEffects ?? []).map(e =>
+          tableRow([e.component ?? e.term, fmtV(e.variance ?? e.estimate), fmtV(e.pct ?? e.percent)])
+        ).join('');
+
+        const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
+<title>Mixed Model Report — ${esc(outcome)}</title>
+<style>
+  body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:24px 32px;max-width:900px;margin:auto}
+  h1{font-size:20px;border-bottom:2px solid #6366f1;padding-bottom:6px;color:#1e1b4b}
+  h2{font-size:14px;margin-top:24px;color:#374151;border-left:3px solid #6366f1;padding-left:8px}
+  table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12px}
+  th{background:#f1f5f9;color:#475569;text-align:left;padding:5px 8px;border:1px solid #e2e8f0;font-size:11px;text-transform:uppercase;letter-spacing:.3px}
+  td{padding:5px 8px;border:1px solid #e2e8f0}
+  tr:nth-child(even) td{background:#f8fafc}
+  .meta{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:8px}
+  .meta-item{background:#f1f5f9;border-radius:6px;padding:8px 10px}
+  .meta-label{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.3px}
+  .meta-value{font-size:15px;font-weight:700;color:#1e1b4b;margin-top:2px}
+  .footer{margin-top:32px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px}
+</style></head><body>
+<h1>Linear Mixed Model — ${esc(outcome)}</h1>
+<p style="color:#64748b;font-size:11px">Generated ${esc(ts)} · Statistico Interactive</p>
+<div class="meta">
+  <div class="meta-item"><div class="meta-label">N</div><div class="meta-value">${esc(r.n ?? r.N)}</div></div>
+  <div class="meta-item"><div class="meta-label">AIC</div><div class="meta-value">${fmtV(r.AIC)}</div></div>
+  <div class="meta-item"><div class="meta-label">BIC</div><div class="meta-value">${fmtV(r.BIC)}</div></div>
+  <div class="meta-item"><div class="meta-label">ICC</div><div class="meta-value">${fmtV(r.ICC ?? r.icc)}</div></div>
+  <div class="meta-item"><div class="meta-label">R² Marginal</div><div class="meta-value">${fmtV(r.r2m)}</div></div>
+  <div class="meta-item"><div class="meta-label">R² Conditional</div><div class="meta-value">${fmtV(r.r2c)}</div></div>
+  <div class="meta-item"><div class="meta-label">Method</div><div class="meta-value">${esc(r.method ?? 'REML')}</div></div>
+  <div class="meta-item"><div class="meta-label">Converged</div><div class="meta-value">${r.converged ? 'Yes' : 'No'}</div></div>
+</div>
+${typeIIIRows ? `<h2>Significance of Fixed Effects (Type III)</h2>
+<table>${thRow(['Predictor','F','df1','df2','p'])}${typeIIIRows}</table>` : ''}
+${coefRows ? `<h2>Predictor Coefficients (B)</h2>
+<table>${thRow(['Predictor','B','SE','t','p','95% CI Lower','95% CI Upper'])}${coefRows}</table>` : ''}
+${vcRows ? `<h2>Variance Components</h2>
+<table>${thRow(['Component','Variance','%'])}${vcRows}</table>` : ''}
+<div class="footer">Statistico Interactive (TM) · statistico.live</div>
+</body></html>`;
+
+        const blob = new Blob([html], { type: 'text/html' });
+        const url  = URL.createObjectURL(blob);
+        const a    = Object.assign(document.createElement('a'), {
+          href: url,
+          download: `MixedModel_${outcome.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.html`
+        });
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+      },
+
+      /* ── JSON Export ──────────────────────────────────────────────── */
       exportJson: () => {
         if (!_results) {
           console.warn('exportJson: no mixed-model results yet. Run a model first.');

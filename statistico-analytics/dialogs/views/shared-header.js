@@ -2406,16 +2406,23 @@ const StatisticoHeader = {
 
     // ── AI pill — above utilities ─────────────────────────────────────────
     const supportsIndependentAi = this.module === 'independent';
-    const supportsSharedAi = (this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations' || supportsIndependentAi;
+    const supportsMixedAi = this.module === 'mixed-model';
+    const supportsSharedAi = (this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations' || supportsIndependentAi || supportsMixedAi;
     if (supportsSharedAi) {
       const aiSection = document.createElement('div');
       aiSection.id = 'sbAiSection';
       aiSection.className = 'sb-ai-section-wrap';
       const isCorrelation = this.module === 'correlations';
-      const aiClick = supportsIndependentAi ? 'StatisticoHeader._sbAiIndependentInterpret()' : 'StatisticoHeader._sbAiGlobalInterpret()';
+      const aiClick = supportsIndependentAi
+        ? 'StatisticoHeader._sbAiIndependentInterpret()'
+        : supportsMixedAi
+          ? 'requestMixedModelAI()'
+          : 'StatisticoHeader._sbAiGlobalInterpret()';
       const aiTitle = supportsIndependentAi
         ? 'AI statistical summary for this independent means analysis'
-        : (isCorrelation ? 'Full correlation analysis - synthesises all correlation views into one report' : 'Full variable analysis - synthesises all diagnostics into one report');
+        : supportsMixedAi
+          ? 'AI interpretation of the mixed model results'
+          : (isCorrelation ? 'Full correlation analysis - synthesises all correlation views into one report' : 'Full variable analysis - synthesises all diagnostics into one report');
       const aiLabel = supportsIndependentAi ? 'Full AI Analysis' : 'Full Analysis';
       const aiBadge = supportsIndependentAi ? 'ALL' : 'AI';
       aiSection.innerHTML = `

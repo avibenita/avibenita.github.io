@@ -1499,28 +1499,65 @@ const StatisticoHeader = {
   },
 
   _mergeActionsWithFallback(actions) {
+    let result = { ...actions };
+
     if (this.module === 'correlations') {
       const fallback = this._buildCorrelationFallbackActions();
-      return {
+      result = {
         ...fallback,
         ...actions,
         moduleName: actions.moduleName || fallback.moduleName || 'Save correlation model',
-        getData: actions.getData || fallback.getData,
+        getData:    actions.getData    || fallback.getData,
         exportJson: actions.exportJson || fallback.exportJson,
         exportHtml: fallback.exportHtml
       };
+    } else if (this.module === 'univariate') {
+      const fallback = this._buildUnivariateFallbackActions();
+      result = { ...fallback, ...actions, moduleName: actions.moduleName || fallback.moduleName || 'Save model' };
+      // Always use shared univariate HTML exporter (section checklist + long report),
+      // even if a page registers its own exportHtml.
+      result.exportHtml = fallback.exportHtml;
     }
-    if (this.module !== 'univariate') return actions;
-    const fallback = this._buildUnivariateFallbackActions();
-    const merged = {
-      ...fallback,
-      ...actions,
-      moduleName: actions.moduleName || fallback.moduleName || 'Save model'
+
+    // Generic: auto-supply exportJson for any module that has getData but no exportJson.
+    // This ensures the JSON button is enabled for every analysis module without
+    // requiring each page to implement its own download handler.
+    if (typeof result.getData === 'function' && typeof result.exportJson !== 'function') {
+      result.exportJson = this._buildGenericJsonExport(result.getData, this.module);
+    }
+
+    return result;
+  },
+
+  /**
+   * Returns a generic exportJson callback that downloads the current getData()
+   * payload as a JSON file.  Used as a fallback for any module that registers
+   * getData but does not supply its own exportJson.
+   */
+  _buildGenericJsonExport(getData, moduleName) {
+    return () => {
+      const data = getData();
+      if (!data) { alert('No data available for export yet.'); return; }
+      const ts   = new Date().toISOString().replace(/[:.TZ]/g, '').replace(/-/g, '').slice(0, 14);
+      const safe = String(moduleName || 'data').replace(/[^a-z0-9]/gi, '_');
+      const payload = {
+        module:      moduleName,
+        exportedAt:  new Date().toISOString(),
+        headers:     data.headers,
+        usedRows:    data.usedRows,
+        allRows:     data.allRows,
+        columnRoles: data.columnRoles || {},
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url;
+      a.download = `${safe}_data_${ts}.json`;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
     };
-    // Always use shared univariate HTML exporter (section checklist + long report),
-    // even if a page registers its own exportHtml.
-    merged.exportHtml = fallback.exportHtml;
-    return merged;
   },
 
   _ensureDefaultActions() {

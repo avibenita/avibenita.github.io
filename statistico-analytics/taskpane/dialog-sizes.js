@@ -26,7 +26,7 @@ const DIALOG_SIZES = window.DIALOG_SIZES = {
   RESULTS_ANOVA:       { height: 72, width: 72, displayInIframe: false },
 
   // Mixed model: full-width input builder dialog
-  MIXED_BUILDER:       { height: 73, width: 95, displayInIframe: false },
+  MIXED_BUILDER:       { height: 90, width: 95, displayInIframe: false },
 
   // Mixed model: hub-opened config dialog
   MIXED_CONFIG_HUB:    { height: 98, width: 40, displayInIframe: false },

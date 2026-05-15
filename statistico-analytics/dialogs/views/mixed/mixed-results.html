@@ -1724,6 +1724,7 @@
     }
 
     /* ── Export HTML — section picker → DOM snapshot of each tab ───── */
+    /* ── Export: step 1 — gate ─────────────────────────────────── */
     function _mm_exportHtml() {
       if (!_results) { alert('Run the model first to export a report.'); return; }
       if (typeof StatisticoHeader.pickReportSections !== 'function') {
@@ -1732,126 +1733,332 @@
       const outcome = _results.outcome ?? _results.y ?? 'Outcome';
       const ALL_SECTIONS = [
         { id: 'overview',        label: 'Overview' },
-        { id: 'model-effects',   label: 'Model Effects' },
-        { id: 'marginal-means',  label: 'Marginal Means' },
-        { id: 'diagnostics',     label: 'Diagnostics' },
-        { id: 'advanced',        label: 'Advanced' },
+        { id: 'model-effects',   label: 'What Matters?' },
+        { id: 'marginal-means',  label: 'How Large?' },
+        { id: 'diagnostics',     label: 'Can I Trust It?' },
+        { id: 'advanced',        label: 'Technical Appendix' },
         { id: 'model-structure', label: 'Model Structure' },
       ].filter(s => !!document.getElementById('tab-' + s.id));
 
-      StatisticoHeader.pickReportSections(ALL_SECTIONS, async (selectedIds) => {
-        const selected = ALL_SECTIONS.filter(s => selectedIds.includes(s.id));
-        const originalTab = document.querySelector('.sb-item.active[data-tab]')?.dataset?.tab || 'overview';
+      _showExportOptionsDialog(outcome, (opts) => {
+        StatisticoHeader.pickReportSections(ALL_SECTIONS, async (selectedIds) => {
+          await _runExport(outcome, opts, ALL_SECTIONS, selectedIds);
+        });
+      });
+    }
 
-        // ── Progress overlay ──────────────────────────────────────────
-        const prog = document.createElement('div');
-        prog.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:2147483400;display:flex;align-items:center;justify-content:center;';
-        prog.innerHTML = `
-          <div style="min-width:300px;max-width:420px;padding:18px 20px;border-radius:12px;background:#111827;color:#e5e7eb;box-shadow:0 12px 28px rgba(2,6,23,.5);display:flex;flex-direction:column;gap:10px;">
-            <div style="display:flex;align-items:center;gap:10px;">
-              <span style="width:16px;height:16px;border:2px solid rgba(148,163,184,.3);border-top-color:#f97316;border-radius:50%;display:inline-block;animation:spin .75s linear infinite;flex-shrink:0;"></span>
-              <span id="mmExpLbl" style="font-size:13px;font-weight:600;">Preparing export\u2026</span>
-            </div>
-            <div style="height:4px;background:rgba(148,163,184,.2);border-radius:4px;overflow:hidden;">
-              <div id="mmExpBar" style="height:100%;width:0%;background:#f97316;border-radius:4px;transition:width .3s ease;"></div>
-            </div>
+    /* ── Export: step 2 — options dialog ────────────────────────── */
+    function _showExportOptionsDialog(outcome, onConfirm) {
+      const defaultTitle = `Linear Mixed Model \u2014 ${outcome}`;
+      const ov = document.createElement('div');
+      ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.68);z-index:2147483500;display:flex;align-items:center;justify-content:center;';
+      ov.innerHTML = `
+        <div style="width:460px;background:#111827;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:26px 28px;color:#e5e7eb;font-family:'Segoe UI',sans-serif;box-shadow:0 24px 48px rgba(0,0,0,.65);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:22px;">
+            <i class="fa-solid fa-file-export" style="color:#a78bfa;font-size:17px;"></i>
+            <span style="font-size:15px;font-weight:700;letter-spacing:-.01em;">Export Report</span>
           </div>
-        `;
-        document.body.appendChild(prog);
-        const setProgress = (n, total, lbl) => {
-          const bar = prog.querySelector('#mmExpBar');
-          const el  = prog.querySelector('#mmExpLbl');
-          if (bar) bar.style.width = `${Math.round(n / total * 100)}%`;
-          if (el)  el.textContent  = lbl;
-        };
 
-        // ── Collect page styles to embed in the report ────────────────
-        const inlineCSS = Array.from(document.querySelectorAll('style'))
-          .map(s => s.textContent).join('\n');
-        const linkTags  = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
-          .map(l => `<link rel="stylesheet" href="${new URL(l.getAttribute('href') || '', location.href).href}">`)
-          .join('\n');
+          <label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:rgba(229,231,235,.45);margin-bottom:6px;">Report Title</label>
+          <input id="expTitle" type="text" value="${_esc(defaultTitle)}"
+            style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13);border-radius:8px;padding:9px 12px;color:#e5e7eb;font-size:13px;outline:none;margin-bottom:18px;" />
 
-        // ── Switch to each tab, wait, clone content ───────────────────
-        const captures = [];
-        for (let i = 0; i < selected.length; i++) {
-          const s = selected[i];
-          setProgress(i, selected.length + 1, `Capturing ${s.label}\u2026`);
-          window.switchTab(s.id);
-          // Diagnostics lazy-loads residuals; give it extra time
-          await new Promise(r => setTimeout(r, s.id === 'diagnostics' ? 2500 : 700));
+          <label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:rgba(229,231,235,.45);margin-bottom:8px;">Style</label>
+          <div style="display:flex;gap:8px;margin-bottom:18px;">
+            <label id="_expLightLbl" style="flex:1;display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:8px;border:1.5px solid rgba(99,102,241,.55);background:rgba(99,102,241,.09);cursor:pointer;">
+              <input type="radio" name="expStyle" value="light" checked style="margin-top:1px;accent-color:#818cf8;">
+              <span>
+                <span style="font-size:13px;font-weight:500;display:block;">Light</span>
+                <span style="font-size:10.5px;color:rgba(229,231,235,.45);">Best for printing &amp; PDF</span>
+              </span>
+            </label>
+            <label id="_expDarkLbl" style="flex:1;display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.10);cursor:pointer;">
+              <input type="radio" name="expStyle" value="dark" style="margin-top:1px;accent-color:#818cf8;">
+              <span>
+                <span style="font-size:13px;font-weight:500;display:block;">Dark</span>
+                <span style="font-size:10.5px;color:rgba(229,231,235,.45);">Screen / digital sharing</span>
+              </span>
+            </label>
+          </div>
 
-          const tabEl = document.getElementById('tab-' + s.id);
-          if (tabEl) {
-            const clone = tabEl.cloneNode(true);
-            clone.querySelectorAll('script, noscript, .loading-overlay, #dialogLoading, .sb-ai-float-btn, .sb-ai-overlay').forEach(el => el.remove());
-            clone.querySelectorAll('button, select, input, textarea').forEach(el => {
-              el.setAttribute('disabled', 'disabled');
-              el.style.cssText += ';pointer-events:none!important;opacity:.55!important;cursor:default!important;';
-              ['onclick','onchange','oninput','onmousedown','onmouseup'].forEach(ev => el.removeAttribute(ev));
-            });
-            captures.push({ label: s.label, html: clone.innerHTML });
-          }
+          <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:22px;">
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+              <input type="checkbox" id="expOnePage" checked style="width:15px;height:15px;margin-top:2px;accent-color:#818cf8;flex-shrink:0;">
+              <span>
+                <span style="font-size:13px;font-weight:500;display:block;">One section per page</span>
+                <span style="font-size:10.5px;color:rgba(229,231,235,.45);">Adds CSS page-breaks — required for a clean Print \u2192 PDF</span>
+              </span>
+            </label>
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+              <input type="checkbox" id="expCover" checked style="width:15px;height:15px;margin-top:2px;accent-color:#818cf8;flex-shrink:0;">
+              <span>
+                <span style="font-size:13px;font-weight:500;display:block;">Cover page</span>
+                <span style="font-size:10.5px;color:rgba(229,231,235,.45);">Full-page cover with title, date and table of contents</span>
+              </span>
+            </label>
+          </div>
+
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button id="expCancel" style="padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:transparent;color:#94a3b8;font-size:13px;cursor:pointer;">Cancel</button>
+            <button id="expGo" style="padding:9px 22px;border-radius:8px;border:none;background:#6366f1;color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;">
+              <i class="fa-solid fa-chevron-right"></i> Select Sections
+            </button>
+          </div>
+        </div>`;
+      document.body.appendChild(ov);
+
+      // Style radio interaction
+      ov.querySelectorAll('input[name="expStyle"]').forEach(r => r.addEventListener('change', () => {
+        ov.querySelector('#_expLightLbl').style.borderColor = r.value === 'light' ? 'rgba(99,102,241,.55)' : 'rgba(255,255,255,.10)';
+        ov.querySelector('#_expLightLbl').style.background  = r.value === 'light' ? 'rgba(99,102,241,.09)' : 'transparent';
+        ov.querySelector('#_expDarkLbl').style.borderColor  = r.value === 'dark'  ? 'rgba(99,102,241,.55)' : 'rgba(255,255,255,.10)';
+        ov.querySelector('#_expDarkLbl').style.background   = r.value === 'dark'  ? 'rgba(99,102,241,.09)' : 'transparent';
+      }));
+
+      ov.querySelector('#expCancel').onclick = () => ov.remove();
+      ov.querySelector('#expGo').onclick = () => {
+        const title      = ov.querySelector('#expTitle').value.trim() || defaultTitle;
+        const style      = ov.querySelector('input[name="expStyle"]:checked').value;
+        const onePerPage = ov.querySelector('#expOnePage').checked;
+        const cover      = ov.querySelector('#expCover').checked;
+        ov.remove();
+        onConfirm({ title, style, onePerPage, cover });
+      };
+      setTimeout(() => ov.querySelector('#expTitle')?.focus(), 60);
+    }
+
+    /* ── Export: step 3 — capture + render ──────────────────────── */
+    async function _runExport(outcome, opts, ALL_SECTIONS, selectedIds) {
+      const selected    = ALL_SECTIONS.filter(s => selectedIds.includes(s.id));
+      const originalTab = document.querySelector('.sb-item.active[data-tab]')?.dataset?.tab || 'overview';
+      const isLight     = opts.style === 'light';
+
+      // Progress overlay
+      const prog = document.createElement('div');
+      prog.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:2147483400;display:flex;align-items:center;justify-content:center;';
+      prog.innerHTML = `
+        <div style="min-width:300px;max-width:420px;padding:18px 20px;border-radius:12px;background:#111827;color:#e5e7eb;box-shadow:0 12px 28px rgba(2,6,23,.5);display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="width:16px;height:16px;border:2px solid rgba(148,163,184,.3);border-top-color:#f97316;border-radius:50%;display:inline-block;animation:spin .75s linear infinite;flex-shrink:0;"></span>
+            <span id="mmExpLbl" style="font-size:13px;font-weight:600;">Preparing export\u2026</span>
+          </div>
+          <div style="height:4px;background:rgba(148,163,184,.2);border-radius:4px;overflow:hidden;">
+            <div id="mmExpBar" style="height:100%;width:0%;background:#f97316;border-radius:4px;transition:width .3s ease;"></div>
+          </div>
+        </div>`;
+      document.body.appendChild(prog);
+      const setProgress = (n, total, lbl) => {
+        const bar = prog.querySelector('#mmExpBar');
+        const el  = prog.querySelector('#mmExpLbl');
+        if (bar) bar.style.width = `${Math.round(n / total * 100)}%`;
+        if (el)  el.textContent  = lbl;
+      };
+
+      // Collect page styles
+      const inlineCSS = Array.from(document.querySelectorAll('style')).map(s => s.textContent).join('\n');
+      const linkTags  = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+        .map(l => `<link rel="stylesheet" href="${new URL(l.getAttribute('href') || '', location.href).href}">`)
+        .join('\n');
+
+      // Capture each tab
+      const captures = [];
+      for (let i = 0; i < selected.length; i++) {
+        const s = selected[i];
+        setProgress(i, selected.length + 2, `Capturing ${s.label}\u2026`);
+        window.switchTab(s.id);
+        await new Promise(r => setTimeout(r, s.id === 'diagnostics' ? 2500 : 700));
+        const tabEl = document.getElementById('tab-' + s.id);
+        if (tabEl) {
+          const clone = tabEl.cloneNode(true);
+          clone.querySelectorAll('script,noscript,.loading-overlay,#dialogLoading,.sb-ai-float-btn,.sb-ai-overlay').forEach(el => el.remove());
+          clone.querySelectorAll('button,select,input,textarea').forEach(el => {
+            el.setAttribute('disabled', 'disabled');
+            el.style.cssText += ';pointer-events:none!important;opacity:.55!important;cursor:default!important;';
+            ['onclick','onchange','oninput','onmousedown','onmouseup'].forEach(ev => el.removeAttribute(ev));
+          });
+          captures.push({ label: s.label, html: clone.innerHTML });
         }
+      }
 
-        // ── Restore original tab ──────────────────────────────────────
-        window.switchTab(originalTab);
-        setProgress(selected.length, selected.length + 1, 'Building document\u2026');
-        await new Promise(r => setTimeout(r, 100));
+      window.switchTab(originalTab);
+      setProgress(selected.length + 1, selected.length + 2, 'Building document\u2026');
+      await new Promise(r => setTimeout(r, 100));
 
-        // ── Assemble the standalone HTML document ─────────────────────
-        const ts  = new Date().toLocaleString();
-        const toc = selected.map((s, i) => `<li><a href="#sec_${i + 1}">${_esc(s.label)}</a></li>`).join('');
-        const body = captures.map((c, i) => `
-        <section id="sec_${i + 1}">
-          <h2 class="rpt-h2">${_esc(c.label)}</h2>
+      // ── Build the report document ───────────────────────────────
+      const ts  = new Date().toLocaleString();
+      const accentColor = isLight ? '#4f46e5' : '#a78bfa';
+      const mutedColor  = isLight ? '#64748b'  : '#94a3b8';
+      const borderColor = isLight ? '#e2e8f0'  : 'rgba(255,255,255,.10)';
+      const bgColor     = isLight ? '#ffffff'  : '#0f172a';
+      const textColor   = isLight ? '#1e293b'  : '#e2e8f0';
+
+      // Navigation bar inserted at top of each section
+      const navBar = (label) => `
+        <div class="rpt-nav" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 14px;margin-bottom:20px;border-bottom:2px solid ${borderColor};">
+          <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:${accentColor};">${_esc(label)}</span>
+          <a href="#rpt-cover" class="rpt-nav-home" style="font-size:11px;color:${mutedColor};text-decoration:none;padding:3px 8px;border:1px solid ${borderColor};border-radius:5px;">&#8593; Contents</a>
+        </div>`;
+
+      // TOC list items
+      const tocItems = selected.map((s, i) => `
+        <li style="border-bottom:1px solid ${borderColor};padding:0;">
+          <a href="#sec_${i+1}" style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px;color:${accentColor};text-decoration:none;">
+            <span>${_esc(s.label)}</span>
+            <span style="color:${mutedColor};font-size:11px;">${i+1}</span>
+          </a>
+        </li>`).join('');
+
+      // Section bodies with page breaks
+      const sectionsHtml = captures.map((c, i) => `
+        <section id="sec_${i+1}" class="rpt-section">
+          ${navBar(c.label)}
           <div class="tab-content active rpt-tab">${c.html}</div>
         </section>`).join('');
 
-        const htmlDoc = `<!DOCTYPE html><html lang="en"><head>
+      // Light-mode content theme overrides
+      const lightContentCSS = `
+        body { background:#ffffff !important; color:#1e293b !important; }
+        .mm-section { background:#ffffff !important; }
+        .mm-section-header { background:#f8fafc !important; color:#1e293b !important; border-color:#e2e8f0 !important; }
+        .mm-section-header span { color:#374151 !important; }
+        .mm-section-header i { color:#6366f1 !important; }
+        table { background:#ffffff !important; border-color:#e2e8f0 !important; }
+        thead th { background:#f1f5f9 !important; color:#1e293b !important; border-color:#e2e8f0 !important; }
+        tbody td { color:#334155 !important; border-color:#f1f5f9 !important; }
+        tbody tr:nth-child(even) td { background:#f8fafc !important; }
+        tbody tr:hover td { background:#eff6ff !important; }
+        .conclusion-card { border-color:#c7d2fe !important; background:#eef2ff !important; }
+        .conclusion-header { background:#e0e7ff !important; color:#4338ca !important; border-color:#c7d2fe !important; }
+        .conclusion-verdict { color:#1e293b !important; }
+        .conclusion-bullets li { color:#334155 !important; }
+        .recommendation-card { background:#f0fdf4 !important; border-color:#86efac !important; }
+        .rec-header { background:#dcfce7 !important; color:#15803d !important; }
+        .rec-body { color:#374151 !important; }
+        .rec-pill { background:#f1f5f9 !important; border-color:#e2e8f0 !important; color:#64748b !important; }
+        .rec-pill.sig  { background:#f0fdf4 !important; border-color:#86efac !important; color:#15803d !important; }
+        .rec-pill.warn { background:#fffbeb !important; border-color:#fcd34d !important; color:#92400e !important; }
+        .rec-pill.info { background:#eef2ff !important; border-color:#c7d2fe !important; color:#4338ca !important; }
+        .insight-cards-row { gap:8px !important; }
+        .insight-card { background:#f8fafc !important; border-color:#e2e8f0 !important; }
+        .insight-label { color:#64748b !important; }
+        .insight-value { color:#1e293b !important; }
+        .kf-text, .kf-text strong { color:#334155 !important; }
+        .model-health-row { background:#f8fafc !important; border-color:#e2e8f0 !important; }
+        .mh-label { color:#64748b !important; }
+        .mh-check { background:#f1f5f9 !important; border-color:#e2e8f0 !important; color:#374151 !important; }
+        .panel-heading, .card-header { background:#f8fafc !important; color:#374151 !important; border-color:#e2e8f0 !important; }
+        .stat-card-group, .stat-group-label { color:#64748b !important; }
+        .sc-label { color:#64748b !important; }
+        .sc-value { color:#1e293b !important; }
+        .awaiting-state { color:#94a3b8 !important; }
+        a { color:#4f46e5 !important; }
+      `;
+
+      const htmlDoc = `<!DOCTYPE html>
+<html lang="en">
+<head>
 <meta charset="UTF-8">
-<title>Mixed Model Report \u2014 ${_esc(outcome)}</title>
+<title>${_esc(opts.title)}</title>
 ${linkTags}
 <style>
 ${inlineCSS}
-/* ── Report layout overrides ─────────────────────────────── */
-body { background: #0f172a !important; margin: 0; padding: 24px 32px; overflow: auto !important; }
+
+/* ── Report base resets ── */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: auto !important; overflow: auto !important; }
+body { margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background: ${bgColor}; color: ${textColor}; }
+.sb-nav, .sb-ai-float-btn, .sb-ai-overlay, .statistico-header,
+#header-container, .dialog-loading-overlay { display: none !important; }
 .tab-content, .tab-content.active, .rpt-tab { display: block !important; opacity: 1 !important; }
-.rpt-h2 { font-family: Arial, sans-serif; font-size: 14px; margin: 28px 0 10px;
-          color: #c4b5fd; border-left: 3px solid #6366f1; padding-left: 8px; }
-h1.rpt-title { font-family: Arial, sans-serif; font-size: 20px;
-               border-bottom: 2px solid #6366f1; padding-bottom: 8px; color: #e2e8f0; }
-.rpt-toc { font-family: Arial, sans-serif; background: rgba(99,102,241,.08);
-           border: 1px solid rgba(99,102,241,.3); border-radius: 8px;
-           padding: 12px 16px; margin: 12px 0 20px; color: #e2e8f0; }
-.rpt-toc ol { margin: 4px 0 0 16px; padding: 0; font-size: 12px; }
-.rpt-toc a { color: #a78bfa; }
-.rpt-footer { margin-top: 32px; font-size: 10px; color: #64748b;
-              border-top: 1px solid rgba(148,163,184,.2); padding-top: 8px;
-              font-family: Arial, sans-serif; }
-section { margin-top: 24px; }
-button, select, input, textarea { pointer-events: none !important; cursor: default !important; opacity: .45 !important; }
+button, select, input, textarea { pointer-events: none !important; cursor: default !important; opacity: .5 !important; }
+
+/* ── Cover page ── */
+#rpt-cover {
+  min-height: 100vh;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 72px 80px;
+  background: linear-gradient(140deg, #0f172a 0%, #1e1b4b 55%, #312e81 100%);
+  color: #fff;
+  ${opts.onePerPage && opts.cover ? 'page-break-after: always;' : ''}
+}
+.rpt-cover-eyebrow { font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: #a5b4fc; margin-bottom: 36px; }
+.rpt-cover-title { font-size: 30px; font-weight: 700; line-height: 1.2; color: #f1f5f9; margin: 0 0 14px; }
+.rpt-cover-divider { width: 48px; height: 3px; background: #6366f1; border-radius: 2px; margin: 20px 0; }
+.rpt-cover-sub { font-size: 15px; color: #94a3b8; margin: 0 0 52px; }
+.rpt-cover-meta { font-size: 11px; color: #475569; line-height: 1.7; }
+.rpt-cover-meta strong { color: #64748b; }
+
+/* ── TOC page ── */
+#rpt-toc {
+  padding: 52px 80px;
+  ${opts.onePerPage && opts.cover ? 'page-break-before: always; page-break-after: always;' : ''}
+}
+.rpt-toc-title { font-size: 20px; font-weight: 700; color: ${textColor}; margin: 0 0 20px; border-bottom: 2px solid ${borderColor}; padding-bottom: 12px; }
+.rpt-toc-list { list-style: none; margin: 0; padding: 0; }
+
+/* ── Sections ── */
+.rpt-section { padding: 40px 80px; }
+${opts.onePerPage ? '.rpt-section { page-break-before: always; }' : ''}
+
+/* ── Footer ── */
+#rpt-footer { padding: 16px 80px; border-top: 1px solid ${borderColor}; font-size: 10px; color: ${mutedColor}; }
+
+/* ── Print / PDF rules ── */
+@page { size: A4 portrait; margin: 14mm 12mm; }
+@media print {
+  .rpt-nav-home { display: none !important; }
+  #rpt-cover { min-height: 100vh; page-break-after: always; }
+  ${opts.onePerPage ? '.rpt-section { page-break-before: always; } #rpt-toc { page-break-before: always; page-break-after: always; }' : ''}
+}
+
+/* ── Content theme ── */
+${isLight ? lightContentCSS : ''}
 </style>
-</head><body>
-<h1 class="rpt-title">Linear Mixed Model \u2014 ${_esc(outcome)}</h1>
-<p style="font-family:Arial,sans-serif;color:#64748b;font-size:11px;margin:4px 0 16px">Generated ${_esc(ts)} \u00b7 Statistico Interactive</p>
-<div class="rpt-toc"><strong>Table of Contents</strong><ol>${toc}</ol></div>
-${body}
-<div class="rpt-footer">Statistico Interactive (TM) \u00b7 statistico.live</div>
+</head>
+<body>
+
+${opts.cover ? `
+<!-- ════ COVER ════ -->
+<div id="rpt-cover">
+  <div class="rpt-cover-eyebrow">Statistico Interactive &middot; Mixed Model Analysis</div>
+  <div class="rpt-cover-title">${_esc(opts.title)}</div>
+  <div class="rpt-cover-divider"></div>
+  <div class="rpt-cover-sub">Dependent variable: <strong style="color:#e2e8f0;">${_esc(outcome)}</strong></div>
+  <div class="rpt-cover-meta">
+    <strong>Generated</strong> ${_esc(ts)}<br>
+    <strong>Sections</strong> ${selected.length}<br>
+    <strong>Source</strong> statistico.live
+  </div>
+</div>
+
+<!-- ════ TABLE OF CONTENTS ════ -->
+<div id="rpt-toc">
+  <div class="rpt-toc-title">Table of Contents</div>
+  <ol class="rpt-toc-list">${tocItems}</ol>
+</div>
+` : ''}
+
+<!-- ════ SECTIONS ════ -->
+${sectionsHtml}
+
+<!-- ════ FOOTER ════ -->
+<div id="rpt-footer">
+  Statistico Interactive (TM) &middot; statistico.live &middot; ${_esc(ts)}
+</div>
+
 </body></html>`;
 
-        prog.remove();
+      prog.remove();
 
-        const blob = new Blob([htmlDoc], { type: 'text/html' });
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement('a');
-        a.href = url;
-        a.download = `MixedModel_${outcome.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.html`;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
-      });
+      const blob = new Blob([htmlDoc], { type: 'text/html' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url;
+      a.download = `MixedModel_${outcome.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.html`;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
     }
 
     /* ── Re-register whenever _results / _rawData state changes ─────── */

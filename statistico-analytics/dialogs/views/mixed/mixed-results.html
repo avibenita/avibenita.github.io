@@ -876,6 +876,13 @@
                 <span class="sb-item-description">Residuals, normality &amp; influential cases.</span>
               </span>
             </button>
+            <button class="sb-item" onclick="switchTab('icc')" data-tab="icc">
+              <i class="fa-solid fa-scale-balanced sb-item-icon"></i>
+              <span class="sb-item-copy">
+                <span class="sb-item-label">Was It Needed?</span>
+                <span class="sb-item-description">ICC, clustering &amp; variance decomposition.</span>
+              </span>
+            </button>
             <button class="sb-item sb-item--appendix" onclick="switchTab('advanced')" data-tab="advanced">
               <i class="fa-solid fa-scroll sb-item-icon"></i>
               <span class="sb-item-copy">
@@ -961,37 +968,7 @@
                   <!-- Important predictors + clustering summary -->
                   <div class="insight-cards-row" id="insightCardsRow"></div>
 
-                  <!-- Compact significance table -->
-                  <div class="mm-section">
-                    <div class="mm-section-header">
-                      <span><i class="fa-solid fa-square-poll-vertical"></i> Significance of Fixed Effects</span>
-                    </div>
-                    <div class="mm-section-body" id="ovFixedBody">
-                      <div class="mm-table-wrap">
-                        <table class="mm-table" id="ovFixedTable">
-                          <thead><tr>
-                            <th>Predictor</th>
-                            <th>p-value</th>
-                            <th>Effect Size (η²<sub>p</sub>)
-                              <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
-                                <span class="metric-tip">Partial eta-squared — proportion of variance explained by each predictor after controlling for others.<br>
-                                  Negligible &lt; .01 · Small ≥ .01 · Medium ≥ .06 · Large ≥ .14 (Cohen, 1988).<br>
-                                  Bar length is scaled so Large (.14) fills ~60% of the bar.</span>
-                              </span>
-                            </th>
-                          </tr></thead>
-                          <tbody id="ovFixedBody_rows">
-                            <tr><td colspan="3" class="awaiting-state" style="padding:20px;text-align:center;font-style:italic;">Awaiting results…</td></tr>
-                          </tbody>
-                        </table>
-                      </div>
-                      <div class="mm-table-wrap" style="margin-top:6px;">
-                        <span class="table-footnote" id="ovFixedFootnote">a. Dependent Variable: —</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Coefficient plot -->
+                  <!-- Coefficient plot — visual summary stays in overview -->
                   <div class="mm-section" id="ovEffectsSection" style="display:none;">
                     <div class="mm-section-header">
                       <span><i class="fa-solid fa-arrows-left-right"></i> Predictor Coefficients (B)</span>
@@ -1294,6 +1271,50 @@
                   </div>
 
                 </div><!-- /tab-diagnostics -->
+
+
+                <!-- ══════════════════════════════════════════════════════
+                     TAB: WAS IT NEEDED?  (ICC + Variance Components)
+                ══════════════════════════════════════════════════════ -->
+                <div id="tab-icc" class="tab-content">
+
+                  <!-- ICC panel -->
+                  <div class="mm-section">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-layer-group"></i> Intraclass Correlation (ICC)</span>
+                    </div>
+                    <div class="mm-section-body padded" id="iccTabMain">
+                      <div class="awaiting-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Awaiting results…</p></div>
+                    </div>
+                  </div>
+
+                  <!-- Variance components -->
+                  <div class="mm-section">
+                    <div class="mm-section-header">
+                      <span><i class="fa-solid fa-chart-pie"></i> Variance Components</span>
+                    </div>
+                    <div class="mm-section-body">
+                      <div class="mm-table-wrap">
+                        <table class="mm-table">
+                          <thead><tr>
+                            <th>Parameter</th><th>Estimate</th><th>SE</th><th>Wald Z</th><th>Sig.</th><th>% of Total</th>
+                          </tr></thead>
+                          <tbody id="iccTabVCRows">
+                            <tr><td colspan="6" class="awaiting-state" style="padding:20px;text-align:center;font-style:italic;">Awaiting results…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Verdict banner -->
+                  <div class="recommendation-card" id="iccVerdictCard" style="display:none;">
+                    <div class="rec-header"><i class="fa-solid fa-scale-balanced"></i> <span>Mixed Model Justification</span></div>
+                    <p class="rec-body" id="iccVerdictBody"></p>
+                    <div class="rec-pills" id="iccVerdictPills"></div>
+                  </div>
+
+                </div><!-- /tab-icc -->
 
 
                 <!-- ══════════════════════════════════════════════════════
@@ -1736,6 +1757,7 @@
         { id: 'model-effects',   label: 'What Matters?' },
         { id: 'marginal-means',  label: 'How Large?' },
         { id: 'diagnostics',     label: 'Can I Trust It?' },
+        { id: 'icc',             label: 'Was It Needed?' },
         { id: 'advanced',        label: 'Technical Appendix' },
         { id: 'model-structure', label: 'Model Structure' },
       ].filter(s => !!document.getElementById('tab-' + s.id));
@@ -2280,12 +2302,13 @@ ${sectionsHtml}
     renderICTable(d);
     renderLRT(d);
     renderPseudoR2(d);
-    renderOverviewFixed(d);
+
     renderOverviewEffects(d);
     renderFE3Table(d);
     renderFECoefTable(d);
     renderVCTable(d);
     renderICC(d);
+    renderICCTabVC(d);
     renderConclusionCard(d);
     populateRecommendationCard(d);
     renderDiagnosticsHealth(d);
@@ -3156,56 +3179,6 @@ ${sectionsHtml}
     el.innerHTML = html;
   }
 
-  /* ─────────────────────────────────────────────────────────────
-     OVERVIEW — Fixed effects snapshot
-  ───────────────────────────────────────────────────────────── */
-  function renderOverviewFixed(d) {
-    const tbody = document.getElementById('ovFixedBody_rows');
-    if (!tbody) return;
-    const typeIII = d.typeIII || [];
-    if (!typeIII.length) {
-      tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">No Type III data available.</td></tr>`;
-      setText('ovFixedFootnote', `a. Dependent Variable: ${d.outcome ?? d.y ?? '—'}`);
-      return;
-    }
-    // Calmer palette for effect sizes
-    const ETA_PALETTE = {
-      large:      { bar: 'rgba(110,231,183,.55)', text: '#6ee7b7', label: 'Large'      },
-      medium:     { bar: 'rgba(253,211,77,.50)',  text: '#fcd34d', label: 'Medium'     },
-      small:      { bar: 'rgba(147,197,253,.55)', text: '#93c5fd', label: 'Small'      },
-      negligible: { bar: 'rgba(148,163,184,.30)', text: '#94a3b8', label: 'Negligible' },
-    };
-    tbody.innerHTML = typeIII.map(r => {
-      const F     = parseFloat(r.F ?? r.f ?? r.Fvalue);
-      const dfN   = parseFloat(r.numDF ?? r.df1);
-      const dfD   = parseFloat(r.denDF ?? r.df2);
-      const pval  = r.pval ?? r.p ?? r.sig ?? r.Sig;
-      const eta2  = etaSquaredPartial(F, dfN, dfD);
-      const etaFmt = !isNaN(eta2) ? fmt(eta2) : '—';
-      const etaPct = !isNaN(eta2) ? Math.min(100, eta2 * 100 / 0.14 * 60).toFixed(1) : '0';
-      const pal  = !isNaN(eta2)
-        ? (eta2 >= 0.14 ? ETA_PALETTE.large : eta2 >= 0.06 ? ETA_PALETTE.medium
-           : eta2 >= 0.01 ? ETA_PALETTE.small : ETA_PALETTE.negligible)
-        : ETA_PALETTE.negligible;
-      const src = r.source ?? r.effect ?? r.Source ?? '—';
-      return `
-        <tr>
-          <td class="coef-cell">${src}</td>
-          <td class="${pClass(pval)}">${fmtP(pval)} ${sigStars(pval)}</td>
-          <td style="min-width:160px;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <div style="flex:1;height:6px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden;">
-                <div style="width:${etaPct}%;height:100%;background:${pal.bar};border-radius:99px;transition:width .4s;"></div>
-              </div>
-              <span style="font-size:.72rem;font-weight:600;color:${pal.text};white-space:nowrap;min-width:32px;">${etaFmt}</span>
-              <span style="font-size:.67rem;color:var(--text-muted);white-space:nowrap;">${pal.label}</span>
-            </div>
-          </td>
-        </tr>`;
-    }).join('');
-    setText('ovFixedFootnote', `a. Dependent Variable: ${d.outcome ?? d.y ?? '—'}`);
-  }
-
   function renderOverviewEffects(d) {
     const section = document.getElementById('ovEffectsSection');
     const body    = document.getElementById('ovEffectsBody');
@@ -3404,22 +3377,24 @@ ${sectionsHtml}
   ───────────────────────────────────────────────────────────── */
   function renderICC(d) {
     const icc = d.ICC ?? d.icc;
-    const container = document.getElementById('iccTableContainer');
-    if (!container) return;
 
     if (icc === undefined || icc === null) {
-      container.innerHTML = `<div style="color:var(--text-muted);font-style:italic;padding:10px;">ICC not available in model output.</div>`;
+      const na = `<div style="color:var(--text-muted);font-style:italic;padding:10px;">ICC not available in model output.</div>`;
+      const c1 = document.getElementById('iccTableContainer');
+      const c2 = document.getElementById('iccTabMain');
+      if (c1) c1.innerHTML = na;
+      if (c2) c2.innerHTML = na;
       return;
     }
     const iccVal = parseFloat(icc);
     const pct = (iccVal * 100).toFixed(2) + '%';
     let msg;
-    if (iccVal < .05)  msg = { cls:'pval-bad', text:'Negligible clustering — a standard OLS model may be adequate.' };
-    else if (iccVal < .10) msg = { cls:'pval-warning', text:'Modest clustering — multilevel model advisable.' };
-    else if (iccVal < .30) msg = { cls:'pval-good', text:'Moderate clustering — multilevel model is justified.' };
-    else msg = { cls:'pval-good', text:'Substantial clustering — multilevel model is strongly recommended.' };
+    if (iccVal < .05)  msg = { cls:'pval-bad',     dot:'fail', text:'Negligible clustering — a standard OLS model may be adequate.',           verdict:'Mixed model may not add beyond OLS.' };
+    else if (iccVal < .10) msg = { cls:'pval-warning', dot:'warn', text:'Modest clustering — multilevel model advisable.',                         verdict:'Clustering is present; mixed model is a reasonable choice.' };
+    else if (iccVal < .30) msg = { cls:'pval-good',    dot:'ok',   text:'Moderate clustering — multilevel model is justified.',                    verdict:'Clustering is confirmed; mixed model is justified.' };
+    else                   msg = { cls:'pval-good',    dot:'ok',   text:'Substantial clustering — multilevel model is strongly recommended.',      verdict:'Substantial clustering; mixed model is the right choice.' };
 
-    container.innerHTML = `
+    const iccHtml = `
       <table class="mm-table" style="margin-bottom:12px;">
         <thead><tr>
           <th>Grouping Variable</th><th>ICC</th><th>% Between-Group Variance</th><th>Interpretation</th>
@@ -3439,8 +3414,54 @@ ${sectionsHtml}
         <span style="font-size:.78rem;font-weight:700;color:var(--accent-3);">${pct}</span>
       </div>`;
 
-    // update interpretive text
+    // Legacy container (hidden, kept for cross-tab reads)
+    const legacy = document.getElementById('iccTableContainer');
+    if (legacy) legacy.innerHTML = iccHtml;
+
+    // New ICC tab main panel
+    const tabMain = document.getElementById('iccTabMain');
+    if (tabMain) tabMain.innerHTML = iccHtml;
+
+    // Verdict banner in ICC tab
+    const verdictCard = document.getElementById('iccVerdictCard');
+    const verdictBody = document.getElementById('iccVerdictBody');
+    const verdictPills = document.getElementById('iccVerdictPills');
+    if (verdictCard && verdictBody) {
+      verdictBody.textContent = msg.verdict;
+      if (verdictPills) verdictPills.innerHTML =
+        `<span class="rec-pill ${msg.dot === 'ok' ? 'sig' : msg.dot === 'warn' ? 'warn' : ''}">${pct} between-group variance</span>` +
+        `<span class="rec-pill info">ICC = ${fmt(iccVal, 4)}</span>`;
+      verdictCard.style.display = 'block';
+    }
+
     setText('iccInterpret', msg.text);
+  }
+
+  function renderICCTabVC(d) {
+    const tbody = document.getElementById('iccTabVCRows');
+    if (!tbody) return;
+    const vc = d.varianceComponents ?? d.randomEffects ?? [];
+    if (!vc.length) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">No variance component data available.</td></tr>`;
+      return;
+    }
+    const totalVar = vc.reduce((s, r) => s + Math.max(0, parseFloat(r.estimate ?? 0)), 0);
+    let html = '';
+    vc.forEach(r => {
+      const est  = parseFloat(r.estimate ?? r.variance);
+      const pct  = !isNaN(est) && totalVar > 0 ? ((Math.max(0,est) / totalVar) * 100).toFixed(1) + '%' : '—';
+      const waldZ = r.waldZ ?? r.z;
+      const pval  = r.pval  ?? r.p ?? r.sig;
+      html += `<tr>
+        <td>${r.parameter ?? r.name ?? '—'}</td>
+        <td class="coef-cell">${fmt(est)}</td>
+        <td>${fmt(r.se ?? r.stderr)}</td>
+        <td>${fmt(waldZ)}</td>
+        <td class="${pClass(pval)}">${fmtP(pval)} ${sigStars(pval)}</td>
+        <td><span style="font-weight:600;color:var(--accent-3);">${pct}</span></td>
+      </tr>`;
+    });
+    tbody.innerHTML = html;
   }
 
   /* ─────────────────────────────────────────────────────────────
@@ -3461,10 +3482,26 @@ ${sectionsHtml}
       parseFloat(a.pval ?? a.p ?? 1) - parseFloat(b.pval ?? b.p ?? 1));
     const hasSig = sorted.length > 0 && parseFloat(sorted[0]?.pval ?? sorted[0]?.p ?? 1) < .05;
 
-    // Headline verdict (short)
-    setText('conclusionVerdict',
-      hasSig ? 'Significant predictor effects detected'
-             : 'No significant effects found');
+    // Headline verdict — specific, data-driven
+    let verdict;
+    if (hasSig) {
+      const top = sorted[0];
+      const topName = top.source ?? top.effect ?? top.Source ?? 'A predictor';
+      const topP    = fmtP(parseFloat(top.pval ?? top.p ?? 1));
+      const others  = sorted.filter(r => parseFloat(r.pval ?? r.p ?? 1) < .05).length - 1;
+      const moreStr = others > 0 ? ` (+${others} more)` : '';
+      const iccClause = icc < .05
+        ? '; clustering is negligible'
+        : icc >= .15 ? `; substantial clustering (ICC = ${iccPct}%)`
+        : `; modest clustering (ICC = ${iccPct}%)`;
+      verdict = `${topName} significantly predicts ${outcome} (p = ${topP})${moreStr}${iccClause}.`;
+    } else {
+      const iccClause = icc < .05
+        ? ' Clustering is also negligible.'
+        : ` Group clustering is present (ICC = ${iccPct}%).`;
+      verdict = `No fixed effects were significantly associated with ${outcome}.${iccClause}`;
+    }
+    setText('conclusionVerdict', verdict);
 
     // Bullet findings
     const bullets = [];

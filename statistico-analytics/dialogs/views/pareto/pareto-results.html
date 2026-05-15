@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pareto 2080</title>
+
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" />
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://code.highcharts.com/modules/exporting.js"></script>
+  <script src="https://code.highcharts.com/modules/export-data.js"></script>
+
+  <style>
+    /* ── Design tokens ─────────────────────────────────────────── */
+    :root {
+      --bg:          #0b1320;
+      --surface-1:   #111827;
+      --surface-2:   #1a2233;
+      --surface-3:   #1f2a3c;
+      --border:      rgba(255,255,255,.09);
+      --accent:      #f97316;
+      --accent-dim:  rgba(249,115,22,.15);
+      --accent-2:    #38bdf8;
+      --text-1:      #f1f5f9;
+      --text-2:      #94a3b8;
+      --text-3:      #475569;
+      --good:        #4ade80;
+      --warn:        #fbbf24;
+      --bad:         #f87171;
+      --scrollbar:   rgba(255,255,255,.08);
+    }
+
+    /* ── Reset ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text-1);
+      overflow: hidden;
+    }
+
+    /* ── Layout ────────────────────────────────────────────────── */
+    .shell {
+      display: flex;
+      width: 100%; height: 100%;
+    }
+
+    /* ── Left sidebar ──────────────────────────────────────────── */
+    .sb-nav {
+      width: 220px;
+      flex-shrink: 0;
+      background: var(--surface-1);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sb-brand {
+      padding: 16px 14px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .sb-brand-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, #f97316, #c2410c);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; color: #fff;
+      flex-shrink: 0;
+    }
+    .sb-brand-text .sb-name   { font-size: 14px; font-weight: 700; color: var(--text-1); }
+    .sb-brand-text .sb-tagline { font-size: 10px; color: var(--text-2); margin-top: 1px; }
+
+    .sb-body { flex: 1; overflow-y: auto; padding: 8px 0; }
+    .sb-group-title {
+      font-size: 9px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: var(--text-3);
+      padding: 10px 14px 4px;
+    }
+
+    .sb-item {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 9px 14px;
+      border: none;
+      background: transparent;
+      color: var(--text-2);
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+      transition: background .12s, color .12s;
+      border-radius: 0;
+    }
+    .sb-item:hover   { background: var(--surface-2); color: var(--text-1); }
+    .sb-item.active  { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
+    .sb-item i       { width: 16px; text-align: center; font-size: 13px; flex-shrink: 0; }
+
+    /* decimals control */
+    .sb-decimals-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-top: 1px solid var(--border);
+    }
+    .sb-decimals-row label { font-size: 11px; color: var(--text-2); flex: 1; }
+    .sb-decimals-row select {
+      padding: 3px 6px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-1);
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    /* ── Right content ─────────────────────────────────────────── */
+    .right-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    /* ── Topbar ────────────────────────────────────────────────── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      background: var(--surface-1);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .topbar-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-1);
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .topbar-badge {
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 99px;
+      background: var(--accent-dim);
+      border: 1px solid rgba(249,115,22,.3);
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    /* ── Tab content ───────────────────────────────────────────── */
+    .tab-content { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+    .tab-content.active { display: flex; }
+
+    /* ── Pareto chart view ─────────────────────────────────────── */
+    .chart-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 14px;
+      gap: 12px;
+    }
+    #paretoChart {
+      flex: 1;
+      border-radius: 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    /* Vital few strip */
+    .vital-strip {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+    .vital-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 11px;
+      border-radius: 99px;
+      font-size: 11.5px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-2);
+    }
+    .vital-pill.highlight {
+      background: rgba(249,115,22,.12);
+      border-color: rgba(249,115,22,.35);
+      color: var(--accent);
+    }
+    .vital-pill .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    /* ── Contributors view ─────────────────────────────────────── */
+    .contributors-pane {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+    }
+    .contrib-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+    .contrib-table th {
+      text-align: left;
+      padding: 8px 10px;
+      background: var(--surface-2);
+      color: var(--text-2);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .contrib-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-1);
+      vertical-align: middle;
+    }
+    .contrib-table tr:last-child td { border-bottom: none; }
+    .contrib-table tr.vital td { background: rgba(249,115,22,.05); }
+
+    .rank-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: var(--surface-3);
+      color: var(--text-2);
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .rank-badge.vital { background: var(--accent-dim); color: var(--accent); }
+
+    .bar-track {
+      flex: 1;
+      height: 6px;
+      background: var(--surface-3);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      background: linear-gradient(90deg, #f97316, #fb923c);
+    }
+    .bar-fill.ns { background: var(--surface-3); }
+    .bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .cum-pct {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-2);
+      min-width: 40px;
+      text-align: right;
+    }
+    .cum-pct.vital { color: var(--accent); }
+
+    /* ── Data table view ───────────────────────────────────────── */
+    .data-pane {
+      flex: 1;
+      overflow: auto;
+      padding: 14px;
+    }
+    .data-tbl {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .data-tbl th {
+      padding: 7px 12px;
+      background: var(--surface-2);
+      color: var(--text-2);
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .data-tbl td {
+      padding: 6px 12px;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      color: var(--text-1);
+      white-space: nowrap;
+    }
+    .data-tbl tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+
+    /* scrollbars */
+    ::-webkit-scrollbar       { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 99px; }
+  </style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ── Left sidebar ─────────────────────────────────────────── -->
+  <nav class="sb-nav">
+    <div class="sb-brand">
+      <div class="sb-brand-icon"><i class="fa-solid fa-chart-column"></i></div>
+      <div class="sb-brand-text">
+        <div class="sb-name">Pareto 2080</div>
+        <div class="sb-tagline" id="sbTagline">80/20 Analysis</div>
+      </div>
+    </div>
+
+    <div class="sb-body">
+      <div class="sb-group-title">Views</div>
+      <button class="sb-item active" onclick="switchTab('chart')" data-tab="chart">
+        <i class="fa-solid fa-chart-column"></i> Pareto Chart
+      </button>
+      <button class="sb-item" onclick="switchTab('contributors')" data-tab="contributors">
+        <i class="fa-solid fa-list-ol"></i> Top Contributors
+      </button>
+      <button class="sb-item" onclick="switchTab('data')" data-tab="data">
+        <i class="fa-solid fa-table"></i> Raw Data
+      </button>
+    </div>
+
+    <!-- Decimals -->
+    <div class="sb-decimals-row">
+      <label><i class="fa-solid fa-decimal" style="font-size:10px;"></i> Decimals</label>
+      <select id="decimalsSelect" onchange="rerender()">
+        <option value="0">0</option>
+        <option value="1">1</option>
+        <option value="2" selected>2</option>
+        <option value="3">3</option>
+      </select>
+    </div>
+  </nav>
+
+  <!-- ── Right column ─────────────────────────────────────────── -->
+  <div class="right-col">
+
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="topbar-title" id="topbarTitle">Pareto Analysis</div>
+      <span class="topbar-badge" id="topbarBadge">—</span>
+    </div>
+
+    <!-- TAB: PARETO CHART -->
+    <div class="tab-content active" id="tab-chart">
+      <div class="chart-pane">
+        <div id="paretoChart"></div>
+        <div class="vital-strip" id="vitalStrip"></div>
+      </div>
+    </div>
+
+    <!-- TAB: TOP CONTRIBUTORS -->
+    <div class="tab-content" id="tab-contributors">
+      <div class="contributors-pane">
+        <table class="contrib-table" id="contribTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Category</th>
+              <th>Value</th>
+              <th>% of Total</th>
+              <th style="min-width:140px;">Cumulative %</th>
+            </tr>
+          </thead>
+          <tbody id="contribBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB: RAW DATA -->
+    <div class="tab-content" id="tab-data">
+      <div class="data-pane">
+        <table class="data-tbl" id="rawDataTable">
+          <thead id="rawDataHead"></thead>
+          <tbody id="rawDataBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /right-col -->
+</div><!-- /shell -->
+
+<script>
+  /* ─────────────────────────────────────────────────────────
+     State
+  ───────────────────────────────────────────────────────── */
+  var _cfg = null;    // config from sessionStorage
+  var _chart = null;  // Highcharts instance
+
+  /* ─────────────────────────────────────────────────────────
+     Boot
+  ───────────────────────────────────────────────────────── */
+  Office.onReady(function () {
+    try {
+      var raw = sessionStorage.getItem('paretoHubRunData');
+      if (!raw) { showError('No configuration found. Please run the analysis from the hub.'); return; }
+      _cfg = JSON.parse(raw);
+      init();
+    } catch (e) {
+      showError('Failed to load configuration: ' + e.message);
+    }
+  });
+
+  function init() {
+    /* Update header */
+    setText('topbarTitle', _cfg.chartTitle || 'Pareto Analysis');
+    var n = (_cfg.paretoData || []).length;
+    setText('topbarBadge', n + ' categories');
+    setText('sbTagline', (_cfg.categoryColName || '') + ' vs. ' + (_cfg.valuesColName || 'Count'));
+
+    renderChart();
+    renderContributors();
+    renderRawData();
+    renderVitalStrip();
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     Tab switching
+  ───────────────────────────────────────────────────────── */
+  function switchTab(name) {
+    document.querySelectorAll('.tab-content').forEach(function (t) { t.classList.remove('active'); });
+    var tab = document.getElementById('tab-' + name);
+    if (tab) tab.classList.add('active');
+    document.querySelectorAll('.sb-item[data-tab]').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.tab === name);
+    });
+    if (name === 'chart' && _chart) { setTimeout(function () { _chart.reflow(); }, 50); }
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     Highcharts Pareto Chart
+  ───────────────────────────────────────────────────────── */
+  function renderChart() {
+    if (!_cfg || !_cfg.paretoData) return;
+    var data    = _cfg.paretoData;
+    var thresh  = _cfg.threshold || 80;
+    var dec     = parseInt(document.getElementById('decimalsSelect').value, 10) || 2;
+
+    var categories = data.map(function (d) { return d.cat; });
+    var values     = data.map(function (d) { return d.val; });
+    var total      = values.reduce(function (s, v) { return s + v; }, 0);
+
+    /* cumulative % */
+    var cumPct = [];
+    var runSum = 0;
+    values.forEach(function (v) {
+      runSum += v;
+      cumPct.push(parseFloat(((runSum / total) * 100).toFixed(2)));
+    });
+
+    /* Find vital few cutoff */
+    var vitalCount = cumPct.filter(function (p) { return p <= thresh; }).length + 1;
+    vitalCount = Math.min(vitalCount, data.length);
+
+    /* Bar colors: orange for vital, muted for trivial many */
+    var barColors = values.map(function (_, i) {
+      return i < vitalCount
+        ? (i === 0 ? '#f97316' : '#fb923c')
+        : '#334155';
+    });
+
+    if (_chart) { try { _chart.destroy(); } catch (e) {} }
+
+    _chart = Highcharts.chart('paretoChart', {
+      chart: {
+        backgroundColor: 'transparent',
+        animation: { duration: 600 },
+        style: { fontFamily: "'Segoe UI', system-ui, sans-serif" }
+      },
+      title: {
+        text: _cfg.chartTitle || 'Pareto Analysis',
+        style: { color: '#f1f5f9', fontSize: '14px', fontWeight: '700' }
+      },
+      xAxis: {
+        categories: categories,
+        crosshair: true,
+        labels: { style: { color: '#94a3b8', fontSize: '11px' }, rotation: categories.length > 8 ? -35 : 0 },
+        lineColor: 'rgba(255,255,255,.1)',
+        tickColor: 'rgba(255,255,255,.08)'
+      },
+      yAxis: [
+        {
+          title: { text: _cfg.valuesColName || 'Count', style: { color: '#94a3b8', fontSize: '11px' } },
+          labels: { style: { color: '#94a3b8', fontSize: '11px' },
+            formatter: function () { return fmtNum(this.value, dec); }
+          },
+          gridLineColor: 'rgba(255,255,255,.07)'
+        },
+        {
+          title: { text: 'Cumulative %', style: { color: '#38bdf8', fontSize: '11px' } },
+          labels: { style: { color: '#38bdf8', fontSize: '11px' },
+            formatter: function () { return this.value + '%'; }
+          },
+          opposite: true,
+          min: 0, max: 100,
+          gridLineWidth: 0,
+          plotLines: _cfg.showThreshLine ? [{
+            value: thresh,
+            color: 'rgba(249,115,22,.6)',
+            width: 1.5,
+            dashStyle: 'Dash',
+            label: { text: thresh + '%', style: { color: '#f97316', fontSize: '10px' }, align: 'right', x: -4 }
+          }] : []
+        }
+      ],
+      legend: {
+        itemStyle: { color: '#94a3b8', fontSize: '11px' }
+      },
+      tooltip: {
+        backgroundColor: '#1a2233',
+        borderColor: 'rgba(255,255,255,.12)',
+        style: { color: '#f1f5f9', fontSize: '12px' },
+        shared: true,
+        formatter: function () {
+          var s = '<b style="color:#f1f5f9">' + this.x + '</b><br/>';
+          this.points.forEach(function (p) {
+            s += '<span style="color:' + p.color + '">\u25cf</span> ' + p.series.name + ': <b>' + fmtNum(p.y, dec) + '</b><br/>';
+          });
+          return s;
+        }
+      },
+      plotOptions: {
+        column: {
+          groupPadding: 0.05,
+          pointPadding: 0.02,
+          borderWidth: 0,
+          borderRadius: 3,
+          dataLabels: {
+            enabled: _cfg.showLabels !== false,
+            style: { color: '#f1f5f9', fontSize: '10px', textOutline: '1px rgba(0,0,0,.5)' },
+            formatter: function () { return fmtNum(this.y, dec); }
+          }
+        },
+        line: {
+          marker: { radius: 3, symbol: 'circle' }
+        }
+      },
+      series: [
+        {
+          type: 'column',
+          name: _cfg.valuesColName || 'Count',
+          data: values.map(function (v, i) { return { y: v, color: barColors[i] }; }),
+          yAxis: 0
+        },
+        _cfg.showCumLine !== false ? {
+          type: 'line',
+          name: 'Cumulative %',
+          data: cumPct,
+          yAxis: 1,
+          color: '#38bdf8',
+          lineWidth: 2,
+          marker: { fillColor: '#38bdf8', lineWidth: 1, lineColor: '#0b1320' }
+        } : null
+      ].filter(Boolean),
+      credits: { enabled: false },
+      exporting: { enabled: false }
+    });
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     Vital-few strip (below chart)
+  ───────────────────────────────────────────────────────── */
+  function renderVitalStrip() {
+    if (!_cfg || !_cfg.paretoData) return;
+    var data   = _cfg.paretoData;
+    var thresh = _cfg.threshold || 80;
+    var total  = data.reduce(function (s, d) { return s + d.val; }, 0);
+    var runSum = 0, vitalCount = 0;
+    for (var i = 0; i < data.length; i++) {
+      runSum += data[i].val;
+      vitalCount++;
+      if ((runSum / total) * 100 >= thresh) break;
+    }
+    var strip = document.getElementById('vitalStrip');
+    var trivial = data.length - vitalCount;
+    strip.innerHTML =
+      '<div class="vital-pill highlight"><span class="dot"></span>' +
+        vitalCount + ' vital ' + (vitalCount === 1 ? 'cause' : 'causes') + ' → ' + thresh + '%</div>' +
+      '<div class="vital-pill">' + trivial + ' trivial ' + (trivial === 1 ? 'cause' : 'causes') + '</div>' +
+      '<div class="vital-pill"><i class="fa-solid fa-sigma" style="font-size:10px;"></i>&nbsp;Total: ' + fmtNum(total, 2) + '</div>';
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     Top Contributors table
+  ───────────────────────────────────────────────────────── */
+  function renderContributors() {
+    if (!_cfg || !_cfg.paretoData) return;
+    var data   = _cfg.paretoData;
+    var thresh = _cfg.threshold || 80;
+    var dec    = parseInt(document.getElementById('decimalsSelect').value, 10) || 2;
+    var total  = data.reduce(function (s, d) { return s + d.val; }, 0);
+    var runSum = 0;
+    var html   = '';
+    data.forEach(function (d, i) {
+      runSum += d.val;
+      var pct    = total > 0 ? (d.val / total * 100) : 0;
+      var cumPct = total > 0 ? (runSum / total * 100) : 0;
+      var isVital = cumPct <= thresh + 0.001;
+      var barW   = Math.min(100, pct).toFixed(1);
+      html += '<tr class="' + (isVital ? 'vital' : '') + '">' +
+        '<td><span class="rank-badge ' + (isVital ? 'vital' : '') + '">' + (i + 1) + '</span></td>' +
+        '<td>' + escHtml(d.cat) + '</td>' +
+        '<td><strong>' + fmtNum(d.val, dec) + '</strong></td>' +
+        '<td>' +
+          '<div class="bar-wrap">' +
+            '<div class="bar-track"><div class="bar-fill ' + (isVital ? '' : 'ns') + '" style="width:' + barW + '%"></div></div>' +
+            '<span style="font-size:11px;color:var(--text-2);min-width:38px;text-align:right;">' + pct.toFixed(1) + '%</span>' +
+          '</div>' +
+        '</td>' +
+        '<td><span class="cum-pct ' + (isVital ? 'vital' : '') + '">' + cumPct.toFixed(1) + '%</span></td>' +
+      '</tr>';
+    });
+    document.getElementById('contribBody').innerHTML = html;
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     Raw Data table
+  ───────────────────────────────────────────────────────── */
+  function renderRawData() {
+    if (!_cfg || !_cfg.rawValues || !_cfg.rawValues.length) return;
+    var rows = _cfg.rawValues;
+    var head = rows[0];
+    var body = rows.slice(1);
+
+    var headHtml = '<tr>' + head.map(function (h) { return '<th>' + escHtml(String(h || '')) + '</th>'; }).join('') + '</tr>';
+    document.getElementById('rawDataHead').innerHTML = headHtml;
+
+    var bodyHtml = body.map(function (row) {
+      return '<tr>' + row.map(function (cell) { return '<td>' + escHtml(String(cell ?? '')) + '</td>'; }).join('') + '</tr>';
+    }).join('');
+    document.getElementById('rawDataBody').innerHTML = bodyHtml;
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     Rerender on decimals change
+  ───────────────────────────────────────────────────────── */
+  function rerender() {
+    renderChart();
+    renderContributors();
+    renderVitalStrip();
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     Utilities
+  ───────────────────────────────────────────────────────── */
+  function fmtNum(v, dec) {
+    var n = parseFloat(v);
+    if (isNaN(n)) return '—';
+    return n.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  }
+  function setText(id, t) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = t;
+  }
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function showError(msg) {
+    document.body.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#f87171;font-family:Segoe UI,sans-serif;font-size:14px;padding:24px;text-align:center;">' +
+      '<i class="fa-solid fa-triangle-exclamation" style="margin-right:8px;"></i>' + escHtml(msg) + '</div>';
+  }
+</script>
+</body>
+</html>

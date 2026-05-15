@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pareto 2080 — Configuration</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared-config.css?v=20260511d"/>
+  <script src="../shared-config.js?v=20260309d"></script>
+
+  <style>
+    /* ── Pareto-specific overrides ─────────────────────────────────── */
+    .prt-col-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+    @media (max-width: 480px) { .prt-col-grid { grid-template-columns: 1fr; } }
+
+    .prt-col-card {
+      background: var(--cfg-surface2);
+      border: 1.5px solid var(--cfg-border);
+      border-radius: 10px;
+      padding: 14px 14px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: border-color .15s;
+    }
+    .prt-col-card:focus-within { border-color: var(--cfg-accent); }
+
+    .prt-col-card-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--cfg-accent);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .prt-col-card-label i { font-size: 12px; }
+
+    .prt-col-card-hint {
+      font-size: 11px;
+      color: var(--cfg-text3);
+      margin-top: -4px;
+      line-height: 1.4;
+    }
+
+    .prt-select {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1.5px solid var(--cfg-border);
+      border-radius: 7px;
+      background: var(--cfg-surface1);
+      color: var(--cfg-text1);
+      font-size: 12.5px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: border-color .15s;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 9px center;
+      padding-right: 28px;
+    }
+    .prt-select:focus { outline: none; border-color: var(--cfg-accent); }
+
+    .prt-preview-strip {
+      font-size: 11px;
+      color: var(--cfg-text3);
+      background: var(--cfg-surface1);
+      border: 1px solid var(--cfg-border);
+      border-radius: 6px;
+      padding: 5px 8px;
+      min-height: 22px;
+      font-style: italic;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    /* Options panel */
+    .prt-options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 480px) { .prt-options-grid { grid-template-columns: 1fr; } }
+
+    .prt-opt-group { display: flex; flex-direction: column; gap: 5px; }
+    .prt-opt-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--cfg-text2);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .prt-threshold-row { display: flex; align-items: center; gap: 10px; }
+    .prt-threshold-row input[type="range"] {
+      flex: 1;
+      accent-color: var(--cfg-accent);
+      height: 4px;
+    }
+    .prt-threshold-val {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--cfg-accent);
+      min-width: 34px;
+      text-align: right;
+    }
+
+    .prt-text-input {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1.5px solid var(--cfg-border);
+      border-radius: 7px;
+      background: var(--cfg-surface1);
+      color: var(--cfg-text1);
+      font-size: 12.5px;
+      font-family: inherit;
+      transition: border-color .15s;
+    }
+    .prt-text-input:focus { outline: none; border-color: var(--cfg-accent); }
+    .prt-text-input::placeholder { color: var(--cfg-text3); }
+
+    .prt-radio-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .prt-radio-btn {
+      flex: 1;
+      min-width: 80px;
+      text-align: center;
+      padding: 6px 8px;
+      border: 1.5px solid var(--cfg-border);
+      border-radius: 7px;
+      background: var(--cfg-surface1);
+      color: var(--cfg-text2);
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      user-select: none;
+    }
+    .prt-radio-btn.active {
+      border-color: var(--cfg-accent);
+      background: rgba(249,115,22,.10);
+      color: var(--cfg-accent);
+    }
+
+    .prt-checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 4px;
+    }
+    .prt-checkbox-row input[type="checkbox"] { accent-color: var(--cfg-accent); width: 14px; height: 14px; }
+    .prt-checkbox-row label { font-size: 12px; color: var(--cfg-text2); cursor: pointer; }
+
+    /* Summary stats strip */
+    .prt-stats-strip {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .prt-stat-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 99px;
+      border: 1px solid var(--cfg-border);
+      background: var(--cfg-surface2);
+      font-size: 11px;
+      color: var(--cfg-text2);
+    }
+    .prt-stat-pill strong { color: var(--cfg-accent); font-size: 12px; }
+
+    /* Validation notice */
+    .prt-validation {
+      font-size: 11.5px;
+      padding: 7px 10px;
+      border-radius: 7px;
+      border: 1px solid var(--cfg-border);
+      background: var(--cfg-surface2);
+      color: var(--cfg-text3);
+      display: none;
+    }
+    .prt-validation.error {
+      display: block;
+      border-color: #f87171;
+      background: rgba(239,68,68,.06);
+      color: #f87171;
+    }
+    .prt-validation.ok {
+      display: block;
+      border-color: #4ade80;
+      background: rgba(74,222,128,.06);
+      color: #4ade80;
+    }
+  </style>
+</head>
+<body>
+  <div class="cfg-shell">
+
+    <!-- Header -->
+    <header class="cfg-header">
+      <div class="cfg-header-icon" style="background:linear-gradient(135deg,#f97316,#c2410c);">
+        <i class="fa-solid fa-chart-column"></i>
+      </div>
+      <span class="cfg-header-title">Pareto 2080</span>
+      <span class="cfg-meta-badge" id="rangeInfo">—</span>
+      <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch to light mode">
+        <span class="cfg-toggle-icon">&#x1F319;</span>
+        <div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div>
+        <span class="cfg-toggle-label">Dark</span>
+      </button>
+    </header>
+
+    <!-- Loading state -->
+    <div id="loadingSpinner" class="cfg-spinner">
+      <i class="fa-solid fa-spinner fa-spin"></i> Loading data…
+    </div>
+
+    <!-- Main content -->
+    <div id="mainContent" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
+      <div class="cfg-body">
+
+        <!-- PANEL 1 — Column assignment -->
+        <div class="cfg-panel">
+          <div class="cfg-panel-head">
+            <i class="fa-solid fa-columns"></i> Column Assignment
+          </div>
+          <div class="cfg-panel-body">
+            <div class="prt-col-grid">
+
+              <!-- Category column -->
+              <div class="prt-col-card">
+                <div class="prt-col-card-label">
+                  <i class="fa-solid fa-tag"></i> Category (X axis)
+                </div>
+                <div class="prt-col-card-hint">Items or defect types to rank.</div>
+                <select class="prt-select" id="categoryColSelect" onchange="onColumnChange()">
+                  <option value="">— Select column —</option>
+                </select>
+                <div class="prt-preview-strip" id="categoryPreview">No column selected</div>
+              </div>
+
+              <!-- Values column -->
+              <div class="prt-col-card">
+                <div class="prt-col-card-label">
+                  <i class="fa-solid fa-hashtag"></i> Values (Y axis)
+                </div>
+                <div class="prt-col-card-hint">Numeric measure to sum per category.</div>
+                <select class="prt-select" id="valuesColSelect" onchange="onColumnChange()">
+                  <option value="">— Count occurrences —</option>
+                </select>
+                <div class="prt-preview-strip" id="valuesPreview">Will count rows per category</div>
+              </div>
+
+            </div>
+
+            <!-- Data summary pills -->
+            <div class="prt-stats-strip" id="statsStrip" style="display:none;">
+              <div class="prt-stat-pill"><i class="fa-solid fa-table-rows"></i> Rows: <strong id="statRows">—</strong></div>
+              <div class="prt-stat-pill"><i class="fa-solid fa-tag"></i> Categories: <strong id="statCats">—</strong></div>
+              <div class="prt-stat-pill"><i class="fa-solid fa-sigma"></i> Total: <strong id="statTotal">—</strong></div>
+            </div>
+
+            <!-- Validation notice -->
+            <div class="prt-validation" id="validationMsg"></div>
+
+          </div>
+        </div>
+
+        <!-- PANEL 2 — Analysis options -->
+        <div class="cfg-panel">
+          <div class="cfg-panel-head">
+            <i class="fa-solid fa-sliders"></i> Analysis Options
+          </div>
+          <div class="cfg-panel-body">
+            <div class="prt-options-grid">
+
+              <!-- Threshold -->
+              <div class="prt-opt-group" style="grid-column:1/-1;">
+                <div class="prt-opt-label">
+                  <i class="fa-solid fa-percent"></i> Pareto Threshold
+                </div>
+                <div class="prt-threshold-row">
+                  <input type="range" id="thresholdSlider" min="50" max="95" step="5" value="80"
+                    oninput="document.getElementById('thresholdVal').textContent=this.value+'%'" />
+                  <span class="prt-threshold-val" id="thresholdVal">80%</span>
+                </div>
+              </div>
+
+              <!-- Chart title -->
+              <div class="prt-opt-group" style="grid-column:1/-1;">
+                <div class="prt-opt-label"><i class="fa-solid fa-heading"></i> Chart Title</div>
+                <input type="text" class="prt-text-input" id="chartTitle" placeholder="e.g. Defect causes Q2-2026" />
+              </div>
+
+              <!-- Sort order -->
+              <div class="prt-opt-group">
+                <div class="prt-opt-label"><i class="fa-solid fa-arrow-down-wide-short"></i> Sort order</div>
+                <div class="prt-radio-row">
+                  <div class="prt-radio-btn active" id="sortDesc" onclick="selectSort('desc')">
+                    <i class="fa-solid fa-arrow-down"></i> Highest first
+                  </div>
+                  <div class="prt-radio-btn" id="sortAsc" onclick="selectSort('asc')">
+                    <i class="fa-solid fa-arrow-up"></i> Lowest first
+                  </div>
+                </div>
+              </div>
+
+              <!-- Display options -->
+              <div class="prt-opt-group">
+                <div class="prt-opt-label"><i class="fa-solid fa-eye"></i> Show on chart</div>
+                <div class="prt-checkbox-row">
+                  <input type="checkbox" id="showCumLine" checked />
+                  <label for="showCumLine">Cumulative % line</label>
+                </div>
+                <div class="prt-checkbox-row">
+                  <input type="checkbox" id="showThreshLine" checked />
+                  <label for="showThreshLine">Threshold reference line</label>
+                </div>
+                <div class="prt-checkbox-row">
+                  <input type="checkbox" id="showLabels" checked />
+                  <label for="showLabels">Value labels on bars</label>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /cfg-body -->
+
+      <!-- Footer -->
+      <div class="cfg-footer">
+        <button class="cfg-btn cancel" onclick="Office.context.ui.messageParent(JSON.stringify({action:'close'}))">
+          <i class="fa-solid fa-times"></i> Cancel
+        </button>
+        <button class="cfg-btn run" id="btnRun" onclick="runAnalysis()" disabled>
+          <i class="fa-solid fa-chart-column"></i> Run Pareto Analysis
+        </button>
+      </div>
+
+    </div><!-- /mainContent -->
+  </div><!-- /cfg-shell -->
+
+  <script>
+    /* ─────────────────────────────────────────────────────────
+       State
+    ───────────────────────────────────────────────────────── */
+    var _rawData  = null;   // 2D array from hub: rows[0] = headers
+    var _headers  = [];
+    var _rows     = [];
+    var _sortDir  = 'desc';
+
+    /* ─────────────────────────────────────────────────────────
+       Office bootstrap
+    ───────────────────────────────────────────────────────── */
+    Office.onReady(function () {
+      Office.context.ui.addHandlerAsync(
+        Office.EventType.DialogParentMessageReceived,
+        function (arg) {
+          try {
+            var msg = JSON.parse(arg.message || '{}');
+            if (msg.type === 'PARETO_DATA') {
+              handleData(msg.payload);
+            }
+          } catch (e) {}
+        }
+      );
+      Office.context.ui.messageParent(JSON.stringify({ action: 'ready' }));
+    });
+
+    /* ─────────────────────────────────────────────────────────
+       Handle incoming range data
+    ───────────────────────────────────────────────────────── */
+    function handleData(payload) {
+      var values = payload.values || [];
+      if (!values.length) return;
+
+      _rawData = values;
+      _headers = values[0].map(function (h) { return String(h || ''); });
+      _rows    = values.slice(1);
+
+      /* Update range badge */
+      var badge = document.getElementById('rangeInfo');
+      if (badge) badge.textContent = (_rows.length) + ' rows × ' + _headers.length + ' cols';
+
+      /* Populate column dropdowns */
+      populateDropdowns();
+
+      /* Show main content */
+      document.getElementById('loadingSpinner').style.display = 'none';
+      document.getElementById('mainContent').style.display    = 'flex';
+
+      /* Auto-detect columns */
+      autoDetectColumns();
+      onColumnChange();
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       Populate column selectors
+    ───────────────────────────────────────────────────────── */
+    function populateDropdowns() {
+      var catSel = document.getElementById('categoryColSelect');
+      var valSel = document.getElementById('valuesColSelect');
+
+      /* Reset */
+      catSel.innerHTML = '<option value="">— Select column —</option>';
+      valSel.innerHTML = '<option value="">— Count occurrences —</option>';
+
+      _headers.forEach(function (h, i) {
+        var isNum = _rows.some(function (r) {
+          return r[i] !== '' && r[i] !== null && r[i] !== undefined && !isNaN(parseFloat(r[i]));
+        });
+        var opt = '<option value="' + i + '">' + escHtml(h) + (isNum ? '' : ' (text)') + '</option>';
+        catSel.insertAdjacentHTML('beforeend', opt);
+        if (isNum) valSel.insertAdjacentHTML('beforeend', opt);
+      });
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       Auto-detect best column pair
+    ───────────────────────────────────────────────────────── */
+    function autoDetectColumns() {
+      var catSel = document.getElementById('categoryColSelect');
+      var valSel = document.getElementById('valuesColSelect');
+
+      /* Category: first non-numeric column, or first column */
+      var firstText = -1, firstNum = -1;
+      _headers.forEach(function (h, i) {
+        var colIsNum = _rows.every(function (r) {
+          var v = r[i];
+          return v === '' || v === null || v === undefined || !isNaN(parseFloat(v));
+        });
+        if (!colIsNum && firstText < 0) firstText = i;
+        if (colIsNum  && firstNum  < 0) firstNum  = i;
+      });
+
+      if (firstText >= 0) catSel.value = String(firstText);
+      if (firstNum  >= 0) valSel.value = String(firstNum);
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       Column change handler
+    ───────────────────────────────────────────────────────── */
+    function onColumnChange() {
+      var catIdx = parseInt(document.getElementById('categoryColSelect').value, 10);
+      var valIdx = document.getElementById('valuesColSelect').value;
+
+      /* Category preview */
+      var catPrev = document.getElementById('categoryPreview');
+      if (!isNaN(catIdx)) {
+        var samples = _rows.slice(0, 5).map(function (r) { return String(r[catIdx] || '—'); }).join(', ');
+        catPrev.textContent = samples;
+        catPrev.style.fontStyle = 'normal';
+      } else {
+        catPrev.textContent = 'No column selected';
+        catPrev.style.fontStyle = 'italic';
+      }
+
+      /* Values preview */
+      var valPrev = document.getElementById('valuesPreview');
+      if (valIdx !== '') {
+        var vi = parseInt(valIdx, 10);
+        var nums = _rows.slice(0, 5).map(function (r) { return r[vi]; }).filter(function (v) { return !isNaN(parseFloat(v)); });
+        valPrev.textContent = nums.map(function (v) { return parseFloat(v).toLocaleString(); }).join(', ');
+        valPrev.style.fontStyle = 'normal';
+      } else {
+        valPrev.textContent = 'Will count rows per category';
+        valPrev.style.fontStyle = 'italic';
+      }
+
+      /* Stats strip */
+      updateStats(catIdx, valIdx);
+
+      /* Validate + enable run */
+      validateAndEnableRun();
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       Stats strip
+    ───────────────────────────────────────────────────────── */
+    function updateStats(catIdx, valIdx) {
+      var strip = document.getElementById('statsStrip');
+      if (isNaN(catIdx)) { strip.style.display = 'none'; return; }
+      strip.style.display = 'flex';
+
+      /* Count unique categories */
+      var cats = {};
+      _rows.forEach(function (r) { var k = String(r[catIdx] || ''); if (k) cats[k] = 1; });
+      document.getElementById('statRows').textContent = _rows.length.toLocaleString();
+      document.getElementById('statCats').textContent = Object.keys(cats).length;
+
+      /* Sum or count */
+      var total;
+      if (valIdx !== '' && !isNaN(parseInt(valIdx, 10))) {
+        var vi = parseInt(valIdx, 10);
+        total = _rows.reduce(function (s, r) { var v = parseFloat(r[vi]); return s + (isNaN(v) ? 0 : v); }, 0);
+        document.getElementById('statTotal').textContent = total.toLocaleString(undefined, { maximumFractionDigits: 2 });
+      } else {
+        document.getElementById('statTotal').textContent = _rows.length.toLocaleString();
+      }
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       Validate + enable run button
+    ───────────────────────────────────────────────────────── */
+    function validateAndEnableRun() {
+      var catIdx = document.getElementById('categoryColSelect').value;
+      var msg    = document.getElementById('validationMsg');
+      var btn    = document.getElementById('btnRun');
+
+      if (catIdx === '') {
+        msg.className = 'prt-validation error';
+        msg.textContent = 'Please select a Category column.';
+        btn.disabled = true;
+        return;
+      }
+
+      var valIdx   = document.getElementById('valuesColSelect').value;
+      var sameCol  = valIdx !== '' && valIdx === catIdx;
+      if (sameCol) {
+        msg.className = 'prt-validation error';
+        msg.textContent = 'Category and Values columns must be different.';
+        btn.disabled = true;
+        return;
+      }
+
+      msg.className = 'prt-validation ok';
+      var catName = _headers[parseInt(catIdx, 10)] || 'column ' + catIdx;
+      var valName = valIdx !== '' ? (_headers[parseInt(valIdx, 10)] || 'column ' + valIdx) : 'occurrence count';
+      msg.textContent = '✓ Ready — chart "' + catName + '" vs. ' + valName + '.';
+      btn.disabled = false;
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       Sort toggle
+    ───────────────────────────────────────────────────────── */
+    function selectSort(dir) {
+      _sortDir = dir;
+      document.getElementById('sortDesc').classList.toggle('active', dir === 'desc');
+      document.getElementById('sortAsc').classList.toggle('active', dir === 'asc');
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       Run analysis — bundle config + raw data, send to hub
+    ───────────────────────────────────────────────────────── */
+    function runAnalysis() {
+      var catIdx      = parseInt(document.getElementById('categoryColSelect').value, 10);
+      var valIdxRaw   = document.getElementById('valuesColSelect').value;
+      var valIdx      = valIdxRaw !== '' ? parseInt(valIdxRaw, 10) : null;
+      var threshold   = parseInt(document.getElementById('thresholdSlider').value, 10);
+      var chartTitle  = document.getElementById('chartTitle').value.trim();
+      var showCumLine = document.getElementById('showCumLine').checked;
+      var showThresh  = document.getElementById('showThreshLine').checked;
+      var showLabels  = document.getElementById('showLabels').checked;
+
+      /* Build category → value map */
+      var map = {};
+      _rows.forEach(function (row) {
+        var cat = String(row[catIdx] || '').trim();
+        if (!cat) return;
+        var val = valIdx !== null ? parseFloat(row[valIdx]) : 1;
+        if (isNaN(val)) val = 0;
+        map[cat] = (map[cat] || 0) + val;
+      });
+
+      /* Sort */
+      var entries = Object.keys(map).map(function (k) { return { cat: k, val: map[k] }; });
+      entries.sort(function (a, b) { return _sortDir === 'desc' ? b.val - a.val : a.val - b.val; });
+
+      Office.context.ui.messageParent(JSON.stringify({
+        action: 'runAnalysis',
+        data: {
+          headers: _headers,
+          categoryColIndex: catIdx,
+          valuesColIndex:   valIdx,
+          categoryColName:  _headers[catIdx] || '',
+          valuesColName:    valIdx !== null ? (_headers[valIdx] || '') : 'Count',
+          sortDir:          _sortDir,
+          threshold:        threshold,
+          chartTitle:       chartTitle || (_headers[catIdx] + ' — Pareto Analysis'),
+          showCumLine:      showCumLine,
+          showThreshLine:   showThresh,
+          showLabels:       showLabels,
+          paretoData:       entries,           // pre-aggregated: [{cat, val}]
+          rawValues:        _rawData           // full grid for data table
+        }
+      }));
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       Utility
+    ───────────────────────────────────────────────────────── */
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+  </script>
+</body>
+</html>

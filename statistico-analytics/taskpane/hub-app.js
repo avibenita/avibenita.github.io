@@ -22,6 +22,9 @@ let hubIndependentFlowActive = false;
 let hubIndependentDialog = null;
 let hubCorrelationFlowActive = false;
 let hubCorrelationDialog = null;
+let hubParetoFlowActive = false;
+let hubParetoConfigDialog = null;
+let hubParetoResultsDialog = null;
 // Dialog dimensions are defined in dialog-sizes.js (DIALOG_SIZES)
 const HUB_CATEGORY_TILES = [
   {
@@ -188,16 +191,31 @@ const CALCULATOR_CATEGORY_TILES = [
 ];
 const APPLICATION_CATEGORY_TILES = [
   {
+    id: "quality-ops",
+    title: "Quality & Operations",
+    icon: "fa-chart-column",
+    color: "#f97316",
+    colorDark: "#c2410c",
+    subtitle: "Operational intelligence and quality analysis tools",
+    modules: [
+      {
+        id: "pareto2080",
+        label: "Pareto 2080",
+        tip: "Identify the vital few contributors using interactive Pareto analysis with the 80/20 rule."
+      }
+    ]
+  },
+  {
     id: "application-clusters",
-    title: "Applications",
+    title: "Coming Soon",
     icon: "fa-grid-2",
     color: "#64748b",
     colorDark: "#334155",
-    subtitle: "Cross-workflow apps that will expand beyond analytics and calculators",
+    subtitle: "More applications expanding the Statistico ecosystem",
     modules: [
-      { id: "app-reports", label: "Reports", tip: "Coming soon: reporting workspace.", comingSoon: true },
+      { id: "app-reports",    label: "Reports",    tip: "Coming soon: reporting workspace.",    comingSoon: true },
       { id: "app-automation", label: "Automation", tip: "Coming soon: automation workspace.", comingSoon: true },
-      { id: "app-insights", label: "Insights", tip: "Coming soon: insights workspace.", comingSoon: true }
+      { id: "app-insights",   label: "Insights",   tip: "Coming soon: insights workspace.",   comingSoon: true }
     ]
   }
 ];
@@ -239,7 +257,7 @@ let HUB_CLUSTER_META = {
   }
 };
 let HUB_VISIBLE_CLUSTERS = ["analytics", "calculators", "applications"];
-let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics"];
+let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics", "applications"];
 let ACTIVE_CLUSTER = "analytics";
 let HUB_ACTIONS = {};
 
@@ -1035,6 +1053,77 @@ function openCorrelationConfigFromHub() {
   return true;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   PARETO 2080 — flow
+   ═══════════════════════════════════════════════════════════════════════════ */
+function finishHubParetoFlow() {
+  hubParetoFlowActive = false;
+  hubParetoConfigDialog = null;
+  hubParetoResultsDialog = null;
+  setSelectedModuleCard("pareto2080", false);
+}
+
+function openParetoFromHub() {
+  var gr = getGlobalRangePayload();
+  if (!gr) return false;
+  hubParetoFlowActive = true;
+  setSelectedModuleCard("pareto2080", true);
+  Office.context.ui.displayDialogAsync(
+    getDialogsBaseUrl() + "pareto/pareto-config.html?v=" + Date.now(),
+    DIALOG_SIZES.SETUP,
+    function (res) {
+      if (res.status === Office.AsyncResultStatus.Failed) {
+        finishHubParetoFlow();
+        return;
+      }
+      hubParetoConfigDialog = res.value;
+      var sendParetoData = function () {
+        if (!hubParetoConfigDialog || !gr) return;
+        hubParetoConfigDialog.messageChild(JSON.stringify({
+          type: "PARETO_DATA",
+          payload: { values: gr.values, address: gr.address || "" }
+        }));
+      };
+      setTimeout(sendParetoData, 550);
+      hubParetoConfigDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+        try {
+          var msg = JSON.parse(arg.message || "{}");
+          if (msg.action === "ready" || msg.action === "requestData") {
+            sendParetoData();
+          } else if (msg.action === "runAnalysis") {
+            sessionStorage.setItem("paretoHubRunData", JSON.stringify(msg.data || {}));
+            try { hubParetoConfigDialog.close(); } catch (e) {}
+            hubParetoConfigDialog = null;
+            /* Open results dialog */
+            Office.context.ui.displayDialogAsync(
+              getDialogsBaseUrl() + "pareto/pareto-results.html?v=" + Date.now(),
+              DIALOG_SIZES.RESULTS,
+              function (rRes) {
+                if (rRes.status === Office.AsyncResultStatus.Failed) {
+                  finishHubParetoFlow();
+                  return;
+                }
+                hubParetoResultsDialog = rRes.value;
+                hubParetoResultsDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
+                  finishHubParetoFlow();
+                });
+              }
+            );
+          } else if (msg.action === "close") {
+            try { hubParetoConfigDialog.close(); } catch (e) {}
+            finishHubParetoFlow();
+          }
+        } catch (e) {}
+      });
+      hubParetoConfigDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
+        hubParetoConfigDialog = null;
+        finishHubParetoFlow();
+      });
+    }
+  );
+  return true;
+}
+
 function openBuilderDialogFromHub(options) {
   var gr = getGlobalRangePayload();
   if (!gr) return false;
@@ -1346,6 +1435,9 @@ function navigateToModule(id) {
   }
   if (id === "cluster" && gr && gr.values && gr.values.length >= 2) {
     if (openClusterConfigFromHub()) return;
+  }
+  if (id === "pareto2080" && gr && gr.values && gr.values.length >= 2) {
+    if (openParetoFromHub()) return;
   }
   var url = "./" + id + "/" + id + ".html?v=" + Date.now() + "&fromHub=1";
   if (gr && gr.values && gr.values.length >= 2) url += "&autoConfig=1&directDialog=1";

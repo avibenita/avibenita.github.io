@@ -321,27 +321,6 @@
     .mh-dot.na   { background: #475569; }
 
     /* ── Key Findings strip ── */
-    .key-findings-strip {
-      display:none; flex-direction:column; gap:0;
-      margin:0; border-radius:8px; overflow:hidden;
-      border:1px solid rgba(255,255,255,.08);
-    }
-    .key-findings-strip.visible { display:flex; }
-    .kf-header {
-      font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em;
-      color:var(--text-muted); padding:5px 14px; background:rgba(255,255,255,.03);
-      border-bottom:1px solid rgba(255,255,255,.06);
-    }
-    .kf-item {
-      display:flex; align-items:center; gap:12px;
-      padding:8px 14px; border-bottom:1px solid rgba(255,255,255,.05);
-      font-size:.82rem; color:var(--text-secondary); background:var(--surface-2);
-    }
-    .kf-item:last-child { border-bottom:none; }
-    .kf-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
-    .kf-dot.sig  { background:#6ee7b7; box-shadow:0 0 6px rgba(110,231,183,.5); }
-    .kf-dot.ns   { background:#475569; }
-    .kf-dot.warn { background:#fcd34d; }
     .kf-text strong { color:var(--text-primary); }
     .microtag {
       display:inline-flex; align-items:center; gap:4px;
@@ -981,11 +960,6 @@
 
                   <!-- Important predictors + clustering summary -->
                   <div class="insight-cards-row" id="insightCardsRow"></div>
-
-                  <!-- Key Findings strip -->
-                  <div class="key-findings-strip" id="keyFindingsStrip">
-                    <div class="kf-header">Key Findings</div>
-                  </div>
 
                   <!-- Compact significance table -->
                   <div class="mm-section">
@@ -2039,7 +2013,6 @@ ${body}
     // populate everything
     renderKPIs(d);
     renderInsightCards(d);
-    renderKeyFindings(d);
     renderSampleInfo(d);
     renderFitInfo(d);
     renderEstimationInfo(d);
@@ -2179,52 +2152,6 @@ ${body}
     row.innerHTML = card1HTML + card2HTML;
   }
 
-  /* ─────────────────────────────────────────────────────────────
-     KEY FINDINGS STRIP  (between insight cards and table)
-  ───────────────────────────────────────────────────────────── */
-  function renderKeyFindings(d) {
-    const strip = document.getElementById('keyFindingsStrip');
-    if (!strip) return;
-
-    const typeIII = (d.typeIII || []).filter(r =>
-      (r.source ?? r.effect ?? r.Source ?? '').toLowerCase() !== 'intercept');
-    const outcome = d.outcome ?? d.y ?? 'the outcome';
-    const icc     = parseFloat(d.ICC ?? d.icc ?? 0);
-
-    const items = [];
-    const sorted = [...typeIII].sort((a, b) =>
-      parseFloat(a.pval ?? a.p ?? 1) - parseFloat(b.pval ?? b.p ?? 1));
-
-    for (const r of sorted) {
-      const name = r.source ?? r.effect ?? r.Source ?? '?';
-      const p    = parseFloat(r.pval ?? r.p ?? 1);
-      const F    = parseFloat(r.F ?? r.f ?? 0);
-      const dfN  = parseFloat(r.numDF ?? r.df1);
-      const dfD  = parseFloat(r.denDF ?? r.df2);
-      const eta2 = etaSquaredPartial(F, dfN, dfD);
-      const sLbl = !isNaN(eta2)
-        ? (eta2 >= 0.14 ? 'large' : eta2 >= 0.06 ? 'medium' : eta2 >= 0.01 ? 'small' : '')
-        : '';
-      if (p < .05) {
-        items.push({ cls:'sig',  text:`<strong>${name}</strong> strongly predicts ${outcome}${sLbl ? ' — ' + sLbl + ' effect' : ''} (p = ${fmtP(p)})` });
-      } else {
-        items.push({ cls:'ns',   text:`<strong>${name}</strong> showed no measurable association (p = ${fmtP(p)})` });
-      }
-    }
-    // Clustering finding
-    if (icc < .05) {
-      items.push({ cls:'ns',   text:`Clustering contribution was negligible (ICC ≈ ${(icc*100).toFixed(1)}%)` });
-    } else {
-      items.push({ cls:'warn', text:`Group clustering detected — ICC = ${(icc*100).toFixed(1)}%` });
-    }
-
-    if (!items.length) return;
-    strip.innerHTML = `<div class="kf-header">Key Findings</div>` +
-      items.map(it =>
-        `<div class="kf-item"><div class="kf-dot ${it.cls}"></div><div class="kf-text">${it.text}</div></div>`
-      ).join('');
-    strip.classList.add('visible');
-  }
 
   /* ─────────────────────────────────────────────────────────────
      SAMPLE INFO

@@ -1862,22 +1862,71 @@
 
       // Capture each tab
       const captures = [];
+      // Light-theme SVG overrides for Highcharts
+      const _hcLightOpts = {
+        chart:       { backgroundColor: '#ffffff' },
+        title:       { style: { color: '#1e293b', fontFamily: 'Segoe UI,Arial,sans-serif' } },
+        subtitle:    { style: { color: '#64748b' } },
+        xAxis:       { labels: { style: { color: '#374151' } }, title: { style: { color: '#374151' } },
+                       lineColor: '#e2e8f0', gridLineColor: '#f1f5f9', tickColor: '#e2e8f0' },
+        yAxis:       { labels: { style: { color: '#374151' } }, title: { style: { color: '#374151' } },
+                       gridLineColor: '#f1f5f9' },
+        legend:      { itemStyle: { color: '#374151', fontWeight: '400' }, itemHoverStyle: { color: '#1e293b' } },
+        tooltip:     { backgroundColor: '#ffffff', style: { color: '#1e293b' }, borderColor: '#e2e8f0' }
+      };
+
       for (let i = 0; i < selected.length; i++) {
         const s = selected[i];
         setProgress(i, selected.length + 2, `Capturing ${s.label}\u2026`);
         window.switchTab(s.id);
-        await new Promise(r => setTimeout(r, s.id === 'diagnostics' ? 2500 : 700));
+        // Diagnostics lazy-loads — give it extra time; otherwise standard wait
+        await new Promise(r => setTimeout(r, s.id === 'diagnostics' ? 2800 : 900));
+
         const tabEl = document.getElementById('tab-' + s.id);
-        if (tabEl) {
-          const clone = tabEl.cloneNode(true);
-          clone.querySelectorAll('script,noscript,.loading-overlay,#dialogLoading,.sb-ai-float-btn,.sb-ai-overlay').forEach(el => el.remove());
-          clone.querySelectorAll('button,select,input,textarea').forEach(el => {
-            el.setAttribute('disabled', 'disabled');
-            el.style.cssText += ';pointer-events:none!important;opacity:.55!important;cursor:default!important;';
-            ['onclick','onchange','oninput','onmousedown','onmouseup'].forEach(ev => el.removeAttribute(ev));
+        if (!tabEl) continue;
+
+        // ── 1. Extract live Highcharts charts as static SVG strings ──
+        const chartSvgMap = {};
+        if (typeof Highcharts !== 'undefined') {
+          Highcharts.charts.forEach(chart => {
+            if (!chart || !chart.renderTo) return;
+            if (!tabEl.contains(chart.renderTo)) return;
+            const id = chart.renderTo.id;
+            if (!id) return;
+            try {
+              chartSvgMap[id] = chart.getSVG(isLight ? _hcLightOpts : { chart: { backgroundColor: '#0b0e16' } });
+            } catch(e) { /* chart.getSVG not available — leave as-is */ }
           });
-          captures.push({ label: s.label, html: clone.innerHTML });
         }
+
+        // ── 2. Deep-clone the tab DOM ──────────────────────────────
+        const clone = tabEl.cloneNode(true);
+
+        // ── 3. Replace chart containers with static SVG snapshots ──
+        Object.entries(chartSvgMap).forEach(([id, svgStr]) => {
+          const el = clone.querySelector('#' + id);
+          if (el) {
+            el.innerHTML = svgStr;
+            el.style.cssText = 'width:100%;overflow:visible;min-height:0;display:block;';
+          }
+        });
+
+        // ── 4. Remove interactive control bars that carry no data ──
+        clone.querySelectorAll(
+          'script, noscript, .loading-overlay, #dialogLoading, ' +
+          '.sb-ai-float-btn, .sb-ai-overlay, ' +
+          '.cov-selector-row, .collapse-toggle, ' +        // factor/adjust bars, collapse buttons
+          '.awaiting-state:empty'                           // empty placeholders
+        ).forEach(el => el.remove());
+
+        // ── 5. Disable remaining interactive elements ──────────────
+        clone.querySelectorAll('button,select,input,textarea').forEach(el => {
+          el.setAttribute('disabled', 'disabled');
+          el.style.cssText += ';pointer-events:none!important;opacity:.45!important;cursor:default!important;';
+          ['onclick','onchange','oninput','onmousedown','onmouseup'].forEach(ev => el.removeAttribute(ev));
+        });
+
+        captures.push({ label: s.label, html: clone.innerHTML });
       }
 
       window.switchTab(originalTab);
@@ -1968,9 +2017,14 @@ ${inlineCSS}
 html, body { height: auto !important; overflow: auto !important; }
 body { margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background: ${bgColor}; color: ${textColor}; }
 .sb-nav, .sb-ai-float-btn, .sb-ai-overlay, .statistico-header,
-#header-container, .dialog-loading-overlay { display: none !important; }
+#header-container, .dialog-loading-overlay,
+.cov-selector-row, .collapse-toggle { display: none !important; }
 .tab-content, .tab-content.active, .rpt-tab { display: block !important; opacity: 1 !important; }
 button, select, input, textarea { pointer-events: none !important; cursor: default !important; opacity: .5 !important; }
+/* Highcharts SVG snapshots — prevent clipping in PDF */
+svg.highcharts-root { width: 100% !important; max-width: 100% !important; height: auto !important; overflow: visible !important; }
+.highcharts-container { overflow: visible !important; width: 100% !important; }
+@media print { svg.highcharts-root { page-break-inside: avoid; } }
 
 /* ── Cover page ── */
 #rpt-cover {

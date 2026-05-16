@@ -508,18 +508,22 @@
      Boot
   ───────────────────────────────────────────────────────── */
   Office.onReady(function () {
+    /* Signal the launcher page that this dialog is ready to receive data */
     try {
-      var rawCfg  = localStorage.getItem('paretoHubRunData');
-      var rawData = localStorage.getItem('paretoRawData');
-      if (!rawCfg || !rawData) {
-        showError('No data found — please re-select a range and run from the hub.');
-        return;
-      }
-      _cfg = JSON.parse(rawCfg);
-      /* Attach raw values so recalculate() can re-aggregate on column change */
-      _cfg.rawValues = JSON.parse(rawData);
-      init();
-    } catch (e) { showError('Failed to load: ' + e.message); }
+      Office.context.ui.addHandlerAsync(
+        Office.EventType.DialogParentMessageReceived,
+        function (arg) {
+          try {
+            var msg = JSON.parse(arg.message || '{}');
+            if (msg.type === 'PARETO_RUN_DATA') {
+              _cfg = msg.payload || {};
+              init();
+            }
+          } catch (e) { showError('Data parse error: ' + e.message); }
+        }
+      );
+      Office.context.ui.messageParent(JSON.stringify({ action: 'ready' }));
+    } catch (e) { showError('Init error: ' + e.message); }
   });
 
   function init() {

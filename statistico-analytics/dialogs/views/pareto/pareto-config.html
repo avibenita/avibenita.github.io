@@ -299,21 +299,20 @@
     var _rawData = null;
 
     /* ─────────────────────────────────────────────────────────
-       Office bootstrap — read raw data from localStorage (same origin).
-       Using localStorage avoids the ~2 MB Office.js message size limit.
+       Office bootstrap
     ───────────────────────────────────────────────────────── */
     Office.onReady(function () {
-      try {
-        var raw = localStorage.getItem('paretoRawData');
-        if (!raw) { showConfigError('No data found — please re-select a range from the hub.'); return; }
-        handleData(JSON.parse(raw));
-      } catch (e) { showConfigError('Failed to load data: ' + e.message); }
+      Office.context.ui.addHandlerAsync(
+        Office.EventType.DialogParentMessageReceived,
+        function (arg) {
+          try {
+            var msg = JSON.parse(arg.message || '{}');
+            if (msg.type === 'PARETO_DATA') handleData(msg.payload.values || []);
+          } catch (e) {}
+        }
+      );
+      Office.context.ui.messageParent(JSON.stringify({ action: 'ready' }));
     });
-
-    function showConfigError(msg) {
-      var spinner = document.getElementById('loadingSpinner');
-      if (spinner) spinner.innerHTML = '<p style="color:#f87171;padding:16px;font-size:13px;">' + msg + '</p>';
-    }
 
     /* ─────────────────────────────────────────────────────────
        Receive range data
@@ -562,7 +561,6 @@
       var paretoData = Object.keys(map).map(function (k) { return { cat: k, val: map[k] }; });
       paretoData.sort(function (a, b) { return b.val - a.val; });
 
-      /* Send only column metadata — raw data stays in localStorage (no size limit risk) */
       Office.context.ui.messageParent(JSON.stringify({
         action: 'runAnalysis',
         data: {
@@ -571,7 +569,8 @@
           valuesColIndex:   valIdx,
           categoryColName:  _headers[catIdx] || '',
           valuesColName:    valIdx !== null ? (_headers[valIdx] || '') : 'Count',
-          paretoData:       paretoData
+          paretoData:       paretoData,
+          rawValues:        _rawData
         }
       }));
     }

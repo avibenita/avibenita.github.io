@@ -1066,14 +1066,6 @@ function finishHubParetoFlow() {
 function openParetoFromHub() {
   var gr = getGlobalRangePayload();
   if (!gr) return false;
-
-  /* Write raw data to localStorage now — dialogs share the same origin so they
-     can read it directly, avoiding the ~2 MB Office.js message size limit. */
-  try {
-    localStorage.setItem("paretoRawData",   JSON.stringify(gr.values || []));
-    localStorage.setItem("paretoRawAddr",   gr.address  || "");
-  } catch (e) { /* quota exceeded – unlikely for reasonable ranges */ }
-
   hubParetoFlowActive = true;
   setSelectedModuleCard("pareto2080", true);
   Office.context.ui.displayDialogAsync(
@@ -1085,29 +1077,26 @@ function openParetoFromHub() {
         return;
       }
       hubParetoConfigDialog = res.value;
+      var sendParetoData = function () {
+        if (!hubParetoConfigDialog || !gr) return;
+        hubParetoConfigDialog.messageChild(JSON.stringify({
+          type: "PARETO_DATA",
+          payload: { values: gr.values, address: gr.address || "" }
+        }));
+      };
+      setTimeout(sendParetoData, 550);
       hubParetoConfigDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
         try {
           var msg = JSON.parse(arg.message || "{}");
-          if (msg.action === "runAnalysis") {
-            /* Config sends only column metadata (no raw data) — store it */
-            localStorage.setItem("paretoHubRunData", JSON.stringify(msg.data || {}));
+          if (msg.action === "ready" || msg.action === "requestData") {
+            sendParetoData();
+          } else if (msg.action === "runAnalysis") {
+            /* Store run data then navigate the taskpane to the launcher — same
+               pattern as correlation so sessionStorage is accessible. */
+            sessionStorage.setItem("paretoHubRunData", JSON.stringify(msg.data || {}));
             try { hubParetoConfigDialog.close(); } catch (e) {}
             hubParetoConfigDialog = null;
-            /* Open results dialog */
-            Office.context.ui.displayDialogAsync(
-              getDialogsBaseUrl() + "pareto/pareto-results.html?v=" + Date.now(),
-              DIALOG_SIZES.RESULTS,
-              function (rRes) {
-                if (rRes.status === Office.AsyncResultStatus.Failed) {
-                  finishHubParetoFlow();
-                  return;
-                }
-                hubParetoResultsDialog = rRes.value;
-                hubParetoResultsDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
-                  finishHubParetoFlow();
-                });
-              }
-            );
+            window.location.href = "./pareto/pareto.html?v=" + Date.now() + "&fromHub=1";
           } else if (msg.action === "close") {
             try { hubParetoConfigDialog.close(); } catch (e) {}
             finishHubParetoFlow();

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <meta charset="utf-8" />
+  <title>Pareto 2080 — Launcher</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="../dialog-sizes.js"></script>
+  <style>
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      background: #0b1320;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      color: #94a3b8; font-size: 13px;
+    }
+    .msg { text-align: center; }
+    .msg .icon { font-size: 28px; margin-bottom: 10px; }
+    .msg.err { color: #f87171; }
+  </style>
+</head>
+<body>
+  <div class="msg" id="status">
+    <div class="icon">⏳</div>
+    <div>Opening Pareto 2080…</div>
+  </div>
+
+  <script>
+    function getDialogsBaseUrl() {
+      var href = window.location.href;
+      if (href.includes('/taskpane/')) return href.split('/taskpane/')[0] + '/dialogs/views/';
+      return window.location.origin + '/dialogs/views/';
+    }
+
+    function showError(msg) {
+      var el = document.getElementById('status');
+      el.className = 'msg err';
+      el.innerHTML = '<div class="icon">⚠️</div><div>' + msg + '</div>';
+    }
+
+    Office.onReady(function () {
+      var raw = null;
+      try { raw = sessionStorage.getItem('paretoHubRunData'); } catch (e) {}
+
+      if (!raw) {
+        showError('No Pareto configuration found.<br>Please return to the hub and re-run.');
+        return;
+      }
+
+      var runData;
+      try { runData = JSON.parse(raw); } catch (e) {
+        showError('Configuration data is corrupted: ' + e.message);
+        return;
+      }
+
+      /* Open the results dialog — same origin, wide dialog */
+      var resultsUrl = getDialogsBaseUrl() + 'pareto/pareto-results.html?v=' + Date.now();
+      var resultsDialog = null;
+
+      Office.context.ui.displayDialogAsync(
+        resultsUrl,
+        DIALOG_SIZES.RESULTS,
+        function (res) {
+          if (res.status === Office.AsyncResultStatus.Failed) {
+            showError('Could not open results dialog (code ' + (res.error && res.error.code) + ').');
+            return;
+          }
+          resultsDialog = res.value;
+
+          /* When dialog signals ready, forward all run data */
+          resultsDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+            try {
+              var msg = JSON.parse(arg.message || '{}');
+              if (msg.action === 'ready') {
+                resultsDialog.messageChild(JSON.stringify({
+                  type: 'PARETO_RUN_DATA',
+                  payload: runData
+                }));
+              }
+            } catch (e) {}
+          });
+
+          /* When dialog closes, navigate back to hub */
+          resultsDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
+            resultsDialog = null;
+            window.location.href = '../hub.html?v=' + Date.now();
+          });
+        }
+      );
+    });
+  </script>
+</body>
+</html>

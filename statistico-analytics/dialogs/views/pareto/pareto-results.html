@@ -277,6 +277,26 @@
     .cum-bar-fill.B { background: var(--cls-b); }
     .cum-bar-fill.C { background: var(--cls-c); }
 
+    /* ── Combined chart + table tab ────────────────────────── */
+    .combo-split {
+      flex: 1; min-height: 0;
+      display: flex; flex-direction: row; overflow: hidden;
+    }
+    .combo-chart-pane {
+      flex: 0 0 56%; min-width: 0;
+      display: flex; flex-direction: column; overflow: hidden;
+      border-right: 1px solid var(--border);
+    }
+    html[data-theme="light"] .combo-chart-pane { border-right-color: #e2e8f0; }
+    #comboChart { flex: 1; min-height: 0; width: 100%; }
+    .combo-table-pane {
+      flex: 1; min-width: 0;
+      overflow-y: auto; overflow-x: hidden;
+    }
+    .combo-table-pane .prt-tbl th { font-size: 10px; padding: 6px 9px; }
+    .combo-table-pane .prt-tbl td { font-size: 12px; padding: 5px 9px; }
+    .combo-table-pane .cls-badge  { font-size: 9px; padding: 1px 5px; }
+
     /* ── ABC Analysis tab ─────────────────────────────────── */
     .abc-summary-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
     .abc-card {
@@ -523,6 +543,13 @@
                 <span class="sb-item-description">Ranked contributions with %.</span>
               </span>
             </button>
+            <button class="sb-item" data-tab="combo" onclick="switchTab('combo')">
+              <i class="fa-solid fa-table-columns sb-item-icon"></i>
+              <span class="sb-item-copy">
+                <span class="sb-item-label">Chart + Table</span>
+                <span class="sb-item-description">Chart &amp; rankings side by side.</span>
+              </span>
+            </button>
             <button class="sb-item" data-tab="abc" onclick="switchTab('abc')">
               <i class="fa-solid fa-layer-group sb-item-icon"></i>
               <span class="sb-item-copy">
@@ -636,6 +663,30 @@
               </thead>
               <tbody id="paretoTableBody"></tbody>
             </table>
+          </div>
+        </div>
+
+        <!-- ── TAB: COMBINED CHART + TABLE ── -->
+        <div class="tab-content" id="tab-combo">
+          <div class="combo-split">
+            <div class="combo-chart-pane">
+              <div id="comboChart"></div>
+            </div>
+            <div class="combo-table-pane">
+              <table class="prt-tbl">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Cls</th>
+                    <th>Category</th>
+                    <th>Value</th>
+                    <th>%</th>
+                    <th>Cum %</th>
+                  </tr>
+                </thead>
+                <tbody id="comboTableBody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -841,9 +892,11 @@
     renderABC();
     renderVitalStrip();
 
-    /* Refresh PSI if that tab is currently active */
-    var psiTab = document.getElementById('tab-psi');
-    if (psiTab && psiTab.classList.contains('active')) renderPSI();
+    /* Refresh active secondary tabs */
+    var psiTab   = document.getElementById('tab-psi');
+    var comboTab = document.getElementById('tab-combo');
+    if (psiTab   && psiTab.classList.contains('active'))   renderPSI();
+    if (comboTab && comboTab.classList.contains('active')) renderCombo();
   }
 
   /* ─────────────────────────────────────────────────────────
@@ -864,6 +917,122 @@
     if (cumPct <= opts.threshold)  return 'A';
     if (cumPct <= opts.thresholdB) return 'B';
     return 'C';
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     Combined Chart + Table
+  ───────────────────────────────────────────────────────── */
+  var _comboChart = null;
+
+  function renderCombo() {
+    if (!_data.length) return;
+    var opts    = getOpts();
+    var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    var bg      = isLight ? '#ffffff' : 'transparent';
+    var tc      = isLight ? '#111827' : '#f1f5f9';
+    var tc2     = isLight ? '#374151' : '#94a3b8';
+    var gc      = isLight ? 'rgba(0,0,0,.07)' : 'rgba(255,255,255,.07)';
+
+    var total  = _data.reduce(function (s, d) { return s + d.val; }, 0);
+    var cats   = _data.map(function (d) { return d.cat; });
+    var vals   = _data.map(function (d) { return d.val; });
+
+    var runSum = 0, cumPct = [];
+    vals.forEach(function (v) {
+      runSum += v;
+      cumPct.push(parseFloat(((runSum / total) * 100).toFixed(2)));
+    });
+
+    var barColors = cumPct.map(function (c) {
+      var cls = classifyItem(c, opts);
+      return cls === 'A' ? '#f97316' : cls === 'B' ? '#fbbf24' : '#475569';
+    });
+
+    if (_comboChart) { try { _comboChart.destroy(); } catch (e) {} _comboChart = null; }
+
+    var plotLines = [];
+    if (opts.showThreshLine) {
+      plotLines.push({ value: opts.threshold,  color: 'rgba(249,115,22,.7)', width: 1.5, dashStyle: 'Dash',
+        label: { text: opts.threshold + '%',  style: { color: '#f97316', fontSize: '9px' }, align: 'right', x: -4 } });
+      plotLines.push({ value: opts.thresholdB, color: 'rgba(251,191,36,.5)', width: 1,   dashStyle: 'Dot',
+        label: { text: opts.thresholdB + '%', style: { color: '#fbbf24', fontSize: '9px' }, align: 'right', x: -4 } });
+    }
+
+    _comboChart = Highcharts.chart('comboChart', {
+      chart: {
+        backgroundColor: bg, animation: { duration: 300 },
+        style: { fontFamily: "'Segoe UI', system-ui, sans-serif" },
+        spacingTop: 6, spacingBottom: 4, spacingLeft: 2, spacingRight: 6
+      },
+      title: { text: null },
+      xAxis: {
+        categories: cats, crosshair: true,
+        labels: { style: { color: tc2, fontSize: '9px' }, rotation: cats.length > 8 ? -40 : 0 },
+        lineColor: gc, tickColor: gc
+      },
+      yAxis: [
+        {
+          title: { text: null },
+          labels: { style: { color: tc2, fontSize: '9px' }, formatter: function () { return fmtNum(this.value, 0); } },
+          gridLineColor: gc
+        },
+        {
+          title: { text: null },
+          labels: { style: { color: '#38bdf8', fontSize: '9px' }, formatter: function () { return this.value + '%'; } },
+          opposite: true, min: 0, max: 100, gridLineWidth: 0,
+          plotLines: plotLines
+        }
+      ],
+      legend: { enabled: false },
+      tooltip: {
+        shared: true, useHTML: true,
+        backgroundColor: isLight ? '#fff' : 'rgba(7,9,14,.96)',
+        borderColor: 'rgba(249,115,22,.4)', borderRadius: 8,
+        style: { color: tc, fontSize: '11px' }
+      },
+      plotOptions: {
+        column: { groupPadding: 0, pointPadding: 0.03, borderWidth: 0, borderRadius: 2 }
+      },
+      series: [
+        {
+          type: 'column', name: 'Value',
+          data: vals.map(function (v, i) { return { y: v, color: barColors[i] }; }),
+          yAxis: 0,
+          dataLabels: { enabled: false }
+        },
+        {
+          type: 'spline', name: 'Cumulative %',
+          data: cumPct, yAxis: 1,
+          color: '#38bdf8', lineWidth: 1.8,
+          marker: { radius: 2.5 }
+        }
+      ],
+      credits: { enabled: false }
+    });
+
+    /* Populate combo table */
+    runSum = 0;
+    var html = '';
+    _data.forEach(function (d, i) {
+      runSum += d.val;
+      var pct  = total > 0 ? (d.val / total * 100) : 0;
+      var cumP = total > 0 ? (runSum / total * 100) : 0;
+      var cls  = classifyItem(cumP, opts);
+      html += '<tr>'
+        + '<td>' + (i + 1) + '</td>'
+        + '<td><span class="cls-badge ' + cls + '">' + cls + '</span></td>'
+        + '<td>' + escHtml(d.cat) + '</td>'
+        + '<td class="val-num">' + fmtNum(d.val, 2) + '</td>'
+        + '<td class="val-pct">' + fmtNum(pct, 1) + '%</td>'
+        + '<td class="val-cum">'
+        +   '<div class="cum-bar-wrap">'
+        +     '<span style="min-width:38px;font-size:12px;font-weight:700;color:rgba(226,232,240,.95);">' + fmtNum(cumP, 1) + '%</span>'
+        +     '<div class="cum-bar-bg"><div class="cum-bar-fill ' + cls + '" style="width:' + Math.min(cumP, 100) + '%"></div></div>'
+        +   '</div>'
+        + '</td>'
+        + '</tr>';
+    });
+    document.getElementById('comboTableBody').innerHTML = html;
   }
 
   /* ─────────────────────────────────────────────────────────
@@ -1026,6 +1195,7 @@
       b.classList.toggle('active', b.dataset.tab === name);
     });
     if (name === 'chart' && _chart) setTimeout(function () { _chart.reflow(); }, 60);
+    if (name === 'combo') { renderCombo(); setTimeout(function () { if (_comboChart) _comboChart.reflow(); }, 80); }
     if (name === 'psi') renderPSI();
   }
 
@@ -1313,6 +1483,7 @@
   window.toggleSidebar = toggleSidebar;
   window.toggleTheme   = toggleTheme;
   window.renderPSI     = renderPSI;
+  window.renderCombo   = renderCombo;
   </script>
 </body>
 </html>

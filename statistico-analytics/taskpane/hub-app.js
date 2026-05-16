@@ -1091,7 +1091,7 @@ function openParetoFromHub() {
           if (msg.action === "ready" || msg.action === "requestData") {
             sendParetoData();
           } else if (msg.action === "runAnalysis") {
-            sessionStorage.setItem("paretoHubRunData", JSON.stringify(msg.data || {}));
+            localStorage.setItem("paretoHubRunData", JSON.stringify(msg.data || {}));
             try { hubParetoConfigDialog.close(); } catch (e) {}
             hubParetoConfigDialog = null;
             /* Open results dialog */

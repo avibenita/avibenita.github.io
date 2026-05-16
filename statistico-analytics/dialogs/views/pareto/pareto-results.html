@@ -3,512 +3,661 @@
 <head>
   <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <title>Pareto 2080</title>
 
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" />
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" />
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <script src="https://code.highcharts.com/modules/exporting.js"></script>
-  <script src="https://code.highcharts.com/modules/export-data.js"></script>
+
+  <!-- Shared sidebar / header styles -->
+  <link rel="stylesheet" href="../shared-header.css?v=20260508o" />
+  <script src="../shared-header.js?v=20260509f"></script>
 
   <style>
-    /* ── Tokens ────────────────────────────────────────────────── */
+    /* ── Design tokens ─────────────────────────────────────── */
     :root {
-      --bg:         #0b1320;
-      --surface-1:  #111827;
-      --surface-2:  #1a2233;
-      --surface-3:  #1f2a3c;
-      --border:     rgba(255,255,255,.09);
-      --accent:     #f97316;
-      --accent-dim: rgba(249,115,22,.14);
-      --accent-2:   #38bdf8;
-      --text-1:     #f1f5f9;
-      --text-2:     #94a3b8;
-      --text-3:     #475569;
-      --good:       #4ade80;
-      --warn:       #fbbf24;
-      --bad:        #f87171;
-      --cls-a:      #f97316;
-      --cls-b:      #fbbf24;
-      --cls-c:      #64748b;
+      --surface-0: #0c1624;
+      --surface-1: #1a1f2e;
+      --surface-2: #242938;
+      --border:    #2d3748;
+      --accent-1:  #f97316;   /* orange — Pareto brand */
+      --accent-2:  #fb923c;
+      --accent-3:  #fed7aa;
+      --cls-a:     #f97316;
+      --cls-b:     #fbbf24;
+      --cls-c:     #64748b;
+      --success:   #4ade80;
+      --warning:   #fbbf24;
+      --danger:    #fb7185;
+      --text-primary:   #fff;
+      --text-secondary: rgba(255,255,255,.80);
+      --text-muted:     rgba(255,255,255,.55);
+    }
+    :root[data-theme="light"] {
+      --surface-0: #f1f5f9;
+      --surface-1: #ffffff;
+      --surface-2: #f8fafc;
+      --border:    #e2e8f0;
+      --accent-1:  #ea580c;
+      --accent-2:  #f97316;
+      --accent-3:  #fed7aa;
+      --text-primary:   #111827;
+      --text-secondary: #374151;
+      --text-muted:     #6b7280;
     }
 
-    /* ── Reset ─────────────────────────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body {
-      width: 100%; height: 100%;
+    html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }
+    body {
+      background: var(--surface-0);
+      color: var(--text-primary);
       font-family: 'Segoe UI', system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text-1);
+      display: flex; flex-direction: row;
       overflow: hidden;
     }
 
-    /* ── Shell ─────────────────────────────────────────────────── */
-    .shell { display: flex; width: 100%; height: 100%; }
+    /* ── sb-nav: inherit colours from shared-header.css ─── */
+    /* Only override the brand accent rail colours for Pareto */
+    .sb-nav { --sb-accent: #f97316; --sb-accent-soft: rgba(249,115,22,.16);
+               --sb-active-bg: linear-gradient(90deg,rgba(249,115,22,.28),rgba(251,146,60,.09)); }
 
-    /* ── Left sidebar ──────────────────────────────────────────── */
-    .sb-nav {
-      width: 210px; flex-shrink: 0;
+    /* ── Right column ── */
+    .right-col {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Compact top-bar ─────────────────────────────────── */
+    .prt-topbar {
+      display: flex; align-items: center;
+      background: linear-gradient(180deg, #171f35 0%, #1b2540 100%);
+      border-bottom: 1px solid rgba(249,115,22,.22);
+      padding: 0 18px;
+      height: 56px;
+      flex-shrink: 0;
+      gap: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.22);
+    }
+    html[data-theme="light"] .prt-topbar {
+      background: linear-gradient(135deg,#ea580c 0%,#c2410c 100%);
+      border-bottom-color: #c2410c;
+    }
+    .prt-module-frame {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+      padding: 5px 10px 6px;
+      border: 1px solid rgba(249,115,22,.35);
+      border-left: 2px solid rgba(249,115,22,.7);
+      border-radius: 8px;
+      background: rgba(249,115,22,.08);
+      flex-shrink: 0;
+    }
+    .prt-module-kicker { font-size: 9px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: rgba(253,186,116,.8); }
+    .prt-module-name   { font-size: 12px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,237,213,.95); }
+    .prt-topbar-title {
+      flex: 1; text-align: center;
+      font-size: 18px; font-weight: 800; color: #fff;
+    }
+    .prt-topbar-badge {
+      font-size: 11px; font-weight: 600; color: rgba(253,186,116,.85);
+      background: rgba(249,115,22,.14); border: 1px solid rgba(249,115,22,.35);
+      padding: 2px 9px; border-radius: 999px; flex-shrink: 0;
+    }
+    .prt-topbar-right {
+      display: flex; align-items: center; gap: 8px; margin-left: auto; flex-shrink: 0;
+    }
+
+    /* ── Hero: column selector strip ─────────────────────── */
+    .hero-section {
       background: var(--surface-1);
-      border-right: 1px solid var(--border);
+      border-bottom: 2px solid var(--border);
+      padding: 8px 16px;
+      display: flex; align-items: center; gap: 10px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+      box-shadow: 0 2px 8px rgba(0,0,0,.12);
+    }
+    html[data-theme="light"] .hero-section { box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+    .hero-control-group {
+      display: flex; align-items: center; gap: 7px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid var(--border);
+      border-radius: 8px; padding: 5px 10px;
+      cursor: default;
+      transition: border-color .18s;
+    }
+    html[data-theme="light"] .hero-control-group { background: #f9fafb; }
+    .hero-control-group:focus-within { border-color: var(--accent-1); }
+    .hero-control-group label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .12em; color: var(--text-muted); white-space: nowrap;
+    }
+    .hero-select {
+      background: transparent; border: none; outline: none;
+      color: var(--text-primary); font-size: 12px; font-weight: 600;
+      cursor: pointer; min-width: 130px; max-width: 220px;
+    }
+    html[data-theme="light"] .hero-select { color: #111827; }
+    .hero-select option { background: #1a1f2e; color: #fff; }
+    html[data-theme="light"] .hero-select option { background: #fff; color: #111827; }
+    .hero-sep { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; }
+    .hero-stats {
+      margin-left: auto; display: flex; align-items: center; gap: 14px;
+    }
+    .hero-stat { text-align: center; }
+    .hero-stat-v { font-size: 16px; font-weight: 700; color: var(--accent-1); line-height: 1; }
+    .hero-stat-l { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); margin-top: 2px; }
+
+    /* ── Content area ─────────────────────────────────────── */
+    .card-main {
+      flex: 1; min-height: 0; min-width: 0;
       display: flex; flex-direction: column; overflow: hidden;
     }
-    .sb-brand {
-      padding: 14px 12px 11px;
-      border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; gap: 9px;
+    .tab-content {
+      display: none; flex: 1; min-height: 0;
+      flex-direction: column; overflow: hidden;
+      animation: prtFadeIn .2s ease;
     }
-    .sb-brand-icon {
-      width: 30px; height: 30px;
-      background: linear-gradient(135deg,#f97316,#c2410c);
-      border-radius: 7px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px; color:#fff; flex-shrink:0;
-    }
-    .sb-name    { font-size:13px; font-weight:700; color:var(--text-1); line-height:1.2; }
-    .sb-tagline { font-size:10px; color:var(--text-2); margin-top:1px; }
+    .tab-content.active { display: flex; }
+    @keyframes prtFadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
 
-    .sb-body { flex:1; overflow-y:auto; padding:6px 0; }
-    .sb-group-title {
-      font-size:9px; font-weight:700; text-transform:uppercase;
-      letter-spacing:.08em; color:var(--text-3);
-      padding:10px 12px 3px;
-    }
-    .sb-item {
-      width:100%; display:flex; align-items:center; gap:8px;
-      padding:9px 12px; border:none; background:transparent;
-      color:var(--text-2); font-size:12.5px; font-weight:500;
-      cursor:pointer; text-align:left; transition:background .12s,color .12s;
-    }
-    .sb-item:hover  { background:var(--surface-2); color:var(--text-1); }
-    .sb-item.active { background:var(--accent-dim); color:var(--accent); font-weight:600; }
-    .sb-item i      { width:15px; text-align:center; font-size:12px; flex-shrink:0; }
-    .sb-item .sb-badge {
-      margin-left:auto; font-size:9px; padding:1px 6px;
-      border-radius:99px; background:var(--surface-3);
-      color:var(--text-3); font-weight:600;
+    /* Tab inner scroll */
+    .tab-scroll {
+      flex: 1; min-height: 0;
+      overflow-y: auto; overflow-x: hidden;
+      padding: 12px 16px 16px;
     }
 
-    .sb-footer {
-      border-top:1px solid var(--border);
-      padding:8px 12px;
-      display:flex; align-items:center; gap:6px;
-    }
-    .sb-footer label { font-size:11px; color:var(--text-2); flex:1; }
-    .sb-dec-select {
-      padding:3px 6px; border-radius:6px;
-      border:1px solid var(--border);
-      background:var(--surface-2); color:var(--text-1);
-      font-size:11px; cursor:pointer;
-    }
-
-    /* ── Right column ──────────────────────────────────────────── */
-    .right-col {
-      flex:1; display:flex; flex-direction:column;
-      overflow:hidden; background:var(--bg);
-    }
-
-    /* ── Topbar ────────────────────────────────────────────────── */
-    .topbar {
-      display:flex; align-items:center; gap:10px;
-      padding:8px 14px;
-      background:var(--surface-1);
-      border-bottom:1px solid var(--border);
-      flex-shrink:0;
-    }
-    .topbar-title {
-      font-size:13px; font-weight:700; color:var(--text-1);
-      flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    }
-    .topbar-badge {
-      font-size:11px; padding:3px 9px; border-radius:99px;
-      background:var(--accent-dim);
-      border:1px solid rgba(249,115,22,.3); color:var(--accent);
-      white-space:nowrap;
-    }
-
-    /* ── Column selector row ───────────────────────────────────── */
-    .col-selector-row {
-      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-      padding:7px 14px;
-      background:var(--surface-2);
-      border-bottom:1px solid var(--border);
-      flex-shrink:0;
-    }
-    .col-selector-row label {
-      font-size:11px; font-weight:600; color:var(--text-2);
-      white-space:nowrap; display:flex; align-items:center; gap:5px;
-    }
-    .col-select {
-      padding:5px 24px 5px 8px; border-radius:7px;
-      border:1.5px solid var(--border);
-      background:var(--surface-1); color:var(--text-1);
-      font-size:11.5px; font-family:inherit; cursor:pointer;
-      appearance:none;
-      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
-      background-repeat:no-repeat; background-position:right 7px center;
-      transition:border-color .14s;
-      min-width:120px; max-width:200px;
-    }
-    .col-select:focus { outline:none; border-color:var(--accent); }
-    .col-sep { width:1px; height:18px; background:var(--border); margin:0 2px; }
-
-    /* ── Tab content ───────────────────────────────────────────── */
-    .tab-content { display:none; flex:1; flex-direction:column; overflow:hidden; }
-    .tab-content.active { display:flex; }
-
-    /* ── Pareto Chart ──────────────────────────────────────────── */
-    .chart-pane {
-      flex:1; display:flex; flex-direction:column;
-      overflow:hidden; padding:12px; gap:10px;
-    }
+    /* ── Chart tab ────────────────────────────────────────── */
     #paretoChart {
-      flex:1; border-radius:10px;
-      background:var(--surface-2); border:1px solid var(--border);
-      overflow:hidden; min-height:0;
+      width: 100%; min-height: 320px;
+      flex: 1;
     }
     .vital-strip {
-      display:flex; gap:8px; flex-wrap:wrap; flex-shrink:0;
+      display: flex; flex-wrap: wrap; gap: 8px;
+      padding: 8px 16px 10px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
     }
-    .vital-pill {
-      display:flex; align-items:center; gap:6px;
-      padding:5px 11px; border-radius:99px;
-      font-size:11.5px; font-weight:600;
-      border:1px solid var(--border); background:var(--surface-2); color:var(--text-2);
+    .vital-card {
+      display: flex; flex-direction: column; align-items: center;
+      background: rgba(255,255,255,.04); border: 1px solid var(--border);
+      border-radius: 8px; padding: 6px 14px; min-width: 90px;
     }
-    .vital-pill.hi { background:rgba(249,115,22,.12); border-color:rgba(249,115,22,.35); color:var(--accent); }
-    .vital-pill .dot { width:8px; height:8px; border-radius:50%; background:var(--accent); }
+    html[data-theme="light"] .vital-card { background: #f9fafb; }
+    .vital-val { font-size: 18px; font-weight: 700; line-height: 1; }
+    .vital-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); margin-top: 3px; }
+    .vital-card.cls-a { border-color: rgba(249,115,22,.45); }
+    .vital-card.cls-b { border-color: rgba(251,191,36,.45); }
+    .vital-card.cls-c { border-color: rgba(100,116,139,.45); }
+    .vital-val.cls-a { color: var(--cls-a); }
+    .vital-val.cls-b { color: var(--cls-b); }
+    .vital-val.cls-c { color: var(--cls-c); }
+    .chart-pane {
+      flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+    }
 
-    /* ── Pareto Table ──────────────────────────────────────────── */
-    .table-pane { flex:1; overflow:auto; padding:14px; }
-    .pareto-tbl {
-      width:100%; border-collapse:collapse; font-size:12.5px;
+    /* ── Shared table styles ─────────────────────────────── */
+    .prt-tbl-wrap { flex: 1; min-height: 0; overflow: auto; }
+    .prt-tbl {
+      width: 100%; border-collapse: collapse; font-size: 12px;
     }
-    .pareto-tbl th {
-      text-align:left; padding:7px 10px;
-      background:var(--surface-2); color:var(--text-2);
-      font-size:10.5px; font-weight:700; text-transform:uppercase;
-      letter-spacing:.05em; border-bottom:1px solid var(--border);
-      white-space:nowrap; position:sticky; top:0; z-index:1;
+    .prt-tbl th {
+      position: sticky; top: 0; z-index: 2;
+      background: var(--surface-2); color: var(--text-muted);
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+      padding: 7px 10px; text-align: left;
+      border-bottom: 2px solid var(--border);
     }
-    .pareto-tbl td {
-      padding:7px 10px; border-bottom:1px solid rgba(255,255,255,.04);
-      color:var(--text-1); vertical-align:middle;
+    html[data-theme="light"] .prt-tbl th { background: #f1f5f9; }
+    .prt-tbl td {
+      padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,.04);
+      color: var(--text-secondary);
     }
-    .pareto-tbl tr.row-vital td { background:rgba(249,115,22,.05); }
-    .pareto-tbl tr:last-child td { border-bottom:none; }
-    .pareto-tbl .rank {
-      display:inline-flex; align-items:center; justify-content:center;
-      width:22px; height:22px; border-radius:50%;
-      background:var(--surface-3); color:var(--text-2);
-      font-size:10px; font-weight:700;
+    html[data-theme="light"] .prt-tbl td { border-bottom-color: #f1f5f9; }
+    .prt-tbl tbody tr:hover td { background: rgba(249,115,22,.05); }
+    .prt-tbl td.val-num { font-weight: 600; color: var(--accent-2); }
+    .prt-tbl td.val-pct { color: var(--text-muted); }
+    .prt-tbl td.val-cum { font-weight: 700; }
+    .cls-badge {
+      display: inline-block; padding: 1px 6px; border-radius: 999px;
+      font-size: 10px; font-weight: 800; letter-spacing: .4px;
     }
-    .pareto-tbl .rank.vital { background:var(--accent-dim); color:var(--accent); }
-    .bar-wrap { display:flex; align-items:center; gap:7px; }
-    .bar-track { flex:1; height:5px; background:var(--surface-3); border-radius:99px; overflow:hidden; min-width:60px; }
-    .bar-fill  { height:100%; border-radius:99px; background:linear-gradient(90deg,#f97316,#fb923c); }
-    .bar-fill.muted { background:var(--surface-3); }
-    .cum-val { font-size:11px; font-weight:600; color:var(--text-2); min-width:40px; text-align:right; }
-    .cum-val.vital { color:var(--accent); }
+    .cls-badge.A { background: rgba(249,115,22,.18); color: #f97316; border: 1px solid rgba(249,115,22,.4); }
+    .cls-badge.B { background: rgba(251,191,36,.15); color: #fbbf24; border: 1px solid rgba(251,191,36,.4); }
+    .cls-badge.C { background: rgba(100,116,139,.15); color: #94a3b8; border: 1px solid rgba(100,116,139,.3); }
 
-    /* ── ABC Analysis ──────────────────────────────────────────── */
-    .abc-pane { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:14px; }
-    .abc-cards { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
-    @media (max-width:600px) { .abc-cards { grid-template-columns:1fr; } }
+    /* Cumulative % bar inside table */
+    .cum-bar-wrap { display: flex; align-items: center; gap: 6px; }
+    .cum-bar-bg {
+      flex: 1; height: 5px; border-radius: 99px;
+      background: rgba(255,255,255,.08);
+    }
+    html[data-theme="light"] .cum-bar-bg { background: #e2e8f0; }
+    .cum-bar-fill { height: 100%; border-radius: 99px; }
+    .cum-bar-fill.A { background: var(--cls-a); }
+    .cum-bar-fill.B { background: var(--cls-b); }
+    .cum-bar-fill.C { background: var(--cls-c); }
 
+    /* ── ABC Analysis tab ─────────────────────────────────── */
+    .abc-summary-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
     .abc-card {
-      border-radius:10px; padding:14px 16px;
-      border:1px solid var(--border); display:flex; flex-direction:column; gap:6px;
+      flex: 1; min-width: 130px;
+      border-radius: 10px; padding: 12px 16px;
+      display: flex; flex-direction: column; gap: 4px;
     }
-    .abc-card.A { background:rgba(249,115,22,.08); border-color:rgba(249,115,22,.3); }
-    .abc-card.B { background:rgba(251,191,36,.07); border-color:rgba(251,191,36,.28); }
-    .abc-card.C { background:rgba(100,116,139,.07); border-color:rgba(100,116,139,.25); }
+    .abc-card.A { background: rgba(249,115,22,.1); border: 1px solid rgba(249,115,22,.35); }
+    .abc-card.B { background: rgba(251,191,36,.08); border: 1px solid rgba(251,191,36,.32); }
+    .abc-card.C { background: rgba(100,116,139,.08); border: 1px solid rgba(100,116,139,.28); }
+    .abc-card-header { display: flex; align-items: center; gap: 7px; }
+    .abc-class-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .abc-class-dot.A { background: var(--cls-a); }
+    .abc-class-dot.B { background: var(--cls-b); }
+    .abc-class-dot.C { background: var(--cls-c); }
+    .abc-class-lbl { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
+    .abc-class-lbl.A { color: var(--cls-a); }
+    .abc-class-lbl.B { color: var(--cls-b); }
+    .abc-class-lbl.C { color: var(--cls-c); }
+    .abc-big-val { font-size: 22px; font-weight: 800; line-height: 1; margin-top: 4px; }
+    .abc-big-val.A { color: var(--cls-a); }
+    .abc-big-val.B { color: var(--cls-b); }
+    .abc-big-val.C { color: var(--cls-c); }
+    .abc-sub { font-size: 10px; color: var(--text-muted); }
+    .abc-bar-bg { height: 6px; border-radius: 99px; background: rgba(255,255,255,.08); margin-top: 6px; }
+    html[data-theme="light"] .abc-bar-bg { background: #e2e8f0; }
+    .abc-bar-fill { height: 100%; border-radius: 99px; }
+    .abc-bar-fill.A { background: var(--cls-a); }
+    .abc-bar-fill.B { background: var(--cls-b); }
+    .abc-bar-fill.C { background: var(--cls-c); }
 
-    .abc-card-header { display:flex; align-items:center; gap:8px; }
-    .abc-class-badge {
-      font-size:18px; font-weight:900; letter-spacing:.02em;
+    /* ── Chart Options tab ─────────────────────────────────── */
+    .opts-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
     }
-    .abc-card.A .abc-class-badge { color:var(--cls-a); }
-    .abc-card.B .abc-class-badge { color:var(--cls-b); }
-    .abc-card.C .abc-class-badge { color:var(--cls-c); }
-
-    .abc-card-title { font-size:11px; font-weight:600; color:var(--text-2); line-height:1.3; }
-    .abc-stat { display:flex; justify-content:space-between; align-items:baseline; }
-    .abc-stat-label { font-size:10.5px; color:var(--text-3); }
-    .abc-stat-val   { font-size:13px; font-weight:700; }
-    .abc-card.A .abc-stat-val { color:var(--cls-a); }
-    .abc-card.B .abc-stat-val { color:var(--cls-b); }
-    .abc-card.C .abc-stat-val { color:var(--cls-c); }
-    .abc-bar-wrap { margin-top:2px; }
-    .abc-bar-track { height:4px; background:var(--surface-3); border-radius:99px; overflow:hidden; }
-    .abc-bar-fill.A { background:var(--cls-a); }
-    .abc-bar-fill.B { background:var(--cls-b); }
-    .abc-bar-fill.C { background:var(--cls-c); }
-    .abc-bar-fill { height:100%; border-radius:99px; }
-
-    .abc-tbl {
-      width:100%; border-collapse:collapse; font-size:12px;
+    @media (max-width: 560px) { .opts-grid { grid-template-columns: 1fr; } }
+    .opt-group {
+      background: rgba(255,255,255,.03); border: 1px solid var(--border);
+      border-radius: 9px; padding: 12px 14px;
     }
-    .abc-tbl th {
-      text-align:left; padding:7px 10px;
-      background:var(--surface-2); color:var(--text-2);
-      font-size:10px; font-weight:700; text-transform:uppercase;
-      letter-spacing:.05em; border-bottom:1px solid var(--border);
-      white-space:nowrap; position:sticky; top:0; z-index:1;
+    html[data-theme="light"] .opt-group { background: #f9fafb; }
+    .opt-group-title {
+      font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em;
+      color: var(--text-muted); margin-bottom: 10px;
     }
-    .abc-tbl td {
-      padding:6px 10px; border-bottom:1px solid rgba(255,255,255,.04);
-      color:var(--text-1); vertical-align:middle;
+    .opt-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .opt-row:last-child { margin-bottom: 0; }
+    .opt-row label {
+      flex: 1; font-size: 12px; color: var(--text-secondary);
     }
-    .abc-tbl tr:last-child td { border-bottom:none; }
-    .abc-label {
-      font-size:11px; font-weight:800; padding:2px 8px;
-      border-radius:99px; display:inline-block;
+    .opt-input {
+      width: 70px; background: var(--surface-0); border: 1px solid var(--border);
+      color: var(--text-primary); border-radius: 6px; padding: 3px 7px;
+      font-size: 12px; font-weight: 600; text-align: right;
     }
-    .abc-label.A { background:rgba(249,115,22,.15); color:var(--cls-a); }
-    .abc-label.B { background:rgba(251,191,36,.12); color:var(--cls-b); }
-    .abc-label.C { background:rgba(100,116,139,.12); color:var(--cls-c); }
-
-    /* ── Chart Options ─────────────────────────────────────────── */
-    .options-pane {
-      flex:1; overflow-y:auto; padding:16px;
-      display:flex; flex-direction:column; gap:18px;
+    html[data-theme="light"] .opt-input { background: #fff; color: #111827; }
+    .opt-title-input {
+      width: 100%; background: var(--surface-0); border: 1px solid var(--border);
+      color: var(--text-primary); border-radius: 6px; padding: 5px 9px; font-size: 12px;
     }
-    .opt-section { display:flex; flex-direction:column; gap:9px; }
-    .opt-section-title {
-      font-size:10px; font-weight:700; text-transform:uppercase;
-      letter-spacing:.07em; color:var(--text-3);
-      padding-bottom:5px; border-bottom:1px solid var(--border);
-    }
-    .opt-row { display:flex; flex-direction:column; gap:4px; }
-    .opt-label { font-size:11.5px; font-weight:600; color:var(--text-2); display:flex; align-items:center; gap:5px; }
-    .opt-label i { font-size:11px; }
-    .opt-text-input {
-      width:100%; padding:7px 10px;
-      border:1.5px solid var(--border); border-radius:7px;
-      background:var(--surface-2); color:var(--text-1);
-      font-size:12.5px; font-family:inherit; transition:border-color .15s;
-    }
-    .opt-text-input:focus { outline:none; border-color:var(--accent); }
-    .opt-text-input::placeholder { color:var(--text-3); }
-    .opt-threshold-row { display:flex; align-items:center; gap:10px; }
-    .opt-threshold-row input[type="range"] { flex:1; accent-color:var(--accent); height:4px; }
-    .opt-threshold-val { font-size:12px; font-weight:700; color:var(--accent); min-width:34px; text-align:right; }
-    .opt-radio-row { display:flex; gap:6px; }
-    .opt-radio-btn {
-      flex:1; text-align:center; padding:6px 8px;
-      border:1.5px solid var(--border); border-radius:7px;
-      background:var(--surface-2); color:var(--text-2);
-      font-size:11px; font-weight:600; cursor:pointer;
-      transition:all .13s; user-select:none;
-    }
-    .opt-radio-btn.active { border-color:var(--accent); background:rgba(249,115,22,.12); color:var(--accent); }
-    .opt-check-row { display:flex; align-items:center; gap:7px; }
-    .opt-check-row input[type="checkbox"] { accent-color:var(--accent); width:14px; height:14px; flex-shrink:0; }
-    .opt-check-row label { font-size:12px; color:var(--text-2); cursor:pointer; }
+    html[data-theme="light"] .opt-title-input { background: #fff; color: #111827; }
     .opt-apply-btn {
-      width:100%; padding:10px; border:none; border-radius:8px;
-      background:linear-gradient(135deg,#f97316,#c2410c);
-      color:#fff; font-size:13px; font-weight:700; cursor:pointer;
-      display:flex; align-items:center; justify-content:center; gap:8px;
-      transition:filter .15s;
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      width: 100%; margin-top: 14px; padding: 9px 0;
+      background: linear-gradient(135deg, rgba(249,115,22,.9), rgba(234,88,12,.85));
+      border: 1px solid rgba(249,115,22,.7); color: #fff;
+      border-radius: 8px; font-size: 13px; font-weight: 700;
+      cursor: pointer; transition: filter .18s;
     }
-    .opt-apply-btn:hover { filter:brightness(1.08); }
+    .opt-apply-btn:hover { filter: brightness(1.12); }
 
-    /* scrollbars */
-    ::-webkit-scrollbar       { width:5px; height:5px; }
-    ::-webkit-scrollbar-track { background:transparent; }
-    ::-webkit-scrollbar-thumb { background:rgba(255,255,255,.08); border-radius:99px; }
+    /* ── Utilities sidebar bottom buttons ─────────────────── */
+    .prt-sb-theme-btn {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 10px; border-radius: 8px; border: 1px solid var(--sb-border);
+      background: rgba(255,255,255,.06); color: var(--sb-text);
+      font-size: 12px; font-weight: 600; cursor: pointer; width: 100%;
+      transition: background .18s, border-color .18s;
+      font-family: 'Montserrat', 'Segoe UI', sans-serif;
+    }
+    .prt-sb-theme-btn:hover { background: rgba(255,255,255,.1); border-color: var(--sb-accent); }
+
+    /* ── Shared footer ─────────────────────────────────────── */
+    .statistico-footer {
+      text-align: center; font-size: 10px; padding: 5px 16px;
+      color: rgba(255,255,255,.28); border-top: 1px solid rgba(255,255,255,.07);
+      background: var(--surface-0); flex-shrink: 0;
+      letter-spacing: .3px;
+    }
+    html[data-theme="light"] .statistico-footer { color: #9ca3af; border-top-color: #e2e8f0; }
+
+    /* ── Loading ────────────────────────────────────────────── */
+    .loading-overlay {
+      position: absolute; inset: 0; z-index: 500;
+      background: rgba(12,22,36,.72); backdrop-filter: blur(4px);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    }
+    .loading-overlay.hidden { display: none; }
+    .loading-spin {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 3px solid rgba(249,115,22,.25);
+      border-top-color: #f97316;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 13px; color: rgba(255,255,255,.75); }
   </style>
 </head>
+
 <body>
-<div class="shell">
+  <div class="sb-layout">
 
-  <!-- ── Left sidebar ─────────────────────────────────────────── -->
-  <nav class="sb-nav">
-    <div class="sb-brand">
-      <div class="sb-brand-icon"><i class="fa-solid fa-chart-column"></i></div>
-      <div>
-        <div class="sb-name">Pareto 2080</div>
-        <div class="sb-tagline" id="sbTagline">80/20 Analysis</div>
-      </div>
-    </div>
+    <!-- ══════════════════════════════════════════════════════════
+         Sidebar Navigation
+    ══════════════════════════════════════════════════════════ -->
+    <nav class="sb-nav" id="sidebarNav">
 
-    <div class="sb-body">
-      <div class="sb-group-title">Analysis</div>
-      <button class="sb-item active" onclick="switchTab('chart')" data-tab="chart">
-        <i class="fa-solid fa-chart-column"></i> Pareto Chart
-      </button>
-      <button class="sb-item" onclick="switchTab('table')" data-tab="table">
-        <i class="fa-solid fa-table-list"></i> Pareto Table
-        <span class="sb-badge" id="badgeTable">—</span>
-      </button>
-      <button class="sb-item" onclick="switchTab('abc')" data-tab="abc">
-        <i class="fa-solid fa-layer-group"></i> ABC Analysis
-      </button>
-
-      <div class="sb-group-title" style="margin-top:6px;">Settings</div>
-      <button class="sb-item" onclick="switchTab('options')" data-tab="options">
-        <i class="fa-solid fa-sliders"></i> Chart Options
-      </button>
-    </div>
-
-    <div class="sb-footer">
-      <label><i class="fa-solid fa-hashtag" style="font-size:10px;"></i> Decimals</label>
-      <select class="sb-dec-select" id="decimalsSelect" onchange="rerender()">
-        <option value="0">0</option>
-        <option value="1">1</option>
-        <option value="2" selected>2</option>
-        <option value="3">3</option>
-      </select>
-    </div>
-  </nav>
-
-  <!-- ── Right column ─────────────────────────────────────────── -->
-  <div class="right-col">
-
-    <!-- Topbar -->
-    <div class="topbar">
-      <div class="topbar-title" id="topbarTitle">Pareto Analysis</div>
-      <span class="topbar-badge" id="topbarBadge">—</span>
-    </div>
-
-    <!-- Column selector row (live re-aggregation) -->
-    <div class="col-selector-row">
-      <label><i class="fa-solid fa-tag"></i> Category</label>
-      <select class="col-select" id="colCat" onchange="recalculate()"></select>
-      <div class="col-sep"></div>
-      <label><i class="fa-solid fa-weight-hanging"></i> Values</label>
-      <select class="col-select" id="colVal" onchange="recalculate()"></select>
-    </div>
-
-    <!-- ── TAB: PARETO CHART ── -->
-    <div class="tab-content active" id="tab-chart">
-      <div class="chart-pane">
-        <div id="paretoChart"></div>
-        <div class="vital-strip" id="vitalStrip"></div>
-      </div>
-    </div>
-
-    <!-- ── TAB: PARETO TABLE ── -->
-    <div class="tab-content" id="tab-table">
-      <div class="table-pane">
-        <table class="pareto-tbl">
-          <thead>
-            <tr>
-              <th style="width:34px;">#</th>
-              <th>Category</th>
-              <th>Value</th>
-              <th>% of Total</th>
-              <th style="min-width:130px;">Cumulative %</th>
-              <th>Class</th>
-            </tr>
-          </thead>
-          <tbody id="paretoTableBody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- ── TAB: ABC ANALYSIS ── -->
-    <div class="tab-content" id="tab-abc">
-      <div class="abc-pane">
-        <div class="abc-cards" id="abcCards"></div>
-        <table class="abc-tbl">
-          <thead>
-            <tr>
-              <th>Class</th>
-              <th>#</th>
-              <th>Category</th>
-              <th>Value</th>
-              <th>% of Total</th>
-              <th>Cumulative %</th>
-            </tr>
-          </thead>
-          <tbody id="abcTableBody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- ── TAB: CHART OPTIONS ── -->
-    <div class="tab-content" id="tab-options">
-      <div class="options-pane">
-
-        <div class="opt-section">
-          <div class="opt-section-title">Chart</div>
-          <div class="opt-row">
-            <div class="opt-label"><i class="fa-solid fa-heading"></i> Title</div>
-            <input type="text" class="opt-text-input" id="optTitle" placeholder="Chart title…" />
-          </div>
-          <div class="opt-row">
-            <div class="opt-label"><i class="fa-solid fa-percent"></i> Threshold (A class)</div>
-            <div class="opt-threshold-row">
-              <input type="range" id="optThreshold" min="50" max="95" step="5" value="80"
-                oninput="document.getElementById('optThreshVal').textContent=this.value+'%'" />
-              <span class="opt-threshold-val" id="optThreshVal">80%</span>
-            </div>
-          </div>
-          <div class="opt-row">
-            <div class="opt-label"><i class="fa-solid fa-arrow-down-wide-short"></i> B class upper limit</div>
-            <div class="opt-threshold-row">
-              <input type="range" id="optThreshB" min="85" max="99" step="1" value="95"
-                oninput="document.getElementById('optThreshBVal').textContent=this.value+'%'" />
-              <span class="opt-threshold-val" id="optThreshBVal">95%</span>
-            </div>
-          </div>
-          <div class="opt-row">
-            <div class="opt-label"><i class="fa-solid fa-arrow-down-wide-short"></i> Sort order</div>
-            <div class="opt-radio-row">
-              <div class="opt-radio-btn active" id="optSortDesc" onclick="optSelectSort('desc')">
-                <i class="fa-solid fa-arrow-down"></i> Highest first
-              </div>
-              <div class="opt-radio-btn" id="optSortAsc" onclick="optSelectSort('asc')">
-                <i class="fa-solid fa-arrow-up"></i> Lowest first
-              </div>
-            </div>
-          </div>
+      <!-- Brand logo (matches mixed-results pattern) -->
+      <div class="sb-logo">
+        <div class="sb-logo-icon">
+          <svg class="sb-logo-svg" viewBox="0 -8 300 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="p-sOrange" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#fb923c"/><stop offset="100%" stop-color="#ea580c"/>
+              </linearGradient>
+              <linearGradient id="p-sAmber" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#fde68a"/><stop offset="100%" stop-color="#f59e0b"/>
+              </linearGradient>
+              <linearGradient id="p-sBarTop" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#ffd4a1"/><stop offset="100%" stop-color="#f97316"/>
+              </linearGradient>
+              <linearGradient id="p-sBarSide" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#c2410c"/><stop offset="100%" stop-color="#7c2d12"/>
+              </linearGradient>
+              <filter id="p-fShadow" x="-15%" y="-10%" width="160%" height="130%">
+                <feDropShadow dx="3" dy="4" stdDeviation="2.5" flood-color="#1c0800" flood-opacity="0.55"/>
+              </filter>
+            </defs>
+            <g>
+              <!-- Pareto bars (descending) -->
+              <g filter="url(#p-fShadow)">
+                <!-- Bar 1 (tallest) -->
+                <polygon points="26,20 26,75 30,72 30,17" fill="url(#p-sBarSide)"/>
+                <polygon points="14,20 26,20 30,17 18,17" fill="url(#p-sBarTop)"/>
+                <rect x="14" y="20" width="12" height="55" rx="1" fill="url(#p-sOrange)"/>
+                <rect x="14" y="20" width="3" height="55" rx="1" fill="rgba(255,255,255,.22)"/>
+                <!-- Bar 2 -->
+                <polygon points="40,33 40,75 44,72 44,30" fill="url(#p-sBarSide)"/>
+                <polygon points="28,33 40,33 44,30 32,30" fill="url(#p-sBarTop)"/>
+                <rect x="28" y="33" width="12" height="42" rx="1" fill="url(#p-sOrange)"/>
+                <rect x="28" y="33" width="3" height="42" rx="1" fill="rgba(255,255,255,.22)"/>
+                <!-- Bar 3 -->
+                <polygon points="54,46 54,75 58,72 58,43" fill="url(#p-sBarSide)"/>
+                <polygon points="42,46 54,46 58,43 46,43" fill="url(#p-sBarTop)"/>
+                <rect x="42" y="46" width="12" height="29" rx="1" fill="url(#p-sAmber)"/>
+                <rect x="42" y="46" width="3" height="29" rx="1" fill="rgba(255,255,255,.22)"/>
+                <!-- Bar 4 -->
+                <polygon points="68,57 68,75 72,72 72,54" fill="url(#p-sBarSide)"/>
+                <polygon points="56,57 68,57 72,54 60,54" fill="url(#p-sBarTop)"/>
+                <rect x="56" y="57" width="12" height="18" rx="1" fill="url(#p-sAmber)"/>
+              </g>
+              <!-- Cumulative line -->
+              <polyline points="20,22 34,35 48,48 62,59 74,70"
+                stroke="#f97316" stroke-width="2.5" fill="none"
+                stroke-linecap="round" stroke-linejoin="round" opacity=".75"/>
+              <!-- 80% threshold line -->
+              <line x1="8" y1="30" x2="74" y2="30"
+                stroke="#fbbf24" stroke-width="1.2" stroke-dasharray="4,3" opacity=".6"/>
+            </g>
+            <!-- STATISTICO text -->
+            <text x="89.5" y="38.5" font-family="Segoe UI, Arial, sans-serif" font-size="24"
+              font-weight="800" letter-spacing="7" fill="#1c0800" opacity="0.4">STATISTICO</text>
+            <text x="88" y="37" font-family="Segoe UI, Arial, sans-serif" font-size="24"
+              font-weight="800" letter-spacing="7" fill="#ffffff">STATISTICO</text>
+            <g>
+              <line x1="92" y1="63" x2="118" y2="63" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".88"/>
+              <text x="191" y="68" font-family="Segoe UI, Arial, sans-serif" font-size="15"
+                font-weight="800" letter-spacing="4.6" text-anchor="middle" fill="#fff" opacity=".96">INTERACTIVE</text>
+              <line x1="264" y1="63" x2="296" y2="63" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".88"/>
+            </g>
+          </svg>
         </div>
+      </div>
 
-        <div class="opt-section">
-          <div class="opt-section-title">Overlays</div>
-          <div class="opt-check-row">
-            <input type="checkbox" id="optCumLine" checked />
-            <label for="optCumLine">Cumulative % line</label>
-          </div>
-          <div class="opt-check-row">
-            <input type="checkbox" id="optThreshLine" checked />
-            <label for="optThreshLine">Threshold reference line</label>
-          </div>
-          <div class="opt-check-row">
-            <input type="checkbox" id="optLabels" checked />
-            <label for="optLabels">Value labels on bars</label>
-          </div>
-        </div>
-
-        <button class="opt-apply-btn" onclick="applyOptions()">
-          <i class="fa-solid fa-rotate-right"></i> Apply &amp; Refresh
+      <!-- Menu header + collapse toggle -->
+      <div class="sb-header">
+        <i class="fa-solid fa-bars-staggered sb-menu-icon"></i>
+        <span class="sb-menu-title">Menu</span>
+        <button class="sb-toggle-btn" onclick="toggleSidebar()" title="Collapse / expand">
+          <i class="fa-solid fa-chevron-left sb-toggle-icon"></i>
         </button>
-
       </div>
-    </div>
 
-  </div><!-- /right-col -->
-</div><!-- /shell -->
+      <!-- Nav items -->
+      <div class="sb-body">
+        <div class="sb-group">
+          <div class="sb-group-title">Pareto Analysis</div>
+          <div class="sb-items-rail">
+            <button class="sb-item active" data-tab="chart" onclick="switchTab('chart')">
+              <i class="fa-solid fa-chart-column sb-item-icon"></i>
+              <span class="sb-item-copy">
+                <span class="sb-item-label">Pareto Chart</span>
+                <span class="sb-item-description">80/20 bar + cumulative line.</span>
+              </span>
+            </button>
+            <button class="sb-item" data-tab="table" onclick="switchTab('table')">
+              <i class="fa-solid fa-table sb-item-icon"></i>
+              <span class="sb-item-copy">
+                <span class="sb-item-label">Pareto Table</span>
+                <span class="sb-item-description">Ranked contributions with %.</span>
+              </span>
+            </button>
+            <button class="sb-item" data-tab="abc" onclick="switchTab('abc')">
+              <i class="fa-solid fa-layer-group sb-item-icon"></i>
+              <span class="sb-item-copy">
+                <span class="sb-item-label">ABC Analysis</span>
+                <span class="sb-item-description">Class A/B/C segmentation.</span>
+              </span>
+            </button>
+          </div>
+        </div>
+        <div class="sb-group">
+          <div class="sb-group-title">Configuration</div>
+          <div class="sb-items-rail">
+            <button class="sb-item" data-tab="options" onclick="switchTab('options')">
+              <i class="fa-solid fa-sliders sb-item-icon"></i>
+              <span class="sb-item-copy">
+                <span class="sb-item-label">Chart Options</span>
+                <span class="sb-item-description">Thresholds, labels & title.</span>
+              </span>
+            </button>
+          </div>
+        </div>
+      </div><!-- /sb-body -->
 
-<script>
+      <!-- Bottom utilities -->
+      <div class="sb-bottom">
+        <button class="prt-sb-theme-btn" onclick="toggleTheme()">
+          <i class="fa-solid fa-circle-half-stroke sb-bottom-icon"></i>
+          <span class="sb-bottom-label">Toggle Theme</span>
+        </button>
+      </div>
+
+    </nav><!-- /sb-nav -->
+
+    <!-- ══════════════════════════════════════════════════════════
+         Right column
+    ══════════════════════════════════════════════════════════ -->
+    <div class="right-col" style="position:relative;">
+
+      <!-- Loading overlay -->
+      <div class="loading-overlay hidden" id="loadingOverlay">
+        <div class="loading-spin"></div>
+        <div class="loading-text">Loading Pareto analysis…</div>
+      </div>
+
+      <!-- Compact top-bar -->
+      <div class="prt-topbar">
+        <div class="prt-module-frame">
+          <span class="prt-module-kicker">Applications</span>
+          <span class="prt-module-name">Pareto 2080</span>
+        </div>
+        <div class="prt-topbar-title" id="topbarTitle">Pareto Analysis</div>
+        <div class="prt-topbar-right">
+          <span class="prt-topbar-badge" id="topbarBadge">—</span>
+        </div>
+      </div>
+
+      <!-- Column selector hero strip -->
+      <div class="hero-section">
+        <div class="hero-control-group">
+          <label><i class="fa-solid fa-tag" style="font-size:9px;"></i>&nbsp; Category</label>
+          <select class="hero-select" id="colCat" onchange="recalculate()"></select>
+        </div>
+        <div class="hero-sep"></div>
+        <div class="hero-control-group">
+          <label><i class="fa-solid fa-weight-hanging" style="font-size:9px;"></i>&nbsp; Values</label>
+          <select class="hero-select" id="colVal" onchange="recalculate()"></select>
+        </div>
+        <div class="hero-stats" id="heroStats">
+          <div class="hero-stat">
+            <div class="hero-stat-v" id="statN">—</div>
+            <div class="hero-stat-l">Categories</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-v" id="statTotal">—</div>
+            <div class="hero-stat-l">Total</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab content area -->
+      <div class="card-main">
+
+        <!-- ── TAB: PARETO CHART ── -->
+        <div class="tab-content active" id="tab-chart">
+          <div class="chart-pane">
+            <div id="paretoChart"></div>
+          </div>
+          <div class="vital-strip" id="vitalStrip"></div>
+        </div>
+
+        <!-- ── TAB: PARETO TABLE ── -->
+        <div class="tab-content" id="tab-table">
+          <div class="prt-tbl-wrap">
+            <table class="prt-tbl">
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Class</th>
+                  <th>Category</th>
+                  <th>Value</th>
+                  <th>% Share</th>
+                  <th>Cumulative %</th>
+                </tr>
+              </thead>
+              <tbody id="paretoTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── TAB: ABC ANALYSIS ── -->
+        <div class="tab-content" id="tab-abc">
+          <div class="tab-scroll">
+            <div class="abc-summary-row" id="abcSummaryRow"></div>
+            <table class="prt-tbl">
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Class</th>
+                  <th>Category</th>
+                  <th>Value</th>
+                  <th>% Share</th>
+                  <th>Cumulative %</th>
+                </tr>
+              </thead>
+              <tbody id="abcTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── TAB: CHART OPTIONS ── -->
+        <div class="tab-content" id="tab-options">
+          <div class="tab-scroll">
+            <div class="opts-grid">
+              <div class="opt-group" style="grid-column:1/-1;">
+                <div class="opt-group-title">Chart Title</div>
+                <div class="opt-row">
+                  <input class="opt-title-input" type="text" id="optTitle" value="Pareto Analysis" />
+                </div>
+              </div>
+              <div class="opt-group">
+                <div class="opt-group-title">Thresholds</div>
+                <div class="opt-row">
+                  <label>Class A upper (%)</label>
+                  <input class="opt-input" type="number" id="optThreshold" value="80" min="50" max="95" step="5" />
+                </div>
+                <div class="opt-row">
+                  <label>Class B upper (%)</label>
+                  <input class="opt-input" type="number" id="optThreshB" value="95" min="80" max="99" step="1" />
+                </div>
+              </div>
+              <div class="opt-group">
+                <div class="opt-group-title">Sort Order</div>
+                <div class="opt-row">
+                  <label>Direction</label>
+                  <select class="opt-input" id="optSort" style="width:90px;text-align:left;">
+                    <option value="desc">Descending</option>
+                    <option value="asc">Ascending</option>
+                  </select>
+                </div>
+              </div>
+              <div class="opt-group">
+                <div class="opt-group-title">Display</div>
+                <div class="opt-row">
+                  <label>Cumulative line</label>
+                  <input type="checkbox" id="optCumLine" checked />
+                </div>
+                <div class="opt-row">
+                  <label>Threshold lines</label>
+                  <input type="checkbox" id="optThreshLine" checked />
+                </div>
+                <div class="opt-row">
+                  <label>Value labels</label>
+                  <input type="checkbox" id="optLabels" checked />
+                </div>
+              </div>
+            </div>
+            <button class="opt-apply-btn" onclick="applyOptions()">
+              <i class="fa-solid fa-rotate-right"></i> Apply &amp; Refresh
+            </button>
+          </div>
+        </div>
+
+      </div><!-- /card-main -->
+
+      <footer class="statistico-footer">
+        2026 Statistico Interactive (TM) — All rights reserved
+      </footer>
+
+    </div><!-- /right-col -->
+  </div><!-- /sb-layout -->
+
+  <script>
   /* ─────────────────────────────────────────────────────────
      State
   ───────────────────────────────────────────────────────── */
-  var _cfg     = null;   // from sessionStorage
-  var _chart   = null;   // Highcharts
-  var _sortDir = 'desc';
-  var _data    = [];     // current sorted aggregated [{cat,val}]
+  var _cfg    = null;
+  var _chart  = null;
+  var _data   = [];   /* sorted aggregated [{cat, val}] */
+  var _sbCollapsed = false;
 
   /* ─────────────────────────────────────────────────────────
-     Boot
+     Boot — receive data via DialogParentMessageReceived
   ───────────────────────────────────────────────────────── */
   Office.onReady(function () {
-    /* Signal the launcher page that this dialog is ready to receive data */
+    document.getElementById('loadingOverlay').classList.remove('hidden');
     try {
       Office.context.ui.addHandlerAsync(
         Office.EventType.DialogParentMessageReceived,
@@ -517,6 +666,7 @@
             var msg = JSON.parse(arg.message || '{}');
             if (msg.type === 'PARETO_RUN_DATA') {
               _cfg = msg.payload || {};
+              document.getElementById('loadingOverlay').classList.add('hidden');
               init();
             }
           } catch (e) { showError('Data parse error: ' + e.message); }
@@ -526,21 +676,18 @@
     } catch (e) { showError('Init error: ' + e.message); }
   });
 
+  /* ─────────────────────────────────────────────────────────
+     Init
+  ───────────────────────────────────────────────────────── */
   function init() {
-    /* Populate column selector dropdowns */
     populateColSelects();
-
-    /* Pre-populate Options panel */
     var titleEl = document.getElementById('optTitle');
-    if (titleEl) titleEl.value = _cfg.chartTitle || (_cfg.categoryColName + ' — Pareto Analysis');
-    setText('topbarTitle', titleEl ? titleEl.value : 'Pareto Analysis');
-    setText('sbTagline', (_cfg.categoryColName || '') + ' vs. ' + (_cfg.valuesColName || 'Count'));
-
+    if (titleEl) titleEl.value = _cfg.chartTitle || ((_cfg.categoryColName || 'Category') + ' — Pareto Analysis');
     recalculate();
   }
 
   /* ─────────────────────────────────────────────────────────
-     Populate col selects from raw headers
+     Populate column selectors
   ───────────────────────────────────────────────────────── */
   function populateColSelects() {
     var headers = _cfg.headers || [];
@@ -562,24 +709,24 @@
         '<option value="' + i + '">' + escHtml(h) + '</option>');
     });
 
-    /* Restore config selections */
     if (_cfg.categoryColIndex !== undefined) catSel.value = String(_cfg.categoryColIndex);
-    if (_cfg.valuesColIndex   !== null && _cfg.valuesColIndex !== undefined)
+    if (_cfg.valuesColIndex !== null && _cfg.valuesColIndex !== undefined)
       valSel.value = String(_cfg.valuesColIndex);
   }
 
   /* ─────────────────────────────────────────────────────────
-     Recalculate from raw data (called on col change)
+     Recalculate (called on column change)
   ───────────────────────────────────────────────────────── */
   function recalculate() {
     var catIdx    = parseInt(document.getElementById('colCat').value, 10);
     var valIdxRaw = document.getElementById('colVal').value;
     var valIdx    = valIdxRaw !== '' ? parseInt(valIdxRaw, 10) : null;
+    var sortDir   = (document.getElementById('optSort') || {value:'desc'}).value || 'desc';
 
     var rows = (_cfg.rawValues || []).slice(1);
     var map  = {};
     rows.forEach(function (row) {
-      var cat = String(row[catIdx] ?? '').trim();
+      var cat = String(row[catIdx] === null || row[catIdx] === undefined ? '' : row[catIdx]).trim();
       if (!cat) return;
       var val = valIdx !== null ? parseFloat(row[valIdx]) : 1;
       if (isNaN(val)) val = 0;
@@ -587,16 +734,19 @@
     });
 
     _data = Object.keys(map).map(function (k) { return { cat: k, val: map[k] }; });
-    _data.sort(function (a, b) { return _sortDir === 'asc' ? a.val - b.val : b.val - a.val; });
+    _data.sort(function (a, b) { return sortDir === 'asc' ? a.val - b.val : b.val - a.val; });
+
+    /* Update hero stats */
+    var total = _data.reduce(function (s, d) { return s + d.val; }, 0);
+    setText('statN', _data.length);
+    setText('statTotal', fmtNum(total, 0));
 
     /* Update topbar */
-    var catName = (_cfg.headers || [])[catIdx] || '';
-    var valName = valIdx !== null ? ((_cfg.headers || [])[valIdx] || '') : 'Count';
+    var catName = (_cfg.headers || [])[catIdx] || 'Category';
+    var valName = valIdx !== null ? ((_cfg.headers || [])[valIdx] || 'Values') : 'Count';
+    setText('topbarTitle', catName + ' — Pareto Analysis');
     setText('topbarBadge', _data.length + ' categories');
-    setText('sbTagline', catName + ' vs. ' + valName);
-    setText('badgeTable', _data.length);
 
-    /* Render all */
     renderChart();
     renderParetoTable();
     renderABC();
@@ -604,16 +754,16 @@
   }
 
   /* ─────────────────────────────────────────────────────────
-     Helpers: opts + totals
+     Helper: get options from controls
   ───────────────────────────────────────────────────────── */
   function getOpts() {
     return {
-      threshold:     parseInt((document.getElementById('optThreshold')  || {value:'80'}).value, 10),
-      thresholdB:    parseInt((document.getElementById('optThreshB')    || {value:'95'}).value, 10),
-      title:         ((document.getElementById('optTitle') || {value:''}).value.trim()) || 'Pareto Analysis',
-      showCumLine:   (document.getElementById('optCumLine')    || {checked:true}).checked,
-      showThreshLine:(document.getElementById('optThreshLine') || {checked:true}).checked,
-      showLabels:    (document.getElementById('optLabels')     || {checked:true}).checked
+      threshold:      parseInt((document.getElementById('optThreshold')  || {value:'80'}).value, 10)  || 80,
+      thresholdB:     parseInt((document.getElementById('optThreshB')    || {value:'95'}).value, 10)  || 95,
+      title:          ((document.getElementById('optTitle') || {value:''}).value.trim()) || 'Pareto Analysis',
+      showCumLine:    (document.getElementById('optCumLine')    || {checked:true}).checked,
+      showThreshLine: (document.getElementById('optThreshLine') || {checked:true}).checked,
+      showLabels:     (document.getElementById('optLabels')     || {checked:true}).checked
     };
   }
 
@@ -624,7 +774,7 @@
   }
 
   /* ─────────────────────────────────────────────────────────
-     Tab switching
+     Sidebar tab switching
   ───────────────────────────────────────────────────────── */
   function switchTab(name) {
     document.querySelectorAll('.tab-content').forEach(function (t) { t.classList.remove('active'); });
@@ -633,7 +783,36 @@
     document.querySelectorAll('.sb-item[data-tab]').forEach(function (b) {
       b.classList.toggle('active', b.dataset.tab === name);
     });
-    if (name === 'chart' && _chart) setTimeout(function () { _chart.reflow(); }, 50);
+    if (name === 'chart' && _chart) setTimeout(function () { _chart.reflow(); }, 60);
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     Sidebar collapse / expand
+  ───────────────────────────────────────────────────────── */
+  function toggleSidebar() {
+    _sbCollapsed = !_sbCollapsed;
+    var nav  = document.getElementById('sidebarNav');
+    var icon = nav.querySelector('.sb-toggle-icon');
+    if (_sbCollapsed) { nav.classList.add('collapsed'); if (icon) icon.style.transform = 'rotate(180deg)'; }
+    else              { nav.classList.remove('collapsed'); if (icon) icon.style.transform = ''; }
+    if (_chart) setTimeout(function () { _chart.reflow(); }, 280);
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     Apply options (re-render all)
+  ───────────────────────────────────────────────────────── */
+  function applyOptions() {
+    recalculate();
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     Theme toggle
+  ───────────────────────────────────────────────────────── */
+  function toggleTheme() {
+    var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    if (isLight) document.documentElement.removeAttribute('data-theme');
+    else         document.documentElement.setAttribute('data-theme', 'light');
+    if (_chart) setTimeout(renderChart, 60);
   }
 
   /* ─────────────────────────────────────────────────────────
@@ -641,95 +820,95 @@
   ───────────────────────────────────────────────────────── */
   function renderChart() {
     if (!_data.length) return;
-    var opts   = getOpts();
-    var dec    = parseInt(document.getElementById('decimalsSelect').value, 10) || 2;
+    var opts  = getOpts();
+    var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    var bg    = isLight ? '#ffffff' : 'transparent';
+    var tc    = isLight ? '#111827' : '#f1f5f9';
+    var tc2   = isLight ? '#374151' : '#94a3b8';
+    var gc    = isLight ? 'rgba(0,0,0,.07)' : 'rgba(255,255,255,.07)';
+
     var total  = _data.reduce(function (s, d) { return s + d.val; }, 0);
     var cats   = _data.map(function (d) { return d.cat; });
     var vals   = _data.map(function (d) { return d.val; });
 
-    /* cumulative % */
     var runSum = 0, cumPct = [];
-    vals.forEach(function (v) { runSum += v; cumPct.push(parseFloat(((runSum/total)*100).toFixed(2))); });
+    vals.forEach(function (v) { runSum += v; cumPct.push(parseFloat(((runSum / total) * 100).toFixed(2))); });
 
-    /* ABC colors */
-    var barColors = cumPct.map(function (c) {
-      return c <= opts.threshold  ? '#f97316' :
-             c <= opts.thresholdB ? '#fbbf24' : '#475569';
+    var barColors = cumPct.map(function (c, i) {
+      var cls = classifyItem(c, opts);
+      return cls === 'A' ? '#f97316' : cls === 'B' ? '#fbbf24' : '#475569';
     });
 
-    if (_chart) { try { _chart.destroy(); } catch (e) {} }
+    if (_chart) { try { _chart.destroy(); } catch (e) {} _chart = null; }
+
+    var plotLines = [];
+    if (opts.showThreshLine) {
+      plotLines.push({ value: opts.threshold,  color: 'rgba(249,115,22,.7)', width: 1.5, dashStyle: 'Dash',
+        label: { text: opts.threshold + '%',  style: { color: '#f97316',  fontSize: '10px' }, align: 'right', x: -4 } });
+      plotLines.push({ value: opts.thresholdB, color: 'rgba(251,191,36,.5)', width: 1,   dashStyle: 'Dot',
+        label: { text: opts.thresholdB + '%', style: { color: '#fbbf24', fontSize: '10px' }, align: 'right', x: -4 } });
+    }
+
+    var series = [
+      {
+        type: 'column', name: 'Value',
+        data: vals.map(function (v, i) { return { y: v, color: barColors[i] }; }),
+        yAxis: 0,
+        dataLabels: opts.showLabels ? {
+          enabled: true, style: { fontSize: '9px', color: tc2, fontWeight: '600', textOutline: 'none' },
+          formatter: function () { return fmtNum(this.y, 1); }
+        } : { enabled: false }
+      }
+    ];
+    if (opts.showCumLine) {
+      series.push({
+        type: 'spline', name: 'Cumulative %',
+        data: cumPct, yAxis: 1,
+        color: '#38bdf8', lineWidth: 2,
+        marker: { radius: 3 }
+      });
+    }
 
     _chart = Highcharts.chart('paretoChart', {
       chart: {
-        backgroundColor:'transparent', animation:{duration:500},
-        style:{fontFamily:"'Segoe UI',system-ui,sans-serif"}
+        backgroundColor: bg, animation: { duration: 400 },
+        style: { fontFamily: "'Segoe UI', system-ui, sans-serif" },
+        spacingTop: 8, spacingBottom: 6, spacingLeft: 4, spacingRight: 8
       },
-      title: {
-        text: opts.title,
-        style:{color:'#f1f5f9',fontSize:'13px',fontWeight:'700'}
-      },
+      title:  { text: opts.title, style: { color: tc, fontSize: '12px', fontWeight: '700' } },
       xAxis: {
-        categories: cats, crosshair:true,
-        labels:{style:{color:'#94a3b8',fontSize:'11px'}, rotation: cats.length > 10 ? -35 : 0},
-        lineColor:'rgba(255,255,255,.1)', tickColor:'rgba(255,255,255,.08)'
+        categories: cats, crosshair: true,
+        labels: { style: { color: tc2, fontSize: '10px' }, rotation: cats.length > 10 ? -35 : 0 },
+        lineColor: gc, tickColor: gc
       },
       yAxis: [
         {
-          title:{text: getValColName(), style:{color:'#94a3b8',fontSize:'11px'}},
-          labels:{style:{color:'#94a3b8',fontSize:'11px'},
-            formatter:function(){return fmtNum(this.value,dec);}},
-          gridLineColor:'rgba(255,255,255,.07)'
+          title: { text: getValColName(), style: { color: tc2, fontSize: '10px' } },
+          labels: { style: { color: tc2, fontSize: '10px' }, formatter: function () { return fmtNum(this.value, 0); } },
+          gridLineColor: gc
         },
         {
-          title:{text:'Cumulative %',style:{color:'#38bdf8',fontSize:'11px'}},
-          labels:{style:{color:'#38bdf8',fontSize:'11px'},
-            formatter:function(){return this.value+'%';}},
-          opposite:true, min:0, max:100, gridLineWidth:0,
-          plotLines: opts.showThreshLine ? [
-            {value:opts.threshold, color:'rgba(249,115,22,.6)', width:1.5, dashStyle:'Dash',
-              label:{text:opts.threshold+'%',style:{color:'#f97316',fontSize:'10px'},align:'right',x:-4}},
-            {value:opts.thresholdB, color:'rgba(251,191,36,.45)', width:1, dashStyle:'Dot',
-              label:{text:opts.thresholdB+'%',style:{color:'#fbbf24',fontSize:'10px'},align:'right',x:-4}}
-          ] : []
+          title: { text: 'Cumulative %', style: { color: '#38bdf8', fontSize: '10px' } },
+          labels: { style: { color: '#38bdf8', fontSize: '10px' }, formatter: function () { return this.value + '%'; } },
+          opposite: true, min: 0, max: 100, gridLineWidth: 0,
+          plotLines: plotLines
         }
       ],
-      legend:{itemStyle:{color:'#94a3b8',fontSize:'11px'}},
-      tooltip:{
-        backgroundColor:'#1a2233', borderColor:'rgba(255,255,255,.12)',
-        style:{color:'#f1f5f9',fontSize:'12px'}, shared:true,
-        formatter:function(){
-          var s='<b style="color:#f1f5f9">'+this.x+'</b><br/>';
-          this.points.forEach(function(p){
-            s+='<span style="color:'+p.color+'">●</span> '+p.series.name+': <b>'+fmtNum(p.y,dec)+'</b><br/>';
-          });
-          return s;
-        }
+      legend: {
+        itemStyle: { color: tc2, fontSize: '11px', fontWeight: '500' },
+        itemHoverStyle: { color: tc }
       },
-      plotOptions:{
-        column:{
-          groupPadding:.04, pointPadding:.02, borderWidth:0, borderRadius:3,
-          dataLabels:{
-            enabled:opts.showLabels,
-            style:{color:'#f1f5f9',fontSize:'10px',textOutline:'1px rgba(0,0,0,.5)'},
-            formatter:function(){return fmtNum(this.y,dec);}
-          }
-        },
-        line:{marker:{radius:3,symbol:'circle'}}
+      tooltip: {
+        shared: true, useHTML: true,
+        backgroundColor: isLight ? '#fff' : 'rgba(7,9,14,.96)',
+        borderColor: 'rgba(249,115,22,.4)', borderRadius: 8,
+        style: { color: tc, fontSize: '11px' }
       },
-      series:[
-        {
-          type:'column', name: getValColName(),
-          data: vals.map(function(v,i){return {y:v,color:barColors[i]};}),
-          yAxis:0
-        },
-        opts.showCumLine ? {
-          type:'line', name:'Cumulative %',
-          data:cumPct, yAxis:1,
-          color:'#38bdf8', lineWidth:2,
-          marker:{fillColor:'#38bdf8',lineWidth:1,lineColor:'#0b1320'}
-        } : null
-      ].filter(Boolean),
-      credits:{enabled:false}, exporting:{enabled:false}
+      plotOptions: {
+        column: { groupPadding: 0, pointPadding: 0.03, borderWidth: 0, borderRadius: 2 }
+      },
+      series: series,
+      credits: { enabled: false }
     });
   }
 
@@ -737,166 +916,159 @@
      Pareto Table
   ───────────────────────────────────────────────────────── */
   function renderParetoTable() {
-    var opts   = getOpts();
-    var dec    = parseInt(document.getElementById('decimalsSelect').value, 10) || 2;
-    var total  = _data.reduce(function(s,d){return s+d.val;},0);
-    var runSum = 0, html = '';
+    if (!_data.length) return;
+    var opts  = getOpts();
+    var total = _data.reduce(function (s, d) { return s + d.val; }, 0);
+    var runSum = 0;
+    var html = '';
     _data.forEach(function (d, i) {
       runSum += d.val;
-      var pct    = total>0 ? (d.val/total*100) : 0;
-      var cumPct = total>0 ? (runSum/total*100) : 0;
-      var cls    = classifyItem(cumPct, opts);
-      var isVital = cls === 'A';
-      var barW   = Math.min(100,pct).toFixed(1);
-      html += '<tr class="' + (isVital?'row-vital':'') + '">' +
-        '<td><span class="rank'+(isVital?' vital':'')+'">'+(i+1)+'</span></td>' +
-        '<td style="font-weight:'+(isVital?'600':'400')+';">' + escHtml(d.cat) + '</td>' +
-        '<td><strong>' + fmtNum(d.val,dec) + '</strong></td>' +
-        '<td><div class="bar-wrap">' +
-          '<div class="bar-track"><div class="bar-fill'+(isVital?'':' muted')+'" style="width:'+barW+'%"></div></div>' +
-          '<span style="font-size:11px;color:var(--text-2);min-width:38px;text-align:right;">'+pct.toFixed(1)+'%</span>' +
-        '</div></td>' +
-        '<td><span class="cum-val'+(isVital?' vital':'')+'">'+cumPct.toFixed(1)+'%</span></td>' +
-        '<td><span class="abc-label '+cls+'">'+cls+'</span></td>' +
-      '</tr>';
+      var pct    = total > 0 ? (d.val / total * 100) : 0;
+      var cumP   = total > 0 ? (runSum / total * 100) : 0;
+      var cls    = classifyItem(cumP, opts);
+      html += '<tr>'
+        + '<td>' + (i + 1) + '</td>'
+        + '<td><span class="cls-badge ' + cls + '">' + cls + '</span></td>'
+        + '<td>' + escHtml(d.cat) + '</td>'
+        + '<td class="val-num">' + fmtNum(d.val, 2) + '</td>'
+        + '<td class="val-pct">' + fmtNum(pct, 1) + '%</td>'
+        + '<td class="val-cum">'
+        +   '<div class="cum-bar-wrap">'
+        +     '<span style="min-width:42px;font-size:11px;font-weight:700;">' + fmtNum(cumP, 1) + '%</span>'
+        +     '<div class="cum-bar-bg"><div class="cum-bar-fill ' + cls + '" style="width:' + Math.min(cumP, 100) + '%"></div></div>'
+        +   '</div>'
+        + '</td>'
+        + '</tr>';
     });
-    document.getElementById('paretoTableBody').innerHTML = html || '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text-3);">No data</td></tr>';
+    document.getElementById('paretoTableBody').innerHTML = html;
   }
 
   /* ─────────────────────────────────────────────────────────
      ABC Analysis
   ───────────────────────────────────────────────────────── */
   function renderABC() {
-    var opts   = getOpts();
-    var dec    = parseInt(document.getElementById('decimalsSelect').value, 10) || 2;
-    var total  = _data.reduce(function(s,d){return s+d.val;},0);
+    if (!_data.length) return;
+    var opts  = getOpts();
+    var total = _data.reduce(function (s, d) { return s + d.val; }, 0);
     var runSum = 0;
+    var classes = { A: [], B: [], C: [] };
 
-    /* Classify each item */
-    var classified = _data.map(function(d) {
+    _data.forEach(function (d) {
       runSum += d.val;
-      var cumPct = total>0 ? (runSum/total*100) : 0;
-      return { cat:d.cat, val:d.val, pct:total>0?(d.val/total*100):0, cumPct:cumPct, cls:classifyItem(cumPct,opts) };
+      var cumP = total > 0 ? (runSum / total * 100) : 0;
+      var cls  = classifyItem(cumP, opts);
+      classes[cls].push({ cat: d.cat, val: d.val, cumP: cumP });
     });
 
-    /* Aggregate by class */
-    var groups = { A:{items:[],sum:0}, B:{items:[],sum:0}, C:{items:[],sum:0} };
-    classified.forEach(function(r){ groups[r.cls].items.push(r); groups[r.cls].sum+=r.val; });
-
-    /* Cards */
-    var classMeta = {
-      A:{ label:'A — Vital Few',   desc:'Top contributors, up to '+opts.threshold+'%' },
-      B:{ label:'B — Moderate',    desc:'Middle tier, '+opts.threshold+'% – '+opts.thresholdB+'%' },
-      C:{ label:'C — Trivial Many',desc:'Long tail, '+opts.thresholdB+'% – 100%' }
-    };
-    var cardsHtml = ['A','B','C'].map(function(cls) {
-      var g   = groups[cls];
-      var m   = classMeta[cls];
-      var pct = total>0 ? (g.sum/total*100).toFixed(1) : '0.0';
-      var countPct = _data.length>0 ? (g.items.length/_data.length*100).toFixed(0) : '0';
-      return '<div class="abc-card '+cls+'">' +
-        '<div class="abc-card-header">' +
-          '<span class="abc-class-badge">'+cls+'</span>' +
-          '<div class="abc-card-title">'+m.label+'<br/><span style="font-weight:400;font-size:10px;color:var(--text-3);">'+m.desc+'</span></div>' +
-        '</div>' +
-        '<div class="abc-stat"><span class="abc-stat-label">Categories</span><span class="abc-stat-val">'+g.items.length+' <small style="font-size:10px;opacity:.7;">('+countPct+'%)</small></span></div>' +
-        '<div class="abc-stat"><span class="abc-stat-label">Value share</span><span class="abc-stat-val">'+pct+'%</span></div>' +
-        '<div class="abc-bar-wrap"><div class="abc-bar-track"><div class="abc-bar-fill '+cls+'" style="width:'+parseFloat(pct)+'%;height:4px;border-radius:99px;"></div></div></div>' +
-      '</div>';
+    /* Summary cards */
+    var cardHtml = ['A', 'B', 'C'].map(function (cls) {
+      var items    = classes[cls];
+      var clsVal   = items.reduce(function (s, d) { return s + d.val; }, 0);
+      var valShare = total > 0 ? (clsVal / total * 100) : 0;
+      var catPct   = _data.length > 0 ? (items.length / _data.length * 100) : 0;
+      var desc = cls === 'A' ? 'Vital few — top contributors'
+               : cls === 'B' ? 'Important middle tier'
+               :                'Trivial many';
+      return '<div class="abc-card ' + cls + '">'
+        + '<div class="abc-card-header">'
+        +   '<div class="abc-class-dot ' + cls + '"></div>'
+        +   '<span class="abc-class-lbl ' + cls + '">Class ' + cls + '</span>'
+        + '</div>'
+        + '<div class="abc-big-val ' + cls + '">' + items.length + '</div>'
+        + '<div class="abc-sub">' + fmtNum(catPct, 1) + '% of categories · ' + fmtNum(valShare, 1) + '% of value</div>'
+        + '<div class="abc-sub" style="font-style:italic;">' + desc + '</div>'
+        + '<div class="abc-bar-bg"><div class="abc-bar-fill ' + cls + '" style="width:' + fmtNum(catPct, 1) + '%"></div></div>'
+        + '</div>';
     }).join('');
-    document.getElementById('abcCards').innerHTML = cardsHtml;
+    document.getElementById('abcSummaryRow').innerHTML = cardHtml;
 
-    /* ABC detail table */
-    var tblHtml = '';
-    classified.forEach(function(r, i) {
-      tblHtml += '<tr>' +
-        '<td><span class="abc-label '+r.cls+'">'+r.cls+'</span></td>' +
-        '<td style="color:var(--text-2);">'+(i+1)+'</td>' +
-        '<td style="font-weight:500;">'+escHtml(r.cat)+'</td>' +
-        '<td>'+fmtNum(r.val,dec)+'</td>' +
-        '<td style="color:var(--text-2);">'+r.pct.toFixed(1)+'%</td>' +
-        '<td style="color:var(--text-2);">'+r.cumPct.toFixed(1)+'%</td>' +
-      '</tr>';
+    /* Detail table */
+    runSum = 0;
+    var rank = 0;
+    var tHtml = '';
+    _data.forEach(function (d) {
+      rank++;
+      runSum += d.val;
+      var pct  = total > 0 ? (d.val / total * 100) : 0;
+      var cumP = total > 0 ? (runSum / total * 100) : 0;
+      var cls  = classifyItem(cumP, opts);
+      tHtml += '<tr>'
+        + '<td>' + rank + '</td>'
+        + '<td><span class="cls-badge ' + cls + '">' + cls + '</span></td>'
+        + '<td>' + escHtml(d.cat) + '</td>'
+        + '<td class="val-num">' + fmtNum(d.val, 2) + '</td>'
+        + '<td class="val-pct">' + fmtNum(pct, 1) + '%</td>'
+        + '<td class="val-cum">' + fmtNum(cumP, 1) + '%</td>'
+        + '</tr>';
     });
-    document.getElementById('abcTableBody').innerHTML = tblHtml || '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text-3);">No data</td></tr>';
+    document.getElementById('abcTableBody').innerHTML = tHtml;
   }
 
   /* ─────────────────────────────────────────────────────────
-     Vital strip (below chart)
+     Vital strip (bottom of chart tab)
   ───────────────────────────────────────────────────────── */
   function renderVitalStrip() {
-    var opts   = getOpts();
-    var total  = _data.reduce(function(s,d){return s+d.val;},0);
-    var runSum = 0, vitalN = 0;
-    for (var i=0;i<_data.length;i++) {
-      runSum += _data[i].val;
-      vitalN++;
-      if ((runSum/total)*100 >= opts.threshold) break;
-    }
-    var trivial = _data.length - vitalN;
-    var strip = document.getElementById('vitalStrip');
-    if (!strip) return;
-    strip.innerHTML =
-      '<div class="vital-pill hi"><span class="dot"></span>'+vitalN+' vital '+(vitalN===1?'category':'categories')+' → '+opts.threshold+'%</div>' +
-      '<div class="vital-pill">'+trivial+' trivial</div>' +
-      '<div class="vital-pill"><i class="fa-solid fa-sigma" style="font-size:10px;"></i>&nbsp;Total: '+fmtNum(total,2)+'</div>';
+    if (!_data.length) return;
+    var opts  = getOpts();
+    var total = _data.reduce(function (s, d) { return s + d.val; }, 0);
+    var runSum = 0;
+    var counts = { A: 0, B: 0, C: 0 };
+    _data.forEach(function (d) {
+      runSum += d.val;
+      var cumP = total > 0 ? (runSum / total * 100) : 0;
+      counts[classifyItem(cumP, opts)]++;
+    });
+    var total2 = _data.length;
+    var stripHtml = ['A', 'B', 'C'].map(function (cls) {
+      var pct = total2 > 0 ? fmtNum(counts[cls] / total2 * 100, 0) : 0;
+      var labels = { A: 'Vital Few', B: 'Important', C: 'Trivial Many' };
+      return '<div class="vital-card cls-' + cls.toLowerCase() + '">'
+        + '<div class="vital-val cls-' + cls + '">' + counts[cls] + '</div>'
+        + '<div class="vital-lbl">Class ' + cls + ' — ' + labels[cls] + '</div>'
+        + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">' + pct + '% of categories</div>'
+        + '</div>';
+    }).join('');
+    document.getElementById('vitalStrip').innerHTML = stripHtml;
   }
 
   /* ─────────────────────────────────────────────────────────
-     Options panel helpers
-  ───────────────────────────────────────────────────────── */
-  function optSelectSort(dir) {
-    _sortDir = dir;
-    document.getElementById('optSortDesc').classList.toggle('active', dir==='desc');
-    document.getElementById('optSortAsc').classList.toggle('active', dir==='asc');
-  }
-
-  function applyOptions() {
-    var titleEl = document.getElementById('optTitle');
-    if (titleEl) setText('topbarTitle', titleEl.value.trim() || 'Pareto Analysis');
-    /* Re-sort current data according to new sort dir */
-    _data.sort(function(a,b){ return _sortDir==='asc' ? a.val-b.val : b.val-a.val; });
-    renderChart();
-    renderParetoTable();
-    renderABC();
-    renderVitalStrip();
-    switchTab('chart');
-  }
-
-  function rerender() {
-    renderChart();
-    renderParetoTable();
-    renderABC();
-    renderVitalStrip();
-  }
-
-  /* ─────────────────────────────────────────────────────────
-     Utilities
+     Helpers
   ───────────────────────────────────────────────────────── */
   function getValColName() {
-    var valSel = document.getElementById('colVal');
-    if (!valSel || valSel.value === '') return 'Count';
-    var idx = parseInt(valSel.value, 10);
-    return (_cfg.headers || [])[idx] || 'Values';
-  }
-  function fmtNum(v, dec) {
-    var n = parseFloat(v);
-    if (isNaN(n)) return '—';
-    return n.toLocaleString(undefined, {minimumFractionDigits:dec, maximumFractionDigits:dec});
-  }
-  function setText(id, t) { var el=document.getElementById(id); if(el) el.textContent=t; }
-  function escHtml(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-  function showError(msg) {
-    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#f87171;font-family:Segoe UI,sans-serif;font-size:14px;padding:24px;text-align:center;"><i class="fa-solid fa-triangle-exclamation" style="margin-right:8px;"></i>'+escHtml(msg)+'</div>';
+    var valIdxRaw = (document.getElementById('colVal') || {}).value;
+    if (!valIdxRaw) return 'Count';
+    return (_cfg.headers || [])[parseInt(valIdxRaw, 10)] || 'Values';
   }
 
-  window.switchTab    = switchTab;
-  window.recalculate  = recalculate;
-  window.rerender     = rerender;
-  window.optSelectSort= optSelectSort;
+  function fmtNum(n, dec) {
+    if (n === null || n === undefined || isNaN(n)) return '—';
+    return Number(n).toLocaleString(undefined, {
+      minimumFractionDigits: dec, maximumFractionDigits: dec
+    });
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function setText(id, val) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
+
+  function showError(msg) {
+    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;'
+      + 'color:#f87171;font-family:Segoe UI,sans-serif;font-size:14px;padding:24px;text-align:center;">'
+      + '<i class="fa-solid fa-triangle-exclamation" style="margin-right:8px;"></i>' + escHtml(msg) + '</div>';
+  }
+
+  /* Expose globals needed by inline event handlers */
+  window.switchTab   = switchTab;
+  window.recalculate = recalculate;
   window.applyOptions = applyOptions;
-</script>
+  window.toggleSidebar = toggleSidebar;
+  window.toggleTheme = toggleTheme;
+  </script>
 </body>
 </html>

@@ -371,6 +371,30 @@
     }
     .opt-apply-btn:hover { filter: brightness(1.12); }
 
+    /* ── Decimals pill (topbar) ────────────────────────────── */
+    .dec-pill-wrap {
+      display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+    }
+    .dec-pill-lbl {
+      font-size: 9px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .14em; color: rgba(253,186,116,.72); white-space: nowrap;
+    }
+    .dec-pill {
+      display: flex; align-items: center;
+      background: rgba(255,255,255,.06); border: 1px solid rgba(249,115,22,.35);
+      border-radius: 8px; overflow: hidden;
+    }
+    .dec-pill button {
+      background: transparent; border: none; color: rgba(253,186,116,.9);
+      font-size: 16px; font-weight: 800; padding: 0 9px; height: 26px;
+      cursor: pointer; line-height: 1; transition: background .15s; font-family: inherit;
+    }
+    .dec-pill button:hover { background: rgba(249,115,22,.18); }
+    .dec-pill-val {
+      font-size: 13px; font-weight: 800; color: #fff;
+      min-width: 18px; text-align: center; padding: 0 2px; pointer-events: none;
+    }
+
     /* ── Utilities sidebar bottom buttons ─────────────────── */
     .prt-sb-theme-btn {
       display: flex; align-items: center; gap: 8px;
@@ -609,6 +633,14 @@
         </div>
         <div class="prt-topbar-title" id="topbarTitle">Pareto Analysis</div>
         <div class="prt-topbar-right">
+          <div class="dec-pill-wrap" title="Display decimal places">
+            <span class="dec-pill-lbl">Dec</span>
+            <div class="dec-pill">
+              <button onclick="changeDecimal(-1)">−</button>
+              <span class="dec-pill-val" id="decDisplay">2</span>
+              <button onclick="changeDecimal(1)">+</button>
+            </div>
+          </div>
           <span class="prt-topbar-badge" id="topbarBadge">—</span>
         </div>
       </div>
@@ -788,10 +820,12 @@
   /* ─────────────────────────────────────────────────────────
      State
   ───────────────────────────────────────────────────────── */
-  var _cfg    = null;
-  var _chart  = null;
-  var _data   = [];   /* sorted aggregated [{cat, val}] */
-  var _valDec = 0;    /* decimal places for raw values: 0 = count mode, 2 = sum mode */
+  var _cfg        = null;
+  var _chart      = null;
+  var _data       = [];   /* sorted aggregated [{cat, val}] */
+  var _valDec     = 0;    /* natural precision: 0 = count, 2 = sum */
+  var _dispDec    = 0;    /* user-controlled display precision (dec pill) */
+  var _lastValSel = null; /* tracks last Values dropdown selection */
   var _sbCollapsed = false;
 
   /* ─────────────────────────────────────────────────────────
@@ -862,8 +896,14 @@
     var catIdx    = parseInt(document.getElementById('colCat').value, 10);
     var valIdxRaw = document.getElementById('colVal').value;
     var valIdx    = valIdxRaw !== '' ? parseInt(valIdxRaw, 10) : null;
-    _valDec       = valIdx === null ? 0 : 2;   /* integers for counts, 2dp for sums */
-    var valHdr    = valIdx === null ? 'Count' : ((_cfg.headers || [])[valIdx] || 'Value');
+    _valDec = valIdx === null ? 0 : 2;
+    /* Reset display decimal only when the column selection actually changes */
+    if (valIdxRaw !== _lastValSel) {
+      _lastValSel = valIdxRaw;
+      _dispDec    = _valDec;
+      setText('decDisplay', _dispDec);
+    }
+    var valHdr = valIdx === null ? 'Count' : ((_cfg.headers || [])[valIdx] || 'Value');
     document.querySelectorAll('.val-col-hdr').forEach(function (th) { th.textContent = valHdr; });
     var sortDir   = (document.getElementById('optSort') || {value:'desc'}).value || 'desc';
 
@@ -924,6 +964,23 @@
   }
 
   /* ─────────────────────────────────────────────────────────
+     Decimal precision pill
+  ───────────────────────────────────────────────────────── */
+  function changeDecimal(delta) {
+    _dispDec = Math.max(0, Math.min(4, _dispDec + delta));
+    setText('decDisplay', _dispDec);
+    /* Re-render all currently-built views */
+    renderChart();
+    renderParetoTable();
+    renderABC();
+    renderVitalStrip();
+    var comboTab = document.getElementById('tab-combo');
+    if (comboTab && comboTab.classList.contains('active')) renderCombo();
+    var psiTab = document.getElementById('tab-psi');
+    if (psiTab && psiTab.classList.contains('active')) renderPSI();
+  }
+
+  /* ─────────────────────────────────────────────────────────
      Combined Chart + Table
   ───────────────────────────────────────────────────────── */
   var _comboChart = null;
@@ -936,6 +993,9 @@
     var tc      = isLight ? '#111827' : '#f1f5f9';
     var tc2     = isLight ? '#374151' : '#94a3b8';
     var gc      = isLight ? 'rgba(0,0,0,.07)' : 'rgba(255,255,255,.07)';
+    var n       = _data.length;
+    var barLblSz = n <= 3 ? '17px' : n <= 6 ? '14px' : n <= 12 ? '13px' : n <= 20 ? '11px' : '10px';
+    var cumLblSz = n <= 5 ? '13px' : n <= 12 ? '12px' : '10px';
 
     var total  = _data.reduce(function (s, d) { return s + d.val; }, 0);
     var cats   = _data.map(function (d) { return d.cat; });
@@ -969,30 +1029,44 @@
         spacingTop: 6, spacingBottom: 4, spacingLeft: 2, spacingRight: 6
       },
       title: { text: null },
+      /* Dynamic sizes */
       xAxis: {
         categories: cats, crosshair: false,
-        labels: { style: { color: tc2, fontSize: '13px' }, rotation: cats.length > 8 ? -40 : 0 },
+        labels: { style: { color: tc2, fontSize: n <= 5 ? '14px' : n <= 12 ? '12px' : '11px',
+                            fontWeight: n <= 6 ? '700' : '500' },
+                  rotation: cats.length > 8 ? -40 : 0 },
         lineColor: gc, tickColor: gc
       },
       yAxis: [
         {
           title: { text: null },
-          labels: { style: { color: tc2, fontSize: '10px' }, formatter: function () { return fmtNum(this.value, 0); } },
+          labels: { style: { color: tc2, fontSize: '11px' }, formatter: function () { return fmtNum(this.value, 0); } },
           gridLineColor: gc
         },
         {
           title: { text: null },
-          labels: { style: { color: '#38bdf8', fontSize: '10px' }, formatter: function () { return this.value + '%'; } },
+          labels: { style: { color: '#38bdf8', fontSize: '11px' }, formatter: function () { return this.value + '%'; } },
           opposite: true, min: 0, max: 100, gridLineWidth: 0,
           plotLines: plotLines
         }
       ],
       legend: { enabled: false },
       tooltip: {
-        shared: true, useHTML: true,
+        shared: true, useHTML: true, hideDelay: 80,
         backgroundColor: isLight ? '#fff' : 'rgba(7,9,14,.96)',
         borderColor: 'rgba(249,115,22,.4)', borderRadius: 8,
-        style: { color: tc, fontSize: '11px' }
+        style: { color: tc, fontSize: '12px' },
+        formatter: function () {
+          var pts = this.points || [{ series: { name: this.series.name }, y: this.y }];
+          var html = '<b style="font-size:12px">' + escHtml(String(this.x)) + '</b><br>';
+          pts.forEach(function (p) {
+            var isCol = p.series.type === 'column';
+            var val   = isCol ? fmtNum(p.y, _dispDec) : p.y.toFixed(2) + '%';
+            html += '<span style="color:' + p.color + '">●</span> '
+                  + p.series.name + ': <b>' + val + '</b><br>';
+          });
+          return html;
+        }
       },
       plotOptions: {
         column: {
@@ -1007,8 +1081,8 @@
           yAxis: 0,
           dataLabels: {
             enabled: true,
-            style: { fontSize: '13px', color: '#ffffff', fontWeight: '800', textOutline: 'none' },
-            formatter: function () { return fmtNum(this.y, _valDec); }
+            style: { fontSize: barLblSz, color: '#ffffff', fontWeight: '800', textOutline: 'none' },
+            formatter: function () { return fmtNum(this.y, _dispDec); }
           }
         },
         {
@@ -1019,7 +1093,7 @@
           dataLabels: {
             enabled: true,
             formatter: function () { return this.y + '%'; },
-            style: { fontSize: '12px', color: '#38bdf8', fontWeight: '800', textOutline: 'none' },
+            style: { fontSize: cumLblSz, color: '#38bdf8', fontWeight: '800', textOutline: 'none' },
             align: 'center', verticalAlign: 'bottom', y: -7
           }
         }
@@ -1039,7 +1113,7 @@
         + '<td>' + (i + 1) + '</td>'
         + '<td><span class="cls-badge ' + cls + '">' + cls + '</span></td>'
         + '<td>' + escHtml(d.cat) + '</td>'
-        + '<td class="val-num">' + fmtNum(d.val, _valDec) + '</td>'
+        + '<td class="val-num">' + fmtNum(d.val, _dispDec) + '</td>'
         + '<td class="val-pct">' + fmtNum(pct, 1) + '%</td>'
         + '<td class="val-cum">'
         +   '<div class="cum-bar-wrap">'
@@ -1287,8 +1361,8 @@
         dataLabels: opts.showLabels ? {
           enabled: true,
           style: { fontSize: '15px', color: '#ffffff', fontWeight: '800', textOutline: 'none' },
-          formatter: function () { return fmtNum(this.y, _valDec); }
-        } : { enabled: false }
+            formatter: function () { return fmtNum(this.y, _dispDec); }
+          } : { enabled: false }
       }
     ];
     if (opts.showCumLine) {
@@ -1306,6 +1380,19 @@
       });
     }
 
+    /* Dynamic label sizes — bigger when fewer bars */
+    var n = _data.length;
+    var barLblSz  = n <= 3  ? '20px' : n <= 6  ? '17px' : n <= 12 ? '15px' : n <= 20 ? '13px' : '11px';
+    var xLblSz    = n <= 5  ? '16px' : n <= 12 ? '14px' : n <= 20 ? '13px' : '12px';
+    var yLblSz    = n <= 12 ? '13px' : '12px';
+    var cumLblSz  = n <= 5  ? '15px' : n <= 12 ? '13px' : '12px';
+
+    /* Apply dynamic bar label size */
+    if (series[0] && series[0].dataLabels && series[0].dataLabels.enabled !== false)
+      series[0].dataLabels.style.fontSize = barLblSz;
+    if (series[1] && series[1].dataLabels)
+      series[1].dataLabels.style.fontSize = cumLblSz;
+
     _chart = Highcharts.chart('paretoChart', {
       chart: {
         backgroundColor: bg, animation: { duration: 400 },
@@ -1315,18 +1402,19 @@
       title:  { text: opts.title, style: { color: tc, fontSize: '13px', fontWeight: '700' } },
       xAxis: {
         categories: cats, crosshair: false,
-        labels: { style: { color: tc2, fontSize: '14px' }, rotation: cats.length > 10 ? -35 : 0 },
+        labels: { style: { color: tc2, fontSize: xLblSz, fontWeight: n <= 8 ? '700' : '500' },
+                  rotation: cats.length > 10 ? -35 : 0 },
         lineColor: gc, tickColor: gc
       },
       yAxis: [
         {
-          title: { text: getValColName(), style: { color: tc2, fontSize: '12px' } },
-          labels: { style: { color: tc2, fontSize: '12px' }, formatter: function () { return fmtNum(this.value, 0); } },
+          title: { text: getValColName(), style: { color: tc2, fontSize: yLblSz } },
+          labels: { style: { color: tc2, fontSize: yLblSz }, formatter: function () { return fmtNum(this.value, 0); } },
           gridLineColor: gc
         },
         {
-          title: { text: 'Cumulative %', style: { color: '#38bdf8', fontSize: '12px' } },
-          labels: { style: { color: '#38bdf8', fontSize: '12px' }, formatter: function () { return this.value + '%'; } },
+          title: { text: 'Cumulative %', style: { color: '#38bdf8', fontSize: yLblSz } },
+          labels: { style: { color: '#38bdf8', fontSize: yLblSz }, formatter: function () { return this.value + '%'; } },
           opposite: true, min: 0, max: 100, gridLineWidth: 0,
           plotLines: plotLines
         }
@@ -1336,15 +1424,26 @@
         itemHoverStyle: { color: tc }
       },
       tooltip: {
-        shared: true, useHTML: true,
+        shared: true, useHTML: true, hideDelay: 80,
         backgroundColor: isLight ? '#fff' : 'rgba(7,9,14,.96)',
         borderColor: 'rgba(249,115,22,.4)', borderRadius: 8,
-        style: { color: tc, fontSize: '12px' }
+        style: { color: tc, fontSize: '12px' },
+        formatter: function () {
+          var pts = this.points || [{ series: { name: this.series.name }, y: this.y }];
+          var html = '<b style="font-size:12px">' + escHtml(String(this.x)) + '</b><br>';
+          pts.forEach(function (p) {
+            var isCol = p.series.type === 'column';
+            var val   = isCol ? fmtNum(p.y, _dispDec) : p.y.toFixed(2) + '%';
+            html += '<span style="color:' + p.color + '">●</span> '
+                  + p.series.name + ': <b>' + val + '</b><br>';
+          });
+          return html;
+        }
       },
       plotOptions: {
         column: {
           groupPadding: 0, pointPadding: 0.03, borderWidth: 0, borderRadius: 2,
-          states: { hover: { brightness: 0 } }   /* no blueish hover overlay */
+          states: { hover: { brightness: 0 } }
         }
       },
       series: series,
@@ -1370,7 +1469,7 @@
         + '<td>' + (i + 1) + '</td>'
         + '<td><span class="cls-badge ' + cls + '">' + cls + '</span></td>'
         + '<td>' + escHtml(d.cat) + '</td>'
-        + '<td class="val-num">' + fmtNum(d.val, _valDec) + '</td>'
+        + '<td class="val-num">' + fmtNum(d.val, _dispDec) + '</td>'
         + '<td class="val-pct">' + fmtNum(pct, 1) + '%</td>'
         + '<td class="val-cum">'
         +   '<div class="cum-bar-wrap">'
@@ -1436,7 +1535,7 @@
         + '<td>' + rank + '</td>'
         + '<td><span class="cls-badge ' + cls + '">' + cls + '</span></td>'
         + '<td>' + escHtml(d.cat) + '</td>'
-        + '<td class="val-num">' + fmtNum(d.val, _valDec) + '</td>'
+        + '<td class="val-num">' + fmtNum(d.val, _dispDec) + '</td>'
         + '<td class="val-pct">' + fmtNum(pct, 1) + '%</td>'
         + '<td class="val-cum">' + fmtNum(cumP, 1) + '%</td>'
         + '</tr>';
@@ -1510,7 +1609,8 @@
   window.toggleSidebar = toggleSidebar;
   window.toggleTheme   = toggleTheme;
   window.renderPSI     = renderPSI;
-  window.renderCombo   = renderCombo;
+  window.renderCombo    = renderCombo;
+  window.changeDecimal  = changeDecimal;
   </script>
 </body>
 </html>

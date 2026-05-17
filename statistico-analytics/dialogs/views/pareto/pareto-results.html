@@ -396,15 +396,7 @@
     }
 
     /* ── Utilities sidebar bottom buttons ─────────────────── */
-    .prt-sb-theme-btn {
-      display: flex; align-items: center; gap: 8px;
-      padding: 7px 10px; border-radius: 8px; border: 1px solid var(--sb-border);
-      background: rgba(255,255,255,.06); color: var(--sb-text);
-      font-size: 12px; font-weight: 600; cursor: pointer; width: 100%;
-      transition: background .18s, border-color .18s;
-      font-family: 'Montserrat', 'Segoe UI', sans-serif;
-    }
-    .prt-sb-theme-btn:hover { background: rgba(255,255,255,.1); border-color: var(--sb-accent); }
+    /* All utility buttons now use shared .sb-bottom-btn classes from shared-header.css */
 
     /* ── Shared footer ─────────────────────────────────────── */
     .statistico-footer {
@@ -646,18 +638,18 @@
           <span class="sb-bottom-label">Utilities</span>
         </div>
         <button class="sb-bottom-btn sb-bottom-btn--data" id="sbViewDataBtn"
-          onclick="prtViewData()" title="View aggregated Pareto data">
+          onclick="prtViewData()" title="View raw source data">
           <i class="fa-solid fa-eye"></i>
           <span class="sb-item-label">View Data</span>
         </button>
-        <button class="sb-bottom-btn sb-bottom-btn--html" id="sbExportHtmlBtn"
-          onclick="prtExportJson()" title="Download data as JSON">
+        <button class="sb-bottom-btn sb-bottom-btn--json" id="sbExportJsonBtn"
+          onclick="prtExportJson()" title="Download Pareto results as JSON">
           <i class="fa-solid fa-download"></i>
           <span class="sb-item-label">JSON</span>
         </button>
-        <button class="prt-sb-theme-btn" onclick="toggleTheme()">
+        <button class="sb-bottom-btn" onclick="toggleTheme()" title="Switch light / dark theme">
           <i class="fa-solid fa-circle-half-stroke sb-bottom-icon"></i>
-          <span class="sb-bottom-label">Toggle Theme</span>
+          <span class="sb-item-label">Toggle Theme</span>
         </button>
       </div>
 
@@ -1778,14 +1770,14 @@
   }
 
   /* ─────────────────────────────────────────────────────────
-     Utilities: View Data
+     Utilities: View Data  (raw source rows)
   ───────────────────────────────────────────────────────── */
   function prtViewData() {
-    if (!_data.length) return;
-    var opts   = getOpts();
-    var total  = _data.reduce(function (s, d) { return s + d.val; }, 0);
-    var runSum = 0;
-    var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    var rawRows = (_cfg.rawValues || []).slice(1);   /* skip header row */
+    var headers = _cfg.headers || [];
+    if (!rawRows.length) return;
+
+    var isLight  = document.documentElement.getAttribute('data-theme') === 'light';
     var headerBg = isLight ? '#f1f5f9' : '#1a1f2e';
     var rowBg    = isLight ? '#fff'    : '#242938';
     var altBg    = isLight ? '#f9fafb' : '#1e2333';
@@ -1793,37 +1785,45 @@
     var accentC  = '#f97316';
     var cyanC    = 'rgb(120,200,255)';
 
-    var valHdr = document.querySelector('.val-col-hdr');
-    var valLabel = valHdr ? valHdr.textContent : 'Value';
+    /* active column indices so we can highlight them */
+    var catIdx   = parseInt((document.getElementById('colCat') || {value:'0'}).value, 10);
+    var valIdxRaw = (document.getElementById('colVal') || {value:''}).value;
+    var valIdx   = valIdxRaw !== '' ? parseInt(valIdxRaw, 10) : null;
 
-    var rows = _data.map(function (d, i) {
-      runSum += d.val;
-      var pct  = total > 0 ? (d.val / total * 100).toFixed(1) : '0';
-      var cumP = total > 0 ? (runSum / total * 100).toFixed(1) : '0';
-      var cls  = classifyItem(parseFloat(cumP), opts);
-      var bg   = i % 2 === 0 ? rowBg : altBg;
-      return '<tr style="background:' + bg + '">'
-        + '<td style="padding:6px 10px;color:' + textC + '">' + (i + 1) + '</td>'
-        + '<td style="padding:6px 10px"><span class="cls-badge ' + cls + '">' + cls + '</span></td>'
-        + '<td style="padding:6px 10px;color:' + textC + '">' + escHtml(d.cat) + '</td>'
-        + '<td style="padding:6px 10px;color:' + accentC + ';font-weight:700">' + fmtNum(d.val, _dispDec) + '</td>'
-        + '<td style="padding:6px 10px;color:' + cyanC + ';font-weight:600">' + pct + '%</td>'
-        + '<td style="padding:6px 10px;color:' + textC + ';font-weight:700">' + cumP + '%</td>'
-        + '</tr>';
+    var thStyle = 'padding:7px 10px;text-align:left;font-size:10px;font-weight:800;'
+                + 'text-transform:uppercase;letter-spacing:.08em;'
+                + 'background:' + headerBg + ';border-bottom:2px solid #2d3748;position:sticky;top:0;z-index:2;';
+
+    var headerCells = headers.map(function (h, i) {
+      var isActive = (i === catIdx || i === valIdx);
+      var col = isActive ? accentC : (isLight ? '#374151' : 'rgba(203,213,225,.85)');
+      return '<th style="' + thStyle + 'color:' + col + '">' + escHtml(h) + '</th>';
     }).join('');
 
-    var thStyle = 'padding:7px 10px;text-align:left;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:' + accentC + ';background:' + headerBg + ';border-bottom:2px solid #2d3748;';
-    var html =
-      '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
-      + '<thead><tr>'
-      + '<th style="' + thStyle + '">#</th>'
-      + '<th style="' + thStyle + '">Cls</th>'
-      + '<th style="' + thStyle + '">Category</th>'
-      + '<th style="' + thStyle + '">' + escHtml(valLabel) + '</th>'
-      + '<th style="' + thStyle + '">%</th>'
-      + '<th style="' + thStyle + '">Cum %</th>'
-      + '</tr></thead>'
-      + '<tbody>' + rows + '</tbody>'
+    var bodyRows = rawRows.map(function (row, ri) {
+      var bg = ri % 2 === 0 ? rowBg : altBg;
+      var cells = headers.map(function (h, ci) {
+        var val = row[ci];
+        var isActive = (ci === catIdx || ci === valIdx);
+        var isValCol = (ci === valIdx);
+        var color = isValCol ? accentC : (isActive ? cyanC : textC);
+        var fw    = isActive ? '700' : '400';
+        var display = (val === null || val === undefined) ? '' : escHtml(String(val));
+        return '<td style="padding:6px 10px;color:' + color + ';font-weight:' + fw + '">' + display + '</td>';
+      }).join('');
+      return '<tr style="background:' + bg + '">' + cells + '</tr>';
+    }).join('');
+
+    var summary = '<div style="padding:0 0 10px;font-size:11px;color:rgba(203,213,225,.72);">'
+      + rawRows.length + ' rows &nbsp;·&nbsp; ' + headers.length + ' columns'
+      + ' &nbsp;·&nbsp; <span style="color:' + accentC + '">■</span> Category'
+      + (valIdx !== null ? ' &nbsp;·&nbsp; <span style="color:' + cyanC + '">■</span> Values' : '')
+      + '</div>';
+
+    var html = summary
+      + '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      + '<thead><tr>' + headerCells + '</tr></thead>'
+      + '<tbody>' + bodyRows + '</tbody>'
       + '</table>';
 
     document.getElementById('prtDataContent').innerHTML = html;

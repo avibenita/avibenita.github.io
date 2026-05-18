@@ -402,6 +402,23 @@
       font-size: 13px; font-weight: 800; color: #fff;
       min-width: 22px; text-align: center; padding: 0 2px; pointer-events: none;
     }
+    .bin-info-icon {
+      font-size: 9px; color: rgba(6,182,212,.6); cursor: help; margin-left: 2px;
+      transition: color .15s;
+    }
+    .bin-info-icon:hover { color: #22d3ee; }
+    .bin-order-btn {
+      font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+      padding: 3px 10px; border-radius: 6px;
+      border: 1px solid rgba(6,182,212,.35);
+      background: rgba(6,182,212,.08); color: rgba(103,232,249,.8);
+      cursor: pointer; transition: all .18s; line-height: 1.6; display: flex; align-items: center; gap: 5px;
+    }
+    .bin-order-btn.natural { background: rgba(6,182,212,.22); border-color: rgba(6,182,212,.6); color: #22d3ee; }
+    .bin-order-btn:hover { background: rgba(6,182,212,.18); }
+    .bin-disabled-note {
+      font-size: 9.5px; color: rgba(148,163,184,.55); font-style: italic; white-space: nowrap;
+    }
 
     /* ── Decimals pill (topbar) ────────────────────────────── */
     .dec-pill-wrap {
@@ -842,11 +859,18 @@
           <select class="hero-select" id="colVal" onchange="recalculate()"></select>
         </div>
 
-        <!-- Bin controls — shown only when category column is numeric -->
-        <div class="hero-sep" id="binSep" style="display:none"></div>
-        <div class="hero-control-group" id="binGroup" style="display:none">
-          <label><i class="fa-solid fa-sliders" style="font-size:9px;"></i>&nbsp; Bin</label>
+        <!-- Bin controls — always visible; toggle disabled when col is not numeric -->
+        <div class="hero-sep"></div>
+        <div class="hero-control-group" id="binGroup">
+          <label>
+            <i class="fa-solid fa-sliders" style="font-size:9px;"></i>&nbsp; Bin
+            <span class="bin-info-icon"
+              title="Group continuous numeric values into equal-width ranges and analyse the Pareto distribution across those ranges — like a histogram. Requires a numeric category column.">
+              <i class="fa-solid fa-circle-info"></i>
+            </span>
+          </label>
           <button class="bin-toggle-btn" id="binToggle" onclick="toggleBinMode()">OFF</button>
+          <!-- bins counter — shown when ON -->
           <div class="bin-pill-wrap" id="binPillWrap" style="display:none">
             <span>Bins</span>
             <div class="bin-pill">
@@ -855,6 +879,14 @@
               <button onclick="changeBins(1)">+</button>
             </div>
           </div>
+          <!-- order toggle — shown when ON -->
+          <button class="bin-order-btn" id="binOrderToggle" style="display:none"
+            onclick="toggleBinNatural()"
+            title="Switch between Pareto order (sorted by value, largest first) and natural range order (bins sorted by their numeric range, left to right)">
+            <i class="fa-solid fa-arrow-up-1-9"></i> Pareto order
+          </button>
+          <!-- disabled notice — shown when col is not numeric -->
+          <span class="bin-disabled-note" id="binDisabledNote">Requires numeric column</span>
         </div>
 
         <div class="hero-stats" id="heroStats">
@@ -1282,6 +1314,7 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
   var _sbCollapsed = false;
   var _binMode    = false; /* binning active? */
   var _binCount   = 10;    /* number of equal-width bins */
+  var _binNatural = false; /* true = sort bins by range, false = sort by value (Pareto) */
 
   /* ─────────────────────────────────────────────────────────
      Boot — receive data via DialogParentMessageReceived
@@ -1367,7 +1400,7 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
     return fmtNum(lo, dp) + ' \u2013 ' + fmtNum(hi, dp) + (isLast ? '' : '');
   }
 
-  function buildBinnedData(catIdx, valIdx, nBins, sortDir) {
+  function buildBinnedData(catIdx, valIdx, nBins, sortDir, naturalOrder) {
     var rows = (_cfg.rawValues || []).slice(1);
     var numVals = [];
     rows.forEach(function (row) {
@@ -1380,7 +1413,6 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
     var mx = Math.max.apply(null, numVals);
     if (mn === mx) mx = mn + 1;
     var width = (mx - mn) / nBins;
-    /* Choose label decimal places: 1 for non-integer widths, 0 for integers */
     var dp = (width === Math.floor(width) && mn === Math.floor(mn)) ? 0 : 2;
 
     /* Build bin buckets */
@@ -1401,18 +1433,31 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
       bins[bi].val += acc;
     });
 
-    /* Filter empty, then sort by value */
+    /* Filter empty bins */
     var result = bins.filter(function (b) { return b.val > 0; });
-    result.sort(function (a, b) { return sortDir === 'asc' ? a.val - b.val : b.val - a.val; });
+
+    if (naturalOrder) {
+      /* Keep natural left-to-right range order (bins already sorted by lo from creation) */
+    } else {
+      /* Pareto order: sort by accumulated value */
+      result.sort(function (a, b) { return sortDir === 'asc' ? a.val - b.val : b.val - a.val; });
+    }
+
     return result.map(function (b) { return { cat: b.label, val: b.val }; });
   }
 
   function toggleBinMode() {
+    var catIdx = parseInt(document.getElementById('colCat').value, 10);
+    if (!isCatColNumeric(catIdx)) return;   /* guard: should not happen with disabled btn */
     _binMode = !_binMode;
-    var btn  = document.getElementById('binToggle');
-    var pill = document.getElementById('binPillWrap');
-    if (btn)  { btn.textContent = _binMode ? 'ON' : 'OFF'; btn.classList.toggle('active', _binMode); }
-    if (pill) pill.style.display = _binMode ? 'flex' : 'none';
+    if (!_binMode) { _binNatural = false; }  /* reset natural order when turning off */
+    _updateBinUI();
+    recalculate();
+  }
+
+  function toggleBinNatural() {
+    _binNatural = !_binNatural;
+    _updateBinOrderBtn();
     recalculate();
   }
 
@@ -1420,6 +1465,28 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
     _binCount = Math.max(2, Math.min(50, _binCount + delta));
     setText('binDisplay', _binCount);
     recalculate();
+  }
+
+  function _updateBinUI() {
+    var btn   = document.getElementById('binToggle');
+    var pill  = document.getElementById('binPillWrap');
+    var order = document.getElementById('binOrderToggle');
+    if (btn)   { btn.textContent = _binMode ? 'ON' : 'OFF'; btn.classList.toggle('active', _binMode); }
+    if (pill)  pill.style.display  = _binMode ? 'flex' : 'none';
+    if (order) order.style.display = _binMode ? 'flex' : 'none';
+    _updateBinOrderBtn();
+  }
+
+  function _updateBinOrderBtn() {
+    var order = document.getElementById('binOrderToggle');
+    if (!order) return;
+    if (_binNatural) {
+      order.innerHTML = '<i class="fa-solid fa-arrow-up-1-9"></i> Range order';
+      order.classList.add('natural');
+    } else {
+      order.innerHTML = '<i class="fa-solid fa-arrow-down-wide-short"></i> Pareto order';
+      order.classList.remove('natural');
+    }
   }
 
   function recalculate() {
@@ -1437,26 +1504,27 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
     document.querySelectorAll('.val-col-hdr').forEach(function (th) { th.textContent = valHdr; });
     var sortDir   = (document.getElementById('optSort') || {value:'desc'}).value || 'desc';
 
-    /* Show / hide binning controls based on whether cat col is numeric */
-    var catIsNum  = isCatColNumeric(catIdx);
-    var binSep    = document.getElementById('binSep');
-    var binGroup  = document.getElementById('binGroup');
-    if (binSep)  binSep.style.display  = catIsNum ? '' : 'none';
-    if (binGroup) binGroup.style.display = catIsNum ? '' : 'none';
-    /* If column switched away from numeric, reset bin mode silently */
+    /* Update bin section state (always visible) */
+    var catIsNum     = isCatColNumeric(catIdx);
+    var binToggleEl  = document.getElementById('binToggle');
+    var binDisNote   = document.getElementById('binDisabledNote');
+    /* If column switched away from numeric, reset bin state silently */
     if (!catIsNum && _binMode) {
-      _binMode = false;
-      var _bt = document.getElementById('binToggle');
-      var _bp = document.getElementById('binPillWrap');
-      if (_bt) { _bt.textContent = 'OFF'; _bt.classList.remove('active'); }
-      if (_bp) _bp.style.display = 'none';
+      _binMode = false; _binNatural = false;
+      _updateBinUI();
     }
+    if (binToggleEl) {
+      binToggleEl.disabled = !catIsNum;
+      binToggleEl.style.opacity = catIsNum ? '' : '0.38';
+      binToggleEl.style.cursor  = catIsNum ? '' : 'not-allowed';
+    }
+    if (binDisNote) binDisNote.style.display = catIsNum ? 'none' : '';
 
     var rows = (_cfg.rawValues || []).slice(1);
 
     if (_binMode && catIsNum) {
       /* ── Binned mode: equal-width histogram bins ── */
-      _data = buildBinnedData(catIdx, valIdx, _binCount, sortDir);
+      _data = buildBinnedData(catIdx, valIdx, _binCount, sortDir, _binNatural);
     } else {
       /* ── Standard mode: aggregate by unique category value ── */
       var map  = {};
@@ -2421,8 +2489,9 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
 
   /* Expose globals needed by inline event handlers */
   window.toggleHelp    = toggleHelp;
-  window.toggleBinMode = toggleBinMode;
-  window.changeBins    = changeBins;
+  window.toggleBinMode    = toggleBinMode;
+  window.toggleBinNatural = toggleBinNatural;
+  window.changeBins       = changeBins;
   window.switchTab     = switchTab;
   window.recalculate   = recalculate;
   window.applyOptions  = applyOptions;

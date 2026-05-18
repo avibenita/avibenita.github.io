@@ -226,6 +226,9 @@
         <div class="cfg-panel">
           <div class="cfg-panel-head">
             <i class="fa-solid fa-table-columns"></i> Available Columns
+            <span style="font-size:10px;font-weight:400;color:var(--cfg-text3);margin-left:6px;">
+              — check a column to include it in the results analysis panels
+            </span>
           </div>
           <div class="cfg-panel-body" style="padding:0;">
             <div class="prt-col-table-wrap">
@@ -234,7 +237,7 @@
                   <tr>
                     <th class="th-center" title="Include column in results">
                       <input type="checkbox" id="chkAll" title="Select / deselect all"
-                        style="width:14px;height:14px;cursor:pointer;accent-color:var(--cfg-accent);"
+                        style="width:14px;height:14px;cursor:pointer;accent-color:var(--cfg-accent);opacity:.55;"
                         onchange="toggleAllCols(this.checked)"/>
                     </th>
                     <th>Column</th>
@@ -261,7 +264,7 @@
               <div class="prt-assign-title">
                 <i class="fa-solid fa-bullseye"></i>
                 Assign Column Roles
-                <span class="prt-assign-subtitle">— select in the table above or use the dropdowns · refine thresholds in the results dialog</span>
+                <span class="prt-assign-subtitle">— category auto-detected · check more columns above to enable sum mode · further customisation in the results dialog</span>
               </div>
 
               <div class="prt-role-row">
@@ -277,7 +280,7 @@
                   <select class="prt-role-select" id="categoryColSelect" onchange="onRoleChange()">
                     <option value="">— Select column —</option>
                   </select>
-                  <div class="prt-role-hint" id="catHint">Items or defect types to rank.</div>
+                  <div class="prt-role-hint" id="catHint">Auto-detected · will count occurrences per category.</div>
                 </div>
 
                 <!-- Values -->
@@ -289,7 +292,7 @@
                   <select class="prt-role-select" id="valuesColSelect" onchange="onRoleChange()">
                     <option value="">— Count occurrences —</option>
                   </select>
-                  <div class="prt-role-hint">Leave blank to count rows per category.</div>
+                  <div class="prt-role-hint">Blank = count rows · check a numeric column above to enable sum mode.</div>
                 </div>
 
               </div>
@@ -434,8 +437,8 @@
 
         html += '<tr id="colRow' + i + '" onclick="toggleColCheck(' + i + ')" style="cursor:pointer;">' +
           '<td class="prt-chk-wrap" onclick="event.stopPropagation();">' +
-            '<input type="checkbox" id="colChk' + i + '" value="' + i + '" checked ' +
-              'onchange="onColCheckChange()" title="Include in results"/>' +
+            '<input type="checkbox" id="colChk' + i + '" value="' + i + '" ' +
+              'onchange="onColCheckChange()" title="Include in results analysis"/>' +
           '</td>' +
           '<td style="font-weight:600;white-space:nowrap;">' + escHtml(h) + '</td>' +
           '<td class="prt-stat">' + nValid + '</td>' +
@@ -489,24 +492,33 @@
     }
 
     /* ─────────────────────────────────────────────────────────
-       Auto-detect: only category (first text col); values = count
+       Auto-detect: first text column → check it, select it as Category
+       Values default = count occurrences (no numeric column pre-selected)
     ───────────────────────────────────────────────────────── */
     function autoDetectCategory() {
       var firstText = -1;
       _headers.forEach(function (_, i) {
         if (!colIsNumeric(i) && firstText < 0) firstText = i;
       });
-      var catSel    = document.getElementById('categoryColSelect');
-      var autoBadge = document.getElementById('catAutoBadge');
-      var catCard   = document.getElementById('catCard');
 
       if (firstText >= 0) {
-        catSel.value = String(firstText);
+        /* Check only this column's checkbox */
+        var chk = document.getElementById('colChk' + firstText);
+        if (chk) chk.checked = true;
+        /* Trigger full cascade: dim rows, repopulate dropdowns */
+        onColCheckChange();
+        /* Select it as Category */
+        document.getElementById('categoryColSelect').value = String(firstText);
+        /* Show auto-detected badge */
+        var autoBadge = document.getElementById('catAutoBadge');
         if (autoBadge) autoBadge.style.display = 'inline-flex';
-        if (catCard)   catCard.classList.add('is-default');
+      } else {
+        onColCheckChange(); /* still repopulate even if no text col found */
       }
-      /* Values stays at "Count occurrences" (empty) by default */
+
+      /* Values = count (blank) by default */
       document.getElementById('valuesColSelect').value = '';
+      onRoleChange();
     }
 
     /* ─────────────────────────────────────────────────────────

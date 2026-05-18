@@ -2329,51 +2329,43 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
     var catTerm   = _binMode ? 'bins' : 'categories';
     var n         = _data.length;
 
-    var runSum = 0, at80 = -1, cumAt80 = 0;
+    /* Cumulative % just below and just at/above the 80% threshold */
+    var runSum = 0, idxBelow = -1, cumBelow = 0, idxAbove = -1, cumAbove = 0;
     for (var i = 0; i < n; i++) {
       runSum += _data[i].val;
       var cumP = (runSum / total) * 100;
-      if (at80 < 0 && cumP >= 80) { at80 = i; cumAt80 = cumP; }
+      if (cumP < 80) { idxBelow = i; cumBelow = cumP; }
+      if (idxAbove < 0 && cumP >= 80) { idxAbove = i; cumAbove = cumP; }
     }
-    var reaches80 = at80 >= 0;
-    if (!reaches80) { cumAt80 = (runSum / total) * 100; }
+    var maxCum = total > 0 ? (runSum / total * 100) : 0;
 
-    var vitalN = reaches80 ? (at80 + 1) : n;
-    var vitalValPct = reaches80 ? cumAt80 : cumAt80;
-    var vitalCatPct = n > 0 ? (vitalN / n * 100) : 0;
-    var tailN = reaches80 ? (n - vitalN) : 0;
-    var tailVal = reaches80
-      ? total - _data.slice(0, vitalN).reduce(function (s, d) { return s + d.val; }, 0)
-      : 0;
-    var tailValPct = total > 0 ? (tailVal / total * 100) : 0;
-    var tailCatPct = n > 0 ? (tailN / n * 100) : 0;
-
-    var lineMore = '<p class="pareto-stmt-line"><span class="pareto-stmt-line-label">≥80% of impact</span>';
-    if (reaches80) {
-      lineMore += '<strong>' + fmtNum(vitalValPct, 1) + '%</strong> of ' + escHtml(measure)
-        + ' are attributable to <strong>' + fmtNum(vitalCatPct, 0) + '%</strong> of ' + escHtml(catTerm)
-        + ' (' + vitalN + ' of ' + n + ').';
+    var lineLess = '<p class="pareto-stmt-line"><span class="pareto-stmt-line-label">Cumulative &lt; 80%</span>';
+    if (idxBelow >= 0) {
+      var nBelow = idxBelow + 1;
+      var catPctBelow = n > 0 ? (nBelow / n * 100) : 0;
+      lineLess += '<strong>' + fmtNum(cumBelow, 2) + '%</strong> of ' + escHtml(measure)
+        + ' with the top <strong>' + fmtNum(catPctBelow, 0) + '%</strong> of ' + escHtml(catTerm)
+        + ' (' + nBelow + ' of ' + n + ').';
+    } else if (idxAbove >= 0) {
+      lineLess += 'The top-ranked ' + escHtml(catTerm) + ' already exceed 80% cumulative impact.';
     } else {
-      lineMore += 'Not reached — ranked ' + escHtml(catTerm) + ' account for at most '
-        + '<strong>' + fmtNum(vitalValPct, 1) + '%</strong> of ' + escHtml(measure)
-        + ' across all ' + n + ' ' + escHtml(catTerm) + '.';
-    }
-    lineMore += '</p>';
-
-    var lineLess = '<p class="pareto-stmt-line"><span class="pareto-stmt-line-label">&lt;80% of impact</span>';
-    if (reaches80 && tailN > 0) {
-      lineLess += '<strong>' + fmtNum(tailValPct, 1) + '%</strong> of ' + escHtml(measure)
-        + ' are attributable to <strong>' + fmtNum(tailCatPct, 0) + '%</strong> of ' + escHtml(catTerm)
-        + ' (' + tailN + ' of ' + n + ').';
-    } else if (reaches80) {
-      lineLess += '<strong>0%</strong> of ' + escHtml(measure)
-        + ' remain outside the ranked subset that reaches 80% of impact.';
-    } else {
-      lineLess += '<strong>100%</strong> of ' + escHtml(measure)
-        + ' are attributable to <strong>100%</strong> of ' + escHtml(catTerm)
-        + ' (' + n + ' of ' + n + '); cumulative impact stays below 80%.';
+      lineLess += 'Maximum cumulative impact is <strong>' + fmtNum(maxCum, 2) + '%</strong>'
+        + ' across all ' + n + ' ' + escHtml(catTerm) + ' (below 80%).';
     }
     lineLess += '</p>';
+
+    var lineMore = '<p class="pareto-stmt-line"><span class="pareto-stmt-line-label">Cumulative ≥ 80%</span>';
+    if (idxAbove >= 0) {
+      var nAbove = idxAbove + 1;
+      var catPctAbove = n > 0 ? (nAbove / n * 100) : 0;
+      lineMore += '<strong>' + fmtNum(cumAbove, 2) + '%</strong> of ' + escHtml(measure)
+        + ' with the top <strong>' + fmtNum(catPctAbove, 0) + '%</strong> of ' + escHtml(catTerm)
+        + ' (' + nAbove + ' of ' + n + ').';
+    } else {
+      lineMore += 'Not reached — cumulative impact does not reach 80%'
+        + ' (maximum <strong>' + fmtNum(maxCum, 2) + '%</strong> across all ' + n + ' ' + escHtml(catTerm) + ').';
+    }
+    lineMore += '</p>';
 
     return '<div class="pareto-statement-card">'
       + '<i class="fa-solid fa-chart-pie pareto-stmt-icon"></i>'

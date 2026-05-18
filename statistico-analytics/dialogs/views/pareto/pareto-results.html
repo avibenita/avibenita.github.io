@@ -1316,6 +1316,17 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
   var _binMode    = false; /* binning active? */
   var _binCount   = 10;    /* number of equal-width bins */
   var _binNatural = false; /* true = sort bins by range, false = sort by value (Pareto) */
+  var _activeTab  = 'chart';
+
+  var TAB_VIEW_NAMES = {
+    chart:   'Pareto Chart',
+    table:   'Pareto Table',
+    combo:   'Chart + Table',
+    abc:     'ABC Analysis',
+    psi:     'P.S.I\u2122',
+    options: 'Chart Options',
+    about:   'About 80/20'
+  };
 
   /* ─────────────────────────────────────────────────────────
      Boot — receive data via DialogParentMessageReceived
@@ -1551,7 +1562,7 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
     /* Update topbar */
     var catName = (_cfg.headers || [])[catIdx] || 'Category';
     var valName = valIdx !== null ? ((_cfg.headers || [])[valIdx] || 'Values') : 'Count';
-    setText('topbarTitle', catName + ' — Pareto Analysis');
+    updateTopbarTitle(_activeTab);
     setText('topbarBadge', _data.length + (isBinned ? ' bins' : ' categories'));
 
     renderChart();
@@ -1953,15 +1964,27 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
   }
 
   /* ─────────────────────────────────────────────────────────
+     Topbar title (category + active view)
+  ───────────────────────────────────────────────────────── */
+  function updateTopbarTitle(tabName) {
+    var catIdx  = parseInt((document.getElementById('colCat') || { value: '0' }).value, 10);
+    var catName = (_cfg && _cfg.headers) ? ((_cfg.headers[catIdx] || 'Category')) : 'Category';
+    var viewName = TAB_VIEW_NAMES[tabName] || 'Pareto Analysis';
+    setText('topbarTitle', catName + ' — ' + viewName);
+  }
+
+  /* ─────────────────────────────────────────────────────────
      Sidebar tab switching
   ───────────────────────────────────────────────────────── */
   function switchTab(name) {
+    _activeTab = name;
     document.querySelectorAll('.tab-content').forEach(function (t) { t.classList.remove('active'); });
     var tab = document.getElementById('tab-' + name);
     if (tab) tab.classList.add('active');
     document.querySelectorAll('.sb-item[data-tab]').forEach(function (b) {
       b.classList.toggle('active', b.dataset.tab === name);
     });
+    updateTopbarTitle(name);
     if (name === 'chart' && _chart) setTimeout(function () { _chart.reflow(); }, 60);
     if (name === 'combo') { renderCombo(); setTimeout(function () { if (_comboChart) _comboChart.reflow(); }, 80); }
     if (name === 'psi') renderPSI();

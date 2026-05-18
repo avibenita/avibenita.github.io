@@ -229,6 +229,34 @@
     .vital-val.cls-a { color: var(--cls-a); }
     .vital-val.cls-b { color: var(--cls-b); }
     .vital-val.cls-c { color: var(--cls-c); }
+    .pareto-statement-card {
+      flex: 1 1 100%; width: 100%; box-sizing: border-box;
+      display: flex; align-items: flex-start; gap: 14px;
+      background: linear-gradient(135deg, rgba(249,115,22,.14) 0%, rgba(249,115,22,.04) 100%);
+      border: 1px solid rgba(249,115,22,.38); border-radius: 10px;
+      padding: 12px 16px; margin-bottom: 2px;
+    }
+    html[data-theme="light"] .pareto-statement-card {
+      background: linear-gradient(135deg, rgba(249,115,22,.08), #fff7ed);
+      border-color: rgba(234,88,12,.35);
+    }
+    .pareto-stmt-icon {
+      font-size: 22px; color: var(--accent-1); flex-shrink: 0; margin-top: 2px;
+    }
+    .pareto-stmt-body { flex: 1; min-width: 0; }
+    .pareto-stmt-eyebrow {
+      font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .14em;
+      color: var(--accent-1); margin: 0 0 6px;
+    }
+    .pareto-stmt-text {
+      font-size: 14px; line-height: 1.55; color: var(--text-primary); margin: 0 0 5px;
+    }
+    .pareto-stmt-text strong { color: #fdba74; font-weight: 800; }
+    html[data-theme="light"] .pareto-stmt-text strong { color: #c2410c; }
+    .pareto-stmt-sub {
+      font-size: 11.5px; line-height: 1.45; color: rgba(203,213,225,.72); font-style: italic; margin: 0;
+    }
+    html[data-theme="light"] .pareto-stmt-sub { color: #64748b; }
     .chart-pane {
       flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
     }
@@ -2284,7 +2312,55 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
         + '<div style="font-size:12px;font-weight:600;color:rgba(203,213,225,.82);margin-top:3px;">' + pct + '% of categories</div>'
         + '</div>';
     }).join('');
-    document.getElementById('vitalStrip').innerHTML = stripHtml;
+    document.getElementById('vitalStrip').innerHTML =
+      buildParetoStatementCard(total) + stripHtml;
+  }
+
+  function buildParetoStatementCard(total) {
+    if (!_data.length || total <= 0) return '';
+
+    var valIdxRaw = (document.getElementById('colVal') || {}).value;
+    var isCount   = !valIdxRaw;
+    var measure   = isCount
+      ? 'occurrences'
+      : ('total ' + (getValColName() || 'value').toLowerCase());
+    var catTerm   = _binMode ? 'bins' : 'categories';
+    var n         = _data.length;
+
+    var runSum = 0, at80 = -1, cumAt80 = 0;
+    for (var i = 0; i < n; i++) {
+      runSum += _data[i].val;
+      var cumP = (runSum / total) * 100;
+      if (at80 < 0 && cumP >= 80) { at80 = i; cumAt80 = cumP; }
+    }
+    if (at80 < 0) { at80 = n - 1; cumAt80 = (runSum / total) * 100; }
+
+    var vitalN = at80 + 1;
+    var catPct = n > 0 ? (vitalN / n * 100) : 0;
+
+    var main = '<strong>' + fmtNum(cumAt80, 1) + '%</strong> of ' + escHtml(measure)
+      + ' are attributable to the <strong>vital few</strong> — the top '
+      + '<strong>' + fmtNum(catPct, 0) + '%</strong> of ' + escHtml(catTerm)
+      + ' (' + vitalN + ' of ' + n + ').';
+
+    var sub;
+    if (cumAt80 >= 80 && catPct <= 30) {
+      sub = 'This distribution exhibits a pronounced Pareto (80/20) concentration: a minority of '
+        + catTerm + ' accounts for the majority of impact.';
+    } else if (cumAt80 >= 80) {
+      sub = 'A strong concentration of impact is evident among a defined subset of ' + catTerm + '.';
+    } else {
+      sub = 'Impact is relatively dispersed; the classic 80% concentration threshold is not reached by the vital few alone.';
+    }
+
+    return '<div class="pareto-statement-card">'
+      + '<i class="fa-solid fa-chart-pie pareto-stmt-icon"></i>'
+      + '<div class="pareto-stmt-body">'
+      +   '<div class="pareto-stmt-eyebrow">Pareto Statement</div>'
+      +   '<p class="pareto-stmt-text">' + main + '</p>'
+      +   '<p class="pareto-stmt-sub">' + escHtml(sub) + '</p>'
+      + '</div>'
+      + '</div>';
   }
 
   /* ─────────────────────────────────────────────────────────

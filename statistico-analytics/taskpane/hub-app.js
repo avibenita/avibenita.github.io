@@ -192,11 +192,11 @@ const CALCULATOR_CATEGORY_TILES = [
 const APPLICATION_CATEGORY_TILES = [
   {
     id: "quality-ops",
-    title: "Quality & Operations",
+    title: "Eliminate Waste. Focus on Impact.",
     icon: "fa-chart-column",
     color: "#f97316",
     colorDark: "#c2410c",
-    subtitle: "Operational intelligence and quality analysis tools",
+    subtitle: "Pinpoint the vital few factors driving 80% of your results.",
     modules: [
       {
         id: "pareto2080",

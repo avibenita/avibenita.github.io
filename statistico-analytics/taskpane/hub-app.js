@@ -192,15 +192,16 @@ const CALCULATOR_CATEGORY_TILES = [
 const APPLICATION_CATEGORY_TILES = [
   {
     id: "quality-ops",
-    title: "Focus on Impact!",
+    title: "Identify the Vital Few",
     icon: "fa-chart-column",
+    iconSvg: '<svg viewBox="0 0 22 19" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" style="display:block"><rect x="0.5" y="5" width="4" height="13" fill="currentColor" opacity="0.9" rx="0.4"/><rect x="5.5" y="8.5" width="4" height="9.5" fill="currentColor" opacity="0.75" rx="0.4"/><rect x="10.5" y="12" width="4" height="6" fill="currentColor" opacity="0.6" rx="0.4"/><rect x="15.5" y="15" width="4" height="3" fill="currentColor" opacity="0.45" rx="0.4"/><path d="M 2.5 18 C 5 7, 12 2, 21 1.5" stroke="rgba(251,146,60,0.95)" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>',
     color: "#f97316",
     colorDark: "#c2410c",
-    subtitle: "Pinpoint the vital few factors driving 80% of your results.",
+    subtitle: "Reveal the small number of contributors driving most outcomes.",
     modules: [
       {
         id: "pareto2080",
-        label: "Pareto 20/80",
+        label: "Pareto 80/20",
         tip: "Identify the vital few contributors using interactive Pareto analysis with the 80/20 rule."
       }
     ]
@@ -332,10 +333,13 @@ function renderCategoryTiles(query) {
     var color = clusterColor;
     var colorDark = clusterColorDark;
     var icon = c.icon || "fa-table-cells-large";
+    var iconContent = c.iconSvg
+      ? c.iconSvg
+      : '<i class="fa-solid ' + escapeHtml(icon) + '"></i>';
     return (
       '<div class="category-tile" style="--cat-color:' + escapeHtml(color) + ";--cat-color-dark:" + escapeHtml(colorDark) + ';">' +
       '<div class="category-title-row">' +
-      '<div class="category-icon"><i class="fa-solid ' + escapeHtml(icon) + '"></i></div>' +
+      '<div class="category-icon">' + iconContent + '</div>' +
       '<div class="category-title">' + escapeHtml(c.title) + "</div>" +
       "</div>" +
       '<div class="category-subtitle">' + escapeHtml(c.subtitle) + "</div>" +

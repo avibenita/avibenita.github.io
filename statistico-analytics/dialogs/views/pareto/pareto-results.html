@@ -2054,103 +2054,169 @@
   window.runParetoAI    = runParetoAI;
   window.prtCloseAi     = prtCloseAi;
   /* ─────────────────────────────────────────────────────────
-     Utilities: Export Report (HTML → print/PDF)
+     Utilities: Export Report — shared approach
+     1. pickReportSections() picker (same modal as univariate)
+     2. Tab-switch + capture each view's live DOM + SVG
+     3. Download as self-contained HTML
   ───────────────────────────────────────────────────────── */
   function prtExportReport() {
     if (!_data.length) { alert('Run an analysis first.'); return; }
-    var opts    = getOpts();
-    var catName = _cfg.categoryColName || 'Category';
-    var valName = _cfg.valuesColName   || 'Count';
-    var isLight = document.documentElement.getAttribute('data-theme') === 'light';
-    var ts      = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
-
-    /* Extract live Highcharts SVG if available */
-    var chartSvg = '';
-    try {
-      var svgEl = document.querySelector('#paretoChart svg.highcharts-root');
-      if (svgEl) {
-        var clone = svgEl.cloneNode(true);
-        clone.setAttribute('width', '700'); clone.setAttribute('height', '380');
-        chartSvg = clone.outerHTML;
-      }
-    } catch(e) {}
-
-    /* Build Pareto table rows */
-    var total  = _data.reduce(function(s,d){return s+d.val;},0);
-    var runSum = 0;
-    var tRows  = _data.map(function(d,i){
-      runSum += d.val;
-      var pct  = total>0?(d.val/total*100).toFixed(1):'0';
-      var cumP = total>0?(runSum/total*100).toFixed(1):'0';
-      var cls  = classifyItem(parseFloat(cumP), opts);
-      var bg   = i%2===0?'#f9fafb':'#ffffff';
-      var clsColor = cls==='A'?'#f97316':cls==='B'?'#38bdf8':'#94a3b8';
-      return '<tr style="background:'+bg+'">'
-        +'<td style="padding:6px 10px;text-align:center;color:#64748b;font-size:12px;">'+(i+1)+'</td>'
-        +'<td style="padding:6px 10px;font-size:12px;font-weight:600;">'+(d.cat||'')+'</td>'
-        +'<td style="padding:6px 10px;text-align:right;font-size:12px;color:#f97316;font-weight:700;">'+fmtNum(d.val,_dispDec)+'</td>'
-        +'<td style="padding:6px 10px;text-align:right;font-size:12px;">'+pct+'%</td>'
-        +'<td style="padding:6px 10px;text-align:right;font-size:12px;font-weight:600;">'+cumP+'%</td>'
-        +'<td style="padding:6px 10px;text-align:center;"><span style="display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;background:'+clsColor+'22;color:'+clsColor+';">'+cls+'</span></td>'
-        +'</tr>';
-    }).join('');
-
-    var html = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>'
-      +'<title>Pareto 80/20 Report</title>'
-      +'<style>'
-      +'  @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap");'
-      +'  *{box-sizing:border-box;margin:0;padding:0;}'
-      +'  body{font-family:"Montserrat","Segoe UI",sans-serif;background:#f8fafc;color:#1e293b;padding:40px;}'
-      +'  .cover{max-width:760px;margin:0 auto 40px;padding:36px 40px;background:#fff;border-radius:16px;'
-      +'    border-left:6px solid #f97316;box-shadow:0 2px 12px rgba(0,0,0,.07);}'
-      +'  .cover h1{font-size:26px;font-weight:800;color:#0f172a;margin-bottom:6px;}'
-      +'  .cover .meta{font-size:12px;color:#64748b;margin-top:8px;}'
-      +'  .section{max-width:760px;margin:0 auto 32px;background:#fff;border-radius:12px;'
-      +'    padding:24px 28px;box-shadow:0 2px 8px rgba(0,0,0,.05);page-break-inside:avoid;}'
-      +'  .section h2{font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;'
-      +'    color:#f97316;margin-bottom:16px;padding-bottom:8px;border-bottom:2px solid #fed7aa;}'
-      +'  table{width:100%;border-collapse:collapse;font-size:12px;}'
-      +'  th{background:#fff7ed;color:#c2410c;font-size:10px;font-weight:800;text-transform:uppercase;'
-      +'    letter-spacing:.06em;padding:7px 10px;border-bottom:2px solid #fed7aa;text-align:left;}'
-      +'  th:not(:nth-child(2)){text-align:right;}'
-      +'  td:not(:nth-child(2)){text-align:right;}'
-      +'  @media print{'
-      +'    body{background:#fff;padding:20px;}'
-      +'    .section{box-shadow:none;border:1px solid #e2e8f0;margin-bottom:24px;}'
-      +'  }'
-      +'</style></head><body>'
-      +'<div class="cover">'
-      +'  <h1>Pareto 80/20 Analysis</h1>'
-      +'  <div style="font-size:13px;color:#475569;margin-top:4px;">Category: <strong>'+escHtml(catName)+'</strong>'
-      +'    &nbsp;·&nbsp; Values: <strong>'+escHtml(valName)+'</strong>'
-      +'    &nbsp;·&nbsp; '+_data.length+' categories'
-      +'  </div>'
-      +'  <div class="meta">Generated '+ts+' · Statistico 80/20</div>'
-      +'</div>';
-
-    if (chartSvg) {
-      html += '<div class="section"><h2>Pareto Chart</h2>'
-        +'<div style="overflow:hidden;border-radius:8px;background:#f8fafc;padding:12px;">'+chartSvg+'</div></div>';
+    if (typeof StatisticoHeader === 'undefined' || !StatisticoHeader.pickReportSections) {
+      alert('Shared export utilities not available.'); return;
     }
 
-    html += '<div class="section"><h2>Ranked Contributions</h2>'
-      +'<table><thead><tr>'
-      +'<th style="text-align:center;">#</th><th>'+escHtml(catName)+'</th>'
-      +'<th>'+escHtml(valName)+'</th><th>%</th><th>Cum %</th><th style="text-align:center;">Class</th>'
-      +'</tr></thead><tbody>'+tRows+'</tbody></table></div>'
-      +'</body></html>';
+    var VIEWS = [
+      { id: 'chart', label: 'Pareto Chart'  },
+      { id: 'table', label: 'Pareto Table'  },
+      { id: 'combo', label: 'Chart + Table' },
+      { id: 'abc',   label: 'ABC Analysis'  },
+      { id: 'psi',   label: 'P.S.I™'        },
+    ];
 
-    var win = window.open('', '_blank');
-    if (!win) { alert('Pop-up blocked. Please allow pop-ups for this dialog.'); return; }
-    win.document.write(html);
-    win.document.close();
-    setTimeout(function(){ win.focus(); win.print(); }, 600);
+    StatisticoHeader.pickReportSections(VIEWS, function(selectedIds) {
+      var selected = VIEWS.filter(function(v){ return selectedIds.indexOf(v.id) >= 0; });
+      if (!selected.length) return;
+
+      /* ── Progress overlay (same structure as univariate) ── */
+      var po = document.createElement('div');
+      po.id = 'prtExportProgress';
+      po.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2147483400;display:flex;align-items:center;justify-content:center;padding:16px;';
+      po.innerHTML = '<div style="min-width:280px;max-width:440px;padding:16px 18px;border-radius:12px;border:1px solid rgba(148,163,184,.4);background:#111827;color:#e5e7eb;box-shadow:0 12px 28px rgba(2,6,23,.5);display:flex;flex-direction:column;gap:10px;">'
+        + '<div style="display:flex;align-items:center;gap:10px;">'
+        + '<span style="width:16px;height:16px;border:2px solid rgba(148,163,184,.3);border-top-color:#f97316;border-radius:999px;display:inline-block;animation:prtExSpin .75s linear infinite;flex-shrink:0;"></span>'
+        + '<span id="prtExLbl" style="font-size:13px;font-weight:600;">Preparing export…</span></div>'
+        + '<div style="height:4px;background:rgba(148,163,184,.2);border-radius:4px;overflow:hidden;"><div id="prtExBar" style="height:100%;width:0%;background:#f97316;border-radius:4px;transition:width .3s;"></div></div>'
+        + '<div id="prtExSub" style="font-size:11px;color:#94a3b8;"></div>'
+        + '</div><style>@keyframes prtExSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}</style>';
+      document.body.appendChild(po);
+
+      function setP(done, total, label) {
+        var pct = total > 0 ? Math.round(done / total * 100) : 0;
+        var bar = document.getElementById('prtExBar');
+        var lbl = document.getElementById('prtExLbl');
+        var sub = document.getElementById('prtExSub');
+        if (bar) bar.style.width = pct + '%';
+        if (lbl && label) lbl.textContent = label;
+        if (sub) sub.textContent = done + ' of ' + total + ' views captured';
+      }
+      function closeP() { var el = document.getElementById('prtExportProgress'); if (el) el.remove(); }
+
+      /* Remember original tab */
+      var origTab = (document.querySelector('.sb-item.active') || {}).getAttribute
+        ? document.querySelector('.sb-item.active').getAttribute('data-tab') : 'chart';
+
+      var captures = [];
+      var idx = 0;
+
+      function captureNext() {
+        if (idx >= selected.length) { restoreAndBuild(); return; }
+        var v = selected[idx];
+        setP(idx, selected.length, 'Capturing: ' + v.label + '…');
+        switchTab(v.id);
+        setTimeout(function() {
+          var panel = document.getElementById('tab-' + v.id);
+          var html  = '';
+          if (panel) {
+            var cl = panel.cloneNode(true);
+            /* Replace Highcharts div containers with their live SVG */
+            ['paretoChart','comboChart'].forEach(function(cid) {
+              var ph = cl.querySelector('#' + cid);
+              if (!ph) return;
+              var liveSvg = document.querySelector('#' + cid + ' svg.highcharts-root');
+              if (liveSvg) {
+                var sc = liveSvg.cloneNode(true);
+                sc.setAttribute('width',  '100%');
+                sc.removeAttribute('height');
+                sc.style.cssText = 'width:100%;max-height:380px;';
+                ph.innerHTML = '';
+                ph.appendChild(sc);
+              }
+            });
+            /* Also grab inline SVGs (PSI gauge, etc.) */
+            html = cl.innerHTML;
+          }
+          captures.push({ label: v.label, html: html });
+          idx++;
+          captureNext();
+        }, 450);
+      }
+
+      function restoreAndBuild() {
+        switchTab(origTab);
+        setP(selected.length, selected.length, 'Building report…');
+        setTimeout(function() {
+          /* Collect page CSS */
+          var css = '';
+          Array.from(document.styleSheets).forEach(function(ss) {
+            try { Array.from(ss.cssRules || []).forEach(function(r){ css += r.cssText + '\n'; }); }
+            catch(e) {}
+          });
+
+          var catName = _cfg.categoryColName || 'Category';
+          var valName = _cfg.valuesColName   || 'Count';
+          var ts      = new Date().toLocaleString();
+
+          var toc = captures.map(function(c, i) {
+            return '<li><a href="#prt-sec-' + (i+1) + '">' + escHtml(c.label) + '</a></li>';
+          }).join('');
+
+          var body = captures.map(function(c, i) {
+            return '<section id="prt-sec-' + (i+1) + '">'
+              + '<h2>' + (i+1) + '. ' + escHtml(c.label) + '</h2>'
+              + '<div class="cap-wrap">' + c.html + '</div>'
+              + '</section>';
+          }).join('');
+
+          var out = '<!DOCTYPE html><html lang="en"><head>'
+            + '<meta charset="utf-8"><title>Pareto 80/20 Report</title>'
+            + '<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>'
+            + '<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet"/>'
+            + '<style>' + css + '</style>'
+            + '<style>'
+            + 'body{font-family:"Montserrat","Segoe UI",sans-serif;background:#f8fafc;color:#0f172a;padding:32px;max-width:1100px;margin:0 auto;}'
+            + '.cover{background:#fff;border-radius:14px;border-left:6px solid #f97316;padding:28px 32px;margin-bottom:28px;box-shadow:0 2px 12px rgba(0,0,0,.07);}'
+            + '.cover h1{font-size:24px;font-weight:800;margin:0 0 8px;}'
+            + 'nav{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 20px;margin-bottom:28px;}'
+            + 'nav ol{padding-left:18px;margin:8px 0 0;} nav a{color:#f97316;text-decoration:none;font-weight:600;}'
+            + 'section{background:#fff;border-radius:12px;padding:24px 28px;margin-bottom:28px;border:1px solid #e2e8f0;page-break-inside:avoid;}'
+            + 'section h2{font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#f97316;border-bottom:2px solid #fed7aa;padding-bottom:8px;margin-bottom:16px;}'
+            + '.cap-wrap{overflow:hidden;}'
+            + 'svg.highcharts-root{width:100%!important;max-height:400px;}'
+            + '.prt-topbar,.loading-overlay,.prt-hero,.hero-control-group{display:none!important;}'
+            + '.tab-content{display:block!important;position:static!important;}'
+            + '@media print{body{background:#fff;padding:16px;} section{box-shadow:none;margin-bottom:20px;}}'
+            + '</style></head><body>'
+            + '<div class="cover">'
+            + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#f97316;margin-bottom:6px;">Applications · Pareto 80/20</div>'
+            + '<h1>Pareto Analysis Report</h1>'
+            + '<div style="font-size:13px;color:#475569;">Category: <strong>' + escHtml(catName) + '</strong>'
+            + ' &nbsp;·&nbsp; Values: <strong>' + escHtml(valName) + '</strong>'
+            + ' &nbsp;·&nbsp; ' + _data.length + ' categories</div>'
+            + '<div style="font-size:11px;color:#94a3b8;margin-top:6px;">Generated ' + ts + ' · Statistico 80/20</div>'
+            + '</div>'
+            + '<nav><strong style="font-size:12px;font-weight:700;">Included Views</strong><ol>' + toc + '</ol></nav>'
+            + body + '</body></html>';
+
+          closeP();
+          var blob = new Blob([out], { type: 'text/html' });
+          var url  = URL.createObjectURL(blob);
+          var a    = Object.assign(document.createElement('a'), {
+            href: url, download: 'Pareto_Report_' + (catName||'analysis').replace(/\s+/g,'_') + '.html'
+          });
+          document.body.appendChild(a); a.click();
+          setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 2000);
+        }, 100);
+      }
+
+      captureNext();
+    });
   }
 
   window.prtViewData      = prtViewData;
   window.prtCloseData     = prtCloseData;
   window.prtExportJson    = prtExportJson;
   window.prtExportReport  = prtExportReport;
+  window.prtCloseAi       = prtCloseAi;
   </script>
 </body>
 </html>

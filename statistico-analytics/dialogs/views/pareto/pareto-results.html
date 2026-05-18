@@ -248,15 +248,17 @@
       font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .14em;
       color: var(--accent-1); margin: 0 0 6px;
     }
-    .pareto-stmt-text {
-      font-size: 14px; line-height: 1.55; color: var(--text-primary); margin: 0 0 5px;
+    .pareto-stmt-line {
+      font-size: 13.5px; line-height: 1.55; color: var(--text-primary); margin: 0 0 8px;
     }
-    .pareto-stmt-text strong { color: #fdba74; font-weight: 800; }
-    html[data-theme="light"] .pareto-stmt-text strong { color: #c2410c; }
-    .pareto-stmt-sub {
-      font-size: 11.5px; line-height: 1.45; color: rgba(203,213,225,.72); font-style: italic; margin: 0;
+    .pareto-stmt-line:last-child { margin-bottom: 0; }
+    .pareto-stmt-line strong { color: #fdba74; font-weight: 800; }
+    html[data-theme="light"] .pareto-stmt-line strong { color: #c2410c; }
+    .pareto-stmt-line-label {
+      font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em;
+      color: rgba(253,186,116,.85); margin-right: 6px;
     }
-    html[data-theme="light"] .pareto-stmt-sub { color: #64748b; }
+    html[data-theme="light"] .pareto-stmt-line-label { color: #c2410c; }
     .chart-pane {
       flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
     }
@@ -2333,30 +2335,51 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
       var cumP = (runSum / total) * 100;
       if (at80 < 0 && cumP >= 80) { at80 = i; cumAt80 = cumP; }
     }
-    if (at80 < 0) { at80 = n - 1; cumAt80 = (runSum / total) * 100; }
+    var reaches80 = at80 >= 0;
+    if (!reaches80) { cumAt80 = (runSum / total) * 100; }
 
-    var vitalN = at80 + 1;
-    var catPct = n > 0 ? (vitalN / n * 100) : 0;
+    var vitalN = reaches80 ? (at80 + 1) : n;
+    var vitalValPct = reaches80 ? cumAt80 : cumAt80;
+    var vitalCatPct = n > 0 ? (vitalN / n * 100) : 0;
+    var tailN = reaches80 ? (n - vitalN) : 0;
+    var tailVal = reaches80
+      ? total - _data.slice(0, vitalN).reduce(function (s, d) { return s + d.val; }, 0)
+      : 0;
+    var tailValPct = total > 0 ? (tailVal / total * 100) : 0;
+    var tailCatPct = n > 0 ? (tailN / n * 100) : 0;
 
-    var main = '<strong>' + fmtNum(cumAt80, 1) + '%</strong> of ' + escHtml(measure)
-      + ' are attributable to <strong>' + fmtNum(catPct, 0) + '%</strong> of ' + escHtml(catTerm)
-      + ' (' + vitalN + ' of ' + n + ').';
-
-    var sub = '';
-    if (cumAt80 >= 80 && catPct <= 20) {
-      sub = 'Consistent with a pronounced Pareto (80/20) pattern.';
-    } else if (cumAt80 >= 80 && catPct <= 30) {
-      sub = 'Moderate concentration: a focused minority of ' + catTerm + ' accounts for most of the impact.';
-    } else if (cumAt80 < 80) {
-      sub = 'The 80% impact threshold is not reached within the ranked subset shown.';
+    var lineMore = '<p class="pareto-stmt-line"><span class="pareto-stmt-line-label">≥80% of impact</span>';
+    if (reaches80) {
+      lineMore += '<strong>' + fmtNum(vitalValPct, 1) + '%</strong> of ' + escHtml(measure)
+        + ' are attributable to <strong>' + fmtNum(vitalCatPct, 0) + '%</strong> of ' + escHtml(catTerm)
+        + ' (' + vitalN + ' of ' + n + ').';
+    } else {
+      lineMore += 'Not reached — ranked ' + escHtml(catTerm) + ' account for at most '
+        + '<strong>' + fmtNum(vitalValPct, 1) + '%</strong> of ' + escHtml(measure)
+        + ' across all ' + n + ' ' + escHtml(catTerm) + '.';
     }
+    lineMore += '</p>';
+
+    var lineLess = '<p class="pareto-stmt-line"><span class="pareto-stmt-line-label">&lt;80% of impact</span>';
+    if (reaches80 && tailN > 0) {
+      lineLess += '<strong>' + fmtNum(tailValPct, 1) + '%</strong> of ' + escHtml(measure)
+        + ' are attributable to <strong>' + fmtNum(tailCatPct, 0) + '%</strong> of ' + escHtml(catTerm)
+        + ' (' + tailN + ' of ' + n + ').';
+    } else if (reaches80) {
+      lineLess += '<strong>0%</strong> of ' + escHtml(measure)
+        + ' remain outside the ranked subset that reaches 80% of impact.';
+    } else {
+      lineLess += '<strong>100%</strong> of ' + escHtml(measure)
+        + ' are attributable to <strong>100%</strong> of ' + escHtml(catTerm)
+        + ' (' + n + ' of ' + n + '); cumulative impact stays below 80%.';
+    }
+    lineLess += '</p>';
 
     return '<div class="pareto-statement-card">'
       + '<i class="fa-solid fa-chart-pie pareto-stmt-icon"></i>'
       + '<div class="pareto-stmt-body">'
       +   '<div class="pareto-stmt-eyebrow">Pareto Statement</div>'
-      +   '<p class="pareto-stmt-text">' + main + '</p>'
-      + (sub ? '<p class="pareto-stmt-sub">' + escHtml(sub) + '</p>' : '')
+      +   lineMore + lineLess
       + '</div>'
       + '</div>';
   }

@@ -398,6 +398,49 @@
     /* ── Utilities sidebar bottom buttons ─────────────────── */
     /* All utility buttons use shared .sb-bottom-btn classes from shared-header.css */
 
+    /* ── Help / computation panels (ABC + PSI) ─────────────── */
+    .help-wrap { padding: 20px 22px 28px; max-width: 780px; border-top: 1px solid var(--border); margin-top: 24px; }
+    .help-toggle {
+      display: flex; align-items: center; gap: 8px; cursor: pointer;
+      font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+      color: var(--accent-1); user-select: none; margin-bottom: 0;
+    }
+    .help-toggle i.toggle-chevron { font-size: 9px; transition: transform .2s; }
+    .help-toggle.open i.toggle-chevron { transform: rotate(90deg); }
+    .help-body { display: none; margin-top: 14px; }
+    .help-body.open { display: block; }
+    .help-section { margin-bottom: 18px; }
+    .help-section-title {
+      font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em;
+      color: var(--accent-2); margin-bottom: 7px; display: flex; align-items: center; gap: 7px;
+    }
+    .help-section-title::after { content:''; flex:1; height:1px; background: rgba(6,182,212,.15); }
+    .help-text { font-size: 12.5px; line-height: 1.7; color: var(--text-secondary); margin-bottom: 8px; }
+    .help-text strong { color: var(--text-primary); }
+    .help-text em { color: var(--accent-2); font-style: normal; font-weight: 600; }
+    .help-formula-block {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11.5px; line-height: 1.9;
+      background: rgba(6,182,212,.06); border: 1px solid rgba(6,182,212,.18);
+      border-left: 3px solid var(--accent-2);
+      padding: 10px 14px; border-radius: 6px; margin: 10px 0;
+      color: var(--text-primary); white-space: pre;
+    }
+    html[data-theme="light"] .help-formula-block { background: #f0fdff; border-color: #a5f3fc; color: #0f172a; }
+    .help-threshold-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .help-threshold-pill {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 11px; padding: 5px 11px; border-radius: 6px; font-weight: 600;
+    }
+    .help-threshold-pill.A { background: rgba(249,115,22,.12); border: 1px solid rgba(249,115,22,.35); color: #f97316; }
+    .help-threshold-pill.B { background: rgba(251,191,36,.10); border: 1px solid rgba(251,191,36,.30); color: #fbbf24; }
+    .help-threshold-pill.C { background: rgba(100,116,139,.10); border: 1px solid rgba(100,116,139,.25); color: #94a3b8; }
+    .help-level-row { display: flex; flex-direction: column; gap: 5px; margin: 10px 0; }
+    .help-level-item { display: flex; align-items: center; gap: 10px; font-size: 11.5px; }
+    .help-level-swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .help-level-range { font-weight: 700; min-width: 80px; }
+    .help-level-label { color: var(--text-secondary); }
+
     /* ── About 80/20 tab ────────────────────────────────────── */
     .about-wrap { padding: 20px 22px 28px; max-width: 780px; }
     .about-hero {
@@ -849,6 +892,53 @@
               </thead>
               <tbody id="abcTableBody"></tbody>
             </table>
+
+            <!-- ── ABC Help panel ── -->
+            <div class="help-wrap">
+              <div class="help-toggle" onclick="toggleHelp(this)">
+                <i class="fa-solid fa-circle-question"></i>
+                How ABC Classification Is Computed
+                <i class="fa-solid fa-chevron-right toggle-chevron"></i>
+              </div>
+              <div class="help-body">
+
+                <div class="help-section">
+                  <div class="help-section-title"><i class="fa-solid fa-arrow-down-wide-short"></i> Step 1 — Sort &amp; Rank</div>
+                  <p class="help-text">All categories are sorted in <strong>descending order</strong> by their aggregated value (count or numeric sum). Each row receives a rank from 1 (largest contributor) to n (smallest).</p>
+                </div>
+
+                <div class="help-section">
+                  <div class="help-section-title"><i class="fa-solid fa-percent"></i> Step 2 — Compute Share &amp; Cumulative %</div>
+                  <p class="help-text">For each ranked item <em>i</em>, two metrics are computed from the grand total T = Σ all values:</p>
+                  <div class="help-formula-block">% Share(i)      = value(i) / T × 100
+
+Cumulative%(i)  = Σ value(1..i) / T × 100</div>
+                  <p class="help-text">The cumulative % starts near 0 for rank 1 and reaches exactly <strong>100%</strong> at rank n.</p>
+                </div>
+
+                <div class="help-section">
+                  <div class="help-section-title"><i class="fa-solid fa-layer-group"></i> Step 3 — Assign Class</div>
+                  <p class="help-text">Each item's cumulative % is compared against two adjustable thresholds (defaults: A ≤ 80%, B ≤ 95%):</p>
+                  <div class="help-threshold-row">
+                    <div class="help-threshold-pill A"><i class="fa-solid fa-circle-dot"></i> Class A — Cumulative % ≤ 80% — <em style="color:#f97316">Vital Few</em></div>
+                    <div class="help-threshold-pill B"><i class="fa-solid fa-circle-dot"></i> Class B — 80% &lt; Cum % ≤ 95% — <em style="color:#fbbf24">Important</em></div>
+                    <div class="help-threshold-pill C"><i class="fa-solid fa-circle-dot"></i> Class C — Cumulative % &gt; 95% — <em style="color:#94a3b8">Trivial Many</em></div>
+                  </div>
+                  <p class="help-text">The 80 / 95 thresholds are the Pareto default and can be adjusted in Chart Options. Items at exactly the boundary belong to the lower class (A boundary takes precedence).</p>
+                </div>
+
+                <div class="help-section">
+                  <div class="help-section-title"><i class="fa-solid fa-calculator"></i> Summary Metrics per Class</div>
+                  <p class="help-text">For each class the summary cards display:</p>
+                  <div class="help-formula-block">Item count         = number of categories in class
+Category %        = item count / n × 100
+Value share %     = Σ values in class / T × 100</div>
+                  <p class="help-text">The <strong>bar fill</strong> on each card represents the category % relative to 100%.</p>
+                </div>
+
+              </div><!-- /help-body -->
+            </div><!-- /help-wrap -->
+
           </div>
         </div>
 
@@ -861,6 +951,84 @@
                 <div style="font-size:14px;">Pareto Strength Index will appear here after analysis loads.</div>
               </div>
             </div>
+
+            <!-- ── PSI Help panel ── -->
+            <div class="help-wrap">
+              <div class="help-toggle" onclick="toggleHelp(this)">
+                <i class="fa-solid fa-circle-question"></i>
+                How P.S.I™ Is Computed
+                <i class="fa-solid fa-chevron-right toggle-chevron"></i>
+              </div>
+              <div class="help-body">
+
+                <div class="help-section">
+                  <div class="help-section-title"><i class="fa-solid fa-wave-square"></i> Gini Coefficient via Lorenz Curve</div>
+                  <p class="help-text">The <strong>Gini coefficient</strong> measures inequality of distribution on a 0–1 scale (0 = perfect equality, 1 = maximum concentration). It is derived from the <em>Lorenz curve</em> — a graph of cumulative value share vs. cumulative category share, sorted ascending:</p>
+                  <div class="help-formula-block">Sort data ascending by value.
+For each item i (i = 1..n):
+  x(i) = i / n                        ← cumulative population fraction
+  y(i) = Σ value(1..i) / T           ← cumulative value fraction
+
+Area under Lorenz curve (trapezoid rule):
+  L = Σ (x(i) − x(i−1)) × (y(i) + y(i−1)) / 2
+
+Gini = (0.5 − L) / 0.5              ← clamped to [0, 1]</div>
+                  <p class="help-text">If the Lorenz area is ≥ 0.5 (degenerate case), a <strong>discrete fallback</strong> is used:</p>
+                  <div class="help-formula-block">Gini = Σᵢ Σⱼ |xᵢ − xⱼ| / (2 × n × T)</div>
+                </div>
+
+                <div class="help-section">
+                  <div class="help-section-title"><i class="fa-solid fa-arrow-up-right-dots"></i> Top-20% Concentration</div>
+                  <p class="help-text">This measures what fraction of the total value is held by the top 20% of categories (the "vital few"). Categories are already sorted descending (highest value first):</p>
+                  <div class="help-formula-block">k     = ceil(n × 0.20)             ← top-20% count (min 1)
+Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
+                </div>
+
+                <div class="help-section">
+                  <div class="help-section-title"><i class="fa-solid fa-bolt"></i> P.S.I™ — Pareto Strength Index</div>
+                  <p class="help-text">The P.S.I™ index combines the Gini coefficient with a small bonus when the top-20% concentration is extreme (≥ 80%), reinforcing the Pareto signal:</p>
+                  <div class="help-formula-block">PSI  = Gini
+If Top20 ≥ 80%:
+  bonus = min(0.10, (Top20 − 80) / 200)
+  PSI   = min(1, PSI + bonus)
+
+Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
+                </div>
+
+                <div class="help-section">
+                  <div class="help-section-title"><i class="fa-solid fa-traffic-light"></i> Interpretation Levels</div>
+                  <div class="help-level-row">
+                    <div class="help-level-item">
+                      <div class="help-level-swatch" style="background:#4ade80"></div>
+                      <div class="help-level-range" style="color:#4ade80">0 – 20%</div>
+                      <div class="help-level-label">Very Low Inequality — nearly uniform distribution</div>
+                    </div>
+                    <div class="help-level-item">
+                      <div class="help-level-swatch" style="background:#a3e635"></div>
+                      <div class="help-level-range" style="color:#a3e635">20 – 40%</div>
+                      <div class="help-level-label">Low Inequality — moderate concentration, fairly balanced</div>
+                    </div>
+                    <div class="help-level-item">
+                      <div class="help-level-swatch" style="background:#fbbf24"></div>
+                      <div class="help-level-range" style="color:#fbbf24">40 – 60%</div>
+                      <div class="help-level-label">Moderate Inequality — clear concentration emerging</div>
+                    </div>
+                    <div class="help-level-item">
+                      <div class="help-level-swatch" style="background:#fb923c"></div>
+                      <div class="help-level-range" style="color:#fb923c">60 – 80%</div>
+                      <div class="help-level-label">High Inequality — strong Pareto principle evident</div>
+                    </div>
+                    <div class="help-level-item">
+                      <div class="help-level-swatch" style="background:#f87171"></div>
+                      <div class="help-level-range" style="color:#f87171">80 – 100%</div>
+                      <div class="help-level-label">Very High Inequality — extreme value concentration</div>
+                    </div>
+                  </div>
+                </div>
+
+              </div><!-- /help-body -->
+            </div><!-- /help-wrap -->
+
           </div>
         </div>
 
@@ -2042,7 +2210,15 @@
     a.click();
   }
 
+  /* ── Help-panel toggle ─────────────────────────────────────────── */
+  function toggleHelp(btn) {
+    btn.classList.toggle('open');
+    var body = btn.nextElementSibling;
+    if (body) body.classList.toggle('open');
+  }
+
   /* Expose globals needed by inline event handlers */
+  window.toggleHelp    = toggleHelp;
   window.switchTab     = switchTab;
   window.recalculate   = recalculate;
   window.applyOptions  = applyOptions;

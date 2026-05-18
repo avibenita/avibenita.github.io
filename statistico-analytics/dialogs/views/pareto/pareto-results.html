@@ -371,6 +371,38 @@
     }
     .opt-apply-btn:hover { filter: brightness(1.12); }
 
+    /* ── Bin-mode toggle (hero strip) ──────────────────────── */
+    .bin-toggle-btn {
+      font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em;
+      padding: 3px 11px; border-radius: 6px;
+      border: 1px solid rgba(100,116,139,.38);
+      background: rgba(100,116,139,.1); color: rgba(148,163,184,.8);
+      cursor: pointer; transition: all .18s; line-height: 1.6;
+    }
+    .bin-toggle-btn.active {
+      background: rgba(6,182,212,.18); border-color: rgba(6,182,212,.5); color: #22d3ee;
+    }
+    .bin-pill-wrap {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 9px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .1em; color: rgba(103,232,249,.7); white-space: nowrap;
+    }
+    .bin-pill {
+      display: flex; align-items: center;
+      background: rgba(255,255,255,.06); border: 1px solid rgba(6,182,212,.35);
+      border-radius: 8px; overflow: hidden;
+    }
+    .bin-pill button {
+      background: transparent; border: none; color: rgba(103,232,249,.9);
+      font-size: 16px; font-weight: 800; padding: 0 8px; height: 26px;
+      cursor: pointer; line-height: 1; transition: background .15s; font-family: inherit;
+    }
+    .bin-pill button:hover { background: rgba(6,182,212,.18); }
+    .bin-pill-val {
+      font-size: 13px; font-weight: 800; color: #fff;
+      min-width: 22px; text-align: center; padding: 0 2px; pointer-events: none;
+    }
+
     /* ── Decimals pill (topbar) ────────────────────────────── */
     .dec-pill-wrap {
       display: flex; align-items: center; gap: 6px; flex-shrink: 0;
@@ -809,10 +841,26 @@
           <label><i class="fa-solid fa-weight-hanging" style="font-size:9px;"></i>&nbsp; Values</label>
           <select class="hero-select" id="colVal" onchange="recalculate()"></select>
         </div>
+
+        <!-- Bin controls — shown only when category column is numeric -->
+        <div class="hero-sep" id="binSep" style="display:none"></div>
+        <div class="hero-control-group" id="binGroup" style="display:none">
+          <label><i class="fa-solid fa-sliders" style="font-size:9px;"></i>&nbsp; Bin</label>
+          <button class="bin-toggle-btn" id="binToggle" onclick="toggleBinMode()">OFF</button>
+          <div class="bin-pill-wrap" id="binPillWrap" style="display:none">
+            <span>Bins</span>
+            <div class="bin-pill">
+              <button onclick="changeBins(-1)">−</button>
+              <span class="bin-pill-val" id="binDisplay">10</span>
+              <button onclick="changeBins(1)">+</button>
+            </div>
+          </div>
+        </div>
+
         <div class="hero-stats" id="heroStats">
           <div class="hero-stat">
             <div class="hero-stat-v" id="statN">—</div>
-            <div class="hero-stat-l">Categories</div>
+            <div class="hero-stat-l" id="statNLbl">Categories</div>
           </div>
           <div class="hero-stat">
             <div class="hero-stat-v" id="statTotal">—</div>
@@ -1232,6 +1280,8 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
   var _dispDec    = 0;    /* user-controlled display precision (dec pill) */
   var _lastValSel = null; /* tracks last Values dropdown selection */
   var _sbCollapsed = false;
+  var _binMode    = false; /* binning active? */
+  var _binCount   = 10;    /* number of equal-width bins */
 
   /* ─────────────────────────────────────────────────────────
      Boot — receive data via DialogParentMessageReceived
@@ -1297,6 +1347,81 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
   /* ─────────────────────────────────────────────────────────
      Recalculate (called on column change)
   ───────────────────────────────────────────────────────── */
+  /* ─────────────────────────────────────────────────────────
+     Binning helpers
+  ───────────────────────────────────────────────────────── */
+  function isCatColNumeric(catIdx) {
+    var rows = (_cfg.rawValues || []).slice(1);
+    if (!rows.length) return false;
+    var numCount = 0, total = 0;
+    rows.forEach(function (row) {
+      var v = row[catIdx];
+      if (v === null || v === undefined || String(v).trim() === '') return;
+      total++;
+      if (isFinite(parseFloat(v))) numCount++;
+    });
+    return total > 0 && numCount / total >= 0.75;
+  }
+
+  function _binLabel(lo, hi, isLast, dp) {
+    return fmtNum(lo, dp) + ' \u2013 ' + fmtNum(hi, dp) + (isLast ? '' : '');
+  }
+
+  function buildBinnedData(catIdx, valIdx, nBins, sortDir) {
+    var rows = (_cfg.rawValues || []).slice(1);
+    var numVals = [];
+    rows.forEach(function (row) {
+      var v = parseFloat(row[catIdx]);
+      if (isFinite(v)) numVals.push(v);
+    });
+    if (!numVals.length) return [];
+
+    var mn = Math.min.apply(null, numVals);
+    var mx = Math.max.apply(null, numVals);
+    if (mn === mx) mx = mn + 1;
+    var width = (mx - mn) / nBins;
+    /* Choose label decimal places: 1 for non-integer widths, 0 for integers */
+    var dp = (width === Math.floor(width) && mn === Math.floor(mn)) ? 0 : 2;
+
+    /* Build bin buckets */
+    var bins = [];
+    for (var i = 0; i < nBins; i++) {
+      var lo = mn + i * width;
+      var hi = lo + width;
+      bins.push({ lo: lo, hi: hi, label: _binLabel(lo, hi, i === nBins - 1, dp), val: 0 });
+    }
+
+    /* Accumulate values into bins */
+    rows.forEach(function (row) {
+      var v = parseFloat(row[catIdx]);
+      if (!isFinite(v)) return;
+      var bi = Math.min(Math.floor((v - mn) / width), nBins - 1);
+      var acc = valIdx !== null ? parseFloat(row[valIdx]) : 1;
+      if (isNaN(acc)) acc = 0;
+      bins[bi].val += acc;
+    });
+
+    /* Filter empty, then sort by value */
+    var result = bins.filter(function (b) { return b.val > 0; });
+    result.sort(function (a, b) { return sortDir === 'asc' ? a.val - b.val : b.val - a.val; });
+    return result.map(function (b) { return { cat: b.label, val: b.val }; });
+  }
+
+  function toggleBinMode() {
+    _binMode = !_binMode;
+    var btn  = document.getElementById('binToggle');
+    var pill = document.getElementById('binPillWrap');
+    if (btn)  { btn.textContent = _binMode ? 'ON' : 'OFF'; btn.classList.toggle('active', _binMode); }
+    if (pill) pill.style.display = _binMode ? 'flex' : 'none';
+    recalculate();
+  }
+
+  function changeBins(delta) {
+    _binCount = Math.max(2, Math.min(50, _binCount + delta));
+    setText('binDisplay', _binCount);
+    recalculate();
+  }
+
   function recalculate() {
     var catIdx    = parseInt(document.getElementById('colCat').value, 10);
     var valIdxRaw = document.getElementById('colVal').value;
@@ -1312,29 +1437,53 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
     document.querySelectorAll('.val-col-hdr').forEach(function (th) { th.textContent = valHdr; });
     var sortDir   = (document.getElementById('optSort') || {value:'desc'}).value || 'desc';
 
-    var rows = (_cfg.rawValues || []).slice(1);
-    var map  = {};
-    rows.forEach(function (row) {
-      var cat = String(row[catIdx] === null || row[catIdx] === undefined ? '' : row[catIdx]).trim();
-      if (!cat) return;
-      var val = valIdx !== null ? parseFloat(row[valIdx]) : 1;
-      if (isNaN(val)) val = 0;
-      map[cat] = (map[cat] || 0) + val;
-    });
+    /* Show / hide binning controls based on whether cat col is numeric */
+    var catIsNum  = isCatColNumeric(catIdx);
+    var binSep    = document.getElementById('binSep');
+    var binGroup  = document.getElementById('binGroup');
+    if (binSep)  binSep.style.display  = catIsNum ? '' : 'none';
+    if (binGroup) binGroup.style.display = catIsNum ? '' : 'none';
+    /* If column switched away from numeric, reset bin mode silently */
+    if (!catIsNum && _binMode) {
+      _binMode = false;
+      var _bt = document.getElementById('binToggle');
+      var _bp = document.getElementById('binPillWrap');
+      if (_bt) { _bt.textContent = 'OFF'; _bt.classList.remove('active'); }
+      if (_bp) _bp.style.display = 'none';
+    }
 
-    _data = Object.keys(map).map(function (k) { return { cat: k, val: map[k] }; });
-    _data.sort(function (a, b) { return sortDir === 'asc' ? a.val - b.val : b.val - a.val; });
+    var rows = (_cfg.rawValues || []).slice(1);
+
+    if (_binMode && catIsNum) {
+      /* ── Binned mode: equal-width histogram bins ── */
+      _data = buildBinnedData(catIdx, valIdx, _binCount, sortDir);
+    } else {
+      /* ── Standard mode: aggregate by unique category value ── */
+      var map  = {};
+      rows.forEach(function (row) {
+        var cat = String(row[catIdx] === null || row[catIdx] === undefined ? '' : row[catIdx]).trim();
+        if (!cat) return;
+        var val = valIdx !== null ? parseFloat(row[valIdx]) : 1;
+        if (isNaN(val)) val = 0;
+        map[cat] = (map[cat] || 0) + val;
+      });
+      _data = Object.keys(map).map(function (k) { return { cat: k, val: map[k] }; });
+      _data.sort(function (a, b) { return sortDir === 'asc' ? a.val - b.val : b.val - a.val; });
+    }
 
     /* Update hero stats */
+    var isBinned = _binMode && catIsNum;
     var total = _data.reduce(function (s, d) { return s + d.val; }, 0);
     setText('statN', _data.length);
     setText('statTotal', fmtNum(total, 0));
+    var statNLblEl = document.getElementById('statNLbl');
+    if (statNLblEl) statNLblEl.textContent = isBinned ? 'Bins' : 'Categories';
 
     /* Update topbar */
     var catName = (_cfg.headers || [])[catIdx] || 'Category';
     var valName = valIdx !== null ? ((_cfg.headers || [])[valIdx] || 'Values') : 'Count';
     setText('topbarTitle', catName + ' — Pareto Analysis');
-    setText('topbarBadge', _data.length + ' categories');
+    setText('topbarBadge', _data.length + (isBinned ? ' bins' : ' categories'));
 
     renderChart();
     renderParetoTable();
@@ -2272,6 +2421,8 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
 
   /* Expose globals needed by inline event handlers */
   window.toggleHelp    = toggleHelp;
+  window.toggleBinMode = toggleBinMode;
+  window.changeBins    = changeBins;
   window.switchTab     = switchTab;
   window.recalculate   = recalculate;
   window.applyOptions  = applyOptions;

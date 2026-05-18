@@ -986,13 +986,16 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
 
                 <div class="help-section">
                   <div class="help-section-title"><i class="fa-solid fa-bolt"></i> P.S.I™ — Pareto Strength Index</div>
-                  <p class="help-text">The P.S.I™ index combines the Gini coefficient with a small bonus when the top-20% concentration is extreme (≥ 80%), reinforcing the Pareto signal:</p>
-                  <div class="help-formula-block">PSI  = Gini
+                  <p class="help-text">The raw Gini is bounded by <em>(n−1)/n</em> — so with only 2 categories the maximum possible Gini is 0.5, making even extreme concentration look mild. PSI corrects for this by normalising Gini relative to its theoretical maximum, then adding a bonus for extreme top-20% concentration:</p>
+                  <div class="help-formula-block">Normalised Gini = Gini × n / (n − 1)   ← clamped to [0,1]
+
+PSI = Normalised Gini
 If Top20 ≥ 80%:
-  bonus = min(0.10, (Top20 − 80) / 200)
+  bonus = min(0.15, (Top20 − 80) / 133)
   PSI   = min(1, PSI + bonus)
 
 Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
+                  <p class="help-text">The <em>Gini Coefficient</em> shown in the metric cards is the raw (unnormalised) value — the standard statistical definition.</p>
                 </div>
 
                 <div class="help-section">
@@ -1546,34 +1549,42 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
                description: 'All values are zero — check data quality.', recommendation: '', color: '#64748b' };
     }
 
-    /* Lorenz curve → Gini via trapezoidal integration */
-    var cumCount = 0, prevX = 0, prevY = 0, area = 0;
-    data.forEach(function (d, i) {
-      cumCount += d.val;
-      var x = (i + 1) / data.length;
-      var y = cumCount / total;
+    var n = data.length;
+
+    /* Lorenz curve → Gini via trapezoidal integration (requires ascending sort) */
+    var asc = data.slice().sort(function (a, b) { return a.val - b.val; });
+    var cumVal = 0, prevX = 0, prevY = 0, area = 0;
+    asc.forEach(function (d, i) {
+      cumVal += d.val;
+      var x = (i + 1) / n;
+      var y = cumVal / total;
       area += (x - prevX) * (prevY + y) / 2;
       prevX = x; prevY = y;
     });
     var gini = Math.max(0, Math.min(1, (0.5 - area) / 0.5));
 
-    /* Fallback discrete Gini if Lorenz gives unexpected result */
+    /* Fallback discrete Gini if Lorenz area is degenerate */
     if (gini <= 0 || area >= 0.5) {
-      var n = data.length, s2 = 0;
+      var s2 = 0;
       for (var i = 0; i < n; i++)
         for (var j = 0; j < n; j++)
           s2 += Math.abs(data[i].val - data[j].val);
       gini = Math.max(0, Math.min(1, s2 / (2 * n * total)));
     }
 
-    /* Top-20% concentration */
-    var top20n   = Math.max(1, Math.ceil(data.length * 0.2));
+    /* Normalize Gini by the theoretical maximum for n categories: (n-1)/n.
+       This makes PSI reflect concentration *relative to what's possible*
+       with the given number of categories (critical for small n). */
+    var giniNorm = n > 1 ? Math.min(1, gini * n / (n - 1)) : gini;
+
+    /* Top-20% concentration (data already sorted descending in _data) */
+    var top20n   = Math.max(1, Math.ceil(n * 0.2));
     var top20val = data.slice(0, top20n).reduce(function (s, d) { return s + d.val; }, 0);
     var top20    = (top20val / total) * 100;
 
-    /* PSI index */
-    var psi = gini;
-    if (top20 >= 80) psi = Math.min(1, psi + Math.min(0.1, (top20 - 80) / 200));
+    /* PSI: normalised Gini + stronger bonus for extreme top-20 concentration */
+    var psi = giniNorm;
+    if (top20 >= 80) psi = Math.min(1, psi + Math.min(0.15, (top20 - 80) / 133));
     psi = Math.max(0, Math.min(1, psi));
 
     /* Interpretation */

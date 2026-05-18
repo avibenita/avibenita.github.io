@@ -192,7 +192,7 @@ const CALCULATOR_CATEGORY_TILES = [
 const APPLICATION_CATEGORY_TILES = [
   {
     id: "quality-ops",
-    title: "Eliminate Waste. Focus on Impact.",
+    title: "Focus on Impact!",
     icon: "fa-chart-column",
     color: "#f97316",
     colorDark: "#c2410c",

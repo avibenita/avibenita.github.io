@@ -65,14 +65,13 @@
     }
     .prt-sample .ellipsis { color: var(--cfg-text2); font-style: normal; font-weight: 700; }
 
-    /* Radio buttons in the table */
-    .prt-radio-wrap { text-align: center; }
-    .prt-radio-wrap input[type="radio"] {
-      width: 14px; height: 14px; cursor: pointer;
-      accent-color: #f97316;
+    /* Include checkbox in the table */
+    .prt-chk-wrap { text-align: center; }
+    .prt-chk-wrap input[type="checkbox"] {
+      width: 15px; height: 15px; cursor: pointer;
+      accent-color: var(--cfg-accent);
+      vertical-align: middle;
     }
-    .prt-radio-wrap.val-radio input[type="radio"] { accent-color: #38bdf8; }
-    .prt-radio-wrap input[type="radio"]:disabled { opacity: .3; cursor: not-allowed; }
 
     /* ── Assignment panel — DOMINANT ───────────────────────────── */
     .prt-assign-panel {
@@ -233,18 +232,21 @@
               <table class="prt-col-table">
                 <thead>
                   <tr>
+                    <th class="th-center" title="Include column in results">
+                      <input type="checkbox" id="chkAll" title="Select / deselect all"
+                        style="width:14px;height:14px;cursor:pointer;accent-color:var(--cfg-accent);"
+                        onchange="toggleAllCols(this.checked)"/>
+                    </th>
                     <th>Column</th>
                     <th class="th-center" title="Non-missing count">n</th>
                     <th class="th-center" title="Numeric values">nNum</th>
                     <th class="th-center" title="Text values">nTxt</th>
                     <th class="th-center" title="Missing / blank">nMiss</th>
-                    <th class="th-center th-cat" title="Assign as Category (X axis)">🏷 Cat</th>
-                    <th class="th-center th-val" title="Assign as Values (Y axis)"># Val</th>
                     <th>Sample values</th>
                   </tr>
                 </thead>
                 <tbody id="colTableBody">
-                  <tr><td colspan="8" style="text-align:center;padding:20px;color:var(--cfg-text3);font-style:italic;">Loading…</td></tr>
+                  <tr><td colspan="7" style="text-align:center;padding:20px;color:var(--cfg-text3);font-style:italic;">Loading…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -373,21 +375,30 @@
     }
 
     /* ─────────────────────────────────────────────────────────
-       Populate dropdowns
+       Populate dropdowns — only from checked columns
     ───────────────────────────────────────────────────────── */
     function populateDropdowns() {
-      var catSel = document.getElementById('categoryColSelect');
-      var valSel = document.getElementById('valuesColSelect');
+      var catSel   = document.getElementById('categoryColSelect');
+      var valSel   = document.getElementById('valuesColSelect');
+      var prevCat  = catSel.value;
+      var prevVal  = valSel.value;
+      var included = getCheckedIndices();
+
       catSel.innerHTML = '<option value="">— Select column —</option>';
       valSel.innerHTML = '<option value="">— Count occurrences —</option>';
 
-      _headers.forEach(function (h, i) {
+      included.forEach(function (i) {
+        var h     = _headers[i];
         var isNum = colIsNumeric(i);
         catSel.insertAdjacentHTML('beforeend',
           '<option value="' + i + '">' + escHtml(h) + (isNum ? '' : ' (text)') + '</option>');
         if (isNum) valSel.insertAdjacentHTML('beforeend',
           '<option value="' + i + '">' + escHtml(h) + '</option>');
       });
+
+      /* Restore previous selections if still available */
+      if (prevCat && catSel.querySelector('option[value="' + prevCat + '"]')) catSel.value = prevCat;
+      if (prevVal && valSel.querySelector('option[value="' + prevVal + '"]')) valSel.value = prevVal;
     }
 
     /* ─────────────────────────────────────────────────────────
@@ -397,8 +408,6 @@
       var tbody = document.getElementById('colTableBody');
       var html  = '';
       _headers.forEach(function (h, i) {
-        var isNum  = colIsNumeric(i);
-
         /* Per-column stats */
         var nNum = 0, nTxt = 0, nMiss = 0;
         _rows.forEach(function (r) {
@@ -409,7 +418,7 @@
         });
         var nValid = nNum + nTxt;
 
-        /* Sample values: collect distinct values, cap at 5, append … if more exist */
+        /* Sample values: first 5 distinct, "…" if more exist */
         var distinct = [];
         for (var ri = 0; ri < _rows.length && distinct.length < 6; ri++) {
           var sv = String(_rows[ri][i] ?? '').trim();
@@ -419,27 +428,20 @@
         var sampleStr = escHtml(distinct.slice(0, 5).join(', '));
         if (hasMore) sampleStr += ' <span class="ellipsis">…</span>';
 
-        var statNum  = nNum  > 0 ? nNum  : '<span class="zero">—</span>';
-        var statTxt  = nTxt  > 0 ? nTxt  : '<span class="zero">—</span>';
+        var statNum  = nNum  > 0 ? '<span class="num">'  + nNum  + '</span>' : '<span class="zero">—</span>';
+        var statTxt  = nTxt  > 0 ? '<span class="txt">'  + nTxt  + '</span>' : '<span class="zero">—</span>';
         var statMiss = nMiss > 0 ? '<span class="miss">' + nMiss + '</span>' : '<span class="zero">—</span>';
 
-        html += '<tr id="colRow' + i + '">' +
+        html += '<tr id="colRow' + i + '" onclick="toggleColCheck(' + i + ')" style="cursor:pointer;">' +
+          '<td class="prt-chk-wrap" onclick="event.stopPropagation();">' +
+            '<input type="checkbox" id="colChk' + i + '" value="' + i + '" checked ' +
+              'onchange="onColCheckChange()" title="Include in results"/>' +
+          '</td>' +
           '<td style="font-weight:600;white-space:nowrap;">' + escHtml(h) + '</td>' +
           '<td class="prt-stat">' + nValid + '</td>' +
-          '<td class="prt-stat num">' + statNum + '</td>' +
-          '<td class="prt-stat txt">' + statTxt + '</td>' +
+          '<td class="prt-stat">' + statNum + '</td>' +
+          '<td class="prt-stat">' + statTxt + '</td>' +
           '<td class="prt-stat">' + statMiss + '</td>' +
-          /* Cat radio */
-          '<td class="prt-radio-wrap">' +
-            '<input type="radio" name="prtCatRadio" value="' + i + '" ' +
-              'onclick="tableRadioClick(\'cat\',' + i + ')" title="Assign as Category"/>' +
-          '</td>' +
-          /* Val radio — only numeric columns */
-          '<td class="prt-radio-wrap val-radio">' +
-            '<input type="radio" name="prtValRadio" value="' + i + '" ' +
-              (isNum ? '' : 'disabled ') +
-              'onclick="tableRadioClick(\'val\',' + i + ')" title="Assign as Values"/>' +
-          '</td>' +
           '<td><span class="prt-sample">' + sampleStr + '</span></td>' +
         '</tr>';
       });
@@ -447,32 +449,42 @@
     }
 
     /* ─────────────────────────────────────────────────────────
-       Radio click → sync dropdowns (allow deselect on second click)
+       Checkbox helpers
     ───────────────────────────────────────────────────────── */
-    var _lastCatRadio = -1;
-    var _lastValRadio = -1;
+    function toggleColCheck(i) {
+      var chk = document.getElementById('colChk' + i);
+      if (chk) { chk.checked = !chk.checked; onColCheckChange(); }
+    }
 
-    function tableRadioClick(role, idx) {
-      if (role === 'cat') {
-        if (_lastCatRadio === idx) {
-          /* Deselect */
-          document.querySelector('input[name="prtCatRadio"][value="' + idx + '"]').checked = false;
-          _lastCatRadio = -1;
-          document.getElementById('categoryColSelect').value = '';
-        } else {
-          _lastCatRadio = idx;
-          document.getElementById('categoryColSelect').value = String(idx);
-        }
-      } else {
-        if (_lastValRadio === idx) {
-          document.querySelector('input[name="prtValRadio"][value="' + idx + '"]').checked = false;
-          _lastValRadio = -1;
-          document.getElementById('valuesColSelect').value = '';
-        } else {
-          _lastValRadio = idx;
-          document.getElementById('valuesColSelect').value = String(idx);
-        }
-      }
+    function toggleAllCols(checked) {
+      _headers.forEach(function (_, i) {
+        var chk = document.getElementById('colChk' + i);
+        if (chk) chk.checked = checked;
+      });
+      onColCheckChange();
+    }
+
+    function getCheckedIndices() {
+      return _headers.map(function (_, i) { return i; })
+        .filter(function (i) {
+          var c = document.getElementById('colChk' + i);
+          return c && c.checked;
+        });
+    }
+
+    function onColCheckChange() {
+      /* Dim unchecked rows */
+      _headers.forEach(function (_, i) {
+        var row = document.getElementById('colRow' + i);
+        var chk = document.getElementById('colChk' + i);
+        if (row) row.style.opacity = (chk && chk.checked) ? '1' : '0.35';
+      });
+      /* Sync "select all" master checkbox */
+      var checked = getCheckedIndices();
+      var master  = document.getElementById('chkAll');
+      if (master) master.checked = checked.length === _headers.length;
+      /* Repopulate dropdowns from checked columns only */
+      populateDropdowns();
       onRoleChange();
     }
 
@@ -504,22 +516,12 @@
       var catIdx = document.getElementById('categoryColSelect').value;
       var valIdx = document.getElementById('valuesColSelect').value;
 
-      /* Sync radios from dropdowns */
-      document.querySelectorAll('input[name="prtCatRadio"]').forEach(function (r) {
-        r.checked = (catIdx !== '' && r.value === catIdx);
-      });
-      document.querySelectorAll('input[name="prtValRadio"]').forEach(function (r) {
-        r.checked = (valIdx !== '' && r.value === valIdx);
-      });
-      _lastCatRadio = catIdx !== '' ? parseInt(catIdx, 10) : -1;
-      _lastValRadio = valIdx !== '' ? parseInt(valIdx, 10) : -1;
-
-      /* Reset + highlight table rows */
+      /* Highlight table rows for assigned columns */
       _headers.forEach(function (_, i) {
         var row = document.getElementById('colRow' + i);
         if (!row) return;
-        var isCat  = catIdx !== '' && parseInt(catIdx, 10) === i;
-        var isVal  = valIdx !== '' && parseInt(valIdx, 10) === i;
+        var isCat = catIdx !== '' && parseInt(catIdx, 10) === i;
+        var isVal = valIdx !== '' && parseInt(valIdx, 10) === i;
         row.className = isCat && isVal ? 'is-both' : isCat ? 'is-cat' : isVal ? 'is-val' : '';
       });
 
@@ -644,13 +646,14 @@
       Office.context.ui.messageParent(JSON.stringify({
         action: 'runAnalysis',
         data: {
-          headers:          _headers,
-          categoryColIndex: catIdx,
-          valuesColIndex:   valIdx,
-          categoryColName:  _headers[catIdx] || '',
-          valuesColName:    valIdx !== null ? (_headers[valIdx] || '') : 'Count',
-          paretoData:       paretoData,
-          rawValues:        _rawData
+          headers:           _headers,
+          includedIndices:   getCheckedIndices(),
+          categoryColIndex:  catIdx,
+          valuesColIndex:    valIdx,
+          categoryColName:   _headers[catIdx] || '',
+          valuesColName:     valIdx !== null ? (_headers[valIdx] || '') : 'Count',
+          paretoData:        paretoData,
+          rawValues:         _rawData
         }
       }));
     }

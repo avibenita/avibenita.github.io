@@ -1602,12 +1602,10 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
     return { index: psi, gini: gini, top20: top20, level: level, description: desc, recommendation: rec, color: color };
   }
 
-  function makePSIGaugeSVG(psiIndex, color) {
+  function makePSIGaugeSVG(color) {
+    /* Renders the gauge in its zero / initial state; animation fills it in */
     var cx = 110, cy = 110, r = 82;
-    var safe  = Math.min(psiIndex, 0.999);
-    var angle = -Math.PI + safe * Math.PI;         /* -π to 0 radians */
-    var nx    = (cx + r * Math.cos(angle)).toFixed(1);
-    var ny    = (cy + r * Math.sin(angle)).toFixed(1);
+    var totalLen = +(Math.PI * r).toFixed(2);   /* semicircle arc length ≈ 257.61 */
     var startX = cx - r, startY = cy;
 
     /* Tick marks at 20 / 40 / 60 / 80 % */
@@ -1630,8 +1628,6 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
     }).join('');
 
     var trackD = 'M '+startX+' '+startY+' A '+r+' '+r+' 0 0 1 '+(cx+r)+' '+startY;
-    /* large-arc is always 0: our sweep (safe × 180°) never exceeds 180° */
-    var fillD  = safe > 0.001 ? ('M '+startX+' '+startY+' A '+r+' '+r+' 0 0 1 '+nx+' '+ny) : '';
 
     return '<svg viewBox="0 0 220 135" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:290px;">'
       + '<defs>'
@@ -1643,18 +1639,61 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
       + '<path d="'+trackD+'" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="16" stroke-linecap="round"/>'
       /* gradient overlay (dim) */
       + '<path d="'+trackD+'" fill="none" stroke="url(#psi-grd)" stroke-width="16" stroke-linecap="round" opacity=".25"/>'
-      /* active fill */
-      + (fillD ? '<path d="'+fillD+'" fill="none" stroke="'+color+'" stroke-width="16" stroke-linecap="round" opacity=".92"/>' : '')
+      /* animated active fill — starts fully hidden via dashoffset = totalLen */
+      + '<path id="psi-arc-fill" d="'+trackD+'" fill="none" stroke="'+color+'" stroke-width="16" stroke-linecap="round" opacity=".92"'
+      + ' stroke-dasharray="'+totalLen+'" stroke-dashoffset="'+totalLen+'"/>'
       /* ticks */
       + ticks
-      /* needle */
-      + '<line x1="'+cx+'" y1="'+cy+'" x2="'+nx+'" y2="'+ny+'" stroke="'+color+'" stroke-width="3" stroke-linecap="round" opacity=".9"/>'
+      /* animated needle — starts at left end (angle −π) */
+      + '<line id="psi-needle" x1="'+cx+'" y1="'+cy+'" x2="'+startX+'" y2="'+startY+'" stroke="'+color+'" stroke-width="3" stroke-linecap="round" opacity=".9"/>'
       + '<circle cx="'+cx+'" cy="'+cy+'" r="5" fill="'+color+'"/>'
-      /* center value */
-      + '<text x="'+cx+'" y="'+(cy-20)+'" text-anchor="middle" font-family="Segoe UI,sans-serif" font-size="24" font-weight="800" fill="'+color+'">'+Math.round(psiIndex*100)+'%</text>'
+      /* animated centre value — starts at 0% */
+      + '<text id="psi-center-val" x="'+cx+'" y="'+(cy-20)+'" text-anchor="middle" font-family="Segoe UI,sans-serif" font-size="24" font-weight="800" fill="'+color+'">0%</text>'
       + '<text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" font-family="Segoe UI,sans-serif" font-size="8" font-weight="700" fill="rgba(255,255,255,.5)" letter-spacing="2">P.S.I\u2122</text>'
       + tickLabels
       + '</svg>';
+  }
+
+  function _animatePSIGauge(psiIndex, color) {
+    var cx = 110, cy = 110, r = 82;
+    var totalLen   = Math.PI * r;
+    var container  = document.getElementById('psiContainer');
+    if (!container) return;
+
+    var arcEl    = container.querySelector('#psi-arc-fill');
+    var needleEl = container.querySelector('#psi-needle');
+    var textEl   = container.querySelector('#psi-center-val');
+    var metricEl = container.querySelector('#psi-metric-index-val');
+    if (!arcEl) return;
+
+    var DURATION = 1100;   /* ms */
+    var startTs  = null;
+
+    function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+    function step(ts) {
+      if (!startTs) startTs = ts;
+      var raw = Math.min((ts - startTs) / DURATION, 1);
+      var p   = easeOutCubic(raw);
+      var cur = p * psiIndex;
+
+      /* Arc: dashoffset shrinks from totalLen → (totalLen − targetLen) */
+      arcEl.setAttribute('stroke-dashoffset', (totalLen * (1 - cur)).toFixed(2));
+
+      /* Needle sweeps from −π to target angle */
+      var angle = -Math.PI + cur * Math.PI;
+      needleEl.setAttribute('x2', (cx + r * Math.cos(angle)).toFixed(1));
+      needleEl.setAttribute('y2', (cy + r * Math.sin(angle)).toFixed(1));
+
+      /* Centre text counts up */
+      if (textEl)   textEl.textContent = Math.round(cur * 100) + '%';
+      /* Metric card PSI value counts up */
+      if (metricEl) metricEl.textContent = Math.round(cur * 100) + '%';
+
+      if (raw < 1) requestAnimationFrame(step);
+    }
+
+    requestAnimationFrame(step);
   }
 
   function renderPSI() {
@@ -1663,13 +1702,13 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
     var container = document.getElementById('psiContainer');
     if (!container) return;
 
-    var gaugeSvg = makePSIGaugeSVG(psi.index, psi.color);
+    var gaugeSvg = makePSIGaugeSVG(psi.color);
 
     container.innerHTML =
       '<div class="psi-gauge-row">' + gaugeSvg + '</div>'
       + '<div class="psi-metrics-row">'
       +   '<div class="psi-metric">'
-      +     '<div class="psi-metric-val" style="color:'+psi.color+'">'+Math.round(psi.index*100)+'%</div>'
+      +     '<div id="psi-metric-index-val" class="psi-metric-val" style="color:'+psi.color+'">0%</div>'
       +     '<div class="psi-metric-lbl">Pareto Strength Index</div>'
       +   '</div>'
       +   '<div class="psi-metric">'
@@ -1690,6 +1729,9 @@ Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
       +   '<div class="psi-desc">'+psi.description+'</div>'
       +   '<div class="psi-rec">'+escHtml(psi.recommendation)+'</div>'
       + '</div>';
+
+    /* Kick off animation after DOM is ready */
+    requestAnimationFrame(function () { _animatePSIGauge(psi.index, psi.color); });
   }
 
   /* ─────────────────────────────────────────────────────────

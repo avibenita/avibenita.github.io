@@ -200,7 +200,7 @@ const APPLICATION_CATEGORY_TILES = [
     modules: [
       {
         id: "pareto2080",
-        label: "Pareto 2080",
+        label: "Pareto 20/80",
         tip: "Identify the vital few contributors using interactive Pareto analysis with the 80/20 rule."
       }
     ]
@@ -1054,7 +1054,7 @@ function openCorrelationConfigFromHub() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   PARETO 2080 — flow
+   PARETO 20/80 — flow
    ═══════════════════════════════════════════════════════════════════════════ */
 function finishHubParetoFlow() {
   hubParetoFlowActive = false;

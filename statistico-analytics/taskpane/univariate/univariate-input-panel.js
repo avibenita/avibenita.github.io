@@ -362,12 +362,20 @@ function openResultsDialog(results) {
         if (!dialog) return;
         dialog.messageChild(JSON.stringify({
           action: 'loadData',
-          data: {
-            values: results.rawData,
-            column: results.column,
-            descriptive: results.descriptive,
-            n: results.n
-          }
+          data: typeof buildUnivariateDialogPayload === 'function'
+            ? buildUnivariateDialogPayload(results)
+            : {
+                values: results.rawData || results.values,
+                column: results.column,
+                descriptive: results.descriptive,
+                n: results.n,
+                columnIndex: results.columnIndex,
+                transform: results.transform,
+                trim: results.trim,
+                dataSource: results.dataSource,
+                sourceHeaders: results.sourceHeaders,
+                sourceRows: results.sourceRows
+              }
         }));
       };
 
@@ -427,12 +435,20 @@ function openNewView(dialogUrl, results) {
         if (!dialog) return;
         dialog.messageChild(JSON.stringify({
           action: 'loadData',
-          data: {
-            values: results.rawData,
-            column: results.column,
-            descriptive: results.descriptive,
-            n: results.n
-          }
+          data: typeof buildUnivariateDialogPayload === 'function'
+            ? buildUnivariateDialogPayload(results)
+            : {
+                values: results.rawData || results.values,
+                column: results.column,
+                descriptive: results.descriptive,
+                n: results.n,
+                columnIndex: results.columnIndex,
+                transform: results.transform,
+                trim: results.trim,
+                dataSource: results.dataSource,
+                sourceHeaders: results.sourceHeaders,
+                sourceRows: results.sourceRows
+              }
         }));
       };
 

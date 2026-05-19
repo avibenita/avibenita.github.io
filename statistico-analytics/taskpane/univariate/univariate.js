@@ -506,8 +506,10 @@ function calculateStatistics(data, address, transform) {
         transform: transform,
         trim: { min: trimMin, max: trimMax },
         n: n,
-        values: data, // Include processed data for all views
-        rawData: data, // Keep for backward compatibility
+        values: data,
+        rawData: data,
+        sourceHeaders: rawData && rawData.length ? rawData[0] : [],
+        sourceRows: rawData && rawData.length > 1 ? rawData.slice(1) : [],
         descriptive: {
             mean: mean,
             median: median,
@@ -602,12 +604,20 @@ function openNewView(dialogUrl, results) {
                 // Send data after a short delay
                 setTimeout(() => {
                     if (resultsDialog) {
-                        const viewData = {
-                            values: results.rawData,
-                            column: results.column,
-                            descriptive: results.descriptive,
-                            n: results.n
-                        };
+                        const viewData = typeof buildUnivariateDialogPayload === 'function'
+                            ? buildUnivariateDialogPayload(results)
+                            : {
+                                values: results.rawData || results.values,
+                                column: results.column,
+                                descriptive: results.descriptive,
+                                n: results.n,
+                                columnIndex: results.columnIndex,
+                                transform: results.transform,
+                                trim: results.trim,
+                                dataSource: results.dataSource,
+                                sourceHeaders: results.sourceHeaders,
+                                sourceRows: results.sourceRows
+                              };
                         
                         console.log('📤 Sending data to new view:', viewData);
                         resultsDialog.messageChild(JSON.stringify({
@@ -626,12 +636,20 @@ function openNewView(dialogUrl, results) {
                         console.log('📩 Message from new view:', message);
                         
                         if (message.status === 'ready') {
-                            const viewData = {
-                                values: results.rawData,
-                                column: results.column,
-                                descriptive: results.descriptive,
-                                n: results.n
-                            };
+                            const viewData = typeof buildUnivariateDialogPayload === 'function'
+                                ? buildUnivariateDialogPayload(results)
+                                : {
+                                    values: results.rawData || results.values,
+                                    column: results.column,
+                                    descriptive: results.descriptive,
+                                    n: results.n,
+                                    columnIndex: results.columnIndex,
+                                    transform: results.transform,
+                                    trim: results.trim,
+                                    dataSource: results.dataSource,
+                                    sourceHeaders: results.sourceHeaders,
+                                    sourceRows: results.sourceRows
+                                  };
                             resultsDialog.messageChild(JSON.stringify({
                                 action: 'loadData',
                                 data: viewData
@@ -768,12 +786,20 @@ function openResultsDialog(results) {
                 setTimeout(() => {
                     if (dialog !== resultsDialog) return;
                     if (dialog) {
-                        const histogramData = {
-                            values: results.rawData,
-                            column: results.column,
-                            descriptive: results.descriptive,
-                            n: results.n
-                        };
+                        const histogramData = typeof buildUnivariateDialogPayload === 'function'
+                            ? buildUnivariateDialogPayload(results)
+                            : {
+                                values: results.rawData || results.values,
+                                column: results.column,
+                                descriptive: results.descriptive,
+                                n: results.n,
+                                columnIndex: results.columnIndex,
+                                transform: results.transform,
+                                trim: results.trim,
+                                dataSource: results.dataSource,
+                                sourceHeaders: results.sourceHeaders,
+                                sourceRows: results.sourceRows
+                              };
                         
                         console.log('📤 Sending data to histogram:', histogramData);
                         dialog.messageChild(JSON.stringify({
@@ -790,13 +816,20 @@ function openResultsDialog(results) {
                         console.log('📩 Message from dialog:', message);
                         
                         if (message.status === 'ready') {
-                            // Dialog is ready, send data
-                            const viewData = {
-                                values: results.rawData,
-                                column: results.column,
-                                descriptive: results.descriptive,
-                                n: results.n
-                            };
+                            const viewData = typeof buildUnivariateDialogPayload === 'function'
+                                ? buildUnivariateDialogPayload(results)
+                                : {
+                                    values: results.rawData || results.values,
+                                    column: results.column,
+                                    descriptive: results.descriptive,
+                                    n: results.n,
+                                    columnIndex: results.columnIndex,
+                                    transform: results.transform,
+                                    trim: results.trim,
+                                    dataSource: results.dataSource,
+                                    sourceHeaders: results.sourceHeaders,
+                                    sourceRows: results.sourceRows
+                                  };
                             if (dialog !== resultsDialog) return;
                             dialog.messageChild(JSON.stringify({
                                 action: 'loadData',

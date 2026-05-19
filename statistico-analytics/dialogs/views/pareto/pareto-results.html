@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <title>Pareto 80/20</title>
-  <!-- build: 20260519-filter-fix -->
+  <!-- build: 20260519-filter-position -->
 
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" />
@@ -251,6 +251,7 @@
     .prt-filt-clear-btn:hover { border-color: var(--accent-1); color: var(--accent-1); }
     .prt-filt-th {
       cursor: pointer; user-select: none; white-space: nowrap;
+      position: relative;
     }
     .prt-filt-th.filtered { color: #4ade80 !important; }
     .prt-filt-th .prt-filt-icon { font-size: 9px; margin-left: 4px; opacity: .75; }
@@ -2779,22 +2780,40 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
       if (idx === null || idx === '') return;
       e.preventDefault();
       e.stopPropagation();
-      prtToggleColFilter(parseInt(idx, 10), e);
+      prtToggleColFilter(parseInt(idx, 10), e, th);
     });
   }
 
-  function prtToggleColFilter(colIdx, ev) {
+  function prtPositionFilterDropdown(dd, anchorEl) {
+    if (!anchorEl || !anchorEl.getBoundingClientRect) return;
+    var rect = anchorEl.getBoundingClientRect();
+    var ddW = 280;
+    var maxH = 320;
+    var pad = 8;
+    var left = rect.left;
+    var top = rect.bottom + 2;
+    if (left + ddW > window.innerWidth - pad) {
+      left = Math.max(pad, window.innerWidth - ddW - pad);
+    }
+    if (left < pad) left = pad;
+    if (top + maxH > window.innerHeight - pad) {
+      top = Math.max(pad, rect.top - maxH - 2);
+    }
+    dd.style.position = 'fixed';
+    dd.style.left = left + 'px';
+    dd.style.top = top + 'px';
+    dd.style.minWidth = Math.max(rect.width, 200) + 'px';
+  }
+
+  function prtToggleColFilter(colIdx, ev, anchorEl) {
     if (ev) { ev.preventDefault(); ev.stopPropagation(); }
     prtCloseColFilterDropdown();
     var unique = prtUniqueValues(colIdx);
     var current = _prtColumnFilters[colIdx] || [];
     var isAll = !current.length;
-    var rect = ev && ev.currentTarget ? ev.currentTarget.getBoundingClientRect() : { left: 80, bottom: 120 };
 
     var dd = document.createElement('div');
     dd.className = 'prt-excel-filter-dropdown';
-    dd.style.left = Math.min(rect.left, window.innerWidth - 290) + 'px';
-    dd.style.top  = (rect.bottom + 4) + 'px';
     dd.setAttribute('data-col-idx', String(colIdx));
 
     var search = document.createElement('input');
@@ -2871,6 +2890,13 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
     dd.addEventListener('click', function (e) { e.stopPropagation(); });
 
     document.body.appendChild(dd);
+    prtPositionFilterDropdown(dd, anchorEl);
+
+    var scrollEl = document.getElementById('prtFilterContent');
+    if (scrollEl) {
+      scrollEl.addEventListener('scroll', prtCloseColFilterDropdown, { once: true });
+    }
+
     _prtFilterDropIgnoreClose = true;
     setTimeout(function () {
       _prtFilterDropIgnoreClose = false;

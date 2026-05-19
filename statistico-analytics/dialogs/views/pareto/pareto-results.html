@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <title>Pareto 80/20</title>
-  <!-- build: 20260519-filter-position -->
+  <!-- build: 20260519-filter-selection -->
 
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" />
@@ -2668,6 +2668,40 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
     return String(val).trim();
   }
 
+  function prtFilterValKey(val) {
+    return prtCellStr(val);
+  }
+
+  function prtFilterSelSet(filterArr) {
+    var set = {};
+    (filterArr || []).forEach(function (v) {
+      if (v !== '__SHOW_NOTHING__') set[prtFilterValKey(v)] = true;
+    });
+    return set;
+  }
+
+  function prtSyncFilterSelectAllState(valuesWrap, selectAllCb) {
+    var valueCbs = valuesWrap.querySelectorAll('.prt-filt-val-row input[type=checkbox]');
+    var total = valueCbs.length;
+    var checked = 0;
+    valueCbs.forEach(function (cb) { if (cb.checked) checked++; });
+    if (!total) {
+      selectAllCb.checked = false;
+      selectAllCb.indeterminate = false;
+      return;
+    }
+    if (checked === 0) {
+      selectAllCb.checked = false;
+      selectAllCb.indeterminate = false;
+    } else if (checked === total) {
+      selectAllCb.checked = true;
+      selectAllCb.indeterminate = false;
+    } else {
+      selectAllCb.checked = false;
+      selectAllCb.indeterminate = true;
+    }
+  }
+
   function prtGetAnalysisRows() {
     if (_prtFilteredRows && _prtFilteredRows.length >= 0) return _prtFilteredRows;
     return (_cfg.rawValues || []).slice(1);
@@ -2810,7 +2844,9 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
     prtCloseColFilterDropdown();
     var unique = prtUniqueValues(colIdx);
     var current = _prtColumnFilters[colIdx] || [];
-    var isAll = !current.length;
+    var showNothing = current.indexOf('__SHOW_NOTHING__') >= 0;
+    var isAll = !current.length && !showNothing;
+    var selSet = prtFilterSelSet(current);
 
     var dd = document.createElement('div');
     dd.className = 'prt-excel-filter-dropdown';
@@ -2839,12 +2875,15 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
     selectAllLbl.appendChild(document.createTextNode(' Select All'));
     selectAllLbl.style.fontWeight = '700';
     selectAllLbl.style.marginBottom = '6px';
+    selectAllCb.style.pointerEvents = 'none';
     selectAllLbl.addEventListener('click', function (e) {
       e.preventDefault();
       var on = !selectAllCb.checked;
       selectAllCb.checked = on;
       selectAllCb.indeterminate = false;
-      valuesWrap.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.checked = on; });
+      valuesWrap.querySelectorAll('.prt-filt-val-row input[type=checkbox]').forEach(function (cb) {
+        cb.checked = on;
+      });
     });
     valuesWrap.appendChild(selectAllLbl);
 
@@ -2854,21 +2893,19 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
       var cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.value = val;
-      cb.checked = isAll || current.indexOf(val) >= 0;
+      cb.setAttribute('data-filter-value', val);
+      cb.style.pointerEvents = 'none';
+      cb.checked = !showNothing && (isAll || !!selSet[prtFilterValKey(val)]);
       lbl.appendChild(cb);
       lbl.appendChild(document.createTextNode(' ' + (val === '' ? '(Blank)' : val)));
       lbl.addEventListener('click', function (e) {
         e.preventDefault();
         cb.checked = !cb.checked;
-        var boxes = valuesWrap.querySelectorAll('input[type=checkbox]');
-        var checked = 0, total = 0;
-        boxes.forEach(function (b, i) { if (i > 0) { total++; if (b.checked) checked++; } });
-        if (checked === 0) { selectAllCb.checked = false; selectAllCb.indeterminate = false; }
-        else if (checked === total) { selectAllCb.checked = true; selectAllCb.indeterminate = false; }
-        else { selectAllCb.checked = false; selectAllCb.indeterminate = true; }
+        prtSyncFilterSelectAllState(valuesWrap, selectAllCb);
       });
       valuesWrap.appendChild(lbl);
     });
+    prtSyncFilterSelectAllState(valuesWrap, selectAllCb);
     dd.appendChild(valuesWrap);
 
     var actions = document.createElement('div');
@@ -2909,7 +2946,9 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
     if (!dd) return;
     var checked = [];
     dd.querySelectorAll('.prt-filt-val-row input[type=checkbox]').forEach(function (cb) {
-      if (cb.checked) checked.push(cb.value);
+      if (!cb.checked) return;
+      var v = cb.getAttribute('data-filter-value');
+      checked.push(v !== null ? v : cb.value);
     });
     var allVals = prtUniqueValues(colIdx);
     if (!checked.length) _prtColumnFilters[colIdx] = ['__SHOW_NOTHING__'];

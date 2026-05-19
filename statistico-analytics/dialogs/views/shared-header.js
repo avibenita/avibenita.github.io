@@ -314,12 +314,14 @@ const StatisticoHeader = {
           <path d="M58 15 C58 6 47 2 35 2 C19 2 8 12 8 25 C8 37 19 43 35 43" stroke="url(#sbLogoBlue)" stroke-width="10" fill="none" stroke-linecap="round"/>
           <path d="M35 43 C51 43 64 49 64 61 C64 75 51 82 35 82 C20 82 10 75 9 64" stroke="url(#sbLogoBlue)" stroke-width="10" fill="none" stroke-linecap="round"/>
           <g class="sb-logo-stats-hint">
-            <line x1="16" y1="74" x2="62" y2="74" stroke="#7ef0e8" stroke-width="1.5" opacity="0.75"/>
-            <rect x="18" y="60" width="5" height="14" rx="1" fill="url(#sbLogoTeal)" opacity="0.58"/>
-            <rect x="26" y="54" width="5" height="20" rx="1" fill="url(#sbLogoTeal)" opacity="0.64"/>
-            <rect x="34" y="48" width="5" height="26" rx="1" fill="url(#sbLogoTeal)" opacity="0.70"/>
-            <rect x="42" y="42" width="5" height="32" rx="1" fill="url(#sbLogoTeal)" opacity="0.76"/>
-            <path d="M15 63 C25 52 36 50 46 46 S58 42 62 48" stroke="#b8fff8" stroke-width="1.6" fill="none" opacity="0.62" stroke-linecap="round"/>
+            <line x1="17" y1="73" x2="58" y2="73" stroke="#8ef8f0" stroke-width="1.2" opacity="0.55"/>
+            <line x1="17" y1="73" x2="17" y2="44" stroke="#8ef8f0" stroke-width="1.2" opacity="0.38"/>
+            <line x1="17" y1="73" x2="58" y2="45" stroke="#8ef8f0" stroke-width="0.9" stroke-dasharray="2.5 2" opacity="0.3"/>
+            <path d="M17 73 C22 72 27 64 33 52 C40 47 50 44 58 44"
+              stroke="#a8fff9" stroke-width="2.2" fill="none" opacity="0.88" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="23" cy="67" r="2" fill="#d4fffb" opacity="0.95"/>
+            <circle cx="29" cy="56" r="1.6" fill="#a8fff9" opacity="0.82"/>
+            <circle cx="35" cy="50" r="1.3" fill="#7ef0e8" opacity="0.65"/>
           </g>
         </g>
 

@@ -506,6 +506,12 @@
       font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
       color: var(--accent-1); user-select: none; margin-bottom: 0;
     }
+    .help-toggle-text { display: flex; flex-direction: column; gap: 2px; line-height: 1.3; }
+    .help-toggle-sub {
+      font-size: 10px; font-weight: 600; letter-spacing: .02em;
+      text-transform: none; color: rgba(253,186,116,.8);
+    }
+    html[data-theme="light"] .help-toggle-sub { color: #c2410c; }
     .help-toggle i.toggle-chevron { font-size: 9px; transition: transform .2s; }
     .help-toggle.open i.toggle-chevron { transform: rotate(90deg); }
     .help-body { display: none; margin-top: 14px; }
@@ -1089,14 +1095,32 @@ Value share %     = Σ values in class / T × 100</div>
             <div class="help-wrap">
               <div class="help-toggle" onclick="toggleHelp(this)">
                 <i class="fa-solid fa-circle-question"></i>
-                How P.S.I™ Is Computed
+                <span class="help-toggle-text">
+                  <span>How P.S.I™ Is Computed</span>
+                  <span class="help-toggle-sub">(Pareto Strength Index)</span>
+                </span>
                 <i class="fa-solid fa-chevron-right toggle-chevron"></i>
               </div>
               <div class="help-body">
 
                 <div class="help-section">
-                  <div class="help-section-title"><i class="fa-solid fa-wave-square"></i> Gini Coefficient via Lorenz Curve</div>
-                  <p class="help-text">The <strong>Gini coefficient</strong> measures inequality of distribution on a 0–1 scale (0 = perfect equality, 1 = maximum concentration). It is derived from the <em>Lorenz curve</em> — a graph of cumulative value share vs. cumulative category share, sorted ascending:</p>
+                  <div class="help-section-title"><i class="fa-solid fa-bolt"></i> Pareto Strength Index (P.S.I™)</div>
+                  <p class="help-text">The <strong>Pareto Strength Index (P.S.I™)</strong> is a single score (0–100%) that quantifies how strongly your data follows a Pareto (80/20) concentration pattern — how much impact is driven by a minority of categories or bins.</p>
+                  <p class="help-text">P.S.I™ is built on the <strong>Gini coefficient</strong> (a standard measure of inequality), adjusted for the number of categories, and reinforced when the top 20% of ranked items hold an extreme share of total value:</p>
+                  <div class="help-formula-block">Normalised Gini = Gini × n / (n − 1)   ← clamped to [0, 1]
+
+P.S.I™ = Normalised Gini
+If Top20 ≥ 80%:
+  bonus = min(0.15, (Top20 − 80) / 133)
+  P.S.I™ = min(1, P.S.I™ + bonus)
+
+Displayed as a percentage (× 100)</div>
+                  <p class="help-text">The gauge and <em>Pareto Strength Index</em> card show P.S.I™. The separate <em>Gini Coefficient</em> card shows the raw (unnormalised) Gini for reference.</p>
+                </div>
+
+                <div class="help-section">
+                  <div class="help-section-title"><i class="fa-solid fa-wave-square"></i> Gini Coefficient (underlying measure)</div>
+                  <p class="help-text">The <strong>Gini coefficient</strong> measures how unequally values are distributed (0 = perfect equality, 1 = maximum concentration). P.S.I™ uses Gini as its foundation, after normalising for sample size (see above). Gini is derived from the <em>Lorenz curve</em> — cumulative value share vs. cumulative category share, sorted ascending by value:</p>
                   <div class="help-formula-block">Sort data ascending by value.
 For each item i (i = 1..n):
   x(i) = i / n                        ← cumulative population fraction
@@ -1108,27 +1132,14 @@ Area under Lorenz curve (trapezoid rule):
 Gini = (0.5 − L) / 0.5              ← clamped to [0, 1]</div>
                   <p class="help-text">If the Lorenz area is ≥ 0.5 (degenerate case), a <strong>discrete fallback</strong> is used:</p>
                   <div class="help-formula-block">Gini = Σᵢ Σⱼ |xᵢ − xⱼ| / (2 × n × T)</div>
+                  <p class="help-text">With few categories, raw Gini is capped at <em>(n−1)/n</em> (e.g. 0.5 when n = 2). Normalisation in the P.S.I™ formula corrects for this so extreme concentration is not understated.</p>
                 </div>
 
                 <div class="help-section">
                   <div class="help-section-title"><i class="fa-solid fa-arrow-up-right-dots"></i> Top-20% Concentration</div>
-                  <p class="help-text">This measures what fraction of the total value is held by the top 20% of categories (the "vital few"). Categories are already sorted descending (highest value first):</p>
+                  <p class="help-text">Used as a Pareto-style check: what fraction of total value is held by the top 20% of ranked categories (highest value first). When this share is ≥ 80%, a small bonus is added to P.S.I™:</p>
                   <div class="help-formula-block">k     = ceil(n × 0.20)             ← top-20% count (min 1)
 Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
-                </div>
-
-                <div class="help-section">
-                  <div class="help-section-title"><i class="fa-solid fa-bolt"></i> P.S.I™ — Pareto Strength Index</div>
-                  <p class="help-text">The raw Gini is bounded by <em>(n−1)/n</em> — so with only 2 categories the maximum possible Gini is 0.5, making even extreme concentration look mild. PSI corrects for this by normalising Gini relative to its theoretical maximum, then adding a bonus for extreme top-20% concentration:</p>
-                  <div class="help-formula-block">Normalised Gini = Gini × n / (n − 1)   ← clamped to [0,1]
-
-PSI = Normalised Gini
-If Top20 ≥ 80%:
-  bonus = min(0.15, (Top20 − 80) / 133)
-  PSI   = min(1, PSI + bonus)
-
-Result: PSI ∈ [0, 1]  →  displayed as a percentage (×100)</div>
-                  <p class="help-text">The <em>Gini Coefficient</em> shown in the metric cards is the raw (unnormalised) value — the standard statistical definition.</p>
                 </div>
 
                 <div class="help-section">

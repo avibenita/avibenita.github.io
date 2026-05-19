@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <title>Pareto 80/20</title>
-  <!-- build: 20260519-filter -->
+  <!-- build: 20260519-filter-fix -->
 
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" />
@@ -255,7 +255,7 @@
     .prt-filt-th.filtered { color: #4ade80 !important; }
     .prt-filt-th .prt-filt-icon { font-size: 9px; margin-left: 4px; opacity: .75; }
     .prt-excel-filter-dropdown {
-      position: fixed; z-index: 10050;
+      position: fixed; z-index: 100050; /* above .sb-ai-overlay (99990) */
       background: var(--surface-1); border: 1px solid var(--border);
       border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.45);
       min-width: 200px; max-width: 280px; max-height: 320px;
@@ -2747,21 +2747,44 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
     prtApplyAllFilters();
   }
 
+  var _prtFilterDropIgnoreClose = false;
+
   function prtCloseColFilterDropdown() {
     var dd = document.querySelector('.prt-excel-filter-dropdown');
     if (dd) dd.remove();
-    document.removeEventListener('click', prtCloseColFilterOnOutside);
+    document.removeEventListener('mousedown', prtCloseColFilterOnOutside, true);
   }
 
   function prtCloseColFilterOnOutside(ev) {
+    if (_prtFilterDropIgnoreClose) return;
     var dd = document.querySelector('.prt-excel-filter-dropdown');
     if (dd && !dd.contains(ev.target) && !ev.target.closest('.prt-filt-th')) {
       prtCloseColFilterDropdown();
     }
   }
 
+  function prtBindFilterTableHandlers() {
+    var el = document.getElementById('prtFilterContent');
+    if (!el || el._prtFiltBound) return;
+    el._prtFiltBound = true;
+    el.addEventListener('click', function (e) {
+      var th = null;
+      var node = e.target;
+      while (node && node !== el) {
+        if (node.classList && node.classList.contains('prt-filt-th')) { th = node; break; }
+        node = node.parentElement;
+      }
+      if (!th) return;
+      var idx = th.getAttribute('data-col-idx');
+      if (idx === null || idx === '') return;
+      e.preventDefault();
+      e.stopPropagation();
+      prtToggleColFilter(parseInt(idx, 10), e);
+    });
+  }
+
   function prtToggleColFilter(colIdx, ev) {
-    if (ev) ev.stopPropagation();
+    if (ev) { ev.preventDefault(); ev.stopPropagation(); }
     prtCloseColFilterDropdown();
     var unique = prtUniqueValues(colIdx);
     var current = _prtColumnFilters[colIdx] || [];
@@ -2844,9 +2867,15 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
     actions.appendChild(okBtn);
     actions.appendChild(cancelBtn);
     dd.appendChild(actions);
+    dd.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+    dd.addEventListener('click', function (e) { e.stopPropagation(); });
 
     document.body.appendChild(dd);
-    setTimeout(function () { document.addEventListener('click', prtCloseColFilterOnOutside); }, 0);
+    _prtFilterDropIgnoreClose = true;
+    setTimeout(function () {
+      _prtFilterDropIgnoreClose = false;
+      document.addEventListener('mousedown', prtCloseColFilterOnOutside, true);
+    }, 120);
   }
 
   function prtApplyColFilter(colIdx) {
@@ -2883,8 +2912,8 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
       var filtered = _prtColumnFilters[i] && _prtColumnFilters[i].length > 0;
       var icon = filtered ? '🔽' : '▼';
       var cls = 'prt-filt-th' + (filtered ? ' filtered' : '');
-      return '<th class="' + cls + '" style="' + thStyle + 'color:' + (filtered ? '#4ade80' : '#f97316') + ';" '
-        + 'onclick="prtToggleColFilter(' + i + ', event)">'
+      return '<th class="' + cls + '" data-col-idx="' + i + '" style="' + thStyle + 'color:' + (filtered ? '#4ade80' : '#f97316') + ';" '
+        + 'title="Click to filter ' + escHtml(h) + '">'
         + escHtml(h) + '<span class="prt-filt-icon">' + icon + '</span></th>';
     }).join('');
 
@@ -2906,6 +2935,7 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
 
   function prtOpenFilter() {
     prtRenderFilterTable();
+    prtBindFilterTableHandlers();
     prtUpdateFilterBadge();
     var overlay = document.getElementById('prtFilterOverlay');
     if (overlay) overlay.classList.add('sb-ai-overlay--visible');

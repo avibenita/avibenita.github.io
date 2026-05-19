@@ -314,12 +314,12 @@ const StatisticoHeader = {
           <path d="M58 15 C58 6 47 2 35 2 C19 2 8 12 8 25 C8 37 19 43 35 43" stroke="url(#sbLogoBlue)" stroke-width="10" fill="none" stroke-linecap="round"/>
           <path d="M35 43 C51 43 64 49 64 61 C64 75 51 82 35 82 C20 82 10 75 9 64" stroke="url(#sbLogoBlue)" stroke-width="10" fill="none" stroke-linecap="round"/>
           <g class="sb-logo-stats-hint">
-            <line x1="16" y1="74" x2="62" y2="74" stroke="url(#sbLogoTeal)" stroke-width="1" opacity="0.32"/>
-            <rect x="19" y="61" width="4" height="13" rx="1" fill="url(#sbLogoTeal)" opacity="0.22"/>
-            <rect x="27" y="55" width="4" height="19" rx="1" fill="url(#sbLogoTeal)" opacity="0.26"/>
-            <rect x="35" y="49" width="4" height="25" rx="1" fill="url(#sbLogoTeal)" opacity="0.30"/>
-            <rect x="43" y="43" width="4" height="31" rx="1" fill="url(#sbLogoTeal)" opacity="0.34"/>
-            <path d="M15 63 C25 52 36 50 46 46 S58 42 62 48" stroke="url(#sbLogoTeal)" stroke-width="1" fill="none" opacity="0.2" stroke-linecap="round"/>
+            <line x1="16" y1="74" x2="62" y2="74" stroke="#7ef0e8" stroke-width="1.5" opacity="0.75"/>
+            <rect x="18" y="60" width="5" height="14" rx="1" fill="url(#sbLogoTeal)" opacity="0.58"/>
+            <rect x="26" y="54" width="5" height="20" rx="1" fill="url(#sbLogoTeal)" opacity="0.64"/>
+            <rect x="34" y="48" width="5" height="26" rx="1" fill="url(#sbLogoTeal)" opacity="0.70"/>
+            <rect x="42" y="42" width="5" height="32" rx="1" fill="url(#sbLogoTeal)" opacity="0.76"/>
+            <path d="M15 63 C25 52 36 50 46 46 S58 42 62 48" stroke="#b8fff8" stroke-width="1.6" fill="none" opacity="0.62" stroke-linecap="round"/>
           </g>
         </g>
 

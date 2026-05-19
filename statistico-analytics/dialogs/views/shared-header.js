@@ -313,10 +313,14 @@ const StatisticoHeader = {
         <g id="sbLogoMark" class="sb-logo-mark">
           <path d="M58 15 C58 6 47 2 35 2 C19 2 8 12 8 25 C8 37 19 43 35 43" stroke="url(#sbLogoBlue)" stroke-width="10" fill="none" stroke-linecap="round"/>
           <path d="M35 43 C51 43 64 49 64 61 C64 75 51 82 35 82 C20 82 10 75 9 64" stroke="url(#sbLogoBlue)" stroke-width="10" fill="none" stroke-linecap="round"/>
-          <rect x="18" y="51" width="8" height="24" rx="2" fill="url(#sbLogoTeal)"/>
-          <rect x="30" y="43" width="8" height="32" rx="2" fill="url(#sbLogoTeal)"/>
-          <rect x="42" y="34" width="8" height="41" rx="2" fill="url(#sbLogoTeal)"/>
-          <rect x="54" y="25" width="8" height="50" rx="2" fill="url(#sbLogoTeal)"/>
+          <g class="sb-logo-stats-hint">
+            <line x1="16" y1="74" x2="62" y2="74" stroke="url(#sbLogoTeal)" stroke-width="1" opacity="0.32"/>
+            <rect x="19" y="61" width="4" height="13" rx="1" fill="url(#sbLogoTeal)" opacity="0.22"/>
+            <rect x="27" y="55" width="4" height="19" rx="1" fill="url(#sbLogoTeal)" opacity="0.26"/>
+            <rect x="35" y="49" width="4" height="25" rx="1" fill="url(#sbLogoTeal)" opacity="0.30"/>
+            <rect x="43" y="43" width="4" height="31" rx="1" fill="url(#sbLogoTeal)" opacity="0.34"/>
+            <path d="M15 63 C25 52 36 50 46 46 S58 42 62 48" stroke="url(#sbLogoTeal)" stroke-width="1" fill="none" opacity="0.2" stroke-linecap="round"/>
+          </g>
         </g>
 
         <!-- Reflection: flip at y=82 (bottom of S), fade out downward -->

@@ -25,8 +25,6 @@
     + '<path d="M35 43 C51 43 64 49 64 61 C64 75 51 82 35 82 C20 82 10 75 9 64" stroke="#001838" stroke-width="14" fill="none" stroke-linecap="round" opacity="0.45" transform="translate(2.5,3.5)"/>'
     + '<path d="M58 15 C58 6 47 2 35 2 C19 2 8 12 8 25 C8 37 19 43 35 43" stroke="url(#sbLogoBlue)" stroke-width="10" fill="none" stroke-linecap="round" filter="url(#sbLogoCurveShadow)"/>'
     + '<path d="M35 43 C51 43 64 49 64 61 C64 75 51 82 35 82 C20 82 10 75 9 64" stroke="url(#sbLogoBlue)" stroke-width="10" fill="none" stroke-linecap="round" filter="url(#sbLogoCurveShadow)"/>'
-    + '<path d="M58 15 C58 6 47 2 35 2 C19 2 8 12 8 25 C8 37 19 43 35 43" stroke="rgba(160,210,255,0.55)" stroke-width="3" fill="none" stroke-linecap="round" transform="translate(-0.7,-1.2)"/>'
-    + '<path d="M35 43 C51 43 64 49 64 61 C64 75 51 82 35 82 C20 82 10 75 9 64" stroke="rgba(160,210,255,0.45)" stroke-width="3" fill="none" stroke-linecap="round" transform="translate(-0.7,-1.2)"/>'
     + '</g>'
     + '<text x="89.5" y="38.5" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="800" letter-spacing="7" fill="#00060f" opacity="0.5">STATISTICO</text>'
     + '<text x="88" y="37" class="sb-logo-title" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="800" letter-spacing="7">STATISTICO</text>'

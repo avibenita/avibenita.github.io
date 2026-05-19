@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('Loading shared-header.js VERSION 2026-05-08-025 (encoding-header-footer)');
+console.log('Loading shared-header.js VERSION 2026-05-23-ui (spacing+brightness+deploy)');
 
 (function () {
   function sanitizeDialogHostInfoParam() {
@@ -1070,6 +1070,9 @@ const StatisticoHeader = {
             out.searchParams.set(key, current.get(key));
           }
         });
+        if (!out.searchParams.has('build')) {
+          out.searchParams.set('build', '20260523');
+        }
         return out.href;
       } catch (e) {
         return url;

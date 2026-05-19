@@ -727,7 +727,7 @@ function openHubUnivariateResultsAt(dialogUrl, results) {
 
 function openHubUnivariateResults(results) {
   hubCurrentUnivariateResults = results;
-  openHubUnivariateResultsAt(getDialogsBaseUrl() + "univariate/histogram-standalone.html", results);
+  openHubUnivariateResultsAt(getDialogsBaseUrl() + "univariate/histogram-standalone.html?cb=" + Date.now(), results);
 }
 
 function openUnivariateConfigFromHub() {

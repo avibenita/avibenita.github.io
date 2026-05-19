@@ -528,17 +528,9 @@ function loadHubScopeConfigIfAny() {
 
 function syncClusterHeader() {
   var meta = HUB_CLUSTER_META[ACTIVE_CLUSTER] || HUB_CLUSTER_META.analytics;
-  var eyebrowEl = document.getElementById("hubBrandEyebrow");
-  var nameEl = document.getElementById("hubBrandName");
-  var tagEl = document.getElementById("hubBrandTagline");
-  var iconEl = document.querySelector(".hub-brand-icon i");
   document.documentElement.style.setProperty("--hub-brand-color", meta.colorDark || meta.color || "#f97316");
   document.documentElement.style.setProperty("--hub-brand-from", meta.brandFrom || meta.color || "#f97316");
   document.documentElement.style.setProperty("--hub-brand-to", meta.brandTo || meta.colorDark || meta.color || "#ea580c");
-  if (eyebrowEl) eyebrowEl.textContent = meta.eyebrow || "Statistico flagship";
-  if (nameEl) nameEl.textContent = meta.name || "Interactive Analytics";
-  if (tagEl) tagEl.textContent = meta.tagline;
-  if (iconEl) iconEl.className = "fa-solid " + (meta.icon || "fa-chart-line");
   document.querySelectorAll(".hub-nav-tab[data-cluster]").forEach(function (btn) {
     var active = btn.getAttribute("data-cluster") === ACTIVE_CLUSTER;
     btn.classList.toggle("active", active);

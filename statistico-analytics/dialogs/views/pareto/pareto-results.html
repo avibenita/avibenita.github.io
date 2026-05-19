@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <title>Pareto 80/20</title>
-  <!-- build: 20260519-filter-selection -->
+  <!-- build: 20260519-included-cols -->
 
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" />
@@ -1567,15 +1567,18 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
      Populate column selectors
   ───────────────────────────────────────────────────────── */
   function populateColSelects() {
-    var headers = _cfg.headers || [];
-    var rows    = (_cfg.rawValues || []).slice(1);
+    var headers  = _cfg.headers || [];
+    var rows     = (_cfg.rawValues || []).slice(1);
+    var included = prtGetIncludedIndices();
 
     var catSel = document.getElementById('colCat');
     var valSel = document.getElementById('colVal');
     catSel.innerHTML = '';
     valSel.innerHTML = '<option value="">— Count occurrences —</option>';
 
-    headers.forEach(function (h, i) {
+    included.forEach(function (i) {
+      var h = headers[i];
+      if (h === undefined) return;
       var isNum = rows.some(function (r) {
         var v = r[i];
         return v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v));
@@ -1586,9 +1589,18 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
         '<option value="' + i + '">' + escHtml(h) + '</option>');
     });
 
-    if (_cfg.categoryColIndex !== undefined) catSel.value = String(_cfg.categoryColIndex);
-    if (_cfg.valuesColIndex !== null && _cfg.valuesColIndex !== undefined)
-      valSel.value = String(_cfg.valuesColIndex);
+    var catIdx = _cfg.categoryColIndex;
+    if (catIdx === undefined || included.indexOf(catIdx) < 0) {
+      catIdx = included.length ? included[0] : 0;
+    }
+    catSel.value = String(catIdx);
+
+    var valIdx = _cfg.valuesColIndex;
+    if (valIdx !== null && valIdx !== undefined && included.indexOf(valIdx) >= 0) {
+      valSel.value = String(valIdx);
+    } else {
+      valSel.value = '';
+    }
   }
 
   /* ─────────────────────────────────────────────────────────
@@ -2707,10 +2719,21 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
     return (_cfg.rawValues || []).slice(1);
   }
 
+  /** Column indices checked in config (subset of full sheet). */
+  function prtGetIncludedIndices() {
+    var headers = _cfg.headers || [];
+    var n = headers.length;
+    var inc = _cfg.includedIndices;
+    if (Array.isArray(inc) && inc.length) {
+      return inc.filter(function (i) { return i >= 0 && i < n; });
+    }
+    return headers.map(function (_, i) { return i; });
+  }
+
   function prtInitFilters() {
     _prtAllRows = (_cfg.rawValues || []).slice(1);
     _prtColumnFilters = {};
-    (_cfg.headers || []).forEach(function (_, i) { _prtColumnFilters[i] = []; });
+    prtGetIncludedIndices().forEach(function (i) { _prtColumnFilters[i] = []; });
     _prtFilteredRows = _prtAllRows.slice();
     prtUpdateFilterBadge();
   }
@@ -2734,8 +2757,8 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
     var summary = document.getElementById('prtFilterSummary');
     if (summary) {
       var activeCols = 0;
-      Object.keys(_prtColumnFilters || {}).forEach(function (k) {
-        var f = _prtColumnFilters[k];
+      prtGetIncludedIndices().forEach(function (i) {
+        var f = _prtColumnFilters[i];
         if (f && f.length) activeCols++;
       });
       if (hasFilter) {
@@ -2759,9 +2782,10 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
   }
 
   function prtApplyAllFilters() {
-    var headers = _cfg.headers || [];
+    var included = prtGetIncludedIndices();
     _prtFilteredRows = (_prtAllRows || []).filter(function (row) {
-      for (var ci = 0; ci < headers.length; ci++) {
+      for (var k = 0; k < included.length; k++) {
+        var ci = included[k];
         var filter = _prtColumnFilters[ci];
         if (!filter || !filter.length) continue;
         if (filter.indexOf('__SHOW_NOTHING__') >= 0) return false;
@@ -2778,7 +2802,7 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
   }
 
   function prtClearAllFilters() {
-    (_cfg.headers || []).forEach(function (_, i) { _prtColumnFilters[i] = []; });
+    prtGetIncludedIndices().forEach(function (i) { _prtColumnFilters[i] = []; });
     prtApplyAllFilters();
   }
 
@@ -2961,9 +2985,10 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
   function prtRenderFilterTable() {
     var el = document.getElementById('prtFilterContent');
     if (!el) return;
-    var headers = _cfg.headers || [];
+    var headers  = _cfg.headers || [];
+    var included = prtGetIncludedIndices();
     var rows = _prtFilteredRows || [];
-    if (!headers.length) { el.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);">No data loaded.</p>'; return; }
+    if (!included.length) { el.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);">No columns selected in config.</p>'; return; }
 
     var isLight  = document.documentElement.getAttribute('data-theme') === 'light';
     var headerBg = isLight ? '#f1f5f9' : '#1a1f2e';
@@ -2973,7 +2998,8 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
     var thStyle  = 'padding:7px 10px;text-align:left;font-size:10px;font-weight:800;text-transform:uppercase;'
       + 'letter-spacing:.08em;background:' + headerBg + ';border:1px solid var(--border);position:sticky;top:0;z-index:2;';
 
-    var headerCells = headers.map(function (h, i) {
+    var headerCells = included.map(function (i) {
+      var h = headers[i] || '';
       var filtered = _prtColumnFilters[i] && _prtColumnFilters[i].length > 0;
       var icon = filtered ? '🔽' : '▼';
       var cls = 'prt-filt-th' + (filtered ? ' filtered' : '');
@@ -2984,7 +3010,7 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
 
     var bodyRows = rows.map(function (row, ri) {
       var bg = ri % 2 === 0 ? rowBg : altBg;
-      var cells = headers.map(function (_, ci) {
+      var cells = included.map(function (ci) {
         var val = row[ci];
         var raw = (val === null || val === undefined) ? '' : String(val);
         var display = escHtml(raw.length > 40 ? raw.substring(0, 40) + '\u2026' : raw);
@@ -3017,8 +3043,9 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
      Utilities: View Data  (raw source rows)
   ───────────────────────────────────────────────────────── */
   function prtViewData() {
-    var rawRows = prtGetAnalysisRows();
-    var headers = _cfg.headers || [];
+    var rawRows  = prtGetAnalysisRows();
+    var headers  = _cfg.headers || [];
+    var included = prtGetIncludedIndices();
     if (!rawRows.length) return;
 
     var isLight  = document.documentElement.getAttribute('data-theme') === 'light';
@@ -3038,7 +3065,8 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
                 + 'text-transform:uppercase;letter-spacing:.08em;'
                 + 'background:' + headerBg + ';border-bottom:2px solid #2d3748;position:sticky;top:0;z-index:2;';
 
-    var headerCells = headers.map(function (h, i) {
+    var headerCells = included.map(function (i) {
+      var h = headers[i] || '';
       var isActive = (i === catIdx || i === valIdx);
       var col = isActive ? accentC : (isLight ? '#374151' : 'rgba(203,213,225,.85)');
       return '<th style="' + thStyle + 'color:' + col + '">' + escHtml(h) + '</th>';
@@ -3046,7 +3074,7 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
 
     var bodyRows = rawRows.map(function (row, ri) {
       var bg = ri % 2 === 0 ? rowBg : altBg;
-      var cells = headers.map(function (h, ci) {
+      var cells = included.map(function (ci) {
         var val = row[ci];
         var isActive = (ci === catIdx || ci === valIdx);
         var isValCol = (ci === valIdx);
@@ -3062,7 +3090,7 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
       ? ' &nbsp;·&nbsp; <span style="color:#4ade80;">Filtered</span> (' + rawRows.length + ' of ' + (_prtAllRows || []).length + ')'
       : '';
     var summary = '<div style="padding:0 0 10px;font-size:11px;color:rgba(203,213,225,.72);">'
-      + rawRows.length + ' rows &nbsp;·&nbsp; ' + headers.length + ' columns' + filterNote
+      + rawRows.length + ' rows &nbsp;·&nbsp; ' + included.length + ' columns' + filterNote
       + ' &nbsp;·&nbsp; <span style="color:' + accentC + '">■</span> Category'
       + (valIdx !== null ? ' &nbsp;·&nbsp; <span style="color:' + cyanC + '">■</span> Values' : '')
       + '</div>';

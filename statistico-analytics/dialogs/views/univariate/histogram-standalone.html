@@ -41,10 +41,10 @@
   <script src="https://code.highcharts.com/modules/histogram-bellcurve.js"></script>
   
   <!-- Shared Header -->
-  <!-- build: 20260519b -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260519b">
-  <script src="../shared-brand-logo.js?v=20260519b"></script>
-  <script src="../shared-header.js?v=20260519b"></script>
+  <!-- build: 20260519d -->
+  <link rel="stylesheet" href="../shared-header.css?v=20260519d">
+  <script src="../shared-brand-logo.js?v=20260519d"></script>
+  <script src="../shared-header.js?v=20260519d"></script>
   <script src="../runtime-core.js?v=20260329a"></script>
   
   <style>
@@ -306,11 +306,30 @@
       cursor: pointer;
     }
 
+    /* Overlay toggles: Normal / Mean / Median in one control box */
+    .control-group.overlay-toggles {
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .control-group.overlay-toggles .overlay-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .control-group.overlay-toggles .overlay-toggle input {
+      accent-color: var(--accent-1);
+    }
+
     /* Chart container - Compact */
     #histogram-chart {
       min-height: 0;
       height: 100%;
-      width: 90%;
+      width: 100%;
       margin: 4px auto 0;
       padding: 0;
       background: rgba(0,0,0,0.2);
@@ -977,6 +996,29 @@
       opacity: 0.22 !important;
     }
     .statistico-footer a { color: inherit !important; }
+
+    /* Fill available dialog height: flex chain + trim shared top padding */
+    body.sb-page .right-col #results-container.show {
+      padding: 6px 10px 4px !important;
+      overflow: hidden !important;
+    }
+    #results-container.show .stats-cards-panel { flex-shrink: 0; }
+    #results-container.show .statistico-footer { flex-shrink: 0; }
+    #results-container.show #histogram-panel {
+      flex: 1 1 0 !important;
+      min-height: 220px !important;
+      height: auto !important;
+    }
+    #histogram-panel .panel-body {
+      flex: 1 1 0 !important;
+      min-height: 0 !important;
+    }
+    #histogram-chart {
+      flex: 1 1 0 !important;
+      min-height: 200px !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
   </style>
 </head>
 <body>
@@ -1103,9 +1145,19 @@
             </div>
           </div>
 
-          <div class="control-group">
-            <label for="showNormalCurve" style="cursor: pointer;">Normal Curve:</label>
-            <input type="checkbox" id="showNormalCurve" checked onchange="createHistogram()">
+          <div class="control-group overlay-toggles" id="overlayControls">
+            <label class="overlay-toggle" for="showNormalCurve">
+              <input type="checkbox" id="showNormalCurve" checked onchange="createHistogram()">
+              Normal
+            </label>
+            <label class="overlay-toggle" for="showMeanLine">
+              <input type="checkbox" id="showMeanLine" onchange="createHistogram()">
+              Mean
+            </label>
+            <label class="overlay-toggle" for="showMedianLine">
+              <input type="checkbox" id="showMedianLine" onchange="createHistogram()">
+              Median
+            </label>
           </div>
 
           <!-- Data Range - now inside controls -->
@@ -1139,47 +1191,37 @@
   <!-- JAVASCRIPT — merged from hist-main.js + premium chart theme -->
   <script>
     function fitLayout() {
-      const frame   = document.querySelector('.right-col') || document.body;
-      const shell   = document.querySelector('.statistico-shell');
-      const headerH = shell ? shell.offsetHeight : 88;
-      const availH  = (frame.clientHeight || window.innerHeight) - headerH;
-      const frameW  = frame.clientWidth || window.innerWidth;
-
       const container = document.getElementById('results-container');
       if (!container || !container.classList.contains('show')) return;
 
-      // Pin container to the available right column (same pattern as kernel/boxplot).
-      container.style.height = availH + 'px';
-      container.style.width  = frameW + 'px';
-      container.style.maxWidth = '100%';
-      container.style.boxSizing = 'border-box';
-
-      const statsRow  = container.querySelector('.stats-cards-panel');
-      const footer    = container.querySelector('.statistico-footer');
-      const gap       = 6;
-      const statsH    = statsRow ? statsRow.offsetHeight + gap : 0;
-      const footerH   = footer   ? footer.offsetHeight + gap   : 0;
-      const chartPanelH = Math.max(260, availH - statsH - footerH - gap * 2);
-
+      // Let flex CSS own sizing; clear legacy inline heights from older builds.
+      container.style.height = '';
+      container.style.width = '';
       const chartPanel = document.getElementById('histogram-panel');
-      if (chartPanel) {
-        chartPanel.style.height = chartPanelH + 'px';
-        const heading   = chartPanel.querySelector('.panel-heading');
-        const controls  = chartPanel.querySelector('.controls');
-        const panelBody = chartPanel.querySelector('.panel-body');
-        const chromeH   = (heading ? heading.offsetHeight : 0)
-                        + (controls ? controls.offsetHeight : 0)
-                        + (panelBody ? parseFloat(getComputedStyle(panelBody).paddingTop) + parseFloat(getComputedStyle(panelBody).paddingBottom) : 16)
-                        + 8;
-        const chartEl = document.getElementById('histogram-chart');
-        if (chartEl) chartEl.style.height = Math.max(150, chartPanelH - chromeH) + 'px';
-      }
+      if (chartPanel) chartPanel.style.height = '';
+      const chartEl = document.getElementById('histogram-chart');
+      if (chartEl) chartEl.style.height = '';
 
-      setTimeout(() => {
+      requestAnimationFrame(function () {
         if (histogramChart && histogramChart.reflow) histogramChart.reflow();
-      }, 50);
+        else if (typeof Highcharts !== 'undefined') {
+          Highcharts.charts.forEach(function (c) { if (c && c.reflow) c.reflow(); });
+        }
+      });
     }
+
+    function attachLayoutObserver() {
+      if (window._histLayoutObserver) return;
+      const target = document.querySelector('.right-col') || document.querySelector('.laptop-frame');
+      if (!target || typeof ResizeObserver === 'undefined') return;
+      window._histLayoutObserver = new ResizeObserver(function () {
+        requestAnimationFrame(fitLayout);
+      });
+      window._histLayoutObserver.observe(target);
+    }
+
     window.addEventListener('resize', fitLayout);
+    attachLayoutObserver();
 
     // Global variables
     let histogramChart = null;
@@ -1260,6 +1302,7 @@
         StatisticoHeader.initSidebarPage();
         StatisticoHeader.updateTitle('Interactive Histogram');
       }
+      attachLayoutObserver();
       mountDemoHeaderBadges();
       console.log('? Shared header initialized');
 
@@ -1565,6 +1608,8 @@
     function createHistogram() {
       const numBinsInput = document.getElementById('numBins');
       const showNormal = document.getElementById('showNormalCurve').checked;
+      const showMeanLine = document.getElementById('showMeanLine').checked;
+      const showMedianLine = document.getElementById('showMedianLine').checked;
       
       let numBins = parseInt(numBinsInput.value);
       const method = document.getElementById('binningMethod').value;
@@ -1603,10 +1648,10 @@
         name: 'Frequency',
         type: 'column',
         data: histogramData,
-        color: 'rgba(99,102,241,0.55)',
-        borderColor: 'rgba(129,140,248,0.30)',
+        color: 'rgba(99,102,241,0.95)',
+        borderColor: 'rgba(165,180,252,0.85)',
         borderWidth: 1,
-        states: { hover: { color: 'rgba(99,102,241,0.80)', brightness: 0 } }
+        states: { hover: { color: 'rgba(129,140,248,1)', brightness: 0 } }
       }];
       
       // Add normal curve if checked
@@ -1647,12 +1692,19 @@
       const _overlayStats = calculateDescriptiveStats(currentData);
       const _overlayRange = max - min || 1;
       const _toCat = function(v) { return ((v - min) / _overlayRange) * (numBins - 1); };
-      const _chartPlotLines = [
-        { color: 'rgba(251,146,60,0.55)', width: 1.5, dashStyle: 'Solid', value: _toCat(_overlayStats.mean),
-          label: { text: '\u00d8', style: { color: '#fb923c', fontSize: '10px', fontWeight: '600', fontFamily: 'Inter,sans-serif' }, align: 'left', x: 4, y: 14 } },
-        { color: 'rgba(52,211,153,0.45)', width: 1.5, dashStyle: 'ShortDash', value: _toCat(_overlayStats.median),
-          label: { text: 'Md', style: { color: '#34d399', fontSize: '10px', fontWeight: '600', fontFamily: 'Inter,sans-serif' }, align: 'left', x: 4, y: 28 } }
-      ];
+      const _chartPlotLines = [];
+      if (showMeanLine) {
+        _chartPlotLines.push({
+          color: 'rgba(251,146,60,0.75)', width: 1.5, dashStyle: 'Solid', value: _toCat(_overlayStats.mean),
+          label: { text: '\u00d8', style: { color: '#fb923c', fontSize: '10px', fontWeight: '600', fontFamily: 'Inter,sans-serif' }, align: 'left', x: 4, y: 14 }
+        });
+      }
+      if (showMedianLine) {
+        _chartPlotLines.push({
+          color: 'rgba(52,211,153,0.70)', width: 1.5, dashStyle: 'ShortDash', value: _toCat(_overlayStats.median),
+          label: { text: 'Md', style: { color: '#34d399', fontSize: '10px', fontWeight: '600', fontFamily: 'Inter,sans-serif' }, align: 'left', x: 4, y: 28 }
+        });
+      }
       const _chartPlotBands = [];
 
       // Create chart
@@ -1721,9 +1773,11 @@
             pointPadding: 0.04,
             borderWidth: 0,
             borderRadius: 3,
-            color: 'rgba(129,140,248,0.60)',
+            color: 'rgba(99,102,241,0.95)',
+            borderColor: 'rgba(165,180,252,0.85)',
+            borderWidth: 1,
             states: {
-              hover: { color: 'rgba(129,140,248,0.85)', brightness: 0 }
+              hover: { color: 'rgba(129,140,248,1)', brightness: 0 }
             },
             animation: enableAnimation ? { duration: 400, easing: 'easeOutCubic' } : false
           },

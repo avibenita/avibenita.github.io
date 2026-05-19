@@ -16,8 +16,8 @@ const DIALOG_SIZES = window.DIALOG_SIZES = {
   // Standard results dialogs (most modules)
   RESULTS:             { height: 92, width: 70, displayInIframe: false },
 
-  // Hub univariate results (wider vertical footprint)
-  RESULTS_HUB:         { height: 90, width: 70, displayInIframe: false },
+  // Hub univariate results (tall/wide — histogram + sidebar)
+  RESULTS_HUB:         { height: 96, width: 78, displayInIframe: false },
 
   // Correlation matrix results (taller than standard)
   RESULTS_CORRELATION: { height: 92, width: 70, displayInIframe: false },

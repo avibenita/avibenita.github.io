@@ -345,7 +345,7 @@ function openResultsDialog(results) {
   localStorage.removeItem('univariateResults');
   localStorage.setItem('univariateResults', JSON.stringify(results));
 
-  const dialogUrl = `${getDialogsBaseUrl()}univariate/histogram-standalone.html`;
+  const dialogUrl = `${getDialogsBaseUrl()}univariate/histogram-standalone.html?cb=${Date.now()}`;
   Office.context.ui.displayDialogAsync(
     dialogUrl,
     DIALOG_SIZES.RESULTS_IFRAME,

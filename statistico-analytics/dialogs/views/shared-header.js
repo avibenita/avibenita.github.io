@@ -2472,7 +2472,7 @@ const StatisticoHeader = {
 
   _injectUniFilterAssets() {
     if (this.module !== 'univariate') return;
-    const v = '20260519s';
+    const v = '20260519t';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2696,12 +2696,7 @@ const StatisticoHeader = {
     if (data.sourceRows && data.sourceRows.length < allRows.length && UniRowFilter.setFilteredRows) {
       UniRowFilter.setFilteredRows(data.sourceRows);
     }
-    if (!this._uniFilterStorageHydrated && typeof window.handleDataReceived === 'function' && data.values && data.values.length) {
-      this._uniFilterStorageHydrated = true;
-      window.handleDataReceived(data);
-    } else {
-      this.updateUniFilterChrome(data);
-    }
+    this.updateUniFilterChrome(data);
   },
 
   _installUniFilterChangeListener() {

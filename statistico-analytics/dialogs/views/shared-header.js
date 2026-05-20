@@ -2472,7 +2472,7 @@ const StatisticoHeader = {
 
   _injectUniFilterAssets() {
     if (this.module !== 'univariate') return;
-    const v = '20260519r';
+    const v = '20260519s';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2867,13 +2867,17 @@ const StatisticoHeader = {
 
     if (document.documentElement.dataset.statisticoNavBound !== '1') {
       document.documentElement.dataset.statisticoNavBound = '1';
-      document.addEventListener('click', (e) => {
+      const routeSidebarEvent = (e) => {
         const btn = e.target && e.target.closest ? e.target.closest('.sb-item[data-nav-file]') : null;
-        if (!btn) return;
+        const navBtn = btn || this._sidebarButtonAtPoint(e);
+        if (!navBtn) return;
         e.preventDefault();
         e.stopPropagation();
-        this.navigateTo(btn.getAttribute('data-nav-file'));
-      }, true);
+        this.navigateTo(navBtn.getAttribute('data-nav-file'));
+      };
+      document.addEventListener('pointerdown', routeSidebarEvent, true);
+      document.addEventListener('mousedown', routeSidebarEvent, true);
+      document.addEventListener('click', routeSidebarEvent, true);
     }
 
     if (nav.dataset.statisticoNavBound === '1') return;
@@ -2885,6 +2889,24 @@ const StatisticoHeader = {
       e.stopPropagation();
       this.navigateTo(btn.getAttribute('data-nav-file'));
     }, true);
+  },
+
+  _sidebarButtonAtPoint(e) {
+    if (!e || typeof e.clientX !== 'number' || typeof e.clientY !== 'number') return null;
+    const nav = document.getElementById('sidebarNav');
+    if (!nav) return null;
+    const navRect = nav.getBoundingClientRect();
+    if (e.clientX < navRect.left || e.clientX > navRect.right || e.clientY < navRect.top || e.clientY > navRect.bottom) {
+      return null;
+    }
+    const buttons = nav.querySelectorAll('.sb-item[data-nav-file]');
+    for (const btn of buttons) {
+      const rect = btn.getBoundingClientRect();
+      if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        return btn;
+      }
+    }
+    return null;
   },
 
   /**

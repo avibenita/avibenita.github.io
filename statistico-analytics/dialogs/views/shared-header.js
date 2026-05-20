@@ -2465,7 +2465,7 @@ const StatisticoHeader = {
 
   _injectUniFilterAssets() {
     if (this.module !== 'univariate') return;
-    const v = '20260519o';
+    const v = '20260519p';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2481,7 +2481,7 @@ const StatisticoHeader = {
       this._initUniRowFilterFromStorage();
       this._installUniFilterChangeListener();
     };
-    if (document.querySelector('script[data-uni-row-filter]')) {
+    if (document.querySelector('script[data-uni-row-filter]') || document.querySelector('script[src*="uni-row-filter.js"]')) {
       boot();
       return;
     }
@@ -2689,7 +2689,8 @@ const StatisticoHeader = {
     if (data.sourceRows && data.sourceRows.length < allRows.length && UniRowFilter.setFilteredRows) {
       UniRowFilter.setFilteredRows(data.sourceRows);
     }
-    if (typeof window.handleDataReceived === 'function' && data.values && data.values.length) {
+    if (!this._uniFilterStorageHydrated && typeof window.handleDataReceived === 'function' && data.values && data.values.length) {
+      this._uniFilterStorageHydrated = true;
       window.handleDataReceived(data);
     } else {
       this.updateUniFilterChrome(data);

@@ -41,12 +41,12 @@
   <script src="https://code.highcharts.com/modules/histogram-bellcurve.js"></script>
   
   <!-- Shared Header -->
-  <!-- build: 20260519m -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260519m">
-  <script src="../shared-brand-logo.js?v=20260519m"></script>
-  <script src="../shared-header.js?v=20260519m"></script>
+  <!-- build: 20260519o -->
+  <link rel="stylesheet" href="../shared-header.css?v=20260519o">
+  <script src="../shared-brand-logo.js?v=20260519o"></script>
+  <script src="../shared-header.js?v=20260519o"></script>
   <script src="../runtime-core.js?v=20260329a"></script>
-  <script src="uni-row-filter.js?v=20260519m"></script>
+  <script src="uni-row-filter.js?v=20260519o"></script>
   
   <style>
     /* EXACT COPY OF ORIGINAL HISTOGRAM STYLES */
@@ -1436,6 +1436,37 @@
       return applyTransform(data, _uniMeta.transform);
     }
 
+    function hasStoredRowFilter(data) {
+      const all = data && data.sourceRowsAll;
+      const rows = data && data.sourceRows;
+      return !!(data && data.rowFilterActive) ||
+        !!(all && rows && rows.length > 0 && rows.length < all.length);
+    }
+
+    function resolveAnalysisValues(data) {
+      const headers = data.sourceHeaders;
+      const allRows = data.sourceRowsAll || data.sourceRows;
+      const hasSource = headers && allRows && allRows.length;
+      if (typeof UniRowFilter !== 'undefined' && hasSource) {
+        UniRowFilter.init({
+          headers: headers,
+          rows: allRows,
+          columnIndex: data.columnIndex != null ? Number(data.columnIndex) : 0,
+          onApply: rebuildFromSourceRows
+        });
+        const filtered = data.sourceRows || [];
+        if (hasStoredRowFilter(data) && filtered.length) {
+          UniRowFilter.setFilteredRows(filtered);
+        }
+        const fromRows = extractValuesFromRows(UniRowFilter.getFilteredRows());
+        if (fromRows.length) return fromRows;
+      }
+      if (hasStoredRowFilter(data) && ((data.values && data.values.length) || (data.data && data.data.length))) {
+        return (data.values || data.data).slice();
+      }
+      return (data.values || data.data || []).slice();
+    }
+
     function rebuildFromSourceRows(filteredRows) {
       const values = extractValuesFromRows(filteredRows);
       if (!values.length) {
@@ -1479,13 +1510,15 @@
         variableName: _uniMeta ? _uniMeta.column : 'Variable',
         values: originalData,
         data: originalData,
+        n: originalData.length,
         transform: _uniMeta ? _uniMeta.transform : 'none',
         trim: _uniMeta ? _uniMeta.trim : { min: 0, max: 100 },
         dataSource: _uniMeta ? _uniMeta.dataSource : null,
         sourceHeaders: meta ? meta.headers : (_uniMeta ? _uniMeta.sourceHeaders : null),
         sourceRowsAll: meta ? meta.allRows : (_uniMeta ? (_uniMeta.sourceRowsAll || _uniMeta.sourceRows) : null),
         sourceRows: meta ? meta.filteredRows : (_uniMeta ? _uniMeta.sourceRows : null),
-        columnIndex: _uniMeta ? _uniMeta.columnIndex : 0
+        columnIndex: _uniMeta ? _uniMeta.columnIndex : 0,
+        rowFilterActive: meta ? meta.hasActiveFilters : false
       };
     }
 
@@ -1626,15 +1659,7 @@
     function handleDataReceived(data) {
       try {
         console.log('Data received:', data);
-        
-        // Save to localStorage for view switching
-        try {
-          localStorage.setItem('univariateResults', JSON.stringify(data));
-          console.log('? Saved data to localStorage');
-        } catch (e) {
-          console.error('? Error saving to localStorage:', e);
-        }
-        
+
         _uniMeta = {
           column: data.column || data.variableName || 'Variable',
           columnIndex: data.columnIndex != null ? Number(data.columnIndex) : 0,
@@ -1647,16 +1672,9 @@
         };
         if (typeof StatisticoHeader !== 'undefined') StatisticoHeader._setUniFilterMeta(_uniMeta);
 
-        if (typeof UniRowFilter !== 'undefined' && _uniMeta.sourceHeaders && (_uniMeta.sourceRowsAll || _uniMeta.sourceRows) && (_uniMeta.sourceRowsAll || _uniMeta.sourceRows).length) {
-          UniRowFilter.init({
-            headers: _uniMeta.sourceHeaders,
-            rows: _uniMeta.sourceRowsAll || _uniMeta.sourceRows,
-            columnIndex: _uniMeta.columnIndex,
-            onApply: rebuildFromSourceRows
-          });
-          originalData = extractValuesFromRows(UniRowFilter.getFilteredRows());
-        } else {
-          originalData = data.values || data.data || [];
+        originalData = resolveAnalysisValues(data);
+        if (typeof UniRowFilter !== 'undefined' && _uniMeta.sourceHeaders && (_uniMeta.sourceRowsAll || _uniMeta.sourceRows)) {
+          _uniMeta.sourceRows = UniRowFilter.getFilteredRows();
         }
   
         window.data = originalData;
@@ -1692,8 +1710,6 @@
         }
         console.log('? Header updated with n:', displayN, 'isModified:', isModified);
 
-        registerHeaderActions(buildPayloadForActions());
-        
         // Initialize range
         originalMin = Math.min(...originalData);
         originalMax = Math.max(...originalData);
@@ -1714,6 +1730,16 @@
         console.log('Creating histogram...');
         createHistogram();
         console.log('? Histogram created');
+
+        const storedPayload = buildPayloadForActions();
+        try {
+          localStorage.setItem('univariateResults', JSON.stringify(storedPayload));
+          sessionStorage.setItem('univariateResults', JSON.stringify(storedPayload));
+        } catch (e) {
+          console.error('? Error saving to localStorage:', e);
+        }
+        registerHeaderActions(storedPayload);
+
         hideDialogLoading();
       } catch (error) {
         console.error('? Error in handleDataReceived:', error);
@@ -1721,6 +1747,7 @@
         alert('Error handling data: ' + error.message);
       }
     }
+    window.handleDataReceived = handleDataReceived;
 
     // Load sample data for testing
     function loadSampleData() {
@@ -1939,7 +1966,11 @@
         color: 'rgba(99,102,241,0.95)',
         borderColor: 'rgba(165,180,252,0.85)',
         borderWidth: 1,
-        states: { hover: { color: 'rgba(129,140,248,1)', brightness: 0 } }
+        stickyTracking: false,
+        states: {
+          hover: { color: 'rgba(129,140,248,1)', brightness: 0 },
+          inactive: { opacity: 1 }
+        }
       }];
       
       // Add normal curve if checked
@@ -1968,7 +1999,18 @@
           color: 'rgba(251,146,60,0.75)',
           lineWidth: 2,
           dashStyle: 'Solid',
-          marker: { enabled: false },
+          stickyTracking: false,
+          findNearestPointBy: 'xy',
+          marker: {
+            enabled: false,
+            states: {
+              hover: { enabled: true, radius: 4, lineWidth: 1, fillColor: 'rgba(251,146,60,0.95)' }
+            }
+          },
+          states: {
+            inactive: { opacity: 1 },
+            hover: { lineWidthPlus: 0 }
+          },
           yAxis: 0
         });
       }
@@ -2065,20 +2107,35 @@
             color: 'rgba(99,102,241,0.95)',
             borderColor: 'rgba(165,180,252,0.85)',
             borderWidth: 1,
+            stickyTracking: false,
             states: {
-              hover: { color: 'rgba(129,140,248,1)', brightness: 0 }
+              hover: { color: 'rgba(129,140,248,1)', brightness: 0 },
+              inactive: { opacity: 1 }
             },
             animation: enableAnimation ? { duration: 400, easing: 'easeOutCubic' } : false
           },
           spline: {
+            stickyTracking: false,
+            findNearestPointBy: 'xy',
+            states: {
+              inactive: { opacity: 1 },
+              hover: { lineWidthPlus: 0 }
+            },
             animation: enableAnimation ? { duration: 550 } : false
           },
           series: {
-            animation: enableAnimation
+            animation: enableAnimation,
+            stickyTracking: false,
+            states: {
+              inactive: { opacity: 1 },
+              hover: { enabled: true }
+            }
           }
         },
         tooltip: {
-          shared: true,
+          shared: false,
+          stickOnContact: true,
+          followPointer: false,
           backgroundColor: 'rgba(7,9,14,0.97)',
           style: { color: '#e4e8f0', fontSize: '11.5px', fontFamily: 'Inter, sans-serif' },
           borderColor: 'rgba(255,255,255,0.10)',
@@ -2086,13 +2143,14 @@
           shadow: false,
           padding: 10,
           formatter: function() {
-            let tooltip = '<span style="font-size:10px;color:rgba(228,232,240,0.45);font-family:\'JetBrains Mono\',monospace">' + this.x + '</span><br/>';
-            this.points.forEach(point => {
-              tooltip += '<span style="color:' + point.color + '">\u25CF</span> ' +
-                         '<span style="color:rgba(228,232,240,0.6)">' + point.series.name + '</span>: ' +
-                         '<b style="color:#e4e8f0;font-family:\'JetBrains Mono\',monospace">' + point.y.toFixed(2) + '</b><br/>';
-            });
-            return tooltip;
+            var axis = this.series && this.series.chart && this.series.chart.xAxis[0];
+            var catLabel = axis && axis.categories && this.point && this.point.x != null
+              ? axis.categories[this.point.x]
+              : this.x;
+            return '<span style="font-size:10px;color:rgba(228,232,240,0.45);font-family:\'JetBrains Mono\',monospace">' + catLabel + '</span><br/>' +
+              '<span style="color:' + this.color + '">\u25CF</span> ' +
+              '<span style="color:rgba(228,232,240,0.6)">' + this.series.name + '</span>: ' +
+              '<b style="color:#e4e8f0;font-family:\'JetBrains Mono\',monospace">' + (this.y != null ? this.y.toFixed(2) : '—') + '</b>';
           }
         },
         series: series,

@@ -2465,7 +2465,7 @@ const StatisticoHeader = {
 
   _injectUniFilterAssets() {
     if (this.module !== 'univariate') return;
-    const v = '20260519m';
+    const v = '20260519o';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2689,7 +2689,11 @@ const StatisticoHeader = {
     if (data.sourceRows && data.sourceRows.length < allRows.length && UniRowFilter.setFilteredRows) {
       UniRowFilter.setFilteredRows(data.sourceRows);
     }
-    this.updateUniFilterChrome(data);
+    if (typeof window.handleDataReceived === 'function' && data.values && data.values.length) {
+      window.handleDataReceived(data);
+    } else {
+      this.updateUniFilterChrome(data);
+    }
   },
 
   _installUniFilterChangeListener() {

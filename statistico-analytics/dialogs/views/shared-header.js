@@ -514,6 +514,17 @@ const StatisticoHeader = {
       window.StatisticoTooltip.refresh();
     }
     setTimeout(() => this._injectPerViewAiButton(), 0);
+    this._syncUniFilterHeader();
+  },
+
+  _syncUniFilterHeader() {
+    if (this.module !== 'univariate') return;
+    if (typeof window.ensureUniFilterInHeader === 'function') {
+      window.ensureUniFilterInHeader();
+    }
+    if (typeof window.updateUniFilterButtonState === 'function') {
+      window.updateUniFilterButtonState();
+    }
   },
   
   /**
@@ -1366,6 +1377,7 @@ const StatisticoHeader = {
     this._pendingActions = this._mergeActionsWithFallback(incoming);
     this.render();
     this._mountSidebarUtilities();
+    this._syncUniFilterHeader();
   },
 
   /**
@@ -1447,9 +1459,23 @@ const StatisticoHeader = {
     }).join('');
     const theme = this.getTheme();
     const themeIcon = theme === 'light' ? '☀️' : '🌙';
+    const uniFilterHtml = this.module === 'univariate'
+      ? `
+        <div class="header-uni-filter-wrap" id="headerUniFilterWrap">
+          <button type="button" class="header-uni-filter-btn uni-filter-btn" id="uniFilterBtn"
+            onclick="StatisticoHeader.openUniRowFilter()"
+            title="Filter rows from the hub workbook range (Excel-style column filters)"
+            disabled>
+            <i class="fa-solid fa-filter" aria-hidden="true"></i>
+            <span class="header-uni-filter-label">Filter</span>
+            <span data-uni-filter-badge>—</span>
+          </button>
+        </div>`
+      : '';
 
     return `
       <div class="header-global-controls">
+        ${uniFilterHtml}
         <label class="header-decimals-label" for="headerDecimalBtn">Decimals Precision</label>
         <select id="decimalSelect" class="header-decimals-hidden-select" onchange="StatisticoHeader.onDecimalChange(this.value)">
           ${optionsHtml}
@@ -2423,6 +2449,12 @@ const StatisticoHeader = {
   selectDecimalOption(value) {
     this.onDecimalChange(value);
     this.closeDecimalMenu();
+  },
+
+  openUniRowFilter() {
+    if (typeof window.openUniSourceFilter === 'function') {
+      window.openUniSourceFilter();
+    }
   },
 
   /* ─────────────────────────────────────────────────────────────────

@@ -2472,7 +2472,7 @@ const StatisticoHeader = {
 
   _injectUniFilterAssets() {
     if (this.module !== 'univariate') return;
-    const v = '20260519t';
+    const v = '20260519u';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2567,6 +2567,46 @@ const StatisticoHeader = {
       sourceHeaders: data.sourceHeaders || null,
       sourceRowsAll: data.sourceRowsAll || data.sourceRows || null
     };
+  },
+
+  _uniPayloadSignature(data, viewKey) {
+    const d = data || {};
+    const values = Array.isArray(d) ? d :
+      (Array.isArray(d.values) ? d.values :
+        (Array.isArray(d.data) ? d.data :
+          (Array.isArray(d.rawData) ? d.rawData :
+            (Array.isArray(d.trimmedValues) ? d.trimmedValues :
+              (Array.isArray(d.transformedValues) ? d.transformedValues :
+                (d.values && Array.isArray(d.values.values) ? d.values.values : []))))));
+    const len = values.length;
+    const table = Array.isArray(d.descriptiveTable) ? d.descriptiveTable : [];
+    const sample = len
+      ? [values[0], values[Math.floor(len / 2)], values[len - 1]].map((v) => Number(v).toPrecision ? Number(v).toPrecision(8) : String(v)).join('|')
+      : (table.length ? `${table.length}|${table[0].Variable || table[0].name || ''}|${table[0].N || ''}` : '');
+    const trim = d.trim ? `${d.trim.min || 0}-${d.trim.max || 100}` : '';
+    return [
+      viewKey || this.currentView || '',
+      d.column || d.variableName || d.variable || d.colName || '',
+      len || table.length,
+      sample,
+      d.transform || '',
+      trim,
+      d.rowFilterActive ? 'filtered' : '',
+      d.sourceRows ? d.sourceRows.length : '',
+      d.sourceRowsAll ? d.sourceRowsAll.length : ''
+    ].join('::');
+  },
+
+  shouldProcessUniPayload(data, viewKey, windowMs = 2500) {
+    const sig = this._uniPayloadSignature(data, viewKey);
+    const now = Date.now();
+    const last = this._lastUniPayload || {};
+    if (last.sig === sig && (now - last.time) < windowMs) {
+      console.log('Skipping duplicate univariate payload:', viewKey || this.currentView || '');
+      return false;
+    }
+    this._lastUniPayload = { sig, time: now };
+    return true;
   },
 
   _extractUniValues(rows) {

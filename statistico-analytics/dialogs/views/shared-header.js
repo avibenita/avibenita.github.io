@@ -2472,7 +2472,7 @@ const StatisticoHeader = {
 
   _injectUniFilterAssets() {
     if (this.module !== 'univariate') return;
-    const v = '20260519q';
+    const v = '20260519r';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2857,7 +2857,26 @@ const StatisticoHeader = {
   },
 
   _bindSidebarNavigation(nav) {
-    if (!nav || nav.dataset.statisticoNavBound === '1') return;
+    if (!nav) return;
+    nav.querySelectorAll('.sb-item[onclick*="StatisticoHeader.navigateTo"]').forEach((btn) => {
+      if (btn.getAttribute('data-nav-file')) return;
+      const raw = btn.getAttribute('onclick') || '';
+      const match = raw.match(/navigateTo\(['"]([^'"]+)['"]\)/);
+      if (match && match[1]) btn.setAttribute('data-nav-file', match[1]);
+    });
+
+    if (document.documentElement.dataset.statisticoNavBound !== '1') {
+      document.documentElement.dataset.statisticoNavBound = '1';
+      document.addEventListener('click', (e) => {
+        const btn = e.target && e.target.closest ? e.target.closest('.sb-item[data-nav-file]') : null;
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this.navigateTo(btn.getAttribute('data-nav-file'));
+      }, true);
+    }
+
+    if (nav.dataset.statisticoNavBound === '1') return;
     nav.dataset.statisticoNavBound = '1';
     nav.addEventListener('click', (e) => {
       const btn = e.target && e.target.closest ? e.target.closest('.sb-item[data-nav-file]') : null;

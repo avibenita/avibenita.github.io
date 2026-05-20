@@ -965,8 +965,10 @@ const StatisticoHeader = {
         const dataView = item.view ? ` data-view="${item.view}"` : '';
 
         let onclick = '';
+        let navFileAttr = '';
         if (item.type === 'navigate' && item.file) {
           onclick = `StatisticoHeader.navigateTo('${item.file}')`;
+          navFileAttr = ` data-nav-file="${item.file}"`;
         } else if (item.type === 'tab' && item.tab) {
           onclick = `switchTab('${item.tab}')`;
         } else if (item.type === 'js' && item.onclick) {
@@ -975,7 +977,7 @@ const StatisticoHeader = {
         const onclickAttr = onclick ? ` onclick="${onclick}"` : '';
         const description = this._getSidebarItemDescription(item);
 
-        return `<button class="sb-item${active}"${idAttr}${dataTab}${dataView}${onclickAttr}><i class="fa-solid ${item.icon || 'fa-circle'} sb-item-icon"></i><span class="sb-item-copy"><span class="sb-item-label">${item.label || ''}</span><span class="sb-item-description">${description}</span></span></button>`;
+        return `<button type="button" class="sb-item${active}"${idAttr}${dataTab}${dataView}${navFileAttr}${onclickAttr}><i class="fa-solid ${item.icon || 'fa-circle'} sb-item-icon"></i><span class="sb-item-copy"><span class="sb-item-label">${item.label || ''}</span><span class="sb-item-description">${description}</span></span></button>`;
       }).join('');
 
       return `<div class="sb-group"><div class="sb-group-title">${group.title || ''}</div><div class="sb-items-rail">${itemsHtml}</div></div>`;
@@ -1098,26 +1100,31 @@ const StatisticoHeader = {
    */
   navigateTo(filename) {
     console.log('🔄 Navigating to:', filename);
+    const targetUrl = this.resolveDialogUrl(filename);
     // All modules navigate within the same dialog window (no new dialog opened).
     // Persist module data in sessionStorage so the destination page can restore it.
-    if (window.correlationData) {
-      try { sessionStorage.setItem('correlationData', JSON.stringify(window.correlationData)); } catch(e) {}
-    } else {
-      try {
-        const storedCorrelationData = sessionStorage.getItem('correlationData');
-        if (storedCorrelationData) {
-          window.correlationData = JSON.parse(storedCorrelationData);
-          sessionStorage.setItem('correlationData', storedCorrelationData);
-        }
-      } catch(e) {}
+    try {
+      if (window.correlationData) {
+        try { sessionStorage.setItem('correlationData', JSON.stringify(window.correlationData)); } catch(e) {}
+      } else {
+        try {
+          const storedCorrelationData = sessionStorage.getItem('correlationData');
+          if (storedCorrelationData) {
+            window.correlationData = JSON.parse(storedCorrelationData);
+            sessionStorage.setItem('correlationData', storedCorrelationData);
+          }
+        } catch(e) {}
+      }
+      if (window.regressionData) {
+        try { sessionStorage.setItem('regressionNavData', JSON.stringify(window.regressionData)); } catch(e) {}
+      }
+      if (this.module === 'univariate') {
+        this._syncLiveDataToStorage();
+      }
+    } catch (e) {
+      console.warn('Navigation storage sync failed; continuing navigation.', e);
     }
-    if (window.regressionData) {
-      try { sessionStorage.setItem('regressionNavData', JSON.stringify(window.regressionData)); } catch(e) {}
-    }
-    if (this.module === 'univariate') {
-      this._syncLiveDataToStorage();
-    }
-    window.location.href = this.resolveDialogUrl(filename);
+    window.location.assign(targetUrl);
   },
 
   /**
@@ -2465,7 +2472,7 @@ const StatisticoHeader = {
 
   _injectUniFilterAssets() {
     if (this.module !== 'univariate') return;
-    const v = '20260519p';
+    const v = '20260519q';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2763,6 +2770,7 @@ const StatisticoHeader = {
   _mountSidebarUtilities() {
     const nav = document.getElementById('sidebarNav');
     if (!nav) return;
+    this._bindSidebarNavigation(nav);
 
     const existing = document.getElementById('sbUtilities');
     if (existing) existing.remove();
@@ -2846,6 +2854,18 @@ const StatisticoHeader = {
     if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
       window.StatisticoTooltip.refresh();
     }
+  },
+
+  _bindSidebarNavigation(nav) {
+    if (!nav || nav.dataset.statisticoNavBound === '1') return;
+    nav.dataset.statisticoNavBound = '1';
+    nav.addEventListener('click', (e) => {
+      const btn = e.target && e.target.closest ? e.target.closest('.sb-item[data-nav-file]') : null;
+      if (!btn || !nav.contains(btn)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.navigateTo(btn.getAttribute('data-nav-file'));
+    }, true);
   },
 
   /**

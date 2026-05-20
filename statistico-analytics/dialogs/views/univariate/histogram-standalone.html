@@ -41,12 +41,12 @@
   <script src="https://code.highcharts.com/modules/histogram-bellcurve.js"></script>
   
   <!-- Shared Header -->
-  <!-- build: 20260519k -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260519k">
-  <script src="../shared-brand-logo.js?v=20260519k"></script>
-  <script src="../shared-header.js?v=20260519k"></script>
+  <!-- build: 20260519m -->
+  <link rel="stylesheet" href="../shared-header.css?v=20260519m">
+  <script src="../shared-brand-logo.js?v=20260519m"></script>
+  <script src="../shared-header.js?v=20260519m"></script>
   <script src="../runtime-core.js?v=20260329a"></script>
-  <script src="uni-row-filter.js?v=20260519k"></script>
+  <script src="uni-row-filter.js?v=20260519m"></script>
   
   <style>
     /* EXACT COPY OF ORIGINAL HISTOGRAM STYLES */
@@ -1272,25 +1272,6 @@
         </span>
       </div>
 
-      <div class="uni-data-guide" id="uniDataGuide" role="note" aria-label="How row filtering and value range work">
-        <div class="uni-data-guide-head">
-          <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-          <span>How to filter your data &amp; what updates</span>
-          <button type="button" class="uni-data-guide-dismiss" onclick="dismissUniDataGuide()" title="Hide this guide">&times;</button>
-        </div>
-        <div class="uni-data-guide-body" id="uniDataGuideBody">
-          <p>Two tools work together: <strong>Filter</strong> picks <em>which rows</em> from the hub range are analysed; <strong>Data Range</strong> zooms the histogram to a <em>value interval</em> inside that series.</p>
-          <ol class="uni-data-guide-steps">
-            <li>Click <strong>Filter</strong> in the header bar (next to Decimals) → the source table opens.</li>
-            <li>Click <strong>▼</strong> on any column header → check values to keep → <strong>OK</strong>.</li>
-            <li>Repeat for other columns if needed. Use <strong>Clear all filters</strong> to reset rows.</li>
-            <li>Use <strong>Data Range</strong> below to focus the chart on a min–max slice (does not change which rows are included).</li>
-          </ol>
-          <div class="uni-data-guide-outcomes" id="uniDataGuideOutcomes">
-            <span>What updates:</span> summary stats (Mean, SD, …), <span id="uniGuideN">n</span>, histogram bars, normal curve, and View Data — all reflect the current row filter, then any value-range zoom.
-          </div>
-        </div>
-      </div>
 
       <div class="panel-body" style="padding: 8px;">
         <!-- Main Controls -->
@@ -1405,59 +1386,6 @@
     window.addEventListener('resize', fitLayout);
     attachLayoutObserver();
 
-    var UNI_GUIDE_DISMISS_KEY = 'statisticoUniHistGuideDismissed';
-
-    function dismissUniDataGuide() {
-      try { localStorage.setItem(UNI_GUIDE_DISMISS_KEY, '1'); } catch (_e) {}
-      var el = document.getElementById('uniDataGuide');
-      if (el) el.classList.add('hidden');
-    }
-
-    function renderUniDataGuide() {
-      var guide = document.getElementById('uniDataGuide');
-      var guideN = document.getElementById('uniGuideN');
-      if (!guide) return;
-      try {
-        if (localStorage.getItem(UNI_GUIDE_DISMISS_KEY) === '1') {
-          guide.classList.add('hidden');
-          return;
-        }
-      } catch (_e) {}
-      var hasSource = _uniMeta && _uniMeta.sourceRows && _uniMeta.sourceRows.length;
-      if (!hasSource) {
-        guide.classList.add('hidden');
-        return;
-      }
-      guide.classList.remove('hidden');
-      var meta = typeof UniRowFilter !== 'undefined' ? UniRowFilter.getSourceMeta() : null;
-      var totalRows = meta ? meta.allRows.length : _uniMeta.sourceRows.length;
-      var shownRows = meta ? meta.filteredRows.length : totalRows;
-      var col = _uniMeta.column || 'Variable';
-      var nVal = currentData.length;
-      var nFull = originalData.length;
-      if (guideN) {
-        if (nVal === nFull && shownRows === totalRows) {
-          guideN.textContent = 'n = ' + nVal + ' (all ' + totalRows + ' rows from range, column “' + col + '”)';
-        } else if (nVal < nFull) {
-          guideN.textContent = 'n = ' + nVal + ' on chart (value zoom from ' + nFull + ' filtered values; ' + shownRows + ' of ' + totalRows + ' rows)';
-        } else {
-          guideN.textContent = 'n = ' + nVal + ' (' + shownRows + ' of ' + totalRows + ' rows kept; column “' + col + '”)';
-        }
-      }
-    }
-
-    function openUniSourceFilter() {
-      if (typeof UniRowFilter === 'undefined') {
-        alert('Filter module failed to load. Reload the add-in and try again.');
-        return;
-      }
-      if (!_uniMeta || !_uniMeta.sourceRows || !_uniMeta.sourceRows.length) {
-        alert('Row filtering needs the full workbook range from the hub.\n\nClose this view, pick a range on the hub, run Univariate again, then use Filter.');
-        return;
-      }
-      UniRowFilter.open();
-    }
-    window.openUniSourceFilter = openUniSourceFilter;
 
     // Global variables
     let histogramChart = null;
@@ -1527,87 +1455,22 @@
       document.getElementById('activeRangeIndicator').style.right = '0%';
       const stats = calculateDescriptiveStats(currentData);
       populateStatistics(stats);
-      const varName = _uniMeta.column || 'Variable';
-      const rowFiltered = typeof UniRowFilter !== 'undefined' && UniRowFilter.hasActiveFilters();
-      StatisticoHeader.updateVariable(varName, rowFiltered ? originalData.length + '*' : originalData.length);
       createHistogram();
       setTimeout(fitLayout, 80);
-      renderUniDataGuide();
-      try {
-        localStorage.setItem('univariateResults', JSON.stringify(buildPayloadForActions()));
-      } catch (_e) {}
-      registerHeaderActions(buildPayloadForActions());
-      updateUniFilterButtonState();
-    }
-
-    function ensureUniFilterInHeader() {
-      document.querySelectorAll('.panel-heading .uni-filter-btn, .panel-heading-actions .uni-filter-btn').forEach(function (el) {
-        el.remove();
-      });
-      var controls = document.querySelector('.header-global-controls');
-      var headerRight = document.querySelector('.header-right');
-      if (!controls && headerRight) {
-        controls = document.createElement('div');
-        controls.className = 'header-global-controls';
-        var themeBtn = headerRight.querySelector('#headerThemeBtn');
-        headerRight.insertBefore(controls, themeBtn || headerRight.firstChild);
-      }
-      if (!controls) return;
-      var wrap = document.getElementById('headerUniFilterWrap');
-      if (!wrap) {
-        wrap = document.createElement('div');
-        wrap.id = 'headerUniFilterWrap';
-        wrap.className = 'header-uni-filter-wrap';
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'header-uni-filter-btn uni-filter-btn';
-        btn.id = 'uniFilterBtn';
-        btn.title = 'Filter rows from the hub workbook range (Excel-style column filters)';
-        btn.disabled = true;
-        btn.addEventListener('click', function () { openUniSourceFilter(); });
-        btn.innerHTML =
-          '<i class="fa-solid fa-filter" aria-hidden="true"></i>' +
-          '<span class="header-uni-filter-label">Filter</span>' +
-          '<span data-uni-filter-badge>—</span>';
-        wrap.appendChild(btn);
-        var anchor = controls.querySelector('.header-decimals-label');
-        controls.insertBefore(wrap, anchor || controls.firstChild);
-      }
-      var panelBtn = document.querySelector('.panel-heading .uni-filter-btn');
-      if (panelBtn && wrap && panelBtn.parentElement !== wrap) {
-        wrap.appendChild(panelBtn);
-        panelBtn.classList.add('header-uni-filter-btn');
-        panelBtn.id = 'uniFilterBtn';
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader._setUniFilterMeta(_uniMeta);
+        var payload = StatisticoHeader.publishUniFilterChange(filteredRows, true);
+        registerHeaderActions(payload || buildPayloadForActions());
+        StatisticoHeader.updateUniFilterChrome(payload);
+      } else {
+        try { localStorage.setItem('univariateResults', JSON.stringify(buildPayloadForActions())); } catch (_e) {}
+        registerHeaderActions(buildPayloadForActions());
       }
     }
 
-    window.ensureUniFilterInHeader = ensureUniFilterInHeader;
-    function updateUniFilterButtonState() {
-      ensureUniFilterInHeader();
-      var wrap = document.getElementById('headerUniFilterWrap');
-      var btn = document.getElementById('uniFilterBtn');
-      var meta = typeof UniRowFilter !== 'undefined' ? UniRowFilter.getSourceMeta() : null;
-      var hasSource = (_uniMeta && _uniMeta.sourceRows && _uniMeta.sourceRows.length) ||
-        (meta && meta.allRows && meta.allRows.length);
-      if (wrap) {
-        wrap.hidden = false;
-        wrap.style.display = 'inline-flex';
-      }
-      if (btn) {
-        btn.disabled = !hasSource;
-        btn.classList.toggle('disabled', !hasSource);
-        btn.title = hasSource
-          ? 'Filter rows from the hub workbook range (Excel-style column filters)'
-          : 'Filter needs the full workbook range from the hub (re-run Univariate from a selected range)';
-      }
-      if (typeof UniRowFilter !== 'undefined' && hasSource) {
-        UniRowFilter.updateBadge();
-      } else if (btn) {
-        var badge = btn.querySelector('[data-uni-filter-badge]');
-        if (badge) badge.textContent = hasSource ? '—' : 'no range';
-      }
-    }
-    window.updateUniFilterButtonState = updateUniFilterButtonState;
+    window.updateUniFilterButtonState = function () {
+      if (typeof StatisticoHeader !== 'undefined') StatisticoHeader.updateUniFilterChrome();
+    };
 
     function buildPayloadForActions() {
       const meta = typeof UniRowFilter !== 'undefined' ? UniRowFilter.getSourceMeta() : null;
@@ -1620,7 +1483,8 @@
         trim: _uniMeta ? _uniMeta.trim : { min: 0, max: 100 },
         dataSource: _uniMeta ? _uniMeta.dataSource : null,
         sourceHeaders: meta ? meta.headers : (_uniMeta ? _uniMeta.sourceHeaders : null),
-        sourceRows: meta ? meta.allRows : (_uniMeta ? _uniMeta.sourceRows : null),
+        sourceRowsAll: meta ? meta.allRows : (_uniMeta ? (_uniMeta.sourceRowsAll || _uniMeta.sourceRows) : null),
+        sourceRows: meta ? meta.filteredRows : (_uniMeta ? _uniMeta.sourceRows : null),
         columnIndex: _uniMeta ? _uniMeta.columnIndex : 0
       };
     }
@@ -1695,8 +1559,7 @@
         StatisticoHeader.initSidebarPage();
         StatisticoHeader.updateTitle('Interactive Histogram');
       }
-      ensureUniFilterInHeader();
-      updateUniFilterButtonState();
+      if (typeof window.updateUniFilterButtonState === 'function') window.updateUniFilterButtonState();
       attachLayoutObserver();
       mountDemoHeaderBadges();
       console.log('? Shared header initialized');
@@ -1779,13 +1642,15 @@
           trim: data.trim || { min: 0, max: 100 },
           dataSource: data.dataSource || null,
           sourceHeaders: data.sourceHeaders || null,
+          sourceRowsAll: data.sourceRowsAll || data.sourceRows || null,
           sourceRows: data.sourceRows || null
         };
+        if (typeof StatisticoHeader !== 'undefined') StatisticoHeader._setUniFilterMeta(_uniMeta);
 
-        if (typeof UniRowFilter !== 'undefined' && _uniMeta.sourceHeaders && _uniMeta.sourceRows && _uniMeta.sourceRows.length) {
+        if (typeof UniRowFilter !== 'undefined' && _uniMeta.sourceHeaders && (_uniMeta.sourceRowsAll || _uniMeta.sourceRows) && (_uniMeta.sourceRowsAll || _uniMeta.sourceRows).length) {
           UniRowFilter.init({
             headers: _uniMeta.sourceHeaders,
-            rows: _uniMeta.sourceRows,
+            rows: _uniMeta.sourceRowsAll || _uniMeta.sourceRows,
             columnIndex: _uniMeta.columnIndex,
             onApply: rebuildFromSourceRows
           });
@@ -1793,9 +1658,7 @@
         } else {
           originalData = data.values || data.data || [];
         }
-        updateUniFilterButtonState();
-        renderUniDataGuide();
-
+  
         window.data = originalData;
         currentData = originalData.slice();
         console.log('? Data arrays set, length:', originalData.length);
@@ -1822,11 +1685,14 @@
         const displayN = isModified ? originalData.length + '*' : originalData.length;
         
         // Update shared header with modified n indicator
-        StatisticoHeader.updateVariable(varName, displayN);
+        if (typeof StatisticoHeader !== 'undefined') {
+          StatisticoHeader.updateUniFilterChrome(buildPayloadForActions());
+        } else {
+          StatisticoHeader.updateVariable(varName, displayN);
+        }
         console.log('? Header updated with n:', displayN, 'isModified:', isModified);
 
         registerHeaderActions(buildPayloadForActions());
-        updateUniFilterButtonState();
         
         // Initialize range
         originalMin = Math.min(...originalData);
@@ -2309,7 +2175,6 @@
       // Update stats and chart (without animation)
       const stats = calculateDescriptiveStats(currentData);
       populateStatistics(stats);
-      renderUniDataGuide();
       createHistogram();
     }
 

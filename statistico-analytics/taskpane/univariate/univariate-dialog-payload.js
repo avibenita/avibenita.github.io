@@ -18,8 +18,9 @@
       transform: r.transform || "none",
       trim: r.trim || { min: 0, max: 100 },
       dataSource: r.dataSource || "",
-      sourceHeaders: r.sourceHeaders || null,
-      sourceRows: r.sourceRows || null
+        sourceHeaders: r.sourceHeaders || null,
+        sourceRowsAll: r.sourceRowsAll || r.sourceRows || null,
+        sourceRows: r.sourceRows || null
     };
   }
 

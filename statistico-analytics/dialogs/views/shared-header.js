@@ -519,12 +519,8 @@ const StatisticoHeader = {
 
   _syncUniFilterHeader() {
     if (this.module !== 'univariate') return;
-    if (typeof window.ensureUniFilterInHeader === 'function') {
-      window.ensureUniFilterInHeader();
-    }
-    if (typeof window.updateUniFilterButtonState === 'function') {
-      window.updateUniFilterButtonState();
-    }
+    this._injectUniFilterAssets();
+    this.updateUniFilterChrome();
   },
   
   /**
@@ -1118,6 +1114,9 @@ const StatisticoHeader = {
     if (window.regressionData) {
       try { sessionStorage.setItem('regressionNavData', JSON.stringify(window.regressionData)); } catch(e) {}
     }
+    if (this.module === 'univariate') {
+      this._syncLiveDataToStorage();
+    }
     window.location.href = this.resolveDialogUrl(filename);
   },
 
@@ -1462,6 +1461,11 @@ const StatisticoHeader = {
     const uniFilterHtml = this.module === 'univariate'
       ? `
         <div class="header-uni-filter-wrap" id="headerUniFilterWrap">
+          <button type="button" class="header-uni-filter-info" id="uniFilterHelpBtn"
+            onclick="StatisticoHeader.openUniFilterHelp()"
+            title="How row filtering works" aria-label="Filter help">
+            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+          </button>
           <button type="button" class="header-uni-filter-btn uni-filter-btn" id="uniFilterBtn"
             onclick="StatisticoHeader.openUniRowFilter()"
             title="Filter rows from the hub workbook range (Excel-style column filters)"
@@ -2451,10 +2455,265 @@ const StatisticoHeader = {
     this.closeDecimalMenu();
   },
 
-  openUniRowFilter() {
-    if (typeof window.openUniSourceFilter === 'function') {
-      window.openUniSourceFilter();
+  _uniFilterAssetBase() {
+    const { origin, pathname } = window.location;
+    if (pathname.includes('/dialogs/views/')) {
+      return `${origin}${pathname.split('/dialogs/views/')[0]}/dialogs/views/univariate/`;
     }
+    return `${origin}/dialogs/views/univariate/`;
+  },
+
+  _injectUniFilterAssets() {
+    if (this.module !== 'univariate') return;
+    const v = '20260519m';
+    const base = this._uniFilterAssetBase();
+    if (!document.querySelector('link[data-uni-filter-shared-css]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = `${base}uni-filter-shared.css?v=${v}`;
+      link.setAttribute('data-uni-filter-shared-css', '1');
+      document.head.appendChild(link);
+    }
+    const boot = () => {
+      this._ensureUniFilterOverlay();
+      this._ensureUniFilterHelpOverlay();
+      this._ensureUniFilterInHeader();
+      this._initUniRowFilterFromStorage();
+      this._installUniFilterChangeListener();
+    };
+    if (document.querySelector('script[data-uni-row-filter]')) {
+      boot();
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = `${base}uni-row-filter.js?v=${v}`;
+    s.setAttribute('data-uni-row-filter', '1');
+    s.onload = boot;
+    document.head.appendChild(s);
+  },
+
+  _ensureUniFilterOverlay() {
+    if (document.getElementById('uniFilterOverlay')) return;
+    const el = document.createElement('div');
+    el.innerHTML = [
+      '<div class="sb-ai-overlay" id="uniFilterOverlay" onclick="UniRowFilter.close(event)">',
+      '<div class="sb-ai-panel" style="width:min(900px,96vw);max-height:88vh;" onclick="event.stopPropagation()">',
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">',
+      '<span style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--accent-1);">',
+      '<i class="fa-solid fa-filter" style="margin-right:6px;"></i>Filter Source Range</span>',
+      '<button type="button" onclick="UniRowFilter.close()" style="background:transparent;border:none;color:rgba(255,255,255,.6);font-size:18px;cursor:pointer;">&times;</button>',
+      '</div>',
+      '<div class="uni-filt-toolbar"><div class="uni-filt-summary" id="uniFilterSummary">Filter rows from the workbook range.</div>',
+      '<button type="button" class="uni-filt-clear-btn" onclick="UniRowFilter.clearAll()">Clear all filters</button></div>',
+      '<div id="uniFilterContent" style="overflow:auto;max-height:calc(88vh - 120px);"></div>',
+      '</div></div>'
+    ].join('');
+    while (el.firstChild) document.body.appendChild(el.firstChild);
+  },
+
+  _ensureUniFilterHelpOverlay() {
+    if (document.getElementById('uniFilterHelpOverlay')) return;
+    document.body.insertAdjacentHTML('beforeend',
+      '<div class="sb-ai-overlay" id="uniFilterHelpOverlay" onclick="StatisticoHeader.closeUniFilterHelp(event)">' +
+      '<div class="uni-filter-help-panel" onclick="event.stopPropagation()">' +
+      '<h3><i class="fa-solid fa-circle-info"></i> How to filter & what updates</h3>' +
+      '<p>Two tools work together: <strong>Filter</strong> picks <em>which rows</em> from the hub range are analysed; ' +
+      '<strong>Data Range</strong> (on chart views) zooms to a <em>value interval</em> inside that series.</p>' +
+      '<ol>' +
+      '<li>Click <strong>Filter</strong> in the header (info icon opens this guide).</li>' +
+      '<li>Click <strong>▼</strong> on a column header, choose values, then <strong>OK</strong>.</li>' +
+      '<li><strong>Clear all filters</strong> restores all rows from the original range.</li>' +
+      '<li>The same filtered rows apply to every univariate view (Histogram, Box Plot, CDF, …).</li>' +
+      '</ol>' +
+      '<div class="uni-filter-help-outcomes"><strong>What updates:</strong> summary stats, n, charts, and View Data in all views.</div>' +
+      '<button type="button" class="uni-filter-help-close" onclick="StatisticoHeader.closeUniFilterHelp()">Got it</button>' +
+      '</div></div>');
+  },
+
+  openUniFilterHelp() {
+    this._ensureUniFilterHelpOverlay();
+    const o = document.getElementById('uniFilterHelpOverlay');
+    if (o) o.classList.add('sb-ai-overlay--visible');
+  },
+
+  closeUniFilterHelp(e) {
+    if (e && e.target && e.target.id !== 'uniFilterHelpOverlay') return;
+    const o = document.getElementById('uniFilterHelpOverlay');
+    if (o) o.classList.remove('sb-ai-overlay--visible');
+  },
+
+  _getUniStored() {
+    try {
+      const raw = localStorage.getItem('univariateResults') || sessionStorage.getItem('univariateResults');
+      return raw ? JSON.parse(raw) : null;
+    } catch (_e) { return null; }
+  },
+
+  _setUniFilterMeta(data) {
+    if (!data) return;
+    this._uniFilterMeta = {
+      column: data.column || data.variableName || 'Variable',
+      columnIndex: data.columnIndex != null ? Number(data.columnIndex) : 0,
+      transform: data.transform || 'none',
+      trim: data.trim || { min: 0, max: 100 },
+      dataSource: data.dataSource || null,
+      sourceHeaders: data.sourceHeaders || null,
+      sourceRowsAll: data.sourceRowsAll || data.sourceRows || null
+    };
+  },
+
+  _extractUniValues(rows) {
+    const m = this._uniFilterMeta || {};
+    if (m.columnIndex == null) return [];
+    const idx = Number(m.columnIndex);
+    let data = (rows || []).map((r) => r[idx])
+      .filter((v) => v !== '' && v !== null && v !== undefined && !Number.isNaN(parseFloat(v)))
+      .map((v) => parseFloat(v));
+    if (!data.length) return [];
+    const trim = m.trim || { min: 0, max: 100 };
+    if (trim.min > 0 || trim.max < 100) {
+      const sorted = [...data].sort((a, b) => a - b);
+      const minVal = sorted[Math.floor((sorted.length - 1) * trim.min / 100)];
+      const maxVal = sorted[Math.floor((sorted.length - 1) * trim.max / 100)];
+      data = data.filter((v) => v >= minVal && v <= maxVal);
+    }
+    const t = m.transform || 'none';
+    if (t === 'ln') data = data.map((v) => (v > 0 ? Math.log(v) : null)).filter((v) => v !== null);
+    else if (t === 'log10') data = data.map((v) => (v > 0 ? Math.log10(v) : null)).filter((v) => v !== null);
+    else if (t === 'sqrt') data = data.map((v) => (v >= 0 ? Math.sqrt(v) : null)).filter((v) => v !== null);
+    else if (t === 'square') data = data.map((v) => v * v);
+    return data;
+  },
+
+  publishUniFilterChange(filteredRows, skipDispatch) {
+    const m = this._uniFilterMeta || {};
+    const allRows = m.sourceRowsAll || filteredRows;
+    const values = this._extractUniValues(filteredRows);
+    if (!values.length) {
+      alert('No numeric values remain after filtering. Adjust filters or clear them.');
+      return;
+    }
+    const payload = {
+      column: m.column || 'Variable',
+      variableName: m.column || 'Variable',
+      columnIndex: m.columnIndex,
+      transform: m.transform,
+      trim: m.trim,
+      dataSource: m.dataSource,
+      sourceHeaders: m.sourceHeaders,
+      sourceRowsAll: allRows,
+      sourceRows: filteredRows,
+      values,
+      data: values,
+      rawData: values,
+      n: values.length,
+      rowFilterActive: typeof UniRowFilter !== 'undefined' && UniRowFilter.hasActiveFilters()
+    };
+    try {
+      localStorage.setItem('univariateResults', JSON.stringify(payload));
+      sessionStorage.setItem('univariateResults', JSON.stringify(payload));
+    } catch (_e) {}
+    this.updateUniFilterChrome(payload);
+    if (!skipDispatch) {
+      document.dispatchEvent(new CustomEvent('statistico-uni-filter-changed', { detail: payload }));
+    }
+    return payload;
+  },
+
+  updateUniFilterChrome(payload) {
+    payload = payload || this._getUniStored();
+    const meta = typeof UniRowFilter !== 'undefined' ? UniRowFilter.getSourceMeta() : null;
+    const hasSource = !!(payload && payload.sourceRowsAll && payload.sourceRowsAll.length) ||
+      !!(meta && meta.allRows && meta.allRows.length);
+    const active = (typeof UniRowFilter !== 'undefined' && UniRowFilter.hasActiveFilters()) ||
+      !!(payload && payload.rowFilterActive);
+    const total = meta ? meta.allRows.length : (payload && payload.sourceRowsAll ? payload.sourceRowsAll.length : 0);
+    const showing = meta ? meta.filteredRows.length : (payload && payload.sourceRows ? payload.sourceRows.length : 0);
+    const varName = (payload && (payload.column || payload.variableName)) || this.variableName || 'Variable';
+    const n = payload && payload.values ? payload.values.length : this.sampleSize;
+
+    const varEl = document.getElementById('headerVariableName');
+    if (varEl) {
+      varEl.innerHTML = active
+        ? `<i class="fa-solid fa-filter uni-title-filter-icon" title="Row filter active"></i>${varName}`
+        : varName;
+    }
+    const nEl = document.getElementById('headerSampleSize');
+    if (nEl) nEl.textContent = `(n=${n})`;
+
+    let notice = document.getElementById('uni-filter-active-notice');
+    if (!notice) {
+      notice = document.createElement('div');
+      notice.id = 'uni-filter-active-notice';
+      const anchor = document.querySelector('.statistico-shell') || document.querySelector('.statistico-header');
+      if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(notice, anchor.nextSibling);
+    }
+    if (active && total) {
+      notice.className = 'is-visible';
+      notice.innerHTML = `<i class="fa-solid fa-filter"></i> Row filter active — showing <strong>${showing}</strong> of <strong>${total}</strong> rows from the hub range (all univariate views)`;
+    } else {
+      notice.className = '';
+      notice.innerHTML = '';
+    }
+
+    const btn = document.getElementById('uniFilterBtn');
+    const wrap = document.getElementById('headerUniFilterWrap');
+    if (wrap) { wrap.hidden = false; wrap.style.display = 'inline-flex'; }
+    if (btn) {
+      btn.disabled = !hasSource;
+      btn.classList.toggle('disabled', !hasSource);
+    }
+    if (typeof UniRowFilter !== 'undefined' && hasSource) UniRowFilter.updateBadge();
+    else if (btn) {
+      const badge = btn.querySelector('[data-uni-filter-badge]');
+      if (badge) badge.textContent = hasSource ? `${total || n} rows` : 'no range';
+    }
+  },
+
+  _ensureUniFilterInHeader() {
+    document.querySelectorAll('.panel-heading .uni-filter-btn, .panel-heading-actions .uni-filter-btn').forEach((el) => el.remove());
+  },
+
+  _initUniRowFilterFromStorage() {
+    const data = this._getUniStored();
+    if (!data || !data.sourceHeaders || !(data.sourceRowsAll || data.sourceRows)) return;
+    this._setUniFilterMeta(data);
+    if (typeof UniRowFilter === 'undefined') return;
+    const allRows = data.sourceRowsAll || data.sourceRows;
+    UniRowFilter.init({
+      headers: data.sourceHeaders,
+      rows: allRows,
+      columnIndex: data.columnIndex != null ? Number(data.columnIndex) : 0,
+      onApply: (rows) => this.publishUniFilterChange(rows)
+    });
+    if (data.sourceRows && data.sourceRows.length < allRows.length && UniRowFilter.setFilteredRows) {
+      UniRowFilter.setFilteredRows(data.sourceRows);
+    }
+    this.updateUniFilterChrome(data);
+  },
+
+  _installUniFilterChangeListener() {
+    if (this._uniFilterListenerInstalled) return;
+    this._uniFilterListenerInstalled = true;
+    document.addEventListener('statistico-uni-filter-changed', (e) => {
+      if (e.detail && typeof window.handleDataReceived === 'function') {
+        window.handleDataReceived(e.detail);
+      }
+    });
+  },
+
+  openUniRowFilter() {
+    if (typeof UniRowFilter === 'undefined') {
+      alert('Filter module failed to load. Reload the add-in.');
+      return;
+    }
+    const data = this._getUniStored();
+    if (!data || !(data.sourceRowsAll || data.sourceRows)) {
+      alert('Row filtering needs the full workbook range from the hub.\n\nPick a range on the hub, run Univariate again, then use Filter.');
+      return;
+    }
+    this._ensureUniFilterOverlay();
+    UniRowFilter.open();
   },
 
   /* ─────────────────────────────────────────────────────────────────
@@ -2493,6 +2752,7 @@ const StatisticoHeader = {
     this._installDecimalOverride();
     setTimeout(() => this.applyDecimalPreferenceToPage(persistedDecimals), 0);
     setTimeout(() => this._injectPerViewAiButton(), 0);
+    if (this.module === 'univariate') this._injectUniFilterAssets();
   },
 
   _mountSidebarUtilities() {
@@ -4424,6 +4684,10 @@ Always follow the exact output format requested.` },
     requestAnimationFrame(() => overlay.classList.add('sb-ai-overlay--visible'));
   }
 };
+
+window.openUniSourceFilter = function () { StatisticoHeader.openUniRowFilter(); };
+window.openUniFilterHelp = function () { StatisticoHeader.openUniFilterHelp(); };
+window.updateUniFilterButtonState = function () { StatisticoHeader.updateUniFilterChrome(); };
 
 // Auto-initialize on DOM load
 document.addEventListener('DOMContentLoaded', () => {

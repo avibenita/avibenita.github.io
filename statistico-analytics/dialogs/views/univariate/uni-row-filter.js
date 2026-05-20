@@ -388,6 +388,11 @@
     return _filteredRows.slice();
   }
 
+  function setFilteredRows(rows) {
+    _filteredRows = (rows || []).map(function (r) { return r.slice(); });
+    updateBadge();
+  }
+
   function getFilteredRows() {
     return (_filteredRows || []).slice();
   }
@@ -410,6 +415,7 @@
     getFilteredRows: getFilteredRows,
     getSourceMeta: getSourceMeta,
     hasActiveFilters: hasActiveFilters,
-    updateBadge: updateBadge
+    updateBadge: updateBadge,
+    setFilteredRows: setFilteredRows
   };
 })(typeof window !== 'undefined' ? window : this);

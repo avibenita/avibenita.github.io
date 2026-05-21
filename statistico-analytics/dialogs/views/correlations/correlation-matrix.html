@@ -1193,6 +1193,40 @@
   let showOnlyConnectedNetworkNodes = false;
   window.networkRendered = false;
 
+  function rowsToCorrelationObjects(headers, rows) {
+    return (rows || []).map(row => {
+      const obj = {};
+      headers.forEach((header, idx) => {
+        const raw = Array.isArray(row) ? row[idx] : (row && row[header]);
+        const n = typeof raw === 'number' ? raw : parseFloat(raw);
+        obj[header] = Number.isFinite(n) ? n : raw;
+      });
+      return obj;
+    });
+  }
+
+  function applyCorrelationRowFilter(filterPayload) {
+    if (!filterPayload || !filterPayload.headers || !filterPayload.usedRows) return;
+    const headers = filterPayload.headers.slice();
+    const filteredData = rowsToCorrelationObjects(headers, filterPayload.usedRows);
+    correlationData = {
+      ...(correlationData || {}),
+      headers,
+      data: filteredData,
+      rowFilterActive: !!filterPayload.rowFilterActive,
+      sourceRowsAll: filterPayload.sourceRowsAll || filterPayload.allRows || null,
+      sourceRows: filterPayload.usedRows
+    };
+    window.correlationData = correlationData;
+    try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch(e) {}
+    scatterPointsCache.clear();
+    window.networkRendered = false;
+    renderMatrix();
+    if (document.getElementById('tab-network')?.classList.contains('active')) {
+      renderNetwork();
+    }
+  }
+
   /* ════════════════════════════════════════════
      INITIALIZATION
   ════════════════════════════════════════════ */
@@ -2308,6 +2342,7 @@
         };
       },
       exportHtml: () => exportHtml(),
+      onFilterRows: applyCorrelationRowFilter,
       moduleName: 'Copy correlation matrix to clipboard (paste into Excel)'
     });
   }

@@ -1083,7 +1083,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260523');
+          out.searchParams.set('build', '20260521g');
         }
         return out.href;
       } catch (e) {

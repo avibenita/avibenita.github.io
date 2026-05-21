@@ -1083,7 +1083,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260521i');
+          out.searchParams.set('build', '20260521j');
         }
         return out.href;
       } catch (e) {
@@ -2478,7 +2478,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260521i';
+    const v = '20260521j';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2621,10 +2621,11 @@ const StatisticoHeader = {
     if (typeof actions.getData !== 'function') return null;
     let result = null;
     try { result = actions.getData(); } catch (_e) { result = null; }
+    if (!result || typeof result !== 'object') return null;
     const sourceHeaders = Array.isArray(result.sourceHeaders) && result.sourceHeaders.length
       ? result.sourceHeaders
       : result.headers;
-    if (!result || !Array.isArray(sourceHeaders) || !sourceHeaders.length) return null;
+    if (!Array.isArray(sourceHeaders) || !sourceHeaders.length) return null;
 
     const headers = sourceHeaders.slice();
     const allRows = this._normalizeRowFilterRows(

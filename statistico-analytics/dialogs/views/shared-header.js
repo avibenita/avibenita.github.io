@@ -1083,7 +1083,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260521h');
+          out.searchParams.set('build', '20260521i');
         }
         return out.href;
       } catch (e) {
@@ -2478,7 +2478,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260521h';
+    const v = '20260521i';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2621,11 +2621,14 @@ const StatisticoHeader = {
     if (typeof actions.getData !== 'function') return null;
     let result = null;
     try { result = actions.getData(); } catch (_e) { result = null; }
-    if (!result || !Array.isArray(result.headers) || !result.headers.length) return null;
+    const sourceHeaders = Array.isArray(result.sourceHeaders) && result.sourceHeaders.length
+      ? result.sourceHeaders
+      : result.headers;
+    if (!result || !Array.isArray(sourceHeaders) || !sourceHeaders.length) return null;
 
-    const headers = result.headers.slice();
+    const headers = sourceHeaders.slice();
     const allRows = this._normalizeRowFilterRows(
-      result.allRows || result.sourceRowsAll || result.rows || result.usedRows,
+      result.sourceRowsAll || result.allRows || result.rows || result.usedRows,
       headers
     );
     if (!allRows.length) return null;
@@ -2635,7 +2638,7 @@ const StatisticoHeader = {
     if (state && !canReuseState) this._setGenericRowFilterState(null);
     const usedRows = canReuseState && Array.isArray(state.usedRows)
       ? this._normalizeRowFilterRows(state.usedRows, headers)
-      : this._normalizeRowFilterRows(result.usedRows || result.sourceRows || allRows, headers);
+      : this._normalizeRowFilterRows(result.sourceRows || result.usedRows || allRows, headers);
     const rowFilterActive = canReuseState
       ? !!state.rowFilterActive
       : !!result.rowFilterActive;
@@ -2645,10 +2648,34 @@ const StatisticoHeader = {
       headers,
       allRows,
       usedRows,
+      sourceHeaders: headers,
       sourceRowsAll: allRows,
       sourceRows: usedRows,
       rowFilterActive
     };
+  },
+
+  _applyGenericHeaderRowFilterFallback(payload) {
+    if (!payload || !Array.isArray(payload.headers) || !Array.isArray(payload.usedRows)) return;
+    const headers = payload.headers.slice();
+    const usedRows = payload.usedRows.map((r) => Array.isArray(r) ? r.slice() : []);
+    const headersMatch = (candidateHeaders) => {
+      if (!Array.isArray(candidateHeaders) || candidateHeaders.length !== headers.length) return false;
+      for (let i = 0; i < headers.length; i += 1) {
+        if (String(candidateHeaders[i]) !== String(headers[i])) return false;
+      }
+      return true;
+    };
+    const table = [headers].concat(usedRows);
+    try {
+      Object.keys(window).forEach((key) => {
+        if (!/RangeData$/i.test(key)) return;
+        const value = window[key];
+        if (!Array.isArray(value) || !Array.isArray(value[0])) return;
+        if (!headersMatch(value[0])) return;
+        window[key] = table.map((row) => row.slice());
+      });
+    } catch (_e) {}
   },
 
   _applyHeaderRowFilterToDataResult(result) {
@@ -2809,6 +2836,8 @@ const StatisticoHeader = {
     const handler = actions.onFilterRows || actions.filterRows;
     if (typeof handler === 'function') {
       try { handler(payload); } catch (e) { console.warn('Row filter handler failed:', e); }
+    } else {
+      this._applyGenericHeaderRowFilterFallback(payload);
     }
     if (!skipDispatch) {
       document.dispatchEvent(new CustomEvent('statistico-row-filter-changed', { detail: payload }));

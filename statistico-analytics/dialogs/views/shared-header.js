@@ -205,10 +205,9 @@ const StatisticoHeader = {
       this.module = 'univariate';
     }
 
-    if (this.module === 'correlations') {
-      this._applyActiveRowFilterToCorrelationStorage();
-      this._installRowFilterMessagePayloadInterceptor();
-    }
+    this._installActiveRowFilterStorageInterceptor();
+    this._installRowFilterMessagePayloadInterceptor();
+    this._applyActiveRowFilterToModuleStorage(this.module);
 
     // Apply persisted theme before rendering (avoids flash of wrong theme)
     this.applyTheme(this.getTheme());
@@ -1088,7 +1087,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260521o');
+          out.searchParams.set('build', '20260521p');
         }
         return out.href;
       } catch (e) {
@@ -2483,7 +2482,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260521o';
+    const v = '20260521p';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2571,12 +2570,12 @@ const StatisticoHeader = {
     } catch (_e) { return null; }
   },
 
-  _rowFilterKey() {
-    return `${this.module || 'module'}`;
+  _rowFilterKey(moduleName) {
+    return `${moduleName || this.module || 'module'}`;
   },
 
-  _rowFilterStorageKey() {
-    return `statistico-row-filter::${this._rowFilterKey()}`;
+  _rowFilterStorageKey(moduleName) {
+    return `statistico-row-filter::${this._rowFilterKey(moduleName)}`;
   },
 
   _isHeaderRowFilterStateCompatible(state, headers) {
@@ -2599,12 +2598,13 @@ const StatisticoHeader = {
     });
   },
 
-  _getGenericRowFilterState() {
-    const key = this._rowFilterKey();
+  _getGenericRowFilterState(moduleName) {
+    const key = this._rowFilterKey(moduleName);
     const state = this._rowFilterStates || {};
     if (state[key]) return state[key];
     try {
-      const raw = sessionStorage.getItem(this._rowFilterStorageKey()) || localStorage.getItem(this._rowFilterStorageKey());
+      const storageKey = this._rowFilterStorageKey(moduleName);
+      const raw = sessionStorage.getItem(storageKey) || localStorage.getItem(storageKey);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       this._rowFilterStates = this._rowFilterStates || {};
@@ -2613,14 +2613,15 @@ const StatisticoHeader = {
     } catch (_e) { return null; }
   },
 
-  _setGenericRowFilterState(state) {
+  _setGenericRowFilterState(state, moduleName) {
     this._rowFilterStates = this._rowFilterStates || {};
-    const key = this._rowFilterKey();
+    const key = this._rowFilterKey(moduleName);
     this._rowFilterStates[key] = state;
     try {
       const raw = JSON.stringify(state || null);
-      sessionStorage.setItem(this._rowFilterStorageKey(), raw);
-      localStorage.setItem(this._rowFilterStorageKey(), raw);
+      const storageKey = this._rowFilterStorageKey(moduleName);
+      sessionStorage.setItem(storageKey, raw);
+      localStorage.setItem(storageKey, raw);
     } catch (_e) {}
   },
 
@@ -2703,33 +2704,142 @@ const StatisticoHeader = {
     });
   },
 
-  _applyActiveRowFilterToCorrelationPayload(payload) {
-    if (!payload || !Array.isArray(payload.headers) || !Array.isArray(payload.data)) return payload;
-    const state = this._getGenericRowFilterState();
-    if (!state || !state.rowFilterActive || !Array.isArray(state.usedRows)) return payload;
-    if (!this._isHeaderRowFilterStateCompatible(state, payload.headers)) return payload;
-    const headers = state.headers.slice();
-    return {
-      ...payload,
-      headers,
-      data: this._rowFilterRowsToObjects(headers, state.usedRows),
-      rowFilterActive: true,
-      sourceRowsAll: Array.isArray(state.allRows) ? state.allRows.map((r) => r.slice()) : null,
-      sourceRows: state.usedRows.map((r) => r.slice())
-    };
+  _inferRowFilterModuleFromStorageKey(key) {
+    const k = String(key || '').toLowerCase();
+    if (k.includes('correlation')) return 'correlations';
+    if (k.includes('regression')) return 'regression';
+    if (k.includes('logistic')) return 'logistic';
+    if (k.includes('mixed')) return 'mixed';
+    if (k.includes('anova')) return 'anova';
+    if (k.includes('independent')) return 'independent';
+    if (k.includes('dependent')) return 'dependent';
+    if (k.includes('pca')) return 'pca';
+    if (k.includes('factor')) return 'factor';
+    if (k.includes('cluster')) return 'cluster';
+    if (k.includes('pareto')) return 'pareto';
+    if (k.includes('power')) return 'power';
+    return this.module || null;
   },
 
-  _applyActiveRowFilterToCorrelationStorage() {
-    if (this.module !== 'correlations') return;
-    try {
-      const raw = sessionStorage.getItem('correlationData');
-      if (!raw) return;
-      const filtered = this._applyActiveRowFilterToCorrelationPayload(JSON.parse(raw));
-      if (filtered) {
-        sessionStorage.setItem('correlationData', JSON.stringify(filtered));
-        window.correlationData = filtered;
+  _inferRowFilterModuleFromMessageType(type) {
+    const t = String(type || '').toLowerCase();
+    if (t.includes('correlation')) return 'correlations';
+    if (t.includes('regression')) return 'regression';
+    if (t.includes('logistic')) return 'logistic';
+    if (t.includes('mixed')) return 'mixed';
+    if (t.includes('anova')) return 'anova';
+    if (t.includes('independent')) return 'independent';
+    if (t.includes('dependent')) return 'dependent';
+    if (t.includes('pca')) return 'pca';
+    if (t.includes('factor')) return 'factor';
+    if (t.includes('cluster')) return 'cluster';
+    if (t.includes('pareto')) return 'pareto';
+    if (t.includes('power')) return 'power';
+    return this.module || null;
+  },
+
+  _firstPayloadRows(payload) {
+    if (!payload || typeof payload !== 'object') return null;
+    return payload.data || payload.rows || payload.usedRows || payload.sourceRows || payload.allRows || payload.sourceRowsAll || null;
+  },
+
+  _rowsForPayloadShape(headers, originalRows, filteredRows) {
+    const first = Array.isArray(originalRows) ? originalRows[0] : null;
+    if (first && !Array.isArray(first) && typeof first === 'object') {
+      return this._rowFilterRowsToObjects(headers, filteredRows);
+    }
+    return filteredRows.map((r) => Array.isArray(r) ? r.slice() : headers.map((h) => r && r[h]));
+  },
+
+  _applyActiveRowFilterToPayload(payload, moduleName) {
+    if (!payload || typeof payload !== 'object') return payload;
+    const headers = Array.isArray(payload.sourceHeaders) && payload.sourceHeaders.length
+      ? payload.sourceHeaders
+      : payload.headers;
+    if (!Array.isArray(headers) || !headers.length) return payload;
+    const state = this._getGenericRowFilterState(moduleName);
+    if (!state || !state.rowFilterActive || !Array.isArray(state.usedRows)) return payload;
+    if (!this._isHeaderRowFilterStateCompatible(state, headers)) return payload;
+
+    const filteredHeaders = state.headers.slice();
+    const filteredRows = state.usedRows.map((r) => Array.isArray(r) ? r.slice() : filteredHeaders.map((h) => r && r[h]));
+    const sourceRowsAll = Array.isArray(state.allRows) ? state.allRows.map((r) => r.slice()) : null;
+    const sourceRows = filteredRows.map((r) => r.slice());
+    const shapedRows = this._rowsForPayloadShape(filteredHeaders, this._firstPayloadRows(payload), filteredRows);
+
+    const out = {
+      ...payload,
+      headers: filteredHeaders,
+      sourceHeaders: filteredHeaders,
+      sourceRowsAll,
+      sourceRows,
+      usedRows: sourceRows,
+      rowFilterActive: true
+    };
+    if (Array.isArray(payload.data)) out.data = shapedRows;
+    if (Array.isArray(payload.rows)) out.rows = shapedRows;
+    if (Array.isArray(payload.allRows)) out.allRows = sourceRowsAll || sourceRows;
+    return out;
+  },
+
+  _applyActiveRowFilterToModuleStorage(moduleName) {
+    const keysByModule = {
+      correlations: ['correlationData', 'correlationResults'],
+      regression: ['regressionNavData', 'regressionData'],
+      logistic: ['logisticData', 'logisticResults'],
+      mixed: ['mixedData', 'mixedResults'],
+      anova: ['anovaData', 'anovaResults'],
+      independent: ['independentData', 'independentResults'],
+      dependent: ['dependentData', 'dependentResults'],
+      pca: ['pcaData', 'pcaResults'],
+      factor: ['factorData', 'factorResults'],
+      cluster: ['clusterData', 'clusterResults'],
+      pareto: ['paretoData', 'paretoResults'],
+      power: ['powerData', 'powerResults']
+    };
+    (keysByModule[moduleName] || []).forEach((key) => {
+      try {
+        const raw = sessionStorage.getItem(key);
+        if (!raw) return;
+        const filtered = this._applyActiveRowFilterToPayload(JSON.parse(raw), moduleName);
+        if (filtered) {
+          sessionStorage.setItem(key, JSON.stringify(filtered));
+          if (moduleName === 'correlations' && key === 'correlationData') window.correlationData = filtered;
+        }
+      } catch (_e) {}
+    });
+  },
+
+  _installActiveRowFilterStorageInterceptor() {
+    if (window.__statisticoRowFilterStorageInterceptorInstalled) return;
+    if (!window.Storage || !Storage.prototype) return;
+    window.__statisticoRowFilterStorageInterceptorInstalled = true;
+    const nativeGetItem = Storage.prototype.getItem;
+    const nativeSetItem = Storage.prototype.setItem;
+    Storage.prototype.getItem = function(key) {
+      const raw = nativeGetItem.call(this, key);
+      try {
+        if (!raw || String(key || '').indexOf('statistico-row-filter::') === 0 || !window.StatisticoHeader) return raw;
+        const moduleName = window.StatisticoHeader._inferRowFilterModuleFromStorageKey(key);
+        const parsed = JSON.parse(raw);
+        const filtered = window.StatisticoHeader._applyActiveRowFilterToPayload(parsed, moduleName);
+        return filtered === parsed ? raw : JSON.stringify(filtered);
+      } catch (_e) {
+        return raw;
       }
-    } catch (_e) {}
+    };
+    Storage.prototype.setItem = function(key, value) {
+      let nextValue = value;
+      try {
+        if (String(key || '').indexOf('statistico-row-filter::') !== 0 && window.StatisticoHeader) {
+          const moduleName = window.StatisticoHeader._inferRowFilterModuleFromStorageKey(key);
+          const parsed = JSON.parse(String(value));
+          const filtered = window.StatisticoHeader._applyActiveRowFilterToPayload(parsed, moduleName);
+          if (filtered !== parsed) nextValue = JSON.stringify(filtered);
+        }
+      } catch (_e) {}
+      return nativeSetItem.call(this, key, nextValue);
+    };
   },
 
   _installRowFilterMessagePayloadInterceptor() {
@@ -2745,9 +2855,9 @@ const StatisticoHeader = {
       const wrappedHandler = function(arg) {
         try {
           const message = JSON.parse(arg && arg.message ? arg.message : '{}');
-          if (message && message.type === 'CORRELATION_DATA' && message.payload && window.StatisticoHeader) {
-            message.payload = window.StatisticoHeader._applyActiveRowFilterToCorrelationPayload(message.payload);
-            try { sessionStorage.setItem('correlationData', JSON.stringify(message.payload)); } catch (_e) {}
+          if (message && message.type && message.payload && window.StatisticoHeader) {
+            const moduleName = window.StatisticoHeader._inferRowFilterModuleFromMessageType(message.type);
+            message.payload = window.StatisticoHeader._applyActiveRowFilterToPayload(message.payload, moduleName);
             const wrappedArg = Object.create(arg || {});
             wrappedArg.message = JSON.stringify(message);
             return handler(wrappedArg);

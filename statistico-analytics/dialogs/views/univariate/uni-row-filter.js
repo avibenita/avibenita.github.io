@@ -292,20 +292,24 @@
     var el = document.getElementById('uniFilterContent');
     if (!el || el._uniFiltBound) return;
     el._uniFiltBound = true;
-    el.addEventListener('click', function (e) {
+    function resolveHeaderCell(target) {
+      if (!target) return null;
       var th = null;
-      var node = e.target;
-      while (node && node !== el) {
-        if (node.classList && node.classList.contains('uni-filt-th')) { th = node; break; }
-        node = node.parentElement;
-      }
+      if (typeof target.closest === 'function') th = target.closest('.uni-filt-th');
+      if (!th || !el.contains(th)) return null;
+      return th;
+    }
+    function openColumnFilter(e) {
+      var th = resolveHeaderCell(e.target);
       if (!th) return;
       var idx = th.getAttribute('data-col-idx');
       if (idx === null || idx === '') return;
       e.preventDefault();
       e.stopPropagation();
       toggleColFilter(parseInt(idx, 10), e, th);
-    });
+    }
+    el.addEventListener('mousedown', openColumnFilter);
+    el.addEventListener('click', openColumnFilter);
   }
 
   function renderFilterTable() {
@@ -331,9 +335,10 @@
       var cls = 'uni-filt-th' + (filtered ? ' filtered' : '');
       var highlight = i === _columnIndex ? ' outline:1px solid rgba(129,140,248,.5);' : '';
       return '<th class="' + cls + '" data-col-idx="' + i + '" style="' + thStyle + highlight
+        + 'cursor:pointer;pointer-events:auto;user-select:none;'
         + 'color:' + (filtered ? '#4ade80' : (i === _columnIndex ? '#a5b4fc' : '#ffa578')) + ';" '
         + 'title="Click to filter ' + escHtml(h) + '">'
-        + escHtml(h) + (i === _columnIndex ? ' ★' : '') + '<span class="uni-filt-icon">' + icon + '</span></th>';
+        + escHtml(h) + (i === _columnIndex ? ' ★' : '') + '<span class="uni-filt-icon" style="pointer-events:none;">' + icon + '</span></th>';
     }).join('');
 
     var bodyRows = rows.map(function (row, ri) {

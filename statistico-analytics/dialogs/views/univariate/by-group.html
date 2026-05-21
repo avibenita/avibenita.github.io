@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>By Group - Univariate</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260521v" />
+  <script src="../shared-brand-logo.js?v=20260519u"></script>
+  <script src="../shared-header.js?v=20260521v"></script>
+  <style>
+    :root {
+      --surface-0:#0c1624; --surface-1:#1a1f2e; --surface-2:#242938; --border:#2d3748;
+      --accent-1:rgb(255,165,120); --accent-2:#818cf8; --text-primary:#fff; --text-secondary:rgba(255,255,255,.78);
+    }
+    :root[data-theme="light"] {
+      --surface-0:#eef0f4; --surface-1:#fff; --surface-2:#f3f4f6; --border:#cbd5e1;
+      --accent-1:#2563eb; --accent-2:#7c3aed; --text-primary:#111827; --text-secondary:#374151;
+    }
+    html, body { height:100%; margin:0; overflow:hidden; }
+    body { background:var(--surface-0); color:var(--text-primary); font-family:"Segoe UI", Tahoma, sans-serif; display:flex; flex-direction:column; }
+    .right-col { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+    .view-wrap { flex:1; min-height:0; padding:12px; box-sizing:border-box; overflow:hidden; }
+    .view-card { height:100%; display:flex; flex-direction:column; background:var(--surface-1); border:1px solid var(--border); border-radius:12px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.24); }
+    .toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border-bottom:1px solid var(--border); background:linear-gradient(180deg, rgba(255,255,255,.04), transparent); }
+    .title { display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .title strong { color:var(--accent-1); font-size:14px; letter-spacing:.03em; text-transform:uppercase; }
+    .title span { color:var(--text-secondary); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+    .control { display:flex; align-items:center; gap:6px; color:var(--text-secondary); font-size:12px; }
+    select, button { border:1px solid var(--border); border-radius:8px; background:var(--surface-2); color:var(--text-primary); padding:7px 10px; font-size:12px; }
+    button { cursor:pointer; font-weight:700; }
+    button.active { background:linear-gradient(135deg, var(--accent-2), #6d5dfc); color:#fff; border-color:transparent; }
+    .content { flex:1; min-height:0; overflow:auto; padding:12px; }
+    .panel { display:none; min-height:100%; }
+    .panel.active { display:block; }
+    .summary-strip { display:grid; grid-template-columns:repeat(4, minmax(120px, 1fr)); gap:10px; margin-bottom:12px; }
+    .metric { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px; }
+    .metric label { display:block; color:var(--text-secondary); font-size:10px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
+    .metric strong { font-size:18px; color:var(--accent-1); }
+    .table-wrap { border:1px solid var(--border); border-radius:10px; overflow:auto; background:var(--surface-2); }
+    table { width:100%; border-collapse:collapse; min-width:980px; }
+    th, td { padding:8px 10px; border-bottom:1px solid var(--border); text-align:right; font-size:12px; }
+    th { position:sticky; top:0; z-index:2; background:var(--surface-1); color:var(--accent-1); text-transform:uppercase; font-size:10px; letter-spacing:.08em; }
+    th:first-child, td:first-child { text-align:left; }
+    tbody tr:hover td { background:rgba(129,140,248,.12); }
+    .hist-grid { display:grid; grid-template-columns:1fr; gap:12px; }
+    .hist-card { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+    .hist-head { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:9px 12px; border-bottom:1px solid var(--border); color:var(--text-secondary); font-size:12px; }
+    .hist-head strong { color:var(--accent-1); font-size:13px; }
+    .hist-chart { height:210px; }
+    .empty { margin:32px auto; max-width:720px; text-align:center; color:var(--text-secondary); line-height:1.5; }
+    .empty i { display:block; color:var(--accent-1); font-size:32px; margin-bottom:10px; }
+    @media (max-width: 900px) {
+      .toolbar { align-items:flex-start; flex-direction:column; }
+      .controls { justify-content:flex-start; }
+      .summary-strip { grid-template-columns:repeat(2, minmax(120px, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div id="header-container"></div>
+  <nav class="sb-nav" id="sidebarNav"></nav>
+  <div class="right-col">
+    <div class="view-wrap">
+      <section class="view-card">
+        <div class="toolbar">
+          <div class="title">
+            <strong>By Group Analysis</strong>
+            <span id="subtitle">Compare the selected numeric variable across a grouping column.</span>
+          </div>
+          <div class="controls">
+            <label class="control">Group by <select id="groupSelect"></select></label>
+            <button id="tableTab" class="active" type="button" onclick="switchSubView('table')"><i class="fa-solid fa-table"></i> Stats Table</button>
+            <button id="histTab" type="button" onclick="switchSubView('histograms')"><i class="fa-solid fa-chart-column"></i> Histogram Rows</button>
+          </div>
+        </div>
+        <div class="content">
+          <div id="emptyState" class="empty" style="display:none;">
+            <i class="fa-solid fa-layer-group"></i>
+            <div id="emptyText">Run a univariate analysis with source rows, then open BY GROUP.</div>
+          </div>
+          <div id="mainContent" style="display:none;">
+            <div class="summary-strip">
+              <div class="metric"><label>Variable</label><strong id="metricVariable">-</strong></div>
+              <div class="metric"><label>Grouping Column</label><strong id="metricGroup">-</strong></div>
+              <div class="metric"><label>Groups</label><strong id="metricGroups">0</strong></div>
+              <div class="metric"><label>Rows Used</label><strong id="metricRows">0</strong></div>
+            </div>
+            <section id="tablePanel" class="panel active">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Group</th><th>N</th><th>Mean</th><th>Median</th><th>Std Dev</th><th>Variance</th>
+                      <th>Min</th><th>Q1</th><th>Q3</th><th>Max</th><th>Skew</th><th>Kurtosis</th>
+                    </tr>
+                  </thead>
+                  <tbody id="statsBody"></tbody>
+                </table>
+              </div>
+            </section>
+            <section id="histPanel" class="panel">
+              <div id="histGrid" class="hist-grid"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    let payload = null;
+    let headers = [];
+    let rows = [];
+    let analysisIndex = 0;
+    let groupIndex = null;
+    let groupStats = [];
+
+    function fmt(value, digits = 2) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n.toFixed(digits) : '-';
+    }
+
+    function quantile(sorted, p) {
+      if (!sorted.length) return null;
+      const pos = (sorted.length - 1) * p;
+      const base = Math.floor(pos);
+      const rest = pos - base;
+      return sorted[base + 1] !== undefined ? sorted[base] + rest * (sorted[base + 1] - sorted[base]) : sorted[base];
+    }
+
+    function calculateStats(values) {
+      const clean = values.filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
+      const n = clean.length;
+      if (!n) return null;
+      const mean = clean.reduce((a, b) => a + b, 0) / n;
+      const variance = n > 1 ? clean.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / (n - 1) : 0;
+      const stdDev = Math.sqrt(variance);
+      const skew = n >= 3 && stdDev > 0
+        ? (n / ((n - 1) * (n - 2))) * clean.reduce((sum, v) => sum + Math.pow((v - mean) / stdDev, 3), 0)
+        : 0;
+      const kurtosis = n >= 4 && stdDev > 0
+        ? ((n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3))) * clean.reduce((sum, v) => sum + Math.pow((v - mean) / stdDev, 4), 0) - (3 * Math.pow(n - 1, 2)) / ((n - 2) * (n - 3))
+        : 0;
+      return {
+        n, values: clean, mean, variance, stdDev, skew, kurtosis,
+        min: clean[0], q1: quantile(clean, 0.25), median: quantile(clean, 0.5), q3: quantile(clean, 0.75), max: clean[n - 1]
+      };
+    }
+
+    function rowValue(row, idx, name) {
+      return Array.isArray(row) ? row[idx] : row && row[name];
+    }
+
+    function normalizeRows(data) {
+      const source = data.sourceRows || data.usedRows || data.rows || data.sourceRowsAll || data.allRows || [];
+      return source.map((row) => Array.isArray(row) ? row.slice() : headers.map((h) => row && row[h]));
+    }
+
+    function loadStoredPayload() {
+      try {
+        const raw = sessionStorage.getItem('univariateResults') || localStorage.getItem('univariateResults');
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (typeof StatisticoHeader !== 'undefined' && !StatisticoHeader.shouldProcessUniPayload(parsed, 'by-group')) return null;
+        return parsed;
+      } catch (e) {
+        console.warn('Unable to load BY GROUP payload:', e);
+        return null;
+      }
+    }
+
+    function setEmpty(message) {
+      document.getElementById('emptyText').textContent = message;
+      document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('mainContent').style.display = 'none';
+    }
+
+    function initializeFromPayload(data) {
+      payload = data || loadStoredPayload();
+      if (!payload) return setEmpty('Run a univariate analysis first, then open BY GROUP.');
+      headers = (payload.sourceHeaders || payload.headers || []).slice();
+      analysisIndex = payload.columnIndex != null ? Number(payload.columnIndex) : 0;
+      rows = normalizeRows(payload);
+      if (!headers.length || !rows.length) return setEmpty('BY GROUP needs source rows from the workbook range.');
+      populateGroupSelect();
+      renderByGroup();
+      registerHeaderActions();
+    }
+
+    function populateGroupSelect() {
+      const select = document.getElementById('groupSelect');
+      select.innerHTML = '';
+      headers.forEach((header, idx) => {
+        const option = document.createElement('option');
+        option.value = String(idx);
+        option.textContent = idx === analysisIndex ? `${header} (analysis variable)` : header;
+        select.appendChild(option);
+      });
+      const firstGroup = headers.findIndex((_, idx) => idx !== analysisIndex);
+      groupIndex = firstGroup >= 0 ? firstGroup : analysisIndex;
+      select.value = String(groupIndex);
+      select.onchange = () => {
+        groupIndex = Number(select.value);
+        renderByGroup();
+        registerHeaderActions();
+      };
+    }
+
+    function buildGroups() {
+      const groups = new Map();
+      rows.forEach((row) => {
+        const rawGroup = rowValue(row, groupIndex, headers[groupIndex]);
+        const group = rawGroup === null || rawGroup === undefined || rawGroup === '' ? '(blank)' : String(rawGroup);
+        const rawValue = rowValue(row, analysisIndex, headers[analysisIndex]);
+        const value = typeof rawValue === 'number' ? rawValue : parseFloat(rawValue);
+        if (!Number.isFinite(value)) return;
+        if (!groups.has(group)) groups.set(group, []);
+        groups.get(group).push(value);
+      });
+      return Array.from(groups.entries())
+        .map(([group, values]) => ({ group, ...calculateStats(values) }))
+        .filter((item) => item.n > 0)
+        .sort((a, b) => String(a.group).localeCompare(String(b.group), undefined, { numeric: true }));
+    }
+
+    function renderByGroup() {
+      groupStats = buildGroups();
+      if (!groupStats.length) return setEmpty('No numeric values remain after grouping. Choose another grouping column or adjust filters.');
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('mainContent').style.display = 'block';
+      document.getElementById('metricVariable').textContent = headers[analysisIndex] || payload.column || 'Variable';
+      document.getElementById('metricGroup').textContent = headers[groupIndex] || 'Group';
+      document.getElementById('metricGroups').textContent = groupStats.length;
+      document.getElementById('metricRows').textContent = groupStats.reduce((sum, g) => sum + g.n, 0);
+      document.getElementById('subtitle').textContent = `${headers[analysisIndex] || 'Variable'} by ${headers[groupIndex] || 'group'} (${rows.length} filtered source rows)`;
+      renderTable();
+      renderHistograms();
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.updateVariable(`${headers[analysisIndex] || 'Variable'} by ${headers[groupIndex] || 'Group'}`, rows.length);
+        StatisticoHeader.updateUniFilterChrome(payload);
+      }
+    }
+
+    function renderTable() {
+      document.getElementById('statsBody').innerHTML = groupStats.map((g) => `
+        <tr>
+          <td>${escapeHtml(g.group)}</td><td>${g.n}</td><td>${fmt(g.mean)}</td><td>${fmt(g.median)}</td>
+          <td>${fmt(g.stdDev)}</td><td>${fmt(g.variance)}</td><td>${fmt(g.min)}</td><td>${fmt(g.q1)}</td>
+          <td>${fmt(g.q3)}</td><td>${fmt(g.max)}</td><td>${fmt(g.skew)}</td><td>${fmt(g.kurtosis)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function histogramSeries(values, globalMin, globalMax, bins) {
+      const width = globalMax === globalMin ? 1 : (globalMax - globalMin) / bins;
+      const counts = Array.from({ length: bins }, () => 0);
+      values.forEach((v) => {
+        const idx = Math.min(bins - 1, Math.max(0, Math.floor((v - globalMin) / width)));
+        counts[idx] += 1;
+      });
+      return counts.map((count, i) => ({
+        name: `${fmt(globalMin + i * width, 1)}-${fmt(globalMin + (i + 1) * width, 1)}`,
+        y: count
+      }));
+    }
+
+    function renderHistograms() {
+      const grid = document.getElementById('histGrid');
+      grid.innerHTML = '';
+      const allValues = groupStats.flatMap((g) => g.values);
+      const globalMin = Math.min(...allValues);
+      const globalMax = Math.max(...allValues);
+      const bins = Math.max(4, Math.min(14, Math.round(Math.sqrt(allValues.length))));
+      groupStats.forEach((g, idx) => {
+        const id = `groupHist${idx}`;
+        const card = document.createElement('div');
+        card.className = 'hist-card';
+        card.innerHTML = `<div class="hist-head"><strong>${escapeHtml(g.group)}</strong><span>n=${g.n}, mean=${fmt(g.mean)}</span></div><div id="${id}" class="hist-chart"></div>`;
+        grid.appendChild(card);
+        Highcharts.chart(id, {
+          chart: { type:'column', backgroundColor:'transparent', spacing:[8, 8, 8, 8] },
+          title: { text:null },
+          credits: { enabled:false },
+          legend: { enabled:false },
+          xAxis: { type:'category', labels:{ style:{ color:'var(--text-secondary)', fontSize:'10px' } }, lineColor:'var(--border)' },
+          yAxis: { min:0, title:{ text:'Frequency', style:{ color:'var(--text-secondary)' } }, labels:{ style:{ color:'var(--text-secondary)' } }, gridLineColor:'rgba(148,163,184,.18)' },
+          tooltip: { pointFormat:'Frequency: <b>{point.y}</b>' },
+          plotOptions: { column:{ borderWidth:0, color:'rgba(129,140,248,.92)', borderRadius:3 } },
+          series: [{ data: histogramSeries(g.values, globalMin, globalMax, bins) }]
+        });
+      });
+    }
+
+    function switchSubView(view) {
+      document.getElementById('tablePanel').classList.toggle('active', view === 'table');
+      document.getElementById('histPanel').classList.toggle('active', view === 'histograms');
+      document.getElementById('tableTab').classList.toggle('active', view === 'table');
+      document.getElementById('histTab').classList.toggle('active', view === 'histograms');
+      if (view === 'histograms' && Highcharts.charts) {
+        setTimeout(() => Highcharts.charts.forEach((chart) => { if (chart) chart.reflow(); }), 50);
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+    }
+
+    function registerHeaderActions() {
+      if (typeof StatisticoHeader === 'undefined') return;
+      StatisticoHeader.registerActions({
+        getData: () => ({
+          headers: ['Group', 'N', 'Mean', 'Median', 'Std Dev', 'Variance', 'Min', 'Q1', 'Q3', 'Max', 'Skew', 'Kurtosis'],
+          allRows: groupStats.map((g) => [g.group, g.n, g.mean, g.median, g.stdDev, g.variance, g.min, g.q1, g.q3, g.max, g.skew, g.kurtosis]),
+          usedRows: groupStats.map((g) => [g.group, g.n, g.mean, g.median, g.stdDev, g.variance, g.min, g.q1, g.q3, g.max, g.skew, g.kurtosis]),
+          fullRange: payload && payload.dataSource,
+          usedRange: 'BY GROUP summary',
+          notice: 'Grouped statistics use the active source row filter.'
+        }),
+        moduleName: 'Copy BY GROUP statistics to clipboard'
+      });
+    }
+
+    function onMessageReceived(arg) {
+      try {
+        const message = JSON.parse(arg.message || '{}');
+        if (message.theme) {
+          if (message.theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+          else document.documentElement.removeAttribute('data-theme');
+          return;
+        }
+        if (message.action === 'loadData' && message.data) initializeFromPayload(message.data);
+      } catch (e) {
+        console.warn('Unable to process BY GROUP message:', e);
+      }
+    }
+
+    function boot() {
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.init('by-group', 'By Group', 0, 'univariate');
+        StatisticoHeader.initSidebarPage();
+        StatisticoHeader.updateTitle('By Group');
+      }
+      initializeFromPayload();
+    }
+
+    if (typeof Office !== 'undefined') {
+      Office.onReady(function() {
+        boot();
+        if (Office.context && Office.context.ui) {
+          Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, onMessageReceived);
+          try { Office.context.ui.messageParent(JSON.stringify({ action:'ready' })); } catch (_e) {}
+        }
+      });
+    } else {
+      window.addEventListener('DOMContentLoaded', boot);
+    }
+  </script>
+</body>
+</html>

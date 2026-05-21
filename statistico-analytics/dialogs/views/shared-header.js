@@ -1087,7 +1087,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260521p');
+          out.searchParams.set('build', '20260521q');
         }
         return out.href;
       } catch (e) {
@@ -2482,7 +2482,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260521p';
+    const v = '20260521q';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2706,6 +2706,7 @@ const StatisticoHeader = {
 
   _inferRowFilterModuleFromStorageKey(key) {
     const k = String(key || '').toLowerCase();
+    if (k.includes('univariate')) return 'univariate';
     if (k.includes('correlation')) return 'correlations';
     if (k.includes('regression')) return 'regression';
     if (k.includes('logistic')) return 'logistic';
@@ -2723,6 +2724,7 @@ const StatisticoHeader = {
 
   _inferRowFilterModuleFromMessageType(type) {
     const t = String(type || '').toLowerCase();
+    if (t.includes('univariate')) return 'univariate';
     if (t.includes('correlation')) return 'correlations';
     if (t.includes('regression')) return 'regression';
     if (t.includes('logistic')) return 'logistic';
@@ -2751,8 +2753,60 @@ const StatisticoHeader = {
     return filteredRows.map((r) => Array.isArray(r) ? r.slice() : headers.map((h) => r && r[h]));
   },
 
+  _extractRowFilterValues(rows, columnIndex, transform, trim) {
+    const idx = Number(columnIndex || 0);
+    let values = (rows || [])
+      .map((row) => Array.isArray(row) ? row[idx] : row && row[idx])
+      .filter((v) => v !== '' && v !== null && v !== undefined && !Number.isNaN(parseFloat(v)))
+      .map((v) => parseFloat(v));
+    const tcfg = trim || { min: 0, max: 100 };
+    const minPct = Number(tcfg.min || 0);
+    const maxPct = Number(tcfg.max == null ? 100 : tcfg.max);
+    if (values.length && (minPct > 0 || maxPct < 100)) {
+      const sorted = values.slice().sort((a, b) => a - b);
+      const minVal = sorted[Math.floor((sorted.length - 1) * minPct / 100)];
+      const maxVal = sorted[Math.floor((sorted.length - 1) * maxPct / 100)];
+      values = values.filter((v) => v >= minVal && v <= maxVal);
+    }
+    const op = transform || 'none';
+    if (op === 'ln') values = values.map((v) => (v > 0 ? Math.log(v) : null)).filter((v) => v !== null);
+    else if (op === 'log10') values = values.map((v) => (v > 0 ? Math.log10(v) : null)).filter((v) => v !== null);
+    else if (op === 'sqrt') values = values.map((v) => (v >= 0 ? Math.sqrt(v) : null)).filter((v) => v !== null);
+    else if (op === 'square') values = values.map((v) => v * v);
+    return values;
+  },
+
+  _applyActiveRowFilterToUnivariatePayload(payload) {
+    if (!payload || typeof payload !== 'object') return payload;
+    const headers = Array.isArray(payload.sourceHeaders) && payload.sourceHeaders.length
+      ? payload.sourceHeaders
+      : payload.headers;
+    if (!Array.isArray(headers) || !headers.length) return payload;
+    const state = this._getGenericRowFilterState('univariate');
+    if (!state || !state.rowFilterActive || !Array.isArray(state.usedRows)) return payload;
+    if (!this._isHeaderRowFilterStateCompatible(state, headers)) return payload;
+    const sourceRows = state.usedRows.map((r) => Array.isArray(r) ? r.slice() : headers.map((h) => r && r[h]));
+    const sourceRowsAll = Array.isArray(state.allRows) ? state.allRows.map((r) => r.slice()) : null;
+    const columnIndex = payload.columnIndex != null ? Number(payload.columnIndex) : (state.columnIndex != null ? Number(state.columnIndex) : 0);
+    const values = this._extractRowFilterValues(sourceRows, columnIndex, payload.transform, payload.trim);
+    return {
+      ...payload,
+      sourceHeaders: headers.slice(),
+      sourceRowsAll,
+      sourceRows,
+      values,
+      data: values,
+      rawData: values,
+      n: values.length,
+      rowFilterActive: true
+    };
+  },
+
   _applyActiveRowFilterToPayload(payload, moduleName) {
     if (!payload || typeof payload !== 'object') return payload;
+    if ((moduleName || this.module) === 'univariate') {
+      return this._applyActiveRowFilterToUnivariatePayload(payload);
+    }
     const headers = Array.isArray(payload.sourceHeaders) && payload.sourceHeaders.length
       ? payload.sourceHeaders
       : payload.headers;
@@ -2784,6 +2838,7 @@ const StatisticoHeader = {
 
   _applyActiveRowFilterToModuleStorage(moduleName) {
     const keysByModule = {
+      univariate: ['univariateResults'],
       correlations: ['correlationData', 'correlationResults'],
       regression: ['regressionNavData', 'regressionData'],
       logistic: ['logisticData', 'logisticResults'],
@@ -2855,12 +2910,19 @@ const StatisticoHeader = {
       const wrappedHandler = function(arg) {
         try {
           const message = JSON.parse(arg && arg.message ? arg.message : '{}');
-          if (message && message.type && message.payload && window.StatisticoHeader) {
-            const moduleName = window.StatisticoHeader._inferRowFilterModuleFromMessageType(message.type);
-            message.payload = window.StatisticoHeader._applyActiveRowFilterToPayload(message.payload, moduleName);
-            const wrappedArg = Object.create(arg || {});
-            wrappedArg.message = JSON.stringify(message);
-            return handler(wrappedArg);
+          if (message && window.StatisticoHeader) {
+            const moduleName = window.StatisticoHeader._inferRowFilterModuleFromMessageType(message.type || message.action || '');
+            if (message.payload) {
+              message.payload = window.StatisticoHeader._applyActiveRowFilterToPayload(message.payload, moduleName);
+            }
+            if (message.data) {
+              message.data = window.StatisticoHeader._applyActiveRowFilterToPayload(message.data, moduleName);
+            }
+            if (message.payload || message.data) {
+              const wrappedArg = Object.create(arg || {});
+              wrappedArg.message = JSON.stringify(message);
+              return handler(wrappedArg);
+            }
           }
         } catch (_e) {}
         return handler(arg);
@@ -2990,6 +3052,18 @@ const StatisticoHeader = {
       n: values.length,
       rowFilterActive: typeof UniRowFilter !== 'undefined' && UniRowFilter.hasActiveFilters()
     };
+    this._setGenericRowFilterState({
+      headers: (m.sourceHeaders || []).slice ? m.sourceHeaders.slice() : (m.sourceHeaders || []),
+      allRows: (allRows || []).map((r) => Array.isArray(r) ? r.slice() : r),
+      usedRows: (filteredRows || []).map((r) => Array.isArray(r) ? r.slice() : r),
+      sourceHeaders: m.sourceHeaders,
+      sourceRowsAll: allRows,
+      sourceRows: filteredRows,
+      columnIndex: m.columnIndex,
+      rowFilterActive: payload.rowFilterActive,
+      module: 'univariate',
+      view: this.currentView
+    }, 'univariate');
     try {
       localStorage.setItem('univariateResults', JSON.stringify(payload));
       sessionStorage.setItem('univariateResults', JSON.stringify(payload));
@@ -3132,6 +3206,20 @@ const StatisticoHeader = {
     });
     if (data.sourceRows && data.sourceRows.length < allRows.length && UniRowFilter.setFilteredRows) {
       UniRowFilter.setFilteredRows(data.sourceRows);
+    }
+    if (data.sourceRows && data.sourceRows.length < allRows.length) {
+      this._setGenericRowFilterState({
+        headers: data.sourceHeaders.slice(),
+        allRows: allRows.map((r) => Array.isArray(r) ? r.slice() : r),
+        usedRows: data.sourceRows.map((r) => Array.isArray(r) ? r.slice() : r),
+        sourceHeaders: data.sourceHeaders,
+        sourceRowsAll: allRows,
+        sourceRows: data.sourceRows,
+        columnIndex: data.columnIndex != null ? Number(data.columnIndex) : 0,
+        rowFilterActive: true,
+        module: 'univariate',
+        view: this.currentView
+      }, 'univariate');
     }
     this.updateUniFilterChrome(data);
   },

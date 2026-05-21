@@ -1087,7 +1087,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260521r');
+          out.searchParams.set('build', '20260521s');
         }
         return out.href;
       } catch (e) {
@@ -2482,7 +2482,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260521r';
+    const v = '20260521s';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2921,6 +2921,26 @@ const StatisticoHeader = {
         }
       } catch (_e) {}
     });
+  },
+
+  _persistActiveRowFilterPayload(moduleName, storageKey) {
+    const state = this._getGenericRowFilterState(moduleName);
+    if (!state || !state.rowFilterActive) return false;
+    try {
+      const key = storageKey || (moduleName === 'univariate' ? 'univariateResults' : null);
+      if (!key) return false;
+      const raw = sessionStorage.getItem(key) || localStorage.getItem(key);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      const payload = this._applyActiveRowFilterToPayload(parsed, moduleName);
+      if (!payload || payload === parsed) return false;
+      const next = JSON.stringify(payload);
+      sessionStorage.setItem(key, next);
+      localStorage.setItem(key, next);
+      return true;
+    } catch (_e) {
+      return false;
+    }
   },
 
   _installActiveRowFilterStorageInterceptor() {
@@ -4157,6 +4177,9 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
    */
   _syncLiveDataToStorage() {
     try {
+      if (this.module === 'univariate' && this._persistActiveRowFilterPayload('univariate', 'univariateResults')) {
+        return;
+      }
       // 1. Try live in-memory arrays (set by individual view pages after data loads)
       const coerce = (arr) => {
         if (!Array.isArray(arr)) return [];

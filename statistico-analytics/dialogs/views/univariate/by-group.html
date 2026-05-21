@@ -6,9 +6,9 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
-  <link rel="stylesheet" href="../shared-header.css?v=20260521v" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260521w" />
   <script src="../shared-brand-logo.js?v=20260519u"></script>
-  <script src="../shared-header.js?v=20260521v"></script>
+  <script src="../shared-header.js?v=20260521w"></script>
   <style>
     :root {
       --surface-0:#0c1624; --surface-1:#1a1f2e; --surface-2:#242938; --border:#2d3748;
@@ -29,6 +29,7 @@
     .title span { color:var(--text-secondary); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
     .control { display:flex; align-items:center; gap:6px; color:var(--text-secondary); font-size:12px; }
+    .group-choice-label { color:var(--text-secondary); font-size:12px; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     select, button { border:1px solid var(--border); border-radius:8px; background:var(--surface-2); color:var(--text-primary); padding:7px 10px; font-size:12px; }
     button { cursor:pointer; font-weight:700; }
     button.active { background:linear-gradient(135deg, var(--accent-2), #6d5dfc); color:#fff; border-color:transparent; }
@@ -52,6 +53,17 @@
     .hist-chart { height:210px; }
     .empty { margin:32px auto; max-width:720px; text-align:center; color:var(--text-secondary); line-height:1.5; }
     .empty i { display:block; color:var(--accent-1); font-size:32px; margin-bottom:10px; }
+    .group-dialog-overlay { position:fixed; inset:0; z-index:2147483200; display:none; align-items:center; justify-content:center; padding:16px; background:rgba(3,7,18,.64); backdrop-filter:blur(3px); }
+    .group-dialog-overlay.is-visible { display:flex; }
+    .group-dialog { width:min(560px,94vw); max-height:86vh; display:flex; flex-direction:column; background:var(--surface-1); border:1px solid var(--border); border-radius:14px; box-shadow:0 24px 70px rgba(0,0,0,.42); overflow:hidden; }
+    .group-dialog-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:16px 18px; border-bottom:1px solid var(--border); }
+    .group-dialog-head strong { display:block; color:var(--accent-1); font-size:15px; margin-bottom:4px; }
+    .group-dialog-head span { color:var(--text-secondary); font-size:12px; line-height:1.4; }
+    .group-dialog-close { width:32px; height:32px; display:flex; align-items:center; justify-content:center; padding:0; border-radius:8px; }
+    .group-dialog-list { padding:10px; overflow:auto; }
+    .group-option { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; margin:4px 0; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); color:var(--text-primary); text-align:left; cursor:pointer; }
+    .group-option:hover, .group-option.is-selected { border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 45%, transparent); }
+    .group-option small { color:var(--text-secondary); font-weight:500; }
     @media (max-width: 900px) {
       .toolbar { align-items:flex-start; flex-direction:column; }
       .controls { justify-content:flex-start; }
@@ -71,7 +83,8 @@
             <span id="subtitle">Compare the selected numeric variable across a grouping column.</span>
           </div>
           <div class="controls">
-            <label class="control">Group by <select id="groupSelect"></select></label>
+            <span class="group-choice-label" id="groupChoiceLabel">No grouping column selected</span>
+            <button id="chooseGroupBtn" type="button" onclick="openGroupDialog()"><i class="fa-solid fa-layer-group"></i> Choose Group</button>
             <button id="tableTab" class="active" type="button" onclick="switchSubView('table')"><i class="fa-solid fa-table"></i> Stats Table</button>
             <button id="histTab" type="button" onclick="switchSubView('histograms')"><i class="fa-solid fa-chart-column"></i> Histogram Rows</button>
           </div>
@@ -107,6 +120,18 @@
           </div>
         </div>
       </section>
+    </div>
+  </div>
+  <div class="group-dialog-overlay" id="groupDialog" role="dialog" aria-modal="true" aria-labelledby="groupDialogTitle">
+    <div class="group-dialog">
+      <div class="group-dialog-head">
+        <div>
+          <strong id="groupDialogTitle">Select Grouping Column</strong>
+          <span>Choose the categorical or grouping column used to split the current filtered source rows.</span>
+        </div>
+        <button class="group-dialog-close" type="button" onclick="closeGroupDialog()" aria-label="Close group selection"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="group-dialog-list" id="groupDialogList"></div>
     </div>
   </div>
 
@@ -185,28 +210,55 @@
       analysisIndex = payload.columnIndex != null ? Number(payload.columnIndex) : 0;
       rows = normalizeRows(payload);
       if (!headers.length || !rows.length) return setEmpty('BY GROUP needs source rows from the workbook range.');
-      populateGroupSelect();
-      renderByGroup();
-      registerHeaderActions();
-    }
-
-    function populateGroupSelect() {
-      const select = document.getElementById('groupSelect');
-      select.innerHTML = '';
-      headers.forEach((header, idx) => {
-        const option = document.createElement('option');
-        option.value = String(idx);
-        option.textContent = idx === analysisIndex ? `${header} (analysis variable)` : header;
-        select.appendChild(option);
-      });
+      populateGroupChoices();
       const firstGroup = headers.findIndex((_, idx) => idx !== analysisIndex);
       groupIndex = firstGroup >= 0 ? firstGroup : analysisIndex;
-      select.value = String(groupIndex);
-      select.onchange = () => {
-        groupIndex = Number(select.value);
-        renderByGroup();
-        registerHeaderActions();
-      };
+      updateGroupChoiceLabel();
+      openGroupDialog();
+    }
+
+    function populateGroupChoices() {
+      const list = document.getElementById('groupDialogList');
+      list.innerHTML = headers.map((header, idx) => {
+        const sampleValues = Array.from(new Set(rows.slice(0, 250).map((row) => rowValue(row, idx, header)).filter((v) => v !== null && v !== undefined && v !== '').map(String)));
+        const uniqueCount = sampleValues.length;
+        const note = idx === analysisIndex ? 'analysis variable' : `${uniqueCount} sample level${uniqueCount === 1 ? '' : 's'}`;
+        return `<button type="button" class="group-option" data-group-index="${idx}" onclick="selectGroupColumn(${idx})">
+          <span>${escapeHtml(header)}</span><small>${escapeHtml(note)}</small>
+        </button>`;
+      }).join('');
+      refreshGroupDialogSelection();
+    }
+
+    function updateGroupChoiceLabel() {
+      document.getElementById('groupChoiceLabel').textContent = groupIndex == null
+        ? 'No grouping column selected'
+        : `Group by: ${headers[groupIndex] || 'Group'}`;
+    }
+
+    function refreshGroupDialogSelection() {
+      document.querySelectorAll('.group-option').forEach((btn) => {
+        btn.classList.toggle('is-selected', Number(btn.getAttribute('data-group-index')) === Number(groupIndex));
+      });
+    }
+
+    function openGroupDialog() {
+      if (!headers.length) return;
+      refreshGroupDialogSelection();
+      document.getElementById('groupDialog').classList.add('is-visible');
+    }
+
+    function closeGroupDialog() {
+      document.getElementById('groupDialog').classList.remove('is-visible');
+    }
+
+    function selectGroupColumn(idx) {
+      groupIndex = Number(idx);
+      updateGroupChoiceLabel();
+      refreshGroupDialogSelection();
+      closeGroupDialog();
+      renderByGroup();
+      registerHeaderActions();
     }
 
     function buildGroups() {

@@ -564,6 +564,8 @@ const StatisticoHeader = {
       { id: 'cdf', label: 'Cumulative Distribution', file: 'univariate/cumulative-distribution.html' },
       { id: 'percentile', label: 'Percentiles', file: 'univariate/percentile-standalone.html' },
       { id: 'kernel', label: 'Kernel Density', file: 'univariate/kernel-standalone.html' },
+      { id: 'separator-core-by-group', label: '---', file: null, isSeparator: true },
+      { id: 'group-by-group', label: 'By Group', file: null, isGroup: true },
       { id: 'by-group', label: 'By Group', file: 'univariate/by-group.html' },
       { id: 'separator-core-advanced', label: '---', file: null, isSeparator: true },
       { id: 'group-advanced', label: 'Advanced Diagnostics', file: null, isGroup: true },
@@ -760,7 +762,12 @@ const StatisticoHeader = {
               { type: 'navigate', view: 'boxplot', file: 'univariate/boxplot-standalone.html', icon: 'fa-chart-gantt', label: 'Box Plot' },
               { type: 'navigate', view: 'cdf', file: 'univariate/cumulative-distribution.html', icon: 'fa-wave-square', label: 'CDF' },
               { type: 'navigate', view: 'percentile', file: 'univariate/percentile-standalone.html', icon: 'fa-percent', label: 'Percentiles' },
-              { type: 'navigate', view: 'kernel', file: 'univariate/kernel-standalone.html', icon: 'fa-bezier-curve', label: 'Kernel Density' },
+              { type: 'navigate', view: 'kernel', file: 'univariate/kernel-standalone.html', icon: 'fa-bezier-curve', label: 'Kernel Density' }
+            ]
+          },
+          {
+            title: 'By Group',
+            items: [
               { type: 'navigate', view: 'by-group', file: 'univariate/by-group.html', icon: 'fa-layer-group', label: 'By Group' }
             ]
           },
@@ -1091,7 +1098,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260521v');
+          out.searchParams.set('build', '20260521w');
         }
         return out.href;
       } catch (e) {
@@ -2486,7 +2493,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260521v';
+    const v = '20260521w';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');

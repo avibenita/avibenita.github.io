@@ -1087,7 +1087,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260521s');
+          out.searchParams.set('build', '20260521t');
         }
         return out.href;
       } catch (e) {
@@ -2482,7 +2482,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260521s';
+    const v = '20260521t';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2807,6 +2807,39 @@ const StatisticoHeader = {
     return filteredRows.map((r) => Array.isArray(r) ? r.slice() : headers.map((h) => r && r[h]));
   },
 
+  _isWorkbookTablePayload(payload) {
+    if (!payload || typeof payload !== 'object') return false;
+    if (!Array.isArray(payload.headers) || !payload.headers.length || !Array.isArray(payload.data)) return false;
+    const first = payload.data[0];
+    return Array.isArray(first) || (!!first && typeof first === 'object');
+  },
+
+  _applyActiveRowFilterToWorkbookTablePayload(payload, moduleName) {
+    if (!payload || typeof payload !== 'object') return payload;
+    const headers = Array.isArray(payload.sourceHeaders) && payload.sourceHeaders.length
+      ? payload.sourceHeaders
+      : payload.headers;
+    if (!Array.isArray(headers) || !headers.length) return payload;
+    const state = this._getGenericRowFilterState(moduleName);
+    if (!state || !state.rowFilterActive) return payload;
+    if (!this._isHeaderRowFilterStateCompatible(state, headers)) return payload;
+    const allRows = this._normalizeRowFilterRows(payload.sourceRowsAll || payload.allRows || payload.data || state.allRows, headers);
+    if (!allRows.length) return payload;
+    const resolved = this._resolveFilteredRowsForState(headers, allRows, state);
+    const filteredRows = resolved.rows;
+    return {
+      ...payload,
+      headers: headers.slice(),
+      sourceHeaders: headers.slice(),
+      data: this._rowsForPayloadShape(headers, payload.data, filteredRows),
+      allRows,
+      sourceRowsAll: allRows,
+      sourceRows: filteredRows.map((r) => r.slice()),
+      usedRows: filteredRows.map((r) => r.slice()),
+      rowFilterActive: resolved.active
+    };
+  },
+
   _extractRowFilterValues(rows, columnIndex, transform, trim) {
     const idx = Number(columnIndex || 0);
     let values = (rows || [])
@@ -2832,6 +2865,9 @@ const StatisticoHeader = {
 
   _applyActiveRowFilterToUnivariatePayload(payload) {
     if (!payload || typeof payload !== 'object') return payload;
+    if (this._isWorkbookTablePayload(payload)) {
+      return this._applyActiveRowFilterToWorkbookTablePayload(payload, 'univariate');
+    }
     const headers = Array.isArray(payload.sourceHeaders) && payload.sourceHeaders.length
       ? payload.sourceHeaders
       : payload.headers;
@@ -3069,6 +3105,13 @@ const StatisticoHeader = {
   },
 
   shouldProcessUniPayload(data, viewKey, windowMs = 2500) {
+    try {
+      const filtered = this._applyActiveRowFilterToPayload(data, 'univariate');
+      if (filtered && filtered !== data && data && typeof data === 'object' && !Array.isArray(data)) {
+        Object.keys(data).forEach((key) => { delete data[key]; });
+        Object.assign(data, filtered);
+      }
+    } catch (_e) {}
     const sig = this._uniPayloadSignature(data, viewKey);
     const now = Date.now();
     const last = this._lastUniPayload || {};

@@ -1547,6 +1547,22 @@
         params.get('sample') === '1';
     }
 
+    function isSamplePayload(payload) {
+      if (!payload || typeof payload !== 'object') return false;
+      const source = String(payload.dataSource || '').toLowerCase();
+      return source.includes('demo sample') || source.includes('local browser test');
+    }
+
+    function clearStoredSamplePayload() {
+      try {
+        const stored = SR.tryLoadUnivariateFromStorage();
+        if (!isSamplePayload(stored)) return;
+        localStorage.removeItem('univariateResults');
+        sessionStorage.removeItem('univariateResults');
+        console.log('Cleared stored demo univariate payload before Office data load');
+      } catch (_e) {}
+    }
+
     var SR = window.StatisticoRuntime;
     var runtime = SR.createRuntime();
     SR.logRuntime(runtime, 'initial');
@@ -1572,6 +1588,11 @@
             console.log('Checking localStorage for univariateResults...');
             var parsedData = SR.tryLoadUnivariateFromStorage();
             if (parsedData) {
+              if (isSamplePayload(parsedData) && !shouldUseSampleData()) {
+                console.log('Ignoring stored demo payload while waiting for Office data');
+                clearStoredSamplePayload();
+                return;
+              }
               try {
                 console.log('Found data in localStorage');
                 handleDataReceived(parsedData);
@@ -1593,6 +1614,7 @@
       if (runtime.mode === SR.MODE.HUB_EMBED) {
         document.body.classList.add('demo-embed');
       }
+      if (!shouldUseSampleData()) clearStoredSamplePayload();
 
       StatisticoHeader.init('histogram', 'Variable', 0);
       if (typeof StatisticoHeader !== 'undefined') {

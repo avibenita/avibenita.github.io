@@ -1083,7 +1083,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260521g');
+          out.searchParams.set('build', '20260521h');
         }
         return out.href;
       } catch (e) {
@@ -2478,7 +2478,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260521g';
+    const v = '20260521h';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2563,7 +2563,20 @@ const StatisticoHeader = {
   },
 
   _rowFilterKey() {
-    return `${this.module || 'module'}::${this.currentView || 'view'}`;
+    return `${this.module || 'module'}`;
+  },
+
+  _rowFilterStorageKey() {
+    return `statistico-row-filter::${this._rowFilterKey()}`;
+  },
+
+  _isHeaderRowFilterStateCompatible(state, headers) {
+    if (!state || !Array.isArray(state.headers) || !Array.isArray(headers)) return false;
+    if (state.headers.length !== headers.length) return false;
+    for (let i = 0; i < headers.length; i += 1) {
+      if (String(state.headers[i]) !== String(headers[i])) return false;
+    }
+    return true;
   },
 
   _normalizeRowFilterRows(rows, headers) {
@@ -2578,13 +2591,28 @@ const StatisticoHeader = {
   },
 
   _getGenericRowFilterState() {
+    const key = this._rowFilterKey();
     const state = this._rowFilterStates || {};
-    return state[this._rowFilterKey()] || null;
+    if (state[key]) return state[key];
+    try {
+      const raw = sessionStorage.getItem(this._rowFilterStorageKey()) || localStorage.getItem(this._rowFilterStorageKey());
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      this._rowFilterStates = this._rowFilterStates || {};
+      this._rowFilterStates[key] = parsed;
+      return parsed;
+    } catch (_e) { return null; }
   },
 
   _setGenericRowFilterState(state) {
     this._rowFilterStates = this._rowFilterStates || {};
-    this._rowFilterStates[this._rowFilterKey()] = state;
+    const key = this._rowFilterKey();
+    this._rowFilterStates[key] = state;
+    try {
+      const raw = JSON.stringify(state || null);
+      sessionStorage.setItem(this._rowFilterStorageKey(), raw);
+      localStorage.setItem(this._rowFilterStorageKey(), raw);
+    } catch (_e) {}
   },
 
   _getHeaderRowFilterData() {
@@ -2603,9 +2631,14 @@ const StatisticoHeader = {
     if (!allRows.length) return null;
 
     const state = this._getGenericRowFilterState();
-    const usedRows = state && Array.isArray(state.usedRows)
-      ? state.usedRows
+    const canReuseState = this._isHeaderRowFilterStateCompatible(state, headers);
+    if (state && !canReuseState) this._setGenericRowFilterState(null);
+    const usedRows = canReuseState && Array.isArray(state.usedRows)
+      ? this._normalizeRowFilterRows(state.usedRows, headers)
       : this._normalizeRowFilterRows(result.usedRows || result.sourceRows || allRows, headers);
+    const rowFilterActive = canReuseState
+      ? !!state.rowFilterActive
+      : !!result.rowFilterActive;
 
     return {
       ...result,
@@ -2613,7 +2646,8 @@ const StatisticoHeader = {
       allRows,
       usedRows,
       sourceRowsAll: allRows,
-      sourceRows: usedRows
+      sourceRows: usedRows,
+      rowFilterActive
     };
   },
 
@@ -2621,6 +2655,7 @@ const StatisticoHeader = {
     if (!result || this.module === 'univariate') return result;
     const state = this._getGenericRowFilterState();
     if (!state || !state.rowFilterActive) return result;
+    if (!this._isHeaderRowFilterStateCompatible(state, result.headers || [])) return result;
     const notice = [
       result.notice,
       `Row filter active: showing ${state.usedRows.length} of ${state.allRows.length} source rows.`
@@ -2848,16 +2883,20 @@ const StatisticoHeader = {
       if (typeof UniRowFilter === 'undefined') return;
       const allRows = data.allRows || data.sourceRowsAll;
       const existing = this._getGenericRowFilterState();
+      const canReuseState = this._isHeaderRowFilterStateCompatible(existing, data.headers);
       UniRowFilter.init({
         headers: data.headers,
         rows: allRows,
         columnIndex: 0,
         onApply: (rows) => this.publishHeaderRowFilterChange(rows)
       });
-      if (existing && existing.rowFilterActive && existing.usedRows && UniRowFilter.setFilteredRows) {
+      if (canReuseState && existing.rowFilterActive && existing.usedRows && UniRowFilter.setFilteredRows) {
         UniRowFilter.setFilteredRows(existing.usedRows);
       }
-      this.updateUniFilterChrome(existing || data);
+      this.updateUniFilterChrome(canReuseState ? existing : data);
+      if (canReuseState && existing.rowFilterActive && Array.isArray(existing.usedRows)) {
+        this.publishHeaderRowFilterChange(existing.usedRows, true);
+      }
       return;
     }
     const data = this._getUniStored();

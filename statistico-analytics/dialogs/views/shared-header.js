@@ -1083,7 +1083,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260521j');
+          out.searchParams.set('build', '20260521k');
         }
         return out.href;
       } catch (e) {
@@ -2478,7 +2478,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260521j';
+    const v = '20260521k';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2488,11 +2488,15 @@ const StatisticoHeader = {
       document.head.appendChild(link);
     }
     const boot = () => {
-      this._ensureUniFilterOverlay();
-      this._ensureUniFilterHelpOverlay();
-      this._ensureUniFilterInHeader();
-      this._initUniRowFilterFromStorage();
-      this._installUniFilterChangeListener();
+      try {
+        this._ensureUniFilterOverlay();
+        this._ensureUniFilterHelpOverlay();
+        this._ensureUniFilterInHeader();
+        this._initUniRowFilterFromStorage();
+        this._installUniFilterChangeListener();
+      } catch (e) {
+        console.warn('Row filter bootstrap deferred:', e);
+      }
     };
     if (document.querySelector('script[data-uni-row-filter]') || document.querySelector('script[src*="uni-row-filter.js"]')) {
       boot();
@@ -2617,43 +2621,48 @@ const StatisticoHeader = {
 
   _getHeaderRowFilterData() {
     if (this.module === 'univariate') return this._getUniStored();
-    const actions = this._pendingActions || {};
-    if (typeof actions.getData !== 'function') return null;
-    let result = null;
-    try { result = actions.getData(); } catch (_e) { result = null; }
-    if (!result || typeof result !== 'object') return null;
-    const sourceHeaders = Array.isArray(result.sourceHeaders) && result.sourceHeaders.length
-      ? result.sourceHeaders
-      : result.headers;
-    if (!Array.isArray(sourceHeaders) || !sourceHeaders.length) return null;
+    try {
+      const actions = this._pendingActions || {};
+      if (typeof actions.getData !== 'function') return null;
+      let result = null;
+      try { result = actions.getData(); } catch (_e) { result = null; }
+      if (!result || typeof result !== 'object') return null;
+      const sourceHeaders = Array.isArray(result.sourceHeaders) && result.sourceHeaders.length
+        ? result.sourceHeaders
+        : result.headers;
+      if (!Array.isArray(sourceHeaders) || !sourceHeaders.length) return null;
 
-    const headers = sourceHeaders.slice();
-    const allRows = this._normalizeRowFilterRows(
-      result.sourceRowsAll || result.allRows || result.rows || result.usedRows,
-      headers
-    );
-    if (!allRows.length) return null;
+      const headers = sourceHeaders.slice();
+      const allRows = this._normalizeRowFilterRows(
+        result.sourceRowsAll || result.allRows || result.rows || result.usedRows,
+        headers
+      );
+      if (!allRows.length) return null;
 
-    const state = this._getGenericRowFilterState();
-    const canReuseState = this._isHeaderRowFilterStateCompatible(state, headers);
-    if (state && !canReuseState) this._setGenericRowFilterState(null);
-    const usedRows = canReuseState && Array.isArray(state.usedRows)
-      ? this._normalizeRowFilterRows(state.usedRows, headers)
-      : this._normalizeRowFilterRows(result.sourceRows || result.usedRows || allRows, headers);
-    const rowFilterActive = canReuseState
-      ? !!state.rowFilterActive
-      : !!result.rowFilterActive;
+      const state = this._getGenericRowFilterState();
+      const canReuseState = this._isHeaderRowFilterStateCompatible(state, headers);
+      if (state && !canReuseState) this._setGenericRowFilterState(null);
+      const usedRows = canReuseState && Array.isArray(state.usedRows)
+        ? this._normalizeRowFilterRows(state.usedRows, headers)
+        : this._normalizeRowFilterRows(result.sourceRows || result.usedRows || allRows, headers);
+      const rowFilterActive = canReuseState
+        ? !!state.rowFilterActive
+        : !!result.rowFilterActive;
 
-    return {
-      ...result,
-      headers,
-      allRows,
-      usedRows,
-      sourceHeaders: headers,
-      sourceRowsAll: allRows,
-      sourceRows: usedRows,
-      rowFilterActive
-    };
+      return {
+        ...result,
+        headers,
+        allRows,
+        usedRows,
+        sourceHeaders: headers,
+        sourceRowsAll: allRows,
+        sourceRows: usedRows,
+        rowFilterActive
+      };
+    } catch (e) {
+      console.warn('Row filter data unavailable:', e);
+      return null;
+    }
   },
 
   _applyGenericHeaderRowFilterFallback(payload) {

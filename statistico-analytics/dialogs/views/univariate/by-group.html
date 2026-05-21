@@ -6,9 +6,9 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
-  <link rel="stylesheet" href="../shared-header.css?v=20260521x" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260521y" />
   <script src="../shared-brand-logo.js?v=20260519u"></script>
-  <script src="../shared-header.js?v=20260521x"></script>
+  <script src="../shared-header.js?v=20260521y"></script>
   <style>
     :root {
       --surface-0:#0c1624; --surface-1:#1a1f2e; --surface-2:#242938; --border:#2d3748;
@@ -66,6 +66,9 @@
     .group-option:hover, .group-option.is-selected { border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 45%, transparent); }
     .group-option small { color:var(--text-secondary); font-weight:500; }
     .level-preview { padding:12px; overflow:auto; min-height:360px; }
+    .level-preview.is-hidden { display:none; }
+    .level-placeholder { display:flex; height:100%; min-height:320px; align-items:center; justify-content:center; color:var(--text-secondary); text-align:center; padding:20px; font-size:13px; line-height:1.5; }
+    .level-placeholder i { display:block; color:var(--accent-1); font-size:28px; margin-bottom:10px; }
     .level-preview-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:10px; }
     .level-preview-head strong { color:var(--accent-1); font-size:13px; }
     .level-preview-head span { display:block; color:var(--text-secondary); font-size:11px; margin-top:3px; }
@@ -147,7 +150,8 @@
       </div>
       <div class="group-dialog-body">
         <div class="group-dialog-list" id="groupDialogList"></div>
-        <div class="level-preview" id="groupLevelPreview"></div>
+        <div class="level-preview is-hidden" id="groupLevelPreview"></div>
+        <div class="level-placeholder" id="groupLevelPlaceholder"><div><i class="fa-solid fa-hand-pointer"></i>Select a grouping column to see its categories and n.</div></div>
       </div>
     </div>
   </div>
@@ -267,10 +271,9 @@
       rows = normalizeRows(payload);
       if (!headers.length || !rows.length) return setEmpty('BY GROUP needs source rows from the workbook range.');
       populateGroupChoices();
-      const firstGroup = headers.findIndex((_, idx) => idx !== analysisIndex);
-      groupIndex = firstGroup >= 0 ? firstGroup : analysisIndex;
+      groupIndex = null;
       updateGroupChoiceLabel();
-      renderLevelPreview(groupIndex);
+      hideLevelPreview();
       openGroupDialog();
     }
 
@@ -279,7 +282,7 @@
       list.innerHTML = headers.map((header, idx) => {
         const levels = getLevelCounts(idx);
         const note = idx === analysisIndex ? 'analysis variable' : `${levels.length} level${levels.length === 1 ? '' : 's'}, n=${levels.reduce((sum, item) => sum + item.n, 0)}`;
-        return `<button type="button" class="group-option" data-group-index="${idx}" onmouseenter="renderLevelPreview(${idx})" onfocus="renderLevelPreview(${idx})" onclick="selectGroupColumn(${idx}, true)">
+        return `<button type="button" class="group-option" data-group-index="${idx}" onclick="selectGroupColumn(${idx}, true)">
           <span>${escapeHtml(header)}</span><small>${escapeHtml(note)}</small>
         </button>`;
       }).join('');
@@ -298,8 +301,22 @@
       });
     }
 
+    function hideLevelPreview() {
+      const preview = document.getElementById('groupLevelPreview');
+      const placeholder = document.getElementById('groupLevelPlaceholder');
+      if (preview) {
+        preview.classList.add('is-hidden');
+        preview.innerHTML = '';
+      }
+      if (placeholder) placeholder.style.display = 'flex';
+    }
+
     function renderLevelPreview(idx) {
       previewGroupIndex = Number(idx);
+      const preview = document.getElementById('groupLevelPreview');
+      const placeholder = document.getElementById('groupLevelPlaceholder');
+      if (preview) preview.classList.remove('is-hidden');
+      if (placeholder) placeholder.style.display = 'none';
       ensureLevelSelection(previewGroupIndex);
       previewLevels = getLevelCounts(previewGroupIndex);
       const selectedCount = previewLevels.filter((item) => isLevelIncluded(previewGroupIndex, item.level)).length;
@@ -323,7 +340,7 @@
           </div>
         `).join('') || '<div class="empty"><i class="fa-solid fa-circle-info"></i>No levels with numeric values.</div>'
       ].join('');
-      document.getElementById('groupLevelPreview').innerHTML = html;
+      preview.innerHTML = html;
     }
 
     function togglePreviewLevel(pos, included) {
@@ -351,6 +368,8 @@
     function openGroupDialog() {
       if (!headers.length) return;
       refreshGroupDialogSelection();
+      if (groupIndex == null) hideLevelPreview();
+      else renderLevelPreview(groupIndex);
       document.getElementById('groupDialog').classList.add('is-visible');
     }
 

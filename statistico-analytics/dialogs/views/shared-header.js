@@ -1087,7 +1087,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260521q');
+          out.searchParams.set('build', '20260521r');
         }
         return out.href;
       } catch (e) {
@@ -2482,7 +2482,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260521q';
+    const v = '20260521r';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2598,6 +2598,61 @@ const StatisticoHeader = {
     });
   },
 
+  _cloneRowFilterCriteria(criteria) {
+    const out = {};
+    Object.keys(criteria || {}).forEach((key) => {
+      out[key] = Array.isArray(criteria[key]) ? criteria[key].slice() : [];
+    });
+    return out;
+  },
+
+  _getCurrentRowFilterCriteria() {
+    if (typeof UniRowFilter !== 'undefined' && typeof UniRowFilter.getColumnFilters === 'function') {
+      return this._cloneRowFilterCriteria(UniRowFilter.getColumnFilters());
+    }
+    const state = this._getGenericRowFilterState();
+    return this._cloneRowFilterCriteria(state && state.columnFilters);
+  },
+
+  _hasActiveRowFilterCriteria(criteria) {
+    return Object.keys(criteria || {}).some((key) => Array.isArray(criteria[key]) && criteria[key].length > 0);
+  },
+
+  _cellFilterValue(value) {
+    if (value === null || value === undefined) return '';
+    return String(value).trim();
+  },
+
+  _applyRowFilterCriteria(rows, criteria) {
+    if (!this._hasActiveRowFilterCriteria(criteria)) return (rows || []).map((r) => Array.isArray(r) ? r.slice() : r);
+    return (rows || []).filter((row) => {
+      for (const key of Object.keys(criteria || {})) {
+        const filter = criteria[key];
+        if (!Array.isArray(filter) || !filter.length) continue;
+        if (filter.indexOf('__SHOW_NOTHING__') >= 0) return false;
+        const idx = Number(key);
+        const value = this._cellFilterValue(Array.isArray(row) ? row[idx] : row && row[idx]);
+        if (filter.map((v) => this._cellFilterValue(v)).indexOf(value) < 0) return false;
+      }
+      return true;
+    }).map((r) => Array.isArray(r) ? r.slice() : r);
+  },
+
+  _resolveFilteredRowsForState(headers, allRows, state) {
+    if (!state || !this._isHeaderRowFilterStateCompatible(state, headers)) {
+      return { rows: allRows.map((r) => r.slice()), active: false };
+    }
+    const criteria = this._cloneRowFilterCriteria(state.columnFilters);
+    if (this._hasActiveRowFilterCriteria(criteria)) {
+      const rows = this._applyRowFilterCriteria(allRows, criteria);
+      return { rows, active: rows.length !== allRows.length };
+    }
+    if (state.rowFilterActive && Array.isArray(state.usedRows)) {
+      return { rows: this._normalizeRowFilterRows(state.usedRows, headers), active: true };
+    }
+    return { rows: allRows.map((r) => r.slice()), active: false };
+  },
+
   _getGenericRowFilterState(moduleName) {
     const key = this._rowFilterKey(moduleName);
     const state = this._rowFilterStates || {};
@@ -2648,12 +2703,11 @@ const StatisticoHeader = {
       const state = this._getGenericRowFilterState();
       const canReuseState = this._isHeaderRowFilterStateCompatible(state, headers);
       if (state && !canReuseState) this._setGenericRowFilterState(null);
-      const usedRows = canReuseState && Array.isArray(state.usedRows)
-        ? this._normalizeRowFilterRows(state.usedRows, headers)
-        : this._normalizeRowFilterRows(result.sourceRows || result.usedRows || allRows, headers);
-      const rowFilterActive = canReuseState
-        ? !!state.rowFilterActive
-        : !!result.rowFilterActive;
+      const resolved = canReuseState
+        ? this._resolveFilteredRowsForState(headers, allRows, state)
+        : { rows: this._normalizeRowFilterRows(result.sourceRows || result.usedRows || allRows, headers), active: !!result.rowFilterActive };
+      const usedRows = resolved.rows;
+      const rowFilterActive = resolved.active;
 
       return {
         ...result,
@@ -2785,8 +2839,10 @@ const StatisticoHeader = {
     const state = this._getGenericRowFilterState('univariate');
     if (!state || !state.rowFilterActive || !Array.isArray(state.usedRows)) return payload;
     if (!this._isHeaderRowFilterStateCompatible(state, headers)) return payload;
-    const sourceRows = state.usedRows.map((r) => Array.isArray(r) ? r.slice() : headers.map((h) => r && r[h]));
-    const sourceRowsAll = Array.isArray(state.allRows) ? state.allRows.map((r) => r.slice()) : null;
+    const payloadAllRows = this._normalizeRowFilterRows(payload.sourceRowsAll || payload.allRows || state.allRows || payload.sourceRows || state.usedRows, headers);
+    const sourceRowsAll = payloadAllRows.length ? payloadAllRows : (Array.isArray(state.allRows) ? state.allRows.map((r) => r.slice()) : null);
+    const resolved = this._resolveFilteredRowsForState(headers, sourceRowsAll || [], state);
+    const sourceRows = resolved.rows;
     const columnIndex = payload.columnIndex != null ? Number(payload.columnIndex) : (state.columnIndex != null ? Number(state.columnIndex) : 0);
     const values = this._extractRowFilterValues(sourceRows, columnIndex, payload.transform, payload.trim);
     return {
@@ -2798,7 +2854,7 @@ const StatisticoHeader = {
       data: values,
       rawData: values,
       n: values.length,
-      rowFilterActive: true
+      rowFilterActive: resolved.active
     };
   },
 
@@ -2816,8 +2872,10 @@ const StatisticoHeader = {
     if (!this._isHeaderRowFilterStateCompatible(state, headers)) return payload;
 
     const filteredHeaders = state.headers.slice();
-    const filteredRows = state.usedRows.map((r) => Array.isArray(r) ? r.slice() : filteredHeaders.map((h) => r && r[h]));
-    const sourceRowsAll = Array.isArray(state.allRows) ? state.allRows.map((r) => r.slice()) : null;
+    const payloadAllRows = this._normalizeRowFilterRows(payload.sourceRowsAll || payload.allRows || payload.data || payload.rows || state.allRows || state.usedRows, filteredHeaders);
+    const sourceRowsAll = payloadAllRows.length ? payloadAllRows : (Array.isArray(state.allRows) ? state.allRows.map((r) => r.slice()) : null);
+    const resolved = this._resolveFilteredRowsForState(filteredHeaders, sourceRowsAll || [], state);
+    const filteredRows = resolved.rows;
     const sourceRows = filteredRows.map((r) => r.slice());
     const shapedRows = this._rowsForPayloadShape(filteredHeaders, this._firstPayloadRows(payload), filteredRows);
 
@@ -2828,7 +2886,7 @@ const StatisticoHeader = {
       sourceRowsAll,
       sourceRows,
       usedRows: sourceRows,
-      rowFilterActive: true
+      rowFilterActive: resolved.active
     };
     if (Array.isArray(payload.data)) out.data = shapedRows;
     if (Array.isArray(payload.rows)) out.rows = shapedRows;
@@ -3056,6 +3114,7 @@ const StatisticoHeader = {
       headers: (m.sourceHeaders || []).slice ? m.sourceHeaders.slice() : (m.sourceHeaders || []),
       allRows: (allRows || []).map((r) => Array.isArray(r) ? r.slice() : r),
       usedRows: (filteredRows || []).map((r) => Array.isArray(r) ? r.slice() : r),
+      columnFilters: this._getCurrentRowFilterCriteria(),
       sourceHeaders: m.sourceHeaders,
       sourceRowsAll: allRows,
       sourceRows: filteredRows,
@@ -3088,6 +3147,7 @@ const StatisticoHeader = {
       headers: data.headers.slice(),
       allRows: allRows.map((r) => r.slice()),
       usedRows: rows.map((r) => r.slice()),
+      columnFilters: this._getCurrentRowFilterCriteria(),
       sourceRowsAll: allRows.map((r) => r.slice()),
       sourceRows: rows.map((r) => r.slice()),
       rowFilterActive: active,
@@ -3185,11 +3245,12 @@ const StatisticoHeader = {
         onApply: (rows) => this.publishHeaderRowFilterChange(rows)
       });
       if (canReuseState && existing.rowFilterActive && existing.usedRows && UniRowFilter.setFilteredRows) {
-        UniRowFilter.setFilteredRows(existing.usedRows);
+        if (existing.columnFilters && UniRowFilter.setColumnFilters) UniRowFilter.setColumnFilters(existing.columnFilters, true);
+        UniRowFilter.setFilteredRows(this._resolveFilteredRowsForState(data.headers, allRows, existing).rows);
       }
       this.updateUniFilterChrome(canReuseState ? existing : data);
       if (canReuseState && existing.rowFilterActive && Array.isArray(existing.usedRows)) {
-        this.publishHeaderRowFilterChange(existing.usedRows, true);
+        this.publishHeaderRowFilterChange(this._resolveFilteredRowsForState(data.headers, allRows, existing).rows, true);
       }
       return;
     }
@@ -3204,14 +3265,23 @@ const StatisticoHeader = {
       columnIndex: data.columnIndex != null ? Number(data.columnIndex) : 0,
       onApply: (rows) => this.publishUniFilterChange(rows)
     });
+    const existing = this._getGenericRowFilterState('univariate');
+    const canReuseState = this._isHeaderRowFilterStateCompatible(existing, data.sourceHeaders);
+    if (canReuseState && existing.columnFilters && UniRowFilter.setColumnFilters) {
+      UniRowFilter.setColumnFilters(existing.columnFilters, true);
+      if (UniRowFilter.setFilteredRows) {
+        UniRowFilter.setFilteredRows(this._resolveFilteredRowsForState(data.sourceHeaders, allRows, existing).rows);
+      }
+    }
     if (data.sourceRows && data.sourceRows.length < allRows.length && UniRowFilter.setFilteredRows) {
       UniRowFilter.setFilteredRows(data.sourceRows);
     }
-    if (data.sourceRows && data.sourceRows.length < allRows.length) {
+    if (!canReuseState && data.sourceRows && data.sourceRows.length < allRows.length) {
       this._setGenericRowFilterState({
         headers: data.sourceHeaders.slice(),
         allRows: allRows.map((r) => Array.isArray(r) ? r.slice() : r),
         usedRows: data.sourceRows.map((r) => Array.isArray(r) ? r.slice() : r),
+        columnFilters: this._getCurrentRowFilterCriteria(),
         sourceHeaders: data.sourceHeaders,
         sourceRowsAll: allRows,
         sourceRows: data.sourceRows,

@@ -30,6 +30,14 @@
     return set;
   }
 
+  function cloneColumnFilters(filters) {
+    var out = {};
+    Object.keys(filters || {}).forEach(function (key) {
+      out[key] = Array.isArray(filters[key]) ? filters[key].slice() : [];
+    });
+    return out;
+  }
+
   function escHtml(s) {
     return String(s)
       .replace(/&/g, '&amp;')
@@ -416,6 +424,19 @@
     return _filteredRows.slice();
   }
 
+  function getColumnFilters() {
+    return cloneColumnFilters(_columnFilters);
+  }
+
+  function setColumnFilters(filters, skipApply) {
+    _columnFilters = {};
+    getColumnIndices().forEach(function (i) {
+      var v = filters && (filters[i] || filters[String(i)]);
+      _columnFilters[i] = Array.isArray(v) ? v.slice() : [];
+    });
+    if (!skipApply) applyAllFilters();
+  }
+
   function setFilteredRows(rows) {
     _filteredRows = (rows || []).map(function (r) { return r.slice(); });
     updateBadge();
@@ -445,6 +466,8 @@
     hasActiveFilters: hasActiveFilters,
     updateBadge: updateBadge,
     setFilteredRows: setFilteredRows,
+    getColumnFilters: getColumnFilters,
+    setColumnFilters: setColumnFilters,
     clickHeaderByIndex: clickHeaderByIndex
   };
 })(typeof window !== 'undefined' ? window : this);

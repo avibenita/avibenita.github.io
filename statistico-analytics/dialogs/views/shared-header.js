@@ -205,6 +205,11 @@ const StatisticoHeader = {
       this.module = 'univariate';
     }
 
+    if (this.module === 'correlations') {
+      this._applyActiveRowFilterToCorrelationStorage();
+      this._installRowFilterMessagePayloadInterceptor();
+    }
+
     // Apply persisted theme before rendering (avoids flash of wrong theme)
     this.applyTheme(this.getTheme());
 
@@ -1083,7 +1088,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260521n');
+          out.searchParams.set('build', '20260521o');
         }
         return out.href;
       } catch (e) {
@@ -2478,7 +2483,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260521n';
+    const v = '20260521o';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2686,6 +2691,72 @@ const StatisticoHeader = {
         window[key] = table.map((row) => row.slice());
       });
     } catch (_e) {}
+  },
+
+  _rowFilterRowsToObjects(headers, rows) {
+    return (Array.isArray(rows) ? rows : []).map((row) => {
+      const out = {};
+      headers.forEach((header, idx) => {
+        out[header] = Array.isArray(row) ? row[idx] : (row && row[header]);
+      });
+      return out;
+    });
+  },
+
+  _applyActiveRowFilterToCorrelationPayload(payload) {
+    if (!payload || !Array.isArray(payload.headers) || !Array.isArray(payload.data)) return payload;
+    const state = this._getGenericRowFilterState();
+    if (!state || !state.rowFilterActive || !Array.isArray(state.usedRows)) return payload;
+    if (!this._isHeaderRowFilterStateCompatible(state, payload.headers)) return payload;
+    const headers = state.headers.slice();
+    return {
+      ...payload,
+      headers,
+      data: this._rowFilterRowsToObjects(headers, state.usedRows),
+      rowFilterActive: true,
+      sourceRowsAll: Array.isArray(state.allRows) ? state.allRows.map((r) => r.slice()) : null,
+      sourceRows: state.usedRows.map((r) => r.slice())
+    };
+  },
+
+  _applyActiveRowFilterToCorrelationStorage() {
+    if (this.module !== 'correlations') return;
+    try {
+      const raw = sessionStorage.getItem('correlationData');
+      if (!raw) return;
+      const filtered = this._applyActiveRowFilterToCorrelationPayload(JSON.parse(raw));
+      if (filtered) {
+        sessionStorage.setItem('correlationData', JSON.stringify(filtered));
+        window.correlationData = filtered;
+      }
+    } catch (_e) {}
+  },
+
+  _installRowFilterMessagePayloadInterceptor() {
+    if (window.__statisticoRowFilterMessageInterceptorInstalled) return;
+    if (!window.Office || !Office.context || !Office.context.ui || typeof Office.context.ui.addHandlerAsync !== 'function') return;
+    window.__statisticoRowFilterMessageInterceptorInstalled = true;
+    const originalAddHandlerAsync = Office.context.ui.addHandlerAsync.bind(Office.context.ui);
+    Office.context.ui.addHandlerAsync = function(eventType, handler, options, callback) {
+      const isDialogMessage = Office.EventType && eventType === Office.EventType.DialogParentMessageReceived;
+      if (!isDialogMessage || typeof handler !== 'function') {
+        return originalAddHandlerAsync(eventType, handler, options, callback);
+      }
+      const wrappedHandler = function(arg) {
+        try {
+          const message = JSON.parse(arg && arg.message ? arg.message : '{}');
+          if (message && message.type === 'CORRELATION_DATA' && message.payload && window.StatisticoHeader) {
+            message.payload = window.StatisticoHeader._applyActiveRowFilterToCorrelationPayload(message.payload);
+            try { sessionStorage.setItem('correlationData', JSON.stringify(message.payload)); } catch (_e) {}
+            const wrappedArg = Object.create(arg || {});
+            wrappedArg.message = JSON.stringify(message);
+            return handler(wrappedArg);
+          }
+        } catch (_e) {}
+        return handler(arg);
+      };
+      return originalAddHandlerAsync(eventType, wrappedHandler, options, callback);
+    };
   },
 
   _applyHeaderRowFilterToDataResult(result) {

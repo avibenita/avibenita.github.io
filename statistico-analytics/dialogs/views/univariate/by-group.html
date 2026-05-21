@@ -6,9 +6,9 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
-  <link rel="stylesheet" href="../shared-header.css?v=20260521w" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260521x" />
   <script src="../shared-brand-logo.js?v=20260519u"></script>
-  <script src="../shared-header.js?v=20260521w"></script>
+  <script src="../shared-header.js?v=20260521x"></script>
   <style>
     :root {
       --surface-0:#0c1624; --surface-1:#1a1f2e; --surface-2:#242938; --border:#2d3748;
@@ -55,19 +55,33 @@
     .empty i { display:block; color:var(--accent-1); font-size:32px; margin-bottom:10px; }
     .group-dialog-overlay { position:fixed; inset:0; z-index:2147483200; display:none; align-items:center; justify-content:center; padding:16px; background:rgba(3,7,18,.64); backdrop-filter:blur(3px); }
     .group-dialog-overlay.is-visible { display:flex; }
-    .group-dialog { width:min(560px,94vw); max-height:86vh; display:flex; flex-direction:column; background:var(--surface-1); border:1px solid var(--border); border-radius:14px; box-shadow:0 24px 70px rgba(0,0,0,.42); overflow:hidden; }
+    .group-dialog { width:min(920px,96vw); max-height:86vh; display:flex; flex-direction:column; background:var(--surface-1); border:1px solid var(--border); border-radius:14px; box-shadow:0 24px 70px rgba(0,0,0,.42); overflow:hidden; }
     .group-dialog-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:16px 18px; border-bottom:1px solid var(--border); }
     .group-dialog-head strong { display:block; color:var(--accent-1); font-size:15px; margin-bottom:4px; }
     .group-dialog-head span { color:var(--text-secondary); font-size:12px; line-height:1.4; }
     .group-dialog-close { width:32px; height:32px; display:flex; align-items:center; justify-content:center; padding:0; border-radius:8px; }
-    .group-dialog-list { padding:10px; overflow:auto; }
+    .group-dialog-body { display:grid; grid-template-columns:minmax(250px, 1fr) minmax(280px, 1fr); gap:0; min-height:0; overflow:hidden; }
+    .group-dialog-list { padding:10px; overflow:auto; border-right:1px solid var(--border); }
     .group-option { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; margin:4px 0; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); color:var(--text-primary); text-align:left; cursor:pointer; }
     .group-option:hover, .group-option.is-selected { border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 45%, transparent); }
     .group-option small { color:var(--text-secondary); font-weight:500; }
+    .level-preview { padding:12px; overflow:auto; min-height:360px; }
+    .level-preview-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:10px; }
+    .level-preview-head strong { color:var(--accent-1); font-size:13px; }
+    .level-preview-head span { display:block; color:var(--text-secondary); font-size:11px; margin-top:3px; }
+    .level-actions { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; margin-bottom:8px; }
+    .level-actions button { padding:5px 8px; font-size:11px; }
+    .level-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 8px; border:1px solid var(--border); border-radius:8px; background:rgba(15,23,42,.22); margin-bottom:5px; color:var(--text-primary); font-size:12px; }
+    .level-row label { display:flex; align-items:center; gap:8px; min-width:0; cursor:pointer; }
+    .level-row input { accent-color:var(--accent-1); }
+    .level-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .level-n { color:var(--text-secondary); font-size:11px; white-space:nowrap; }
     @media (max-width: 900px) {
       .toolbar { align-items:flex-start; flex-direction:column; }
       .controls { justify-content:flex-start; }
       .summary-strip { grid-template-columns:repeat(2, minmax(120px, 1fr)); }
+      .group-dialog-body { grid-template-columns:1fr; }
+      .group-dialog-list { border-right:none; border-bottom:1px solid var(--border); max-height:280px; }
     }
   </style>
 </head>
@@ -131,7 +145,10 @@
         </div>
         <button class="group-dialog-close" type="button" onclick="closeGroupDialog()" aria-label="Close group selection"><i class="fa-solid fa-xmark"></i></button>
       </div>
-      <div class="group-dialog-list" id="groupDialogList"></div>
+      <div class="group-dialog-body">
+        <div class="group-dialog-list" id="groupDialogList"></div>
+        <div class="level-preview" id="groupLevelPreview"></div>
+      </div>
     </div>
   </div>
 
@@ -142,6 +159,9 @@
     let analysisIndex = 0;
     let groupIndex = null;
     let groupStats = [];
+    let previewGroupIndex = null;
+    let previewLevels = [];
+    const levelSelections = {};
 
     function fmt(value, digits = 2) {
       const n = Number(value);
@@ -179,6 +199,42 @@
       return Array.isArray(row) ? row[idx] : row && row[name];
     }
 
+    function levelKey(value) {
+      return value === null || value === undefined || value === '' ? '(blank)' : String(value);
+    }
+
+    function getLevelCounts(idx) {
+      const counts = new Map();
+      rows.forEach((row) => {
+        const rawValue = rowValue(row, analysisIndex, headers[analysisIndex]);
+        const value = typeof rawValue === 'number' ? rawValue : parseFloat(rawValue);
+        if (!Number.isFinite(value)) return;
+        const key = levelKey(rowValue(row, idx, headers[idx]));
+        counts.set(key, (counts.get(key) || 0) + 1);
+      });
+      return Array.from(counts.entries())
+        .map(([level, n]) => ({ level, n }))
+        .sort((a, b) => String(a.level).localeCompare(String(b.level), undefined, { numeric: true }));
+    }
+
+    function ensureLevelSelection(idx) {
+      const key = String(idx);
+      const levels = getLevelCounts(idx);
+      if (!levelSelections[key]) levelSelections[key] = {};
+      levels.forEach((item) => {
+        if (levelSelections[key][item.level] === undefined) levelSelections[key][item.level] = true;
+      });
+      Object.keys(levelSelections[key]).forEach((level) => {
+        if (!levels.some((item) => item.level === level)) delete levelSelections[key][level];
+      });
+      return levelSelections[key];
+    }
+
+    function isLevelIncluded(idx, level) {
+      const selection = ensureLevelSelection(idx);
+      return selection[level] !== false;
+    }
+
     function normalizeRows(data) {
       const source = data.sourceRows || data.usedRows || data.rows || data.sourceRowsAll || data.allRows || [];
       return source.map((row) => Array.isArray(row) ? row.slice() : headers.map((h) => row && row[h]));
@@ -214,16 +270,16 @@
       const firstGroup = headers.findIndex((_, idx) => idx !== analysisIndex);
       groupIndex = firstGroup >= 0 ? firstGroup : analysisIndex;
       updateGroupChoiceLabel();
+      renderLevelPreview(groupIndex);
       openGroupDialog();
     }
 
     function populateGroupChoices() {
       const list = document.getElementById('groupDialogList');
       list.innerHTML = headers.map((header, idx) => {
-        const sampleValues = Array.from(new Set(rows.slice(0, 250).map((row) => rowValue(row, idx, header)).filter((v) => v !== null && v !== undefined && v !== '').map(String)));
-        const uniqueCount = sampleValues.length;
-        const note = idx === analysisIndex ? 'analysis variable' : `${uniqueCount} sample level${uniqueCount === 1 ? '' : 's'}`;
-        return `<button type="button" class="group-option" data-group-index="${idx}" onclick="selectGroupColumn(${idx})">
+        const levels = getLevelCounts(idx);
+        const note = idx === analysisIndex ? 'analysis variable' : `${levels.length} level${levels.length === 1 ? '' : 's'}, n=${levels.reduce((sum, item) => sum + item.n, 0)}`;
+        return `<button type="button" class="group-option" data-group-index="${idx}" onmouseenter="renderLevelPreview(${idx})" onfocus="renderLevelPreview(${idx})" onclick="selectGroupColumn(${idx}, true)">
           <span>${escapeHtml(header)}</span><small>${escapeHtml(note)}</small>
         </button>`;
       }).join('');
@@ -242,6 +298,56 @@
       });
     }
 
+    function renderLevelPreview(idx) {
+      previewGroupIndex = Number(idx);
+      ensureLevelSelection(previewGroupIndex);
+      previewLevels = getLevelCounts(previewGroupIndex);
+      const selectedCount = previewLevels.filter((item) => isLevelIncluded(previewGroupIndex, item.level)).length;
+      const totalN = previewLevels.reduce((sum, item) => sum + item.n, 0);
+      const html = [
+        `<div class="level-preview-head">
+          <div><strong>${escapeHtml(headers[previewGroupIndex] || 'Group')}</strong><span>${selectedCount} of ${previewLevels.length} levels included, n=${totalN}</span></div>
+        </div>`,
+        `<div class="level-actions">
+          <button type="button" onclick="setAllPreviewLevels(true)">Include all</button>
+          <button type="button" onclick="setAllPreviewLevels(false)">Exclude all</button>
+          <button type="button" onclick="closeGroupDialog()">Done</button>
+        </div>`,
+        previewLevels.map((item, pos) => `
+          <div class="level-row">
+            <label title="${escapeHtml(item.level)}">
+              <input type="checkbox" ${isLevelIncluded(previewGroupIndex, item.level) ? 'checked' : ''} onchange="togglePreviewLevel(${pos}, this.checked)" />
+              <span class="level-name">${escapeHtml(item.level)}</span>
+            </label>
+            <span class="level-n">n=${item.n}</span>
+          </div>
+        `).join('') || '<div class="empty"><i class="fa-solid fa-circle-info"></i>No levels with numeric values.</div>'
+      ].join('');
+      document.getElementById('groupLevelPreview').innerHTML = html;
+    }
+
+    function togglePreviewLevel(pos, included) {
+      const item = previewLevels[pos];
+      if (!item) return;
+      const selection = ensureLevelSelection(previewGroupIndex);
+      selection[item.level] = !!included;
+      if (previewGroupIndex === groupIndex) {
+        renderByGroup();
+        registerHeaderActions();
+      }
+      renderLevelPreview(previewGroupIndex);
+    }
+
+    function setAllPreviewLevels(included) {
+      const selection = ensureLevelSelection(previewGroupIndex);
+      previewLevels.forEach((item) => { selection[item.level] = !!included; });
+      if (previewGroupIndex === groupIndex) {
+        renderByGroup();
+        registerHeaderActions();
+      }
+      renderLevelPreview(previewGroupIndex);
+    }
+
     function openGroupDialog() {
       if (!headers.length) return;
       refreshGroupDialogSelection();
@@ -252,11 +358,12 @@
       document.getElementById('groupDialog').classList.remove('is-visible');
     }
 
-    function selectGroupColumn(idx) {
+    function selectGroupColumn(idx, keepDialogOpen) {
       groupIndex = Number(idx);
       updateGroupChoiceLabel();
       refreshGroupDialogSelection();
-      closeGroupDialog();
+      renderLevelPreview(groupIndex);
+      if (!keepDialogOpen) closeGroupDialog();
       renderByGroup();
       registerHeaderActions();
     }
@@ -265,7 +372,8 @@
       const groups = new Map();
       rows.forEach((row) => {
         const rawGroup = rowValue(row, groupIndex, headers[groupIndex]);
-        const group = rawGroup === null || rawGroup === undefined || rawGroup === '' ? '(blank)' : String(rawGroup);
+        const group = levelKey(rawGroup);
+        if (!isLevelIncluded(groupIndex, group)) return;
         const rawValue = rowValue(row, analysisIndex, headers[analysisIndex]);
         const value = typeof rawValue === 'number' ? rawValue : parseFloat(rawValue);
         if (!Number.isFinite(value)) return;

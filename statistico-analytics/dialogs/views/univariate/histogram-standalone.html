@@ -1563,6 +1563,29 @@
       } catch (_e) {}
     }
 
+    function loadStoredResultsIfAvailable() {
+      if (histogramChart) return false;
+      console.log('Checking localStorage for univariateResults...');
+      var parsedData = SR.tryLoadUnivariateFromStorage();
+      if (!parsedData) {
+        console.log('No localStorage data found');
+        return false;
+      }
+      if (isSamplePayload(parsedData) && !shouldUseSampleData()) {
+        console.log('Ignoring stored demo payload while waiting for Office data');
+        clearStoredSamplePayload();
+        return false;
+      }
+      try {
+        console.log('Found data in localStorage');
+        handleDataReceived(parsedData);
+        return true;
+      } catch (e) {
+        console.error('? Error parsing localStorage data:', e);
+        return false;
+      }
+    }
+
     var SR = window.StatisticoRuntime;
     var runtime = SR.createRuntime();
     SR.logRuntime(runtime, 'initial');
@@ -1584,25 +1607,7 @@
           sendMessageToParent({ status: 'ready' });
         }, 500);
         setTimeout(function () {
-          if (!histogramChart) {
-            console.log('Checking localStorage for univariateResults...');
-            var parsedData = SR.tryLoadUnivariateFromStorage();
-            if (parsedData) {
-              if (isSamplePayload(parsedData) && !shouldUseSampleData()) {
-                console.log('Ignoring stored demo payload while waiting for Office data');
-                clearStoredSamplePayload();
-                return;
-              }
-              try {
-                console.log('Found data in localStorage');
-                handleDataReceived(parsedData);
-              } catch (e) {
-                console.error('? Error parsing localStorage data:', e);
-              }
-            } else {
-              console.log('No localStorage data found');
-            }
-          }
+          loadStoredResultsIfAvailable();
         }, 1000);
       }
     });
@@ -1615,6 +1620,7 @@
         document.body.classList.add('demo-embed');
       }
       if (!shouldUseSampleData()) clearStoredSamplePayload();
+      setTimeout(loadStoredResultsIfAvailable, 300);
 
       StatisticoHeader.init('histogram', 'Variable', 0);
       if (typeof StatisticoHeader !== 'undefined') {
@@ -1687,7 +1693,10 @@
     // Handle data received
     function handleDataReceived(data) {
       try {
-        if (typeof StatisticoHeader !== 'undefined' && !StatisticoHeader.shouldProcessUniPayload(data, 'histogram')) return;
+        if (typeof StatisticoHeader !== 'undefined' && !StatisticoHeader.shouldProcessUniPayload(data, 'histogram')) {
+          hideDialogLoading();
+          return;
+        }
         console.log('Data received:', data);
 
         _uniMeta = {

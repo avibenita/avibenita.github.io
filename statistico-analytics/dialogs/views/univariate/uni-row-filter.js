@@ -294,8 +294,17 @@
     el._uniFiltBound = true;
     function resolveHeaderCell(target) {
       if (!target) return null;
+      var node = target;
+      if (node.nodeType === 3) node = node.parentElement; // text node -> element
+      if (!node) return null;
       var th = null;
-      if (typeof target.closest === 'function') th = target.closest('.uni-filt-th');
+      if (typeof node.closest === 'function') th = node.closest('.uni-filt-th');
+      if (!th) {
+        while (node && node !== el) {
+          if (node.classList && node.classList.contains('uni-filt-th')) { th = node; break; }
+          node = node.parentElement;
+        }
+      }
       if (!th || !el.contains(th)) return null;
       return th;
     }
@@ -310,6 +319,18 @@
     }
     el.addEventListener('mousedown', openColumnFilter);
     el.addEventListener('click', openColumnFilter);
+  }
+
+  function clickHeaderByIndex(colIdx, ev) {
+    if (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
+    var el = document.getElementById('uniFilterContent');
+    if (!el) return;
+    var th = el.querySelector('.uni-filt-th[data-col-idx="' + String(colIdx) + '"]');
+    if (!th) return;
+    toggleColFilter(Number(colIdx), ev || null, th);
   }
 
   function renderFilterTable() {
@@ -337,6 +358,8 @@
       return '<th class="' + cls + '" data-col-idx="' + i + '" style="' + thStyle + highlight
         + 'cursor:pointer;pointer-events:auto;user-select:none;'
         + 'color:' + (filtered ? '#4ade80' : (i === _columnIndex ? '#a5b4fc' : '#ffa578')) + ';" '
+        + 'onclick="UniRowFilter.clickHeaderByIndex(' + i + ', event)" '
+        + 'onmousedown="UniRowFilter.clickHeaderByIndex(' + i + ', event)" '
         + 'title="Click to filter ' + escHtml(h) + '">'
         + escHtml(h) + (i === _columnIndex ? ' ★' : '') + '<span class="uni-filt-icon" style="pointer-events:none;">' + icon + '</span></th>';
     }).join('');
@@ -421,6 +444,7 @@
     getSourceMeta: getSourceMeta,
     hasActiveFilters: hasActiveFilters,
     updateBadge: updateBadge,
-    setFilteredRows: setFilteredRows
+    setFilteredRows: setFilteredRows,
+    clickHeaderByIndex: clickHeaderByIndex
   };
 })(typeof window !== 'undefined' ? window : this);

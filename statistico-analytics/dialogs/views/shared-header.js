@@ -514,13 +514,16 @@ const StatisticoHeader = {
       window.StatisticoTooltip.refresh();
     }
     setTimeout(() => this._injectPerViewAiButton(), 0);
-    this._syncUniFilterHeader();
+    this._syncRowFilterHeader();
+  },
+
+  _syncRowFilterHeader() {
+    this._injectUniFilterAssets();
+    this.updateUniFilterChrome();
   },
 
   _syncUniFilterHeader() {
-    if (this.module !== 'univariate') return;
-    this._injectUniFilterAssets();
-    this.updateUniFilterChrome();
+    this._syncRowFilterHeader();
   },
   
   /**
@@ -1200,7 +1203,7 @@ const StatisticoHeader = {
 
     const actions = this._pendingActions;
     if (!actions || !actions.getData) return;
-    const result = actions.getData();
+    const result = this._applyHeaderRowFilterToDataResult(actions.getData());
     if (!result) { console.warn('No data available yet'); return; }
 
     this._viewDataMode = 'all';   // always open on All obs
@@ -1378,12 +1381,12 @@ const StatisticoHeader = {
    * Register action buttons (View Data / Model / HTML) into the header top bar.
    * Call this right after StatisticoHeader.init().
    */
-  registerActions({ getData, saveModel, exportHtml, exportJson, moduleName = 'Save model' } = {}) {
-    const incoming = { getData, saveModel, exportHtml, exportJson, moduleName };
+  registerActions({ getData, saveModel, exportHtml, exportJson, filterRows, onFilterRows, moduleName = 'Save model' } = {}) {
+    const incoming = { getData, saveModel, exportHtml, exportJson, filterRows, onFilterRows, moduleName };
     this._pendingActions = this._mergeActionsWithFallback(incoming);
     this.render();
     this._mountSidebarUtilities();
-    this._syncUniFilterHeader();
+    this._syncRowFilterHeader();
   },
 
   /**
@@ -1465,7 +1468,7 @@ const StatisticoHeader = {
     }).join('');
     const theme = this.getTheme();
     const themeIcon = theme === 'light' ? '☀️' : '🌙';
-    const uniFilterHtml = this.module === 'univariate'
+    const uniFilterHtml = this._shouldRenderHeaderRowFilter()
       ? `
         <div class="header-uni-filter-wrap" id="headerUniFilterWrap">
           <button type="button" class="header-uni-filter-info" id="uniFilterHelpBtn"
@@ -1475,7 +1478,7 @@ const StatisticoHeader = {
           </button>
           <button type="button" class="header-uni-filter-btn uni-filter-btn" id="uniFilterBtn"
             onclick="StatisticoHeader.openUniRowFilter()"
-            title="Filter rows from the hub workbook range (Excel-style column filters)"
+            title="Filter rows from the workbook range (Excel-style column filters)"
             disabled>
             <i class="fa-solid fa-filter" aria-hidden="true"></i>
             <span class="header-uni-filter-label">Filter</span>
@@ -1504,6 +1507,10 @@ const StatisticoHeader = {
         </button>
       </div>
     `;
+  },
+
+  _shouldRenderHeaderRowFilter() {
+    return true;
   },
 
   _mergeActionsWithFallback(actions) {
@@ -2471,7 +2478,6 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    if (this.module !== 'univariate') return;
     const v = '20260519u';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
@@ -2524,15 +2530,15 @@ const StatisticoHeader = {
       '<div class="sb-ai-overlay" id="uniFilterHelpOverlay" onclick="StatisticoHeader.closeUniFilterHelp(event)">' +
       '<div class="uni-filter-help-panel" onclick="event.stopPropagation()">' +
       '<h3><i class="fa-solid fa-circle-info"></i> How to filter & what updates</h3>' +
-      '<p>Two tools work together: <strong>Filter</strong> picks <em>which rows</em> from the hub range are analysed; ' +
-      '<strong>Data Range</strong> (on chart views) zooms to a <em>value interval</em> inside that series.</p>' +
+      '<p><strong>Filter</strong> picks <em>which source rows</em> from the workbook range are shown or analysed. ' +
+      'When a module exposes a recalculation hook, the visible results update from the filtered rows.</p>' +
       '<ol>' +
       '<li>Click <strong>Filter</strong> in the header (info icon opens this guide).</li>' +
       '<li>Click <strong>▼</strong> on a column header, choose values, then <strong>OK</strong>.</li>' +
       '<li><strong>Clear all filters</strong> restores all rows from the original range.</li>' +
-      '<li>The same filtered rows apply to every univariate view (Histogram, Box Plot, CDF, …).</li>' +
+      '<li>Use <strong>View Data</strong> to inspect the filtered rows currently in scope.</li>' +
       '</ol>' +
-      '<div class="uni-filter-help-outcomes"><strong>What updates:</strong> summary stats, n, charts, and View Data in all views.</div>' +
+      '<div class="uni-filter-help-outcomes"><strong>What updates:</strong> View Data always follows the filter; supported modules also refresh their charts and tables.</div>' +
       '<button type="button" class="uni-filter-help-close" onclick="StatisticoHeader.closeUniFilterHelp()">Got it</button>' +
       '</div></div>');
   },
@@ -2554,6 +2560,78 @@ const StatisticoHeader = {
       const raw = localStorage.getItem('univariateResults') || sessionStorage.getItem('univariateResults');
       return raw ? JSON.parse(raw) : null;
     } catch (_e) { return null; }
+  },
+
+  _rowFilterKey() {
+    return `${this.module || 'module'}::${this.currentView || 'view'}`;
+  },
+
+  _normalizeRowFilterRows(rows, headers) {
+    const width = Array.isArray(headers) ? headers.length : 0;
+    return (Array.isArray(rows) ? rows : []).map((row) => {
+      if (Array.isArray(row)) return row.slice(0, width || row.length);
+      if (row && typeof row === 'object') {
+        return (headers || Object.keys(row)).map((h) => row[h]);
+      }
+      return [row];
+    });
+  },
+
+  _getGenericRowFilterState() {
+    const state = this._rowFilterStates || {};
+    return state[this._rowFilterKey()] || null;
+  },
+
+  _setGenericRowFilterState(state) {
+    this._rowFilterStates = this._rowFilterStates || {};
+    this._rowFilterStates[this._rowFilterKey()] = state;
+  },
+
+  _getHeaderRowFilterData() {
+    if (this.module === 'univariate') return this._getUniStored();
+    const actions = this._pendingActions || {};
+    if (typeof actions.getData !== 'function') return null;
+    let result = null;
+    try { result = actions.getData(); } catch (_e) { result = null; }
+    if (!result || !Array.isArray(result.headers) || !result.headers.length) return null;
+
+    const headers = result.headers.slice();
+    const allRows = this._normalizeRowFilterRows(
+      result.allRows || result.sourceRowsAll || result.rows || result.usedRows,
+      headers
+    );
+    if (!allRows.length) return null;
+
+    const state = this._getGenericRowFilterState();
+    const usedRows = state && Array.isArray(state.usedRows)
+      ? state.usedRows
+      : this._normalizeRowFilterRows(result.usedRows || result.sourceRows || allRows, headers);
+
+    return {
+      ...result,
+      headers,
+      allRows,
+      usedRows,
+      sourceRowsAll: allRows,
+      sourceRows: usedRows
+    };
+  },
+
+  _applyHeaderRowFilterToDataResult(result) {
+    if (!result || this.module === 'univariate') return result;
+    const state = this._getGenericRowFilterState();
+    if (!state || !state.rowFilterActive) return result;
+    const notice = [
+      result.notice,
+      `Row filter active: showing ${state.usedRows.length} of ${state.allRows.length} source rows.`
+    ].filter(Boolean).join(' ');
+    return {
+      ...result,
+      headers: state.headers.slice(),
+      allRows: state.allRows.map((r) => r.slice()),
+      usedRows: state.usedRows.map((r) => r.slice()),
+      notice
+    };
   },
 
   _setUniFilterMeta(data) {
@@ -2633,6 +2711,9 @@ const StatisticoHeader = {
   },
 
   publishUniFilterChange(filteredRows, skipDispatch) {
+    if (this.module !== 'univariate') {
+      return this.publishHeaderRowFilterChange(filteredRows, skipDispatch);
+    }
     const m = this._uniFilterMeta || {};
     const allRows = m.sourceRowsAll || filteredRows;
     const values = this._extractUniValues(filteredRows);
@@ -2667,15 +2748,53 @@ const StatisticoHeader = {
     return payload;
   },
 
+  publishHeaderRowFilterChange(filteredRows, skipDispatch) {
+    const data = this._getHeaderRowFilterData();
+    if (!data) return null;
+    const rows = this._normalizeRowFilterRows(filteredRows, data.headers);
+    const allRows = data.allRows || data.sourceRowsAll || rows;
+    const active = typeof UniRowFilter !== 'undefined'
+      ? UniRowFilter.hasActiveFilters()
+      : rows.length !== allRows.length;
+    const payload = {
+      ...data,
+      headers: data.headers.slice(),
+      allRows: allRows.map((r) => r.slice()),
+      usedRows: rows.map((r) => r.slice()),
+      sourceRowsAll: allRows.map((r) => r.slice()),
+      sourceRows: rows.map((r) => r.slice()),
+      rowFilterActive: active,
+      module: this.module,
+      view: this.currentView
+    };
+    this._setGenericRowFilterState(payload);
+    this.updateUniFilterChrome(payload);
+
+    const actions = this._pendingActions || {};
+    const handler = actions.onFilterRows || actions.filterRows;
+    if (typeof handler === 'function') {
+      try { handler(payload); } catch (e) { console.warn('Row filter handler failed:', e); }
+    }
+    if (!skipDispatch) {
+      document.dispatchEvent(new CustomEvent('statistico-row-filter-changed', { detail: payload }));
+    }
+    if (document.getElementById('hdpModal')) {
+      this._lastDataResult = this._applyHeaderRowFilterToDataResult(data);
+      this._populateDataModal(this._lastDataResult, 'used');
+    }
+    return payload;
+  },
+
   updateUniFilterChrome(payload) {
-    payload = payload || this._getUniStored();
+    payload = payload || (this.module === 'univariate' ? this._getUniStored() : this._getHeaderRowFilterData());
     const meta = typeof UniRowFilter !== 'undefined' ? UniRowFilter.getSourceMeta() : null;
     const hasSource = !!(payload && payload.sourceRowsAll && payload.sourceRowsAll.length) ||
+      !!(payload && payload.allRows && payload.allRows.length) ||
       !!(meta && meta.allRows && meta.allRows.length);
     const active = (typeof UniRowFilter !== 'undefined' && UniRowFilter.hasActiveFilters()) ||
       !!(payload && payload.rowFilterActive);
-    const total = meta ? meta.allRows.length : (payload && payload.sourceRowsAll ? payload.sourceRowsAll.length : 0);
-    const showing = meta ? meta.filteredRows.length : (payload && payload.sourceRows ? payload.sourceRows.length : 0);
+    const total = meta ? meta.allRows.length : (payload && payload.sourceRowsAll ? payload.sourceRowsAll.length : (payload && payload.allRows ? payload.allRows.length : 0));
+    const showing = meta ? meta.filteredRows.length : (payload && payload.sourceRows ? payload.sourceRows.length : (payload && payload.usedRows ? payload.usedRows.length : 0));
     const varName = (payload && (payload.column || payload.variableName)) || this.variableName || 'Variable';
     const n = payload && payload.values ? payload.values.length : this.sampleSize;
 
@@ -2686,7 +2805,7 @@ const StatisticoHeader = {
         : varName;
     }
     const nEl = document.getElementById('headerSampleSize');
-    if (nEl) nEl.textContent = `(n=${n})`;
+    if (nEl) nEl.textContent = `(n=${this.module === 'univariate' ? n : (showing || n || 0)})`;
 
     let notice = document.getElementById('uni-filter-active-notice');
     if (!notice) {
@@ -2697,7 +2816,8 @@ const StatisticoHeader = {
     }
     if (active && total) {
       notice.className = 'is-visible';
-      notice.innerHTML = `<i class="fa-solid fa-filter"></i> Row filter active — showing <strong>${showing}</strong> of <strong>${total}</strong> rows from the hub range (all univariate views)`;
+      const scope = this.module === 'univariate' ? ' from the hub range (all univariate views)' : ' from the source range';
+      notice.innerHTML = `<i class="fa-solid fa-filter"></i> Row filter active — showing <strong>${showing}</strong> of <strong>${total}</strong> rows${scope}`;
     } else {
       notice.className = '';
       notice.innerHTML = '';
@@ -2722,6 +2842,24 @@ const StatisticoHeader = {
   },
 
   _initUniRowFilterFromStorage() {
+    if (this.module !== 'univariate') {
+      const data = this._getHeaderRowFilterData();
+      if (!data || !data.headers || !(data.allRows || data.sourceRowsAll)) return;
+      if (typeof UniRowFilter === 'undefined') return;
+      const allRows = data.allRows || data.sourceRowsAll;
+      const existing = this._getGenericRowFilterState();
+      UniRowFilter.init({
+        headers: data.headers,
+        rows: allRows,
+        columnIndex: 0,
+        onApply: (rows) => this.publishHeaderRowFilterChange(rows)
+      });
+      if (existing && existing.rowFilterActive && existing.usedRows && UniRowFilter.setFilteredRows) {
+        UniRowFilter.setFilteredRows(existing.usedRows);
+      }
+      this.updateUniFilterChrome(existing || data);
+      return;
+    }
     const data = this._getUniStored();
     if (!data || !data.sourceHeaders || !(data.sourceRowsAll || data.sourceRows)) return;
     this._setUniFilterMeta(data);
@@ -2754,11 +2892,13 @@ const StatisticoHeader = {
       alert('Filter module failed to load. Reload the add-in.');
       return;
     }
-    const data = this._getUniStored();
-    if (!data || !(data.sourceRowsAll || data.sourceRows)) {
-      alert('Row filtering needs the full workbook range from the hub.\n\nPick a range on the hub, run Univariate again, then use Filter.');
+    const data = this.module === 'univariate' ? this._getUniStored() : this._getHeaderRowFilterData();
+    if (!data || !(data.sourceRowsAll || data.sourceRows || data.allRows)) {
+      const moduleName = this.module === 'univariate' ? 'Univariate' : 'this module';
+      alert(`Row filtering needs source rows from the workbook range.\n\nRun ${moduleName} with a selected range, then use Filter.`);
       return;
     }
+    if (this.module !== 'univariate') this._initUniRowFilterFromStorage();
     this._ensureUniFilterOverlay();
     UniRowFilter.open();
   },
@@ -2799,7 +2939,7 @@ const StatisticoHeader = {
     this._installDecimalOverride();
     setTimeout(() => this.applyDecimalPreferenceToPage(persistedDecimals), 0);
     setTimeout(() => this._injectPerViewAiButton(), 0);
-    if (this.module === 'univariate') this._injectUniFilterAssets();
+    this._injectUniFilterAssets();
   },
 
   _mountSidebarUtilities() {

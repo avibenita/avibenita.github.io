@@ -1087,7 +1087,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260521t');
+          out.searchParams.set('build', '20260521u');
         }
         return out.href;
       } catch (e) {
@@ -2482,7 +2482,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260521t';
+    const v = '20260521u';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2694,14 +2694,20 @@ const StatisticoHeader = {
       if (!Array.isArray(sourceHeaders) || !sourceHeaders.length) return null;
 
       const headers = sourceHeaders.slice();
-      const allRows = this._normalizeRowFilterRows(
+      const state = this._getGenericRowFilterState();
+      const canReuseState = this._isHeaderRowFilterStateCompatible(state, headers);
+      const payloadRows = this._normalizeRowFilterRows(
         result.sourceRowsAll || result.allRows || result.rows || result.usedRows,
         headers
       );
+      const stateAllRows = canReuseState && Array.isArray(state.allRows)
+        ? state.allRows.map((r) => Array.isArray(r) ? r.slice() : r)
+        : null;
+      const stateUsedCount = canReuseState && Array.isArray(state.usedRows) ? state.usedRows.length : 0;
+      const allRows = stateAllRows && (!payloadRows.length || (stateUsedCount && payloadRows.length <= stateUsedCount))
+        ? stateAllRows
+        : payloadRows;
       if (!allRows.length) return null;
-
-      const state = this._getGenericRowFilterState();
-      const canReuseState = this._isHeaderRowFilterStateCompatible(state, headers);
       if (state && !canReuseState) this._setGenericRowFilterState(null);
       const resolved = canReuseState
         ? this._resolveFilteredRowsForState(headers, allRows, state)
@@ -2908,8 +2914,12 @@ const StatisticoHeader = {
     if (!this._isHeaderRowFilterStateCompatible(state, headers)) return payload;
 
     const filteredHeaders = state.headers.slice();
-    const payloadAllRows = this._normalizeRowFilterRows(payload.sourceRowsAll || payload.allRows || payload.data || payload.rows || state.allRows || state.usedRows, filteredHeaders);
-    const sourceRowsAll = payloadAllRows.length ? payloadAllRows : (Array.isArray(state.allRows) ? state.allRows.map((r) => r.slice()) : null);
+    const payloadAllRows = this._normalizeRowFilterRows(payload.sourceRowsAll || payload.allRows || payload.data || payload.rows, filteredHeaders);
+    const stateAllRows = Array.isArray(state.allRows) ? state.allRows.map((r) => Array.isArray(r) ? r.slice() : r) : null;
+    const stateUsedCount = Array.isArray(state.usedRows) ? state.usedRows.length : 0;
+    const sourceRowsAll = stateAllRows && (!payloadAllRows.length || (stateUsedCount && payloadAllRows.length <= stateUsedCount))
+      ? stateAllRows
+      : (payloadAllRows.length ? payloadAllRows : stateAllRows);
     const resolved = this._resolveFilteredRowsForState(filteredHeaders, sourceRowsAll || [], state);
     const filteredRows = resolved.rows;
     const sourceRows = filteredRows.map((r) => r.slice());

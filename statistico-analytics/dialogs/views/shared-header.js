@@ -207,6 +207,7 @@ const StatisticoHeader = {
 
     this._installActiveRowFilterStorageInterceptor();
     this._installRowFilterMessagePayloadInterceptor();
+    this._clearLegacyPersistentRowFilterState(this.module);
     this._applyActiveRowFilterToModuleStorage(this.module);
 
     // Apply persisted theme before rendering (avoids flash of wrong theme)
@@ -1098,7 +1099,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260522c');
+          out.searchParams.set('build', '20260522d');
         }
         return out.href;
       } catch (e) {
@@ -2493,7 +2494,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260522c';
+    const v = '20260522d';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2576,9 +2577,44 @@ const StatisticoHeader = {
 
   _getUniStored() {
     try {
-      const raw = localStorage.getItem('univariateResults') || sessionStorage.getItem('univariateResults');
-      return raw ? JSON.parse(raw) : null;
+      const sessionRaw = sessionStorage.getItem('univariateResults');
+      if (sessionRaw) return JSON.parse(sessionRaw);
+      const localRaw = localStorage.getItem('univariateResults');
+      if (!localRaw) return null;
+      const parsed = JSON.parse(localRaw);
+      if (parsed && parsed.rowFilterActive) {
+        const cleaned = this._clearLegacyUniPayloadFilter(parsed);
+        try { localStorage.setItem('univariateResults', JSON.stringify(cleaned)); } catch (_e) {}
+        return cleaned;
+      }
+      return parsed;
     } catch (_e) { return null; }
+  },
+
+  _clearLegacyUniPayloadFilter(payload) {
+    if (!payload || typeof payload !== 'object') return payload;
+    const headers = Array.isArray(payload.sourceHeaders) && payload.sourceHeaders.length
+      ? payload.sourceHeaders
+      : payload.headers;
+    const allRows = Array.isArray(headers)
+      ? this._normalizeRowFilterRows(payload.sourceRowsAll || payload.allRows || payload.sourceRows || payload.usedRows, headers)
+      : [];
+    const clean = { ...payload };
+    delete clean.columnFilters;
+    clean.rowFilterActive = false;
+    if (headers && allRows.length) {
+      const columnIndex = payload.columnIndex != null ? Number(payload.columnIndex) : 0;
+      const values = this._extractRowFilterValues(allRows, columnIndex, payload.transform, payload.trim);
+      clean.sourceHeaders = headers.slice();
+      clean.sourceRowsAll = allRows.map((r) => r.slice());
+      clean.sourceRows = allRows.map((r) => r.slice());
+      clean.usedRows = allRows.map((r) => r.slice());
+      clean.values = values;
+      clean.data = values;
+      clean.rawData = values;
+      clean.n = values.length;
+    }
+    return clean;
   },
 
   _rowFilterKey(moduleName) {
@@ -2670,7 +2706,7 @@ const StatisticoHeader = {
     if (state[key]) return state[key];
     try {
       const storageKey = this._rowFilterStorageKey(moduleName);
-      const raw = sessionStorage.getItem(storageKey) || localStorage.getItem(storageKey);
+      const raw = sessionStorage.getItem(storageKey);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       this._rowFilterStates = this._rowFilterStates || {};
@@ -2682,13 +2718,22 @@ const StatisticoHeader = {
   _setGenericRowFilterState(state, moduleName) {
     this._rowFilterStates = this._rowFilterStates || {};
     const key = this._rowFilterKey(moduleName);
-    this._rowFilterStates[key] = state;
+    if (state) this._rowFilterStates[key] = state;
+    else delete this._rowFilterStates[key];
     try {
-      const raw = JSON.stringify(state || null);
       const storageKey = this._rowFilterStorageKey(moduleName);
-      sessionStorage.setItem(storageKey, raw);
-      localStorage.setItem(storageKey, raw);
+      if (state) sessionStorage.setItem(storageKey, JSON.stringify(state));
+      else sessionStorage.removeItem(storageKey);
+      localStorage.removeItem(storageKey);
     } catch (_e) {}
+  },
+
+  _clearGenericRowFilterState(moduleName) {
+    this._setGenericRowFilterState(null, moduleName);
+  },
+
+  _clearLegacyPersistentRowFilterState(moduleName) {
+    try { localStorage.removeItem(this._rowFilterStorageKey(moduleName)); } catch (_e) {}
   },
 
   _getHeaderRowFilterData() {
@@ -2790,7 +2835,7 @@ const StatisticoHeader = {
     if (k.includes('cluster')) return 'cluster';
     if (k.includes('pareto')) return 'pareto';
     if (k.includes('power')) return 'power';
-    return this.module || null;
+    return null;
   },
 
   _inferRowFilterModuleFromMessageType(type) {
@@ -2808,7 +2853,7 @@ const StatisticoHeader = {
     if (t.includes('cluster')) return 'cluster';
     if (t.includes('pareto')) return 'pareto';
     if (t.includes('power')) return 'power';
-    return this.module || null;
+    return null;
   },
 
   _firstPayloadRows(payload) {
@@ -2913,6 +2958,7 @@ const StatisticoHeader = {
 
   _applyActiveRowFilterToPayload(payload, moduleName) {
     if (!payload || typeof payload !== 'object') return payload;
+    if (!moduleName) return payload;
     if ((moduleName || this.module) === 'univariate') {
       return this._applyActiveRowFilterToUnivariatePayload(payload);
     }
@@ -2993,11 +3039,21 @@ const StatisticoHeader = {
       if (!payload || payload === parsed) return false;
       const next = JSON.stringify(payload);
       sessionStorage.setItem(key, next);
-      localStorage.setItem(key, next);
       return true;
     } catch (_e) {
       return false;
     }
+  },
+
+  _looksLikeFreshRowFilterPayload(payload, moduleName) {
+    if (!moduleName || !payload || typeof payload !== 'object') return false;
+    if (payload.rowFilterActive || payload.columnFilters) return false;
+    const headers = Array.isArray(payload.sourceHeaders) && payload.sourceHeaders.length
+      ? payload.sourceHeaders
+      : payload.headers;
+    if (!Array.isArray(headers) || !headers.length) return false;
+    const rows = this._firstPayloadRows(payload);
+    return Array.isArray(rows) && rows.length > 0;
   },
 
   _installActiveRowFilterStorageInterceptor() {
@@ -3011,6 +3067,7 @@ const StatisticoHeader = {
       try {
         if (!raw || String(key || '').indexOf('statistico-row-filter::') === 0 || !window.StatisticoHeader) return raw;
         const moduleName = window.StatisticoHeader._inferRowFilterModuleFromStorageKey(key);
+        if (!moduleName) return raw;
         const parsed = JSON.parse(raw);
         const filtered = window.StatisticoHeader._applyActiveRowFilterToPayload(parsed, moduleName);
         return filtered === parsed ? raw : JSON.stringify(filtered);
@@ -3023,7 +3080,12 @@ const StatisticoHeader = {
       try {
         if (String(key || '').indexOf('statistico-row-filter::') !== 0 && window.StatisticoHeader) {
           const moduleName = window.StatisticoHeader._inferRowFilterModuleFromStorageKey(key);
+          if (!moduleName) return nativeSetItem.call(this, key, nextValue);
           const parsed = JSON.parse(String(value));
+          if (window.StatisticoHeader._looksLikeFreshRowFilterPayload(parsed, moduleName)) {
+            window.StatisticoHeader._clearGenericRowFilterState(moduleName);
+            return nativeSetItem.call(this, key, nextValue);
+          }
           const filtered = window.StatisticoHeader._applyActiveRowFilterToPayload(parsed, moduleName);
           if (filtered !== parsed) nextValue = JSON.stringify(filtered);
         }
@@ -3046,11 +3108,20 @@ const StatisticoHeader = {
         try {
           const message = JSON.parse(arg && arg.message ? arg.message : '{}');
           if (message && window.StatisticoHeader) {
-            const moduleName = window.StatisticoHeader._inferRowFilterModuleFromMessageType(message.type || message.action || '');
+            const moduleName = window.StatisticoHeader._inferRowFilterModuleFromMessageType(message.module || message.moduleName || message.type || '');
+            if (!moduleName) return handler(arg);
             if (message.payload) {
+              if (window.StatisticoHeader._looksLikeFreshRowFilterPayload(message.payload, moduleName)) {
+                window.StatisticoHeader._clearGenericRowFilterState(moduleName);
+                return handler(arg);
+              }
               message.payload = window.StatisticoHeader._applyActiveRowFilterToPayload(message.payload, moduleName);
             }
             if (message.data) {
+              if (window.StatisticoHeader._looksLikeFreshRowFilterPayload(message.data, moduleName)) {
+                window.StatisticoHeader._clearGenericRowFilterState(moduleName);
+                return handler(arg);
+              }
               message.data = window.StatisticoHeader._applyActiveRowFilterToPayload(message.data, moduleName);
             }
             if (message.payload || message.data) {
@@ -3208,7 +3279,6 @@ const StatisticoHeader = {
       view: this.currentView
     }, 'univariate');
     try {
-      localStorage.setItem('univariateResults', JSON.stringify(payload));
       sessionStorage.setItem('univariateResults', JSON.stringify(payload));
     } catch (_e) {}
     this.updateUniFilterChrome(payload);
@@ -4265,16 +4335,24 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
 
       // 3. Merge into existing stored object so we don't lose keys other views need
       let existing = {};
-      try { const r = localStorage.getItem('univariateResults'); if (r) existing = JSON.parse(r); } catch (_) {}
+      try { const r = sessionStorage.getItem('univariateResults') || localStorage.getItem('univariateResults'); if (r) existing = JSON.parse(r); } catch (_) {}
+      const {
+        rowFilterActive: _rowFilterActive,
+        columnFilters: _columnFilters,
+        sourceRows: _sourceRows,
+        usedRows: _usedRows,
+        ...existingClean
+      } = existing || {};
 
       const fresh = {
-        ...existing,
+        ...existingClean,
         values:       liveValues,
         rawData:      liveValues,
         data:         liveValues,
         variableName: varName,
         column:       varName,
         colName:      varName,
+        rowFilterActive: false,
         _syncedAt:    Date.now()
       };
 

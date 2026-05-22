@@ -6,9 +6,9 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
-  <link rel="stylesheet" href="../shared-header.css?v=20260521y" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260522a" />
   <script src="../shared-brand-logo.js?v=20260519u"></script>
-  <script src="../shared-header.js?v=20260521y"></script>
+  <script src="../shared-header.js?v=20260522a"></script>
   <style>
     :root {
       --surface-0:#0c1624; --surface-1:#1a1f2e; --surface-2:#242938; --border:#2d3748;
@@ -34,8 +34,10 @@
     button { cursor:pointer; font-weight:700; }
     button.active { background:linear-gradient(135deg, var(--accent-2), #6d5dfc); color:#fff; border-color:transparent; }
     .content { flex:1; min-height:0; overflow:auto; padding:12px; }
-    .panel { display:none; min-height:100%; }
-    .panel.active { display:block; }
+    .panel { display:block; min-height:0; margin-top:12px; }
+    .panel:first-of-type { margin-top:0; }
+    .section-title { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:4px 2px 8px; color:var(--accent-1); font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
+    .section-title span { color:var(--text-secondary); font-size:11px; font-weight:600; text-transform:none; letter-spacing:0; }
     .summary-strip { display:grid; grid-template-columns:repeat(4, minmax(120px, 1fr)); gap:10px; margin-bottom:12px; }
     .metric { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px; }
     .metric label { display:block; color:var(--text-secondary); font-size:10px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
@@ -46,11 +48,12 @@
     th { position:sticky; top:0; z-index:2; background:var(--surface-1); color:var(--accent-1); text-transform:uppercase; font-size:10px; letter-spacing:.08em; }
     th:first-child, td:first-child { text-align:left; }
     tbody tr:hover td { background:rgba(129,140,248,.12); }
-    .hist-grid { display:grid; grid-template-columns:1fr; gap:12px; }
+    .hist-grid { display:grid; grid-template-columns:repeat(4, minmax(180px, 1fr)); gap:10px; }
     .hist-card { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
-    .hist-head { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:9px 12px; border-bottom:1px solid var(--border); color:var(--text-secondary); font-size:12px; }
-    .hist-head strong { color:var(--accent-1); font-size:13px; }
-    .hist-chart { height:210px; }
+    .hist-head { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 9px; border-bottom:1px solid var(--border); color:var(--text-secondary); font-size:10px; }
+    .hist-head strong { color:var(--accent-1); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .hist-head span { white-space:nowrap; }
+    .hist-chart { height:135px; }
     .empty { margin:32px auto; max-width:720px; text-align:center; color:var(--text-secondary); line-height:1.5; }
     .empty i { display:block; color:var(--accent-1); font-size:32px; margin-bottom:10px; }
     .group-dialog-overlay { position:fixed; inset:0; z-index:2147483200; display:none; align-items:center; justify-content:center; padding:16px; background:rgba(3,7,18,.64); backdrop-filter:blur(3px); }
@@ -83,8 +86,12 @@
       .toolbar { align-items:flex-start; flex-direction:column; }
       .controls { justify-content:flex-start; }
       .summary-strip { grid-template-columns:repeat(2, minmax(120px, 1fr)); }
+      .hist-grid { grid-template-columns:repeat(2, minmax(170px, 1fr)); }
       .group-dialog-body { grid-template-columns:1fr; }
       .group-dialog-list { border-right:none; border-bottom:1px solid var(--border); max-height:280px; }
+    }
+    @media (max-width: 560px) {
+      .hist-grid { grid-template-columns:1fr; }
     }
   </style>
 </head>
@@ -102,8 +109,6 @@
           <div class="controls">
             <span class="group-choice-label" id="groupChoiceLabel">No grouping column selected</span>
             <button id="chooseGroupBtn" type="button" onclick="openGroupDialog()"><i class="fa-solid fa-layer-group"></i> Choose Group</button>
-            <button id="tableTab" class="active" type="button" onclick="switchSubView('table')"><i class="fa-solid fa-table"></i> Stats Table</button>
-            <button id="histTab" type="button" onclick="switchSubView('histograms')"><i class="fa-solid fa-chart-column"></i> Histogram Rows</button>
           </div>
         </div>
         <div class="content">
@@ -118,7 +123,8 @@
               <div class="metric"><label>Groups</label><strong id="metricGroups">0</strong></div>
               <div class="metric"><label>Rows Used</label><strong id="metricRows">0</strong></div>
             </div>
-            <section id="tablePanel" class="panel active">
+            <section id="tablePanel" class="panel">
+              <div class="section-title"><strong>Grouped Statistics</strong><span>Main descriptive statistics by selected group levels</span></div>
               <div class="table-wrap">
                 <table>
                   <thead>
@@ -132,6 +138,7 @@
               </div>
             </section>
             <section id="histPanel" class="panel">
+              <div class="section-title"><strong>Grouped Histograms</strong><span>Compact distribution view, 4 per row</span></div>
               <div id="histGrid" class="hist-grid"></div>
             </section>
           </div>
@@ -460,27 +467,17 @@
         card.innerHTML = `<div class="hist-head"><strong>${escapeHtml(g.group)}</strong><span>n=${g.n}, mean=${fmt(g.mean)}</span></div><div id="${id}" class="hist-chart"></div>`;
         grid.appendChild(card);
         Highcharts.chart(id, {
-          chart: { type:'column', backgroundColor:'transparent', spacing:[8, 8, 8, 8] },
+          chart: { type:'column', backgroundColor:'transparent', spacing:[4, 4, 4, 4] },
           title: { text:null },
           credits: { enabled:false },
           legend: { enabled:false },
-          xAxis: { type:'category', labels:{ style:{ color:'var(--text-secondary)', fontSize:'10px' } }, lineColor:'var(--border)' },
-          yAxis: { min:0, title:{ text:'Frequency', style:{ color:'var(--text-secondary)' } }, labels:{ style:{ color:'var(--text-secondary)' } }, gridLineColor:'rgba(148,163,184,.18)' },
+          xAxis: { type:'category', labels:{ enabled:false }, tickLength:0, lineColor:'var(--border)' },
+          yAxis: { min:0, title:{ text:null }, labels:{ style:{ color:'var(--text-secondary)', fontSize:'9px' } }, gridLineColor:'rgba(148,163,184,.18)' },
           tooltip: { pointFormat:'Frequency: <b>{point.y}</b>' },
           plotOptions: { column:{ borderWidth:0, color:'rgba(129,140,248,.92)', borderRadius:3 } },
           series: [{ data: histogramSeries(g.values, globalMin, globalMax, bins) }]
         });
       });
-    }
-
-    function switchSubView(view) {
-      document.getElementById('tablePanel').classList.toggle('active', view === 'table');
-      document.getElementById('histPanel').classList.toggle('active', view === 'histograms');
-      document.getElementById('tableTab').classList.toggle('active', view === 'table');
-      document.getElementById('histTab').classList.toggle('active', view === 'histograms');
-      if (view === 'histograms' && Highcharts.charts) {
-        setTimeout(() => Highcharts.charts.forEach((chart) => { if (chart) chart.reflow(); }), 50);
-      }
     }
 
     function escapeHtml(value) {

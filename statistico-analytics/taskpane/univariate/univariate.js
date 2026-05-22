@@ -768,7 +768,7 @@ function openResultsDialog(results) {
     lockTaskpaneUI();
     
     // Use standalone histogram instead of full results dialog
-    const dialogUrl = `${getDialogsBaseUrl()}univariate/histogram-standalone.html?cb=${Date.now()}`;
+    const dialogUrl = `${getDialogsBaseUrl()}univariate/histogram-standalone-v2.html?cb=${Date.now()}`;
     
     Office.context.ui.displayDialogAsync(
         dialogUrl,

@@ -560,7 +560,7 @@ const StatisticoHeader = {
   getNavigationItems() {
     const univariateViews = [
       { id: 'group-core', label: 'Core Descriptive', file: null, isGroup: true },
-      { id: 'histogram', label: 'Interactive Histogram', file: 'univariate/histogram-standalone.html' },
+      { id: 'histogram', label: 'Interactive Histogram', file: 'univariate/histogram-standalone-v2.html' },
       { id: 'boxplot', label: 'Box Plot Analysis', file: 'univariate/boxplot-standalone.html' },
       { id: 'cdf', label: 'Cumulative Distribution', file: 'univariate/cumulative-distribution.html' },
       { id: 'percentile', label: 'Percentiles', file: 'univariate/percentile-standalone.html' },
@@ -759,7 +759,7 @@ const StatisticoHeader = {
           {
             title: 'Core Descriptive',
             items: [
-              { type: 'navigate', view: 'histogram', file: 'univariate/histogram-standalone.html', icon: 'fa-chart-column', label: 'Histogram' },
+              { type: 'navigate', view: 'histogram', file: 'univariate/histogram-standalone-v2.html', icon: 'fa-chart-column', label: 'Histogram' },
               { type: 'navigate', view: 'boxplot', file: 'univariate/boxplot-standalone.html', icon: 'fa-chart-gantt', label: 'Box Plot' },
               { type: 'navigate', view: 'cdf', file: 'univariate/cumulative-distribution.html', icon: 'fa-wave-square', label: 'CDF' },
               { type: 'navigate', view: 'percentile', file: 'univariate/percentile-standalone.html', icon: 'fa-percent', label: 'Percentiles' },
@@ -1119,7 +1119,13 @@ const StatisticoHeader = {
    */
   navigateTo(filename) {
     console.log('🔄 Navigating to:', filename);
-    const targetUrl = this.resolveDialogUrl(filename);
+    const targetUrlRaw = this.resolveDialogUrl(filename);
+    let targetUrl = targetUrlRaw;
+    try {
+      const navUrl = new URL(targetUrlRaw, window.location.href);
+      navUrl.searchParams.set('cb', Date.now().toString());
+      targetUrl = navUrl.href;
+    } catch (_e) {}
     // All modules navigate within the same dialog window (no new dialog opened).
     // Persist module data in sessionStorage so the destination page can restore it.
     try {
@@ -2488,21 +2494,26 @@ const StatisticoHeader = {
   _uniFilterAssetBase() {
     const { origin, pathname } = window.location;
     if (pathname.includes('/dialogs/views/')) {
-      return `${origin}${pathname.split('/dialogs/views/')[0]}/dialogs/views/univariate/`;
+      return `${origin}${pathname.split('/dialogs/views/')[0]}/dialogs/views/shared/`;
     }
-    return `${origin}/dialogs/views/univariate/`;
+    return `${origin}/dialogs/views/shared/`;
   },
 
   _injectUniFilterAssets() {
-    const v = '20260522r';
+    const v = '20260522u';
     const base = this._uniFilterAssetBase();
-    if (!document.querySelector('link[data-uni-filter-shared-css]')) {
+    const cssHref = `${base}uni-filter-shared.css?v=${v}`;
+    const existingCss = document.querySelector('link[data-uni-filter-shared-css]');
+    if (!existingCss) {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = `${base}uni-filter-shared.css?v=${v}`;
+      link.href = cssHref;
       link.setAttribute('data-uni-filter-shared-css', '1');
       document.head.appendChild(link);
+    } else if (existingCss.getAttribute('href') !== cssHref) {
+      existingCss.setAttribute('href', cssHref);
     }
+    const scriptSrc = `${base}uni-row-filter.js?v=${v}`;
     const boot = () => {
       try {
         this._ensureUniFilterOverlay();
@@ -2514,23 +2525,33 @@ const StatisticoHeader = {
         console.warn('Row filter bootstrap deferred:', e);
       }
     };
-    if (document.querySelector('script[data-uni-row-filter]') || document.querySelector('script[src*="uni-row-filter.js"]')) {
+    const existingScript = document.querySelector('script[data-uni-row-filter]') || document.querySelector('script[src*="uni-row-filter.js"]');
+    const needsReload =
+      !window.UniRowFilter ||
+      typeof window.UniRowFilter.finishAndClose !== 'function' ||
+      !existingScript ||
+      String(existingScript.getAttribute('src') || '').indexOf('/dialogs/views/shared/uni-row-filter.js') < 0;
+    if (!needsReload) {
       boot();
       return;
     }
+    if (existingScript && existingScript.parentNode) existingScript.parentNode.removeChild(existingScript);
     const s = document.createElement('script');
-    s.src = `${base}uni-row-filter.js?v=${v}`;
+    s.src = scriptSrc;
     s.setAttribute('data-uni-row-filter', '1');
     s.onload = boot;
     document.head.appendChild(s);
   },
 
   _ensureUniFilterOverlay() {
-    if (document.getElementById('uniFilterOverlay')) return;
+    const overlayVersion = 'v2';
+    const existing = document.getElementById('uniFilterOverlay');
+    if (existing && existing.getAttribute('data-overlay-version') === overlayVersion) return;
+    if (existing) existing.remove();
     const el = document.createElement('div');
     el.innerHTML = [
-      '<div class="sb-ai-overlay" id="uniFilterOverlay" onclick="UniRowFilter.close(event)">',
-      '<div class="sb-ai-panel" style="width:min(900px,96vw);max-height:88vh;" onclick="event.stopPropagation()">',
+      '<div class="sb-ai-overlay" id="uniFilterOverlay" data-overlay-version="v2" onclick="UniRowFilter.close(event)">',
+      '<div class="sb-ai-panel" style="width:min(1020px,97vw);max-height:88vh;display:flex;flex-direction:column;" onclick="event.stopPropagation()">',
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">',
       '<span style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--accent-1);">',
       '<i class="fa-solid fa-filter" style="margin-right:6px;"></i>Filter Source Range</span>',
@@ -2541,14 +2562,19 @@ const StatisticoHeader = {
       '<ol>',
       '<li>The table below is your <strong>hub workbook range</strong> (all columns). The analysis column is marked with ★.</li>',
       '<li>Click <strong>▼</strong> on a column header to choose which values to keep (Excel-style).</li>',
-      '<li>Press <strong>OK</strong> on the dropdown — this module recalculates from filtered rows.</li>',
+      '<li>Press <strong>OK</strong> on the dropdown to preview updates in the filter table.</li>',
+      '<li>Press <strong>Finish &amp; Apply</strong> to freeze the dataset this module uses.</li>',
       '<li><strong>Filter</strong> controls which rows are analyzed. It is separate from chart zoom/range controls.</li>',
       '<li><strong>Clear all filters</strong> restores every row from the original range.</li>',
       '</ol>',
       '</div>',
       '<div class="uni-filt-toolbar"><div class="uni-filt-summary" id="uniFilterSummary">Filter rows from the workbook range.</div>',
       '<button type="button" class="uni-filt-clear-btn" onclick="UniRowFilter.clearAll()">Clear all filters</button></div>',
-      '<div id="uniFilterContent" style="overflow:auto;max-height:calc(88vh - 120px);"></div>',
+      '<div id="uniFilterContent" style="overflow:auto;flex:1;min-height:0;max-height:none;border:1px solid rgba(148,163,184,.25);border-radius:8px;"></div>',
+      '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">',
+      '<button type="button" onclick="UniRowFilter.close()" style="padding:7px 12px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--text-secondary);font-size:12px;font-weight:600;cursor:pointer;">Exit</button>',
+      '<button type="button" id="uniFilterApplyBtn" onclick="UniRowFilter.finishAndClose()" style="padding:7px 12px;border:1px solid rgba(255,165,120,.5);border-radius:7px;background:rgba(255,165,120,.18);color:#ffd8be;font-size:12px;font-weight:700;cursor:pointer;">Finish &amp; Apply</button>',
+      '</div>',
       '</div></div>'
     ].join('');
     while (el.firstChild) document.body.appendChild(el.firstChild);
@@ -2565,10 +2591,11 @@ const StatisticoHeader = {
       '<ol>' +
       '<li>Click <strong>Filter</strong> in the header (info icon opens this guide).</li>' +
       '<li>Click <strong>▼</strong> on a column header, choose values, then <strong>OK</strong>.</li>' +
+      '<li>Click <strong>Finish &amp; Apply</strong> to freeze the filtered dataset used by this module.</li>' +
       '<li><strong>Clear all filters</strong> restores all rows from the original range.</li>' +
-      '<li>Use <strong>View Data</strong> to inspect the filtered rows currently in scope.</li>' +
+      '<li>Use <strong>View Data</strong> to inspect the currently frozen rows in scope.</li>' +
       '</ol>' +
-      '<div class="uni-filter-help-outcomes"><strong>What updates:</strong> View Data always follows the filter; supported modules also refresh their charts and tables.</div>' +
+      '<div class="uni-filter-help-outcomes"><strong>What updates:</strong> View Data and module results refresh after Finish &amp; Apply.</div>' +
       '<button type="button" class="uni-filter-help-close" onclick="StatisticoHeader.closeUniFilterHelp()">Got it</button>' +
       '</div></div>');
   },
@@ -4482,7 +4509,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
    */
   async _collectAllViewsViaIframes(onProgress) {
     const views = [
-      { id: 'histogram',  url: 'univariate/histogram-standalone.html'     },
+      { id: 'histogram',  url: 'univariate/histogram-standalone-v2.html'     },
       { id: 'boxplot',    url: 'univariate/boxplot-standalone.html'        },
       { id: 'cdf',        url: 'univariate/cumulative-distribution.html'   },
       { id: 'percentile', url: 'univariate/percentile-standalone.html'     },

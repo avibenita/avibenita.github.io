@@ -1098,7 +1098,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260522a');
+          out.searchParams.set('build', '20260522b');
         }
         return out.href;
       } catch (e) {
@@ -2493,7 +2493,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260522a';
+    const v = '20260522b';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');

@@ -6,9 +6,9 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
-  <link rel="stylesheet" href="../shared-header.css?v=20260522a" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260522b" />
   <script src="../shared-brand-logo.js?v=20260519u"></script>
-  <script src="../shared-header.js?v=20260522a"></script>
+  <script src="../shared-header.js?v=20260522b"></script>
   <style>
     :root {
       --surface-0:#0c1624; --surface-1:#1a1f2e; --surface-2:#242938; --border:#2d3748;
@@ -43,7 +43,7 @@
     .metric label { display:block; color:var(--text-secondary); font-size:10px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
     .metric strong { font-size:18px; color:var(--accent-1); }
     .table-wrap { border:1px solid var(--border); border-radius:10px; overflow:auto; background:var(--surface-2); }
-    table { width:100%; border-collapse:collapse; min-width:980px; }
+    table { width:100%; border-collapse:collapse; min-width:1120px; }
     th, td { padding:8px 10px; border-bottom:1px solid var(--border); text-align:right; font-size:12px; }
     th { position:sticky; top:0; z-index:2; background:var(--surface-1); color:var(--accent-1); text-transform:uppercase; font-size:10px; letter-spacing:.08em; }
     th:first-child, td:first-child { text-align:left; }
@@ -53,7 +53,7 @@
     .hist-head { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 9px; border-bottom:1px solid var(--border); color:var(--text-secondary); font-size:10px; }
     .hist-head strong { color:var(--accent-1); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .hist-head span { white-space:nowrap; }
-    .hist-chart { height:135px; }
+    .hist-chart { height:185px; }
     .empty { margin:32px auto; max-width:720px; text-align:center; color:var(--text-secondary); line-height:1.5; }
     .empty i { display:block; color:var(--accent-1); font-size:32px; margin-bottom:10px; }
     .group-dialog-overlay { position:fixed; inset:0; z-index:2147483200; display:none; align-items:center; justify-content:center; padding:16px; background:rgba(3,7,18,.64); backdrop-filter:blur(3px); }
@@ -129,7 +129,7 @@
                 <table>
                   <thead>
                     <tr>
-                      <th>Group</th><th>N</th><th>Mean</th><th>Median</th><th>Std Dev</th><th>Variance</th>
+                      <th>Group</th><th>N</th><th>Mean</th><th>LCL</th><th>UCL</th><th>Median</th><th>Std Dev</th><th>Variance</th>
                       <th>Min</th><th>Q1</th><th>Q3</th><th>Max</th><th>Skew</th><th>Kurtosis</th>
                     </tr>
                   </thead>
@@ -194,6 +194,8 @@
       const mean = clean.reduce((a, b) => a + b, 0) / n;
       const variance = n > 1 ? clean.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / (n - 1) : 0;
       const stdDev = Math.sqrt(variance);
+      const se = n > 1 ? stdDev / Math.sqrt(n) : 0;
+      const ci = n > 1 ? 1.96 * se : 0;
       const skew = n >= 3 && stdDev > 0
         ? (n / ((n - 1) * (n - 2))) * clean.reduce((sum, v) => sum + Math.pow((v - mean) / stdDev, 3), 0)
         : 0;
@@ -201,7 +203,7 @@
         ? ((n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3))) * clean.reduce((sum, v) => sum + Math.pow((v - mean) / stdDev, 4), 0) - (3 * Math.pow(n - 1, 2)) / ((n - 2) * (n - 3))
         : 0;
       return {
-        n, values: clean, mean, variance, stdDev, skew, kurtosis,
+        n, values: clean, mean, lcl: mean - ci, ucl: mean + ci, variance, stdDev, skew, kurtosis,
         min: clean[0], q1: quantile(clean, 0.25), median: quantile(clean, 0.5), q3: quantile(clean, 0.75), max: clean[n - 1]
       };
     }
@@ -433,7 +435,7 @@
     function renderTable() {
       document.getElementById('statsBody').innerHTML = groupStats.map((g) => `
         <tr>
-          <td>${escapeHtml(g.group)}</td><td>${g.n}</td><td>${fmt(g.mean)}</td><td>${fmt(g.median)}</td>
+          <td>${escapeHtml(g.group)}</td><td>${g.n}</td><td>${fmt(g.mean)}</td><td>${fmt(g.lcl)}</td><td>${fmt(g.ucl)}</td><td>${fmt(g.median)}</td>
           <td>${fmt(g.stdDev)}</td><td>${fmt(g.variance)}</td><td>${fmt(g.min)}</td><td>${fmt(g.q1)}</td>
           <td>${fmt(g.q3)}</td><td>${fmt(g.max)}</td><td>${fmt(g.skew)}</td><td>${fmt(g.kurtosis)}</td>
         </tr>
@@ -447,9 +449,11 @@
         const idx = Math.min(bins - 1, Math.max(0, Math.floor((v - globalMin) / width)));
         counts[idx] += 1;
       });
+      const total = values.length || 1;
       return counts.map((count, i) => ({
         name: `${fmt(globalMin + i * width, 1)}-${fmt(globalMin + (i + 1) * width, 1)}`,
-        y: count
+        y: count,
+        pct: count / total * 100
       }));
     }
 
@@ -467,14 +471,27 @@
         card.innerHTML = `<div class="hist-head"><strong>${escapeHtml(g.group)}</strong><span>n=${g.n}, mean=${fmt(g.mean)}</span></div><div id="${id}" class="hist-chart"></div>`;
         grid.appendChild(card);
         Highcharts.chart(id, {
-          chart: { type:'column', backgroundColor:'transparent', spacing:[4, 4, 4, 4] },
+          chart: { type:'column', backgroundColor:'transparent', spacing:[6, 6, 24, 6] },
           title: { text:null },
           credits: { enabled:false },
           legend: { enabled:false },
-          xAxis: { type:'category', labels:{ enabled:false }, tickLength:0, lineColor:'var(--border)' },
+          xAxis: { type:'category', labels:{ enabled:true, rotation:-45, style:{ color:'var(--text-secondary)', fontSize:'8px' } }, tickLength:0, lineColor:'var(--border)' },
           yAxis: { min:0, title:{ text:null }, labels:{ style:{ color:'var(--text-secondary)', fontSize:'9px' } }, gridLineColor:'rgba(148,163,184,.18)' },
-          tooltip: { pointFormat:'Frequency: <b>{point.y}</b>' },
-          plotOptions: { column:{ borderWidth:0, color:'rgba(129,140,248,.92)', borderRadius:3 } },
+          tooltip: { pointFormat:'Frequency: <b>{point.y}</b><br/>Percent: <b>{point.pct:.1f}%</b>' },
+          plotOptions: {
+            column:{
+              borderWidth:0,
+              color:'rgba(129,140,248,.92)',
+              borderRadius:3,
+              dataLabels:{
+                enabled:true,
+                crop:false,
+                overflow:'allow',
+                formatter:function(){ return this.point.pct > 0 ? this.point.pct.toFixed(0) + '%' : ''; },
+                style:{ color:'var(--text-primary)', fontSize:'9px', fontWeight:'700', textOutline:'none' }
+              }
+            }
+          },
           series: [{ data: histogramSeries(g.values, globalMin, globalMax, bins) }]
         });
       });
@@ -488,9 +505,9 @@
       if (typeof StatisticoHeader === 'undefined') return;
       StatisticoHeader.registerActions({
         getData: () => ({
-          headers: ['Group', 'N', 'Mean', 'Median', 'Std Dev', 'Variance', 'Min', 'Q1', 'Q3', 'Max', 'Skew', 'Kurtosis'],
-          allRows: groupStats.map((g) => [g.group, g.n, g.mean, g.median, g.stdDev, g.variance, g.min, g.q1, g.q3, g.max, g.skew, g.kurtosis]),
-          usedRows: groupStats.map((g) => [g.group, g.n, g.mean, g.median, g.stdDev, g.variance, g.min, g.q1, g.q3, g.max, g.skew, g.kurtosis]),
+          headers: ['Group', 'N', 'Mean', 'LCL', 'UCL', 'Median', 'Std Dev', 'Variance', 'Min', 'Q1', 'Q3', 'Max', 'Skew', 'Kurtosis'],
+          allRows: groupStats.map((g) => [g.group, g.n, g.mean, g.lcl, g.ucl, g.median, g.stdDev, g.variance, g.min, g.q1, g.q3, g.max, g.skew, g.kurtosis]),
+          usedRows: groupStats.map((g) => [g.group, g.n, g.mean, g.lcl, g.ucl, g.median, g.stdDev, g.variance, g.min, g.q1, g.q3, g.max, g.skew, g.kurtosis]),
           fullRange: payload && payload.dataSource,
           usedRange: 'BY GROUP summary',
           notice: 'Grouped statistics use the active source row filter.'

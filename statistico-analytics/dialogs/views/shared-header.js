@@ -1099,7 +1099,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260522l');
+          out.searchParams.set('build', '20260522m');
         }
         return out.href;
       } catch (e) {
@@ -2494,7 +2494,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260522l';
+    const v = '20260522m';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -3371,19 +3371,30 @@ const StatisticoHeader = {
   },
 
   publishHeaderRowFilterChange(filteredRows, skipDispatch) {
+    const meta = (typeof UniRowFilter !== 'undefined' && typeof UniRowFilter.getSourceMeta === 'function')
+      ? UniRowFilter.getSourceMeta()
+      : null;
     const data = this._getHeaderRowFilterData();
-    if (!data) return null;
-    const rows = this._normalizeRowFilterRows(filteredRows, data.headers);
-    const allRows = data.allRows || data.sourceRowsAll || rows;
+    const headers = (meta && Array.isArray(meta.headers) && meta.headers.length)
+      ? meta.headers.slice()
+      : (data && Array.isArray(data.headers) ? data.headers.slice() : []);
+    if (!headers.length) return null;
+    const rows = this._normalizeRowFilterRows(filteredRows, headers);
+    const allRows = (meta && Array.isArray(meta.allRows) && meta.allRows.length)
+      ? this._normalizeRowFilterRows(meta.allRows, headers)
+      : (data && (data.allRows || data.sourceRowsAll)
+        ? this._normalizeRowFilterRows(data.allRows || data.sourceRowsAll, headers)
+        : rows);
     const active = typeof UniRowFilter !== 'undefined'
       ? UniRowFilter.hasActiveFilters()
       : rows.length !== allRows.length;
     const payload = {
-      ...data,
-      headers: data.headers.slice(),
+      ...(data || {}),
+      headers: headers.slice(),
       allRows: allRows.map((r) => r.slice()),
       usedRows: rows.map((r) => r.slice()),
       columnFilters: this._getCurrentRowFilterCriteria(),
+      sourceHeaders: headers.slice(),
       sourceRowsAll: allRows.map((r) => r.slice()),
       sourceRows: rows.map((r) => r.slice()),
       rowFilterActive: active,

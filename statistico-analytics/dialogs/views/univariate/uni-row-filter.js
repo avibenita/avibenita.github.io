@@ -15,6 +15,7 @@
   var MAX_RENDER_ROWS = 500;
   var MAX_DROPDOWN_VALUES = 600;
   var MAX_UNIQUE_SCAN_VALUES = 2500;
+  var MAX_UNIQUE_SCAN_ROWS = 15000;
   var MAX_FILTER_VALUES = 400;
 
   function cellStr(val) {
@@ -80,7 +81,7 @@
       }
     });
     var rows = _allRows || [];
-    for (var i = 0; i < rows.length && out.length < MAX_UNIQUE_SCAN_VALUES; i++) {
+    for (var i = 0; i < rows.length && out.length < MAX_UNIQUE_SCAN_VALUES && i < MAX_UNIQUE_SCAN_ROWS; i++) {
       var row = rows[i];
       var s = cellStr(row[colIdx]);
       if (!Object.prototype.hasOwnProperty.call(seen, s)) {
@@ -89,7 +90,7 @@
       }
     }
     out.sort();
-    out._truncated = Object.keys(seen).length >= MAX_UNIQUE_SCAN_VALUES;
+    out._truncated = rows.length > MAX_UNIQUE_SCAN_ROWS || out.length >= MAX_UNIQUE_SCAN_VALUES;
     return out;
   }
 
@@ -129,17 +130,32 @@
   function applyAllFilters() {
     var included = getColumnIndices();
     var filterSets = {};
+    var activeColumns = [];
     included.forEach(function (ci) {
       var filter = _columnFilters[ci];
       if (Array.isArray(filter) && filter.length && filter.indexOf('__SHOW_NOTHING__') < 0) {
         filterSets[ci] = filterSelSet(filter);
+        activeColumns.push(ci);
       } else if (filter && typeof filter === 'object' && Array.isArray(filter.values) && filter.values.length) {
         filterSets[ci] = filterSelSet(filter);
+        activeColumns.push(ci);
+      } else if (Array.isArray(filter) && filter.indexOf('__SHOW_NOTHING__') >= 0) {
+        activeColumns.push(ci);
       }
     });
+    if (!activeColumns.length) {
+      _filteredRows = (_allRows || []).slice();
+      updateBadge();
+      var overlayIdle = document.getElementById('uniFilterOverlay');
+      if (overlayIdle && overlayIdle.classList.contains('sb-ai-overlay--visible')) {
+        renderFilterTable();
+      }
+      if (typeof _onApply === 'function') _onApply(_filteredRows.slice());
+      return;
+    }
     _filteredRows = (_allRows || []).filter(function (row) {
-      for (var k = 0; k < included.length; k++) {
-        var ci = included[k];
+      for (var k = 0; k < activeColumns.length; k++) {
+        var ci = activeColumns[k];
         var filter = _columnFilters[ci];
         if (!filter) continue;
         if (Array.isArray(filter)) {

@@ -12,10 +12,11 @@
   var _columnIndex = 0;
   var _onApply = null;
   var _dropIgnoreClose = false;
+  var _uniqueCache = {};
   var MAX_RENDER_ROWS = 500;
-  var MAX_DROPDOWN_VALUES = 600;
+  var MAX_DROPDOWN_VALUES = 250;
   var MAX_UNIQUE_SCAN_VALUES = 2500;
-  var MAX_UNIQUE_SCAN_ROWS = 15000;
+  var MAX_UNIQUE_SCAN_ROWS = 8000;
   var MAX_FILTER_VALUES = 400;
 
   function cellStr(val) {
@@ -72,25 +73,37 @@
   }
 
   function uniqueValues(colIdx, requiredValues) {
-    var seen = {};
-    var out = [];
-    Object.keys(requiredValues || {}).forEach(function (key) {
-      if (!Object.prototype.hasOwnProperty.call(seen, key)) {
-        seen[key] = true;
-        out.push(key);
+    var cacheKey = String(colIdx);
+    var cached = _uniqueCache[cacheKey];
+    if (!cached) {
+      var seen = {};
+      var base = [];
+      var rows = _allRows || [];
+      for (var i = 0; i < rows.length && base.length < MAX_UNIQUE_SCAN_VALUES && i < MAX_UNIQUE_SCAN_ROWS; i++) {
+        var row = rows[i];
+        var s = cellStr(row[colIdx]);
+        if (!Object.prototype.hasOwnProperty.call(seen, s)) {
+          seen[s] = true;
+          base.push(s);
+        }
       }
-    });
-    var rows = _allRows || [];
-    for (var i = 0; i < rows.length && out.length < MAX_UNIQUE_SCAN_VALUES && i < MAX_UNIQUE_SCAN_ROWS; i++) {
-      var row = rows[i];
-      var s = cellStr(row[colIdx]);
-      if (!Object.prototype.hasOwnProperty.call(seen, s)) {
-        seen[s] = true;
-        out.push(s);
-      }
+      base.sort();
+      cached = {
+        values: base,
+        truncated: rows.length > MAX_UNIQUE_SCAN_ROWS || base.length >= MAX_UNIQUE_SCAN_VALUES
+      };
+      _uniqueCache[cacheKey] = cached;
     }
+    var out = cached.values.slice();
+    var seenOut = {};
+    out.forEach(function (v) { seenOut[v] = true; });
+    Object.keys(requiredValues || {}).forEach(function (key) {
+      if (!seenOut[key]) out.push(key);
+    });
     out.sort();
-    out._truncated = rows.length > MAX_UNIQUE_SCAN_ROWS || out.length >= MAX_UNIQUE_SCAN_VALUES;
+    var truncated = cached.truncated || out.length > MAX_UNIQUE_SCAN_VALUES;
+    if (out.length > MAX_UNIQUE_SCAN_VALUES) out = out.slice(0, MAX_UNIQUE_SCAN_VALUES);
+    out._truncated = truncated;
     return out;
   }
 
@@ -574,6 +587,7 @@
     _columnIndex = opts.columnIndex != null ? Number(opts.columnIndex) : 0;
     _onApply = opts.onApply || null;
     _columnFilters = {};
+    _uniqueCache = {};
     getColumnIndices().forEach(function (i) { _columnFilters[i] = []; });
     _filteredRows = _allRows.slice();
     updateBadge();

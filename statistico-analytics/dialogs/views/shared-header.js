@@ -1099,7 +1099,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260522e');
+          out.searchParams.set('build', '20260522f');
         }
         return out.href;
       } catch (e) {
@@ -2494,7 +2494,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260522e';
+    const v = '20260522f';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2648,7 +2648,17 @@ const StatisticoHeader = {
   _cloneRowFilterCriteria(criteria) {
     const out = {};
     Object.keys(criteria || {}).forEach((key) => {
-      out[key] = Array.isArray(criteria[key]) ? criteria[key].slice() : [];
+      const value = criteria[key];
+      if (Array.isArray(value)) {
+        out[key] = value.slice();
+      } else if (value && typeof value === 'object') {
+        out[key] = {
+          mode: value.mode || 'include',
+          values: Array.isArray(value.values) ? value.values.slice() : []
+        };
+      } else {
+        out[key] = [];
+      }
     });
     return out;
   },
@@ -2662,7 +2672,11 @@ const StatisticoHeader = {
   },
 
   _hasActiveRowFilterCriteria(criteria) {
-    return Object.keys(criteria || {}).some((key) => Array.isArray(criteria[key]) && criteria[key].length > 0);
+    return Object.keys(criteria || {}).some((key) => {
+      const value = criteria[key];
+      return (Array.isArray(value) && value.length > 0) ||
+        (value && typeof value === 'object' && Array.isArray(value.values) && value.values.length > 0);
+    });
   },
 
   _cellFilterValue(value) {
@@ -2672,14 +2686,34 @@ const StatisticoHeader = {
 
   _applyRowFilterCriteria(rows, criteria) {
     if (!this._hasActiveRowFilterCriteria(criteria)) return (rows || []).map((r) => Array.isArray(r) ? r.slice() : r);
+    const compiled = {};
+    Object.keys(criteria || {}).forEach((key) => {
+      const filter = criteria[key];
+      if (Array.isArray(filter)) {
+        if (!filter.length) return;
+        if (filter.indexOf('__SHOW_NOTHING__') >= 0) {
+          compiled[key] = { mode: 'none', values: null };
+          return;
+        }
+        const selected = {};
+        filter.forEach((v) => { selected[this._cellFilterValue(v)] = true; });
+        compiled[key] = { mode: 'include', values: selected };
+      } else if (filter && typeof filter === 'object') {
+        const values = Array.isArray(filter.values) ? filter.values : [];
+        if (!values.length) return;
+        const selected = {};
+        values.forEach((v) => { selected[this._cellFilterValue(v)] = true; });
+        compiled[key] = { mode: filter.mode === 'exclude' ? 'exclude' : 'include', values: selected };
+      }
+    });
     return (rows || []).filter((row) => {
-      for (const key of Object.keys(criteria || {})) {
-        const filter = criteria[key];
-        if (!Array.isArray(filter) || !filter.length) continue;
-        if (filter.indexOf('__SHOW_NOTHING__') >= 0) return false;
+      for (const key of Object.keys(compiled)) {
+        const filter = compiled[key];
         const idx = Number(key);
         const value = this._cellFilterValue(Array.isArray(row) ? row[idx] : row && row[idx]);
-        if (filter.map((v) => this._cellFilterValue(v)).indexOf(value) < 0) return false;
+        if (filter.mode === 'none') return false;
+        const matched = !!(filter.values && filter.values[value]);
+        if (filter.mode === 'exclude' ? matched : !matched) return false;
       }
       return true;
     }).map((r) => Array.isArray(r) ? r.slice() : r);

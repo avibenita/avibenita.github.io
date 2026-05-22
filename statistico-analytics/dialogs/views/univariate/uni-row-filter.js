@@ -14,6 +14,7 @@
   var _dropIgnoreClose = false;
   var MAX_RENDER_ROWS = 500;
   var MAX_DROPDOWN_VALUES = 600;
+  var MAX_UNIQUE_SCAN_VALUES = 2500;
 
   function cellStr(val) {
     if (val === null || val === undefined) return '';
@@ -26,7 +27,8 @@
 
   function filterSelSet(filterArr) {
     var set = {};
-    (filterArr || []).forEach(function (v) {
+    var values = Array.isArray(filterArr) ? filterArr : (filterArr && Array.isArray(filterArr.values) ? filterArr.values : []);
+    values.forEach(function (v) {
       if (v !== '__SHOW_NOTHING__') set[valKey(v)] = true;
     });
     return set;
@@ -35,7 +37,10 @@
   function cloneColumnFilters(filters) {
     var out = {};
     Object.keys(filters || {}).forEach(function (key) {
-      out[key] = Array.isArray(filters[key]) ? filters[key].slice() : [];
+      var f = filters[key];
+      if (Array.isArray(f)) out[key] = f.slice();
+      else if (f && typeof f === 'object') out[key] = { mode: f.mode || 'include', values: Array.isArray(f.values) ? f.values.slice() : [] };
+      else out[key] = [];
     });
     return out;
   }
@@ -52,19 +57,26 @@
     return _headers.map(function (_, i) { return i; });
   }
 
-  function uniqueValues(colIdx) {
+  function uniqueValues(colIdx, requiredValues) {
     var seen = {};
     var out = [];
-    (_allRows || []).forEach(function (row) {
+    Object.keys(requiredValues || {}).forEach(function (key) {
+      if (!Object.prototype.hasOwnProperty.call(seen, key)) {
+        seen[key] = true;
+        out.push(key);
+      }
+    });
+    var rows = _allRows || [];
+    for (var i = 0; i < rows.length && out.length < MAX_UNIQUE_SCAN_VALUES; i++) {
+      var row = rows[i];
       var s = cellStr(row[colIdx]);
       if (!Object.prototype.hasOwnProperty.call(seen, s)) {
         seen[s] = true;
         out.push(s);
       }
-    });
-    out.sort(function (a, b) {
-      return a.localeCompare(b, undefined, { numeric: true });
-    });
+    }
+    out.sort();
+    out._truncated = Object.keys(seen).length >= MAX_UNIQUE_SCAN_VALUES;
     return out;
   }
 
@@ -106,7 +118,9 @@
     var filterSets = {};
     included.forEach(function (ci) {
       var filter = _columnFilters[ci];
-      if (filter && filter.length && filter.indexOf('__SHOW_NOTHING__') < 0) {
+      if (Array.isArray(filter) && filter.length && filter.indexOf('__SHOW_NOTHING__') < 0) {
+        filterSets[ci] = filterSelSet(filter);
+      } else if (filter && typeof filter === 'object' && Array.isArray(filter.values) && filter.values.length) {
         filterSets[ci] = filterSelSet(filter);
       }
     });
@@ -114,9 +128,16 @@
       for (var k = 0; k < included.length; k++) {
         var ci = included[k];
         var filter = _columnFilters[ci];
-        if (!filter || !filter.length) continue;
-        if (filter.indexOf('__SHOW_NOTHING__') >= 0) return false;
-        if (!filterSets[ci] || !filterSets[ci][cellStr(row[ci])]) return false;
+        if (!filter) continue;
+        if (Array.isArray(filter)) {
+          if (!filter.length) continue;
+          if (filter.indexOf('__SHOW_NOTHING__') >= 0) return false;
+          if (!filterSets[ci] || !filterSets[ci][cellStr(row[ci])]) return false;
+        } else if (filter && typeof filter === 'object') {
+          if (!filter.values || !filter.values.length) continue;
+          var matched = !!(filterSets[ci] && filterSets[ci][cellStr(row[ci])]);
+          if (filter.mode === 'exclude' ? matched : !matched) return false;
+        }
       }
       return true;
     });
@@ -150,7 +171,7 @@
       var activeCols = 0;
       getColumnIndices().forEach(function (i) {
         var f = _columnFilters[i];
-        if (f && f.length) activeCols++;
+        if ((Array.isArray(f) && f.length) || (f && typeof f === 'object' && f.values && f.values.length)) activeCols++;
       });
       if (active) {
         summary.textContent = 'Showing ' + showing + ' of ' + total + ' rows from the selected range'
@@ -212,13 +233,18 @@
       applyAllFilters();
       return;
     }
+    if (dd._selectionMode === 'exclude') {
+      var excluded = Object.keys(dd._excludedValues || {});
+      _columnFilters[colIdx] = excluded.length ? { mode: 'exclude', values: excluded } : [];
+      closeColDropdown();
+      applyAllFilters();
+      return;
+    }
     var checked = [];
     Object.keys(dd._selectedValues || {}).forEach(function (key) {
       if (dd._selectedValues[key]) checked.push(key);
     });
-    var allVals = uniqueValues(colIdx);
     if (!checked.length) _columnFilters[colIdx] = ['__SHOW_NOTHING__'];
-    else if (checked.length >= allVals.length) _columnFilters[colIdx] = [];
     else _columnFilters[colIdx] = checked.slice();
     closeColDropdown();
     applyAllFilters();
@@ -227,11 +253,13 @@
   function toggleColFilter(colIdx, ev, anchorEl) {
     if (ev) { ev.preventDefault(); ev.stopPropagation(); }
     closeColDropdown();
-    var unique = uniqueValues(colIdx);
     var current = _columnFilters[colIdx] || [];
-    var showNothing = current.indexOf('__SHOW_NOTHING__') >= 0;
-    var isAll = !current.length && !showNothing;
+    var isExclude = !!(current && typeof current === 'object' && !Array.isArray(current) && current.mode === 'exclude');
+    var showNothing = Array.isArray(current) && current.indexOf('__SHOW_NOTHING__') >= 0;
+    var isAll = Array.isArray(current) && !current.length && !showNothing;
     var selSet = filterSelSet(current);
+    var excludedSet = isExclude ? filterSelSet(current) : {};
+    var unique = uniqueValues(colIdx, isExclude ? excludedSet : selSet);
 
     var dd = document.createElement('div');
     dd.className = 'uni-excel-filter-dropdown';
@@ -248,9 +276,11 @@
 
     var valuesWrap = document.createElement('div');
     valuesWrap.className = 'uni-filt-values';
-    dd._selectionMode = showNothing ? 'none' : (isAll ? 'all' : 'custom');
+    dd._selectionMode = showNothing ? 'none' : (isExclude ? 'exclude' : (isAll ? 'all' : 'include'));
     dd._selectedValues = {};
+    dd._excludedValues = {};
     Object.keys(selSet).forEach(function (key) { dd._selectedValues[key] = true; });
+    Object.keys(excludedSet).forEach(function (key) { dd._excludedValues[key] = true; });
 
     var selectAllLbl = document.createElement('label');
     var selectAllCb = document.createElement('input');
@@ -275,6 +305,7 @@
     function isValueSelected(val) {
       if (dd._selectionMode === 'all') return true;
       if (dd._selectionMode === 'none') return false;
+      if (dd._selectionMode === 'exclude') return !dd._excludedValues[valKey(val)];
       return !!dd._selectedValues[valKey(val)];
     }
 
@@ -283,9 +314,9 @@
       var total = valueCbs.length;
       var checked = 0;
       valueCbs.forEach(function (cb) { if (cb.checked) checked++; });
-      if (dd._selectionMode === 'all') {
+      if (dd._selectionMode === 'all' || dd._selectionMode === 'exclude') {
         selectAllCb.checked = true;
-        selectAllCb.indeterminate = false;
+        selectAllCb.indeterminate = dd._selectionMode === 'exclude' && Object.keys(dd._excludedValues || {}).length > 0;
       } else if (dd._selectionMode === 'none') {
         selectAllCb.checked = false;
         selectAllCb.indeterminate = false;
@@ -320,13 +351,16 @@
         lbl.addEventListener('click', function (e) {
           e.preventDefault();
           cb.checked = !cb.checked;
-          if (dd._selectionMode === 'all') {
+          if (dd._selectionMode === 'all' || dd._selectionMode === 'exclude') {
+            dd._selectionMode = 'exclude';
             dd._selectedValues = {};
-            unique.forEach(function (u) { dd._selectedValues[valKey(u)] = true; });
+            if (cb.checked) delete dd._excludedValues[key];
+            else dd._excludedValues[key] = true;
+          } else {
+            dd._selectionMode = 'include';
+            dd._selectedValues[key] = cb.checked;
+            if (!cb.checked) delete dd._selectedValues[key];
           }
-          dd._selectionMode = 'custom';
-          dd._selectedValues[key] = cb.checked;
-          if (!cb.checked) delete dd._selectedValues[key];
           syncRenderedSelectAll();
         });
         valuesWrap.appendChild(lbl);
@@ -336,6 +370,11 @@
         note.className = 'uni-filt-more-note';
         note.textContent = 'Showing ' + slice.values.length + ' of ' + slice.total + ' matching values. Type to narrow the list.';
         valuesWrap.appendChild(note);
+      } else if (unique._truncated) {
+        var capNote = document.createElement('div');
+        capNote.className = 'uni-filt-more-note';
+        capNote.textContent = 'High-cardinality column: showing a capped value list to keep filtering responsive.';
+        valuesWrap.appendChild(capNote);
       }
       syncRenderedSelectAll();
     }
@@ -444,7 +483,8 @@
       + 'letter-spacing:.08em;background:' + headerBg + ';border:1px solid var(--border);position:sticky;top:0;z-index:2;';
 
     var headerCells = _headers.map(function (h, i) {
-      var filtered = _columnFilters[i] && _columnFilters[i].length > 0;
+      var cf = _columnFilters[i];
+      var filtered = (Array.isArray(cf) && cf.length > 0) || (cf && typeof cf === 'object' && cf.values && cf.values.length > 0);
       var icon = filtered ? '🔽' : '▼';
       var cls = 'uni-filt-th' + (filtered ? ' filtered' : '');
       var highlight = i === _columnIndex ? ' outline:1px solid rgba(129,140,248,.5);' : '';
@@ -519,7 +559,9 @@
     _columnFilters = {};
     getColumnIndices().forEach(function (i) {
       var v = filters && (filters[i] || filters[String(i)]);
-      _columnFilters[i] = Array.isArray(v) ? v.slice() : [];
+      if (Array.isArray(v)) _columnFilters[i] = v.slice();
+      else if (v && typeof v === 'object') _columnFilters[i] = { mode: v.mode || 'include', values: Array.isArray(v.values) ? v.values.slice() : [] };
+      else _columnFilters[i] = [];
     });
     if (!skipApply) applyAllFilters();
   }

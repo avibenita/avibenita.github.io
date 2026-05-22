@@ -28,9 +28,9 @@
   <script src="https://d3js.org/d3.v7.min.js"></script>
 
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260522p">  <script src="../shared-brand-logo.js?v=20260523"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260522p"></script>
+  <script src="../shared-header.js?v=20260522r"></script>
 
   <style>
     /* ── Variables ── */
@@ -1205,6 +1205,25 @@
     });
   }
 
+  function toFiniteNumber(value) {
+    const n = typeof value === 'number' ? value : parseFloat(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function toListwiseCompleteData(data, headers) {
+    return (data || []).reduce((acc, row) => {
+      const obj = {};
+      for (let i = 0; i < headers.length; i += 1) {
+        const key = headers[i];
+        const num = toFiniteNumber(row ? row[key] : null);
+        if (num === null) return acc;
+        obj[key] = num;
+      }
+      acc.push(obj);
+      return acc;
+    }, []);
+  }
+
   function normalizeCorrelationPayload(payload) {
     if (!payload || typeof payload !== 'object') return null;
     const rawData = Array.isArray(payload.data) ? payload.data : null;
@@ -1238,7 +1257,11 @@
       console.warn('Invalid correlation payload ignored:', source, payload);
       return false;
     }
-    correlationData = normalized;
+    const listwiseData = toListwiseCompleteData(normalized.data, normalized.headers);
+    correlationData = {
+      ...normalized,
+      data: listwiseData
+    };
     window.correlationData = correlationData;
     try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch(e) {}
     renderMatrix();
@@ -1296,11 +1319,13 @@
     const projectedRows = canProject
       ? (filterPayload.usedRows || []).map((row) => analysisHeaders.map((h) => Array.isArray(row) ? row[headerIndex[h]] : (row && row[h])))
       : filterPayload.usedRows;
-    const filteredData = rowsToCorrelationObjects(canProject ? analysisHeaders : sourceHeaders, projectedRows);
+    const projectedHeaders = canProject ? analysisHeaders : sourceHeaders;
+    const filteredData = rowsToCorrelationObjects(projectedHeaders, projectedRows);
+    const listwiseData = toListwiseCompleteData(filteredData, projectedHeaders);
     correlationData = {
       ...(correlationData || {}),
-      headers: canProject ? analysisHeaders : sourceHeaders,
-      data: filteredData,
+      headers: projectedHeaders,
+      data: listwiseData,
       rowFilterActive: !!filterPayload.rowFilterActive,
       sourceHeaders,
       sourceRowsAll: filterPayload.sourceRowsAll || filterPayload.allRows || null,
@@ -1544,37 +1569,12 @@
     document.getElementById('resultsContainer').style.display = 'flex';
   }
 
-  function correlationNStats(matrix) {
-    const nValues = [];
-    for (let i = 0; i < matrix.length; i += 1) {
-      for (let j = i + 1; j < matrix.length; j += 1) {
-        const cell = matrix[i] && matrix[i][j];
-        if (cell && Number.isFinite(cell.n)) nValues.push(cell.n);
-      }
-    }
-    if (!nValues.length) return null;
-    let min = nValues[0], max = nValues[0];
-    for (let i = 1; i < nValues.length; i += 1) {
-      if (nValues[i] < min) min = nValues[i];
-      if (nValues[i] > max) max = nValues[i];
-    }
-    return { min, max, same: min === max };
-  }
-
   function updateCorrelationHeaderSummary() {
     if (isInIframe || typeof StatisticoHeader === 'undefined') return;
     try {
       const varCount = correlationData && correlationData.headers ? correlationData.headers.length : 0;
-      const stats = currentMatrix ? correlationNStats(currentMatrix) : null;
-      if (stats) {
-        StatisticoHeader.sampleSize = stats.same ? stats.min : stats.min;
-        StatisticoHeader.variableName = stats.same
-          ? `${varCount} Variables`
-          : `${varCount} Variables (pairwise N ${stats.min}-${stats.max})`;
-      } else {
-        StatisticoHeader.sampleSize = correlationData && correlationData.data ? correlationData.data.length : 0;
-        StatisticoHeader.variableName = `${varCount} Variables`;
-      }
+      StatisticoHeader.sampleSize = correlationData && correlationData.data ? correlationData.data.length : 0;
+      StatisticoHeader.variableName = `${varCount} Variables`;
       StatisticoHeader.render();
       registerHeaderActions();
     } catch (e) {
@@ -2459,7 +2459,6 @@
 
         const fullRange = correlationData.address || null;
         const usedRange = fullRange; // correlation uses pairwise deletion, no sub-range
-
         return {
           headers: sourceHeaders,
           allRows,
@@ -2501,7 +2500,7 @@
     }
 
     // Append n per pair
-    tsv += '\nN (pairwise)\t' + currentHeaders.join('\t') + '\n';
+    tsv += '\nN\t' + currentHeaders.join('\t') + '\n';
     for (let i = 0; i < n; i++) {
       tsv += currentHeaders[i];
       for (let j = 0; j < n; j++) {

@@ -1099,7 +1099,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260522p');
+          out.searchParams.set('build', '20260522r');
         }
         return out.href;
       } catch (e) {
@@ -2494,7 +2494,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260522p';
+    const v = '20260522r';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -3451,7 +3451,13 @@ const StatisticoHeader = {
         : varName;
     }
     const nEl = document.getElementById('headerSampleSize');
-    if (nEl) nEl.textContent = `(n=${this.module === 'univariate' ? n : (showing || n || 0)})`;
+    if (nEl) {
+      if (this.module === 'correlations') {
+        nEl.textContent = `(n=${this.sampleSize || n || 0})`;
+      } else {
+        nEl.textContent = `(n=${this.module === 'univariate' ? n : (showing || n || 0)})`;
+      }
+    }
 
     let notice = document.getElementById('uni-filter-active-notice');
     if (!notice) {

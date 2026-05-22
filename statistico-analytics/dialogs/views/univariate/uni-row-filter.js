@@ -12,6 +12,8 @@
   var _columnIndex = 0;
   var _onApply = null;
   var _dropIgnoreClose = false;
+  var MAX_RENDER_ROWS = 500;
+  var MAX_DROPDOWN_VALUES = 600;
 
   function cellStr(val) {
     if (val === null || val === undefined) return '';
@@ -66,6 +68,17 @@
     return out;
   }
 
+  function visibleValueSlice(values, term) {
+    var q = String(term || '').toLowerCase();
+    var matched = !q ? values : values.filter(function (v) {
+      return String(v).toLowerCase().indexOf(q) >= 0;
+    });
+    return {
+      values: matched.slice(0, MAX_DROPDOWN_VALUES),
+      total: matched.length
+    };
+  }
+
   function syncSelectAllState(valuesWrap, selectAllCb) {
     var valueCbs = valuesWrap.querySelectorAll('.uni-filt-val-row input[type=checkbox]');
     var total = valueCbs.length;
@@ -90,13 +103,20 @@
 
   function applyAllFilters() {
     var included = getColumnIndices();
+    var filterSets = {};
+    included.forEach(function (ci) {
+      var filter = _columnFilters[ci];
+      if (filter && filter.length && filter.indexOf('__SHOW_NOTHING__') < 0) {
+        filterSets[ci] = filterSelSet(filter);
+      }
+    });
     _filteredRows = (_allRows || []).filter(function (row) {
       for (var k = 0; k < included.length; k++) {
         var ci = included[k];
         var filter = _columnFilters[ci];
         if (!filter || !filter.length) continue;
         if (filter.indexOf('__SHOW_NOTHING__') >= 0) return false;
-        if (filter.indexOf(cellStr(row[ci])) < 0) return false;
+        if (!filterSets[ci] || !filterSets[ci][cellStr(row[ci])]) return false;
       }
       return true;
     });
@@ -180,11 +200,21 @@
   function applyColFilter(colIdx) {
     var dd = document.querySelector('.uni-excel-filter-dropdown');
     if (!dd) return;
+    if (dd._selectionMode === 'all') {
+      _columnFilters[colIdx] = [];
+      closeColDropdown();
+      applyAllFilters();
+      return;
+    }
+    if (dd._selectionMode === 'none') {
+      _columnFilters[colIdx] = ['__SHOW_NOTHING__'];
+      closeColDropdown();
+      applyAllFilters();
+      return;
+    }
     var checked = [];
-    dd.querySelectorAll('.uni-filt-val-row input[type=checkbox]').forEach(function (cb) {
-      if (!cb.checked) return;
-      var v = cb.getAttribute('data-filter-value');
-      checked.push(v !== null ? v : cb.value);
+    Object.keys(dd._selectedValues || {}).forEach(function (key) {
+      if (dd._selectedValues[key]) checked.push(key);
     });
     var allVals = uniqueValues(colIdx);
     if (!checked.length) _columnFilters[colIdx] = ['__SHOW_NOTHING__'];
@@ -212,15 +242,15 @@
     search.placeholder = 'Search...';
     search.className = 'uni-filt-search';
     search.addEventListener('input', function () {
-      var term = search.value.toLowerCase();
-      dd.querySelectorAll('.uni-filt-val-row').forEach(function (lbl) {
-        lbl.style.display = lbl.textContent.toLowerCase().indexOf(term) >= 0 ? 'flex' : 'none';
-      });
+      renderDropdownValues(search.value);
     });
     dd.appendChild(search);
 
     var valuesWrap = document.createElement('div');
     valuesWrap.className = 'uni-filt-values';
+    dd._selectionMode = showNothing ? 'none' : (isAll ? 'all' : 'custom');
+    dd._selectedValues = {};
+    Object.keys(selSet).forEach(function (key) { dd._selectedValues[key] = true; });
 
     var selectAllLbl = document.createElement('label');
     var selectAllCb = document.createElement('input');
@@ -236,31 +266,81 @@
       var on = !selectAllCb.checked;
       selectAllCb.checked = on;
       selectAllCb.indeterminate = false;
-      valuesWrap.querySelectorAll('.uni-filt-val-row input[type=checkbox]').forEach(function (cb) {
-        cb.checked = on;
-      });
+      dd._selectionMode = on ? 'all' : 'none';
+      dd._selectedValues = {};
+      renderDropdownValues(search.value);
     });
     valuesWrap.appendChild(selectAllLbl);
 
-    unique.forEach(function (val) {
-      var lbl = document.createElement('label');
-      lbl.className = 'uni-filt-val-row';
-      var cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.value = val;
-      cb.setAttribute('data-filter-value', val);
-      cb.style.pointerEvents = 'none';
-      cb.checked = !showNothing && (isAll || !!selSet[valKey(val)]);
-      lbl.appendChild(cb);
-      lbl.appendChild(document.createTextNode(' ' + (val === '' ? '(Blank)' : val)));
-      lbl.addEventListener('click', function (e) {
-        e.preventDefault();
-        cb.checked = !cb.checked;
-        syncSelectAllState(valuesWrap, selectAllCb);
+    function isValueSelected(val) {
+      if (dd._selectionMode === 'all') return true;
+      if (dd._selectionMode === 'none') return false;
+      return !!dd._selectedValues[valKey(val)];
+    }
+
+    function syncRenderedSelectAll() {
+      var valueCbs = valuesWrap.querySelectorAll('.uni-filt-val-row input[type=checkbox]');
+      var total = valueCbs.length;
+      var checked = 0;
+      valueCbs.forEach(function (cb) { if (cb.checked) checked++; });
+      if (dd._selectionMode === 'all') {
+        selectAllCb.checked = true;
+        selectAllCb.indeterminate = false;
+      } else if (dd._selectionMode === 'none') {
+        selectAllCb.checked = false;
+        selectAllCb.indeterminate = false;
+      } else if (total && checked === total) {
+        selectAllCb.checked = true;
+        selectAllCb.indeterminate = false;
+      } else if (checked === 0) {
+        selectAllCb.checked = false;
+        selectAllCb.indeterminate = false;
+      } else {
+        selectAllCb.checked = false;
+        selectAllCb.indeterminate = true;
+      }
+    }
+
+    function renderDropdownValues(term) {
+      var slice = visibleValueSlice(unique, term);
+      valuesWrap.innerHTML = '';
+      valuesWrap.appendChild(selectAllLbl);
+      slice.values.forEach(function (val) {
+        var key = valKey(val);
+        var lbl = document.createElement('label');
+        lbl.className = 'uni-filt-val-row';
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = val;
+        cb.setAttribute('data-filter-value', val);
+        cb.style.pointerEvents = 'none';
+        cb.checked = isValueSelected(val);
+        lbl.appendChild(cb);
+        lbl.appendChild(document.createTextNode(' ' + (val === '' ? '(Blank)' : val)));
+        lbl.addEventListener('click', function (e) {
+          e.preventDefault();
+          cb.checked = !cb.checked;
+          if (dd._selectionMode === 'all') {
+            dd._selectedValues = {};
+            unique.forEach(function (u) { dd._selectedValues[valKey(u)] = true; });
+          }
+          dd._selectionMode = 'custom';
+          dd._selectedValues[key] = cb.checked;
+          if (!cb.checked) delete dd._selectedValues[key];
+          syncRenderedSelectAll();
+        });
+        valuesWrap.appendChild(lbl);
       });
-      valuesWrap.appendChild(lbl);
-    });
-    syncSelectAllState(valuesWrap, selectAllCb);
+      if (slice.total > slice.values.length) {
+        var note = document.createElement('div');
+        note.className = 'uni-filt-more-note';
+        note.textContent = 'Showing ' + slice.values.length + ' of ' + slice.total + ' matching values. Type to narrow the list.';
+        valuesWrap.appendChild(note);
+      }
+      syncRenderedSelectAll();
+    }
+
+    renderDropdownValues('');
     dd.appendChild(valuesWrap);
 
     var actions = document.createElement('div');
@@ -317,12 +397,17 @@
       return th;
     }
     function openColumnFilter(e) {
+      if (e.type === 'click' && el._uniFiltMouseOpened) {
+        el._uniFiltMouseOpened = false;
+        return;
+      }
       var th = resolveHeaderCell(e.target);
       if (!th) return;
       var idx = th.getAttribute('data-col-idx');
       if (idx === null || idx === '') return;
       e.preventDefault();
       e.stopPropagation();
+      if (e.type === 'mousedown') el._uniFiltMouseOpened = true;
       toggleColFilter(parseInt(idx, 10), e, th);
     }
     el.addEventListener('mousedown', openColumnFilter);
@@ -366,13 +451,12 @@
       return '<th class="' + cls + '" data-col-idx="' + i + '" style="' + thStyle + highlight
         + 'cursor:pointer;pointer-events:auto;user-select:none;'
         + 'color:' + (filtered ? '#4ade80' : (i === _columnIndex ? '#a5b4fc' : '#ffa578')) + ';" '
-        + 'onclick="UniRowFilter.clickHeaderByIndex(' + i + ', event)" '
-        + 'onmousedown="UniRowFilter.clickHeaderByIndex(' + i + ', event)" '
         + 'title="Click to filter ' + escHtml(h) + '">'
         + escHtml(h) + (i === _columnIndex ? ' ★' : '') + '<span class="uni-filt-icon" style="pointer-events:none;">' + icon + '</span></th>';
     }).join('');
 
-    var bodyRows = rows.map(function (row, ri) {
+    var displayRows = rows.slice(0, MAX_RENDER_ROWS);
+    var bodyRows = displayRows.map(function (row, ri) {
       var bg = ri % 2 === 0 ? rowBg : altBg;
       var cells = _headers.map(function (_, ci) {
         var val = row[ci];
@@ -386,7 +470,10 @@
       return '<tr style="background:' + bg + '">' + cells + '</tr>';
     }).join('');
 
-    el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
+    var limitNote = rows.length > displayRows.length
+      ? '<div class="uni-filt-more-note">Showing first ' + displayRows.length + ' of ' + rows.length + ' rows. Filters apply to the full source range.</div>'
+      : '';
+    el.innerHTML = limitNote + '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
       + '<thead><tr>' + headerCells + '</tr></thead>'
       + '<tbody>' + bodyRows + '</tbody></table>';
   }

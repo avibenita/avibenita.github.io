@@ -15,6 +15,7 @@
   var MAX_RENDER_ROWS = 500;
   var MAX_DROPDOWN_VALUES = 600;
   var MAX_UNIQUE_SCAN_VALUES = 2500;
+  var MAX_FILTER_VALUES = 2000;
 
   function cellStr(val) {
     if (val === null || val === undefined) return '';
@@ -37,12 +38,22 @@
   function cloneColumnFilters(filters) {
     var out = {};
     Object.keys(filters || {}).forEach(function (key) {
-      var f = filters[key];
-      if (Array.isArray(f)) out[key] = f.slice();
-      else if (f && typeof f === 'object') out[key] = { mode: f.mode || 'include', values: Array.isArray(f.values) ? f.values.slice() : [] };
-      else out[key] = [];
+      out[key] = sanitizeFilterEntry(filters[key]);
     });
     return out;
+  }
+
+  function sanitizeFilterEntry(filter) {
+    if (Array.isArray(filter)) {
+      if (filter.indexOf('__SHOW_NOTHING__') >= 0) return ['__SHOW_NOTHING__'];
+      if (filter.length > MAX_FILTER_VALUES) return [];
+      return filter.slice();
+    }
+    if (filter && typeof filter === 'object') {
+      var values = Array.isArray(filter.values) ? filter.values.slice(0, MAX_FILTER_VALUES) : [];
+      return { mode: filter.mode === 'exclude' ? 'exclude' : 'include', values: values };
+    }
+    return [];
   }
 
   function escHtml(s) {
@@ -559,9 +570,7 @@
     _columnFilters = {};
     getColumnIndices().forEach(function (i) {
       var v = filters && (filters[i] || filters[String(i)]);
-      if (Array.isArray(v)) _columnFilters[i] = v.slice();
-      else if (v && typeof v === 'object') _columnFilters[i] = { mode: v.mode || 'include', values: Array.isArray(v.values) ? v.values.slice() : [] };
-      else _columnFilters[i] = [];
+      _columnFilters[i] = sanitizeFilterEntry(v);
     });
     if (!skipApply) applyAllFilters();
   }

@@ -1099,7 +1099,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260522f');
+          out.searchParams.set('build', '20260522g');
         }
         return out.href;
       } catch (e) {
@@ -2494,7 +2494,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260522f';
+    const v = '20260522g';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2646,15 +2646,17 @@ const StatisticoHeader = {
   },
 
   _cloneRowFilterCriteria(criteria) {
+    const MAX_FILTER_VALUES = 2000;
     const out = {};
     Object.keys(criteria || {}).forEach((key) => {
       const value = criteria[key];
       if (Array.isArray(value)) {
-        out[key] = value.slice();
+        if (value.indexOf('__SHOW_NOTHING__') >= 0) out[key] = ['__SHOW_NOTHING__'];
+        else out[key] = value.length > MAX_FILTER_VALUES ? [] : value.slice();
       } else if (value && typeof value === 'object') {
         out[key] = {
           mode: value.mode || 'include',
-          values: Array.isArray(value.values) ? value.values.slice() : []
+          values: Array.isArray(value.values) ? value.values.slice(0, MAX_FILTER_VALUES) : []
         };
       } else {
         out[key] = [];
@@ -2752,11 +2754,17 @@ const StatisticoHeader = {
   _setGenericRowFilterState(state, moduleName) {
     this._rowFilterStates = this._rowFilterStates || {};
     const key = this._rowFilterKey(moduleName);
-    if (state) this._rowFilterStates[key] = state;
+    const nextState = state && typeof state === 'object'
+      ? {
+        ...state,
+        columnFilters: this._cloneRowFilterCriteria(state.columnFilters)
+      }
+      : state;
+    if (nextState) this._rowFilterStates[key] = nextState;
     else delete this._rowFilterStates[key];
     try {
       const storageKey = this._rowFilterStorageKey(moduleName);
-      if (state) sessionStorage.setItem(storageKey, JSON.stringify(state));
+      if (nextState) sessionStorage.setItem(storageKey, JSON.stringify(nextState));
       else sessionStorage.removeItem(storageKey);
       localStorage.removeItem(storageKey);
     } catch (_e) {}

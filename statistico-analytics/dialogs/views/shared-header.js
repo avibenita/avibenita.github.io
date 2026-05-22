@@ -1099,7 +1099,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260522m');
+          out.searchParams.set('build', '20260522n');
         }
         return out.href;
       } catch (e) {
@@ -2494,7 +2494,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260522m';
+    const v = '20260522n';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -3388,20 +3388,30 @@ const StatisticoHeader = {
     const active = typeof UniRowFilter !== 'undefined'
       ? UniRowFilter.hasActiveFilters()
       : rows.length !== allRows.length;
+    const allRowsCopy = allRows.map((r) => r.slice());
+    const rowsCopy = rows.map((r) => r.slice());
     const payload = {
       ...(data || {}),
       headers: headers.slice(),
-      allRows: allRows.map((r) => r.slice()),
-      usedRows: rows.map((r) => r.slice()),
+      allRows: allRowsCopy,
+      usedRows: rowsCopy,
       columnFilters: this._getCurrentRowFilterCriteria(),
       sourceHeaders: headers.slice(),
-      sourceRowsAll: allRows.map((r) => r.slice()),
-      sourceRows: rows.map((r) => r.slice()),
+      sourceRowsAll: allRowsCopy,
+      sourceRows: rowsCopy,
       rowFilterActive: active,
       module: this.module,
       view: this.currentView
     };
-    this._setGenericRowFilterState(payload);
+    // Keep shared row-filter state compact: criteria + header identity only.
+    // Storing full row matrices here can freeze on large datasets.
+    this._setGenericRowFilterState({
+      headers: headers.slice(),
+      columnFilters: payload.columnFilters,
+      rowFilterActive: active,
+      module: this.module,
+      view: this.currentView
+    });
     this.updateUniFilterChrome(payload);
 
     const actions = this._pendingActions || {};

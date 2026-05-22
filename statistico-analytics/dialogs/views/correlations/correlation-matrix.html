@@ -28,9 +28,9 @@
   <script src="https://d3js.org/d3.v7.min.js"></script>
 
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260522j">  <script src="../shared-brand-logo.js?v=20260523"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260522k">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260522j"></script>
+  <script src="../shared-header.js?v=20260522k"></script>
 
   <style>
     /* ── Variables ── */
@@ -1207,11 +1207,15 @@
 
   function normalizeCorrelationPayload(payload) {
     if (!payload || typeof payload !== 'object') return null;
+    const rawData = Array.isArray(payload.data) ? payload.data : null;
+    const objectHeaders = rawData && rawData.length && rawData[0] && !Array.isArray(rawData[0]) && typeof rawData[0] === 'object'
+      ? Object.keys(rawData[0])
+      : [];
     const headers = Array.isArray(payload.headers) && payload.headers.length
       ? payload.headers.slice()
-      : (Array.isArray(payload.sourceHeaders) ? payload.sourceHeaders.slice() : []);
+      : (Array.isArray(payload.sourceHeaders) && payload.sourceHeaders.length ? payload.sourceHeaders.slice() : objectHeaders.slice());
     if (!headers.length) return null;
-    let data = Array.isArray(payload.data) ? payload.data : null;
+    let data = rawData;
     if (!data && Array.isArray(payload.rows)) data = payload.rows;
     if (!data && Array.isArray(payload.usedRows)) data = payload.usedRows;
     if (!data && Array.isArray(payload.sourceRows)) data = payload.sourceRows;
@@ -1223,6 +1227,7 @@
     return {
       ...payload,
       headers,
+      sourceHeaders: Array.isArray(payload.sourceHeaders) && payload.sourceHeaders.length ? payload.sourceHeaders.slice() : headers.slice(),
       data: shapedData
     };
   }
@@ -2397,9 +2402,13 @@
       getData: () => {
         if (!correlationData || !correlationData.headers || !correlationData.data) return null;
         const analysisHeaders = correlationData.headers;
+        const firstObj = Array.isArray(correlationData.data) && correlationData.data[0] && !Array.isArray(correlationData.data[0]) && typeof correlationData.data[0] === 'object'
+          ? correlationData.data[0]
+          : null;
+        const inferredSourceHeaders = firstObj ? Object.keys(firstObj) : [];
         const sourceHeaders = Array.isArray(correlationData.sourceHeaders) && correlationData.sourceHeaders.length
           ? correlationData.sourceHeaders
-          : analysisHeaders;
+          : (inferredSourceHeaders.length ? inferredSourceHeaders : analysisHeaders);
 
         let allRows = Array.isArray(correlationData.sourceRowsAll) ? correlationData.sourceRowsAll : null;
         let usedRows = Array.isArray(correlationData.sourceRows) ? correlationData.sourceRows : null;

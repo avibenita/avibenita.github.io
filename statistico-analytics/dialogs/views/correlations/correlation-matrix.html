@@ -28,9 +28,9 @@
   <script src="https://d3js.org/d3.v7.min.js"></script>
 
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260522b">  <script src="../shared-brand-logo.js?v=20260523"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260522c">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260522b"></script>
+  <script src="../shared-header.js?v=20260522c"></script>
 
   <style>
     /* ── Variables ── */
@@ -1205,6 +1205,80 @@
     });
   }
 
+  function normalizeCorrelationPayload(payload) {
+    if (!payload || typeof payload !== 'object') return null;
+    const headers = Array.isArray(payload.headers) && payload.headers.length
+      ? payload.headers.slice()
+      : (Array.isArray(payload.sourceHeaders) ? payload.sourceHeaders.slice() : []);
+    if (!headers.length) return null;
+    let data = Array.isArray(payload.data) ? payload.data : null;
+    if (!data && Array.isArray(payload.rows)) data = payload.rows;
+    if (!data && Array.isArray(payload.usedRows)) data = payload.usedRows;
+    if (!data && Array.isArray(payload.sourceRows)) data = payload.sourceRows;
+    if (!data && Array.isArray(payload.allRows)) data = payload.allRows;
+    if (!Array.isArray(data)) return null;
+    const shapedData = data.length && Array.isArray(data[0])
+      ? rowsToCorrelationObjects(headers, data)
+      : data;
+    return {
+      ...payload,
+      headers,
+      data: shapedData
+    };
+  }
+
+  function receiveCorrelationData(payload, source) {
+    const normalized = normalizeCorrelationPayload(payload);
+    if (!normalized) {
+      console.warn('Invalid correlation payload ignored:', source, payload);
+      return false;
+    }
+    correlationData = normalized;
+    window.correlationData = correlationData;
+    try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch(e) {}
+    renderMatrix();
+    return true;
+  }
+
+  function tryLoadStoredCorrelationData() {
+    const keys = [
+      ['sessionStorage', 'correlationData'],
+      ['sessionStorage', 'correlationResults'],
+      ['localStorage', 'correlationData'],
+      ['localStorage', 'correlationResults']
+    ];
+    for (const [storeName, key] of keys) {
+      try {
+        const store = storeName === 'localStorage' ? localStorage : sessionStorage;
+        const raw = store.getItem(key);
+        if (raw && receiveCorrelationData(JSON.parse(raw), `${storeName}:${key}`)) return true;
+      } catch (e) {}
+    }
+    return false;
+  }
+
+  function requestCorrelationDataFromParent() {
+    try {
+      if (Office && Office.context && Office.context.ui) {
+        Office.context.ui.messageParent(JSON.stringify({ action: 'ready', type: 'CORRELATION_READY' }));
+        return;
+      }
+    } catch (e) {}
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ action: 'ready', type: 'CORRELATION_READY' }, '*');
+      }
+    } catch (e) {}
+  }
+
+  function showCorrelationLoadError(message) {
+    const el = document.getElementById('loadingMessage');
+    if (!el || correlationData) return;
+    el.innerHTML =
+      '<i class="fa-solid fa-exclamation-triangle" style="font-size:48px;color:#fbbf24;"></i>' +
+      `<p>${message || 'No correlation data available.'}</p>`;
+  }
+
   function applyCorrelationRowFilter(filterPayload) {
     if (!filterPayload || !filterPayload.headers || !filterPayload.usedRows) return;
     const headers = filterPayload.headers.slice();
@@ -1267,11 +1341,8 @@
         if (event.data && event.data.type === 'THEME_CHANGE') applyTheme(event.data.theme);
         return;
       }
-      if (event.data && event.data.type === 'CORRELATION_DATA') {
-        correlationData = event.data.payload;
-        // Persist so other correlation views can read it via sessionStorage
-        try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch(e) {}
-        renderMatrix();
+      if (event.data && (event.data.type === 'CORRELATION_DATA' || event.data.action === 'loadData')) {
+        receiveCorrelationData(event.data.payload || event.data.data || event.data, 'postMessage');
       } else if (event.data && event.data.type === 'THEME_CHANGE') {
         applyTheme(event.data.theme);
       }
@@ -1305,11 +1376,10 @@
         renderMatrix();
         return;
       }
-      let stored = null;
-      try { stored = sessionStorage.getItem('correlationData'); } catch (e) {}
-      if (stored) {
-        try { correlationData = JSON.parse(stored); renderMatrix(); return; } catch(e) {}
-      }
+      if (tryLoadStoredCorrelationData()) return;
+      requestCorrelationDataFromParent();
+      setTimeout(() => { if (!correlationData) requestCorrelationDataFromParent(); }, 500);
+      setTimeout(() => { if (!correlationData && !tryLoadStoredCorrelationData()) showCorrelationLoadError('Still waiting for correlation data. Re-run the correlation analysis or switch back from the source view.'); }, 6000);
     }
 
     loadEmbeddedCorrelationData();
@@ -1323,32 +1393,24 @@
         registerHeaderActions();
       }
 
-      // Check sessionStorage pre-load (e.g. after same-window tab navigation)
-      const stored = sessionStorage.getItem('correlationData');
-      if (stored) {
-        try {
-          correlationData = JSON.parse(stored);
-          // Do NOT remove — keep in sessionStorage for further tab navigations
-          renderMatrix();
-        } catch(e) {}
-      }
+      // Check storage pre-load (e.g. after same-window tab navigation)
+      tryLoadStoredCorrelationData();
 
       Office.context.ui.addHandlerAsync(
         Office.EventType.DialogParentMessageReceived,
         function(arg) {
           try {
             const msg = JSON.parse(arg.message);
-            if (msg.type === 'CORRELATION_DATA' && msg.payload) {
-              correlationData = msg.payload;
-              // Persist for same-window navigation to other correlation views
-              try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch(e) {}
-              renderMatrix();
+            if ((msg.type === 'CORRELATION_DATA' && msg.payload) || (msg.action === 'loadData' && msg.data)) {
+              receiveCorrelationData(msg.payload || msg.data, 'Office message');
             }
           } catch(e) { console.error('Error parsing message:', e); }
         }
       );
 
-      Office.context.ui.messageParent(JSON.stringify({ action: 'ready' }));
+      requestCorrelationDataFromParent();
+      setTimeout(() => { if (!correlationData) requestCorrelationDataFromParent(); }, 500);
+      setTimeout(() => { if (!correlationData && !tryLoadStoredCorrelationData()) showCorrelationLoadError('Still waiting for correlation data. Re-run the correlation analysis or switch back from the source view.'); }, 6000);
     });
   }
 
@@ -1389,10 +1451,14 @@
 
     // Update shared header
     if (!isInIframe && typeof StatisticoHeader !== 'undefined') {
-      StatisticoHeader.sampleSize = correlationData.data ? correlationData.data.length : 0;
-      StatisticoHeader.variableName = correlationData.headers.length + ' Variables';
-      StatisticoHeader.render();
-      registerHeaderActions();
+      try {
+        StatisticoHeader.sampleSize = correlationData.data ? correlationData.data.length : 0;
+        StatisticoHeader.variableName = correlationData.headers.length + ' Variables';
+        StatisticoHeader.render();
+        registerHeaderActions();
+      } catch (e) {
+        console.warn('Correlation header refresh skipped:', e);
+      }
     }
 
     // Transition: hide loading, show main content
@@ -1403,10 +1469,16 @@
     mc.style.minHeight = '0';
     mc.style.flexDirection = 'column';
 
-    // Build all tabs
-    buildCorrelationMatrix();
-    setMatrixView(currentView);
-    buildExploreTab();
+    try {
+      // Build all tabs
+      buildCorrelationMatrix();
+      setMatrixView(currentView);
+      buildExploreTab();
+    } catch (e) {
+      console.error('Correlation render failed:', e);
+      document.getElementById('loadingMessage').style.display = 'flex';
+      showCorrelationLoadError('Correlation data loaded, but rendering failed. Please reload or re-run the analysis.');
+    }
   }
 
   /* ════════════════════════════════════════════

@@ -1099,7 +1099,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260522g');
+          out.searchParams.set('build', '20260522h');
         }
         return out.href;
       } catch (e) {
@@ -2494,7 +2494,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260522g';
+    const v = '20260522h';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -2535,6 +2535,16 @@ const StatisticoHeader = {
       '<span style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--accent-1);">',
       '<i class="fa-solid fa-filter" style="margin-right:6px;"></i>Filter Source Range</span>',
       '<button type="button" onclick="UniRowFilter.close()" style="background:transparent;border:none;color:rgba(255,255,255,.6);font-size:18px;cursor:pointer;">&times;</button>',
+      '</div>',
+      '<div class="uni-filt-help-panel">',
+      '<h4><i class="fa-solid fa-lightbulb"></i> Step-by-step</h4>',
+      '<ol>',
+      '<li>The table below is your <strong>hub workbook range</strong> (all columns). The analysis column is marked with ★.</li>',
+      '<li>Click <strong>▼</strong> on a column header to choose which values to keep (Excel-style).</li>',
+      '<li>Press <strong>OK</strong> on the dropdown — this module recalculates from filtered rows.</li>',
+      '<li><strong>Filter</strong> controls which rows are analyzed. It is separate from chart zoom/range controls.</li>',
+      '<li><strong>Clear all filters</strong> restores every row from the original range.</li>',
+      '</ol>',
       '</div>',
       '<div class="uni-filt-toolbar"><div class="uni-filt-summary" id="uniFilterSummary">Filter rows from the workbook range.</div>',
       '<button type="button" class="uni-filt-clear-btn" onclick="UniRowFilter.clearAll()">Clear all filters</button></div>',
@@ -2646,7 +2656,7 @@ const StatisticoHeader = {
   },
 
   _cloneRowFilterCriteria(criteria) {
-    const MAX_FILTER_VALUES = 2000;
+    const MAX_FILTER_VALUES = 400;
     const out = {};
     Object.keys(criteria || {}).forEach((key) => {
       const value = criteria[key];
@@ -2654,9 +2664,10 @@ const StatisticoHeader = {
         if (value.indexOf('__SHOW_NOTHING__') >= 0) out[key] = ['__SHOW_NOTHING__'];
         else out[key] = value.length > MAX_FILTER_VALUES ? [] : value.slice();
       } else if (value && typeof value === 'object') {
+        const sourceValues = Array.isArray(value.values) ? value.values : [];
         out[key] = {
           mode: value.mode || 'include',
-          values: Array.isArray(value.values) ? value.values.slice(0, MAX_FILTER_VALUES) : []
+          values: sourceValues.length > MAX_FILTER_VALUES ? [] : sourceValues.slice()
         };
       } else {
         out[key] = [];

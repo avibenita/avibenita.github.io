@@ -15,7 +15,7 @@
   var MAX_RENDER_ROWS = 500;
   var MAX_DROPDOWN_VALUES = 600;
   var MAX_UNIQUE_SCAN_VALUES = 2500;
-  var MAX_FILTER_VALUES = 2000;
+  var MAX_FILTER_VALUES = 400;
 
   function cellStr(val) {
     if (val === null || val === undefined) return '';
@@ -50,7 +50,9 @@
       return filter.slice();
     }
     if (filter && typeof filter === 'object') {
-      var values = Array.isArray(filter.values) ? filter.values.slice(0, MAX_FILTER_VALUES) : [];
+      var sourceValues = Array.isArray(filter.values) ? filter.values : [];
+      if (sourceValues.length > MAX_FILTER_VALUES) return [];
+      var values = sourceValues.slice();
       return { mode: filter.mode === 'exclude' ? 'exclude' : 'include', values: values };
     }
     return [];

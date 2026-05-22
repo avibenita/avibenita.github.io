@@ -1099,7 +1099,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260522i');
+          out.searchParams.set('build', '20260522j');
         }
         return out.href;
       } catch (e) {
@@ -2494,7 +2494,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260522i';
+    const v = '20260522j';
     const base = this._uniFilterAssetBase();
     if (!document.querySelector('link[data-uni-filter-shared-css]')) {
       const link = document.createElement('link');
@@ -3034,6 +3034,35 @@ const StatisticoHeader = {
     const filteredRows = resolved.rows;
     const sourceRows = filteredRows.map((r) => r.slice());
     const shapedRows = this._rowsForPayloadShape(filteredHeaders, this._firstPayloadRows(payload), filteredRows);
+
+    if (moduleName === 'correlations') {
+      const idxByHeader = {};
+      filteredHeaders.forEach((h, i) => { idxByHeader[h] = i; });
+      let analysisHeaders = Array.isArray(payload.analysisHeaders) && payload.analysisHeaders.length
+        ? payload.analysisHeaders.slice()
+        : (Array.isArray(payload.headers) ? payload.headers.slice() : []);
+      if (!analysisHeaders.length || !analysisHeaders.every((h) => Object.prototype.hasOwnProperty.call(idxByHeader, h))) {
+        analysisHeaders = filteredHeaders.slice();
+      }
+      const projectedRows = analysisHeaders.every((h) => Object.prototype.hasOwnProperty.call(idxByHeader, h))
+        ? filteredRows.map((row) => analysisHeaders.map((h) => row[idxByHeader[h]]))
+        : filteredRows.map((r) => r.slice());
+      const projectedShaped = this._rowsForPayloadShape(analysisHeaders, payload.data, projectedRows);
+      const corrOut = {
+        ...payload,
+        headers: analysisHeaders,
+        analysisHeaders: analysisHeaders.slice(),
+        sourceHeaders: filteredHeaders,
+        sourceRowsAll,
+        sourceRows,
+        usedRows: projectedRows.map((r) => r.slice()),
+        rowFilterActive: resolved.active
+      };
+      if (Array.isArray(payload.data)) corrOut.data = projectedShaped;
+      if (Array.isArray(payload.rows)) corrOut.rows = projectedShaped;
+      if (Array.isArray(payload.allRows)) corrOut.allRows = sourceRowsAll || sourceRows;
+      return corrOut;
+    }
 
     const out = {
       ...payload,

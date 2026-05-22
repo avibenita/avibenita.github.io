@@ -206,7 +206,10 @@ function handleRunAnalysis(data) {
     headers: selectedVars,
     selectedVariables: selectedVars,
     method: data.method || 'pearson',
-    address: data.data?.address || correlationRangeData?.address
+    address: data.data?.address || correlationRangeData?.address,
+    sourceHeaders: headers,
+    sourceRowsAll: rows,
+    sourceRows: rows
   };
   
   console.log('📊 Prepared matrix data with', matrixData.headers.length, 'variables');
@@ -261,7 +264,11 @@ function openCorrelationResultDialog(viewType, matrixData) {
                     data: matrixData.data,
                     headers: matrixData.headers,
                     selectedVariables: matrixData.selectedVariables,
-                    method: matrixData.method
+                    method: matrixData.method,
+                    address: matrixData.address,
+                    sourceHeaders: matrixData.sourceHeaders,
+                    sourceRowsAll: matrixData.sourceRowsAll,
+                    sourceRows: matrixData.sourceRows
                   }
                 }));
               } else if (message.action === 'switchView') {

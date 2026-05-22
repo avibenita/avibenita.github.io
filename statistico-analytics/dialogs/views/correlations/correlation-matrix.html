@@ -28,9 +28,9 @@
   <script src="https://d3js.org/d3.v7.min.js"></script>
 
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20260522i">  <script src="../shared-brand-logo.js?v=20260523"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260522j">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260522i"></script>
+  <script src="../shared-header.js?v=20260522j"></script>
 
   <style>
     /* ── Variables ── */
@@ -1281,13 +1281,23 @@
 
   function applyCorrelationRowFilter(filterPayload) {
     if (!filterPayload || !filterPayload.headers || !filterPayload.usedRows) return;
-    const headers = filterPayload.headers.slice();
-    const filteredData = rowsToCorrelationObjects(headers, filterPayload.usedRows);
+    const sourceHeaders = filterPayload.headers.slice();
+    const analysisHeaders = (correlationData && Array.isArray(correlationData.headers) && correlationData.headers.length)
+      ? correlationData.headers.slice()
+      : sourceHeaders.slice();
+    const headerIndex = {};
+    sourceHeaders.forEach((h, i) => { headerIndex[h] = i; });
+    const canProject = analysisHeaders.every((h) => Object.prototype.hasOwnProperty.call(headerIndex, h));
+    const projectedRows = canProject
+      ? (filterPayload.usedRows || []).map((row) => analysisHeaders.map((h) => Array.isArray(row) ? row[headerIndex[h]] : (row && row[h])))
+      : filterPayload.usedRows;
+    const filteredData = rowsToCorrelationObjects(canProject ? analysisHeaders : sourceHeaders, projectedRows);
     correlationData = {
       ...(correlationData || {}),
-      headers,
+      headers: canProject ? analysisHeaders : sourceHeaders,
       data: filteredData,
       rowFilterActive: !!filterPayload.rowFilterActive,
+      sourceHeaders,
       sourceRowsAll: filterPayload.sourceRowsAll || filterPayload.allRows || null,
       sourceRows: filterPayload.usedRows
     };
@@ -2386,31 +2396,44 @@
     StatisticoHeader.registerActions({
       getData: () => {
         if (!correlationData || !correlationData.headers || !correlationData.data) return null;
-        const headers = correlationData.headers;
-        const rawData = correlationData.data; // array of { varName: value, … }
+        const analysisHeaders = correlationData.headers;
+        const sourceHeaders = Array.isArray(correlationData.sourceHeaders) && correlationData.sourceHeaders.length
+          ? correlationData.sourceHeaders
+          : analysisHeaders;
 
-        // Convert object-per-row to array-per-row (matching headers order)
-        const allRows = rawData.map(row => headers.map(h => {
-          const v = row[h];
-          return (v === null || v === undefined || v === '') ? null
-               : typeof v === 'number' ? parseFloat(v.toFixed(4)) : v;
-        }));
-
-        // Complete cases = rows where every variable has a valid numeric value
-        const usedRows = allRows.filter(row =>
-          row.every(v => v !== null && v !== undefined && !isNaN(v))
-        );
+        let allRows = Array.isArray(correlationData.sourceRowsAll) ? correlationData.sourceRowsAll : null;
+        let usedRows = Array.isArray(correlationData.sourceRows) ? correlationData.sourceRows : null;
+        if (!allRows || !allRows.length) {
+          const rawData = correlationData.data; // array of { varName: value, … }
+          allRows = rawData.map(row => sourceHeaders.map(h => {
+            const v = row[h];
+            return (v === null || v === undefined || v === '') ? null
+                 : typeof v === 'number' ? parseFloat(v.toFixed(4)) : v;
+          }));
+          // Complete cases in analysis columns for fallback path
+          const analysisSet = {};
+          analysisHeaders.forEach((h) => { analysisSet[h] = true; });
+          usedRows = allRows.filter((row) => sourceHeaders.every((h, idx) => {
+            if (!analysisSet[h]) return true;
+            const v = row[idx];
+            return v !== null && v !== undefined && !isNaN(v);
+          }));
+        }
 
         const fullRange = correlationData.address || null;
         const usedRange = fullRange; // correlation uses pairwise deletion, no sub-range
 
         return {
-          headers,
+          headers: sourceHeaders,
           allRows,
           usedRows,
+          sourceHeaders,
+          sourceRowsAll: allRows,
+          sourceRows: usedRows,
           fullRange,
           usedRange,
-          columnRoles: null   // all variables are symmetric in correlation
+          columnRoles: null,   // all variables are symmetric in correlation
+          analysisHeaders
         };
       },
       exportHtml: () => exportHtml(),

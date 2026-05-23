@@ -11,7 +11,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
   <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260523f"></script>
+  <script src="../shared-header.js?v=20260523g"></script>
   <script src="../../shared/views/normality-view.js"></script>
   <style>
     /* Dark Theme (Default) */
@@ -620,7 +620,8 @@
       const rows = payload.data || [];
       console.log('📋 Headers:', headers);
       console.log('📋 Rows count:', rows.length);
-      
+
+      window.correlationData = payload;
       window.rawData = rows;
       window.variableNames = headers.slice();
 
@@ -632,21 +633,40 @@
       }
 
       // Sync header chrome with the active dataset (filtered or full).
-      // Without this, the title shows "(n=0)" while cells correctly show
-      // the filtered N, because shared-header was only initialised with 0.
       try {
         if (typeof StatisticoHeader !== 'undefined') {
           StatisticoHeader.sampleSize = rows.length;
           StatisticoHeader.variableName = `${headers.length} Variables`;
           if (typeof StatisticoHeader.render === 'function') StatisticoHeader.render();
-          if (typeof StatisticoHeader.updateUniFilterChrome === 'function') {
-            StatisticoHeader.updateUniFilterChrome();
-          }
+        }
+      } catch (_e) {}
+
+      // Mirror univariate: each view OWNS its UniRowFilter installation
+      // and onApply callback. The shared helper handles init + restore
+      // of the active filter; we just provide the page-specific
+      // re-render hook.
+      try {
+        if (typeof StatisticoHeader !== 'undefined' &&
+            typeof StatisticoHeader.installCorrelationFilter === 'function') {
+          StatisticoHeader.installCorrelationFilter({
+            rebuildAndRender: function (next) {
+              window.correlationData = next.correlationData;
+              window.rawData = next.projectedData;
+              window.variableNames = next.headers.slice();
+              if (typeof StatisticoHeader !== 'undefined') {
+                StatisticoHeader.sampleSize = next.projectedData.length;
+                StatisticoHeader.variableName = `${next.headers.length} Variables`;
+                StatisticoHeader.render();
+              }
+              if (typeof window.updateDescriptiveStats === 'function') {
+                window.updateDescriptiveStats(next.headers);
+              }
+            }
+          });
         }
       } catch (_e) {}
 
       // Keep shared header visible in live dialog mode.
-      // Export/embed mode handles hiding separately via URL params.
       const headerContainer = document.getElementById('header-container');
       if (headerContainer) {
         headerContainer.style.display = '';

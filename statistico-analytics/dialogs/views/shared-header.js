@@ -3053,6 +3053,152 @@ const StatisticoHeader = {
   },
 
   /**
+   * Mirrors univariate's `resolveAnalysisValues` pattern but for any
+   * correlation view (Network / Taylor / Partial / Reliability /
+   * Descriptives — and the matrix can opt in too). Each view OWNS its
+   * own UniRowFilter installation and onApply callback so that
+   * Clear/badge/column highlight / panel restoration all work the same
+   * as univariate.
+   *
+   * Usage from a correlation child view, AFTER correlationData is set:
+   *
+   *   StatisticoHeader.installCorrelationFilter({
+   *     rebuildAndRender: function (next) {
+   *       // next.correlationData is already updated; use next.projectedData
+   *       // and next.headers to refresh the view.
+   *       myRenderFn(next.correlationData);
+   *     }
+   *   });
+   *
+   * @param {Object} opts
+   * @param {Function} opts.rebuildAndRender - Called whenever the user
+   *        applies a filter. Receives `{correlationData, projectedData,
+   *        headers, sourceRows, sourceRowsAll, rowFilterActive}`.
+   */
+  installCorrelationFilter(opts) {
+    if (typeof UniRowFilter === 'undefined' || typeof UniRowFilter.init !== 'function') return;
+    const cd = (typeof window !== 'undefined' && window.correlationData)
+      ? window.correlationData
+      : (() => { try { return JSON.parse(sessionStorage.getItem('correlationData') || 'null'); } catch (_e) { return null; } })();
+    if (!cd || !Array.isArray(cd.headers) || !cd.headers.length) return;
+    const sourceHeaders = (Array.isArray(cd.sourceHeaders) && cd.sourceHeaders.length)
+      ? cd.sourceHeaders.slice()
+      : cd.headers.slice();
+    const allRows = (Array.isArray(cd.sourceRowsAll) && cd.sourceRowsAll.length
+      ? cd.sourceRowsAll
+      : (Array.isArray(cd.sourceRows) ? cd.sourceRows : [])
+    ).map((r) => Array.isArray(r) ? r.slice() : r);
+    if (!allRows.length) return;
+    const usedRows = (Array.isArray(cd.sourceRows) && cd.sourceRows.length
+      ? cd.sourceRows
+      : allRows
+    ).map((r) => Array.isArray(r) ? r.slice() : r);
+    const isFiltered = !!cd.rowFilterActive ||
+      (usedRows.length > 0 && usedRows.length < allRows.length);
+
+    const rebuildAndRender = typeof opts.rebuildAndRender === 'function' ? opts.rebuildAndRender : null;
+
+    const onApply = (filteredRows) => {
+      const next = this._rebuildCorrelationDataFromFilteredRows(filteredRows);
+      if (next && rebuildAndRender) {
+        try { rebuildAndRender(next); } catch (e) { console.warn('Correlation filter render failed:', e); }
+      }
+      try {
+        StatisticoHeader.publishHeaderRowFilterChange(filteredRows, true);
+      } catch (_e) {}
+      if (typeof StatisticoHeader.updateUniFilterChrome === 'function') {
+        try { StatisticoHeader.updateUniFilterChrome(); } catch (_e) {}
+      }
+    };
+
+    UniRowFilter.init({
+      headers: sourceHeaders,
+      rows: allRows,
+      columnIndex: 0,
+      onApply: onApply
+    });
+    if (isFiltered && typeof UniRowFilter.setFilteredRows === 'function') {
+      UniRowFilter.setFilteredRows(usedRows);
+    }
+    if (typeof StatisticoHeader.updateUniFilterChrome === 'function') {
+      try { StatisticoHeader.updateUniFilterChrome(); } catch (_e) {}
+    }
+    console.warn('[CORR][installCorrelationFilter]', {
+      module: this.module,
+      view: this.currentView,
+      sourceHeaders: sourceHeaders.length,
+      allRows: allRows.length,
+      usedRows: usedRows.length,
+      restoredFilter: !!isFiltered
+    });
+  },
+
+  /**
+   * Project filteredRows (sourceHeader-aligned) onto the active
+   * analysisHeaders, update window.correlationData and sessionStorage,
+   * and return the rebuild result so a view-specific render fn can use
+   * it. Shared by all correlation views via installCorrelationFilter.
+   */
+  _rebuildCorrelationDataFromFilteredRows(filteredRows) {
+    let cd = (typeof window !== 'undefined' && window.correlationData)
+      ? window.correlationData
+      : null;
+    if (!cd) {
+      try { cd = JSON.parse(sessionStorage.getItem('correlationData') || 'null'); } catch (_e) {}
+    }
+    if (!cd || !Array.isArray(cd.headers) || !cd.headers.length) return null;
+    const sourceHeaders = (Array.isArray(cd.sourceHeaders) && cd.sourceHeaders.length)
+      ? cd.sourceHeaders.slice()
+      : cd.headers.slice();
+    const analysisHeaders = cd.headers.slice();
+    const headerIndex = {};
+    sourceHeaders.forEach((h, i) => { headerIndex[h] = i; });
+    const canProject = analysisHeaders.every((h) => Object.prototype.hasOwnProperty.call(headerIndex, h));
+    const used = (Array.isArray(filteredRows) ? filteredRows : []).map((r) => Array.isArray(r) ? r.slice() : r);
+    const allRows = (Array.isArray(cd.sourceRowsAll) && cd.sourceRowsAll.length
+      ? cd.sourceRowsAll
+      : used
+    ).map((r) => Array.isArray(r) ? r.slice() : r);
+
+    const projectedData = canProject
+      ? used.map((row) => {
+        const obj = {};
+        analysisHeaders.forEach((h) => {
+          obj[h] = Array.isArray(row) ? row[headerIndex[h]] : (row && row[h]);
+        });
+        return obj;
+      })
+      : used.map((row) => {
+        const obj = {};
+        analysisHeaders.forEach((h, idx) => {
+          obj[h] = Array.isArray(row) ? row[idx] : (row && row[h]);
+        });
+        return obj;
+      });
+
+    const rowFilterActive = used.length !== allRows.length;
+    const next = {
+      ...cd,
+      headers: analysisHeaders,
+      data: projectedData,
+      sourceHeaders,
+      sourceRowsAll: allRows,
+      sourceRows: used,
+      rowFilterActive
+    };
+    if (typeof window !== 'undefined') window.correlationData = next;
+    try { sessionStorage.setItem('correlationData', JSON.stringify(next)); } catch (_e) {}
+    return {
+      correlationData: next,
+      projectedData,
+      headers: analysisHeaders,
+      sourceRows: used,
+      sourceRowsAll: allRows,
+      rowFilterActive
+    };
+  },
+
+  /**
    * Auto-rebuild correlationData in sessionStorage from a filter payload
    * dispatched by UniRowFilter. Mirrors the matrix's
    * rebuildCorrelationFromSourceRows() logic but lives in shared-header
@@ -3919,7 +4065,15 @@ const StatisticoHeader = {
       alert(`Row filtering needs source rows from the workbook range.\n\nRun ${moduleName} with a selected range, then use Filter.`);
       return;
     }
-    if (this.module !== 'univariate') this._initUniRowFilterFromStorage();
+    // If a view (univariate or correlations via installCorrelationFilter)
+    // has already wired UniRowFilter with its own onApply, do NOT re-init
+    // here — that would clobber the page's onApply and reset _appliedRows
+    // back to the full dataset. Mirrors univariate's open() flow.
+    const meta = (typeof UniRowFilter.getSourceMeta === 'function') ? UniRowFilter.getSourceMeta() : null;
+    const alreadyWired = !!(meta && Array.isArray(meta.allRows) && meta.allRows.length);
+    if (this.module !== 'univariate' && !alreadyWired) {
+      this._initUniRowFilterFromStorage();
+    }
     this._ensureUniFilterOverlay();
     UniRowFilter.open();
   },

@@ -22,7 +22,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260523f"></script>
+  <script src="../shared-header.js?v=20260523g"></script>
 
   <style>
     :root {
@@ -639,9 +639,11 @@
       if (storedCorr) {
         try {
           const data = JSON.parse(storedCorr);
+          window.correlationData = data;
           originalRawData = data.data;
           const dataArrays = data.data.map(row => data.headers.map(h => row[h]));
           runReliabilityAnalysis(dataArrays, data.headers);
+          installReliabilityFilter();
         } catch(e) { console.warn('Error reading correlationData from sessionStorage:', e); }
       }
       
@@ -664,6 +666,7 @@
                 return;
               }
               const data = message.payload;
+              window.correlationData = data;
               try { sessionStorage.setItem('correlationData', JSON.stringify(data)); } catch(e) {}
               console.log('Reliability data received:', data);
               
@@ -676,6 +679,7 @@
               );
               
               runReliabilityAnalysis(dataArrays, data.headers);
+              installReliabilityFilter();
             }
           } catch (error) {
             console.error('Error parsing message:', error);
@@ -687,18 +691,27 @@
       setTimeout(() => {
         if (!storedCorr) checkLocalStorage();
       }, 500);
-
-      // Re-run reliability when a filter updates correlationData.
-      document.addEventListener('statistico-correlation-data-changed', function(e) {
-        try {
-          const next = e && e.detail && e.detail.correlationData;
-          if (!next || !Array.isArray(next.headers) || !Array.isArray(next.data)) return;
-          originalRawData = next.data;
-          const dataArrays = next.data.map(row => next.headers.map(h => row[h]));
-          runReliabilityAnalysis(dataArrays, next.headers);
-        } catch (err) { console.warn('Reliability filter re-render failed:', err); }
-      });
     });
+
+    function installReliabilityFilter() {
+      try {
+        if (typeof StatisticoHeader === 'undefined' ||
+            typeof StatisticoHeader.installCorrelationFilter !== 'function') return;
+        StatisticoHeader.installCorrelationFilter({
+          rebuildAndRender: function (next) {
+            window.correlationData = next.correlationData;
+            originalRawData = next.projectedData;
+            const dataArrays = next.projectedData.map(row => next.headers.map(h => row[h]));
+            if (typeof StatisticoHeader !== 'undefined') {
+              StatisticoHeader.sampleSize = next.projectedData.length;
+              StatisticoHeader.variableName = `${next.headers.length} Variables`;
+              StatisticoHeader.render();
+            }
+            runReliabilityAnalysis(dataArrays, next.headers);
+          }
+        });
+      } catch (err) { console.warn('Reliability filter install failed:', err); }
+    }
 
     function checkLocalStorage() {
       const correlationData = localStorage.getItem('correlationResults');

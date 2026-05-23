@@ -536,6 +536,18 @@ const StatisticoHeader = {
   _syncRowFilterHeader() {
     this._injectUniFilterAssets();
     this.updateUniFilterChrome();
+    // _injectUniFilterAssets loads UniRowFilter / Filter API asynchronously
+    // and runs _initUniRowFilterFromStorage on script onload. The first
+    // updateUniFilterChrome above can fire before any of that has finished,
+    // leaving the banner empty even though the persisted state says a row
+    // filter is active. Schedule a couple of follow-up refreshes so the
+    // banner picks up the live UniRowFilter meta once it lands.
+    if (typeof requestAnimationFrame === 'function') {
+      try { requestAnimationFrame(() => { try { this.updateUniFilterChrome(); } catch (_e) {} }); } catch (_e) {}
+    }
+    try { setTimeout(() => { try { this.updateUniFilterChrome(); } catch (_e) {} }, 80); } catch (_e) {}
+    try { setTimeout(() => { try { this.updateUniFilterChrome(); } catch (_e) {} }, 320); } catch (_e) {}
+    try { setTimeout(() => { try { this.updateUniFilterChrome(); } catch (_e) {} }, 900); } catch (_e) {}
   },
 
   _syncUniFilterHeader() {
@@ -2546,7 +2558,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260523s';
+    const v = '20260523t';
     const base = this._uniFilterAssetBase();
     const cssHref = `${base}uni-filter-shared.css?v=${v}`;
     const existingCss = document.querySelector('link[data-uni-filter-shared-css]');

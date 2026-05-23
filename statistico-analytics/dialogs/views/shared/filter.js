@@ -57,6 +57,21 @@
     }
   }
 
+  // Re-fire the banner refresh on the next animation frame and again after a
+  // short delay. Pages typically call StatisticoHeader.render() during boot
+  // (which wipes #uni-filter-active-notice and populates an empty one), and
+  // we want the banner to stick once UniRowFilter has real data — even if a
+  // late render() races against attach().
+  function _scheduleDeferredRefresh() {
+    if (typeof global.requestAnimationFrame === 'function') {
+      global.requestAnimationFrame(_refreshChrome);
+    } else {
+      global.setTimeout(_refreshChrome, 0);
+    }
+    global.setTimeout(_refreshChrome, 60);
+    global.setTimeout(_refreshChrome, 250);
+  }
+
   /**
    * Attach the filter to a page's source data.
    *
@@ -66,7 +81,19 @@
   function attach(opts) {
     opts = opts || {};
     if (!_hasUniRowFilter()) {
-      console.warn('Filter.attach: UniRowFilter not loaded yet');
+      // UniRowFilter is loaded asynchronously by shared-header.js. Retry on
+      // a short cadence (up to ~1.5s) so callers don't have to know about
+      // the loading order. This also schedules a banner refresh so the
+      // chrome reflects state once init has actually happened.
+      var attempts = (opts.__attempts | 0) + 1;
+      if (attempts <= 15) {
+        global.setTimeout(function () {
+          opts.__attempts = attempts;
+          attach(opts);
+        }, 100);
+      } else {
+        console.warn('Filter.attach: UniRowFilter never loaded; giving up');
+      }
       return false;
     }
     var headers = Array.isArray(opts.headers) ? opts.headers.slice() : [];
@@ -114,6 +141,7 @@
     }
 
     _refreshChrome();
+    _scheduleDeferredRefresh();
     return true;
   }
 

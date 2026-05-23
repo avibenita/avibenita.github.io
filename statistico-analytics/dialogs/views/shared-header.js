@@ -1153,6 +1153,42 @@ const StatisticoHeader = {
   },
 
   /**
+   * Decide whether a fresh CORRELATION_DATA payload from the parent should
+   * be accepted by a correlation child view. When the matrix has applied a
+   * row filter and persisted it to sessionStorage, the parent task pane
+   * still holds the ORIGINAL unfiltered dataset and re-sends it whenever
+   * the child posts {action:'ready'}. Accepting that payload would silently
+   * revert the filter for Network / Taylor / Partial / Reliability /
+   * Descriptives / etc. when navigating between views.
+   *
+   * Returns true if the incoming payload should overwrite local state,
+   * false to keep the locally-stored (filtered) data.
+   */
+  shouldAcceptCorrelationPayload(incoming) {
+    try {
+      const stored = JSON.parse(sessionStorage.getItem('correlationData') || 'null');
+      if (!stored) return true;
+      const localFiltered = stored.rowFilterActive === true ||
+        (Array.isArray(stored.sourceRows) && Array.isArray(stored.sourceRowsAll) &&
+          stored.sourceRows.length > 0 && stored.sourceRows.length < stored.sourceRowsAll.length);
+      const incomingFiltered = !!(incoming && (
+        incoming.rowFilterActive === true ||
+        (Array.isArray(incoming.sourceRows) && Array.isArray(incoming.sourceRowsAll) &&
+          incoming.sourceRows.length > 0 && incoming.sourceRows.length < incoming.sourceRowsAll.length)
+      ));
+      if (localFiltered && !incomingFiltered) {
+        console.warn('[CORR] Ignoring parent CORRELATION_DATA payload while row filter is active', {
+          localUsedRows: Array.isArray(stored.sourceRows) ? stored.sourceRows.length : (Array.isArray(stored.data) ? stored.data.length : null),
+          localTotalRows: Array.isArray(stored.sourceRowsAll) ? stored.sourceRowsAll.length : null,
+          incomingRows: incoming && Array.isArray(incoming.data) ? incoming.data.length : null
+        });
+        return false;
+      }
+    } catch (_e) {}
+    return true;
+  },
+
+  /**
    * Build the HTML string for action buttons in the header-right area.
    * Groups: [View] | [Model, HTML] | [Theme toggle]  — separated by dividers.
    * @private

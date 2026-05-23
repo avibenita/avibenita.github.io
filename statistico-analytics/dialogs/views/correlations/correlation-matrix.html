@@ -1553,7 +1553,13 @@
         return;
       }
       if (event.data && (event.data.type === 'CORRELATION_DATA' || event.data.action === 'loadData')) {
-        receiveCorrelationData(event.data.payload || event.data.data || event.data, 'postMessage');
+        const incomingMsg = event.data.payload || event.data.data || event.data;
+        if (typeof StatisticoHeader !== 'undefined' &&
+            typeof StatisticoHeader.shouldAcceptCorrelationPayload === 'function' &&
+            !StatisticoHeader.shouldAcceptCorrelationPayload(incomingMsg)) {
+          return;
+        }
+        receiveCorrelationData(incomingMsg, 'postMessage');
       } else if (event.data && event.data.type === 'THEME_CHANGE') {
         applyTheme(event.data.theme);
       }
@@ -1616,7 +1622,13 @@
           try {
             const msg = JSON.parse(arg.message);
             if ((msg.type === 'CORRELATION_DATA' && msg.payload) || (msg.action === 'loadData' && msg.data)) {
-              receiveCorrelationData(msg.payload || msg.data, 'Office message');
+              const incomingMsg = msg.payload || msg.data;
+              if (typeof StatisticoHeader !== 'undefined' &&
+                  typeof StatisticoHeader.shouldAcceptCorrelationPayload === 'function' &&
+                  !StatisticoHeader.shouldAcceptCorrelationPayload(incomingMsg)) {
+                return;
+              }
+              receiveCorrelationData(incomingMsg, 'Office message');
             }
           } catch(e) { console.error('Error parsing message:', e); }
         }

@@ -11,7 +11,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
   <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260523a"></script>
+  <script src="../shared-header.js?v=20260523c"></script>
   <script src="../../shared/views/normality-view.js"></script>
   <style>
     /* Dark Theme (Default) */
@@ -508,6 +508,11 @@
       window.addEventListener('message', function(event) {
         console.log('📥 Received postMessage:', event.data);
         if (event.data && event.data.type === 'CORRELATION_DATA') {
+          if (typeof StatisticoHeader !== 'undefined' &&
+              typeof StatisticoHeader.shouldAcceptCorrelationPayload === 'function' &&
+              !StatisticoHeader.shouldAcceptCorrelationPayload(event.data.payload)) {
+            return;
+          }
           console.log('✅ Data received via postMessage');
           handleCorrelationData(event.data.payload);
         } else if (event.data && event.data.type === 'THEME_CHANGE') {
@@ -583,6 +588,11 @@
         if (message.action === 'loadData' && message.data) {
           handleOfficeData(message.data);
         } else if (message.type === 'CORRELATION_DATA' && message.payload) {
+          if (typeof StatisticoHeader !== 'undefined' &&
+              typeof StatisticoHeader.shouldAcceptCorrelationPayload === 'function' &&
+              !StatisticoHeader.shouldAcceptCorrelationPayload(message.payload)) {
+            return;
+          }
           handleCorrelationData(message.payload);
         }
       } catch (e) {
@@ -606,6 +616,20 @@
       } else {
         console.warn('⚠️ No headers found in payload');
       }
+
+      // Sync header chrome with the active dataset (filtered or full).
+      // Without this, the title shows "(n=0)" while cells correctly show
+      // the filtered N, because shared-header was only initialised with 0.
+      try {
+        if (typeof StatisticoHeader !== 'undefined') {
+          StatisticoHeader.sampleSize = rows.length;
+          StatisticoHeader.variableName = `${headers.length} Variables`;
+          if (typeof StatisticoHeader.render === 'function') StatisticoHeader.render();
+          if (typeof StatisticoHeader.updateUniFilterChrome === 'function') {
+            StatisticoHeader.updateUniFilterChrome();
+          }
+        }
+      } catch (_e) {}
 
       // Keep shared header visible in live dialog mode.
       // Export/embed mode handles hiding separately via URL params.

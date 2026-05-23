@@ -2760,12 +2760,24 @@ const StatisticoHeader = {
     return clean;
   },
 
-  _rowFilterKey(moduleName) {
-    return `${moduleName || this.module || 'module'}`;
+  /* ─────────────────────────────────────────────────────────────────
+     Row-filter state is GLOBAL across all modules and all views.
+     A single sessionStorage entry (`statistico-row-filter::active`)
+     is the single source of truth. The `moduleName` argument that
+     the rest of the codebase passes around is preserved purely for
+     diagnostics / `state.module` / `state.view` annotations — the
+     storage location and in-memory cache key are the same regardless
+     of caller. This guarantees that a filter applied in correlations
+     is immediately visible to univariate / regression / ANOVA / …
+     and vice versa, until cleared or invalidated by a fresh analysis
+     on a different source range (different headers).
+  ───────────────────────────────────────────────────────────────── */
+  _rowFilterKey(_moduleName) {
+    return 'active';
   },
 
-  _rowFilterStorageKey(moduleName) {
-    return `statistico-row-filter::${this._rowFilterKey(moduleName)}`;
+  _rowFilterStorageKey(_moduleName) {
+    return 'statistico-row-filter::active';
   },
 
   _isHeaderRowFilterStateCompatible(state, headers) {
@@ -2932,6 +2944,50 @@ const StatisticoHeader = {
 
   _clearLegacyPersistentRowFilterState(moduleName) {
     try { localStorage.removeItem(this._rowFilterStorageKey(moduleName)); } catch (_e) {}
+    // One-time migration: legacy installations stored the filter under
+    // per-module keys (statistico-row-filter::correlations, ::univariate,
+    // ::regression, …). Now that the filter is global these are stale
+    // and would compete with the unified key. Sweep them.
+    if (this.__statisticoLegacyKeysSwept) return;
+    this.__statisticoLegacyKeysSwept = true;
+    const legacyModules = [
+      'univariate', 'correlations', 'regression', 'logistic', 'mixed',
+      'anova', 'independent', 'dependent', 'pca', 'factor', 'cluster',
+      'pareto', 'power'
+    ];
+    legacyModules.forEach((m) => {
+      const k = `statistico-row-filter::${m}`;
+      try { sessionStorage.removeItem(k); } catch (_e) {}
+      try { localStorage.removeItem(k); } catch (_e) {}
+    });
+  },
+
+  /**
+   * PUBLIC: clear the global active row filter. Any view's "Clear all
+   * filters" button, or any code path that wants to reset the session
+   * to full data, can call this. After this returns the next view
+   * load (or UniRowFilter re-init) will see no filter at all.
+   *
+   * Returns true if a filter was cleared, false if there was nothing
+   * to clear.
+   */
+  clearActiveRowFilter() {
+    const had = !!this._getGenericRowFilterState();
+    this._setGenericRowFilterState(null);
+    try {
+      if (typeof UniRowFilter !== 'undefined' && typeof UniRowFilter.clearAll === 'function') {
+        UniRowFilter.clearAll();
+      }
+    } catch (_e) {}
+    if (typeof this.updateUniFilterChrome === 'function') {
+      try { this.updateUniFilterChrome(); } catch (_e) {}
+    }
+    if (had) {
+      try {
+        document.dispatchEvent(new CustomEvent('statistico-row-filter-cleared'));
+      } catch (_e) {}
+    }
+    return had;
   },
 
   /**
@@ -3425,8 +3481,15 @@ const StatisticoHeader = {
       : payload.headers;
     if (!Array.isArray(headers) || !headers.length) return payload;
     const state = this._getGenericRowFilterState('univariate');
-    if (!state || !state.rowFilterActive || !Array.isArray(state.usedRows)) return payload;
+    if (!state || !state.rowFilterActive) return payload;
+    // Headers don't match → skip; clear-on-incompatible is handled by
+    // _looksLikeFreshRowFilterPayload at ingress, not here.
     if (!this._isHeaderRowFilterStateCompatible(state, headers)) return payload;
+    // Compact state (set by correlations / regression / etc.) carries
+    // only columnFilters, not usedRows — _resolveFilteredRowsForState
+    // will replay the criteria against allRows. Skip only if neither
+    // form of filter is materialised.
+    if (!Array.isArray(state.usedRows) && !this._hasActiveRowFilterCriteria(state.columnFilters)) return payload;
     const payloadAllRows = this._normalizeRowFilterRows(payload.sourceRowsAll || payload.allRows || state.allRows || payload.sourceRows || state.usedRows, headers);
     const sourceRowsAll = payloadAllRows.length ? payloadAllRows : (Array.isArray(state.allRows) ? state.allRows.map((r) => r.slice()) : null);
     const resolved = this._resolveFilteredRowsForState(headers, sourceRowsAll || [], state);
@@ -3457,8 +3520,18 @@ const StatisticoHeader = {
       : payload.headers;
     if (!Array.isArray(headers) || !headers.length) return payload;
     const state = this._getGenericRowFilterState(moduleName);
-    if (!state || !state.rowFilterActive || !Array.isArray(state.usedRows)) return payload;
+    if (!state || !state.rowFilterActive) return payload;
+    // Headers don't match the active global filter → don't apply the
+    // filter (and don't clear here either — clearing is handled by
+    // _looksLikeFreshRowFilterPayload at the storage / message ingress
+    // points, which sees genuinely-new analyses; calling clear here
+    // would wipe the filter on incidental reads of stale storage).
     if (!this._isHeaderRowFilterStateCompatible(state, headers)) return payload;
+    // Compact state (set by publishHeaderRowFilterChange) has only
+    // columnFilters; full state (set by publishUniFilterChange) also
+    // has usedRows. Either form is valid — the resolve step replays
+    // criteria against allRows when usedRows is missing.
+    if (!Array.isArray(state.usedRows) && !this._hasActiveRowFilterCriteria(state.columnFilters)) return payload;
 
     const filteredHeaders = state.headers.slice();
     const payloadAllRows = this._normalizeRowFilterRows(payload.sourceRowsAll || payload.allRows || payload.data || payload.rows, filteredHeaders);
@@ -3564,6 +3637,16 @@ const StatisticoHeader = {
     }
   },
 
+  /**
+   * "Fresh" = a brand-new analysis whose source range (headers) is
+   * incompatible with the currently-active global filter. In a
+   * single-global-filter world we ONLY want to clear the active
+   * filter when the user has actually loaded a different dataset;
+   * a re-broadcast of the same range (e.g. parent re-sending
+   * CORRELATION_DATA when a child view posts {action:'ready'})
+   * must NOT wipe the filter, even though the payload itself has
+   * no rowFilterActive flag on it.
+   */
   _looksLikeFreshRowFilterPayload(payload, moduleName) {
     if (!moduleName || !payload || typeof payload !== 'object') return false;
     if (payload.rowFilterActive || payload.columnFilters) return false;
@@ -3572,7 +3655,17 @@ const StatisticoHeader = {
       : payload.headers;
     if (!Array.isArray(headers) || !headers.length) return false;
     const rows = this._firstPayloadRows(payload);
-    return Array.isArray(rows) && rows.length > 0;
+    if (!Array.isArray(rows) || !rows.length) return false;
+    // Only treat as "fresh" if there's actually an active filter to
+    // potentially invalidate. No filter? Nothing to do.
+    const state = this._getGenericRowFilterState();
+    if (!state || !state.rowFilterActive) return false;
+    // Same source range as the active filter → just a re-broadcast
+    // of the same dataset. Keep the filter; the storage / message
+    // interceptor will then apply it to the payload via
+    // _applyActiveRowFilterToPayload. Different headers → genuinely
+    // new analysis on a different range → clear the filter.
+    return !this._isHeaderRowFilterStateCompatible(state, headers);
   },
 
   _installActiveRowFilterStorageInterceptor() {

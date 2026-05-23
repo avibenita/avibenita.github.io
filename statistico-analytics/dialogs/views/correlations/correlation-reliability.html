@@ -22,7 +22,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260523g"></script>
+  <script src="../shared-header.js?v=20260523h"></script>
 
   <style>
     :root {
@@ -634,6 +634,19 @@
     Office.onReady(() => {
       console.log('Office.js ready for Reliability Analysis');
 
+      // Initialise the shared header EARLY so the UniRowFilter assets
+      // start loading right away. Doing this before runReliabilityAnalysis
+      // (which used to call init at its tail) gives the filter script time
+      // to finish loading before installReliabilityFilter runs, mirroring
+      // how the matrix view bootstraps its filter.
+      try {
+        if (typeof StatisticoHeader !== 'undefined') {
+          StatisticoHeader.init('reliability', 'Reliability Coefficients', 0, 'correlations');
+          StatisticoHeader.initSidebarPage();
+          StatisticoHeader.updateTitle('Reliability Coefficients');
+        }
+      } catch (_e) {}
+
       // Load from sessionStorage (same-window tab navigation)
       const storedCorr = sessionStorage.getItem('correlationData');
       if (storedCorr) {
@@ -643,7 +656,11 @@
           originalRawData = data.data;
           const dataArrays = data.data.map(row => data.headers.map(h => row[h]));
           runReliabilityAnalysis(dataArrays, data.headers);
-          installReliabilityFilter();
+          // Defer install so shared-header asset bootstrap (which itself
+          // runs UniRowFilter.init) finishes first; we then re-init with
+          // our own onApply, mirroring the matrix view.
+          setTimeout(installReliabilityFilter, 250);
+          setTimeout(installReliabilityFilter, 800);
         } catch(e) { console.warn('Error reading correlationData from sessionStorage:', e); }
       }
       
@@ -679,7 +696,8 @@
               );
               
               runReliabilityAnalysis(dataArrays, data.headers);
-              installReliabilityFilter();
+              setTimeout(installReliabilityFilter, 250);
+              setTimeout(installReliabilityFilter, 800);
             }
           } catch (error) {
             console.error('Error parsing message:', error);
@@ -888,10 +906,20 @@
       document.getElementById('loadingMessage').style.display = 'none';
       document.getElementById('mainContainer').style.display = 'flex';
       
-      // Initialize header
-      const sampleSize = numSubjects;
-      StatisticoHeader.init('reliability', 'Reliability Coefficients', sampleSize, 'correlations');
-        StatisticoHeader.initSidebarPage(); StatisticoHeader.updateTitle('Reliability Coefficients');;
+      // Update header (init was already called early in Office.onReady so
+      // the row-filter assets are loaded by now — re-init here would race
+      // with installReliabilityFilter and silently revert UniRowFilter to
+      // the unfiltered dataset).
+      try {
+        if (typeof StatisticoHeader !== 'undefined') {
+          StatisticoHeader.sampleSize = numSubjects;
+          StatisticoHeader.variableName = 'Reliability Coefficients';
+          if (typeof StatisticoHeader.render === 'function') StatisticoHeader.render();
+          if (typeof StatisticoHeader.updateUniFilterChrome === 'function') {
+            StatisticoHeader.updateUniFilterChrome();
+          }
+        }
+      } catch (_e) {}
     }
 
     function toggleDescriptiveColumns(show) {

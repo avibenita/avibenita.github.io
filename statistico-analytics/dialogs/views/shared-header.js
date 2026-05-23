@@ -462,6 +462,7 @@ const StatisticoHeader = {
           </div>
         </div>`}
       </div>
+      <div id="uni-filter-active-notice"></div>
     `;
     
     // Insert into header-container if it exists, otherwise at beginning of body
@@ -487,6 +488,15 @@ const StatisticoHeader = {
     this.revealModuleName();
     // Trigger view-name slide-in animation
     this.revealViewName();
+
+    // Re-populate the row-filter notice banner now that the header DOM was
+    // (re-)mounted. The banner div is part of the header template so it gets
+    // wiped on every render; this ensures it stays in sync with state.
+    try {
+      if (typeof this.updateUniFilterChrome === 'function') {
+        this.updateUniFilterChrome();
+      }
+    } catch (_e) {}
 
     // Inject website link into the footer (create footer if absent)
     (function injectSiteLink() {
@@ -2536,7 +2546,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260523m';
+    const v = '20260523p';
     const base = this._uniFilterAssetBase();
     const cssHref = `${base}uni-filter-shared.css?v=${v}`;
     const existingCss = document.querySelector('link[data-uni-filter-shared-css]');
@@ -2591,23 +2601,24 @@ const StatisticoHeader = {
   },
 
   _ensureUniFilterOverlay() {
-    const overlayVersion = 'v2';
+    const overlayVersion = 'v3';
     const existing = document.getElementById('uniFilterOverlay');
     if (existing && existing.getAttribute('data-overlay-version') === overlayVersion) return;
     if (existing) existing.remove();
     const el = document.createElement('div');
     el.innerHTML = [
-      '<div class="sb-ai-overlay" id="uniFilterOverlay" data-overlay-version="v2" onclick="UniRowFilter.close(event)">',
+      '<div class="sb-ai-overlay" id="uniFilterOverlay" data-overlay-version="v3" onclick="UniRowFilter.close(event)">',
       '<div class="sb-ai-panel" style="width:min(1020px,97vw);max-height:88vh;display:flex;flex-direction:column;" onclick="event.stopPropagation()">',
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">',
+      '<div style="display:flex;align-items:center;justify-content:flex-start;margin-bottom:12px;">',
       '<span style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--accent-1);">',
       '<i class="fa-solid fa-filter" style="margin-right:6px;"></i>Filter Source Range</span>',
-      '<button type="button" onclick="UniRowFilter.close()" style="background:transparent;border:none;color:rgba(255,255,255,.6);font-size:18px;cursor:pointer;">&times;</button>',
       '</div>',
       '<div class="uni-filt-help-panel">',
       '<h4><i class="fa-solid fa-lightbulb"></i> Step-by-step</h4>',
       '<ol>',
-      '<li>The table below is your <strong>hub workbook range</strong> (all columns). The analysis column is marked with ★.</li>',
+      (this.module === 'univariate'
+        ? '<li>The table below is your <strong>hub workbook range</strong> (all columns). The analysis column is marked with ★.</li>'
+        : '<li>The table below is your <strong>source range</strong> (all columns).</li>'),
       '<li>Click <strong>▼</strong> on a column header to choose which values to keep (Excel-style).</li>',
       '<li>Press <strong>OK</strong> on the dropdown to preview updates in the filter table.</li>',
       '<li>Press <strong>Finish &amp; Apply</strong> to freeze the dataset this module uses.</li>',
@@ -3225,9 +3236,25 @@ const StatisticoHeader = {
     UniRowFilter.init({
       headers: sourceHeaders,
       rows: allRows,
-      columnIndex: 0,
+      // Correlations (and other multi-variable modules) have no single
+      // "analysis column", so we deliberately pass an out-of-range index
+      // to suppress the ★ analysis-column marker on column 0.
+      columnIndex: -1,
       onApply: onApply
     });
+    // Restore active per-column criteria FIRST so the eventual call to
+    // setFilteredRows() stamps _appliedColumnFilters with these criteria.
+    // Without this ordering, opening the panel resets _columnFilters back
+    // to the (empty) applied state, and the column-header indicator stays
+    // off even though the rows are filtered.
+    try {
+      const state = this._getGenericRowFilterState();
+      if (state && state.columnFilters &&
+          this._isHeaderRowFilterStateCompatible(state, sourceHeaders) &&
+          typeof UniRowFilter.setColumnFilters === 'function') {
+        UniRowFilter.setColumnFilters(state.columnFilters, true);
+      }
+    } catch (_e) {}
     if (isFiltered && typeof UniRowFilter.setFilteredRows === 'function') {
       UniRowFilter.setFilteredRows(usedRows);
     }
@@ -4080,10 +4107,27 @@ const StatisticoHeader = {
 
     let notice = document.getElementById('uni-filter-active-notice');
     if (!notice) {
+      // Fallback for pages whose header HTML predates the in-template notice div.
       notice = document.createElement('div');
       notice.id = 'uni-filter-active-notice';
-      const anchor = document.querySelector('.statistico-shell') || document.querySelector('.statistico-header');
-      if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(notice, anchor.nextSibling);
+      const headerContainer = document.getElementById('header-container');
+      if (headerContainer) {
+        headerContainer.appendChild(notice);
+      } else {
+        const anchor = document.querySelector('.statistico-shell') || document.querySelector('.statistico-header');
+        if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(notice, anchor.nextSibling);
+      }
+    } else if (!notice.isConnected) {
+      // The element exists in JS memory but was detached from the DOM
+      // (e.g. by header-container.innerHTML reassignment during render).
+      // Re-attach it so the banner is visible again.
+      const headerContainer = document.getElementById('header-container');
+      if (headerContainer) {
+        headerContainer.appendChild(notice);
+      } else {
+        const anchor = document.querySelector('.statistico-shell') || document.querySelector('.statistico-header');
+        if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(notice, anchor.nextSibling);
+      }
     }
     if (active && total) {
       notice.className = 'is-visible';
@@ -4129,7 +4173,10 @@ const StatisticoHeader = {
       UniRowFilter.init({
         headers: data.headers,
         rows: allRows,
-        columnIndex: 0,
+        // Non-univariate modules (regression, ANOVA, PCA, factor, cluster…)
+        // have no single analysis column; suppress the ★ marker by passing
+        // an out-of-range index.
+        columnIndex: -1,
         onApply: (rows) => this.publishHeaderRowFilterChange(rows)
       });
       // Restore the filter UI to reflect the active filtered dataset.

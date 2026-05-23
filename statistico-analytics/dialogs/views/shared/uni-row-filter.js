@@ -564,17 +564,23 @@
       + 'letter-spacing:.08em;background:' + headerBg + ';border:1px solid var(--border);'
       + 'position:sticky;top:0;left:auto;z-index:2;min-width:0;';
 
+    // Only highlight an "analysis column" when the host page provided a
+    // valid index. A negative or out-of-range index means the module is
+    // multi-variable (correlations, regression, ANOVA, …) and no single
+    // column should be marked with the ★ / blue accent.
+    var hasAnalysisCol = _columnIndex >= 0 && _columnIndex < _headers.length;
     var headerCells = _headers.map(function (h, i) {
       var cf = _columnFilters[i];
       var filtered = (Array.isArray(cf) && cf.length > 0) || (cf && typeof cf === 'object' && cf.values && cf.values.length > 0);
       var icon = filtered ? '🔽' : '▼';
       var cls = 'uni-filt-th' + (filtered ? ' filtered' : '');
-      var highlight = i === _columnIndex ? ' outline:1px solid rgba(129,140,248,.5);' : '';
+      var isAnalysisCol = hasAnalysisCol && i === _columnIndex;
+      var highlight = isAnalysisCol ? ' outline:1px solid rgba(129,140,248,.5);' : '';
       return '<th class="' + cls + '" data-col-idx="' + i + '" style="' + thStyle + highlight
         + 'cursor:pointer;pointer-events:auto;user-select:none;'
-        + 'color:' + (filtered ? '#4ade80' : (i === _columnIndex ? '#a5b4fc' : '#ffa578')) + ';" '
+        + 'color:' + (filtered ? '#4ade80' : (isAnalysisCol ? '#a5b4fc' : '#ffa578')) + ';" '
         + 'title="Click to filter ' + escHtml(h) + '">'
-        + escHtml(h) + (i === _columnIndex ? ' ★' : '') + '<span class="uni-filt-icon" style="pointer-events:none;">' + icon + '</span></th>';
+        + escHtml(h) + (isAnalysisCol ? ' ★' : '') + '<span class="uni-filt-icon" style="pointer-events:none;">' + icon + '</span></th>';
     }).join('');
 
     var displayRows = rows.slice(0, MAX_RENDER_ROWS);
@@ -585,7 +591,7 @@
         var raw = (val === null || val === undefined) ? '' : String(val);
         var display = escHtml(raw.length > 40 ? raw.substring(0, 40) + '\u2026' : raw);
         var tdStyle = 'position:static;left:auto;z-index:auto;min-width:0;max-width:none;background:transparent;'
-          + (ci === _columnIndex
+          + ((hasAnalysisCol && ci === _columnIndex)
             ? 'font-weight:600;color:' + (isLight ? '#4338ca' : '#c4b5fd') + ';'
             : 'color:' + textC + ';');
         return '<td style="padding:6px 10px;border:1px solid var(--border);' + tdStyle + '">' + display + '</td>';

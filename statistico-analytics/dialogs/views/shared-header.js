@@ -578,7 +578,7 @@ const StatisticoHeader = {
     ];
 
     const correlationViews = [
-      { id: 'correlation-matrix', label: 'Correlation Matrix', file: 'correlations/correlation-matrix.html' },
+      { id: 'correlation-matrix', label: 'Correlation Matrix', file: 'correlations/correlation-matrix-v2.html' },
       { id: 'correlation-network', label: 'Correlation Network', file: 'correlations/correlation-network.html' },
       { id: 'taylor-diagram', label: 'Taylor Diagram', file: 'correlations/correlation-taylor.html' },
       { id: 'descriptive-stats', label: 'Descriptive Statistics', file: 'correlations/descriptive-stats.html' },
@@ -795,7 +795,7 @@ const StatisticoHeader = {
           {
             title: 'Analysis Views',
             items: [
-              { type: 'navigate', viewIn: ['correlation-matrix'], file: 'correlations/correlation-matrix.html', icon: 'fa-table-cells', label: 'Matrix' },
+              { type: 'navigate', viewIn: ['correlation-matrix'], file: 'correlations/correlation-matrix-v2.html', icon: 'fa-table-cells', label: 'Matrix' },
               { type: 'navigate', viewIn: ['correlation-network'], file: 'correlations/correlation-network.html', icon: 'fa-circle-nodes', label: 'Network' },
               { type: 'navigate', viewIn: ['taylor-diagram'], file: 'correlations/correlation-taylor.html', icon: 'fa-compass-drafting', label: 'Taylor Diagram' },
               { type: 'navigate', viewIn: ['partial-correlations'], file: 'correlations/correlation-partial.html', icon: 'fa-filter', label: 'Partial' },
@@ -1677,7 +1677,7 @@ const StatisticoHeader = {
       };
     };
     const getCorrelationMenuItems = () => ([
-      { id: 'matrix', label: 'Correlation Matrix', file: 'correlations/correlation-matrix.html' },
+      { id: 'matrix', label: 'Correlation Matrix', file: 'correlations/correlation-matrix-v2.html' },
       { id: 'network', label: 'Correlation Network', file: 'correlations/correlation-network.html' },
       { id: 'taylor', label: 'Taylor Diagram', file: 'correlations/correlation-taylor.html' },
       { id: 'partial', label: 'Partial Correlations', file: 'correlations/correlation-partial.html' },
@@ -2573,7 +2573,7 @@ const StatisticoHeader = {
       '<div id="uniFilterContent" style="overflow:auto;flex:1;min-height:0;max-height:none;border:1px solid rgba(148,163,184,.25);border-radius:8px;"></div>',
       '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">',
       '<button type="button" onclick="UniRowFilter.close()" style="padding:7px 12px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--text-secondary);font-size:12px;font-weight:600;cursor:pointer;">Exit</button>',
-      '<button type="button" id="uniFilterApplyBtn" onclick="UniRowFilter.finishAndClose()" style="padding:7px 12px;border:1px solid rgba(255,165,120,.5);border-radius:7px;background:rgba(255,165,120,.18);color:#ffd8be;font-size:12px;font-weight:700;cursor:pointer;">Finish &amp; Apply</button>',
+      '<button type="button" id="uniFilterApplyBtn" onclick="StatisticoHeader.applyUniRowFilterAndClose()" style="padding:7px 12px;border:1px solid rgba(255,165,120,.5);border-radius:7px;background:rgba(255,165,120,.18);color:#ffd8be;font-size:12px;font-weight:700;cursor:pointer;">Finish &amp; Apply</button>',
       '</div>',
       '</div></div>'
     ].join('');
@@ -2610,6 +2610,67 @@ const StatisticoHeader = {
     if (e && e.target && e.target.id !== 'uniFilterHelpOverlay') return;
     const o = document.getElementById('uniFilterHelpOverlay');
     if (o) o.classList.remove('sb-ai-overlay--visible');
+  },
+
+  applyUniRowFilterAndClose() {
+    try {
+      if (typeof UniRowFilter === 'undefined' || typeof UniRowFilter.finishAndClose !== 'function') return;
+      const metaBefore = (typeof UniRowFilter.getSourceMeta === 'function') ? UniRowFilter.getSourceMeta() : null;
+      UniRowFilter.finishAndClose();
+      try {
+        const metaAfter = (typeof UniRowFilter.getSourceMeta === 'function') ? UniRowFilter.getSourceMeta() : null;
+        const total = metaAfter && Array.isArray(metaAfter.allRows) ? metaAfter.allRows.length : (metaBefore && Array.isArray(metaBefore.allRows) ? metaBefore.allRows.length : 0);
+        const shown = metaAfter && Array.isArray(metaAfter.filteredRows) ? metaAfter.filteredRows.length : 0;
+        this._showRowFilterToast(shown, total);
+      } catch (_e) {}
+      // Fallback for runtime variants where UniRowFilter.onApply does not propagate.
+      // Correlations require explicit publish to keep filtered dataset coherent.
+      if (this.module !== 'univariate' &&
+          typeof UniRowFilter.getFilteredRows === 'function' &&
+          typeof this.publishHeaderRowFilterChange === 'function') {
+        const rows = UniRowFilter.getFilteredRows();
+        if (Array.isArray(rows)) {
+          console.warn('[ROWFILTER][fallback-apply]', {
+            module: this.module,
+            rows: rows.length
+          });
+          this.publishHeaderRowFilterChange(rows);
+        }
+      }
+    } catch (e) {
+      console.warn('applyUniRowFilterAndClose failed:', e);
+    }
+  },
+
+  _showRowFilterToast(shown, total) {
+    const wrap = document.getElementById('uniFilterToast') || (() => {
+      const el = document.createElement('div');
+      el.id = 'uniFilterToast';
+      el.style.position = 'fixed';
+      el.style.right = '16px';
+      el.style.bottom = '16px';
+      el.style.zIndex = '99999';
+      el.style.padding = '8px 12px';
+      el.style.borderRadius = '8px';
+      el.style.border = '1px solid rgba(255,165,120,.45)';
+      el.style.background = 'rgba(13,21,38,.92)';
+      el.style.color = '#ffd8be';
+      el.style.fontSize = '12px';
+      el.style.fontWeight = '700';
+      el.style.boxShadow = '0 8px 24px rgba(0,0,0,.35)';
+      el.style.opacity = '0';
+      el.style.transition = 'opacity .18s ease';
+      document.body.appendChild(el);
+      return el;
+    })();
+    const safeShown = Number.isFinite(Number(shown)) ? Number(shown) : 0;
+    const safeTotal = Number.isFinite(Number(total)) ? Number(total) : 0;
+    wrap.textContent = `Applied row filter: ${safeShown} of ${safeTotal} rows`;
+    wrap.style.opacity = '1';
+    if (this._uniFilterToastTimer) clearTimeout(this._uniFilterToastTimer);
+    this._uniFilterToastTimer = setTimeout(() => {
+      wrap.style.opacity = '0';
+    }, 2000);
   },
 
   _getUniStored() {
@@ -2674,7 +2735,19 @@ const StatisticoHeader = {
   _normalizeRowFilterRows(rows, headers) {
     const width = Array.isArray(headers) ? headers.length : 0;
     return (Array.isArray(rows) ? rows : []).map((row) => {
-      if (Array.isArray(row)) return row.slice(0, width || row.length);
+      if (Array.isArray(row)) {
+        if (!width) return row.slice();
+        if (row.length > width) {
+          // Some filter UIs include a leading helper/index column.
+          // If detected, drop that first column instead of truncating a real data column.
+          if (row.length === width + 1) {
+            const first = row[0];
+            const n = typeof first === 'number' ? first : parseFloat(first);
+            if (Number.isFinite(n)) return row.slice(1, 1 + width);
+          }
+        }
+        return row.slice(0, width);
+      }
       if (row && typeof row === 'object') {
         return (headers || Object.keys(row)).map((h) => row[h]);
       }
@@ -3430,6 +3503,16 @@ const StatisticoHeader = {
       module: this.module,
       view: this.currentView
     };
+    try {
+      console.warn('[ROWFILTER][dispatch]', {
+        module: this.module,
+        view: this.currentView,
+        headers: headers.length,
+        allRows: allRowsCopy.length,
+        usedRows: rowsCopy.length,
+        active
+      });
+    } catch (_e) {}
     // Keep shared row-filter state compact: criteria + header identity only.
     // Storing full row matrices here can freeze on large datasets.
     this._setGenericRowFilterState({
@@ -3444,8 +3527,16 @@ const StatisticoHeader = {
     const actions = this._pendingActions || {};
     const handler = actions.onFilterRows || actions.filterRows;
     if (typeof handler === 'function') {
-      try { handler(payload); } catch (e) { console.warn('Row filter handler failed:', e); }
+      try {
+        console.warn('[ROWFILTER][handler] invoking module-specific handler', {
+          module: this.module,
+          hasOnFilterRows: typeof actions.onFilterRows === 'function',
+          hasFilterRows: typeof actions.filterRows === 'function'
+        });
+        handler(payload);
+      } catch (e) { console.warn('Row filter handler failed:', e); }
     } else {
+      console.warn('[ROWFILTER][handler] using generic fallback', { module: this.module });
       this._applyGenericHeaderRowFilterFallback(payload);
     }
     if (!skipDispatch) {

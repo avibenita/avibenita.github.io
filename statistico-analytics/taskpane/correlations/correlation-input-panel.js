@@ -229,7 +229,7 @@ function handleRunAnalysis(data) {
  * Open correlation result dialog
  */
 function openCorrelationResultDialog(viewType, matrixData) {
-  const dialogFile = 'correlation-matrix.html';
+  const dialogFile = 'correlation-matrix-v2.html';
   const dialogUrl = `${getDialogsBaseUrl()}correlations/${dialogFile}`;
   
   console.log('📂 Opening matrix dialog:', dialogUrl);

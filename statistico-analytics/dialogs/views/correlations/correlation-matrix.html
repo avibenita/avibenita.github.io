@@ -5,6 +5,31 @@
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <title>Correlation Analysis</title>
 
+  <script>
+    (function () {
+      try {
+        var u = new URL(window.location.href);
+        var dirty = false;
+        ['_host_Info', '_hostInfo', 'telemetry', 'isDialog'].forEach(function (k) {
+          if (u.searchParams.has(k)) { u.searchParams.delete(k); dirty = true; }
+        });
+        if (dirty) window.history.replaceState({}, document.title, u.pathname + (u.search ? u.search : '') + (u.hash || ''));
+      } catch (e) {}
+    })();
+  </script>
+  <script>
+    (function () {
+      try {
+        var u = new URL(window.location.href);
+        if (u.pathname.indexOf('/dialogs/views/correlations/correlation-matrix.html') >= 0) {
+          u.pathname = u.pathname.replace('/correlation-matrix.html', '/correlation-matrix-v2.html');
+          if (!u.searchParams.has('cb')) u.searchParams.set('cb', Date.now().toString());
+          window.location.replace(u.toString());
+        }
+      } catch (e) {}
+    })();
+  </script>
+
   <!-- Office.js -->
   <script>
     if (new URLSearchParams(location.search).get('embed') !== '1') {
@@ -30,7 +55,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260522r"></script>
+  <script src="../shared-header.js?v=20260523a"></script>
 
   <style>
     /* ── Variables ── */
@@ -921,7 +946,7 @@
       <div class="sb-group">
         <div class="sb-group-title">Analysis Views</div>
         <div class="sb-items-rail">
-          <button class="sb-item active" onclick="StatisticoHeader.navigateTo('correlations/correlation-matrix.html')"><i class="fa-solid fa-table-cells sb-item-icon"></i><span class="sb-item-label">Matrix</span></button>
+          <button class="sb-item active" onclick="StatisticoHeader.navigateTo('correlations/correlation-matrix-v2.html')"><i class="fa-solid fa-table-cells sb-item-icon"></i><span class="sb-item-label">Matrix</span></button>
           <button class="sb-item" onclick="StatisticoHeader.navigateTo('correlations/correlation-network.html')"><i class="fa-solid fa-circle-nodes sb-item-icon"></i><span class="sb-item-label">Network</span></button>
           <button class="sb-item" onclick="StatisticoHeader.navigateTo('correlations/correlation-taylor.html')"><i class="fa-solid fa-compass-drafting sb-item-icon"></i><span class="sb-item-label">Taylor Diagram</span></button>
           <button class="sb-item" onclick="StatisticoHeader.navigateTo('correlations/correlation-partial.html')"><i class="fa-solid fa-filter sb-item-icon"></i><span class="sb-item-label">Partial</span></button>
@@ -1210,18 +1235,52 @@
     return Number.isFinite(n) ? n : null;
   }
 
-  function toListwiseCompleteData(data, headers) {
-    return (data || []).reduce((acc, row) => {
+  function toNumericRows(data, headers) {
+    return (data || []).map((row) => {
       const obj = {};
       for (let i = 0; i < headers.length; i += 1) {
         const key = headers[i];
-        const num = toFiniteNumber(row ? row[key] : null);
-        if (num === null) return acc;
-        obj[key] = num;
+        obj[key] = toFiniteNumber(row ? row[key] : null);
       }
-      acc.push(obj);
-      return acc;
-    }, []);
+      return obj;
+    });
+  }
+
+  function bestRowOffsetForHeaders(rows, headerCount, analysisIndexes) {
+    const sample = (rows || []).filter((r) => Array.isArray(r)).slice(0, 40);
+    if (!sample.length || !headerCount) return 0;
+    const maxRowLen = sample.reduce((m, r) => Math.max(m, r.length), 0);
+    const maxOffset = Math.max(0, maxRowLen - headerCount);
+    let bestOffset = 0;
+    let bestScore = -1;
+    for (let offset = 0; offset <= maxOffset; offset += 1) {
+      let score = 0;
+      for (let r = 0; r < sample.length; r += 1) {
+        const row = sample[r];
+        for (let i = 0; i < analysisIndexes.length; i += 1) {
+          const srcIdx = analysisIndexes[i] + offset;
+          const value = srcIdx >= 0 && srcIdx < row.length ? row[srcIdx] : null;
+          const n = typeof value === 'number' ? value : parseFloat(value);
+          if (Number.isFinite(n)) score += 1;
+        }
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        bestOffset = offset;
+      }
+    }
+    return bestOffset;
+  }
+
+  function normalizeRowsToHeaderWidth(rows, headerCount, offset) {
+    return (rows || []).map((row) => {
+      if (!Array.isArray(row)) return row;
+      if (!headerCount) return row.slice();
+      const start = Math.max(0, offset || 0);
+      const out = row.slice(start, start + headerCount);
+      while (out.length < headerCount) out.push(null);
+      return out;
+    });
   }
 
   function normalizeCorrelationPayload(payload) {
@@ -1251,17 +1310,56 @@
     };
   }
 
+  function resetStaleCorrelationFilterIfNeeded(normalized) {
+    if (!normalized || typeof normalized !== 'object') return normalized;
+    const allRows = Array.isArray(normalized.sourceRowsAll)
+      ? normalized.sourceRowsAll
+      : (Array.isArray(normalized.allRows) ? normalized.allRows : null);
+    const usedRows = Array.isArray(normalized.sourceRows)
+      ? normalized.sourceRows
+      : (Array.isArray(normalized.usedRows) ? normalized.usedRows : null);
+    const hasAll = Array.isArray(allRows) && allRows.length > 0;
+    const hasUsed = Array.isArray(usedRows);
+    const explicitFiltered = !!normalized.rowFilterActive ||
+      (hasAll && hasUsed && usedRows.length < allRows.length);
+    if (explicitFiltered || !hasAll) return normalized;
+
+    // Fresh/full payload from parent should not inherit stale persisted row-filter state.
+    if (typeof StatisticoHeader !== 'undefined' &&
+        typeof StatisticoHeader._clearGenericRowFilterState === 'function') {
+      try {
+        StatisticoHeader._clearGenericRowFilterState('correlations');
+        console.warn('[CORR] Cleared stale persisted row-filter state on fresh payload');
+      } catch (_e) {}
+    }
+
+    return {
+      ...normalized,
+      rowFilterActive: false,
+      sourceRowsAll: allRows,
+      sourceRows: allRows,
+      usedRows: allRows
+    };
+  }
+
   function receiveCorrelationData(payload, source) {
     const normalized = normalizeCorrelationPayload(payload);
     if (!normalized) {
       console.warn('Invalid correlation payload ignored:', source, payload);
       return false;
     }
-    const listwiseData = toListwiseCompleteData(normalized.data, normalized.headers);
+    const clean = resetStaleCorrelationFilterIfNeeded(normalized);
+    const numericData = toNumericRows(clean.data, clean.headers);
     correlationData = {
-      ...normalized,
-      data: listwiseData
+      ...clean,
+      data: numericData
     };
+    console.warn('[CORR] Data received', {
+      source: source || 'unknown',
+      headers: Array.isArray(correlationData.headers) ? correlationData.headers.length : 0,
+      rows: Array.isArray(correlationData.data) ? correlationData.data.length : 0,
+      rowFilterActive: !!correlationData.rowFilterActive
+    });
     window.correlationData = correlationData;
     try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch(e) {}
     renderMatrix();
@@ -1309,6 +1407,13 @@
 
   function applyCorrelationRowFilter(filterPayload) {
     if (!filterPayload || !filterPayload.headers || !filterPayload.usedRows) return;
+    console.warn('[CORR][applyCorrelationRowFilter] received payload', {
+      headers: Array.isArray(filterPayload.headers) ? filterPayload.headers.length : 0,
+      usedRows: Array.isArray(filterPayload.usedRows) ? filterPayload.usedRows.length : 0,
+      sourceRowsAll: Array.isArray(filterPayload.sourceRowsAll) ? filterPayload.sourceRowsAll.length : 0,
+      allRows: Array.isArray(filterPayload.allRows) ? filterPayload.allRows.length : 0,
+      rowFilterActive: !!filterPayload.rowFilterActive
+    });
     const sourceHeaders = filterPayload.headers.slice();
     const analysisHeaders = (correlationData && Array.isArray(correlationData.headers) && correlationData.headers.length)
       ? correlationData.headers.slice()
@@ -1316,20 +1421,46 @@
     const headerIndex = {};
     sourceHeaders.forEach((h, i) => { headerIndex[h] = i; });
     const canProject = analysisHeaders.every((h) => Object.prototype.hasOwnProperty.call(headerIndex, h));
+    const analysisIndexes = canProject ? analysisHeaders.map((h) => headerIndex[h]) : [];
+    const usedRowsRaw = Array.isArray(filterPayload.usedRows) ? filterPayload.usedRows : [];
+    const allRowsRaw = Array.isArray(filterPayload.sourceRowsAll || filterPayload.allRows) ? (filterPayload.sourceRowsAll || filterPayload.allRows) : null;
+    const expectedWidth = sourceHeaders.length;
+    const alignmentOffset = canProject ? bestRowOffsetForHeaders(usedRowsRaw, expectedWidth, analysisIndexes) : 0;
+    const usedRowsAligned = normalizeRowsToHeaderWidth(usedRowsRaw, expectedWidth, alignmentOffset);
+    const allRowsAligned = allRowsRaw ? normalizeRowsToHeaderWidth(allRowsRaw, expectedWidth, alignmentOffset) : null;
     const projectedRows = canProject
-      ? (filterPayload.usedRows || []).map((row) => analysisHeaders.map((h) => Array.isArray(row) ? row[headerIndex[h]] : (row && row[h])))
-      : filterPayload.usedRows;
+      ? usedRowsAligned.map((row) => analysisHeaders.map((h) => Array.isArray(row) ? row[headerIndex[h]] : (row && row[h])))
+      : usedRowsAligned;
     const projectedHeaders = canProject ? analysisHeaders : sourceHeaders;
     const filteredData = rowsToCorrelationObjects(projectedHeaders, projectedRows);
-    const listwiseData = toListwiseCompleteData(filteredData, projectedHeaders);
+    const numericData = toNumericRows(filteredData, projectedHeaders);
+    const firstProjected = projectedRows && projectedRows.length ? projectedRows[0] : null;
+    const numericCoverage = projectedHeaders.reduce((acc, h) => {
+      const count = numericData.reduce((c, row) => c + (Number.isFinite(row[h]) ? 1 : 0), 0);
+      acc[h] = count;
+      return acc;
+    }, {});
+    console.warn('[CORR][applyCorrelationRowFilter] normalized', {
+      headers: sourceHeaders.length,
+      usedRowsRaw: usedRowsRaw.length,
+      usedRowsAligned: usedRowsAligned.length,
+      allRowsRaw: allRowsRaw ? allRowsRaw.length : 0,
+      allRowsAligned: allRowsAligned ? allRowsAligned.length : 0,
+      expectedWidth,
+      alignmentOffset,
+      canProject
+    });
+    console.warn('[CORR][applyCorrelationRowFilter] analysis headers', analysisHeaders);
+    console.warn('[CORR][applyCorrelationRowFilter] first projected row', firstProjected);
+    console.warn('[CORR][applyCorrelationRowFilter] numeric coverage', numericCoverage);
     correlationData = {
       ...(correlationData || {}),
       headers: projectedHeaders,
-      data: listwiseData,
+      data: numericData,
       rowFilterActive: !!filterPayload.rowFilterActive,
       sourceHeaders,
-      sourceRowsAll: filterPayload.sourceRowsAll || filterPayload.allRows || null,
-      sourceRows: filterPayload.usedRows
+      sourceRowsAll: allRowsAligned,
+      sourceRows: usedRowsAligned
     };
     window.correlationData = correlationData;
     try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch(e) {}
@@ -1341,9 +1472,53 @@
     }
   }
 
+  function installCorrelationFilterApplyFallback() {
+    if (window.__corrFilterApplyFallbackInstalled) return;
+    window.__corrFilterApplyFallbackInstalled = true;
+    document.addEventListener('click', function (ev) {
+      const target = ev && ev.target && typeof ev.target.closest === 'function'
+        ? ev.target.closest('#uniFilterApplyBtn')
+        : null;
+      if (!target) return;
+      // Run after the default handler so UniRowFilter has committed rows.
+      setTimeout(function () {
+        try {
+          if (typeof UniRowFilter === 'undefined') return;
+          const meta = typeof UniRowFilter.getSourceMeta === 'function' ? UniRowFilter.getSourceMeta() : null;
+          const filteredRows = typeof UniRowFilter.getFilteredRows === 'function' ? UniRowFilter.getFilteredRows() : null;
+          if (!meta || !Array.isArray(meta.headers) || !Array.isArray(filteredRows)) return;
+          const payload = {
+            headers: meta.headers.slice(),
+            allRows: Array.isArray(meta.allRows) ? meta.allRows : filteredRows,
+            sourceRowsAll: Array.isArray(meta.allRows) ? meta.allRows : filteredRows,
+            usedRows: filteredRows,
+            sourceRows: filteredRows,
+            rowFilterActive: !!meta.hasActiveFilters
+          };
+          // Preferred path: shared header dispatch.
+          if (typeof StatisticoHeader !== 'undefined' &&
+              typeof StatisticoHeader.publishHeaderRowFilterChange === 'function') {
+            StatisticoHeader.publishHeaderRowFilterChange(filteredRows, true);
+          } else {
+            applyCorrelationRowFilter(payload);
+          }
+          // Hard fallback: ensure view updates even if dispatch path is bypassed.
+          applyCorrelationRowFilter(payload);
+          console.warn('[CORR][fallback] Finish & Apply forced propagation', {
+            total: Array.isArray(meta.allRows) ? meta.allRows.length : filteredRows.length,
+            shown: filteredRows.length
+          });
+        } catch (e) {
+          console.warn('[CORR][fallback] apply failed', e);
+        }
+      }, 0);
+    }, true);
+  }
+
   /* ════════════════════════════════════════════
      INITIALIZATION
   ════════════════════════════════════════════ */
+  installCorrelationFilterApplyFallback();
   const isInIframe = window.self !== window.top;
   const isHubEmbedDemo = new URLSearchParams(location.search).get('embed') === '1'
     && new URLSearchParams(location.search).get('demo') === '1';
@@ -1416,7 +1591,9 @@
         renderMatrix();
         return;
       }
-      if (tryLoadStoredCorrelationData()) return;
+      // Prefer fresh data from parent; storage is fallback only.
+      try { sessionStorage.removeItem('correlationData'); } catch (_e) {}
+      try { sessionStorage.removeItem('correlationResults'); } catch (_e) {}
       requestCorrelationDataFromParent();
       setTimeout(() => { if (!correlationData) requestCorrelationDataFromParent(); }, 500);
       setTimeout(() => { if (!correlationData && !tryLoadStoredCorrelationData()) showCorrelationLoadError('Still waiting for correlation data. Re-run the correlation analysis or switch back from the source view.'); }, 6000);
@@ -1433,8 +1610,9 @@
         registerHeaderActions();
       }
 
-      // Check storage pre-load (e.g. after same-window tab navigation)
-      tryLoadStoredCorrelationData();
+      // Prefer fresh data from parent; storage is fallback only.
+      try { sessionStorage.removeItem('correlationData'); } catch (_e) {}
+      try { sessionStorage.removeItem('correlationResults'); } catch (_e) {}
 
       Office.context.ui.addHandlerAsync(
         Office.EventType.DialogParentMessageReceived,
@@ -1450,7 +1628,11 @@
 
       requestCorrelationDataFromParent();
       setTimeout(() => { if (!correlationData) requestCorrelationDataFromParent(); }, 500);
-      setTimeout(() => { if (!correlationData && !tryLoadStoredCorrelationData()) showCorrelationLoadError('Still waiting for correlation data. Re-run the correlation analysis or switch back from the source view.'); }, 6000);
+      setTimeout(() => {
+        if (!correlationData && !tryLoadStoredCorrelationData()) {
+          showCorrelationLoadError('Still waiting for correlation data. Re-run the correlation analysis or switch back from the source view.');
+        }
+      }, 6000);
     });
   }
 
@@ -1943,7 +2125,7 @@
       <div class="explore-notice">
         <strong><i class="fa-solid fa-circle-info"></i> Per-Variable Statistics</strong> —
         N shown is the count of valid (non-missing) observations for each variable individually
-        (listwise deletion is used when computing the correlation matrix).
+        (the correlation matrix uses pairwise valid observations per variable pair).
         ${hasMissing ? '<br><span style="color:#fbbf24;"><i class="fa-solid fa-triangle-exclamation"></i> Missing values detected — see "Missing" column below.</span>' : ''}
       </div>
       <div class="explore-table-wrap">

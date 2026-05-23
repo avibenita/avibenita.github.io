@@ -2546,7 +2546,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260523r';
+    const v = '20260523s';
     const base = this._uniFilterAssetBase();
     const cssHref = `${base}uni-filter-shared.css?v=${v}`;
     const existingCss = document.querySelector('link[data-uni-filter-shared-css]');
@@ -4104,8 +4104,18 @@ const StatisticoHeader = {
       !!(meta && meta.allRows && meta.allRows.length);
     const active = (typeof UniRowFilter !== 'undefined' && UniRowFilter.hasActiveFilters()) ||
       !!(payload && payload.rowFilterActive);
-    const total = meta ? meta.allRows.length : (payload && payload.sourceRowsAll ? payload.sourceRowsAll.length : (payload && payload.allRows ? payload.allRows.length : 0));
-    const showing = meta ? meta.filteredRows.length : (payload && payload.sourceRows ? payload.sourceRows.length : (payload && payload.usedRows ? payload.usedRows.length : 0));
+    // Prefer the live UniRowFilter meta when it has real data; otherwise
+    // fall back to the payload. Without this fallback, render() can fire
+    // updateUniFilterChrome() before Filter.attach has had a chance to
+    // initialise UniRowFilter, leaving meta.allRows empty and total=0,
+    // which suppresses the banner even when the page payload says the
+    // filter is active.
+    const total = (meta && Array.isArray(meta.allRows) && meta.allRows.length)
+      ? meta.allRows.length
+      : (payload && payload.sourceRowsAll ? payload.sourceRowsAll.length : (payload && payload.allRows ? payload.allRows.length : 0));
+    const showing = (meta && Array.isArray(meta.filteredRows) && meta.filteredRows.length)
+      ? meta.filteredRows.length
+      : (payload && payload.sourceRows ? payload.sourceRows.length : (payload && payload.usedRows ? payload.usedRows.length : 0));
     const varName = (payload && (payload.column || payload.variableName)) || this.variableName || 'Variable';
     const n = payload && payload.values ? payload.values.length : this.sampleSize;
 

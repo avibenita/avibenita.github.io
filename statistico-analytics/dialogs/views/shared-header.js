@@ -2536,7 +2536,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260522u';
+    const v = '20260523m';
     const base = this._uniFilterAssetBase();
     const cssHref = `${base}uni-filter-shared.css?v=${v}`;
     const existingCss = document.querySelector('link[data-uni-filter-shared-css]');
@@ -2660,11 +2660,13 @@ const StatisticoHeader = {
   },
 
   /**
-   * One-click "Clear all filters" — resets the staging criteria, applies
+   * One-click "Clear all filters" — resets the staging criteria, commits
    * the cleared (full) dataset to the page (so the page's onApply
    * handler runs, which in turn updates window.<moduleData>, persists
    * to sessionStorage, and publishes the global row-filter state to
-   * inactive), then closes the filter panel.
+   * inactive), and KEEPS the filter table panel open so the user can
+   * inspect the cleared state and apply new filters without having to
+   * re-open the panel.
    *
    * Replaces the previous UX where "Clear all filters" only reset the
    * staging area and required a separate "Finish & Apply" click — that
@@ -2680,19 +2682,30 @@ const StatisticoHeader = {
         UniRowFilter.clearAll();
       }
       // clearAll resets _columnFilters and rebuilds _filteredRows to
-      // the full _allRows, but does NOT touch _appliedRows. Calling
-      // finishAndClose now commits _filteredRows → _appliedRows and
-      // fires the page's onApply(allRows), which is the single chokepoint
-      // every view (matrix, network, taylor, partial, reliability,
+      // the full _allRows, but does NOT touch _appliedRows. Commit
+      // without closing so _appliedRows = full set and the page's
+      // onApply(allRows) fires — that's the single chokepoint every
+      // view (matrix, network, taylor, partial, reliability,
       // descriptives, regression, ANOVA, PCA, …) routes through to
       // update its own data layer + the global filter state.
-      if (typeof UniRowFilter.finishAndClose === 'function') {
+      if (typeof UniRowFilter.applyWithoutClosing === 'function') {
+        UniRowFilter.applyWithoutClosing();
+      } else if (typeof UniRowFilter.finishAndClose === 'function') {
+        // Older builds without applyWithoutClosing — fall back to
+        // the closing variant so at least the clear takes effect.
         UniRowFilter.finishAndClose();
       }
       // Defensive: even if the page's onApply chain failed for some
       // reason, force the global state to inactive so other modules
       // / views don't resurrect the filter on next load.
       try { this._setGenericRowFilterState(null); } catch (_e) {}
+      // Re-render the filter table so the user sees the now-full row
+      // set straight away (the panel stays open).
+      try {
+        if (typeof UniRowFilter.renderFilterTable === 'function') {
+          UniRowFilter.renderFilterTable();
+        }
+      } catch (_e) {}
       if (typeof this.updateUniFilterChrome === 'function') {
         try { this.updateUniFilterChrome(); } catch (_e) {}
       }

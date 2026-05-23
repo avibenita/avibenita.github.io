@@ -620,14 +620,31 @@
   }
 
   function finishAndClose() {
+    commitFiltered(true);
+  }
+
+  // Internal: commit the current staging state (_filteredRows /
+  // _columnFilters) as the applied state and fire onApply so the
+  // host page updates. When `closeOverlay` is true, also closes the
+  // overlay (legacy "Finish & Apply" behaviour). When false, leaves
+  // the panel open so the user can keep interacting with it (used by
+  // the one-click Clear-all-filters action — clearing should commit
+  // globally without yanking the table away).
+  function commitFiltered(closeOverlay) {
     _appliedRows = cloneRows(_filteredRows);
     _appliedColumnFilters = cloneColumnFilters(_columnFilters);
     _hasPendingChanges = false;
     updateBadge();
     if (typeof _onApply === 'function') _onApply(cloneRows(_appliedRows));
     closeColDropdown();
-    var overlay = document.getElementById('uniFilterOverlay');
-    if (overlay) overlay.classList.remove('sb-ai-overlay--visible');
+    if (closeOverlay) {
+      var overlay = document.getElementById('uniFilterOverlay');
+      if (overlay) overlay.classList.remove('sb-ai-overlay--visible');
+    }
+  }
+
+  function applyWithoutClosing() {
+    commitFiltered(false);
   }
 
   function clearAllFilters() {
@@ -694,10 +711,12 @@
     close: closeFilter,
     clearAll: clearAllFilters,
     finishAndClose: finishAndClose,
+    applyWithoutClosing: applyWithoutClosing,
     getFilteredRows: getFilteredRows,
     getSourceMeta: getSourceMeta,
     hasActiveFilters: hasActiveFilters,
     updateBadge: updateBadge,
+    renderFilterTable: renderFilterTable,
     setFilteredRows: setFilteredRows,
     getColumnFilters: getColumnFilters,
     setColumnFilters: setColumnFilters,

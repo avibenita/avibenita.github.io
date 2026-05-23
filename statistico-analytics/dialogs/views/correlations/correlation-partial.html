@@ -17,7 +17,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260523q"></script>
+  <script src="../shared-header.js?v=20260523r"></script>
 
   <style>
     :root{
@@ -31,7 +31,7 @@
       --text-secondary: rgba(255,255,255,0.92);
       --text-muted:rgba(255,255,255,0.5);
     }
-    /* ג”€ג”€ Light Theme ג”€ג”€ */
+    /* ׳’ג€ג‚¬׳’ג€ג‚¬ Light Theme ׳’ג€ג‚¬׳’ג€ג‚¬ */
     :root[data-theme="light"] {
       --surface-0: #eef0f4;
       --surface-1: #ffffff;
@@ -1089,9 +1089,52 @@
       }
     }
 
-    // Mirror univariate: this view owns its UniRowFilter installation.
+    // Page owns filter install + apply callback. Lean Filter API path with
+    // a legacy fallback so older bundles still work during the rollout.
     function installPartialFilter() {
+      function applyPartialFromFiltered(filteredRows, criteria, sourceHeaders, allRows) {
+        const analysisHeaders = correlationData.headers || sourceHeaders;
+        correlationData.sourceRows = filteredRows;
+        correlationData.columnFilters = criteria;
+        correlationData.rowFilterActive = filteredRows.length < allRows.length;
+        correlationData.data = Filter.projectRows(filteredRows, sourceHeaders, analysisHeaders);
+        window.correlationData = correlationData;
+        try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch (_e) {}
+        variableNames = analysisHeaders;
+        const out = calculateCorrelationMatrixFromData(correlationData.data, analysisHeaders);
+        precomputedCorrelationMatrix = out.correlationMatrix;
+        precomputedNMatrix = out.nMatrix;
+        if (typeof StatisticoHeader !== 'undefined') {
+          StatisticoHeader.sampleSize = filteredRows.length;
+          StatisticoHeader.variableName = analysisHeaders.length + ' Variables';
+          StatisticoHeader.render();
+        }
+        if (typeof generatePartialCorrelationMatrix === 'function') {
+          setTimeout(() => generatePartialCorrelationMatrix(), 50);
+        }
+      }
       try {
+        if (typeof Filter !== 'undefined' && typeof Filter.attach === 'function' && correlationData) {
+          const sourceHeaders = (Array.isArray(correlationData.sourceHeaders) && correlationData.sourceHeaders.length)
+            ? correlationData.sourceHeaders
+            : correlationData.headers;
+          const allRows = (Array.isArray(correlationData.sourceRowsAll) && correlationData.sourceRowsAll.length)
+            ? correlationData.sourceRowsAll
+            : (Array.isArray(correlationData.sourceRows) ? correlationData.sourceRows : []);
+          if (!sourceHeaders || !sourceHeaders.length || !allRows.length) return;
+          Filter.attach({
+            headers: sourceHeaders,
+            rows: allRows,
+            initial: {
+              columnFilters: correlationData.columnFilters,
+              sourceRows: correlationData.sourceRows
+            },
+            onApply: function (filteredRows, criteria) {
+              applyPartialFromFiltered(filteredRows, criteria, sourceHeaders, allRows);
+            }
+          });
+          return;
+        }
         if (typeof StatisticoHeader === 'undefined' ||
             typeof StatisticoHeader.installCorrelationFilter !== 'function') return;
         StatisticoHeader.installCorrelationFilter({
@@ -1755,7 +1798,7 @@
 
     console.log('Partial Correlations Dialog loaded');
   
-    // ג”€ג”€ Light / Dark theme support ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
+    // ׳’ג€ג‚¬׳’ג€ג‚¬ Light / Dark theme support ׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬
     function applyTheme(theme) {
       if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
       else document.documentElement.removeAttribute('data-theme');

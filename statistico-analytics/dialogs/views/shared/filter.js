@@ -214,6 +214,33 @@
     }
   }
 
+  /**
+   * Project a list of source-aligned filtered rows onto a (possibly
+   * narrower) analysis header set, returning an array of objects keyed by
+   * the analysis header names. Useful for modules whose render layer
+   * expects { header: value } rows but whose filter operates on the full
+   * source range. Works for either array-shaped or object-shaped input
+   * rows.
+   */
+  function projectRows(filteredRows, sourceHeaders, analysisHeaders) {
+    if (!Array.isArray(filteredRows) || !Array.isArray(analysisHeaders)) return [];
+    var headerIndex = {};
+    if (Array.isArray(sourceHeaders)) {
+      sourceHeaders.forEach(function (h, i) { headerIndex[h] = i; });
+    }
+    var canProject = analysisHeaders.every(function (h) {
+      return Object.prototype.hasOwnProperty.call(headerIndex, h);
+    });
+    return filteredRows.map(function (row) {
+      var obj = {};
+      analysisHeaders.forEach(function (h, idx) {
+        var i = canProject ? headerIndex[h] : idx;
+        obj[h] = Array.isArray(row) ? row[i] : (row && row[h]);
+      });
+      return obj;
+    });
+  }
+
   global.Filter = {
     attach:       attach,
     clear:        clear,
@@ -222,6 +249,7 @@
     isCompatible: isCompatible,
     open:         open,
     close:        close,
+    projectRows:  projectRows,
     FIELDS:       FILTER_FIELDS.slice()
   };
 })(typeof window !== 'undefined' ? window : this);

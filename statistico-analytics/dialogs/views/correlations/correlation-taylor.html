@@ -12,7 +12,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260523q"></script>
+  <script src="../shared-header.js?v=20260523r"></script>
   
   <style>
     :root {
@@ -28,7 +28,7 @@
       --panel-radius: 10px;
       --panel-shadow: 0 4px 20px rgba(0,0,0,.4);
     }
-    /* ג”€ג”€ Light Theme ג”€ג”€ */
+    /* ׳’ג€ג‚¬׳’ג€ג‚¬ Light Theme ׳’ג€ג‚¬׳’ג€ג‚¬ */
     :root[data-theme="light"] {
       --surface-0: #eef0f4;
       --surface-1: #ffffff;
@@ -3262,7 +3262,46 @@
   }
 
   function installTaylorFilter() {
+    const cd = window.correlationData;
+    function applyFromFiltered(filteredRows, criteria, sourceHeaders, allRows) {
+      const analysisHeaders = cd.headers || sourceHeaders;
+      cd.sourceRows = filteredRows;
+      cd.columnFilters = criteria;
+      cd.rowFilterActive = filteredRows.length < allRows.length;
+      cd.data = Filter.projectRows(filteredRows, sourceHeaders, analysisHeaders);
+      window.correlationData = cd;
+      try { sessionStorage.setItem('correlationData', JSON.stringify(cd)); } catch (_e) {}
+      const payload = buildTaylorPayload(analysisHeaders, cd.data);
+      window.__REAL_TAYLOR_DATA__ = payload;
+      injectDataFromVB6(payload);
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.sampleSize = filteredRows.length;
+        StatisticoHeader.variableName = analysisHeaders.length + ' Variables';
+        StatisticoHeader.render();
+      }
+    }
     try {
+      if (typeof Filter !== 'undefined' && typeof Filter.attach === 'function' && cd) {
+        const sourceHeaders = (Array.isArray(cd.sourceHeaders) && cd.sourceHeaders.length)
+          ? cd.sourceHeaders
+          : cd.headers;
+        const allRows = (Array.isArray(cd.sourceRowsAll) && cd.sourceRowsAll.length)
+          ? cd.sourceRowsAll
+          : (Array.isArray(cd.sourceRows) ? cd.sourceRows : []);
+        if (!sourceHeaders || !sourceHeaders.length || !allRows.length) return;
+        Filter.attach({
+          headers: sourceHeaders,
+          rows: allRows,
+          initial: {
+            columnFilters: cd.columnFilters,
+            sourceRows: cd.sourceRows
+          },
+          onApply: function (filteredRows, criteria) {
+            applyFromFiltered(filteredRows, criteria, sourceHeaders, allRows);
+          }
+        });
+        return;
+      }
       if (typeof StatisticoHeader === 'undefined' ||
           typeof StatisticoHeader.installCorrelationFilter !== 'function') return;
       StatisticoHeader.installCorrelationFilter({
@@ -3296,7 +3335,7 @@
     return payload;
     }
   
-    // ג”€ג”€ Light / Dark theme support ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
+    // ׳’ג€ג‚¬׳’ג€ג‚¬ Light / Dark theme support ׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬
     function applyTheme(theme) {
       if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
       else document.documentElement.removeAttribute('data-theme');

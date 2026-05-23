@@ -22,7 +22,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260523q"></script>
+  <script src="../shared-header.js?v=20260523r"></script>
 
   <style>
     :root {
@@ -40,7 +40,7 @@
       --panel-radius: 10px;
       --panel-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
     }
-    /* ג”€ג”€ Light Theme ג”€ג”€ */
+    /* ׳’ג€ג‚¬׳’ג€ג‚¬ Light Theme ׳’ג€ג‚¬׳’ג€ג‚¬ */
     :root[data-theme="light"] {
       --surface-0: #eef0f4;
       --surface-1: #ffffff;
@@ -712,7 +712,46 @@
     });
 
     function installReliabilityFilter() {
+      const cd = window.correlationData;
+      function applyFromFiltered(filteredRows, criteria, sourceHeaders, allRows) {
+        const analysisHeaders = cd.headers || sourceHeaders;
+        cd.sourceRows = filteredRows;
+        cd.columnFilters = criteria;
+        cd.rowFilterActive = filteredRows.length < allRows.length;
+        cd.data = Filter.projectRows(filteredRows, sourceHeaders, analysisHeaders);
+        window.correlationData = cd;
+        try { sessionStorage.setItem('correlationData', JSON.stringify(cd)); } catch (_e) {}
+        originalRawData = cd.data;
+        const dataArrays = cd.data.map(row => analysisHeaders.map(h => row[h]));
+        if (typeof StatisticoHeader !== 'undefined') {
+          StatisticoHeader.sampleSize = filteredRows.length;
+          StatisticoHeader.variableName = analysisHeaders.length + ' Variables';
+          StatisticoHeader.render();
+        }
+        runReliabilityAnalysis(dataArrays, analysisHeaders);
+      }
       try {
+        if (typeof Filter !== 'undefined' && typeof Filter.attach === 'function' && cd) {
+          const sourceHeaders = (Array.isArray(cd.sourceHeaders) && cd.sourceHeaders.length)
+            ? cd.sourceHeaders
+            : cd.headers;
+          const allRows = (Array.isArray(cd.sourceRowsAll) && cd.sourceRowsAll.length)
+            ? cd.sourceRowsAll
+            : (Array.isArray(cd.sourceRows) ? cd.sourceRows : []);
+          if (!sourceHeaders || !sourceHeaders.length || !allRows.length) return;
+          Filter.attach({
+            headers: sourceHeaders,
+            rows: allRows,
+            initial: {
+              columnFilters: cd.columnFilters,
+              sourceRows: cd.sourceRows
+            },
+            onApply: function (filteredRows, criteria) {
+              applyFromFiltered(filteredRows, criteria, sourceHeaders, allRows);
+            }
+          });
+          return;
+        }
         if (typeof StatisticoHeader === 'undefined' ||
             typeof StatisticoHeader.installCorrelationFilter !== 'function') return;
         StatisticoHeader.installCorrelationFilter({
@@ -907,7 +946,7 @@
       document.getElementById('mainContainer').style.display = 'flex';
       
       // Update header (init was already called early in Office.onReady so
-      // the row-filter assets are loaded by now ג€” re-init here would race
+      // the row-filter assets are loaded by now ׳’ג‚¬ג€ re-init here would race
       // with installReliabilityFilter and silently revert UniRowFilter to
       // the unfiltered dataset).
       try {
@@ -1378,7 +1417,7 @@
       // PCA chart is now embedded inline; no button/modal needed
     });
   
-    // ג”€ג”€ Light / Dark theme support ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
+    // ׳’ג€ג‚¬׳’ג€ג‚¬ Light / Dark theme support ׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬׳’ג€ג‚¬
     function applyTheme(theme) {
       if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
       else document.documentElement.removeAttribute('data-theme');

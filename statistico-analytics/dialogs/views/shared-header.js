@@ -2546,7 +2546,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260523q';
+    const v = '20260523r';
     const base = this._uniFilterAssetBase();
     const cssHref = `${base}uni-filter-shared.css?v=${v}`;
     const existingCss = document.querySelector('link[data-uni-filter-shared-css]');

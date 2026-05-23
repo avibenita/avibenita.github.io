@@ -3662,6 +3662,12 @@ const StatisticoHeader = {
       if (!data || !data.headers || !(data.allRows || data.sourceRowsAll)) return;
       if (typeof UniRowFilter === 'undefined') return;
       const allRows = data.allRows || data.sourceRowsAll;
+      const dataUsedRows = Array.isArray(data.usedRows) ? data.usedRows
+        : (Array.isArray(data.sourceRows) ? data.sourceRows : null);
+      const dataIsFiltered = !!data.rowFilterActive || (
+        Array.isArray(dataUsedRows) && Array.isArray(allRows) &&
+        dataUsedRows.length > 0 && dataUsedRows.length < allRows.length
+      );
       const existing = this._getGenericRowFilterState();
       const canReuseState = this._isHeaderRowFilterStateCompatible(existing, data.headers);
       UniRowFilter.init({
@@ -3670,7 +3676,16 @@ const StatisticoHeader = {
         columnIndex: 0,
         onApply: (rows) => this.publishHeaderRowFilterChange(rows)
       });
-      if (canReuseState && existing.rowFilterActive && existing.usedRows && UniRowFilter.setFilteredRows) {
+      // Restore the filter UI to reflect the active filtered dataset.
+      // Prefer the page's own data (correlationData.sourceRows) over the
+      // generic compact state, which may not have stored full usedRows
+      // (compact-by-design to avoid freezes on large datasets).
+      if (dataIsFiltered && Array.isArray(dataUsedRows) && UniRowFilter.setFilteredRows) {
+        if (canReuseState && existing.columnFilters && UniRowFilter.setColumnFilters) {
+          UniRowFilter.setColumnFilters(existing.columnFilters, true);
+        }
+        UniRowFilter.setFilteredRows(dataUsedRows);
+      } else if (canReuseState && existing.rowFilterActive && existing.usedRows && UniRowFilter.setFilteredRows) {
         if (existing.columnFilters && UniRowFilter.setColumnFilters) UniRowFilter.setColumnFilters(existing.columnFilters, true);
         UniRowFilter.setFilteredRows(this._resolveFilteredRowsForState(data.headers, allRows, existing).rows);
       }

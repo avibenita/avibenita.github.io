@@ -55,7 +55,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260523c"></script>
+  <script src="../shared-header.js?v=20260523d"></script>
 
   <style>
     /* ── Variables ── */
@@ -1503,9 +1503,20 @@
       columnIndex: 0,
       onApply: rebuildCorrelationFromSourceRows
     });
+    // Re-apply the persisted filter (correlationData.sourceRows) so the
+    // filter UI / badge / panel stay coherent with the rendered matrix
+    // across page reloads and inter-view navigation.
+    const usedRows = Array.isArray(correlationData.sourceRows) ? correlationData.sourceRows : null;
+    const isFiltered = !!correlationData.rowFilterActive ||
+      (usedRows && usedRows.length > 0 && usedRows.length < allRows.length);
+    if (isFiltered && usedRows && typeof UniRowFilter.setFilteredRows === 'function') {
+      UniRowFilter.setFilteredRows(usedRows);
+    }
     console.warn('[CORR] UniRowFilter installed with direct onApply', {
       headers: sourceHeaders.length,
-      rows: allRows.length
+      rows: allRows.length,
+      restoredFilter: !!isFiltered,
+      usedRows: usedRows ? usedRows.length : null
     });
     if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader.updateUniFilterChrome === 'function') {
       try { StatisticoHeader.updateUniFilterChrome(); } catch (_e) {}
@@ -2658,7 +2669,9 @@
           sourceRows: usedRows,
           fullRange,
           usedRange,
-          columnRoles: null,   // all variables are symmetric in correlation
+          rowFilterActive: !!correlationData.rowFilterActive ||
+            (Array.isArray(allRows) && Array.isArray(usedRows) && usedRows.length > 0 && usedRows.length < allRows.length),
+          columnRoles: null,
           analysisHeaders
         };
       },

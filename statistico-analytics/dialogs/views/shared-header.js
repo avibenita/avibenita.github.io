@@ -4158,13 +4158,17 @@ const StatisticoHeader = {
       alert(`Row filtering needs source rows from the workbook range.\n\nRun ${moduleName} with a selected range, then use Filter.`);
       return;
     }
-    // If a view (univariate or correlations via installCorrelationFilter)
-    // has already wired UniRowFilter with its own onApply, do NOT re-init
-    // here — that would clobber the page's onApply and reset _appliedRows
-    // back to the full dataset. Mirrors univariate's open() flow.
+    // If a view (e.g. histogram via its own UniRowFilter.init, or any
+    // correlation view via installCorrelationFilter) has already wired
+    // UniRowFilter with rows + onApply, do NOT re-init here — that would
+    // clobber the page's onApply and reset _appliedRows back to the
+    // full dataset. But if UniRowFilter is empty (most univariate views
+    // don't wire it themselves and the boot-time storage init may have
+    // run before loadData arrived), re-run the storage-driven init now
+    // so the panel actually has rows to display.
     const meta = (typeof UniRowFilter.getSourceMeta === 'function') ? UniRowFilter.getSourceMeta() : null;
     const alreadyWired = !!(meta && Array.isArray(meta.allRows) && meta.allRows.length);
-    if (this.module !== 'univariate' && !alreadyWired) {
+    if (!alreadyWired) {
       this._initUniRowFilterFromStorage();
     }
     this._ensureUniFilterOverlay();

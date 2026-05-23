@@ -17,7 +17,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260523c"></script>
+  <script src="../shared-header.js?v=20260523f"></script>
 
   <style>
     :root{
@@ -1086,6 +1086,28 @@
         console.error('Error parsing message:', error);
       }
     }
+
+    // Re-render when a header-driven filter updates correlationData.
+    document.addEventListener('statistico-correlation-data-changed', function(e) {
+      try {
+        const next = e && e.detail && e.detail.correlationData;
+        if (!next) return;
+        correlationData = next;
+        const { headers, data } = correlationData;
+        variableNames = headers;
+        const { correlationMatrix, nMatrix } = calculateCorrelationMatrixFromData(data, headers);
+        precomputedCorrelationMatrix = correlationMatrix;
+        precomputedNMatrix = nMatrix;
+        if (typeof StatisticoHeader !== 'undefined') {
+          StatisticoHeader.sampleSize = data ? data.length : 0;
+          StatisticoHeader.variableName = `${headers.length} Variables`;
+          StatisticoHeader.render();
+        }
+        if (typeof generatePartialCorrelationMatrix === 'function') {
+          setTimeout(() => generatePartialCorrelationMatrix(), 50);
+        }
+      } catch (err) { console.warn('Partial filter re-render failed:', err); }
+    });
 
     /**
      * Calculate correlation matrix from raw data

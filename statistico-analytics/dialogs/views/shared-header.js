@@ -2934,13 +2934,64 @@ const StatisticoHeader = {
     try { localStorage.removeItem(this._rowFilterStorageKey(moduleName)); } catch (_e) {}
   },
 
+  /**
+   * Build a row-filter "result" object from the persisted correlationData
+   * in sessionStorage. Used as a fallback for correlation child views
+   * (Network / Taylor / Partial / Reliability / Descriptives) that don't
+   * own the matrix's full getData() registration but still need the
+   * filter UI (badge, column highlighting, Clear, panel restoration) to
+   * reflect the active filter.
+   */
+  _getCorrelationRowFilterDataFromStorage() {
+    try {
+      const raw = sessionStorage.getItem('correlationData');
+      if (!raw) return null;
+      const cd = JSON.parse(raw);
+      if (!cd || typeof cd !== 'object') return null;
+      const sourceHeaders = (Array.isArray(cd.sourceHeaders) && cd.sourceHeaders.length)
+        ? cd.sourceHeaders.slice()
+        : (Array.isArray(cd.headers) ? cd.headers.slice() : null);
+      const sourceRowsAll = Array.isArray(cd.sourceRowsAll) && cd.sourceRowsAll.length
+        ? cd.sourceRowsAll
+        : null;
+      const sourceRows = Array.isArray(cd.sourceRows) ? cd.sourceRows : null;
+      if (!sourceHeaders || !sourceRowsAll) return null;
+      const allRows = sourceRowsAll.map((r) => Array.isArray(r) ? r.slice() : r);
+      const usedRows = (sourceRows && sourceRows.length)
+        ? sourceRows.map((r) => Array.isArray(r) ? r.slice() : r)
+        : allRows.map((r) => Array.isArray(r) ? r.slice() : r);
+      const rowFilterActive = !!cd.rowFilterActive ||
+        (usedRows.length > 0 && usedRows.length < allRows.length);
+      return {
+        headers: sourceHeaders,
+        allRows,
+        usedRows,
+        sourceHeaders,
+        sourceRowsAll: allRows,
+        sourceRows: usedRows,
+        rowFilterActive
+      };
+    } catch (_e) {
+      return null;
+    }
+  },
+
   _getHeaderRowFilterData() {
     if (this.module === 'univariate') return this._getUniStored();
     try {
       const actions = this._pendingActions || {};
-      if (typeof actions.getData !== 'function') return null;
       let result = null;
-      try { result = actions.getData(); } catch (_e) { result = null; }
+      if (typeof actions.getData === 'function') {
+        try { result = actions.getData(); } catch (_e) { result = null; }
+      }
+      // Fallback for correlation child views (Network / Taylor / Partial /
+      // Reliability / Descriptives) that don't register a getData action:
+      // read the persisted correlationData from sessionStorage so the
+      // shared filter UI can still show badge / blue column / Clear, and
+      // restore the active filter on panel re-open.
+      if ((!result || typeof result !== 'object') && this.module === 'correlations') {
+        result = this._getCorrelationRowFilterDataFromStorage();
+      }
       if (!result || typeof result !== 'object') return null;
       const sourceHeaders = Array.isArray(result.sourceHeaders) && result.sourceHeaders.length
         ? result.sourceHeaders
@@ -2999,6 +3050,85 @@ const StatisticoHeader = {
       console.warn('Row filter data unavailable:', e);
       return null;
     }
+  },
+
+  /**
+   * Auto-rebuild correlationData in sessionStorage from a filter payload
+   * dispatched by UniRowFilter. Mirrors the matrix's
+   * rebuildCorrelationFromSourceRows() logic but lives in shared-header
+   * so non-matrix correlation views inherit the same behaviour without
+   * having to register onFilterRows themselves.
+   *
+   * Dispatches `statistico-correlation-data-changed` so views that want
+   * to live-refresh on filter change can listen for it.
+   */
+  _autoRebuildCorrelationDataFromFilter(payload) {
+    if (!payload || !Array.isArray(payload.usedRows)) return;
+    let cd = null;
+    try { cd = JSON.parse(sessionStorage.getItem('correlationData') || 'null'); } catch (_e) {}
+    if (!cd || typeof cd !== 'object') {
+      cd = (typeof window !== 'undefined' && window.correlationData) ? window.correlationData : null;
+    }
+    if (!cd || !Array.isArray(cd.headers) || !cd.headers.length) return;
+
+    const sourceHeaders = (Array.isArray(cd.sourceHeaders) && cd.sourceHeaders.length)
+      ? cd.sourceHeaders.slice()
+      : (Array.isArray(payload.sourceHeaders) && payload.sourceHeaders.length
+        ? payload.sourceHeaders.slice()
+        : (Array.isArray(payload.headers) ? payload.headers.slice() : cd.headers.slice()));
+    const analysisHeaders = cd.headers.slice();
+    const headerIndex = {};
+    sourceHeaders.forEach((h, i) => { headerIndex[h] = i; });
+    const canProject = analysisHeaders.every((h) => Object.prototype.hasOwnProperty.call(headerIndex, h));
+    const usedRows = payload.usedRows.map((r) => Array.isArray(r) ? r.slice() : r);
+    const allRows = (Array.isArray(payload.allRows) && payload.allRows.length
+      ? payload.allRows
+      : (Array.isArray(cd.sourceRowsAll) ? cd.sourceRowsAll : usedRows)
+    ).map((r) => Array.isArray(r) ? r.slice() : r);
+
+    const projectedData = canProject
+      ? usedRows.map((row) => {
+        const obj = {};
+        analysisHeaders.forEach((h) => {
+          obj[h] = Array.isArray(row) ? row[headerIndex[h]] : (row && row[h]);
+        });
+        return obj;
+      })
+      : usedRows.map((row) => {
+        const obj = {};
+        analysisHeaders.forEach((h, idx) => {
+          obj[h] = Array.isArray(row) ? row[idx] : (row && row[h]);
+        });
+        return obj;
+      });
+    const isFiltered = usedRows.length !== allRows.length;
+
+    const next = {
+      ...cd,
+      headers: analysisHeaders,
+      data: projectedData,
+      sourceHeaders,
+      sourceRowsAll: allRows,
+      sourceRows: usedRows,
+      rowFilterActive: isFiltered
+    };
+    if (typeof window !== 'undefined') window.correlationData = next;
+    try { sessionStorage.setItem('correlationData', JSON.stringify(next)); } catch (_e) {}
+
+    try {
+      document.dispatchEvent(new CustomEvent('statistico-correlation-data-changed', {
+        detail: { correlationData: next, rowFilterActive: isFiltered, usedRows: usedRows.length, allRows: allRows.length }
+      }));
+    } catch (_e) {}
+
+    console.warn('[ROWFILTER][autoRebuild]', {
+      analysisHeaders: analysisHeaders.length,
+      sourceHeaders: sourceHeaders.length,
+      allRows: allRows.length,
+      usedRows: usedRows.length,
+      rowFilterActive: isFiltered,
+      canProject
+    });
   },
 
   _applyGenericHeaderRowFilterFallback(payload) {
@@ -3596,6 +3726,14 @@ const StatisticoHeader = {
         });
         handler(payload);
       } catch (e) { console.warn('Row filter handler failed:', e); }
+    } else if (this.module === 'correlations') {
+      // Non-matrix correlation views (Network / Taylor / Partial /
+      // Reliability / Descriptives) don't register an onFilterRows
+      // handler. Auto-rebuild correlationData in sessionStorage so the
+      // shared filter UI stays coherent and dispatch a custom event so
+      // the page can re-render itself.
+      console.warn('[ROWFILTER][handler] using correlation auto-rebuild fallback', { module: this.module });
+      this._autoRebuildCorrelationDataFromFilter(payload);
     } else {
       console.warn('[ROWFILTER][handler] using generic fallback', { module: this.module });
       this._applyGenericHeaderRowFilterFallback(payload);

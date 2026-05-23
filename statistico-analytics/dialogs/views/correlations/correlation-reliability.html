@@ -22,7 +22,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260523c"></script>
+  <script src="../shared-header.js?v=20260523f"></script>
 
   <style>
     :root {
@@ -687,6 +687,17 @@
       setTimeout(() => {
         if (!storedCorr) checkLocalStorage();
       }, 500);
+
+      // Re-run reliability when a filter updates correlationData.
+      document.addEventListener('statistico-correlation-data-changed', function(e) {
+        try {
+          const next = e && e.detail && e.detail.correlationData;
+          if (!next || !Array.isArray(next.headers) || !Array.isArray(next.data)) return;
+          originalRawData = next.data;
+          const dataArrays = next.data.map(row => next.headers.map(h => row[h]));
+          runReliabilityAnalysis(dataArrays, next.headers);
+        } catch (err) { console.warn('Reliability filter re-render failed:', err); }
+      });
     });
 
     function checkLocalStorage() {

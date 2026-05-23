@@ -12,7 +12,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260523c"></script>
+  <script src="../shared-header.js?v=20260523f"></script>
   
   <style>
     :root {
@@ -3256,6 +3256,23 @@
       console.error('Error parsing message:', error);
     }
   }
+
+  // Re-render when a filter applied from the shared header updates
+  // correlationData in sessionStorage.
+  document.addEventListener('statistico-correlation-data-changed', function(e) {
+    try {
+      const next = e && e.detail && e.detail.correlationData;
+      if (!next || !Array.isArray(next.headers) || !Array.isArray(next.data)) return;
+      const payload = buildTaylorPayload(next.headers, next.data);
+      window.__REAL_TAYLOR_DATA__ = payload;
+      injectDataFromVB6(payload);
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.sampleSize = next.data.length;
+        StatisticoHeader.variableName = `${next.headers.length} Variables`;
+        StatisticoHeader.render();
+      }
+    } catch (err) { console.warn('Taylor filter re-render failed:', err); }
+  });
 
   function buildTaylorPayload(headers, rows) {
     const payload = {};

@@ -2519,8 +2519,18 @@ const StatisticoHeader = {
         this._ensureUniFilterOverlay();
         this._ensureUniFilterHelpOverlay();
         this._ensureUniFilterInHeader();
-        this._initUniRowFilterFromStorage();
-        this._installUniFilterChangeListener();
+        // Only run the storage-driven init the FIRST time UniRowFilter is
+        // wired up. Re-running it on every header render() races with
+        // finishAndClose: it resets _appliedRows back to the full dataset,
+        // which would silently revert filters in correlations / regression /
+        // ANOVA / etc. Subsequent boots only refresh chrome.
+        if (!this._uniFilterBootstrapped) {
+          this._initUniRowFilterFromStorage();
+          this._installUniFilterChangeListener();
+          this._uniFilterBootstrapped = true;
+        } else {
+          this._ensureUniFilterInHeader();
+        }
       } catch (e) {
         console.warn('Row filter bootstrap deferred:', e);
       }
@@ -2535,6 +2545,7 @@ const StatisticoHeader = {
       boot();
       return;
     }
+    this._uniFilterBootstrapped = false;
     if (existingScript && existingScript.parentNode) existingScript.parentNode.removeChild(existingScript);
     const s = document.createElement('script');
     s.src = scriptSrc;
@@ -2616,27 +2627,25 @@ const StatisticoHeader = {
     try {
       if (typeof UniRowFilter === 'undefined' || typeof UniRowFilter.finishAndClose !== 'function') return;
       const metaBefore = (typeof UniRowFilter.getSourceMeta === 'function') ? UniRowFilter.getSourceMeta() : null;
+      // Snapshot the filtered rows BEFORE finishAndClose, since the apply
+      // path may trigger a render that re-initialises UniRowFilter and
+      // clobbers _appliedRows back to the full dataset (race observed in
+      // correlations).
+      const filteredSnapshot = (typeof UniRowFilter.getSourceMeta === 'function')
+        ? (metaBefore && Array.isArray(metaBefore.filteredRows) ? metaBefore.filteredRows.slice() : null)
+        : null;
       UniRowFilter.finishAndClose();
       try {
-        const metaAfter = (typeof UniRowFilter.getSourceMeta === 'function') ? UniRowFilter.getSourceMeta() : null;
-        const total = metaAfter && Array.isArray(metaAfter.allRows) ? metaAfter.allRows.length : (metaBefore && Array.isArray(metaBefore.allRows) ? metaBefore.allRows.length : 0);
-        const shown = metaAfter && Array.isArray(metaAfter.filteredRows) ? metaAfter.filteredRows.length : 0;
+        const total = metaBefore && Array.isArray(metaBefore.allRows) ? metaBefore.allRows.length : 0;
+        const shown = filteredSnapshot ? filteredSnapshot.length : 0;
         this._showRowFilterToast(shown, total);
       } catch (_e) {}
-      // Fallback for runtime variants where UniRowFilter.onApply does not propagate.
-      // Correlations require explicit publish to keep filtered dataset coherent.
-      if (this.module !== 'univariate' &&
-          typeof UniRowFilter.getFilteredRows === 'function' &&
-          typeof this.publishHeaderRowFilterChange === 'function') {
-        const rows = UniRowFilter.getFilteredRows();
-        if (Array.isArray(rows)) {
-          console.warn('[ROWFILTER][fallback-apply]', {
-            module: this.module,
-            rows: rows.length
-          });
-          this.publishHeaderRowFilterChange(rows);
-        }
-      }
+      // NOTE: We deliberately do NOT re-publish here. `finishAndClose` already
+      // invoked `_onApply` synchronously, which routes through whichever
+      // handler the module installed (publishHeaderRowFilterChange for
+      // correlations, publishUniFilterChange for univariate). A second publish
+      // here used to race against re-init inside render() and reverted
+      // correlations to the full dataset.
     } catch (e) {
       console.warn('applyUniRowFilterAndClose failed:', e);
     }

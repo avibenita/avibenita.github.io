@@ -55,7 +55,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260523d"></script>
+  <script src="../shared-header.js?v=20260523e"></script>
 
   <style>
     /* ── Variables ── */
@@ -1604,9 +1604,12 @@
         renderMatrix();
         return;
       }
-      // Prefer fresh data from parent; storage is fallback only.
-      try { sessionStorage.removeItem('correlationData'); } catch (_e) {}
-      try { sessionStorage.removeItem('correlationResults'); } catch (_e) {}
+      // Try sessionStorage FIRST so a previously-filtered analysis survives
+      // page refresh / inter-view navigation. If parent later sends a fresh
+      // CORRELATION_DATA payload, shouldAcceptCorrelationPayload() will
+      // either accept (matching headers, no active local filter) or decline
+      // (active local filter), so we don't lose user state.
+      tryLoadStoredCorrelationData();
       requestCorrelationDataFromParent();
       setTimeout(() => { if (!correlationData) requestCorrelationDataFromParent(); }, 500);
       setTimeout(() => { if (!correlationData && !tryLoadStoredCorrelationData()) showCorrelationLoadError('Still waiting for correlation data. Re-run the correlation analysis or switch back from the source view.'); }, 6000);
@@ -1623,9 +1626,10 @@
         registerHeaderActions();
       }
 
-      // Prefer fresh data from parent; storage is fallback only.
-      try { sessionStorage.removeItem('correlationData'); } catch (_e) {}
-      try { sessionStorage.removeItem('correlationResults'); } catch (_e) {}
+      // Try sessionStorage FIRST so previously-filtered state survives a
+      // refresh. shouldAcceptCorrelationPayload() will decline parent's
+      // unfiltered payload when local has an active filter.
+      tryLoadStoredCorrelationData();
 
       Office.context.ui.addHandlerAsync(
         Office.EventType.DialogParentMessageReceived,

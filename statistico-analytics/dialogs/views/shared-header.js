@@ -2966,8 +2966,24 @@ const StatisticoHeader = {
       const resolved = canReuseState
         ? this._resolveFilteredRowsForState(headers, allRows, state)
         : { rows: this._normalizeRowFilterRows(result.sourceRows || result.usedRows || allRows, headers), active: !!result.rowFilterActive };
-      const usedRows = resolved.rows;
-      const rowFilterActive = resolved.active;
+      let usedRows = resolved.rows;
+      let rowFilterActive = resolved.active;
+
+      // Compact generic state stores neither usedRows nor reproducible
+      // criteria, so canReuseState may resolve to "all rows / inactive"
+      // even when the page (e.g. correlation matrix) holds a real
+      // filtered subset. Trust the page's own getData() output in that
+      // case — it is the authoritative source of truth.
+      if (!rowFilterActive) {
+        const liveUsedRows = this._normalizeRowFilterRows(result.sourceRows || result.usedRows || [], headers);
+        if (liveUsedRows.length > 0 && liveUsedRows.length < allRows.length) {
+          usedRows = liveUsedRows;
+          rowFilterActive = true;
+        } else if (result.rowFilterActive && liveUsedRows.length > 0) {
+          usedRows = liveUsedRows;
+          rowFilterActive = true;
+        }
+      }
 
       return {
         ...result,
@@ -3680,6 +3696,15 @@ const StatisticoHeader = {
       // Prefer the page's own data (correlationData.sourceRows) over the
       // generic compact state, which may not have stored full usedRows
       // (compact-by-design to avoid freezes on large datasets).
+      console.warn('[ROWFILTER][initFromStorage]', {
+        module: this.module,
+        headers: Array.isArray(data.headers) ? data.headers.length : 0,
+        allRows: Array.isArray(allRows) ? allRows.length : 0,
+        dataUsedRows: Array.isArray(dataUsedRows) ? dataUsedRows.length : null,
+        dataIsFiltered,
+        canReuseState,
+        existingActive: !!(existing && existing.rowFilterActive)
+      });
       if (dataIsFiltered && Array.isArray(dataUsedRows) && UniRowFilter.setFilteredRows) {
         if (canReuseState && existing.columnFilters && UniRowFilter.setColumnFilters) {
           UniRowFilter.setColumnFilters(existing.columnFilters, true);

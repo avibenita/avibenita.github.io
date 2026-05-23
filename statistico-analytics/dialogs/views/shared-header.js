@@ -2546,7 +2546,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260523p';
+    const v = '20260523q';
     const base = this._uniFilterAssetBase();
     const cssHref = `${base}uni-filter-shared.css?v=${v}`;
     const existingCss = document.querySelector('link[data-uni-filter-shared-css]');
@@ -2560,11 +2560,30 @@ const StatisticoHeader = {
       existingCss.setAttribute('href', cssHref);
     }
     const scriptSrc = `${base}uni-row-filter.js?v=${v}`;
+    const filterApiSrc = `${base}filter.js?v=${v}`;
+
+    // Load the new lean Filter API alongside the legacy stack. It has no
+    // side effects — just exposes window.Filter — so it's safe to load
+    // additively. Pages that haven't migrated yet keep using the old
+    // installCorrelationFilter / _initUniRowFilterFromStorage paths.
+    const ensureFilterApi = () => {
+      const existing = document.querySelector('script[data-filter-api]');
+      const needs = !window.Filter || !existing ||
+        String(existing.getAttribute('src') || '').indexOf('/dialogs/views/shared/filter.js') < 0;
+      if (!needs) return;
+      if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      const fs = document.createElement('script');
+      fs.src = filterApiSrc;
+      fs.setAttribute('data-filter-api', '1');
+      document.head.appendChild(fs);
+    };
+
     const boot = () => {
       try {
         this._ensureUniFilterOverlay();
         this._ensureUniFilterHelpOverlay();
         this._ensureUniFilterInHeader();
+        ensureFilterApi();
         // Only run the storage-driven init the FIRST time UniRowFilter is
         // wired up. Re-running it on every header render() races with
         // finishAndClose: it resets _appliedRows back to the full dataset,

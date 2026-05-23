@@ -2616,7 +2616,7 @@ const StatisticoHeader = {
       '</ol>',
       '</div>',
       '<div class="uni-filt-toolbar"><div class="uni-filt-summary" id="uniFilterSummary">Filter rows from the workbook range.</div>',
-      '<button type="button" class="uni-filt-clear-btn" onclick="UniRowFilter.clearAll()">Clear all filters</button></div>',
+      '<button type="button" class="uni-filt-clear-btn" onclick="StatisticoHeader.clearAllRowFiltersAndApply()">Clear all filters</button></div>',
       '<div id="uniFilterContent" style="overflow:auto;flex:1;min-height:0;max-height:none;border:1px solid rgba(148,163,184,.25);border-radius:8px;"></div>',
       '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">',
       '<button type="button" onclick="UniRowFilter.close()" style="padding:7px 12px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--text-secondary);font-size:12px;font-weight:600;cursor:pointer;">Exit</button>',
@@ -2657,6 +2657,48 @@ const StatisticoHeader = {
     if (e && e.target && e.target.id !== 'uniFilterHelpOverlay') return;
     const o = document.getElementById('uniFilterHelpOverlay');
     if (o) o.classList.remove('sb-ai-overlay--visible');
+  },
+
+  /**
+   * One-click "Clear all filters" — resets the staging criteria, applies
+   * the cleared (full) dataset to the page (so the page's onApply
+   * handler runs, which in turn updates window.<moduleData>, persists
+   * to sessionStorage, and publishes the global row-filter state to
+   * inactive), then closes the filter panel.
+   *
+   * Replaces the previous UX where "Clear all filters" only reset the
+   * staging area and required a separate "Finish & Apply" click — that
+   * extra step was easy to miss and caused the filter to look cleared
+   * locally while the rest of the session still saw it active. With
+   * this single action the rule "filter from any view, clear from any
+   * view" holds: clearing is symmetric to filtering.
+   */
+  clearAllRowFiltersAndApply() {
+    try {
+      if (typeof UniRowFilter === 'undefined') return;
+      if (typeof UniRowFilter.clearAll === 'function') {
+        UniRowFilter.clearAll();
+      }
+      // clearAll resets _columnFilters and rebuilds _filteredRows to
+      // the full _allRows, but does NOT touch _appliedRows. Calling
+      // finishAndClose now commits _filteredRows → _appliedRows and
+      // fires the page's onApply(allRows), which is the single chokepoint
+      // every view (matrix, network, taylor, partial, reliability,
+      // descriptives, regression, ANOVA, PCA, …) routes through to
+      // update its own data layer + the global filter state.
+      if (typeof UniRowFilter.finishAndClose === 'function') {
+        UniRowFilter.finishAndClose();
+      }
+      // Defensive: even if the page's onApply chain failed for some
+      // reason, force the global state to inactive so other modules
+      // / views don't resurrect the filter on next load.
+      try { this._setGenericRowFilterState(null); } catch (_e) {}
+      if (typeof this.updateUniFilterChrome === 'function') {
+        try { this.updateUniFilterChrome(); } catch (_e) {}
+      }
+    } catch (e) {
+      console.warn('clearAllRowFiltersAndApply failed:', e);
+    }
   },
 
   applyUniRowFilterAndClose() {

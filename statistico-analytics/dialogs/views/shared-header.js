@@ -3512,6 +3512,14 @@ const StatisticoHeader = {
   _applyActiveRowFilterToPayload(payload, moduleName) {
     if (!payload || typeof payload !== 'object') return payload;
     if (!moduleName) return payload;
+    // The page can assert "this payload is already in the unfiltered
+    // state" by setting `rowFilterActive: false` explicitly. This is
+    // exactly what the Clear-all-filters → Finish & Apply flow does,
+    // and we MUST honour it: otherwise the storage interceptor (which
+    // fires on setItem before publishHeaderRowFilterChange has a chance
+    // to flip the global state to inactive) would re-apply the old
+    // criteria and silently resurrect the filter the user just cleared.
+    if (payload.rowFilterActive === false) return payload;
     if ((moduleName || this.module) === 'univariate') {
       return this._applyActiveRowFilterToUnivariatePayload(payload);
     }

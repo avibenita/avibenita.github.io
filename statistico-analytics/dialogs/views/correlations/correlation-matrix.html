@@ -55,7 +55,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260523a"></script>
+  <script src="../shared-header.js?v=20260523b"></script>
 
   <style>
     /* ── Variables ── */
@@ -1363,6 +1363,10 @@
     window.correlationData = correlationData;
     try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch(e) {}
     renderMatrix();
+    // Defer so shared-header asset bootstrap (which itself runs UniRowFilter.init)
+    // finishes first; we then re-init with our own onApply, mirroring univariate.
+    setTimeout(installCorrelationRowFilter, 250);
+    setTimeout(installCorrelationRowFilter, 800);
     return true;
   }
 
@@ -1405,65 +1409,65 @@
       `<p>${message || 'No correlation data available.'}</p>`;
   }
 
-  function applyCorrelationRowFilter(filterPayload) {
-    if (!filterPayload || !filterPayload.headers || !filterPayload.usedRows) return;
-    console.warn('[CORR][applyCorrelationRowFilter] received payload', {
-      headers: Array.isArray(filterPayload.headers) ? filterPayload.headers.length : 0,
-      usedRows: Array.isArray(filterPayload.usedRows) ? filterPayload.usedRows.length : 0,
-      sourceRowsAll: Array.isArray(filterPayload.sourceRowsAll) ? filterPayload.sourceRowsAll.length : 0,
-      allRows: Array.isArray(filterPayload.allRows) ? filterPayload.allRows.length : 0,
-      rowFilterActive: !!filterPayload.rowFilterActive
-    });
-    const sourceHeaders = filterPayload.headers.slice();
-    const analysisHeaders = (correlationData && Array.isArray(correlationData.headers) && correlationData.headers.length)
+  /* ────────────────────────────────────────────────────────────────
+     Direct rebuild from filtered source rows (mirrors univariate's
+     `rebuildFromSourceRows` flow).  Called as `UniRowFilter.onApply`.
+  ──────────────────────────────────────────────────────────────── */
+  function rebuildCorrelationFromSourceRows(filteredRows) {
+    if (!correlationData) return;
+    const sourceHeaders = (Array.isArray(correlationData.sourceHeaders) && correlationData.sourceHeaders.length)
+      ? correlationData.sourceHeaders.slice()
+      : (Array.isArray(correlationData.headers) ? correlationData.headers.slice() : []);
+    const analysisHeaders = (Array.isArray(correlationData.headers) && correlationData.headers.length)
       ? correlationData.headers.slice()
       : sourceHeaders.slice();
+    if (!sourceHeaders.length || !analysisHeaders.length) return;
+
+    const allRows = Array.isArray(correlationData.sourceRowsAll) && correlationData.sourceRowsAll.length
+      ? correlationData.sourceRowsAll
+      : (Array.isArray(filteredRows) ? filteredRows : []);
+    const usedRowsRaw = Array.isArray(filteredRows) ? filteredRows : [];
+
     const headerIndex = {};
     sourceHeaders.forEach((h, i) => { headerIndex[h] = i; });
     const canProject = analysisHeaders.every((h) => Object.prototype.hasOwnProperty.call(headerIndex, h));
     const analysisIndexes = canProject ? analysisHeaders.map((h) => headerIndex[h]) : [];
-    const usedRowsRaw = Array.isArray(filterPayload.usedRows) ? filterPayload.usedRows : [];
-    const allRowsRaw = Array.isArray(filterPayload.sourceRowsAll || filterPayload.allRows) ? (filterPayload.sourceRowsAll || filterPayload.allRows) : null;
+
     const expectedWidth = sourceHeaders.length;
     const alignmentOffset = canProject ? bestRowOffsetForHeaders(usedRowsRaw, expectedWidth, analysisIndexes) : 0;
     const usedRowsAligned = normalizeRowsToHeaderWidth(usedRowsRaw, expectedWidth, alignmentOffset);
-    const allRowsAligned = allRowsRaw ? normalizeRowsToHeaderWidth(allRowsRaw, expectedWidth, alignmentOffset) : null;
+    const allRowsAligned = normalizeRowsToHeaderWidth(allRows, expectedWidth, alignmentOffset);
+
     const projectedRows = canProject
       ? usedRowsAligned.map((row) => analysisHeaders.map((h) => Array.isArray(row) ? row[headerIndex[h]] : (row && row[h])))
-      : usedRowsAligned;
+      : usedRowsAligned.map((r) => Array.isArray(r) ? r.slice() : r);
     const projectedHeaders = canProject ? analysisHeaders : sourceHeaders;
-    const filteredData = rowsToCorrelationObjects(projectedHeaders, projectedRows);
-    const numericData = toNumericRows(filteredData, projectedHeaders);
-    const firstProjected = projectedRows && projectedRows.length ? projectedRows[0] : null;
-    const numericCoverage = projectedHeaders.reduce((acc, h) => {
-      const count = numericData.reduce((c, row) => c + (Number.isFinite(row[h]) ? 1 : 0), 0);
-      acc[h] = count;
-      return acc;
-    }, {});
-    console.warn('[CORR][applyCorrelationRowFilter] normalized', {
-      headers: sourceHeaders.length,
-      usedRowsRaw: usedRowsRaw.length,
-      usedRowsAligned: usedRowsAligned.length,
-      allRowsRaw: allRowsRaw ? allRowsRaw.length : 0,
-      allRowsAligned: allRowsAligned ? allRowsAligned.length : 0,
-      expectedWidth,
-      alignmentOffset,
-      canProject
+    const objectRows = rowsToCorrelationObjects(projectedHeaders, projectedRows);
+    const numericData = toNumericRows(objectRows, projectedHeaders);
+    const isFiltered = usedRowsAligned.length !== allRowsAligned.length;
+
+    console.warn('[CORR][rebuildFromSourceRows]', {
+      sourceHeaders: sourceHeaders.length,
+      analysisHeaders: analysisHeaders.length,
+      allRows: allRowsAligned.length,
+      usedRows: usedRowsAligned.length,
+      projectedRows: projectedRows.length,
+      numericRows: numericData.length,
+      rowFilterActive: isFiltered
     });
-    console.warn('[CORR][applyCorrelationRowFilter] analysis headers', analysisHeaders);
-    console.warn('[CORR][applyCorrelationRowFilter] first projected row', firstProjected);
-    console.warn('[CORR][applyCorrelationRowFilter] numeric coverage', numericCoverage);
+
     correlationData = {
       ...(correlationData || {}),
       headers: projectedHeaders,
       data: numericData,
-      rowFilterActive: !!filterPayload.rowFilterActive,
       sourceHeaders,
       sourceRowsAll: allRowsAligned,
-      sourceRows: usedRowsAligned
+      sourceRows: usedRowsAligned,
+      rowFilterActive: isFiltered
     };
     window.correlationData = correlationData;
-    try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch(e) {}
+    try { sessionStorage.setItem('correlationData', JSON.stringify(correlationData)); } catch (e) {}
+
     scatterPointsCache.clear();
     window.networkRendered = false;
     renderMatrix();
@@ -1472,53 +1476,45 @@
     }
   }
 
-  function installCorrelationFilterApplyFallback() {
-    if (window.__corrFilterApplyFallbackInstalled) return;
-    window.__corrFilterApplyFallbackInstalled = true;
-    document.addEventListener('click', function (ev) {
-      const target = ev && ev.target && typeof ev.target.closest === 'function'
-        ? ev.target.closest('#uniFilterApplyBtn')
-        : null;
-      if (!target) return;
-      // Run after the default handler so UniRowFilter has committed rows.
-      setTimeout(function () {
-        try {
-          if (typeof UniRowFilter === 'undefined') return;
-          const meta = typeof UniRowFilter.getSourceMeta === 'function' ? UniRowFilter.getSourceMeta() : null;
-          const filteredRows = typeof UniRowFilter.getFilteredRows === 'function' ? UniRowFilter.getFilteredRows() : null;
-          if (!meta || !Array.isArray(meta.headers) || !Array.isArray(filteredRows)) return;
-          const payload = {
-            headers: meta.headers.slice(),
-            allRows: Array.isArray(meta.allRows) ? meta.allRows : filteredRows,
-            sourceRowsAll: Array.isArray(meta.allRows) ? meta.allRows : filteredRows,
-            usedRows: filteredRows,
-            sourceRows: filteredRows,
-            rowFilterActive: !!meta.hasActiveFilters
-          };
-          // Preferred path: shared header dispatch.
-          if (typeof StatisticoHeader !== 'undefined' &&
-              typeof StatisticoHeader.publishHeaderRowFilterChange === 'function') {
-            StatisticoHeader.publishHeaderRowFilterChange(filteredRows, true);
-          } else {
-            applyCorrelationRowFilter(payload);
-          }
-          // Hard fallback: ensure view updates even if dispatch path is bypassed.
-          applyCorrelationRowFilter(payload);
-          console.warn('[CORR][fallback] Finish & Apply forced propagation', {
-            total: Array.isArray(meta.allRows) ? meta.allRows.length : filteredRows.length,
-            shown: filteredRows.length
-          });
-        } catch (e) {
-          console.warn('[CORR][fallback] apply failed', e);
-        }
-      }, 0);
-    }, true);
+  /* Adapter so shared-header `actions.onFilterRows` keeps working. */
+  function applyCorrelationRowFilter(filterPayload) {
+    if (!filterPayload) return;
+    const filteredRows = Array.isArray(filterPayload.usedRows)
+      ? filterPayload.usedRows
+      : (Array.isArray(filterPayload.sourceRows) ? filterPayload.sourceRows : []);
+    rebuildCorrelationFromSourceRows(filteredRows);
+  }
+
+  /* Mirror univariate: page owns UniRowFilter.init() and onApply callback. */
+  function installCorrelationRowFilter() {
+    if (typeof UniRowFilter === 'undefined' || typeof UniRowFilter.init !== 'function') return;
+    if (!correlationData) return;
+    const sourceHeaders = (Array.isArray(correlationData.sourceHeaders) && correlationData.sourceHeaders.length)
+      ? correlationData.sourceHeaders
+      : correlationData.headers;
+    const allRows = Array.isArray(correlationData.sourceRowsAll) && correlationData.sourceRowsAll.length
+      ? correlationData.sourceRowsAll
+      : correlationData.sourceRows;
+    if (!Array.isArray(sourceHeaders) || !sourceHeaders.length) return;
+    if (!Array.isArray(allRows) || !allRows.length) return;
+    UniRowFilter.init({
+      headers: sourceHeaders,
+      rows: allRows,
+      columnIndex: 0,
+      onApply: rebuildCorrelationFromSourceRows
+    });
+    console.warn('[CORR] UniRowFilter installed with direct onApply', {
+      headers: sourceHeaders.length,
+      rows: allRows.length
+    });
+    if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader.updateUniFilterChrome === 'function') {
+      try { StatisticoHeader.updateUniFilterChrome(); } catch (_e) {}
+    }
   }
 
   /* ════════════════════════════════════════════
      INITIALIZATION
   ════════════════════════════════════════════ */
-  installCorrelationFilterApplyFallback();
   const isInIframe = window.self !== window.top;
   const isHubEmbedDemo = new URLSearchParams(location.search).get('embed') === '1'
     && new URLSearchParams(location.search).get('demo') === '1';

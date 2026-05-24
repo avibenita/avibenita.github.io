@@ -58,13 +58,13 @@ if (typeof window !== 'undefined' && typeof window.switchTab !== 'function') {
     if (!tab) return;
 
     const tabTitles = {
-      explore: 'Explore',
+      explore: 'Descriptives',
       assumptions: 'Assumptions',
-      results: 'Results',
-      posthoc: 'Post-hoc',
-      effects: 'Effects',
-      power: 'Power',
-      report: 'Report'
+      results: 'Test Results',
+      posthoc: 'Pairwise Comparisons',
+      effects: 'Effect Sizes',
+      power: 'Power Analysis',
+      report: 'APA Report'
     };
 
     if (tabTitles[tab] && typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader.updateTitle === 'function') {
@@ -723,13 +723,13 @@ const StatisticoHeader = {
 
     const key = String(item.tab || item.view || item.label || item.id || '').toLowerCase();
     const descriptions = {
-      explore: 'Review variables and descriptive shape.',
-      assumptions: 'Check model requirements before inference.',
-      results: 'Read the main test outcome.',
-      posthoc: 'Compare groups after an omnibus test.',
-      effects: 'Estimate practical magnitude.',
-      power: 'Assess sensitivity and required sample size.',
-      report: 'Generate an APA-ready summary.',
+      explore: 'Summary stats, histograms, and group profiles.',
+      assumptions: 'Normality, equal variance, and test suitability.',
+      results: 'Omnibus outcome and between-group comparison.',
+      posthoc: 'Pairwise contrasts after a significant omnibus test.',
+      effects: 'Magnitude of the group difference.',
+      power: 'Observed power and sample-size planning.',
+      report: 'APA-style narrative and export.',
       predictions: 'Score cases and inspect predicted risk.',
       diagnostics: 'Inspect fit, residuals, and warnings.',
       roc: 'Evaluate classification performance.',
@@ -843,27 +843,34 @@ const StatisticoHeader = {
     }
 
     if (this.module === 'independent') {
-      const independentItems = [
-        { type: 'tab', tab: 'explore', icon: 'fa-chart-column', label: 'Explore', active: true },
+      const analysisItems = [
+        { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: 'Test Results', active: true },
         { type: 'tab', tab: 'assumptions', icon: 'fa-shield-halved', label: 'Assumptions' },
-        { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: 'Results' }
       ];
       if (this.currentView === 'independent-results-kplus') {
-        independentItems.push({ type: 'tab', tab: 'posthoc', icon: 'fa-table-cells', label: 'Post-hoc' });
+        analysisItems.push({ type: 'tab', tab: 'posthoc', icon: 'fa-table-cells', label: 'Pairwise Comparisons' });
       }
-      independentItems.push(
-        { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effects' },
-        { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power' },
-        { type: 'tab', tab: 'report', icon: 'fa-file-lines', label: 'Report' }
+      analysisItems.push(
+        { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effect Sizes' },
+        { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power Analysis' },
+        { type: 'tab', tab: 'report', icon: 'fa-file-lines', label: 'APA Report' }
       );
       return {
         logoIcon: 'fa-equals',
         logoSub: 'Independent',
         menuTitle: 'Menu',
-        groups: [{
-          title: 'Analysis',
-          items: independentItems
-        }]
+        groups: [
+          {
+            title: 'Explore',
+            items: [
+              { type: 'tab', tab: 'explore', icon: 'fa-chart-column', label: 'Descriptives' }
+            ]
+          },
+          {
+            title: 'Analysis',
+            items: analysisItems
+          }
+        ]
       };
     }
 
@@ -4720,13 +4727,13 @@ READING: [1-2 sentences about what the currently visible state suggests, using e
   _independentViewLabels() {
     return {
       'independent-setup': 'Setup',
-      'independent-explore': 'Explore',
+      'independent-explore': 'Descriptives',
       'independent-assumptions': 'Assumptions',
-      'independent-results': 'Results',
-      'independent-posthoc': 'Post-hoc',
-      'independent-effects': 'Effects',
-      'independent-power': 'Power',
-      'independent-report': 'Report'
+      'independent-results': 'Test Results',
+      'independent-posthoc': 'Pairwise Comparisons',
+      'independent-effects': 'Effect Sizes',
+      'independent-power': 'Power Analysis',
+      'independent-report': 'APA Report'
     };
   },
 
@@ -4740,13 +4747,13 @@ READING: [1-2 sentences about what the currently visible state suggests, using e
     const hasPower = payload?.power?.available !== false;
     return [
       'Setup',
-      'Explore',
+      'Descriptives',
       'Assumptions',
-      'Results',
-      ...(hasPosthoc ? ['Post-hoc'] : []),
-      'Effects',
-      ...(hasPower ? ['Power'] : []),
-      'Report'
+      'Test Results',
+      ...(hasPosthoc ? ['Pairwise Comparisons'] : []),
+      'Effect Sizes',
+      ...(hasPower ? ['Power Analysis'] : []),
+      'APA Report'
     ];
   },
 

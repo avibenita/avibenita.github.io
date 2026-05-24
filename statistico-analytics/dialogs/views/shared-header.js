@@ -1724,7 +1724,14 @@ const StatisticoHeader = {
       if (!payload || !Array.isArray(payload.headers) || !Array.isArray(payload.data)) return null;
       const headers = payload.headers.slice();
       const rows = payload.data.map((row) => headers.map((header) => row && typeof row === 'object' ? row[header] : null));
-      return {
+      // Forward source-level filter fields when they exist on the persisted
+      // correlationData so the row-filter UI can see the FULL source range
+      // (sourceHeaders / sourceRowsAll, e.g. 19 cols × 128 rows) and not
+      // just the analysis subset (e.g. 7 cols × 95 rows). Without this,
+      // child views like Taylor / Reliability / Descriptives that rely on
+      // this fallback would lose the full-source view, so the banner and
+      // Excel-style filter table would think nothing is filtered.
+      const out = {
         headers,
         allRows: rows,
         usedRows: rows,
@@ -1733,6 +1740,25 @@ const StatisticoHeader = {
         columnRoles: headers.map(() => 'variable'),
         notice: null
       };
+      if (Array.isArray(payload.sourceHeaders) && payload.sourceHeaders.length) {
+        out.sourceHeaders = payload.sourceHeaders.slice();
+      }
+      if (Array.isArray(payload.sourceRowsAll) && payload.sourceRowsAll.length) {
+        out.sourceRowsAll = payload.sourceRowsAll.map((r) => Array.isArray(r) ? r.slice() : r);
+      }
+      if (Array.isArray(payload.sourceRows)) {
+        out.sourceRows = payload.sourceRows.map((r) => Array.isArray(r) ? r.slice() : r);
+      }
+      if (typeof payload.rowFilterActive === 'boolean') {
+        out.rowFilterActive = payload.rowFilterActive;
+      }
+      if (payload.columnFilters && typeof payload.columnFilters === 'object') {
+        out.columnFilters = payload.columnFilters;
+      }
+      if (Array.isArray(payload.analysisHeaders) && payload.analysisHeaders.length) {
+        out.analysisHeaders = payload.analysisHeaders.slice();
+      }
+      return out;
     };
     const getCorrelationMenuItems = () => ([
       { id: 'matrix', label: 'Correlation Matrix', file: 'correlations/correlation-matrix-v2.html' },
@@ -2558,7 +2584,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260523t';
+    const v = '20260523u';
     const base = this._uniFilterAssetBase();
     const cssHref = `${base}uni-filter-shared.css?v=${v}`;
     const existingCss = document.querySelector('link[data-uni-filter-shared-css]');

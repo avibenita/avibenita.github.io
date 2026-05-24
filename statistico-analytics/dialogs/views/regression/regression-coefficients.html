@@ -1868,15 +1868,74 @@
       align-items: flex-start;
       white-space: normal;
     }
-    #sidebarNav .sb-body {
+    #sidebarNav .sb-nav-main {
+      flex: 1;
+      min-height: 0;
       display: flex;
       flex-direction: column;
+    }
+    #sidebarNav .sb-nav-scroll {
+      flex: 1;
       min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 14px 0 6px;
+      scrollbar-width: auto;
+      scrollbar-color: rgba(148,163,184,.55) rgba(255,255,255,.06);
+    }
+    #sidebarNav .sb-nav-scroll::-webkit-scrollbar {
+      width: 9px;
+    }
+    #sidebarNav .sb-nav-scroll::-webkit-scrollbar-track {
+      background: rgba(255,255,255,.05);
+      border-radius: 5px;
+      margin: 6px 2px;
+    }
+    #sidebarNav .sb-nav-scroll::-webkit-scrollbar-thumb {
+      background: rgba(148,163,184,.55);
+      border-radius: 5px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+    #sidebarNav .sb-nav-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(167,139,250,.72);
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+    #sidebarNav .sb-scroll-hint {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 2px 12px 6px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: rgba(203,213,225,.82);
+      pointer-events: none;
+      flex: 0 0 auto;
+    }
+    #sidebarNav .sb-scroll-hint i {
+      font-size: 9px;
+      opacity: .85;
+      animation: regSidebarScrollNudge 1.6s ease-in-out infinite;
+    }
+    @keyframes regSidebarScrollNudge {
+      0%, 100% { transform: translateY(0); opacity: .7; }
+      50% { transform: translateY(2px); opacity: 1; }
+    }
+    #sidebarNav .sb-nav-main.is-scrollable:not(.scrolled-end) .sb-scroll-hint {
+      display: flex;
+    }
+    #sidebarNav .sb-nav-main.is-scrollable:not(.scrolled-end) .sb-nav-scroll {
+      box-shadow: inset 0 -14px 12px -10px rgba(12,19,32,.92);
     }
     /* Regression sidebar: pin Descriptives group toward bottom */
     #sidebarNav .sb-group--descriptives {
-      margin-top: auto;
+      flex: 0 0 auto;
       padding-top: 4px;
+      padding-bottom: 6px;
     }
 
     /* Interactions expandable parent button — matches .sb-item exactly when collapsed */
@@ -2670,8 +2729,9 @@
           </button>
         </div>
 
-        <!-- Scrollable nav items -->
-        <div class="sb-body">
+        <!-- Scrollable model items + pinned descriptives -->
+        <div class="sb-nav-main" id="regSidebarMain">
+          <div class="sb-nav-scroll" id="regSidebarScroll">
 
           <!-- Group: Model -->
           <div class="sb-group">
@@ -2721,10 +2781,6 @@
                 <i class="fa-solid fa-border-all sb-item-icon"></i>
                 <span class="sb-item-copy"><span class="sb-item-label">Partial Reg. Plots</span><span class="sb-item-description">Added-variable plots for each predictor.</span></span>
               </button>
-              <button class="sb-item" onclick="switchTab('correlations')" data-tab="correlations">
-                <i class="fa-solid fa-diagram-project sb-item-icon"></i>
-                <span class="sb-item-copy"><span class="sb-item-label">Correlations</span><span class="sb-item-description">Pairwise r among model variables.</span></span>
-              </button>
               <button class="sb-item" onclick="switchTab('residuals')" data-tab="residuals">
                 <i class="fa-solid fa-gauge-high sb-item-icon"></i>
                 <span class="sb-item-copy"><span class="sb-item-label">Residual Overview</span><span class="sb-item-description">Normality, homoscedasticity, and autocorrelation checks.</span></span>
@@ -2736,17 +2792,6 @@
               <button class="sb-item" onclick="switchTab('res-influential')" data-tab="res-influential">
                 <i class="fa-solid fa-triangle-exclamation sb-item-icon"></i>
                 <span class="sb-item-copy"><span class="sb-item-label">Influential Cases</span><span class="sb-item-description">Leverage, Cook's distance, and flagged observations.</span></span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Group: Descriptives (independent, pinned toward bottom) -->
-          <div class="sb-group sb-group--descriptives">
-            <div class="sb-group-title">Descriptives</div>
-            <div class="sb-items-rail">
-              <button class="sb-item" onclick="switchTab('descriptive')" data-tab="descriptive">
-                <i class="fa-solid fa-chart-column sb-item-icon"></i>
-                <span class="sb-item-copy"><span class="sb-item-label">Descriptives</span><span class="sb-item-description">Per-variable mean, SD, skew, and missingness.</span></span>
               </button>
             </div>
           </div>
@@ -2776,7 +2821,29 @@
             </div>
           </div>
 
-        </div><!-- /sb-body -->
+          </div><!-- /sb-nav-scroll -->
+
+          <div class="sb-scroll-hint" id="regSidebarScrollHint" aria-hidden="true">
+            <i class="fa-solid fa-chevron-down"></i>
+            <span>More items below</span>
+          </div>
+
+          <!-- Group: Descriptives (independent, pinned toward bottom) -->
+          <div class="sb-group sb-group--descriptives">
+            <div class="sb-group-title">Descriptives</div>
+            <div class="sb-items-rail">
+              <button class="sb-item" onclick="switchTab('correlations')" data-tab="correlations">
+                <i class="fa-solid fa-diagram-project sb-item-icon"></i>
+                <span class="sb-item-copy"><span class="sb-item-label">Correlations</span><span class="sb-item-description">Pairwise r among model variables.</span></span>
+              </button>
+              <button class="sb-item" onclick="switchTab('descriptive')" data-tab="descriptive">
+                <i class="fa-solid fa-chart-column sb-item-icon"></i>
+                <span class="sb-item-copy"><span class="sb-item-label">Descriptives</span><span class="sb-item-description">Per-variable mean, SD, skew, and missingness.</span></span>
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /sb-nav-main -->
 
       </nav>
 
@@ -3882,6 +3949,18 @@
     function toggleSidebar() {
       const nav = document.getElementById('sidebarNav');
       nav.classList.toggle('collapsed');
+      requestAnimationFrame(updateRegSidebarScrollHint);
+    }
+
+    function updateRegSidebarScrollHint() {
+      const main = document.getElementById('regSidebarMain');
+      const scroll = document.getElementById('regSidebarScroll');
+      if (!main || !scroll) return;
+      const canScroll = scroll.scrollHeight > scroll.clientHeight + 2;
+      main.classList.toggle('is-scrollable', canScroll);
+      main.classList.toggle('scrolled-end', scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 4);
+      const hint = document.getElementById('regSidebarScrollHint');
+      if (hint) hint.setAttribute('aria-hidden', canScroll ? 'false' : 'true');
     }
 
     // Toggle Interactions expandable nav item
@@ -3893,6 +3972,7 @@
       btn.classList.toggle('expanded', shouldExpand);
       panel.classList.toggle('open', shouldExpand);
       btn.setAttribute('aria-expanded', shouldExpand);
+      requestAnimationFrame(updateRegSidebarScrollHint);
     }
 
     function toggleAncovaNav(expand) {
@@ -3903,6 +3983,7 @@
       btn.classList.toggle('expanded', shouldExpand);
       panel.classList.toggle('open', shouldExpand);
       btn.setAttribute('aria-expanded', shouldExpand);
+      requestAnimationFrame(updateRegSidebarScrollHint);
     }
 
     // Tab Management
@@ -4836,6 +4917,13 @@
         }
         document.addEventListener('statistico-decimals-changed', updateDecimalPrecision);
         registerHeaderActions();
+        const regSidebarScroll = document.getElementById('regSidebarScroll');
+        if (regSidebarScroll) {
+          regSidebarScroll.addEventListener('scroll', updateRegSidebarScrollHint, { passive: true });
+          window.addEventListener('resize', updateRegSidebarScrollHint);
+          requestAnimationFrame(updateRegSidebarScrollHint);
+          setTimeout(updateRegSidebarScrollHint, 250);
+        }
       }
       // Apply Insight depth immediately so layout is correct before results arrive
       applyDepth('insight');
@@ -5437,6 +5525,7 @@
         renderInteractionsTab(results, varNames, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo, yVarName, window.regressionRows || [], window.regressionHeaders || []);
         // Stay on current tab (do not auto-navigate to ix-summary)
       }
+      requestAnimationFrame(updateRegSidebarScrollHint);
       
       // Populate Model Fit panel
       document.getElementById('rSquared').textContent = results.R2.toFixed(4); // Always 4 decimals for R²

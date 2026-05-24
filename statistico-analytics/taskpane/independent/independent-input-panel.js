@@ -3,6 +3,13 @@
 let independentRangeData = null;
 let independentRangeAddress = "";
 let independentDialog = null;
+// Cache of the last filtered row set (null = no filter active). Settings
+// changes (alpha, framework, primary test, ...) call sendIndependentBundle,
+// which without this cache would silently revert the analysis to the full
+// source range and contradict the still-visible filter banner. With the
+// cache, every recompute path — filter apply, filter clear, settings
+// change, re-emit on dialog ready — uses the same row set the user sees.
+let independentFilteredRows = null;
 let _indEmbedMessageHandler = null;
 
 function onRangeDataLoaded(values, address) {
@@ -815,7 +822,7 @@ function openIndependentResultsDialog() {
               sendIndependentBundle();
             }
           }
-          else if (message.action === "close") { independentDialog.close(); independentDialog = null; }
+          else if (message.action === "close") { independentDialog.close(); independentDialog = null; independentFilteredRows = null; }
         } catch (_e) { console.error("Results dialog message error:", _e); }
       });
       setTimeout(sendIndependentBundle, 1100);
@@ -830,43 +837,37 @@ function sendIndependentBundle() {
     return;
   }
   const headers = independentRangeData[0] || [];
-  const rows = independentRangeData.slice(1);
-  const modelSpec = JSON.parse(sessionStorage.getItem("independentModelSpec") || "{}");
-  console.log("sendIndependentBundle: calling buildIndependentBundle with modelSpec:", modelSpec);
-  const bundle = buildIndependentBundle(headers, rows, modelSpec);
-  console.log("sendIndependentBundle: bundle built, sending to dialog");
-  independentDialog.messageChild(JSON.stringify({ 
-    type: "INDEPENDENT_BUNDLE", 
-    payload: bundle,
-    rawData: independentRangeData  // Include raw data for descriptive stats
-  }));
-}
-
-// Filter-as-macro recompute: dialog passed pre-filtered rows (UniRowFilter
-// in the dialog has done the filtering). We re-run buildIndependentBundle
-// against those rows and ship a fresh bundle. We deliberately omit rawData
-// (dialog keeps full source for the filter UI + View Data) but DO ship
-// analysisRows so dialog-side helpers that reach for raw data
-// (extractVector → descriptive stats, distribution panel, normality
-// assessment) see the filtered subset and stay consistent with the bundle.
-function recomputeIndependentFromFilteredRows(filteredRows) {
-  if (!independentDialog || !independentRangeData) return;
-  const headers = independentRangeData[0] || [];
-  const allRows = independentRangeData.slice(1);
-  const rows = (Array.isArray(filteredRows) && filteredRows.length) ? filteredRows : allRows;
+  const fullRows = independentRangeData.slice(1);
+  // Honour the cached filter (if any). Settings changes always flow through
+  // here — without the cache check they would revert to fullRows and silently
+  // unfilter the analysis.
+  const isFiltered = !!(independentFilteredRows && independentFilteredRows.length && independentFilteredRows.length < fullRows.length);
+  const rows = isFiltered ? independentFilteredRows : fullRows;
   const modelSpec = JSON.parse(sessionStorage.getItem("independentModelSpec") || "{}");
   const bundle = buildIndependentBundle(headers, rows, modelSpec);
-  console.log("recomputeIndependentFromFilteredRows: rows=" + rows.length + "/" + allRows.length);
+  console.log("sendIndependentBundle: rows=" + rows.length + "/" + fullRows.length + (isFiltered ? " (filtered)" : ""));
   independentDialog.messageChild(JSON.stringify({
     type: "INDEPENDENT_BUNDLE",
     payload: bundle,
-    analysisRows: [headers].concat(rows)  // filter-aware view of the dataset
-    // NOTE: no rawData — dialog keeps full source for filter UI.
+    rawData: independentRangeData,                                   // full source — filter UI / View Data
+    analysisRows: isFiltered ? [headers].concat(rows) : null         // filter-aware — extractVector helpers
   }));
+}
+
+// Filter-as-macro recompute: dialog handed us the filtered row set produced
+// by UniRowFilter. Cache it (so subsequent settings changes preserve the
+// filter) and dispatch through the standard bundle path.
+function recomputeIndependentFromFilteredRows(filteredRows) {
+  if (!independentDialog || !independentRangeData) return;
+  const fullRows = independentRangeData.slice(1);
+  const looksFiltered = Array.isArray(filteredRows) && filteredRows.length > 0 && filteredRows.length < fullRows.length;
+  independentFilteredRows = looksFiltered ? filteredRows : null;
+  sendIndependentBundle();
 }
 
 function resetIndependentModel() {
   sessionStorage.removeItem("independentModelSpec");
+  independentFilteredRows = null;
   hideIndependentConfigEmbed();
   updateButtonState();
 }

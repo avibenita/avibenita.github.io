@@ -845,8 +845,10 @@ function sendIndependentBundle() {
 // Filter-as-macro recompute: dialog passed pre-filtered rows (UniRowFilter
 // in the dialog has done the filtering). We re-run buildIndependentBundle
 // against those rows and ship a fresh bundle. We deliberately omit rawData
-// so the dialog's full source range stays intact for the filter UI; only
-// the analysis statistics update.
+// (dialog keeps full source for the filter UI + View Data) but DO ship
+// analysisRows so dialog-side helpers that reach for raw data
+// (extractVector → descriptive stats, distribution panel, normality
+// assessment) see the filtered subset and stay consistent with the bundle.
 function recomputeIndependentFromFilteredRows(filteredRows) {
   if (!independentDialog || !independentRangeData) return;
   const headers = independentRangeData[0] || [];
@@ -857,7 +859,8 @@ function recomputeIndependentFromFilteredRows(filteredRows) {
   console.log("recomputeIndependentFromFilteredRows: rows=" + rows.length + "/" + allRows.length);
   independentDialog.messageChild(JSON.stringify({
     type: "INDEPENDENT_BUNDLE",
-    payload: bundle
+    payload: bundle,
+    analysisRows: [headers].concat(rows)  // filter-aware view of the dataset
     // NOTE: no rawData — dialog keeps full source for filter UI.
   }));
 }

@@ -12,10 +12,10 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r" />  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260524b"></script>
+  <script src="../shared-header.js?v=20260524c"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
-  <script src="../shared/uni-row-filter.js?v=20260524b" data-uni-row-filter="1"></script>
-  <script src="../shared/filter.js?v=20260524b" data-filter-api="1"></script>
+  <script src="../shared/uni-row-filter.js?v=20260524c" data-uni-row-filter="1"></script>
+  <script src="../shared/filter.js?v=20260524c" data-filter-api="1"></script>
 
   <script src="../../../src/shared/js/ai-config.js?v=20260429a"></script>
   <style>
@@ -990,13 +990,21 @@
         return '...';
       }
       
-      // Helper: extract a numeric vector for a named column from raw range data
+      // Helper: extract a numeric vector for a named column from the
+      // CURRENT analysis range. When a filter is active, the host posts
+      // window.independentAnalysisRows = [headers, ...filteredRows] so
+      // descriptive stats / normality assessment / histogram all see the
+      // same N as the bundle. Falls back to the full source range
+      // (window.independentRangeData) when no filter is active.
       function extractVector(colName) {
-        if (!window.independentRangeData || !colName) return null;
-        const headers = window.independentRangeData[0] || [];
+        const src = (window.independentAnalysisRows && window.independentAnalysisRows.length)
+          ? window.independentAnalysisRows
+          : window.independentRangeData;
+        if (!src || !colName) return null;
+        const headers = src[0] || [];
         const colIdx  = headers.indexOf(colName);
         if (colIdx === -1) return null;
-        return window.independentRangeData.slice(1)
+        return src.slice(1)
           .map(r => parseFloat(r[colIdx]))
           .filter(v => isFinite(v));
       }
@@ -1630,7 +1638,16 @@
         Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function(arg){
           const msg = JSON.parse(arg.message||"{}");
           if(msg.type==="INDEPENDENT_BUNDLE"){
-            if (msg.rawData) window.independentRangeData = msg.rawData;
+            if (msg.rawData) {
+              window.independentRangeData = msg.rawData;
+              // Initial load: analysis range == full source range.
+              window.independentAnalysisRows = msg.rawData;
+            }
+            if (msg.analysisRows) {
+              // Filter recompute: dialog-side helpers (extractVector → desc
+              // stats, distribution, normality) follow the filtered subset.
+              window.independentAnalysisRows = msg.analysisRows;
+            }
             populateBundle(msg.payload||{});
             // First bundle (with rawData) sets up the filter bridge. Later
             // bundles (filter recompute, settings change) skip it — the

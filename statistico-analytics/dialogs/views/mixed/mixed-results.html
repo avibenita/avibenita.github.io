@@ -17,7 +17,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r"/>  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260524j"></script>
+  <script src="../shared-header.js?v=20260524k"></script>
 
   <style>
     /* ── Design tokens ── */
@@ -111,16 +111,86 @@
     }
 
     #tab-descriptives {
-      padding: 0;
-      gap: 0;
-      overflow: hidden;
+      padding: 16px 18px;
+      gap: 20px;
+      overflow-y: auto;
+    }
+    .mm-desc-scroll {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 100%;
+    }
+    .mm-desc-kpi-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+    .mm-desc-kpi {
+      flex: 1;
+      min-width: 110px;
+      background: rgba(167,139,250,.08);
+      border: 1px solid rgba(167,139,250,.28);
+      border-radius: 8px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+    .mm-desc-kpi-label {
+      font-size: .68rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    .mm-desc-kpi-value {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--accent-3);
+      font-variant-numeric: tabular-nums;
+    }
+    .mm-desc-factor-block + .mm-desc-factor-block {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .mm-desc-factor-title {
+      font-size: .88rem;
+      font-weight: 700;
+      color: var(--accent-3);
+      margin-bottom: 8px;
+    }
+    .mm-desc-factor-meta {
+      font-size: .74rem;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .mm-desc-level-ref {
+      color: var(--accent-1);
+      font-weight: 700;
+    }
+    .mm-desc-warn {
+      color: var(--warning);
+      font-size: .74rem;
+      margin-top: 6px;
+    }
+    .mm-desc-empty {
+      color: var(--text-muted);
+      font-size: .85rem;
+      margin: 0;
+    }
+    .mm-desc-continuous-section .mm-desc-frame-wrap {
+      height: 420px;
+      min-height: 320px;
     }
     #mixedDescriptivesFrame {
-      flex: 1;
       width: 100%;
+      height: 100%;
       min-height: 0;
       border: none;
       background: var(--surface-0);
+      border-radius: 8px;
     }
 
     /* ── Tab content ── */
@@ -1481,10 +1551,31 @@
                 </div><!-- /tab-model-structure -->
 
                 <!-- ══════════════════════════════════════════════════════
-                     TAB: DESCRIPTIVES (embedded correlation descriptives view)
+                     TAB: DESCRIPTIVES
                 ══════════════════════════════════════════════════════ -->
                 <div id="tab-descriptives" class="tab-content">
-                  <iframe id="mixedDescriptivesFrame" title="Descriptive Statistics"></iframe>
+                  <div class="mm-desc-scroll">
+                    <div class="mm-section" id="mixedDescGroupingSection">
+                      <div class="mm-section-header">
+                        <span><i class="fa-solid fa-sitemap"></i> Grouping Structure</span>
+                      </div>
+                      <div class="mm-section-body padded" id="mixedDescGrouping"></div>
+                    </div>
+                    <div class="mm-section" id="mixedDescCategoricalSection">
+                      <div class="mm-section-header">
+                        <span><i class="fa-solid fa-tags"></i> Categorical Predictors</span>
+                      </div>
+                      <div class="mm-section-body padded" id="mixedDescCategorical"></div>
+                    </div>
+                    <div class="mm-section mm-desc-continuous-section" id="mixedDescContinuousSection">
+                      <div class="mm-section-header">
+                        <span><i class="fa-solid fa-chart-column"></i> Continuous Variables</span>
+                      </div>
+                      <div class="mm-section-body mm-desc-frame-wrap">
+                        <iframe id="mixedDescriptivesFrame" title="Descriptive Statistics"></iframe>
+                      </div>
+                    </div>
+                  </div>
                 </div>
             </div><!-- /view-container -->
 
@@ -2010,7 +2101,14 @@ ${sectionsHtml}
         StatisticoHeader.setAiReady(!!_results);
       }
       const descBtn = document.getElementById('btnMixedDescriptives');
-      if (descBtn) descBtn.disabled = !(_sourceHeaders && _sourceRows && _modelSpec);
+      if (descBtn) {
+        const hasDesc = !!(_sourceHeaders && _sourceRows && _modelSpec) && (
+          (typeof _mm_getContinuousVars === 'function' && _mm_getContinuousVars(_sourceHeaders, _sourceRows, _modelSpec).length > 0) ||
+          (typeof _mm_getCategoricalVars === 'function' && _mm_getCategoricalVars(_sourceHeaders, _sourceRows, _modelSpec).length > 0) ||
+          !!(_modelSpec.rnd || _modelSpec.rndVar)
+        );
+        descBtn.disabled = !hasDesc;
+      }
     }
 
     window._registerMixedActions = _registerMixedActions;
@@ -4603,6 +4701,29 @@ ${sectionsHtml}
     return Array.isArray(row) ? row : headers.map(h => row[h]);
   }
 
+  function _mm_varIsContinuous(headers, rows, name) {
+    const idx = headers.indexOf(name);
+    if (idx < 0) return false;
+    const uniq = [...new Set(rows.map(r => _mm_rowValues(r, headers)[idx]).filter(x => x !== '' && x != null))];
+    if (!uniq.length) return false;
+    return uniq.every(x => !isNaN(parseFloat(x)));
+  }
+
+  function _mm_getCategoricalVars(headers, rows, spec) {
+    if (!headers || !rows || !spec) return [];
+    const fixVars = (spec.fix || []).concat(spec.cov || []);
+    const rnd = spec.rnd || spec.rndVar || spec.rep || spec.subject;
+    const seen = new Set();
+    const categorical = [];
+    fixVars.filter(Boolean).forEach((name) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      if (_mm_varIsContinuous(headers, rows, name)) return;
+      categorical.push(name);
+    });
+    return categorical;
+  }
+
   function _mm_getContinuousVars(headers, rows, spec) {
     if (!headers || !rows || !spec) return [];
     const fixVars = (spec.fix || []).concat(spec.cov || []);
@@ -4612,19 +4733,141 @@ ${sectionsHtml}
     [dep, ...fixVars].filter(Boolean).forEach((name) => {
       if (seen.has(name)) return;
       seen.add(name);
-      const idx = headers.indexOf(name);
-      if (idx < 0) return;
-      const uniq = [...new Set(rows.map(r => _mm_rowValues(r, headers)[idx]).filter(x => x !== '' && x != null))];
-      if (!uniq.length) return;
-      const allNum = uniq.every(x => !isNaN(parseFloat(x)));
-      if (allNum) continuous.push(name);
+      if (_mm_varIsContinuous(headers, rows, name)) continuous.push(name);
     });
     return continuous;
   }
 
-  window.openMixedDescriptives = function() {
-    switchTab('descriptives');
-  };
+  function _mm_esc(v) {
+    return String(v ?? '—').replace(/[<>&"]/g, (m) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[m]));
+  }
+
+  function _mm_getReferenceLevel(spec, varName, levels) {
+    const refs = spec && spec.refLevels ? spec.refLevels : {};
+    if (refs[varName]) return String(refs[varName]);
+    const sorted = levels.slice().sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+    return sorted.length ? String(sorted[0]) : '—';
+  }
+
+  function _mm_buildLevelCounts(headers, rows, varName) {
+    const idx = headers.indexOf(varName);
+    if (idx < 0) return { total: 0, missing: 0, levels: [] };
+    let missing = 0;
+    const counts = new Map();
+    rows.forEach((row) => {
+      const raw = _mm_rowValues(row, headers)[idx];
+      if (raw === null || raw === undefined || raw === '') {
+        missing += 1;
+        return;
+      }
+      const key = String(raw);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    const valid = rows.length - missing;
+    const levels = [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([level, count]) => ({
+        level,
+        count,
+        pct: valid > 0 ? (100 * count / valid) : 0
+      }));
+    return { total: rows.length, missing, valid, levels };
+  }
+
+  function _renderMixedDescGrouping() {
+    const el = document.getElementById('mixedDescGrouping');
+    const section = document.getElementById('mixedDescGroupingSection');
+    if (!el || !section) return;
+    const rnd = _modelSpec && (_modelSpec.rnd || _modelSpec.rndVar);
+    if (!rnd || !_sourceHeaders || !_sourceRows) {
+      section.style.display = 'none';
+      return;
+    }
+    section.style.display = '';
+    const idx = _sourceHeaders.indexOf(rnd);
+    if (idx < 0) {
+      el.innerHTML = '<p class="mm-desc-empty">Grouping variable not found in source data.</p>';
+      return;
+    }
+    const groupMap = new Map();
+    let missing = 0;
+    _sourceRows.forEach((row) => {
+      const raw = _mm_rowValues(row, _sourceHeaders)[idx];
+      if (raw === null || raw === undefined || raw === '') {
+        missing += 1;
+        return;
+      }
+      const key = String(raw);
+      groupMap.set(key, (groupMap.get(key) || 0) + 1);
+    });
+    const sizes = [...groupMap.values()].sort((a, b) => a - b);
+    const nGroups = sizes.length;
+    const totalObs = _sourceRows.length - missing;
+    const singletons = sizes.filter(n => n === 1).length;
+    const minSize = sizes.length ? sizes[0] : 0;
+    const maxSize = sizes.length ? sizes[sizes.length - 1] : 0;
+    const meanSize = sizes.length ? (sizes.reduce((s, n) => s + n, 0) / sizes.length) : 0;
+    const medianSize = sizes.length
+      ? (sizes.length % 2 === 0
+        ? (sizes[sizes.length / 2 - 1] + sizes[sizes.length / 2]) / 2
+        : sizes[Math.floor(sizes.length / 2)])
+      : 0;
+    const warn = singletons > 0
+      ? `<p class="mm-desc-warn"><i class="fa-solid fa-triangle-exclamation"></i> ${singletons} group${singletons === 1 ? '' : 's'} with only 1 observation — random effects may be unstable.</p>`
+      : '';
+    el.innerHTML = `
+      <div class="mm-desc-factor-meta">Random grouping variable: <strong>${_mm_esc(rnd)}</strong></div>
+      <div class="mm-desc-kpi-row">
+        <div class="mm-desc-kpi"><div class="mm-desc-kpi-label">Groups</div><div class="mm-desc-kpi-value">${nGroups}</div></div>
+        <div class="mm-desc-kpi"><div class="mm-desc-kpi-label">Observations</div><div class="mm-desc-kpi-value">${totalObs}</div></div>
+        <div class="mm-desc-kpi"><div class="mm-desc-kpi-label">Obs / group (mean)</div><div class="mm-desc-kpi-value">${fmt(meanSize, 1)}</div></div>
+        <div class="mm-desc-kpi"><div class="mm-desc-kpi-label">Obs / group (median)</div><div class="mm-desc-kpi-value">${fmt(medianSize, 1)}</div></div>
+        <div class="mm-desc-kpi"><div class="mm-desc-kpi-label">Min / max</div><div class="mm-desc-kpi-value">${minSize} / ${maxSize}</div></div>
+        <div class="mm-desc-kpi"><div class="mm-desc-kpi-label">Singleton groups</div><div class="mm-desc-kpi-value">${singletons}</div></div>
+      </div>
+      ${missing ? `<p class="mm-desc-warn">${missing} row${missing === 1 ? '' : 's'} missing a group ID.</p>` : ''}
+      ${warn}`;
+  }
+
+  function _renderMixedDescCategorical() {
+    const el = document.getElementById('mixedDescCategorical');
+    const section = document.getElementById('mixedDescCategoricalSection');
+    if (!el || !section || !_sourceHeaders || !_sourceRows || !_modelSpec) return;
+    const catVars = _mm_getCategoricalVars(_sourceHeaders, _sourceRows, _modelSpec);
+    if (!catVars.length) {
+      section.style.display = '';
+      el.innerHTML = '<p class="mm-desc-empty">No categorical predictors in this model.</p>';
+      return;
+    }
+    section.style.display = '';
+    el.innerHTML = catVars.map((varName) => {
+      const stats = _mm_buildLevelCounts(_sourceHeaders, _sourceRows, varName);
+      const refLevel = _mm_getReferenceLevel(_modelSpec, varName, stats.levels.map(l => l.level));
+      const counts = stats.levels.map(l => l.count);
+      const minCell = counts.length ? Math.min(...counts) : 0;
+      const maxCell = counts.length ? Math.max(...counts) : 0;
+      const imbalance = counts.length > 1 && minCell > 0 && (maxCell / minCell) >= 5;
+      const rowsHtml = stats.levels.map((l) => {
+        const isRef = String(l.level) === String(refLevel);
+        return `<tr>
+          <td>${_mm_esc(l.level)}${isRef ? ' <span class="mm-desc-level-ref">(ref)</span>' : ''}</td>
+          <td>${l.count}</td>
+          <td>${l.pct.toFixed(1)}%</td>
+        </tr>`;
+      }).join('');
+      return `<div class="mm-desc-factor-block">
+        <div class="mm-desc-factor-title">${_mm_esc(varName)}</div>
+        <div class="mm-desc-factor-meta">${stats.levels.length} level${stats.levels.length === 1 ? '' : 's'} · ${stats.valid} valid · ${stats.missing} missing · reference: <strong>${_mm_esc(refLevel)}</strong></div>
+        <div class="mm-table-wrap">
+          <table class="mm-table">
+            <thead><tr><th>Level</th><th>N</th><th>%</th></tr></thead>
+            <tbody>${rowsHtml || '<tr><td colspan="3">No valid levels</td></tr>'}</tbody>
+          </table>
+        </div>
+        ${imbalance ? `<p class="mm-desc-warn">Imbalanced factor: largest cell is ${(maxCell / minCell).toFixed(1)}× the smallest (min=${minCell}, max=${maxCell}).</p>` : ''}
+      </div>`;
+    }).join('');
+  }
 
   function _prepareMixedDescriptivePayload() {
     if (!_sourceHeaders || !_sourceRows || !_modelSpec) {
@@ -4632,38 +4875,53 @@ ${sectionsHtml}
       return false;
     }
     const contVars = _mm_getContinuousVars(_sourceHeaders, _sourceRows, _modelSpec);
-    if (!contVars.length) {
-      window.alert('No continuous variables in the current model.');
+    const catVars = _mm_getCategoricalVars(_sourceHeaders, _sourceRows, _modelSpec);
+    const hasGrouping = !!(_modelSpec.rnd || _modelSpec.rndVar);
+    if (!contVars.length && !catVars.length && !hasGrouping) {
+      window.alert('No model variables available for descriptives.');
       return false;
     }
-    const indices = contVars.map(v => _sourceHeaders.indexOf(v)).filter(i => i >= 0);
-    const filteredHeaders = indices.map(i => _sourceHeaders[i]);
-    const sourceRowsAll = _sourceRows.map(r => _mm_rowValues(r, _sourceHeaders));
-    const filteredData = sourceRowsAll.map(r => {
-      const rowObj = {};
-      filteredHeaders.forEach((h, i) => { rowObj[h] = r[indices[i]]; });
-      return rowObj;
-    });
-    const payload = {
-      headers: filteredHeaders,
-      data: filteredData,
-      sourceHeaders: _sourceHeaders.slice(),
-      sourceRowsAll,
-      sourceRows: sourceRowsAll,
-      rowFilterActive: false,
-      source: 'mixed-model',
-      modelInfo: {
-        outcome: _modelSpec.dep || _modelSpec.y || null,
-        continuousVars: filteredHeaders.slice()
-      }
-    };
-    try { sessionStorage.setItem('mixedDescriptiveData', JSON.stringify(payload)); } catch (_e) {}
+    if (contVars.length) {
+      const indices = contVars.map(v => _sourceHeaders.indexOf(v)).filter(i => i >= 0);
+      const filteredHeaders = indices.map(i => _sourceHeaders[i]);
+      const sourceRowsAll = _sourceRows.map(r => _mm_rowValues(r, _sourceHeaders));
+      const filteredData = sourceRowsAll.map(r => {
+        const rowObj = {};
+        filteredHeaders.forEach((h, i) => { rowObj[h] = r[indices[i]]; });
+        return rowObj;
+      });
+      const payload = {
+        headers: filteredHeaders,
+        data: filteredData,
+        sourceHeaders: _sourceHeaders.slice(),
+        sourceRowsAll,
+        sourceRows: sourceRowsAll,
+        rowFilterActive: false,
+        source: 'mixed-model',
+        modelInfo: {
+          outcome: _modelSpec.dep || _modelSpec.y || null,
+          continuousVars: filteredHeaders.slice()
+        }
+      };
+      try { sessionStorage.setItem('mixedDescriptiveData', JSON.stringify(payload)); } catch (_e) {}
+    } else {
+      try { sessionStorage.removeItem('mixedDescriptiveData'); } catch (_e) {}
+    }
     return true;
   }
 
   function _loadMixedDescriptivesFrame() {
     const frame = document.getElementById('mixedDescriptivesFrame');
-    if (!frame || typeof StatisticoHeader === 'undefined') return;
+    const contSection = document.getElementById('mixedDescContinuousSection');
+    const contVars = (_sourceHeaders && _sourceRows && _modelSpec)
+      ? _mm_getContinuousVars(_sourceHeaders, _sourceRows, _modelSpec)
+      : [];
+    if (contSection) contSection.style.display = contVars.length ? '' : 'none';
+    if (!frame || !contVars.length) {
+      if (frame) frame.src = 'about:blank';
+      return;
+    }
+    if (typeof StatisticoHeader === 'undefined') return;
     let target = StatisticoHeader.resolveDialogUrl('correlations/descriptive-stats.html');
     try {
       const url = new URL(target, window.location.href);
@@ -4674,6 +4932,16 @@ ${sectionsHtml}
     } catch (_e) {}
     frame.src = target;
   }
+
+  function _loadMixedDescriptivesTab() {
+    _renderMixedDescGrouping();
+    _renderMixedDescCategorical();
+    _loadMixedDescriptivesFrame();
+  }
+
+  window.openMixedDescriptives = function() {
+    switchTab('descriptives');
+  };
 
   window.setDepth = function(depth) {
     _depth = depth;
@@ -4735,7 +5003,7 @@ ${sectionsHtml}
     if (name === 'diagnostics' && !window._influentialLoaded) { loadInfluentialTab();  window._influentialLoaded = true; }
     if (name === 'advanced'    && _results) { updateCovStructure(); renderCovCompChart(); }
     if (name === 'model-structure' && _results) { _renderInlineMsd(); }
-    if (name === 'descriptives') { _loadMixedDescriptivesFrame(); }
+    if (name === 'descriptives') { _loadMixedDescriptivesTab(); }
 
     const cardBody = document.querySelector('.card-body');
     if (cardBody) cardBody.scrollTop = 0;

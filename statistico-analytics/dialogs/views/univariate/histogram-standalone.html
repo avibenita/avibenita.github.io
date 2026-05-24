@@ -56,10 +56,10 @@
   <!-- build: 20260519u -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522u">
   <script src="../shared-brand-logo.js?v=20260519u"></script>
-  <script src="../shared-header.js?v=20260523v"></script>
+  <script src="../shared-header.js?v=20260523w"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
-  <script src="../shared/uni-row-filter.js?v=20260523v" data-uni-row-filter="1"></script>
-  <script src="../shared/filter.js?v=20260523v" data-filter-api="1"></script>
+  <script src="../shared/uni-row-filter.js?v=20260523w" data-uni-row-filter="1"></script>
+  <script src="../shared/filter.js?v=20260523w" data-filter-api="1"></script>
   <script src="../runtime-core.js?v=20260329a"></script>
   <style>
     /* EXACT COPY OF ORIGINAL HISTOGRAM STYLES */
@@ -1460,19 +1460,41 @@
       const headers = data.sourceHeaders;
       const allRows = data.sourceRowsAll || data.sourceRows;
       const hasSource = headers && allRows && allRows.length;
-      if (typeof UniRowFilter !== 'undefined' && hasSource) {
-        UniRowFilter.init({
-          headers: headers,
-          rows: allRows,
-          columnIndex: data.columnIndex != null ? Number(data.columnIndex) : 0,
-          onApply: rebuildFromSourceRows
-        });
+      if (hasSource) {
         const filtered = data.sourceRows || [];
-        if (hasStoredRowFilter(data) && filtered.length) {
-          UniRowFilter.setFilteredRows(filtered);
+        const restoredRows = hasStoredRowFilter(data) && filtered.length ? filtered : null;
+        // Prefer the lean Filter API; fall back to direct UniRowFilter.init for
+        // older bundles that haven't loaded filter.js yet.
+        if (typeof Filter !== 'undefined' && typeof Filter.attach === 'function') {
+          Filter.attach({
+            headers: headers,
+            rows: allRows,
+            columnIndex: data.columnIndex != null ? Number(data.columnIndex) : 0,
+            initial: {
+              columnFilters: data.columnFilters,
+              sourceRows: restoredRows
+            },
+            onApply: function (filteredRows /*, criteria */) {
+              rebuildFromSourceRows(filteredRows);
+            }
+          });
+          if (typeof UniRowFilter !== 'undefined') {
+            const fromRows = extractValuesFromRows(UniRowFilter.getFilteredRows());
+            if (fromRows.length) return fromRows;
+          }
+        } else if (typeof UniRowFilter !== 'undefined') {
+          UniRowFilter.init({
+            headers: headers,
+            rows: allRows,
+            columnIndex: data.columnIndex != null ? Number(data.columnIndex) : 0,
+            onApply: rebuildFromSourceRows
+          });
+          if (restoredRows) {
+            UniRowFilter.setFilteredRows(restoredRows);
+          }
+          const fromRows = extractValuesFromRows(UniRowFilter.getFilteredRows());
+          if (fromRows.length) return fromRows;
         }
-        const fromRows = extractValuesFromRows(UniRowFilter.getFilteredRows());
-        if (fromRows.length) return fromRows;
       }
       if (hasStoredRowFilter(data) && ((data.values && data.values.length) || (data.data && data.data.length))) {
         return (data.values || data.data).slice();

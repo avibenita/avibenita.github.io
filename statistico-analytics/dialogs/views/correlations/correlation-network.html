@@ -17,10 +17,10 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260523v"></script>
+  <script src="../shared-header.js?v=20260523w"></script>
   <!-- Preload filter assets so installNetworkFilter() finds them on first call (no flicker). -->
-  <script src="../shared/uni-row-filter.js?v=20260523v" data-uni-row-filter="1"></script>
-  <script src="../shared/filter.js?v=20260523v" data-filter-api="1"></script>
+  <script src="../shared/uni-row-filter.js?v=20260523w" data-uni-row-filter="1"></script>
+  <script src="../shared/filter.js?v=20260523w" data-filter-api="1"></script>
 
   <style>
     :root{
@@ -549,16 +549,12 @@
       }
     }
 
-    // Page owns the filter UI install and the apply callback. Uses the
-    // lean Filter API (window.Filter) when available; falls back to the
-    // legacy StatisticoHeader.installCorrelationFilter so older bundles
-    // keep working during the rollout.
+    // Page owns the filter UI install and the apply callback via the
+    // lean Filter API (window.Filter). filter.js is preloaded by the
+    // <script> tag at the top of the page so it should be available
+    // immediately; the retry below covers the rare case where the
+    // preload is delayed.
     function installNetworkFilter() {
-      // shared-header.js loads filter.js asynchronously. If we're called
-      // before it lands, wait for it instead of silently falling through
-      // to the legacy fallback (which also requires UniRowFilter and would
-      // also fail). Without this retry, Office.onReady fires before the
-      // async script tag finishes loading and the filter never gets wired.
       if (typeof Filter === 'undefined' || typeof Filter.attach !== 'function') {
         if (!installNetworkFilter._waited) installNetworkFilter._waited = 0;
         if (installNetworkFilter._waited < 30) {
@@ -566,6 +562,7 @@
           setTimeout(installNetworkFilter, 100);
           return;
         }
+        return;
       }
       try {
         if (typeof Filter !== 'undefined' && typeof Filter.attach === 'function' && correlationData) {
@@ -600,24 +597,7 @@
               renderNetwork();
             }
           });
-          return;
         }
-        // Legacy fallback (pre-Step-2 bundles)
-        if (typeof StatisticoHeader === 'undefined' ||
-            typeof StatisticoHeader.installCorrelationFilter !== 'function') return;
-        StatisticoHeader.installCorrelationFilter({
-          rebuildAndRender: function (next) {
-            correlationData = next.correlationData;
-            window.correlationData = correlationData;
-            window.networkRendered = false;
-            if (typeof StatisticoHeader !== 'undefined') {
-              StatisticoHeader.sampleSize = next.projectedData.length;
-              StatisticoHeader.variableName = `${next.headers.length} Variables`;
-              StatisticoHeader.render();
-            }
-            renderNetwork();
-          }
-        });
       } catch (err) { console.warn('Network filter install failed:', err); }
     }
 

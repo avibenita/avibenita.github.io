@@ -2584,7 +2584,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260523v';
+    const v = '20260523w';
     const base = this._uniFilterAssetBase();
     const cssHref = `${base}uni-filter-shared.css?v=${v}`;
     const existingCss = document.querySelector('link[data-uni-filter-shared-css]');
@@ -3240,27 +3240,11 @@ const StatisticoHeader = {
   },
 
   /**
-   * Mirrors univariate's `resolveAnalysisValues` pattern but for any
-   * correlation view (Network / Taylor / Partial / Reliability /
-   * Descriptives — and the matrix can opt in too). Each view OWNS its
-   * own UniRowFilter installation and onApply callback so that
-   * Clear/badge/column highlight / panel restoration all work the same
-   * as univariate.
-   *
-   * Usage from a correlation child view, AFTER correlationData is set:
-   *
-   *   StatisticoHeader.installCorrelationFilter({
-   *     rebuildAndRender: function (next) {
-   *       // next.correlationData is already updated; use next.projectedData
-   *       // and next.headers to refresh the view.
-   *       myRenderFn(next.correlationData);
-   *     }
-   *   });
-   *
-   * @param {Object} opts
-   * @param {Function} opts.rebuildAndRender - Called whenever the user
-   *        applies a filter. Receives `{correlationData, projectedData,
-   *        headers, sourceRows, sourceRowsAll, rowFilterActive}`.
+   * @deprecated Replaced by the lean `Filter.attach` API used directly
+   * inside each correlation view (see Step 2 of the filter refactor).
+   * This shim is retained ONLY in case an external embed still calls it.
+   * It is unreachable from the bundled correlation views and may be
+   * removed in a future release.
    */
   installCorrelationFilter(opts) {
     if (typeof UniRowFilter === 'undefined' || typeof UniRowFilter.init !== 'function') return;
@@ -3337,10 +3321,10 @@ const StatisticoHeader = {
   },
 
   /**
-   * Project filteredRows (sourceHeader-aligned) onto the active
-   * analysisHeaders, update window.correlationData and sessionStorage,
-   * and return the rebuild result so a view-specific render fn can use
-   * it. Shared by all correlation views via installCorrelationFilter.
+   * @deprecated Helper for the legacy `installCorrelationFilter` shim.
+   * The bundled correlation views project rows directly through
+   * `Filter.projectRows` now and don't call this. May be removed when
+   * `installCorrelationFilter` is fully deleted.
    */
   _rebuildCorrelationDataFromFilteredRows(filteredRows) {
     let cd = (typeof window !== 'undefined' && window.correlationData)

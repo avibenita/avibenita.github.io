@@ -14,10 +14,10 @@
   <!-- Shared Header (same version pattern as other modules) -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r"/>  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260523v"></script>
+  <script src="../shared-header.js?v=20260523w"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
-  <script src="../shared/uni-row-filter.js?v=20260523v" data-uni-row-filter="1"></script>
-  <script src="../shared/filter.js?v=20260523v" data-filter-api="1"></script>
+  <script src="../shared/uni-row-filter.js?v=20260523w" data-uni-row-filter="1"></script>
+  <script src="../shared/filter.js?v=20260523w" data-filter-api="1"></script>
 
   <style>
     /* ג”€ג”€ CSS tokens ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ */
@@ -2813,6 +2813,7 @@
     _vdFiltered = _vdRows;
     _vdPage = 0;
     renderVDPage();
+    installAnovaRowFilter();
     if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateUniFilterChrome) {
       StatisticoHeader.updateUniFilterChrome();
     }
@@ -2825,6 +2826,78 @@
     });
     _vdPage = 0;
     renderVDPage();
+  }
+
+  /* Page owns the row-filter install + apply callback. Uses the lean
+     Filter API when available; falls back to the header's legacy
+     auto-wiring (via registered onFilterRows action) otherwise. */
+  function installAnovaRowFilter() {
+    if (!_vdCols.length || !_vdRows.length) return;
+    if (typeof Filter === 'undefined' || typeof Filter.attach !== 'function') {
+      if (!installAnovaRowFilter._waited) installAnovaRowFilter._waited = 0;
+      if (installAnovaRowFilter._waited < 30) {
+        installAnovaRowFilter._waited++;
+        setTimeout(installAnovaRowFilter, 100);
+        return;
+      }
+      return;
+    }
+    var initialColumnFilters = null;
+    var initialSourceRows = null;
+    try {
+      if (typeof StatisticoHeader !== 'undefined' &&
+          typeof StatisticoHeader._getGenericRowFilterState === 'function') {
+        var state = StatisticoHeader._getGenericRowFilterState();
+        if (state &&
+            typeof StatisticoHeader._isHeaderRowFilterStateCompatible === 'function' &&
+            StatisticoHeader._isHeaderRowFilterStateCompatible(state, _vdCols)) {
+          initialColumnFilters = state.columnFilters || null;
+          if (Array.isArray(state.usedRows) && state.usedRows.length < _vdRows.length) {
+            initialSourceRows = state.usedRows;
+          } else if (initialColumnFilters &&
+                     typeof StatisticoHeader._resolveFilteredRowsForState === 'function') {
+            var resolved = StatisticoHeader._resolveFilteredRowsForState(_vdCols, _vdRows, state);
+            if (resolved && Array.isArray(resolved.rows) && resolved.rows.length < _vdRows.length) {
+              initialSourceRows = resolved.rows;
+            }
+          }
+        }
+      }
+    } catch (_e) {}
+
+    Filter.attach({
+      headers: _vdCols,
+      rows: _vdRows,
+      columnIndex: -1,
+      initial: {
+        columnFilters: initialColumnFilters,
+        sourceRows: initialSourceRows
+      },
+      onApply: function (filteredRows /*, criteria */) {
+        // Back-compat: publishing to global state writes generic state
+        // for other modules AND invokes our registered onFilterRows
+        // handler (applyAnovaRowFilter), which renders the page table.
+        // So one publish call covers both back-compat AND the local
+        // render — no need to call applyAnovaRowFilter directly.
+        var published = false;
+        try {
+          if (typeof StatisticoHeader !== 'undefined' &&
+              typeof StatisticoHeader.publishHeaderRowFilterChange === 'function') {
+            StatisticoHeader.publishHeaderRowFilterChange(filteredRows, true);
+            published = true;
+          }
+        } catch (_e) {}
+        if (!published) {
+          applyAnovaRowFilter({ usedRows: filteredRows });
+        }
+      }
+    });
+    console.warn('[ANOVA] Filter.attach installed', {
+      headers: _vdCols.length,
+      rows: _vdRows.length,
+      hasInitialFilters: !!initialColumnFilters,
+      hasInitialRows: !!initialSourceRows
+    });
   }
 
   function filterVD(q) {

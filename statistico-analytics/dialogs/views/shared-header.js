@@ -1636,7 +1636,7 @@ const StatisticoHeader = {
   },
 
   _isHeaderRowFilterSuppressed() {
-    return this.module === 'mixed-model' || this.module === 'independent' || this.module === 'dependent';
+    return this.module === 'mixed-model' || this.module === 'independent' || this.module === 'dependent' || this.module === 'regression';
   },
 
   _mergeActionsWithFallback(actions) {

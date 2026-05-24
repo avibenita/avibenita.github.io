@@ -17,7 +17,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r"/>  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260524p"></script>
+  <script src="../shared-header.js?v=20260524q"></script>
 
   <style>
     /* ── Design tokens ── */
@@ -1680,6 +1680,10 @@
     document.addEventListener('DOMContentLoaded', function() {
       if (typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.init('overview', 'Outcome', 0, 'mixed-model');
+        if (typeof StatisticoHeader.initSidebarPage === 'function') {
+          StatisticoHeader.initSidebarPage();
+        }
+        if (typeof window._mm_syncHeader === 'function') window._mm_syncHeader();
       }
     });
   </script>
@@ -2196,12 +2200,13 @@ ${sectionsHtml}
         );
         descBtn.disabled = !hasDesc;
       }
+      if (typeof window._mm_syncHeader === 'function') window._mm_syncHeader();
     }
 
     window._registerMixedActions = _registerMixedActions;
 
     // Initial mount — results not yet available; only JSON is enabled
-    _registerMixedActions();
+    window._registerMixedActions();
   });
   </script>
 
@@ -2337,22 +2342,46 @@ ${sectionsHtml}
   };
 
   /* ─────────────────────────────────────────────────────────────
+     HEADER — outcome name + sample size (survives registerActions re-render)
+  ───────────────────────────────────────────────────────────── */
+  function _mm_resolveHeaderMeta(d) {
+    d = d || _results;
+    const outcome = d?.outcome ?? d?.y ?? _modelSpec?.dep ?? _modelSpec?.y ?? 'Outcome';
+    let n = d?.n ?? d?.N;
+    if (n == null || n === '') {
+      n = d?.residuals?.values?.length
+        ?? d?.residuals?.fitted?.length
+        ?? _rawData?.outcomeVector?.length
+        ?? _sourceRows?.length
+        ?? 0;
+    }
+    n = parseInt(n, 10);
+    if (isNaN(n) || n < 0) n = 0;
+    return { outcome, n };
+  }
+
+  function _mm_syncHeader(d) {
+    if (typeof StatisticoHeader === 'undefined') return;
+    const { outcome, n } = _mm_resolveHeaderMeta(d);
+    if (typeof StatisticoHeader.updateVariable === 'function') {
+      StatisticoHeader.updateVariable(outcome, n);
+    } else {
+      StatisticoHeader.variableName = outcome;
+      StatisticoHeader.sampleSize = n;
+      const varEl = document.getElementById('headerVariableName');
+      const nEl = document.getElementById('headerSampleSize');
+      if (varEl) varEl.textContent = outcome;
+      if (nEl) nEl.textContent = `(n=${n})`;
+    }
+  }
+  window._mm_syncHeader = _mm_syncHeader;
+
+  /* ─────────────────────────────────────────────────────────────
      MAIN ENTRY — receive and render full model results
   ───────────────────────────────────────────────────────────── */
   function receiveMixedModelResults(d) {
     _results = d;
     hideLoading();
-
-    if (typeof StatisticoHeader !== 'undefined') {
-      const outcome = d.outcome ?? d.y ?? _modelSpec?.dep ?? _modelSpec?.y ?? 'Outcome';
-      const n = d.n ?? d.N ?? (_rawData?.outcomeVector?.length ?? (_sourceRows ? _sourceRows.length : 0));
-      if (typeof StatisticoHeader.updateVariable === 'function') {
-        StatisticoHeader.updateVariable(outcome, n);
-      } else {
-        StatisticoHeader.variableName = outcome;
-        StatisticoHeader.sampleSize = n;
-      }
-    }
 
     // populate everything
     renderKPIs(d);
@@ -5405,6 +5434,7 @@ STRENGTH: [High, Moderate, or Low — short reason based on p-values, ICC, conve
   ───────────────────────────────────────────────────────────── */
   document.addEventListener('DOMContentLoaded', () => {
     applyDepth(_depth);
+    if (typeof window._mm_syncHeader === 'function') window._mm_syncHeader();
     sendToHost('mixedModelDashboardReady', {});
     console.log('🚀 Mixed Model dashboard ready');
 

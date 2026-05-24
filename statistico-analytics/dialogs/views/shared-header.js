@@ -265,23 +265,27 @@ const StatisticoHeader = {
   updateVariable(variableName, sampleSize) {
     this.variableName = variableName;
     this.sampleSize = sampleSize;
-    document.getElementById('headerVariableName').textContent = variableName;
-    
+    const varEl = document.getElementById('headerVariableName');
+    const nEl = document.getElementById('headerSampleSize');
+    if (varEl) varEl.textContent = variableName;
+
     // Check if sampleSize contains asterisk (indicating trimmed/transformed data)
     const sampleSizeStr = String(sampleSize);
     const hasAsterisk = sampleSizeStr.includes('*');
-    
+
+    if (nEl) {
+      if (hasAsterisk) {
+        // Use innerHTML with superscript for asterisk
+        const numericPart = sampleSizeStr.replace('*', '');
+        nEl.innerHTML = `(n=${numericPart}<sup>*</sup>)`;
+      } else {
+        nEl.textContent = `(n=${sampleSize})`;
+      }
+    }
+
     if (hasAsterisk) {
-      // Use innerHTML with superscript for asterisk
-      const numericPart = sampleSizeStr.replace('*', '');
-      document.getElementById('headerSampleSize').innerHTML = `(n=${numericPart}<sup>*</sup>)`;
-      
-      // Show notice
       this.showModificationNotice();
     } else {
-      document.getElementById('headerSampleSize').textContent = `(n=${sampleSize})`;
-      
-      // Hide notice
       this.hideModificationNotice();
     }
   },

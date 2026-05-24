@@ -538,7 +538,7 @@ const StatisticoHeader = {
   },
 
   _syncRowFilterHeader() {
-    if (this.module === 'mixed-model') {
+    if (this._isHeaderRowFilterSuppressed()) {
       this.updateUniFilterChrome();
       return;
     }
@@ -1610,7 +1610,11 @@ const StatisticoHeader = {
   },
 
   _shouldRenderHeaderRowFilter() {
-    return this.module !== 'mixed-model';
+    return !this._isHeaderRowFilterSuppressed();
+  },
+
+  _isHeaderRowFilterSuppressed() {
+    return this.module === 'mixed-model' || this.module === 'independent';
   },
 
   _mergeActionsWithFallback(actions) {
@@ -4001,7 +4005,7 @@ const StatisticoHeader = {
   },
 
   updateUniFilterChrome(payload) {
-    if (this.module === 'mixed-model') {
+    if (this._isHeaderRowFilterSuppressed()) {
       const notice = document.getElementById('uni-filter-active-notice');
       if (notice) {
         notice.className = '';
@@ -4116,7 +4120,7 @@ const StatisticoHeader = {
   },
 
   _initUniRowFilterFromStorage() {
-    if (this.module === 'mixed-model') return;
+    if (this._isHeaderRowFilterSuppressed()) return;
     if (this.module !== 'univariate') {
       const data = this._getHeaderRowFilterData();
       if (!data || !data.headers || !(data.allRows || data.sourceRowsAll)) return;

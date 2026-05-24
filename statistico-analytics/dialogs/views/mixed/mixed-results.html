@@ -17,10 +17,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r"/>  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260524a"></script>
-  <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
-  <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
-  <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
+  <script src="../shared-header.js?v=20260524i"></script>
 
   <style>
     /* ── Design tokens ── */
@@ -742,13 +739,6 @@
                 <span class="sb-item-description">Conclusion, health &amp; effect visualization.</span>
               </span>
             </button>
-            <button class="sb-item" onclick="setDepth('analyst')" id="detailedViewBtn">
-              <i class="fa-solid fa-microscope sb-item-icon"></i>
-              <span class="sb-item-copy">
-                <span class="sb-item-label">Detailed View</span>
-                <span class="sb-item-description">Analyst-level detail and effect sizes.</span>
-              </span>
-            </button>
             <button class="sb-item" onclick="switchTab('model-effects')" data-tab="model-effects">
               <i class="fa-solid fa-layer-group sb-item-icon"></i>
               <span class="sb-item-copy">
@@ -796,6 +786,13 @@
               <span class="sb-item-copy">
                 <span class="sb-item-label">Model Structure</span>
                 <span class="sb-item-description">Visual diagram of the model.</span>
+              </span>
+            </button>
+            <button class="sb-item" id="btnMixedDescriptives" onclick="openMixedDescriptives()" disabled>
+              <i class="fa-solid fa-list-ol sb-item-icon"></i>
+              <span class="sb-item-copy">
+                <span class="sb-item-label">Descriptives</span>
+                <span class="sb-item-description">Mean, SD, skew for continuous model variables.</span>
               </span>
             </button>
           </div>
@@ -1992,6 +1989,8 @@ ${sectionsHtml}
       if (typeof StatisticoHeader.setAiReady === 'function') {
         StatisticoHeader.setAiReady(!!_results);
       }
+      const descBtn = document.getElementById('btnMixedDescriptives');
+      if (descBtn) descBtn.disabled = !(_sourceHeaders && _sourceRows && _modelSpec);
     }
 
     window._registerMixedActions = _registerMixedActions;
@@ -2015,6 +2014,8 @@ ${sectionsHtml}
   let _modelSpec = null;      // {y, fixed, random, subject, covStructure}
   let _msdShowResults = true; // toggle: show β / σ² overlay on diagram (ON by default)
   let _rawData  = null;       // raw data vectors for JSON export / Python re-fit
+  let _sourceHeaders = null;  // full workbook headers for descriptives / view data
+  let _sourceRows = null;     // full workbook rows for descriptives / view data
   let _emmData = {};          // cached EMM by factor name
   let _pwData  = {};          // cached pairwise data
 
@@ -4577,25 +4578,73 @@ ${sectionsHtml}
      DEPTH (Insight / Analyst)
   ───────────────────────────────────────────────────────────── */
   const DEPTH_RANK = { insight:0, analyst:1 };
-  let _depthNavigation = false;
+
+  function _mm_rowValues(row, headers) {
+    return Array.isArray(row) ? row : headers.map(h => row[h]);
+  }
+
+  function _mm_getContinuousVars(headers, rows, spec) {
+    if (!headers || !rows || !spec) return [];
+    const fixVars = (spec.fix || []).concat(spec.cov || []);
+    const dep = spec.dep || spec.y;
+    const seen = new Set();
+    const continuous = [];
+    [dep, ...fixVars].filter(Boolean).forEach((name) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      const idx = headers.indexOf(name);
+      if (idx < 0) return;
+      const uniq = [...new Set(rows.map(r => _mm_rowValues(r, headers)[idx]).filter(x => x !== '' && x != null))];
+      if (!uniq.length) return;
+      const allNum = uniq.every(x => !isNaN(parseFloat(x)));
+      if (allNum) continuous.push(name);
+    });
+    return continuous;
+  }
+
+  window.openMixedDescriptives = function() {
+    if (!_sourceHeaders || !_sourceRows || !_modelSpec) {
+      console.warn('openMixedDescriptives: no mixed model data yet');
+      return;
+    }
+    const contVars = _mm_getContinuousVars(_sourceHeaders, _sourceRows, _modelSpec);
+    if (!contVars.length) {
+      window.alert('No continuous variables in the current model.');
+      return;
+    }
+    const indices = contVars.map(v => _sourceHeaders.indexOf(v)).filter(i => i >= 0);
+    const filteredHeaders = indices.map(i => _sourceHeaders[i]);
+    const sourceRowsAll = _sourceRows.map(r => _mm_rowValues(r, _sourceHeaders));
+    const filteredData = sourceRowsAll.map(r => {
+      const rowObj = {};
+      filteredHeaders.forEach((h, i) => { rowObj[h] = r[indices[i]]; });
+      return rowObj;
+    });
+    const payload = {
+      headers: filteredHeaders,
+      data: filteredData,
+      sourceHeaders: _sourceHeaders.slice(),
+      sourceRowsAll,
+      sourceRows: sourceRowsAll,
+      rowFilterActive: false,
+      source: 'mixed-model',
+      modelInfo: {
+        outcome: _modelSpec.dep || _modelSpec.y || null,
+        continuousVars: filteredHeaders.slice()
+      }
+    };
+    window.correlationData = payload;
+    try { sessionStorage.setItem('correlationData', JSON.stringify(payload)); } catch (_e) {}
+    if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader.navigateTo === 'function') {
+      StatisticoHeader.navigateTo('correlations/descriptive-stats.html');
+    }
+  };
 
   window.setDepth = function(depth) {
     _depth = depth;
     document.querySelectorAll('.depth-btn').forEach(b =>
       b.classList.toggle('active', b.dataset.depth === depth));
-
-    const dvBtn = document.getElementById('detailedViewBtn');
-    if (dvBtn) {
-      dvBtn.classList.toggle('active', depth === 'analyst');
-      dvBtn.classList.remove('is-depth');
-    }
-
     applyDepth(depth);
-
-    // Always navigate to overview to show analyst-level content
-    _depthNavigation = true;
-    switchTab('overview');
-    _depthNavigation = false;
   };
 
   function applyDepth(depth) {
@@ -4630,29 +4679,12 @@ ${sectionsHtml}
   };
 
   window.switchTab = function(name) {
-    // Navigating to overview directly (not via setDepth) resets analyst depth
-    if (name === 'overview' && !_depthNavigation && _depth === 'analyst') {
-      _depth = 'insight';
-      const dvBtn = document.getElementById('detailedViewBtn');
-      if (dvBtn) dvBtn.classList.remove('active', 'is-depth');
-      applyDepth('insight');
-    }
-
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     const tab = document.getElementById(`tab-${name}`);
     if (tab) tab.classList.add('active');
 
     document.querySelectorAll('.sb-item[data-tab]').forEach(b =>
       b.classList.toggle('active', b.dataset.tab === name));
-
-    // When on the overview tab in analyst depth, keep Detailed View active
-    // and Overview visually deactivated so the sidebar reflects the real state
-    if (name === 'overview' && _depth === 'analyst') {
-      const dvBtn = document.getElementById('detailedViewBtn');
-      const ovBtn = document.getElementById('overviewBtn');
-      if (dvBtn) dvBtn.classList.add('active');
-      if (ovBtn) ovBtn.classList.remove('active');
-    }
 
     if (typeof StatisticoHeader !== 'undefined' && TAB_TITLES[name]) {
       StatisticoHeader.updateTitle(TAB_TITLES[name]);
@@ -5627,6 +5659,8 @@ STRENGTH: [High, Moderate, or Low — short reason based on p-values, ICC, conve
                 console.warn('No modelSpec.dep — cannot compute'); return;
               }
               _modelSpec = spec;   // store so renderModelDiagram can reach it
+              _sourceHeaders = headers.slice();
+              _sourceRows = rows.slice();
 
               // Populate _rawData from spreadsheet rows so View Data works
               const _depIdx = headers.indexOf(spec.dep || spec.y || '');

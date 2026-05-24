@@ -534,6 +534,10 @@ const StatisticoHeader = {
   },
 
   _syncRowFilterHeader() {
+    if (this.module === 'mixed-model') {
+      this.updateUniFilterChrome();
+      return;
+    }
     this._injectUniFilterAssets();
     this.updateUniFilterChrome();
     // _injectUniFilterAssets loads UniRowFilter / Filter API asynchronously
@@ -1595,7 +1599,7 @@ const StatisticoHeader = {
   },
 
   _shouldRenderHeaderRowFilter() {
-    return true;
+    return this.module !== 'mixed-model';
   },
 
   _mergeActionsWithFallback(actions) {
@@ -3986,6 +3990,24 @@ const StatisticoHeader = {
   },
 
   updateUniFilterChrome(payload) {
+    if (this.module === 'mixed-model') {
+      const notice = document.getElementById('uni-filter-active-notice');
+      if (notice) {
+        notice.className = '';
+        notice.innerHTML = '';
+      }
+      const wrap = document.getElementById('headerUniFilterWrap');
+      if (wrap) {
+        wrap.hidden = true;
+        wrap.style.display = 'none';
+      }
+      const varEl = document.getElementById('headerVariableName');
+      if (varEl) varEl.textContent = this.variableName || 'Variable';
+      const nEl = document.getElementById('headerSampleSize');
+      if (nEl) nEl.textContent = `(n=${this.sampleSize || 0})`;
+      return;
+    }
+
     payload = payload || (this.module === 'univariate' ? this._getUniStored() : this._getHeaderRowFilterData());
     const meta = typeof UniRowFilter !== 'undefined' ? UniRowFilter.getSourceMeta() : null;
     const hasSource = !!(payload && payload.sourceRowsAll && payload.sourceRowsAll.length) ||
@@ -4083,6 +4105,7 @@ const StatisticoHeader = {
   },
 
   _initUniRowFilterFromStorage() {
+    if (this.module === 'mixed-model') return;
     if (this.module !== 'univariate') {
       const data = this._getHeaderRowFilterData();
       if (!data || !data.headers || !(data.allRows || data.sourceRowsAll)) return;

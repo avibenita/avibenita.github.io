@@ -11,10 +11,10 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
   <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260524i"></script>
+  <script src="../shared-header.js?v=20260524j"></script>
   <!-- Preload filter assets so the page's installer finds them on first call (no flicker). -->
-  <script src="../shared/uni-row-filter.js?v=20260524i" data-uni-row-filter="1"></script>
-  <script src="../shared/filter.js?v=20260524i" data-filter-api="1"></script>
+  <script src="../shared/uni-row-filter.js?v=20260524j" data-uni-row-filter="1"></script>
+  <script src="../shared/filter.js?v=20260524j" data-filter-api="1"></script>
   <script src="../../shared/views/normality-view.js"></script>
   <style>
     /* Dark Theme (Default) */
@@ -162,6 +162,11 @@
     
     @keyframes pulseHighlight { 0% { background-color: rgba(255, 255, 0, 0.5); } 50% { background-color: rgba(255, 255, 0, 0); } 100% { background-color: rgba(255, 255, 0, 0.5); } }
     .animated-critical { animation: pulseHighlight 0.8s ease-in-out; }
+    html.embed-mode .sb-nav { display: none !important; }
+    html.embed-mode .sb-layout { display: block !important; }
+    html.embed-mode .right-col { width: 100% !important; max-width: 100% !important; flex: 1 1 auto !important; }
+    html.embed-mode #header-container { display: none !important; }
+    html.embed-mode body { overflow: hidden !important; }
   </style>
   <style>
     html,body{height:100%!important;overflow:hidden!important;}
@@ -637,7 +642,8 @@
 
       // Sync header chrome with the active dataset (filtered or full).
       try {
-        if (typeof StatisticoHeader !== 'undefined') {
+        const isMixedEmbed = new URLSearchParams(window.location.search).get('parent') === 'mixed';
+        if (typeof StatisticoHeader !== 'undefined' && !isMixedEmbed) {
           StatisticoHeader.sampleSize = rows.length;
           StatisticoHeader.variableName = `${headers.length} Variables`;
           if (typeof StatisticoHeader.render === 'function') StatisticoHeader.render();
@@ -648,6 +654,8 @@
       // path with a legacy fallback for pre-Step-2 bundles.
       try {
         const cd = window.correlationData;
+        const skipFilter = (cd && cd.source === 'mixed-model') ||
+          new URLSearchParams(window.location.search).get('parent') === 'mixed';
         function applyDescFromFiltered(filteredRows, criteria, sourceHeaders, allRows) {
           const analysisHeaders = cd.headers || sourceHeaders;
           cd.sourceRows = filteredRows;
@@ -667,7 +675,7 @@
             window.updateDescriptiveStats(analysisHeaders);
           }
         }
-        if (typeof Filter !== 'undefined' && typeof Filter.attach === 'function' && cd) {
+        if (!skipFilter && typeof Filter !== 'undefined' && typeof Filter.attach === 'function' && cd) {
           const sourceHeaders = (Array.isArray(cd.sourceHeaders) && cd.sourceHeaders.length)
             ? cd.sourceHeaders
             : cd.headers;
@@ -1635,15 +1643,33 @@
       
       // Keep the shared header visible in the live view; export snapshots use embed=1.
       const isEmbed = params.get('embed') === '1';
+      const embedParent = params.get('parent') || '';
+      if (isEmbed) {
+        document.documentElement.classList.add('embed-mode');
+      }
       if (!isEmbed && typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.init('descriptive-stats', 'Descriptive Statistics', 0, 'correlations');
         StatisticoHeader.initSidebarPage();
         StatisticoHeader.updateTitle('Descriptive Statistics');
       } else if (isEmbed) {
-        console.log('📦 Running in export embed mode - header hidden');
+        console.log('📦 Running in embed mode - header/sidebar hidden');
       }
 
       console.log('🔄 Descriptive Statistics page loaded');
+
+      if (isEmbed && embedParent === 'mixed') {
+        const mixedData = sessionStorage.getItem('mixedDescriptiveData');
+        if (mixedData) {
+          try {
+            const payload = JSON.parse(mixedData);
+            console.log('📦 Loaded mixed-model descriptive data from sessionStorage');
+            handleCorrelationData(payload);
+            return;
+          } catch (e) {
+            console.warn('Error loading mixedDescriptiveData from sessionStorage:', e);
+          }
+        }
+      }
 
       // PRIMARY: Check for correlationData passed via same-window tab navigation
       const navCorrelData = sessionStorage.getItem('correlationData');

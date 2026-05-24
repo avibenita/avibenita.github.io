@@ -17,7 +17,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r"/>  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260524i"></script>
+  <script src="../shared-header.js?v=20260524j"></script>
 
   <style>
     /* ── Design tokens ── */
@@ -108,6 +108,19 @@
     :root[data-theme="light"] .view-container {
       background: #f8f9fc;
       border-top: 1px solid var(--border);
+    }
+
+    #tab-descriptives {
+      padding: 0;
+      gap: 0;
+      overflow: hidden;
+    }
+    #mixedDescriptivesFrame {
+      flex: 1;
+      width: 100%;
+      min-height: 0;
+      border: none;
+      background: var(--surface-0);
     }
 
     /* ── Tab content ── */
@@ -788,7 +801,7 @@
                 <span class="sb-item-description">Visual diagram of the model.</span>
               </span>
             </button>
-            <button class="sb-item" id="btnMixedDescriptives" onclick="openMixedDescriptives()" disabled>
+            <button class="sb-item" id="btnMixedDescriptives" onclick="switchTab('descriptives')" data-tab="descriptives" disabled>
               <i class="fa-solid fa-list-ol sb-item-icon"></i>
               <span class="sb-item-copy">
                 <span class="sb-item-label">Descriptives</span>
@@ -1466,6 +1479,13 @@
 
                   </div>
                 </div><!-- /tab-model-structure -->
+
+                <!-- ══════════════════════════════════════════════════════
+                     TAB: DESCRIPTIVES (embedded correlation descriptives view)
+                ══════════════════════════════════════════════════════ -->
+                <div id="tab-descriptives" class="tab-content">
+                  <iframe id="mixedDescriptivesFrame" title="Descriptive Statistics"></iframe>
+                </div>
             </div><!-- /view-container -->
 
           </div><!-- /card-main -->
@@ -4603,14 +4623,18 @@ ${sectionsHtml}
   }
 
   window.openMixedDescriptives = function() {
+    switchTab('descriptives');
+  };
+
+  function _prepareMixedDescriptivePayload() {
     if (!_sourceHeaders || !_sourceRows || !_modelSpec) {
-      console.warn('openMixedDescriptives: no mixed model data yet');
-      return;
+      console.warn('Mixed descriptives: no model data yet');
+      return false;
     }
     const contVars = _mm_getContinuousVars(_sourceHeaders, _sourceRows, _modelSpec);
     if (!contVars.length) {
       window.alert('No continuous variables in the current model.');
-      return;
+      return false;
     }
     const indices = contVars.map(v => _sourceHeaders.indexOf(v)).filter(i => i >= 0);
     const filteredHeaders = indices.map(i => _sourceHeaders[i]);
@@ -4633,12 +4657,23 @@ ${sectionsHtml}
         continuousVars: filteredHeaders.slice()
       }
     };
-    window.correlationData = payload;
-    try { sessionStorage.setItem('correlationData', JSON.stringify(payload)); } catch (_e) {}
-    if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader.navigateTo === 'function') {
-      StatisticoHeader.navigateTo('correlations/descriptive-stats.html');
-    }
-  };
+    try { sessionStorage.setItem('mixedDescriptiveData', JSON.stringify(payload)); } catch (_e) {}
+    return true;
+  }
+
+  function _loadMixedDescriptivesFrame() {
+    const frame = document.getElementById('mixedDescriptivesFrame');
+    if (!frame || typeof StatisticoHeader === 'undefined') return;
+    let target = StatisticoHeader.resolveDialogUrl('correlations/descriptive-stats.html');
+    try {
+      const url = new URL(target, window.location.href);
+      url.searchParams.set('embed', '1');
+      url.searchParams.set('parent', 'mixed');
+      url.searchParams.set('cb', Date.now().toString());
+      target = url.href;
+    } catch (_e) {}
+    frame.src = target;
+  }
 
   window.setDepth = function(depth) {
     _depth = depth;
@@ -4676,9 +4711,14 @@ ${sectionsHtml}
     'diagnostics':     'Diagnostics',
     'advanced':        'Advanced',
     'model-structure': 'Model Structure',
+    'descriptives':    'Descriptives',
   };
 
   window.switchTab = function(name) {
+    if (name === 'descriptives' && !_prepareMixedDescriptivePayload()) {
+      return;
+    }
+
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     const tab = document.getElementById(`tab-${name}`);
     if (tab) tab.classList.add('active');
@@ -4695,6 +4735,7 @@ ${sectionsHtml}
     if (name === 'diagnostics' && !window._influentialLoaded) { loadInfluentialTab();  window._influentialLoaded = true; }
     if (name === 'advanced'    && _results) { updateCovStructure(); renderCovCompChart(); }
     if (name === 'model-structure' && _results) { _renderInlineMsd(); }
+    if (name === 'descriptives') { _loadMixedDescriptivesFrame(); }
 
     const cardBody = document.querySelector('.card-body');
     if (cardBody) cardBody.scrollTop = 0;

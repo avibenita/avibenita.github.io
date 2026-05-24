@@ -602,10 +602,10 @@ const StatisticoHeader = {
     const correlationViews = [
       { id: 'correlation-matrix', label: 'Correlation Matrix', file: 'correlations/correlation-matrix-v2.html' },
       { id: 'correlation-network', label: 'Correlation Network', file: 'correlations/correlation-network.html' },
-      { id: 'taylor-diagram', label: 'Taylor Diagram', file: 'correlations/correlation-taylor.html' },
-      { id: 'descriptive-stats', label: 'Descriptive Statistics', file: 'correlations/descriptive-stats.html' },
       { id: 'partial-correlations', label: 'Partial Correlations', file: 'correlations/correlation-partial.html' },
-      { id: 'reliability', label: 'Reliability Coefficients', file: 'correlations/correlation-reliability.html' }
+      { id: 'reliability', label: 'Reliability Coefficients', file: 'correlations/correlation-reliability.html' },
+      { id: 'taylor-diagram', label: 'Taylor Diagram', file: 'correlations/correlation-taylor.html' },
+      { id: 'descriptive-stats', label: 'Descriptive Statistics', file: 'correlations/descriptive-stats.html' }
     ];
 
     const regressionViews = [
@@ -819,9 +819,14 @@ const StatisticoHeader = {
             items: [
               { type: 'navigate', viewIn: ['correlation-matrix'], file: 'correlations/correlation-matrix-v2.html', icon: 'fa-table-cells', label: 'Pairwise Matrix', description: 'All r-values, p-values, and scatterplots side by side.' },
               { type: 'navigate', viewIn: ['correlation-network'], file: 'correlations/correlation-network.html', icon: 'fa-circle-nodes', label: 'Network Graph', description: 'Strong correlations as a graph: spot clusters and isolates.' },
-              { type: 'navigate', viewIn: ['taylor-diagram'], file: 'correlations/correlation-taylor.html', icon: 'fa-compass-drafting', label: 'Taylor Diagram', description: 'Benchmark each variable against a reference signal.' },
-              { type: 'navigate', viewIn: ['partial-correlations'], file: 'correlations/correlation-partial.html', icon: 'fa-filter', label: 'Partial Correlations', description: 'Net relationships after holding selected covariates fixed.' },
+              { type: 'navigate', viewIn: ['partial-correlations'], file: 'correlations/correlation-partial.html', icon: 'fa-filter', label: 'Partial r', description: 'Net relationships after holding selected covariates fixed.' },
               { type: 'navigate', viewIn: ['reliability'], file: 'correlations/correlation-reliability.html', icon: 'fa-check-double', label: 'Scale Reliability', description: 'Cronbach alpha, omega, and item-total diagnostics.' },
+              { type: 'navigate', viewIn: ['taylor-diagram'], file: 'correlations/correlation-taylor.html', icon: 'fa-compass-drafting', label: 'Taylor Diagram', description: 'Benchmark each variable against a reference signal.' }
+            ]
+          },
+          {
+            title: 'Descriptives',
+            items: [
               { type: 'navigate', viewIn: ['descriptive-stats'], file: 'correlations/descriptive-stats.html', icon: 'fa-list-ol', label: 'Descriptives', description: 'Per-variable mean, SD, skew, and missingness.' }
             ]
           }
@@ -1763,9 +1768,9 @@ const StatisticoHeader = {
     const getCorrelationMenuItems = () => ([
       { id: 'matrix', label: 'Correlation Matrix', file: 'correlations/correlation-matrix-v2.html' },
       { id: 'network', label: 'Correlation Network', file: 'correlations/correlation-network.html' },
-      { id: 'taylor', label: 'Taylor Diagram', file: 'correlations/correlation-taylor.html' },
       { id: 'partial', label: 'Partial Correlations', file: 'correlations/correlation-partial.html' },
       { id: 'reliability', label: 'Reliability Coefficients', file: 'correlations/correlation-reliability.html' },
+      { id: 'taylor', label: 'Taylor Diagram', file: 'correlations/correlation-taylor.html' },
       { id: 'descriptives', label: 'Descriptive Statistics', file: 'correlations/descriptive-stats.html' }
     ]);
     const pickReportSections = (sections, onConfirm) => {

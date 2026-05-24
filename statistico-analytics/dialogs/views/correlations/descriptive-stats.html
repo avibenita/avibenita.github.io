@@ -16,6 +16,18 @@
   <script src="../shared/uni-row-filter.js?v=20260524o" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524o" data-filter-api="1"></script>
   <script src="../../shared/views/normality-view.js"></script>
+  <script>
+    (function () {
+      try {
+        var p = new URLSearchParams(window.location.search);
+        if (p.get('embed') === '1') {
+          document.documentElement.classList.add('embed-mode');
+          if (p.get('parent') === 'mixed') document.documentElement.classList.add('embed-mixed');
+          if (p.get('parent') === 'regression') document.documentElement.classList.add('embed-regression');
+        }
+      } catch (e) {}
+    })();
+  </script>
   <style>
     /* Dark Theme (Default) */
     :root{
@@ -166,14 +178,20 @@
     html.embed-mode .sb-layout { display: block !important; }
     html.embed-mode .right-col { width: 100% !important; max-width: 100% !important; flex: 1 1 auto !important; }
     html.embed-mode #header-container { display: none !important; }
+    html.embed-mode #sbUtilities,
+    html.embed-mode #sbAiSection { display: none !important; }
     html.embed-mode body { overflow: hidden !important; }
     html.embed-mode.embed-mixed html,
     html.embed-mode.embed-mixed body,
-    html.embed-mode.embed-mixed .right-col {
+    html.embed-mode.embed-mixed .right-col,
+    html.embed-mode.embed-regression html,
+    html.embed-mode.embed-regression body,
+    html.embed-mode.embed-regression .right-col {
       height: 100% !important;
       overflow: hidden !important;
     }
-    html.embed-mode.embed-mixed .wrap {
+    html.embed-mode.embed-mixed .wrap,
+    html.embed-mode.embed-regression .wrap {
       display: grid;
       grid-template-columns: minmax(240px, 40%) minmax(0, 1fr);
       grid-template-rows: 1fr;
@@ -185,62 +203,77 @@
       box-sizing: border-box;
     }
     html.embed-mode.embed-mixed #stats-card,
-    html.embed-mode.embed-mixed #histogram-panel {
+    html.embed-mode.embed-mixed #histogram-panel,
+    html.embed-mode.embed-regression #stats-card,
+    html.embed-mode.embed-regression #histogram-panel {
       display: flex !important;
       flex-direction: column;
       min-height: 0;
       height: 100%;
       overflow: hidden;
     }
-    html.embed-mode.embed-mixed .wrap.histogram-visible #stats-card {
+    html.embed-mode.embed-mixed .wrap.histogram-visible #stats-card,
+    html.embed-mode.embed-regression .wrap.histogram-visible #stats-card {
       flex: none;
       min-height: 0;
     }
-    html.embed-mode.embed-mixed #histogram-panel {
+    html.embed-mode.embed-mixed #histogram-panel,
+    html.embed-mode.embed-regression #histogram-panel {
       min-height: 0;
     }
-    html.embed-mode.embed-mixed #stats-card .card-body {
+    html.embed-mode.embed-mixed #stats-card .card-body,
+    html.embed-mode.embed-regression #stats-card .card-body {
       min-height: 0;
       overflow: hidden;
     }
-    html.embed-mode.embed-mixed #stats-card .table-wrap {
+    html.embed-mode.embed-mixed #stats-card .table-wrap,
+    html.embed-mode.embed-regression #stats-card .table-wrap {
       flex: 1;
       min-height: 0;
       overflow-y: auto;
     }
-    html.embed-mode.embed-mixed #stats-table {
+    html.embed-mode.embed-mixed #stats-table,
+    html.embed-mode.embed-regression #stats-table {
       min-width: 0;
     }
     html.embed-mode.embed-mixed #stats-table th,
-    html.embed-mode.embed-mixed #stats-table td {
+    html.embed-mode.embed-mixed #stats-table td,
+    html.embed-mode.embed-regression #stats-table th,
+    html.embed-mode.embed-regression #stats-table td {
       padding: 6px 7px;
       font-size: 11px;
       line-height: 15px;
       height: 30px;
     }
-    html.embed-mode.embed-mixed #histogram-panel .card-body {
+    html.embed-mode.embed-mixed #histogram-panel .card-body,
+    html.embed-mode.embed-regression #histogram-panel .card-body {
       min-height: 0;
       overflow: hidden;
     }
-    html.embed-mode.embed-mixed .flex-container {
+    html.embed-mode.embed-mixed .flex-container,
+    html.embed-mode.embed-regression .flex-container {
       min-height: 0;
       height: 100%;
     }
-    html.embed-mode.embed-mixed .chart-wrapper {
+    html.embed-mode.embed-mixed .chart-wrapper,
+    html.embed-mode.embed-regression .chart-wrapper {
       flex: 1.35;
       min-height: 0;
     }
-    html.embed-mode.embed-mixed .summary-container {
+    html.embed-mode.embed-mixed .summary-container,
+    html.embed-mode.embed-regression .summary-container {
       flex: 0 0 170px;
       min-height: 0;
       overflow-y: auto;
     }
-    html.embed-mode.embed-mixed .chart-container {
+    html.embed-mode.embed-mixed .chart-container,
+    html.embed-mode.embed-regression .chart-container {
       min-height: 0;
       height: 100% !important;
     }
     @media (max-width: 900px) {
-      html.embed-mode.embed-mixed .wrap {
+      html.embed-mode.embed-mixed .wrap,
+      html.embed-mode.embed-regression .wrap {
         grid-template-columns: 1fr;
         grid-template-rows: minmax(0, 38%) minmax(0, 62%);
       }
@@ -1740,6 +1773,8 @@
         document.documentElement.classList.add('embed-mode');
         if (embedParent === 'mixed') {
           document.documentElement.classList.add('embed-mixed');
+        } else if (embedParent === 'regression') {
+          document.documentElement.classList.add('embed-regression');
         }
       }
       if (!isEmbed && typeof StatisticoHeader !== 'undefined') {

@@ -20,6 +20,19 @@
   <script>
     (function () {
       try {
+        var p = new URLSearchParams(window.location.search);
+        if (p.get('embed') === '1') {
+          document.documentElement.classList.add('embed-mode');
+          if (p.get('parent') === 'regression') {
+            document.documentElement.classList.add('embed-regression');
+          }
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <script>
+    (function () {
+      try {
         var u = new URL(window.location.href);
         if (u.pathname.indexOf('/dialogs/views/correlations/correlation-matrix.html') >= 0) {
           u.pathname = u.pathname.replace('/correlation-matrix.html', '/correlation-matrix-v2.html');
@@ -111,6 +124,15 @@
     :root[data-theme="light"] .explore-tip { background: rgba(0,0,0,0.04); }
     :root[data-theme="light"] .explore-controls { background: rgba(0,0,0,0.04); }
     :root[data-theme="light"] .explore-table th { border-right-color: rgba(0,0,0,0.1); }
+
+    html.embed-mode .sb-nav,
+    html.embed-mode #header-container,
+    html.embed-mode #sbUtilities,
+    html.embed-mode #sbAiSection { display: none !important; }
+    html.embed-mode .sb-layout { display: block !important; }
+    html.embed-mode .right-col { width: 100% !important; max-width: 100% !important; flex: 1 1 auto !important; }
+    html.embed-mode body { overflow: hidden !important; }
+    html.embed-mode #mainContent { flex: 1; min-height: 0; height: 100%; }
 
     /* ── Header action buttons in navrow ── */
     .navrow-actions {
@@ -1552,7 +1574,8 @@
      INITIALIZATION
   ════════════════════════════════════════════ */
   const isInIframe = window.self !== window.top;
-  const isHubEmbedDemo = new URLSearchParams(location.search).get('embed') === '1'
+  const isEmbedMode = new URLSearchParams(location.search).get('embed') === '1';
+  const isHubEmbedDemo = isEmbedMode
     && new URLSearchParams(location.search).get('demo') === '1';
 
   function createDemoCorrelationData() {
@@ -1603,7 +1626,7 @@
 
     // Fallback: sessionStorage
     document.addEventListener('DOMContentLoaded', function() {
-      if (typeof StatisticoHeader !== 'undefined') {
+      if (typeof StatisticoHeader !== 'undefined' && !isEmbedMode) {
         try {
           StatisticoHeader.init('correlation-matrix', 'Correlation Analysis', 0, 'correlations');
           StatisticoHeader.initSidebarPage();
@@ -1612,6 +1635,8 @@
         } catch (e) {
           console.warn('Embedded correlation header init skipped:', e);
         }
+      } else if (isEmbedMode) {
+        console.log('📦 Correlation matrix running in embed mode — sidebar hidden');
       }
       loadEmbeddedCorrelationData();
     });

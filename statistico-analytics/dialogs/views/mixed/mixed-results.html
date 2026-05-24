@@ -17,7 +17,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r"/>  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260524k"></script>
+  <script src="../shared-header.js?v=20260524l"></script>
 
   <style>
     /* ── Design tokens ── */
@@ -121,34 +121,72 @@
       gap: 20px;
       width: 100%;
     }
-    .mm-desc-kpi-row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-bottom: 4px;
+    .mm-desc-top-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      align-items: stretch;
     }
-    .mm-desc-kpi {
-      flex: 1;
-      min-width: 110px;
+    .mm-desc-top-row .mm-section {
+      height: 100%;
+      min-width: 0;
+    }
+    @media (max-width: 960px) {
+      .mm-desc-top-row { grid-template-columns: 1fr; }
+    }
+    .mm-desc-top-row.mm-desc-top-row--single {
+      grid-template-columns: 1fr;
+    }
+    .mm-desc-lead {
+      font-size: .82rem;
+      line-height: 1.45;
+      color: var(--text-secondary);
+      margin: 0 0 12px;
+    }
+    .mm-desc-stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .mm-desc-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
       background: rgba(167,139,250,.08);
-      border: 1px solid rgba(167,139,250,.28);
+      border: 1px solid rgba(167,139,250,.24);
       border-radius: 8px;
       padding: 10px 12px;
-      text-align: center;
     }
-    .mm-desc-kpi-label {
-      font-size: .68rem;
+    .mm-desc-stat-label {
+      font-size: .72rem;
       color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      margin-bottom: 4px;
-      font-weight: 600;
+      line-height: 1.25;
     }
-    .mm-desc-kpi-value {
-      font-size: 1.15rem;
+    .mm-desc-stat-value {
+      font-size: 1.05rem;
       font-weight: 800;
       color: var(--accent-3);
       font-variant-numeric: tabular-nums;
+    }
+    .mm-desc-balance {
+      font-size: .78rem;
+      color: var(--text-secondary);
+      margin: 0 0 10px;
+      padding: 8px 10px;
+      border-radius: 7px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--border);
+    }
+    .mm-desc-balance.is-good { border-color: rgba(74,222,128,.35); color: #bbf7d0; }
+    .mm-desc-balance.is-warn { border-color: rgba(251,191,36,.35); color: #fde68a; }
+    .mm-desc-subhead {
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin: 0 0 6px;
     }
     .mm-desc-factor-block + .mm-desc-factor-block {
       margin-top: 18px;
@@ -1555,17 +1593,19 @@
                 ══════════════════════════════════════════════════════ -->
                 <div id="tab-descriptives" class="tab-content">
                   <div class="mm-desc-scroll">
-                    <div class="mm-section" id="mixedDescGroupingSection">
-                      <div class="mm-section-header">
-                        <span><i class="fa-solid fa-sitemap"></i> Grouping Structure</span>
+                    <div class="mm-desc-top-row">
+                      <div class="mm-section" id="mixedDescGroupingSection">
+                        <div class="mm-section-header">
+                          <span><i class="fa-solid fa-sitemap"></i> Grouping Structure</span>
+                        </div>
+                        <div class="mm-section-body padded" id="mixedDescGrouping"></div>
                       </div>
-                      <div class="mm-section-body padded" id="mixedDescGrouping"></div>
-                    </div>
-                    <div class="mm-section" id="mixedDescCategoricalSection">
-                      <div class="mm-section-header">
-                        <span><i class="fa-solid fa-tags"></i> Categorical Predictors</span>
+                      <div class="mm-section" id="mixedDescCategoricalSection">
+                        <div class="mm-section-header">
+                          <span><i class="fa-solid fa-tags"></i> Categorical Predictors</span>
+                        </div>
+                        <div class="mm-section-body padded" id="mixedDescCategorical"></div>
                       </div>
-                      <div class="mm-section-body padded" id="mixedDescCategorical"></div>
                     </div>
                     <div class="mm-section mm-desc-continuous-section" id="mixedDescContinuousSection">
                       <div class="mm-section-header">
@@ -4812,20 +4852,54 @@ ${sectionsHtml}
         ? (sizes[sizes.length / 2 - 1] + sizes[sizes.length / 2]) / 2
         : sizes[Math.floor(sizes.length / 2)])
       : 0;
-    const warn = singletons > 0
-      ? `<p class="mm-desc-warn"><i class="fa-solid fa-triangle-exclamation"></i> ${singletons} group${singletons === 1 ? '' : 's'} with only 1 observation — random effects may be unstable.</p>`
+    const balanced = sizes.length > 0 && minSize === maxSize;
+    const balanceClass = singletons > 0 ? 'is-warn' : (balanced ? 'is-good' : 'is-warn');
+    const balanceText = singletons > 0
+      ? `${singletons} cluster${singletons === 1 ? '' : 's'} have only one row — random intercepts may be unreliable for those groups.`
+      : balanced
+        ? `Balanced nesting: every cluster has exactly ${minSize} row${minSize === 1 ? '' : 's'}.`
+        : `Uneven nesting: cluster sizes range from ${minSize} to ${maxSize} rows (typical ≈ ${fmt(meanSize, 1)}).`;
+    const sizeDist = new Map();
+    sizes.forEach((n) => sizeDist.set(n, (sizeDist.get(n) || 0) + 1));
+    const distRows = [...sizeDist.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([size, ng]) => `<tr>
+          <td>${size} row${size === 1 ? '' : 's'} per cluster</td>
+          <td>${ng} cluster${ng === 1 ? '' : 's'}</td>
+          <td>${nGroups ? ((100 * ng) / nGroups).toFixed(0) : 0}%</td>
+        </tr>`)
+      .join('');
+    const warn = missing
+      ? `<p class="mm-desc-warn"><i class="fa-solid fa-triangle-exclamation"></i> ${missing} row${missing === 1 ? '' : 's'} excluded because ${_mm_esc(rnd)} is missing.</p>`
       : '';
     el.innerHTML = `
-      <div class="mm-desc-factor-meta">Random grouping variable: <strong>${_mm_esc(rnd)}</strong></div>
-      <div class="mm-desc-kpi-row">
-        <div class="mm-desc-kpi"><div class="mm-desc-kpi-label">Groups</div><div class="mm-desc-kpi-value">${nGroups}</div></div>
-        <div class="mm-desc-kpi"><div class="mm-desc-kpi-label">Observations</div><div class="mm-desc-kpi-value">${totalObs}</div></div>
-        <div class="mm-desc-kpi"><div class="mm-desc-kpi-label">Obs / group (mean)</div><div class="mm-desc-kpi-value">${fmt(meanSize, 1)}</div></div>
-        <div class="mm-desc-kpi"><div class="mm-desc-kpi-label">Obs / group (median)</div><div class="mm-desc-kpi-value">${fmt(medianSize, 1)}</div></div>
-        <div class="mm-desc-kpi"><div class="mm-desc-kpi-label">Min / max</div><div class="mm-desc-kpi-value">${minSize} / ${maxSize}</div></div>
-        <div class="mm-desc-kpi"><div class="mm-desc-kpi-label">Singleton groups</div><div class="mm-desc-kpi-value">${singletons}</div></div>
+      <p class="mm-desc-lead">Rows are grouped by <strong>${_mm_esc(rnd)}</strong> for the random intercept. Each cluster ID is one subject / site / repeated-measures unit in the mixed model.</p>
+      <div class="mm-desc-stat-grid">
+        <div class="mm-desc-stat">
+          <span class="mm-desc-stat-label">Clusters (unique IDs)</span>
+          <span class="mm-desc-stat-value">${nGroups}</span>
+        </div>
+        <div class="mm-desc-stat">
+          <span class="mm-desc-stat-label">Rows used in model</span>
+          <span class="mm-desc-stat-value">${totalObs}</span>
+        </div>
+        <div class="mm-desc-stat">
+          <span class="mm-desc-stat-label">Typical rows per cluster (median)</span>
+          <span class="mm-desc-stat-value">${fmt(medianSize, 1)}</span>
+        </div>
+        <div class="mm-desc-stat">
+          <span class="mm-desc-stat-label">Smallest → largest cluster</span>
+          <span class="mm-desc-stat-value">${minSize} → ${maxSize}</span>
+        </div>
       </div>
-      ${missing ? `<p class="mm-desc-warn">${missing} row${missing === 1 ? '' : 's'} missing a group ID.</p>` : ''}
+      <p class="mm-desc-balance ${balanceClass}">${balanceText}</p>
+      <div class="mm-desc-subhead">Cluster size distribution</div>
+      <div class="mm-table-wrap">
+        <table class="mm-table">
+          <thead><tr><th>Rows per cluster</th><th># clusters</th><th>Share</th></tr></thead>
+          <tbody>${distRows || '<tr><td colspan="3">No clusters found</td></tr>'}</tbody>
+        </table>
+      </div>
       ${warn}`;
   }
 
@@ -4933,9 +5007,20 @@ ${sectionsHtml}
     frame.src = target;
   }
 
+  function _syncDescTopRowLayout() {
+    const row = document.querySelector('.mm-desc-top-row');
+    const grp = document.getElementById('mixedDescGroupingSection');
+    const cat = document.getElementById('mixedDescCategoricalSection');
+    if (!row) return;
+    const grpVisible = !!(grp && grp.style.display !== 'none');
+    const catVisible = !!(cat && cat.style.display !== 'none');
+    row.classList.toggle('mm-desc-top-row--single', grpVisible !== catVisible);
+  }
+
   function _loadMixedDescriptivesTab() {
     _renderMixedDescGrouping();
     _renderMixedDescCategorical();
+    _syncDescTopRowLayout();
     _loadMixedDescriptivesFrame();
   }
 

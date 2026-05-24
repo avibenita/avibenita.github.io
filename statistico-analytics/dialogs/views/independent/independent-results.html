@@ -12,10 +12,10 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r" />  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260524a"></script>
+  <script src="../shared-header.js?v=20260524b"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
-  <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
-  <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
+  <script src="../shared/uni-row-filter.js?v=20260524b" data-uni-row-filter="1"></script>
+  <script src="../shared/filter.js?v=20260524b" data-filter-api="1"></script>
 
   <script src="../../../src/shared/js/ai-config.js?v=20260429a"></script>
   <style>
@@ -1583,12 +1583,59 @@
       
       setFrameworkButtons(primaryFramework);
       refreshSettingsVisibility();
+      // Filter-as-macro bridge: when the user applies criteria in the row
+      // filter panel, route the filtered row set to the host for a full
+      // recompute. The host calls the SAME buildIndependentBundle() it uses
+      // at first open, so analysis stats stay consistent with the visible N.
+      // No per-module recompute, no sessionStorage filter state, no banner
+      // state machine — the dialog stays a dumb renderer.
+      let _independentFilterBridgeInstalled = false;
+      function installIndependentFilterBridge(){
+        if (_independentFilterBridgeInstalled) return;
+        const data = window.independentRangeData;
+        if (!data || data.length < 2) return;
+        if (typeof Filter === "undefined" || typeof Filter.attach !== "function") {
+          // filter.js loads asynchronously via shared-header asset injection;
+          // retry until the API surfaces.
+          setTimeout(installIndependentFilterBridge, 100);
+          return;
+        }
+        const headers = data[0] || [];
+        const allRows = data.slice(1);
+        // Preserve any active filter state across re-installs.
+        let initialFilters = null, initialRows = null;
+        try {
+          const cur = (typeof Filter.getCurrent === "function") ? Filter.getCurrent() : null;
+          if (cur) {
+            initialFilters = cur.columnFilters || null;
+            if (Array.isArray(cur.sourceRows) && cur.sourceRows.length && cur.sourceRows.length < allRows.length) {
+              initialRows = cur.sourceRows;
+            }
+          }
+        } catch(_e) {}
+        Filter.attach({
+          headers: headers,
+          rows: allRows,
+          columnIndex: -1,
+          initial: { columnFilters: initialFilters, sourceRows: initialRows },
+          onApply: function(filteredRows){
+            sendToHost("independentRecomputeFromFilter", { filteredRows: filteredRows });
+          }
+        });
+        _independentFilterBridgeInstalled = true;
+        console.log("[FILTER] bridge installed for independent (rows=" + allRows.length + ")");
+      }
+
       Office.onReady(function(){
         Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function(arg){
           const msg = JSON.parse(arg.message||"{}");
           if(msg.type==="INDEPENDENT_BUNDLE"){
             if (msg.rawData) window.independentRangeData = msg.rawData;
             populateBundle(msg.payload||{});
+            // First bundle (with rawData) sets up the filter bridge. Later
+            // bundles (filter recompute, settings change) skip it — the
+            // existing UniRowFilter instance keeps the user's criteria.
+            if (msg.rawData) installIndependentFilterBridge();
           } else if (msg.theme) { applyTheme(msg.theme); }
         });
         sendToHost("independentDashboardReady",{});

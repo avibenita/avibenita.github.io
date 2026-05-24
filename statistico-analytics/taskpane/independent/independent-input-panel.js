@@ -802,8 +802,18 @@ function openIndependentResultsDialog() {
               const current = JSON.parse(sessionStorage.getItem("independentModelSpec") || "{}");
               const next = Object.assign({}, current, message.data);
               sessionStorage.setItem("independentModelSpec", JSON.stringify(next));
+              sendIndependentBundle();
+            } else if (message.cmd === "independentRecomputeFromFilter" && message.data) {
+              // New "filter as macro" path: dialog has the user's filter
+              // criteria applied (UniRowFilter produces filteredRows). The
+              // host re-runs the SAME compute fn used at first open and
+              // returns a fresh bundle. The dialog renders it via the same
+              // populateBundle() path. No per-module recompute logic, no
+              // sessionStorage filter state, no banner state-machine.
+              recomputeIndependentFromFilteredRows(message.data.filteredRows);
+            } else {
+              sendIndependentBundle();
             }
-            sendIndependentBundle();
           }
           else if (message.action === "close") { independentDialog.close(); independentDialog = null; }
         } catch (_e) { console.error("Results dialog message error:", _e); }
@@ -829,6 +839,26 @@ function sendIndependentBundle() {
     type: "INDEPENDENT_BUNDLE", 
     payload: bundle,
     rawData: independentRangeData  // Include raw data for descriptive stats
+  }));
+}
+
+// Filter-as-macro recompute: dialog passed pre-filtered rows (UniRowFilter
+// in the dialog has done the filtering). We re-run buildIndependentBundle
+// against those rows and ship a fresh bundle. We deliberately omit rawData
+// so the dialog's full source range stays intact for the filter UI; only
+// the analysis statistics update.
+function recomputeIndependentFromFilteredRows(filteredRows) {
+  if (!independentDialog || !independentRangeData) return;
+  const headers = independentRangeData[0] || [];
+  const allRows = independentRangeData.slice(1);
+  const rows = (Array.isArray(filteredRows) && filteredRows.length) ? filteredRows : allRows;
+  const modelSpec = JSON.parse(sessionStorage.getItem("independentModelSpec") || "{}");
+  const bundle = buildIndependentBundle(headers, rows, modelSpec);
+  console.log("recomputeIndependentFromFilteredRows: rows=" + rows.length + "/" + allRows.length);
+  independentDialog.messageChild(JSON.stringify({
+    type: "INDEPENDENT_BUNDLE",
+    payload: bundle
+    // NOTE: no rawData — dialog keeps full source for filter UI.
   }));
 }
 

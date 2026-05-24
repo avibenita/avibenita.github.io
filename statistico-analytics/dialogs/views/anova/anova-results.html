@@ -14,10 +14,10 @@
   <!-- Shared Header (same version pattern as other modules) -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r"/>  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260523x"></script>
+  <script src="../shared-header.js?v=20260523y"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
-  <script src="../shared/uni-row-filter.js?v=20260523x" data-uni-row-filter="1"></script>
-  <script src="../shared/filter.js?v=20260523x" data-filter-api="1"></script>
+  <script src="../shared/uni-row-filter.js?v=20260523y" data-uni-row-filter="1"></script>
+  <script src="../shared/filter.js?v=20260523y" data-filter-api="1"></script>
 
   <style>
     /* ג”€ג”€ CSS tokens ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ */
@@ -1485,6 +1485,10 @@
   <script>
   /* ג”€ג”€ Global state ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ */
   var _bundle   = null;
+  /* Original (host-precomputed) bundle preserved for two reasons: a clean
+     restore when the user clears the row filter, and access to spec /
+     posthoc / descriptive blocks we don't recompute on filter changes. */
+  var _originalBundle = null;
   var _decPrec  = 3;
   var _charts   = {};
   var _vdRows = [], _vdFiltered = [], _vdCols = [], _vdPage = 0;
@@ -1634,6 +1638,9 @@
             var msg = JSON.parse(arg.message || '{}');
             if (msg.type === 'ANOVA_BUNDLE') {
               _bundle = msg.payload;
+              /* Snapshot the host-precomputed bundle so we can restore on
+                 filter clear and recompute deltas on filter apply. */
+              try { _originalBundle = JSON.parse(JSON.stringify(_bundle)); } catch (_e) { _originalBundle = _bundle; }
               populateAll(_bundle);
             } else if (msg.type === 'ANOVA_RAW_DATA') {
               populateViewData(msg.payload || {});
@@ -2826,6 +2833,265 @@
     });
     _vdPage = 0;
     renderVDPage();
+    _refreshAnalysisFromFilter();
+  }
+
+  /* ────────────────────────────────────────────────────────────────────
+     Recompute analysis from the current row filter.
+
+     Today: one-way ANOVA recomputes F / p / η² / N / SS / df / MS / Welch
+     directly from the filtered rows so the displayed stats agree with the
+     row-filter banner. Two-way and repeated-measures designs fall back to
+     the host-precomputed bundle (the dialog only filters the View Data
+     tab in those cases — banner still says "filter active" but stats
+     reflect the original sample).
+
+     When the filter is cleared, we restore the original bundle exactly.
+     ──────────────────────────────────────────────────────────────────── */
+
+  function _refreshAnalysisFromFilter() {
+    if (!_originalBundle) return;
+    var isFiltered = Array.isArray(_vdFiltered) &&
+                     Array.isArray(_vdRows) &&
+                     _vdFiltered.length > 0 &&
+                     _vdFiltered.length < _vdRows.length;
+
+    if (!isFiltered) {
+      // Filter is empty / cleared — restore the host bundle verbatim.
+      try { _bundle = JSON.parse(JSON.stringify(_originalBundle)); } catch (_e) { _bundle = _originalBundle; }
+      populateAll(_bundle);
+      return;
+    }
+
+    if (_originalBundle.type === 'one-way') {
+      var recomputed = _recomputeOneWayFromRows(_vdFiltered);
+      if (recomputed) {
+        try { _bundle = JSON.parse(JSON.stringify(_originalBundle)); } catch (_e) { _bundle = _originalBundle; }
+        _bundle.oneWay = recomputed.oneWay;
+        if (Array.isArray(recomputed.levels) && recomputed.levels.length) {
+          _bundle.levels = recomputed.levels;
+        }
+        if (recomputed.welchAnova) _bundle.welchAnova = recomputed.welchAnova;
+        if (Array.isArray(recomputed.descriptives) && recomputed.descriptives.length) {
+          _bundle.descriptives = recomputed.descriptives;
+          // Drop two-way descriptive splits — they don't apply to a
+          // recomputed one-way pass and would render stale numbers.
+          delete _bundle.descA;
+          delete _bundle.descB;
+          delete _bundle.descAB;
+        }
+        // Post-hoc / Levene / Shapiro / interaction tables come from the
+        // host and we don't recompute them on filter changes. Drop them
+        // so the rendered tabs show a clean "not recomputed" state
+        // instead of stale values that disagree with the new F / p.
+        delete _bundle.posthoc;
+        delete _bundle.posthocA;
+        delete _bundle.posthocB;
+        delete _bundle.assumptions;
+        delete _bundle.effects;
+        populateAll(_bundle);
+        return;
+      }
+    }
+
+    // Fallback: filter applied but we can't safely recompute (two-way,
+    // repeated, or one-way with degenerate groups). Keep the host stats
+    // and flag the staleness in the decision banner so the user knows.
+    try { _bundle = JSON.parse(JSON.stringify(_originalBundle)); } catch (_e) { _bundle = _originalBundle; }
+    populateAll(_bundle);
+    var bodyEl = document.getElementById('overviewDecisionBody');
+    if (bodyEl) {
+      var note = document.createElement('div');
+      note.style.cssText = 'margin-top:8px;font-size:12px;color:var(--warning,#f0a050);';
+      note.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> ' +
+        'Row filter applies to <strong>View Data</strong> only — the analysis above ' +
+        'still reflects the original sample (re-run from Excel for filtered stats).';
+      bodyEl.appendChild(note);
+    }
+  }
+
+  function _recomputeOneWayFromRows(rows) {
+    if (!_originalBundle || _originalBundle.type !== 'one-way') return null;
+    var spec = _originalBundle.spec || {};
+    var dvName = spec.dv;
+    var fAName = spec.factor1 || spec.factor;
+    if (!dvName || !fAName || !Array.isArray(_vdCols) || !_vdCols.length) return null;
+    var dvIdx = _vdCols.indexOf(dvName);
+    var fAIdx = _vdCols.indexOf(fAName);
+    if (dvIdx < 0 || fAIdx < 0) return null;
+
+    var groups = {};
+    var groupOrder = [];
+    rows.forEach(function (r) {
+      if (!Array.isArray(r)) return;
+      var rawG = r[fAIdx];
+      if (rawG === '' || rawG === null || rawG === undefined) return;
+      var g = String(rawG);
+      var v = parseFloat(r[dvIdx]);
+      if (!isFinite(v)) return;
+      if (!Object.prototype.hasOwnProperty.call(groups, g)) {
+        groups[g] = [];
+        groupOrder.push(g);
+      }
+      groups[g].push(v);
+    });
+
+    // Preserve the bundle's original level ordering when possible — keeps
+    // bar charts / posthoc columns in the same order across renders.
+    var levels = Array.isArray(_originalBundle.levels)
+      ? _originalBundle.levels.filter(function (g) { return groupOrder.indexOf(String(g)) >= 0; })
+      : [];
+    groupOrder.forEach(function (g) {
+      if (levels.indexOf(g) < 0) levels.push(g);
+    });
+    levels = levels.filter(function (g) { return groups[g] && groups[g].length > 0; });
+
+    var k = levels.length;
+    if (k < 2) return null;
+
+    var grandSum = 0, N = 0;
+    var means = {};
+    levels.forEach(function (g) {
+      var arr = groups[g];
+      var sum = 0;
+      for (var i = 0; i < arr.length; i++) sum += arr[i];
+      means[g] = sum / arr.length;
+      grandSum += sum;
+      N += arr.length;
+    });
+    if (N <= k) return null;
+    var grandMean = grandSum / N;
+
+    var ssBetween = 0;
+    levels.forEach(function (g) {
+      var d = means[g] - grandMean;
+      ssBetween += groups[g].length * d * d;
+    });
+    var ssWithin = 0;
+    levels.forEach(function (g) {
+      var m = means[g];
+      var arr = groups[g];
+      for (var i = 0; i < arr.length; i++) {
+        var d = arr[i] - m;
+        ssWithin += d * d;
+      }
+    });
+    var ssTotal = ssBetween + ssWithin;
+    var df1 = k - 1;
+    var df2 = N - k;
+    if (df2 <= 0 || ssWithin <= 0) return null;
+    var msBetween = ssBetween / df1;
+    var msWithin = ssWithin / df2;
+    var F = msBetween / msWithin;
+    var p = _fSurv(F, df1, df2);
+    var etaSq = ssTotal > 0 ? ssBetween / ssTotal : 0;
+    // Cohen's f and ω² as nice-to-haves; the bundle exposes them in some
+    // populate paths and falling back to NaN keeps cards from breaking.
+    var omegaSq = (ssBetween - df1 * msWithin) / (ssTotal + msWithin);
+    var cohenF = etaSq < 1 && etaSq >= 0 ? Math.sqrt(etaSq / (1 - etaSq)) : NaN;
+
+    // Welch's ANOVA — robust to unequal variances. Cheap to compute and
+    // already rendered in the inference tab when the host provides it.
+    var welch = _recomputeWelchOneWay(levels, groups);
+
+    var descriptives = levels.map(function (g) {
+      var arr = groups[g];
+      var n = arr.length;
+      var m = means[g];
+      var ssq = 0;
+      var mn = Infinity;
+      var mx = -Infinity;
+      for (var i = 0; i < n; i++) {
+        var v = arr[i];
+        var d = v - m;
+        ssq += d * d;
+        if (v < mn) mn = v;
+        if (v > mx) mx = v;
+      }
+      var sd = n > 1 ? Math.sqrt(ssq / (n - 1)) : 0;
+      var se = n > 0 ? sd / Math.sqrt(n) : 0;
+      // 1.96 is an OK normal approximation for the 95% CI here; we
+      // don't carry a t-inverse in this dialog. The host bundle uses
+      // exact Student-t when present.
+      var halfWidth = 1.96 * se;
+      return {
+        level: g,
+        n: n,
+        mean: m,
+        sd: sd,
+        se: se,
+        ciLow: m - halfWidth,
+        ciHigh: m + halfWidth,
+        min: mn,
+        max: mx
+      };
+    });
+
+    return {
+      oneWay: {
+        F: F, p: p, etaSq: etaSq, etaSqPartial: etaSq, omegaSq: omegaSq, cohenF: cohenF,
+        N: N, k: k, df1: df1, df2: df2,
+        ssBetween: ssBetween, ssWithin: ssWithin, ssTotal: ssTotal,
+        msBetween: msBetween, msWithin: msWithin
+      },
+      levels: levels,
+      welchAnova: welch,
+      descriptives: descriptives,
+      groups: groups,
+      means: means
+    };
+  }
+
+  function _recomputeWelchOneWay(levels, groups) {
+    // Welch's heteroscedastic F — Welch (1951). Useful when group variances
+    // differ. Returns null on degenerate input.
+    var k = levels.length;
+    if (k < 2) return null;
+    var weights = {};
+    var means = {};
+    var ns = {};
+    var totalW = 0;
+    var weightedSum = 0;
+    for (var i = 0; i < k; i++) {
+      var g = levels[i];
+      var arr = groups[g];
+      var n = arr.length;
+      if (n < 2) return null;
+      var sum = 0;
+      for (var j = 0; j < n; j++) sum += arr[j];
+      var m = sum / n;
+      var ssq = 0;
+      for (var j2 = 0; j2 < n; j2++) { var d = arr[j2] - m; ssq += d * d; }
+      var s2 = ssq / (n - 1);
+      if (s2 <= 0) return null;
+      var w = n / s2;
+      weights[g] = w;
+      means[g] = m;
+      ns[g] = n;
+      totalW += w;
+      weightedSum += w * m;
+    }
+    var grandMean = weightedSum / totalW;
+    var num = 0;
+    for (var i2 = 0; i2 < k; i2++) {
+      var g2 = levels[i2];
+      var d2 = means[g2] - grandMean;
+      num += weights[g2] * d2 * d2;
+    }
+    num /= (k - 1);
+
+    var denomTerm = 0;
+    for (var i3 = 0; i3 < k; i3++) {
+      var g3 = levels[i3];
+      var t = 1 - weights[g3] / totalW;
+      denomTerm += (t * t) / (ns[g3] - 1);
+    }
+    var df1 = k - 1;
+    var df2 = (k * k - 1) / (3 * denomTerm);
+    var denom = 1 + (2 * (k - 2) * denomTerm) / (k * k - 1);
+    var F = num / denom;
+    var p = _fSurv(F, df1, df2);
+    return { F: F, df1: df1, df2: df2, p: p };
   }
 
   /* Page owns the row-filter install + apply callback. Uses the lean

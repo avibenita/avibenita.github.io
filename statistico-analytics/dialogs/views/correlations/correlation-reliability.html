@@ -22,10 +22,10 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260524a"></script>
+  <script src="../shared-header.js?v=20260524f"></script>
   <!-- Preload filter assets so the page's installer finds them on first call (no flicker). -->
-  <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
-  <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
+  <script src="../shared/uni-row-filter.js?v=20260524f" data-uni-row-filter="1"></script>
+  <script src="../shared/filter.js?v=20260524f" data-filter-api="1"></script>
 
   <style>
     :root {
@@ -633,6 +633,70 @@
     let reliabilitySort = { key: null, direction: 'asc' };
     let reliabilityResultsForAI = null;
 
+    // Accept any of the persisted correlationData shapes and return
+    // [[Number, ...], ...] aligned to data.headers.
+    //
+    // Across the correlation views the persisted payload is heterogenous:
+    //   • Matrix    →  data[] is array-of-objects, values already coerced
+    //                  to finite numbers via toNumericRows (null for NaN).
+    //   • Network / Taylor / Partial / Descriptives  →  data[] is the
+    //                  parent's raw payload: array-of-objects keyed by
+    //                  the FULL source headers, values are raw Excel
+    //                  cells (often strings — "3.2", "2024-01-05", …).
+    //   • After a filter  →  cd.data is the projected/numeric form, and
+    //                  cd.sourceRows / sourceRowsAll are full-source
+    //                  arrays.
+    //
+    // We always project onto cd.headers (analysis columns) and run
+    // parseFloat on each value, so the typeof === 'number' check inside
+    // runReliabilityAnalysis succeeds regardless of which view we
+    // navigated from. (Without this, non-matrix → reliability silently
+    // dropped every row and left the spinner running.)
+    function extractAnalysisRows(cd) {
+      if (!cd || typeof cd !== 'object') return null;
+      const analysisHeaders = Array.isArray(cd.headers) ? cd.headers : null;
+      if (!analysisHeaders || !analysisHeaders.length) return null;
+      const sourceHeaders = (Array.isArray(cd.sourceHeaders) && cd.sourceHeaders.length)
+        ? cd.sourceHeaders
+        : analysisHeaders;
+      const idxBySource = {};
+      sourceHeaders.forEach((h, i) => { idxBySource[h] = i; });
+
+      function num(v) {
+        if (v === null || v === undefined || v === '') return NaN;
+        const n = typeof v === 'number' ? v : parseFloat(v);
+        return Number.isFinite(n) ? n : NaN;
+      }
+      function projectArrayRow(row) {
+        return analysisHeaders.map((h) => {
+          const i = Object.prototype.hasOwnProperty.call(idxBySource, h) ? idxBySource[h] : null;
+          return num(i == null ? null : row[i]);
+        });
+      }
+      function projectObjectRow(row) {
+        return analysisHeaders.map((h) => num(row[h]));
+      }
+      function shape(row) {
+        if (Array.isArray(row)) return projectArrayRow(row);
+        if (row && typeof row === 'object') return projectObjectRow(row);
+        return null;
+      }
+
+      const candidates = [cd.data, cd.usedRows, cd.sourceRows, cd.sourceRowsAll, cd.allRows];
+      for (let i = 0; i < candidates.length; i += 1) {
+        const rows = candidates[i];
+        if (!Array.isArray(rows) || !rows.length) continue;
+        const projected = rows.map(shape).filter(Boolean);
+        // Accept the first candidate that produces ANY all-finite row.
+        // (Some candidates — e.g. cd.sourceRowsAll arrays of length 19
+        // when sourceHeaders is missing — degrade to all-NaN; we want
+        // to fall through to the next shape rather than return them.)
+        const hasFiniteRow = projected.some(r => r.every(v => Number.isFinite(v)));
+        if (hasFiniteRow) return projected;
+      }
+      return null;
+    }
+
     // Office.js initialization
     Office.onReady(() => {
       console.log('Office.js ready for Reliability Analysis');
@@ -656,14 +720,26 @@
         try {
           const data = JSON.parse(storedCorr);
           window.correlationData = data;
-          originalRawData = data.data;
-          const dataArrays = data.data.map(row => data.headers.map(h => row[h]));
-          runReliabilityAnalysis(dataArrays, data.headers);
-          // Defer install so shared-header asset bootstrap (which itself
-          // runs UniRowFilter.init) finishes first; we then re-init with
-          // our own onApply, mirroring the matrix view.
-          setTimeout(installReliabilityFilter, 250);
-          setTimeout(installReliabilityFilter, 800);
+          const dataArrays = extractAnalysisRows(data);
+          console.log('[Reliability] sessionStorage load', {
+            hasHeaders: Array.isArray(data.headers) ? data.headers.length : null,
+            dataField:  Array.isArray(data.data) ? data.data.length : null,
+            sourceRows: Array.isArray(data.sourceRows) ? data.sourceRows.length : null,
+            sourceRowsAll: Array.isArray(data.sourceRowsAll) ? data.sourceRowsAll.length : null,
+            dataArrays: dataArrays ? dataArrays.length : null,
+            firstRow:   dataArrays && dataArrays[0] ? dataArrays[0].slice(0, 4) : null
+          });
+          if (dataArrays && dataArrays.length) {
+            originalRawData = data.data || dataArrays;
+            runReliabilityAnalysis(dataArrays, data.headers);
+            // Defer install so shared-header asset bootstrap (which itself
+            // runs UniRowFilter.init) finishes first; we then re-init with
+            // our own onApply, mirroring the matrix view.
+            setTimeout(installReliabilityFilter, 250);
+            setTimeout(installReliabilityFilter, 800);
+          } else {
+            console.warn('[Reliability] sessionStorage had no usable rows; will wait for parent CORRELATION_DATA.');
+          }
         } catch(e) { console.warn('Error reading correlationData from sessionStorage:', e); }
       }
       
@@ -689,15 +765,19 @@
               window.correlationData = data;
               try { sessionStorage.setItem('correlationData', JSON.stringify(data)); } catch(e) {}
               console.log('Reliability data received:', data);
-              
-              // Store original data
-              originalRawData = data.data;
-              
-              // Convert to array format and run analysis
-              const dataArrays = data.data.map(row => 
-                data.headers.map(header => row[header])
-              );
-              
+
+              const dataArrays = extractAnalysisRows(data);
+              if (!dataArrays || !dataArrays.length) {
+                console.warn('[Reliability] CORRELATION_DATA payload had no usable rows', data);
+                var loadingEl = document.getElementById('loadingMessage');
+                if (loadingEl) {
+                  loadingEl.innerHTML =
+                    '<i class="fa-solid fa-exclamation-triangle" style="font-size:48px;color:#fbbf24;"></i>' +
+                    '<p>No reliability data available.<br><small style="opacity:.7;">Open the Correlation matrix first, then return here.</small></p>';
+                }
+                return;
+              }
+              originalRawData = data.data || dataArrays;
               runReliabilityAnalysis(dataArrays, data.headers);
               setTimeout(installReliabilityFilter, 250);
               setTimeout(installReliabilityFilter, 800);
@@ -801,7 +881,18 @@
       lastVarNames = varnames;
 
       if (!Array.isArray(cleanedData) || cleanedData.length === 0 || !Array.isArray(cleanedData[0])) {
-        console.error('Invalid data structure');
+        console.error('[Reliability] Invalid data structure', {
+          dataLen:    Array.isArray(data) ? data.length : null,
+          cleanedLen: Array.isArray(cleanedData) ? cleanedData.length : null,
+          firstRow:   Array.isArray(cleanedData) && cleanedData.length ? cleanedData[0] : null,
+          varnames:   varnames
+        });
+        var loadingEl = document.getElementById('loadingMessage');
+        if (loadingEl) {
+          loadingEl.innerHTML =
+            '<i class="fa-solid fa-exclamation-triangle" style="font-size:48px;color:#fbbf24;"></i>' +
+            '<p>No reliability data available.<br><small style="opacity:.7;">Open the Correlation matrix first, then return here.</small></p>';
+        }
         return;
       }
 

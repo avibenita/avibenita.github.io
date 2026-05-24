@@ -12,10 +12,10 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r" />  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260524d"></script>
+  <script src="../shared-header.js?v=20260524e"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
-  <script src="../shared/uni-row-filter.js?v=20260524d" data-uni-row-filter="1"></script>
-  <script src="../shared/filter.js?v=20260524d" data-filter-api="1"></script>
+  <script src="../shared/uni-row-filter.js?v=20260524e" data-uni-row-filter="1"></script>
+  <script src="../shared/filter.js?v=20260524e" data-filter-api="1"></script>
 
   <script src="../../../src/shared/js/ai-config.js?v=20260429a"></script>
   <style>
@@ -1628,6 +1628,31 @@
           initial: { columnFilters: initialFilters, sourceRows: initialRows },
           onApply: function(filteredRows){
             sendToHost("independentRecomputeFromFilter", { filteredRows: filteredRows });
+            // Filter.attach also calls updateUniFilterChrome via _refreshChrome,
+            // but the host roundtrip may trigger a populateBundle that runs
+            // updateVariable() and rewrites headerVariableName.textContent
+            // (stripping the filter icon). Schedule belt-and-braces refreshes
+            // so the banner / chip / icon stay in sync with the filtered N
+            // both before and after the host responds.
+            try {
+              if (typeof StatisticoHeader !== "undefined" &&
+                  typeof StatisticoHeader.updateUniFilterChrome === "function") {
+                StatisticoHeader.updateUniFilterChrome();
+                setTimeout(function(){ try { StatisticoHeader.updateUniFilterChrome(); } catch(_e){} }, 60);
+                setTimeout(function(){ try { StatisticoHeader.updateUniFilterChrome(); } catch(_e){} }, 350);
+                setTimeout(function(){ try { StatisticoHeader.updateUniFilterChrome(); } catch(_e){} }, 800);
+              }
+            } catch(_e){}
+            try {
+              var meta = (typeof UniRowFilter !== "undefined" && UniRowFilter.getSourceMeta)
+                ? UniRowFilter.getSourceMeta() : null;
+              console.log("[FILTER][independent] applied", {
+                filtered: filteredRows.length,
+                metaAll:  meta ? meta.allRows.length    : null,
+                metaFilt: meta ? meta.filteredRows.length : null,
+                hasActive: meta ? meta.hasActiveFilters : null
+              });
+            } catch(_e){}
           }
         });
         _independentFilterBridgeInstalled = true;
@@ -1653,6 +1678,22 @@
             // bundles (filter recompute, settings change) skip it — the
             // existing UniRowFilter instance keeps the user's criteria.
             if (msg.rawData) installIndependentFilterBridge();
+            // populateBundle calls StatisticoHeader.updateVariable() which
+            // resets headerVariableName.textContent (stripping the filter
+            // icon set by updateUniFilterChrome). Re-sync the chrome (icon,
+            // chip, green banner) AFTER populate so the filter state stays
+            // visible whenever a new bundle lands (initial load, settings
+            // change, filter recompute).
+            try {
+              if (typeof StatisticoHeader !== "undefined" &&
+                  typeof StatisticoHeader.updateUniFilterChrome === "function") {
+                requestAnimationFrame(function(){
+                  try { StatisticoHeader.updateUniFilterChrome(); } catch(_e){}
+                });
+                setTimeout(function(){ try { StatisticoHeader.updateUniFilterChrome(); } catch(_e){} }, 80);
+                setTimeout(function(){ try { StatisticoHeader.updateUniFilterChrome(); } catch(_e){} }, 350);
+              }
+            } catch(_e){}
           } else if (msg.theme) { applyTheme(msg.theme); }
         });
         sendToHost("independentDashboardReady",{});

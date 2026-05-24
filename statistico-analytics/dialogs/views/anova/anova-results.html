@@ -14,10 +14,10 @@
   <!-- Shared Header (same version pattern as other modules) -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r"/>  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260523y"></script>
+  <script src="../shared-header.js?v=20260523z"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
-  <script src="../shared/uni-row-filter.js?v=20260523y" data-uni-row-filter="1"></script>
-  <script src="../shared/filter.js?v=20260523y" data-filter-api="1"></script>
+  <script src="../shared/uni-row-filter.js?v=20260523z" data-uni-row-filter="1"></script>
+  <script src="../shared/filter.js?v=20260523z" data-filter-api="1"></script>
 
   <style>
     /* ג”€ג”€ CSS tokens ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ */
@@ -2872,6 +2872,8 @@
           _bundle.levels = recomputed.levels;
         }
         if (recomputed.welchAnova) _bundle.welchAnova = recomputed.welchAnova;
+        if (recomputed.levene) _bundle.levene = recomputed.levene;
+        if (recomputed.brownForsythe) _bundle.brownForsythe = recomputed.brownForsythe;
         if (Array.isArray(recomputed.descriptives) && recomputed.descriptives.length) {
           _bundle.descriptives = recomputed.descriptives;
           // Drop two-way descriptive splits — they don't apply to a
@@ -2880,15 +2882,21 @@
           delete _bundle.descB;
           delete _bundle.descAB;
         }
-        // Post-hoc / Levene / Shapiro / interaction tables come from the
-        // host and we don't recompute them on filter changes. Drop them
-        // so the rendered tabs show a clean "not recomputed" state
-        // instead of stale values that disagree with the new F / p.
+        // Post-hoc / Kruskal-Wallis / Shapiro / interaction blocks are
+        // host-precomputed on the original sample. Drop them so the
+        // rendered tabs show a clean "not recomputed" state instead of
+        // stale values that disagree with the new F / p / N. They come
+        // back on filter clear (see the restore branch above).
         delete _bundle.posthoc;
         delete _bundle.posthocA;
         delete _bundle.posthocB;
+        delete _bundle.posthocAB;
         delete _bundle.assumptions;
         delete _bundle.effects;
+        delete _bundle.kruskalWallis;
+        delete _bundle.shapiro;
+        delete _bundle.shapiroByGroup;
+        delete _bundle.friedman;
         populateAll(_bundle);
         return;
       }
@@ -2994,6 +3002,12 @@
     // already rendered in the inference tab when the host provides it.
     var welch = _recomputeWelchOneWay(levels, groups);
 
+    // Levene (mean-centred) and Brown-Forsythe (median-centred) tests for
+    // homogeneity of variance. Both reduce to a one-way ANOVA on absolute
+    // deviations from the per-group center.
+    var levene = _recomputeLeveneLike(levels, groups, 'mean');
+    var brownForsythe = _recomputeLeveneLike(levels, groups, 'median');
+
     var descriptives = levels.map(function (g) {
       var arr = groups[g];
       var n = arr.length;
@@ -3036,10 +3050,81 @@
       },
       levels: levels,
       welchAnova: welch,
+      levene: levene,
+      brownForsythe: brownForsythe,
       descriptives: descriptives,
       groups: groups,
       means: means
     };
+  }
+
+  function _recomputeLeveneLike(levels, groups, centerType) {
+    // Levene (centerType === 'mean') / Brown-Forsythe (centerType ===
+    // 'median'): run a one-way ANOVA on absolute deviations from the
+    // per-group center.
+    var k = levels.length;
+    if (k < 2) return null;
+
+    function median(arr) {
+      var s = arr.slice().sort(function (a, b) { return a - b; });
+      var n = s.length;
+      if (!n) return 0;
+      return n % 2 ? s[(n - 1) >> 1] : 0.5 * (s[n / 2 - 1] + s[n / 2]);
+    }
+
+    var z = {};
+    var totalN = 0;
+    for (var i = 0; i < k; i++) {
+      var g = levels[i];
+      var arr = groups[g];
+      if (!arr || !arr.length) return null;
+      var center;
+      if (centerType === 'median') {
+        center = median(arr);
+      } else {
+        var sum = 0;
+        for (var j = 0; j < arr.length; j++) sum += arr[j];
+        center = sum / arr.length;
+      }
+      var zArr = new Array(arr.length);
+      for (var j2 = 0; j2 < arr.length; j2++) zArr[j2] = Math.abs(arr[j2] - center);
+      z[g] = zArr;
+      totalN += zArr.length;
+    }
+
+    // One-way ANOVA on z.
+    var grandSum = 0;
+    var zMeans = {};
+    for (var i2 = 0; i2 < k; i2++) {
+      var g2 = levels[i2];
+      var s2 = 0;
+      for (var j3 = 0; j3 < z[g2].length; j3++) s2 += z[g2][j3];
+      zMeans[g2] = s2 / z[g2].length;
+      grandSum += s2;
+    }
+    var zGrand = grandSum / totalN;
+
+    var ssB = 0;
+    for (var i3 = 0; i3 < k; i3++) {
+      var g3 = levels[i3];
+      var d = zMeans[g3] - zGrand;
+      ssB += z[g3].length * d * d;
+    }
+    var ssW = 0;
+    for (var i4 = 0; i4 < k; i4++) {
+      var g4 = levels[i4];
+      var m = zMeans[g4];
+      for (var j4 = 0; j4 < z[g4].length; j4++) {
+        var d2 = z[g4][j4] - m;
+        ssW += d2 * d2;
+      }
+    }
+    var df1 = k - 1;
+    var df2 = totalN - k;
+    if (df2 <= 0 || ssW <= 0) return null;
+    var F = (ssB / df1) / (ssW / df2);
+    var p = _fSurv(F, df1, df2);
+    return { F: F, df1: df1, df2: df2, p: p };
   }
 
   function _recomputeWelchOneWay(levels, groups) {

@@ -861,14 +861,14 @@ const StatisticoHeader = {
         menuTitle: 'Menu',
         groups: [
           {
-            title: 'Explore',
+            title: 'Analysis',
+            items: analysisItems
+          },
+          {
+            title: 'Tools',
             items: [
               { type: 'tab', tab: 'explore', icon: 'fa-chart-column', label: 'Descriptives' }
             ]
-          },
-          {
-            title: 'Analysis',
-            items: analysisItems
           }
         ]
       };

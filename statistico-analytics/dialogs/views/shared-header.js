@@ -2584,7 +2584,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260523w';
+    const v = '20260523x';
     const base = this._uniFilterAssetBase();
     const cssHref = `${base}uni-filter-shared.css?v=${v}`;
     const existingCss = document.querySelector('link[data-uni-filter-shared-css]');
@@ -4157,10 +4157,18 @@ const StatisticoHeader = {
     }
     const nEl = document.getElementById('headerSampleSize');
     if (nEl) {
-      if (this.module === 'correlations') {
-        nEl.textContent = `(n=${this.sampleSize || n || 0})`;
+      if (this.module === 'univariate') {
+        // Univariate views recompute on filter (see rebuildFromSourceRows
+        // in histogram), so payload.values.length IS the analysis N.
+        nEl.textContent = `(n=${n})`;
       } else {
-        nEl.textContent = `(n=${this.module === 'univariate' ? n : (showing || n || 0)})`;
+        // For everyone else (correlations, ANOVA, regression, PCA, …)
+        // the page is the source of truth for what N means in the title:
+        // it calls updateVariable() whenever its analysis N changes.
+        // Don't override with the row-filter `showing` count — modules
+        // that don't recompute on filter (ANOVA, factor, …) would then
+        // show a lie next to their precomputed stats.
+        nEl.textContent = `(n=${this.sampleSize || showing || n || 0})`;
       }
     }
 

@@ -2584,7 +2584,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260523u';
+    const v = '20260523v';
     const base = this._uniFilterAssetBase();
     const cssHref = `${base}uni-filter-shared.css?v=${v}`;
     const existingCss = document.querySelector('link[data-uni-filter-shared-css]');
@@ -2605,11 +2605,12 @@ const StatisticoHeader = {
     // additively. Pages that haven't migrated yet keep using the old
     // installCorrelationFilter / _initUniRowFilterFromStorage paths.
     const ensureFilterApi = () => {
-      const existing = document.querySelector('script[data-filter-api]');
-      const needs = !window.Filter || !existing ||
-        String(existing.getAttribute('src') || '').indexOf('/dialogs/views/shared/filter.js') < 0;
-      if (!needs) return;
-      if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      // Trust window.Filter once it is fully loaded. Pages may preload
+      // filter.js with a relative href to avoid the boot-time flicker.
+      if (window.Filter && typeof window.Filter.attach === 'function') return;
+      const existing = document.querySelector('script[data-filter-api]') ||
+        document.querySelector('script[src*="/shared/filter.js"]');
+      if (existing) return; // already loading
       const fs = document.createElement('script');
       fs.src = filterApiSrc;
       fs.setAttribute('data-filter-api', '1');
@@ -2638,12 +2639,19 @@ const StatisticoHeader = {
         console.warn('Row filter bootstrap deferred:', e);
       }
     };
-    const existingScript = document.querySelector('script[data-uni-row-filter]') || document.querySelector('script[src*="uni-row-filter.js"]');
+    const existingScript = document.querySelector('script[data-uni-row-filter]') ||
+      document.querySelector('script[src*="/shared/uni-row-filter.js"]') ||
+      document.querySelector('script[src*="uni-row-filter.js"]');
+    // Trust window.UniRowFilter once it is fully loaded (init + finishAndClose
+    // exposed). Pages may preload uni-row-filter.js with a relative href
+    // (e.g. "../shared/uni-row-filter.js") to eliminate the boot-time
+    // "FILTER —" flicker; a stricter URL check would needlessly reload
+    // them and reset the closure state.
     const needsReload =
       !window.UniRowFilter ||
+      typeof window.UniRowFilter.init !== 'function' ||
       typeof window.UniRowFilter.finishAndClose !== 'function' ||
-      !existingScript ||
-      String(existingScript.getAttribute('src') || '').indexOf('/dialogs/views/shared/uni-row-filter.js') < 0;
+      !existingScript;
     if (!needsReload) {
       boot();
       return;

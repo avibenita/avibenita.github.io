@@ -59,12 +59,14 @@ if (typeof window !== 'undefined' && typeof window.switchTab !== 'function') {
 
     const tabTitles = {
       explore: 'Descriptives',
+      trajectories: 'Trajectories',
       assumptions: 'Assumptions',
       results: 'Test Results',
       posthoc: 'Pairwise Comparisons',
       effects: 'Effect Sizes',
       power: 'Power Analysis',
-      report: 'APA Report'
+      report: 'APA Report',
+      'ai-interpretation': 'AI Interpretation'
     };
 
     if (tabTitles[tab] && typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader.updateTitle === 'function') {
@@ -81,6 +83,7 @@ if (typeof window !== 'undefined' && typeof window.switchTab !== 'function') {
 
     const fitLayout =
       window.fitIndependentLayout ||
+      window.fitDependentKplusLayout ||
       window.fitDependentLayout ||
       window.fitLayout;
     if (typeof fitLayout === 'function') requestAnimationFrame(fitLayout);
@@ -875,21 +878,40 @@ const StatisticoHeader = {
     }
 
     if (this.module === 'dependent') {
+      const isKplus = this.currentView === 'dependent-results-kplus';
+      const analysisItems = [
+        { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: 'Test Results', active: true },
+        { type: 'tab', tab: 'assumptions', icon: 'fa-shield-halved', label: 'Assumptions' }
+      ];
+      if (isKplus) {
+        analysisItems.splice(1, 0, { type: 'tab', tab: 'trajectories', icon: 'fa-chart-line', label: 'Trajectories' });
+        analysisItems.push({ type: 'tab', tab: 'posthoc', icon: 'fa-table-cells', label: 'Pairwise Comparisons' });
+      }
+      analysisItems.push(
+        { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effect Sizes' },
+        { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power Analysis' }
+      );
+      if (isKplus) {
+        analysisItems.push({ type: 'tab', tab: 'ai-interpretation', icon: 'fa-brain', label: 'AI Interpretation' });
+      } else {
+        analysisItems.push({ type: 'tab', tab: 'report', icon: 'fa-file-lines', label: 'APA Report' });
+      }
       return {
         logoIcon: 'fa-clock-rotate-left',
-        logoSub: 'Dependent',
+        logoSub: 'Repeated',
         menuTitle: 'Menu',
-        groups: [{
-          title: 'Analysis',
-          items: [
-            { type: 'tab', tab: 'explore', icon: 'fa-chart-column', label: 'Explore', active: true },
-            { type: 'tab', tab: 'assumptions', icon: 'fa-shield-halved', label: 'Assumptions' },
-            { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: 'Results' },
-            { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effects' },
-            { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power' },
-            { type: 'tab', tab: 'report', icon: 'fa-file-lines', label: 'Report' }
-          ]
-        }]
+        groups: [
+          {
+            title: 'Analysis',
+            items: analysisItems
+          },
+          {
+            title: 'Tools',
+            items: [
+              { type: 'tab', tab: 'explore', icon: 'fa-chart-column', label: 'Descriptives' }
+            ]
+          }
+        ]
       };
     }
 
@@ -1614,7 +1636,7 @@ const StatisticoHeader = {
   },
 
   _isHeaderRowFilterSuppressed() {
-    return this.module === 'mixed-model' || this.module === 'independent';
+    return this.module === 'mixed-model' || this.module === 'independent' || this.module === 'dependent';
   },
 
   _mergeActionsWithFallback(actions) {
@@ -4518,12 +4540,15 @@ const StatisticoHeader = {
 
   _genericModuleViewLabels() {
     return {
-      'dependent-explore': 'Explore',
+      'dependent-explore': 'Descriptives',
+      'dependent-trajectories': 'Trajectories',
       'dependent-assumptions': 'Assumptions',
-      'dependent-results': 'Results',
-      'dependent-effects': 'Effects',
-      'dependent-power': 'Power',
-      'dependent-report': 'Report',
+      'dependent-results': 'Test Results',
+      'dependent-posthoc': 'Pairwise Comparisons',
+      'dependent-effects': 'Effect Sizes',
+      'dependent-power': 'Power Analysis',
+      'dependent-report': 'APA Report',
+      'dependent-ai-interpretation': 'AI Interpretation',
       'logistic-results': 'Results',
       'logistic-predictions': 'Predictions',
       'logistic-diagnostics': 'Diagnostics',
@@ -4569,11 +4594,14 @@ const StatisticoHeader = {
     const label = this._getInsightGuideLabel();
     const docs = {
       'dependent-explore': 'Review paired or repeated-measures descriptives, missingness, and within-subject patterns before interpreting the test.',
+      'dependent-trajectories': 'Inspect individual and group trajectories across timepoints to understand change patterns.',
       'dependent-assumptions': 'Check normality of differences, sphericity or related diagnostics, and the recommended testing route.',
       'dependent-results': 'Read the paired/repeated-measures test statistic, p-value, confidence interval, and decision against alpha.',
+      'dependent-posthoc': 'Review pairwise comparisons with correction when the omnibus test is significant.',
       'dependent-effects': 'Use the effect-size panel to distinguish practical magnitude from statistical significance.',
       'dependent-power': 'Inspect power or required sample size calculations when available.',
-      'dependent-report': 'Use the report view for publication-ready wording and consistency checks.',
+      'dependent-report': 'Use the APA report view for publication-ready wording and consistency checks.',
+      'dependent-ai-interpretation': 'Get an AI-assisted interpretation of the repeated-measures analysis.',
       'logistic-results': 'Review coefficient direction, odds ratios, uncertainty intervals, and significance together.',
       'logistic-predictions': 'Inspect predicted probabilities and classification behavior for meaningful changes in risk.',
       'logistic-diagnostics': 'Use fit and residual diagnostics to check calibration, leverage, and model stability.',

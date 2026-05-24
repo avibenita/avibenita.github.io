@@ -2584,7 +2584,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260523z';
+    const v = '20260524a';
     const base = this._uniFilterAssetBase();
     const cssHref = `${base}uni-filter-shared.css?v=${v}`;
     const existingCss = document.querySelector('link[data-uni-filter-shared-css]');
@@ -2600,10 +2600,10 @@ const StatisticoHeader = {
     const scriptSrc = `${base}uni-row-filter.js?v=${v}`;
     const filterApiSrc = `${base}filter.js?v=${v}`;
 
-    // Load the new lean Filter API alongside the legacy stack. It has no
-    // side effects — just exposes window.Filter — so it's safe to load
-    // additively. Pages that haven't migrated yet keep using the old
-    // installCorrelationFilter / _initUniRowFilterFromStorage paths.
+    // Load the lean Filter API. It has no side effects — just exposes
+    // window.Filter — so it's safe to load even on pages that don't use
+    // it directly. Migrated views call Filter.attach themselves; legacy
+    // views still rely on _initUniRowFilterFromStorage.
     const ensureFilterApi = () => {
       // Trust window.Filter once it is fully loaded. Pages may preload
       // filter.js with a relative href to avoid the boot-time flicker.
@@ -3237,152 +3237,6 @@ const StatisticoHeader = {
       console.warn('Row filter data unavailable:', e);
       return null;
     }
-  },
-
-  /**
-   * @deprecated Replaced by the lean `Filter.attach` API used directly
-   * inside each correlation view (see Step 2 of the filter refactor).
-   * This shim is retained ONLY in case an external embed still calls it.
-   * It is unreachable from the bundled correlation views and may be
-   * removed in a future release.
-   */
-  installCorrelationFilter(opts) {
-    if (typeof UniRowFilter === 'undefined' || typeof UniRowFilter.init !== 'function') return;
-    const cd = (typeof window !== 'undefined' && window.correlationData)
-      ? window.correlationData
-      : (() => { try { return JSON.parse(sessionStorage.getItem('correlationData') || 'null'); } catch (_e) { return null; } })();
-    if (!cd || !Array.isArray(cd.headers) || !cd.headers.length) return;
-    const sourceHeaders = (Array.isArray(cd.sourceHeaders) && cd.sourceHeaders.length)
-      ? cd.sourceHeaders.slice()
-      : cd.headers.slice();
-    const allRows = (Array.isArray(cd.sourceRowsAll) && cd.sourceRowsAll.length
-      ? cd.sourceRowsAll
-      : (Array.isArray(cd.sourceRows) ? cd.sourceRows : [])
-    ).map((r) => Array.isArray(r) ? r.slice() : r);
-    if (!allRows.length) return;
-    const usedRows = (Array.isArray(cd.sourceRows) && cd.sourceRows.length
-      ? cd.sourceRows
-      : allRows
-    ).map((r) => Array.isArray(r) ? r.slice() : r);
-    const isFiltered = !!cd.rowFilterActive ||
-      (usedRows.length > 0 && usedRows.length < allRows.length);
-
-    const rebuildAndRender = typeof opts.rebuildAndRender === 'function' ? opts.rebuildAndRender : null;
-
-    const onApply = (filteredRows) => {
-      const next = this._rebuildCorrelationDataFromFilteredRows(filteredRows);
-      if (next && rebuildAndRender) {
-        try { rebuildAndRender(next); } catch (e) { console.warn('Correlation filter render failed:', e); }
-      }
-      try {
-        StatisticoHeader.publishHeaderRowFilterChange(filteredRows, true);
-      } catch (_e) {}
-      if (typeof StatisticoHeader.updateUniFilterChrome === 'function') {
-        try { StatisticoHeader.updateUniFilterChrome(); } catch (_e) {}
-      }
-    };
-
-    UniRowFilter.init({
-      headers: sourceHeaders,
-      rows: allRows,
-      // Correlations (and other multi-variable modules) have no single
-      // "analysis column", so we deliberately pass an out-of-range index
-      // to suppress the ★ analysis-column marker on column 0.
-      columnIndex: -1,
-      onApply: onApply
-    });
-    // Restore active per-column criteria FIRST so the eventual call to
-    // setFilteredRows() stamps _appliedColumnFilters with these criteria.
-    // Without this ordering, opening the panel resets _columnFilters back
-    // to the (empty) applied state, and the column-header indicator stays
-    // off even though the rows are filtered.
-    try {
-      const state = this._getGenericRowFilterState();
-      if (state && state.columnFilters &&
-          this._isHeaderRowFilterStateCompatible(state, sourceHeaders) &&
-          typeof UniRowFilter.setColumnFilters === 'function') {
-        UniRowFilter.setColumnFilters(state.columnFilters, true);
-      }
-    } catch (_e) {}
-    if (isFiltered && typeof UniRowFilter.setFilteredRows === 'function') {
-      UniRowFilter.setFilteredRows(usedRows);
-    }
-    if (typeof StatisticoHeader.updateUniFilterChrome === 'function') {
-      try { StatisticoHeader.updateUniFilterChrome(); } catch (_e) {}
-    }
-    console.warn('[CORR][installCorrelationFilter]', {
-      module: this.module,
-      view: this.currentView,
-      sourceHeaders: sourceHeaders.length,
-      allRows: allRows.length,
-      usedRows: usedRows.length,
-      restoredFilter: !!isFiltered
-    });
-  },
-
-  /**
-   * @deprecated Helper for the legacy `installCorrelationFilter` shim.
-   * The bundled correlation views project rows directly through
-   * `Filter.projectRows` now and don't call this. May be removed when
-   * `installCorrelationFilter` is fully deleted.
-   */
-  _rebuildCorrelationDataFromFilteredRows(filteredRows) {
-    let cd = (typeof window !== 'undefined' && window.correlationData)
-      ? window.correlationData
-      : null;
-    if (!cd) {
-      try { cd = JSON.parse(sessionStorage.getItem('correlationData') || 'null'); } catch (_e) {}
-    }
-    if (!cd || !Array.isArray(cd.headers) || !cd.headers.length) return null;
-    const sourceHeaders = (Array.isArray(cd.sourceHeaders) && cd.sourceHeaders.length)
-      ? cd.sourceHeaders.slice()
-      : cd.headers.slice();
-    const analysisHeaders = cd.headers.slice();
-    const headerIndex = {};
-    sourceHeaders.forEach((h, i) => { headerIndex[h] = i; });
-    const canProject = analysisHeaders.every((h) => Object.prototype.hasOwnProperty.call(headerIndex, h));
-    const used = (Array.isArray(filteredRows) ? filteredRows : []).map((r) => Array.isArray(r) ? r.slice() : r);
-    const allRows = (Array.isArray(cd.sourceRowsAll) && cd.sourceRowsAll.length
-      ? cd.sourceRowsAll
-      : used
-    ).map((r) => Array.isArray(r) ? r.slice() : r);
-
-    const projectedData = canProject
-      ? used.map((row) => {
-        const obj = {};
-        analysisHeaders.forEach((h) => {
-          obj[h] = Array.isArray(row) ? row[headerIndex[h]] : (row && row[h]);
-        });
-        return obj;
-      })
-      : used.map((row) => {
-        const obj = {};
-        analysisHeaders.forEach((h, idx) => {
-          obj[h] = Array.isArray(row) ? row[idx] : (row && row[h]);
-        });
-        return obj;
-      });
-
-    const rowFilterActive = used.length !== allRows.length;
-    const next = {
-      ...cd,
-      headers: analysisHeaders,
-      data: projectedData,
-      sourceHeaders,
-      sourceRowsAll: allRows,
-      sourceRows: used,
-      rowFilterActive
-    };
-    if (typeof window !== 'undefined') window.correlationData = next;
-    try { sessionStorage.setItem('correlationData', JSON.stringify(next)); } catch (_e) {}
-    return {
-      correlationData: next,
-      projectedData,
-      headers: analysisHeaders,
-      sourceRows: used,
-      sourceRowsAll: allRows,
-      rowFilterActive
-    };
   },
 
   /**
@@ -4336,9 +4190,9 @@ const StatisticoHeader = {
       return;
     }
     // If a view (e.g. histogram via its own UniRowFilter.init, or any
-    // correlation view via installCorrelationFilter) has already wired
-    // UniRowFilter with rows + onApply, do NOT re-init here — that would
-    // clobber the page's onApply and reset _appliedRows back to the
+    // correlation view via Filter.attach) has already wired UniRowFilter
+    // with rows + onApply, do NOT re-init here — that would clobber the
+    // page's onApply and reset _appliedRows back to the
     // full dataset. But if UniRowFilter is empty (most univariate views
     // don't wire it themselves and the boot-time storage init may have
     // run before loadData arrived), re-run the storage-driven init now

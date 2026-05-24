@@ -3262,6 +3262,18 @@
   }
 
   function installTaylorFilter() {
+    // Wait for filter.js to load (shared-header.js injects it async).
+    // Without this, Office.onReady fires before the script lands and
+    // both Filter.attach and the legacy fallback (which also needs
+    // UniRowFilter, also async) silently no-op.
+    if (typeof Filter === 'undefined' || typeof Filter.attach !== 'function') {
+      if (!installTaylorFilter._waited) installTaylorFilter._waited = 0;
+      if (installTaylorFilter._waited < 30) {
+        installTaylorFilter._waited++;
+        setTimeout(installTaylorFilter, 100);
+        return;
+      }
+    }
     const cd = window.correlationData;
     function applyFromFiltered(filteredRows, criteria, sourceHeaders, allRows) {
       const analysisHeaders = cd.headers || sourceHeaders;

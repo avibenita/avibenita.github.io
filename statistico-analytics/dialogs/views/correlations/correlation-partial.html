@@ -1092,6 +1092,15 @@
     // Page owns filter install + apply callback. Lean Filter API path with
     // a legacy fallback so older bundles still work during the rollout.
     function installPartialFilter() {
+      // Wait for filter.js to land (loaded async by shared-header.js).
+      if (typeof Filter === 'undefined' || typeof Filter.attach !== 'function') {
+        if (!installPartialFilter._waited) installPartialFilter._waited = 0;
+        if (installPartialFilter._waited < 30) {
+          installPartialFilter._waited++;
+          setTimeout(installPartialFilter, 100);
+          return;
+        }
+      }
       function applyPartialFromFiltered(filteredRows, criteria, sourceHeaders, allRows) {
         const analysisHeaders = correlationData.headers || sourceHeaders;
         correlationData.sourceRows = filteredRows;

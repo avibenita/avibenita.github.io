@@ -551,6 +551,19 @@
     // legacy StatisticoHeader.installCorrelationFilter so older bundles
     // keep working during the rollout.
     function installNetworkFilter() {
+      // shared-header.js loads filter.js asynchronously. If we're called
+      // before it lands, wait for it instead of silently falling through
+      // to the legacy fallback (which also requires UniRowFilter and would
+      // also fail). Without this retry, Office.onReady fires before the
+      // async script tag finishes loading and the filter never gets wired.
+      if (typeof Filter === 'undefined' || typeof Filter.attach !== 'function') {
+        if (!installNetworkFilter._waited) installNetworkFilter._waited = 0;
+        if (installNetworkFilter._waited < 30) {
+          installNetworkFilter._waited++;
+          setTimeout(installNetworkFilter, 100);
+          return;
+        }
+      }
       try {
         if (typeof Filter !== 'undefined' && typeof Filter.attach === 'function' && correlationData) {
           var sourceHeaders = (Array.isArray(correlationData.sourceHeaders) && correlationData.sourceHeaders.length)

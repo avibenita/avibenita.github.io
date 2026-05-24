@@ -17,7 +17,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r"/>  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260524m"></script>
+  <script src="../shared-header.js?v=20260524n"></script>
 
   <style>
     /* ── Design tokens ── */
@@ -4766,13 +4766,13 @@ ${sectionsHtml}
 
   function _mm_getCategoricalVars(headers, rows, spec) {
     if (!headers || !rows || !spec) return [];
-    const fixVars = (spec.fix || []).concat(spec.cov || []);
+    // Model spec: everything in `fix` is a factor (including numeric→factor like 0/1 Logi).
+    const fixVars = (spec.fix || []);
     const seen = new Set();
     const categorical = [];
     fixVars.filter(Boolean).forEach((name) => {
       if (seen.has(name) || _mm_isGroupingVar(name, spec)) return;
       seen.add(name);
-      if (_mm_varIsContinuous(headers, rows, name, spec)) return;
       categorical.push(name);
     });
     return categorical;
@@ -4780,11 +4780,12 @@ ${sectionsHtml}
 
   function _mm_getContinuousVars(headers, rows, spec) {
     if (!headers || !rows || !spec) return [];
-    const fixVars = (spec.fix || []).concat(spec.cov || []);
+    // Model spec: outcome + `cov` are continuous; `fix` factors are never continuous here.
+    const covVars = (spec.cov || []);
     const dep = spec.dep || spec.y;
     const seen = new Set();
     const continuous = [];
-    [dep, ...fixVars].filter(Boolean).forEach((name) => {
+    [dep, ...covVars].filter(Boolean).forEach((name) => {
       if (seen.has(name) || _mm_isGroupingVar(name, spec)) return;
       seen.add(name);
       if (_mm_varIsContinuous(headers, rows, name, spec)) continuous.push(name);
@@ -4920,8 +4921,11 @@ ${sectionsHtml}
       const imbalance = counts.length > 1 && minCell > 0 && (maxCell / minCell) >= 5;
       const rowsHtml = stats.levels.map((l) => {
         const isRef = String(l.level) === String(refLevel);
+        const levelLabel = _mm_varIsContinuous(_sourceHeaders, _sourceRows, varName, _modelSpec)
+          ? `${_mm_esc(l.level)} <span class="mm-desc-level-ref" style="font-weight:500">(numeric code)</span>`
+          : _mm_esc(l.level);
         return `<tr>
-          <td>${_mm_esc(l.level)}${isRef ? ' <span class="mm-desc-level-ref">(ref)</span>' : ''}</td>
+          <td>${levelLabel}${isRef ? ' <span class="mm-desc-level-ref">(ref)</span>' : ''}</td>
           <td>${l.count}</td>
           <td>${l.pct.toFixed(1)}%</td>
         </tr>`;

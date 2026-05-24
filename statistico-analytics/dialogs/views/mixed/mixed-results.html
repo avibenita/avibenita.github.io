@@ -17,7 +17,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260522r"/>  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260524l"></script>
+  <script src="../shared-header.js?v=20260524m"></script>
 
   <style>
     /* ── Design tokens ── */
@@ -219,8 +219,8 @@
       margin: 0;
     }
     .mm-desc-continuous-section .mm-desc-frame-wrap {
-      height: 420px;
-      min-height: 320px;
+      height: 560px;
+      min-height: 480px;
     }
     #mixedDescriptivesFrame {
       width: 100%;
@@ -4741,7 +4741,22 @@ ${sectionsHtml}
     return Array.isArray(row) ? row : headers.map(h => row[h]);
   }
 
-  function _mm_varIsContinuous(headers, rows, name) {
+  function _mm_getGroupingVarNames(spec) {
+    if (!spec) return [];
+    return [spec.rnd, spec.rndVar, spec.rep, spec.subject].filter(Boolean);
+  }
+
+  function _mm_isGroupingVar(name, spec) {
+    return _mm_getGroupingVarNames(spec).includes(name);
+  }
+
+  function _mm_formatRowCount(n) {
+    const v = Math.round(Number(n) || 0);
+    return `${v} row${v === 1 ? '' : 's'}`;
+  }
+
+  function _mm_varIsContinuous(headers, rows, name, spec) {
+    if (spec && _mm_isGroupingVar(name, spec)) return false;
     const idx = headers.indexOf(name);
     if (idx < 0) return false;
     const uniq = [...new Set(rows.map(r => _mm_rowValues(r, headers)[idx]).filter(x => x !== '' && x != null))];
@@ -4752,13 +4767,12 @@ ${sectionsHtml}
   function _mm_getCategoricalVars(headers, rows, spec) {
     if (!headers || !rows || !spec) return [];
     const fixVars = (spec.fix || []).concat(spec.cov || []);
-    const rnd = spec.rnd || spec.rndVar || spec.rep || spec.subject;
     const seen = new Set();
     const categorical = [];
     fixVars.filter(Boolean).forEach((name) => {
-      if (seen.has(name)) return;
+      if (seen.has(name) || _mm_isGroupingVar(name, spec)) return;
       seen.add(name);
-      if (_mm_varIsContinuous(headers, rows, name)) return;
+      if (_mm_varIsContinuous(headers, rows, name, spec)) return;
       categorical.push(name);
     });
     return categorical;
@@ -4771,9 +4785,9 @@ ${sectionsHtml}
     const seen = new Set();
     const continuous = [];
     [dep, ...fixVars].filter(Boolean).forEach((name) => {
-      if (seen.has(name)) return;
+      if (seen.has(name) || _mm_isGroupingVar(name, spec)) return;
       seen.add(name);
-      if (_mm_varIsContinuous(headers, rows, name)) continuous.push(name);
+      if (_mm_varIsContinuous(headers, rows, name, spec)) continuous.push(name);
     });
     return continuous;
   }
@@ -4857,23 +4871,13 @@ ${sectionsHtml}
     const balanceText = singletons > 0
       ? `${singletons} cluster${singletons === 1 ? '' : 's'} have only one row — random intercepts may be unreliable for those groups.`
       : balanced
-        ? `Balanced nesting: every cluster has exactly ${minSize} row${minSize === 1 ? '' : 's'}.`
-        : `Uneven nesting: cluster sizes range from ${minSize} to ${maxSize} rows (typical ≈ ${fmt(meanSize, 1)}).`;
-    const sizeDist = new Map();
-    sizes.forEach((n) => sizeDist.set(n, (sizeDist.get(n) || 0) + 1));
-    const distRows = [...sizeDist.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([size, ng]) => `<tr>
-          <td>${size} row${size === 1 ? '' : 's'} per cluster</td>
-          <td>${ng} cluster${ng === 1 ? '' : 's'}</td>
-          <td>${nGroups ? ((100 * ng) / nGroups).toFixed(0) : 0}%</td>
-        </tr>`)
-      .join('');
+        ? `Balanced nesting: every cluster has exactly ${_mm_formatRowCount(minSize)}.`
+        : `Uneven nesting: cluster sizes range from ${_mm_formatRowCount(minSize)} to ${_mm_formatRowCount(maxSize)} (typical ${_mm_formatRowCount(Math.round(meanSize))}).`;
     const warn = missing
       ? `<p class="mm-desc-warn"><i class="fa-solid fa-triangle-exclamation"></i> ${missing} row${missing === 1 ? '' : 's'} excluded because ${_mm_esc(rnd)} is missing.</p>`
       : '';
     el.innerHTML = `
-      <p class="mm-desc-lead">Rows are grouped by <strong>${_mm_esc(rnd)}</strong> for the random intercept. Each cluster ID is one subject / site / repeated-measures unit in the mixed model.</p>
+      <p class="mm-desc-lead">Rows are grouped by <strong>${_mm_esc(rnd)}</strong> for the random intercept. Each cluster ID is one subject / site / repeated-measures unit — treated as a category even when IDs look numeric.</p>
       <div class="mm-desc-stat-grid">
         <div class="mm-desc-stat">
           <span class="mm-desc-stat-label">Clusters (unique IDs)</span>
@@ -4885,21 +4889,14 @@ ${sectionsHtml}
         </div>
         <div class="mm-desc-stat">
           <span class="mm-desc-stat-label">Typical rows per cluster (median)</span>
-          <span class="mm-desc-stat-value">${fmt(medianSize, 1)}</span>
+          <span class="mm-desc-stat-value">${_mm_formatRowCount(medianSize)}</span>
         </div>
         <div class="mm-desc-stat">
           <span class="mm-desc-stat-label">Smallest → largest cluster</span>
-          <span class="mm-desc-stat-value">${minSize} → ${maxSize}</span>
+          <span class="mm-desc-stat-value">${_mm_formatRowCount(minSize)} → ${_mm_formatRowCount(maxSize)}</span>
         </div>
       </div>
       <p class="mm-desc-balance ${balanceClass}">${balanceText}</p>
-      <div class="mm-desc-subhead">Cluster size distribution</div>
-      <div class="mm-table-wrap">
-        <table class="mm-table">
-          <thead><tr><th>Rows per cluster</th><th># clusters</th><th>Share</th></tr></thead>
-          <tbody>${distRows || '<tr><td colspan="3">No clusters found</td></tr>'}</tbody>
-        </table>
-      </div>
       ${warn}`;
   }
 

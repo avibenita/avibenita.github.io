@@ -11,10 +11,10 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
   <link rel="stylesheet" href="../shared-header.css?v=20260522r">  <script src="../shared-brand-logo.js?v=20260523"></script>
 
-  <script src="../shared-header.js?v=20260524j"></script>
+  <script src="../shared-header.js?v=20260524m"></script>
   <!-- Preload filter assets so the page's installer finds them on first call (no flicker). -->
-  <script src="../shared/uni-row-filter.js?v=20260524j" data-uni-row-filter="1"></script>
-  <script src="../shared/filter.js?v=20260524j" data-filter-api="1"></script>
+  <script src="../shared/uni-row-filter.js?v=20260524m" data-uni-row-filter="1"></script>
+  <script src="../shared/filter.js?v=20260524m" data-filter-api="1"></script>
   <script src="../../shared/views/normality-view.js"></script>
   <style>
     /* Dark Theme (Default) */
@@ -167,6 +167,52 @@
     html.embed-mode .right-col { width: 100% !important; max-width: 100% !important; flex: 1 1 auto !important; }
     html.embed-mode #header-container { display: none !important; }
     html.embed-mode body { overflow: hidden !important; }
+    html.embed-mode.embed-mixed .wrap {
+      display: grid;
+      grid-template-columns: minmax(260px, 42%) minmax(0, 1fr);
+      grid-template-rows: 1fr;
+      gap: 10px;
+      height: 100%;
+      padding: 8px;
+    }
+    html.embed-mode.embed-mixed #stats-card,
+    html.embed-mode.embed-mixed #histogram-panel {
+      display: flex !important;
+      min-height: 0;
+      height: 100%;
+    }
+    html.embed-mode.embed-mixed .wrap.histogram-visible #stats-card {
+      flex: none;
+      min-height: 0;
+    }
+    html.embed-mode.embed-mixed #histogram-panel {
+      min-height: 0;
+    }
+    html.embed-mode.embed-mixed #stats-table {
+      min-width: 0;
+    }
+    html.embed-mode.embed-mixed #stats-table th,
+    html.embed-mode.embed-mixed #stats-table td {
+      padding: 7px 8px;
+      font-size: 12px;
+      line-height: 16px;
+      height: 34px;
+    }
+    html.embed-mode.embed-mixed .chart-wrapper {
+      flex: 1.4;
+    }
+    html.embed-mode.embed-mixed .summary-container {
+      flex: 0 0 190px;
+    }
+    html.embed-mode.embed-mixed .chart-container {
+      min-height: 280px;
+    }
+    @media (max-width: 900px) {
+      html.embed-mode.embed-mixed .wrap {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+      }
+    }
   </style>
   <style>
     html,body{height:100%!important;overflow:hidden!important;}
@@ -701,7 +747,17 @@
       // Keep shared header visible in live dialog mode.
       const headerContainer = document.getElementById('header-container');
       if (headerContainer) {
-        headerContainer.style.display = '';
+        headerContainer.style.display = document.documentElement.classList.contains('embed-mixed') ? 'none' : '';
+      }
+
+      if (document.documentElement.classList.contains('embed-mixed')) {
+        const wrap = document.getElementById('descriptivesWrap');
+        const panel = document.getElementById('histogram-panel');
+        if (wrap) wrap.classList.add('histogram-visible');
+        if (panel) {
+          panel.style.display = 'flex';
+          panel.classList.add('active');
+        }
       }
     }
 
@@ -1081,17 +1137,21 @@
         chart: {
           backgroundColor: 'transparent',
           animation: false,
-          style: { fontFamily: "'Segoe UI', Tahoma, sans-serif" }
+          style: { fontFamily: "'Segoe UI', Tahoma, sans-serif" },
+          marginBottom: document.documentElement.classList.contains('embed-mixed') ? 72 : 60
         },
         title: { text: null },
         xAxis: {
           categories: categories,
           labels: {
-            style: { color: 'rgba(255,255,255,0.7)', fontSize: '9px' },
-            rotation: -40
+            style: { color: 'rgba(255,255,255,0.7)', fontSize: document.documentElement.classList.contains('embed-mixed') ? '10px' : '9px' },
+            rotation: document.documentElement.classList.contains('embed-mixed') ? -35 : -40,
+            step: categories.length > 10 ? Math.ceil(categories.length / 10) : 1,
+            autoRotation: [-35, -45, -60]
           },
           lineColor: '#555',
-          tickColor: '#555'
+          tickColor: '#555',
+          tickLength: 4
         },
         yAxis: {
           title: { text: 'Count', style: { color: 'rgba(255,255,255,0.5)', fontSize: '11px' } },
@@ -1646,6 +1706,9 @@
       const embedParent = params.get('parent') || '';
       if (isEmbed) {
         document.documentElement.classList.add('embed-mode');
+        if (embedParent === 'mixed') {
+          document.documentElement.classList.add('embed-mixed');
+        }
       }
       if (!isEmbed && typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.init('descriptive-stats', 'Descriptive Statistics', 0, 'correlations');

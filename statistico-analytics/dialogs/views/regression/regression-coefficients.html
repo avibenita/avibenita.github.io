@@ -7930,18 +7930,24 @@
       const ix = interactions[selIdx];
       const ixi = interactionInfo[selIdx];
       const container = document.getElementById('ixSumPlotContainer');
-      if (!container) return;
+      if (!container || typeof Highcharts === 'undefined') return;
 
-      if (ixi.v1IsNumeric && ixi.v2Cat) {
-        _renderNumCatInteractionPlot(container, ix, ixi, results, xnVars, xcVars, rows, headers, yVar);
-      } else if (ixi.v1Cat && ixi.v2IsNumeric) {
-        const ixFlip = { v1: ix.v2, v2: ix.v1, v1IsNumeric: true, v2IsNumeric: false, v1Cat: null, v2Cat: ixi.v1Cat, v1Idx: ixi.v2Idx, v2Idx: ixi.v1Idx };
-        _renderNumCatInteractionPlot(container, {var1: ix.v2, var2: ix.v1}, ixFlip, results, xnVars, xcVars, rows, headers, yVar);
-      } else {
-        _renderNumNumInteractionPlot(container, ix, ixi, results, xnVars, xcVars, rows, headers, yVar);
+      try {
+        if (ixi.v1IsNumeric && ixi.v2Cat) {
+          _renderNumCatInteractionPlot(container, ix, ixi, results, xnVars, xcVars, rows, headers, yVar);
+        } else if (ixi.v1Cat && ixi.v2IsNumeric) {
+          const ixFlip = { v1: ix.var2, v2: ix.var1, v1IsNumeric: true, v2IsNumeric: false, v1Cat: null, v2Cat: ixi.v1Cat, v1Idx: ixi.v2Idx, v2Idx: ixi.v1Idx };
+          _renderNumCatInteractionPlot(container, {var1: ix.var2, var2: ix.var1}, ixFlip, results, xnVars, xcVars, rows, headers, yVar);
+        } else if (ixi.v1IsNumeric && ixi.v2IsNumeric) {
+          _renderNumNumInteractionPlot(container, ix, ixi, results, xnVars, xcVars, rows, headers, yVar);
+        } else {
+          container.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center;">Visualization for this interaction type is not available yet.</div>';
+        }
+      } catch (e) {
+        console.warn('Interaction plot render failed:', e);
+        container.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center;">Could not render interaction plot.</div>';
       }
 
-      // Also update simple slopes section on summary tab
       _renderSimpleSlopes(selIdx, document.getElementById('ixSumSlopesContainer'));
     }
 

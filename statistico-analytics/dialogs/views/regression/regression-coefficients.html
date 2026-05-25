@@ -1848,7 +1848,15 @@
       line-height: 1.5;
     }
 
-    /* ── Interaction Analysis workspace (unified 3-tab pattern) ── */
+    .reg-workspace-tabs.ix-workspace-tabs {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    @media (max-width: 720px) { .reg-workspace-tabs.ix-workspace-tabs { grid-template-columns: 1fr; } }
+    #tab-results.active { overflow-y: auto; min-height: 0; }
+    #tab-results .tab-panel.reg-results-panel {
+      flex: 1 1 auto; width: 100%; min-height: 0; overflow-y: visible;
+      padding: 14px 16px 18px; gap: 14px;
+    }
     .ix-workspace { display: flex; flex-direction: column; gap: 14px; max-width: 1180px; }
     .ix-workspace-top {
       padding-bottom: 12px; border-bottom: 1px solid var(--border);
@@ -2878,13 +2886,9 @@
           <div class="sb-group">
             <div class="sb-group-title">Model</div>
             <div class="sb-items-rail">
-              <button class="sb-item active" onclick="sbGoOverview()" data-tab="results-overview" id="overviewBtn">
-                <i class="fa-solid fa-table-cells-large sb-item-icon"></i>
-                <span class="sb-item-copy"><span class="sb-item-label">Overview</span><span class="sb-item-description">R², F-test, and key fit statistics at a glance.</span></span>
-              </button>
-              <button class="sb-item" onclick="sbGoDetailed()" data-tab="results-detail" id="detailedResultsBtn">
-                <i class="fa-solid fa-table-list sb-item-icon"></i>
-                <span class="sb-item-copy"><span class="sb-item-label">Detailed Results</span><span class="sb-item-description">Full coefficient table, intervals, and inference details.</span></span>
+              <button class="sb-item active" id="modelResultsNavBtn" onclick="switchTab('results-overview')" data-tab="model-results">
+                <i class="fa-solid fa-square-poll-vertical sb-item-icon"></i>
+                <span class="sb-item-copy"><span class="sb-item-label">Model Results</span><span class="sb-item-description">Fit summary, coefficients, and inference details.</span></span>
               </button>
               <!-- Interactions (single nav item; sub-views are in-page tabs) -->
               <button class="sb-item disabled" id="interactionsNavBtn" onclick="switchTab('ix-summary')" data-tab="interactions" title="Add interaction terms in the model to enable this section">
@@ -2984,18 +2988,6 @@
   <div class="wrap">
     <section class="card" role="main">
       <div class="card-main">
-        <!-- Single toolbar row: depth toggle (results-only) -->
-        <div class="hero-section">
-          <div class="hero-row-1">
-            <div class="depth-selector" id="depthSelectorRow2" title="Analysis depth">
-              <button class="depth-btn active" data-depth="insight" onclick="setDepth('insight')">🟢 Insight</button>
-              <button class="depth-btn"        data-depth="analyst" onclick="setDepth('analyst')">🟡 Analyst</button>
-            </div>
-          </div>
-          <div class="hero-row-2" id="resultsSubToolbar"></div>
-        </div>
-
-
       <!-- View Container: wraps both tabbed and single-page views -->
       <div class="view-container">
         <!-- Tabbed View -->
@@ -3003,6 +2995,26 @@
       <div class="card-body">
         <!-- Tab: Results -->
         <div id="tab-results" class="tab-content active">
+        <div class="tab-panel ix-workspace reg-results-panel active">
+
+        <div class="ix-workspace-top">
+          <nav class="ix-workspace-tabs reg-workspace-tabs" aria-label="Model results views">
+            <button type="button" class="ix-ws-tab active" data-reg-tab="results-overview" onclick="switchTab('results-overview')">
+              <i class="fa-solid fa-table-cells-large" aria-hidden="true"></i>
+              <span class="ix-ws-tab-copy">
+                <span class="ix-ws-tab-label">Overview</span>
+                <span class="ix-ws-tab-desc">R², F-test, and key fit statistics at a glance.</span>
+              </span>
+            </button>
+            <button type="button" class="ix-ws-tab" data-reg-tab="results-detail" onclick="switchTab('results-detail')">
+              <i class="fa-solid fa-table-list" aria-hidden="true"></i>
+              <span class="ix-ws-tab-copy">
+                <span class="ix-ws-tab-label">Detailed Results</span>
+                <span class="ix-ws-tab-desc">Full coefficient table, intervals, and inference details.</span>
+              </span>
+            </button>
+          </nav>
+        </div>
 
         <!-- ① Conclusion card – Insight mode only -->
         <div class="conclusion-card" id="conclusionCard">
@@ -3189,6 +3201,7 @@
           <div class="equation-formula" id="equationFormula">
             Awaiting regression results...
           </div>
+        </div>
         </div>
         </div>
         <!-- End Tab: Results -->
@@ -3990,29 +4003,22 @@
 
     function setDepth(depth) {
       window._analysisDepth = depth;
-      // Update ALL depth buttons (toolbar + header-right)
-      document.querySelectorAll('.depth-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.depth === depth);
-      });
       applyDepth(depth);
+      highlightRegWorkspaceTab(depth === 'insight' ? 'results-overview' : 'results-detail');
     }
 
-    // Navigate to Overview (results tab, insight depth)
+    function highlightRegWorkspaceTab(tabName) {
+      document.querySelectorAll('[data-reg-tab]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.regTab === tabName);
+      });
+    }
+
     function sbGoOverview() {
       switchTab('results-overview');
-      setDepth('insight');
     }
 
-    // Navigate to Detailed Results (results tab, analyst depth)
     function sbGoDetailed() {
       switchTab('results-detail');
-      setDepth('analyst');
-    }
-
-    // Keep "Detailed Results" nav item highlighted only when
-    // the results tab is active AND depth = analyst
-    function _syncDetailedResultsActive(currentTab) {
-      // No-op: active state is now fully driven by switchTab's data-tab matching
     }
 
     // ── Equation popup ────────────────────────────────────────
@@ -4150,8 +4156,9 @@
 
       // Map tab names to header titles
       const tabTitles = {
-        'results-overview':  'Overview',
-        'results-detail':    'Detailed Results',
+        'results-overview':  'Model Results \u2013 Overview',
+        'results-detail':    'Model Results \u2013 Detailed',
+        'results':           'Model Results',
         'interactions':      'Interactions',
         'ix-summary':        'Interaction Analysis \u2013 Overview',
         'ix-viz':            'Interaction Analysis \u2013 Visualization',
@@ -4177,10 +4184,22 @@
       document.querySelectorAll('.sb-item[data-tab]').forEach(btn => {
         btn.classList.remove('active');
         const navTab = btn.dataset.tab;
-        if (navTab === tabName || (tabName.startsWith('ix-') && navTab === 'interactions')) {
+        if (navTab === tabName ||
+            (tabName.startsWith('ix-') && navTab === 'interactions') ||
+            ((tabName === 'results-overview' || tabName === 'results-detail') && navTab === 'model-results')) {
           btn.classList.add('active');
         }
       });
+
+      // Model results depth + in-page tab highlight
+      if (tabName === 'results-overview') {
+        setDepth('insight');
+      } else if (tabName === 'results-detail') {
+        setDepth('analyst');
+      } else if (tabName === 'results') {
+        switchTab('results-overview');
+        return;
+      }
 
       // Highlight in-page interaction workspace tab
       if (tabName.startsWith('ix-')) {
@@ -4214,15 +4233,6 @@
       if (cardBody) cardBody.scrollTop = 0;
       const viewContainer = document.querySelector('.view-container');
       if (viewContainer) viewContainer.scrollTop = 0;
-      
-      // Show/hide the depth-toggle and hero-section only when Results tab is active
-      const depthSel = document.getElementById('depthSelectorRow2');
-      const heroSec = document.querySelector('.hero-section');
-      if (depthSel) {
-        const show = (tabName === 'results-overview' || tabName === 'results-detail');
-        depthSel.style.display = show ? '' : 'none';
-        if (heroSec) heroSec.style.display = show ? '' : 'none';
-      }
       
       // Lazy load tab content if not already loaded
       if (tabName === 'residuals' && !window.residualsLoaded) {
@@ -5108,6 +5118,10 @@
       }
       // Apply Insight depth immediately so layout is correct before results arrive
       applyDepth('insight');
+      highlightRegWorkspaceTab('results-overview');
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.updateTitle('Model Results \u2013 Overview');
+      }
     });
 
     function registerHeaderActions() {

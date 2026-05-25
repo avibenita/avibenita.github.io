@@ -1914,9 +1914,22 @@
     #tab-results .tab-panel.reg-results-panel,
     #tab-ix-summary .tab-panel.ix-workspace,
     #tab-ix-viz .tab-panel.ix-workspace,
-    #tab-ix-details .tab-panel.ix-workspace {
+    #tab-ix-details .tab-panel.ix-workspace,
+    #tab-pred-overview .tab-panel.ix-workspace,
+    #tab-predictions .tab-panel.ix-workspace,
+    #tab-pred-technical .tab-panel.ix-workspace,
+    #tab-model-viz .tab-panel.ix-workspace,
+    #tab-partial-grid .tab-panel.ix-workspace,
+    #tab-residuals .tab-panel.ix-workspace,
+    #tab-res-plots .tab-panel.ix-workspace,
+    #tab-res-influential .tab-panel.ix-workspace {
       flex: 1 1 auto; width: 100%; min-height: 0; overflow-y: visible;
       padding: 0 16px 18px;
+    }
+    #tab-pred-overview.active, #tab-predictions.active, #tab-pred-technical.active,
+    #tab-model-viz.active, #tab-partial-grid.active,
+    #tab-residuals.active, #tab-res-plots.active, #tab-res-influential.active {
+      overflow-y: auto; min-height: 0;
     }
 
     /* ── Analysis workspace: VB6-style attached tab shell ── */
@@ -3145,29 +3158,17 @@
                 <i class="fa-solid fa-arrows-split-up-and-left sb-item-icon"></i>
                 <span class="sb-item-copy"><span class="sb-item-label">Interactions</span><span class="sb-item-description">Moderation analysis: overview, plots, and technical tests.</span></span>
               </button>
-              <button class="sb-item" onclick="switchTab('predictions')" data-tab="predictions">
+              <button class="sb-item" onclick="switchTab('pred-overview')" data-tab="predictions">
                 <i class="fa-solid fa-crosshairs sb-item-icon"></i>
-                <span class="sb-item-copy"><span class="sb-item-label">Predictions</span><span class="sb-item-description">Predicted scores and intervals for model cases.</span></span>
+                <span class="sb-item-copy"><span class="sb-item-label">Predictions</span><span class="sb-item-description">Fit quality, what-if scenarios, and interval details.</span></span>
               </button>
-              <button class="sb-item" onclick="switchTab('model-viz')" data-tab="model-viz">
-                <i class="fa-solid fa-chart-scatter sb-item-icon"></i>
-                <span class="sb-item-copy"><span class="sb-item-label">Model Visualization</span><span class="sb-item-description">Observed vs predicted and fitted-line views.</span></span>
+              <button class="sb-item" onclick="switchTab('viz-partial')" data-tab="visualization">
+                <i class="fa-solid fa-chart-line sb-item-icon"></i>
+                <span class="sb-item-copy"><span class="sb-item-label">Visualization</span><span class="sb-item-description">Partial effects and unique predictor contributions.</span></span>
               </button>
-              <button class="sb-item" onclick="switchTab('partial-grid')" data-tab="partial-grid">
-                <i class="fa-solid fa-border-all sb-item-icon"></i>
-                <span class="sb-item-copy"><span class="sb-item-label">Partial Reg. Plots</span><span class="sb-item-description">Added-variable plots for each predictor.</span></span>
-              </button>
-              <button class="sb-item" onclick="switchTab('residuals')" data-tab="residuals">
-                <i class="fa-solid fa-gauge-high sb-item-icon"></i>
-                <span class="sb-item-copy"><span class="sb-item-label">Residual Overview</span><span class="sb-item-description">Normality, homoscedasticity, and autocorrelation checks.</span></span>
-              </button>
-              <button class="sb-item" onclick="switchTab('res-plots')" data-tab="res-plots">
-                <i class="fa-solid fa-chart-area sb-item-icon"></i>
-                <span class="sb-item-copy"><span class="sb-item-label">Residual Plots</span><span class="sb-item-description">Standard residual diagnostic charts.</span></span>
-              </button>
-              <button class="sb-item" onclick="switchTab('res-influential')" data-tab="res-influential">
-                <i class="fa-solid fa-triangle-exclamation sb-item-icon"></i>
-                <span class="sb-item-copy"><span class="sb-item-label">Influential Cases</span><span class="sb-item-description">Leverage, Cook's distance, and flagged observations.</span></span>
+              <button class="sb-item" onclick="switchTab('diag-overview')" data-tab="diagnostics">
+                <i class="fa-solid fa-stethoscope sb-item-icon"></i>
+                <span class="sb-item-copy"><span class="sb-item-label">Diagnostics</span><span class="sb-item-description">Assumptions, residual plots, and influential cases.</span></span>
               </button>
             </div>
           </div>
@@ -3468,16 +3469,65 @@
           </div>
         </div>
 
-        <!-- Tab: Predictions -->
+        <!-- Tab: Predictions – Overview -->
+        <div id="tab-pred-overview" class="tab-content">
+          <div class="tab-panel ix-workspace">
+            <div class="ws-shell">
+              <div class="ws-chrome ws-chrome--attached">
+                <nav class="ws-mode-bar ws-mode-bar--attached" aria-label="Prediction views">
+                  <button type="button" class="ws-mode-tab active" data-pred-tab="pred-overview" onclick="switchTab('pred-overview')" title="Observed vs predicted and fit quality">
+                    <i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Overview</span>
+                  </button>
+                  <button type="button" class="ws-mode-tab" data-pred-tab="pred-scenario" onclick="switchTab('pred-scenario')" title="Interactive what-if scenario engine">
+                    <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span>Scenario Engine</span>
+                  </button>
+                  <button type="button" class="ws-mode-tab" data-pred-tab="pred-technical" onclick="switchTab('pred-technical')" title="Prediction intervals and formulas">
+                    <i class="fa-solid fa-flask" aria-hidden="true"></i><span>Technical</span>
+                  </button>
+                </nav>
+              </div>
+              <div class="ws-body">
+                <p style="font-size:12px;color:var(--text-secondary);margin:0 0 14px 0;line-height:1.6;">
+                  How well the model predicts the sample. Points near the diagonal indicate good fit; systematic curvature suggests misspecification.
+                </p>
+                <div class="kpi-strip" style="margin-bottom:16px;">
+                  <div class="kpi-card" style="border-top:3px solid var(--warning);"><div class="kpi-label">RMSE</div><div id="predOverviewKpiRMSE" class="kpi-value">—</div></div>
+                  <div class="kpi-card" style="border-top:3px solid var(--accent-2);"><div class="kpi-label">R²</div><div id="predOverviewKpiR2" class="kpi-value">—</div></div>
+                  <div class="kpi-card" style="border-top:3px solid var(--accent-1);"><div class="kpi-label">MAE</div><div id="predOverviewKpiMAE" class="kpi-value">—</div></div>
+                  <div class="kpi-card" style="border-top:3px solid var(--text-muted);"><div class="kpi-label">n</div><div id="predOverviewKpiN" class="kpi-value">—</div></div>
+                </div>
+                <div id="predObsPredChart" style="height:420px;min-height:280px;"></div>
+                <div class="ix-crossnav" style="margin-top:14px;">
+                  <button type="button" class="ix-crossnav-btn" onclick="switchTab('pred-scenario')"><i class="fa-solid fa-wand-magic-sparkles"></i> Explore scenarios in Scenario Engine →</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Predictions – Scenario Engine -->
         <div id="tab-predictions" class="tab-content">
+          <div class="tab-panel ix-workspace">
+            <div class="ws-shell">
+              <div class="ws-chrome ws-chrome--attached">
+                <nav class="ws-mode-bar ws-mode-bar--attached" aria-label="Prediction views">
+                  <button type="button" class="ws-mode-tab" data-pred-tab="pred-overview" onclick="switchTab('pred-overview')" title="Observed vs predicted and fit quality">
+                    <i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Overview</span>
+                  </button>
+                  <button type="button" class="ws-mode-tab active" data-pred-tab="pred-scenario" onclick="switchTab('pred-scenario')" title="Interactive what-if scenario engine">
+                    <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span>Scenario Engine</span>
+                  </button>
+                  <button type="button" class="ws-mode-tab" data-pred-tab="pred-technical" onclick="switchTab('pred-technical')" title="Prediction intervals and formulas">
+                    <i class="fa-solid fa-flask" aria-hidden="true"></i><span>Technical</span>
+                  </button>
+                </nav>
+              </div>
+              <div class="ws-body">
           <div class="predictions-container">
             
             <!-- Prediction Header -->
-            <div class="prediction-header">
-              <div class="prediction-title">
-                <i class="fa-solid fa-wand-magic-sparkles"></i> Interactive Prediction Engine
-              </div>
-              <div class="prediction-subtitle">
+            <div class="prediction-header" style="margin-bottom:12px;">
+              <div class="prediction-subtitle" style="margin:0;">
                 Adjust variable values below to explore "what-if" scenarios
               </div>
             </div>
@@ -3583,13 +3633,70 @@
             </div>
 
           </div>
+              </div><!-- /ws-body -->
+            </div><!-- /ws-shell -->
+          </div>
         </div>
-        <!-- End Tab: Predictions -->
+        <!-- End Tab: Predictions – Scenario Engine -->
 
-        <!-- Tab: Residual Overview -->
-        <!-- Tab: Model Visualization -->
+        <!-- Tab: Predictions – Technical -->
+        <div id="tab-pred-technical" class="tab-content">
+          <div class="tab-panel ix-workspace">
+            <div class="ws-shell">
+              <div class="ws-chrome ws-chrome--attached">
+                <nav class="ws-mode-bar ws-mode-bar--attached" aria-label="Prediction views">
+                  <button type="button" class="ws-mode-tab" data-pred-tab="pred-overview" onclick="switchTab('pred-overview')" title="Observed vs predicted and fit quality">
+                    <i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Overview</span>
+                  </button>
+                  <button type="button" class="ws-mode-tab" data-pred-tab="pred-scenario" onclick="switchTab('pred-scenario')" title="Interactive what-if scenario engine">
+                    <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span>Scenario Engine</span>
+                  </button>
+                  <button type="button" class="ws-mode-tab active" data-pred-tab="pred-technical" onclick="switchTab('pred-technical')" title="Prediction intervals and formulas">
+                    <i class="fa-solid fa-flask" aria-hidden="true"></i><span>Technical</span>
+                  </button>
+                </nav>
+              </div>
+              <div class="ws-body">
+                <div class="ix-tech-card">
+                  <div class="ix-section-title"><i class="fa-solid fa-function"></i> Prediction equation</div>
+                  <p style="font-size:13px;color:var(--text-secondary);margin:0 0 10px 0;">Full regression equation used for point predictions and intervals.</p>
+                  <div id="predTechEquation" style="font-family:var(--mono-font,monospace);font-size:13px;padding:12px;background:var(--surface-1);border:1px solid var(--border);border-radius:8px;line-height:1.6;">Awaiting results…</div>
+                  <button class="show-eq-btn" type="button" onclick="openEquationPopup()" style="margin-top:10px;">
+                    <i class="fa-solid fa-up-right-from-square"></i> Open equation popup
+                  </button>
+                </div>
+                <div class="ix-tech-card" style="margin-top:16px;">
+                  <div class="ix-section-title"><i class="fa-solid fa-chart-area"></i> Interval definitions</div>
+                  <div style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                    <p><strong>95% Confidence interval</strong> — range for the <em>mean</em> predicted response at a given predictor profile. Narrows with larger n and lower multicollinearity.</p>
+                    <p style="margin-top:10px;"><strong>95% Prediction interval</strong> — range for a <em>single new observation</em>. Always wider than the confidence interval because it includes residual variance.</p>
+                    <p style="margin-top:10px;"><strong>RMSE</strong> — typical in-sample prediction error in outcome units. Reported on the Overview tab alongside R² and MAE.</p>
+                  </div>
+                </div>
+                <div class="ix-crossnav" style="margin-top:14px;">
+                  <button type="button" class="ix-crossnav-btn" onclick="switchTab('pred-scenario')"><i class="fa-solid fa-wand-magic-sparkles"></i> Run scenarios in Scenario Engine →</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Visualization – Partial Effects -->
         <div id="tab-model-viz" class="tab-content">
-          <div style="display:flex;flex-direction:column;height:100%;padding:12px 16px 10px;gap:0;overflow:hidden;">
+          <div class="tab-panel ix-workspace">
+            <div class="ws-shell">
+              <div class="ws-chrome ws-chrome--attached">
+                <nav class="ws-mode-bar ws-mode-bar--attached" aria-label="Visualization views">
+                  <button type="button" class="ws-mode-tab active" data-viz-tab="viz-partial" onclick="switchTab('viz-partial')" title="Partial effect line with CI band per predictor">
+                    <i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>Partial Effects</span>
+                  </button>
+                  <button type="button" class="ws-mode-tab" data-viz-tab="viz-unique" onclick="switchTab('viz-unique')" title="Added-variable plots for unique contributions">
+                    <i class="fa-solid fa-border-all" aria-hidden="true"></i><span>Unique Contributions</span>
+                  </button>
+                </nav>
+              </div>
+              <div class="ws-body">
+          <div style="display:flex;flex-direction:column;height:100%;gap:0;overflow:hidden;">
 
             <!-- Loading state -->
             <div id="modelVizLoading" style="text-align:center;padding:60px 20px;color:var(--text-muted);">
@@ -3606,9 +3713,6 @@
 
                   <!-- Left: explanation -->
                   <div>
-                    <div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:4px;letter-spacing:-0.01em;">
-                      Partial Effect Plot
-                    </div>
                     <div style="font-size:12px;color:rgba(255,255,255,0.72);max-width:480px;line-height:1.6;">
                       Shows the relationship between the selected predictor and <strong id="mvYLabel" style="color:var(--accent-1);">Y</strong>,
                       with all other predictors held at their sample mean.
@@ -3646,11 +3750,27 @@
 
             </div><!-- /content -->
           </div>
+              </div><!-- /ws-body -->
+            </div><!-- /ws-shell -->
+          </div>
         </div>
 
-        <!-- Tab: Partial Regression Grid (Added Variable Plots) -->
+        <!-- Tab: Visualization – Unique Contributions -->
         <div id="tab-partial-grid" class="tab-content">
-          <div style="display:flex;flex-direction:column;height:100%;padding:12px 16px 10px;gap:0;overflow:hidden;">
+          <div class="tab-panel ix-workspace">
+            <div class="ws-shell">
+              <div class="ws-chrome ws-chrome--attached">
+                <nav class="ws-mode-bar ws-mode-bar--attached" aria-label="Visualization views">
+                  <button type="button" class="ws-mode-tab" data-viz-tab="viz-partial" onclick="switchTab('viz-partial')" title="Partial effect line with CI band per predictor">
+                    <i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>Partial Effects</span>
+                  </button>
+                  <button type="button" class="ws-mode-tab active" data-viz-tab="viz-unique" onclick="switchTab('viz-unique')" title="Added-variable plots for unique contributions">
+                    <i class="fa-solid fa-border-all" aria-hidden="true"></i><span>Unique Contributions</span>
+                  </button>
+                </nav>
+              </div>
+              <div class="ws-body">
+          <div style="display:flex;flex-direction:column;height:100%;gap:0;overflow:hidden;">
 
             <!-- Loading state -->
             <div id="pgLoading" style="text-align:center;padding:60px 20px;color:var(--text-muted);">
@@ -3680,39 +3800,99 @@
 
             </div><!-- /pgContent -->
           </div>
+              </div><!-- /ws-body -->
+            </div><!-- /ws-shell -->
+          </div>
         </div>
 
-        <!-- Tab: Residual Overview -->
+        <!-- Tab: Diagnostics – Overview -->
         <div id="tab-residuals" class="tab-content">
+          <div class="tab-panel ix-workspace">
+            <div class="ws-shell">
+              <div class="ws-chrome ws-chrome--attached">
+                <nav class="ws-mode-bar ws-mode-bar--attached" aria-label="Diagnostic views">
+                  <button type="button" class="ws-mode-tab active" data-diag-tab="diag-overview" onclick="switchTab('diag-overview')" title="Assumption summary and test results">
+                    <i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Overview</span>
+                  </button>
+                  <button type="button" class="ws-mode-tab" data-diag-tab="diag-plots" onclick="switchTab('diag-plots')" title="QQ, residuals vs fitted, scale-location, leverage">
+                    <i class="fa-solid fa-chart-area" aria-hidden="true"></i><span>Residual Plots</span>
+                  </button>
+                  <button type="button" class="ws-mode-tab" data-diag-tab="diag-influence" onclick="switchTab('diag-influence')" title="Cook's distance and flagged observations">
+                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>Influence</span>
+                  </button>
+                </nav>
+              </div>
+              <div class="ws-body">
           <div class="tab-panel res-workspace" id="residualsPanel">
             <div style="text-align:center;padding:60px 20px;color:var(--text-muted);">
               <i class="fa-solid fa-spinner fa-spin" style="font-size:48px;margin-bottom:15px;"></i>
               <p>Loading residual diagnostics...</p>
             </div>
           </div>
+              </div><!-- /ws-body -->
+            </div><!-- /ws-shell -->
+          </div>
         </div>
 
-        <!-- Tab: Diagnostic Plots -->
+        <!-- Tab: Diagnostics – Residual Plots -->
         <div id="tab-res-plots" class="tab-content">
+          <div class="tab-panel ix-workspace">
+            <div class="ws-shell">
+              <div class="ws-chrome ws-chrome--attached">
+                <nav class="ws-mode-bar ws-mode-bar--attached" aria-label="Diagnostic views">
+                  <button type="button" class="ws-mode-tab" data-diag-tab="diag-overview" onclick="switchTab('diag-overview')" title="Assumption summary and test results">
+                    <i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Overview</span>
+                  </button>
+                  <button type="button" class="ws-mode-tab active" data-diag-tab="diag-plots" onclick="switchTab('diag-plots')" title="QQ, residuals vs fitted, scale-location, leverage">
+                    <i class="fa-solid fa-chart-area" aria-hidden="true"></i><span>Residual Plots</span>
+                  </button>
+                  <button type="button" class="ws-mode-tab" data-diag-tab="diag-influence" onclick="switchTab('diag-influence')" title="Cook's distance and flagged observations">
+                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>Influence</span>
+                  </button>
+                </nav>
+              </div>
+              <div class="ws-body">
           <div class="tab-panel res-workspace" id="resPlotsPanel">
             <div style="text-align:center;padding:60px 20px;color:var(--text-muted);">
               <i class="fa-solid fa-spinner fa-spin" style="font-size:48px;margin-bottom:15px;"></i>
               <p>Loading plots...</p>
             </div>
           </div>
+              </div><!-- /ws-body -->
+            </div><!-- /ws-shell -->
+          </div>
         </div>
 
-        <!-- Tab: Influential Observations -->
+        <!-- Tab: Diagnostics – Influence -->
         <div id="tab-res-influential" class="tab-content">
+          <div class="tab-panel ix-workspace">
+            <div class="ws-shell">
+              <div class="ws-chrome ws-chrome--attached">
+                <nav class="ws-mode-bar ws-mode-bar--attached" aria-label="Diagnostic views">
+                  <button type="button" class="ws-mode-tab" data-diag-tab="diag-overview" onclick="switchTab('diag-overview')" title="Assumption summary and test results">
+                    <i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Overview</span>
+                  </button>
+                  <button type="button" class="ws-mode-tab" data-diag-tab="diag-plots" onclick="switchTab('diag-plots')" title="QQ, residuals vs fitted, scale-location, leverage">
+                    <i class="fa-solid fa-chart-area" aria-hidden="true"></i><span>Residual Plots</span>
+                  </button>
+                  <button type="button" class="ws-mode-tab active" data-diag-tab="diag-influence" onclick="switchTab('diag-influence')" title="Cook's distance and flagged observations">
+                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>Influence</span>
+                  </button>
+                </nav>
+              </div>
+              <div class="ws-body">
           <div class="tab-panel res-workspace" id="resInfluentialPanel">
             <div style="text-align:center;padding:60px 20px;color:var(--text-muted);">
               <i class="fa-solid fa-spinner fa-spin" style="font-size:48px;margin-bottom:15px;"></i>
               <p>Loading influential observations...</p>
             </div>
           </div>
+              </div><!-- /ws-body -->
+            </div><!-- /ws-shell -->
+          </div>
         </div>
 
-        <!-- Tab: Residual AI -->
+        <!-- Tab: Residual AI (internal; not in sidebar) -->
         <div id="tab-res-ai" class="tab-content">
           <div class="tab-panel res-workspace" id="resAiPanel">
             <div style="text-align:center;padding:60px 20px;color:var(--text-muted);">
@@ -4228,6 +4408,36 @@
       });
     }
 
+    function highlightWsTab(dataAttr, tabName) {
+      document.querySelectorAll(`.ws-mode-tab[data-${dataAttr}]`).forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute(`data-${dataAttr}`) === tabName);
+      });
+    }
+
+    function resolveRegContentTab(tabName) {
+      const panelMap = {
+        'results-overview': 'results',
+        'results-detail': 'results',
+        'viz-partial': 'model-viz',
+        'viz-unique': 'partial-grid',
+        'diag-overview': 'residuals',
+        'diag-plots': 'res-plots',
+        'diag-influence': 'res-influential',
+        'pred-scenario': 'predictions',
+      };
+      return panelMap[tabName] || tabName;
+    }
+
+    function matchesRegNavTab(navTab, tabName) {
+      if (navTab === tabName) return true;
+      if (tabName.startsWith('ix-') && navTab === 'interactions') return true;
+      if (['results-overview', 'results-detail'].includes(tabName) && navTab === 'model-results') return true;
+      if (['pred-overview', 'pred-scenario', 'pred-technical', 'predictions'].includes(tabName) && navTab === 'predictions') return true;
+      if (['viz-partial', 'viz-unique', 'model-viz', 'partial-grid', 'visualization'].includes(tabName) && navTab === 'visualization') return true;
+      if (['diag-overview', 'diag-plots', 'diag-influence', 'residuals', 'res-plots', 'res-influential', 'diagnostics'].includes(tabName) && navTab === 'diagnostics') return true;
+      return false;
+    }
+
     function sbGoOverview() {
       switchTab('results-overview');
     }
@@ -4369,21 +4579,39 @@
     function switchTab(tabName) {
       console.log('🔄 Switching to tab:', tabName);
 
-      // Map tab names to header titles
+      // Legacy sidebar aliases → canonical workspace tabs
+      const legacyRedirect = {
+        'results': 'results-overview',
+        'interactions': 'ix-summary',
+        'visualization': 'viz-partial',
+        'model-viz': 'viz-partial',
+        'partial-grid': 'viz-unique',
+        'diagnostics': 'diag-overview',
+        'residuals': 'diag-overview',
+        'res-plots': 'diag-plots',
+        'res-influential': 'diag-influence',
+        'predictions': 'pred-scenario',
+      };
+      if (legacyRedirect[tabName]) {
+        switchTab(legacyRedirect[tabName]);
+        return;
+      }
+
+      // Map tab names to header titles (sidebar item + sub-view)
       const tabTitles = {
         'results-overview':  'Model Results \u2013 Overview',
         'results-detail':    'Model Results \u2013 Technical',
-        'results':           'Model Results',
-        'interactions':      'Interactions',
         'ix-summary':        'Interactions \u2013 Overview',
         'ix-viz':            'Interactions \u2013 Visualization',
         'ix-details':        'Interactions \u2013 Technical',
-        'predictions':       'Predictions',
-        'model-viz':         'Model Visualization',
-        'partial-grid':      'Partial Reg. Plots',
-        'residuals':         'Residual Overview',
-        'res-plots':         'Residual Plots',
-        'res-influential':   'Influential Cases',
+        'pred-overview':     'Predictions \u2013 Overview',
+        'pred-scenario':     'Predictions \u2013 Scenario Engine',
+        'pred-technical':    'Predictions \u2013 Technical',
+        'viz-partial':       'Visualization \u2013 Partial Effects',
+        'viz-unique':        'Visualization \u2013 Unique Contributions',
+        'diag-overview':     'Diagnostics \u2013 Overview',
+        'diag-plots':        'Diagnostics \u2013 Residual Plots',
+        'diag-influence':    'Diagnostics \u2013 Influence',
         'correlations':      'Correlations',
         'descriptive':       'Descriptives',
         'ancova':            'ANCOVA',
@@ -4398,12 +4626,7 @@
       // Update nav items — all items are mutually exclusive
       document.querySelectorAll('.sb-item[data-tab]').forEach(btn => {
         btn.classList.remove('active');
-        const navTab = btn.dataset.tab;
-        if (navTab === tabName ||
-            (tabName.startsWith('ix-') && navTab === 'interactions') ||
-            ((tabName === 'results-overview' || tabName === 'results-detail') && navTab === 'model-results')) {
-          btn.classList.add('active');
-        }
+        if (matchesRegNavTab(btn.dataset.tab, tabName)) btn.classList.add('active');
       });
 
       // Model results depth + in-page tab highlight
@@ -4411,15 +4634,14 @@
         setDepth('insight');
       } else if (tabName === 'results-detail') {
         setDepth('analyst');
-      } else if (tabName === 'results') {
-        switchTab('results-overview');
-        return;
       }
 
-      // Highlight in-page interaction workspace tab
-      if (tabName.startsWith('ix-')) {
-        highlightIxWorkspaceTab(tabName);
-      }
+      // In-page workspace tab highlights
+      if (tabName.startsWith('ix-')) highlightWsTab('ix-tab', tabName);
+      if (['pred-overview', 'pred-scenario', 'pred-technical'].includes(tabName)) highlightWsTab('pred-tab', tabName);
+      if (['viz-partial', 'viz-unique'].includes(tabName)) highlightWsTab('viz-tab', tabName);
+      if (['diag-overview', 'diag-plots', 'diag-influence'].includes(tabName)) highlightWsTab('diag-tab', tabName);
+
       const ixCtx = document.getElementById('ixWorkspaceContext');
       if (ixCtx) {
         const showIxCtx = tabName.startsWith('ix-');
@@ -4432,8 +4654,7 @@
       }
       
       // Hide all tab content, show the selected one
-      // 'results-overview' and 'results-detail' both map to tab-results
-      const realTabName = (tabName === 'results-overview' || tabName === 'results-detail') ? 'results' : tabName;
+      const realTabName = resolveRegContentTab(tabName);
       document.querySelectorAll('.tab-content').forEach(content => {
         content.classList.remove('active');
         content.querySelectorAll(':scope > .tab-panel').forEach(panel => panel.classList.remove('active'));
@@ -4456,17 +4677,17 @@
       if (viewContainer) viewContainer.scrollTop = 0;
       
       // Lazy load tab content if not already loaded
-      if (tabName === 'residuals' && !window.residualsLoaded) {
+      if (tabName === 'diag-overview' && !window.residualsLoaded) {
         loadResidualsTab();
-      } else if (tabName === 'model-viz' && !window.modelVizLoaded) {
+      } else if (tabName === 'viz-partial' && !window.modelVizLoaded) {
         window.modelVizLoaded = true;
         loadModelVizTab();
-      } else if (tabName === 'partial-grid' && !window.partialGridLoaded) {
+      } else if (tabName === 'viz-unique' && !window.partialGridLoaded) {
         window.partialGridLoaded = true;
         loadPartialGridTab();
-      } else if (tabName === 'res-plots' && !window.resPlotsLoaded) {
+      } else if (tabName === 'diag-plots' && !window.resPlotsLoaded) {
         loadResPlots();
-      } else if (tabName === 'res-influential' && !window.resInfluentialLoaded) {
+      } else if (tabName === 'diag-influence' && !window.resInfluentialLoaded) {
         loadResInfluential();
       } else if (tabName === 'res-ai' && !window.resAiLoaded) {
         loadResAi();
@@ -4474,26 +4695,23 @@
         loadCorrelationsTab();
       } else if (tabName === 'descriptive' && !window.descriptiveLoaded) {
         loadDescriptiveTab();
-      } else if (tabName === 'predictions' && !window.predictionsLoaded) {
+      } else if (tabName === 'pred-scenario' && !window.predictionsLoaded) {
         initializePredictions();
         window.predictionsLoaded = true;
+      } else if (tabName === 'pred-overview' && !window.predOverviewLoaded) {
+        loadPredOverviewTab();
+      } else if (tabName === 'pred-technical') {
+        loadPredTechnicalTab();
       } else if (tabName === 'ancova' && !window.ancovaLoaded) {
-        // legacy guard – kept for safety but sub-tabs handle loading now
         initializeANCOVA();
         window.ancovaLoaded = true;
       } else if (['ancova-results','ancova-assumptions','ancova-viz'].includes(tabName)) {
-        // Initialise ANCOVA data exactly once, then render the requested sub-panel
         if (!window.ancovaLoaded) {
           initializeANCOVA();
           window.ancovaLoaded = true;
         }
         renderANCOVASubTab(tabName);
-      } else if (tabName === 'interactions') {
-        // legacy – redirect to summary
-        switchTab('ix-summary');
-        return;
       } else if (['ix-summary','ix-viz','ix-details'].includes(tabName)) {
-        // Interaction sub-tabs — (re)render when opened
         setTimeout(() => {
           if (!window._interactionTabData) {
             showInteractionEmptyState(tabName);
@@ -5806,6 +6024,8 @@
         _resData = null; window._resDiagResults = null;
         window.residualsLoaded = false; window.resPlotsLoaded = false;
         window.resInfluentialLoaded = false; window.resAiLoaded = false;
+        window.predOverviewLoaded = false; window.predictionsLoaded = false;
+        window.modelVizLoaded = false; window.partialGridLoaded = false;
         window.ancovaLoaded = false;
         
         // Store global variables for predictions module
@@ -6746,7 +6966,7 @@
     
     // Function to open residual diagnostics (keep for dropdown compatibility)
     function openResidualDiagnostics() {
-      switchTab('residuals');
+      switchTab('diag-overview');
     }
     
     // Function to open correlation matrix for model variables (keep for dropdown compatibility)
@@ -7519,6 +7739,58 @@
        PREDICTIONS MODULE
        Interactive prediction engine with sliders
     ======================================== */
+
+    /**
+     * Predictions workspace — Overview tab (fit quality + observed vs predicted)
+     */
+    function loadPredOverviewTab() {
+      const res = window.regressionResults || window.globalRegressionResults;
+      const dat = window.regressionData;
+      const yVar = window.globalYVar || 'Y';
+      if (!res || !dat) return;
+
+      const fitted = res.fitted || res.fittedValues || [];
+      const observed = dat.yVector || [];
+      const n = observed.length;
+      if (!n || fitted.length !== n) return;
+
+      const rmse = res.RMSE ?? res.rootMSE ?? Math.sqrt(res.MSE || 0);
+      const r2 = res.R2 ?? res.rSquared ?? res.R_squared ?? 0;
+      const mae = observed.reduce((s, y, i) => s + Math.abs(y - fitted[i]), 0) / n;
+
+      const setKpi = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = formatNumber(val); };
+      setKpi('predOverviewKpiRMSE', rmse);
+      setKpi('predOverviewKpiR2', r2);
+      setKpi('predOverviewKpiMAE', mae);
+      const nEl = document.getElementById('predOverviewKpiN');
+      if (nEl) nEl.textContent = String(n);
+
+      if (typeof Highcharts === 'undefined') return;
+      const th = _resChartTheme();
+      const scatter = observed.map((y, i) => [fitted[i], y]);
+      const lo = Math.min(...fitted, ...observed);
+      const hi = Math.max(...fitted, ...observed);
+      Highcharts.chart('predObsPredChart', {
+        chart: { type: 'scatter', backgroundColor: 'transparent', style: { fontFamily: 'inherit' } },
+        title: { text: null },
+        xAxis: { title: { text: 'Predicted ' + yVar, style: { color: th.textColor } }, gridLineColor: th.gridLine, labels: { style: { color: th.axisText } } },
+        yAxis: { title: { text: 'Observed ' + yVar, style: { color: th.textColor } }, gridLineColor: th.gridLine, labels: { style: { color: th.axisText } } },
+        legend: { enabled: false },
+        tooltip: { backgroundColor: th.bgTooltip, borderColor: th.borderTooltip, style: { color: th.textColor } },
+        series: [
+          { name: 'Cases', type: 'scatter', color: 'rgba(120,200,255,0.65)', data: scatter },
+          { name: 'Perfect fit', type: 'line', color: 'rgba(255,165,120,0.75)', dashStyle: 'Dash', marker: { enabled: false }, enableMouseTracking: false, data: [[lo, lo], [hi, hi]] }
+        ],
+        credits: { enabled: false }
+      });
+      window.predOverviewLoaded = true;
+    }
+
+    function loadPredTechnicalTab() {
+      const eqEl = document.getElementById('predTechEquation');
+      const src = document.getElementById('regressionEquation');
+      if (eqEl) eqEl.textContent = src?.textContent?.trim() || 'Run a regression to see the prediction equation.';
+    }
 
     /**
      * Initialize prediction inputs based on regression model
@@ -9710,7 +9982,7 @@
             For detailed assumption validation (normality, heteroscedasticity, independence, influential observations), 
             please refer to the <strong>Residual Diagnostics</strong> tab where comprehensive statistical tests and visualizations are available.
             <div style="margin-top: 12px;">
-              <button onclick="switchTab('residuals')" style="padding: 8px 16px; background: var(--accent-2); color: white; border: none; border-radius: 6px; cursor: pointer;">
+              <button onclick="switchTab('diag-overview')" style="padding: 8px 16px; background: var(--accent-2); color: white; border: none; border-radius: 6px; cursor: pointer;">
                 <i class="fa-solid fa-arrow-right"></i> View Residual Diagnostics
               </button>
             </div>

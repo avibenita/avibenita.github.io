@@ -1851,29 +1851,37 @@
     /* ── Interaction Analysis workspace (unified 3-tab pattern) ── */
     .ix-workspace { display: flex; flex-direction: column; gap: 14px; max-width: 1180px; }
     .ix-workspace-top {
-      display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-      padding-bottom: 10px; border-bottom: 1px solid var(--border);
+      padding-bottom: 12px; border-bottom: 1px solid var(--border);
     }
-    .ix-workspace-brand {
-      display: flex; align-items: center; gap: 10px;
-      font-size: 0.82rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--accent-2);
-    }
-    .ix-workspace-brand i { font-size: 1rem; opacity: 0.9; }
     .ix-workspace-tabs {
-      display: inline-flex; gap: 4px; padding: 4px;
-      background: rgba(0,0,0,.22); border: 1px solid var(--border); border-radius: 10px;
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;
+      width: 100%;
     }
+    @media (max-width: 900px) { .ix-workspace-tabs { grid-template-columns: 1fr; } }
     .ix-ws-tab {
-      border: none; background: transparent; color: var(--text-muted);
-      font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
-      padding: 7px 14px; border-radius: 7px; cursor: pointer; transition: all .15s;
+      display: flex; align-items: flex-start; gap: 12px; text-align: left;
+      padding: 12px 14px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--surface-0);
+      color: var(--text-secondary); cursor: pointer; transition: all .15s;
     }
-    .ix-ws-tab:hover { color: var(--text-secondary); background: rgba(255,255,255,.06); }
+    .ix-ws-tab > i {
+      font-size: 1rem; margin-top: 2px; opacity: 0.85; flex-shrink: 0;
+      color: var(--text-muted);
+    }
+    .ix-ws-tab-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    .ix-ws-tab-label { font-size: 13px; font-weight: 700; color: var(--text-primary); line-height: 1.25; }
+    .ix-ws-tab-desc { font-size: 11px; line-height: 1.4; color: var(--text-muted); }
+    .ix-ws-tab:hover:not(.active) {
+      background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.14);
+    }
     .ix-ws-tab.active {
-      color: #fff; background: linear-gradient(135deg, rgba(232,118,58,.85), rgba(232,118,58,.55));
-      box-shadow: 0 2px 8px rgba(232,118,58,.25);
+      border-color: rgba(167,139,250,.45);
+      background: linear-gradient(135deg, rgba(167,139,250,.14), rgba(120,200,255,.07));
+      box-shadow: inset 3px 0 0 var(--accent-2);
     }
+    .ix-ws-tab.active > i { color: var(--accent-2); opacity: 1; }
+    .ix-ws-tab.active .ix-ws-tab-label { color: #fff; }
+    .ix-ws-tab.active .ix-ws-tab-desc { color: var(--text-secondary); }
     .ix-context-banner {
       display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
       padding: 10px 14px; border-radius: 10px;
@@ -2127,6 +2135,11 @@
       color: inherit;
     }
     .sb-item-parent.disabled {
+      opacity: 0.38;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .sb-item.disabled {
       opacity: 0.38;
       cursor: not-allowed;
       pointer-events: none;
@@ -2873,30 +2886,11 @@
                 <i class="fa-solid fa-table-list sb-item-icon"></i>
                 <span class="sb-item-copy"><span class="sb-item-label">Detailed Results</span><span class="sb-item-description">Full coefficient table, intervals, and inference details.</span></span>
               </button>
-              <!-- Interactions expandable item (disabled until model has interaction terms) -->
-              <div id="interactionsGroupNav">
-                <button class="sb-item-parent disabled" id="interactionsParentBtn" onclick="toggleInteractionsNav()" aria-expanded="false" title="Add interaction terms in the model to enable this section">
-                  <i class="fa-solid fa-arrows-split-up-and-left sb-item-icon"></i>
-                  <span class="sb-item-copy"><span class="sb-item-label">Interactions</span><span class="sb-item-description">Moderation analysis: overview, plots, and technical tests.</span></span>
-                  <i class="fa-solid fa-chevron-right sb-arrow"></i>
-                </button>
-                <div class="sb-subitems" id="interactionsSubItems">
-                  <div class="sb-subitems-rail">
-                    <button class="sb-item sb-item-sub" onclick="switchTab('ix-summary')" data-tab="ix-summary">
-                      <i class="fa-solid fa-layer-group sb-item-icon"></i>
-                      <span class="sb-item-copy"><span class="sb-item-label">Overview</span><span class="sb-item-description">Interpretation, preview plot, and simple slopes.</span></span>
-                    </button>
-                    <button class="sb-item sb-item-sub" onclick="switchTab('ix-viz')" data-tab="ix-viz">
-                      <i class="fa-solid fa-chart-line sb-item-icon"></i>
-                      <span class="sb-item-copy"><span class="sb-item-label">Visualization</span><span class="sb-item-description">Full interaction plots and adjusted means.</span></span>
-                    </button>
-                    <button class="sb-item sb-item-sub" onclick="switchTab('ix-details')" data-tab="ix-details">
-                      <i class="fa-solid fa-table-list sb-item-icon"></i>
-                      <span class="sb-item-copy"><span class="sb-item-label">Technical</span><span class="sb-item-description">Coefficients, ΔR², and model comparison.</span></span>
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <!-- Interactions (single nav item; sub-views are in-page tabs) -->
+              <button class="sb-item disabled" id="interactionsNavBtn" onclick="switchTab('ix-summary')" data-tab="interactions" title="Add interaction terms in the model to enable this section">
+                <i class="fa-solid fa-arrows-split-up-and-left sb-item-icon"></i>
+                <span class="sb-item-copy"><span class="sb-item-label">Interactions</span><span class="sb-item-description">Moderation analysis: overview, plots, and technical tests.</span></span>
+              </button>
               <button class="sb-item" onclick="switchTab('predictions')" data-tab="predictions">
                 <i class="fa-solid fa-crosshairs sb-item-icon"></i>
                 <span class="sb-item-copy"><span class="sb-item-label">Predictions</span><span class="sb-item-description">Predicted scores and intervals for model cases.</span></span>
@@ -3471,11 +3465,28 @@
         <div id="tab-ix-summary" class="tab-content">
           <div class="tab-panel ancova-sub-panel ix-workspace">
             <div class="ix-workspace-top">
-              <div class="ix-workspace-brand"><i class="fa-solid fa-arrows-split-up-and-left"></i> Interaction Analysis</div>
               <nav class="ix-workspace-tabs" aria-label="Interaction views">
-                <button type="button" class="ix-ws-tab active" data-ix-tab="ix-summary" onclick="switchTab('ix-summary')">Overview</button>
-                <button type="button" class="ix-ws-tab" data-ix-tab="ix-viz" onclick="switchTab('ix-viz')">Visualization</button>
-                <button type="button" class="ix-ws-tab" data-ix-tab="ix-details" onclick="switchTab('ix-details')">Technical</button>
+                <button type="button" class="ix-ws-tab active" data-ix-tab="ix-summary" onclick="switchTab('ix-summary')">
+                  <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                  <span class="ix-ws-tab-copy">
+                    <span class="ix-ws-tab-label">Overview</span>
+                    <span class="ix-ws-tab-desc">Interpretation, preview plot, and simple slopes.</span>
+                  </span>
+                </button>
+                <button type="button" class="ix-ws-tab" data-ix-tab="ix-viz" onclick="switchTab('ix-viz')">
+                  <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                  <span class="ix-ws-tab-copy">
+                    <span class="ix-ws-tab-label">Visualization</span>
+                    <span class="ix-ws-tab-desc">Full interaction plots and adjusted means.</span>
+                  </span>
+                </button>
+                <button type="button" class="ix-ws-tab" data-ix-tab="ix-details" onclick="switchTab('ix-details')">
+                  <i class="fa-solid fa-table-list" aria-hidden="true"></i>
+                  <span class="ix-ws-tab-copy">
+                    <span class="ix-ws-tab-label">Technical</span>
+                    <span class="ix-ws-tab-desc">Coefficients, ΔR², and model comparison.</span>
+                  </span>
+                </button>
               </nav>
             </div>
             <div class="ix-context-banner">
@@ -3521,11 +3532,28 @@
         <div id="tab-ix-viz" class="tab-content">
           <div class="tab-panel ancova-sub-panel ix-workspace">
             <div class="ix-workspace-top">
-              <div class="ix-workspace-brand"><i class="fa-solid fa-arrows-split-up-and-left"></i> Interaction Analysis</div>
               <nav class="ix-workspace-tabs" aria-label="Interaction views">
-                <button type="button" class="ix-ws-tab" data-ix-tab="ix-summary" onclick="switchTab('ix-summary')">Overview</button>
-                <button type="button" class="ix-ws-tab active" data-ix-tab="ix-viz" onclick="switchTab('ix-viz')">Visualization</button>
-                <button type="button" class="ix-ws-tab" data-ix-tab="ix-details" onclick="switchTab('ix-details')">Technical</button>
+                <button type="button" class="ix-ws-tab" data-ix-tab="ix-summary" onclick="switchTab('ix-summary')">
+                  <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                  <span class="ix-ws-tab-copy">
+                    <span class="ix-ws-tab-label">Overview</span>
+                    <span class="ix-ws-tab-desc">Interpretation, preview plot, and simple slopes.</span>
+                  </span>
+                </button>
+                <button type="button" class="ix-ws-tab active" data-ix-tab="ix-viz" onclick="switchTab('ix-viz')">
+                  <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                  <span class="ix-ws-tab-copy">
+                    <span class="ix-ws-tab-label">Visualization</span>
+                    <span class="ix-ws-tab-desc">Full interaction plots and adjusted means.</span>
+                  </span>
+                </button>
+                <button type="button" class="ix-ws-tab" data-ix-tab="ix-details" onclick="switchTab('ix-details')">
+                  <i class="fa-solid fa-table-list" aria-hidden="true"></i>
+                  <span class="ix-ws-tab-copy">
+                    <span class="ix-ws-tab-label">Technical</span>
+                    <span class="ix-ws-tab-desc">Coefficients, ΔR², and model comparison.</span>
+                  </span>
+                </button>
               </nav>
             </div>
             <div class="ix-context-banner">
@@ -3573,11 +3601,28 @@
         <div id="tab-ix-details" class="tab-content">
           <div class="tab-panel ancova-sub-panel ix-workspace">
             <div class="ix-workspace-top">
-              <div class="ix-workspace-brand"><i class="fa-solid fa-arrows-split-up-and-left"></i> Interaction Analysis</div>
               <nav class="ix-workspace-tabs" aria-label="Interaction views">
-                <button type="button" class="ix-ws-tab" data-ix-tab="ix-summary" onclick="switchTab('ix-summary')">Overview</button>
-                <button type="button" class="ix-ws-tab" data-ix-tab="ix-viz" onclick="switchTab('ix-viz')">Visualization</button>
-                <button type="button" class="ix-ws-tab active" data-ix-tab="ix-details" onclick="switchTab('ix-details')">Technical</button>
+                <button type="button" class="ix-ws-tab" data-ix-tab="ix-summary" onclick="switchTab('ix-summary')">
+                  <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                  <span class="ix-ws-tab-copy">
+                    <span class="ix-ws-tab-label">Overview</span>
+                    <span class="ix-ws-tab-desc">Interpretation, preview plot, and simple slopes.</span>
+                  </span>
+                </button>
+                <button type="button" class="ix-ws-tab" data-ix-tab="ix-viz" onclick="switchTab('ix-viz')">
+                  <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                  <span class="ix-ws-tab-copy">
+                    <span class="ix-ws-tab-label">Visualization</span>
+                    <span class="ix-ws-tab-desc">Full interaction plots and adjusted means.</span>
+                  </span>
+                </button>
+                <button type="button" class="ix-ws-tab active" data-ix-tab="ix-details" onclick="switchTab('ix-details')">
+                  <i class="fa-solid fa-table-list" aria-hidden="true"></i>
+                  <span class="ix-ws-tab-copy">
+                    <span class="ix-ws-tab-label">Technical</span>
+                    <span class="ix-ws-tab-desc">Coefficients, ΔR², and model comparison.</span>
+                  </span>
+                </button>
               </nav>
             </div>
             <div class="ix-context-banner">
@@ -4088,18 +4133,6 @@
       if (hint) hint.setAttribute('aria-hidden', canScroll ? 'false' : 'true');
     }
 
-    // Toggle Interactions expandable nav item
-    function toggleInteractionsNav(expand) {
-      const btn   = document.getElementById('interactionsParentBtn');
-      const panel = document.getElementById('interactionsSubItems');
-      if (!btn || !panel) return;
-      const shouldExpand = (expand !== undefined) ? expand : !btn.classList.contains('expanded');
-      btn.classList.toggle('expanded', shouldExpand);
-      panel.classList.toggle('open', shouldExpand);
-      btn.setAttribute('aria-expanded', shouldExpand);
-      requestAnimationFrame(updateRegSidebarScrollHint);
-    }
-
     function toggleAncovaNav(expand) {
       const btn   = document.getElementById('ancovaParentBtn');
       const panel = document.getElementById('ancovaSubItems');
@@ -4143,12 +4176,14 @@
       // Update nav items — all items are mutually exclusive
       document.querySelectorAll('.sb-item[data-tab]').forEach(btn => {
         btn.classList.remove('active');
-        if (btn.dataset.tab === tabName) btn.classList.add('active');
+        const navTab = btn.dataset.tab;
+        if (navTab === tabName || (tabName.startsWith('ix-') && navTab === 'interactions')) {
+          btn.classList.add('active');
+        }
       });
 
-      // Auto-expand interactions nav when any ix-* tab is activated
+      // Highlight in-page interaction workspace tab
       if (tabName.startsWith('ix-')) {
-        toggleInteractionsNav(true);
         highlightIxWorkspaceTab(tabName);
       }
       // Auto-expand ANCOVA nav when any ancova-* tab is activated
@@ -5670,24 +5705,18 @@
         console.log(`🎯 ANCOVA group ${hasANCOVA ? 'shown' : 'hidden'} (${xnVars.length} continuous, ${xcVars.length} categorical)`);
       }
       
-      // Enable/disable Interactions item based on whether model has interaction terms
-      const interactionsGroupNav = document.getElementById('interactionsGroupNav');
-      const interactionsParentBtn = document.getElementById('interactionsParentBtn');
+      // Enable/disable Interactions nav item based on whether model has interaction terms
+      const interactionsNavBtn = document.getElementById('interactionsNavBtn');
       const interactionsTabButton = document.getElementById('interactionsTabButton'); // legacy hidden btn
       const hasInteractions = normalizeInteractionTerms(interactions).length > 0;
-      if (interactionsParentBtn) {
-        interactionsParentBtn.classList.toggle('disabled', !hasInteractions);
-        interactionsParentBtn.title = hasInteractions
-          ? 'Click to expand interaction results'
+      if (interactionsNavBtn) {
+        interactionsNavBtn.classList.toggle('disabled', !hasInteractions);
+        interactionsNavBtn.title = hasInteractions
+          ? 'Moderation analysis: overview, plots, and technical tests'
           : 'Add interaction terms in the model to enable this section';
       }
       if (interactionsTabButton) interactionsTabButton.style.display = 'none'; // always hide legacy btn
-      if (!hasInteractions) {
-        // Collapse and close sub-items when no interactions
-        toggleInteractionsNav(false);
-      }
       if (hasInteractions) {
-        toggleInteractionsNav(true);
         renderInteractionsTab(results, varNames, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo, yVarName, window.regressionRows || [], window.regressionHeaders || []);
         // Stay on current tab (do not auto-navigate to ix-summary)
       }

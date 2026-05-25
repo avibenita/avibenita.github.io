@@ -1927,8 +1927,16 @@
       padding: 0 16px 18px;
     }
     #tab-pred-overview.active, #tab-predictions.active, #tab-pred-technical.active,
-    #tab-model-viz.active, #tab-partial-grid.active,
-    #tab-residuals.active, #tab-res-plots.active, #tab-res-influential.active {
+    #tab-model-viz.active, #tab-partial-grid.active {
+      overflow: hidden;
+      min-height: 0;
+    }
+    #tab-residuals.active {
+      overflow: hidden;
+      min-height: 0;
+      padding: 8px 10px 10px;
+    }
+    #tab-res-plots.active, #tab-res-influential.active {
       overflow: hidden;
       min-height: 0;
     }
@@ -1960,9 +1968,23 @@
     #tab-res-influential .ws-body {
       flex: 1;
       min-height: 0;
-      overflow-y: auto;
       overflow-x: hidden;
-      padding: 14px 16px 28px;
+      padding: 8px 12px 10px;
+    }
+    #tab-residuals .ws-body {
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    #tab-res-plots .ws-body,
+    #tab-res-influential .ws-body {
+      overflow-y: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    #tab-res-plots .ws-body::-webkit-scrollbar,
+    #tab-res-influential .ws-body::-webkit-scrollbar {
+      display: none;
     }
     #tab-residuals .ws-body > .res-workspace,
     #tab-res-plots .ws-body > .res-workspace,
@@ -1972,6 +1994,74 @@
       overflow: visible;
       padding: 0;
     }
+    #tab-residuals #residualsPanel {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+    }
+
+    /* Diagnostics overview: fit all panels in viewport without scrolling */
+    .res-overview-stack {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      gap: 8px;
+      overflow: hidden;
+    }
+    .res-overview-stack > .res-verdict-strip {
+      flex: 0 0 auto;
+      margin-bottom: 0;
+      padding: 8px 10px;
+      border-width: 1px;
+    }
+    .res-overview-stack .res-verdict-title { margin-bottom: 6px; font-size: 12px; }
+    .res-overview-stack .res-verdict-grid { gap: 6px; margin-bottom: 6px; }
+    .res-overview-stack .res-verdict-item { padding: 5px 8px; }
+    .res-overview-stack .res-verdict-label { font-size: 12px; }
+    .res-overview-stack .res-verdict-overall { margin-top: 6px; padding: 6px 8px; font-size: 11px; }
+    .res-overview-stack > .res-tests-panel {
+      flex: 0 0 auto;
+      margin-bottom: 0;
+      padding: 8px 10px;
+    }
+    .res-overview-stack .res-tests-panel h2 { margin-bottom: 6px; font-size: 12px; }
+    .res-overview-stack .res-tests-grid { gap: 6px; }
+    .res-overview-stack .res-test-card { padding: 6px 8px; }
+    .res-overview-stack .res-test-name { font-size: 11px; margin-bottom: 3px; }
+    .res-overview-stack .res-test-stat { font-size: 9px; line-height: 1.25; }
+    .res-overview-stack .res-test-impact { font-size: 8px; margin-top: 3px; padding-top: 3px; }
+    .res-overview-stack > .res-dist-panel {
+      flex: 1 1 0;
+      min-height: 0;
+      margin-bottom: 0;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .res-overview-stack .res-dist-header { margin-bottom: 6px; flex-shrink: 0; }
+    .res-overview-stack .res-hist-title { font-size: 13px; }
+    .res-overview-stack .res-badge { padding: 4px 8px; font-size: 10px; }
+    .res-overview-stack .res-dist-body {
+      flex: 1 1 0;
+      min-height: 0;
+      height: auto;
+      gap: 10px;
+    }
+    .res-overview-stack .res-dist-chart-wrap {
+      flex: 1 1 0;
+      min-height: 0;
+      height: auto;
+      padding-bottom: 0;
+    }
+    .res-overview-stack .res-dist-stats-wrap { flex: 0 0 168px; min-height: 0; overflow: hidden; }
+    .res-overview-stack .res-dist-summary-table { font-size: 11px; }
+    .res-overview-stack .res-dist-summary-table td { padding: 3px 2px; }
+    .res-overview-stack .res-dist-summary-table tr.res-section-head td { padding-top: 5px; font-size: 10px; }
 
     .ws-body > .res-workspace {
       flex: 1 1 auto;
@@ -4729,6 +4819,7 @@
       // Lazy load tab content if not already loaded
       if (tabName === 'diag-overview') {
         loadResidualsTab();
+        if (typeof _resReflowOverviewChart === 'function') setTimeout(_resReflowOverviewChart, 180);
       } else if (tabName === 'viz-partial' && !window.modelVizLoaded) {
         window.modelVizLoaded = true;
         loadModelVizTab();
@@ -5809,6 +5900,9 @@ ${sectionsHtml}
           requestAnimationFrame(updateRegSidebarScrollHint);
           setTimeout(updateRegSidebarScrollHint, 250);
         }
+        window.addEventListener('resize', () => {
+          if (typeof _resReflowOverviewChart === 'function') _resReflowOverviewChart();
+        }, { passive: true });
       }
       // Apply Insight depth immediately so layout is correct before results arrive
       applyDepth('insight');
@@ -6821,6 +6915,7 @@ ${sectionsHtml}
       const tooltip = (txt)=>`<span class="res-tooltip"><i class="fa-solid fa-circle-question" style="font-size:9px;color:var(--text-muted);cursor:help;opacity:.6;"></i><span class="res-tooltiptext">${txt}</span></span>`;
 
       document.getElementById('residualsPanel').innerHTML = `
+        <div class="res-overview-stack">
           <div class="res-verdict-strip">
             <div class="res-verdict-title"><i class="fa-solid fa-gauge-high"></i> Model Diagnostics Summary</div>
             <div class="res-verdict-grid">
@@ -6884,7 +6979,8 @@ ${sectionsHtml}
               <div class="res-dist-chart-wrap"><div id="resHistogramChart" style="height:100%;width:100%;"></div></div>
               <div class="res-dist-stats-wrap"><table class="res-dist-summary-table" id="resDistTable"></table></div>
             </div>
-          </div>`;
+          </div>
+        </div>`;
       _resRenderHistogram(d.standardized);
     }
 
@@ -7011,7 +7107,16 @@ ${sectionsHtml}
       const normalCurve=xRange.map(x=>[parseFloat(x.toFixed(3)),parseFloat(((1/(sd*Math.sqrt(2*Math.PI)))*Math.exp(-0.5*Math.pow((x-mean)/sd,2))*n*bw).toFixed(4))]);
       const th=_resChartTheme();
       if(window._residualHistChart){try{window._residualHistChart.destroy();}catch(e){}}
-      window._residualHistChart=Highcharts.chart('resHistogramChart',{chart:{type:'column',backgroundColor:'transparent',style:{fontFamily:'inherit'},animation:false,spacingBottom:12,marginBottom:48},title:{text:null},xAxis:{title:{text:'Standardized Residuals',style:{color:th.textColor},margin:14},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}},plotLines:[{value:-3,color:'#ef4444',width:1,dashStyle:'Dash'},{value:-2,color:'#f59e0b',width:1,dashStyle:'Dash'},{value:2,color:'#f59e0b',width:1,dashStyle:'Dash'},{value:3,color:'#ef4444',width:1,dashStyle:'Dash'}]},yAxis:{title:{text:'Frequency',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}}},legend:{enabled:true,itemStyle:{color:th.axisText,fontSize:'11px'}},plotOptions:{column:{pointPadding:0,borderWidth:0,groupPadding:0,shadow:false}},series:[{name:'Frequency',type:'column',data:bins.map(b=>({x:b.x,y:b.y,color:b.color})),pointWidth:18,zIndex:1},{name:'Normal',type:'spline',data:normalCurve,color:'#a78bfa',lineWidth:2,dashStyle:'Dash',marker:{enabled:false},zIndex:2}],tooltip:{formatter:function(){if(this.series.type==='spline')return false;return`<b>${this.y}</b> obs | Res: ${this.x.toFixed(2)}`;}},credits:{enabled:false}});
+      window._residualHistChart=Highcharts.chart('resHistogramChart',{chart:{type:'column',backgroundColor:'transparent',style:{fontFamily:'inherit'},animation:false,spacingBottom:8,marginBottom:36},title:{text:null},xAxis:{title:{text:'Standardized Residuals',style:{color:th.textColor},margin:10},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}},plotLines:[{value:-3,color:'#ef4444',width:1,dashStyle:'Dash'},{value:-2,color:'#f59e0b',width:1,dashStyle:'Dash'},{value:2,color:'#f59e0b',width:1,dashStyle:'Dash'},{value:3,color:'#ef4444',width:1,dashStyle:'Dash'}]},yAxis:{title:{text:'Frequency',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}}},legend:{enabled:true,itemStyle:{color:th.axisText,fontSize:'10px'}},plotOptions:{column:{pointPadding:0,borderWidth:0,groupPadding:0,shadow:false}},series:[{name:'Frequency',type:'column',data:bins.map(b=>({x:b.x,y:b.y,color:b.color})),pointWidth:18,zIndex:1},{name:'Normal',type:'spline',data:normalCurve,color:'#a78bfa',lineWidth:2,dashStyle:'Dash',marker:{enabled:false},zIndex:2}],tooltip:{formatter:function(){if(this.series.type==='spline')return false;return`<b>${this.y}</b> obs | Res: ${this.x.toFixed(2)}`;}},credits:{enabled:false}});
+      _resReflowOverviewChart();
+    }
+
+    function _resReflowOverviewChart() {
+      const reflow = () => {
+        try { window._residualHistChart?.reflow(); } catch (_e) {}
+      };
+      requestAnimationFrame(reflow);
+      setTimeout(reflow, 120);
     }
 
     // ── Refit without influential obs ─────────────────────────────

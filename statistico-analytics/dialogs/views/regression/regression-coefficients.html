@@ -1850,25 +1850,41 @@
 
     .reg-workspace-tabs.ws-mode-bar { flex-wrap: wrap; }
     #tab-results.active { overflow-y: auto; min-height: 0; }
-    #tab-results .tab-panel.reg-results-panel {
+    #tab-results .tab-panel.reg-results-panel,
+    #tab-ix-summary .tab-panel.ix-workspace,
+    #tab-ix-viz .tab-panel.ix-workspace,
+    #tab-ix-details .tab-panel.ix-workspace {
       flex: 1 1 auto; width: 100%; min-height: 0; overflow-y: visible;
-      padding: 14px 16px 18px; gap: 14px;
+      padding: 14px 16px 18px;
     }
 
-    /* ── Analysis workspace chrome: context ribbon + compact mode bar ── */
-    .ix-workspace { display: flex; flex-direction: column; gap: 14px; max-width: 1180px; }
+    /* ── Analysis workspace: attached tab shell ── */
+    .ix-workspace { display: flex; flex-direction: column; gap: 0; width: 100%; }
+    .ws-shell {
+      width: 100%; max-width: 1180px;
+      border: 1px solid rgba(255,255,255,.1); border-radius: 10px;
+      overflow: hidden; background: var(--surface-0);
+      box-shadow: 0 2px 14px rgba(0,0,0,.14);
+    }
+    :root[data-theme="light"] .ws-shell {
+      border-color: var(--border); box-shadow: 0 2px 10px rgba(0,0,0,.06);
+    }
+
     .ws-chrome {
       position: sticky; top: 0; z-index: 12;
-      margin: 0 0 12px; padding-bottom: 10px;
-      background: var(--surface-1);
-      border-bottom: 1px solid rgba(255,255,255,.08);
+      background: rgba(0,0,0,.22);
     }
-    :root[data-theme="light"] .ws-chrome { background: var(--surface-2); border-bottom-color: var(--border); }
-    .ws-chrome--compact { padding-top: 2px; }
+    :root[data-theme="light"] .ws-chrome { background: var(--surface-2); }
+    .ws-chrome--attached { margin: 0; padding: 0; border-bottom: none; }
+    .ws-chrome--compact { padding-top: 6px; }
+
+    .ws-chrome--attached .ix-context-banner {
+      margin: 10px 12px 6px; border-radius: 8px;
+    }
 
     .ix-context-banner {
       display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
-      padding: 8px 12px; border-radius: 8px; margin-bottom: 10px;
+      padding: 8px 12px;
       background: rgba(120,200,255,.05); border: 1px solid rgba(120,200,255,.14);
     }
     .ix-ctx-chip { display: flex; align-items: baseline; gap: 5px; font-size: 11px; color: var(--text-secondary); }
@@ -1897,24 +1913,62 @@
       padding: 3px; border-radius: 8px;
       background: rgba(0,0,0,.24); border: 1px solid rgba(255,255,255,.07);
     }
-    :root[data-theme="light"] .ws-mode-bar { background: rgba(0,0,0,.04); border-color: var(--border); }
+    .ws-mode-bar--attached {
+      display: flex; width: 100%; gap: 4px;
+      padding: 0 10px; margin: 0;
+      background: transparent; border: none;
+      border-bottom: 1px solid rgba(255,255,255,.07);
+      border-radius: 0;
+    }
+    .ws-mode-bar--attached .ws-mode-tab {
+      flex: 1 1 0; justify-content: center; min-width: 0; max-width: none;
+    }
+    :root[data-theme="light"] .ws-mode-bar--attached { border-bottom-color: var(--border); }
+
     .ws-mode-tab {
+      position: relative;
       display: inline-flex; align-items: center; gap: 6px;
-      padding: 5px 13px; border: none; border-radius: 6px;
+      padding: 8px 16px; border: 1px solid transparent;
+      border-radius: 8px 8px 0 0; margin-bottom: -1px;
       background: transparent; color: var(--text-muted);
       font-size: 12px; font-weight: 600; letter-spacing: 0.01em;
-      cursor: pointer; transition: color .15s, background .15s, box-shadow .15s;
+      cursor: pointer; transition: color .15s, background .15s, box-shadow .15s, opacity .15s, border-color .15s;
       white-space: nowrap;
     }
-    .ws-mode-tab > i { font-size: 10px; opacity: 0.5; }
-    .ws-mode-tab:hover:not(.active) { color: var(--text-secondary); background: rgba(255,255,255,.05); }
-    .ws-mode-tab:hover:not(.active) > i { opacity: 0.65; }
-    .ws-mode-tab.active {
-      color: #fff;
-      background: linear-gradient(180deg, rgba(167,139,250,.32), rgba(167,139,250,.16));
-      box-shadow: 0 1px 5px rgba(167,139,250,.18), inset 0 -2px 0 var(--accent-2);
+    .ws-mode-tab > i { font-size: 10px; opacity: 0.45; transition: opacity .15s; }
+    .ws-mode-bar--attached .ws-mode-tab:not(.active) {
+      opacity: 0.7;
+      background: rgba(0,0,0,.18);
+      border-color: rgba(255,255,255,.04);
     }
-    .ws-mode-tab.active > i { opacity: 0.7; color: rgba(255,255,255,.85); }
+    .ws-mode-tab:hover:not(.active) {
+      color: var(--text-secondary); opacity: 0.92;
+      background: rgba(255,255,255,.06);
+    }
+    .ws-mode-tab:hover:not(.active) > i { opacity: 0.6; }
+    .ws-mode-tab.active {
+      color: #fff; font-weight: 700; opacity: 1; z-index: 2;
+      background: linear-gradient(180deg, rgba(167,139,250,.42) 0%, rgba(167,139,250,.14) 42%, var(--surface-0) 100%);
+      border-color: rgba(167,139,250,.5);
+      border-bottom-color: var(--surface-0);
+      box-shadow:
+        inset 0 1px 0 rgba(200,180,255,.55),
+        0 0 18px rgba(167,139,250,.22),
+        0 -1px 0 rgba(167,139,250,.15);
+    }
+    .ws-mode-tab.active::after {
+      content: '';
+      position: absolute; left: 10px; right: 10px; bottom: 0;
+      height: 2px; border-radius: 2px 2px 0 0;
+      background: linear-gradient(90deg, var(--accent-2), rgba(232,118,58,.9));
+      box-shadow: 0 0 10px rgba(167,139,250,.65);
+    }
+    .ws-mode-tab.active > i { opacity: 0.85; color: rgba(255,255,255,.9); }
+
+    .ws-body {
+      padding: 14px 16px 18px;
+      background: var(--surface-0);
+    }
     .ix-overview-grid {
       display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 38%);
       gap: 16px; align-items: stretch;
@@ -2894,7 +2948,7 @@
             <div class="sb-items-rail">
               <button class="sb-item active" id="modelResultsNavBtn" onclick="switchTab('results-overview')" data-tab="model-results">
                 <i class="fa-solid fa-square-poll-vertical sb-item-icon"></i>
-                <span class="sb-item-copy"><span class="sb-item-label">Model Results</span><span class="sb-item-description">Fit summary, coefficients, and inference details.</span></span>
+                <span class="sb-item-copy"><span class="sb-item-label">Model Results</span><span class="sb-item-description">Overview and technical specification for the fitted model.</span></span>
               </button>
               <!-- Interactions (single nav item; sub-views are in-page tabs) -->
               <button class="sb-item disabled" id="interactionsNavBtn" onclick="switchTab('ix-summary')" data-tab="interactions" title="Add interaction terms in the model to enable this section">
@@ -3002,19 +3056,22 @@
         <!-- Tab: Results -->
         <div id="tab-results" class="tab-content active">
         <div class="tab-panel ix-workspace reg-results-panel active">
+        <div class="ws-shell">
 
-        <div class="ws-chrome ws-chrome--compact">
-          <nav class="ws-mode-bar reg-workspace-tabs" aria-label="Model results views">
+        <div class="ws-chrome ws-chrome--attached ws-chrome--compact">
+          <nav class="ws-mode-bar ws-mode-bar--attached reg-workspace-tabs" aria-label="Model results views">
             <button type="button" class="ws-mode-tab ix-ws-tab active" data-reg-tab="results-overview" onclick="switchTab('results-overview')" title="R², F-test, and key fit statistics at a glance">
               <i class="fa-solid fa-table-cells-large" aria-hidden="true"></i>
               <span>Overview</span>
             </button>
-            <button type="button" class="ws-mode-tab ix-ws-tab" data-reg-tab="results-detail" onclick="switchTab('results-detail')" title="Full coefficient table, intervals, and inference details">
-              <i class="fa-solid fa-table-list" aria-hidden="true"></i>
-              <span>Detailed Results</span>
+            <button type="button" class="ws-mode-tab ix-ws-tab" data-reg-tab="results-detail" onclick="switchTab('results-detail')" title="Coefficients, ANOVA, intervals, and inference details">
+              <i class="fa-solid fa-flask" aria-hidden="true"></i>
+              <span>Technical</span>
             </button>
           </nav>
         </div>
+
+        <div class="ws-body">
 
         <!-- ① Conclusion card – Insight mode only -->
         <div class="conclusion-card" id="conclusionCard">
@@ -3201,6 +3258,8 @@
           <div class="equation-formula" id="equationFormula">
             Awaiting regression results...
           </div>
+        </div>
+        </div>
         </div>
         </div>
         </div>
@@ -3477,7 +3536,8 @@
         <!-- Tab: Interactions – Overview (interpretation layer) -->
         <div id="tab-ix-summary" class="tab-content">
           <div class="tab-panel ancova-sub-panel ix-workspace">
-            <div class="ws-chrome">
+            <div class="ws-shell">
+            <div class="ws-chrome ws-chrome--attached">
               <div class="ix-context-banner">
                 <div class="ix-ctx-chip"><span class="ix-ctx-label">Outcome</span><strong class="ix-ctx-outcome">—</strong></div>
                 <div class="ix-ctx-chip"><span class="ix-ctx-label">Interaction</span><strong class="ix-ctx-interaction">—</strong></div>
@@ -3489,7 +3549,7 @@
                 </div>
                 <span class="ix-ctx-sig-badge is-ns">—</span>
               </div>
-              <nav class="ws-mode-bar" aria-label="Interaction views">
+              <nav class="ws-mode-bar ws-mode-bar--attached" aria-label="Interaction views">
                 <button type="button" class="ws-mode-tab ix-ws-tab active" data-ix-tab="ix-summary" onclick="switchTab('ix-summary')" title="Interpretation, preview plot, and simple slopes">
                   <i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Overview</span>
                 </button>
@@ -3497,10 +3557,12 @@
                   <i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>Visualization</span>
                 </button>
                 <button type="button" class="ws-mode-tab ix-ws-tab" data-ix-tab="ix-details" onclick="switchTab('ix-details')" title="Coefficients, ΔR², and model comparison">
-                  <i class="fa-solid fa-table-list" aria-hidden="true"></i><span>Technical</span>
+                  <i class="fa-solid fa-flask" aria-hidden="true"></i><span>Technical</span>
                 </button>
               </nav>
             </div>
+
+            <div class="ws-body">
 
             <div class="ix-overview-grid">
               <div class="ix-overview-left">
@@ -3527,13 +3589,17 @@
               <button type="button" class="ix-crossnav-btn" onclick="switchTab('ix-viz')"><i class="fa-solid fa-chart-line"></i> View interaction geometry in Visualization →</button>
               <button type="button" class="ix-crossnav-btn" onclick="switchTab('ix-details')"><i class="fa-solid fa-table-list"></i> Technical coefficients &amp; ΔR² →</button>
             </div>
+
+            </div><!-- /ws-body -->
+            </div><!-- /ws-shell -->
           </div>
         </div>
 
         <!-- Tab: Interactions – Visualization (conceptual / reporting layer) -->
         <div id="tab-ix-viz" class="tab-content">
           <div class="tab-panel ancova-sub-panel ix-workspace">
-            <div class="ws-chrome">
+            <div class="ws-shell">
+            <div class="ws-chrome ws-chrome--attached">
               <div class="ix-context-banner">
                 <div class="ix-ctx-chip"><span class="ix-ctx-label">Outcome</span><strong class="ix-ctx-outcome">—</strong></div>
                 <div class="ix-ctx-chip"><span class="ix-ctx-label">Interaction</span><strong class="ix-ctx-interaction">—</strong></div>
@@ -3545,7 +3611,7 @@
                 </div>
                 <span class="ix-ctx-sig-badge is-ns">—</span>
               </div>
-              <nav class="ws-mode-bar" aria-label="Interaction views">
+              <nav class="ws-mode-bar ws-mode-bar--attached" aria-label="Interaction views">
                 <button type="button" class="ws-mode-tab ix-ws-tab" data-ix-tab="ix-summary" onclick="switchTab('ix-summary')" title="Interpretation, preview plot, and simple slopes">
                   <i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Overview</span>
                 </button>
@@ -3553,10 +3619,12 @@
                   <i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>Visualization</span>
                 </button>
                 <button type="button" class="ws-mode-tab ix-ws-tab" data-ix-tab="ix-details" onclick="switchTab('ix-details')" title="Coefficients, ΔR², and model comparison">
-                  <i class="fa-solid fa-table-list" aria-hidden="true"></i><span>Technical</span>
+                  <i class="fa-solid fa-flask" aria-hidden="true"></i><span>Technical</span>
                 </button>
               </nav>
             </div>
+
+            <div class="ws-body">
 
             <div class="ix-viz-layout">
               <div>
@@ -3585,13 +3653,17 @@
               <button type="button" class="ix-crossnav-btn" onclick="switchTab('ix-summary')"><i class="fa-solid fa-layer-group"></i> Back to Overview interpretation ←</button>
               <button type="button" class="ix-crossnav-btn" onclick="switchTab('ix-details')"><i class="fa-solid fa-flask"></i> Technical coefficients &amp; ΔR² →</button>
             </div>
+
+            </div><!-- /ws-body -->
+            </div><!-- /ws-shell -->
           </div>
         </div>
 
         <!-- Tab: Interactions – Technical (diagnostics layer) -->
         <div id="tab-ix-details" class="tab-content">
           <div class="tab-panel ancova-sub-panel ix-workspace">
-            <div class="ws-chrome">
+            <div class="ws-shell">
+            <div class="ws-chrome ws-chrome--attached">
               <div class="ix-context-banner">
                 <div class="ix-ctx-chip"><span class="ix-ctx-label">Outcome</span><strong class="ix-ctx-outcome">—</strong></div>
                 <div class="ix-ctx-chip"><span class="ix-ctx-label">Interaction</span><strong class="ix-ctx-interaction">—</strong></div>
@@ -3603,7 +3675,7 @@
                 </div>
                 <span class="ix-ctx-sig-badge is-ns">—</span>
               </div>
-              <nav class="ws-mode-bar" aria-label="Interaction views">
+              <nav class="ws-mode-bar ws-mode-bar--attached" aria-label="Interaction views">
                 <button type="button" class="ws-mode-tab ix-ws-tab" data-ix-tab="ix-summary" onclick="switchTab('ix-summary')" title="Interpretation, preview plot, and simple slopes">
                   <i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Overview</span>
                 </button>
@@ -3611,10 +3683,12 @@
                   <i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>Visualization</span>
                 </button>
                 <button type="button" class="ws-mode-tab ix-ws-tab active" data-ix-tab="ix-details" onclick="switchTab('ix-details')" title="Coefficients, ΔR², and model comparison">
-                  <i class="fa-solid fa-table-list" aria-hidden="true"></i><span>Technical</span>
+                  <i class="fa-solid fa-flask" aria-hidden="true"></i><span>Technical</span>
                 </button>
               </nav>
             </div>
+
+            <div class="ws-body">
 
             <div class="ix-tech-card">
               <div class="ix-section-title"><i class="fa-solid fa-sigma"></i> Interaction coefficients</div>
@@ -3649,6 +3723,9 @@
               <button type="button" class="ix-crossnav-btn" onclick="switchTab('ix-viz')"><i class="fa-solid fa-chart-line"></i> Inspect interaction pattern visually →</button>
               <button type="button" class="ix-crossnav-btn" onclick="switchTab('ix-summary')"><i class="fa-solid fa-layer-group"></i> Executive summary ←</button>
             </div>
+
+            </div><!-- /ws-body -->
+            </div><!-- /ws-shell -->
           </div>
         </div>
         <!-- Tab: ANCOVA - Results (Model Summary + ANCOVA Table) -->
@@ -4124,7 +4201,7 @@
       // Map tab names to header titles
       const tabTitles = {
         'results-overview':  'Model Results \u2013 Overview',
-        'results-detail':    'Model Results \u2013 Detailed',
+        'results-detail':    'Model Results \u2013 Technical',
         'results':           'Model Results',
         'interactions':      'Interactions',
         'ix-summary':        'Interaction Analysis \u2013 Overview',

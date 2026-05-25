@@ -416,31 +416,40 @@
     </div>
     <div class="sb-body">
       <div class="sb-group">
-        <div class="sb-group-title">Analysis</div>
+        <div class="sb-group-title">Model</div>
         <div class="sb-items-rail">
-          <button class="sb-item active" onclick="switchTab('results')" data-tab="results">
+          <button class="sb-item active" onclick="switchTab('model-results')" data-tab="model-results">
             <i class="fa-solid fa-square-poll-vertical sb-item-icon"></i>
-            <span class="sb-item-label">Results</span>
+            <span class="sb-item-label">Model Results</span>
           </button>
-          <button class="sb-item" onclick="switchTab('predictions')" data-tab="predictions">
+          <button class="sb-item" onclick="switchTab('predictive-performance')" data-tab="predictive-performance">
+            <i class="fa-solid fa-chart-area sb-item-icon"></i>
+            <span class="sb-item-label">Predictive Performance</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('probabilities')" data-tab="probabilities">
             <i class="fa-solid fa-wand-magic-sparkles sb-item-icon"></i>
-            <span class="sb-item-label">Predictions</span>
+            <span class="sb-item-label">Probabilities</span>
+          </button>
+          <button class="sb-item" onclick="switchTab('interactions')" data-tab="interactions">
+            <i class="fa-solid fa-brain sb-item-icon"></i>
+            <span class="sb-item-label">Interactions</span>
           </button>
           <button class="sb-item" onclick="switchTab('diagnostics')" data-tab="diagnostics">
             <i class="fa-solid fa-stethoscope sb-item-icon"></i>
             <span class="sb-item-label">Diagnostics</span>
           </button>
-          <button class="sb-item" onclick="switchTab('roc')" data-tab="roc">
-            <i class="fa-solid fa-chart-area sb-item-icon"></i>
-            <span class="sb-item-label">ROC / AUC</span>
+        </div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-group-title">Descriptives</div>
+        <div class="sb-items-rail">
+          <button class="sb-item" onclick="switchTab('correlations')" data-tab="correlations">
+            <i class="fa-solid fa-diagram-project sb-item-icon"></i>
+            <span class="sb-item-label">Correlations</span>
           </button>
           <button class="sb-item" onclick="switchTab('descriptives')" data-tab="descriptives">
             <i class="fa-solid fa-chart-bar sb-item-icon"></i>
             <span class="sb-item-label">Descriptives</span>
-          </button>
-          <button class="sb-item" onclick="switchTab('ai')" data-tab="ai">
-            <i class="fa-solid fa-brain sb-item-icon"></i>
-            <span class="sb-item-label">AI Assessment</span>
           </button>
         </div>
       </div>
@@ -748,24 +757,43 @@
     }
 
     function switchTab(tabKey) {
-      const tabTitles = {
-        'results':      'Results',
-        'predictions':  'Predictions',
-        'diagnostics':  'Diagnostics',
-        'roc':          'ROC / AUC',
-        'descriptives': 'Descriptives',
-        'ai':           'AI Assessment'
+      var aliases = {
+        results: "model-results",
+        predictions: "probabilities",
+        roc: "predictive-performance",
+        ai: "interactions"
       };
-      if (tabTitles[tabKey] && typeof StatisticoHeader !== 'undefined') {
-        StatisticoHeader.updateTitle(tabTitles[tabKey]);
+      var canonical = aliases[tabKey] || tabKey;
+      var panelByTab = {
+        "model-results": "results",
+        "predictive-performance": "roc",
+        "probabilities": "predictions",
+        "interactions": "ai",
+        "diagnostics": "diagnostics",
+        "correlations": "descriptives",
+        "descriptives": "descriptives"
+      };
+      var panelKey = panelByTab[canonical] || "results";
+
+      const tabTitles = {
+        "model-results": "Model Results",
+        "predictive-performance": "Predictive Performance",
+        "probabilities": "Probabilities",
+        "interactions": "Interactions",
+        "diagnostics": "Diagnostics",
+        "correlations": "Correlations",
+        "descriptives": "Descriptives"
+      };
+      if (tabTitles[canonical] && typeof StatisticoHeader !== "undefined") {
+        StatisticoHeader.updateTitle(tabTitles[canonical]);
       }
       document.querySelectorAll(".sb-item[data-tab]").forEach(function(btn) {
-        btn.classList.toggle("active", btn.getAttribute("data-tab") === tabKey);
+        btn.classList.toggle("active", btn.getAttribute("data-tab") === canonical);
       });
       document.querySelectorAll(".tab-panel").forEach(function(panel) {
-        panel.classList.toggle("active", panel.id === "tab-" + tabKey);
+        panel.classList.toggle("active", panel.id === "tab-" + panelKey);
       });
-      if (tabKey === "roc" && latestLogisticPredictions.length > 0) {
+      if (panelKey === "roc" && latestLogisticPredictions.length > 0) {
         renderRocCurveFromPredictions(latestLogisticPredictions);
       }
     }
@@ -1214,7 +1242,7 @@
       var rocEmpty = document.getElementById("rocEmptyMsg");
       renderRocHighchart([{ fpr: 0, tpr: 0 }, { fpr: 1, tpr: 1 }], "ROC curve will render when prediction probabilities are available.");
       if (rocEmpty) rocEmpty.style.display = "block";
-      switchTab("results");
+      switchTab("model-results");
     };
 
     function handleParentMessage(message) {
@@ -1306,10 +1334,10 @@
           moduleName: 'Save logistic regression model'
         });
         StatisticoHeader.initSidebarPage();
-        StatisticoHeader.updateTitle('Results');
+        StatisticoHeader.updateTitle('Model Results');
       }
       wireNavigation();
-      switchTab("results");
+      switchTab("model-results");
       renderRocHighchart([{ fpr: 0, tpr: 0 }, { fpr: 1, tpr: 1 }], "ROC curve will render when prediction probabilities are available.");
       wireOfficeDialogMessaging();
 

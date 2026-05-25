@@ -301,6 +301,22 @@
       background: transparent;
     }
 
+    /* Interaction sub-tabs — fill panel and scroll when needed */
+    #tab-ix-summary.active,
+    #tab-ix-viz.active,
+    #tab-ix-details.active {
+      overflow-y: auto;
+      min-height: 0;
+    }
+    #tab-ix-summary .tab-panel,
+    #tab-ix-viz .tab-panel,
+    #tab-ix-details .tab-panel {
+      flex: 1 1 auto;
+      width: 100%;
+      min-height: 0;
+      overflow-y: auto;
+    }
+
     /* Dropdown Navigation Styles */
     .dropdown-container{ position:relative; }
     .dropdown-content{
@@ -4112,15 +4128,19 @@
         switchTab('ix-summary');
         return;
       } else if (['ix-summary','ix-viz','ix-details'].includes(tabName)) {
-        // Interaction sub-tabs
-        if (tabName === 'ix-viz') {
-          setTimeout(() => {
-            const sel = document.getElementById('interactionPlotSelect');
-            if (sel && sel.value !== '') renderInteractionPlot();
-          }, 50);
-        } else if (tabName === 'ix-summary') {
-          setTimeout(() => renderInteractionSummaryPlot(), 60);
-        }
+        // Interaction sub-tabs — (re)render when opened
+        setTimeout(() => {
+          if (!window._interactionTabData) {
+            showInteractionEmptyState(tabName);
+            return;
+          }
+          if (tabName === 'ix-summary') {
+            renderInteractionSummary();
+            renderInteractionSummaryPlot();
+          } else if (tabName === 'ix-viz') {
+            renderInteractionPlot();
+          }
+        }, 50);
       }
     }
 
@@ -5145,18 +5165,38 @@
       }, 50);
     }
     
+    /** Normalize interaction terms from modelSpec ({var1,var2} or legacy {v1,v2}). */
+    function normalizeInteractionTerms(interactions) {
+      if (!Array.isArray(interactions)) return [];
+      return interactions
+        .map(ix => {
+          if (!ix) return null;
+          const var1 = ix.var1 || ix.v1;
+          const var2 = ix.var2 || ix.v2;
+          return (var1 && var2) ? { var1: String(var1), var2: String(var2) } : null;
+        })
+        .filter(Boolean);
+    }
+
     // Internal function that does the actual computation
     function processRegressionDataInternal() {
       console.log('🔄 Processing regression data...');
       
       const { headers, rows, address } = receivedRegressionData;
-      const { y, xn = [], xc = [], interactions = [], intercept } = receivedModelSpec;
+      const rawSpec = receivedModelSpec;
+      const { y, xn = [], xc = [], intercept } = rawSpec;
+      const interactions = normalizeInteractionTerms(rawSpec.interactions);
+      if (rawSpec && interactions.length !== (rawSpec.interactions || []).length) {
+        receivedModelSpec = { ...rawSpec, interactions };
+      }
+      const includeIntercept = intercept === 1 || intercept === true;
       
       console.log('📋 Model specification:', {
         y,
         xn,
         xc,
-        intercept
+        interactions,
+        intercept: includeIntercept
       });
       console.log('📋 Available headers:', headers);
       
@@ -5339,7 +5379,7 @@
       console.log('📊 Data prepared:', {
         observations: yVector.length,
         predictors: xMatrix[0]?.length || 0,
-        intercept: intercept === 1,
+        intercept: includeIntercept,
         xMatrixRows: xMatrix.length,
         yVectorLength: yVector.length
       });
@@ -5371,11 +5411,11 @@
       // Compute regression using OLS
       console.log('🔢 Computing OLS regression...');
       try {
-        const results = computeOLS(xMatrix, yVector, intercept === 1, 0.05);
+        const results = computeOLS(xMatrix, yVector, includeIntercept, 0.05);
         console.log('✅ Regression computed successfully:', results);
         
         // Calculate fitted values
-        const X = intercept === 1 
+        const X = includeIntercept
           ? xMatrix.map(row => [1, ...row])
           : xMatrix;
         results.fitted = X.map(row => 
@@ -5402,7 +5442,7 @@
         window.globalInteractionColumnNames = interactionColumnNames;
         window.globalRawHeaders = headers;
         window.globalRawRows = rows;
-        window.globalIncludeIntercept = intercept;
+        window.globalIncludeIntercept = includeIntercept;
         
         // Pre-store data for all tabs in sessionStorage
         sessionStorage.setItem('residualData', JSON.stringify({
@@ -5528,7 +5568,7 @@
       const interactionsGroupNav = document.getElementById('interactionsGroupNav');
       const interactionsParentBtn = document.getElementById('interactionsParentBtn');
       const interactionsTabButton = document.getElementById('interactionsTabButton'); // legacy hidden btn
-      const hasInteractions = (interactions || []).length > 0;
+      const hasInteractions = normalizeInteractionTerms(interactions).length > 0;
       if (interactionsParentBtn) {
         interactionsParentBtn.classList.toggle('disabled', !hasInteractions);
         interactionsParentBtn.title = hasInteractions
@@ -5541,7 +5581,7 @@
         toggleInteractionsNav(false);
       }
       if (hasInteractions) {
-        // Show interactions nav collapsed — user clicks to expand
+        toggleInteractionsNav(true);
         renderInteractionsTab(results, varNames, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo, yVarName, window.regressionRows || [], window.regressionHeaders || []);
         // Stay on current tab (do not auto-navigate to ix-summary)
       }
@@ -7572,11 +7612,31 @@
     // INTERACTIONS TAB RENDERING
     // ============================================================================
 
+    function _interactionCoeffIndex(results, interactionColumnNames, interactionIndex) {
+      const nIntCols = (interactionColumnNames || []).length;
+      if (!results || !Array.isArray(results.coefficients) || nIntCols === 0) return -1;
+      const start = results.coefficients.length - nIntCols;
+      const idx = start + interactionIndex;
+      return (idx >= 0 && idx < results.coefficients.length) ? idx : -1;
+    }
+
+    function showInteractionEmptyState(tabName) {
+      const msg = '<div style="color:var(--text-muted);font-style:italic;padding:16px 0;font-size:13px;">No interaction results yet. Run a model with at least one interaction term (e.g. age × score).</div>';
+      if (tabName === 'ix-summary') {
+        const cards = document.getElementById('ixSumSignifCards');
+        const interp = document.getElementById('ixSumInterpretation');
+        if (cards) cards.innerHTML = msg;
+        if (interp) interp.textContent = '';
+      }
+    }
+
     function renderInteractionsTab(results, variableNames, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo, yVar, rows, headers) {
       if (!interactions || interactions.length === 0) return;
 
+      interactions = normalizeInteractionTerms(interactions);
+      window._interactionTabData = { results, variableNames, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo, yVar, rows, headers };
+
       // The coefficient array from OLS is [ intercept?, ...mainEffects, ...interactionCols ]
-      // Number of main effect columns = variableNames.length - interactionColumnNames.length
       const nInteractionCols = interactionColumnNames.length;
       const totalCoeffs = results.coefficients.length;
       const interactionStartIdx = totalCoeffs - nInteractionCols; // index into coefficients[] (includes intercept offset)
@@ -7771,36 +7831,28 @@
       const emmVizSection = document.getElementById('emmVizSection');
       if (emmVizSection) emmVizSection.style.display = (xcVars && xcVars.length > 0) ? '' : 'none';
 
-      // ── Populate Interaction Plot select ──
-      const plotSelect = document.getElementById('interactionPlotSelect');
-      if (plotSelect) {
-        plotSelect.innerHTML = '<option value="">-- Select --</option>';
+      // ── Populate plot selects + render summary ──
+      ['ixSumPlotSelect', 'interactionPlotSelect'].forEach(selId => {
+        const sel = document.getElementById(selId);
+        if (!sel) return;
+        sel.innerHTML = '<option value="">-- Select --</option>';
         interactions.forEach((ix, i) => {
           const opt = document.createElement('option');
           opt.value = i;
-          opt.textContent = `${ix.var1} × ${ix.var2}`;
-          plotSelect.appendChild(opt);
+          opt.textContent = `${ix.var1} \u00D7 ${ix.var2}`;
+          sel.appendChild(opt);
         });
-        // Store for later use by renderInteractionPlot
-        window._interactionTabData = { results, variableNames, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo, yVar, rows, headers };
+        if (interactions.length > 0) sel.value = '0';
+      });
 
-        // ── Populate Summary and Visualization plot selects ──
-        ['ixSumPlotSelect','interactionPlotSelect'].forEach(selId => {
-          const sel = document.getElementById(selId);
-          if (!sel) return;
-          sel.innerHTML = '<option value="">-- Select --</option>';
-          interactions.forEach((ix, i) => {
-            const opt = document.createElement('option');
-            opt.value = i;
-            opt.textContent = `${ix.var1} \u00D7 ${ix.var2}`;
-            sel.appendChild(opt);
-          });
-          // Auto-select first interaction
-          if (interactions.length > 0) sel.value = '0';
-        });
-
-        // Render summary section (significance cards + inline plot + simple slopes)
+      try {
         renderInteractionSummary();
+        const sumTab = document.getElementById('tab-ix-summary');
+        if (sumTab && sumTab.classList.contains('active')) {
+          renderInteractionSummaryPlot();
+        }
+      } catch (e) {
+        console.warn('Interaction summary render failed:', e);
       }
 
     } // end renderInteractionsTab
@@ -7813,42 +7865,41 @@
       if (!data) return;
       const { results, variableNames, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo, yVar } = data;
       const nIntCols = interactionColumnNames.length;
-      const totalCoeffs = results.coefficients.length;
-      const interactionStart = totalCoeffs - nIntCols;
 
       // ── Section 1: significance cards ──
       const cardsEl = document.getElementById('ixSumSignifCards');
       const interpEl = document.getElementById('ixSumInterpretation');
       if (cardsEl) {
-        // Gather per-interaction stats
         let html = '';
-        let allSig = true;
-        interactions.forEach((ix, i) => {
-          const coeffIdx = interactionStart + i;
-          const b   = results.coefficients[coeffIdx];
-          const se  = results.std_errors[coeffIdx];
-          const t   = results.t_values[coeffIdx];
-          const p   = results.p_values[coeffIdx];
-          const sig = p < 0.05;
-          if (!sig) allSig = false;
-          const pFmt = p < 0.0001 ? '< .0001' : p.toFixed(3);
-          const col = sig ? 'var(--success,#16a34a)' : 'var(--text-muted,#64748b)';
-          html += `<div style="background:var(--surface-0);border:1px solid var(--border);border-radius:8px;padding:10px 14px;min-width:160px;flex:1 1 160px;">
-            <div style="font-size:12.5px;font-weight:700;color:var(--text-secondary);margin-bottom:6px;">${ix.var1} &times; ${ix.var2}</div>
-            <div style="display:flex;gap:14px;flex-wrap:wrap;">
-              <span style="font-size:13px;">&beta;&nbsp;=&nbsp;<strong>${b.toFixed(3)}</strong></span>
-              <span style="font-size:13px;">t&nbsp;=&nbsp;<strong>${t.toFixed(2)}</strong></span>
-              <span style="font-size:13px;color:${col};">p&nbsp;=&nbsp;<strong>${pFmt}</strong></span>
-              <span style="font-size:13px;">&Delta;R&sup2;&nbsp;&asymp;&nbsp;<strong>${(b * b / (results.SS_total || 1)).toFixed(3)}</strong></span>
-            </div>
-          </div>`;
-        });
-        cardsEl.innerHTML = html;
+        if (nIntCols === 0) {
+          html = '<div style="color:var(--warning);font-size:13px;padding:8px 0;">Interaction terms were specified but could not be matched to model coefficients. Check variable names and re-run.</div>';
+        } else {
+          interactions.forEach((ix, i) => {
+            const coeffIdx = _interactionCoeffIndex(results, interactionColumnNames, i);
+            if (coeffIdx < 0) return;
+            const b   = results.coefficients[coeffIdx];
+            const t   = results.t_values[coeffIdx];
+            const p   = results.p_values[coeffIdx];
+            const sig = p < 0.05;
+            const pFmt = p < 0.0001 ? '< .0001' : p.toFixed(3);
+            const col = sig ? 'var(--success,#16a34a)' : 'var(--text-muted,#64748b)';
+            html += `<div style="background:var(--surface-0);border:1px solid var(--border);border-radius:8px;padding:10px 14px;min-width:160px;flex:1 1 160px;">
+              <div style="font-size:12.5px;font-weight:700;color:var(--text-secondary);margin-bottom:6px;">${ix.var1} &times; ${ix.var2}</div>
+              <div style="display:flex;gap:14px;flex-wrap:wrap;">
+                <span style="font-size:13px;">&beta;&nbsp;=&nbsp;<strong>${b.toFixed(3)}</strong></span>
+                <span style="font-size:13px;">t&nbsp;=&nbsp;<strong>${t.toFixed(2)}</strong></span>
+                <span style="font-size:13px;color:${col};">p&nbsp;=&nbsp;<strong>${pFmt}</strong></span>
+              </div>
+            </div>`;
+          });
+        }
+        cardsEl.innerHTML = html || '<div style="color:var(--text-muted);font-style:italic;">No interaction coefficients available.</div>';
 
         // Interpretation text
-        if (interpEl) {
+        if (interpEl && nIntCols > 0) {
           const firstIx = interactions[0];
-          const p0 = results.p_values[interactionStart];
+          const p0Idx = _interactionCoeffIndex(results, interactionColumnNames, 0);
+          const p0 = p0Idx >= 0 ? results.p_values[p0Idx] : 1;
           if (p0 < 0.05) {
             interpEl.innerHTML = `<strong>Significant interaction detected.</strong> The effect of <em>${firstIx.var1}</em> on <em>${yVar}</em> depends on the level of <em>${firstIx.var2}</em>. Examine simple slopes below to locate where the effect is significant.`;
           } else {

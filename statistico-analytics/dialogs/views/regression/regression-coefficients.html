@@ -5333,175 +5333,189 @@
     }
 
     /**
-     * Export current dialog state as a static HTML snapshot.
-     * Captures current values, active tab, and rendered visuals.
+     * Export selected regression views as a static HTML report.
+     * Uses the shared univariate-style section picker dialog.
      */
     async function exportResultsAsHtml() {
-      try {
-        const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-        async function waitForTabIframesReady(timeoutMs = 5000) {
-          const iframes = Array.from(document.querySelectorAll(
-            '#tab-residuals iframe, #tab-correlations iframe, #tab-descriptive iframe'
-          ));
-          if (iframes.length === 0) return;
-
-          await Promise.race([
-            Promise.all(iframes.map(frame => new Promise(resolve => {
-              try {
-                if (frame.contentDocument?.readyState === 'complete') {
-                  resolve();
-                  return;
-                }
-              } catch (e) {
-                // Ignore and fallback to onload/timeout.
-              }
-              const done = () => {
-                frame.removeEventListener('load', done);
-                resolve();
-              };
-              frame.addEventListener('load', done, { once: true });
-              setTimeout(done, 1600);
-            }))),
-            wait(timeoutMs)
-          ]);
-        }
-
-        // Force-open all tabs once so each page is initialized and rendered.
-        ['results', 'predictions', 'residuals', 'ancova', 'correlations', 'descriptive', 'ai-assessment'].forEach(tab => {
-          try { switchTab(tab); } catch (e) {}
+      const ancovaNav = document.getElementById('ancovaGroupNav');
+      const includeAncova = !!(ancovaNav && ancovaNav.style.display !== 'none');
+      const sectionDefs = [
+        { id: 'model-results', label: 'Model Results', tabIds: ['tab-results'], primeTabs: ['results-overview', 'results-detail'] },
+        { id: 'interactions', label: 'Interactions', tabIds: ['tab-ix-summary', 'tab-ix-viz', 'tab-ix-details'], primeTabs: ['ix-summary', 'ix-viz', 'ix-details'] },
+        { id: 'predictions', label: 'Predictions', tabIds: ['tab-pred-overview', 'tab-predictions', 'tab-pred-technical'], primeTabs: ['pred-overview', 'pred-scenario', 'pred-technical'] },
+        { id: 'visualization', label: 'Visualization', tabIds: ['tab-model-viz', 'tab-partial-grid'], primeTabs: ['viz-partial', 'viz-unique'] },
+        { id: 'diagnostics', label: 'Diagnostics', tabIds: ['tab-residuals', 'tab-res-plots', 'tab-res-influential'], primeTabs: ['diag-overview', 'diag-plots', 'diag-influence'] },
+        { id: 'correlations', label: 'Correlations', tabIds: ['tab-correlations'], primeTabs: ['correlations'] },
+        { id: 'descriptives', label: 'Descriptives', tabIds: ['tab-descriptive'], primeTabs: ['descriptive'] }
+      ];
+      if (includeAncova) {
+        sectionDefs.push({
+          id: 'ancova',
+          label: 'ANCOVA',
+          tabIds: ['tab-ancova-results', 'tab-ancova-assumptions', 'tab-ancova-viz'],
+          primeTabs: ['ancova-results', 'ancova-assumptions', 'ancova-viz']
         });
-        try { switchTab('results'); } catch (e) {}
-
-        // Ensure lazy tabs are populated before snapshot.
-        if (!window.residualsLoaded) {
-          try { loadResidualsTab(); window.residualsLoaded = true; } catch (e) {}
-        }
-        if (!window.correlationsLoaded) {
-          try { loadCorrelationsTab(); window.correlationsLoaded = true; } catch (e) {}
-        }
-        if (!window.descriptiveLoaded) {
-          try { loadDescriptiveTab(); window.descriptiveLoaded = true; } catch (e) {}
-        }
-        if (!window.predictionsLoaded) {
-          try { initializePredictions(); window.predictionsLoaded = true; } catch (e) {}
-        }
-        if (!window.ancovaLoaded && typeof initializeANCOVA === 'function') {
-          try { initializeANCOVA(); window.ancovaLoaded = true; } catch (e) {}
-        }
-
-        // Let dynamic tab content and iframe tabs render before cloning.
-        await waitForTabIframesReady(5000);
-        await wait(450);
-
-        const clone = document.documentElement.cloneNode(true);
-
-        // Remove menu/header from exported HTML
-        ['#sidebarNav','#header-container'].forEach(sel => { const el = clone.querySelector(sel); if (el) el.remove(); });
-
-        // Preserve form control state (select/input/textarea).
-        const sourceControls = document.querySelectorAll('input, textarea, select');
-        const cloneControls = clone.querySelectorAll('input, textarea, select');
-        sourceControls.forEach((sourceEl, idx) => {
-          const cloneEl = cloneControls[idx];
-          if (!cloneEl) return;
-          if (sourceEl.tagName === 'SELECT') {
-            cloneEl.value = sourceEl.value;
-            Array.from(cloneEl.options || []).forEach(opt => {
-              opt.selected = opt.value === sourceEl.value;
-            });
-          } else if (sourceEl.type === 'checkbox' || sourceEl.type === 'radio') {
-            cloneEl.checked = sourceEl.checked;
-            if (sourceEl.checked) cloneEl.setAttribute('checked', 'checked');
-            else cloneEl.removeAttribute('checked');
-          } else {
-            cloneEl.value = sourceEl.value;
-            cloneEl.setAttribute('value', sourceEl.value);
-          }
-        });
-
-        // Replace canvas elements with static images so charts persist in exported file.
-        const sourceCanvases = document.querySelectorAll('canvas');
-        const cloneCanvases = clone.querySelectorAll('canvas');
-        sourceCanvases.forEach((canvas, idx) => {
-          const cloneCanvas = cloneCanvases[idx];
-          if (!cloneCanvas) return;
-          try {
-            const dataUrl = canvas.toDataURL('image/png');
-            const img = clone.ownerDocument.createElement('img');
-            img.src = dataUrl;
-            img.style.width = `${canvas.width || canvas.clientWidth || 400}px`;
-            img.style.maxWidth = '100%';
-            img.style.height = 'auto';
-            img.alt = 'Chart snapshot';
-            cloneCanvas.replaceWith(img);
-          } catch (e) {
-            // If toDataURL fails, keep original canvas markup.
-          }
-        });
-
-        // Inline iframe content when same-origin so exported file contains tab details.
-        const sourceIframes = document.querySelectorAll('iframe');
-        const cloneIframes = clone.querySelectorAll('iframe');
-        sourceIframes.forEach((frame, idx) => {
-          const cloneFrame = cloneIframes[idx];
-          if (!cloneFrame) return;
-          try {
-            const doc = frame.contentDocument;
-            if (doc && doc.documentElement) {
-              cloneFrame.setAttribute('srcdoc', '<!DOCTYPE html>\n' + doc.documentElement.outerHTML);
-              cloneFrame.removeAttribute('src');
-            }
-          } catch (e) {
-            // Cross-origin or inaccessible iframe; keep original src.
-          }
-        });
-
-        // Export all tab sections as a single complete report.
-        const tabbedView = clone.querySelector('.tabbed-view-container');
-        if (tabbedView) tabbedView.classList.remove('hidden');
-        const singlePageView = clone.querySelector('#singlePageView');
-        if (singlePageView) {
-          singlePageView.classList.remove('active');
-          singlePageView.style.display = 'none';
-        }
-        clone.querySelectorAll('.tab-content').forEach(section => {
-          section.classList.add('active');
-          section.style.display = 'block';
-        });
-        const tabNav = clone.querySelector('.tab-navigation');
-        if (tabNav) {
-          tabNav.style.position = 'static';
-          tabNav.style.overflow = 'visible';
-        }
-
-        // Static export: remove scripts to avoid re-running app logic on open.
-        clone.querySelectorAll('script').forEach(script => script.remove());
-
-        // Hide any loading overlay remnants in export.
-        const loadingOverlay = clone.querySelector('#loadingOverlay');
-        if (loadingOverlay) loadingOverlay.remove();
-
-        const now = new Date();
-        const stamp = now.toISOString().replace(/[:.]/g, '-');
-        const fileName = `regression-results-snapshot-${stamp}.html`;
-        const html = '<!DOCTYPE html>\n' + clone.outerHTML;
-        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-
-        await customAlert(`HTML snapshot saved (all tabs) as:\n${fileName}`, 'success');
-      } catch (error) {
-        console.error('❌ Failed to export HTML snapshot:', error);
-        await customAlert(`Failed to export HTML snapshot: ${error.message}`, 'error');
       }
+
+      const runExport = async (selectedIds) => {
+        try {
+          const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+          const selectedSet = new Set((Array.isArray(selectedIds) && selectedIds.length) ? selectedIds : sectionDefs.map(s => s.id));
+          const selectedSections = sectionDefs.filter(s => selectedSet.has(s.id));
+          if (!selectedSections.length) return;
+
+          async function waitForTabIframesReady(timeoutMs = 5000) {
+            const iframes = Array.from(document.querySelectorAll('#tab-correlations iframe, #tab-descriptive iframe'));
+            if (iframes.length === 0) return;
+            await Promise.race([
+              Promise.all(iframes.map(frame => new Promise(resolve => {
+                try {
+                  if (frame.contentDocument?.readyState === 'complete') { resolve(); return; }
+                } catch (e) {}
+                const done = () => { frame.removeEventListener('load', done); resolve(); };
+                frame.addEventListener('load', done, { once: true });
+                setTimeout(done, 1600);
+              }))),
+              wait(timeoutMs)
+            ]);
+          }
+
+          // Prime selected views so dynamic content and charts are fully rendered.
+          const tabsToPrime = Array.from(new Set(selectedSections.flatMap(s => s.primeTabs || [])));
+          tabsToPrime.forEach(tab => { try { switchTab(tab); } catch (e) {} });
+          try { switchTab('results-overview'); } catch (e) {}
+
+          // Ensure major lazy sections are hydrated.
+          if (selectedSet.has('diagnostics')) {
+            try { loadResidualsTab(); } catch (e) {}
+            try { loadResPlots(); } catch (e) {}
+            try { loadResInfluential(); } catch (e) {}
+          }
+          if (selectedSet.has('predictions')) {
+            try { initializePredictions(); window.predictionsLoaded = true; } catch (e) {}
+            try { loadPredOverviewTab(); } catch (e) {}
+            try { loadPredTechnicalTab(); } catch (e) {}
+          }
+          if (selectedSet.has('correlations') && !window.correlationsLoaded) {
+            try { loadCorrelationsTab(); window.correlationsLoaded = true; } catch (e) {}
+          }
+          if (selectedSet.has('descriptives') && !window.descriptiveLoaded) {
+            try { loadDescriptiveTab(); window.descriptiveLoaded = true; } catch (e) {}
+          }
+          if (selectedSet.has('ancova') && !window.ancovaLoaded && typeof initializeANCOVA === 'function') {
+            try { initializeANCOVA(); window.ancovaLoaded = true; } catch (e) {}
+          }
+
+          await waitForTabIframesReady(5000);
+          await wait(450);
+
+          const clone = document.documentElement.cloneNode(true);
+          ['#sidebarNav', '#header-container'].forEach(sel => { const el = clone.querySelector(sel); if (el) el.remove(); });
+
+          const sourceControls = document.querySelectorAll('input, textarea, select');
+          const cloneControls = clone.querySelectorAll('input, textarea, select');
+          sourceControls.forEach((sourceEl, idx) => {
+            const cloneEl = cloneControls[idx];
+            if (!cloneEl) return;
+            if (sourceEl.tagName === 'SELECT') {
+              cloneEl.value = sourceEl.value;
+              Array.from(cloneEl.options || []).forEach(opt => { opt.selected = opt.value === sourceEl.value; });
+            } else if (sourceEl.type === 'checkbox' || sourceEl.type === 'radio') {
+              cloneEl.checked = sourceEl.checked;
+              if (sourceEl.checked) cloneEl.setAttribute('checked', 'checked');
+              else cloneEl.removeAttribute('checked');
+            } else {
+              cloneEl.value = sourceEl.value;
+              cloneEl.setAttribute('value', sourceEl.value);
+            }
+          });
+
+          const sourceCanvases = document.querySelectorAll('canvas');
+          const cloneCanvases = clone.querySelectorAll('canvas');
+          sourceCanvases.forEach((canvas, idx) => {
+            const cloneCanvas = cloneCanvases[idx];
+            if (!cloneCanvas) return;
+            try {
+              const dataUrl = canvas.toDataURL('image/png');
+              const img = clone.ownerDocument.createElement('img');
+              img.src = dataUrl;
+              img.style.width = `${canvas.width || canvas.clientWidth || 400}px`;
+              img.style.maxWidth = '100%';
+              img.style.height = 'auto';
+              img.alt = 'Chart snapshot';
+              cloneCanvas.replaceWith(img);
+            } catch (e) {}
+          });
+
+          const sourceIframes = document.querySelectorAll('iframe');
+          const cloneIframes = clone.querySelectorAll('iframe');
+          sourceIframes.forEach((frame, idx) => {
+            const cloneFrame = cloneIframes[idx];
+            if (!cloneFrame) return;
+            try {
+              const doc = frame.contentDocument;
+              if (doc && doc.documentElement) {
+                cloneFrame.setAttribute('srcdoc', '<!DOCTYPE html>\n' + doc.documentElement.outerHTML);
+                cloneFrame.removeAttribute('src');
+              }
+            } catch (e) {}
+          });
+
+          const tabbedView = clone.querySelector('.tabbed-view-container');
+          if (tabbedView) tabbedView.classList.remove('hidden');
+          const singlePageView = clone.querySelector('#singlePageView');
+          if (singlePageView) {
+            singlePageView.classList.remove('active');
+            singlePageView.style.display = 'none';
+          }
+
+          const selectedTabIds = new Set(selectedSections.flatMap(s => s.tabIds || []));
+          clone.querySelectorAll('.tab-content').forEach(section => {
+            const show = selectedTabIds.has(section.id);
+            section.classList.toggle('active', show);
+            section.style.display = show ? 'block' : 'none';
+          });
+          if (!selectedSet.has('interactions')) {
+            const ixCtx = clone.querySelector('#ixWorkspaceContext');
+            if (ixCtx) ixCtx.remove();
+          }
+
+          clone.querySelectorAll('script').forEach(script => script.remove());
+          const loadingOverlay = clone.querySelector('#loadingOverlay');
+          if (loadingOverlay) loadingOverlay.remove();
+
+          const now = new Date();
+          const stamp = now.toISOString().replace(/[:.]/g, '-');
+          const fileName = `regression-report-${stamp}.html`;
+          const html = '<!DOCTYPE html>\n' + clone.outerHTML;
+          const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+
+          const labels = selectedSections.map(s => s.label).join(', ');
+          await customAlert(`HTML report saved with selected views:\n${labels}\n\n${fileName}`, 'success');
+        } catch (error) {
+          console.error('❌ Failed to export HTML snapshot:', error);
+          await customAlert(`Failed to export HTML snapshot: ${error.message}`, 'error');
+        }
+      };
+
+      if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader.pickReportSections === 'function') {
+        StatisticoHeader.pickReportSections(
+          sectionDefs.map(({ id, label }) => ({ id, label })),
+          (selected) => { runExport(selected); }
+        );
+        return;
+      }
+
+      await runExport(sectionDefs.map(s => s.id));
     }
     
     /**

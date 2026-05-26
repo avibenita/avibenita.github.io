@@ -187,6 +187,12 @@ function sendLogisticBundle() {
   try {
     const computed = computeLogisticBundle(headers, rows, modelSpec, 0.5);
     logisticComputedState = computed.state;
+    computed.bundle.dataContext = {
+      headers,
+      rows,
+      address: logisticRangeAddress,
+      modelSpec
+    };
     logisticDialog.messageChild(JSON.stringify({
       type: "LOGISTIC_BUNDLE",
       payload: computed.bundle

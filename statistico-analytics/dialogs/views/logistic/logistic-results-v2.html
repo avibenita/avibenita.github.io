@@ -281,6 +281,44 @@
 
     .subview { display:none; }
     .subview.active { display:block; }
+    .tab-obs-filter-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      background: rgba(255,255,255,.04);
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .tab-obs-info {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+    .tab-obs-info strong { color: var(--text-primary); }
+    .tab-obs-btns { display: flex; gap: 6px; }
+    .tab-obs-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.06);
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+      white-space: nowrap;
+    }
+    .tab-obs-btn:hover { background: rgba(255,255,255,.12); color: var(--text-primary); }
+    .tab-obs-btn.active {
+      background: var(--accent-1, #e8763a);
+      border-color: var(--accent-1, #e8763a);
+      color: #fff;
+    }
 
     @media (max-width:1200px){
       .grid.kpi{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
@@ -384,32 +422,15 @@
             </section>
 
             <section class="tab-panel" data-view="correlations">
-              <div class="panel">
-                <div class="panel-h">Correlation Matrix</div>
-                <div class="panel-b">
-                  <table>
-                    <thead><tr id="corrHeadRow"><th>Variable</th></tr></thead>
-                    <tbody id="corrBody"></tbody>
-                  </table>
-                </div>
-              </div>
-              <div class="panel" style="margin-top:12px;">
-                <div class="panel-h">Correlation Notes</div>
-                <div class="panel-b tiny" id="corrNote">Awaiting correlation output...</div>
+              <div class="panel" id="corrEmbedPanel">
+                <div class="panel-b tiny">Loading correlations...</div>
               </div>
             </section>
             <section class="tab-panel" data-view="descriptives">
               <div class="panel"><div class="panel-h">Descriptives</div><div class="panel-b tiny" id="descSummary"></div></div>
-              <div class="panel" style="margin-top:12px;">
-                <div class="panel-h">Variable Statistics</div>
-                <div class="panel-b">
-                  <table>
-                    <thead><tr><th>Variable</th><th>N</th><th>Mean</th><th>SD</th><th>Min</th><th>Max</th><th>Missing</th></tr></thead>
-                    <tbody id="descStatsBody"></tbody>
-                  </table>
-                </div>
+              <div class="panel" id="descEmbedPanel" style="margin-top:12px;">
+                <div class="panel-b tiny">Loading descriptive statistics...</div>
               </div>
-              <div class="panel" style="margin-top:12px;"><div class="panel-h">Rows</div><div class="panel-b"><table><thead><tr><th>Predictor</th><th>Event Rate</th><th>Mean by Outcome</th><th>Notes</th></tr></thead><tbody id="descBody"></tbody></table></div></div>
             </section>
             </div>
           </div>
@@ -444,8 +465,10 @@
       residuals: "fa-wave-square",
       influence: "fa-crosshairs"
     };
-    const state = { results: {}, coefficients: [], predictions: [], diagnostics: {}, descriptives: {} };
+    const state = { results: {}, coefficients: [], predictions: [], diagnostics: {}, descriptives: {}, dataContext: null };
     let currentPrimary = "model-results";
+    let correlationsLoaded = false;
+    let descriptiveLoaded = false;
 
     function sendToHost(cmd, data) {
       try {
@@ -490,6 +513,8 @@
       mountSubtabs(tab);
       const first = (SUBTAB_CONFIG[tab] || [])[0];
       if (first) switchSub(tab, first);
+      if (tab === "correlations" && !correlationsLoaded) loadCorrelationsTab();
+      if (tab === "descriptives" && !descriptiveLoaded) loadDescriptiveTab();
       if (typeof StatisticoHeader !== "undefined") {
         const labels = {
           "model-results": "Model Results",
@@ -517,7 +542,7 @@
       document.getElementById("cmText").innerHTML = "TP: <b>" + (r.tp || 0) + "</b> &nbsp; FP: <b>" + (r.fp || 0) + "</b> &nbsp; TN: <b>" + (r.tn || 0) + "</b> &nbsp; FN: <b>" + (r.fn || 0) + "</b>";
       document.getElementById("fitTech").innerHTML = "AIC: <b>" + (r.aic || "-") + "</b><br>BIC: <b>" + (r.bic || "-") + "</b><br>McFadden R2: <b>" + (r.mcfaddenR2 || "-") + "</b>";
       document.getElementById("testsTech").innerHTML = "LR: <b>" + (r.lrTest || "-") + "</b><br>Wald: <b>" + (r.waldTest || "-") + "</b><br>Score: <b>" + (r.scoreTest || "-") + "</b>";
-      document.getElementById("corrNote").innerHTML = state.descriptives.correlationSummary || ("AUC <b>" + (r.auc || "-") + "</b>, KS <b>" + (r.ks || "-") + "</b>, Top Decile Lift <b>" + (r.topDecileLift || "-") + "</b>.");
+      var corrSummary = state.descriptives.correlationSummary || ("AUC " + (r.auc || "-") + ", KS " + (r.ks || "-") + ", Top Decile Lift " + (r.topDecileLift || "-") + ".");
       document.getElementById("descSummary").innerHTML = "Separation Risk: <b>" + (state.descriptives.separationRisk || "-") + "</b><br>Sparse Cells: <b>" + (state.descriptives.sparseCells || "-") + "</b><br>Missing Pattern: <b>" + (state.descriptives.missingPattern || "-") + "</b>";
       document.getElementById("diagOverview").innerHTML = "Deviance residual mean: <b>" + (state.diagnostics.devianceResidualMean || "-") + "</b><br>Pearson residual mean: <b>" + (state.diagnostics.pearsonResidualMean || "-") + "</b><br>Outlier count: <b>" + (state.diagnostics.outlierCount || "-") + "</b>";
       document.getElementById("diagResiduals").innerHTML = "Deviance SD: <b>" + (state.diagnostics.devianceResidualSd || "-") + "</b><br>Pearson SD: <b>" + (state.diagnostics.pearsonResidualSd || "-") + "</b>";
@@ -536,31 +561,8 @@
       document.getElementById("predBody").innerHTML = predRows.length
         ? predRows.slice(0, 60).map((r) => "<tr><td>" + esc(r.Observed) + "</td><td>" + esc(r.Probability) + "</td><td>" + esc(r.PredictedClass) + "</td></tr>").join("")
         : "<tr><td colspan='3' class='empty'>No predictions</td></tr>";
-      const statsRows = state.descriptives.variableStats || [];
-      document.getElementById("descStatsBody").innerHTML = statsRows.length
-        ? statsRows.map((r) => "<tr><td>" + esc(r.Variable) + "</td><td>" + esc(r.N) + "</td><td>" + esc(r.Mean) + "</td><td>" + esc(r.SD) + "</td><td>" + esc(r.Min) + "</td><td>" + esc(r.Max) + "</td><td>" + esc(r.Missing) + "</td></tr>").join("")
-        : "<tr><td colspan='7' class='empty'>No numeric statistics available</td></tr>";
-      const dRows = state.descriptives.rows || [];
-      document.getElementById("descBody").innerHTML = dRows.length
-        ? dRows.slice(0, 120).map((r) => "<tr><td>" + esc(r.Predictor) + "</td><td>" + esc(r.EventRate) + "</td><td>" + esc(r.MeanByOutcome) + "</td><td>" + esc(r.Notes) + "</td></tr>").join("")
-        : "<tr><td colspan='4' class='empty'>No descriptive rows</td></tr>";
-
-      const corr = state.descriptives.correlations || {};
-      const vars = corr.variables || [];
-      const matrix = corr.matrix || [];
-      const corrHead = document.getElementById("corrHeadRow");
-      const corrBody = document.getElementById("corrBody");
-      if (corrHead && corrBody) {
-        if (vars.length >= 2 && matrix.length === vars.length) {
-          corrHead.innerHTML = "<th>Variable</th>" + vars.map((v) => "<th>" + esc(v) + "</th>").join("");
-          corrBody.innerHTML = vars.map((v, i) => {
-            var cells = (matrix[i] || []).map((val) => "<td>" + esc(val) + "</td>").join("");
-            return "<tr><td>" + esc(v) + "</td>" + cells + "</tr>";
-          }).join("");
-        } else {
-          corrHead.innerHTML = "<th>Variable</th>";
-          corrBody.innerHTML = "<tr><td class='empty'>Not enough numeric variables for a correlation matrix.</td></tr>";
-        }
+      if (document.getElementById("corrEmbedPanel") && correlationsLoaded === false) {
+        document.getElementById("corrEmbedPanel").setAttribute("data-summary", corrSummary);
       }
     }
     function renderProbabilityBands() {
@@ -641,12 +643,165 @@
         state.predictions = message.payload.predictions || [];
         state.diagnostics = message.payload.diagnostics || {};
         state.descriptives = message.payload.descriptives || {};
+        state.dataContext = message.payload.dataContext || null;
       } else if (message.type === "LOGISTIC_RESULTS") state.results = Object.assign({}, state.results, message.payload || {});
       else if (message.type === "LOGISTIC_COEFFICIENTS") state.coefficients = message.payload || [];
       else if (message.type === "LOGISTIC_PREDICTIONS") state.predictions = message.payload || [];
       else if (message.type === "LOGISTIC_DIAGNOSTICS") state.diagnostics = message.payload || {};
       else if (message.type === "LOGISTIC_DESCRIPTIVES") state.descriptives = message.payload || {};
+      else if (message.type === "LOGISTIC_DATA_CONTEXT") state.dataContext = message.payload || null;
       renderAll();
+    }
+
+    function _dialogsBaseUrl() {
+      const href = window.location.href;
+      if (href.includes("/dialogs/views/")) return href.split("/dialogs/views/")[0] + "/dialogs/views";
+      return window.location.origin + "/dialogs/views";
+    }
+    function _isUsedRow(row, indices) {
+      return indices.every((idx) => {
+        const v = row[idx];
+        return v !== null && v !== undefined && v !== '' && v !== '—';
+      });
+    }
+    function _buildIframeData(rows, filteredHeaders, indices, usedOnly) {
+      return rows
+        .filter((row) => !usedOnly || _isUsedRow(row, indices))
+        .map((row) => {
+          const rowObj = {};
+          filteredHeaders.forEach((header, i) => { rowObj[header] = row[indices[i]]; });
+          return rowObj;
+        });
+    }
+    function _sendDataToIframe(iframe, filteredHeaders, filteredData, address, delayMs) {
+      const doSend = () => {
+        iframe.contentWindow.postMessage({
+          type: "CORRELATION_DATA",
+          payload: { headers: filteredHeaders, data: filteredData, address: address || "", source: "logistic-model" }
+        }, "*");
+        const currentTheme = document.documentElement.getAttribute("data-theme") || "dark";
+        setTimeout(() => {
+          iframe.contentWindow.postMessage({ type: "THEME_CHANGE", theme: currentTheme }, "*");
+        }, 100);
+      };
+      if (delayMs > 0) setTimeout(doSend, delayMs);
+      else doSend();
+    }
+
+    function _modelVariableIndices(headers, modelSpec) {
+      const spec = modelSpec || {};
+      const y = spec.y;
+      const xn = Array.isArray(spec.xn) ? spec.xn : [];
+      const xc = Array.isArray(spec.xc) ? spec.xc : [];
+      const names = [y].concat(xn).concat(xc).filter(Boolean);
+      const uniq = [];
+      names.forEach((name) => { if (uniq.indexOf(name) === -1) uniq.push(name); });
+      const idx = uniq.map((v) => headers.indexOf(v)).filter((i) => i !== -1);
+      return { indices: idx, filteredHeaders: idx.map((i) => headers[i]) };
+    }
+
+    function loadCorrelationsTab() {
+      const panel = document.getElementById("corrEmbedPanel");
+      const ctx = state.dataContext;
+      if (!panel || !ctx || !Array.isArray(ctx.headers) || !Array.isArray(ctx.rows)) {
+        if (panel) panel.innerHTML = "<div class='panel-b tiny'>No source data available for correlations.</div>";
+        return;
+      }
+      const baseUrl = _dialogsBaseUrl();
+      const iframeUrl = baseUrl + "/correlations/correlation-matrix-v2.html?embed=1&parent=logistic&cb=" + Date.now();
+      const headers = ctx.headers;
+      const rows = ctx.rows;
+      const address = ctx.address || "";
+      const parts = _modelVariableIndices(headers, ctx.modelSpec || {});
+      if (!parts.indices.length) {
+        panel.innerHTML = "<div class='panel-b tiny'>Model variables were not found in source headers.</div>";
+        return;
+      }
+      const usedCount = rows.filter((row) => _isUsedRow(row, parts.indices)).length;
+      const totalCount = rows.length;
+      let usedOnly = true;
+
+      panel.style.cssText = "display:flex;flex-direction:column;flex:1;min-height:0;padding:0;";
+      panel.innerHTML =
+        "<div class='tab-obs-filter-bar'>" +
+          "<span class='tab-obs-info' id='corrObsInfo'>Showing <strong>" + usedCount + "</strong> used obs of " + totalCount + " total</span>" +
+          "<div class='tab-obs-btns'>" +
+            "<button id='corrBtnUsed' class='tab-obs-btn active'><i class='fa-solid fa-check'></i> Used obs</button>" +
+            "<button id='corrBtnAll' class='tab-obs-btn'><i class='fa-solid fa-bars'></i> All rows</button>" +
+          "</div>" +
+        "</div>" +
+        "<iframe id='corrIframe' style='width:100%;flex:1;min-height:0;border:none;background:transparent;' src='" + iframeUrl + "'></iframe>";
+
+      const iframe = document.getElementById("corrIframe");
+      iframe.onload = function() {
+        const data = _buildIframeData(rows, parts.filteredHeaders, parts.indices, usedOnly);
+        _sendDataToIframe(iframe, parts.filteredHeaders, data, address, 200);
+      };
+
+      function applyFilter(useUsedOnly) {
+        usedOnly = useUsedOnly;
+        document.getElementById("corrBtnUsed").classList.toggle("active", usedOnly);
+        document.getElementById("corrBtnAll").classList.toggle("active", !usedOnly);
+        const shownCount = usedOnly ? usedCount : totalCount;
+        document.getElementById("corrObsInfo").innerHTML = "Showing <strong>" + shownCount + "</strong> " + (usedOnly ? "used obs" : "all rows") + " of " + totalCount + " total";
+        const data = _buildIframeData(rows, parts.filteredHeaders, parts.indices, usedOnly);
+        if (iframe.contentWindow) _sendDataToIframe(iframe, parts.filteredHeaders, data, address, 0);
+      }
+      document.getElementById("corrBtnUsed").onclick = function() { applyFilter(true); };
+      document.getElementById("corrBtnAll").onclick = function() { applyFilter(false); };
+      correlationsLoaded = true;
+    }
+
+    function loadDescriptiveTab() {
+      const panel = document.getElementById("descEmbedPanel");
+      const ctx = state.dataContext;
+      if (!panel || !ctx || !Array.isArray(ctx.headers) || !Array.isArray(ctx.rows)) {
+        if (panel) panel.innerHTML = "<div class='panel-b tiny'>No source data available for descriptives.</div>";
+        return;
+      }
+      const baseUrl = _dialogsBaseUrl();
+      const iframeUrl = baseUrl + "/correlations/descriptive-stats.html?embed=1&parent=logistic&cb=" + Date.now();
+      const headers = ctx.headers;
+      const rows = ctx.rows;
+      const address = ctx.address || "";
+      const parts = _modelVariableIndices(headers, ctx.modelSpec || {});
+      if (!parts.indices.length) {
+        panel.innerHTML = "<div class='panel-b tiny'>Model variables were not found in source headers.</div>";
+        return;
+      }
+      const usedCount = rows.filter((row) => _isUsedRow(row, parts.indices)).length;
+      const totalCount = rows.length;
+      let usedOnly = true;
+
+      panel.style.cssText = "display:flex;flex-direction:column;flex:1;min-height:0;padding:0;";
+      panel.innerHTML =
+        "<div class='tab-obs-filter-bar'>" +
+          "<span class='tab-obs-info' id='descObsInfo'>Showing <strong>" + usedCount + "</strong> used obs of " + totalCount + " total</span>" +
+          "<div class='tab-obs-btns'>" +
+            "<button id='descBtnUsed' class='tab-obs-btn active'><i class='fa-solid fa-check'></i> Used obs</button>" +
+            "<button id='descBtnAll' class='tab-obs-btn'><i class='fa-solid fa-bars'></i> All rows</button>" +
+          "</div>" +
+        "</div>" +
+        "<iframe id='descIframe' style='width:100%;flex:1;min-height:0;border:none;background:transparent;' src='" + iframeUrl + "'></iframe>";
+
+      const iframe = document.getElementById("descIframe");
+      iframe.onload = function() {
+        const data = _buildIframeData(rows, parts.filteredHeaders, parts.indices, usedOnly);
+        _sendDataToIframe(iframe, parts.filteredHeaders, data, address, 200);
+      };
+
+      function applyFilter(useUsedOnly) {
+        usedOnly = useUsedOnly;
+        document.getElementById("descBtnUsed").classList.toggle("active", usedOnly);
+        document.getElementById("descBtnAll").classList.toggle("active", !usedOnly);
+        const shownCount = usedOnly ? usedCount : totalCount;
+        document.getElementById("descObsInfo").innerHTML = "Showing <strong>" + shownCount + "</strong> " + (usedOnly ? "used obs" : "all rows") + " of " + totalCount + " total";
+        const data = _buildIframeData(rows, parts.filteredHeaders, parts.indices, usedOnly);
+        if (iframe.contentWindow) _sendDataToIframe(iframe, parts.filteredHeaders, data, address, 0);
+      }
+      document.getElementById("descBtnUsed").onclick = function() { applyFilter(true); };
+      document.getElementById("descBtnAll").onclick = function() { applyFilter(false); };
+      descriptiveLoaded = true;
     }
 
     document.addEventListener("DOMContentLoaded", function () {

@@ -278,6 +278,50 @@
     .empty { padding:14px 10px; color:var(--text-muted); font-style:italic; }
     .controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
     input[type="range"]{ width:260px; }
+    .insight-banner{
+      border:1px solid rgba(120,200,255,.35);
+      background:linear-gradient(135deg, rgba(120,200,255,.16), rgba(120,200,255,.06));
+      border-radius:10px;
+      padding:10px 12px;
+      margin-bottom:12px;
+    }
+    .insight-title{
+      font-size:11px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      color:var(--text-secondary);
+      margin-bottom:6px;
+    }
+    .insight-body{
+      font-size:13px;
+      line-height:1.5;
+      color:var(--text-primary);
+    }
+    .split-two{
+      display:grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+      gap:12px;
+      align-items:stretch;
+    }
+    .metric-table td:first-child{
+      color:var(--text-secondary);
+      font-weight:600;
+      width:56%;
+    }
+    .quality-pill{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      border-radius:999px;
+      font-size:11px;
+      font-weight:700;
+      padding:4px 10px;
+      border:1px solid transparent;
+    }
+    .quality-pill.strong{ color:#a7f3d0; background:rgba(16,185,129,.18); border-color:rgba(16,185,129,.45); }
+    .quality-pill.moderate{ color:#fde68a; background:rgba(234,179,8,.2); border-color:rgba(234,179,8,.45); }
+    .quality-pill.weak{ color:#fecaca; background:rgba(239,68,68,.18); border-color:rgba(239,68,68,.42); }
 
     .subview { display:none; }
     .subview.active { display:block; }
@@ -323,6 +367,7 @@
     @media (max-width:1200px){
       .grid.kpi{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
       .grid.two{ grid-template-columns:1fr; }
+      .split-two{ grid-template-columns:1fr; }
     }
   </style>
 </head>
@@ -352,11 +397,25 @@
             <div class="ws-body">
             <section class="tab-panel active" data-view="model-results">
               <section class="subview active" data-parent="model-results" data-sub="overview">
+                <div class="insight-banner">
+                  <div class="insight-title">Model Conclusion</div>
+                  <div class="insight-body" id="modelConclusion">Awaiting model output...</div>
+                </div>
                 <div class="grid kpi">
                   <div class="panel"><div class="panel-b"><div class="kpi-val" id="kpiObs">-</div><div class="kpi-lab">Observations</div></div></div>
                   <div class="panel"><div class="panel-b"><div class="kpi-val" id="kpiEvents">-</div><div class="kpi-lab">Events</div></div></div>
                   <div class="panel"><div class="panel-b"><div class="kpi-val" id="kpiAuc">-</div><div class="kpi-lab">AUC</div></div></div>
                   <div class="panel"><div class="panel-b"><div class="kpi-val" id="kpiP">-</div><div class="kpi-lab">Overall p-value</div></div></div>
+                </div>
+                <div class="grid two" style="margin-top:12px;">
+                  <div class="panel">
+                    <div class="panel-h">Event Balance</div>
+                    <div class="panel-b tiny" id="eventBalance">Awaiting event prevalence...</div>
+                  </div>
+                  <div class="panel">
+                    <div class="panel-h">Predictor Highlights</div>
+                    <div class="panel-b tiny" id="predictorHighlights">Awaiting coefficients...</div>
+                  </div>
                 </div>
                 <div class="panel" style="margin-top:12px;">
                   <div class="panel-h">Top Odds Ratios</div>
@@ -378,6 +437,10 @@
 
             <section class="tab-panel" data-view="predictive-performance">
               <section class="subview active" data-parent="predictive-performance" data-sub="overview">
+                <div class="insight-banner">
+                  <div class="insight-title">Performance Interpretation</div>
+                  <div class="insight-body" id="perfInterpretation">Awaiting predictive metrics...</div>
+                </div>
                 <div class="grid kpi">
                   <div class="panel"><div class="panel-b"><div class="kpi-val" id="accVal">-</div><div class="kpi-lab">Accuracy</div></div></div>
                   <div class="panel"><div class="panel-b"><div class="kpi-val" id="sensVal">-</div><div class="kpi-lab">Sensitivity</div></div></div>
@@ -388,11 +451,42 @@
               </section>
               <section class="subview" data-parent="predictive-performance" data-sub="roc-thresholds">
                 <div class="controls"><label for="thr">Threshold</label><input id="thr" type="range" min="0.30" max="0.70" step="0.01" value="0.50"><span id="thrVal">0.50</span></div>
-                <div class="panel"><div class="panel-h">ROC Curve</div><div class="panel-b"><div id="rocChart" style="height:300px;"></div></div></div>
+                <div class="split-two">
+                  <div class="panel"><div class="panel-h">ROC Curve</div><div class="panel-b"><div id="rocChart" style="height:300px;"></div></div></div>
+                  <div class="panel">
+                    <div class="panel-h">Threshold Interpretation</div>
+                    <div class="panel-b">
+                      <div class="tiny" id="rocInterpretation" style="margin-bottom:10px;">Awaiting ROC interpretation...</div>
+                      <table class="metric-table">
+                        <tbody>
+                          <tr><td>AUC Band</td><td id="aucBand">-</td></tr>
+                          <tr><td>Sensitivity</td><td id="thrSens">-</td></tr>
+                          <tr><td>Specificity</td><td id="thrSpec">-</td></tr>
+                          <tr><td>Precision (PPV)</td><td id="thrPrec">-</td></tr>
+                          <tr><td>Accuracy</td><td id="thrAcc">-</td></tr>
+                          <tr><td>F1</td><td id="thrF1">-</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
               </section>
               <section class="subview" data-parent="predictive-performance" data-sub="calibration">
                 <div class="panel"><div class="panel-h">Calibration</div><div class="panel-b"><div id="calChart" style="height:300px;"></div></div></div>
-                <div class="panel" style="margin-top:12px;"><div class="panel-h">Calibration Stats</div><div class="panel-b tiny" id="calText">Awaiting predictions...</div></div>
+                <div class="grid two" style="margin-top:12px;">
+                  <div class="panel">
+                    <div class="panel-h">Calibration Stats</div>
+                    <div class="panel-b tiny" id="calText">Awaiting predictions...</div>
+                  </div>
+                  <div class="panel">
+                    <div class="panel-h">Calibration Interpretation</div>
+                    <div class="panel-b tiny">
+                      <div style="margin-bottom:8px;">Calibration quality: <span id="calQuality" class="quality-pill moderate">-</span></div>
+                      <div id="calInterpretation" style="margin-bottom:8px;">Awaiting calibration assessment...</div>
+                      <div class="tiny" style="opacity:.86;">Reference line (45°): perfect calibration means predicted probabilities match observed event rates across risk bins.</div>
+                    </div>
+                  </div>
+                </div>
               </section>
             </section>
 
@@ -487,6 +581,33 @@
         return (isFinite(y) && isFinite(p)) ? { y: y >= 0.5 ? 1 : 0, p: Math.min(1, Math.max(0, p > 1 ? p / 100 : p)) } : null;
       }).filter(Boolean);
     }
+    function toUnit(v) {
+      const raw = String(v == null ? "" : v);
+      const x = n(raw);
+      if (!isFinite(x)) return NaN;
+      if (raw.indexOf("%") >= 0) return x / 100;
+      if (x > 1 && x <= 100) return x / 100;
+      return x;
+    }
+    function toFixedOrDash(v, digits) {
+      const x = Number(v);
+      return isFinite(x) ? x.toFixed(digits == null ? 2 : digits) : "-";
+    }
+    function formatPctCell(v) {
+      const x = toUnit(v);
+      return isFinite(x) ? (x * 100).toFixed(1) + "%" : "-";
+    }
+    function aucBand(auc) {
+      if (!isFinite(auc)) return { label: "Not available", detail: "AUC unavailable for interpretation." };
+      if (auc >= 0.9) return { label: "Excellent", detail: "Discrimination is excellent and clinically strong." };
+      if (auc >= 0.8) return { label: "Good", detail: "Discrimination is good for decision support." };
+      if (auc >= 0.7) return { label: "Fair", detail: "Discrimination is fair but not robust." };
+      if (auc >= 0.6) return { label: "Weak", detail: "Discrimination is weak and near limited utility." };
+      return { label: "Very weak", detail: "Discrimination is only slightly better than random guessing." };
+    }
+    function isStatSig(p) {
+      return isFinite(p) && p <= 0.05;
+    }
 
     function switchSub(parent, sub) {
       document.querySelectorAll('.subview[data-parent="' + parent + '"]').forEach((v) => v.classList.toggle("active", v.dataset.sub === sub));
@@ -542,11 +663,49 @@
       document.getElementById("cmText").innerHTML = "TP: <b>" + (r.tp || 0) + "</b> &nbsp; FP: <b>" + (r.fp || 0) + "</b> &nbsp; TN: <b>" + (r.tn || 0) + "</b> &nbsp; FN: <b>" + (r.fn || 0) + "</b>";
       document.getElementById("fitTech").innerHTML = "AIC: <b>" + (r.aic || "-") + "</b><br>BIC: <b>" + (r.bic || "-") + "</b><br>McFadden R2: <b>" + (r.mcfaddenR2 || "-") + "</b>";
       document.getElementById("testsTech").innerHTML = "LR: <b>" + (r.lrTest || "-") + "</b><br>Wald: <b>" + (r.waldTest || "-") + "</b><br>Score: <b>" + (r.scoreTest || "-") + "</b>";
-      var corrSummary = state.descriptives.correlationSummary || ("AUC " + (r.auc || "-") + ", KS " + (r.ks || "-") + ", Top Decile Lift " + (r.topDecileLift || "-") + ".");
       document.getElementById("descSummary").innerHTML = "Separation Risk: <b>" + (state.descriptives.separationRisk || "-") + "</b><br>Sparse Cells: <b>" + (state.descriptives.sparseCells || "-") + "</b><br>Missing Pattern: <b>" + (state.descriptives.missingPattern || "-") + "</b>";
       document.getElementById("diagOverview").innerHTML = "Deviance residual mean: <b>" + (state.diagnostics.devianceResidualMean || "-") + "</b><br>Pearson residual mean: <b>" + (state.diagnostics.pearsonResidualMean || "-") + "</b><br>Outlier count: <b>" + (state.diagnostics.outlierCount || "-") + "</b>";
       document.getElementById("diagResiduals").innerHTML = "Deviance SD: <b>" + (state.diagnostics.devianceResidualSd || "-") + "</b><br>Pearson SD: <b>" + (state.diagnostics.pearsonResidualSd || "-") + "</b>";
       document.getElementById("diagInfluence").innerHTML = "Max leverage: <b>" + (state.diagnostics.maxLeverage || "-") + "</b><br>Max Cook's D: <b>" + (state.diagnostics.maxCooksDistance || "-") + "</b><br>Max |DFBETA|: <b>" + (state.diagnostics.maxDfbeta || "-") + "</b>";
+
+      const auc = toUnit(r.auc);
+      const p = n(r.overallPValue);
+      const aucInfo = aucBand(auc);
+      const sigText = isStatSig(p) ? "statistically significant" : "not statistically significant";
+      const utilityText = (auc >= 0.7 && isStatSig(p))
+        ? "Predictive utility appears actionable."
+        : "Predictive utility appears limited.";
+      document.getElementById("modelConclusion").textContent =
+        "The model shows " + aucInfo.label.toLowerCase() + " discrimination (AUC = " + toFixedOrDash(auc, 2) +
+        ") and is " + sigText + " (p = " + (isFinite(p) ? p.toFixed(3) : "-") + "). " + utilityText;
+
+      const obs = n(r.observations);
+      const events = n(r.events);
+      const nonEvents = isFinite(obs) && isFinite(events) ? Math.max(0, obs - events) : NaN;
+      const prevalence = isFinite(obs) && obs > 0 && isFinite(events) ? events / obs : NaN;
+      document.getElementById("eventBalance").innerHTML =
+        "Events: <b>" + (isFinite(events) ? events : "-") + "</b> / <b>" + (isFinite(obs) ? obs : "-") + "</b><br>" +
+        "Non-events: <b>" + (isFinite(nonEvents) ? nonEvents : "-") + "</b><br>" +
+        "Event prevalence: <b>" + (isFinite(prevalence) ? (prevalence * 100).toFixed(1) + "%" : "-") + "</b>";
+
+      const perfParts = [];
+      if (isFinite(auc)) perfParts.push("AUC " + toFixedOrDash(auc, 2) + " (" + aucInfo.label + ")");
+      if (r.accuracy != null && r.accuracy !== "") perfParts.push("Accuracy " + formatPctCell(r.accuracy));
+      if (r.sensitivity != null && r.sensitivity !== "") perfParts.push("Sensitivity " + formatPctCell(r.sensitivity));
+      if (r.specificity != null && r.specificity !== "") perfParts.push("Specificity " + formatPctCell(r.specificity));
+      document.getElementById("perfInterpretation").textContent = perfParts.length
+        ? aucInfo.detail + " Key operating metrics: " + perfParts.join(", ") + "."
+        : "Awaiting predictive metrics...";
+
+      document.getElementById("rocInterpretation").textContent = isFinite(auc)
+        ? "AUC = " + toFixedOrDash(auc, 2) + ". " + aucInfo.detail
+        : "Awaiting ROC interpretation...";
+      document.getElementById("aucBand").textContent = aucInfo.label;
+      document.getElementById("thrSens").textContent = formatPctCell(r.sensitivity);
+      document.getElementById("thrSpec").textContent = formatPctCell(r.specificity);
+      document.getElementById("thrPrec").textContent = formatPctCell(r.precision || r.ppv);
+      document.getElementById("thrAcc").textContent = formatPctCell(r.accuracy);
+      document.getElementById("thrF1").textContent = formatPctCell(r.f1);
     }
     function renderTables() {
       const coef = state.coefficients || [];
@@ -557,13 +716,33 @@
       document.getElementById("topOrBody").innerHTML = ranked.length
         ? ranked.map((r) => "<tr><td>" + esc(r.Variable) + "</td><td>" + esc(r.OR) + "</td><td>" + esc(r.OR_CI_Lower) + " - " + esc(r.OR_CI_Upper) + "</td><td>" + esc(r.PValue) + "</td></tr>").join("")
         : "<tr><td colspan='4' class='empty'>No OR rows</td></tr>";
+
+      const usable = coef
+        .filter((r) => String(r.Variable || "").toLowerCase() !== "intercept")
+        .map((r) => ({
+          name: r.Variable,
+          or: n(r.OR),
+          p: n(r.PValue),
+          rawOr: r.OR,
+          rawP: r.PValue
+        }))
+        .filter((r) => isFinite(r.or));
+      if (usable.length) {
+        const strongest = usable.slice().sort((a, b) => Math.abs(Math.log(b.or || 1)) - Math.abs(Math.log(a.or || 1)))[0];
+        const weakest = usable.slice().sort((a, b) => Math.abs(Math.log(a.or || 1)) - Math.abs(Math.log(b.or || 1)))[0];
+        const sigStrong = isStatSig(strongest.p) ? "statistically notable" : "not statistically significant";
+        const sigWeak = isStatSig(weakest.p) ? "statistically notable" : "not statistically significant";
+        document.getElementById("predictorHighlights").innerHTML =
+          "Strongest effect: <b>" + esc(strongest.name) + "</b> (OR = <b>" + esc(strongest.rawOr) + "</b>, p = " + esc(strongest.rawP) + ", " + sigStrong + ").<br>" +
+          "Weakest effect: <b>" + esc(weakest.name) + "</b> (OR = <b>" + esc(weakest.rawOr) + "</b>, p = " + esc(weakest.rawP) + ", " + sigWeak + ").";
+      } else {
+        document.getElementById("predictorHighlights").textContent = "Awaiting coefficients...";
+      }
+
       const predRows = state.predictions || [];
       document.getElementById("predBody").innerHTML = predRows.length
         ? predRows.slice(0, 60).map((r) => "<tr><td>" + esc(r.Observed) + "</td><td>" + esc(r.Probability) + "</td><td>" + esc(r.PredictedClass) + "</td></tr>").join("")
         : "<tr><td colspan='3' class='empty'>No predictions</td></tr>";
-      if (document.getElementById("corrEmbedPanel") && correlationsLoaded === false) {
-        document.getElementById("corrEmbedPanel").setAttribute("data-summary", corrSummary);
-      }
     }
     function renderProbabilityBands() {
       const pairs = predictionPairs();
@@ -573,6 +752,30 @@
       const total = pairs.length;
       document.getElementById("probBands").innerHTML = "Low risk: <b>" + counts.low + " (" + pct(counts.low / total) + ")</b><br>Medium risk: <b>" + counts.mid + " (" + pct(counts.mid / total) + ")</b><br>High risk: <b>" + counts.high + " (" + pct(counts.high / total) + ")</b>";
       document.getElementById("riskProfiles").innerHTML = "High-risk share: <b>" + pct(counts.high / total) + "</b><br>Non-low risk: <b>" + pct((counts.mid + counts.high) / total) + "</b>";
+    }
+    function renderThresholdMetrics(threshold) {
+      const pairs = predictionPairs();
+      if (!pairs.length) return;
+      let tp = 0, fp = 0, tn = 0, fn = 0;
+      pairs.forEach((d) => {
+        const pred = d.p >= threshold ? 1 : 0;
+        if (pred === 1 && d.y === 1) tp++;
+        else if (pred === 1 && d.y === 0) fp++;
+        else if (pred === 0 && d.y === 0) tn++;
+        else fn++;
+      });
+      const sensitivity = (tp + fn) ? tp / (tp + fn) : NaN;
+      const specificity = (tn + fp) ? tn / (tn + fp) : NaN;
+      const precision = (tp + fp) ? tp / (tp + fp) : NaN;
+      const accuracy = (tp + tn) / pairs.length;
+      const f1 = (isFinite(precision) && isFinite(sensitivity) && (precision + sensitivity))
+        ? (2 * precision * sensitivity) / (precision + sensitivity)
+        : NaN;
+      document.getElementById("thrSens").textContent = isFinite(sensitivity) ? (sensitivity * 100).toFixed(1) + "%" : "-";
+      document.getElementById("thrSpec").textContent = isFinite(specificity) ? (specificity * 100).toFixed(1) + "%" : "-";
+      document.getElementById("thrPrec").textContent = isFinite(precision) ? (precision * 100).toFixed(1) + "%" : "-";
+      document.getElementById("thrAcc").textContent = isFinite(accuracy) ? (accuracy * 100).toFixed(1) + "%" : "-";
+      document.getElementById("thrF1").textContent = isFinite(f1) ? (f1 * 100).toFixed(1) + "%" : "-";
     }
     function renderRoc() {
       const pairs = predictionPairs();
@@ -602,8 +805,15 @@
       const pairs = predictionPairs();
       const el = document.getElementById("calChart");
       const txt = document.getElementById("calText");
+      const qualityEl = document.getElementById("calQuality");
+      const interpEl = document.getElementById("calInterpretation");
       if (!el || typeof Highcharts === "undefined") return;
-      if (!pairs.length) { txt.textContent = "Awaiting predictions..."; return; }
+      if (!pairs.length) {
+        txt.textContent = "Awaiting predictions...";
+        if (qualityEl) { qualityEl.textContent = "-"; qualityEl.className = "quality-pill moderate"; }
+        if (interpEl) interpEl.textContent = "Awaiting calibration assessment...";
+        return;
+      }
       const sorted = pairs.slice().sort((a, b) => a.p - b.p);
       const bins = 10;
       const size = Math.max(1, Math.floor(sorted.length / bins));
@@ -618,6 +828,9 @@
         const my = chunk.reduce((s, d) => s + d.y, 0) / chunk.length;
         pts.push([mp, my]);
       }
+      const meanAbsCalErr = pts.length
+        ? pts.reduce((s, d) => s + Math.abs(d[0] - d[1]), 0) / pts.length
+        : NaN;
       Highcharts.chart(el, {
         chart: { type: "scatter", backgroundColor: "transparent" },
         title: { text: null }, credits: { enabled: false }, legend: { enabled: false },
@@ -625,11 +838,29 @@
         series: [{ type:"line", data:[[0,0],[1,1]], dashStyle:"Dash", enableMouseTracking:false }, { data: pts, color:"#5aa7ff" }]
       });
       txt.textContent = "Brier score: " + brier.toFixed(4) + " (lower is better).";
+
+      let quality = "Moderate";
+      let qualityClass = "moderate";
+      if (brier <= 0.12) { quality = "Strong"; qualityClass = "strong"; }
+      else if (brier >= 0.22) { quality = "Weak"; qualityClass = "weak"; }
+      if (qualityEl) {
+        qualityEl.textContent = quality;
+        qualityEl.className = "quality-pill " + qualityClass;
+      }
+      if (interpEl) {
+        const zone = isFinite(meanAbsCalErr) && meanAbsCalErr > 0.08
+          ? "noticeable miscalibration at moderate-risk levels"
+          : "alignment with observed risk is reasonably stable across bins";
+        interpEl.textContent = "Calibration appears " + quality.toLowerCase() + "; average bin error is " +
+          (isFinite(meanAbsCalErr) ? meanAbsCalErr.toFixed(3) : "-") + ", indicating " + zone + ".";
+      }
     }
     function renderAll() {
       renderKPIs();
       renderTables();
       renderProbabilityBands();
+      const thrEl = document.getElementById("thr");
+      if (thrEl) renderThresholdMetrics(Number(thrEl.value || 0.5));
       if (currentPrimary === "predictive-performance") {
         renderRoc();
         renderCalibration();
@@ -823,6 +1054,7 @@
         thr.addEventListener("input", function () {
           const v = Number(this.value).toFixed(2);
           document.getElementById("thrVal").textContent = v;
+          renderThresholdMetrics(Number(v));
           sendToHost("logisticThresholdChanged", { threshold: Number(v) });
         });
       }

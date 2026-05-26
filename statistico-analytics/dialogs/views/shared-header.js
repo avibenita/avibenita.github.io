@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('Loading shared-header.js VERSION 2026-05-23-ui (spacing+brightness+deploy)');
+console.log('Loading shared-header.js VERSION 2026-05-26-recovery');
 
 (function () {
   function sanitizeDialogHostInfoParam() {
@@ -6329,6 +6329,28 @@ window.updateUniFilterButtonState = function () { StatisticoHeader.updateUniFilt
 // Auto-initialize on DOM load
 document.addEventListener('DOMContentLoaded', () => {
   console.log('✅ StatisticoHeader loaded and ready');
+
+  // Recovery: if logistic results page inline script crashed, reload from v3
+  (function _logisticRecovery() {
+    try {
+      var href = window.location.href || '';
+      if (href.indexOf('logistic-results') === -1) return;
+      if (window.switchTab) return; // inline script initialized fine
+      console.warn('[shared-header] Logistic results page script failed — fetching v3 recovery...');
+      var base = href.split('/logistic/')[0] + '/logistic/';
+      var v3url = base + 'logistic-results-v3.html?recovered=1&cb=' + Date.now();
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', v3url, true);
+      xhr.onload = function () {
+        if (xhr.status === 200 && xhr.responseText.length > 500) {
+          document.open();
+          document.write(xhr.responseText);
+          document.close();
+        }
+      };
+      xhr.send();
+    } catch (_e) { console.error('[shared-header] recovery error', _e); }
+  })();
   
   // Add keyboard shortcut for refresh
   document.addEventListener('keydown', (e) => {

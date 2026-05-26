@@ -132,7 +132,7 @@ function sendDialogData() {
 
 function openLogisticResultsDialog() {
   closeLogisticDialogIfOpen();
-  const dialogUrl = withDialogCacheBust(`${getDialogsBaseUrl()}logistic/logistic-results-v2.html`);
+  const dialogUrl = withDialogCacheBust(`${getDialogsBaseUrl()}logistic/logistic-results-v3.html`);
 
   Office.context.ui.displayDialogAsync(
     dialogUrl,

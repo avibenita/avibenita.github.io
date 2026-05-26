@@ -1221,7 +1221,7 @@ function openLogisticConfigFromHub() {
   try { sessionStorage.removeItem("logisticModelSpec"); } catch (e) {}
   return openBuilderDialogFromHub({
     moduleId: "logistic",
-    dialogPath: "logistic/logistic-input.html",
+    dialogPath: "logistic/logistic-input.html?dialog=1",
     dialogOptions: DIALOG_SIZES.SETUP,
     dataType: "LOGISTIC_DATA",
     payloadBuilder: function (gr) {

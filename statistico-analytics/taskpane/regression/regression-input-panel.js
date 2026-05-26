@@ -187,7 +187,7 @@ function openRegressionCoefficientsDialog() {
 function openLogisticResultsDialog() {
   console.log('🪟 Opening Logistic Results dialog');
 
-  const dialogUrl = `${getDialogsBaseUrl()}logistic/logistic-results.html?cb=${Date.now()}`;
+  const dialogUrl = `${getDialogsBaseUrl()}logistic/logistic-results.html?dialog=1&cb=${Date.now()}`;
 
   if (!Office || !Office.context || !Office.context.ui) {
     console.error('Office dialog API not available');

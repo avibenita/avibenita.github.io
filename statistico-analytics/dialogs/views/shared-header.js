@@ -920,17 +920,25 @@ const StatisticoHeader = {
         logoIcon: 'fa-chart-pie',
         logoSub: 'Logistic',
         menuTitle: 'Menu',
-        groups: [{
-          title: 'Analysis',
-          items: [
-            { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: 'Results', active: true },
-            { type: 'tab', tab: 'predictions', icon: 'fa-wand-magic-sparkles', label: 'Predictions' },
-            { type: 'tab', tab: 'diagnostics', icon: 'fa-stethoscope', label: 'Diagnostics' },
-            { type: 'tab', tab: 'roc', icon: 'fa-chart-area', label: 'ROC / AUC' },
-            { type: 'tab', tab: 'descriptives', icon: 'fa-chart-bar', label: 'Descriptives' },
-            { type: 'tab', tab: 'ai', icon: 'fa-brain', label: 'AI Assessment' }
-          ]
-        }]
+        groups: [
+          {
+            title: 'Model',
+            items: [
+              { type: 'tab', tab: 'model-results', icon: 'fa-square-poll-vertical', label: 'Model Results', active: true },
+              { type: 'tab', tab: 'predictive-performance', icon: 'fa-chart-area', label: 'Predictive Performance' },
+              { type: 'tab', tab: 'probabilities', icon: 'fa-wand-magic-sparkles', label: 'Probabilities' },
+              { type: 'tab', tab: 'interactions', icon: 'fa-brain', label: 'Interactions' },
+              { type: 'tab', tab: 'diagnostics', icon: 'fa-stethoscope', label: 'Diagnostics' }
+            ]
+          },
+          {
+            title: 'Descriptives',
+            items: [
+              { type: 'tab', tab: 'correlations', icon: 'fa-diagram-project', label: 'Correlations' },
+              { type: 'tab', tab: 'descriptives', icon: 'fa-chart-bar', label: 'Descriptives' }
+            ]
+          }
+        ]
       };
     }
 
@@ -4549,12 +4557,13 @@ const StatisticoHeader = {
       'dependent-power': 'Power Analysis',
       'dependent-report': 'APA Report',
       'dependent-ai-interpretation': 'AI Interpretation',
-      'logistic-results': 'Results',
-      'logistic-predictions': 'Predictions',
+      'logistic-model-results': 'Model Results',
+      'logistic-predictive-performance': 'Predictive Performance',
+      'logistic-probabilities': 'Probabilities',
+      'logistic-interactions': 'Interactions',
       'logistic-diagnostics': 'Diagnostics',
-      'logistic-roc': 'ROC / AUC',
+      'logistic-correlations': 'Correlations',
       'logistic-descriptives': 'Descriptives',
-      'logistic-ai': 'AI Assessment',
       'factor-suitability': 'Suitability',
       'factor-extraction': 'Extraction',
       'factor-rotation': 'Rotation',
@@ -4602,10 +4611,12 @@ const StatisticoHeader = {
       'dependent-power': 'Inspect power or required sample size calculations when available.',
       'dependent-report': 'Use the APA report view for publication-ready wording and consistency checks.',
       'dependent-ai-interpretation': 'Get an AI-assisted interpretation of the repeated-measures analysis.',
-      'logistic-results': 'Review coefficient direction, odds ratios, uncertainty intervals, and significance together.',
-      'logistic-predictions': 'Inspect predicted probabilities and classification behavior for meaningful changes in risk.',
-      'logistic-diagnostics': 'Use fit and residual diagnostics to check calibration, leverage, and model stability.',
-      'logistic-roc': 'Read ROC/AUC as discrimination performance, and compare threshold trade-offs.',
+      'logistic-model-results': 'Review effect directions, odds ratios, confidence intervals, and model significance together.',
+      'logistic-predictive-performance': 'Evaluate classification quality, ROC trade-offs, and threshold-dependent performance.',
+      'logistic-probabilities': 'Inspect predicted probabilities and risk patterns across observations and scenarios.',
+      'logistic-interactions': 'Examine interaction effects on event probability for combined predictor conditions.',
+      'logistic-diagnostics': 'Use residual and influence diagnostics to check separation, leverage, and model stability.',
+      'logistic-correlations': 'Inspect quick correlation-style screening indicators before deeper model interpretation.',
       'factor-suitability': 'Check KMO, Bartlett, determinant, and correlation adequacy before trusting factor extraction.',
       'factor-extraction': 'Review eigenvalues, variance explained, communalities, and extraction choice.',
       'factor-rotation': 'Inspect rotated loadings to see whether factors become interpretable and simple.',

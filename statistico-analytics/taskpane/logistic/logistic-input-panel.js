@@ -44,8 +44,10 @@ function getDialogsBaseUrl() {
 }
 
 function withDialogCacheBust(url) {
-  const sep = url.includes("?") ? "&" : "?";
-  return `${url}${sep}v=${Date.now()}`;
+  const hasDialogParam = /[?&]dialog=1(?:&|$)/.test(url);
+  const withDialog = hasDialogParam ? url : `${url}${url.includes("?") ? "&" : "?"}dialog=1`;
+  const sep = withDialog.includes("?") ? "&" : "?";
+  return `${withDialog}${sep}v=${Date.now()}`;
 }
 
 function closeLogisticDialogIfOpen() {

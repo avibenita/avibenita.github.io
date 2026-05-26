@@ -337,7 +337,7 @@ function computeLogisticBundle(headers, rows, modelSpec, threshold) {
 
   const coeffRows = buildCoefficientRows(fit, predictorNames, includeIntercept, referenceMap);
   const diagnostics = computeDiagnostics(y, fit.probabilities, fit.X, fit.covariance);
-  const descriptives = buildDescriptives(rows, headers, yIdx, xnIdx, xcIdx, droppedMissing);
+  const descriptives = buildDescriptives(rows, headers, yIdx, xnIdx, xcIdx, droppedMissing, yName, [yName].concat(xn).concat(xc));
   const metrics = computeClassificationMetrics(y, fit.probabilities, threshold);
 
   const results = Object.assign({
@@ -562,7 +562,7 @@ function computeDiagnostics(y, p, X, covariance) {
   };
 }
 
-function buildDescriptives(rows, headers, yIdx, xnIdx, xcIdx, droppedMissing) {
+function buildDescriptives(rows, headers, yIdx, xnIdx, xcIdx, droppedMissing, yName, modelVarNames) {
   const descriptiveRows = [];
   let sparseCount = 0;
   let separationFlags = [];
@@ -609,12 +609,131 @@ function buildDescriptives(rows, headers, yIdx, xnIdx, xcIdx, droppedMissing) {
     });
   });
 
+  const usual = computeUsualStatsAndCorrelations(rows, headers, modelVarNames);
+
   return {
     separationRisk: separationFlags.length ? `Potential in ${separationFlags.slice(0, 3).join(", ")}${separationFlags.length > 3 ? "..." : ""}` : "Low",
     sparseCells: sparseCount > 0 ? `${sparseCount} sparse level(s)` : "None detected",
     missingPattern: droppedMissing > 0 ? `${droppedMissing} rows excluded due to missing/non-binary values` : "No exclusions",
-    rows: descriptiveRows.slice(0, 300)
+    rows: descriptiveRows.slice(0, 300),
+    variableStats: usual.variableStats,
+    correlations: usual.correlations,
+    correlationSummary: usual.correlationSummary
   };
+}
+
+function computeUsualStatsAndCorrelations(rows, headers, preferredNames) {
+  const preferredSet = new Set((preferredNames || []).map(v => String(v)));
+  let candidates = collectNumericCandidates(rows, headers, preferredSet);
+  if (!candidates.length) {
+    // Fallback to all headers if model-specific variables are insufficient.
+    candidates = collectNumericCandidates(rows, headers, null);
+  }
+
+  const variableStats = candidates.map(c => ({
+    Variable: c.name,
+    N: String(c.nNumeric),
+    Mean: fmt(c.mean),
+    SD: fmt(c.sd),
+    Min: fmt(c.min),
+    Max: fmt(c.max),
+    Missing: `${c.missingCount}`
+  }));
+
+  const vars = candidates.map(c => c.name);
+  const matrix = [];
+  if (vars.length >= 2) {
+    for (let i = 0; i < candidates.length; i++) {
+      const rowVals = [];
+      for (let j = 0; j < candidates.length; j++) {
+        if (i === j) rowVals.push("1.0000");
+        else rowVals.push(fmt(computePearsonFromRows(rows, candidates[i].idx, candidates[j].idx)));
+      }
+      matrix.push(rowVals);
+    }
+  }
+
+  const correlationSummary = vars.length >= 2
+    ? `Pearson matrix computed for ${vars.length} numeric variable(s): ${vars.join(", ")}.`
+    : "Not enough numeric variables selected to compute pairwise correlations.";
+
+  return {
+    variableStats,
+    correlations: {
+      variables: vars,
+      matrix
+    },
+    correlationSummary
+  };
+}
+
+function collectNumericCandidates(rows, headers, preferredSet) {
+  const out = [];
+  for (let j = 0; j < headers.length; j++) {
+    const name = String(headers[j] || `V${j + 1}`);
+    if (preferredSet && preferredSet.size && !preferredSet.has(name)) continue;
+
+    let nonMissing = 0;
+    let nNumeric = 0;
+    let sum = 0;
+    let sumSq = 0;
+    let min = Infinity;
+    let max = -Infinity;
+
+    for (let i = 0; i < rows.length; i++) {
+      const raw = rows[i][j];
+      if (raw === null || raw === undefined || raw === "") continue;
+      nonMissing++;
+      const val = Number(raw);
+      if (!isFinite(val)) continue;
+      nNumeric++;
+      sum += val;
+      sumSq += val * val;
+      if (val < min) min = val;
+      if (val > max) max = val;
+    }
+
+    if (nonMissing < 3 || nNumeric < 3) continue;
+    if (nNumeric / nonMissing < 0.8) continue;
+
+    const mean = sum / nNumeric;
+    const variance = nNumeric > 1 ? Math.max(0, (sumSq - (sum * sum) / nNumeric) / (nNumeric - 1)) : 0;
+    const sd = Math.sqrt(variance);
+    out.push({
+      name,
+      idx: j,
+      nNumeric,
+      mean,
+      sd,
+      min,
+      max,
+      missingCount: rows.length - nNumeric
+    });
+  }
+  return out;
+}
+
+function computePearsonFromRows(rows, idxA, idxB) {
+  let n = 0;
+  let sumX = 0, sumY = 0, sumXX = 0, sumYY = 0, sumXY = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const x = Number(rows[i][idxA]);
+    const y = Number(rows[i][idxB]);
+    if (!isFinite(x) || !isFinite(y)) continue;
+    n++;
+    sumX += x;
+    sumY += y;
+    sumXX += x * x;
+    sumYY += y * y;
+    sumXY += x * y;
+  }
+  if (n < 3) return NaN;
+  const cov = sumXY - (sumX * sumY) / n;
+  const varX = sumXX - (sumX * sumX) / n;
+  const varY = sumYY - (sumY * sumY) / n;
+  const denom = Math.sqrt(Math.max(0, varX * varY));
+  if (denom <= 1e-12) return NaN;
+  return cov / denom;
 }
 
 function logLikelihood(y, p) {

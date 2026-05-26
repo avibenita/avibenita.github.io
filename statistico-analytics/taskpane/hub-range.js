@@ -1,18 +1,43 @@
 /* global Office, Excel, document, StatisticoGlobalRange */
 /**
- * Hub-only: pick workbook range before choosing a module; persists via StatisticoGlobalRange.
+ * Hub-only: compact Working Data range bar; persists via StatisticoGlobalRange.
  */
 (function () {
   var rangeMode = "used";
 
+  var MODE_LABELS = {
+    used: "Active region",
+    selection: "Selected cells",
+    named: "Named range",
+    manual: "Manual range"
+  };
+
   function hubSyncRangeModeUI(mode) {
     mode = mode || "used";
-    document.getElementById("hubLblNamed").classList.toggle("active", mode === "named");
-    document.getElementById("hubLblUsed").classList.toggle("active", mode === "used");
-    document.getElementById("hubLblSelection").classList.toggle("active", mode === "selection");
-    var inp = document.querySelector('input[name="hubRm"][value="' + mode + '"]');
-    if (inp) inp.checked = true;
-    document.getElementById("hubNamedRangePanel").style.display = mode === "named" ? "block" : "none";
+    ["hubPickSelection", "hubPickUsed", "hubPickNamed", "hubPickManual"].forEach(function (id) {
+      var btn = document.getElementById(id);
+      if (!btn) return;
+      var active =
+        (id === "hubPickSelection" && mode === "selection") ||
+        (id === "hubPickUsed" && mode === "used") ||
+        (id === "hubPickNamed" && mode === "named") ||
+        (id === "hubPickManual" && mode === "manual");
+      btn.classList.toggle("is-active", active);
+    });
+    var namedPanel = document.getElementById("hubNamedRangePanel");
+    if (namedPanel) namedPanel.style.display = mode === "named" ? "block" : "none";
+    updateSourceLabel();
+  }
+
+  function updateSourceLabel() {
+    var el = document.getElementById("hubRangeSourceLabel");
+    if (!el) return;
+    if (rangeMode === "named") {
+      var sel = document.getElementById("hubNamedRangeSelect");
+      el.textContent = sel && sel.value ? sel.value : MODE_LABELS.named;
+    } else {
+      el.textContent = MODE_LABELS[rangeMode] || "";
+    }
   }
 
   function setRangeMode(mode) {
@@ -22,12 +47,26 @@
     else if (mode === "selection") useSelection();
   }
 
+  function pickRangeMode(mode) {
+    if (mode === "named") {
+      rangeMode = "named";
+      hubSyncRangeModeUI("named");
+      loadNamedRanges();
+      var pop = document.getElementById("hubRangePopover");
+      if (pop) pop.classList.add("open");
+      return;
+    }
+    closeRangePicker();
+    setRangeMode(mode);
+  }
+
   async function loadNamedRanges() {
     try {
       await Excel.run(async function (ctx) {
         var names = ctx.workbook.names.load("items");
         await ctx.sync();
         var sel = document.getElementById("hubNamedRangeSelect");
+        if (!sel) return;
         sel.innerHTML = '<option value="">— Select a named range —</option>';
         names.items.forEach(function (n) {
           var o = document.createElement("option");
@@ -43,21 +82,23 @@
   async function loadFromNamedRange() {
     var name = document.getElementById("hubNamedRangeSelect").value;
     if (!name) return;
-    showRangeBadge("Loading…", false);
+    showRangeState("Loading…", false);
     try {
       await Excel.run(async function (ctx) {
         var rng = ctx.workbook.names.getItem(name).getRange();
         rng.load(["values", "address"]);
         await ctx.sync();
+        rangeMode = "named";
         applyRangeData(rng.values, rng.address);
+        closeRangePicker();
       });
     } catch (e) {
-      showRangeBadge("Could not load: " + e.message, true);
+      showRangeState("Could not load: " + e.message, true);
     }
   }
 
   async function autoDetectRange() {
-    showRangeBadge("Loading…", false);
+    showRangeState("Loading…", false);
     try {
       await Excel.run(async function (ctx) {
         var rng = ctx.workbook.worksheets.getActiveWorksheet().getUsedRange();
@@ -66,24 +107,43 @@
         applyRangeData(rng.values, rng.address);
       });
     } catch (e) {
-      showRangeBadge("Could not read worksheet range", true);
+      showRangeState("Could not read worksheet range", true);
     }
   }
 
   async function useSelection() {
-    showRangeBadge("Loading…", false);
+    showRangeState("Loading…", false);
     try {
       await Excel.run(async function (ctx) {
         var rng = ctx.workbook.getSelectedRange();
         rng.load(["values", "address"]);
         await ctx.sync();
         if (!rng.values || rng.values.length < 2) {
-          return showRangeBadge("Selection too small — needs a header row + data", true);
+          return showRangeState("Selection too small — needs header + data", true);
         }
         applyRangeData(rng.values, rng.address);
       });
     } catch (e) {
-      showRangeBadge("Could not read selection", true);
+      showRangeState("Could not read selection", true);
+    }
+  }
+
+  async function useManualRange() {
+    closeRangePicker();
+    var input = prompt("Enter the workbook range (e.g. Sheet1!A1:I65):");
+    if (!input || !input.trim()) return;
+    showRangeState("Loading…", false);
+    try {
+      await Excel.run(async function (ctx) {
+        var rng = ctx.workbook.worksheets.getActiveWorksheet().getRange(input.trim());
+        rng.load(["values", "address"]);
+        await ctx.sync();
+        rangeMode = "manual";
+        hubSyncRangeModeUI("manual");
+        applyRangeData(rng.values, rng.address);
+      });
+    } catch (e) {
+      showRangeState("Invalid range", true);
     }
   }
 
@@ -100,35 +160,47 @@
 
   function applyRangeData(values, address) {
     if (!values || values.length < 2) {
-      return showRangeBadge("Need at least 2 rows (header + 1 data row)", true);
+      return showRangeState("Need header row + at least 1 data row", true);
     }
     var addr = (address || "").trim();
-    showRangeBadge(addr || "Range loaded", false);
+    showRangeState(addr || "Range loaded", false);
     if (window.StatisticoGlobalRange) {
       StatisticoGlobalRange.save(values, address || "", rangeMode);
     }
   }
 
-  function showRangeBadge(text, isError) {
-    var badge = document.getElementById("hubRangeBadge");
-    badge.className = "hub-range-badge" + (isError ? " error" : "");
-    badge.style.display = "block";
-    document.getElementById("hubRangeBadgeText").textContent = text;
+  function showRangeState(text, isError) {
+    var addrEl = document.getElementById("hubRangeBadgeText");
+    var okIcon = document.getElementById("hubRangeOkIcon");
+    var bar = document.getElementById("hubWdataBar");
+    if (addrEl) addrEl.textContent = text;
+    if (okIcon) {
+      var pending = /loading|detecting/i.test(text);
+      okIcon.style.display = isError || pending ? "none" : "";
+    }
+    if (bar) bar.classList.toggle("is-error", !!isError);
+    updateSourceLabel();
     if (isError && window.StatisticoGlobalRange) {
       StatisticoGlobalRange.clear();
     }
   }
 
-  function toggleRangeInfo(event) {
+  function toggleRangePicker(event) {
     if (event) event.stopPropagation();
-    var box = document.getElementById("hubRangeInfo");
-    if (!box) return;
-    box.classList.toggle("open");
+    var pop = document.getElementById("hubRangePopover");
+    if (!pop) return;
+    var opening = !pop.classList.contains("open");
+    pop.classList.toggle("open");
+    if (opening) hubSyncRangeModeUI(rangeMode);
+    else {
+      var namedPanel = document.getElementById("hubNamedRangePanel");
+      if (namedPanel && rangeMode !== "named") namedPanel.style.display = "none";
+    }
   }
 
-  function closeRangeInfo() {
-    var box = document.getElementById("hubRangeInfo");
-    if (box) box.classList.remove("open");
+  function closeRangePicker() {
+    var pop = document.getElementById("hubRangePopover");
+    if (pop) pop.classList.remove("open");
   }
 
   Office.onReady(async function (info) {
@@ -146,14 +218,16 @@
   });
 
   window.hubSetRangeMode = setRangeMode;
+  window.hubPickRangeMode = pickRangeMode;
   window.hubLoadFromNamedRange = loadFromNamedRange;
-  window.hubToggleRangeInfo = toggleRangeInfo;
+  window.hubUseManualRange = useManualRange;
+  window.hubToggleRangePicker = toggleRangePicker;
 
   document.addEventListener("click", function (ev) {
-    var box = document.getElementById("hubRangeInfo");
-    var btn = document.getElementById("hubRangeInfoBtn");
-    if (!box || !btn) return;
-    if (box.contains(ev.target) || btn.contains(ev.target)) return;
-    closeRangeInfo();
+    var pop = document.getElementById("hubRangePopover");
+    var btn = document.getElementById("hubRangeChangeBtn");
+    if (!pop || !btn) return;
+    if (pop.contains(ev.target) || btn.contains(ev.target)) return;
+    closeRangePicker();
   });
 })();

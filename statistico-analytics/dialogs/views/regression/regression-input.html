@@ -357,60 +357,59 @@
       padding: 10px;
     }
 
-    .int-row {
+    .int-pair-list {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .int-placeholder {
+      font-size: 11px;
+      color: var(--cfg-text3);
+      font-style: italic;
+    }
+    .int-group-label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: var(--cfg-text3);
+      margin-top: 4px;
+      margin-bottom: 1px;
+    }
+    .int-pair-row {
       display: flex;
       align-items: center;
-      gap: 5px;
-      flex-wrap: wrap;
-      margin-bottom: 6px;
-    }
-    .int-select {
-      flex: 1 1 0;
-      min-width: 0;
-      padding: 4px 6px;
-      font-size: 11px;
-      min-height: 28px;
+      gap: 6px;
+      padding: 3px 6px;
       border-radius: 5px;
-      border: 1px solid var(--cfg-border);
-      background: var(--cfg-surface);
+      cursor: pointer;
+      transition: background .12s;
+    }
+    .int-pair-row:hover { background: rgba(244,114,182,.06); }
+    .int-pair-row.selected { background: rgba(244,114,182,.12); }
+    .int-pair-row input[type="checkbox"] {
+      accent-color: var(--reg-int);
+      width: 13px;
+      height: 13px;
+      cursor: pointer;
+    }
+    .int-pair-label {
+      font-size: 11px;
       color: var(--cfg-text);
+      cursor: pointer;
     }
-    .btn-int-add {
-      flex-shrink: 0;
-      background: rgba(244,114,182,.15);
-      border: 1px solid rgba(244,114,182,.4);
-      color: var(--reg-int);
-      border-radius: 5px;
-      padding: 4px 10px;
-      font-size: 11px;
+    .int-pair-type {
+      font-size: 8.5px;
       font-weight: 600;
-      cursor: pointer;
+      padding: 1px 4px;
+      border-radius: 3px;
+      margin-left: auto;
+      text-transform: uppercase;
+      letter-spacing: .2px;
     }
-    .btn-int-add:hover { background: rgba(244,114,182,.25); }
-    .int-chips { display: flex; flex-wrap: wrap; gap: 5px; min-height: 22px; }
-    .int-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      background: rgba(244,114,182,.12);
-      border: 1px solid rgba(244,114,182,.35);
-      border-radius: 20px;
-      padding: 2px 8px 2px 10px;
-      font-size: 11px;
-      color: var(--reg-int);
-      white-space: nowrap;
-    }
-    .int-chip-remove {
-      background: none;
-      border: none;
-      color: var(--reg-int);
-      cursor: pointer;
-      padding: 0;
-      line-height: 1;
-      font-size: 12px;
-      opacity: .7;
-    }
-    .int-chip-remove:hover { opacity: 1; }
+    .int-type-nn { background: rgba(167,139,250,.1); color: #7c3aed; }
+    .int-type-nc { background: rgba(79,195,247,.1);  color: #0369a1; }
+    .int-type-cc { background: rgba(34,197,94,.1);   color: #15803d; }
     .int-badge {
       font-size: 9px;
       font-weight: 700;
@@ -652,14 +651,8 @@
             <i class="fa-solid fa-chevron-down adv-chevron"></i>
           </button>
           <div class="adv-body" id="interactionsBody">
-            <div class="int-row" id="interactionAddRow" style="display:none;">
-              <select id="intVar1" class="int-select"><option value="">— Variable 1 —</option></select>
-              <span style="color:var(--cfg-text3);font-size:13px;padding:0 3px;">×</span>
-              <select id="intVar2" class="int-select"><option value="">— Variable 2 —</option></select>
-              <button class="btn-int-add" id="btnAddInteraction" title="Add interaction term"><i class="fa-solid fa-plus"></i> Add</button>
-            </div>
-            <div class="int-chips" id="interactionChips">
-              <div style="font-size:11px;color:var(--cfg-text3);font-style:italic;" id="interactionPlaceholder">Assign at least two predictors to create interactions</div>
+            <div class="int-pair-list" id="intPairList">
+              <div class="int-placeholder" id="interactionPlaceholder">Assign at least two predictors to see possible interactions</div>
             </div>
           </div>
         </div>
@@ -1199,7 +1192,7 @@
     }
 
     // ============================================================================
-    // INTERACTIONS BUILDER
+    // INTERACTIONS — all possible pairs with checkboxes
     // ============================================================================
     function getInteractionCandidates() {
       var list = [];
@@ -1208,58 +1201,101 @@
       return list;
     }
 
+    function getAllPossiblePairs(candidates) {
+      var pairs = [];
+      for (var i = 0; i < candidates.length; i++) {
+        for (var j = i + 1; j < candidates.length; j++) {
+          var a = candidates[i], b = candidates[j];
+          var pairType;
+          if (a.type === 'numeric' && b.type === 'numeric') pairType = 'nn';
+          else if (a.type === 'categorical' && b.type === 'categorical') pairType = 'cc';
+          else pairType = 'nc';
+          pairs.push({ var1: a.name, var2: b.name, type: pairType });
+        }
+      }
+      return pairs;
+    }
+
+    function isInteractionSelected(v1, v2) {
+      return STATE.assignments.interactions.some(function(ix) {
+        return (ix.var1 === v1 && ix.var2 === v2) || (ix.var1 === v2 && ix.var2 === v1);
+      });
+    }
+
     function refreshInteractionUI() {
       var candidates = getInteractionCandidates();
-      var addRow = qs('interactionAddRow');
-      var placeholder = qs('interactionPlaceholder');
-      if (candidates.length >= 2) {
-        addRow.style.display = 'flex';
-        if (placeholder) placeholder.style.display = 'none';
-        populateIntSelect('intVar1', candidates);
-        populateIntSelect('intVar2', candidates);
-      } else {
-        addRow.style.display = 'none';
-        if (placeholder) placeholder.style.display = 'block';
-        STATE.assignments.interactions = STATE.assignments.interactions.filter(function(ix) {
-          var names = candidates.map(function(c){return c.name;});
-          return names.indexOf(ix.var1)>=0 && names.indexOf(ix.var2)>=0;
-        });
-      }
-      renderInteractionChips();
-    }
-
-    function populateIntSelect(selectId, candidates) {
-      var sel = qs(selectId);
-      var current = sel.value;
-      sel.innerHTML = '<option value="">— Variable —</option>';
-      candidates.forEach(function(c) { var opt = document.createElement('option'); opt.value = c.name; opt.textContent = c.name + (c.type==='categorical'?' (cat)':''); sel.appendChild(opt); });
-      sel.value = current;
-    }
-
-    function renderInteractionChips() {
-      var chips = qs('interactionChips');
+      var container = qs('intPairList');
       var badge = qs('interactionsBadge');
-      chips.innerHTML = '';
-      var interactions = STATE.assignments.interactions;
-      if (interactions.length === 0) {
-        chips.innerHTML = '<div style="font-size:11px;color:var(--cfg-text3);font-style:italic;" id="interactionPlaceholder">' +
-          (getInteractionCandidates().length >= 2 ? 'No interactions added yet' : 'Assign at least two predictors to create interactions') + '</div>';
-        badge.style.display = 'none'; return;
-      }
-      interactions.forEach(function(ix, idx) {
-        var chip = document.createElement('div');
-        chip.className = 'int-chip';
-        chip.innerHTML = '<span>' + ix.var1 + ' × ' + ix.var2 + '</span><button class="int-chip-remove" data-idx="' + idx + '">✕</button>';
-        chips.appendChild(chip);
+      var placeholder = qs('interactionPlaceholder');
+
+      STATE.assignments.interactions = STATE.assignments.interactions.filter(function(ix) {
+        var names = candidates.map(function(c) { return c.name; });
+        return names.indexOf(ix.var1) >= 0 && names.indexOf(ix.var2) >= 0;
       });
-      badge.style.display = 'inline';
-      badge.textContent = interactions.length + ' term' + (interactions.length > 1 ? 's' : '');
-      chips.querySelectorAll('.int-chip-remove').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          STATE.assignments.interactions.splice(parseInt(btn.dataset.idx), 1);
-          renderInteractionChips(); updateModelEquation();
+
+      if (candidates.length < 2) {
+        container.innerHTML = '<div class="int-placeholder">Assign at least two predictors to see possible interactions</div>';
+        badge.style.display = 'none';
+        updateModelEquation();
+        return;
+      }
+
+      var pairs = getAllPossiblePairs(candidates);
+      var grouped = { nn: [], nc: [], cc: [] };
+      pairs.forEach(function(p) { grouped[p.type].push(p); });
+
+      var html = '';
+      var groupLabels = { nn: 'Numeric × Numeric', nc: 'Numeric × Categorical', cc: 'Categorical × Categorical' };
+      var groupOrder = ['nn', 'nc', 'cc'];
+
+      groupOrder.forEach(function(gType) {
+        var items = grouped[gType];
+        if (items.length === 0) return;
+        html += '<div class="int-group-label">' + groupLabels[gType] + '</div>';
+        items.forEach(function(p) {
+          var checked = isInteractionSelected(p.var1, p.var2) ? ' checked' : '';
+          var sel = checked ? ' selected' : '';
+          html += '<label class="int-pair-row' + sel + '">';
+          html += '<input type="checkbox" data-v1="' + p.var1 + '" data-v2="' + p.var2 + '"' + checked + '>';
+          html += '<span class="int-pair-label">' + p.var1 + ' × ' + p.var2 + '</span>';
+          html += '<span class="int-pair-type int-type-' + p.type + '">' + p.type.replace('nn','N×N').replace('nc','N×C').replace('cc','C×C') + '</span>';
+          html += '</label>';
         });
       });
+
+      container.innerHTML = html;
+
+      var count = STATE.assignments.interactions.length;
+      var total = pairs.length;
+      if (count > 0) {
+        badge.style.display = 'inline';
+        badge.textContent = count + ' of ' + total;
+      } else {
+        badge.style.display = 'none';
+      }
+
+      container.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+          var v1 = cb.dataset.v1, v2 = cb.dataset.v2;
+          if (cb.checked) {
+            if (!isInteractionSelected(v1, v2)) {
+              STATE.assignments.interactions.push({ var1: v1, var2: v2 });
+            }
+            cb.closest('.int-pair-row').classList.add('selected');
+          } else {
+            STATE.assignments.interactions = STATE.assignments.interactions.filter(function(ix) {
+              return !((ix.var1 === v1 && ix.var2 === v2) || (ix.var1 === v2 && ix.var2 === v1));
+            });
+            cb.closest('.int-pair-row').classList.remove('selected');
+          }
+          var cnt = STATE.assignments.interactions.length;
+          if (cnt > 0) { badge.style.display = 'inline'; badge.textContent = cnt + ' of ' + total; }
+          else { badge.style.display = 'none'; }
+          updateModelEquation();
+        });
+      });
+
+      updateModelEquation();
     }
 
     // ============================================================================
@@ -1365,16 +1401,6 @@
       qs('interactionsWrap').classList.toggle('open');
     });
 
-    // Add interaction
-    qs('btnAddInteraction').addEventListener('click', function() {
-      var v1 = qs('intVar1').value, v2 = qs('intVar2').value;
-      if (!v1 || !v2) { showToast('Select both variables.', 'warning'); return; }
-      if (v1 === v2) { showToast('Select two different variables.', 'warning'); return; }
-      var dup = STATE.assignments.interactions.some(function(ix) { return (ix.var1===v1&&ix.var2===v2)||(ix.var1===v2&&ix.var2===v1); });
-      if (dup) { showToast('Interaction already exists.', 'warning'); return; }
-      STATE.assignments.interactions.push({ var1: v1, var2: v2 });
-      renderInteractionChips(); updateModelEquation();
-    });
 
     // Run regression
     qs('btnRunAnalysis').addEventListener('click', function() {

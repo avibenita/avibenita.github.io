@@ -154,6 +154,8 @@ function openLogisticResultsDialog() {
                 if (isFinite(threshold)) {
                   sendThresholdUpdate(threshold);
                 }
+              } else if (message.cmd === "logisticRequestDataContext") {
+                sendLogisticDataContext();
               } else {
                 console.log("Logistic host event:", message.cmd, message.data);
               }
@@ -231,6 +233,22 @@ function sendThresholdUpdate(threshold) {
   const metrics = computeClassificationMetrics(logisticComputedState.y, logisticComputedState.probabilities, threshold);
   logisticDialog.messageChild(JSON.stringify({ type: "LOGISTIC_RESULTS", payload: metrics.resultsPatch }));
   logisticDialog.messageChild(JSON.stringify({ type: "LOGISTIC_PREDICTIONS", payload: metrics.predictionRows }));
+}
+
+function sendLogisticDataContext() {
+  if (!logisticDialog || !logisticRangeData) return;
+  const headers = logisticRangeData[0] || [];
+  const rows = logisticRangeData.slice(1);
+  const modelSpec = JSON.parse(sessionStorage.getItem("logisticModelSpec") || "{}");
+  logisticDialog.messageChild(JSON.stringify({
+    type: "LOGISTIC_DATA_CONTEXT",
+    payload: {
+      headers,
+      rows,
+      address: logisticRangeAddress,
+      modelSpec
+    }
+  }));
 }
 
 function computeLogisticBundle(headers, rows, modelSpec, threshold) {

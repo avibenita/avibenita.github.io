@@ -83,10 +83,22 @@
     }
 
     cluster.classList.add('has-active');
-    var clusterRect = cluster.getBoundingClientRect();
-    var tabRect = active.getBoundingClientRect();
-    indicator.style.width = tabRect.width + 'px';
-    indicator.style.transform = 'translateX(' + (tabRect.left - clusterRect.left) + 'px)';
+
+    function positionIndicator() {
+      var clusterRect = cluster.getBoundingClientRect();
+      var tabRect = active.getBoundingClientRect();
+      indicator.style.width = tabRect.width + 'px';
+      indicator.style.transform = 'translateX(' + (tabRect.left - clusterRect.left) + 'px)';
+    }
+
+    positionIndicator();
+    requestAnimationFrame(positionIndicator);
+  }
+
+  function onTabActiveChanged() {
+    requestAnimationFrame(function() {
+      refreshAllIndicators();
+    });
   }
 
   function refreshAllIndicators() {
@@ -119,10 +131,6 @@
       initialized = true;
       window.addEventListener('resize', refreshAllIndicators);
     }
-  }
-
-  function onTabActiveChanged() {
-    requestAnimationFrame(refreshAllIndicators);
   }
 
   function pulseWsBody(bodyEl) {

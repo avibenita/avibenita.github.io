@@ -48,8 +48,22 @@ function withDialogCacheBust(url) {
   return `${url}${sep}v=${Date.now()}`;
 }
 
+function closeLogisticDialogIfOpen() {
+  if (!logisticDialog) return;
+  try {
+    logisticDialog.close();
+  } catch (_e) {}
+  logisticDialog = null;
+}
+
 function openLogisticModelBuilder() {
   if (!logisticRangeData || logisticRangeData.length < 2) return;
+
+  // Always start with a fresh model-assignment session when opening the builder.
+  closeLogisticDialogIfOpen();
+  sessionStorage.removeItem("logisticModelSpec");
+  logisticComputedState = null;
+  updateButtonState();
 
   const dialogUrl = withDialogCacheBust(`${getDialogsBaseUrl()}logistic/logistic-input.html`);
 
@@ -115,6 +129,7 @@ function sendDialogData() {
 }
 
 function openLogisticResultsDialog() {
+  closeLogisticDialogIfOpen();
   const dialogUrl = withDialogCacheBust(`${getDialogsBaseUrl()}logistic/logistic-results.html`);
 
   Office.context.ui.displayDialogAsync(

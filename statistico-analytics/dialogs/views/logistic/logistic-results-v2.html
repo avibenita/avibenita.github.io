@@ -246,6 +246,7 @@
     .grid { display:grid; gap:12px; }
     .grid.kpi { grid-template-columns:repeat(4, minmax(0, 1fr)); }
     .grid.two { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns:repeat(3, minmax(0, 1fr)); }
     .panel{
       background:var(--surface-1);
       border:1px solid var(--border);
@@ -275,6 +276,23 @@
     th, td { border-bottom:1px solid rgba(255,255,255,.12); padding:7px 8px; font-size:12px; text-align:left; }
     th { background:rgba(120,200,255,.12); color:var(--text-secondary); font-weight:700; text-transform:uppercase; font-size:11px; }
     .tiny { font-size:12px; color:var(--text-muted); }
+    .stat-list { font-size:12px; line-height:1.55; }
+    .stat-line{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:2px 0;
+      border-bottom:1px solid rgba(255,255,255,.08);
+    }
+    .stat-line:last-child{ border-bottom:none; }
+    .stat-key{ color:var(--text-secondary); }
+    .stat-val{
+      color:var(--text-primary);
+      font-weight:700;
+      text-align:right;
+      white-space:nowrap;
+    }
     .empty { padding:14px 10px; color:var(--text-muted); font-style:italic; }
     .controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
     input[type="range"]{ width:260px; }
@@ -367,6 +385,7 @@
     @media (max-width:1200px){
       .grid.kpi{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
       .grid.two{ grid-template-columns:1fr; }
+      .grid.three{ grid-template-columns:1fr; }
       .split-two{ grid-template-columns:1fr; }
     }
   </style>
@@ -424,9 +443,10 @@
               </section>
 
               <section class="subview" data-parent="model-results" data-sub="technical">
-                <div class="grid two">
-                  <div class="panel"><div class="panel-h">Model Fit</div><div class="panel-b tiny" id="fitTech"></div></div>
-                  <div class="panel"><div class="panel-h">Global Tests</div><div class="panel-b tiny" id="testsTech"></div></div>
+                <div class="grid three">
+                  <div class="panel"><div class="panel-h">Model Info</div><div class="panel-b tiny stat-list" id="modelInfoTech"></div></div>
+                  <div class="panel"><div class="panel-h">Model Fit</div><div class="panel-b tiny stat-list" id="fitTech"></div></div>
+                  <div class="panel"><div class="panel-h">Global Tests</div><div class="panel-b tiny stat-list" id="testsTech"></div></div>
                 </div>
                 <div class="panel" style="margin-top:12px;">
                   <div class="panel-h">Coefficient Table</div>
@@ -574,6 +594,17 @@
     function n(v) { const x = Number(String(v).replace("%", "")); return isFinite(x) ? x : NaN; }
     function pct(v) { return isFinite(v) ? (v * 100).toFixed(1) + "%" : "N/A"; }
     function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c])); }
+    function firstDefined(obj, keys, fallback) {
+      for (let i = 0; i < keys.length; i++) {
+        const k = keys[i];
+        if (obj && obj[k] !== undefined && obj[k] !== null && obj[k] !== "") return obj[k];
+      }
+      return fallback;
+    }
+    function statRow(label, value) {
+      const txt = (value === undefined || value === null || value === "") ? "-" : String(value);
+      return "<div class='stat-line'><span class='stat-key'>" + esc(label) + ":</span><span class='stat-val'>" + esc(txt) + "</span></div>";
+    }
     function predictionPairs() {
       return (state.predictions || []).map((r) => {
         const y = Number(r.Observed);
@@ -661,8 +692,45 @@
       document.getElementById("specVal").textContent = r.specificity || "-";
       document.getElementById("f1Val").textContent = r.f1 || "-";
       document.getElementById("cmText").innerHTML = "TP: <b>" + (r.tp || 0) + "</b> &nbsp; FP: <b>" + (r.fp || 0) + "</b> &nbsp; TN: <b>" + (r.tn || 0) + "</b> &nbsp; FN: <b>" + (r.fn || 0) + "</b>";
-      document.getElementById("fitTech").innerHTML = "AIC: <b>" + (r.aic || "-") + "</b><br>BIC: <b>" + (r.bic || "-") + "</b><br>McFadden R2: <b>" + (r.mcfaddenR2 || "-") + "</b>";
-      document.getElementById("testsTech").innerHTML = "LR: <b>" + (r.lrTest || "-") + "</b><br>Wald: <b>" + (r.waldTest || "-") + "</b><br>Score: <b>" + (r.scoreTest || "-") + "</b>";
+      const observations = firstDefined(r, ["observations", "n", "sampleSize"], "-");
+      const events = firstDefined(r, ["events", "eventCount"], "-");
+      const nonEvents = (isFinite(n(observations)) && isFinite(n(events))) ? Math.max(0, n(observations) - n(events)) : firstDefined(r, ["nonEvents", "nonevents"], "-");
+      const predictorsCount = firstDefined(r, ["predictors", "predictorsCount", "numPredictors"], (state.coefficients || []).filter((c) => String(c.Variable || "").toLowerCase() !== "intercept").length || "-");
+      const linkFn = firstDefined(r, ["link", "linkFunction"], "logit");
+      const intercept = firstDefined(r, ["intercept"], firstDefined((state.coefficients || []).find((c) => String(c.Variable || "").toLowerCase() === "intercept") || {}, ["Beta", "beta"], "-"));
+      document.getElementById("modelInfoTech").innerHTML =
+        statRow("Observations", observations) +
+        statRow("Events", events) +
+        statRow("Non-events", nonEvents) +
+        statRow("Predictors", predictorsCount) +
+        statRow("Link", linkFn) +
+        statRow("Intercept", intercept);
+
+      const neg2LogLik = firstDefined(r, ["neg2LogLikelihood", "-2LogLikelihood", "minus2LogLikelihood", "minus2LL"], "-");
+      const deviance = firstDefined(r, ["deviance", "residualDeviance"], "-");
+      const aic = firstDefined(r, ["aic", "AIC"], "-");
+      const bic = firstDefined(r, ["bic", "BIC"], "-");
+      const mcfadden = firstDefined(r, ["mcfaddenR2", "mcfadden", "mcfaddenPseudoR2"], "-");
+      const coxSnell = firstDefined(r, ["coxSnellR2", "coxsnellR2", "coxSnell"], "-");
+      const nagelkerke = firstDefined(r, ["nagelkerkeR2", "nagelkerke"], "-");
+      document.getElementById("fitTech").innerHTML =
+        statRow("-2 Log Likelihood", neg2LogLik) +
+        statRow("Deviance", deviance) +
+        statRow("AIC", aic) +
+        statRow("BIC", bic) +
+        statRow("McFadden R2", mcfadden) +
+        statRow("Cox-Snell R2", coxSnell) +
+        statRow("Nagelkerke R2", nagelkerke);
+
+      const lr = firstDefined(r, ["lrTest", "likelihoodRatio", "likelihoodRatioTest"], "-");
+      const wald = firstDefined(r, ["waldTest", "wald"], "-");
+      const score = firstDefined(r, ["scoreTest", "score"], "-");
+      const overallP = firstDefined(r, ["overallPValue", "overallP", "modelPValue"], "-");
+      document.getElementById("testsTech").innerHTML =
+        statRow("Likelihood Ratio", lr) +
+        statRow("Wald Test", wald) +
+        statRow("Score Test", score) +
+        statRow("Overall p-value", overallP);
       document.getElementById("descSummary").innerHTML = "Separation Risk: <b>" + (state.descriptives.separationRisk || "-") + "</b><br>Sparse Cells: <b>" + (state.descriptives.sparseCells || "-") + "</b><br>Missing Pattern: <b>" + (state.descriptives.missingPattern || "-") + "</b>";
       document.getElementById("diagOverview").innerHTML = "Deviance residual mean: <b>" + (state.diagnostics.devianceResidualMean || "-") + "</b><br>Pearson residual mean: <b>" + (state.diagnostics.pearsonResidualMean || "-") + "</b><br>Outlier count: <b>" + (state.diagnostics.outlierCount || "-") + "</b>";
       document.getElementById("diagResiduals").innerHTML = "Deviance SD: <b>" + (state.diagnostics.devianceResidualSd || "-") + "</b><br>Pearson SD: <b>" + (state.diagnostics.pearsonResidualSd || "-") + "</b>";

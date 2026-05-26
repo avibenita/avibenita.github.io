@@ -94,8 +94,6 @@ function sendDialogData() {
   if (!logisticDialog || !logisticRangeData) return;
   const headers = logisticRangeData[0] || [];
   const rows = logisticRangeData.slice(1);
-  const savedModelSpec = sessionStorage.getItem("logisticModelSpec");
-  const modelSpec = savedModelSpec ? JSON.parse(savedModelSpec) : null;
 
   logisticDialog.messageChild(JSON.stringify({
     type: "LOGISTIC_DATA",
@@ -104,7 +102,9 @@ function sendDialogData() {
       rows,
       address: logisticRangeAddress,
       analysisMode: "logistic",
-      savedModelSpec: modelSpec
+      // Always open the builder with a fresh assignment state.
+      // Persisted model spec is still used for direct results opens.
+      savedModelSpec: null
     }
   }));
 }

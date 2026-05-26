@@ -1218,15 +1218,22 @@ function openFactorConfigFromHub() {
 }
 
 function openLogisticConfigFromHub() {
+  try { sessionStorage.removeItem("logisticModelSpec"); } catch (e) {}
   return openBuilderDialogFromHub({
     moduleId: "logistic",
     dialogPath: "logistic/logistic-input.html",
     dialogOptions: DIALOG_SIZES.SETUP,
     dataType: "LOGISTIC_DATA",
     payloadBuilder: function (gr) {
-      var saved = null;
-      try { saved = JSON.parse(sessionStorage.getItem("logisticModelSpec") || "null"); } catch (e) {}
-      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", analysisMode: "logistic", savedModelSpec: saved };
+      return {
+        headers: gr.values[0] || [],
+        rows: gr.values.slice(1),
+        address: gr.address || "",
+        analysisMode: "logistic",
+        // Always open logistic builder fresh from Hub.
+        savedModelSpec: null,
+        restoreSavedModel: false
+      };
     },
     modelActions: ["logisticModel", "regressionModel"],
     onModel: function (msg) {

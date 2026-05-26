@@ -43,10 +43,15 @@ function getDialogsBaseUrl() {
   return `${window.location.origin}/dialogs/views/`;
 }
 
+function withDialogCacheBust(url) {
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}v=${Date.now()}`;
+}
+
 function openLogisticModelBuilder() {
   if (!logisticRangeData || logisticRangeData.length < 2) return;
 
-  const dialogUrl = `${getDialogsBaseUrl()}logistic/logistic-input.html`;
+  const dialogUrl = withDialogCacheBust(`${getDialogsBaseUrl()}logistic/logistic-input.html`);
 
   Office.context.ui.displayDialogAsync(
     dialogUrl,
@@ -110,7 +115,7 @@ function sendDialogData() {
 }
 
 function openLogisticResultsDialog() {
-  const dialogUrl = `${getDialogsBaseUrl()}logistic/logistic-results.html`;
+  const dialogUrl = withDialogCacheBust(`${getDialogsBaseUrl()}logistic/logistic-results.html`);
 
   Office.context.ui.displayDialogAsync(
     dialogUrl,

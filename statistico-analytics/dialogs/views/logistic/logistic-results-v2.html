@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Logistic Regression - Statistico</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <style>
+    :root {
+      --bg: #0a1422;
+      --panel: #121f33;
+      --panel-2: #0f1b2d;
+      --border: #213652;
+      --text: #e9f0fb;
+      --muted: #9bb1ce;
+      --accent: #5aa7ff;
+      --accent-2: #3d87dc;
+      --good: #30c48d;
+      --warn: #f5b041;
+      --bad: #f25f5c;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; font-family: "Segoe UI", Arial, sans-serif; background: var(--bg); color: var(--text); }
+    .app { height: 100%; display: grid; grid-template-columns: 250px 1fr; }
+    .sidebar { border-right: 1px solid var(--border); background: #0b1728; padding: 14px 12px; overflow: auto; }
+    .brand { font-size: 12px; font-weight: 700; letter-spacing: .08em; color: #d8e8ff; margin-bottom: 14px; text-transform: uppercase; }
+    .group-title { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .09em; margin: 12px 8px 6px; }
+    .nav-btn {
+      width: 100%; text-align: left; border: 1px solid transparent; color: var(--text); background: transparent;
+      padding: 9px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; margin: 3px 0;
+    }
+    .nav-btn.active { background: rgba(90,167,255,0.18); border-color: rgba(90,167,255,0.45); }
+    .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+    .topbar {
+      border-bottom: 1px solid var(--border); background: var(--panel-2); padding: 10px 14px;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .title { font-size: 18px; font-weight: 700; }
+    .subtabs { display: flex; flex-wrap: wrap; gap: 8px; }
+    .subtab-btn {
+      border: 1px solid var(--border); background: transparent; color: var(--muted);
+      border-radius: 999px; padding: 5px 11px; font-size: 12px; cursor: pointer;
+    }
+    .subtab-btn.active { color: var(--text); border-color: rgba(90,167,255,0.45); background: rgba(90,167,255,0.16); }
+    .workspace { flex: 1; min-height: 0; overflow: auto; padding: 14px; }
+    .view { display: none; }
+    .view.active { display: block; }
+    .subview { display: none; }
+    .subview.active { display: block; }
+    .grid { display: grid; gap: 12px; }
+    .grid.kpi { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .card-h { padding: 8px 10px; font-size: 12px; font-weight: 700; border-bottom: 1px solid var(--border); color: #cde2ff; text-transform: uppercase; letter-spacing: .04em; }
+    .card-b { padding: 10px; }
+    .kpi-val { font-size: 22px; font-weight: 700; color: #d8e8ff; }
+    .kpi-lab { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid rgba(255,255,255,0.08); padding: 7px 8px; font-size: 12px; }
+    th { text-align: left; color: #cde2ff; background: rgba(90,167,255,0.12); }
+    td { color: var(--text); }
+    .tiny { color: var(--muted); font-size: 12px; }
+    .bar { height: 12px; border-radius: 999px; background: #0b1626; border: 1px solid var(--border); overflow: hidden; }
+    .bar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent-2), var(--accent)); }
+    .risk-pill { padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; display: inline-block; }
+    .risk-low { background: rgba(48,196,141,0.18); color: #8df2ca; border: 1px solid rgba(48,196,141,0.45); }
+    .risk-mid { background: rgba(245,176,65,0.18); color: #ffd28e; border: 1px solid rgba(245,176,65,0.45); }
+    .risk-high { background: rgba(242,95,92,0.18); color: #ff9d9b; border: 1px solid rgba(242,95,92,0.45); }
+    .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+    input[type="range"] { width: 260px; }
+    .empty { padding: 16px; color: var(--muted); font-style: italic; }
+    @media (max-width: 1200px) { .grid.kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid.two { grid-template-columns: 1fr; } }
+    @media (max-width: 900px) { .app { grid-template-columns: 1fr; } .sidebar { border-right: 0; border-bottom: 1px solid var(--border); } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">Logistic Regression v2</div>
+      <div class="group-title">Model</div>
+      <button class="nav-btn active" data-tab="model-results">Model Results</button>
+      <button class="nav-btn" data-tab="predictive-performance">Predictive Performance</button>
+      <button class="nav-btn" data-tab="probabilities">Probabilities</button>
+      <button class="nav-btn" data-tab="interactions">Interactions</button>
+      <button class="nav-btn" data-tab="diagnostics">Diagnostics</button>
+      <div class="group-title">Descriptives</div>
+      <button class="nav-btn" data-tab="correlations">Correlations</button>
+      <button class="nav-btn" data-tab="descriptives">Descriptives</button>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div class="title" id="viewTitle">Model Results</div>
+        <div class="subtabs" id="subtabs"></div>
+      </div>
+      <div class="workspace">
+        <section class="view active" data-view="model-results">
+          <section class="subview active" data-parent="model-results" data-sub="overview">
+            <div class="grid kpi">
+              <div class="card"><div class="card-b"><div class="kpi-val" id="kpiObs">-</div><div class="kpi-lab">Observations</div></div></div>
+              <div class="card"><div class="card-b"><div class="kpi-val" id="kpiEvents">-</div><div class="kpi-lab">Events</div></div></div>
+              <div class="card"><div class="card-b"><div class="kpi-val" id="kpiAuc">-</div><div class="kpi-lab">AUC</div></div></div>
+              <div class="card"><div class="card-b"><div class="kpi-val" id="kpiP">-</div><div class="kpi-lab">Overall p-value</div></div></div>
+            </div>
+            <div class="card" style="margin-top:12px;">
+              <div class="card-h">Top Odds Ratios</div>
+              <div class="card-b"><table><thead><tr><th>Variable</th><th>OR</th><th>95% CI</th><th>p</th></tr></thead><tbody id="topOrBody"></tbody></table></div>
+            </div>
+          </section>
+          <section class="subview" data-parent="model-results" data-sub="technical">
+            <div class="grid two">
+              <div class="card"><div class="card-h">Model Fit</div><div class="card-b" id="fitTech"></div></div>
+              <div class="card"><div class="card-h">Global Tests</div><div class="card-b" id="testsTech"></div></div>
+            </div>
+            <div class="card" style="margin-top:12px;">
+              <div class="card-h">Coefficient Table</div>
+              <div class="card-b"><table><thead><tr><th>Variable</th><th>Beta</th><th>SE</th><th>z</th><th>OR</th><th>p</th></tr></thead><tbody id="coefBody"></tbody></table></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view="predictive-performance">
+          <section class="subview active" data-parent="predictive-performance" data-sub="overview">
+            <div class="grid kpi">
+              <div class="card"><div class="card-b"><div class="kpi-val" id="accVal">-</div><div class="kpi-lab">Accuracy</div></div></div>
+              <div class="card"><div class="card-b"><div class="kpi-val" id="sensVal">-</div><div class="kpi-lab">Sensitivity</div></div></div>
+              <div class="card"><div class="card-b"><div class="kpi-val" id="specVal">-</div><div class="kpi-lab">Specificity</div></div></div>
+              <div class="card"><div class="card-b"><div class="kpi-val" id="f1Val">-</div><div class="kpi-lab">F1</div></div></div>
+            </div>
+            <div class="card" style="margin-top:12px;"><div class="card-h">Confusion Matrix</div><div class="card-b" id="cmText"></div></div>
+          </section>
+          <section class="subview" data-parent="predictive-performance" data-sub="roc-thresholds">
+            <div class="controls"><label for="thr">Threshold</label><input id="thr" type="range" min="0.30" max="0.70" step="0.01" value="0.50"><span id="thrVal">0.50</span></div>
+            <div class="card"><div class="card-h">ROC Curve</div><div class="card-b"><div id="rocChart" style="height:300px;"></div></div></div>
+          </section>
+          <section class="subview" data-parent="predictive-performance" data-sub="calibration">
+            <div class="card"><div class="card-h">Calibration (Observed vs Predicted by Decile)</div><div class="card-b"><div id="calChart" style="height:300px;"></div></div></div>
+            <div class="card" style="margin-top:12px;"><div class="card-h">Calibration Stats</div><div class="card-b tiny" id="calText">Awaiting predictions...</div></div>
+          </section>
+        </section>
+
+        <section class="view" data-view="probabilities">
+          <section class="subview active" data-parent="probabilities" data-sub="overview">
+            <div class="card"><div class="card-h">Probability Bands</div><div class="card-b" id="probBands"></div></div>
+          </section>
+          <section class="subview" data-parent="probabilities" data-sub="scenario-engine">
+            <div class="card"><div class="card-h">Scenario Engine (Threshold Impact)</div><div class="card-b tiny">Move threshold in Performance → ROC & Thresholds to test scenario sensitivity.</div></div>
+            <div class="card" style="margin-top:12px;"><div class="card-h">Prediction Sample</div><div class="card-b"><table><thead><tr><th>Observed</th><th>Probability</th><th>Class</th></tr></thead><tbody id="predBody"></tbody></table></div></div>
+          </section>
+          <section class="subview" data-parent="probabilities" data-sub="risk-profiles">
+            <div class="card"><div class="card-h">Risk Profiles</div><div class="card-b" id="riskProfiles"></div></div>
+          </section>
+        </section>
+
+        <section class="view" data-view="interactions">
+          <section class="subview active" data-parent="interactions" data-sub="overview"><div class="card"><div class="card-h">Overview</div><div class="card-b tiny">Interaction-ready workspace. High-impact predictors are listed to guide pair exploration.</div></div><div class="card" style="margin-top:12px;"><div class="card-h">Top Candidate Predictors</div><div class="card-b" id="intCandidates"></div></div></section>
+          <section class="subview" data-parent="interactions" data-sub="visualization"><div class="card"><div class="card-h">Probability Interaction Placeholder</div><div class="card-b tiny">Use this panel for probability curves by moderator level (next enhancement).</div></div></section>
+          <section class="subview" data-parent="interactions" data-sub="technical"><div class="card"><div class="card-h">Technical Notes</div><div class="card-b tiny">Current model payload does not include explicit interaction terms. Add `x1*x2` terms in builder to surface them here.</div></div></section>
+        </section>
+
+        <section class="view" data-view="diagnostics">
+          <section class="subview active" data-parent="diagnostics" data-sub="overview"><div class="card"><div class="card-h">Diagnostics Snapshot</div><div class="card-b" id="diagOverview"></div></div></section>
+          <section class="subview" data-parent="diagnostics" data-sub="residuals"><div class="card"><div class="card-h">Residual Indicators</div><div class="card-b tiny" id="diagResiduals"></div></div></section>
+          <section class="subview" data-parent="diagnostics" data-sub="influence"><div class="card"><div class="card-h">Influence Indicators</div><div class="card-b tiny" id="diagInfluence"></div></div></section>
+        </section>
+
+        <section class="view" data-view="correlations">
+          <div class="card"><div class="card-h">Correlation-style Screening</div><div class="card-b" id="corrView"></div></div>
+        </section>
+
+        <section class="view" data-view="descriptives">
+          <div class="card"><div class="card-h">Descriptive Diagnostics</div><div class="card-b" id="descSummary"></div></div>
+          <div class="card" style="margin-top:12px;"><div class="card-h">Rows</div><div class="card-b"><table><thead><tr><th>Predictor</th><th>Event Rate</th><th>Mean by Outcome</th><th>Notes</th></tr></thead><tbody id="descBody"></tbody></table></div></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const SUBTAB_CONFIG = {
+      "model-results": ["overview", "technical"],
+      "predictive-performance": ["overview", "roc-thresholds", "calibration"],
+      "probabilities": ["overview", "scenario-engine", "risk-profiles"],
+      "interactions": ["overview", "visualization", "technical"],
+      "diagnostics": ["overview", "residuals", "influence"],
+      "correlations": [],
+      "descriptives": []
+    };
+    const SUBTAB_LABELS = {
+      overview: "Overview", technical: "Technical", "roc-thresholds": "ROC & Thresholds", calibration: "Calibration",
+      "scenario-engine": "Scenario Engine", "risk-profiles": "Risk Profiles", visualization: "Visualization",
+      residuals: "Residuals", influence: "Influence"
+    };
+    const state = { results: {}, coefficients: [], predictions: [], diagnostics: {}, descriptives: {} };
+    let currentPrimary = "model-results";
+    let currentThreshold = 0.5;
+
+    function sendToHost(cmd, data) {
+      try {
+        if (typeof Office !== "undefined" && Office.context && Office.context.ui && typeof Office.context.ui.messageParent === "function") {
+          Office.context.ui.messageParent(JSON.stringify({ action: "HOST_EVENT", cmd: cmd, data: data || {} }));
+        }
+      } catch (_e) {}
+    }
+    function n(v) { const x = Number(String(v).replace("%", "")); return isFinite(x) ? x : NaN; }
+    function pct(v) { return isFinite(v) ? (v * 100).toFixed(1) + "%" : "N/A"; }
+    function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c])); }
+    function predictionPairs() {
+      return (state.predictions || []).map((r) => {
+        const y = Number(r.Observed);
+        const p = Number(r.Probability);
+        return (isFinite(y) && isFinite(p)) ? { y: y >= 0.5 ? 1 : 0, p: Math.min(1, Math.max(0, p > 1 ? p / 100 : p)) } : null;
+      }).filter(Boolean);
+    }
+
+    function mountSubtabs(tab) {
+      const host = document.getElementById("subtabs");
+      host.innerHTML = "";
+      (SUBTAB_CONFIG[tab] || []).forEach((sub, i) => {
+        const b = document.createElement("button");
+        b.className = "subtab-btn" + (i === 0 ? " active" : "");
+        b.textContent = SUBTAB_LABELS[sub] || sub;
+        b.onclick = () => switchSub(tab, sub);
+        host.appendChild(b);
+      });
+    }
+    function switchPrimary(tab) {
+      currentPrimary = tab;
+      document.querySelectorAll(".nav-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+      document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.dataset.view === tab));
+      document.getElementById("viewTitle").textContent = document.querySelector('.nav-btn[data-tab="' + tab + '"]').textContent;
+      mountSubtabs(tab);
+      const first = (SUBTAB_CONFIG[tab] || [])[0];
+      if (first) switchSub(tab, first);
+    }
+    function switchSub(parent, sub) {
+      document.querySelectorAll('.subview[data-parent="' + parent + '"]').forEach((v) => v.classList.toggle("active", v.dataset.sub === sub));
+      document.querySelectorAll(".subtab-btn").forEach((b) => b.classList.toggle("active", b.textContent === (SUBTAB_LABELS[sub] || sub)));
+      if (parent === "predictive-performance" && sub === "roc-thresholds") renderRoc();
+      if (parent === "predictive-performance" && sub === "calibration") renderCalibration();
+    }
+
+    function renderKPIs() {
+      const r = state.results || {};
+      document.getElementById("kpiObs").textContent = r.observations || "-";
+      document.getElementById("kpiEvents").textContent = r.events || "-";
+      document.getElementById("kpiAuc").textContent = r.auc || "-";
+      document.getElementById("kpiP").textContent = r.overallPValue || "-";
+      document.getElementById("accVal").textContent = r.accuracy || "-";
+      document.getElementById("sensVal").textContent = r.sensitivity || "-";
+      document.getElementById("specVal").textContent = r.specificity || "-";
+      document.getElementById("f1Val").textContent = r.f1 || "-";
+      document.getElementById("cmText").innerHTML = "TP: <b>" + (r.tp || 0) + "</b> &nbsp; FP: <b>" + (r.fp || 0) + "</b> &nbsp; TN: <b>" + (r.tn || 0) + "</b> &nbsp; FN: <b>" + (r.fn || 0) + "</b>";
+      document.getElementById("fitTech").innerHTML = "<div class='tiny'>AIC: <b>" + (r.aic || "-") + "</b><br>BIC: <b>" + (r.bic || "-") + "</b><br>McFadden R2: <b>" + (r.mcfaddenR2 || "-") + "</b></div>";
+      document.getElementById("testsTech").innerHTML = "<div class='tiny'>LR: <b>" + (r.lrTest || "-") + "</b><br>Wald: <b>" + (r.waldTest || "-") + "</b><br>Score: <b>" + (r.scoreTest || "-") + "</b></div>";
+      document.getElementById("corrView").innerHTML = "<div class='tiny'>AUC <b>" + (r.auc || "-") + "</b>, KS <b>" + (r.ks || "-") + "</b>, Top Decile Lift <b>" + (r.topDecileLift || "-") + "</b>.</div>";
+      document.getElementById("descSummary").innerHTML = "<div class='tiny'>Separation Risk: <b>" + (state.descriptives.separationRisk || "-") + "</b><br>Sparse Cells: <b>" + (state.descriptives.sparseCells || "-") + "</b><br>Missing Pattern: <b>" + (state.descriptives.missingPattern || "-") + "</b></div>";
+      document.getElementById("diagOverview").innerHTML = "<div class='tiny'>Deviance residual mean: <b>" + (state.diagnostics.devianceResidualMean || "-") + "</b><br>Pearson residual mean: <b>" + (state.diagnostics.pearsonResidualMean || "-") + "</b><br>Outlier count: <b>" + (state.diagnostics.outlierCount || "-") + "</b></div>";
+      document.getElementById("diagResiduals").innerHTML = "Deviance SD: <b>" + (state.diagnostics.devianceResidualSd || "-") + "</b><br>Pearson SD: <b>" + (state.diagnostics.pearsonResidualSd || "-") + "</b>";
+      document.getElementById("diagInfluence").innerHTML = "Max leverage: <b>" + (state.diagnostics.maxLeverage || "-") + "</b><br>Max Cook's D: <b>" + (state.diagnostics.maxCooksDistance || "-") + "</b><br>Max |DFBETA|: <b>" + (state.diagnostics.maxDfbeta || "-") + "</b>";
+    }
+
+    function renderTables() {
+      const coef = state.coefficients || [];
+      const coefBody = document.getElementById("coefBody");
+      const topOrBody = document.getElementById("topOrBody");
+      const intCandidates = document.getElementById("intCandidates");
+      coefBody.innerHTML = coef.length ? coef.map((r) => "<tr><td>" + esc(r.Variable) + "</td><td>" + esc(r.Beta) + "</td><td>" + esc(r.SE) + "</td><td>" + esc(r.WaldZ) + "</td><td>" + esc(r.OR) + "</td><td>" + esc(r.PValue) + "</td></tr>").join("") : "<tr><td colspan='6' class='empty'>No coefficients</td></tr>";
+      const ranked = coef.filter((r) => String(r.Variable || "").toLowerCase() !== "intercept").sort((a, b) => n(a.PValue) - n(b.PValue)).slice(0, 8);
+      topOrBody.innerHTML = ranked.length ? ranked.map((r) => "<tr><td>" + esc(r.Variable) + "</td><td>" + esc(r.OR) + "</td><td>" + esc(r.OR_CI_Lower) + " - " + esc(r.OR_CI_Upper) + "</td><td>" + esc(r.PValue) + "</td></tr>").join("") : "<tr><td colspan='4' class='empty'>No OR rows</td></tr>";
+      intCandidates.innerHTML = ranked.length ? ranked.slice(0, 5).map((r) => "<div class='tiny'>" + esc(r.Variable) + " (OR " + esc(r.OR) + ", p=" + esc(r.PValue) + ")</div>").join("") : "<div class='tiny'>No candidate predictors yet.</div>";
+
+      const predRows = state.predictions || [];
+      document.getElementById("predBody").innerHTML = predRows.length ? predRows.slice(0, 50).map((r) => "<tr><td>" + esc(r.Observed) + "</td><td>" + esc(r.Probability) + "</td><td>" + esc(r.PredictedClass) + "</td></tr>").join("") : "<tr><td colspan='3' class='empty'>No predictions</td></tr>";
+      const dRows = state.descriptives.rows || [];
+      document.getElementById("descBody").innerHTML = dRows.length ? dRows.slice(0, 120).map((r) => "<tr><td>" + esc(r.Predictor) + "</td><td>" + esc(r.EventRate) + "</td><td>" + esc(r.MeanByOutcome) + "</td><td>" + esc(r.Notes) + "</td></tr>").join("") : "<tr><td colspan='4' class='empty'>No descriptive rows</td></tr>";
+    }
+
+    function renderProbabilityBands() {
+      const pairs = predictionPairs();
+      if (!pairs.length) { document.getElementById("probBands").innerHTML = "<div class='empty'>Awaiting prediction rows...</div>"; return; }
+      const counts = { low: 0, mid: 0, high: 0 };
+      pairs.forEach((d) => { if (d.p < .33) counts.low++; else if (d.p < .66) counts.mid++; else counts.high++; });
+      const total = pairs.length;
+      document.getElementById("probBands").innerHTML =
+        "<div class='tiny'>Low risk (<0.33): <span class='risk-pill risk-low'>" + counts.low + " (" + pct(counts.low / total) + ")</span></div>" +
+        "<div class='tiny' style='margin-top:6px;'>Medium risk (0.33-0.66): <span class='risk-pill risk-mid'>" + counts.mid + " (" + pct(counts.mid / total) + ")</span></div>" +
+        "<div class='tiny' style='margin-top:6px;'>High risk (>=0.66): <span class='risk-pill risk-high'>" + counts.high + " (" + pct(counts.high / total) + ")</span></div>";
+      document.getElementById("riskProfiles").innerHTML = "<div class='tiny'>Highest-risk share: <b>" + pct(counts.high / total) + "</b><br>Combined non-low risk: <b>" + pct((counts.mid + counts.high) / total) + "</b></div>";
+    }
+
+    function renderRoc() {
+      const pairs = predictionPairs();
+      const el = document.getElementById("rocChart");
+      if (!el || typeof Highcharts === "undefined") return;
+      if (pairs.length < 2) {
+        Highcharts.chart(el, { chart: { type: "line", backgroundColor: "transparent" }, title: { text: null }, credits: { enabled: false }, series: [{ data: [[0,0],[1,1]], color: "#5a7ea8" }] });
+        return;
+      }
+      const pos = pairs.filter((d) => d.y === 1).length;
+      const neg = pairs.length - pos;
+      if (!pos || !neg) return;
+      const thresholds = [1].concat(pairs.map((d) => d.p).sort((a,b) => b-a)).concat([0]);
+      const points = thresholds.map((t) => {
+        let tp = 0, fp = 0;
+        pairs.forEach((d) => { if (d.p >= t) { if (d.y === 1) tp++; else fp++; } });
+        return [fp / neg, tp / pos];
+      }).sort((a,b) => a[0] - b[0]);
+      Highcharts.chart(el, {
+        chart: { type: "line", backgroundColor: "transparent" },
+        title: { text: null }, credits: { enabled: false }, legend: { enabled: false },
+        xAxis: { min:0, max:1, title:{ text:"False Positive Rate" } }, yAxis: { min:0, max:1, title:{ text:"True Positive Rate" } },
+        series: [{ data: [[0,0],[1,1]], color:"#4a6f95", dashStyle:"Dash", enableMouseTracking:false }, { data: points, color:"#5aa7ff", lineWidth:3 }]
+      });
+    }
+
+    function renderCalibration() {
+      const pairs = predictionPairs();
+      const calText = document.getElementById("calText");
+      const el = document.getElementById("calChart");
+      if (!el || typeof Highcharts === "undefined") return;
+      if (!pairs.length) { calText.textContent = "Awaiting predictions..."; return; }
+      const sorted = pairs.slice().sort((a,b) => a.p - b.p);
+      const bins = 10, size = Math.max(1, Math.floor(sorted.length / bins));
+      const pts = [];
+      let brier = 0;
+      pairs.forEach((d) => { brier += Math.pow(d.p - d.y, 2); });
+      brier /= pairs.length;
+      for (let i = 0; i < bins; i++) {
+        const chunk = sorted.slice(i * size, i === bins - 1 ? sorted.length : (i + 1) * size);
+        if (!chunk.length) continue;
+        const mp = chunk.reduce((s,d) => s + d.p, 0) / chunk.length;
+        const my = chunk.reduce((s,d) => s + d.y, 0) / chunk.length;
+        pts.push([mp, my]);
+      }
+      Highcharts.chart(el, {
+        chart: { type: "scatter", backgroundColor: "transparent" },
+        title: { text: null }, credits: { enabled: false }, legend: { enabled: false },
+        xAxis: { min:0, max:1, title:{ text:"Predicted probability" } }, yAxis: { min:0, max:1, title:{ text:"Observed event rate" } },
+        series: [{ type:"line", data:[[0,0],[1,1]], color:"#4a6f95", dashStyle:"Dash", enableMouseTracking:false }, { data: pts, color:"#5aa7ff" }]
+      });
+      calText.textContent = "Brier score: " + brier.toFixed(4) + " (lower is better).";
+    }
+
+    function renderAll() {
+      renderKPIs();
+      renderTables();
+      renderProbabilityBands();
+      if (currentPrimary === "predictive-performance") {
+        renderRoc();
+        renderCalibration();
+      }
+    }
+
+    function applyMessage(message) {
+      if (!message || !message.type) return;
+      if (message.type === "LOGISTIC_BUNDLE" && message.payload) {
+        state.results = message.payload.results || {};
+        state.coefficients = message.payload.coefficients || [];
+        state.predictions = message.payload.predictions || [];
+        state.diagnostics = message.payload.diagnostics || {};
+        state.descriptives = message.payload.descriptives || {};
+      } else if (message.type === "LOGISTIC_RESULTS") state.results = Object.assign({}, state.results, message.payload || {});
+      else if (message.type === "LOGISTIC_COEFFICIENTS") state.coefficients = message.payload || [];
+      else if (message.type === "LOGISTIC_PREDICTIONS") state.predictions = message.payload || [];
+      else if (message.type === "LOGISTIC_DIAGNOSTICS") state.diagnostics = message.payload || {};
+      else if (message.type === "LOGISTIC_DESCRIPTIVES") state.descriptives = message.payload || {};
+      renderAll();
+    }
+
+    document.querySelectorAll(".nav-btn").forEach((b) => b.addEventListener("click", () => switchPrimary(b.dataset.tab)));
+    document.getElementById("thr").addEventListener("input", function () {
+      currentThreshold = Number(this.value);
+      document.getElementById("thrVal").textContent = currentThreshold.toFixed(2);
+      sendToHost("logisticThresholdChanged", { threshold: currentThreshold });
+    });
+
+    document.addEventListener("DOMContentLoaded", function () {
+      switchPrimary("model-results");
+      if (typeof Office !== "undefined") {
+        Office.onReady(function () {
+          try { Office.context.ui.messageParent(JSON.stringify({ action: "ready", module: "logistic-v2" })); } catch (_e) {}
+          try {
+            Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function (arg) {
+              try { applyMessage(JSON.parse(arg.message)); } catch (_e) {}
+            });
+          } catch (_e) {}
+        });
+      }
+    });
+  </script>
+</body>
+</html>

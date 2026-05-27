@@ -247,6 +247,9 @@ function openCorrelationResultDialog(viewType, matrixData) {
       } else {
         currentResultDialog = asyncResult.value; // Store global reference
         console.log('✅ Matrix dialog opened successfully');
+        if (window.StatisticoDialogHost) {
+          StatisticoDialogHost.onUserClosed(currentResultDialog, function () { currentResultDialog = null; });
+        }
         
         // Send data to matrix dialog
         currentResultDialog.addEventHandler(
@@ -274,6 +277,13 @@ function openCorrelationResultDialog(viewType, matrixData) {
               } else if (message.action === 'switchView') {
                 console.log('🔀 Matrix dialog requests view switch:', message.view);
                 handleSwitchView(message.view);
+              } else if (message.action === 'close' || message.action === 'closeDialog') {
+                if (window.StatisticoDialogHost) {
+                  StatisticoDialogHost.closeFromMessage(currentResultDialog, function () { currentResultDialog = null; });
+                } else {
+                  currentResultDialog.close();
+                  currentResultDialog = null;
+                }
               }
             } catch (e) {
               console.error('❌ Error in matrix dialog communication:', e);
@@ -322,6 +332,9 @@ function handleSwitchView(viewFilename) {
         } else {
           currentResultDialog = asyncResult.value;
           console.log('✅ New view opened successfully');
+          if (window.StatisticoDialogHost) {
+            StatisticoDialogHost.onUserClosed(currentResultDialog, function () { currentResultDialog = null; });
+          }
           
           // Send data to new view
           currentResultDialog.addEventHandler(
@@ -338,6 +351,13 @@ function handleSwitchView(viewFilename) {
                   }));
                 } else if (message.action === 'switchView') {
                   handleSwitchView(message.view);
+                } else if (message.action === 'close' || message.action === 'closeDialog') {
+                  if (window.StatisticoDialogHost) {
+                    StatisticoDialogHost.closeFromMessage(currentResultDialog, function () { currentResultDialog = null; });
+                  } else {
+                    currentResultDialog.close();
+                    currentResultDialog = null;
+                  }
                 }
               } catch (e) {
                 console.error('❌ Error in new view communication:', e);

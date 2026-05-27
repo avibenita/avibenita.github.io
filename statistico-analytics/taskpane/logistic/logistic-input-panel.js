@@ -95,8 +95,12 @@ function openLogisticModelBuilder() {
               updateButtonState();
               setTimeout(() => openLogisticResultsDialog(), 450);
             } else if (message.action === "close") {
-              logisticDialog.close();
-              logisticDialog = null;
+              if (window.StatisticoDialogHost) {
+                StatisticoDialogHost.closeFromMessage(logisticDialog, function () { logisticDialog = null; });
+              } else {
+                logisticDialog.close();
+                logisticDialog = null;
+              }
             }
           } catch (e) {
             console.error("Error handling logistic model builder message:", e);
@@ -105,6 +109,7 @@ function openLogisticModelBuilder() {
 
         logisticDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
           logisticDialog = null;
+          if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
         });
       }
     }
@@ -160,8 +165,12 @@ function openLogisticResultsDialog() {
                 console.log("Logistic host event:", message.cmd, message.data);
               }
             } else if (message.action === "close") {
-              logisticDialog.close();
-              logisticDialog = null;
+              if (window.StatisticoDialogHost) {
+                StatisticoDialogHost.closeFromMessage(logisticDialog, function () { logisticDialog = null; });
+              } else {
+                logisticDialog.close();
+                logisticDialog = null;
+              }
             }
           } catch (e) {
             console.error("Error handling logistic dialog message:", e);
@@ -170,6 +179,7 @@ function openLogisticResultsDialog() {
 
         logisticDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
           logisticDialog = null;
+          if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
         });
 
         // Fallback if ready signal is missed.

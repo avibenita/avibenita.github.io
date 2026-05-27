@@ -122,6 +122,9 @@ function openIndependentBuilderDialog() {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       independentDialog = asyncResult.value;
       setTimeout(sendDialogData, 550);
+      if (window.StatisticoDialogHost) {
+        StatisticoDialogHost.onUserClosed(independentDialog, function () { independentDialog = null; });
+      }
       independentDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
         try {
           const message = JSON.parse(arg.message || "{}");
@@ -133,8 +136,12 @@ function openIndependentBuilderDialog() {
             updateButtonState();
             setTimeout(openIndependentResultsDialog, 380);
           } else if (message.action === "close") {
-            independentDialog.close();
-            independentDialog = null;
+            if (window.StatisticoDialogHost) {
+              StatisticoDialogHost.closeFromMessage(independentDialog, function () { independentDialog = null; });
+            } else {
+              independentDialog.close();
+              independentDialog = null;
+            }
           }
         } catch (_e) {}
       });
@@ -799,6 +806,12 @@ function openIndependentResultsDialog() {
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       independentDialog = asyncResult.value;
+      if (window.StatisticoDialogHost) {
+        StatisticoDialogHost.onUserClosed(independentDialog, function () {
+          independentDialog = null;
+          independentFilteredRows = null;
+        });
+      }
       independentDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
         try {
           const message = JSON.parse(arg.message || "{}");
@@ -822,7 +835,18 @@ function openIndependentResultsDialog() {
               sendIndependentBundle();
             }
           }
-          else if (message.action === "close") { independentDialog.close(); independentDialog = null; independentFilteredRows = null; }
+          else if (message.action === "close") {
+            if (window.StatisticoDialogHost) {
+              StatisticoDialogHost.closeFromMessage(independentDialog, function () {
+                independentDialog = null;
+                independentFilteredRows = null;
+              });
+            } else {
+              independentDialog.close();
+              independentDialog = null;
+              independentFilteredRows = null;
+            }
+          }
         } catch (_e) { console.error("Results dialog message error:", _e); }
       });
       setTimeout(sendIndependentBundle, 1100);

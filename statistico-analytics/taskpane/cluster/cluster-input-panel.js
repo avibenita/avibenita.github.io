@@ -199,6 +199,7 @@ function openClusterSetupDialog() {
       });
       clusterSetupDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
         clusterSetupDialog = null;
+        if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
       });
       setTimeout(() => pushClusterSetupPayload(), 800);
     }
@@ -672,8 +673,12 @@ function openClusterResultsDialogOnly() {
           if (!message) return;
           if (message.action === "ready") sendClusterBundle();
           else if (message.action === "close") {
-            clusterDialog.close();
-            clusterDialog = null;
+            if (window.StatisticoDialogHost) {
+              StatisticoDialogHost.closeFromMessage(clusterDialog, function () { clusterDialog = null; });
+            } else {
+              clusterDialog.close();
+              clusterDialog = null;
+            }
           }
         } catch (e) {
           console.error("Cluster dialog message:", e);
@@ -681,6 +686,7 @@ function openClusterResultsDialogOnly() {
       });
       clusterDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
         clusterDialog = null;
+        if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
       });
       setTimeout(() => sendClusterBundle(), 1100);
     }

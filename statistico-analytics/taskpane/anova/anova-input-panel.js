@@ -24,6 +24,9 @@ function openAnovaBuilder() {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       anovaDialog = asyncResult.value;
       setTimeout(sendAnovaConfigData, 550);
+      if (window.StatisticoDialogHost) {
+        StatisticoDialogHost.onUserClosed(anovaDialog, function () { anovaDialog = null; });
+      }
       anovaDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
         try {
           const message = JSON.parse(arg.message || '{}');
@@ -35,8 +38,12 @@ function openAnovaBuilder() {
             anovaDialog = null;
             setTimeout(openAnovaResultsDialog, 380);
           } else if (message.action === 'close') {
-            anovaDialog.close();
-            anovaDialog = null;
+            if (window.StatisticoDialogHost) {
+              StatisticoDialogHost.closeFromMessage(anovaDialog, function () { anovaDialog = null; });
+            } else {
+              anovaDialog.close();
+              anovaDialog = null;
+            }
           }
         } catch (_e) {}
       });
@@ -621,6 +628,9 @@ function openAnovaResultsDialog() {
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       anovaDialog = asyncResult.value;
+      if (window.StatisticoDialogHost) {
+        StatisticoDialogHost.onUserClosed(anovaDialog, function () { anovaDialog = null; });
+      }
       anovaDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
         try {
           const message = JSON.parse(arg.message || '{}');
@@ -632,8 +642,12 @@ function openAnovaResultsDialog() {
             }
             sendAnovaBundle();
           } else if (message.action === 'close') {
-            anovaDialog.close();
-            anovaDialog = null;
+            if (window.StatisticoDialogHost) {
+              StatisticoDialogHost.closeFromMessage(anovaDialog, function () { anovaDialog = null; });
+            } else {
+              anovaDialog.close();
+              anovaDialog = null;
+            }
           }
         } catch (_e) { console.error(_e); }
       });

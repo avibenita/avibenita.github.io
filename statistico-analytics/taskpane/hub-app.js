@@ -570,6 +570,7 @@ function openExternalDialogUrl(url, options) {
 
 function runHubModuleAction(actionKey) {
   dismissHubButtonTooltips();
+  dismissAllHubDialogs();
   var module = HUB_ACTIONS[actionKey];
   if (!module) return;
   if (module.comingSoon) {
@@ -713,15 +714,20 @@ function openHubUnivariateResultsAt(dialogUrl, results) {
         } else if (message.action === "close" || message.action === "closeDialog") {
           hubPendingResultsViewUrl = null;
           if (dialog === hubResultsDialog) {
-            dialog.close();
-            hubResultsDialog = null;
-            finishHubUnivariateFlow();
+            if (window.StatisticoDialogHost) {
+              StatisticoDialogHost.closeFromMessage(dialog, function () { hubResultsDialog = null; finishHubUnivariateFlow(); });
+            } else {
+              dialog.close();
+              hubResultsDialog = null;
+              finishHubUnivariateFlow();
+            }
           }
         }
       } catch (e) {}
     });
     dialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
       if (dialog === hubResultsDialog) hubResultsDialog = null;
+      if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
       if (hubPendingResultsViewUrl && !hubResultsDialog && hubCurrentUnivariateResults) {
         var next = hubPendingResultsViewUrl;
         hubPendingResultsViewUrl = null;
@@ -1397,7 +1403,39 @@ function openClusterConfigFromHub() {
   return true;
 }
 
+function dismissAllHubDialogs() {
+  [
+    hubConfigDialog,
+    hubResultsDialog,
+    hubRegressionConfigDialog,
+    hubRegressionResultsDialog,
+    hubAnovaDialog,
+    hubIndependentDialog,
+    hubCorrelationDialog,
+    hubParetoConfigDialog,
+    hubParetoResultsDialog
+  ].forEach(function (dlg) {
+    if (dlg) {
+      try { dlg.close(); } catch (e) {}
+    }
+  });
+  hubConfigDialog = null;
+  hubResultsDialog = null;
+  hubRegressionConfigDialog = null;
+  hubRegressionResultsDialog = null;
+  hubAnovaDialog = null;
+  hubIndependentDialog = null;
+  hubCorrelationDialog = null;
+  hubParetoConfigDialog = null;
+  hubParetoResultsDialog = null;
+  hubPendingResultsViewUrl = null;
+  hubPendingUnivariateResults = null;
+  hubCurrentUnivariateResults = null;
+  if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
+}
+
 function navigateToModule(id) {
+  dismissAllHubDialogs();
   var gr = getGlobalRangePayload();
   if (id === "univariate" && gr && gr.values && gr.values.length >= 2) {
     if (openUnivariateConfigFromHub()) return;

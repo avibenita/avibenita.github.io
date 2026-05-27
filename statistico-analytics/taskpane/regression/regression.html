@@ -272,6 +272,7 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="../global-range-store.js?v=20260325a"></script>
   <script src="../dialog-sizes.js"></script>
+  <script src="../dialog-host.js?v=20260528"></script>
   <script src="../../src/shared/js/core/saved-analyses-manager.js"></script>
 
   <script>
@@ -289,9 +290,6 @@
     const directDialogFromHub = openedFromHub && (urlParams.get('directDialog') === '1' || urlParams.get('autoConfig') === '1');
     if (directDialogFromHub) {
       document.body.classList.add('direct-config-opening');
-      window.addEventListener('focus', function () {
-        document.body.classList.remove('direct-config-opening');
-      });
     }
 
     // ================================================================
@@ -575,7 +573,10 @@
             }
           } catch(e) {}
         });
-        activeDialog.addEventHandler(Office.EventType.DialogEventReceived, () => { activeDialog = null; });
+        activeDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
+          activeDialog = null;
+          if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
+        });
       });
     }
 
@@ -598,7 +599,9 @@
           } catch(e) {}
         });
         activeDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
-          activeDialog = null; loadSavedModels();
+          activeDialog = null;
+          loadSavedModels();
+          if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
         });
         setTimeout(() => sendRegressionResults(), 1200);
       });

@@ -285,6 +285,7 @@ function openUnivariateBuilderDialog() {
         univariateDialog = null;
         stopUnivariateDialogDataPump();
         notifyConfigDialogClosed();
+        if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
       });
     }
   );
@@ -412,6 +413,7 @@ function openResultsDialog(results) {
           pendingUnivariateViewUrl = null;
           setTimeout(() => openNewView(target, univariateCurrentResults), 120);
         }
+        if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
       });
     }
   );
@@ -485,6 +487,7 @@ function openNewView(dialogUrl, results) {
           pendingUnivariateViewUrl = null;
           setTimeout(() => openNewView(target, univariateCurrentResults), 120);
         }
+        if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
       });
     }
   );

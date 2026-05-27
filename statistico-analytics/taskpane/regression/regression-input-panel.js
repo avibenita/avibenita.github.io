@@ -97,8 +97,12 @@ function openModelBuilder() {
                 openRegressionCoefficientsDialog();
               }, 500);
             } else if (message.action === 'close') {
-              resultsDialog.close();
-              resultsDialog = null;
+              if (window.StatisticoDialogHost) {
+                StatisticoDialogHost.closeFromMessage(resultsDialog, function () { resultsDialog = null; });
+              } else {
+                resultsDialog.close();
+                resultsDialog = null;
+              }
             }
           } catch (e) {
             console.error('Error handling dialog message:', e);
@@ -107,6 +111,7 @@ function openModelBuilder() {
 
         resultsDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
           resultsDialog = null;
+          if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
         });
       }
     }
@@ -155,10 +160,16 @@ function openRegressionCoefficientsDialog() {
               console.log('🗑️ Received DELETE_ANALYSIS request from dialog');
               handleDeleteAnalysisFromDialog(message.data);
             } else if (message.action === 'close') {
-              resultsDialog.close();
-              resultsDialog = null;
-              // Update taskpane button state after closing dialog
-              updateButtonState();
+              if (window.StatisticoDialogHost) {
+                StatisticoDialogHost.closeFromMessage(resultsDialog, function () {
+                  resultsDialog = null;
+                  updateButtonState();
+                });
+              } else {
+                resultsDialog.close();
+                resultsDialog = null;
+                updateButtonState();
+              }
             }
           } catch (e) {
             console.error('Error handling dialog message:', e);
@@ -168,8 +179,8 @@ function openRegressionCoefficientsDialog() {
         resultsDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
           console.log('📊 Coefficients dialog closed by user');
           resultsDialog = null;
-          // Update taskpane button state after closing dialog
           updateButtonState();
+          if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
         });
         
         // Also send data after a delay as fallback
@@ -221,8 +232,12 @@ function openLogisticResultsDialog() {
                 }
               }));
             } else if (message.action === 'close') {
-              resultsDialog.close();
-              resultsDialog = null;
+              if (window.StatisticoDialogHost) {
+                StatisticoDialogHost.closeFromMessage(resultsDialog, function () { resultsDialog = null; });
+              } else {
+                resultsDialog.close();
+                resultsDialog = null;
+              }
             }
           } catch (e) {
             console.error('Error handling logistic dialog message:', e);
@@ -232,6 +247,7 @@ function openLogisticResultsDialog() {
         resultsDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
           console.log('📊 Logistic dialog closed by user');
           resultsDialog = null;
+          if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
         });
       }
     }

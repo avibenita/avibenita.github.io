@@ -51,9 +51,8 @@ function openMetaBuilder() {
     });
     
     metaDialog.addEventHandler(Office.EventType.DialogEventReceived, (arg) => {
-      if (arg.error === 12006) { // Dialog closed by user
-        metaDialog = null;
-      }
+      if (arg.error === 12006) metaDialog = null;
+      if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
     });
   });
 }
@@ -302,9 +301,8 @@ function openMetaResultsDialog(bundle) {
     });
     
     metaResultsDialog.addEventHandler(Office.EventType.DialogEventReceived, (arg) => {
-      if (arg.error === 12006) {
-        metaResultsDialog = null;
-      }
+      if (arg.error === 12006) metaResultsDialog = null;
+      if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
     });
   });
 }

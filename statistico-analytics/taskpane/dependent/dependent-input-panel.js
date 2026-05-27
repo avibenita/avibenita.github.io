@@ -53,6 +53,9 @@ function openDependentBuilder() {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       dependentDialog = asyncResult.value;
       setTimeout(sendDialogData, 550);
+      if (window.StatisticoDialogHost) {
+        StatisticoDialogHost.onUserClosed(dependentDialog, function () { dependentDialog = null; });
+      }
       dependentDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
         try {
           const message = JSON.parse(arg.message || "{}");
@@ -68,8 +71,12 @@ function openDependentBuilder() {
             console.log("Calling openDependentResultsDialog in 380ms...");
             setTimeout(openDependentResultsDialog, 380);
           } else if (message.action === "close") {
-            dependentDialog.close();
-            dependentDialog = null;
+            if (window.StatisticoDialogHost) {
+              StatisticoDialogHost.closeFromMessage(dependentDialog, function () { dependentDialog = null; });
+            } else {
+              dependentDialog.close();
+              dependentDialog = null;
+            }
           }
         } catch (_e) {}
       });
@@ -1236,6 +1243,9 @@ function openDependentResultsDialog() {
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       dependentDialog = asyncResult.value;
+      if (window.StatisticoDialogHost) {
+        StatisticoDialogHost.onUserClosed(dependentDialog, function () { dependentDialog = null; });
+      }
       dependentDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
         try {
           const message = JSON.parse(arg.message || "{}");
@@ -1249,7 +1259,14 @@ function openDependentResultsDialog() {
             }
             sendDependentBundle();
           }
-          else if (message.action === "close") { dependentDialog.close(); dependentDialog = null; }
+          else if (message.action === "close") {
+            if (window.StatisticoDialogHost) {
+              StatisticoDialogHost.closeFromMessage(dependentDialog, function () { dependentDialog = null; });
+            } else {
+              dependentDialog.close();
+              dependentDialog = null;
+            }
+          }
         } catch (_e) { console.error("Results dialog message error:", _e); }
       });
       setTimeout(sendDependentBundle, 1100);

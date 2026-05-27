@@ -681,6 +681,7 @@ function openNewView(dialogUrl, results) {
                     console.log('Dialog event:', arg.error);
                     resultsDialog = null;
                     unlockTaskpaneUI();
+                    if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
                 });
             }
         }

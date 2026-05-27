@@ -71,8 +71,12 @@ function openFactorModelBuilder() {
               updateButtonState();
               setTimeout(() => openFactorResultsDialog(), 450);
             } else if (message.action === "close") {
-              factorDialog.close();
-              factorDialog = null;
+              if (window.StatisticoDialogHost) {
+                StatisticoDialogHost.closeFromMessage(factorDialog, function () { factorDialog = null; });
+              } else {
+                factorDialog.close();
+                factorDialog = null;
+              }
             }
           } catch (e) {
             console.error("Error handling factor model builder message:", e);
@@ -81,6 +85,7 @@ function openFactorModelBuilder() {
 
         factorDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
           factorDialog = null;
+          if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
         });
       }
     }
@@ -552,8 +557,12 @@ function openFactorResultsDialog() {
               }
               sendFactorBundle();
             } else if (message.action === "close") {
-              factorDialog.close();
-              factorDialog = null;
+              if (window.StatisticoDialogHost) {
+                StatisticoDialogHost.closeFromMessage(factorDialog, function () { factorDialog = null; });
+              } else {
+                factorDialog.close();
+                factorDialog = null;
+              }
             }
           } catch (e) {
             console.error("Error handling factor dialog message:", e);
@@ -562,6 +571,7 @@ function openFactorResultsDialog() {
 
         factorDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
           factorDialog = null;
+          if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
         });
 
         setTimeout(() => sendFactorBundle(), 1100);

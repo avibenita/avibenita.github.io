@@ -71,8 +71,12 @@ function openPcaModelBuilder() {
               updatePcaButtonState();
               setTimeout(() => openPcaResultsDialog(), 450);
             } else if (message.action === "close") {
-              pcaDialog.close();
-              pcaDialog = null;
+              if (window.StatisticoDialogHost) {
+                StatisticoDialogHost.closeFromMessage(pcaDialog, function () { pcaDialog = null; });
+              } else {
+                pcaDialog.close();
+                pcaDialog = null;
+              }
             }
           } catch (e) {
             console.error("Error handling PCA builder message:", e);
@@ -81,6 +85,7 @@ function openPcaModelBuilder() {
 
         pcaDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
           pcaDialog = null;
+          if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
         });
       }
     }
@@ -525,8 +530,12 @@ function openPcaResultsDialog() {
               }
               sendPcaBundle();
             } else if (message.action === "close") {
-              pcaDialog.close();
-              pcaDialog = null;
+              if (window.StatisticoDialogHost) {
+                StatisticoDialogHost.closeFromMessage(pcaDialog, function () { pcaDialog = null; });
+              } else {
+                pcaDialog.close();
+                pcaDialog = null;
+              }
             }
           } catch (e) {
             console.error("Error handling PCA dialog message:", e);
@@ -535,6 +544,7 @@ function openPcaResultsDialog() {
 
         pcaDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
           pcaDialog = null;
+          if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
         });
 
         setTimeout(() => sendPcaBundle(), 1100);

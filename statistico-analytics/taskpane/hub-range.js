@@ -7,21 +7,19 @@
 
   var MODE_LABELS = {
     used: "Active region",
-    selection: "Selected cells",
-    named: "Named range",
-    manual: "Manual range"
+    selection: "Selected range",
+    named: "Named range"
   };
 
   function hubSyncRangeModeUI(mode) {
     mode = mode || "used";
-    ["hubPickSelection", "hubPickUsed", "hubPickNamed", "hubPickManual"].forEach(function (id) {
+    ["hubPickSelection", "hubPickUsed", "hubPickNamed"].forEach(function (id) {
       var btn = document.getElementById(id);
       if (!btn) return;
       var active =
         (id === "hubPickSelection" && mode === "selection") ||
         (id === "hubPickUsed" && mode === "used") ||
-        (id === "hubPickNamed" && mode === "named") ||
-        (id === "hubPickManual" && mode === "manual");
+        (id === "hubPickNamed" && mode === "named");
       btn.classList.toggle("is-active", active);
     });
     var namedPanel = document.getElementById("hubNamedRangePanel");
@@ -128,25 +126,6 @@
     }
   }
 
-  async function useManualRange() {
-    closeRangePicker();
-    var input = prompt("Enter the workbook range (e.g. Sheet1!A1:I65):");
-    if (!input || !input.trim()) return;
-    showRangeState("Loading…", false);
-    try {
-      await Excel.run(async function (ctx) {
-        var rng = ctx.workbook.worksheets.getActiveWorksheet().getRange(input.trim());
-        rng.load(["values", "address"]);
-        await ctx.sync();
-        rangeMode = "manual";
-        hubSyncRangeModeUI("manual");
-        applyRangeData(rng.values, rng.address);
-      });
-    } catch (e) {
-      showRangeState("Invalid range", true);
-    }
-  }
-
   async function watchSelection() {
     try {
       await Excel.run(async function (ctx) {
@@ -222,7 +201,7 @@
     await watchSelection();
     var gr = window.StatisticoGlobalRange && StatisticoGlobalRange.load();
     if (gr && gr.values && gr.values.length >= 2) {
-      rangeMode = gr.mode || "used";
+      rangeMode = gr.mode === "manual" ? "used" : (gr.mode || "used");
       hubSyncRangeModeUI(rangeMode);
       applyRangeData(gr.values, gr.address);
     } else {
@@ -233,7 +212,6 @@
   window.hubSetRangeMode = setRangeMode;
   window.hubPickRangeMode = pickRangeMode;
   window.hubLoadFromNamedRange = loadFromNamedRange;
-  window.hubUseManualRange = useManualRange;
   window.hubToggleRangePicker = toggleRangePicker;
   window.hubToggleRangeInfo = toggleRangeInfo;
 

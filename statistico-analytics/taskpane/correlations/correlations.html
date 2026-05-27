@@ -138,7 +138,7 @@
   <script src="../global-range-store.js?v=20260325a"></script>
   <script src="../dialog-sizes.js"></script>
   <script src="../dialog-host.js?v=20260528"></script>
-  <script src="correlation-input-panel.js"></script>
+  <script src="correlation-input-panel.js?v=20260528"></script>
 
   <script>
     let rangeData = null;
@@ -243,7 +243,9 @@
       document.getElementById('configureBtn').disabled = false;
       document.getElementById('hintText').textContent = 'Ready — click to open the model builder';
       if (window.StatisticoGlobalRange) StatisticoGlobalRange.save(values, address, rangeMode);
-      if (typeof onRangeDataLoaded === 'function') onRangeDataLoaded(values, address);
+      if (typeof onRangeDataLoaded === 'function') {
+        try { onRangeDataLoaded(values, address); } catch (e) { console.warn('onRangeDataLoaded:', e); }
+      }
     }
 
     function showRangeBadge(text, isError) {
@@ -270,9 +272,13 @@
       try {
         const runData = JSON.parse(raw);
         sessionStorage.removeItem('correlationHubRunData');
-        handleRunAnalysis(runData);
+        setTimeout(function () {
+          handleRunAnalysis(runData);
+          if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
+        }, 200);
         return true;
       } catch (e) {
+        console.warn('tryOpenCorrelationResultsFromHub:', e);
         return false;
       }
     }

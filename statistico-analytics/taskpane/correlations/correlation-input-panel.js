@@ -25,25 +25,21 @@ function onRangeDataLoaded(values, address) {
     return;
   }
   
-  // Store data for the dialog
   correlationRangeData = { values, address };
-  
-  // Store in sessionStorage for dialog to pick up
   sessionStorage.setItem('correlationRawData', JSON.stringify({ values, address }));
   
-  // Update UI
-  const headers = values[0];
+  const headers = values[0] || [];
   const dataRows = values.slice(1);
   
-  document.getElementById('corrRange').textContent = address;
-  document.getElementById('corrRows').textContent = dataRows.length;
-  document.getElementById('corrCols').textContent = headers.length;
+  const rangeEl = document.getElementById('corrRange');
+  const rowsEl = document.getElementById('corrRows');
+  const colsEl = document.getElementById('corrCols');
+  if (rangeEl) rangeEl.textContent = address || '';
+  if (rowsEl) rowsEl.textContent = String(dataRows.length);
+  if (colsEl) colsEl.textContent = String(headers.length);
   
-  // Enable button
-  const btn = document.getElementById('openCorrelationConfig');
-  if (btn) {
-    btn.disabled = false;
-  }
+  const btn = document.getElementById('openCorrelationConfig') || document.getElementById('configureBtn');
+  if (btn) btn.disabled = false;
 }
 
 /**
@@ -147,6 +143,7 @@ function openCorrelationConfig() {
           (arg) => {
             console.log('Dialog event:', arg);
             correlationDialog = null;
+            if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
           }
         );
       }
@@ -247,6 +244,7 @@ function openCorrelationResultDialog(viewType, matrixData) {
       } else {
         currentResultDialog = asyncResult.value; // Store global reference
         console.log('✅ Matrix dialog opened successfully');
+        if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
         if (window.StatisticoDialogHost) {
           StatisticoDialogHost.onUserClosed(currentResultDialog, function () { currentResultDialog = null; });
         }

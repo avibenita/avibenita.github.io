@@ -100,22 +100,14 @@
     }
     .reg-equation-strip strong { color: var(--anova-dv); font-weight: 700; }
 
-    .type-row {
-      display: flex; gap: 6px; flex-shrink: 0;
+    #panelVars {
+      display: flex; flex-direction: column; gap: 8px;
     }
-    .type-pill {
-      flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 7px 8px; border-radius: 8px; border: 1px solid var(--cfg-border);
-      background: var(--cfg-surface); cursor: pointer; font-size: 11px; font-weight: 600;
-      color: var(--cfg-text2, var(--cfg-text)); transition: all .12s;
-    }
-    .type-pill input { display: none; }
-    .type-pill i { font-size: 11px; opacity: .75; }
-    .type-pill.active {
-      border-color: rgba(249,115,22,.45);
-      background: rgba(249,115,22,.08);
-      color: var(--anova-dv);
-      box-shadow: 0 0 0 1px rgba(249,115,22,.12);
+
+    .int-badge {
+      font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 10px;
+      background: rgba(79,195,247,.2); color: var(--anova-fac);
+      border: 1px solid rgba(79,195,247,.4); margin-left: 5px;
     }
 
     .reg-zone-card {
@@ -262,17 +254,6 @@
           <span class="reg-model-meta" id="tbRange">—</span>
         </div>
 
-        <div class="type-row" id="typeGroup">
-          <label class="type-pill active" id="pillOneWay">
-            <input type="radio" name="anovaType" id="typeOneWay" value="one-way" checked/>
-            <i class="fa-solid fa-layer-group"></i> One-Way
-          </label>
-          <label class="type-pill" id="pillTwoWay">
-            <input type="radio" name="anovaType" id="typeTwoWay" value="two-way"/>
-            <i class="fa-solid fa-table-cells-large"></i> Two-Way
-          </label>
-        </div>
-
         <div class="reg-equation-strip" id="modelEquation">Assign dependent variable and grouping factor(s)</div>
 
         <div id="panelVars">
@@ -292,33 +273,18 @@
             </div>
           </div>
 
-          <div class="reg-zone-card zone-fac zone-single">
+          <div class="reg-zone-card zone-fac">
             <div class="reg-zone-head">
               <div class="dot"></div>
               <div class="zone-head-main">
-                <div class="zone-label">Group A</div>
-                <div class="zone-hint">First grouping factor (categories)</div>
+                <div class="zone-label">Grouping factors</div>
+                <div class="zone-hint">Drag 1 for one-way, 2 for two-way ANOVA</div>
               </div>
               <span class="zone-req">*</span>
-              <span class="zone-single-badge"><span>&times;1</span></span>
+              <span class="int-badge" id="factorCountBadge" style="display:none;"></span>
             </div>
-            <div class="reg-zone-body drop-zone" data-zone="f1" id="zoneF1">
-              <div class="reg-zone-placeholder">Drag a grouping variable here</div>
-            </div>
-          </div>
-
-          <div class="reg-zone-card zone-fac zone-single" id="factor2Card" style="display:none;">
-            <div class="reg-zone-head">
-              <div class="dot"></div>
-              <div class="zone-head-main">
-                <div class="zone-label">Group B</div>
-                <div class="zone-hint">Second grouping factor (two-way only)</div>
-              </div>
-              <span class="zone-req">*</span>
-              <span class="zone-single-badge"><span>&times;1</span></span>
-            </div>
-            <div class="reg-zone-body drop-zone" data-zone="f2" id="zoneF2">
-              <div class="reg-zone-placeholder">Drag a grouping variable here</div>
+            <div class="reg-zone-body drop-zone" data-zone="fac" id="zoneFac">
+              <div class="reg-zone-placeholder">Drag grouping variables here</div>
             </div>
           </div>
 
@@ -385,7 +351,7 @@
   var columnStats = [];
   var draggedElement = null;
 
-  var assignments = { dv: null, factor1: null, factor2: null, conditions: [] };
+  var assignments = { dv: null, factors: [], conditions: [], mode: 'between' };
 
   var STORAGE_KEY = 'anova-config';
 
@@ -412,11 +378,6 @@
     );
     setupDropZones();
     document.getElementById('btnCancel').addEventListener('click', sendClose);
-    document.querySelectorAll('input[name="anovaType"]').forEach(function(r) {
-      r.addEventListener('change', onTypeChange);
-    });
-    document.getElementById('pillOneWay').addEventListener('click', function() { setType('one-way'); });
-    document.getElementById('pillTwoWay').addEventListener('click', function() { setType('two-way'); });
     document.getElementById('guideToggle').addEventListener('click', function() {
       document.getElementById('guideWrap').classList.toggle('open');
     });
@@ -463,46 +424,36 @@
     document.getElementById('metaBadge').textContent = _rows.length + ' rows · ' + _headers.length + ' vars';
 
     buildColumnStats();
-    assignments = { dv: null, factor1: null, factor2: null, conditions: [] };
+    assignments = { dv: null, factors: [], conditions: [], mode: 'between' };
     if (_saved) applySpec(_saved);
 
     renderVariables();
     renderAssignments();
-    onTypeChange();
+    refreshLayout();
     validateModel();
 
     var hasSaved = typeof CfgSave !== 'undefined' && CfgSave.getSavedList(STORAGE_KEY).length > 0;
     document.getElementById('btnLoadPrev').disabled = !hasSaved;
   }
 
-  function onTypeChange() {
-    return document.querySelector('input[name="anovaType"]:checked')?.value || 'one-way';
+  function inferType() {
+    if (assignments.mode === 'repeated') return 'repeated';
+    return assignments.factors.length >= 2 ? 'two-way' : 'one-way';
   }
 
-  function setType(type) {
-    var map = { 'one-way': 'typeOneWay', 'two-way': 'typeTwoWay', 'repeated': 'typeRM' };
-    var el = document.getElementById(map[type]);
-    if (el) { el.checked = true; onTypeChange(); }
-  }
-
-  function onTypeChange() {
-    var type = getType();
-    document.getElementById('pillOneWay').classList.toggle('active', type === 'one-way');
-    document.getElementById('pillTwoWay').classList.toggle('active', type === 'two-way');
-    document.getElementById('panelVars').style.display = (type === 'repeated') ? 'none' : 'flex';
-    document.getElementById('panelVars').style.flexDirection = 'column';
-    document.getElementById('panelVars').style.gap = '8px';
-    document.getElementById('panelRM').style.display = (type === 'repeated') ? 'block' : 'none';
-    document.getElementById('factor2Card').style.display = (type === 'two-way') ? 'block' : 'none';
-    if (typeof DsGuide !== 'undefined') DsGuide.renderAnova(type, 'dsGuideContainer', { collapsed: true });
+  function refreshLayout() {
+    var repeated = assignments.mode === 'repeated';
+    document.getElementById('panelVars').style.display = repeated ? 'none' : 'flex';
+    document.getElementById('panelRM').style.display = repeated ? 'block' : 'none';
+    var guideType = inferType();
+    if (guideType === 'repeated') guideType = 'one-way';
+    if (typeof DsGuide !== 'undefined') DsGuide.renderAnova(guideType, 'dsGuideContainer', { collapsed: true });
     updateModelEquation();
-    validateModel();
   }
 
   function isAssigned(name) {
     return assignments.dv === name ||
-      assignments.factor1 === name ||
-      assignments.factor2 === name ||
+      assignments.factors.indexOf(name) >= 0 ||
       assignments.conditions.indexOf(name) >= 0;
   }
 
@@ -616,14 +567,12 @@
     if (zoneType === 'dv') {
       if (!s.dvEligible) return false;
       assignments.dv = varName;
-    } else if (zoneType === 'f1' || zoneType === 'f2') {
+    } else if (zoneType === 'fac') {
       if (!s.factorEligible) return false;
       if (varName === assignments.dv) return false;
-      if (zoneType === 'f1') assignments.factor1 = varName;
-      else {
-        if (varName === assignments.factor1) return false;
-        assignments.factor2 = varName;
-      }
+      if (assignments.factors.indexOf(varName) >= 0) return false;
+      if (assignments.factors.length >= 2) return false;
+      assignments.factors.push(varName);
     } else if (zoneType === 'cond') {
       if (!s.condEligible) return false;
       if (assignments.conditions.indexOf(varName) < 0) assignments.conditions.push(varName);
@@ -637,9 +586,9 @@
 
   function removeFromZone(zoneType, varName) {
     if (zoneType === 'dv') assignments.dv = null;
-    else if (zoneType === 'f1') assignments.factor1 = null;
-    else if (zoneType === 'f2') assignments.factor2 = null;
-    else if (zoneType === 'cond') {
+    else if (zoneType === 'fac') {
+      assignments.factors = assignments.factors.filter(function(n) { return n !== varName; });
+    } else if (zoneType === 'cond') {
       assignments.conditions = assignments.conditions.filter(function(n) { return n !== varName; });
     }
     renderVariables();
@@ -647,29 +596,35 @@
     validateModel();
   }
 
-  function renderSingleZone(zoneId, varName, zoneType) {
-    var zone = document.getElementById(zoneId);
-    zone.innerHTML = '';
-    if (!varName) {
-      var placeholders = {
-        dv: 'Drag a numeric variable here',
-        f1: 'Drag a grouping variable here',
-        f2: 'Drag a grouping variable here'
-      };
-      zone.innerHTML = '<div class="reg-zone-placeholder">' + placeholders[zoneType] + '</div>';
-      return;
-    }
-    var chip = document.createElement('div');
-    chip.className = 'reg-chip';
-    chip.innerHTML = '<span>' + varName + '</span><button class="reg-chip-x" title="Remove">✕</button>';
-    chip.querySelector('.reg-chip-x').addEventListener('click', function() { removeFromZone(zoneType, varName); });
-    zone.appendChild(chip);
-  }
-
   function renderAssignments() {
     renderSingleZone('zoneDV', assignments.dv, 'dv');
-    renderSingleZone('zoneF1', assignments.factor1, 'f1');
-    renderSingleZone('zoneF2', assignments.factor2, 'f2');
+
+    var zoneFac = document.getElementById('zoneFac');
+    zoneFac.innerHTML = '';
+    if (!assignments.factors.length) {
+      zoneFac.innerHTML = '<div class="reg-zone-placeholder">Drag grouping variables here</div>';
+    } else {
+      assignments.factors.forEach(function(name) {
+        var chip = document.createElement('div');
+        chip.className = 'reg-chip';
+        chip.innerHTML = '<span>' + name + '</span><button class="reg-chip-x" title="Remove">✕</button>';
+        chip.querySelector('.reg-chip-x').addEventListener('click', function() { removeFromZone('fac', name); });
+        zoneFac.appendChild(chip);
+      });
+    }
+
+    var badge = document.getElementById('factorCountBadge');
+    if (badge) {
+      if (assignments.factors.length >= 2) {
+        badge.style.display = 'inline';
+        badge.textContent = 'two-way';
+      } else if (assignments.factors.length === 1) {
+        badge.style.display = 'inline';
+        badge.textContent = 'one-way';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
 
     var zoneCond = document.getElementById('zoneCond');
     zoneCond.innerHTML = '';
@@ -687,9 +642,23 @@
     updateModelEquation();
   }
 
+  function renderSingleZone(zoneId, varName, zoneType) {
+    var zone = document.getElementById(zoneId);
+    zone.innerHTML = '';
+    if (!varName) {
+      zone.innerHTML = '<div class="reg-zone-placeholder">Drag a numeric variable here</div>';
+      return;
+    }
+    var chip = document.createElement('div');
+    chip.className = 'reg-chip';
+    chip.innerHTML = '<span>' + varName + '</span><button class="reg-chip-x" title="Remove">✕</button>';
+    chip.querySelector('.reg-chip-x').addEventListener('click', function() { removeFromZone(zoneType, varName); });
+    zone.appendChild(chip);
+  }
+
   function updateModelEquation() {
     var el = document.getElementById('modelEquation');
-    var type = getType();
+    var type = inferType();
     if (type === 'repeated') {
       if (assignments.conditions.length >= 2) {
         el.innerHTML = 'RM-ANOVA · <strong>' + assignments.conditions.join('</strong>, <strong>') + '</strong>';
@@ -703,41 +672,33 @@
       return;
     }
     var eq = '<strong>' + assignments.dv + '</strong> ~ ';
-    if (assignments.factor1) eq += '<strong>' + assignments.factor1 + '</strong>';
-    else eq += '(Group A)';
-    if (type === 'two-way') {
-      eq += ' × ';
-      if (assignments.factor2) eq += '<strong>' + assignments.factor2 + '</strong>';
-      else eq += '(Group B)';
-    }
+    if (!assignments.factors.length) eq += '(grouping factor)';
+    else if (assignments.factors.length === 1) eq += '<strong>' + assignments.factors[0] + '</strong>';
+    else eq += '<strong>' + assignments.factors[0] + '</strong> × <strong>' + assignments.factors[1] + '</strong>';
     el.innerHTML = eq;
   }
 
   function validateModel() {
-    var type = getType();
+    var type = inferType();
     var ok = false;
     var warn = '';
     var obsText = document.getElementById('obsText');
     var obsWarn = document.getElementById('obsWarn');
+    var factors = assignments.factors;
 
     if (type === 'repeated') {
       ok = assignments.conditions.length >= 2;
       obsText.textContent = 'Conditions: ' + assignments.conditions.length;
       if (!ok) warn = 'Need at least 2 condition columns';
-    } else if (type === 'two-way') {
-      ok = !!(assignments.dv && assignments.factor1 && assignments.factor2 &&
-        assignments.dv !== assignments.factor1 && assignments.dv !== assignments.factor2 &&
-        assignments.factor1 !== assignments.factor2);
-      obsText.textContent = assignments.dv
-        ? 'DV: ' + assignments.dv + ' · Groups: ' + (assignments.factor1 || '—') + ', ' + (assignments.factor2 || '—')
-        : 'Configure the model to continue';
-      if (!ok) warn = 'Assign DV and two distinct grouping factors';
     } else {
-      ok = !!(assignments.dv && assignments.factor1 && assignments.dv !== assignments.factor1);
+      var distinct = factors.length === new Set(factors).size;
+      ok = !!(assignments.dv && factors.length >= 1 && distinct &&
+        factors.every(function(f) { return f !== assignments.dv; }));
+      var design = factors.length >= 2 ? 'Two-way' : 'One-way';
       obsText.textContent = assignments.dv
-        ? 'DV: ' + assignments.dv + ' · Group: ' + (assignments.factor1 || '—')
+        ? design + ' · DV: ' + assignments.dv + ' · Groups: ' + (factors.join(', ') || '—')
         : 'Configure the model to continue';
-      if (!ok) warn = 'Assign DV and one grouping factor';
+      if (!ok) warn = 'Assign DV and at least one grouping factor';
     }
 
     document.getElementById('runBtn').disabled = !ok;
@@ -751,21 +712,23 @@
 
   function applySpec(spec) {
     if (!spec) return;
-    assignments = { dv: null, factor1: null, factor2: null, conditions: [] };
-    if (spec.type) setType(spec.type);
+    assignments = { dv: null, factors: [], conditions: [], mode: 'between' };
+    if (spec.type === 'repeated') assignments.mode = 'repeated';
     if (spec.dv) assignments.dv = spec.dv;
-    if (spec.factor1) assignments.factor1 = spec.factor1;
-    if (spec.factor2) assignments.factor2 = spec.factor2;
+    if (spec.factor1) assignments.factors.push(spec.factor1);
+    if (spec.factor2 && assignments.factors.indexOf(spec.factor2) < 0) assignments.factors.push(spec.factor2);
     if (spec.conditions && spec.conditions.length) assignments.conditions = spec.conditions.slice();
+    refreshLayout();
   }
 
   function collectSpec() {
-    var type = getType();
+    var factors = assignments.factors.slice();
+    var type = inferType();
     return {
       type: type,
       dv: assignments.dv,
-      factor1: assignments.factor1,
-      factor2: assignments.factor2,
+      factor1: factors[0] || null,
+      factor2: factors[1] || null,
       conditions: assignments.conditions.slice(),
       posthocMethod: 'tukey',
       alpha: 0.05,
@@ -794,6 +757,7 @@
       applySpec(item.spec || {});
       renderVariables();
       renderAssignments();
+      refreshLayout();
       validateModel();
     });
   }

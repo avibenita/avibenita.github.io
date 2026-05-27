@@ -514,6 +514,7 @@ function openPcaResultsDialog() {
         console.error("Failed to open PCA dialog:", asyncResult.error);
       } else {
         pcaDialog = asyncResult.value;
+        if (window.HubResultsBridge) HubResultsBridge.registerDialog(pcaDialog);
         pcaDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
           try {
             const message = JSON.parse(arg.message);
@@ -594,3 +595,16 @@ window.openPcaModelBuilder     = openPcaModelBuilder;
 window.openPcaResultsDialog    = openPcaResultsDialog;
 window.resetPcaModel           = resetPcaModel;
 window.updatePcaButtonState    = updatePcaButtonState;
+
+(function (hubKey, fn) {
+  window.StatisticoHubResults = window.StatisticoHubResults || {};
+  window.StatisticoHubResults[hubKey] = function () {
+    var gr = window.StatisticoGlobalRange && window.StatisticoGlobalRange.load();
+    if (!gr || !gr.values || gr.values.length < 2) return false;
+    return fn(gr);
+  };
+})('pca', function (gr) {
+  onRangeDataLoaded(gr.values, gr.address);
+  openPcaResultsDialog();
+  return true;
+});

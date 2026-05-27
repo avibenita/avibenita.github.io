@@ -1243,6 +1243,7 @@ function openDependentResultsDialog() {
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       dependentDialog = asyncResult.value;
+      if (window.HubResultsBridge) HubResultsBridge.registerDialog(dependentDialog);
       if (window.StatisticoDialogHost) {
         StatisticoDialogHost.onUserClosed(dependentDialog, function () { dependentDialog = null; });
       }
@@ -1325,4 +1326,18 @@ function updateButtonState() {
 
 window.openDependentBuilder = openDependentBuilder;
 window.openDependentResultsDialog = openDependentResultsDialog;
+
+(function (hubKey, fn) {
+  window.StatisticoHubResults = window.StatisticoHubResults || {};
+  window.StatisticoHubResults[hubKey] = function () {
+    var gr = window.StatisticoGlobalRange && window.StatisticoGlobalRange.load();
+    if (!gr || !gr.values || gr.values.length < 2) return false;
+    return fn(gr);
+  };
+})('dependent', function (gr) {
+  dependentRangeData = gr.values;
+  dependentRangeAddress = gr.address || '';
+  openDependentResultsDialog();
+  return true;
+});
 window.resetDependentModel = resetDependentModel;

@@ -806,6 +806,7 @@ function openIndependentResultsDialog() {
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       independentDialog = asyncResult.value;
+      if (window.HubResultsBridge) HubResultsBridge.registerDialog(independentDialog);
       if (window.StatisticoDialogHost) {
         StatisticoDialogHost.onUserClosed(independentDialog, function () {
           independentDialog = null;
@@ -915,3 +916,16 @@ window.openIndependentBuilderDialog = openIndependentBuilderDialog;
 window.hideIndependentConfigEmbed = hideIndependentConfigEmbed;
 window.openIndependentResultsDialog = openIndependentResultsDialog;
 window.resetIndependentModel = resetIndependentModel;
+
+(function (hubKey, fn) {
+  window.StatisticoHubResults = window.StatisticoHubResults || {};
+  window.StatisticoHubResults[hubKey] = function () {
+    var gr = window.StatisticoGlobalRange && window.StatisticoGlobalRange.load();
+    if (!gr || !gr.values || gr.values.length < 2) return false;
+    return fn(gr);
+  };
+})('independent', function (gr) {
+  onRangeDataLoaded(gr.values, gr.address);
+  openIndependentResultsDialog();
+  return true;
+});

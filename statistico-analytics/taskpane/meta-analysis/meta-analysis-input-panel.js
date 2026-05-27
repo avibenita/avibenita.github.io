@@ -279,10 +279,15 @@ function approximateChiSquare(chiSq, df) {
 }
 
 function openMetaResultsDialog(bundle) {
-  // Save bundle to session
   sessionStorage.setItem("metaBundle", JSON.stringify(bundle));
-  
-  const url = window.location.origin + window.location.pathname.replace("meta-analysis.html", "../../dialogs/views/meta-analysis/meta-results.html");
+
+  function getDialogsBaseUrl() {
+    const href = window.location.href;
+    if (href.includes("/taskpane/")) return `${href.split("/taskpane/")[0]}/dialogs/views/`;
+    return `${window.location.origin}/dialogs/views/`;
+  }
+
+  const url = `${getDialogsBaseUrl()}meta-analysis/meta-results.html?v=${Date.now()}`;
   
   Office.context.ui.displayDialogAsync(url, DIALOG_SIZES.RESULTS, (result) => {
     if (result.status === Office.AsyncResultStatus.Failed) {
@@ -291,6 +296,7 @@ function openMetaResultsDialog(bundle) {
     }
     
     metaResultsDialog = result.value;
+    if (window.HubResultsBridge) HubResultsBridge.registerDialog(metaResultsDialog);
     
     metaResultsDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
       const msg = JSON.parse(arg.message || "{}");
@@ -339,3 +345,22 @@ function updateButtonState() {
     resetBtn.style.display = hasSpec ? "inline-block" : "none";
   }
 }
+
+(function (hubKey, fn) {
+  window.StatisticoHubResults = window.StatisticoHubResults || {};
+  window.StatisticoHubResults[hubKey] = function () {
+    var gr = window.StatisticoGlobalRange && window.StatisticoGlobalRange.load();
+    if (!gr || !gr.values || gr.values.length < 2) return false;
+    return fn(gr);
+  };
+})('meta-analysis', function (gr) {
+  var spec = {};
+  try { spec = JSON.parse(sessionStorage.getItem('metaModelSpec') || '{}'); } catch (_e) {}
+  var bundle = buildMetaBundle(gr.values[0], gr.values.slice(1), spec);
+  if (bundle.error) {
+    alert('Error: ' + bundle.error);
+    return false;
+  }
+  openMetaResultsDialog(bundle);
+  return true;
+});

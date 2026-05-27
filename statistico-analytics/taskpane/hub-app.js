@@ -29,6 +29,7 @@ let hubPendingCorrelationViewUrl = null;
 let hubParetoFlowActive = false;
 let hubParetoConfigDialog = null;
 let hubParetoResultsDialog = null;
+let hubBuilderDialog = null;
 // Dialog dimensions are defined in dialog-sizes.js (DIALOG_SIZES)
 const HUB_CATEGORY_TILES = [
   {
@@ -638,12 +639,16 @@ function finishHubRegressionFlow() {
 
 function finishHubAnovaFlow() {
   hubAnovaFlowActive = false;
-  if (!hubAnovaDialog) setSelectedModuleCard("anova", false);
+  if (!hubAnovaDialog && !(window.HubResultsBridge && HubResultsBridge.hasActive())) {
+    setSelectedModuleCard("anova", false);
+  }
 }
 
 function finishHubIndependentFlow() {
   hubIndependentFlowActive = false;
-  if (!hubIndependentDialog) setSelectedModuleCard("independent", false);
+  if (!hubIndependentDialog && !(window.HubResultsBridge && HubResultsBridge.hasActive())) {
+    setSelectedModuleCard("independent", false);
+  }
 }
 
 function finishHubCorrelationFlow() {
@@ -705,6 +710,7 @@ function openHubCorrelationResultsAt(dialogUrl) {
       }
       var dialog = res.value;
       hubCorrelationResultsDialog = dialog;
+      if (window.HubResultsBridge) HubResultsBridge.registerDialog(dialog);
       var onClosed = function () {
         hubCorrelationResultsDialog = null;
         if (hubPendingCorrelationViewUrl && hubCorrelationMatrixData) {
@@ -1063,7 +1069,7 @@ function openAnovaConfigFromHub() {
             sessionStorage.setItem("anovaModelSpec", JSON.stringify(msg.data || msg.payload || {}));
             try { hubAnovaDialog.close(); } catch (e) {}
             hubAnovaDialog = null;
-            window.location.href = "./anova/anova.html?v=" + Date.now() + "&fromHub=1&autoConfig=1&directDialog=1&openResults=1";
+            if (window.HubResultsBridge) HubResultsBridge.open("anova", 500);
           } else if (msg.action === "close") {
             try { hubAnovaDialog.close(); } catch (e) {}
             hubAnovaDialog = null;
@@ -1073,7 +1079,7 @@ function openAnovaConfigFromHub() {
       });
       hubAnovaDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
         hubAnovaDialog = null;
-        finishHubAnovaFlow();
+        if (!window.HubResultsBridge || !HubResultsBridge.hasActive()) finishHubAnovaFlow();
       });
     }
   );
@@ -1118,7 +1124,7 @@ function openIndependentConfigFromHub() {
             sessionStorage.setItem("independentModelSpec", JSON.stringify(msg.data || msg.payload || {}));
             try { hubIndependentDialog.close(); } catch (e) {}
             hubIndependentDialog = null;
-            window.location.href = "./independent/independent.html?v=" + Date.now() + "&fromHub=1&autoConfig=1&directDialog=1&openResults=1";
+            if (window.HubResultsBridge) HubResultsBridge.open("independent", 500);
           } else if (msg.action === "close") {
             try { hubIndependentDialog.close(); } catch (e) {}
             hubIndependentDialog = null;
@@ -1128,7 +1134,7 @@ function openIndependentConfigFromHub() {
       });
       hubIndependentDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
         hubIndependentDialog = null;
-        finishHubIndependentFlow();
+        if (!window.HubResultsBridge || !HubResultsBridge.hasActive()) finishHubIndependentFlow();
       });
     }
   );
@@ -1233,12 +1239,10 @@ function openParetoFromHub() {
           if (msg.action === "ready" || msg.action === "requestData") {
             sendParetoData();
           } else if (msg.action === "runAnalysis") {
-            /* Store run data then navigate the taskpane to the launcher — same
-               pattern as correlation so sessionStorage is accessible. */
-            sessionStorage.setItem("paretoHubRunData", JSON.stringify(msg.data || {}));
+            try { sessionStorage.setItem("paretoHubRunData", JSON.stringify(msg.data || {})); } catch (e) {}
             try { hubParetoConfigDialog.close(); } catch (e) {}
             hubParetoConfigDialog = null;
-            window.location.href = "./pareto/pareto.html?v=" + Date.now() + "&fromHub=1";
+            if (window.HubResultsBridge) HubResultsBridge.open("pareto", 500);
           } else if (msg.action === "close") {
             try { hubParetoConfigDialog.close(); } catch (e) {}
             finishHubParetoFlow();
@@ -1266,7 +1270,8 @@ function openBuilderDialogFromHub(options) {
         setSelectedModuleCard(options.moduleId, false);
         return;
       }
-      var dlg = res.value;
+      hubBuilderDialog = res.value;
+      var dlg = hubBuilderDialog;
       var sendPayload = function () {
         if (!dlg) return;
         dlg.messageChild(JSON.stringify({
@@ -1288,21 +1293,29 @@ function openBuilderDialogFromHub(options) {
             if (typeof options.onModel === "function") options.onModel(msg);
             try { dlg.close(); } catch (e) {}
             dlg = null;
-            setTimeout(function () {
-              window.location.href = options.nextUrl();
-            }, options.nextDelayMs || 380);
+            hubBuilderDialog = null;
+            if (options.hubResultsKey && window.HubResultsBridge) {
+              HubResultsBridge.open(options.hubResultsKey, options.nextDelayMs || 380);
+            } else if (typeof options.nextUrl === "function") {
+              setTimeout(function () {
+                window.location.href = options.nextUrl();
+              }, options.nextDelayMs || 380);
+            }
             return;
           }
           var closeActions = options.closeActions || ["close"];
           if (closeActions.indexOf(msg.action) >= 0) {
             try { dlg.close(); } catch (e) {}
             dlg = null;
+            hubBuilderDialog = null;
             setSelectedModuleCard(options.moduleId, false);
           }
         } catch (e) {}
       });
       dlg.addEventHandler(Office.EventType.DialogEventReceived, function () {
         dlg = null;
+        hubBuilderDialog = null;
+        if (options.hubResultsKey) return;
         setSelectedModuleCard(options.moduleId, false);
       });
     }
@@ -1329,7 +1342,7 @@ function openDependentConfigFromHub() {
     onModel: function (msg) {
       sessionStorage.setItem("dependentModelSpec", JSON.stringify(msg.data || msg.payload || {}));
     },
-    nextUrl: function () { return nextModuleResultUrl("dependent"); }
+    hubResultsKey: "dependent"
   });
 }
 
@@ -1350,7 +1363,7 @@ function openFactorConfigFromHub() {
       spec.analysisMode = "factor";
       sessionStorage.setItem("factorModelSpec", JSON.stringify(spec));
     },
-    nextUrl: function () { return nextModuleResultUrl("factor"); },
+    hubResultsKey: "factor",
     nextDelayMs: 450
   });
 }
@@ -1379,7 +1392,7 @@ function openLogisticConfigFromHub() {
       spec.analysisMode = "logistic";
       sessionStorage.setItem("logisticModelSpec", JSON.stringify(spec));
     },
-    nextUrl: function () { return nextModuleResultUrl("logistic"); },
+    hubResultsKey: "logistic",
     nextDelayMs: 450
   });
 }
@@ -1401,7 +1414,7 @@ function openPcaConfigFromHub() {
       spec.analysisMode = "pca";
       sessionStorage.setItem("pcaModelSpec", JSON.stringify(spec));
     },
-    nextUrl: function () { return nextModuleResultUrl("pca"); },
+    hubResultsKey: "pca",
     nextDelayMs: 450
   });
 }
@@ -1421,7 +1434,7 @@ function openMixedConfigFromHub() {
     onModel: function (msg) {
       sessionStorage.setItem("mixedModelSpec", JSON.stringify(msg.payload || msg.data || {}));
     },
-    nextUrl: function () { return nextModuleResultUrl("mixed"); },
+    hubResultsKey: "mixed",
     nextDelayMs: 500
   });
 }
@@ -1441,7 +1454,7 @@ function openMetaConfigFromHub() {
     onModel: function (msg) {
       sessionStorage.setItem("metaModelSpec", JSON.stringify(msg.spec || msg.payload || msg.data || {}));
     },
-    nextUrl: function () { return nextModuleResultUrl("meta-analysis"); }
+    hubResultsKey: "meta-analysis"
   });
 }
 
@@ -1512,9 +1525,7 @@ function openClusterConfigFromHub() {
                 sessionStorage.setItem("clusterSpec", JSON.stringify(msg.spec || msg.payload || {}));
                 try { dlg.close(); } catch (e) {}
                 dlg = null;
-                setTimeout(function () {
-                  window.location.href = nextModuleResultUrl("cluster");
-                }, 480);
+                if (window.HubResultsBridge) HubResultsBridge.open("cluster", 480);
               } else if (msg.action === "clusterSetupClose" || msg.action === "close") {
                 try { dlg.close(); } catch (e) {}
                 dlg = null;
@@ -1524,7 +1535,9 @@ function openClusterConfigFromHub() {
           });
           dlg.addEventHandler(Office.EventType.DialogEventReceived, function () {
             dlg = null;
-            setSelectedModuleCard("cluster", false);
+            if (!window.HubResultsBridge || !HubResultsBridge.hasActive()) {
+              setSelectedModuleCard("cluster", false);
+            }
           });
         }
       );
@@ -1547,7 +1560,8 @@ function dismissAllHubDialogs() {
     hubCorrelationDialog,
     hubCorrelationResultsDialog,
     hubParetoConfigDialog,
-    hubParetoResultsDialog
+    hubParetoResultsDialog,
+    hubBuilderDialog
   ].forEach(function (dlg) {
     if (dlg) {
       hadOpen = true;
@@ -1567,9 +1581,11 @@ function dismissAllHubDialogs() {
   hubCorrelationMatrixData = null;
   hubParetoConfigDialog = null;
   hubParetoResultsDialog = null;
+  hubBuilderDialog = null;
   hubPendingResultsViewUrl = null;
   hubPendingUnivariateResults = null;
   hubCurrentUnivariateResults = null;
+  if (window.HubResultsBridge) HubResultsBridge.dismissAll();
   if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
   return hadOpen;
 }

@@ -667,6 +667,7 @@ function openClusterResultsDialogOnly() {
         return;
       }
       clusterDialog = asyncResult.value;
+      if (window.HubResultsBridge) HubResultsBridge.registerDialog(clusterDialog);
       clusterDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
         try {
           const message = parseDialogMessage(arg);
@@ -727,3 +728,16 @@ window.openClusterSetupDialog = openClusterSetupDialog;
 window.openClusterResultsDialog = openClusterResultsDialog;
 window.readClusterSpec = readClusterSpec;
 window.saveClusterSpec = saveClusterSpec;
+
+(function (hubKey, fn) {
+  window.StatisticoHubResults = window.StatisticoHubResults || {};
+  window.StatisticoHubResults[hubKey] = function () {
+    var gr = window.StatisticoGlobalRange && window.StatisticoGlobalRange.load();
+    if (!gr || !gr.values || gr.values.length < 2) return false;
+    return fn(gr);
+  };
+})('cluster', function (gr) {
+  onRangeDataLoaded(gr.values, gr.address);
+  openClusterResultsDialog();
+  return true;
+});

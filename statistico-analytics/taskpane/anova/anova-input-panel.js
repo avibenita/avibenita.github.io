@@ -628,6 +628,7 @@ function openAnovaResultsDialog() {
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       anovaDialog = asyncResult.value;
+      if (window.HubResultsBridge) HubResultsBridge.registerDialog(anovaDialog);
       if (window.StatisticoDialogHost) {
         StatisticoDialogHost.onUserClosed(anovaDialog, function () { anovaDialog = null; });
       }
@@ -678,3 +679,16 @@ function sendAnovaBundle() {
 
 window.openAnovaBuilder = openAnovaBuilder;
 window.openAnovaResultsDialog = openAnovaResultsDialog;
+
+(function (hubKey, fn) {
+  window.StatisticoHubResults = window.StatisticoHubResults || {};
+  window.StatisticoHubResults[hubKey] = function () {
+    var gr = window.StatisticoGlobalRange && window.StatisticoGlobalRange.load();
+    if (!gr || !gr.values || gr.values.length < 2) return false;
+    return fn(gr);
+  };
+})('anova', function (gr) {
+  onRangeDataLoaded(gr.values, gr.address);
+  openAnovaResultsDialog();
+  return true;
+});

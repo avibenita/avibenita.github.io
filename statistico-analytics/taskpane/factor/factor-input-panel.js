@@ -541,6 +541,7 @@ function openFactorResultsDialog() {
         console.error("Failed to open factor dialog:", asyncResult.error);
       } else {
         factorDialog = asyncResult.value;
+        if (window.HubResultsBridge) HubResultsBridge.registerDialog(factorDialog);
         factorDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
           try {
             const message = JSON.parse(arg.message);
@@ -620,3 +621,16 @@ function updateButtonState() {
 window.openFactorModelBuilder = openFactorModelBuilder;
 window.openFactorResultsDialog = openFactorResultsDialog;
 window.resetFactorModel = resetFactorModel;
+
+(function (hubKey, fn) {
+  window.StatisticoHubResults = window.StatisticoHubResults || {};
+  window.StatisticoHubResults[hubKey] = function () {
+    var gr = window.StatisticoGlobalRange && window.StatisticoGlobalRange.load();
+    if (!gr || !gr.values || gr.values.length < 2) return false;
+    return fn(gr);
+  };
+})('factor', function (gr) {
+  onRangeDataLoaded(gr.values, gr.address);
+  openFactorResultsDialog();
+  return true;
+});

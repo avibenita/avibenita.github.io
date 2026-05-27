@@ -147,6 +147,7 @@ function openLogisticResultsDialog() {
         console.error("Failed to open logistic dialog:", asyncResult.error);
       } else {
         logisticDialog = asyncResult.value;
+        if (window.HubResultsBridge) HubResultsBridge.registerDialog(logisticDialog);
 
         logisticDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
           try {
@@ -1023,3 +1024,17 @@ function updateButtonState() {
 window.openLogisticModelBuilder = openLogisticModelBuilder;
 window.openLogisticResultsDialog = openLogisticResultsDialog;
 window.resetLogisticModel = resetLogisticModel;
+
+(function (hubKey, fn) {
+  window.StatisticoHubResults = window.StatisticoHubResults || {};
+  window.StatisticoHubResults[hubKey] = function () {
+    var gr = window.StatisticoGlobalRange && window.StatisticoGlobalRange.load();
+    if (!gr || !gr.values || gr.values.length < 2) return false;
+    return fn(gr);
+  };
+})('logistic', function (gr) {
+  logisticRangeData = gr.values;
+  logisticRangeAddress = gr.address || '';
+  openLogisticResultsDialog();
+  return true;
+});

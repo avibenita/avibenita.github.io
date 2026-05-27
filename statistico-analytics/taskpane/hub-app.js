@@ -1324,7 +1324,7 @@ function openMixedConfigFromHub() {
   return openBuilderDialogFromHub({
     moduleId: "mixed",
     dialogPath: "mixed/mixed-input.html",
-    dialogOptions: DIALOG_SIZES.MIXED_CONFIG_HUB,
+    dialogOptions: DIALOG_SIZES.SETUP,
     dataType: "MIXED_DATA",
     payloadBuilder: function (gr) {
       var saved = null;

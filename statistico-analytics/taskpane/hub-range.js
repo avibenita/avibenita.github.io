@@ -1,6 +1,6 @@
 /* global Office, Excel, document, StatisticoGlobalRange */
 /**
- * Hub-only: compact Working Data range bar; persists via StatisticoGlobalRange.
+ * Hub-only: compact Active Range bar; persists via StatisticoGlobalRange.
  */
 (function () {
   var rangeMode = "used";
@@ -187,6 +187,7 @@
 
   function toggleRangePicker(event) {
     if (event) event.stopPropagation();
+    closeRangeInfo();
     var pop = document.getElementById("hubRangePopover");
     if (!pop) return;
     var opening = !pop.classList.contains("open");
@@ -201,6 +202,18 @@
   function closeRangePicker() {
     var pop = document.getElementById("hubRangePopover");
     if (pop) pop.classList.remove("open");
+  }
+
+  function toggleRangeInfo(event) {
+    if (event) event.stopPropagation();
+    closeRangePicker();
+    var box = document.getElementById("hubRangeInfo");
+    if (box) box.classList.toggle("open");
+  }
+
+  function closeRangeInfo() {
+    var box = document.getElementById("hubRangeInfo");
+    if (box) box.classList.remove("open");
   }
 
   Office.onReady(async function (info) {
@@ -222,12 +235,18 @@
   window.hubLoadFromNamedRange = loadFromNamedRange;
   window.hubUseManualRange = useManualRange;
   window.hubToggleRangePicker = toggleRangePicker;
+  window.hubToggleRangeInfo = toggleRangeInfo;
 
   document.addEventListener("click", function (ev) {
     var pop = document.getElementById("hubRangePopover");
-    var btn = document.getElementById("hubRangeChangeBtn");
-    if (!pop || !btn) return;
-    if (pop.contains(ev.target) || btn.contains(ev.target)) return;
-    closeRangePicker();
+    var customizeBtn = document.getElementById("hubRangeCustomizeBtn");
+    var infoBox = document.getElementById("hubRangeInfo");
+    var infoBtn = document.getElementById("hubRangeInfoBtn");
+    if (pop && customizeBtn && !pop.contains(ev.target) && !customizeBtn.contains(ev.target)) {
+      closeRangePicker();
+    }
+    if (infoBox && infoBtn && !infoBox.contains(ev.target) && !infoBtn.contains(ev.target)) {
+      closeRangeInfo();
+    }
   });
 })();

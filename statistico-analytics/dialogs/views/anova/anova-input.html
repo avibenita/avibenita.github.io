@@ -3,101 +3,230 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>ANOVA Builder</title>
+  <title>ANOVA Configuration</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
-  <link rel="stylesheet" href="../shared-config.css?v=20260511d"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="../shared-config.css?v=20260526a"/>
   <script src="../shared-config.js?v=20260316"></script>
   <script src="../ds-guide.js?v=20260330g"></script>
   <style>
-    /* ── Dependent Variable — elevated hierarchy ───────────── */
-    .dv-wrap {
-      background: var(--cfg-input-bg);
-      border: 1.5px solid var(--cfg-run-from);
-      border-left: 4px solid var(--cfg-run-from);
-      border-radius: 9px;
-      padding: 10px 12px 12px;
-      margin-bottom: 4px;
-      box-shadow: 0 2px 8px rgba(249,115,22,.10);
+    :root {
+      --anova-dv: #f97316;
+      --anova-fac: #4fc3f7;
+      --anova-cond: #a78bfa;
     }
-    .dv-label-row {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      margin-bottom: 7px;
-    }
-    .dv-badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 22px;
-      height: 22px;
-      border-radius: 6px;
-      background: rgba(249,115,22,.15);
-      color: var(--cfg-run-from);
-      font-size: 11px;
-      flex-shrink: 0;
-    }
-    .dv-label {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--cfg-run-from);
-      letter-spacing: .01em;
-      flex: 1;
-    }
-    .dv-role-tag {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      color: var(--cfg-run-from);
-      background: rgba(249,115,22,.12);
-      border: 1px solid rgba(249,115,22,.28);
-      border-radius: 20px;
-      padding: 1px 8px;
-      opacity: .9;
-    }
-    .dv-select {
-      border-color: rgba(249,115,22,.35) !important;
-    }
-    .dv-select:focus {
-      border-color: var(--cfg-run-from) !important;
-      box-shadow: 0 0 0 3px rgba(249,115,22,.15) !important;
+    [data-theme="light"] {
+      --anova-dv: #c2410c;
+      --anova-fac: #0369a1;
+      --anova-cond: #6d28d9;
     }
 
-    /* ── Grouping factors divider ───────────────────────────── */
-    .factors-divider {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 14px 0 12px;
+    .anova-layout {
+      display: flex; gap: 10px; flex: 1 1 0; min-height: 0;
+      padding: 8px 10px; overflow: hidden;
     }
-    .factors-divider-line {
-      flex: 1;
-      height: 1px;
-      background: var(--cfg-border);
+    .reg-vars-col {
+      flex: 0 0 220px; display: flex; flex-direction: column;
+      gap: 6px; min-height: 0; overflow: hidden;
     }
-    .factors-divider-text {
-      font-size: 10.5px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .07em;
-      color: var(--cfg-text2);
-      white-space: nowrap;
-      display: flex;
-      align-items: center;
-      gap: 5px;
+    .reg-model-col {
+      flex: 1 1 0; display: flex; flex-direction: column;
+      gap: 8px; min-height: 0; overflow-y: auto; padding-right: 4px;
     }
-    .factors-divider-text i { font-size: 9px; }
+    .reg-vars-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 2px 6px; border-bottom: 1px solid var(--cfg-border); flex-shrink: 0;
+    }
+    .reg-vars-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .55px; color: var(--cfg-text); white-space: nowrap;
+    }
+    .reg-vars-summary { display: flex; gap: 5px; align-items: center; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
+    .reg-vars-badge {
+      font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px; white-space: nowrap;
+    }
+    .reg-vb-num  { background: rgba(167,139,250,.12); color: #6d28d9; border: 1px solid rgba(167,139,250,.3); }
+    .reg-vb-cat  { background: rgba(79,195,247,.12);  color: #0369a1; border: 1px solid rgba(79,195,247,.3); }
+    .reg-vb-miss { background: rgba(249,115,22,.1);   color: #c2410c; border: 1px solid rgba(249,115,22,.25); }
+
+    .reg-vars-box {
+      flex: 1 1 0; min-height: 0; overflow-y: auto;
+      border: 1px solid var(--cfg-border); border-radius: 8px; background: var(--cfg-surface);
+    }
+    .reg-var-row {
+      display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+      cursor: grab; border-bottom: 1px solid var(--cfg-border);
+      transition: background .12s; user-select: none;
+    }
+    .reg-var-row:last-child { border-bottom: none; }
+    .reg-var-row:hover:not(.used):not(.ineligible) { background: var(--cfg-tbl-hover); }
+    .reg-var-row.dragging { opacity: .4; }
+    .reg-var-row.used { opacity: .38; cursor: not-allowed; pointer-events: none; }
+    .reg-var-row.ineligible { opacity: .45; cursor: not-allowed; }
+    .reg-var-icon {
+      width: 16px; height: 16px; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 8px; font-weight: 700; flex-shrink: 0;
+    }
+    .reg-var-icon.num { background: rgba(167,139,250,.2); color: #a78bfa; }
+    .reg-var-icon.cat { background: rgba(79,195,247,.2);  color: #4fc3f7; }
+    .reg-var-icon.unk { background: rgba(148,163,184,.2); color: #94a3b8; }
+    .reg-var-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .reg-var-name {
+      font-size: 12px; font-weight: 600; color: var(--cfg-text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .reg-var-stats { font-size: 9.5px; color: var(--cfg-text3); line-height: 1.2; }
+    .reg-var-miss { color: #f97316; font-weight: 600; }
+
+    .reg-model-title {
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 2px 6px; border-bottom: 1px solid var(--cfg-border); flex-shrink: 0;
+    }
+    .reg-model-title > span:first-child {
+      font-size: 13px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .6px; color: var(--cfg-text);
+    }
+    .reg-model-meta {
+      font-size: 10px; color: var(--cfg-text3); margin-left: auto;
+      text-align: right; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; max-width: 55%;
+    }
+    .reg-equation-strip {
+      font-size: 11.5px; color: var(--cfg-text3);
+      padding: 5px 8px; background: var(--cfg-surface);
+      border: 1px dashed var(--cfg-border); border-radius: 6px;
+      line-height: 1.4; word-break: break-word; flex-shrink: 0;
+    }
+    .reg-equation-strip strong { color: var(--anova-dv); font-weight: 700; }
+
+    .type-row {
+      display: flex; gap: 6px; flex-shrink: 0;
+    }
+    .type-pill {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 7px 8px; border-radius: 8px; border: 1px solid var(--cfg-border);
+      background: var(--cfg-surface); cursor: pointer; font-size: 11px; font-weight: 600;
+      color: var(--cfg-text2, var(--cfg-text)); transition: all .12s;
+    }
+    .type-pill input { display: none; }
+    .type-pill i { font-size: 11px; opacity: .75; }
+    .type-pill.active {
+      border-color: rgba(249,115,22,.45);
+      background: rgba(249,115,22,.08);
+      color: var(--anova-dv);
+      box-shadow: 0 0 0 1px rgba(249,115,22,.12);
+    }
+
+    .reg-zone-card {
+      border: 1px solid var(--cfg-border); border-radius: 8px;
+      overflow: hidden; flex-shrink: 0;
+    }
+    .zone-dv.reg-zone-card {
+      border: 2px solid rgba(249,115,22,.45);
+      box-shadow: 0 2px 14px rgba(249,115,22,.1);
+    }
+    .zone-fac.reg-zone-card { border-color: rgba(79,195,247,.35); }
+    .zone-cond.reg-zone-card { border-color: rgba(167,139,250,.35); }
+
+    .reg-zone-head {
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 10px; font-size: 11.5px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .45px;
+      border-bottom: 1px solid var(--cfg-border);
+    }
+    .reg-zone-head .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .zone-dv .reg-zone-head { background: rgba(249,115,22,.08); color: var(--anova-dv); }
+    .zone-dv .reg-zone-head .dot { background: var(--anova-dv); }
+    .zone-fac .reg-zone-head { background: rgba(79,195,247,.08); color: var(--anova-fac); }
+    .zone-fac .reg-zone-head .dot { background: var(--anova-fac); }
+    .zone-cond .reg-zone-head { background: rgba(167,139,250,.08); color: var(--anova-cond); }
+    .zone-cond .reg-zone-head .dot { background: var(--anova-cond); }
+
+    .zone-head-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .zone-head-main .zone-hint {
+      font-size: 9.5px; font-weight: 400; letter-spacing: .1px;
+      text-transform: none; opacity: .8; line-height: 1.2;
+    }
+    .zone-req { font-size: 13px; font-weight: 900; color: #dc2626; opacity: .85; margin-left: 3px; }
+    .zone-single-badge {
+      display: inline-flex; align-items: center;
+      font-size: 9px; font-weight: 700; padding: 1px 5px;
+      border-radius: 4px; opacity: .7; background: currentColor;
+    }
+    .zone-single-badge span { color: var(--cfg-bg, #1e1e2e); }
+
+    .zone-single .reg-zone-body {
+      height: 38px; min-height: unset; max-height: 38px;
+      padding: 4px 6px; flex-wrap: nowrap; align-items: center; overflow: hidden;
+    }
+    .reg-zone-body {
+      padding: 6px; min-height: 54px; display: flex; flex-wrap: wrap;
+      gap: 4px; align-content: flex-start; transition: background .2s;
+    }
+    .zone-dv .reg-zone-body { background: rgba(249,115,22,.04); }
+    .zone-fac .reg-zone-body { background: rgba(79,195,247,.04); }
+    .zone-cond .reg-zone-body { background: rgba(167,139,250,.04); }
+    .reg-zone-body.drag-over { background: rgba(255,255,255,.06); }
+    .zone-dv .reg-zone-body.drag-over { background: rgba(249,115,22,.1); }
+    .zone-fac .reg-zone-body.drag-over { background: rgba(79,195,247,.1); }
+    .zone-cond .reg-zone-body.drag-over { background: rgba(167,139,250,.1); }
+    .reg-zone-placeholder {
+      width: 100%; text-align: center; font-size: 11px; font-style: italic;
+      color: var(--cfg-text3); padding: 8px 0;
+    }
+    .zone-single .reg-zone-placeholder { padding: 4px 0; }
+
+    .reg-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 6px 3px 8px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; border: 1px solid; white-space: nowrap;
+    }
+    .zone-dv .reg-chip { background: rgba(249,115,22,.15); border-color: rgba(249,115,22,.4); color: var(--anova-dv); }
+    .zone-fac .reg-chip { background: rgba(79,195,247,.15);  border-color: rgba(79,195,247,.4);  color: var(--anova-fac); }
+    .zone-cond .reg-chip { background: rgba(167,139,250,.15); border-color: rgba(167,139,250,.4); color: var(--anova-cond); }
+    .reg-chip-x {
+      background: none; border: none; cursor: pointer;
+      padding: 0 1px; opacity: .7; font-size: 12px; color: inherit; line-height: 1;
+    }
+    .reg-chip-x:hover { opacity: 1; }
+
+    .adv-wrap { flex-shrink: 0; }
+    .adv-toggle {
+      width: 100%; display: flex; align-items: center; gap: 7px;
+      padding: 7px 10px; border: 1px solid var(--cfg-border); border-radius: 8px;
+      background: var(--cfg-surface2, var(--cfg-surface));
+      cursor: pointer; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .5px;
+      color: var(--cfg-text); user-select: none;
+    }
+    .adv-toggle:hover { background: var(--cfg-tbl-hover); }
+    .adv-toggle .adv-chevron { margin-left: auto; font-size: 10px; transition: transform .2s; color: var(--cfg-text3); }
+    .adv-wrap.open .adv-toggle { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+    .adv-wrap.open .adv-toggle .adv-chevron { transform: rotate(180deg); }
+    .adv-body {
+      overflow: hidden; max-height: 0; opacity: 0;
+      transition: max-height .28s ease, opacity .2s ease;
+      border: 1px solid var(--cfg-border); border-top: none;
+      border-radius: 0 0 8px 8px; padding: 0 10px;
+    }
+    .adv-wrap.open .adv-body { max-height: 400px; opacity: 1; padding: 8px 10px; }
+
+    .reg-obs-strip {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 10px; font-size: 11px; color: var(--cfg-text);
+      border: 1px solid var(--cfg-border); border-radius: 8px;
+      background: var(--cfg-surface); flex-shrink: 0;
+    }
+    .reg-obs-strip .warn { color: #dc2626; font-size: 10px; }
   </style>
 </head>
 <body>
 <div class="cfg-shell">
 
-  <!-- Header -->
   <header class="cfg-header">
     <div class="cfg-header-icon"><i class="fa-solid fa-table-cells"></i></div>
-    <span class="cfg-header-title">ANOVA Builder</span>
+    <span class="cfg-header-title">ANOVA Configuration</span>
     <span class="cfg-meta-badge" id="metaBadge">—</span>
     <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch theme">
       <span class="cfg-toggle-icon">&#x1F319;</span>
@@ -106,247 +235,562 @@
     </button>
   </header>
 
-  <!-- Spinner -->
   <div id="loadingSpinner" class="cfg-spinner">
-    <i class="fa-solid fa-spinner fa-spin"></i> Loading data…
+    <i class="fa-solid fa-spinner fa-spin"></i> Loading data&hellip;
   </div>
 
-  <!-- Main content -->
-  <div id="mainContent" style="display:none;flex:1;flex-direction:column;min-height:0;">
-    <div class="cfg-body">
+  <div id="mainContent" style="display:none;flex:1;min-height:0;overflow:hidden;">
 
-      <!-- Range info -->
-      <div class="cfg-panel">
-        <div class="cfg-panel-body">
-          <div class="cfg-range-strip">
-            <div class="cfg-range-item">Range: <strong id="rangeAddr">—</strong></div>
-            <div class="cfg-range-item">Rows: <strong id="rowCount">0</strong></div>
-            <div class="cfg-range-item">Columns: <strong id="colCount">0</strong></div>
+    <div class="anova-layout">
+
+      <div class="reg-vars-col">
+        <div class="reg-vars-header">
+          <span class="reg-vars-title">Available Variables</span>
+          <span class="reg-vars-summary" id="varsSummary"></span>
+        </div>
+        <div class="reg-vars-box" id="variablesListBox">
+          <div style="color:var(--cfg-text3);font-style:italic;font-size:11px;text-align:center;padding:20px 10px;">
+            No data loaded yet.
           </div>
         </div>
       </div>
 
-      <!-- Analysis Type -->
-      <div class="cfg-panel">
-        <div class="cfg-panel-head"><i class="fa-solid fa-diagram-project"></i> Analysis Type</div>
-        <div class="cfg-panel-body">
-          <div class="cfg-radio-group" id="typeGroup">
-            <div class="cfg-radio-option">
-              <input type="radio" name="anovaType" id="typeOneWay" value="one-way" checked/>
-              <label for="typeOneWay" class="cfg-radio-label">
-                <span class="radio-icon"><i class="fa-solid fa-layer-group"></i></span>
-                <span class="radio-text">One-Way</span>
-              </label>
+      <div class="reg-model-col">
+
+        <div class="reg-model-title">
+          <span>Model</span>
+          <span class="reg-model-meta" id="tbRange">—</span>
+        </div>
+
+        <div class="type-row" id="typeGroup">
+          <label class="type-pill active" id="pillOneWay">
+            <input type="radio" name="anovaType" id="typeOneWay" value="one-way" checked/>
+            <i class="fa-solid fa-layer-group"></i> One-Way
+          </label>
+          <label class="type-pill" id="pillTwoWay">
+            <input type="radio" name="anovaType" id="typeTwoWay" value="two-way"/>
+            <i class="fa-solid fa-table-cells-large"></i> Two-Way
+          </label>
+        </div>
+
+        <div class="reg-equation-strip" id="modelEquation">Assign dependent variable and grouping factor(s)</div>
+
+        <div id="panelVars">
+
+          <div class="reg-zone-card zone-dv zone-single">
+            <div class="reg-zone-head">
+              <div class="dot"></div>
+              <div class="zone-head-main">
+                <div class="zone-label">Dependent variable</div>
+                <div class="zone-hint">Numeric outcome to compare across groups</div>
+              </div>
+              <span class="zone-req">*</span>
+              <span class="zone-single-badge"><span>&times;1</span></span>
             </div>
-            <div class="cfg-radio-option">
-              <input type="radio" name="anovaType" id="typeTwoWay" value="two-way"/>
-              <label for="typeTwoWay" class="cfg-radio-label">
-                <span class="radio-icon"><i class="fa-solid fa-table-cells-large"></i></span>
-                <span class="radio-text">Two-Way</span>
-              </label>
+            <div class="reg-zone-body drop-zone" data-zone="dv" id="zoneDV">
+              <div class="reg-zone-placeholder">Drag a numeric variable here</div>
             </div>
-            <div class="cfg-radio-option" style="display:none;">
-              <input type="radio" name="anovaType" id="typeRM" value="repeated"/>
-              <label for="typeRM" class="cfg-radio-label">
-                <span class="radio-icon"><i class="fa-solid fa-repeat"></i></span>
-                <span class="radio-text">Repeated</span>
-              </label>
+          </div>
+
+          <div class="reg-zone-card zone-fac zone-single">
+            <div class="reg-zone-head">
+              <div class="dot"></div>
+              <div class="zone-head-main">
+                <div class="zone-label">Group A</div>
+                <div class="zone-hint">First grouping factor (categories)</div>
+              </div>
+              <span class="zone-req">*</span>
+              <span class="zone-single-badge"><span>&times;1</span></span>
+            </div>
+            <div class="reg-zone-body drop-zone" data-zone="f1" id="zoneF1">
+              <div class="reg-zone-placeholder">Drag a grouping variable here</div>
+            </div>
+          </div>
+
+          <div class="reg-zone-card zone-fac zone-single" id="factor2Card" style="display:none;">
+            <div class="reg-zone-head">
+              <div class="dot"></div>
+              <div class="zone-head-main">
+                <div class="zone-label">Group B</div>
+                <div class="zone-hint">Second grouping factor (two-way only)</div>
+              </div>
+              <span class="zone-req">*</span>
+              <span class="zone-single-badge"><span>&times;1</span></span>
+            </div>
+            <div class="reg-zone-body drop-zone" data-zone="f2" id="zoneF2">
+              <div class="reg-zone-placeholder">Drag a grouping variable here</div>
+            </div>
+          </div>
+
+        </div>
+
+        <div id="panelRM" style="display:none;">
+          <div class="reg-zone-card zone-cond">
+            <div class="reg-zone-head">
+              <div class="dot"></div>
+              <div class="zone-head-main">
+                <div class="zone-label">Conditions</div>
+                <div class="zone-hint">Repeated measures — one numeric column per condition</div>
+              </div>
+              <span class="zone-req">*</span>
+            </div>
+            <div class="reg-zone-body drop-zone" data-zone="cond" id="zoneCond">
+              <div class="reg-zone-placeholder">Drag 2+ numeric condition columns here</div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Data Structure Guide -->
-      <div id="dsGuideContainer"></div>
-
-      <!-- Variable Selection – One-Way / Two-Way -->
-      <div class="cfg-panel" id="panelVars">
-        <div class="cfg-panel-head"><i class="fa-solid fa-list-check"></i> Variables</div>
-        <div class="cfg-panel-body">
-
-          <!-- Dependent Variable — primary/outcome role -->
-          <div class="dv-wrap">
-            <div class="dv-label-row">
-              <span class="dv-badge"><i class="fa-solid fa-arrow-down-to-bracket"></i></span>
-              <label class="dv-label" for="selectDV">Dependent Variable</label>
-              <span class="dv-role-tag">outcome</span>
-            </div>
-            <select id="selectDV" class="cfg-select dv-select"></select>
+        <div class="adv-wrap" id="guideWrap">
+          <div class="adv-toggle" id="guideToggle" role="button" tabindex="0" aria-expanded="false">
+            <i class="fa-solid fa-circle-info" style="color:var(--anova-dv);"></i>
+            <span>Data format guide</span>
+            <i class="fa-solid fa-chevron-down adv-chevron"></i>
           </div>
-
-          <div class="factors-divider">
-            <span class="factors-divider-line"></span>
-            <span class="factors-divider-text"><i class="fa-solid fa-sitemap"></i> Grouping Factors</span>
-            <span class="factors-divider-line"></span>
-          </div>
-
-          <label class="cfg-label" for="selectFactor1">Group A (grouping column)</label>
-          <select id="selectFactor1" class="cfg-select"></select>
-
-          <div id="factor2Wrap" style="display:none;">
-            <label class="cfg-label" style="margin-top:10px;" for="selectFactor2">Group B (grouping column)</label>
-            <select id="selectFactor2" class="cfg-select"></select>
-          </div>
-
-          <!-- hidden checkboxes – always on, kept for collectSpec() compat -->
-          <input type="checkbox" id="chkDescriptives" checked style="display:none;"/>
-          <input type="checkbox" id="chkAssumptions"  checked style="display:none;"/>
-          <input type="checkbox" id="chkNonParam"     checked style="display:none;"/>
-
+          <div class="adv-body"><div id="dsGuideContainer"></div></div>
         </div>
+
+        <div class="reg-obs-strip" id="obsMonitor">
+          <span id="obsText">Configure the model to continue</span>
+          <span class="warn" id="obsWarn" style="display:none;"></span>
+        </div>
+
+        <input type="checkbox" id="chkDescriptives" checked style="display:none;"/>
+        <input type="checkbox" id="chkAssumptions" checked style="display:none;"/>
+        <input type="checkbox" id="chkNonParam" checked style="display:none;"/>
+
       </div>
-
-      <!-- Variable Selection – Repeated Measures -->
-      <div class="cfg-panel" id="panelRM" style="display:none;">
-        <div class="cfg-panel-head"><i class="fa-solid fa-repeat"></i> Conditions (columns)</div>
-        <div class="cfg-panel-body">
-          <p class="cfg-hint">Select 2 or more columns — each column = one condition measured on the same subjects.</p>
-          <div id="conditionCheckList" style="margin-top:8px;max-height:200px;overflow-y:auto;"></div>
-
-        </div><!-- /.cfg-panel-body (panelRM) -->
-      </div><!-- /.cfg-panel (panelRM) -->
-
-    </div><!-- /.cfg-body -->
-
-    <!-- Footer -->
-    <div class="cfg-footer">
-      <button class="cfg-btn cancel" id="btnCancel" onclick="sendClose()">
-        <i class="fa-solid fa-times"></i> Cancel
-      </button>
-      <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Load a previously saved configuration">
-        <i class="fa-solid fa-clock-rotate-left"></i> Load previous…
-      </button>
-      <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" disabled title="Save current configuration">
-        <i class="fa-solid fa-floppy-disk"></i> Save configuration
-      </button>
-      <button class="cfg-btn run" id="runBtn" onclick="runAnalysis()" disabled>
-        <i class="fa-solid fa-play"></i> Run ANOVA
-      </button>
     </div>
-  </div><!-- /#mainContent -->
+  </div>
 
-</div><!-- /.cfg-shell -->
+  <div class="cfg-footer">
+    <button class="cfg-btn cancel" id="btnCancel"><i class="fa-solid fa-times"></i> Cancel</button>
+    <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Load a previously saved configuration">
+      <i class="fa-solid fa-clock-rotate-left"></i> Load previous&hellip;
+    </button>
+    <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" disabled title="Save current configuration">
+      <i class="fa-solid fa-floppy-disk"></i> Save configuration
+    </button>
+    <button class="cfg-btn run" id="runBtn" onclick="runAnalysis()" disabled>
+      <i class="fa-solid fa-play"></i> Run ANOVA
+    </button>
+  </div>
+
+</div>
 
 <script>
-  /* ── State ────────────────────────────────────────────── */
-  let _headers = [];
-  let _rows    = [];
-  let _saved   = null;
+  var _headers = [];
+  var _rows = [];
+  var _address = '';
+  var _saved = null;
+  var columnStats = [];
+  var draggedElement = null;
 
-  const STORAGE_KEY = 'anova-config';
+  var assignments = { dv: null, factor1: null, factor2: null, conditions: [] };
 
-  /* ── Message bridge ───────────────────────────────────── */
+  var STORAGE_KEY = 'anova-config';
+
   function sendClose() {
     Office.context.ui.messageParent(JSON.stringify({ action: 'close' }));
   }
 
-  Office.onReady(() => {
+  Office.onReady(function() {
     Office.context.ui.addHandlerAsync(
       Office.EventType.DialogParentMessageReceived,
-      (arg) => {
+      function(arg) {
         try {
-          const msg = JSON.parse(arg.message || '{}');
+          var msg = JSON.parse(arg.message || '{}');
           if (msg.type === 'ANOVA_DATA') {
-            const p = msg.payload || {};
+            var p = msg.payload || {};
             _headers = p.headers || [];
-            _rows    = p.rows    || [];
-            _saved   = p.savedModelSpec || null;
+            _rows = p.rows || [];
+            _address = p.address || '';
+            _saved = p.savedModelSpec || null;
             initUI();
           }
-        } catch(e) {}
+        } catch (_e) {}
       }
     );
-    Office.context.ui.messageParent(JSON.stringify({ action: 'ready' }));
-  });
-
-  /* ── Build UI once data arrives ───────────────────────── */
-  function initUI() {
-    document.getElementById('loadingSpinner').style.display = 'none';
-    const mc = document.getElementById('mainContent');
-    mc.style.display = 'flex';
-
-    document.getElementById('rowCount').textContent = _rows.length;
-    document.getElementById('colCount').textContent = _headers.length;
-    document.getElementById('rangeAddr').textContent = '(workbook)';
-    document.getElementById('metaBadge').textContent = `${_rows.length} rows`;
-
-    populateColumnSelects();
-    buildConditionCheckList();
-
-    /* Radio change */
-    document.querySelectorAll('input[name="anovaType"]').forEach(r => {
+    setupDropZones();
+    document.getElementById('btnCancel').addEventListener('click', sendClose);
+    document.querySelectorAll('input[name="anovaType"]').forEach(function(r) {
       r.addEventListener('change', onTypeChange);
     });
-    onTypeChange();
+    document.getElementById('pillOneWay').addEventListener('click', function() { setType('one-way'); });
+    document.getElementById('pillTwoWay').addEventListener('click', function() { setType('two-way'); });
+    document.getElementById('guideToggle').addEventListener('click', function() {
+      document.getElementById('guideWrap').classList.toggle('open');
+    });
+    Office.context.ui.messageParent(JSON.stringify({ action: 'ready' }));
+    setInterval(function() {
+      if (_headers.length) return;
+      Office.context.ui.messageParent(JSON.stringify({ action: 'requestData' }));
+    }, 500);
+  });
 
+  function buildColumnStats() {
+    columnStats = _headers.map(function(name, colIdx) {
+      var numeric = 0, string = 0, missing = 0, categories = {};
+      _rows.forEach(function(row) {
+        var value = row[colIdx];
+        if (value === null || value === undefined || value === '') { missing++; return; }
+        var num = parseFloat(value);
+        if (!isNaN(num) && isFinite(num)) numeric++;
+        else { string++; categories[String(value)] = true; }
+        if (!isNaN(num) && isFinite(num)) categories[String(num)] = true;
+      });
+      var distinct = Object.keys(categories).length;
+      var isNumeric = numeric > string;
+      return {
+        name: name || ('Col ' + (colIdx + 1)),
+        idx: colIdx,
+        numeric: numeric,
+        string: string,
+        missing: missing,
+        distinct: distinct,
+        isNumeric: isNumeric,
+        dvEligible: isNumeric && numeric >= 5,
+        factorEligible: distinct >= 2 && distinct <= 100,
+        condEligible: isNumeric && numeric >= 2
+      };
+    });
+  }
+
+  function initUI() {
+    document.getElementById('loadingSpinner').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'flex';
+
+    document.getElementById('tbRange').textContent = _address || '(workbook)';
+    document.getElementById('metaBadge').textContent = _rows.length + ' rows · ' + _headers.length + ' vars';
+
+    buildColumnStats();
     if (_saved) applySpec(_saved);
+    else applySmartDefaults();
 
-    /* Enable footer buttons */
-    document.getElementById('runBtn').disabled = false;
-    document.getElementById('btnSaveConfig').disabled = false;
-    const hasSaved = typeof CfgSave !== 'undefined' && CfgSave.getSavedList(STORAGE_KEY).length > 0;
+    renderVariables();
+    renderAssignments();
+    onTypeChange();
+    validateModel();
+
+    var hasSaved = typeof CfgSave !== 'undefined' && CfgSave.getSavedList(STORAGE_KEY).length > 0;
     document.getElementById('btnLoadPrev').disabled = !hasSaved;
   }
 
-  function populateColumnSelects() {
-    ['selectDV', 'selectFactor1', 'selectFactor2'].forEach(id => {
-      const sel = document.getElementById(id);
-      sel.innerHTML = _headers.map((h) => `<option value="${h}">${h}</option>`).join('');
+  function applySmartDefaults() {
+    var dvCols = columnStats.filter(function(s) { return s.dvEligible; });
+    var facCols = columnStats.filter(function(s) { return s.factorEligible; });
+    if (dvCols.length) assignments.dv = dvCols[0].name;
+    facCols.forEach(function(s) {
+      if (!assignments.factor1 && s.name !== assignments.dv) assignments.factor1 = s.name;
+      else if (!assignments.factor2 && s.name !== assignments.dv && s.name !== assignments.factor1) assignments.factor2 = s.name;
     });
-    if (_headers.length >= 2) {
-      document.getElementById('selectFactor1').selectedIndex = 1;
-    }
-    if (_headers.length >= 3) {
-      document.getElementById('selectFactor2').selectedIndex = 2;
-    }
   }
 
-  function buildConditionCheckList() {
-    const div = document.getElementById('conditionCheckList');
-    div.innerHTML = _headers.map((h, i) => `
-      <label style="display:flex;align-items:center;gap:7px;padding:4px 0;font-size:12px;cursor:pointer;">
-        <input type="checkbox" class="cfg-checkbox cond-check" value="${h}" ${i > 0 && i < 4 ? 'checked' : ''}/> ${h}
-      </label>`).join('');
+  function getType() {
+    return document.querySelector('input[name="anovaType"]:checked')?.value || 'one-way';
+  }
+
+  function setType(type) {
+    var map = { 'one-way': 'typeOneWay', 'two-way': 'typeTwoWay', 'repeated': 'typeRM' };
+    var el = document.getElementById(map[type]);
+    if (el) { el.checked = true; onTypeChange(); }
   }
 
   function onTypeChange() {
-    const type = document.querySelector('input[name="anovaType"]:checked')?.value || 'one-way';
-    document.getElementById('panelVars').style.display   = (type === 'repeated') ? 'none'  : '';
-    document.getElementById('panelRM').style.display     = (type === 'repeated') ? ''      : 'none';
-    document.getElementById('factor2Wrap').style.display = (type === 'two-way')  ? ''      : 'none';
+    var type = getType();
+    document.getElementById('pillOneWay').classList.toggle('active', type === 'one-way');
+    document.getElementById('pillTwoWay').classList.toggle('active', type === 'two-way');
+    document.getElementById('panelVars').style.display = (type === 'repeated') ? 'none' : 'flex';
+    document.getElementById('panelVars').style.flexDirection = 'column';
+    document.getElementById('panelVars').style.gap = '8px';
+    document.getElementById('panelRM').style.display = (type === 'repeated') ? 'block' : 'none';
+    document.getElementById('factor2Card').style.display = (type === 'two-way') ? 'block' : 'none';
     if (typeof DsGuide !== 'undefined') DsGuide.renderAnova(type, 'dsGuideContainer', { collapsed: true });
+    updateModelEquation();
+    validateModel();
+  }
+
+  function isAssigned(name) {
+    return assignments.dv === name ||
+      assignments.factor1 === name ||
+      assignments.factor2 === name ||
+      assignments.conditions.indexOf(name) >= 0;
+  }
+
+  function updateVarsSummary() {
+    var el = document.getElementById('varsSummary');
+    if (!el) return;
+    var numCount = 0, catCount = 0, missCount = 0;
+    columnStats.forEach(function(s) {
+      if (s.isNumeric) numCount++;
+      else if (s.string > 0) catCount++;
+      if (s.missing > 0) missCount++;
+    });
+    var html = '';
+    if (numCount) html += '<span class="reg-vars-badge reg-vb-num">' + numCount + ' num</span>';
+    if (catCount) html += '<span class="reg-vars-badge reg-vb-cat">' + catCount + ' cat</span>';
+    if (missCount) html += '<span class="reg-vars-badge reg-vb-miss">' + missCount + ' miss</span>';
+    el.innerHTML = html;
+  }
+
+  function renderVariables() {
+    var box = document.getElementById('variablesListBox');
+    box.innerHTML = '';
+    if (!columnStats.length) {
+      box.innerHTML = '<div style="color:var(--cfg-text3);font-style:italic;font-size:11px;text-align:center;padding:20px 10px;">No variables found.</div>';
+      updateVarsSummary();
+      return;
+    }
+    columnStats.forEach(function(s) {
+      var row = document.createElement('div');
+      var assigned = isAssigned(s.name);
+      var canDrag = !assigned && (s.dvEligible || s.factorEligible || s.condEligible);
+      row.className = 'reg-var-row' + (assigned ? ' used' : '') + (!canDrag && !assigned ? ' ineligible' : '');
+      row.draggable = canDrag;
+      row.dataset.varName = s.name;
+
+      var iconClass = s.isNumeric ? 'num' : (s.string > 0 ? 'cat' : 'unk');
+      var iconLetter = s.isNumeric ? 'N' : (s.string > 0 ? 'C' : '?');
+      var statsText = s.numeric + ' num';
+      if (s.string > 0) statsText += ' · ' + s.string + ' cat';
+      if (s.missing > 0) statsText += ' · <span class="reg-var-miss">' + s.missing + ' miss</span>';
+      statsText += ' · ' + s.distinct + ' levels';
+
+      row.innerHTML =
+        '<div class="reg-var-icon ' + iconClass + '">' + iconLetter + '</div>' +
+        '<div class="reg-var-body">' +
+          '<div class="reg-var-name">' + s.name + '</div>' +
+          '<div class="reg-var-stats">' + statsText + '</div>' +
+        '</div>';
+
+      if (canDrag) {
+        row.addEventListener('dragstart', handleDragStart);
+        row.addEventListener('dragend', handleDragEnd);
+      }
+      box.appendChild(row);
+    });
+    updateVarsSummary();
+  }
+
+  function setupDropZones() {
+    document.querySelectorAll('.drop-zone').forEach(function(zone) {
+      zone.addEventListener('dragover', handleDragOver);
+      zone.addEventListener('dragenter', handleDragEnter);
+      zone.addEventListener('dragleave', handleDragLeave);
+      zone.addEventListener('drop', handleDrop);
+    });
+  }
+
+  function handleDragStart(e) {
+    draggedElement = e.target.closest('.reg-var-row');
+    if (draggedElement) draggedElement.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', '');
+  }
+
+  function handleDragEnd(e) {
+    var row = e.target.closest('.reg-var-row');
+    if (row) row.classList.remove('dragging');
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+  }
+
+  function handleDragEnter(e) {
+    var zone = e.target.closest('.drop-zone');
+    if (zone) zone.classList.add('drag-over');
+  }
+
+  function handleDragLeave(e) {
+    var zone = e.target.closest('.drop-zone');
+    if (zone && !zone.contains(e.relatedTarget)) zone.classList.remove('drag-over');
+  }
+
+  function getStats(name) {
+    return columnStats.find(function(s) { return s.name === name; });
+  }
+
+  function handleDrop(e) {
+    e.stopPropagation();
+    e.preventDefault();
+    var zone = e.target.closest('.drop-zone');
+    if (!zone || !draggedElement) return false;
+    zone.classList.remove('drag-over');
+    var varName = draggedElement.dataset.varName;
+    var zoneType = zone.dataset.zone;
+    var s = getStats(varName);
+    if (!s || isAssigned(varName)) return false;
+
+    if (zoneType === 'dv') {
+      if (!s.dvEligible) return false;
+      assignments.dv = varName;
+    } else if (zoneType === 'f1' || zoneType === 'f2') {
+      if (!s.factorEligible) return false;
+      if (varName === assignments.dv) return false;
+      if (zoneType === 'f1') assignments.factor1 = varName;
+      else {
+        if (varName === assignments.factor1) return false;
+        assignments.factor2 = varName;
+      }
+    } else if (zoneType === 'cond') {
+      if (!s.condEligible) return false;
+      if (assignments.conditions.indexOf(varName) < 0) assignments.conditions.push(varName);
+    }
+
+    renderVariables();
+    renderAssignments();
+    validateModel();
+    return false;
+  }
+
+  function removeFromZone(zoneType, varName) {
+    if (zoneType === 'dv') assignments.dv = null;
+    else if (zoneType === 'f1') assignments.factor1 = null;
+    else if (zoneType === 'f2') assignments.factor2 = null;
+    else if (zoneType === 'cond') {
+      assignments.conditions = assignments.conditions.filter(function(n) { return n !== varName; });
+    }
+    renderVariables();
+    renderAssignments();
+    validateModel();
+  }
+
+  function renderSingleZone(zoneId, varName, zoneType) {
+    var zone = document.getElementById(zoneId);
+    zone.innerHTML = '';
+    if (!varName) {
+      var placeholders = {
+        dv: 'Drag a numeric variable here',
+        f1: 'Drag a grouping variable here',
+        f2: 'Drag a grouping variable here'
+      };
+      zone.innerHTML = '<div class="reg-zone-placeholder">' + placeholders[zoneType] + '</div>';
+      return;
+    }
+    var chip = document.createElement('div');
+    chip.className = 'reg-chip';
+    chip.innerHTML = '<span>' + varName + '</span><button class="reg-chip-x" title="Remove">✕</button>';
+    chip.querySelector('.reg-chip-x').addEventListener('click', function() { removeFromZone(zoneType, varName); });
+    zone.appendChild(chip);
+  }
+
+  function renderAssignments() {
+    renderSingleZone('zoneDV', assignments.dv, 'dv');
+    renderSingleZone('zoneF1', assignments.factor1, 'f1');
+    renderSingleZone('zoneF2', assignments.factor2, 'f2');
+
+    var zoneCond = document.getElementById('zoneCond');
+    zoneCond.innerHTML = '';
+    if (!assignments.conditions.length) {
+      zoneCond.innerHTML = '<div class="reg-zone-placeholder">Drag 2+ numeric condition columns here</div>';
+    } else {
+      assignments.conditions.forEach(function(name) {
+        var chip = document.createElement('div');
+        chip.className = 'reg-chip';
+        chip.innerHTML = '<span>' + name + '</span><button class="reg-chip-x" title="Remove">✕</button>';
+        chip.querySelector('.reg-chip-x').addEventListener('click', function() { removeFromZone('cond', name); });
+        zoneCond.appendChild(chip);
+      });
+    }
+    updateModelEquation();
+  }
+
+  function updateModelEquation() {
+    var el = document.getElementById('modelEquation');
+    var type = getType();
+    if (type === 'repeated') {
+      if (assignments.conditions.length >= 2) {
+        el.innerHTML = 'RM-ANOVA · <strong>' + assignments.conditions.join('</strong>, <strong>') + '</strong>';
+      } else {
+        el.innerHTML = 'Repeated measures · assign <strong>≥2</strong> condition columns';
+      }
+      return;
+    }
+    if (!assignments.dv) {
+      el.textContent = 'Assign dependent variable and grouping factor(s)';
+      return;
+    }
+    var eq = '<strong>' + assignments.dv + '</strong> ~ ';
+    if (assignments.factor1) eq += '<strong>' + assignments.factor1 + '</strong>';
+    else eq += '(Group A)';
+    if (type === 'two-way') {
+      eq += ' × ';
+      if (assignments.factor2) eq += '<strong>' + assignments.factor2 + '</strong>';
+      else eq += '(Group B)';
+    }
+    el.innerHTML = eq;
+  }
+
+  function validateModel() {
+    var type = getType();
+    var ok = false;
+    var warn = '';
+    var obsText = document.getElementById('obsText');
+    var obsWarn = document.getElementById('obsWarn');
+
+    if (type === 'repeated') {
+      ok = assignments.conditions.length >= 2;
+      obsText.textContent = 'Conditions: ' + assignments.conditions.length;
+      if (!ok) warn = 'Need at least 2 condition columns';
+    } else if (type === 'two-way') {
+      ok = !!(assignments.dv && assignments.factor1 && assignments.factor2 &&
+        assignments.dv !== assignments.factor1 && assignments.dv !== assignments.factor2 &&
+        assignments.factor1 !== assignments.factor2);
+      obsText.textContent = assignments.dv
+        ? 'DV: ' + assignments.dv + ' · Groups: ' + (assignments.factor1 || '—') + ', ' + (assignments.factor2 || '—')
+        : 'Configure the model to continue';
+      if (!ok) warn = 'Assign DV and two distinct grouping factors';
+    } else {
+      ok = !!(assignments.dv && assignments.factor1 && assignments.dv !== assignments.factor1);
+      obsText.textContent = assignments.dv
+        ? 'DV: ' + assignments.dv + ' · Group: ' + (assignments.factor1 || '—')
+        : 'Configure the model to continue';
+      if (!ok) warn = 'Assign DV and one grouping factor';
+    }
+
+    document.getElementById('runBtn').disabled = !ok;
+    document.getElementById('btnSaveConfig').disabled = !ok;
+    obsWarn.textContent = warn;
+    obsWarn.style.display = warn ? 'inline' : 'none';
+    if (typeof CfgSave !== 'undefined' && typeof CfgSave.syncConfigButtons === 'function') {
+      CfgSave.syncConfigButtons(STORAGE_KEY);
+    }
   }
 
   function applySpec(spec) {
     if (!spec) return;
-    if (spec.type) {
-      const r = document.getElementById(
-        spec.type === 'one-way' ? 'typeOneWay' : spec.type === 'two-way' ? 'typeTwoWay' : 'typeRM');
-      if (r) { r.checked = true; onTypeChange(); }
-    }
-    if (spec.dv)      setSelect('selectDV',      spec.dv);
-    if (spec.factor1) setSelect('selectFactor1', spec.factor1);
-    if (spec.factor2) setSelect('selectFactor2', spec.factor2);
-    if (spec.conditions) {
-      document.querySelectorAll('.cond-check').forEach(cb => {
-        cb.checked = spec.conditions.includes(cb.value);
-      });
-    }
+    assignments = { dv: null, factor1: null, factor2: null, conditions: [] };
+    if (spec.type) setType(spec.type);
+    if (spec.dv) assignments.dv = spec.dv;
+    if (spec.factor1) assignments.factor1 = spec.factor1;
+    if (spec.factor2) assignments.factor2 = spec.factor2;
+    if (spec.conditions && spec.conditions.length) assignments.conditions = spec.conditions.slice();
   }
 
-  function setSelect(id, val) {
-    const sel = document.getElementById(id);
-    if (!sel) return;
-    for (const o of sel.options) if (o.value === val) { o.selected = true; return; }
+  function collectSpec() {
+    var type = getType();
+    return {
+      type: type,
+      dv: assignments.dv,
+      factor1: assignments.factor1,
+      factor2: assignments.factor2,
+      conditions: assignments.conditions.slice(),
+      posthocMethod: 'tukey',
+      alpha: 0.05,
+      includeDescriptives: true,
+      includeAssumptions: true,
+      includeNonParam: true
+    };
   }
 
-  /* ── Save / Load (shared-config.js CfgSave) ──────────── */
   function saveModelSpec() {
-    const spec = collectSpec();
-    const defaultName = (spec.dv || 'DV') + ' ~ ' + (spec.factor1 || 'Factor');
+    var spec = collectSpec();
+    var defaultName = (spec.dv || 'DV') + ' ~ ' + (spec.factor1 || 'Factor');
     CfgSave.showPrompt('Save configuration', 'Configuration name', defaultName, function(name) {
       CfgSave.saveCfgEntry(STORAGE_KEY, name, spec, function() {
-        const hasSaved = CfgSave.getSavedList(STORAGE_KEY).length > 0;
+        var hasSaved = CfgSave.getSavedList(STORAGE_KEY).length > 0;
         document.getElementById('btnLoadPrev').disabled = !hasSaved;
       });
     });
@@ -354,38 +798,24 @@
 
   function showSavedList() {
     CfgSave.showSavedList(STORAGE_KEY, function(item) {
-      const s = item.spec || {};
+      var s = item.spec || {};
       return (s.dv ? 'DV: ' + s.dv : '') + (s.factor1 ? '  ×  ' + s.factor1 : '');
     }, function(item) {
       applySpec(item.spec || {});
+      renderVariables();
+      renderAssignments();
+      validateModel();
     });
   }
 
-  function collectSpec() {
-    const type = document.querySelector('input[name="anovaType"]:checked')?.value || 'one-way';
-    return {
-      type,
-      dv:      document.getElementById('selectDV')?.value,
-      factor1: document.getElementById('selectFactor1')?.value,
-      factor2: document.getElementById('selectFactor2')?.value,
-      conditions: [...document.querySelectorAll('.cond-check:checked')].map(cb => cb.value),
-      posthocMethod: 'tukey',
-      alpha: 0.05,
-      includeDescriptives: true,
-      includeAssumptions:  true,
-      includeNonParam:     true,
-    };
-  }
-
   function runAnalysis() {
-    const spec = collectSpec();
-    Office.context.ui.messageParent(JSON.stringify({ action: 'anovaModel', data: spec }));
+    if (document.getElementById('runBtn').disabled) return;
+    Office.context.ui.messageParent(JSON.stringify({ action: 'anovaModel', data: collectSpec() }));
   }
 
   document.addEventListener('DOMContentLoaded', function() {
-    DsGuide.renderAnova('one-way', 'dsGuideContainer', { collapsed: true });
+    if (typeof DsGuide !== 'undefined') DsGuide.renderAnova('one-way', 'dsGuideContainer', { collapsed: true });
   });
 </script>
 </body>
 </html>
-

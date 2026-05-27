@@ -570,7 +570,6 @@ function openExternalDialogUrl(url, options) {
 
 function runHubModuleAction(actionKey) {
   dismissHubButtonTooltips();
-  dismissAllHubDialogs();
   var module = HUB_ACTIONS[actionKey];
   if (!module) return;
   if (module.comingSoon) {
@@ -578,6 +577,7 @@ function runHubModuleAction(actionKey) {
     return;
   }
   if (module.dialogUrl) {
+    dismissAllHubDialogs();
     openExternalDialogUrl(module.dialogUrl, module.dialogOptions);
     return;
   }
@@ -1404,6 +1404,7 @@ function openClusterConfigFromHub() {
 }
 
 function dismissAllHubDialogs() {
+  var hadOpen = false;
   [
     hubConfigDialog,
     hubResultsDialog,
@@ -1416,6 +1417,7 @@ function dismissAllHubDialogs() {
     hubParetoResultsDialog
   ].forEach(function (dlg) {
     if (dlg) {
+      hadOpen = true;
       try { dlg.close(); } catch (e) {}
     }
   });
@@ -1432,10 +1434,10 @@ function dismissAllHubDialogs() {
   hubPendingUnivariateResults = null;
   hubCurrentUnivariateResults = null;
   if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
+  return hadOpen;
 }
 
-function navigateToModule(id) {
-  dismissAllHubDialogs();
+function navigateToModuleCore(id) {
   var gr = getGlobalRangePayload();
   if (id === "univariate" && gr && gr.values && gr.values.length >= 2) {
     if (openUnivariateConfigFromHub()) return;
@@ -1479,6 +1481,15 @@ function navigateToModule(id) {
   var url = "./" + id + "/" + id + ".html?v=" + Date.now() + "&fromHub=1";
   if (gr && gr.values && gr.values.length >= 2) url += "&autoConfig=1&directDialog=1";
   window.location.href = url;
+}
+
+function navigateToModule(id) {
+  var hadOpenDialog = dismissAllHubDialogs();
+  if (hadOpenDialog) {
+    setTimeout(function () { navigateToModuleCore(id); }, 150);
+    return;
+  }
+  navigateToModuleCore(id);
 }
 
 function showAdvisor() {

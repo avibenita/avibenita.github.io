@@ -4,39 +4,49 @@
  * All values are percentages of screen height/width as required by
  * Office.context.ui.displayDialogAsync.
  *
+ * IMPORTANT: Office.js mutates the options object passed to displayDialogAsync.
+ * Always pass a fresh clone — use DIALOG_SIZES.KEY (returns a new object each
+ * access) or getDialogOptions('KEY').
+ *
  * Add this script to every taskpane HTML before other scripts:
  *   <script src="./dialog-sizes.js"></script>   (taskpane root)
  *   <script src="../dialog-sizes.js"></script>  (taskpane sub-folders)
  */
 
-const DIALOG_SIZES = window.DIALOG_SIZES = {
-  // Narrow setup / config builder dialogs (most modules)
+const DIALOG_SIZE_PRESETS = {
   SETUP:               { height: 70, width: 25, displayInIframe: false },
-
-  // Standard results dialogs (most modules)
   RESULTS:             { height: 92, width: 70, displayInIframe: false },
-
-  // Hub univariate results (tall/wide — histogram + sidebar)
   RESULTS_HUB:         { height: 96, width: 78, displayInIframe: false },
-
-  // Correlation matrix results (taller than standard)
   RESULTS_CORRELATION: { height: 92, width: 70, displayInIframe: false },
-
-  // ANOVA results (slightly wider than standard)
   RESULTS_ANOVA:       { height: 92, width: 72, displayInIframe: false },
-
-  // Mixed model: full-width input builder dialog
   MIXED_BUILDER:       { height: 90, width: 95, displayInIframe: false },
-
-  // Mixed model: hub-opened config dialog
   MIXED_CONFIG_HUB:    { height: 98, width: 40, displayInIframe: false },
-
-  // Regression model builder (standalone regression.html)
   REGRESSION_BUILDER:  { height: 92, width: 30, displayInIframe: false },
-
-  // base-analytics-office.js generic openDialog
   BASE_ANALYTICS:      { height: 80, width: 60, displayInIframe: false },
-
-  // univariate-input-panel opens results inside an iframe
-  RESULTS_IFRAME:      { height: 72, width: 70, displayInIframe: true },
+  RESULTS_IFRAME:      { height: 72, width: 70, displayInIframe: true }
 };
+
+function cloneDialogOptions(preset) {
+  return {
+    height: preset.height,
+    width: preset.width,
+    displayInIframe: !!preset.displayInIframe
+  };
+}
+
+function getDialogOptions(key) {
+  var preset = DIALOG_SIZE_PRESETS[key] || DIALOG_SIZE_PRESETS.RESULTS;
+  return cloneDialogOptions(preset);
+}
+
+/** Each property access returns a fresh options object safe for displayDialogAsync. */
+const DIALOG_SIZES = window.DIALOG_SIZES = new Proxy(DIALOG_SIZE_PRESETS, {
+  get: function (target, prop) {
+    if (Object.prototype.hasOwnProperty.call(target, prop)) {
+      return cloneDialogOptions(target[prop]);
+    }
+    return target[prop];
+  }
+});
+
+window.getDialogOptions = getDialogOptions;

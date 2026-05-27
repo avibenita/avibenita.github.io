@@ -273,7 +273,10 @@
       background: var(--cfg-surface); border: 1px solid var(--cfg-border);
       white-space: nowrap;
     }
-    .cfg-trim-meta b { display: block; margin-top: 2px; color: var(--uni-accent); font-size: 12px; }
+    .cfg-trim-meta b {
+      display: block; margin-top: 2px; color: var(--uni-accent); font-size: 12px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
     .cfg-dual-range {
       --trim-left: 0%; --trim-right: 100%;
       position: relative; height: 34px; padding-top: 14px;
@@ -397,22 +400,22 @@
               <i class="fa-solid fa-scissors" style="color:var(--uni-accent);"></i>
               <span>Trimming</span>
               <span class="opt-badge" id="trimBadge" style="display:none;">active</span>
-              <button type="button" class="adv-reset" id="btnResetTrim" disabled title="Reset trim to 0–100%">Reset</button>
+              <button type="button" class="adv-reset" id="btnResetTrim" disabled title="Reset trim to full data range">Reset</button>
               <i class="fa-solid fa-chevron-down adv-chevron"></i>
             </div>
             <div class="adv-body" id="trimBody">
               <div class="cfg-trim-control">
                 <div class="cfg-trim-meta">
-                  <span>Left trim <b id="trimMinVal">0%</b></span>
-                  <span>Kept range <b id="trimKeptVal">100%</b></span>
-                  <span>Right trim <b id="trimMaxVal">0%</b></span>
+                  <span>Lower bound <b id="trimMinVal">—</b></span>
+                  <span>Kept range <b id="trimKeptVal">—</b></span>
+                  <span>Upper bound <b id="trimMaxVal">—</b></span>
                 </div>
                 <div class="cfg-dual-range" id="trimRange">
                   <div class="cfg-dual-track"><div class="cfg-dual-keep"></div></div>
-                  <input type="range" id="trimMin" min="0" max="99" value="0" step="1" aria-label="Left trim percentage" oninput="onTrimChange(event)"/>
-                  <input type="range" id="trimMax" min="1" max="100" value="100" step="1" aria-label="Right trim boundary" oninput="onTrimChange(event)"/>
+                  <input type="range" id="trimMin" min="0" max="99" value="0" step="1" aria-label="Lower trim percentile" oninput="onTrimChange(event)"/>
+                  <input type="range" id="trimMax" min="1" max="100" value="100" step="1" aria-label="Upper trim percentile" oninput="onTrimChange(event)"/>
                 </div>
-                <div class="cfg-trim-scale"><span>0%</span><span>Percentile range kept</span><span>100%</span></div>
+                <div class="cfg-trim-scale"><span id="trimScaleMin">—</span><span>Value range kept</span><span id="trimScaleMax">—</span></div>
               </div>
             </div>
           </div>
@@ -783,6 +786,35 @@
       updateAnalysisSummary(stats);
     }
 
+    function fmtVal(v) {
+      if (!Number.isFinite(v)) return '—';
+      const abs = Math.abs(v);
+      if (abs >= 1000) return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+      if (abs >= 1) return String(Number(v.toFixed(4)));
+      return String(Number(v.toPrecision(4)));
+    }
+
+    function getSelectedValues() {
+      if (!Number.isInteger(STATE.selectedIdx)) return [];
+      const idx = STATE.selectedIdx;
+      return STATE.rows
+        .map((row) => row[idx])
+        .filter((v) => v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v)))
+        .map((v) => parseFloat(v));
+    }
+
+    function getTrimBounds(values, trimMinPct, trimMaxPct) {
+      if (!values.length) {
+        return { dataMin: null, dataMax: null, lowerCut: null, upperCut: null };
+      }
+      const sorted = [...values].sort((a, b) => a - b);
+      const dataMin = sorted[0];
+      const dataMax = sorted[sorted.length - 1];
+      const lowerCut = sorted[Math.floor((sorted.length - 1) * trimMinPct / 100)];
+      const upperCut = sorted[Math.floor((sorted.length - 1) * trimMaxPct / 100)];
+      return { dataMin, dataMax, lowerCut, upperCut };
+    }
+
     function updateAnalysisSummary(stats) {
       const el = document.getElementById('analysisSummary');
       if (!stats) {
@@ -792,9 +824,14 @@
       const transform = document.querySelector('input[name="transform"]:checked')?.value || 'none';
       const trimMin = parseInt(document.getElementById('trimMin').value, 10) || 0;
       const trimMax = parseInt(document.getElementById('trimMax').value, 10) || 100;
-      const trimPart = (trimMin > 0 || trimMax < 100)
-        ? `trim ${trimMin}–${trimMax}%`
-        : 'no trim';
+      const values = getSelectedValues();
+      const bounds = getTrimBounds(values, trimMin, trimMax);
+      let trimPart = 'no trim';
+      if (trimMin > 0 || trimMax < 100) {
+        trimPart = 'keep ' + fmtVal(bounds.lowerCut) + '–' + fmtVal(bounds.upperCut);
+      } else if (values.length) {
+        trimPart = 'full range ' + fmtVal(bounds.dataMin) + '–' + fmtVal(bounds.dataMax);
+      }
       const transformPart = transform === 'none' ? 'no transform' : transform + ' transform';
       el.innerHTML = '<strong>' + stats.name + '</strong> · n=' + stats.n + ' · ' + trimPart + ' · ' + transformPart;
     }
@@ -957,11 +994,28 @@
         minEl.value = minV;
         maxEl.value = maxV;
       }
-      const rightTrim = Math.max(0, 100 - maxV);
-      const keptPct = Math.max(0, maxV - minV);
-      document.getElementById('trimMinVal').textContent = `${minV}%`;
-      document.getElementById('trimMaxVal').textContent = `${rightTrim}%`;
-      document.getElementById('trimKeptVal').textContent = `${keptPct}%`;
+      const values = getSelectedValues();
+      const bounds = getTrimBounds(values, minV, maxV);
+      const minLabel = document.getElementById('trimMinVal');
+      const keptLabel = document.getElementById('trimKeptVal');
+      const maxLabel = document.getElementById('trimMaxVal');
+      const scaleMin = document.getElementById('trimScaleMin');
+      const scaleMax = document.getElementById('trimScaleMax');
+
+      if (!values.length) {
+        if (minLabel) minLabel.textContent = '—';
+        if (keptLabel) keptLabel.textContent = '—';
+        if (maxLabel) maxLabel.textContent = '—';
+        if (scaleMin) scaleMin.textContent = '—';
+        if (scaleMax) scaleMax.textContent = '—';
+      } else {
+        if (minLabel) minLabel.textContent = fmtVal(bounds.lowerCut);
+        if (keptLabel) keptLabel.textContent = fmtVal(bounds.lowerCut) + ' – ' + fmtVal(bounds.upperCut);
+        if (maxLabel) maxLabel.textContent = fmtVal(bounds.upperCut);
+        if (scaleMin) scaleMin.textContent = fmtVal(bounds.dataMin);
+        if (scaleMax) scaleMax.textContent = fmtVal(bounds.dataMax);
+      }
+
       const range = document.getElementById('trimRange');
       if (range) {
         range.style.setProperty('--trim-left', `${minV}%`);
@@ -978,27 +1032,17 @@
     function updateTrimResultN() {
       const out = document.getElementById('trimResultN');
       if (!out) return;
-      if (!Number.isInteger(STATE.selectedIdx)) {
-        out.textContent = '--';
-        return;
-      }
-      const idx = STATE.selectedIdx;
-      const values = STATE.rows
-        .map((row) => row[idx])
-        .filter((v) => v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v)))
-        .map((v) => parseFloat(v));
+      const values = getSelectedValues();
       if (!values.length) {
-        out.textContent = '0';
+        out.textContent = '--';
         return;
       }
       const trimMin = parseInt(document.getElementById('trimMin').value, 10) || 0;
       const trimMax = parseInt(document.getElementById('trimMax').value, 10) || 100;
+      const bounds = getTrimBounds(values, trimMin, trimMax);
       let count = values.length;
       if (trimMin > 0 || trimMax < 100) {
-        const sorted = [...values].sort((a, b) => a - b);
-        const minVal = sorted[Math.floor((sorted.length - 1) * trimMin / 100)];
-        const maxVal = sorted[Math.floor((sorted.length - 1) * trimMax / 100)];
-        count = values.filter((v) => v >= minVal && v <= maxVal).length;
+        count = values.filter((v) => v >= bounds.lowerCut && v <= bounds.upperCut).length;
       }
       out.textContent = String(count);
     }

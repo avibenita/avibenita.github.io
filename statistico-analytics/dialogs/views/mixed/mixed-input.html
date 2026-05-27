@@ -34,7 +34,7 @@
     /* -- Three-column layout ------------------------------------ */
     .mx-layout {
       display: flex;
-      gap: 8px;
+      gap: 10px;
       flex: 1 1 0;
       min-height: 0;
       padding: 8px 10px;
@@ -51,33 +51,103 @@
       min-height: 0;
     }
 
-    /* Centre: model zones */
+    /* Centre: model zones (regression-style panel) */
     .mx-model-col {
       flex: 1 1 0;
       display: flex;
       flex-direction: column;
-      gap: 5px;
+      gap: 8px;
       min-height: 0;
       min-width: 0;
       overflow-x: hidden;
       overflow-y: auto;
+      padding-right: 4px;
       padding-bottom: 4px;
     }
 
-    /* Stack fixed effects and dependency blocks in the narrow setup dialog */
-    .mx-predictors-deps-row {
+    .reg-model-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 2px 6px;
+      border-bottom: 1px solid var(--cfg-border);
+      flex-shrink: 0;
+    }
+    .reg-model-title > span:first-child {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--cfg-text);
+    }
+    .reg-model-meta {
+      font-size: 10px;
+      font-weight: 400;
+      color: var(--cfg-text3);
+      margin-left: auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .reg-equation-strip {
+      font-size: 11.5px;
+      color: var(--cfg-text3);
+      padding: 5px 8px;
+      background: var(--cfg-surface);
+      border: 1px dashed var(--cfg-border);
+      border-radius: 6px;
+      line-height: 1.4;
+      word-break: break-word;
+      flex-shrink: 0;
+    }
+
+    /* Outcome | Fixed effects | Dependency — clearly separated blocks */
+    .mx-model-section {
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      align-items: stretch;
+      gap: 8px;
       min-width: 0;
     }
-    .mx-predictors-col,
-    .mx-deps-col {
+    .mx-model-section + .mx-model-section {
+      margin-top: 6px;
+      padding-top: 14px;
+      border-top: 1px solid var(--cfg-border);
+    }
+    .mx-section-heading {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .55px;
+      color: var(--cfg-text3);
+      padding: 0 2px;
+      flex-shrink: 0;
+    }
+
+    /* Left column header — match regression */
+    .reg-vars-header {
       display: flex;
-      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 0 2px 6px;
+      border-bottom: 1px solid var(--cfg-border);
+      flex-shrink: 0;
+    }
+    .reg-vars-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .55px;
+      color: var(--cfg-text);
+      white-space: nowrap;
+    }
+    .reg-vars-summary {
+      display: flex;
       gap: 5px;
-      min-width: 0;
+      align-items: center;
+      margin-left: auto;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
 
     /* Hide drag hint — zone labels are self-explanatory */
@@ -201,12 +271,12 @@
     .mx-zone-head {
       display: flex;
       align-items: center;
-      gap: 5px;
-      padding: 4px 8px;
-      font-size: 10px;
+      gap: 7px;
+      padding: 7px 10px;
+      font-size: 11.5px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: .35px;
+      letter-spacing: .45px;
       border-bottom: 1px solid var(--cfg-border);
       position: relative;
       min-width: 0;
@@ -214,7 +284,7 @@
     }
 
     .mx-zone-head .dot {
-      width: 7px; height: 7px;
+      width: 8px; height: 8px;
       border-radius: 50%;
       flex-shrink: 0;
     }
@@ -228,11 +298,10 @@
       position: relative;
     }
     .zone-head-main .zone-label {
-      line-height: 1.15;
+      line-height: 1.2;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      font-size: 10px;
     }
     .zone-head-main .zone-hint {
       display: none;
@@ -317,11 +386,11 @@
       transition: background .2s;
     }
 
-    /* Single-variable zones: fixed-height slot — one chip only */
+    /* Single-variable zones: fixed-height slot */
     .zone-single .mx-zone-body {
-      height: 36px;
+      height: 38px;
       min-height: unset;
-      max-height: 36px;
+      max-height: 38px;
       padding: 4px 6px;
       flex-wrap: nowrap;
       align-items: center;
@@ -1507,15 +1576,10 @@
 
       <!-- -- LEFT: variable list -------------------------------- -->
       <div class="mx-vars-col">
-        <div class="mx-vars-title">
-          <i class="fa-solid fa-database" style="color:var(--cfg-run-from);margin-right:4px;"></i>
-          Available Variables
+        <div class="reg-vars-header">
+          <span class="reg-vars-title">Available Variables</span>
+          <span class="reg-vars-summary" id="varsSummary"></span>
         </div>
-        <div class="mx-drag-hint">
-          <i class="fa-solid fa-hand-pointer"></i>
-          Drag variables to the model zones
-        </div>
-        <div class="mx-vars-summary" id="varsSummary"></div>
         <div class="mx-vars-box" id="varsList">
           <div style="padding:16px;text-align:center;font-size:12px;color:var(--cfg-text3);font-style:italic;">
             No data loaded yet.
@@ -1523,135 +1587,109 @@
         </div>
       </div>
 
-      <!-- -- CENTRE: model specification ----------------------- -->
+      <!-- -- RIGHT: model specification ------------------------ -->
       <div class="mx-model-col">
 
-        <!-- Zone 1: Outcome -->
-        <div class="mx-zone-card zone-dep zone-single">
-          <div class="mx-zone-head">
-            <div class="dot"></div>
-            <div class="zone-head-main">
-              <span class="zone-label">Outcome<span class="zone-req" aria-label="required">*</span></span>
-              <span class="zone-hint">Choose the continuous variable you want to explain</span>
+        <div class="reg-model-title">
+          <span>Model</span>
+          <span class="reg-model-meta" id="tbRange"></span>
+        </div>
+
+        <div class="reg-equation-strip" id="modelEquation">Y = (assign outcome first)</div>
+
+        <!-- Outcome -->
+        <div class="mx-model-section mx-section-outcome">
+          <div class="mx-zone-card zone-dep zone-single">
+            <div class="mx-zone-head">
+              <div class="dot"></div>
+              <div class="zone-head-main">
+                <span class="zone-label">Outcome</span>
+                <span class="zone-hint">The variable you want to explain</span>
+              </div>
+              <span class="zone-req">*</span>
+              <span class="zone-single-badge"><span>&times;1</span></span>
+              <button class="adv-open-btn" id="btnAdvOpts" type="button" title="Advanced Options">
+                <i class="fa-solid fa-sliders"></i>
+                <span>Options</span>
+              </button>
             </div>
-            <span class="zone-outcome-tag">Y</span>
-            <span class="zone-single-badge"><span>&times;1</span></span>
-            <button class="zone-info-btn" tabindex="0" aria-label="About the outcome"
-              data-tip="The numeric outcome you want to model. Fixed predictors and random effects explain variation in this variable.">
-              <i class="fa-solid fa-circle-info"></i>
-            </button>
-            <button class="adv-open-btn" id="btnAdvOpts" type="button" title="Advanced Options">
-              <i class="fa-solid fa-sliders"></i>
-              <span>Options</span>
-            </button>
-          </div>
-          <div class="mx-zone-body" id="zoneDep" data-zone="dep" data-max="1">
-            <div class="mx-zone-placeholder" id="phDep">Drag outcome here</div>
+            <div class="mx-zone-body" id="zoneDep" data-zone="dep" data-max="1">
+              <div class="mx-zone-placeholder" id="phDep">Drag a numeric variable here</div>
+            </div>
           </div>
         </div>
 
-        <div class="mx-predictors-deps-row">
-          <div class="mx-predictors-col">
-            <div class="mx-zone-sep mx-zone-sep-step">
-              <span class="mx-step-n">2</span>
-              <div class="mx-zone-step-core">
-                <strong>Fixed effects</strong>
-                <span class="mx-zone-step-sub">What explains the outcome? (categories vs numeric predictors)</span>
+        <!-- Fixed effects -->
+        <div class="mx-model-section mx-section-fixed">
+          <div class="mx-section-heading">Fixed effects</div>
+
+          <div class="mx-zone-card zone-fix">
+            <div class="mx-zone-head">
+              <div class="dot"></div>
+              <div class="zone-head-main">
+                <span class="zone-label">Categorical predictors</span>
+                <span class="zone-hint">Groups or categories such as treatment, gender, site</span>
               </div>
             </div>
-
-            <!-- Zone 2: Factors -->
-            <div class="mx-zone-card zone-fix">
-              <div class="mx-zone-head">
-                <div class="dot"></div>
-                <div class="zone-head-main">
-                  <span class="zone-label">Group predictors</span>
-                  <span class="zone-hint">Factors (treatment, gender, wave coded as discrete levels, ...)</span>
-                </div>
-                <button class="zone-info-btn" tabindex="0" aria-label="About group predictors"
-                  data-tip="Categorical predictors: each level gets its own coefficient. Numeric columns dragged here are treated as factors (SPSS Fixed Factors).">
-                  <i class="fa-solid fa-circle-info"></i>
-                </button>
-              </div>
-              <div class="mx-zone-body" id="zoneFix" data-zone="fix">
-                <div class="mx-zone-placeholder" id="phFix">Drag group predictors here</div>
-              </div>
-            </div>
-
-            <!-- Zone 3: Numeric predictors -->
-            <div class="mx-zone-card zone-cov">
-              <div class="mx-zone-head">
-                <div class="dot"></div>
-                <div class="zone-head-main">
-                  <span class="zone-label">Numeric predictors</span>
-                  <span class="zone-hint">Covariates on a continuous scale</span>
-                </div>
-                <button class="zone-info-btn" tabindex="0" aria-label="About numeric predictors"
-                  data-tip="Continuous controls (age, baseline score, ...). Equivalent to SPSS Covariates.">
-                  <i class="fa-solid fa-circle-info"></i>
-                </button>
-              </div>
-              <div class="mx-zone-body" id="zoneCov" data-zone="cov">
-                <div class="mx-zone-placeholder" id="phCov">Drag numeric predictors here</div>
-              </div>
+            <div class="mx-zone-body" id="zoneFix" data-zone="fix">
+              <div class="mx-zone-placeholder" id="phFix">Drag categorical variables here</div>
             </div>
           </div>
 
-          <div class="mx-deps-col">
-            <div class="mx-zone-sep mx-zone-sep-step">
-              <span class="mx-step-n">3</span>
-              <div class="mx-zone-step-core">
-                <strong>Dependency</strong>
-                <span class="mx-zone-step-sub">How rows relate — clustering / repeated IDs</span>
+          <div class="mx-zone-card zone-cov">
+            <div class="mx-zone-head">
+              <div class="dot"></div>
+              <div class="zone-head-main">
+                <span class="zone-label">Numeric predictors</span>
+                <span class="zone-hint">Continuous variables that may predict the outcome</span>
               </div>
             </div>
-
-            <!-- Zone 4: Cluster ID -->
-            <div class="mx-zone-card zone-rnd zone-single">
-              <div class="mx-zone-head">
-                <div class="dot"></div>
-                <div class="zone-head-main">
-                  <span class="zone-label">Cluster ID<span class="zone-req" aria-label="required">*</span></span>
-                  <span class="zone-hint">Rows belonging to the same person, team, school, ... share random intercepts</span>
-                </div>
-                <span class="zone-single-badge"><span>&times;1</span></span>
-                <button class="zone-info-btn" tabindex="0" aria-label="About clustering"
-                  data-tip="Defines groups of correlated rows (patient, participant, site). This is the '(1 | group)' term in mixed-model notation.">
-                  <i class="fa-solid fa-circle-info"></i>
-                </button>
-              </div>
-              <div class="mx-zone-body" id="zoneRnd" data-zone="rnd">
-                <div class="mx-zone-placeholder" id="phRnd">Drag cluster ID here</div>
-              </div>
+            <div class="mx-zone-body" id="zoneCov" data-zone="cov">
+              <div class="mx-zone-placeholder" id="phCov">Drag numeric variables here</div>
             </div>
+          </div>
+        </div>
 
-            <!-- Zone 5: Time / wave -->
-            <div class="mx-zone-card zone-rep zone-single zone-rep-muted">
-              <div class="mx-zone-head">
-                <div class="dot"></div>
-                <div class="zone-head-main">
-                  <span class="zone-label">Time / wave</span>
-                  <span class="zone-hint">Use only when subjects are measured across occasions</span>
-                </div>
-                <span class="zone-single-badge"><span>&times;1</span></span>
-                <button class="zone-info-btn" tabindex="0" aria-label="About repeated measures"
-                  data-tip="Within-subject ordering (visit, wave). Defines residual correlation over time. Leave empty unless you need explicit repeated-measures covariance.">
-                  <i class="fa-solid fa-circle-info"></i>
-                </button>
+        <!-- Dependency structure -->
+        <div class="mx-model-section mx-section-deps">
+          <div class="mx-section-heading">Dependency</div>
+
+          <div class="mx-zone-card zone-rnd zone-single">
+            <div class="mx-zone-head">
+              <div class="dot"></div>
+              <div class="zone-head-main">
+                <span class="zone-label">Cluster / subject ID</span>
+                <span class="zone-hint">Rows from the same person, team, or site share random intercepts</span>
               </div>
-              <div class="mx-zone-body" id="zoneRep" data-zone="rep" data-max="1">
-                <div class="mx-zone-placeholder" id="phRep">Drag time / wave (optional)</div>
+              <span class="zone-req">*</span>
+              <span class="zone-single-badge"><span>&times;1</span></span>
+            </div>
+            <div class="mx-zone-body" id="zoneRnd" data-zone="rnd">
+              <div class="mx-zone-placeholder" id="phRnd">Drag cluster ID here</div>
+            </div>
+          </div>
+
+          <div class="mx-zone-card zone-rep zone-single zone-rep-muted">
+            <div class="mx-zone-head">
+              <div class="dot"></div>
+              <div class="zone-head-main">
+                <span class="zone-label">Time / wave</span>
+                <span class="zone-hint">Optional — use when subjects are measured across occasions</span>
               </div>
-              <div class="rep-also-fixed-note" id="repNote" style="display:none;">
-                <i class="fa-solid fa-link" style="font-size:9px;"></i>
-                Also added to <strong>group predictors</strong> for inference &mdash; remove there to model correlation only.
-              </div>
+              <span class="zone-single-badge"><span>&times;1</span></span>
+            </div>
+            <div class="mx-zone-body" id="zoneRep" data-zone="rep" data-max="1">
+              <div class="mx-zone-placeholder" id="phRep">Drag time / wave variable here (optional)</div>
+            </div>
+            <div class="rep-also-fixed-note" id="repNote" style="display:none;">
+              <i class="fa-solid fa-link" style="font-size:9px;"></i>
+              Also added to <strong>categorical predictors</strong> for inference &mdash; remove there to model correlation only.
             </div>
           </div>
         </div>
 
         <details class="mx-advanced-details" id="mxAdvancedDetails">
-          <summary><span class="mx-step-n">5</span> Interactions &amp; slopes</summary>
+          <summary><span class="mx-step-n">+</span> Interactions &amp; slopes</summary>
           <div class="mx-advanced-body">
             <div class="mx-inner-h">Interactions between predictors</div>
             <!-- Interaction builder -->
@@ -1889,6 +1927,7 @@ var STATE = {
   variableStats: {},
   rawRows:    [],        // raw row objects [{colName: value, ...}] for detection engine
   rawHeaders: [],        // ordered header names
+  rangeAddress: '',
   assignments: {
     dep:  null,          // single var name
     fix:  [],            // factor names
@@ -2233,10 +2272,10 @@ function renderVarsList() {
     if ((v.missing || 0) > 0) nWithMissing++;
   });
   if (summary) {
-    var sbHtml = '<span class="mx-vars-summary-badge mx-vsb-num">' + nNumerical + ' numerical</span>' +
-                 '<span class="mx-vars-summary-badge mx-vsb-cat">' + nCategorical + ' categorical</span>';
+    var sbHtml = '<span class="mx-vars-summary-badge mx-vsb-num">' + nNumerical + ' num</span>' +
+                 '<span class="mx-vars-summary-badge mx-vsb-cat">' + nCategorical + ' cat</span>';
     if (nWithMissing > 0)
-      sbHtml += '<span class="mx-vars-summary-badge mx-vsb-miss">' + nWithMissing + ' with missing</span>';
+      sbHtml += '<span class="mx-vars-summary-badge mx-vsb-miss">' + nWithMissing + ' miss</span>';
     summary.innerHTML = sbHtml;
   }
 
@@ -2412,6 +2451,20 @@ function returnToList(name) {
 // ============================================================================
 // ZONE RENDERING
 // ============================================================================
+function updateModelEquation() {
+  var eq = qs('modelEquation');
+  if (!eq) return;
+  var a = STATE.assignments;
+  if (!a.dep) {
+    eq.textContent = 'Y = (assign outcome first)';
+    return;
+  }
+  var fixed = a.fix.concat(a.cov);
+  var fixedStr = fixed.length ? fixed.join(' + ') : '…';
+  var rndStr = a.rnd ? '(1 | ' + a.rnd + ')' : '(cluster ID)';
+  eq.textContent = a.dep + ' ~ ' + fixedStr + ' + ' + rndStr;
+}
+
 function refreshAllZones() {
   renderZone('dep', STATE.assignments.dep ? [STATE.assignments.dep] : [], qs('phDep'));
   renderZone('fix', STATE.assignments.fix, qs('phFix'));
@@ -2420,6 +2473,7 @@ function refreshAllZones() {
   renderZone('rep', STATE.assignments.rep ? [STATE.assignments.rep] : [], qs('phRep'));
   renderVarsList();
   refreshIntChips();
+  updateModelEquation();
 }
 
 function renderZone(zone, names, phEl) {
@@ -3346,7 +3400,9 @@ window.populateVariableSelectionTable = function(varStats) {
     // Range badge
     var nVars = STATE.variables.length;
     var nObs  = STATE.variables.length > 0 ? (STATE.variables[0].validCount || 0) : 0;
-    qs('metaBadge').textContent = nVars + ' vars \u00B7 n = ' + nObs;
+    qs('metaBadge').textContent = nObs + ' rows \u00B7 ' + nVars + ' vars';
+    var tb = qs('tbRange');
+    if (tb) tb.textContent = STATE.rangeAddress || '';
 
     refreshAllZones();
     refreshRepNote();
@@ -3403,7 +3459,11 @@ window.loadMixedModelData = function(payload) {
       });
     });
 
-    if (data.address) qs('metaBadge').textContent = data.address;
+    if (data.address) {
+      STATE.rangeAddress = data.address;
+      var tb = qs('tbRange');
+      if (tb) tb.textContent = data.address;
+    }
 
     // Restore saved model spec if provided
     if (data.savedModelSpec) {

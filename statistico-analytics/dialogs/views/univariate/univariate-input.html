@@ -11,12 +11,8 @@
   <style>
     :root {
       --uni-accent: #f97316;
-      --uni-accent-soft: rgba(249,115,22,.12);
     }
-    [data-theme="light"] {
-      --uni-accent: #c2410c;
-      --uni-accent-soft: rgba(194,65,12,.08);
-    }
+    [data-theme="light"] { --uni-accent: #c2410c; }
 
     body.cfg-embed .cfg-header { display: none; }
     body.cfg-embed .cfg-shell  { min-height: 100%; }
@@ -30,7 +26,7 @@
       overflow: hidden;
     }
 
-    .uni-vars-col {
+    .reg-vars-col {
       flex: 0 0 220px;
       display: flex;
       flex-direction: column;
@@ -39,7 +35,7 @@
       overflow: hidden;
     }
 
-    .uni-analysis-col {
+    .reg-model-col {
       flex: 1 1 0;
       display: flex;
       flex-direction: column;
@@ -49,7 +45,7 @@
       padding-right: 4px;
     }
 
-    .uni-vars-header {
+    .reg-vars-header {
       display: flex;
       align-items: center;
       gap: 8px;
@@ -57,7 +53,7 @@
       border-bottom: 1px solid var(--cfg-border);
       flex-shrink: 0;
     }
-    .uni-vars-title {
+    .reg-vars-title {
       font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
@@ -65,13 +61,8 @@
       color: var(--cfg-text);
       white-space: nowrap;
     }
-    .uni-vars-summary {
-      display: flex;
-      gap: 5px;
-      align-items: center;
-      margin-left: auto;
-    }
-    .uni-vars-badge {
+    .reg-vars-summary { display: flex; gap: 5px; align-items: center; margin-left: auto; }
+    .reg-vars-badge {
       font-size: 9px;
       font-weight: 700;
       padding: 1px 5px;
@@ -79,10 +70,11 @@
       letter-spacing: .1px;
       white-space: nowrap;
     }
-    .uni-vb-eligible { background: rgba(249,115,22,.12); color: #c2410c; border: 1px solid rgba(249,115,22,.28); }
-    .uni-vb-total   { background: rgba(148,163,184,.12); color: #64748b; border: 1px solid rgba(148,163,184,.28); }
+    .reg-vb-num  { background: rgba(167,139,250,.12); color: #6d28d9; border: 1px solid rgba(167,139,250,.3); }
+    .reg-vb-cat  { background: rgba(79,195,247,.12);  color: #0369a1; border: 1px solid rgba(79,195,247,.3); }
+    .reg-vb-miss { background: rgba(249,115,22,.1);   color: #c2410c; border: 1px solid rgba(249,115,22,.25); }
 
-    .uni-vars-box {
+    .reg-vars-box {
       flex: 1 1 0;
       min-height: 0;
       overflow-y: auto;
@@ -91,226 +83,197 @@
       background: var(--cfg-surface);
     }
 
-    .uni-var-row {
+    .reg-var-row {
       display: flex;
       align-items: center;
       gap: 6px;
       padding: 5px 8px;
-      cursor: pointer;
+      cursor: grab;
       border-bottom: 1px solid var(--cfg-border);
       transition: background .12s;
       user-select: none;
     }
-    .uni-var-row:last-child { border-bottom: none; }
-    .uni-var-row:hover:not(.disabled) { background: var(--cfg-tbl-hover); }
-    .uni-var-row.selected {
-      background: rgba(249,115,22,.12);
-      box-shadow: inset 3px 0 0 var(--uni-accent);
-    }
-    .uni-var-row.disabled { opacity: .38; cursor: not-allowed; }
+    .reg-var-row:last-child { border-bottom: none; }
+    .reg-var-row:hover { background: var(--cfg-tbl-hover); }
+    .reg-var-row.dragging { opacity: .4; }
+    .reg-var-row.used { opacity: .38; cursor: not-allowed; pointer-events: none; }
+    .reg-var-row.ineligible { opacity: .45; cursor: not-allowed; }
 
-    .uni-var-icon {
+    .reg-var-icon {
       width: 16px; height: 16px;
       border-radius: 4px;
       display: flex; align-items: center; justify-content: center;
       font-size: 8px; font-weight: 700; flex-shrink: 0;
-      background: rgba(249,115,22,.18); color: var(--uni-accent);
     }
-    .uni-var-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-    .uni-var-name {
+    .reg-var-icon.num { background: rgba(167,139,250,.2); color: #a78bfa; }
+    .reg-var-icon.cat { background: rgba(79,195,247,.2);  color: #4fc3f7; }
+    .reg-var-icon.unk { background: rgba(148,163,184,.2); color: #94a3b8; }
+
+    .reg-var-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .reg-var-name {
       font-size: 12px; font-weight: 600; color: var(--cfg-text);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .uni-var-stats { font-size: 9.5px; color: var(--cfg-text3); line-height: 1.2; }
+    .reg-var-stats { font-size: 9.5px; color: var(--cfg-text3); line-height: 1.2; }
+    .reg-var-miss { color: #f97316; font-weight: 600; }
 
-    .uni-model-title {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 0 2px 6px;
-      border-bottom: 1px solid var(--cfg-border);
-      flex-shrink: 0;
+    .reg-model-title {
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 2px 6px; border-bottom: 1px solid var(--cfg-border); flex-shrink: 0;
     }
-    .uni-model-title > span:first-child {
-      font-size: 13px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .6px;
-      color: var(--cfg-text);
+    .reg-model-title > span:first-child {
+      font-size: 13px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .6px; color: var(--cfg-text);
     }
-    .uni-model-meta {
-      font-size: 10px;
-      font-weight: 400;
-      color: var(--cfg-text3);
-      margin-left: auto;
-      text-align: right;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 55%;
+    .reg-model-meta {
+      font-size: 10px; font-weight: 400; color: var(--cfg-text3);
+      margin-left: auto; text-align: right;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%;
     }
 
-    .uni-summary-strip {
-      font-size: 11.5px;
-      color: var(--cfg-text3);
-      padding: 5px 8px;
-      background: var(--cfg-surface);
-      border: 1px dashed var(--cfg-border);
-      border-radius: 6px;
-      line-height: 1.4;
-      word-break: break-word;
-      flex-shrink: 0;
+    .reg-equation-strip {
+      font-size: 11.5px; color: var(--cfg-text3);
+      padding: 5px 8px; background: var(--cfg-surface);
+      border: 1px dashed var(--cfg-border); border-radius: 6px;
+      line-height: 1.4; word-break: break-word; flex-shrink: 0;
     }
-    .uni-summary-strip strong { color: var(--uni-accent); font-weight: 700; }
+    .reg-equation-strip strong { color: var(--uni-accent); font-weight: 700; }
 
-    .uni-zone-card {
+    .reg-zone-card {
       border: 1px solid var(--cfg-border);
       border-radius: 8px;
       overflow: hidden;
       flex-shrink: 0;
     }
-    .uni-zone-card.zone-var {
+    .zone-out.reg-zone-card {
       border: 2px solid rgba(249,115,22,.45);
-      box-shadow: 0 2px 14px rgba(249,115,22,.1);
+      box-shadow: 0 2px 14px rgba(249,115,22,.12);
     }
-    .uni-zone-head {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      padding: 7px 10px;
-      font-size: 11.5px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .45px;
+    [data-theme="light"] .zone-out.reg-zone-card {
+      border-color: rgba(194,65,12,.38);
+      box-shadow: 0 2px 14px rgba(194,65,12,.1);
+    }
+    .reg-zone-head {
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 10px; font-size: 11.5px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .45px;
       border-bottom: 1px solid var(--cfg-border);
-      background: rgba(249,115,22,.08);
-      color: var(--uni-accent);
+      background: rgba(249,115,22,.08); color: var(--uni-accent);
     }
-    .uni-zone-head .dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--uni-accent); flex-shrink: 0;
-    }
+    .reg-zone-head .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--uni-accent); flex-shrink: 0; }
     .zone-head-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
     .zone-head-main .zone-hint {
       font-size: 9.5px; font-weight: 400; letter-spacing: .1px;
       text-transform: none; opacity: .8; line-height: 1.2;
     }
-    .uni-zone-body {
-      padding: 6px;
-      background: rgba(249,115,22,.04);
-      min-height: 38px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      align-items: center;
+    .zone-req {
+      font-size: 13px; font-weight: 900; line-height: 1; margin-left: 3px;
+      color: #dc2626; vertical-align: middle; opacity: .85;
     }
-    .uni-zone-placeholder {
-      width: 100%;
-      text-align: center;
-      font-size: 11px;
-      font-style: italic;
-      color: var(--cfg-text3);
-      padding: 4px 0;
+    .zone-single-badge {
+      display: inline-flex; align-items: center;
+      font-size: 9px; font-weight: 700; padding: 1px 5px;
+      border-radius: 4px; opacity: .7; background: currentColor;
     }
-    .uni-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 8px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 600;
-      border: 1px solid rgba(249,115,22,.4);
-      background: rgba(249,115,22,.15);
-      color: var(--uni-accent);
+    .zone-single-badge span { color: var(--cfg-bg, #1e1e2e); }
+
+    .zone-single .reg-zone-body {
+      height: 38px; min-height: unset; max-height: 38px;
+      padding: 4px 6px; flex-wrap: nowrap; align-items: center; overflow: hidden;
+    }
+    .reg-zone-body {
+      padding: 6px; background: rgba(249,115,22,.04);
+      min-height: 54px; display: flex; flex-wrap: wrap;
+      gap: 4px; align-content: flex-start; transition: background .2s;
+    }
+    .zone-out .reg-zone-body { background: rgba(249,115,22,.04); }
+    .reg-zone-body.drag-over { background: rgba(249,115,22,.1); }
+    .reg-zone-placeholder {
+      width: 100%; text-align: center; font-size: 11px; font-style: italic;
+      color: var(--cfg-text3); padding: 8px 0;
+    }
+    .zone-single .reg-zone-placeholder { padding: 4px 0; }
+
+    .reg-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 6px 3px 8px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; border: 1px solid;
       white-space: nowrap;
+      background: rgba(249,115,22,.15); border-color: rgba(249,115,22,.4); color: var(--uni-accent);
     }
+    .reg-chip-x {
+      background: none; border: none; cursor: pointer;
+      padding: 0 1px; opacity: .7; font-size: 12px; color: inherit; line-height: 1;
+    }
+    .reg-chip-x:hover { opacity: 1; }
 
-    .uni-options-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      flex-shrink: 0;
+    .adv-wrap { flex-shrink: 0; }
+    .adv-toggle {
+      width: 100%; display: flex; align-items: center; gap: 7px;
+      padding: 7px 10px; border: 1px solid var(--cfg-border); border-radius: 8px;
+      background: var(--cfg-surface2, var(--cfg-surface));
+      cursor: pointer; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .5px;
+      color: var(--cfg-text2, var(--cfg-text3)); transition: border-radius .2s;
     }
-    @media (max-width: 720px) {
-      .uni-layout { flex-direction: column; }
-      .uni-vars-col { flex: 0 0 auto; max-height: 38%; }
-      .uni-options-grid { grid-template-columns: 1fr; }
+    .adv-toggle:hover { opacity: .85; }
+    .adv-toggle .adv-chevron { margin-left: auto; font-size: 10px; transition: transform .2s; }
+    .adv-wrap.open .adv-toggle { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+    .adv-wrap.open .adv-toggle .adv-chevron { transform: rotate(180deg); }
+    .adv-body {
+      overflow: hidden; max-height: 0; opacity: 0;
+      transition: max-height .28s ease, opacity .2s ease;
+      border: 1px solid var(--cfg-border); border-top: none;
+      border-radius: 0 0 8px 8px; padding: 0 10px;
     }
+    .adv-wrap.open .adv-body { max-height: 600px; opacity: 1; padding: 10px; }
 
-    .cfg-phead-info {
+    .adv-reset {
       margin-left: auto;
-      width: 18px; height: 18px; flex-shrink: 0;
-      border-radius: 50%;
-      border: 1px solid rgba(255,255,255,.14);
-      background: transparent; color: rgba(255,255,255,.28);
-      font-size: 10px; line-height: 1; cursor: pointer;
-      display: inline-flex; align-items: center; justify-content: center;
-      transition: all .14s;
+      font-size: 9px; font-weight: 600; letter-spacing: .2px;
+      text-transform: none; padding: 2px 7px; border-radius: 4px;
+      border: 1px solid var(--cfg-border); background: transparent;
+      color: var(--cfg-text3); cursor: pointer;
     }
-    .cfg-phead-info:hover {
-      background: var(--uni-accent); border-color: var(--uni-accent); color: #fff;
-      box-shadow: 0 0 8px rgba(249,115,22,.55);
-    }
-    .cfg-phead-info.active {
-      background: rgba(249,115,22,.14);
-      border-color: rgba(249,115,22,.55);
-      color: var(--uni-accent);
-    }
-    [data-theme="light"] .cfg-phead-info { border-color: rgba(0,0,0,.14); color: rgba(0,0,0,.28); }
+    .adv-reset:hover:not(:disabled) { color: var(--uni-accent); border-color: rgba(249,115,22,.45); }
+    .adv-reset:disabled { opacity: .35; cursor: default; }
 
-    .cfg-info-blurb {
-      display: none; font-size: 10.5px;
-      color: rgba(255,255,255,.38); line-height: 1.55;
-      padding: 6px 12px 5px;
-      border-bottom: 1px solid rgba(255,255,255,.045);
-      background: rgba(249,115,22,.028);
+    .opt-badge {
+      font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 10px;
+      background: rgba(249,115,22,.2); color: var(--uni-accent);
+      border: 1px solid rgba(249,115,22,.4);
     }
-    .cfg-info-blurb.open { display: block; }
-    .cfg-info-blurb strong { color: rgba(255,255,255,.65); font-weight: 600; }
-    .cfg-info-blurb em { color: rgba(249,115,22,.85); font-style: normal; font-weight: 600; }
-    [data-theme="light"] .cfg-info-blurb { background: rgba(249,115,22,.02); border-bottom-color: rgba(0,0,0,.055); color: rgba(0,0,0,.42); }
-    [data-theme="light"] .cfg-info-blurb strong { color: rgba(0,0,0,.62); }
-    [data-theme="light"] .cfg-info-blurb em { color: rgba(180,60,0,.85); }
 
-    #transformHint {
-      margin-top: 6px; font-size: 10.5px;
-      color: rgba(249,115,22,.8); line-height: 1.45;
-      min-height: 14px; border-radius: 5px;
-      padding: 0; background: transparent;
-      border: 1px solid transparent;
-      transition: all .2s;
+    .reg-obs-strip {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 10px; font-size: 11px; color: var(--cfg-text);
+      border: 1px solid var(--cfg-border); border-radius: 8px;
+      background: var(--cfg-surface); flex-shrink: 0;
     }
-    #transformHint:not(:empty) {
-      padding: 5px 8px;
-      background: rgba(249,115,22,.045);
-      border-color: rgba(249,115,22,.14);
-    }
+    .reg-obs-strip strong { font-weight: 700; }
 
     .cfg-trim-control { display: flex; flex-direction: column; gap: 9px; }
     .cfg-trim-meta {
       display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
-      font-size: 10.5px; color: rgba(255,255,255,.42);
+      font-size: 10.5px; color: var(--cfg-text3);
     }
     .cfg-trim-meta span {
       padding: 6px 8px; border-radius: 8px;
-      background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.06);
+      background: var(--cfg-surface); border: 1px solid var(--cfg-border);
       white-space: nowrap;
     }
     .cfg-trim-meta b { display: block; margin-top: 2px; color: var(--uni-accent); font-size: 12px; }
     .cfg-dual-range {
-      --trim-left: 0%;
-      --trim-right: 100%;
+      --trim-left: 0%; --trim-right: 100%;
       position: relative; height: 34px; padding-top: 14px;
     }
     .cfg-dual-track {
       position: absolute; left: 0; right: 0; top: 18px; height: 5px;
       border-radius: 999px; background: rgba(255,255,255,.12); overflow: hidden;
     }
-    .cfg-dual-track::before,
-    .cfg-dual-track::after {
-      content: ''; position: absolute; top: 0; bottom: 0;
-      background: rgba(255,255,255,.08);
+    [data-theme="light"] .cfg-dual-track { background: rgba(0,0,0,.12); }
+    .cfg-dual-track::before, .cfg-dual-track::after {
+      content: ''; position: absolute; top: 0; bottom: 0; background: rgba(255,255,255,.08);
     }
     .cfg-dual-track::before { left: 0; width: var(--trim-left); }
     .cfg-dual-track::after { left: var(--trim-right); right: 0; }
@@ -344,12 +307,20 @@
     }
     .cfg-trim-scale {
       display: flex; justify-content: space-between;
-      font-size: 10px; color: rgba(255,255,255,.25); margin-top: -4px;
+      font-size: 10px; color: var(--cfg-text3); margin-top: -4px;
     }
-    [data-theme="light"] .cfg-trim-meta { color: rgba(0,0,0,.45); }
-    [data-theme="light"] .cfg-trim-meta span { background: rgba(0,0,0,.025); border-color: rgba(0,0,0,.07); }
-    [data-theme="light"] .cfg-dual-track { background: rgba(0,0,0,.12); }
-    [data-theme="light"] .cfg-trim-scale { color: rgba(0,0,0,.3); }
+
+    #transformHint {
+      margin-top: 6px; font-size: 10.5px;
+      color: rgba(249,115,22,.8); line-height: 1.45;
+      min-height: 14px; border-radius: 5px;
+      padding: 0; background: transparent; border: 1px solid transparent;
+    }
+    #transformHint:not(:empty) {
+      padding: 5px 8px;
+      background: rgba(249,115,22,.045);
+      border-color: rgba(249,115,22,.14);
+    }
   </style>
 </head>
 <body>
@@ -374,122 +345,118 @@
 
       <div class="uni-layout">
 
-        <div class="uni-vars-col">
-          <div class="uni-vars-header">
-            <span class="uni-vars-title">Variables</span>
-            <span class="uni-vars-summary" id="varsSummary"></span>
+        <div class="reg-vars-col">
+          <div class="reg-vars-header">
+            <span class="reg-vars-title">Available Variables</span>
+            <span class="reg-vars-summary" id="varsSummary"></span>
           </div>
-          <div class="uni-vars-box" id="variablesListBox">
+          <div class="reg-vars-box" id="variablesListBox">
             <div style="color:var(--cfg-text3);font-style:italic;font-size:11px;text-align:center;padding:20px 10px;">
               No data loaded yet.
             </div>
           </div>
         </div>
 
-        <div class="uni-analysis-col">
+        <div class="reg-model-col">
 
-          <div class="uni-model-title">
+          <div class="reg-model-title">
             <span>Analysis</span>
-            <span class="uni-model-meta" id="tbRange">-</span>
+            <span class="reg-model-meta" id="tbRange">-</span>
           </div>
 
-          <div class="uni-summary-strip" id="analysisSummary">Select one numeric variable from the list.</div>
+          <div class="reg-equation-strip" id="analysisSummary">Distribution of: <em>(assign variable first)</em></div>
 
-          <div class="uni-zone-card zone-var">
-            <div class="uni-zone-head">
+          <div class="reg-zone-card zone-out zone-single">
+            <div class="reg-zone-head">
               <div class="dot"></div>
               <div class="zone-head-main">
                 <div class="zone-label">Variable to analyse</div>
                 <div class="zone-hint">The numeric column for distribution and summary statistics</div>
               </div>
+              <span class="zone-req">*</span>
+              <span class="zone-single-badge"><span>&times;1</span></span>
             </div>
-            <div class="uni-zone-body" id="zoneVar">
-              <div class="uni-zone-placeholder" id="zoneVarPlaceholder">Click a variable on the left</div>
+            <div class="reg-zone-body drop-zone" data-zone="var" id="zoneVar">
+              <div class="reg-zone-placeholder">Drag a numeric variable here</div>
             </div>
           </div>
 
-          <div class="uni-options-grid">
-
-            <div class="cfg-panel">
-              <div class="cfg-panel-head">
-                <i class="fa-solid fa-scissors"></i> Trim
-                <button class="cfg-phead-info" id="trimInfoBtn" onclick="toggleInfo('trimBlurb','trimInfoBtn')" title="About Trim">
-                  <i class="fa-solid fa-circle-info"></i>
-                </button>
-              </div>
-              <div class="cfg-info-blurb" id="trimBlurb">
-                Trims extreme values from each tail before analysis. <strong>Left trim</strong> discards the lowest x%; <strong>right trim</strong> discards the highest y%.
-              </div>
-              <div class="cfg-panel-body">
-                <div class="cfg-trim-control">
-                  <div class="cfg-trim-meta">
-                    <span>Left trim <b id="trimMinVal">0%</b></span>
-                    <span>Kept range <b id="trimKeptVal">100%</b></span>
-                    <span>Right trim <b id="trimMaxVal">0%</b></span>
-                  </div>
-                  <div class="cfg-dual-range" id="trimRange">
-                    <div class="cfg-dual-track"><div class="cfg-dual-keep"></div></div>
-                    <input type="range" id="trimMin" min="0" max="99" value="0" step="1" aria-label="Left trim percentage" oninput="onTrimChange(event)"/>
-                    <input type="range" id="trimMax" min="1" max="100" value="100" step="1" aria-label="Right trim boundary" oninput="onTrimChange(event)"/>
-                  </div>
-                  <div class="cfg-trim-scale"><span>0%</span><span>Percentile range kept</span><span>100%</span></div>
+          <div class="adv-wrap" id="trimWrap">
+            <button type="button" class="adv-toggle" id="trimToggle">
+              <i class="fa-solid fa-scissors" style="color:var(--uni-accent);"></i>
+              <span>Trimming</span>
+              <span class="opt-badge" id="trimBadge" style="display:none;">active</span>
+              <button type="button" class="adv-reset" id="btnResetTrim" disabled title="Reset trim to 0–100%">Reset</button>
+              <i class="fa-solid fa-chevron-down adv-chevron"></i>
+            </button>
+            <div class="adv-body" id="trimBody">
+              <div class="cfg-trim-control">
+                <div class="cfg-trim-meta">
+                  <span>Left trim <b id="trimMinVal">0%</b></span>
+                  <span>Kept range <b id="trimKeptVal">100%</b></span>
+                  <span>Right trim <b id="trimMaxVal">0%</b></span>
                 </div>
+                <div class="cfg-dual-range" id="trimRange">
+                  <div class="cfg-dual-track"><div class="cfg-dual-keep"></div></div>
+                  <input type="range" id="trimMin" min="0" max="99" value="0" step="1" aria-label="Left trim percentage" oninput="onTrimChange(event)"/>
+                  <input type="range" id="trimMax" min="1" max="100" value="100" step="1" aria-label="Right trim boundary" oninput="onTrimChange(event)"/>
+                </div>
+                <div class="cfg-trim-scale"><span>0%</span><span>Percentile range kept</span><span>100%</span></div>
               </div>
             </div>
-
-            <div class="cfg-panel">
-              <div class="cfg-panel-head">
-                <i class="fa-solid fa-wave-square"></i> Transform
-                <button class="cfg-phead-info" id="transformInfoBtn" onclick="toggleInfo('transformBlurb','transformInfoBtn')" title="About Transforms">
-                  <i class="fa-solid fa-circle-info"></i>
-                </button>
-              </div>
-              <div class="cfg-info-blurb" id="transformBlurb">
-                Applies a mathematical function to all values before analysis. Applied <em>after</em> any trimming.
-              </div>
-              <div class="cfg-panel-body">
-                <div class="cfg-transform-grid">
-                  <div class="cfg-transform-option">
-                    <input type="radio" name="transform" id="t_none" value="none" checked />
-                    <label for="t_none" class="cfg-transform-label">None</label>
-                  </div>
-                  <div class="cfg-transform-option">
-                    <input type="radio" name="transform" id="t_ln" value="ln" />
-                    <label for="t_ln" class="cfg-transform-label">ln(x)</label>
-                  </div>
-                  <div class="cfg-transform-option">
-                    <input type="radio" name="transform" id="t_log10" value="log10" />
-                    <label for="t_log10" class="cfg-transform-label">log10(x)</label>
-                  </div>
-                  <div class="cfg-transform-option">
-                    <input type="radio" name="transform" id="t_sqrt" value="sqrt" />
-                    <label for="t_sqrt" class="cfg-transform-label">sqrt(x)</label>
-                  </div>
-                  <div class="cfg-transform-option">
-                    <input type="radio" name="transform" id="t_sq" value="square" />
-                    <label for="t_sq" class="cfg-transform-label">x^2</label>
-                  </div>
-                  <div class="cfg-transform-option">
-                    <input type="radio" name="transform" id="t_rec" value="reciprocal" />
-                    <label for="t_rec" class="cfg-transform-label">1/x</label>
-                  </div>
-                  <div class="cfg-transform-option">
-                    <input type="radio" name="transform" id="t_z" value="z" />
-                    <label for="t_z" class="cfg-transform-label">z-score</label>
-                  </div>
-                  <div class="cfg-transform-option">
-                    <input type="radio" name="transform" id="t_mm" value="minmax" />
-                    <label for="t_mm" class="cfg-transform-label">Min-Max</label>
-                  </div>
-                </div>
-                <div id="transformHint"></div>
-              </div>
-            </div>
-
           </div>
 
-          <div class="cfg-hint" id="trimResultN">Resulting n: --</div>
-          <div id="selectNote" class="cfg-note">Choose one valid variable to continue.</div>
+          <div class="adv-wrap" id="transformWrap">
+            <button type="button" class="adv-toggle" id="transformToggle">
+              <i class="fa-solid fa-wave-square" style="color:var(--uni-accent);"></i>
+              <span>Transforming</span>
+              <span class="opt-badge" id="transformBadge" style="display:none;"></span>
+              <button type="button" class="adv-reset" id="btnResetTransform" disabled title="Reset transform to none">Reset</button>
+              <i class="fa-solid fa-chevron-down adv-chevron"></i>
+            </button>
+            <div class="adv-body" id="transformBody">
+              <div class="cfg-transform-grid">
+                <div class="cfg-transform-option">
+                  <input type="radio" name="transform" id="t_none" value="none" checked />
+                  <label for="t_none" class="cfg-transform-label">None</label>
+                </div>
+                <div class="cfg-transform-option">
+                  <input type="radio" name="transform" id="t_ln" value="ln" />
+                  <label for="t_ln" class="cfg-transform-label">ln(x)</label>
+                </div>
+                <div class="cfg-transform-option">
+                  <input type="radio" name="transform" id="t_log10" value="log10" />
+                  <label for="t_log10" class="cfg-transform-label">log10(x)</label>
+                </div>
+                <div class="cfg-transform-option">
+                  <input type="radio" name="transform" id="t_sqrt" value="sqrt" />
+                  <label for="t_sqrt" class="cfg-transform-label">sqrt(x)</label>
+                </div>
+                <div class="cfg-transform-option">
+                  <input type="radio" name="transform" id="t_sq" value="square" />
+                  <label for="t_sq" class="cfg-transform-label">x^2</label>
+                </div>
+                <div class="cfg-transform-option">
+                  <input type="radio" name="transform" id="t_rec" value="reciprocal" />
+                  <label for="t_rec" class="cfg-transform-label">1/x</label>
+                </div>
+                <div class="cfg-transform-option">
+                  <input type="radio" name="transform" id="t_z" value="z" />
+                  <label for="t_z" class="cfg-transform-label">z-score</label>
+                </div>
+                <div class="cfg-transform-option">
+                  <input type="radio" name="transform" id="t_mm" value="minmax" />
+                  <label for="t_mm" class="cfg-transform-label">Min-Max</label>
+                </div>
+              </div>
+              <div id="transformHint"></div>
+            </div>
+          </div>
+
+          <div class="reg-obs-strip" id="obsMonitor" style="display:none;">
+            <span>Resulting n: <strong id="trimResultN">--</strong></span>
+            <span id="selectNote" style="color:var(--cfg-text3);"></span>
+          </div>
 
         </div>
       </div>
@@ -517,6 +484,7 @@
     })();
 
     let STATE = { headers: [], rows: [], address: '', savedSpec: null, columnStats: [], selectedIdx: null };
+    let draggedElement = null;
 
     function showMain() {
       document.getElementById('mainContent').style.display = 'flex';
@@ -557,6 +525,8 @@
           onMessageFromParent
         );
       }
+      setupDropZone();
+      setupAdvSections();
       send({ action: 'ready' });
       _requestDataRetryTimer = setInterval(() => {
         if (STATE.headers && STATE.headers.length) {
@@ -594,22 +564,19 @@
 
       const rangeText = STATE.address || `${STATE.rows.length} rows × ${STATE.headers.length} cols`;
       document.getElementById('tbRange').textContent = rangeText;
-      document.getElementById('metaBadge').textContent = STATE.address || `${STATE.rows.length} rows`;
+      document.getElementById('metaBadge').textContent =
+        STATE.rows.length + ' rows · ' + STATE.headers.length + ' vars';
 
       buildColumnStats();
-      renderVariableList();
-      updateVarsSummary();
+      renderVariables();
       stopRequestDataRetry();
       send({ action: 'dataApplied' });
 
-      document.getElementById('trimMin').value = 0;
-      document.getElementById('trimMax').value = 100;
-      const defaultTransform = document.querySelector('input[name="transform"][value="none"]');
-      if (defaultTransform) defaultTransform.checked = true;
-      document.getElementById('transformHint').textContent = '';
-      onTrimChange();
+      resetTrim(true);
+      resetTransform(true);
       applySavedSpec();
-      onVariableSelect();
+      renderAssignment();
+      validateModel();
 
       document.getElementById('loadingSpinner').style.display = 'none';
       showMain();
@@ -623,82 +590,192 @@
       if (spec.transform) {
         const tr = document.querySelector(`input[name="transform"][value="${spec.transform}"]`);
         if (tr) tr.checked = true;
+        document.getElementById('transformHint').textContent = TRANSFORM_HINTS[spec.transform] || '';
       }
       if (spec.trimMin !== undefined) document.getElementById('trimMin').value = spec.trimMin;
       if (spec.trimMax !== undefined) document.getElementById('trimMax').value = spec.trimMax;
+      onTrimChange();
+      updateOptionBadges();
     }
 
     function buildColumnStats() {
       STATE.columnStats = STATE.headers.map((h, idx) => {
-        const values = STATE.rows
-          .map(row => row[idx])
-          .filter(v => v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v)))
-          .map(v => parseFloat(v));
-        const n = values.length;
-        if (!n) return { idx, name: h || `Col ${idx+1}`, n:0, mean:null, sd:null, min:null, max:null, eligible:false };
-        const mean = values.reduce((a,b)=>a+b,0)/n;
-        const variance = n>1 ? values.reduce((acc,v)=>acc+(v-mean)**2,0)/(n-1) : 0;
-        return { idx, name:h||`Col ${idx+1}`, n, mean, sd:Math.sqrt(variance),
-                 min:Math.min(...values), max:Math.max(...values), eligible:n>=5 };
+        let numericCnt = 0, stringCnt = 0, missingCnt = 0;
+        const numericValues = [];
+        STATE.rows.forEach((row) => {
+          const v = row[idx];
+          if (v === '' || v === null || v === undefined) { missingCnt++; return; }
+          const numVal = parseFloat(v);
+          if (!isNaN(numVal) && isFinite(numVal)) {
+            numericCnt++;
+            numericValues.push(numVal);
+          } else {
+            stringCnt++;
+          }
+        });
+        const n = numericCnt;
+        const isNumeric = numericCnt > stringCnt;
+        let mean = null, sd = null, min = null, max = null;
+        if (n) {
+          mean = numericValues.reduce((a, b) => a + b, 0) / n;
+          const variance = n > 1
+            ? numericValues.reduce((acc, v) => acc + (v - mean) ** 2, 0) / (n - 1)
+            : 0;
+          sd = Math.sqrt(variance);
+          min = Math.min(...numericValues);
+          max = Math.max(...numericValues);
+        }
+        return {
+          idx, name: h || `Col ${idx + 1}`,
+          numeric: numericCnt, string: stringCnt, missing: missingCnt,
+          n, mean, sd, min, max,
+          isNumeric, eligible: numericCnt >= 5
+        };
       });
     }
 
-    function fmt(v) { return Number.isFinite(v) ? v.toFixed(2) : '-'; }
-
     function updateVarsSummary() {
-      const eligible = STATE.columnStats.filter(s => s.eligible).length;
-      const total = STATE.columnStats.length;
-      document.getElementById('varsSummary').innerHTML =
-        `<span class="uni-vars-badge uni-vb-eligible">${eligible} eligible</span>` +
-        `<span class="uni-vars-badge uni-vb-total">${total} total</span>`;
+      const el = document.getElementById('varsSummary');
+      if (!el) return;
+      let numCount = 0, catCount = 0, missCount = 0;
+      STATE.columnStats.forEach((s) => {
+        if (s.isNumeric) numCount++;
+        else if (s.string > 0) catCount++;
+        if (s.missing > 0) missCount++;
+      });
+      let html = '';
+      if (numCount) html += `<span class="reg-vars-badge reg-vb-num">${numCount} num</span>`;
+      if (catCount) html += `<span class="reg-vars-badge reg-vb-cat">${catCount} cat</span>`;
+      if (missCount) html += `<span class="reg-vars-badge reg-vb-miss">${missCount} miss</span>`;
+      el.innerHTML = html;
     }
 
-    function renderVariableList() {
+    function renderVariables() {
       const box = document.getElementById('variablesListBox');
+      box.innerHTML = '';
       if (!STATE.columnStats.length) {
         box.innerHTML = '<div style="color:var(--cfg-text3);font-style:italic;font-size:11px;text-align:center;padding:20px 10px;">No variables found.</div>';
+        updateVarsSummary();
         return;
       }
-      box.innerHTML = STATE.columnStats.map(s => {
-        const stats = s.eligible
-          ? `n=${s.n} · mean ${fmt(s.mean)} · SD ${fmt(s.sd)}`
-          : `n=${s.n} · needs ≥5 numeric values`;
-        const cls = [
-          'uni-var-row',
-          s.eligible ? '' : 'disabled',
-          STATE.selectedIdx === s.idx ? 'selected' : ''
-        ].filter(Boolean).join(' ');
-        return `<div class="${cls}" data-idx="${s.idx}" ${s.eligible ? `onclick="pickRow(${s.idx})"` : ''}>
-          <div class="uni-var-icon">#</div>
-          <div class="uni-var-body">
-            <div class="uni-var-name">${s.name}</div>
-            <div class="uni-var-stats">${stats}</div>
-          </div>
-        </div>`;
-      }).join('');
+
+      STATE.columnStats.forEach((s) => {
+        const isAssigned = STATE.selectedIdx === s.idx;
+        const row = document.createElement('div');
+        const canDrag = s.eligible && !isAssigned;
+        row.className = 'reg-var-row' +
+          (isAssigned ? ' used' : '') +
+          (!s.eligible ? ' ineligible' : '');
+        row.draggable = canDrag;
+        row.dataset.idx = String(s.idx);
+
+        const iconClass = s.isNumeric ? 'num' : (s.string > 0 ? 'cat' : 'unk');
+        const iconLetter = s.isNumeric ? 'N' : (s.string > 0 ? 'C' : '?');
+        let statsText = s.numeric + ' num';
+        if (s.string > 0) statsText += ' · ' + s.string + ' cat';
+        if (s.missing > 0) statsText += ' · <span class="reg-var-miss">' + s.missing + ' miss</span>';
+        if (s.isNumeric && !s.eligible) statsText += ' · needs ≥5 numeric';
+
+        row.innerHTML =
+          '<div class="reg-var-icon ' + iconClass + '">' + iconLetter + '</div>' +
+          '<div class="reg-var-body">' +
+            '<div class="reg-var-name">' + s.name + '</div>' +
+            '<div class="reg-var-stats">' + statsText + '</div>' +
+          '</div>';
+
+        if (canDrag) {
+          row.addEventListener('dragstart', handleDragStart);
+          row.addEventListener('dragend', handleDragEnd);
+        }
+        box.appendChild(row);
+      });
+      updateVarsSummary();
     }
 
-    function pickRow(idx) {
-      const stats = STATE.columnStats.find(s => s.idx === idx);
-      if (!stats || !stats.eligible) return;
-      STATE.selectedIdx = idx;
-      renderVariableList();
-      onVariableSelect();
-    }
-
-    function updateSelectedZone(stats) {
+    function setupDropZone() {
       const zone = document.getElementById('zoneVar');
+      zone.addEventListener('dragover', handleDragOver);
+      zone.addEventListener('dragenter', handleDragEnter);
+      zone.addEventListener('dragleave', handleDragLeave);
+      zone.addEventListener('drop', handleDrop);
+    }
+
+    function handleDragStart(e) {
+      draggedElement = e.target.closest('.reg-var-row');
+      if (draggedElement) draggedElement.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
+    }
+
+    function handleDragEnd(e) {
+      const row = e.target.closest('.reg-var-row');
+      if (row) row.classList.remove('dragging');
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      return false;
+    }
+
+    function handleDragEnter(e) {
+      const zone = e.target.closest('.drop-zone');
+      if (zone) zone.classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+      const zone = e.target.closest('.drop-zone');
+      if (zone && !zone.contains(e.relatedTarget)) zone.classList.remove('drag-over');
+    }
+
+    function handleDrop(e) {
+      e.stopPropagation();
+      e.preventDefault();
+      const zone = e.target.closest('.drop-zone');
+      if (!zone || !draggedElement) return false;
+      zone.classList.remove('drag-over');
+
+      const idx = parseInt(draggedElement.dataset.idx, 10);
+      const stats = STATE.columnStats.find((s) => s.idx === idx);
+      if (!stats || !stats.eligible) return false;
+
+      STATE.selectedIdx = idx;
+      renderVariables();
+      renderAssignment();
+      validateModel();
+      return false;
+    }
+
+    function removeSelectedVariable() {
+      STATE.selectedIdx = null;
+      renderVariables();
+      renderAssignment();
+      validateModel();
+    }
+
+    function renderAssignment() {
+      const zone = document.getElementById('zoneVar');
+      zone.innerHTML = '';
+      const stats = Number.isInteger(STATE.selectedIdx)
+        ? STATE.columnStats.find((s) => s.idx === STATE.selectedIdx)
+        : null;
       if (!stats) {
-        zone.innerHTML = '<div class="uni-zone-placeholder" id="zoneVarPlaceholder">Click a variable on the left</div>';
+        zone.innerHTML = '<div class="reg-zone-placeholder">Drag a numeric variable here</div>';
+        updateAnalysisSummary(null);
         return;
       }
-      zone.innerHTML = `<span class="uni-chip"><i class="fa-solid fa-hashtag"></i> ${stats.name} <span style="opacity:.75;font-weight:500;">(n=${stats.n})</span></span>`;
+      const chip = document.createElement('div');
+      chip.className = 'reg-chip';
+      chip.innerHTML = '<span>' + stats.name + '</span><button class="reg-chip-x" title="Remove">✕</button>';
+      chip.querySelector('.reg-chip-x').addEventListener('click', removeSelectedVariable);
+      zone.appendChild(chip);
+      updateAnalysisSummary(stats);
     }
 
     function updateAnalysisSummary(stats) {
       const el = document.getElementById('analysisSummary');
       if (!stats) {
-        el.innerHTML = 'Select one numeric variable from the list.';
+        el.innerHTML = 'Distribution of: <em>(assign variable first)</em>';
         return;
       }
       const transform = document.querySelector('input[name="transform"]:checked')?.value || 'none';
@@ -707,26 +784,23 @@
       const trimPart = (trimMin > 0 || trimMax < 100)
         ? `trim ${trimMin}–${trimMax}%`
         : 'no trim';
-      const transformPart = transform === 'none' ? 'no transform' : `${transform} transform`;
-      el.innerHTML = `<strong>${stats.name}</strong> · n=${stats.n} · ${trimPart} · ${transformPart}`;
+      const transformPart = transform === 'none' ? 'no transform' : transform + ' transform';
+      el.innerHTML = '<strong>' + stats.name + '</strong> · n=' + stats.n + ' · ' + trimPart + ' · ' + transformPart;
     }
 
-    function onVariableSelect() {
-      const btn  = document.getElementById('runBtn');
+    function validateModel() {
+      const btn = document.getElementById('runBtn');
       const note = document.getElementById('selectNote');
+      const monitor = document.getElementById('obsMonitor');
       const stats = Number.isInteger(STATE.selectedIdx)
-        ? STATE.columnStats.find(s => s.idx === STATE.selectedIdx)
+        ? STATE.columnStats.find((s) => s.idx === STATE.selectedIdx)
         : null;
       const ok = !!(stats && stats.eligible);
-      if (!ok) {
-        btn.disabled = true;
-        note.textContent = 'Choose one valid variable to continue.';
-      } else {
-        btn.disabled = false;
-        note.textContent = `Ready: ${stats.name} (${stats.n} numeric values)`;
-      }
-      updateSelectedZone(ok ? stats : null);
-      updateAnalysisSummary(ok ? stats : null);
+
+      btn.disabled = !ok;
+      if (note) note.textContent = ok ? '' : 'Drag one numeric variable (≥5 values) to continue.';
+      if (monitor) monitor.style.display = ok ? 'flex' : 'none';
+
       const saveBtn = document.getElementById('btnSaveConfig');
       if (saveBtn) saveBtn.disabled = !ok;
       if (typeof CfgSave !== 'undefined' && typeof CfgSave.syncConfigButtons === 'function') {
@@ -740,7 +814,7 @@
     function saveModelSpec() {
       if (!Number.isInteger(STATE.selectedIdx)) return;
       const idx = STATE.selectedIdx;
-      const colName = STATE.headers[idx] || `Column ${idx+1}`;
+      const colName = STATE.headers[idx] || `Column ${idx + 1}`;
       const transform = document.querySelector('input[name="transform"]:checked')?.value || 'none';
       const trimMin = parseInt(document.getElementById('trimMin').value, 10);
       const trimMax = parseInt(document.getElementById('trimMax').value, 10);
@@ -750,7 +824,7 @@
       CfgSave.showPrompt('Save Configuration', 'Configuration name', suggestedName, function(name) {
         CfgSave.saveCfgEntry(STORAGE_KEY_UNI, name, {
           columnIndex: idx, columnName: colName, transform, trimMin, trimMax
-        }, function() { onVariableSelect(); });
+        }, function() { validateModel(); });
       });
     }
 
@@ -767,13 +841,83 @@
         if (spec.transform) {
           const tr = document.querySelector(`input[name="transform"][value="${spec.transform}"]`);
           if (tr) tr.checked = true;
+          document.getElementById('transformHint').textContent = TRANSFORM_HINTS[spec.transform] || '';
         }
         if (spec.trimMin !== undefined) document.getElementById('trimMin').value = spec.trimMin;
         if (spec.trimMax !== undefined) document.getElementById('trimMax').value = spec.trimMax;
-        renderVariableList();
+        renderVariables();
+        renderAssignment();
         onTrimChange();
-        onVariableSelect();
+        updateOptionBadges();
+        validateModel();
       });
+    }
+
+    function setupAdvSections() {
+      document.getElementById('trimToggle').addEventListener('click', function(e) {
+        if (e.target.closest('.adv-reset')) return;
+        document.getElementById('trimWrap').classList.toggle('open');
+      });
+      document.getElementById('transformToggle').addEventListener('click', function(e) {
+        if (e.target.closest('.adv-reset')) return;
+        document.getElementById('transformWrap').classList.toggle('open');
+      });
+      document.getElementById('btnResetTrim').addEventListener('click', function(e) {
+        e.stopPropagation();
+        resetTrim(false);
+      });
+      document.getElementById('btnResetTransform').addEventListener('click', function(e) {
+        e.stopPropagation();
+        resetTransform(false);
+      });
+    }
+
+    function isTrimDefault() {
+      const minV = parseInt(document.getElementById('trimMin').value, 10) || 0;
+      const maxV = parseInt(document.getElementById('trimMax').value, 10) || 100;
+      return minV === 0 && maxV === 100;
+    }
+
+    function isTransformDefault() {
+      return (document.querySelector('input[name="transform"]:checked')?.value || 'none') === 'none';
+    }
+
+    function updateOptionBadges() {
+      const trimBadge = document.getElementById('trimBadge');
+      const transformBadge = document.getElementById('transformBadge');
+      const resetTrimBtn = document.getElementById('btnResetTrim');
+      const resetTransformBtn = document.getElementById('btnResetTransform');
+      const trimActive = !isTrimDefault();
+      const transformVal = document.querySelector('input[name="transform"]:checked')?.value || 'none';
+      const transformActive = transformVal !== 'none';
+
+      if (trimBadge) trimBadge.style.display = trimActive ? 'inline' : 'none';
+      if (transformBadge) {
+        transformBadge.style.display = transformActive ? 'inline' : 'none';
+        transformBadge.textContent = transformActive ? transformVal : '';
+      }
+      if (resetTrimBtn) resetTrimBtn.disabled = !trimActive;
+      if (resetTransformBtn) resetTransformBtn.disabled = !transformActive;
+    }
+
+    function resetTrim(silent) {
+      document.getElementById('trimMin').value = 0;
+      document.getElementById('trimMax').value = 100;
+      onTrimChange();
+      updateOptionBadges();
+      if (!silent) document.getElementById('trimWrap').classList.remove('open');
+    }
+
+    function resetTransform(silent) {
+      const none = document.querySelector('input[name="transform"][value="none"]');
+      if (none) none.checked = true;
+      document.getElementById('transformHint').textContent = '';
+      updateOptionBadges();
+      const stats = Number.isInteger(STATE.selectedIdx)
+        ? STATE.columnStats.find((s) => s.idx === STATE.selectedIdx)
+        : null;
+      if (stats) updateAnalysisSummary(stats);
+      if (!silent) document.getElementById('transformWrap').classList.remove('open');
     }
 
     function onTrimChange(evt) {
@@ -796,17 +940,17 @@
       const keptPct = Math.max(0, maxV - minV);
       document.getElementById('trimMinVal').textContent = `${minV}%`;
       document.getElementById('trimMaxVal').textContent = `${rightTrim}%`;
-      const keptEl = document.getElementById('trimKeptVal');
-      if (keptEl) keptEl.textContent = `${keptPct}%`;
+      document.getElementById('trimKeptVal').textContent = `${keptPct}%`;
       const range = document.getElementById('trimRange');
       if (range) {
         range.style.setProperty('--trim-left', `${minV}%`);
         range.style.setProperty('--trim-right', `${maxV}%`);
       }
       const stats = Number.isInteger(STATE.selectedIdx)
-        ? STATE.columnStats.find(s => s.idx === STATE.selectedIdx)
+        ? STATE.columnStats.find((s) => s.idx === STATE.selectedIdx)
         : null;
       if (stats) updateAnalysisSummary(stats);
+      updateOptionBadges();
       updateTrimResultN();
     }
 
@@ -814,7 +958,7 @@
       const out = document.getElementById('trimResultN');
       if (!out) return;
       if (!Number.isInteger(STATE.selectedIdx)) {
-        out.textContent = 'Resulting n: --';
+        out.textContent = '--';
         return;
       }
       const idx = STATE.selectedIdx;
@@ -823,7 +967,7 @@
         .filter((v) => v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v)))
         .map((v) => parseFloat(v));
       if (!values.length) {
-        out.textContent = 'Resulting n: 0';
+        out.textContent = '0';
         return;
       }
       const trimMin = parseInt(document.getElementById('trimMin').value, 10) || 0;
@@ -835,7 +979,7 @@
         const maxVal = sorted[Math.floor((sorted.length - 1) * trimMax / 100)];
         count = values.filter((v) => v >= minVal && v <= maxVal).length;
       }
-      out.textContent = `Resulting n: ${count}`;
+      out.textContent = String(count);
     }
 
     function runAnalysis() {
@@ -844,11 +988,11 @@
       const transform = document.querySelector('input[name="transform"]:checked')?.value || 'none';
       const trimMin = parseInt(document.getElementById('trimMin').value, 10);
       const trimMax = parseInt(document.getElementById('trimMax').value, 10);
-      const colName = STATE.headers[idx] || `Column ${idx+1}`;
+      const colName = STATE.headers[idx] || `Column ${idx + 1}`;
 
       let data = STATE.rows
         .map(r => r[idx])
-        .filter(v => v!=='' && v!==null && v!==undefined && !isNaN(parseFloat(v)))
+        .filter(v => v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v)))
         .map(v => parseFloat(v));
       if (!data.length) return;
 
@@ -920,13 +1064,6 @@
     function calcSkewness(d,m,sd){ const n=d.length; return (d.reduce((a,v)=>a+(v-m)**3,0)/n)/sd**3; }
     function calcKurtosis(d,m,sd){ const n=d.length; return (d.reduce((a,v)=>a+(v-m)**4,0)/n)/sd**4-3; }
 
-    function toggleInfo(blurbId, btnId) {
-      const blurb = document.getElementById(blurbId);
-      const btn   = document.getElementById(btnId);
-      if (blurb) blurb.classList.toggle('open');
-      if (btn)   btn.classList.toggle('active');
-    }
-
     const TRANSFORM_HINTS = {
       none:      '',
       ln:        'ln(x) — natural log; compresses right-skewed data. Requires all values > 0.',
@@ -940,12 +1077,12 @@
 
     document.addEventListener('change', function(e) {
       if (e.target.name === 'transform') {
-        const hint = document.getElementById('transformHint');
-        if (hint) hint.textContent = TRANSFORM_HINTS[e.target.value] || '';
+        document.getElementById('transformHint').textContent = TRANSFORM_HINTS[e.target.value] || '';
         const stats = Number.isInteger(STATE.selectedIdx)
-          ? STATE.columnStats.find(s => s.idx === STATE.selectedIdx)
+          ? STATE.columnStats.find((s) => s.idx === STATE.selectedIdx)
           : null;
         if (stats) updateAnalysisSummary(stats);
+        updateOptionBadges();
       }
     });
 

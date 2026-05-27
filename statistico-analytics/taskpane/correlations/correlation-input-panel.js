@@ -214,10 +214,8 @@ function handleRunAnalysis(data) {
   // Store for matrix dialog
   sessionStorage.setItem('correlationMatrixData', JSON.stringify(matrixData));
   
-  // Wait a moment for the config dialog to fully close before opening matrix
-  console.log('⏳ Waiting for dialog to close...');
+  if (document.body) document.body.classList.add('direct-config-opening');
   setTimeout(() => {
-    console.log('🚀 Opening matrix dialog...');
     openCorrelationResultDialog('matrix', matrixData);
   }, 300);
 }

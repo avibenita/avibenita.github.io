@@ -22,6 +22,10 @@ let hubIndependentFlowActive = false;
 let hubIndependentDialog = null;
 let hubCorrelationFlowActive = false;
 let hubCorrelationDialog = null;
+let hubCorrelationResultsDialog = null;
+let hubCorrelationMatrixData = null;
+let hubPendingCorrelationRunData = null;
+let hubPendingCorrelationViewUrl = null;
 let hubParetoFlowActive = false;
 let hubParetoConfigDialog = null;
 let hubParetoResultsDialog = null;
@@ -644,7 +648,123 @@ function finishHubIndependentFlow() {
 
 function finishHubCorrelationFlow() {
   hubCorrelationFlowActive = false;
-  if (!hubCorrelationDialog) setSelectedModuleCard("correlations", false);
+  if (!hubCorrelationDialog && !hubCorrelationResultsDialog) setSelectedModuleCard("correlations", false);
+}
+
+function buildHubCorrelationMatrixData(runData, gr) {
+  var data = runData || {};
+  var dataValues = (data.data && data.data.values) || (gr && gr.values) || [];
+  if (!dataValues || dataValues.length < 2) return null;
+  var headers = dataValues[0] || [];
+  var rows = dataValues.slice(1);
+  var dataObjects = rows.map(function (row) {
+    var obj = {};
+    headers.forEach(function (header, idx) { obj[header] = row[idx]; });
+    return obj;
+  });
+  var selectedVars = data.variables || headers;
+  return {
+    data: dataObjects,
+    headers: selectedVars,
+    selectedVariables: selectedVars,
+    method: data.method || "pearson",
+    address: (data.data && data.data.address) || (gr && gr.address) || "",
+    sourceHeaders: headers,
+    sourceRowsAll: rows,
+    sourceRows: rows
+  };
+}
+
+function sendHubCorrelationResultsData() {
+  if (!hubCorrelationResultsDialog || !hubCorrelationMatrixData) return;
+  var m = hubCorrelationMatrixData;
+  hubCorrelationResultsDialog.messageChild(JSON.stringify({
+    type: "CORRELATION_DATA",
+    payload: {
+      data: m.data,
+      headers: m.headers,
+      selectedVariables: m.selectedVariables,
+      method: m.method,
+      address: m.address,
+      sourceHeaders: m.sourceHeaders,
+      sourceRowsAll: m.sourceRowsAll,
+      sourceRows: m.sourceRows
+    }
+  }));
+}
+
+function openHubCorrelationResultsAt(dialogUrl) {
+  Office.context.ui.displayDialogAsync(
+    dialogUrl,
+    DIALOG_SIZES.RESULTS_CORRELATION,
+    function (res) {
+      if (res.status === Office.AsyncResultStatus.Failed) {
+        console.error("Could not open correlation results:", res.error && res.error.message);
+        finishHubCorrelationFlow();
+        return;
+      }
+      var dialog = res.value;
+      hubCorrelationResultsDialog = dialog;
+      var onClosed = function () {
+        hubCorrelationResultsDialog = null;
+        if (hubPendingCorrelationViewUrl && hubCorrelationMatrixData) {
+          var next = hubPendingCorrelationViewUrl;
+          hubPendingCorrelationViewUrl = null;
+          setTimeout(function () { openHubCorrelationResultsAt(next); }, 120);
+          return;
+        }
+        finishHubCorrelationFlow();
+      };
+      if (window.StatisticoDialogHost) {
+        StatisticoDialogHost.onUserClosed(dialog, onClosed);
+      }
+      dialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+        try {
+          var msg = JSON.parse(arg.message || "{}");
+          if (msg.action === "ready") sendHubCorrelationResultsData();
+          else if (msg.action === "switchView" && msg.view) {
+            queueHubCorrelationViewSwitch(msg.view);
+          } else if (msg.action === "close" || msg.action === "closeDialog") {
+            if (window.StatisticoDialogHost) {
+              StatisticoDialogHost.closeFromMessage(dialog, onClosed);
+            } else {
+              dialog.close();
+              onClosed();
+            }
+          }
+        } catch (e) {}
+      });
+      if (!window.StatisticoDialogHost) {
+        dialog.addEventHandler(Office.EventType.DialogEventReceived, onClosed);
+      }
+      setTimeout(sendHubCorrelationResultsData, 1100);
+    }
+  );
+}
+
+function queueHubCorrelationViewSwitch(viewPath) {
+  hubPendingCorrelationViewUrl = getDialogsBaseUrl() + viewPath;
+  if (hubCorrelationResultsDialog) {
+    try { hubCorrelationResultsDialog.close(); } catch (e) {}
+    return;
+  }
+  if (hubPendingCorrelationViewUrl && hubCorrelationMatrixData) {
+    var target = hubPendingCorrelationViewUrl;
+    hubPendingCorrelationViewUrl = null;
+    openHubCorrelationResultsAt(target);
+  }
+}
+
+function openCorrelationResultsFromHub(runData) {
+  var gr = getGlobalRangePayload();
+  var matrixData = buildHubCorrelationMatrixData(runData, gr);
+  if (!matrixData) {
+    finishHubCorrelationFlow();
+    return;
+  }
+  hubCorrelationMatrixData = matrixData;
+  try { sessionStorage.setItem("correlationMatrixData", JSON.stringify(matrixData)); } catch (e) {}
+  openHubCorrelationResultsAt(getDialogsBaseUrl() + "correlations/correlation-matrix-v2.html?v=" + Date.now());
 }
 
 function sendUnivariateDialogData() {
@@ -1043,10 +1163,16 @@ function openCorrelationConfigFromHub() {
           if (msg.action === "ready" || msg.action === "requestData") {
             sendCorrelationData();
           } else if (msg.action === "runAnalysis") {
-            sessionStorage.setItem("correlationHubRunData", JSON.stringify(msg.data || {}));
+            hubPendingCorrelationRunData = msg.data || {};
             try { hubCorrelationDialog.close(); } catch (e) {}
             hubCorrelationDialog = null;
-            window.location.href = "./correlations/correlations.html?v=" + Date.now() + "&fromHub=1&autoConfig=1&directDialog=1&openResults=1";
+            setTimeout(function () {
+              if (hubPendingCorrelationRunData && !hubCorrelationResultsDialog) {
+                var pending = hubPendingCorrelationRunData;
+                hubPendingCorrelationRunData = null;
+                openCorrelationResultsFromHub(pending);
+              }
+            }, 500);
           } else if (msg.action === "close") {
             try { hubCorrelationDialog.close(); } catch (e) {}
             hubCorrelationDialog = null;
@@ -1056,7 +1182,13 @@ function openCorrelationConfigFromHub() {
       });
       hubCorrelationDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
         hubCorrelationDialog = null;
-        finishHubCorrelationFlow();
+        if (hubPendingCorrelationRunData && !hubCorrelationResultsDialog) {
+          var pending = hubPendingCorrelationRunData;
+          hubPendingCorrelationRunData = null;
+          setTimeout(function () { openCorrelationResultsFromHub(pending); }, 120);
+          return;
+        }
+        if (!hubCorrelationResultsDialog) finishHubCorrelationFlow();
       });
     }
   );
@@ -1413,6 +1545,7 @@ function dismissAllHubDialogs() {
     hubAnovaDialog,
     hubIndependentDialog,
     hubCorrelationDialog,
+    hubCorrelationResultsDialog,
     hubParetoConfigDialog,
     hubParetoResultsDialog
   ].forEach(function (dlg) {
@@ -1428,6 +1561,10 @@ function dismissAllHubDialogs() {
   hubAnovaDialog = null;
   hubIndependentDialog = null;
   hubCorrelationDialog = null;
+  hubCorrelationResultsDialog = null;
+  hubPendingCorrelationRunData = null;
+  hubPendingCorrelationViewUrl = null;
+  hubCorrelationMatrixData = null;
   hubParetoConfigDialog = null;
   hubParetoResultsDialog = null;
   hubPendingResultsViewUrl = null;

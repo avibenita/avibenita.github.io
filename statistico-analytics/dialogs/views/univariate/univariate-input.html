@@ -5,15 +5,239 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Univariate Configuration</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
-  <link rel="stylesheet" href="../shared-config.css?v=20260511d"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="../shared-config.css?v=20260526a"/>
   <script src="../shared-config.js?v=20260309d"></script>
   <style>
-    /* ── Embed mode ────────────────────────────────────────────────────── */
+    :root {
+      --uni-accent: #f97316;
+      --uni-accent-soft: rgba(249,115,22,.12);
+    }
+    [data-theme="light"] {
+      --uni-accent: #c2410c;
+      --uni-accent-soft: rgba(194,65,12,.08);
+    }
+
     body.cfg-embed .cfg-header { display: none; }
     body.cfg-embed .cfg-shell  { min-height: 100%; }
 
-    /* ── Info toggle button in panel head (univariate-specific) ────────── */
+    .uni-layout {
+      display: flex;
+      gap: 10px;
+      flex: 1 1 0;
+      min-height: 0;
+      padding: 8px 10px;
+      overflow: hidden;
+    }
+
+    .uni-vars-col {
+      flex: 0 0 220px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .uni-analysis-col {
+      flex: 1 1 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .uni-vars-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 2px 6px;
+      border-bottom: 1px solid var(--cfg-border);
+      flex-shrink: 0;
+    }
+    .uni-vars-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .55px;
+      color: var(--cfg-text);
+      white-space: nowrap;
+    }
+    .uni-vars-summary {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+      margin-left: auto;
+    }
+    .uni-vars-badge {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+      letter-spacing: .1px;
+      white-space: nowrap;
+    }
+    .uni-vb-eligible { background: rgba(249,115,22,.12); color: #c2410c; border: 1px solid rgba(249,115,22,.28); }
+    .uni-vb-total   { background: rgba(148,163,184,.12); color: #64748b; border: 1px solid rgba(148,163,184,.28); }
+
+    .uni-vars-box {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow-y: auto;
+      border: 1px solid var(--cfg-border);
+      border-radius: 8px;
+      background: var(--cfg-surface);
+    }
+
+    .uni-var-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--cfg-border);
+      transition: background .12s;
+      user-select: none;
+    }
+    .uni-var-row:last-child { border-bottom: none; }
+    .uni-var-row:hover:not(.disabled) { background: var(--cfg-tbl-hover); }
+    .uni-var-row.selected {
+      background: rgba(249,115,22,.12);
+      box-shadow: inset 3px 0 0 var(--uni-accent);
+    }
+    .uni-var-row.disabled { opacity: .38; cursor: not-allowed; }
+
+    .uni-var-icon {
+      width: 16px; height: 16px;
+      border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 8px; font-weight: 700; flex-shrink: 0;
+      background: rgba(249,115,22,.18); color: var(--uni-accent);
+    }
+    .uni-var-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .uni-var-name {
+      font-size: 12px; font-weight: 600; color: var(--cfg-text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .uni-var-stats { font-size: 9.5px; color: var(--cfg-text3); line-height: 1.2; }
+
+    .uni-model-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 2px 6px;
+      border-bottom: 1px solid var(--cfg-border);
+      flex-shrink: 0;
+    }
+    .uni-model-title > span:first-child {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--cfg-text);
+    }
+    .uni-model-meta {
+      font-size: 10px;
+      font-weight: 400;
+      color: var(--cfg-text3);
+      margin-left: auto;
+      text-align: right;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 55%;
+    }
+
+    .uni-summary-strip {
+      font-size: 11.5px;
+      color: var(--cfg-text3);
+      padding: 5px 8px;
+      background: var(--cfg-surface);
+      border: 1px dashed var(--cfg-border);
+      border-radius: 6px;
+      line-height: 1.4;
+      word-break: break-word;
+      flex-shrink: 0;
+    }
+    .uni-summary-strip strong { color: var(--uni-accent); font-weight: 700; }
+
+    .uni-zone-card {
+      border: 1px solid var(--cfg-border);
+      border-radius: 8px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .uni-zone-card.zone-var {
+      border: 2px solid rgba(249,115,22,.45);
+      box-shadow: 0 2px 14px rgba(249,115,22,.1);
+    }
+    .uni-zone-head {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 10px;
+      font-size: 11.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .45px;
+      border-bottom: 1px solid var(--cfg-border);
+      background: rgba(249,115,22,.08);
+      color: var(--uni-accent);
+    }
+    .uni-zone-head .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--uni-accent); flex-shrink: 0;
+    }
+    .zone-head-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .zone-head-main .zone-hint {
+      font-size: 9.5px; font-weight: 400; letter-spacing: .1px;
+      text-transform: none; opacity: .8; line-height: 1.2;
+    }
+    .uni-zone-body {
+      padding: 6px;
+      background: rgba(249,115,22,.04);
+      min-height: 38px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+    }
+    .uni-zone-placeholder {
+      width: 100%;
+      text-align: center;
+      font-size: 11px;
+      font-style: italic;
+      color: var(--cfg-text3);
+      padding: 4px 0;
+    }
+    .uni-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid rgba(249,115,22,.4);
+      background: rgba(249,115,22,.15);
+      color: var(--uni-accent);
+      white-space: nowrap;
+    }
+
+    .uni-options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    @media (max-width: 720px) {
+      .uni-layout { flex-direction: column; }
+      .uni-vars-col { flex: 0 0 auto; max-height: 38%; }
+      .uni-options-grid { grid-template-columns: 1fr; }
+    }
+
     .cfg-phead-info {
       margin-left: auto;
       width: 18px; height: 18px; flex-shrink: 0;
@@ -25,17 +249,16 @@
       transition: all .14s;
     }
     .cfg-phead-info:hover {
-      background: #f97316; border-color: #f97316; color: #fff;
+      background: var(--uni-accent); border-color: var(--uni-accent); color: #fff;
       box-shadow: 0 0 8px rgba(249,115,22,.55);
     }
     .cfg-phead-info.active {
       background: rgba(249,115,22,.14);
       border-color: rgba(249,115,22,.55);
-      color: #f97316;
+      color: var(--uni-accent);
     }
     [data-theme="light"] .cfg-phead-info { border-color: rgba(0,0,0,.14); color: rgba(0,0,0,.28); }
 
-    /* ── Collapsible info blurb ────────────────────────────────────────── */
     .cfg-info-blurb {
       display: none; font-size: 10.5px;
       color: rgba(255,255,255,.38); line-height: 1.55;
@@ -43,14 +266,13 @@
       border-bottom: 1px solid rgba(255,255,255,.045);
       background: rgba(249,115,22,.028);
     }
-    .cfg-info-blurb.open   { display: block; }
+    .cfg-info-blurb.open { display: block; }
     .cfg-info-blurb strong { color: rgba(255,255,255,.65); font-weight: 600; }
-    .cfg-info-blurb em     { color: rgba(249,115,22,.85); font-style: normal; font-weight: 600; }
-    [data-theme="light"] .cfg-info-blurb         { background: rgba(249,115,22,.02); border-bottom-color: rgba(0,0,0,.055); color: rgba(0,0,0,.42); }
-    [data-theme="light"] .cfg-info-blurb strong  { color: rgba(0,0,0,.62); }
-    [data-theme="light"] .cfg-info-blurb em      { color: rgba(180,60,0,.85); }
+    .cfg-info-blurb em { color: rgba(249,115,22,.85); font-style: normal; font-weight: 600; }
+    [data-theme="light"] .cfg-info-blurb { background: rgba(249,115,22,.02); border-bottom-color: rgba(0,0,0,.055); color: rgba(0,0,0,.42); }
+    [data-theme="light"] .cfg-info-blurb strong { color: rgba(0,0,0,.62); }
+    [data-theme="light"] .cfg-info-blurb em { color: rgba(180,60,0,.85); }
 
-    /* ── Dynamic transform hint ────────────────────────────────────────── */
     #transformHint {
       margin-top: 6px; font-size: 10.5px;
       color: rgba(249,115,22,.8); line-height: 1.45;
@@ -64,10 +286,7 @@
       background: rgba(249,115,22,.045);
       border-color: rgba(249,115,22,.14);
     }
-    [data-theme="light"] #transformHint           { color: rgba(160,55,0,.82); background: transparent; }
-    [data-theme="light"] #transformHint:not(:empty) { background: rgba(249,115,22,.04); border-color: rgba(249,115,22,.12); }
 
-    /* ── Dual-handle trim control ───────────────────────────────────────── */
     .cfg-trim-control { display: flex; flex-direction: column; gap: 9px; }
     .cfg-trim-meta {
       display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
@@ -78,7 +297,7 @@
       background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.06);
       white-space: nowrap;
     }
-    .cfg-trim-meta b { display: block; margin-top: 2px; color: #f97316; font-size: 12px; }
+    .cfg-trim-meta b { display: block; margin-top: 2px; color: var(--uni-accent); font-size: 12px; }
     .cfg-dual-range {
       --trim-left: 0%;
       --trim-right: 100%;
@@ -106,9 +325,7 @@
       position: absolute; left: 0; right: 0; top: 8px;
       width: 100%; margin: 0; background: transparent; pointer-events: none;
     }
-    .cfg-dual-range input[type="range"]::-webkit-slider-runnable-track {
-      height: 20px; background: transparent;
-    }
+    .cfg-dual-range input[type="range"]::-webkit-slider-runnable-track { height: 20px; background: transparent; }
     .cfg-dual-range input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none; appearance: none;
       width: 18px; height: 18px; border-radius: 50%;
@@ -130,9 +347,7 @@
       font-size: 10px; color: rgba(255,255,255,.25); margin-top: -4px;
     }
     [data-theme="light"] .cfg-trim-meta { color: rgba(0,0,0,.45); }
-    [data-theme="light"] .cfg-trim-meta span {
-      background: rgba(0,0,0,.025); border-color: rgba(0,0,0,.07);
-    }
+    [data-theme="light"] .cfg-trim-meta span { background: rgba(0,0,0,.025); border-color: rgba(0,0,0,.07); }
     [data-theme="light"] .cfg-dual-track { background: rgba(0,0,0,.12); }
     [data-theme="light"] .cfg-trim-scale { color: rgba(0,0,0,.3); }
   </style>
@@ -140,10 +355,9 @@
 <body>
   <div class="cfg-shell">
 
-    <!-- Header -->
     <header class="cfg-header">
       <div class="cfg-header-icon"><i class="fa-solid fa-chart-simple"></i></div>
-      <span class="cfg-header-title">Univariate Configuration</span>
+      <span class="cfg-header-title">Univariate Analysis</span>
       <span class="cfg-meta-badge" id="metaBadge">-</span>
       <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch to light mode">
         <span class="cfg-toggle-icon">&#x1F319;</span>
@@ -152,158 +366,149 @@
       </button>
     </header>
 
-    <!-- Spinner -->
     <div id="loadingSpinner" class="cfg-spinner">
-      <i class="fa-solid fa-spinner fa-spin"></i> Loading data...
+      <i class="fa-solid fa-spinner fa-spin"></i> Loading data&hellip;
     </div>
 
-    <!-- Main content (hidden until data arrives) -->
-    <div id="mainContent" style="display:none; display:none; flex:1; flex-direction:column; overflow:hidden;">
+    <div id="mainContent" style="display:none;flex:1;min-height:0;overflow:hidden;">
 
-      <!-- Scrollable body -->
-      <div class="cfg-body">
+      <div class="uni-layout">
 
-        <!-- Range info -->
-        <div class="cfg-panel">
-          <div class="cfg-panel-body">
-            <div class="cfg-range-strip">
-              <div class="cfg-range-item">Range: <strong id="rangeAddr">-</strong></div>
-              <div class="cfg-range-item">Rows: <strong id="rowCount">0</strong></div>
-              <div class="cfg-range-item">Columns: <strong id="colCount">0</strong></div>
+        <div class="uni-vars-col">
+          <div class="uni-vars-header">
+            <span class="uni-vars-title">Variables</span>
+            <span class="uni-vars-summary" id="varsSummary"></span>
+          </div>
+          <div class="uni-vars-box" id="variablesListBox">
+            <div style="color:var(--cfg-text3);font-style:italic;font-size:11px;text-align:center;padding:20px 10px;">
+              No data loaded yet.
             </div>
           </div>
         </div>
 
-        <!-- Variable picker -->
-        <div class="cfg-panel">
-          <div class="cfg-panel-head">
-            <i class="fa-solid fa-table-columns"></i> Column to Analyse
+        <div class="uni-analysis-col">
+
+          <div class="uni-model-title">
+            <span>Analysis</span>
+            <span class="uni-model-meta" id="tbRange">-</span>
           </div>
-          <div class="cfg-panel-body" style="padding-bottom:8px;">
-            <div class="cfg-hint" style="margin-bottom:8px;">Select exactly one variable. Disabled rows have &lt;5 numeric values.</div>
-            <div class="cfg-tbl-wrap">
-              <div class="cfg-tbl-scroll">
-                <table class="cfg-tbl">
-                  <thead>
-                    <tr>
-                      <th class="radio-cell">Pick</th>
-                      <th class="sortable" data-sort="name">Variable <span class="sort-icon">▲</span></th>
-                      <th class="right sortable" data-sort="n">N Num <span class="sort-icon">▲</span></th>
-                      <th class="right sortable" data-sort="mean">Mean <span class="sort-icon">▲</span></th>
-                      <th class="right sortable" data-sort="sd">SD <span class="sort-icon">▲</span></th>
-                      <th class="right sortable" data-sort="min">Min <span class="sort-icon">▲</span></th>
-                      <th class="right sortable" data-sort="max">Max <span class="sort-icon">▲</span></th>
-                    </tr>
-                  </thead>
-                  <tbody id="varsTbody"></tbody>
-                </table>
+
+          <div class="uni-summary-strip" id="analysisSummary">Select one numeric variable from the list.</div>
+
+          <div class="uni-zone-card zone-var">
+            <div class="uni-zone-head">
+              <div class="dot"></div>
+              <div class="zone-head-main">
+                <div class="zone-label">Variable to analyse</div>
+                <div class="zone-hint">The numeric column for distribution and summary statistics</div>
               </div>
             </div>
-            <div id="selectNote" class="cfg-note">Choose one valid variable to continue.</div>
+            <div class="uni-zone-body" id="zoneVar">
+              <div class="uni-zone-placeholder" id="zoneVarPlaceholder">Click a variable on the left</div>
+            </div>
           </div>
+
+          <div class="uni-options-grid">
+
+            <div class="cfg-panel">
+              <div class="cfg-panel-head">
+                <i class="fa-solid fa-scissors"></i> Trim
+                <button class="cfg-phead-info" id="trimInfoBtn" onclick="toggleInfo('trimBlurb','trimInfoBtn')" title="About Trim">
+                  <i class="fa-solid fa-circle-info"></i>
+                </button>
+              </div>
+              <div class="cfg-info-blurb" id="trimBlurb">
+                Trims extreme values from each tail before analysis. <strong>Left trim</strong> discards the lowest x%; <strong>right trim</strong> discards the highest y%.
+              </div>
+              <div class="cfg-panel-body">
+                <div class="cfg-trim-control">
+                  <div class="cfg-trim-meta">
+                    <span>Left trim <b id="trimMinVal">0%</b></span>
+                    <span>Kept range <b id="trimKeptVal">100%</b></span>
+                    <span>Right trim <b id="trimMaxVal">0%</b></span>
+                  </div>
+                  <div class="cfg-dual-range" id="trimRange">
+                    <div class="cfg-dual-track"><div class="cfg-dual-keep"></div></div>
+                    <input type="range" id="trimMin" min="0" max="99" value="0" step="1" aria-label="Left trim percentage" oninput="onTrimChange(event)"/>
+                    <input type="range" id="trimMax" min="1" max="100" value="100" step="1" aria-label="Right trim boundary" oninput="onTrimChange(event)"/>
+                  </div>
+                  <div class="cfg-trim-scale"><span>0%</span><span>Percentile range kept</span><span>100%</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="cfg-panel">
+              <div class="cfg-panel-head">
+                <i class="fa-solid fa-wave-square"></i> Transform
+                <button class="cfg-phead-info" id="transformInfoBtn" onclick="toggleInfo('transformBlurb','transformInfoBtn')" title="About Transforms">
+                  <i class="fa-solid fa-circle-info"></i>
+                </button>
+              </div>
+              <div class="cfg-info-blurb" id="transformBlurb">
+                Applies a mathematical function to all values before analysis. Applied <em>after</em> any trimming.
+              </div>
+              <div class="cfg-panel-body">
+                <div class="cfg-transform-grid">
+                  <div class="cfg-transform-option">
+                    <input type="radio" name="transform" id="t_none" value="none" checked />
+                    <label for="t_none" class="cfg-transform-label">None</label>
+                  </div>
+                  <div class="cfg-transform-option">
+                    <input type="radio" name="transform" id="t_ln" value="ln" />
+                    <label for="t_ln" class="cfg-transform-label">ln(x)</label>
+                  </div>
+                  <div class="cfg-transform-option">
+                    <input type="radio" name="transform" id="t_log10" value="log10" />
+                    <label for="t_log10" class="cfg-transform-label">log10(x)</label>
+                  </div>
+                  <div class="cfg-transform-option">
+                    <input type="radio" name="transform" id="t_sqrt" value="sqrt" />
+                    <label for="t_sqrt" class="cfg-transform-label">sqrt(x)</label>
+                  </div>
+                  <div class="cfg-transform-option">
+                    <input type="radio" name="transform" id="t_sq" value="square" />
+                    <label for="t_sq" class="cfg-transform-label">x^2</label>
+                  </div>
+                  <div class="cfg-transform-option">
+                    <input type="radio" name="transform" id="t_rec" value="reciprocal" />
+                    <label for="t_rec" class="cfg-transform-label">1/x</label>
+                  </div>
+                  <div class="cfg-transform-option">
+                    <input type="radio" name="transform" id="t_z" value="z" />
+                    <label for="t_z" class="cfg-transform-label">z-score</label>
+                  </div>
+                  <div class="cfg-transform-option">
+                    <input type="radio" name="transform" id="t_mm" value="minmax" />
+                    <label for="t_mm" class="cfg-transform-label">Min-Max</label>
+                  </div>
+                </div>
+                <div id="transformHint"></div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="cfg-hint" id="trimResultN">Resulting n: --</div>
+          <div id="selectNote" class="cfg-note">Choose one valid variable to continue.</div>
+
         </div>
-
-        <!-- Trim + Transform side by side -->
-        <div class="cfg-2col">
-
-          <div class="cfg-panel">
-            <div class="cfg-panel-head">
-              <i class="fa-solid fa-scissors"></i> Trim
-              <button class="cfg-phead-info" id="trimInfoBtn" onclick="toggleInfo('trimBlurb','trimInfoBtn')" title="About Trim">
-                <i class="fa-solid fa-circle-info"></i>
-              </button>
-            </div>
-            <div class="cfg-info-blurb" id="trimBlurb">
-              Trims extreme values from each tail before analysis. <strong>Left trim</strong> discards the lowest x% of values; <strong>right trim</strong> discards the highest y%. Use to reduce the influence of outliers without permanently deleting data.
-            </div>
-            <div class="cfg-panel-body">
-              <div class="cfg-trim-control">
-                <div class="cfg-trim-meta">
-                  <span>Left trim <b id="trimMinVal">0%</b></span>
-                  <span>Kept range <b id="trimKeptVal">100%</b></span>
-                  <span>Right trim <b id="trimMaxVal">0%</b></span>
-                </div>
-                <div class="cfg-dual-range" id="trimRange">
-                  <div class="cfg-dual-track"><div class="cfg-dual-keep"></div></div>
-                  <input type="range" id="trimMin" min="0" max="99" value="0" step="1" aria-label="Left trim percentage" oninput="onTrimChange(event)"/>
-                  <input type="range" id="trimMax" min="1" max="100" value="100" step="1" aria-label="Right trim boundary" oninput="onTrimChange(event)"/>
-                </div>
-                <div class="cfg-trim-scale"><span>0%</span><span>Percentile range kept</span><span>100%</span></div>
-              </div>
-              <div class="cfg-hint" id="trimResultN">Resulting n: --</div>
-            </div>
-          </div>
-
-          <div class="cfg-panel">
-            <div class="cfg-panel-head">
-              <i class="fa-solid fa-wave-square"></i> Transform
-              <button class="cfg-phead-info" id="transformInfoBtn" onclick="toggleInfo('transformBlurb','transformInfoBtn')" title="About Transforms">
-                <i class="fa-solid fa-circle-info"></i>
-              </button>
-            </div>
-            <div class="cfg-info-blurb" id="transformBlurb">
-              Applies a mathematical function to all values before analysis. Useful for correcting skewness or meeting normality assumptions. The transform is applied <em>after</em> any trimming.
-            </div>
-            <div class="cfg-panel-body">
-              <div class="cfg-transform-grid">
-                <div class="cfg-transform-option">
-                  <input type="radio" name="transform" id="t_none" value="none" checked />
-                  <label for="t_none" class="cfg-transform-label">None</label>
-                </div>
-                <div class="cfg-transform-option">
-                  <input type="radio" name="transform" id="t_ln" value="ln" />
-                  <label for="t_ln" class="cfg-transform-label">ln(x)</label>
-                </div>
-                <div class="cfg-transform-option">
-                  <input type="radio" name="transform" id="t_log10" value="log10" />
-                  <label for="t_log10" class="cfg-transform-label">log10(x)</label>
-                </div>
-                <div class="cfg-transform-option">
-                  <input type="radio" name="transform" id="t_sqrt" value="sqrt" />
-                  <label for="t_sqrt" class="cfg-transform-label">sqrt(x)</label>
-                </div>
-                <div class="cfg-transform-option">
-                  <input type="radio" name="transform" id="t_sq" value="square" />
-                  <label for="t_sq" class="cfg-transform-label">x^2</label>
-                </div>
-                <div class="cfg-transform-option">
-                  <input type="radio" name="transform" id="t_rec" value="reciprocal" />
-                  <label for="t_rec" class="cfg-transform-label">1/x</label>
-                </div>
-                <div class="cfg-transform-option">
-                  <input type="radio" name="transform" id="t_z" value="z" />
-                  <label for="t_z" class="cfg-transform-label">z-score</label>
-                </div>
-                <div class="cfg-transform-option">
-                  <input type="radio" name="transform" id="t_mm" value="minmax" />
-                  <label for="t_mm" class="cfg-transform-label">Min-Max</label>
-                </div>
-              </div>
-              <div id="transformHint"></div>
-            </div>
-          </div>
-
-        </div><!-- /cfg-2col -->
-
-      </div><!-- /cfg-body -->
-
-      <!-- Footer -->
-      <div class="cfg-footer">
-        <button class="cfg-btn cancel" onclick="cancel()"><i class="fa-solid fa-times"></i> Cancel</button>
-        <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Open saved templates">
-          <i class="fa-solid fa-folder-open"></i> Templates
-        </button>
-        <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" disabled title="Save the exact current configuration (selected variable, trim, and transform)">
-          <i class="fa-solid fa-floppy-disk"></i> Save this Configuration
-        </button>
-        <button class="cfg-btn run" id="runBtn" onclick="runAnalysis()" disabled>
-          <i class="fa-solid fa-play"></i> Run Full Analysis
-        </button>
       </div>
+    </div>
 
-    </div><!-- /mainContent -->
+    <div class="cfg-footer">
+      <button class="cfg-btn cancel" onclick="cancel()"><i class="fa-solid fa-times"></i> Cancel</button>
+      <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Open saved templates">
+        <i class="fa-solid fa-clock-rotate-left"></i> Load previous&hellip;
+      </button>
+      <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" disabled title="Save the current configuration">
+        <i class="fa-solid fa-floppy-disk"></i> Save configuration
+      </button>
+      <button class="cfg-btn run" id="runBtn" onclick="runAnalysis()" disabled>
+        <i class="fa-solid fa-play"></i> Run Analysis
+      </button>
+    </div>
 
-  </div><!-- /cfg-shell -->
+  </div>
 
   <script>
     const EMBED = (() => {
@@ -311,12 +516,10 @@
       catch (_e) { return false; }
     })();
 
-    let STATE = { headers: [], rows: [], address: '', savedSpec: null, columnStats: [] };
+    let STATE = { headers: [], rows: [], address: '', savedSpec: null, columnStats: [], selectedIdx: null };
 
-    // Show mainContent as flex once loaded
     function showMain() {
-      const el = document.getElementById('mainContent');
-      el.style.display = 'flex';
+      document.getElementById('mainContent').style.display = 'flex';
     }
 
     function send(msg) {
@@ -362,7 +565,6 @@
         }
         send({ action: 'requestData' });
       }, 500);
-      // Fallback: hydrate from shared storage if Office message is missed.
       setTimeout(() => {
         if (STATE.headers && STATE.headers.length) return;
         try {
@@ -388,29 +590,42 @@
       STATE.rows      = p.rows      || [];
       STATE.address   = p.address   || '';
       STATE.savedSpec = p.savedSpec || null;
+      STATE.selectedIdx = null;
 
-      document.getElementById('rangeAddr').textContent = STATE.address || 'Selection';
-      document.getElementById('rowCount').textContent  = STATE.rows.length;
-      document.getElementById('colCount').textContent  = STATE.headers.length;
-      document.getElementById('metaBadge').textContent =
-        STATE.address ? STATE.address : `${STATE.rows.length} rows`;
+      const rangeText = STATE.address || `${STATE.rows.length} rows × ${STATE.headers.length} cols`;
+      document.getElementById('tbRange').textContent = rangeText;
+      document.getElementById('metaBadge').textContent = STATE.address || `${STATE.rows.length} rows`;
 
       buildColumnStats();
-      renderVariableTable();
-      initSortHeaders();
+      renderVariableList();
+      updateVarsSummary();
       stopRequestDataRetry();
       send({ action: 'dataApplied' });
 
-      document.querySelectorAll('input[name="selectedColumn"]').forEach((radio) => { radio.checked = false; });
       document.getElementById('trimMin').value = 0;
       document.getElementById('trimMax').value = 100;
       const defaultTransform = document.querySelector('input[name="transform"][value="none"]');
       if (defaultTransform) defaultTransform.checked = true;
+      document.getElementById('transformHint').textContent = '';
       onTrimChange();
+      applySavedSpec();
       onVariableSelect();
 
       document.getElementById('loadingSpinner').style.display = 'none';
       showMain();
+    }
+
+    function applySavedSpec() {
+      const spec = STATE.savedSpec;
+      if (!spec || spec.columnIndex === undefined) return;
+      const stats = STATE.columnStats.find(s => s.idx === spec.columnIndex);
+      if (stats && stats.eligible) STATE.selectedIdx = spec.columnIndex;
+      if (spec.transform) {
+        const tr = document.querySelector(`input[name="transform"][value="${spec.transform}"]`);
+        if (tr) tr.checked = true;
+      }
+      if (spec.trimMin !== undefined) document.getElementById('trimMin').value = spec.trimMin;
+      if (spec.trimMax !== undefined) document.getElementById('trimMax').value = spec.trimMax;
     }
 
     function buildColumnStats() {
@@ -430,82 +645,88 @@
 
     function fmt(v) { return Number.isFinite(v) ? v.toFixed(2) : '-'; }
 
-    const _varSort = { col: null, dir: 1 };
+    function updateVarsSummary() {
+      const eligible = STATE.columnStats.filter(s => s.eligible).length;
+      const total = STATE.columnStats.length;
+      document.getElementById('varsSummary').innerHTML =
+        `<span class="uni-vars-badge uni-vb-eligible">${eligible} eligible</span>` +
+        `<span class="uni-vars-badge uni-vb-total">${total} total</span>`;
+    }
 
-    function renderVariableTable() {
-      const selVal = (() => {
-        const r = document.querySelector('input[name="selectedColumn"]:checked');
-        return r ? parseInt(r.value, 10) : null;
-      })();
-      let rows = [...STATE.columnStats];
-      if (_varSort.col) {
-        rows.sort((a, b) => {
-          const av = a[_varSort.col], bv = b[_varSort.col];
-          if (typeof av === 'string') return av.localeCompare(bv) * _varSort.dir;
-          const an = Number.isFinite(av) ? av : -Infinity;
-          const bn = Number.isFinite(bv) ? bv : -Infinity;
-          return (an - bn) * _varSort.dir;
-        });
+    function renderVariableList() {
+      const box = document.getElementById('variablesListBox');
+      if (!STATE.columnStats.length) {
+        box.innerHTML = '<div style="color:var(--cfg-text3);font-style:italic;font-size:11px;text-align:center;padding:20px 10px;">No variables found.</div>';
+        return;
       }
-      document.getElementById('varsTbody').innerHTML = rows.map(s => `
-        <tr class="${s.eligible ? '' : 'disabled'}${selVal === s.idx ? ' selected' : ''}"
-            ${s.eligible ? `onclick="pickRow(${s.idx})"` : ''}>
-          <td class="radio-cell">
-            <input type="radio" name="selectedColumn" value="${s.idx}"
-              ${s.eligible ? '' : 'disabled'}
-              ${selVal === s.idx ? 'checked' : ''}
-              onchange="onVariableSelect()"/>
-          </td>
-          <td>${s.name}</td>
-          <td class="right">${s.n}</td>
-          <td class="right">${fmt(s.mean)}</td>
-          <td class="right">${fmt(s.sd)}</td>
-          <td class="right">${fmt(s.min)}</td>
-          <td class="right">${fmt(s.max)}</td>
-        </tr>`).join('');
-      document.querySelectorAll('.cfg-tbl thead th.sortable').forEach(th => {
-        th.classList.remove('sort-asc', 'sort-desc');
-        const icon = th.querySelector('.sort-icon');
-        if (th.dataset.sort === _varSort.col) {
-          th.classList.add(_varSort.dir === 1 ? 'sort-asc' : 'sort-desc');
-          if (icon) icon.textContent = _varSort.dir === 1 ? '▲' : '▼';
-        } else { if (icon) icon.textContent = '▲'; }
-      });
+      box.innerHTML = STATE.columnStats.map(s => {
+        const stats = s.eligible
+          ? `n=${s.n} · mean ${fmt(s.mean)} · SD ${fmt(s.sd)}`
+          : `n=${s.n} · needs ≥5 numeric values`;
+        const cls = [
+          'uni-var-row',
+          s.eligible ? '' : 'disabled',
+          STATE.selectedIdx === s.idx ? 'selected' : ''
+        ].filter(Boolean).join(' ');
+        return `<div class="${cls}" data-idx="${s.idx}" ${s.eligible ? `onclick="pickRow(${s.idx})"` : ''}>
+          <div class="uni-var-icon">#</div>
+          <div class="uni-var-body">
+            <div class="uni-var-name">${s.name}</div>
+            <div class="uni-var-stats">${stats}</div>
+          </div>
+        </div>`;
+      }).join('');
     }
 
     function pickRow(idx) {
-      const radio = document.querySelector(`input[name="selectedColumn"][value="${idx}"]`);
-      if (radio && !radio.disabled) {
-        radio.checked = true;
-        document.querySelectorAll('#varsTbody tr').forEach(tr => tr.classList.remove('selected'));
-        if (radio.closest('tr')) radio.closest('tr').classList.add('selected');
-        onVariableSelect();
+      const stats = STATE.columnStats.find(s => s.idx === idx);
+      if (!stats || !stats.eligible) return;
+      STATE.selectedIdx = idx;
+      renderVariableList();
+      onVariableSelect();
+    }
+
+    function updateSelectedZone(stats) {
+      const zone = document.getElementById('zoneVar');
+      if (!stats) {
+        zone.innerHTML = '<div class="uni-zone-placeholder" id="zoneVarPlaceholder">Click a variable on the left</div>';
+        return;
       }
+      zone.innerHTML = `<span class="uni-chip"><i class="fa-solid fa-hashtag"></i> ${stats.name} <span style="opacity:.75;font-weight:500;">(n=${stats.n})</span></span>`;
     }
 
-    function initSortHeaders() {
-      document.querySelectorAll('.cfg-tbl thead th.sortable').forEach(th => {
-        th.addEventListener('click', () => {
-          const col = th.dataset.sort;
-          if (_varSort.col === col) { _varSort.dir *= -1; }
-          else { _varSort.col = col; _varSort.dir = 1; }
-          renderVariableTable();
-        });
-      });
+    function updateAnalysisSummary(stats) {
+      const el = document.getElementById('analysisSummary');
+      if (!stats) {
+        el.innerHTML = 'Select one numeric variable from the list.';
+        return;
+      }
+      const transform = document.querySelector('input[name="transform"]:checked')?.value || 'none';
+      const trimMin = parseInt(document.getElementById('trimMin').value, 10) || 0;
+      const trimMax = parseInt(document.getElementById('trimMax').value, 10) || 100;
+      const trimPart = (trimMin > 0 || trimMax < 100)
+        ? `trim ${trimMin}–${trimMax}%`
+        : 'no trim';
+      const transformPart = transform === 'none' ? 'no transform' : `${transform} transform`;
+      el.innerHTML = `<strong>${stats.name}</strong> · n=${stats.n} · ${trimPart} · ${transformPart}`;
     }
 
-    
     function onVariableSelect() {
-      const sel  = document.querySelector('input[name="selectedColumn"]:checked');
       const btn  = document.getElementById('runBtn');
       const note = document.getElementById('selectNote');
-      const ok   = !!sel;
-      if (!sel) { btn.disabled=true; note.textContent='Choose one valid variable to continue.'; }
-      else {
+      const stats = Number.isInteger(STATE.selectedIdx)
+        ? STATE.columnStats.find(s => s.idx === STATE.selectedIdx)
+        : null;
+      const ok = !!(stats && stats.eligible);
+      if (!ok) {
+        btn.disabled = true;
+        note.textContent = 'Choose one valid variable to continue.';
+      } else {
         btn.disabled = false;
-        const stats = STATE.columnStats.find(s => s.idx === parseInt(sel.value, 10));
-        note.textContent = stats ? `Selected: ${stats.name} (${stats.n} numeric values)` : '';
+        note.textContent = `Ready: ${stats.name} (${stats.n} numeric values)`;
       }
+      updateSelectedZone(ok ? stats : null);
+      updateAnalysisSummary(ok ? stats : null);
       const saveBtn = document.getElementById('btnSaveConfig');
       if (saveBtn) saveBtn.disabled = !ok;
       if (typeof CfgSave !== 'undefined' && typeof CfgSave.syncConfigButtons === 'function') {
@@ -515,14 +736,14 @@
     }
 
     const STORAGE_KEY_UNI = 'uni-config';
+
     function saveModelSpec() {
-      const sel = document.querySelector('input[name="selectedColumn"]:checked');
-      if (!sel) return;
-      const idx       = parseInt(sel.value, 10);
-      const colName   = STATE.headers[idx] || `Column ${idx+1}`;
+      if (!Number.isInteger(STATE.selectedIdx)) return;
+      const idx = STATE.selectedIdx;
+      const colName = STATE.headers[idx] || `Column ${idx+1}`;
       const transform = document.querySelector('input[name="transform"]:checked')?.value || 'none';
-      const trimMin   = parseInt(document.getElementById('trimMin').value);
-      const trimMax   = parseInt(document.getElementById('trimMax').value);
+      const trimMin = parseInt(document.getElementById('trimMin').value, 10);
+      const trimMax = parseInt(document.getElementById('trimMax').value, 10);
       const suggestedName = transform === 'none'
         ? `${colName} - raw distribution`
         : `${colName} - ${transform} transform`;
@@ -532,20 +753,24 @@
         }, function() { onVariableSelect(); });
       });
     }
+
     function showSavedList() {
       CfgSave.showSavedList(STORAGE_KEY_UNI, function(item) {
         const s = item.spec || {};
         return (s.columnName || '') + (s.transform && s.transform !== 'none' ? '  (' + s.transform + ')' : '');
       }, function(item) {
         const spec = item.spec || {};
-        const radio = document.querySelector(`input[name="selectedColumn"][value="${spec.columnIndex}"]`);
-        if (radio && !radio.disabled) radio.checked = true;
+        if (Number.isInteger(spec.columnIndex)) {
+          const stats = STATE.columnStats.find(s => s.idx === spec.columnIndex);
+          if (stats && stats.eligible) STATE.selectedIdx = spec.columnIndex;
+        }
         if (spec.transform) {
           const tr = document.querySelector(`input[name="transform"][value="${spec.transform}"]`);
           if (tr) tr.checked = true;
         }
         if (spec.trimMin !== undefined) document.getElementById('trimMin').value = spec.trimMin;
         if (spec.trimMax !== undefined) document.getElementById('trimMax').value = spec.trimMax;
+        renderVariableList();
         onTrimChange();
         onVariableSelect();
       });
@@ -578,22 +803,21 @@
         range.style.setProperty('--trim-left', `${minV}%`);
         range.style.setProperty('--trim-right', `${maxV}%`);
       }
+      const stats = Number.isInteger(STATE.selectedIdx)
+        ? STATE.columnStats.find(s => s.idx === STATE.selectedIdx)
+        : null;
+      if (stats) updateAnalysisSummary(stats);
       updateTrimResultN();
     }
 
     function updateTrimResultN() {
       const out = document.getElementById('trimResultN');
       if (!out) return;
-      const sel = document.querySelector('input[name="selectedColumn"]:checked');
-      if (!sel) {
+      if (!Number.isInteger(STATE.selectedIdx)) {
         out.textContent = 'Resulting n: --';
         return;
       }
-      const idx = parseInt(sel.value, 10);
-      if (!Number.isInteger(idx)) {
-        out.textContent = 'Resulting n: --';
-        return;
-      }
+      const idx = STATE.selectedIdx;
       const values = STATE.rows
         .map((row) => row[idx])
         .filter((v) => v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v)))
@@ -602,7 +826,6 @@
         out.textContent = 'Resulting n: 0';
         return;
       }
-
       const trimMin = parseInt(document.getElementById('trimMin').value, 10) || 0;
       const trimMax = parseInt(document.getElementById('trimMax').value, 10) || 100;
       let count = values.length;
@@ -616,13 +839,12 @@
     }
 
     function runAnalysis() {
-      const sel = document.querySelector('input[name="selectedColumn"]:checked');
-      if (!sel) return;
-      const idx       = parseInt(sel.value, 10);
+      if (!Number.isInteger(STATE.selectedIdx)) return;
+      const idx = STATE.selectedIdx;
       const transform = document.querySelector('input[name="transform"]:checked')?.value || 'none';
-      const trimMin   = parseInt(document.getElementById('trimMin').value);
-      const trimMax   = parseInt(document.getElementById('trimMax').value);
-      const colName   = STATE.headers[idx] || `Column ${idx+1}`;
+      const trimMin = parseInt(document.getElementById('trimMin').value, 10);
+      const trimMax = parseInt(document.getElementById('trimMax').value, 10);
+      const colName = STATE.headers[idx] || `Column ${idx+1}`;
 
       let data = STATE.rows
         .map(r => r[idx])
@@ -720,6 +942,10 @@
       if (e.target.name === 'transform') {
         const hint = document.getElementById('transformHint');
         if (hint) hint.textContent = TRANSFORM_HINTS[e.target.value] || '';
+        const stats = Number.isInteger(STATE.selectedIdx)
+          ? STATE.columnStats.find(s => s.idx === STATE.selectedIdx)
+          : null;
+        if (stats) updateAnalysisSummary(stats);
       }
     });
 

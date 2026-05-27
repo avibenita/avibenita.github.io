@@ -6,6 +6,7 @@
   'use strict';
 
   var PANEL_SCRIPTS = {
+    univariate: ['univariate/univariate-hub-results.js'],
     anova: ['anova/anova-input-panel.js'],
     independent: ['independent/independent-input-panel.js'],
     dependent: ['dependent/dependent-input-panel.js'],
@@ -17,7 +18,7 @@
     mixed: ['mixed/mixed-hub-results.js']
   };
 
-  var CACHE_BUST = 'v=20260529';
+  var CACHE_BUST = 'v=20260530';
   var loaded = {};
   var loading = {};
   var activeDialog = null;

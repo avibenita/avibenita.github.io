@@ -4,20 +4,170 @@
   <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Correlation Analysis - Configuration</title>
+  <title>Correlation Analysis — Configuration</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" />
-  <link rel="stylesheet" href="../shared-config.css?v=20260511d"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared-config.css?v=20260526a"/>
   <script src="../shared-config.js?v=20260309d"></script>
+  <style>
+    :root { --corr-accent: #f97316; }
+    [data-theme="light"] { --corr-accent: #c2410c; }
+
+    .corr-layout {
+      display: flex; gap: 10px; flex: 1 1 0; min-height: 0;
+      padding: 8px 10px; overflow: hidden;
+    }
+    .reg-vars-col {
+      flex: 0 0 220px; display: flex; flex-direction: column;
+      gap: 6px; min-height: 0; overflow: hidden;
+    }
+    .reg-model-col {
+      flex: 1 1 0; display: flex; flex-direction: column;
+      gap: 8px; min-height: 0; overflow-y: auto; padding-right: 4px;
+    }
+    .reg-vars-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 2px 6px; border-bottom: 1px solid var(--cfg-border); flex-shrink: 0;
+    }
+    .reg-vars-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .55px; color: var(--cfg-text); white-space: nowrap;
+    }
+    .reg-vars-summary { display: flex; gap: 5px; align-items: center; margin-left: auto; }
+    .reg-vars-badge {
+      font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px;
+      letter-spacing: .1px; white-space: nowrap;
+    }
+    .reg-vb-num  { background: rgba(167,139,250,.12); color: #6d28d9; border: 1px solid rgba(167,139,250,.3); }
+    .reg-vb-cat  { background: rgba(79,195,247,.12);  color: #0369a1; border: 1px solid rgba(79,195,247,.3); }
+    .reg-vb-miss { background: rgba(249,115,22,.1);   color: #c2410c; border: 1px solid rgba(249,115,22,.25); }
+    .reg-vb-ok   { background: rgba(34,197,94,.1);    color: #15803d; border: 1px solid rgba(34,197,94,.28); }
+
+    .reg-vars-box {
+      flex: 1 1 0; min-height: 0; overflow-y: auto;
+      border: 1px solid var(--cfg-border); border-radius: 8px; background: var(--cfg-surface);
+    }
+    .reg-var-row {
+      display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+      cursor: grab; border-bottom: 1px solid var(--cfg-border);
+      transition: background .12s; user-select: none;
+    }
+    .reg-var-row:last-child { border-bottom: none; }
+    .reg-var-row:hover:not(.used):not(.ineligible) { background: var(--cfg-tbl-hover); }
+    .reg-var-row.dragging { opacity: .4; }
+    .reg-var-row.used { opacity: .38; cursor: not-allowed; pointer-events: none; }
+    .reg-var-row.ineligible { opacity: .45; cursor: not-allowed; }
+    .reg-var-icon {
+      width: 16px; height: 16px; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 8px; font-weight: 700; flex-shrink: 0;
+    }
+    .reg-var-icon.num { background: rgba(167,139,250,.2); color: #a78bfa; }
+    .reg-var-icon.cat { background: rgba(79,195,247,.2);  color: #4fc3f7; }
+    .reg-var-icon.unk { background: rgba(148,163,184,.2); color: #94a3b8; }
+    .reg-var-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .reg-var-name {
+      font-size: 12px; font-weight: 600; color: var(--cfg-text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .reg-var-stats { font-size: 9.5px; color: var(--cfg-text3); line-height: 1.2; }
+    .reg-var-miss { color: #f97316; font-weight: 600; }
+
+    .reg-model-title {
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 2px 6px; border-bottom: 1px solid var(--cfg-border); flex-shrink: 0;
+    }
+    .reg-model-title > span:first-child {
+      font-size: 13px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .6px; color: var(--cfg-text);
+    }
+    .reg-model-meta {
+      font-size: 10px; color: var(--cfg-text3); margin-left: auto;
+      text-align: right; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; max-width: 55%;
+    }
+    .reg-equation-strip {
+      font-size: 11.5px; color: var(--cfg-text3);
+      padding: 5px 8px; background: var(--cfg-surface);
+      border: 1px dashed var(--cfg-border); border-radius: 6px;
+      line-height: 1.4; word-break: break-word; flex-shrink: 0;
+    }
+    .reg-equation-strip strong { color: var(--corr-accent); font-weight: 700; }
+
+    .reg-zone-card {
+      border: 1px solid var(--cfg-border); border-radius: 8px;
+      overflow: hidden; flex-shrink: 0;
+    }
+    .zone-out.reg-zone-card {
+      border: 2px solid rgba(249,115,22,.45);
+      box-shadow: 0 2px 14px rgba(249,115,22,.12);
+    }
+    .reg-zone-head {
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 10px; font-size: 11.5px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .45px;
+      border-bottom: 1px solid var(--cfg-border);
+      background: rgba(249,115,22,.08); color: var(--corr-accent);
+    }
+    .reg-zone-head .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--corr-accent); flex-shrink: 0; }
+    .zone-head-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .zone-head-main .zone-hint {
+      font-size: 9.5px; font-weight: 400; letter-spacing: .1px;
+      text-transform: none; opacity: .8; line-height: 1.2;
+    }
+    .zone-req { font-size: 13px; font-weight: 900; color: #dc2626; opacity: .85; margin-left: 3px; }
+    .reg-zone-body {
+      padding: 6px; background: rgba(249,115,22,.04);
+      min-height: 54px; display: flex; flex-wrap: wrap;
+      gap: 4px; align-content: flex-start; transition: background .2s;
+    }
+    .reg-zone-body.drag-over { background: rgba(249,115,22,.1); }
+    .reg-zone-placeholder {
+      width: 100%; text-align: center; font-size: 11px; font-style: italic;
+      color: var(--cfg-text3); padding: 8px 0;
+    }
+    .reg-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 6px 3px 8px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; border: 1px solid;
+      white-space: nowrap;
+      background: rgba(249,115,22,.15); border-color: rgba(249,115,22,.4); color: var(--corr-accent);
+    }
+    .reg-chip-x {
+      background: none; border: none; cursor: pointer;
+      padding: 0 1px; opacity: .7; font-size: 12px; color: inherit; line-height: 1;
+    }
+    .reg-chip-x:hover { opacity: 1; }
+
+    .corr-quick-row {
+      display: flex; gap: 6px; flex-shrink: 0;
+    }
+    .corr-quick-btn {
+      flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 6px 8px; border-radius: 8px; border: 1px solid var(--cfg-border);
+      background: var(--cfg-surface); color: var(--cfg-text2, var(--cfg-text));
+      font-size: 10px; font-weight: 600; cursor: pointer;
+    }
+    .corr-quick-btn:hover { background: var(--cfg-tbl-hover); }
+    .corr-quick-btn i { color: var(--corr-accent); font-size: 10px; }
+
+    .reg-obs-strip {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 10px; font-size: 11px; color: var(--cfg-text);
+      border: 1px solid var(--cfg-border); border-radius: 8px;
+      background: var(--cfg-surface); flex-shrink: 0;
+    }
+    .reg-obs-strip strong { font-weight: 700; }
+    .reg-obs-strip .warn { color: #dc2626; font-size: 10px; }
+  </style>
 </head>
 <body>
   <div class="cfg-shell">
 
-    <!-- Header -->
     <header class="cfg-header">
       <div class="cfg-header-icon"><i class="fa-solid fa-chart-scatter"></i></div>
       <span class="cfg-header-title">Correlation Analysis</span>
-      <span class="cfg-meta-badge" id="rangeInfo">-</span>
+      <span class="cfg-meta-badge" id="metaBadge">-</span>
       <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch to light mode">
         <span class="cfg-toggle-icon">&#x1F319;</span>
         <div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div>
@@ -25,89 +175,94 @@
       </button>
     </header>
 
-    <!-- Spinner -->
     <div id="loadingSpinner" class="cfg-spinner">
-      <i class="fa-solid fa-spinner fa-spin"></i> Loading data...
+      <i class="fa-solid fa-spinner fa-spin"></i> Loading data&hellip;
     </div>
 
-    <!-- Main content -->
-    <div id="mainContent" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
-      <div class="cfg-body">
+    <div id="mainContent" style="display:none;flex:1;min-height:0;overflow:hidden;">
 
-        <!-- Variables section -->
-        <div class="cfg-panel">
-          <div class="cfg-panel-head"><i class="fa-solid fa-table-columns"></i> Select Variables</div>
-          <div class="cfg-panel-body">
+      <div class="corr-layout">
 
-            <div class="cfg-tbl-toolbar">
-              <label>
-                <input type="checkbox" id="selectAll" class="cfg-tbl" style="width:16px;height:16px;" checked onchange="toggleAll(this.checked)">
-                <span>Select All</span>
-              </label>
-              <button class="cfg-btn-small" onclick="selectNumericOnly()">
-                <i class="fa-solid fa-hashtag"></i> Numeric Only
-              </button>
+        <div class="reg-vars-col">
+          <div class="reg-vars-header">
+            <span class="reg-vars-title">Available Variables</span>
+            <span class="reg-vars-summary" id="varsSummary"></span>
+          </div>
+          <div class="reg-vars-box" id="variablesListBox">
+            <div style="color:var(--cfg-text3);font-style:italic;font-size:11px;text-align:center;padding:20px 10px;">
+              No data loaded yet.
             </div>
-
-            <div class="cfg-tbl-wrap">
-              <div class="cfg-tbl-scroll">
-                <table class="cfg-tbl">
-                  <thead>
-                    <tr>
-                      <th class="center" style="width:44px;">Include</th>
-                      <th>Variable</th>
-                      <th class="center">n Numeric</th>
-                      <th class="center">Avg</th>
-                      <th class="center">Std</th>
-                      <th class="center">n String</th>
-                      <th class="center">n Missing</th>
-                    </tr>
-                  </thead>
-                  <tbody id="variablesTableBody">
-                    <tr>
-                      <td colspan="7" style="text-align:center;color:var(--cfg-text3);padding:20px;">
-                        Loading variables...
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div class="cfg-summary" id="selectionSummary">
-              Selected: <strong>0</strong> variables
-            </div>
-
           </div>
         </div>
 
-      </div><!-- /cfg-body -->
+        <div class="reg-model-col">
 
-      <!-- Footer -->
-      <div class="cfg-footer">
-        <button class="cfg-btn cancel" id="btnCancel" onclick="Office.context.ui.messageParent(JSON.stringify({action:'close'}))"><i class="fa-solid fa-times"></i> Cancel</button>
-        <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Load a previously saved configuration">
-          <i class="fa-solid fa-clock-rotate-left"></i> Load previous…
-        </button>
-        <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" disabled title="Save current configuration">
-          <i class="fa-solid fa-floppy-disk"></i> Save configuration
-        </button>
-        <button class="cfg-btn run" id="btnRun" onclick="runAnalysis()" disabled>
-          <i class="fa-solid fa-play"></i> Run Correlation Analysis
-        </button>
+          <div class="reg-model-title">
+            <span>Correlation Matrix</span>
+            <span class="reg-model-meta" id="tbRange">-</span>
+          </div>
+
+          <div class="reg-equation-strip" id="analysisSummary">
+            Pearson correlation · drag numeric variables below (≥2 required)
+          </div>
+
+          <div class="reg-zone-card zone-out">
+            <div class="reg-zone-head">
+              <div class="dot"></div>
+              <div class="zone-head-main">
+                <div class="zone-label">Variables to correlate</div>
+                <div class="zone-hint">Numeric columns with variation (SD &gt; 0, n ≥ 5)</div>
+              </div>
+              <span class="zone-req">*</span>
+            </div>
+            <div class="reg-zone-body drop-zone" id="zoneVars">
+              <div class="reg-zone-placeholder">Drag numeric variables here</div>
+            </div>
+          </div>
+
+          <div class="corr-quick-row">
+            <button type="button" class="corr-quick-btn" id="btnAddAllNumeric">
+              <i class="fa-solid fa-hashtag"></i> Add all numeric
+            </button>
+            <button type="button" class="corr-quick-btn" id="btnClearAll">
+              <i class="fa-solid fa-eraser"></i> Clear all
+            </button>
+          </div>
+
+          <div class="reg-obs-strip" id="obsMonitor">
+            <span>Selected: <strong id="selectedCount">0</strong> variables</span>
+            <span class="warn" id="selectionWarn">Need at least 2</span>
+          </div>
+
+        </div>
       </div>
+    </div>
 
-    </div><!-- /mainContent -->
-  </div><!-- /cfg-shell -->
+    <div class="cfg-footer">
+      <button class="cfg-btn cancel" id="btnCancel"><i class="fa-solid fa-times"></i> Cancel</button>
+      <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Load a previously saved configuration">
+        <i class="fa-solid fa-clock-rotate-left"></i> Load previous&hellip;
+      </button>
+      <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" disabled title="Save current configuration">
+        <i class="fa-solid fa-floppy-disk"></i> Save configuration
+      </button>
+      <button class="cfg-btn run" id="btnRun" onclick="runAnalysis()" disabled>
+        <i class="fa-solid fa-play"></i> Run Correlation Analysis
+      </button>
+    </div>
+
+  </div>
 
   <script>
     var correlationData = null;
     var variableStats = {};
+    var variableOrder = [];
+    var draggedElement = null;
 
     Office.onReady(function() {
       var storedData = sessionStorage.getItem('correlationRawData');
       if (storedData) {
-        try { correlationData = JSON.parse(storedData); processData(); } catch(e) {}
+        try { correlationData = JSON.parse(storedData); processData(); } catch (_e) {}
       }
       Office.context.ui.addHandlerAsync(
         Office.EventType.DialogParentMessageReceived,
@@ -118,115 +273,283 @@
               correlationData = message.payload;
               processData();
             }
-          } catch(e) {}
+          } catch (_e) {}
         }
       );
+      setupDropZone();
+      document.getElementById('btnCancel').addEventListener('click', function() {
+        Office.context.ui.messageParent(JSON.stringify({ action: 'close' }));
+      });
+      document.getElementById('btnAddAllNumeric').addEventListener('click', selectAllNumeric);
+      document.getElementById('btnClearAll').addEventListener('click', clearAllSelected);
       Office.context.ui.messageParent(JSON.stringify({ action: 'ready' }));
+      setInterval(function() {
+        if (correlationData && correlationData.values) return;
+        Office.context.ui.messageParent(JSON.stringify({ action: 'requestData' }));
+      }, 500);
     });
 
     function processData() {
       if (!correlationData || !correlationData.values) return;
       var values  = correlationData.values;
       var address = correlationData.address || 'Selection';
-      document.getElementById('rangeInfo').textContent = address;
-
-      var headers  = values[0];
+      var headers = values[0] || [];
       var dataRows = values.slice(1);
 
+      document.getElementById('tbRange').textContent = address;
+      document.getElementById('metaBadge').textContent = dataRows.length + ' rows · ' + headers.length + ' vars';
+
       variableStats = {};
+      variableOrder = [];
       headers.forEach(function(header, colIdx) {
-        var numeric=0, string=0, missing=0, numericValues=[];
+        var name = header || ('Col ' + (colIdx + 1));
+        variableOrder.push(name);
+        var numeric = 0, string = 0, missing = 0, numericValues = [];
         dataRows.forEach(function(row) {
           var value = row[colIdx];
-          if (value===null||value===undefined||value==='') { missing++; return; }
-          var num = (typeof value==='number' && !isNaN(value)) ? value : parseFloat(value);
-          if (!isNaN(num)) { numeric++; numericValues.push(num); } else { string++; }
+          if (value === null || value === undefined || value === '') { missing++; return; }
+          var num = (typeof value === 'number' && !isNaN(value)) ? value : parseFloat(value);
+          if (!isNaN(num) && isFinite(num)) { numeric++; numericValues.push(num); }
+          else { string++; }
         });
-        var avg=0,std=0;
-        if (numericValues.length>0) {
-          avg = numericValues.reduce(function(a,b){return a+b;},0)/numericValues.length;
-          if (numericValues.length>1) {
-            std = Math.sqrt(numericValues.reduce(function(a,v){return a+Math.pow(v-avg,2);},0)/numericValues.length);
+        var avg = 0, std = 0;
+        if (numericValues.length > 0) {
+          avg = numericValues.reduce(function(a, b) { return a + b; }, 0) / numericValues.length;
+          if (numericValues.length > 1) {
+            std = Math.sqrt(numericValues.reduce(function(a, v) { return a + Math.pow(v - avg, 2); }, 0) / numericValues.length);
           }
         }
-        var isValid = numeric>=5 && std>0;
-        variableStats[header] = { name:header, numeric:numeric, string:string, missing:missing, avg:avg, std:std, isValid:isValid, selected:isValid };
+        var isValid = numeric >= 5 && std > 0;
+        variableStats[name] = {
+          name: name, numeric: numeric, string: string, missing: missing,
+          avg: avg, std: std, isValid: isValid, selected: isValid
+        };
       });
-      renderVariablesTable();
+
+      renderVariables();
+      renderAssignment();
       updateSelectionSummary();
-      // Show main content, hide spinner
+
       document.getElementById('loadingSpinner').style.display = 'none';
-      var mc = document.getElementById('mainContent'); mc.style.display = 'flex';
+      document.getElementById('mainContent').style.display = 'flex';
     }
 
-    function renderVariablesTable() {
-      var tbody = document.getElementById('variablesTableBody');
-      tbody.innerHTML = '';
-      for (var varName in variableStats) {
-        if (!variableStats.hasOwnProperty(varName)) continue;
-        var stats = variableStats[varName];
-        var tr = document.createElement('tr');
-        if (!stats.isValid) tr.style.opacity = '0.4';
-        tr.innerHTML =
-          '<td class="center"><input type="checkbox" class="checkbox var-checkbox" data-var="'+varName+'" '+
-          (stats.selected?'checked':'')+' '+(stats.isValid?'':'disabled')+' onchange="updateSelectionSummary()" style="width:16px;height:16px;accent-color:var(--cfg-check-acc);cursor:pointer;"></td>'+
-          '<td><strong>'+varName+'</strong></td>'+
-          '<td class="center cfg-badge-num">'+stats.numeric+'</td>'+
-          '<td class="center">'+(stats.avg?stats.avg.toFixed(2):'-')+'</td>'+
-          '<td class="center">'+(stats.std?stats.std.toFixed(2):'0.00')+'</td>'+
-          '<td class="center cfg-badge-str">'+stats.string+'</td>'+
-          '<td class="center cfg-badge-mis">'+stats.missing+'</td>';
-        tbody.appendChild(tr);
-      }
+    function fmt(v) {
+      return Number.isFinite(v) ? v.toFixed(2) : '-';
     }
 
-    function toggleAll(checked) {
-      document.querySelectorAll('.var-checkbox').forEach(function(cb) {
-        cb.checked = checked;
-        variableStats[cb.dataset.var].selected = checked;
+    function getSelectedVars() {
+      return variableOrder.filter(function(name) {
+        return variableStats[name] && variableStats[name].selected;
       });
+    }
+
+    function updateVarsSummary() {
+      var el = document.getElementById('varsSummary');
+      if (!el) return;
+      var numCount = 0, catCount = 0, missCount = 0, validCount = 0;
+      variableOrder.forEach(function(name) {
+        var s = variableStats[name];
+        if (!s) return;
+        if (s.numeric > s.string) numCount++;
+        else if (s.string > 0) catCount++;
+        if (s.missing > 0) missCount++;
+        if (s.isValid) validCount++;
+      });
+      var html = '';
+      if (numCount) html += '<span class="reg-vars-badge reg-vb-num">' + numCount + ' num</span>';
+      if (catCount) html += '<span class="reg-vars-badge reg-vb-cat">' + catCount + ' cat</span>';
+      if (validCount) html += '<span class="reg-vars-badge reg-vb-ok">' + validCount + ' eligible</span>';
+      if (missCount) html += '<span class="reg-vars-badge reg-vb-miss">' + missCount + ' miss</span>';
+      el.innerHTML = html;
+    }
+
+    function renderVariables() {
+      var box = document.getElementById('variablesListBox');
+      box.innerHTML = '';
+      if (!variableOrder.length) {
+        box.innerHTML = '<div style="color:var(--cfg-text3);font-style:italic;font-size:11px;text-align:center;padding:20px 10px;">No variables found.</div>';
+        updateVarsSummary();
+        return;
+      }
+      variableOrder.forEach(function(name) {
+        var s = variableStats[name];
+        if (!s) return;
+        var row = document.createElement('div');
+        var isAssigned = !!s.selected;
+        var canDrag = s.isValid && !isAssigned;
+        row.className = 'reg-var-row' +
+          (isAssigned ? ' used' : '') +
+          (!s.isValid ? ' ineligible' : '');
+        row.draggable = canDrag;
+        row.dataset.varName = name;
+
+        var isNum = s.numeric > s.string;
+        var iconClass = isNum ? 'num' : (s.string > 0 ? 'cat' : 'unk');
+        var iconLetter = isNum ? 'N' : (s.string > 0 ? 'C' : '?');
+        var statsText = s.numeric + ' num';
+        if (s.string > 0) statsText += ' · ' + s.string + ' cat';
+        if (s.missing > 0) statsText += ' · <span class="reg-var-miss">' + s.missing + ' miss</span>';
+        if (isNum && s.isValid) statsText += ' · μ ' + fmt(s.avg) + ' · SD ' + fmt(s.std);
+        if (isNum && !s.isValid) statsText += ' · needs n≥5 & SD>0';
+
+        row.innerHTML =
+          '<div class="reg-var-icon ' + iconClass + '">' + iconLetter + '</div>' +
+          '<div class="reg-var-body">' +
+            '<div class="reg-var-name">' + name + '</div>' +
+            '<div class="reg-var-stats">' + statsText + '</div>' +
+          '</div>';
+
+        if (canDrag) {
+          row.addEventListener('dragstart', handleDragStart);
+          row.addEventListener('dragend', handleDragEnd);
+        }
+        box.appendChild(row);
+      });
+      updateVarsSummary();
+    }
+
+    function setupDropZone() {
+      var zone = document.getElementById('zoneVars');
+      zone.addEventListener('dragover', handleDragOver);
+      zone.addEventListener('dragenter', handleDragEnter);
+      zone.addEventListener('dragleave', handleDragLeave);
+      zone.addEventListener('drop', handleDrop);
+    }
+
+    function handleDragStart(e) {
+      draggedElement = e.target.closest('.reg-var-row');
+      if (draggedElement) draggedElement.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
+    }
+
+    function handleDragEnd(e) {
+      var row = e.target.closest('.reg-var-row');
+      if (row) row.classList.remove('dragging');
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      return false;
+    }
+
+    function handleDragEnter(e) {
+      var zone = e.target.closest('.drop-zone');
+      if (zone) zone.classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+      var zone = e.target.closest('.drop-zone');
+      if (zone && !zone.contains(e.relatedTarget)) zone.classList.remove('drag-over');
+    }
+
+    function handleDrop(e) {
+      e.stopPropagation();
+      e.preventDefault();
+      var zone = e.target.closest('.drop-zone');
+      if (!zone || !draggedElement) return false;
+      zone.classList.remove('drag-over');
+      var varName = draggedElement.dataset.varName;
+      addVariable(varName);
+      return false;
+    }
+
+    function addVariable(varName) {
+      var s = variableStats[varName];
+      if (!s || !s.isValid || s.selected) return;
+      s.selected = true;
+      renderVariables();
+      renderAssignment();
       updateSelectionSummary();
     }
 
-    function selectNumericOnly() {
-      document.querySelectorAll('.var-checkbox').forEach(function(cb) {
-        if (!cb.disabled) {
-          var isValid = variableStats[cb.dataset.var].isValid;
-          cb.checked = isValid;
-          variableStats[cb.dataset.var].selected = isValid;
+    function removeVariable(varName) {
+      if (!variableStats[varName]) return;
+      variableStats[varName].selected = false;
+      renderVariables();
+      renderAssignment();
+      updateSelectionSummary();
+    }
+
+    function renderAssignment() {
+      var zone = document.getElementById('zoneVars');
+      zone.innerHTML = '';
+      var selected = getSelectedVars();
+      if (!selected.length) {
+        zone.innerHTML = '<div class="reg-zone-placeholder">Drag numeric variables here</div>';
+        updateAnalysisSummary(0);
+        return;
+      }
+      selected.forEach(function(name) {
+        var chip = document.createElement('div');
+        chip.className = 'reg-chip';
+        chip.innerHTML = '<span>' + name + '</span><button class="reg-chip-x" title="Remove">✕</button>';
+        chip.querySelector('.reg-chip-x').addEventListener('click', function() { removeVariable(name); });
+        zone.appendChild(chip);
+      });
+      updateAnalysisSummary(selected.length);
+    }
+
+    function updateAnalysisSummary(count) {
+      var el = document.getElementById('analysisSummary');
+      if (!count) {
+        el.innerHTML = 'Pearson correlation · drag numeric variables below (<strong>≥2</strong> required)';
+        return;
+      }
+      var names = getSelectedVars();
+      var preview = names.slice(0, 4).join(', ');
+      if (names.length > 4) preview += '…';
+      el.innerHTML = '<strong>' + count + '</strong> variables · Pearson · ' + preview;
+    }
+
+    function selectAllNumeric() {
+      variableOrder.forEach(function(name) {
+        if (variableStats[name] && variableStats[name].isValid) {
+          variableStats[name].selected = true;
         }
       });
-      updateSelectAllCheckbox();
+      renderVariables();
+      renderAssignment();
       updateSelectionSummary();
     }
 
-    function updateSelectAllCheckbox() {
-      var all = Array.from(document.querySelectorAll('.var-checkbox')).every(function(cb){return cb.checked;});
-      document.getElementById('selectAll').checked = all;
+    function clearAllSelected() {
+      variableOrder.forEach(function(name) {
+        if (variableStats[name]) variableStats[name].selected = false;
+      });
+      renderVariables();
+      renderAssignment();
+      updateSelectionSummary();
     }
 
     function updateSelectionSummary() {
-      var selected = Array.from(document.querySelectorAll('.var-checkbox:checked')).length;
-      document.getElementById('selectionSummary').innerHTML =
-        'Selected: <strong>'+selected+'</strong> variables';
+      var selected = getSelectedVars().length;
+      document.getElementById('selectedCount').textContent = String(selected);
       var ok = selected >= 2;
+      document.getElementById('selectionWarn').style.display = ok ? 'none' : 'inline';
       document.getElementById('btnRun').disabled = !ok;
       var saveBtn = document.getElementById('btnSaveConfig');
       if (saveBtn) saveBtn.disabled = !ok;
       var loadBtn = document.getElementById('btnLoadPrev');
-      if (loadBtn) loadBtn.disabled = !(typeof CfgSave !== 'undefined' && CfgSave.getSavedList('corr-config').length > 0);
-      updateSelectAllCheckbox();
+      if (loadBtn) loadBtn.disabled = !(typeof CfgSave !== 'undefined' && CfgSave.getSavedList(STORAGE_KEY_CORR).length > 0);
+      if (typeof CfgSave !== 'undefined' && typeof CfgSave.syncConfigButtons === 'function') {
+        CfgSave.syncConfigButtons(STORAGE_KEY_CORR);
+      }
     }
 
     var STORAGE_KEY_CORR = 'corr-config';
+
     function saveModelSpec() {
-      var selectedVars = Array.from(document.querySelectorAll('.var-checkbox:checked')).map(function(cb){return cb.dataset.var;});
+      var selectedVars = getSelectedVars();
       if (selectedVars.length < 2) return;
-      var defaultName = selectedVars.slice(0,3).join(', ') + (selectedVars.length > 3 ? '…' : '');
+      var defaultName = selectedVars.slice(0, 3).join(', ') + (selectedVars.length > 3 ? '…' : '');
       CfgSave.showPrompt('Save configuration', 'Configuration name', defaultName, function(name) {
         CfgSave.saveCfgEntry(STORAGE_KEY_CORR, name, { variables: selectedVars }, function() { updateSelectionSummary(); });
       });
     }
+
     function showSavedList() {
       CfgSave.showSavedList(STORAGE_KEY_CORR, function(item) {
         var s = item.spec || {};
@@ -234,22 +557,28 @@
       }, function(item) {
         var spec = item.spec || {};
         var vars = spec.variables || [];
-        document.querySelectorAll('.var-checkbox').forEach(function(cb) {
-          cb.checked = vars.indexOf(cb.dataset.var) >= 0;
+        variableOrder.forEach(function(name) {
+          if (variableStats[name]) {
+            variableStats[name].selected = vars.indexOf(name) >= 0;
+          }
         });
+        renderVariables();
+        renderAssignment();
         updateSelectionSummary();
       });
     }
 
     function runAnalysis() {
-      var selectedVars = [];
-      document.querySelectorAll('.var-checkbox:checked').forEach(function(cb) {
-        selectedVars.push(cb.dataset.var);
-      });
-      if (selectedVars.length < 2) { alert('Please select at least 2 variables.'); return; }
+      var selectedVars = getSelectedVars();
+      if (selectedVars.length < 2) return;
       Office.context.ui.messageParent(JSON.stringify({
         action: 'runAnalysis',
-        data: { variables: selectedVars, method: 'pearson', viewType: 'matrix', data: correlationData }
+        data: {
+          variables: selectedVars,
+          method: 'pearson',
+          viewType: 'matrix',
+          data: correlationData
+        }
       }));
     }
   </script>

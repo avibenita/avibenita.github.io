@@ -3,299 +3,719 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Repeated Measures Builder</title>
+  <title>Repeated Measures Configuration</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
-  <link rel="stylesheet" href="../shared-config.css?v=20260511d"/>
-  <script src="../shared-config.js?v=20260309d"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="../shared-config.css?v=20260526a"/>
+  <script src="../shared-config.js?v=20260316"></script>
   <script src="../ds-guide.js?v=20260330g"></script>
+  <style>
+    :root {
+      --dep-tp: #a78bfa;
+      --dep-acc: #f97316;
+    }
+    [data-theme="light"] {
+      --dep-tp: #6d28d9;
+      --dep-acc: #c2410c;
+    }
+
+    body.cfg-embed .cfg-header { display: none; }
+    body.cfg-embed .cfg-shell { min-height: 100%; }
+
+    .dep-layout {
+      display: flex; gap: 10px; flex: 1 1 0; min-height: 0;
+      padding: 8px 10px; overflow: hidden;
+    }
+    .reg-vars-col {
+      flex: 0 0 220px; display: flex; flex-direction: column;
+      gap: 6px; min-height: 0; overflow: hidden;
+    }
+    .reg-model-col {
+      flex: 1 1 0; display: flex; flex-direction: column;
+      gap: 8px; min-height: 0; overflow-y: auto; padding-right: 4px;
+    }
+    .reg-vars-header {
+      display: flex; flex-direction: column; align-items: stretch; gap: 4px;
+      padding: 0 2px 6px; border-bottom: 1px solid var(--cfg-border); flex-shrink: 0;
+    }
+    .reg-vars-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .55px; color: var(--cfg-text); white-space: nowrap;
+    }
+    .reg-vars-summary { display: flex; gap: 5px; align-items: center; flex-wrap: nowrap; }
+    .reg-vars-badge {
+      font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px; white-space: nowrap;
+    }
+    .reg-vb-num  { background: rgba(167,139,250,.12); color: #6d28d9; border: 1px solid rgba(167,139,250,.3); }
+    .reg-vb-cat  { background: rgba(79,195,247,.12);  color: #0369a1; border: 1px solid rgba(79,195,247,.3); }
+    .reg-vb-miss { background: rgba(249,115,22,.1);   color: #c2410c; border: 1px solid rgba(249,115,22,.25); }
+
+    .reg-vars-box {
+      flex: 1 1 0; min-height: 0; overflow-y: auto;
+      border: 1px solid var(--cfg-border); border-radius: 8px; background: var(--cfg-surface);
+    }
+    .reg-var-row {
+      display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+      cursor: grab; border-bottom: 1px solid var(--cfg-border);
+      transition: background .12s; user-select: none;
+    }
+    .reg-var-row:last-child { border-bottom: none; }
+    .reg-var-row:hover:not(.used):not(.ineligible) { background: var(--cfg-tbl-hover); }
+    .reg-var-row.dragging { opacity: .4; }
+    .reg-var-row.used { opacity: .38; cursor: not-allowed; pointer-events: none; }
+    .reg-var-row.ineligible { opacity: .45; cursor: not-allowed; }
+    .reg-var-icon {
+      width: 16px; height: 16px; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 8px; font-weight: 700; flex-shrink: 0;
+    }
+    .reg-var-icon.num { background: rgba(167,139,250,.2); color: var(--dep-tp); }
+    .reg-var-icon.cat { background: rgba(148,163,184,.2); color: #94a3b8; }
+    .reg-var-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .reg-var-name {
+      font-size: 12px; font-weight: 600; color: var(--cfg-text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .reg-var-stats { font-size: 9.5px; color: var(--cfg-text3); line-height: 1.2; }
+    .reg-var-miss { color: #f97316; font-weight: 600; }
+
+    .reg-model-title {
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 2px 6px; border-bottom: 1px solid var(--cfg-border); flex-shrink: 0;
+    }
+    .reg-model-title > span:first-child {
+      font-size: 13px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .6px; color: var(--cfg-text);
+    }
+    .reg-model-meta {
+      font-size: 10px; color: var(--cfg-text3); margin-left: auto;
+      text-align: right; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; max-width: 55%;
+    }
+    .reg-equation-strip {
+      font-size: 11.5px; color: var(--cfg-text3);
+      padding: 5px 8px; background: var(--cfg-surface);
+      border: 1px dashed var(--cfg-border); border-radius: 6px;
+      line-height: 1.4; word-break: break-word; flex-shrink: 0;
+    }
+    .reg-equation-strip strong { color: var(--dep-acc); font-weight: 700; }
+
+    .int-badge {
+      font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 10px;
+      background: rgba(167,139,250,.2); color: var(--dep-tp);
+      border: 1px solid rgba(167,139,250,.4); margin-left: 5px;
+    }
+
+    .reg-zone-card {
+      border: 1px solid rgba(167,139,250,.35); border-radius: 8px;
+      overflow: hidden; flex-shrink: 0;
+      box-shadow: 0 2px 14px rgba(167,139,250,.08);
+    }
+    .reg-zone-head {
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 10px; font-size: 11.5px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .45px;
+      border-bottom: 1px solid var(--cfg-border);
+      background: rgba(167,139,250,.08); color: var(--dep-tp);
+    }
+    .reg-zone-head .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dep-tp); flex-shrink: 0; }
+    .zone-head-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .zone-head-main .zone-hint {
+      font-size: 9.5px; font-weight: 400; letter-spacing: .1px;
+      text-transform: none; opacity: .8; line-height: 1.2;
+    }
+    .zone-req { font-size: 13px; font-weight: 900; color: #dc2626; opacity: .85; margin-left: 3px; }
+    .reg-zone-body {
+      padding: 6px; background: rgba(167,139,250,.04);
+      min-height: 54px; display: flex; flex-wrap: wrap;
+      gap: 4px; align-content: flex-start; transition: background .2s;
+    }
+    .reg-zone-body.drag-over { background: rgba(167,139,250,.1); }
+    .reg-zone-placeholder {
+      width: 100%; text-align: center; font-size: 11px; font-style: italic;
+      color: var(--cfg-text3); padding: 8px 0;
+    }
+    .reg-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 6px 3px 8px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; border: 1px solid; white-space: nowrap;
+      background: rgba(167,139,250,.15); border-color: rgba(167,139,250,.4); color: var(--dep-tp);
+    }
+    .reg-chip-x {
+      background: none; border: none; cursor: pointer;
+      padding: 0 1px; opacity: .7; font-size: 12px; color: inherit; line-height: 1;
+    }
+    .reg-chip-x:hover { opacity: 1; }
+
+    .dep-quick-row { display: flex; gap: 6px; flex-shrink: 0; }
+    .dep-quick-btn {
+      flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 6px 8px; border-radius: 8px; border: 1px solid var(--cfg-border);
+      background: var(--cfg-surface); color: var(--cfg-text2, var(--cfg-text));
+      font-size: 10px; font-weight: 600; cursor: pointer;
+    }
+    .dep-quick-btn:hover { background: var(--cfg-tbl-hover); }
+    .dep-quick-btn i { color: var(--dep-acc); font-size: 10px; }
+
+    .adv-wrap { flex-shrink: 0; }
+    .adv-toggle {
+      width: 100%; display: flex; align-items: center; gap: 7px;
+      padding: 7px 10px; border: 1px solid var(--cfg-border); border-radius: 8px;
+      background: var(--cfg-surface2, var(--cfg-surface));
+      cursor: pointer; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .5px;
+      color: var(--cfg-text); user-select: none;
+    }
+    .adv-toggle:hover { background: var(--cfg-tbl-hover); }
+    .adv-toggle .adv-chevron { margin-left: auto; font-size: 10px; transition: transform .2s; color: var(--cfg-text3); }
+    .adv-wrap.open .adv-toggle { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+    .adv-wrap.open .adv-toggle .adv-chevron { transform: rotate(180deg); }
+    .adv-body {
+      overflow: hidden; max-height: 0; opacity: 0;
+      transition: max-height .28s ease, opacity .2s ease;
+      border: 1px solid var(--cfg-border); border-top: none;
+      border-radius: 0 0 8px 8px; padding: 0 10px;
+    }
+    .adv-wrap.open .adv-body { max-height: 400px; opacity: 1; padding: 8px 10px; }
+    .opt-row { display: flex; flex-direction: column; gap: 4px; }
+    .opt-row label { font-size: 11px; font-weight: 600; color: var(--cfg-text2); }
+
+    .reg-obs-strip {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 10px; font-size: 11px; color: var(--cfg-text);
+      border: 1px solid var(--cfg-border); border-radius: 8px;
+      background: var(--cfg-surface); flex-shrink: 0;
+    }
+    .reg-obs-strip .warn { color: #dc2626; font-size: 10px; }
+  </style>
 </head>
 <body>
   <div class="cfg-shell">
 
-    <!-- Header -->
     <header class="cfg-header">
       <div class="cfg-header-icon"><i class="fa-solid fa-repeat"></i></div>
       <span class="cfg-header-title">Repeated Measures</span>
-      <span class="cfg-meta-badge" id="metaBadge">�</span>
-      <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch to light mode">
+      <span class="cfg-meta-badge" id="metaBadge">—</span>
+      <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch theme">
         <span class="cfg-toggle-icon">&#x1F319;</span>
         <div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div>
         <span class="cfg-toggle-label">Dark</span>
       </button>
     </header>
 
-    <!-- Spinner -->
     <div id="loadingSpinner" class="cfg-spinner">
-      <i class="fa-solid fa-spinner fa-spin"></i> Loading data�
+      <i class="fa-solid fa-spinner fa-spin"></i> Loading data&hellip;
     </div>
 
-    <!-- Main content -->
-    <div id="mainContent" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
+    <div id="mainContent" style="display:none;flex:1;min-height:0;overflow:hidden;">
 
-      <div class="cfg-body">
+      <div class="dep-layout">
 
-        <!-- Range info -->
-        <div class="cfg-panel">
-          <div class="cfg-panel-body">
-            <div class="cfg-range-strip">
-              <div class="cfg-range-item">Range: <strong id="rangeAddr">�</strong></div>
-              <div class="cfg-range-item">Rows: <strong id="rowCount">0</strong></div>
-              <div class="cfg-range-item">Columns: <strong id="colCount">0</strong></div>
+        <div class="reg-vars-col">
+          <div class="reg-vars-header">
+            <span class="reg-vars-title">Available Variables</span>
+            <span class="reg-vars-summary" id="varsSummary"></span>
+          </div>
+          <div class="reg-vars-box" id="variablesListBox">
+            <div style="color:var(--cfg-text3);font-style:italic;font-size:11px;text-align:center;padding:20px 10px;">
+              No data loaded yet.
             </div>
           </div>
         </div>
 
-        <!-- Options -->
-        <div class="cfg-panel">
-          <div class="cfg-panel-head"><i class="fa-solid fa-sliders"></i> Analysis Options</div>
-          <div class="cfg-panel-body">
+        <div class="reg-model-col">
 
-            <div class="cfg-label" style="margin-bottom:8px;">Timepoints</div>
-            <div class="cfg-radio-group" style="margin-bottom:12px;">
-              <div class="cfg-radio-option">
-                <input type="radio" name="dataMode" id="twoTimepoints" value="two-vars" />
-                <label for="twoTimepoints" class="cfg-radio-label">
-                  <span class="radio-icon"><i class="fa-solid fa-arrows-left-right"></i></span>
-                  <span class="radio-text">2 Timepoints</span>
-                </label>
-              </div>
-              <div class="cfg-radio-option">
-                <input type="radio" name="dataMode" id="kPlusTimepoints" value="k-plus" checked />
-                <label for="kPlusTimepoints" class="cfg-radio-label">
-                  <span class="radio-icon"><i class="fa-solid fa-timeline"></i></span>
-                  <span class="radio-text">3+ Timepoints</span>
-                </label>
-              </div>
-            </div>
-
-            <label class="cfg-label" for="frameworkMode">Primary Framework</label>
-            <select id="frameworkMode" class="cfg-select">
-              <option value="parametric">Parametric (means)</option>
-              <option value="nonparametric">Nonparametric (ranks)</option>
-            </select>
-
+          <div class="reg-model-title">
+            <span>Compare Timepoints</span>
+            <span class="reg-model-meta" id="tbRange">—</span>
           </div>
-        </div>
 
-        <!-- Data Structure Guide -->
-        <div id="dsGuideContainer"></div>
+          <div class="reg-equation-strip" id="modelSummary">Drag timepoint columns below (wide format: one column = one occasion, each row = same subject)</div>
 
-        <!-- Variable picker -->
-        <div class="cfg-panel">
-          <div class="cfg-panel-head"><i class="fa-solid fa-clock-rotate-left"></i> Timepoint Variables</div>
-          <div class="cfg-panel-body">
-            <div class="cfg-hint" style="margin-bottom:8px;">Click columns representing timepoints (e.g., Time1, Time2, Time3).</div>
-            <div class="cfg-tbl-wrap">
-              <div class="cfg-tbl-scroll">
-                <table class="cfg-tbl">
-                  <thead>
-                    <tr>
-                      <th>Timepoint</th>
-                      <th class="center">N Num</th>
-                      <th class="center">N Str</th>
-                      <th class="center">N Miss</th>
-                      <th class="center"></th>
-                    </tr>
-                  </thead>
-                  <tbody id="interestChecks"></tbody>
-                </table>
+          <div class="reg-zone-card zone-tp">
+            <div class="reg-zone-head">
+              <div class="dot"></div>
+              <div class="zone-head-main">
+                <div class="zone-label">Timepoints to compare</div>
+                <div class="zone-hint">Each numeric column is one measurement occasion for the same subjects</div>
+              </div>
+              <span class="zone-req">*</span>
+              <span class="int-badge" id="tpCountBadge" style="display:none;"></span>
+            </div>
+            <div class="reg-zone-body drop-zone" id="zoneTimepoints">
+              <div class="reg-zone-placeholder" id="zonePlaceholder">Drag numeric timepoint columns here</div>
+            </div>
+          </div>
+
+          <div class="dep-quick-row">
+            <button type="button" class="dep-quick-btn" id="btnAddAllNumeric">
+              <i class="fa-solid fa-hashtag"></i> Add all numeric
+            </button>
+            <button type="button" class="dep-quick-btn" id="btnClearAll">
+              <i class="fa-solid fa-eraser"></i> Clear all
+            </button>
+          </div>
+
+          <div class="adv-wrap" id="guideWrap">
+            <div class="adv-toggle" id="guideToggle" role="button" tabindex="0" aria-expanded="false">
+              <i class="fa-solid fa-circle-info" style="color:var(--dep-acc);"></i>
+              <span>Data format guide</span>
+              <i class="fa-solid fa-chevron-down adv-chevron"></i>
+            </div>
+            <div class="adv-body"><div id="dsGuideContainer"></div></div>
+          </div>
+
+          <div class="adv-wrap" id="optionsWrap">
+            <div class="adv-toggle" id="optionsToggle" role="button" tabindex="0" aria-expanded="false">
+              <i class="fa-solid fa-sliders" style="color:var(--dep-acc);"></i>
+              <span>Analysis options</span>
+              <i class="fa-solid fa-chevron-down adv-chevron"></i>
+            </div>
+            <div class="adv-body">
+              <div class="opt-row">
+                <label for="frameworkMode">Primary framework</label>
+                <select id="frameworkMode" class="cfg-select">
+                  <option value="parametric">Parametric (means)</option>
+                  <option value="nonparametric">Nonparametric (ranks)</option>
+                </select>
               </div>
             </div>
-
-            <div class="cfg-bucket">
-              <div class="cfg-bucket-title">Timepoints Bucket</div>
-              <div id="compareBucket" class="cfg-bucket-items"></div>
-            </div>
-            <div class="cfg-hint" id="bucketHint" style="margin-top:6px;">For 2 timepoints: exactly 2. For 3+: at least 3.</div>
           </div>
+
+          <div class="reg-obs-strip" id="obsMonitor">
+            <span id="obsText">Select timepoints to continue</span>
+            <span class="warn" id="obsWarn" style="display:none;"></span>
+          </div>
+
         </div>
-
-      </div><!-- /cfg-body -->
-
-      <!-- Footer -->
-      <div class="cfg-footer">
-        <button class="cfg-btn cancel" id="btnCancel"><i class="fa-solid fa-times"></i> Cancel</button>
-        <button class="cfg-btn" id="btnRefresh" style="flex-shrink:0;" title="Refresh data">
-          <i class="fa-solid fa-rotate"></i>
-        </button>
-        <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Load a previously saved configuration">
-          <i class="fa-solid fa-clock-rotate-left"></i> Load previous…
-        </button>
-        <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" disabled title="Save current configuration">
-          <i class="fa-solid fa-floppy-disk"></i> Save configuration
-        </button>
-        <button class="cfg-btn run" id="btnRun" disabled>
-          <i class="fa-solid fa-play"></i> Open Dashboard
-        </button>
       </div>
+    </div>
 
-    </div><!-- /mainContent -->
-  </div><!-- /cfg-shell -->
+    <div class="cfg-footer">
+      <button class="cfg-btn cancel" id="btnCancel"><i class="fa-solid fa-times"></i> Cancel</button>
+      <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Load a previously saved configuration">
+        <i class="fa-solid fa-clock-rotate-left"></i> Load previous&hellip;
+      </button>
+      <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" disabled title="Save current configuration">
+        <i class="fa-solid fa-floppy-disk"></i> Save configuration
+      </button>
+      <button class="cfg-btn run" id="btnRun" disabled>
+        <i class="fa-solid fa-play"></i> Open Dashboard
+      </button>
+    </div>
+
+  </div>
 
   <script>
-    var STATE = { headers:[], rows:[], address:"", saved:null, selectedColumns:[], draggingCol:null };
-    function qs(id){ return document.getElementById(id); }
-    function send(action,data){
-      if(Office&&Office.context&&Office.context.ui&&typeof Office.context.ui.messageParent==="function")
-        Office.context.ui.messageParent(JSON.stringify({action:action,data:data||null}));
-    }
+    var EMBED = (function () {
+      try { return /[?&]embed=1(?:&|$)/.test(window.location.search || ''); } catch (e) { return false; }
+    })();
 
-    function countKinds(headers,rows){
-      return headers.map(function(name,idx){
-        var numeric=0,string=0,missing=0;
-        rows.forEach(function(r){
-          var v=r[idx];
-          if(v===null||v===undefined||v===""){missing++;return;}
-          isFinite(Number(String(v).replace(",",".")))? numeric++ : string++;
-        });
-        return {name:name,numeric:numeric,string:string,missing:missing};
-      });
-    }
+    var _headers = [];
+    var _rows = [];
+    var _address = '';
+    var _saved = null;
+    var columnStats = [];
+    var selectedColumns = [];
+    var draggedElement = null;
+    var STORAGE_KEY = 'dep-config';
 
-    function renderInterestChecks(headers){
-      var tbody = qs("interestChecks");
-      if(!tbody) return;
-      var stats = countKinds(headers,STATE.rows||[]);
-      var html = "";
-      stats.forEach(function(s){
-        var isSel = STATE.selectedColumns.indexOf(s.name)>=0;
-        html += '<tr class="'+(isSel?'disabled':'')+'" draggable="'+(isSel?'false':'true')+'" data-col="'+s.name+'">' +
-          '<td>'+s.name+'</td>' +
-          '<td class="center cfg-badge-num">'+s.numeric+'</td>' +
-          '<td class="center cfg-badge-str">'+s.string+'</td>' +
-          '<td class="center cfg-badge-mis">'+s.missing+'</td>' +
-          '<td class="center cfg-drag-h"><i class="fa-solid fa-grip"></i></td></tr>';
-      });
-      tbody.innerHTML = html;
-      tbody.querySelectorAll("tr").forEach(function(tr){
-        var col = tr.getAttribute("data-col");
-        var disabled = tr.classList.contains("disabled");
-        tr.addEventListener("click",function(){ if(!disabled) addToBucket(col); });
-      });
-    }
+    function qs(id) { return document.getElementById(id); }
 
-    function addToBucket(colName){
-      if(!colName||STATE.selectedColumns.indexOf(colName)>=0) return;
-      var mode = (document.querySelector('input[name="dataMode"]:checked')||{}).value||'k-plus';
-      if(mode==="two-vars"&&STATE.selectedColumns.length>=2) STATE.selectedColumns.shift();
-      STATE.selectedColumns.push(colName);
-      renderBucket(); renderInterestChecks(STATE.headers); validateBucket();
-    }
-
-    function removeFromBucket(colName){
-      STATE.selectedColumns = STATE.selectedColumns.filter(function(c){return c!==colName;});
-      renderBucket(); renderInterestChecks(STATE.headers); validateBucket();
-    }
-
-    function renderBucket(){
-      var container = qs("compareBucket");
-      if(!container) return;
-      if(STATE.selectedColumns.length===0){
-        container.innerHTML='<span style="color:var(--cfg-text3);font-size:11px;">No timepoints selected</span>';
+    function send(action, data) {
+      var payload = JSON.stringify({ action: action, data: data || null });
+      if (EMBED && window.parent && window.parent !== window) {
+        try { window.parent.postMessage({ statisticoDependentEmbed: true, body: payload }, '*'); } catch (_e) {}
         return;
       }
-      container.innerHTML = STATE.selectedColumns.map(function(col){
-        return '<span class="cfg-pill">'+col+' <button onclick="removeFromBucket(\''+col+'\')"><i class="fa-solid fa-xmark"></i></button></span>';
-      }).join('');
+      if (Office && Office.context && Office.context.ui && typeof Office.context.ui.messageParent === 'function') {
+        Office.context.ui.messageParent(payload);
+      }
     }
 
-    function validateBucket(){
-      var mode = (document.querySelector('input[name="dataMode"]:checked')||{}).value||'k-plus';
-      var count = STATE.selectedColumns.length;
-      var ok = (mode==="two-vars") ? count===2 : count>=3;
-      var btn = qs("btnRun");
-      if(btn) btn.disabled = !ok;
-      if(qs("btnSaveConfig")) qs("btnSaveConfig").disabled = !ok;
-      var hasSaved = (CfgSave.getSavedList('dep-config').length > 0);
-      if(qs("btnLoadPrev")) qs("btnLoadPrev").disabled = !hasSaved;
+    function inferCompareMode() {
+      var n = selectedColumns.length;
+      if (n === 2) return 'two-vars';
+      if (n >= 3) return 'k-plus';
+      return null;
     }
 
-    var STORAGE_KEY_DEP = 'dep-config';
+    function buildColumnStats() {
+      columnStats = _headers.map(function(name, colIdx) {
+        var numeric = 0, string = 0, missing = 0;
+        _rows.forEach(function(row) {
+          var value = row[colIdx];
+          if (value === null || value === undefined || value === '') { missing++; return; }
+          var num = parseFloat(String(value).replace(',', '.'));
+          if (!isNaN(num) && isFinite(num)) numeric++;
+          else string++;
+        });
+        var isNumeric = numeric > string;
+        return {
+          name: name || ('Col ' + (colIdx + 1)),
+          idx: colIdx,
+          numeric: numeric,
+          string: string,
+          missing: missing,
+          isNumeric: isNumeric,
+          eligible: isNumeric && numeric >= 5
+        };
+      });
+    }
+
+    function getStat(name) {
+      for (var i = 0; i < columnStats.length; i++) {
+        if (columnStats[i].name === name) return columnStats[i];
+      }
+      return null;
+    }
+
+    function isSelected(name) {
+      return selectedColumns.indexOf(name) >= 0;
+    }
+
+    function updateVarsSummary() {
+      var el = qs('varsSummary');
+      if (!el) return;
+      var numCount = 0, catCount = 0;
+      columnStats.forEach(function(s) {
+        if (s.isNumeric) numCount++;
+        else if (s.string > 0) catCount++;
+      });
+      var html = '';
+      if (numCount) html += '<span class="reg-vars-badge reg-vb-num">' + numCount + ' num</span>';
+      if (catCount) html += '<span class="reg-vars-badge reg-vb-cat">' + catCount + ' cat</span>';
+      el.innerHTML = html;
+    }
+
+    function renderVariables() {
+      var box = qs('variablesListBox');
+      if (!box) return;
+      box.innerHTML = '';
+      if (!columnStats.length) {
+        box.innerHTML = '<div style="color:var(--cfg-text3);font-style:italic;font-size:11px;text-align:center;padding:20px 10px;">No variables found.</div>';
+        updateVarsSummary();
+        return;
+      }
+      columnStats.forEach(function(s) {
+        var used = isSelected(s.name);
+        var row = document.createElement('div');
+        row.className = 'reg-var-row' + (used ? ' used' : '') + (!s.eligible ? ' ineligible' : '');
+        row.draggable = s.eligible && !used;
+        row.dataset.varName = s.name;
+
+        var statsText = s.numeric + ' num';
+        if (s.string > 0) statsText += ' · ' + s.string + ' cat';
+        if (s.missing > 0) statsText += ' · <span class="reg-var-miss">' + s.missing + ' miss</span>';
+        if (s.isNumeric && !s.eligible) statsText += ' · needs n&ge;5';
+
+        row.innerHTML =
+          '<div class="reg-var-icon ' + (s.isNumeric ? 'num' : 'cat') + '">' + (s.isNumeric ? 'N' : 'C') + '</div>' +
+          '<div class="reg-var-body">' +
+            '<div class="reg-var-name">' + s.name + '</div>' +
+            '<div class="reg-var-stats">' + statsText + '</div>' +
+          '</div>';
+
+        if (s.eligible && !used) {
+          row.addEventListener('dragstart', handleDragStart);
+          row.addEventListener('dragend', handleDragEnd);
+        }
+        box.appendChild(row);
+      });
+      updateVarsSummary();
+    }
+
+    function renderTimepoints() {
+      var zone = qs('zoneTimepoints');
+      var ph = qs('zonePlaceholder');
+      if (!zone) return;
+
+      Array.from(zone.querySelectorAll('.reg-chip')).forEach(function(c) { c.remove(); });
+
+      if (!selectedColumns.length) {
+        if (ph) ph.style.display = '';
+        updateModelSummary();
+        validateModel();
+        return;
+      }
+      if (ph) ph.style.display = 'none';
+
+      selectedColumns.forEach(function(name) {
+        var chip = document.createElement('div');
+        chip.className = 'reg-chip';
+        chip.innerHTML = '<span>' + name + '</span><button class="reg-chip-x" title="Remove">&times;</button>';
+        chip.querySelector('.reg-chip-x').addEventListener('click', function() {
+          removeTimepoint(name);
+        });
+        zone.appendChild(chip);
+      });
+      updateModelSummary();
+      validateModel();
+    }
+
+    function addTimepoint(name) {
+      if (!name || isSelected(name)) return;
+      var s = getStat(name);
+      if (!s || !s.eligible) return;
+
+      selectedColumns.push(name);
+      renderTimepoints();
+      renderVariables();
+      updateDataGuide();
+    }
+
+    function removeTimepoint(name) {
+      selectedColumns = selectedColumns.filter(function(n) { return n !== name; });
+      renderTimepoints();
+      renderVariables();
+      updateDataGuide();
+    }
+
+    function selectAllNumeric() {
+      columnStats.forEach(function(s) {
+        if (s.eligible && !isSelected(s.name)) selectedColumns.push(s.name);
+      });
+      renderTimepoints();
+      renderVariables();
+      updateDataGuide();
+    }
+
+    function clearAllTimepoints() {
+      selectedColumns = [];
+      renderTimepoints();
+      renderVariables();
+      updateDataGuide();
+    }
+
+    function updateModelSummary() {
+      var el = qs('modelSummary');
+      if (!el) return;
+      var n = selectedColumns.length;
+      if (!n) {
+        el.textContent = 'Drag timepoint columns below (wide format: one column = one occasion, each row = same subject)';
+        return;
+      }
+      if (n === 2) {
+        el.innerHTML = 'Paired comparison: <strong>' + selectedColumns[0] + '</strong> vs <strong>' + selectedColumns[1] + '</strong>';
+        return;
+      }
+      el.innerHTML = 'Repeated measures across <strong>' + n + '</strong> timepoints: ' + selectedColumns.map(function(c) {
+        return '<strong>' + c + '</strong>';
+      }).join(', ');
+    }
+
+    function updateDataGuide() {
+      if (typeof DsGuide === 'undefined') return;
+      var mode = inferCompareMode() || 'k-plus';
+      DsGuide.renderDependent(mode, 'dsGuideContainer', { collapsed: false });
+    }
+
+    function validateModel() {
+      var mode = inferCompareMode();
+      var badge = qs('tpCountBadge');
+      if (badge) {
+        if (mode === 'two-vars') {
+          badge.style.display = 'inline';
+          badge.textContent = 'two timepoints';
+        } else if (mode === 'k-plus') {
+          badge.style.display = 'inline';
+          badge.textContent = 'k+ timepoints';
+        } else {
+          badge.style.display = 'none';
+        }
+      }
+
+      var obsText = qs('obsText');
+      var obsWarn = qs('obsWarn');
+      var warn = '';
+      if (selectedColumns.length === 1) {
+        warn = 'Add one more timepoint for paired comparison, or a third for k+ repeated measures';
+      } else if (mode === 'k-plus' && selectedColumns.length < 3) {
+        warn = 'Need at least 3 timepoints for k+ repeated measures';
+      }
+
+      if (obsText) {
+        obsText.textContent = selectedColumns.length
+          ? ('Selected: ' + selectedColumns.length + ' timepoint' + (selectedColumns.length === 1 ? '' : 's'))
+          : 'Select timepoints to continue';
+      }
+      if (obsWarn) {
+        obsWarn.style.display = warn ? 'inline' : 'none';
+        obsWarn.textContent = warn;
+      }
+
+      var runOk = mode === 'two-vars' || (mode === 'k-plus' && selectedColumns.length >= 3);
+      if (qs('btnRun')) qs('btnRun').disabled = !runOk;
+      if (qs('btnSaveConfig')) qs('btnSaveConfig').disabled = !runOk;
+
+      var hasSaved = typeof CfgSave !== 'undefined' && CfgSave.getSavedList(STORAGE_KEY).length > 0;
+      if (qs('btnLoadPrev')) qs('btnLoadPrev').disabled = !hasSaved;
+    }
+
+    function applySpec(spec) {
+      if (!spec) return;
+      selectedColumns = Array.isArray(spec.selectedColumns) ? spec.selectedColumns.slice() : [];
+      if (spec.primaryFramework && qs('frameworkMode')) qs('frameworkMode').value = spec.primaryFramework;
+    }
+
+    function initUI() {
+      qs('loadingSpinner').style.display = 'none';
+      qs('mainContent').style.display = 'flex';
+
+      qs('tbRange').textContent = _address || '(workbook)';
+      qs('metaBadge').textContent = _rows.length + ' rows · ' + _headers.length + ' vars';
+
+      buildColumnStats();
+      selectedColumns = [];
+      if (_saved) applySpec(_saved);
+
+      renderVariables();
+      renderTimepoints();
+      updateDataGuide();
+      validateModel();
+    }
+
+    function setupDropZone() {
+      var zone = qs('zoneTimepoints');
+      if (!zone) return;
+      zone.addEventListener('dragover', function(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+      zone.addEventListener('dragenter', function(e) {
+        var z = e.target.closest('.drop-zone');
+        if (z) z.classList.add('drag-over');
+      });
+      zone.addEventListener('dragleave', function(e) {
+        var z = e.target.closest('.drop-zone');
+        if (z && !z.contains(e.relatedTarget)) z.classList.remove('drag-over');
+      });
+      zone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var z = e.target.closest('.drop-zone');
+        if (z) z.classList.remove('drag-over');
+        if (!draggedElement) return;
+        addTimepoint(draggedElement.dataset.varName);
+      });
+    }
+
+    function handleDragStart(e) {
+      draggedElement = e.target.closest('.reg-var-row');
+      if (draggedElement) draggedElement.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
+    }
+
+    function handleDragEnd(e) {
+      var row = e.target.closest('.reg-var-row');
+      if (row) row.classList.remove('dragging');
+    }
 
     function saveModelSpec() {
-      var mode = (document.querySelector('input[name="dataMode"]:checked')||{}).value||'k-plus';
-      var defaultName = STATE.selectedColumns.join(', ') || 'Repeated Measures';
+      var mode = inferCompareMode();
+      if (!mode) return;
+      var defaultName = selectedColumns.join(', ') || 'Repeated Measures';
       CfgSave.showPrompt('Save configuration', 'Configuration name', defaultName, function(name) {
-        CfgSave.saveCfgEntry(STORAGE_KEY_DEP, name, {
+        CfgSave.saveCfgEntry(STORAGE_KEY, name, {
           compareMode: mode,
-          primaryFramework: qs("frameworkMode") ? qs("frameworkMode").value : 'parametric',
-          selectedColumns: STATE.selectedColumns.slice()
-        }, function(entry) {
-          validateBucket();
-        });
+          primaryFramework: qs('frameworkMode') ? qs('frameworkMode').value : 'parametric',
+          selectedColumns: selectedColumns.slice()
+        }, function() { validateModel(); });
       });
     }
 
     function showSavedList() {
-      CfgSave.showSavedList(STORAGE_KEY_DEP, function(item) {
+      CfgSave.showSavedList(STORAGE_KEY, function(item) {
         var spec = item.spec || {};
-        return (spec.selectedColumns||[]).join(', ');
+        return (spec.selectedColumns || []).join(', ');
       }, function(item) {
-        var spec = item.spec || {};
-        if(spec.compareMode) {
-          var r = qs(spec.compareMode==='k-plus'?'kPlusTimepoints':'twoTimepoints');
-          if(r) r.checked = true;
-        }
-        if(spec.primaryFramework && qs("frameworkMode")) qs("frameworkMode").value = spec.primaryFramework;
-        if(Array.isArray(spec.selectedColumns)) STATE.selectedColumns = spec.selectedColumns.slice();
-        renderInterestChecks(STATE.headers); renderBucket(); validateBucket();
+        applySpec(item.spec || {});
+        renderVariables();
+        renderTimepoints();
+        updateDataGuide();
+        validateModel();
       });
     }
 
-    function applyPayload(p){
-      if(!p||!p.headers) return;
-      STATE.headers=p.headers||[]; STATE.rows=p.rows||[]; STATE.address=p.address||""; STATE.saved=p.savedModelSpec||null;
-      qs("rangeAddr").textContent = STATE.address||"�";
-      qs("rowCount").textContent  = STATE.rows.length;
-      qs("colCount").textContent  = STATE.headers.length;
-      qs("metaBadge").textContent = STATE.address || (STATE.rows.length+" rows");
-      if(STATE.saved){
-        if(STATE.saved.compareMode){
-          var r=qs(STATE.saved.compareMode==="k-plus"?"kPlusTimepoints":"twoTimepoints");
-          if(r) r.checked=true;
-        }
-        if(STATE.saved.primaryFramework){ var f=qs("frameworkMode"); if(f) f.value=STATE.saved.primaryFramework; }
-        if(Array.isArray(STATE.saved.selectedColumns)) STATE.selectedColumns=STATE.saved.selectedColumns.slice();
+    function runAnalysis() {
+      var mode = inferCompareMode();
+      if (!mode) return;
+      if (mode === 'k-plus' && selectedColumns.length < 3) return;
+
+      var selected = selectedColumns.slice();
+      var spec = {
+        compareMode: mode,
+        primaryFramework: qs('frameworkMode').value,
+        selectedColumns: selected,
+        groupA: selected[0] || '',
+        groupB: selected[1] || '',
+        confidence: 0.95,
+        hypothesis: 'two-sided'
+      };
+      if (mode === 'k-plus') {
+        spec.posthocMethod = 'paired';
+        spec.posthocCorrection = 'holm';
       }
-      renderInterestChecks(STATE.headers); renderBucket(); validateBucket();
-      // Show main content, hide spinner
-      qs("loadingSpinner").style.display = "none";
-      var mc = qs("mainContent"); mc.style.display = "flex";
+      send('dependentModel', spec);
     }
 
-    Office.onReady(function(){
-      Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived,function(arg){
-        var msg=JSON.parse(arg.message||"{}");
-        if(msg.type==="DEPENDENT_DATA"&&msg.payload) applyPayload(msg.payload);
-      });
-      send("requestData",null); send("ready",null);
-      qs("btnRefresh").addEventListener("click",function(){send("requestData");});
-      qs("btnCancel").addEventListener("click",function(){send("close");});
-      qs("btnRun").addEventListener("click",function(){
-        var mode=(document.querySelector('input[name="dataMode"]:checked')||{}).value||'k-plus';
-        var framework=qs("frameworkMode").value;
-        send("dependentModel",{
-          compareMode:mode, primaryFramework:framework,
-          selectedColumns:STATE.selectedColumns.slice(),
-          groupA:STATE.selectedColumns[0]||"", groupB:STATE.selectedColumns[1]||"",
-          confidence:0.95, hypothesis:"two-sided"
-        });
-      });
-      document.querySelectorAll('input[name="dataMode"]').forEach(function(r){
-        r.addEventListener("change",function(){ validateBucket(); renderInterestChecks(STATE.headers); });
-      });
-    });
+    function applyPayload(p) {
+      if (!p || !p.headers) return;
+      _headers = p.headers || [];
+      _rows = p.rows || [];
+      _address = p.address || '';
+      _saved = p.savedModelSpec || null;
+      initUI();
+    }
 
-    document.addEventListener("DOMContentLoaded", function() {
-      DsGuide.renderDependent('k-plus', 'dsGuideContainer', { collapsed: true });
-      document.querySelectorAll('input[name="dataMode"]').forEach(function(r){
-        r.addEventListener('change', function(){
-          DsGuide.renderDependent(r.value, 'dsGuideContainer', { collapsed: true });
-        });
+    document.addEventListener('DOMContentLoaded', function() {
+      if (EMBED) document.body.classList.add('cfg-embed');
+
+      setupDropZone();
+      qs('btnCancel').addEventListener('click', function() { send('close', null); });
+      qs('btnRun').addEventListener('click', runAnalysis);
+      qs('btnAddAllNumeric').addEventListener('click', selectAllNumeric);
+      qs('btnClearAll').addEventListener('click', clearAllTimepoints);
+      qs('guideToggle').addEventListener('click', function() {
+        qs('guideWrap').classList.toggle('open');
+      });
+      qs('optionsToggle').addEventListener('click', function() {
+        qs('optionsWrap').classList.toggle('open');
+      });
+
+      if (typeof DsGuide !== 'undefined') {
+        DsGuide.renderDependent('k-plus', 'dsGuideContainer', { collapsed: true });
+      }
+
+      Office.onReady(function() {
+        if (EMBED) {
+          window.addEventListener('message', function(ev) {
+            var d = ev.data;
+            if (!d || d.statisticoDependentEmbed !== true) return;
+            try {
+              var msg = typeof d.body === 'string' ? JSON.parse(d.body || '{}') : d.body;
+              if (msg.type === 'DEPENDENT_DATA' && msg.payload) applyPayload(msg.payload);
+            } catch (_e) {}
+          });
+          send('requestData', null);
+          send('ready', null);
+          return;
+        }
+
+        Office.context.ui.addHandlerAsync(
+          Office.EventType.DialogParentMessageReceived,
+          function(arg) {
+            try {
+              var msg = JSON.parse(arg.message || '{}');
+              if (msg.type === 'DEPENDENT_DATA' && msg.payload) applyPayload(msg.payload);
+            } catch (_e) {}
+          }
+        );
+        send('ready', null);
+        setInterval(function() {
+          if (_headers.length) return;
+          send('requestData', null);
+        }, 500);
       });
     });
   </script>
 </body>
 </html>
-

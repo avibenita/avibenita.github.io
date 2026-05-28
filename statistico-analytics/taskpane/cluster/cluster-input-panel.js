@@ -165,13 +165,11 @@ function openClusterSetupDialog() {
   if (!clusterRangeData || clusterRangeData.length < 2) return;
   const dlg = clusterCfg().dialog || {};
   const setupFile = dlg.setupFilename || "cluster/cluster-input.html";
-  const hPct = dlg.setupHeightPercent != null ? Number(dlg.setupHeightPercent) : DIALOG_SIZES.SETUP.height;
-  const wPct = dlg.setupWidthPercent != null ? Number(dlg.setupWidthPercent) : DIALOG_SIZES.SETUP.width;
   const dialogUrl = `${getDialogsBaseUrl()}${setupFile}?v=${Date.now()}`;
 
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    { height: hPct, width: wPct, displayInIframe: false },
+    DIALOG_SIZES.REGRESSION_BUILDER,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error("Failed to open cluster setup dialog:", asyncResult.error);

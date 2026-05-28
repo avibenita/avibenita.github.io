@@ -18,8 +18,8 @@
       heightPercent: 90,
       widthPercent: 70,
       setupFilename: "cluster/cluster-input.html",
-      setupHeightPercent: 66,
-      setupWidthPercent: 56
+      setupHeightPercent: 92,
+      setupWidthPercent: 30
     },
     defaults: { numClusters: 3, standardize: true, linkage: "average", clusterMethod: "kmeans" },
     limits: {

@@ -157,6 +157,40 @@
     .reg-vb-num  { background: rgba(167,139,250,.12); color: #6d28d9; border: 1px solid rgba(167,139,250,.3); }
     .reg-vb-cat  { background: rgba(79,195,247,.12);  color: #0369a1; border: 1px solid rgba(79,195,247,.3); }
     .reg-vb-miss { background: rgba(249,115,22,.1);   color: #c2410c; border: 1px solid rgba(249,115,22,.25); }
+    .reg-vb-out  { background: rgba(34,197,94,.12);  color: #15803d; border: 1px solid rgba(34,197,94,.35); }
+
+    .reg-var-row.outcome-eligible {
+      background: rgba(34,197,94,.06);
+    }
+    .reg-var-row.outcome-eligible:hover:not(.used) {
+      background: rgba(34,197,94,.1);
+    }
+    .reg-var-outcome-tag {
+      flex-shrink: 0;
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: .25px;
+      text-transform: uppercase;
+      padding: 2px 5px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    .reg-var-outcome-tag.valid {
+      background: rgba(34,197,94,.18);
+      color: #22c55e;
+      border: 1px solid rgba(34,197,94,.35);
+    }
+    .reg-var-outcome-tag.two-level {
+      background: rgba(234,179,8,.15);
+      color: #ca8a04;
+      border: 1px solid rgba(234,179,8,.35);
+    }
+    .reg-vars-hint {
+      font-size: 9px;
+      color: var(--cfg-text3);
+      line-height: 1.25;
+      padding: 0 2px;
+    }
 
     /* ── Zone cards ── */
     .reg-zone-card {
@@ -576,10 +610,11 @@
 
       <!-- ═══ LEFT: Variable List ═══ -->
       <div class="reg-vars-col">
-        <div class="reg-vars-header">
-          <span class="reg-vars-title">Available Variables</span>
-          <span class="reg-vars-summary" id="varsSummary"></span>
-        </div>
+          <div class="reg-vars-header">
+            <span class="reg-vars-title">Available Variables</span>
+            <span class="reg-vars-summary" id="varsSummary"></span>
+            <span class="reg-vars-hint" id="varsHint">B = valid binary outcome (0/1)</span>
+          </div>
         <div class="reg-vars-box" id="variablesListBox">
           <div style="color: var(--cfg-text3); font-style: italic; font-size: 11px; text-align: center; padding: 20px 10px;">
             No data loaded yet. Select a range in the taskpane.
@@ -970,8 +1005,49 @@
       return { valid: true, values: uniqueValues };
     }
 
+    function getOutcomeStatus(varName) {
+      var stats = STATE.variableStats && STATE.variableStats[varName];
+      if (!stats) return { status: 'invalid', detail: '' };
+
+      var categories = stats.categories || [];
+      var uniqueValues = [];
+      for (var i = 0; i < categories.length; i++) {
+        var rawValue = categories[i] && categories[i].value !== undefined ? String(categories[i].value).trim() : '';
+        if (rawValue !== '' && uniqueValues.indexOf(rawValue) === -1) uniqueValues.push(rawValue);
+      }
+
+      if (uniqueValues.length === 2) {
+        if (validateBinaryResponseVariable(varName).valid) {
+          return { status: 'valid', detail: getBinarySummary(varName) };
+        }
+        return { status: 'two-level', detail: uniqueValues.join(', ') + ' — recode to 0/1' };
+      }
+      if (uniqueValues.length < 2) {
+        return { status: 'invalid', detail: uniqueValues.length + ' level' + (uniqueValues.length === 1 ? '' : 's') };
+      }
+      return { status: 'invalid', detail: uniqueValues.length + ' levels' };
+    }
+
     function isBinaryVariable(varName) {
-      return validateBinaryResponseVariable(varName).valid;
+      return getOutcomeStatus(varName).status === 'valid';
+    }
+
+    function getValidOutcomeNames() {
+      return STATE.variables
+        .filter(function(v) { return getOutcomeStatus(v.name).status === 'valid'; })
+        .map(function(v) { return v.name; });
+    }
+
+    function updateOutcomeHint() {
+      var el = qs('varsHint');
+      if (!el) return;
+      var names = getValidOutcomeNames();
+      if (!names.length) {
+        el.textContent = 'No binary 0/1 columns found — outcome must be coded 0 and 1';
+        return;
+      }
+      var preview = names.length <= 3 ? names.join(', ') : names.slice(0, 3).join(', ') + ' +' + (names.length - 3);
+      el.textContent = 'Potential outcomes: ' + preview;
     }
 
     function getBinarySummary(varName) {
@@ -999,15 +1075,24 @@
         return;
       }
 
-      STATE.variables.forEach(function(variable) {
+      var sorted = STATE.variables.slice().sort(function(a, b) {
+        var rank = { valid: 0, 'two-level': 1, invalid: 2 };
+        var ra = rank[getOutcomeStatus(a.name).status] || 2;
+        var rb = rank[getOutcomeStatus(b.name).status] || 2;
+        if (ra !== rb) return ra - rb;
+        return a.name.localeCompare(b.name);
+      });
+
+      sorted.forEach(function(variable) {
         var isAssigned = isVariableAssigned(variable.name);
+        var outcome = getOutcomeStatus(variable.name);
         var row = document.createElement('div');
-        row.className = 'reg-var-row' + (isAssigned ? ' used' : '');
+        row.className = 'reg-var-row' + (isAssigned ? ' used' : '') + (outcome.status === 'valid' ? ' outcome-eligible' : '');
         row.draggable = !isAssigned;
         row.dataset.varName = variable.name;
         row.dataset.varType = variable.type;
 
-        var isBin = isBinaryVariable(variable.name);
+        var isBin = outcome.status === 'valid';
         var isNum = !isBin && variable.numeric > variable.string;
         var iconClass = isBin ? 'bin' : (isNum ? 'num' : (variable.string > 0 ? 'cat' : 'unk'));
         var iconLetter = isBin ? 'B' : (isNum ? 'N' : (variable.string > 0 ? 'C' : '?'));
@@ -1015,15 +1100,30 @@
         var statsText = variable.numeric + ' num';
         if (variable.string > 0) statsText += ' · ' + variable.string + ' cat';
         if (variable.missing > 0) statsText += ' · <span class="reg-var-miss">' + variable.missing + ' miss</span>';
-        if (isBin) statsText += ' · <span class="reg-var-bin">binary 0/1</span>';
-        else if (variable.numeric > variable.string && variable.numeric >= 5) statsText += ' · predictor';
+        if (outcome.status === 'valid') {
+          statsText += ' · <span class="reg-var-bin">outcome · ' + outcome.detail + '</span>';
+        } else if (outcome.status === 'two-level') {
+          statsText += ' · <span style="color:#ca8a04;font-weight:600;">' + outcome.detail + '</span>';
+        } else if (outcome.detail) {
+          statsText += ' · ' + outcome.detail;
+        } else if (variable.numeric > variable.string && variable.numeric >= 5) {
+          statsText += ' · predictor';
+        }
+
+        var tagHtml = '';
+        if (outcome.status === 'valid' && !isAssigned) {
+          tagHtml = '<span class="reg-var-outcome-tag valid">Outcome</span>';
+        } else if (outcome.status === 'two-level' && !isAssigned) {
+          tagHtml = '<span class="reg-var-outcome-tag two-level">2 levels</span>';
+        }
 
         row.innerHTML =
           '<div class="reg-var-icon ' + iconClass + '">' + iconLetter + '</div>' +
           '<div class="reg-var-body">' +
             '<div class="reg-var-name">' + variable.name + '</div>' +
             '<div class="reg-var-stats">' + statsText + '</div>' +
-          '</div>';
+          '</div>' +
+          tagHtml;
 
         if (!isAssigned) {
           row.addEventListener('dragstart', handleDragStart);
@@ -1033,17 +1133,21 @@
       });
 
       updateVarsSummary();
+      updateOutcomeHint();
     }
 
     function updateVarsSummary() {
       var el = qs('varsSummary');
       if (!el) return;
-      var numCount = 0, catCount = 0, missCount = 0;
+      var numCount = 0, catCount = 0, missCount = 0, outcomeCount = 0;
       STATE.variables.forEach(function(v) {
-        if (v.numeric > v.string) numCount++; else if (v.string > 0) catCount++;
+        if (getOutcomeStatus(v.name).status === 'valid') outcomeCount++;
+        else if (v.numeric > v.string) numCount++;
+        else if (v.string > 0) catCount++;
         if (v.missing > 0) missCount++;
       });
       var html = '';
+      if (outcomeCount) html += '<span class="reg-vars-badge reg-vb-out">' + outcomeCount + ' outcome</span>';
       if (numCount) html += '<span class="reg-vars-badge reg-vb-num">' + numCount + ' num</span>';
       if (catCount) html += '<span class="reg-vars-badge reg-vb-cat">' + catCount + ' cat</span>';
       if (missCount) html += '<span class="reg-vars-badge reg-vb-miss">' + missCount + ' miss</span>';
@@ -1177,7 +1281,11 @@
       if (STATE.assignments.y) {
         zoneY.appendChild(createChip(STATE.assignments.y, 'y', getBinarySummary(STATE.assignments.y)));
       } else {
-        zoneY.innerHTML = '<div class="reg-zone-placeholder">Drag a binary 0/1 variable here</div>';
+        var outcomes = getValidOutcomeNames();
+        var phText = outcomes.length
+          ? ('Drag a binary outcome here — e.g. ' + outcomes.slice(0, 3).join(', '))
+          : 'Drag a binary 0/1 variable here (none detected in range)';
+        zoneY.innerHTML = '<div class="reg-zone-placeholder">' + phText + '</div>';
       }
 
       var zoneXn = qs('zoneXn');

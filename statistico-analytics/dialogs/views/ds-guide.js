@@ -135,6 +135,39 @@
         ['0', '35', '8',  'EU'],
         ['0', '51', '12', 'US']
       ]
+    },
+
+    factor: {
+      badge: 'Wide format  one row per case',
+      rule:  'Each row = one observation. Each numeric column = one measured item or scale score.',
+      note:  'Select at least two numeric variables. Categorical columns are not used in factor extraction.',
+      cols: [
+        { label: 'Item1', role: 'meas', roleLabel: 'Measure' },
+        { label: 'Item2', role: 'meas', roleLabel: 'Measure' },
+        { label: 'Item3', role: 'meas', roleLabel: 'Measure' },
+        { label: 'Item4', role: 'meas', roleLabel: 'Measure' }
+      ],
+      rows: [
+        ['4.2', '3.8', '4.0', '3.5'],
+        ['2.1', '2.4', '2.0', '2.2'],
+        ['5.0', '4.8', '4.9', '4.7']
+      ]
+    },
+
+    pca: {
+      badge: 'Wide format  one row per case',
+      rule:  'Each row = one observation. Each numeric column = one variable to reduce.',
+      note:  'PCA extracts orthogonal components from correlated numeric columns. Need at least 2 variables.',
+      cols: [
+        { label: 'Var A', role: 'meas', roleLabel: 'Variable' },
+        { label: 'Var B', role: 'meas', roleLabel: 'Variable' },
+        { label: 'Var C', role: 'meas', roleLabel: 'Variable' }
+      ],
+      rows: [
+        ['12.4', '8.1', '5.2'],
+        ['15.0', '9.3', '6.1'],
+        ['11.2', '7.8', '4.9']
+      ]
     }
   };
 

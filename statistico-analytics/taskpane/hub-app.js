@@ -1251,7 +1251,7 @@ function openFactorConfigFromHub() {
   return openBuilderDialogFromHub({
     moduleId: "factor",
     dialogPath: "factor/factor-input.html",
-    dialogOptions: DIALOG_SIZES.SETUP,
+    dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "FACTOR_DATA",
     payloadBuilder: function (gr) {
       var saved = null;
@@ -1302,7 +1302,7 @@ function openPcaConfigFromHub() {
   return openBuilderDialogFromHub({
     moduleId: "pca",
     dialogPath: "factor/factor-input.html?mode=pca",
-    dialogOptions: DIALOG_SIZES.SETUP,
+    dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "FACTOR_DATA",
     payloadBuilder: function (gr) {
       var saved = null;

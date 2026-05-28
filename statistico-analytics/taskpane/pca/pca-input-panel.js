@@ -48,7 +48,7 @@ function openPcaModelBuilder() {
 
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    DIALOG_SIZES.SETUP,
+    DIALOG_SIZES.REGRESSION_BUILDER,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error("Failed to open PCA builder:", asyncResult.error);

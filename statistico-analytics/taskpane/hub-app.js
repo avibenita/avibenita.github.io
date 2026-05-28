@@ -1274,7 +1274,7 @@ function openLogisticConfigFromHub() {
   return openBuilderDialogFromHub({
     moduleId: "logistic",
     dialogPath: "logistic/logistic-input.html?dialog=1",
-    dialogOptions: DIALOG_SIZES.SETUP,
+    dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "LOGISTIC_DATA",
     payloadBuilder: function (gr) {
       return {

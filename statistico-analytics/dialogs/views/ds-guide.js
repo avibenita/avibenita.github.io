@@ -118,6 +118,23 @@
         ['2', 'B', '0', '50'],
         ['2', 'B', '1', '58']
       ]
+    },
+
+    logistic: {
+      badge: 'One row per observation',
+      rule:  'Binary response column coded 0/1. Numeric and categorical predictors in separate columns.',
+      note:  'The outcome must contain exactly two values: 0 and 1. One row = one case.',
+      cols: [
+        { label: 'Churn',  role: 'outcome', roleLabel: 'Binary Y' },
+        { label: 'Age',    role: 'meas', roleLabel: 'Numeric X' },
+        { label: 'Tenure', role: 'meas', roleLabel: 'Numeric X' },
+        { label: 'Region', role: 'cat',     roleLabel: 'Categorical X' }
+      ],
+      rows: [
+        ['1', '42', '3',  'US'],
+        ['0', '35', '8',  'EU'],
+        ['0', '51', '12', 'US']
+      ]
     }
   };
 

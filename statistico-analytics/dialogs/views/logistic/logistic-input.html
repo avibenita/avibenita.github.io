@@ -185,6 +185,26 @@
       color: #ca8a04;
       border: 1px solid rgba(234,179,8,.35);
     }
+    .reg-var-outcome-tag.two-level.recode-btn {
+      cursor: pointer;
+    }
+    .reg-var-outcome-tag.two-level.recode-btn:hover {
+      background: rgba(234,179,8,.28);
+    }
+    .reg-vb-rec { background: rgba(234,179,8,.12); color: #ca8a04; border: 1px solid rgba(234,179,8,.35); }
+    .recode-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.7); display: none; align-items: center; justify-content: center; z-index: 10000; backdrop-filter: blur(4px); }
+    .recode-modal-overlay.active { display: flex; }
+    .recode-modal { background: var(--cfg-bg, #1e1e2e); border: 2px solid var(--reg-out); border-radius: 10px; width: 90%; max-width: 440px; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,.5); }
+    .recode-modal-header { background: rgba(34,197,94,.12); border-bottom: 2px solid var(--reg-out); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+    .recode-modal-header h3 { margin: 0; color: var(--reg-out); font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .recode-modal-body { padding: 14px 16px; }
+    .recode-info { font-size: 11px; color: var(--cfg-text3); margin-bottom: 12px; line-height: 1.45; }
+    .recode-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .recode-row label { flex: 0 0 130px; font-size: 11px; font-weight: 600; color: var(--cfg-text2); }
+    .recode-row select { flex: 1; padding: 6px 8px; border: 1px solid var(--cfg-border); border-radius: 6px; background: var(--cfg-surface); color: var(--cfg-text); font-size: 11px; }
+    .recode-preview { margin-top: 12px; padding: 10px 12px; background: rgba(34,197,94,.08); border: 1px solid rgba(34,197,94,.25); border-radius: 8px; font-size: 11px; color: var(--cfg-text2); }
+    .recode-preview strong { color: var(--reg-out); }
+    .recode-modal-footer { border-top: 1px solid var(--cfg-border); padding: 10px 16px; display: flex; gap: 8px; justify-content: flex-end; }
     .reg-vars-hint {
       font-size: 9px;
       color: var(--cfg-text3);
@@ -741,6 +761,35 @@
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
 
+  <!-- Outcome Recode Modal -->
+  <div class="recode-modal-overlay" id="recodeModal">
+    <div class="recode-modal">
+      <div class="recode-modal-header">
+        <h3><i class="fa-solid fa-right-left"></i> <span id="recodeModalTitle">Recode outcome to 0/1</span></h3>
+      </div>
+      <div class="recode-modal-body">
+        <div class="recode-info">
+          Variable <strong id="recodeVarName"></strong> has two levels. Map one level to <strong>0</strong> (reference) and the other to <strong>1</strong> (event) for logistic regression.
+        </div>
+        <div class="recode-row">
+          <label for="recodeLevel0">Code as 0</label>
+          <select id="recodeLevel0"></select>
+        </div>
+        <div class="recode-row">
+          <label for="recodeLevel1">Code as 1</label>
+          <select id="recodeLevel1"></select>
+        </div>
+        <div class="recode-preview" id="recodePreview"></div>
+      </div>
+      <div class="recode-modal-footer">
+        <button id="btnRecodeCancel" style="padding:6px 14px;border:1px solid var(--cfg-border);border-radius:7px;background:var(--cfg-surface);color:var(--cfg-text3);cursor:pointer;font-size:11px;">Cancel</button>
+        <button id="btnRecodeConfirm" style="padding:6px 14px;border:none;border-radius:7px;background:var(--reg-out);color:#fff;cursor:pointer;font-size:11px;font-weight:700;">
+          <i class="fa-solid fa-check"></i> Assign as outcome
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Category Modal -->
   <div class="category-modal-overlay" id="categoryModal">
     <div class="category-modal">
@@ -787,6 +836,7 @@
       data: {},
       variableStats: {},
       analysisMode: 'logistic',
+      yRecode: null,
       assignments: {
         y: null,
         xn: [],
@@ -863,6 +913,7 @@
         }
         STATE.data = {};
         STATE.assignments = { y: null, xn: [], xc: [], interactions: [] };
+        STATE.yRecode = null;
         renderVariables();
         clearAssignments();
       } catch(e) {
@@ -899,6 +950,7 @@
       STATE.variables = [];
       STATE.data = {};
       STATE.assignments = { y: null, xn: [], xc: [], interactions: [] };
+      STATE.yRecode = null;
 
       for (var i = 0; i < headers.length; i++) {
         var name = headers[i];
@@ -963,10 +1015,42 @@
       return { sheet: sheet, startRow: startRow, endRow: endRow, col: function(offset) { return numberToCol(startColNum + offset); } };
     }
 
+    function getTwoLevelValues(varName) {
+      var stats = STATE.variableStats && STATE.variableStats[varName];
+      if (!stats) return null;
+      var categories = stats.categories || [];
+      var uniqueValues = [];
+      for (var i = 0; i < categories.length; i++) {
+        var rawValue = categories[i] && categories[i].value !== undefined ? String(categories[i].value).trim() : '';
+        if (rawValue !== '' && uniqueValues.indexOf(rawValue) === -1) uniqueValues.push(rawValue);
+      }
+      return uniqueValues.length === 2 ? uniqueValues : null;
+    }
+
+    function getActiveYRecode(varName) {
+      if (STATE.assignments.y !== varName || !STATE.yRecode) return null;
+      if (STATE.yRecode.level0 == null || STATE.yRecode.level1 == null) return null;
+      if (String(STATE.yRecode.level0) === String(STATE.yRecode.level1)) return null;
+      return { level0: String(STATE.yRecode.level0), level1: String(STATE.yRecode.level1) };
+    }
+
+    function isRecodedOutcomeValid(varName) {
+      var recode = getActiveYRecode(varName);
+      if (!recode) return false;
+      var levels = getTwoLevelValues(varName);
+      if (!levels) return false;
+      return levels.indexOf(recode.level0) >= 0 && levels.indexOf(recode.level1) >= 0;
+    }
+
     function validateBinaryResponseVariable(varName) {
       var stats = STATE.variableStats && STATE.variableStats[varName];
       if (!stats) {
         return { valid: false, message: 'Unable to validate "' + varName + '" as binary response.' };
+      }
+
+      if (isRecodedOutcomeValid(varName)) {
+        var recode = getActiveYRecode(varName);
+        return { valid: true, recoded: true, values: [recode.level0, recode.level1] };
       }
 
       var categories = stats.categories || [];
@@ -979,7 +1063,7 @@
       if (uniqueValues.length !== 2) {
         return {
           valid: false,
-          message: 'Response "' + varName + '" must have exactly 2 values (0/1). Found ' + uniqueValues.length + '.'
+          message: 'Response "' + varName + '" must have exactly 2 values (0/1 or recodable). Found ' + uniqueValues.length + '.'
         };
       }
 
@@ -987,9 +1071,11 @@
       for (var j = 0; j < uniqueValues.length; j++) {
         var num = Number(uniqueValues[j]);
         if (isNaN(num) || !isFinite(num)) {
+          var levels = uniqueValues.join(', ');
           return {
             valid: false,
-            message: 'Response "' + varName + '" must be coded 0/1. Found: ' + uniqueValues.join(', ')
+            message: 'Response "' + varName + '" is not coded 0/1 (' + levels + '). Use Recode to map levels to 0 and 1.',
+            recodable: true
           };
         }
         normalized.push(num);
@@ -998,7 +1084,8 @@
       if (normalized.indexOf(0) < 0 || normalized.indexOf(1) < 0) {
         return {
           valid: false,
-          message: 'Response "' + varName + '" must include both 0 and 1. Found: ' + uniqueValues.join(', ')
+          message: 'Response "' + varName + '" must include both 0 and 1. Found: ' + uniqueValues.join(', ') + '. Use Recode if these are category labels.',
+          recodable: true
         };
       }
 
@@ -1009,23 +1096,28 @@
       var stats = STATE.variableStats && STATE.variableStats[varName];
       if (!stats) return { status: 'invalid', detail: '' };
 
-      var categories = stats.categories || [];
-      var uniqueValues = [];
-      for (var i = 0; i < categories.length; i++) {
-        var rawValue = categories[i] && categories[i].value !== undefined ? String(categories[i].value).trim() : '';
-        if (rawValue !== '' && uniqueValues.indexOf(rawValue) === -1) uniqueValues.push(rawValue);
-      }
-
-      if (uniqueValues.length === 2) {
+      var uniqueValues = getTwoLevelValues(varName);
+      if (uniqueValues) {
         if (validateBinaryResponseVariable(varName).valid) {
+          var recode = getActiveYRecode(varName);
+          if (recode) {
+            return { status: 'valid', detail: getRecodeSummary(varName, recode), recoded: true };
+          }
           return { status: 'valid', detail: getBinarySummary(varName) };
         }
-        return { status: 'two-level', detail: uniqueValues.join(', ') + ' — recode to 0/1' };
+        return { status: 'two-level', detail: uniqueValues.join(', ') + ' — click Recode' };
       }
-      if (uniqueValues.length < 2) {
-        return { status: 'invalid', detail: uniqueValues.length + ' level' + (uniqueValues.length === 1 ? '' : 's') };
+
+      var categories = stats.categories || [];
+      var distinct = [];
+      for (var k = 0; k < categories.length; k++) {
+        var rv = categories[k] && categories[k].value !== undefined ? String(categories[k].value).trim() : '';
+        if (rv !== '' && distinct.indexOf(rv) === -1) distinct.push(rv);
       }
-      return { status: 'invalid', detail: uniqueValues.length + ' levels' };
+      if (distinct.length < 2) {
+        return { status: 'invalid', detail: distinct.length + ' level' + (distinct.length === 1 ? '' : 's') };
+      }
+      return { status: 'invalid', detail: distinct.length + ' levels' };
     }
 
     function isBinaryVariable(varName) {
@@ -1038,19 +1130,48 @@
         .map(function(v) { return v.name; });
     }
 
+    function getRecodableOutcomeNames() {
+      return STATE.variables
+        .filter(function(v) { return getOutcomeStatus(v.name).status === 'two-level'; })
+        .map(function(v) { return v.name; });
+    }
+
     function updateOutcomeHint() {
       var el = qs('varsHint');
       if (!el) return;
       var names = getValidOutcomeNames();
-      if (!names.length) {
-        el.textContent = 'No binary 0/1 columns found — outcome must be coded 0 and 1';
+      var recodable = getRecodableOutcomeNames();
+      if (!names.length && !recodable.length) {
+        el.textContent = 'No binary 0/1 columns found — outcome must be coded 0 and 1, or recoded from 2 levels';
         return;
       }
-      var preview = names.length <= 3 ? names.join(', ') : names.slice(0, 3).join(', ') + ' +' + (names.length - 3);
-      el.textContent = 'Potential outcomes: ' + preview;
+      var parts = [];
+      if (names.length) {
+        var preview = names.length <= 3 ? names.join(', ') : names.slice(0, 3).join(', ') + ' +' + (names.length - 3);
+        parts.push('Ready: ' + preview);
+      }
+      if (recodable.length) {
+        var recPreview = recodable.length <= 2 ? recodable.join(', ') : recodable.slice(0, 2).join(', ') + ' +' + (recodable.length - 2);
+        parts.push('Recodable: ' + recPreview);
+      }
+      el.textContent = parts.join(' · ');
+    }
+
+    function getRecodeSummary(varName, recode) {
+      var stats = STATE.variableStats[varName];
+      if (!stats || !stats.categories) return recode.level0 + '→0 · ' + recode.level1 + '→1';
+      var c0 = 0, c1 = 0;
+      stats.categories.forEach(function(c) {
+        var v = String(c.value);
+        if (v === String(recode.level0)) c0 += c.freq || 0;
+        else if (v === String(recode.level1)) c1 += c.freq || 0;
+      });
+      return recode.level0 + '→0:' + c0 + ' · ' + recode.level1 + '→1:' + c1;
     }
 
     function getBinarySummary(varName) {
+      var recode = getActiveYRecode(varName);
+      if (recode) return getRecodeSummary(varName, recode);
       var stats = STATE.variableStats[varName];
       if (!stats || !stats.categories) return '';
       var zero = 0, one = 0;
@@ -1114,7 +1235,7 @@
         if (outcome.status === 'valid' && !isAssigned) {
           tagHtml = '<span class="reg-var-outcome-tag valid">Outcome</span>';
         } else if (outcome.status === 'two-level' && !isAssigned) {
-          tagHtml = '<span class="reg-var-outcome-tag two-level">2 levels</span>';
+          tagHtml = '<span class="reg-var-outcome-tag two-level recode-btn" data-var-name="' + variable.name + '" title="Map levels to 0 and 1">2 levels · Recode</span>';
         }
 
         row.innerHTML =
@@ -1132,6 +1253,14 @@
         container.appendChild(row);
       });
 
+      container.querySelectorAll('.recode-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var name = btn.getAttribute('data-var-name');
+          if (name) showRecodeModal(name);
+        });
+      });
+
       updateVarsSummary();
       updateOutcomeHint();
     }
@@ -1139,15 +1268,18 @@
     function updateVarsSummary() {
       var el = qs('varsSummary');
       if (!el) return;
-      var numCount = 0, catCount = 0, missCount = 0, outcomeCount = 0;
+      var numCount = 0, catCount = 0, missCount = 0, outcomeCount = 0, recodableCount = 0;
       STATE.variables.forEach(function(v) {
-        if (getOutcomeStatus(v.name).status === 'valid') outcomeCount++;
+        var st = getOutcomeStatus(v.name).status;
+        if (st === 'valid') outcomeCount++;
+        else if (st === 'two-level') recodableCount++;
         else if (v.numeric > v.string) numCount++;
         else if (v.string > 0) catCount++;
         if (v.missing > 0) missCount++;
       });
       var html = '';
       if (outcomeCount) html += '<span class="reg-vars-badge reg-vb-out">' + outcomeCount + ' outcome</span>';
+      if (recodableCount) html += '<span class="reg-vars-badge reg-vb-rec">' + recodableCount + ' recodable</span>';
       if (numCount) html += '<span class="reg-vars-badge reg-vb-num">' + numCount + ' num</span>';
       if (catCount) html += '<span class="reg-vars-badge reg-vb-cat">' + catCount + ' cat</span>';
       if (missCount) html += '<span class="reg-vars-badge reg-vb-miss">' + missCount + ' miss</span>';
@@ -1207,16 +1339,21 @@
       var nonMissingCount = numericCount + stringCount;
 
       if (zoneType === 'y') {
-        var yCheck = validateBinaryResponseVariable(varName);
-        if (!yCheck.valid) {
-          showToast(yCheck.message, 'error');
-          return false;
-        }
-        if (STATE.assignments.y !== null) {
+        if (STATE.assignments.y !== null && STATE.assignments.y !== varName) {
           showToast('Only one binary response variable allowed.', 'warning');
           return false;
         }
-        addVariableToZone(varName, 'binary', zoneType);
+        var yCheck = validateBinaryResponseVariable(varName);
+        if (yCheck.valid && !yCheck.recoded) {
+          STATE.yRecode = null;
+          addVariableToZone(varName, 'binary', zoneType);
+          return false;
+        }
+        if (getTwoLevelValues(varName)) {
+          showRecodeModal(varName);
+          return false;
+        }
+        showToast(yCheck.message || ('"' + varName + '" cannot be used as binary outcome.'), 'error');
         return false;
       }
 
@@ -1263,7 +1400,10 @@
     }
 
     function removeVariableFromZone(varName, zoneType) {
-      if (zoneType === 'y') STATE.assignments.y = null;
+      if (zoneType === 'y') {
+        STATE.assignments.y = null;
+        STATE.yRecode = null;
+      }
       else if (zoneType === 'xn') { var idx = STATE.assignments.xn.indexOf(varName); if (idx >= 0) STATE.assignments.xn.splice(idx, 1); }
       else if (zoneType === 'xc') { var idx = STATE.assignments.xc.indexOf(varName); if (idx >= 0) STATE.assignments.xc.splice(idx, 1); }
       STATE.assignments.interactions = STATE.assignments.interactions.filter(function(ix) {
@@ -1282,8 +1422,12 @@
         zoneY.appendChild(createChip(STATE.assignments.y, 'y', getBinarySummary(STATE.assignments.y)));
       } else {
         var outcomes = getValidOutcomeNames();
-        var phText = outcomes.length
-          ? ('Drag a binary outcome here — e.g. ' + outcomes.slice(0, 3).join(', '))
+        var recodable = getRecodableOutcomeNames();
+        var phParts = [];
+        if (outcomes.length) phParts.push('0/1: ' + outcomes.slice(0, 2).join(', '));
+        if (recodable.length) phParts.push('recodable: ' + recodable.slice(0, 2).join(', '));
+        var phText = phParts.length
+          ? ('Drag outcome here — ' + phParts.join(' · '))
           : 'Drag a binary 0/1 variable here (none detected in range)';
         zoneY.innerHTML = '<div class="reg-zone-placeholder">' + phText + '</div>';
       }
@@ -1323,7 +1467,17 @@
         ? '<span>' + varName + '</span><span style="font-size:9px;opacity:.75;margin-left:2px;">(' + sublabel + ')</span>'
         : '<span>' + varName + '</span>';
       chip.innerHTML = label + '<button class="reg-chip-x" title="Remove">✕</button>';
-      chip.querySelector('.reg-chip-x').addEventListener('click', function() { removeVariableFromZone(varName, zoneType); });
+      chip.querySelector('.reg-chip-x').addEventListener('click', function(e) {
+        e.stopPropagation();
+        removeVariableFromZone(varName, zoneType);
+      });
+      if (zoneType === 'y' && getActiveYRecode(varName)) {
+        chip.title = 'Click to edit 0/1 recode mapping';
+        chip.addEventListener('click', function(e) {
+          if (e.target.closest('.reg-chip-x')) return;
+          showRecodeModal(varName);
+        });
+      }
       return chip;
     }
 
@@ -1371,13 +1525,27 @@
 
     function clearAssignments() {
       STATE.assignments = { y: null, xn: [], xc: [], interactions: [] };
+      STATE.yRecode = null;
       renderVariables(); renderAssignments(); validateModel();
     }
 
     function restoreModelConfiguration(modelSpec) {
+      STATE.yRecode = null;
+      STATE.assignments.y = null;
       if (modelSpec.y) {
         var yVar = STATE.variables.find(function(v){ return v.name === modelSpec.y; });
-        if (yVar && validateBinaryResponseVariable(modelSpec.y).valid) STATE.assignments.y = modelSpec.y;
+        if (yVar) {
+          if (modelSpec.yRecode && modelSpec.yRecode.level0 != null && modelSpec.yRecode.level1 != null) {
+            STATE.yRecode = { level0: String(modelSpec.yRecode.level0), level1: String(modelSpec.yRecode.level1) };
+            STATE.assignments.y = modelSpec.y;
+            if (!validateBinaryResponseVariable(modelSpec.y).valid) {
+              STATE.assignments.y = null;
+              STATE.yRecode = null;
+            }
+          } else if (validateBinaryResponseVariable(modelSpec.y).valid) {
+            STATE.assignments.y = modelSpec.y;
+          }
+        }
       }
       if (modelSpec.xn && Array.isArray(modelSpec.xn)) { modelSpec.xn.forEach(function(n){ if (STATE.variables.find(function(v){return v.name===n;}) && STATE.assignments.xn.indexOf(n)===-1) STATE.assignments.xn.push(n); }); }
       if (modelSpec.xc && Array.isArray(modelSpec.xc)) { modelSpec.xc.forEach(function(n){ if (STATE.variables.find(function(v){return v.name===n;}) && STATE.assignments.xc.indexOf(n)===-1) STATE.assignments.xc.push(n); }); }
@@ -1516,6 +1684,99 @@
     }
 
     // ============================================================================
+    // OUTCOME RECODE MODAL
+    // ============================================================================
+    var pendingRecodeAssignment = null;
+
+    function showRecodeModal(varName) {
+      var levels = getTwoLevelValues(varName);
+      if (!levels) {
+        showToast('"' + varName + '" does not have exactly two levels to recode.', 'error');
+        return;
+      }
+      if (STATE.assignments.y && STATE.assignments.y !== varName) {
+        showToast('Remove the current outcome before assigning another.', 'warning');
+        return;
+      }
+      pendingRecodeAssignment = { varName: varName };
+      qs('recodeModalTitle').textContent = 'Recode: ' + varName;
+      qs('recodeVarName').textContent = varName;
+
+      var sel0 = qs('recodeLevel0');
+      var sel1 = qs('recodeLevel1');
+      sel0.innerHTML = '';
+      sel1.innerHTML = '';
+      levels.slice().sort(function(a, b) { return a.localeCompare(b); }).forEach(function(lvl) {
+        var o0 = document.createElement('option'); o0.value = lvl; o0.textContent = lvl; sel0.appendChild(o0);
+        var o1 = document.createElement('option'); o1.value = lvl; o1.textContent = lvl; sel1.appendChild(o1);
+      });
+
+      var existing = getActiveYRecode(varName);
+      if (existing) {
+        sel0.value = existing.level0;
+        sel1.value = existing.level1;
+      } else {
+        sel0.selectedIndex = 0;
+        sel1.selectedIndex = Math.min(1, levels.length - 1);
+      }
+
+      sel0.onchange = sel1.onchange = updateRecodePreview;
+      updateRecodePreview();
+      qs('recodeModal').classList.add('active');
+    }
+
+    function hideRecodeModal() {
+      qs('recodeModal').classList.remove('active');
+      pendingRecodeAssignment = null;
+    }
+
+    function updateRecodePreview() {
+      var sel0 = qs('recodeLevel0');
+      var sel1 = qs('recodeLevel1');
+      var preview = qs('recodePreview');
+      if (!sel0 || !sel1 || !preview || !pendingRecodeAssignment) return;
+      var l0 = sel0.value;
+      var l1 = sel1.value;
+      var btn = qs('btnRecodeConfirm');
+      if (l0 === l1) {
+        preview.innerHTML = '<span style="color:#f87171;">Choose two different levels for 0 and 1.</span>';
+        if (btn) btn.disabled = true;
+        return;
+      }
+      if (btn) btn.disabled = false;
+      var varName = pendingRecodeAssignment.varName;
+      var stats = STATE.variableStats[varName];
+      var n0 = 0, n1 = 0;
+      if (stats && stats.categories) {
+        stats.categories.forEach(function(c) {
+          var v = String(c.value);
+          if (v === l0) n0 += c.freq || 0;
+          else if (v === l1) n1 += c.freq || 0;
+        });
+      }
+      preview.innerHTML = '<strong>' + l0 + '</strong> → 0 (' + n0 + ' obs) · <strong>' + l1 + '</strong> → 1 (' + n1 + ' obs)';
+    }
+
+    function confirmRecodeAssignment() {
+      if (!pendingRecodeAssignment) return;
+      var varName = pendingRecodeAssignment.varName;
+      var l0 = qs('recodeLevel0').value;
+      var l1 = qs('recodeLevel1').value;
+      if (l0 === l1) { showToast('Levels for 0 and 1 must differ.', 'warning'); return; }
+      STATE.yRecode = { level0: l0, level1: l1 };
+      if (STATE.assignments.y !== varName) {
+        addVariableToZone(varName, 'binary', 'y');
+      } else {
+        renderAssignments();
+        renderVariables();
+        validateModel();
+        updateModelEquation();
+      }
+      hideRecodeModal();
+      showToast('Outcome recoded: ' + l0 + '→0, ' + l1 + '→1', 'success');
+    }
+
+    // ============================================================================
     // CATEGORY MODAL
     // ============================================================================
     var pendingCategoryAssignment = null;
@@ -1635,6 +1896,7 @@
         analysisMode: 'logistic',
         ranges: {}
       };
+      if (STATE.yRecode) modelSpec.yRecode = { level0: STATE.yRecode.level0, level1: STATE.yRecode.level1 };
       if (STATE.variableStats) {
         if (STATE.assignments.y && STATE.variableStats[STATE.assignments.y]) modelSpec.ranges[STATE.assignments.y] = STATE.variableStats[STATE.assignments.y].rangeAddress;
         STATE.assignments.xn.forEach(function(v) { if (STATE.variableStats[v]) modelSpec.ranges[v] = STATE.variableStats[v].rangeAddress; });
@@ -1644,6 +1906,9 @@
     });
 
     // Category modal buttons
+    qs('btnRecodeCancel').addEventListener('click', hideRecodeModal);
+    qs('btnRecodeConfirm').addEventListener('click', confirmRecodeAssignment);
+    qs('recodeModal').addEventListener('click', function(e) { if (e.target === this) hideRecodeModal(); });
     qs('btnCategoryCancel').addEventListener('click', hideCategoryModal);
     qs('btnCategoryConfirm').addEventListener('click', confirmCategoryAssignment);
     qs('btnSelectAllCat').addEventListener('click', function() { document.querySelectorAll('.category-checkbox').forEach(function(cb){cb.checked=true;}); updateCategoryStats(); });
@@ -1669,7 +1934,8 @@
         CfgSave.saveCfgEntry(STORAGE_KEY_LOG, name, {
           y: a.y, xn: a.xn.slice(), xc: a.xc.slice(),
           interactions: (a.interactions || []).map(function(i) { return { var1: i.var1, var2: i.var2 }; }),
-          intercept: qs('chkIncludeIntercept').checked ? 1 : 0
+          intercept: qs('chkIncludeIntercept').checked ? 1 : 0,
+          yRecode: STATE.yRecode ? { level0: STATE.yRecode.level0, level1: STATE.yRecode.level1 } : null
         }, function() { validateModel(); });
       });
     }

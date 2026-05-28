@@ -262,6 +262,20 @@ function sendLogisticDataContext() {
   }));
 }
 
+function encodeLogisticY(raw, modelSpec) {
+  if (raw === null || raw === undefined || raw === "") return NaN;
+  const recode = modelSpec && modelSpec.yRecode;
+  if (recode && recode.level0 != null && recode.level1 != null) {
+    const s = String(raw).trim();
+    if (s === String(recode.level0)) return 0;
+    if (s === String(recode.level1)) return 1;
+    return NaN;
+  }
+  const yNum = Number(String(raw).replace(",", "."));
+  if (yNum === 0 || yNum === 1) return yNum;
+  return NaN;
+}
+
 function computeLogisticBundle(headers, rows, modelSpec, threshold) {
   const yName = modelSpec.y || headers[0];
   const xn = modelSpec.xn || [];
@@ -308,8 +322,8 @@ function computeLogisticBundle(headers, rows, modelSpec, threshold) {
       droppedMissing++;
       return;
     }
-    const yNum = Number(yValRaw);
-    if (!(yNum === 0 || yNum === 1)) {
+    const yNum = encodeLogisticY(yValRaw, modelSpec);
+    if (!isFinite(yNum) || !(yNum === 0 || yNum === 1)) {
       droppedMissing++;
       return;
     }
@@ -372,7 +386,7 @@ function computeLogisticBundle(headers, rows, modelSpec, threshold) {
 
   const coeffRows = buildCoefficientRows(fit, predictorNames, includeIntercept, referenceMap);
   const diagnostics = computeDiagnostics(y, fit.probabilities, fit.X, fit.covariance);
-  const descriptives = buildDescriptives(rows, headers, yIdx, xnIdx, xcIdx, droppedMissing, yName, [yName].concat(xn).concat(xc));
+  const descriptives = buildDescriptives(rows, headers, yIdx, xnIdx, xcIdx, droppedMissing, yName, [yName].concat(xn).concat(xc), modelSpec);
   const metrics = computeClassificationMetrics(y, fit.probabilities, threshold);
 
   const results = Object.assign({
@@ -597,7 +611,7 @@ function computeDiagnostics(y, p, X, covariance) {
   };
 }
 
-function buildDescriptives(rows, headers, yIdx, xnIdx, xcIdx, droppedMissing, yName, modelVarNames) {
+function buildDescriptives(rows, headers, yIdx, xnIdx, xcIdx, droppedMissing, yName, modelVarNames, modelSpec) {
   const descriptiveRows = [];
   let sparseCount = 0;
   let separationFlags = [];
@@ -605,7 +619,7 @@ function buildDescriptives(rows, headers, yIdx, xnIdx, xcIdx, droppedMissing, yN
   xcIdx.forEach(c => {
     const levelMap = {};
     rows.forEach(r => {
-      const yv = Number(r[yIdx]);
+      const yv = encodeLogisticY(r[yIdx], modelSpec);
       const cv = r[c.idx];
       if (!(yv === 0 || yv === 1) || cv === null || cv === undefined || cv === "") return;
       const key = String(cv);
@@ -631,7 +645,7 @@ function buildDescriptives(rows, headers, yIdx, xnIdx, xcIdx, droppedMissing, yN
   xnIdx.forEach(x => {
     let sum0 = 0, n0 = 0, sum1 = 0, n1 = 0;
     rows.forEach(r => {
-      const yv = Number(r[yIdx]);
+      const yv = encodeLogisticY(r[yIdx], modelSpec);
       const xv = Number(r[x.idx]);
       if (!(yv === 0 || yv === 1) || !isFinite(xv)) return;
       if (yv === 1) { sum1 += xv; n1++; } else { sum0 += xv; n0++; }

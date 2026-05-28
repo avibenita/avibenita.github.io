@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cluster Analysis Configuration</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="../shared-config.css?v=20260526a"/>
+  <script src="../shared-config.js?v=20260316"></script>
+  <script src="../ds-guide.js?v=20260330g"></script>
+  <style>
+    :root {
+      --clu-var: #0d9488;
+      --clu-acc: #14b8a6;
+    }
+    [data-theme="light"] {
+      --clu-var: #0f766e;
+      --clu-acc: #0d9488;
+    }
+
+    body.cfg-embed .cfg-header { display: none; }
+    body.cfg-embed .cfg-shell { min-height: 100%; }
+
+    .clu-layout {
+      display: flex; gap: 10px; flex: 1 1 0; min-height: 0;
+      padding: 8px 10px; overflow: hidden;
+    }
+    .reg-vars-col {
+      flex: 0 0 220px; display: flex; flex-direction: column;
+      gap: 6px; min-height: 0; overflow: hidden;
+    }
+    .reg-model-col {
+      flex: 1 1 0; display: flex; flex-direction: column;
+      gap: 8px; min-height: 0; overflow-y: auto; padding-right: 4px;
+    }
+    .reg-vars-header {
+      display: flex; flex-direction: column; align-items: stretch; gap: 4px;
+      padding: 0 2px 6px; border-bottom: 1px solid var(--cfg-border); flex-shrink: 0;
+    }
+    .reg-vars-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .55px; color: var(--cfg-text); white-space: nowrap;
+    }
+    .reg-vars-summary { display: flex; gap: 5px; align-items: center; flex-wrap: nowrap; }
+    .reg-vars-badge {
+      font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px; white-space: nowrap;
+    }
+    .reg-vb-num  { background: rgba(56,189,248,.12); color: #0369a1; border: 1px solid rgba(56,189,248,.3); }
+    .reg-vb-cat  { background: rgba(148,163,184,.12); color: #64748b; border: 1px solid rgba(148,163,184,.3); }
+    .reg-vb-miss { background: rgba(249,115,22,.1);   color: #c2410c; border: 1px solid rgba(249,115,22,.25); }
+
+    .reg-vars-box {
+      flex: 1 1 0; min-height: 0; overflow-y: auto;
+      border: 1px solid var(--cfg-border); border-radius: 8px; background: var(--cfg-surface);
+    }
+    .reg-var-row {
+      display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+      cursor: grab; border-bottom: 1px solid var(--cfg-border);
+      transition: background .12s; user-select: none;
+    }
+    .reg-var-row:last-child { border-bottom: none; }
+    .reg-var-row:hover:not(.used):not(.ineligible) { background: var(--cfg-tbl-hover); }
+    .reg-var-row.dragging { opacity: .4; }
+    .reg-var-row.used { opacity: .38; cursor: not-allowed; pointer-events: none; }
+    .reg-var-row.ineligible { opacity: .45; cursor: not-allowed; }
+    .reg-var-icon {
+      width: 16px; height: 16px; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 8px; font-weight: 700; flex-shrink: 0;
+    }
+    .reg-var-icon.num { background: rgba(13,148,136,.2); color: var(--clu-var); }
+    .reg-var-icon.cat { background: rgba(148,163,184,.2); color: #94a3b8; }
+    .reg-var-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .reg-var-name {
+      font-size: 12px; font-weight: 600; color: var(--cfg-text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .reg-var-stats { font-size: 9.5px; color: var(--cfg-text3); line-height: 1.2; }
+    .reg-var-miss { color: #f97316; font-weight: 600; }
+
+    .reg-model-title {
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 2px 6px; border-bottom: 1px solid var(--cfg-border); flex-shrink: 0;
+    }
+    .reg-model-title > span:first-child {
+      font-size: 13px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .6px; color: var(--cfg-text);
+    }
+    .reg-model-meta {
+      font-size: 10px; color: var(--cfg-text3); margin-left: auto;
+      text-align: right; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; max-width: 55%;
+    }
+    .reg-equation-strip {
+      font-size: 11.5px; color: var(--cfg-text3);
+      padding: 5px 8px; background: var(--cfg-surface);
+      border: 1px dashed var(--cfg-border); border-radius: 6px;
+      line-height: 1.4; word-break: break-word; flex-shrink: 0;
+    }
+    .reg-equation-strip strong { color: var(--clu-acc); font-weight: 700; }
+
+    .int-badge {
+      font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 10px;
+      background: rgba(13,148,136,.2); color: var(--clu-var);
+      border: 1px solid rgba(13,148,136,.4); margin-left: 5px;
+    }
+
+    .reg-zone-card {
+      border: 1px solid rgba(56,189,248,.35); border-radius: 8px;
+      overflow: hidden; flex-shrink: 0;
+      box-shadow: 0 2px 14px rgba(56,189,248,.08);
+    }
+    .reg-zone-head {
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 10px; font-size: 11.5px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .45px;
+      border-bottom: 1px solid var(--cfg-border);
+      background: rgba(13,148,136,.08); color: var(--clu-var);
+    }
+    .reg-zone-head .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--clu-var); flex-shrink: 0; }
+    .zone-head-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .zone-head-main .zone-hint {
+      font-size: 9.5px; font-weight: 400; letter-spacing: .1px;
+      text-transform: none; opacity: .8; line-height: 1.2;
+    }
+    .zone-req { font-size: 13px; font-weight: 900; color: #dc2626; opacity: .85; margin-left: 3px; }
+    .reg-zone-body {
+      padding: 6px; background: rgba(13,148,136,.04);
+      min-height: 54px; display: flex; flex-wrap: wrap;
+      gap: 4px; align-content: flex-start; transition: background .2s;
+    }
+    .reg-zone-body.drag-over { background: rgba(13,148,136,.1); }
+    .reg-zone-placeholder {
+      width: 100%; text-align: center; font-size: 11px; font-style: italic;
+      color: var(--cfg-text3); padding: 8px 0;
+    }
+    .reg-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 6px 3px 8px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; border: 1px solid; white-space: nowrap;
+      background: rgba(13,148,136,.15); border-color: rgba(13,148,136,.4); color: var(--clu-var);
+    }
+    .reg-chip-x {
+      background: none; border: none; cursor: pointer;
+      padding: 0 1px; opacity: .7; font-size: 12px; color: inherit; line-height: 1;
+    }
+    .reg-chip-x:hover { opacity: 1; }
+
+    .clu-quick-row { display: flex; gap: 6px; flex-shrink: 0; }
+    .clu-quick-btn {
+      flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 6px 8px; border-radius: 8px; border: 1px solid var(--cfg-border);
+      background: var(--cfg-surface); color: var(--cfg-text2, var(--cfg-text));
+      font-size: 10px; font-weight: 600; cursor: pointer;
+    }
+    .clu-quick-btn:hover { background: var(--cfg-tbl-hover); }
+    .clu-quick-btn i { color: var(--clu-acc); font-size: 10px; }
+
+    .adv-wrap { flex-shrink: 0; }
+    .adv-toggle {
+      width: 100%; display: flex; align-items: center; gap: 7px;
+      padding: 7px 10px; border: 1px solid var(--cfg-border); border-radius: 8px;
+      background: var(--cfg-surface2, var(--cfg-surface));
+      cursor: pointer; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .5px;
+      color: var(--cfg-text); user-select: none;
+    }
+    .adv-toggle:hover { background: var(--cfg-tbl-hover); }
+    .adv-toggle .adv-chevron { margin-left: auto; font-size: 10px; transition: transform .2s; color: var(--cfg-text3); }
+    .adv-wrap.open .adv-toggle { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+    .adv-wrap.open .adv-toggle .adv-chevron { transform: rotate(180deg); }
+    .adv-body {
+      overflow: hidden; max-height: 0; opacity: 0;
+      transition: max-height .28s ease, opacity .2s ease;
+      border: 1px solid var(--cfg-border); border-top: none;
+      border-radius: 0 0 8px 8px; padding: 0 10px;
+    }
+    .adv-wrap.open .adv-body { max-height: 400px; opacity: 1; padding: 8px 10px; }
+    .opt-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+    .opt-row:last-child { margin-bottom: 0; }
+    .opt-row label { font-size: 11px; font-weight: 600; color: var(--cfg-text2); }
+
+    .reg-obs-strip {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 10px; font-size: 11px; color: var(--cfg-text);
+      border: 1px solid var(--cfg-border); border-radius: 8px;
+      background: var(--cfg-surface); flex-shrink: 0;
+    }
+    .reg-obs-strip .warn { color: #dc2626; font-size: 10px; }
+  </style>
+</head>
+<body>
+  <div class="cfg-shell">
+
+    <header class="cfg-header">
+      <div class="cfg-header-icon"><i class="fa-solid fa-object-group" id="headerIcon"></i></div>
+      <span class="cfg-header-title" id="headerTitle">Cluster Analysis</span>
+      <span class="cfg-meta-badge" id="metaBadge">—</span>
+      <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch theme">
+        <span class="cfg-toggle-icon">&#x1F319;</span>
+        <div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div>
+        <span class="cfg-toggle-label">Dark</span>
+      </button>
+    </header>
+
+    <div id="loadingSpinner" class="cfg-spinner">
+      <i class="fa-solid fa-spinner fa-spin"></i> Loading data&hellip;
+    </div>
+
+    <div id="mainContent" style="display:none;flex:1;min-height:0;overflow:hidden;">
+
+      <div class="clu-layout">
+
+        <div class="reg-vars-col">
+          <div class="reg-vars-header">
+            <span class="reg-vars-title">Available Variables</span>
+            <span class="reg-vars-summary" id="varsSummary"></span>
+          </div>
+          <div class="reg-vars-box" id="variablesListBox">
+            <div style="color:var(--cfg-text3);font-style:italic;font-size:11px;text-align:center;padding:20px 10px;">
+              No data loaded yet.
+            </div>
+          </div>
+        </div>
+
+        <div class="reg-model-col">
+
+          <div class="reg-model-title">
+            <span id="modelTitle">Cluster Variables</span>
+            <span class="reg-model-meta" id="tbRange">—</span>
+          </div>
+
+          <div class="reg-equation-strip" id="modelSummary">Drag numeric variables below (need at least 1 for clustering)</div>
+
+          <div class="reg-zone-card zone-vars">
+            <div class="reg-zone-head">
+              <div class="dot"></div>
+              <div class="zone-head-main">
+                <div class="zone-label" id="zoneLabel">Variables to cluster</div>
+                <div class="zone-hint">Numeric columns only — rows with missing values on any included variable are excluded</div>
+              </div>
+              <span class="zone-req">*</span>
+              <span class="int-badge" id="varCountBadge" style="display:none;"></span>
+            </div>
+            <div class="reg-zone-body drop-zone" id="zoneVariables">
+              <div class="reg-zone-placeholder" id="zonePlaceholder">Drag numeric variables here</div>
+            </div>
+          </div>
+
+          <div class="clu-quick-row">
+            <button type="button" class="clu-quick-btn" id="btnAddAllNumeric">
+              <i class="fa-solid fa-hashtag"></i> Add all numeric
+            </button>
+            <button type="button" class="clu-quick-btn" id="btnClearAll">
+              <i class="fa-solid fa-eraser"></i> Clear all
+            </button>
+          </div>
+
+          <div class="adv-wrap" id="optionsWrap">
+            <div class="adv-toggle" id="optionsToggle" role="button" tabindex="0">
+              <i class="fa-solid fa-sliders" style="color:var(--clu-acc);"></i>
+              <span>Clustering options</span>
+              <i class="fa-solid fa-chevron-down adv-chevron"></i>
+            </div>
+            <div class="adv-body">
+              <div class="opt-row">
+                <label for="clusterMethod">Method</label>
+                <select id="clusterMethod" class="cfg-select">
+                  <option value="kmeans">K-means</option>
+                  <option value="hierarchical">Hierarchical</option>
+                </select>
+              </div>
+              <div class="opt-row">
+                <label for="clusterK">Number of clusters (k)</label>
+                <input id="clusterK" type="number" min="2" max="50" step="1" value="3" class="cfg-select" style="min-height:32px;" />
+              </div>
+              <div class="opt-row" id="linkageRow">
+                <label for="clusterLinkage">Linkage method</label>
+                <select id="clusterLinkage" class="cfg-select">
+                  <option value="average">Average (UPGMA)</option>
+                  <option value="complete">Complete</option>
+                  <option value="single">Single</option>
+                </select>
+              </div>
+              <div class="opt-row">
+                <label for="clusterDistance">Distance measure</label>
+                <select id="clusterDistance" class="cfg-select">
+                  <option value="euclidean">Euclidean (L2)</option>
+                  <option value="manhattan">Manhattan (L1)</option>
+                </select>
+              </div>
+              <div class="opt-row">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="clusterStandardize" checked />
+                  Standardise variables (recommended)
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="adv-wrap" id="guideWrap">
+            <div class="adv-toggle" id="guideToggle" role="button" tabindex="0">
+              <i class="fa-solid fa-circle-info" style="color:var(--clu-acc);"></i>
+              <span>Data format guide</span>
+              <i class="fa-solid fa-chevron-down adv-chevron"></i>
+            </div>
+            <div class="adv-body"><div id="dsGuideContainer"></div></div>
+          </div>
+
+          <div class="reg-obs-strip" id="obsMonitor">
+            <span id="obsText">Select variables to continue</span>
+            <span class="warn" id="obsWarn" style="display:none;"></span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="cfg-footer">
+      <button class="cfg-btn cancel" id="btnCancel"><i class="fa-solid fa-times"></i> Cancel</button>
+      <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Load a previously saved configuration">
+        <i class="fa-solid fa-clock-rotate-left"></i> Load previous&hellip;
+      </button>
+      <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" disabled title="Save current configuration">
+        <i class="fa-solid fa-floppy-disk"></i> Save configuration
+      </button>
+      <button class="cfg-btn run" id="btnRun" disabled>
+        <i class="fa-solid fa-play"></i> Run Cluster
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    var _headers = [];
+    var _rows = [];
+    var _address = '';
+    var _saved = null;
+    var columnStats = [];
+    var selectedColumns = [];
+    var draggedElement = null;
+    var NUMERIC_THRESHOLD = 0.8;
+
+    function qs(id) { return document.getElementById(id); }
+
+    function send(action, data) {
+      var payload = JSON.stringify({ action: action, data: data || null, payload: data || null });
+      if (Office && Office.context && Office.context.ui && typeof Office.context.ui.messageParent === 'function') {
+        Office.context.ui.messageParent(payload);
+      }
+    }
+
+    function buildColumnStats() {
+      columnStats = _headers.map(function(name, colIdx) {
+        var numeric = 0, string = 0, missing = 0;
+        _rows.forEach(function(row) {
+          var value = row[colIdx];
+          if (value === null || value === undefined || value === '') { missing++; return; }
+          var num = parseFloat(String(value).replace(',', '.'));
+          if (!isNaN(num) && isFinite(num)) numeric++;
+          else string++;
+        });
+        var nonMissing = numeric + string;
+        var isNumeric = nonMissing > 0 && numeric / nonMissing >= NUMERIC_THRESHOLD;
+        return {
+          name: name || ('Col ' + (colIdx + 1)),
+          idx: colIdx,
+          numeric: numeric,
+          string: string,
+          missing: missing,
+          isNumeric: isNumeric,
+          eligible: isNumeric && nonMissing >= 5
+        };
+      });
+    }
+
+    function buildVariableStats(headers, rows, address) {
+      var stats = {};
+      var parsed = parseRangeAddress(address);
+      for (var colIdx = 0; colIdx < headers.length; colIdx++) {
+        var name = headers[colIdx];
+        var numericCnt = 0, stringCnt = 0, missingCnt = 0;
+        for (var rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+          var value = rows[rowIdx][colIdx];
+          if (value === null || value === undefined || value === '') { missingCnt++; continue; }
+          var numVal = parseFloat(String(value).replace(',', '.'));
+          if (!isNaN(numVal) && isFinite(numVal)) numericCnt++;
+          else stringCnt++;
+        }
+        stats[name] = {
+          numeric: numericCnt,
+          string: stringCnt,
+          missing: missingCnt,
+          rangeAddress: parsed ? parsed.sheet + parsed.col(colIdx) + parsed.startRow + ':' + parsed.sheet + parsed.col(colIdx) + parsed.endRow : ''
+        };
+      }
+      return stats;
+    }
+
+    function parseRangeAddress(address) {
+      if (!address) return null;
+      var match = address.match(/^(.*!)?([A-Za-z]+)(\d+):([A-Za-z]+)(\d+)$/);
+      if (!match) return null;
+      var sheet = match[1] || '';
+      var startRow = parseInt(match[3], 10) + 1;
+      var endRow = parseInt(match[5], 10);
+      function colToNumber(col) {
+        var num = 0;
+        for (var i = 0; i < col.length; i++) num = num * 26 + (col.charCodeAt(i) - 64);
+        return num;
+      }
+      function numberToCol(num) {
+        var col = '';
+        while (num > 0) {
+          var rem = (num - 1) % 26;
+          col = String.fromCharCode(65 + rem) + col;
+          num = Math.floor((num - 1) / 26);
+        }
+        return col;
+      }
+      var startColNum = colToNumber(match[2].toUpperCase());
+      return {
+        sheet: sheet,
+        startRow: startRow,
+        endRow: endRow,
+        col: function(offset) { return numberToCol(startColNum + offset); }
+      };
+    }
+
+    var variableStats = {};
+
+    function getStat(name) {
+      for (var i = 0; i < columnStats.length; i++) {
+        if (columnStats[i].name === name) return columnStats[i];
+      }
+      return null;
+    }
+
+    function isSelected(name) {
+      return selectedColumns.indexOf(name) >= 0;
+    }
+
+    function updateVarsSummary() {
+      var el = qs('varsSummary');
+      if (!el) return;
+      var numCount = 0, catCount = 0;
+      columnStats.forEach(function(s) {
+        if (s.isNumeric) numCount++;
+        else if (s.string > 0) catCount++;
+      });
+      var html = '';
+      if (numCount) html += '<span class="reg-vars-badge reg-vb-num">' + numCount + ' num</span>';
+      if (catCount) html += '<span class="reg-vars-badge reg-vb-cat">' + catCount + ' cat</span>';
+      el.innerHTML = html;
+    }
+
+    function renderVariables() {
+      var box = qs('variablesListBox');
+      if (!box) return;
+      box.innerHTML = '';
+      if (!columnStats.length) {
+        box.innerHTML = '<div style="color:var(--cfg-text3);font-style:italic;font-size:11px;text-align:center;padding:20px 10px;">No variables found.</div>';
+        updateVarsSummary();
+        return;
+      }
+      columnStats.forEach(function(s) {
+        var used = isSelected(s.name);
+        var row = document.createElement('div');
+        row.className = 'reg-var-row' + (used ? ' used' : '') + (!s.eligible ? ' ineligible' : '');
+        row.draggable = s.eligible && !used;
+        row.dataset.varName = s.name;
+
+        var statsText = s.numeric + ' num';
+        if (s.string > 0) statsText += ' · ' + s.string + ' cat';
+        if (s.missing > 0) statsText += ' · <span class="reg-var-miss">' + s.missing + ' miss</span>';
+        if (s.isNumeric && !s.eligible) statsText += ' · needs n&ge;5';
+
+        row.innerHTML =
+          '<div class="reg-var-icon ' + (s.isNumeric ? 'num' : 'cat') + '">' + (s.isNumeric ? 'N' : 'C') + '</div>' +
+          '<div class="reg-var-body">' +
+            '<div class="reg-var-name">' + s.name + '</div>' +
+            '<div class="reg-var-stats">' + statsText + '</div>' +
+          '</div>';
+
+        if (s.eligible && !used) {
+          row.addEventListener('dragstart', handleDragStart);
+          row.addEventListener('dragend', handleDragEnd);
+        }
+        box.appendChild(row);
+      });
+      updateVarsSummary();
+    }
+
+    function renderSelection() {
+      var zone = qs('zoneVariables');
+      var ph = qs('zonePlaceholder');
+      if (!zone) return;
+
+      Array.from(zone.querySelectorAll('.reg-chip')).forEach(function(c) { c.remove(); });
+
+      if (!selectedColumns.length) {
+        if (ph) ph.style.display = '';
+        updateModelSummary();
+        validateModel();
+        return;
+      }
+      if (ph) ph.style.display = 'none';
+
+      selectedColumns.forEach(function(name) {
+        var chip = document.createElement('div');
+        chip.className = 'reg-chip';
+        chip.innerHTML = '<span>' + name + '</span><button class="reg-chip-x" title="Remove">&times;</button>';
+        chip.querySelector('.reg-chip-x').addEventListener('click', function() {
+          removeVariable(name);
+        });
+        zone.appendChild(chip);
+      });
+      updateModelSummary();
+      validateModel();
+    }
+
+    function addVariable(name) {
+      if (!name || isSelected(name)) return;
+      var s = getStat(name);
+      if (!s || !s.eligible) return;
+      selectedColumns.push(name);
+      renderSelection();
+      renderVariables();
+    }
+
+    function removeVariable(name) {
+      selectedColumns = selectedColumns.filter(function(n) { return n !== name; });
+      renderSelection();
+      renderVariables();
+    }
+
+    function selectAllNumeric() {
+      columnStats.forEach(function(s) {
+        if (s.eligible && !isSelected(s.name)) selectedColumns.push(s.name);
+      });
+      renderSelection();
+      renderVariables();
+    }
+
+    function clearAll() {
+      selectedColumns = [];
+      renderSelection();
+      renderVariables();
+    }
+
+    function updateModelSummary() {
+      var el = qs('modelSummary');
+      if (!el) return;
+      var n = selectedColumns.length;
+      if (!n) {
+        el.textContent = 'Drag numeric variables below — each row is one case, each column a measure';
+        return;
+      }
+      var method = qs('clusterMethod') ? qs('clusterMethod').value : 'kmeans';
+      el.innerHTML = '<strong>' + n + '</strong> variable' + (n === 1 ? '' : 's') + ' selected · ' +
+        (method === 'hierarchical' ? 'Hierarchical' : 'K-means') + ' clustering';
+    }
+
+    function updateMethodUI() {
+      var method = qs('clusterMethod') ? qs('clusterMethod').value : 'kmeans';
+      var linkageRow = qs('linkageRow');
+      if (linkageRow) linkageRow.style.display = method === 'hierarchical' ? '' : 'none';
+      updateModelSummary();
+    }
+
+    function updateDataGuide() {
+      if (typeof DsGuide === 'undefined') return;
+      DsGuide.render('cluster', 'dsGuideContainer', { collapsed: false });
+    }
+
+    function validateModel() {
+      var n = selectedColumns.length;
+      var ok = n >= 1;
+      var badge = qs('varCountBadge');
+      if (badge) {
+        if (n >= 1) {
+          badge.style.display = 'inline';
+          badge.textContent = n + ' var' + (n === 1 ? '' : 's');
+        } else {
+          badge.style.display = 'none';
+        }
+      }
+
+      var obsText = qs('obsText');
+      var obsWarn = qs('obsWarn');
+      if (obsText) {
+        obsText.textContent = n
+          ? ('Selected: ' + n + ' variable' + (n === 1 ? '' : 's'))
+          : 'Select at least one numeric variable';
+      }
+      if (obsWarn) {
+        obsWarn.style.display = 'none';
+        obsWarn.textContent = '';
+      }
+
+      if (qs('btnRun')) qs('btnRun').disabled = !ok;
+      if (qs('btnSaveConfig')) qs('btnSaveConfig').disabled = !ok;
+
+      var hasSaved = typeof CfgSave !== 'undefined' && CfgSave.getSavedList('cluster-config').length > 0;
+      if (qs('btnLoadPrev')) qs('btnLoadPrev').disabled = !hasSaved;
+    }
+
+    function applyOptionsFromSpec(spec) {
+      if (!spec) return;
+      if (qs('clusterMethod')) qs('clusterMethod').value = spec.clusterMethod === 'hierarchical' ? 'hierarchical' : 'kmeans';
+      if (qs('clusterK')) {
+        var k = parseInt(spec.k, 10);
+        qs('clusterK').value = isFinite(k) ? String(Math.max(2, Math.min(50, k))) : '3';
+      }
+      if (qs('clusterLinkage')) qs('clusterLinkage').value = spec.linkage || 'average';
+      if (qs('clusterDistance')) qs('clusterDistance').value = spec.distance === 'manhattan' ? 'manhattan' : 'euclidean';
+      if (qs('clusterStandardize')) qs('clusterStandardize').checked = spec.standardize !== false;
+      updateMethodUI();
+    }
+
+    function applySpec(spec) {
+      if (!spec) return;
+      var vars = [];
+      if (Array.isArray(spec.variables) && spec.variables.length) vars = spec.variables.slice();
+      else if (Array.isArray(spec.selectedVariableIndices) && spec.selectedVariableIndices.length) {
+        spec.selectedVariableIndices.forEach(function(idx) {
+          if (_headers[idx]) vars.push(_headers[idx]);
+        });
+      }
+      selectedColumns = vars.filter(function(name) {
+        return getStat(name) && getStat(name).eligible;
+      });
+      applyOptionsFromSpec(spec);
+    }
+
+    function initUI() {
+      qs('loadingSpinner').style.display = 'none';
+      qs('mainContent').style.display = 'flex';
+
+      qs('tbRange').textContent = _address || '(workbook)';
+      qs('metaBadge').textContent = _rows.length + ' rows · ' + _headers.length + ' vars';
+
+      buildColumnStats();
+
+      selectedColumns = [];
+      if (_saved) applySpec(_saved);
+
+      renderVariables();
+      renderSelection();
+      updateMethodUI();
+      updateDataGuide();
+      validateModel();
+    }
+
+    function setupDropZone() {
+      var zone = qs('zoneVariables');
+      if (!zone) return;
+      zone.addEventListener('dragover', function(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+      zone.addEventListener('dragenter', function(e) {
+        var z = e.target.closest('.drop-zone');
+        if (z) z.classList.add('drag-over');
+      });
+      zone.addEventListener('dragleave', function(e) {
+        var z = e.target.closest('.drop-zone');
+        if (z && !z.contains(e.relatedTarget)) z.classList.remove('drag-over');
+      });
+      zone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var z = e.target.closest('.drop-zone');
+        if (z) z.classList.remove('drag-over');
+        if (!draggedElement) return;
+        addVariable(draggedElement.dataset.varName);
+      });
+    }
+
+    function handleDragStart(e) {
+      draggedElement = e.target.closest('.reg-var-row');
+      if (draggedElement) draggedElement.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
+    }
+
+    function handleDragEnd(e) {
+      var row = e.target.closest('.reg-var-row');
+      if (row) row.classList.remove('dragging');
+    }
+
+    function buildModelSpec() {
+      var selected = selectedColumns.slice();
+      var kParsed = parseInt(qs('clusterK') ? qs('clusterK').value : '3', 10);
+      var spec = {
+        variables: selected,
+        selectedVariableIndices: selected.map(function(name) { return _headers.indexOf(name); }).filter(function(i) { return i >= 0; }),
+        k: isFinite(kParsed) ? Math.max(2, Math.min(50, kParsed)) : 3,
+        standardize: qs('clusterStandardize') ? qs('clusterStandardize').checked : true,
+        linkage: qs('clusterLinkage') ? qs('clusterLinkage').value : 'average',
+        clusterMethod: qs('clusterMethod') && qs('clusterMethod').value === 'hierarchical' ? 'hierarchical' : 'kmeans',
+        distance: qs('clusterDistance') && qs('clusterDistance').value === 'manhattan' ? 'manhattan' : 'euclidean'
+      };
+      return spec;
+    }
+
+    function saveModelSpec() {
+      if (selectedColumns.length < 1) return;
+      var spec = buildModelSpec();
+      var defaultName = selectedColumns.join(', ') || 'Cluster';
+      CfgSave.showPrompt('Save configuration', 'Configuration name', defaultName, function(name) {
+        CfgSave.saveCfgEntry('cluster-config', name, {
+          variables: selectedColumns.slice(),
+          k: spec.k,
+          standardize: spec.standardize,
+          linkage: spec.linkage,
+          clusterMethod: spec.clusterMethod,
+          distance: spec.distance
+        }, function() { validateModel(); });
+      });
+    }
+
+    function showSavedList() {
+      CfgSave.showSavedList('cluster-config', function(item) {
+        var spec = item.spec || {};
+        return (spec.variables || []).join(', ');
+      }, function(item) {
+        applySpec(item.spec || {});
+        renderVariables();
+        renderSelection();
+        updateDataGuide();
+        validateModel();
+      });
+    }
+
+    function runAnalysis() {
+      if (selectedColumns.length < 1) return;
+      send('clusterModel', buildModelSpec());
+    }
+
+    function applyPayload(p) {
+      if (!p || !p.headers) return;
+      _headers = p.headers || [];
+      _rows = p.rows || [];
+      _address = p.address || '';
+      _saved = p.savedModelSpec || p.savedSpec || null;
+      initUI();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      setupDropZone();
+      qs('btnCancel').addEventListener('click', function() { send('close', null); });
+      qs('btnRun').addEventListener('click', runAnalysis);
+      qs('btnAddAllNumeric').addEventListener('click', selectAllNumeric);
+      qs('btnClearAll').addEventListener('click', clearAll);
+      qs('guideToggle').addEventListener('click', function() { qs('guideWrap').classList.toggle('open'); });
+      qs('optionsToggle').addEventListener('click', function() { qs('optionsWrap').classList.toggle('open'); });
+      if (qs('clusterMethod')) qs('clusterMethod').addEventListener('change', updateMethodUI);
+
+      if (typeof DsGuide !== 'undefined') {
+        DsGuide.render('cluster', 'dsGuideContainer', { collapsed: true });
+      }
+
+      Office.onReady(function() {
+        Office.context.ui.addHandlerAsync(
+          Office.EventType.DialogParentMessageReceived,
+          function(arg) {
+            try {
+              var msg = JSON.parse(arg.message || '{}');
+              if (msg.type === 'CLUSTER_DATA' && msg.payload) applyPayload(msg.payload);
+            } catch (_e) {}
+          }
+        );
+        send('ready', null);
+        setInterval(function() {
+          if (_headers.length) return;
+          send('requestData', null);
+        }, 500);
+      });
+    });
+  </script>
+</body>
+</html>

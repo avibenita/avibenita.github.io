@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pareto 80/20 Configuration</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="../shared-config.css?v=20260526a"/>
+  <script src="../shared-config.js?v=20260316"></script>
+  <script src="../ds-guide.js?v=20260330g"></script>
+  <style>
+    :root { --prt-cat: #f97316; --prt-val: #38bdf8; }
+    body.cfg-embed .cfg-header { display: none; }
+    body.cfg-embed .cfg-shell { min-height: 100%; }
+    .prt-layout { display: flex; gap: 10px; flex: 1 1 0; min-height: 0; padding: 8px 10px; overflow: hidden; }
+    .reg-vars-col { flex: 0 0 220px; display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow: hidden; }
+    .reg-model-col { flex: 1 1 0; display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; padding-right: 4px; }
+    .reg-vars-header { display: flex; flex-direction: column; gap: 4px; padding: 0 2px 6px; border-bottom: 1px solid var(--cfg-border); flex-shrink: 0; }
+    .reg-vars-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .55px; color: var(--cfg-text); }
+    .reg-vars-summary { display: flex; gap: 5px; flex-wrap: wrap; }
+    .reg-vars-badge { font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px; white-space: nowrap; }
+    .reg-vb-num { background: rgba(56,189,248,.12); color: #0369a1; border: 1px solid rgba(56,189,248,.3); }
+    .reg-vb-cat { background: rgba(249,115,22,.12); color: #c2410c; border: 1px solid rgba(249,115,22,.3); }
+    .reg-vars-box { flex: 1 1 0; min-height: 0; overflow-y: auto; border: 1px solid var(--cfg-border); border-radius: 8px; background: var(--cfg-surface); }
+    .reg-var-row { display: flex; align-items: center; gap: 6px; padding: 5px 8px; cursor: grab; border-bottom: 1px solid var(--cfg-border); user-select: none; }
+    .reg-var-row:last-child { border-bottom: none; }
+    .reg-var-row:hover:not(.used) { background: var(--cfg-tbl-hover); }
+    .reg-var-row.dragging { opacity: .4; }
+    .reg-var-row.used { opacity: .38; cursor: not-allowed; pointer-events: none; }
+    .reg-var-icon { width: 16px; height: 16px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; flex-shrink: 0; }
+    .reg-var-icon.num { background: rgba(56,189,248,.2); color: var(--prt-val); }
+    .reg-var-icon.cat { background: rgba(249,115,22,.2); color: var(--prt-cat); }
+    .reg-var-body { flex: 1; min-width: 0; }
+    .reg-var-name { font-size: 12px; font-weight: 600; color: var(--cfg-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .reg-var-stats { font-size: 9.5px; color: var(--cfg-text3); }
+    .reg-model-title { display: flex; align-items: center; gap: 10px; padding: 0 2px 6px; border-bottom: 1px solid var(--cfg-border); flex-shrink: 0; }
+    .reg-model-title > span:first-child { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; }
+    .reg-model-meta { font-size: 10px; color: var(--cfg-text3); margin-left: auto; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .reg-equation-strip { font-size: 11.5px; color: var(--cfg-text3); padding: 5px 8px; background: var(--cfg-surface); border: 1px dashed var(--cfg-border); border-radius: 6px; flex-shrink: 0; }
+    .reg-equation-strip strong { color: var(--prt-cat); }
+    .reg-zone-card { border-radius: 8px; overflow: hidden; flex-shrink: 0; border: 1px solid var(--cfg-border); }
+    .reg-zone-card.zone-cat { border-color: rgba(249,115,22,.35); }
+    .reg-zone-card.zone-val { border-color: rgba(56,189,248,.35); }
+    .reg-zone-head { display: flex; align-items: center; gap: 7px; padding: 7px 10px; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .45px; border-bottom: 1px solid var(--cfg-border); }
+    .reg-zone-card.zone-cat .reg-zone-head { background: rgba(249,115,22,.08); color: var(--prt-cat); }
+    .reg-zone-card.zone-val .reg-zone-head { background: rgba(56,189,248,.08); color: var(--prt-val); }
+    .reg-zone-head .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .reg-zone-card.zone-cat .dot { background: var(--prt-cat); }
+    .reg-zone-card.zone-val .dot { background: var(--prt-val); }
+    .zone-head-main { flex: 1; min-width: 0; }
+    .zone-hint { font-size: 9.5px; font-weight: 400; text-transform: none; opacity: .8; }
+    .zone-req { font-size: 13px; font-weight: 900; color: #dc2626; }
+    .reg-zone-body { padding: 6px; min-height: 44px; display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start; transition: background .2s; }
+    .reg-zone-card.zone-cat .reg-zone-body { background: rgba(249,115,22,.04); }
+    .reg-zone-card.zone-val .reg-zone-body { background: rgba(56,189,248,.04); }
+    .reg-zone-body.drag-over { filter: brightness(1.08); }
+    .reg-zone-placeholder { width: 100%; text-align: center; font-size: 11px; font-style: italic; color: var(--cfg-text3); padding: 8px 0; }
+    .reg-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; border: 1px solid; white-space: nowrap; }
+    .reg-chip.cat { background: rgba(249,115,22,.15); border-color: rgba(249,115,22,.4); color: var(--prt-cat); }
+    .reg-chip.val { background: rgba(56,189,248,.15); border-color: rgba(56,189,248,.4); color: var(--prt-val); }
+    .reg-chip-x { background: none; border: none; cursor: pointer; padding: 0 1px; opacity: .7; font-size: 12px; color: inherit; }
+    .adv-wrap { flex-shrink: 0; }
+    .adv-toggle { width: 100%; display: flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid var(--cfg-border); border-radius: 8px; background: var(--cfg-surface); cursor: pointer; font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--cfg-text); }
+    .adv-wrap.open .adv-body { max-height: 400px; opacity: 1; padding: 8px 10px; }
+    .adv-body { overflow: hidden; max-height: 0; opacity: 0; transition: max-height .28s ease, opacity .2s ease; border: 1px solid var(--cfg-border); border-top: none; border-radius: 0 0 8px 8px; padding: 0 10px; }
+    .adv-wrap.open .adv-toggle { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+    .adv-toggle .adv-chevron { margin-left: auto; font-size: 10px; transition: transform .2s; }
+    .adv-wrap.open .adv-toggle .adv-chevron { transform: rotate(180deg); }
+  </style>
+</head>
+<body>
+  <div class="cfg-shell">
+    <header class="cfg-header">
+      <div class="cfg-header-icon"><i class="fa-solid fa-chart-pie"></i></div>
+      <span class="cfg-header-title">Pareto 80/20</span>
+      <span class="cfg-meta-badge" id="metaBadge">—</span>
+      <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch theme"><span class="cfg-toggle-icon">&#x1F319;</span><div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div><span class="cfg-toggle-label">Dark</span></button>
+    </header>
+    <div id="loadingSpinner" class="cfg-spinner"><i class="fa-solid fa-spinner fa-spin"></i> Loading data&hellip;</div>
+    <div id="mainContent" style="display:none;flex:1;min-height:0;overflow:hidden;">
+      <div class="prt-layout">
+        <div class="reg-vars-col">
+          <div class="reg-vars-header">
+            <span class="reg-vars-title">Available Columns</span>
+            <span class="reg-vars-summary" id="varsSummary"></span>
+          </div>
+          <div class="reg-vars-box" id="variablesListBox"></div>
+        </div>
+        <div class="reg-model-col">
+          <div class="reg-model-title">
+            <span>Assign Roles</span>
+            <span class="reg-model-meta" id="tbRange">—</span>
+          </div>
+          <div class="reg-equation-strip" id="modelSummary">Drag a category column and optionally a numeric values column</div>
+          <div class="reg-zone-card zone-cat">
+            <div class="reg-zone-head"><div class="dot"></div><div class="zone-head-main"><div>Category</div><div class="zone-hint">Labels to rank (e.g. product, region)</div></div><span class="zone-req">*</span></div>
+            <div class="reg-zone-body drop-zone" data-zone="category" id="zoneCategory"><div class="reg-zone-placeholder">Drag category column here</div></div>
+          </div>
+          <div class="reg-zone-card zone-val">
+            <div class="reg-zone-head"><div class="dot"></div><div class="zone-head-main"><div>Values (optional)</div><div class="zone-hint">Numeric measure to sum — leave empty to count rows</div></div></div>
+            <div class="reg-zone-body drop-zone" data-zone="values" id="zoneValues"><div class="reg-zone-placeholder">Drag numeric column here, or leave empty for count</div></div>
+          </div>
+          <div class="adv-wrap" id="guideWrap">
+            <div class="adv-toggle" id="guideToggle"><i class="fa-solid fa-circle-info" style="color:var(--prt-cat);"></i><span>Data format guide</span><i class="fa-solid fa-chevron-down adv-chevron"></i></div>
+            <div class="adv-body"><div id="dsGuideContainer"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cfg-footer">
+      <button class="cfg-btn cancel" id="btnCancel"><i class="fa-solid fa-times"></i> Cancel</button>
+      <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" disabled><i class="fa-solid fa-clock-rotate-left"></i> Load previous&hellip;</button>
+      <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" disabled><i class="fa-solid fa-floppy-disk"></i> Save configuration</button>
+      <button class="cfg-btn run" id="btnRun" disabled><i class="fa-solid fa-play"></i> Run Pareto</button>
+    </div>
+  </div>
+  <script>
+    var _headers = [], _rows = [], _address = '', _saved = null;
+    var columnStats = [], assignments = { category: null, values: null };
+    var draggedElement = null;
+
+    function qs(id) { return document.getElementById(id); }
+    function send(action, data) {
+      if (Office && Office.context && Office.context.ui) {
+        Office.context.ui.messageParent(JSON.stringify({ action: action, data: data || null, payload: data || null }));
+      }
+    }
+
+    function buildColumnStats() {
+      columnStats = _headers.map(function(name, colIdx) {
+        var numeric = 0, string = 0, missing = 0;
+        _rows.forEach(function(row) {
+          var value = row[colIdx];
+          if (value === null || value === undefined || value === '') { missing++; return; }
+          var num = parseFloat(String(value).replace(',', '.'));
+          if (!isNaN(num) && isFinite(num)) numeric++; else string++;
+        });
+        return {
+          name: name || ('Col ' + (colIdx + 1)),
+          idx: colIdx,
+          numeric: numeric,
+          string: string,
+          missing: missing,
+          isNumeric: numeric > string
+        };
+      });
+    }
+
+    function getStat(name) {
+      for (var i = 0; i < columnStats.length; i++) if (columnStats[i].name === name) return columnStats[i];
+      return null;
+    }
+
+    function isAssigned(name) {
+      return assignments.category === name || assignments.values === name;
+    }
+
+    function updateVarsSummary() {
+      var el = qs('varsSummary');
+      if (!el) return;
+      var num = 0, cat = 0;
+      columnStats.forEach(function(s) { if (s.isNumeric) num++; else if (s.string > 0) cat++; });
+      el.innerHTML = (num ? '<span class="reg-vars-badge reg-vb-num">' + num + ' num</span>' : '') +
+        (cat ? '<span class="reg-vars-badge reg-vb-cat">' + cat + ' cat</span>' : '');
+    }
+
+    function renderVariables() {
+      var box = qs('variablesListBox');
+      box.innerHTML = '';
+      if (!columnStats.length) {
+        box.innerHTML = '<div style="color:var(--cfg-text3);font-style:italic;font-size:11px;text-align:center;padding:20px;">No columns loaded</div>';
+        updateVarsSummary(); return;
+      }
+      columnStats.forEach(function(s) {
+        var used = isAssigned(s.name);
+        var row = document.createElement('div');
+        row.className = 'reg-var-row' + (used ? ' used' : '');
+        row.draggable = !used;
+        row.dataset.varName = s.name;
+        row.innerHTML = '<div class="reg-var-icon ' + (s.isNumeric ? 'num' : 'cat') + '">' + (s.isNumeric ? 'N' : 'C') + '</div>' +
+          '<div class="reg-var-body"><div class="reg-var-name">' + s.name + '</div><div class="reg-var-stats">' +
+          s.numeric + ' num' + (s.string ? ' · ' + s.string + ' cat' : '') + '</div></div>';
+        if (!used) {
+          row.addEventListener('dragstart', function(e) { draggedElement = row; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+          row.addEventListener('dragend', function() { row.classList.remove('dragging'); });
+        }
+        box.appendChild(row);
+      });
+      updateVarsSummary();
+    }
+
+    function createChip(name, zone, cls) {
+      var chip = document.createElement('div');
+      chip.className = 'reg-chip ' + cls;
+      chip.innerHTML = '<span>' + name + '</span><button class="reg-chip-x" title="Remove">&times;</button>';
+      chip.querySelector('.reg-chip-x').addEventListener('click', function() {
+        assignments[zone] = null;
+        renderAssignments(); renderVariables(); validateModel();
+      });
+      return chip;
+    }
+
+    function renderAssignments() {
+      var catZone = qs('zoneCategory');
+      var valZone = qs('zoneValues');
+      catZone.innerHTML = assignments.category
+        ? '' : '<div class="reg-zone-placeholder">Drag category column here</div>';
+      valZone.innerHTML = assignments.values
+        ? '' : '<div class="reg-zone-placeholder">Drag numeric column here, or leave empty for count</div>';
+      if (assignments.category) catZone.appendChild(createChip(assignments.category, 'category', 'cat'));
+      if (assignments.values) valZone.appendChild(createChip(assignments.values, 'values', 'val'));
+      updateSummary();
+      validateModel();
+    }
+
+    function updateSummary() {
+      var el = qs('modelSummary');
+      if (!el) return;
+      if (!assignments.category) { el.textContent = 'Drag a category column and optionally a numeric values column'; return; }
+      var mode = assignments.values ? ('sum of <strong>' + assignments.values + '</strong> by <strong>' + assignments.category + '</strong>')
+        : ('count rows by <strong>' + assignments.category + '</strong>');
+      el.innerHTML = 'Pareto chart: ' + mode;
+    }
+
+    function validateModel() {
+      var ok = !!assignments.category;
+      if (qs('btnRun')) qs('btnRun').disabled = !ok;
+      if (qs('btnSaveConfig')) qs('btnSaveConfig').disabled = !ok;
+      var hasSaved = typeof CfgSave !== 'undefined' && CfgSave.getSavedList('pareto-config').length > 0;
+      if (qs('btnLoadPrev')) qs('btnLoadPrev').disabled = !hasSaved;
+    }
+
+    function handleDrop(zoneType) {
+      if (!draggedElement) return;
+      var name = draggedElement.dataset.varName;
+      var stat = getStat(name);
+      if (!stat) return;
+      if (zoneType === 'category') {
+        if (assignments.values === name) assignments.values = null;
+        assignments.category = name;
+      } else if (zoneType === 'values') {
+        if (!stat.isNumeric) { return; }
+        if (assignments.category === name) assignments.category = null;
+        assignments.values = name;
+      }
+      renderAssignments(); renderVariables();
+    }
+
+    function setupDropZones() {
+      document.querySelectorAll('.drop-zone').forEach(function(zone) {
+        zone.addEventListener('dragover', function(e) { e.preventDefault(); zone.classList.add('drag-over'); });
+        zone.addEventListener('dragleave', function(e) { if (!zone.contains(e.relatedTarget)) zone.classList.remove('drag-over'); });
+        zone.addEventListener('drop', function(e) {
+          e.preventDefault(); zone.classList.remove('drag-over');
+          handleDrop(zone.dataset.zone);
+        });
+      });
+    }
+
+    function buildModelSpec() {
+      var catIdx = _headers.indexOf(assignments.category);
+      var valIdx = assignments.values ? _headers.indexOf(assignments.values) : null;
+      return {
+        categoryColName: assignments.category,
+        valuesColName: assignments.values || null,
+        categoryColIndex: catIdx,
+        valuesColIndex: valIdx,
+        includedIndices: _headers.map(function(_, i) { return i; })
+      };
+    }
+
+    function applySpec(spec) {
+      if (!spec) return;
+      assignments.category = null;
+      assignments.values = null;
+      if (spec.categoryColName && getStat(spec.categoryColName)) assignments.category = spec.categoryColName;
+      else if (spec.categoryColIndex >= 0 && _headers[spec.categoryColIndex]) assignments.category = _headers[spec.categoryColIndex];
+      if (spec.valuesColName && getStat(spec.valuesColName) && getStat(spec.valuesColName).isNumeric) assignments.values = spec.valuesColName;
+      else if (spec.valuesColIndex >= 0 && _headers[spec.valuesColIndex] && getStat(_headers[spec.valuesColIndex]).isNumeric) assignments.values = _headers[spec.valuesColIndex];
+    }
+
+    function saveModelSpec() {
+      if (!assignments.category) return;
+      var spec = buildModelSpec();
+      var defaultName = spec.categoryColName + (spec.valuesColName ? ' · ' + spec.valuesColName : ' · count');
+      CfgSave.showPrompt('Save configuration', 'Configuration name', defaultName, function(name) {
+        CfgSave.saveCfgEntry('pareto-config', name, spec, function() { validateModel(); });
+      });
+    }
+
+    function showSavedList() {
+      CfgSave.showSavedList('pareto-config', function(item) {
+        var s = item.spec || {};
+        return (s.categoryColName || '') + (s.valuesColName ? ' · ' + s.valuesColName : '');
+      }, function(item) {
+        applySpec(item.spec || {}); renderAssignments(); renderVariables(); validateModel();
+      });
+    }
+
+    function runAnalysis() {
+      if (!assignments.category) return;
+      send('paretoModel', buildModelSpec());
+    }
+
+    function applyPayload(p) {
+      if (!p || !p.headers) return;
+      _headers = p.headers || [];
+      _rows = p.rows || [];
+      _address = p.address || '';
+      _saved = p.savedModelSpec || null;
+      qs('loadingSpinner').style.display = 'none';
+      qs('mainContent').style.display = 'flex';
+      qs('tbRange').textContent = (_address ? _address + ' · ' : '') + _rows.length + ' rows';
+      qs('metaBadge').textContent = _rows.length + ' rows · ' + _headers.length + ' cols';
+      buildColumnStats();
+      assignments = { category: null, values: null };
+      if (_saved) applySpec(_saved);
+      if (!assignments.category) autoDetectCategory();
+      renderVariables(); renderAssignments();
+      if (typeof DsGuide !== 'undefined') DsGuide.render('pareto', 'dsGuideContainer', { collapsed: false });
+      validateModel();
+    }
+
+    function autoDetectCategory() {
+      var best = null, bestScore = -1;
+      columnStats.forEach(function(s) {
+        var score = s.string + s.numeric;
+        if (score > bestScore) { bestScore = score; best = s.name; }
+      });
+      if (best) assignments.category = best;
+      columnStats.forEach(function(s) {
+        if (s.isNumeric && s.name !== assignments.category && !assignments.values) assignments.values = s.name;
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      setupDropZones();
+      qs('btnCancel').addEventListener('click', function() { send('close', null); });
+      qs('btnRun').addEventListener('click', runAnalysis);
+      qs('guideToggle').addEventListener('click', function() { qs('guideWrap').classList.toggle('open'); });
+      if (typeof DsGuide !== 'undefined') DsGuide.render('pareto', 'dsGuideContainer', { collapsed: true });
+      Office.onReady(function() {
+        Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function(arg) {
+          try {
+            var msg = JSON.parse(arg.message || '{}');
+            if (msg.type === 'PARETO_DATA' && msg.payload) applyPayload(msg.payload);
+          } catch (_e) {}
+        });
+        send('ready', null);
+        setInterval(function() { if (!_headers.length) send('requestData', null); }, 500);
+      });
+    });
+  </script>
+</body>
+</html>

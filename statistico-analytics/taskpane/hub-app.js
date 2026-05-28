@@ -1113,50 +1113,28 @@ function finishHubParetoFlow() {
 }
 
 function openParetoFromHub() {
-  var gr = getGlobalRangePayload();
-  if (!gr) return false;
-  hubParetoFlowActive = true;
-  setSelectedModuleCard("pareto2080", true);
-  Office.context.ui.displayDialogAsync(
-    getDialogsBaseUrl() + "pareto/pareto-config.html?v=" + Date.now(),
-    DIALOG_SIZES.SETUP,
-    function (res) {
-      if (res.status === Office.AsyncResultStatus.Failed) {
-        finishHubParetoFlow();
-        return;
-      }
-      hubParetoConfigDialog = res.value;
-      var sendParetoData = function () {
-        if (!hubParetoConfigDialog || !gr) return;
-        hubParetoConfigDialog.messageChild(JSON.stringify({
-          type: "PARETO_DATA",
-          payload: { values: gr.values, address: gr.address || "" }
-        }));
+  return openBuilderDialogFromHub({
+    moduleId: "pareto2080",
+    dialogPath: "pareto/pareto-input.html",
+    dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
+    dataType: "PARETO_DATA",
+    payloadBuilder: function (gr) {
+      var saved = null;
+      try { saved = JSON.parse(sessionStorage.getItem("paretoModelSpec") || "null"); } catch (e) {}
+      return {
+        headers: gr.values[0] || [],
+        rows: gr.values.slice(1),
+        address: gr.address || "",
+        savedModelSpec: saved
       };
-      setTimeout(sendParetoData, 550);
-      hubParetoConfigDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
-        try {
-          var msg = JSON.parse(arg.message || "{}");
-          if (msg.action === "ready" || msg.action === "requestData") {
-            sendParetoData();
-          } else if (msg.action === "runAnalysis") {
-            try { sessionStorage.setItem("paretoHubRunData", JSON.stringify(msg.data || {})); } catch (e) {}
-            try { hubParetoConfigDialog.close(); } catch (e) {}
-            hubParetoConfigDialog = null;
-            if (window.HubResultsBridge) HubResultsBridge.open("pareto", 500);
-          } else if (msg.action === "close") {
-            try { hubParetoConfigDialog.close(); } catch (e) {}
-            finishHubParetoFlow();
-          }
-        } catch (e) {}
-      });
-      hubParetoConfigDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
-        hubParetoConfigDialog = null;
-        finishHubParetoFlow();
-      });
-    }
-  );
-  return true;
+    },
+    modelActions: ["paretoModel"],
+    onModel: function (msg) {
+      sessionStorage.setItem("paretoModelSpec", JSON.stringify(msg.payload || msg.data || {}));
+    },
+    hubResultsKey: "pareto2080",
+    nextDelayMs: 500
+  });
 }
 
 function openBuilderDialogFromHub(options) {
@@ -1381,72 +1359,32 @@ function buildClusterNumericCandidates(gr, threshold) {
 }
 
 function openClusterConfigFromHub() {
-  var gr = getGlobalRangePayload();
-  if (!gr) return false;
-  setSelectedModuleCard("cluster", true);
-  fetch("./cluster/cluster.module.json?v=" + Date.now(), { cache: "no-store" })
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (moduleConfig) {
-      if (!moduleConfig) throw new Error("cluster.module.json missing");
-      Office.context.ui.displayDialogAsync(
-        getDialogsBaseUrl() + "cluster/cluster-setup-dialog.html?v=" + Date.now(),
-        {
-          height: Number((moduleConfig.dialog && moduleConfig.dialog.setupHeightPercent) || DIALOG_SIZES.SETUP.height),
-          width: Number((moduleConfig.dialog && moduleConfig.dialog.setupWidthPercent) || DIALOG_SIZES.SETUP.width),
-          displayInIframe: false
-        },
-        function (res) {
-          if (res.status === Office.AsyncResultStatus.Failed) {
-            setSelectedModuleCard("cluster", false);
-            return;
-          }
-          var dlg = res.value;
-          var sendInit = function () {
-            if (!dlg) return;
-            var savedClusterSpec = null;
-            try { savedClusterSpec = JSON.parse(sessionStorage.getItem("clusterSpec") || "null"); } catch (e) {}
-            dlg.messageChild(JSON.stringify({
-              action: "clusterSetupInit",
-              payload: {
-                moduleConfig: moduleConfig,
-                rangeAddress: gr.address || "",
-                dataRows: Math.max(0, (gr.values || []).length - 1),
-                dataCols: ((gr.values && gr.values[0]) || []).length,
-                variableCandidates: buildClusterNumericCandidates(gr, moduleConfig.analysis && moduleConfig.analysis.numericColumnThreshold),
-                savedSpec: savedClusterSpec
-              }
-            }));
-          };
-          setTimeout(sendInit, 600);
-          dlg.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
-            try {
-              var msg = JSON.parse(arg.message || "{}");
-              if (msg.action === "requestClusterSetup") sendInit();
-              else if (msg.action === "clusterSetupRun") {
-                sessionStorage.setItem("clusterSpec", JSON.stringify(msg.spec || msg.payload || {}));
-                try { dlg.close(); } catch (e) {}
-                dlg = null;
-                if (window.HubResultsBridge) HubResultsBridge.open("cluster", 480);
-              } else if (msg.action === "clusterSetupClose" || msg.action === "close") {
-                try { dlg.close(); } catch (e) {}
-                dlg = null;
-                setSelectedModuleCard("cluster", false);
-              }
-            } catch (e) {}
-          });
-          dlg.addEventHandler(Office.EventType.DialogEventReceived, function () {
-            dlg = null;
-            if (!window.HubResultsBridge || !HubResultsBridge.hasActive()) {
-              setSelectedModuleCard("cluster", false);
-            }
-          });
-        }
-      );
-    })
-    .catch(function () {
-      setSelectedModuleCard("cluster", false);
-    });
-  return true;
+  return openBuilderDialogFromHub({
+    moduleId: "cluster",
+    dialogPath: "cluster/cluster-input.html",
+    dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
+    dataType: "CLUSTER_DATA",
+    payloadBuilder: function (gr) {
+      var saved = null;
+      try {
+        saved = JSON.parse(sessionStorage.getItem("clusterModelSpec") || sessionStorage.getItem("clusterSpec") || "null");
+      } catch (e) {}
+      return {
+        headers: gr.values[0] || [],
+        rows: gr.values.slice(1),
+        address: gr.address || "",
+        savedModelSpec: saved
+      };
+    },
+    modelActions: ["clusterModel"],
+    onModel: function (msg) {
+      var spec = msg.payload || msg.data || {};
+      sessionStorage.setItem("clusterModelSpec", JSON.stringify(spec));
+      sessionStorage.setItem("clusterSpec", JSON.stringify(spec));
+    },
+    hubResultsKey: "cluster",
+    nextDelayMs: 480
+  });
 }
 
 function dismissAllHubDialogs() {

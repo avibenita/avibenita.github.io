@@ -17,7 +17,7 @@
       resultsFilename: "cluster/cluster-analysis.html",
       heightPercent: 90,
       widthPercent: 70,
-      setupFilename: "cluster/cluster-setup-dialog.html",
+      setupFilename: "cluster/cluster-input.html",
       setupHeightPercent: 66,
       setupWidthPercent: 56
     },

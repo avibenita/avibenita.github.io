@@ -168,6 +168,37 @@
         ['15.0', '9.3', '6.1'],
         ['11.2', '7.8', '4.9']
       ]
+    },
+
+    cluster: {
+      badge: 'Wide format  one row per case',
+      rule:  'Each row = one observation. Select numeric columns that define similarity between cases.',
+      note:  'Rows with missing values on any included variable are excluded. Standardisation is recommended.',
+      cols: [
+        { label: 'Age', role: 'meas', roleLabel: 'Measure' },
+        { label: 'Income', role: 'meas', roleLabel: 'Measure' },
+        { label: 'Spend', role: 'meas', roleLabel: 'Measure' }
+      ],
+      rows: [
+        ['34', '52000', '1200'],
+        ['41', '61000', '980'],
+        ['29', '48000', '1500']
+      ]
+    },
+
+    pareto: {
+      badge: 'Long format  one row per item',
+      rule:  'One category column (labels to rank). Optional numeric values column to sum — otherwise rows are counted.',
+      note:  'Classic ABC / 80-20 analysis: aggregate by category, sort descending, compute cumulative share.',
+      cols: [
+        { label: 'Product', role: 'cat', roleLabel: 'Category' },
+        { label: 'Revenue', role: 'outcome', roleLabel: 'Values' }
+      ],
+      rows: [
+        ['Widget A', '4200'],
+        ['Widget B', '3100'],
+        ['Widget C', '1800']
+      ]
     }
   };
 

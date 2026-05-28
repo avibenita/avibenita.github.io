@@ -55,7 +55,7 @@ function readClusterSpec() {
   const kMin = lim.kMin != null ? Number(lim.kMin) : 2;
   const kMax = lim.kMax != null ? Number(lim.kMax) : 50;
   try {
-    const raw = sessionStorage.getItem("clusterSpec");
+    const raw = sessionStorage.getItem("clusterModelSpec") || sessionStorage.getItem("clusterSpec");
     if (raw) {
       const o = JSON.parse(raw);
       if (o && typeof o === "object") {
@@ -117,35 +117,43 @@ function persistClusterSpec(spec) {
   const an2 = clusterCfg().analysis || {};
   const distance = spec.distance === "manhattan" ? "manhattan" : (spec.distance || an2.distance || "euclidean");
   const obj = { k, standardize, linkage, clusterMethod, distance };
+  if (Array.isArray(spec.variables) && spec.variables.length) obj.variables = spec.variables.slice();
   if (Array.isArray(spec.selectedVariableIndices) && spec.selectedVariableIndices.length > 0) {
     obj.selectedVariableIndices = spec.selectedVariableIndices
       .map((x) => Number(x))
       .filter((i) => Number.isInteger(i) && i >= 0);
   }
   try {
+    sessionStorage.setItem("clusterModelSpec", JSON.stringify(obj));
     sessionStorage.setItem("clusterSpec", JSON.stringify(obj));
   } catch (e) {}
+}
+
+function normalizeClusterSpec(spec, headers) {
+  const out = Object.assign({}, spec || {});
+  if (headers && Array.isArray(out.variables) && out.variables.length) {
+    const fromNames = out.variables.map((v) => headers.indexOf(v)).filter((i) => i >= 0);
+    if (fromNames.length) out.selectedVariableIndices = fromNames;
+  }
+  return out;
 }
 
 function pushClusterSetupPayload() {
   if (!clusterSetupDialog || !clusterRangeData || clusterRangeData.length < 2) return;
   const headers = clusterRangeData[0] || [];
-  const rows = clusterRangeData.length - 1;
   let savedSpec = null;
   try {
-    const raw = sessionStorage.getItem("clusterSpec");
+    const raw = sessionStorage.getItem("clusterModelSpec") || sessionStorage.getItem("clusterSpec");
     if (raw) savedSpec = JSON.parse(raw);
   } catch (e) {}
   try {
     clusterSetupDialog.messageChild(JSON.stringify({
-      action: "clusterSetupInit",
+      type: "CLUSTER_DATA",
       payload: {
-        moduleConfig: clusterCfg(),
-        rangeAddress: clusterRangeAddress || "",
-        dataRows: rows,
-        dataCols: headers.length,
-        variableCandidates: buildNumericVariableCandidates(headers, clusterRangeData.slice(1)),
-        savedSpec: savedSpec && typeof savedSpec === "object" ? savedSpec : null
+        headers,
+        rows: clusterRangeData.slice(1),
+        address: clusterRangeAddress || "",
+        savedModelSpec: savedSpec && typeof savedSpec === "object" ? savedSpec : null
       }
     }));
   } catch (e) {
@@ -156,7 +164,7 @@ function pushClusterSetupPayload() {
 function openClusterSetupDialog() {
   if (!clusterRangeData || clusterRangeData.length < 2) return;
   const dlg = clusterCfg().dialog || {};
-  const setupFile = dlg.setupFilename || "cluster/cluster-setup-dialog.html";
+  const setupFile = dlg.setupFilename || "cluster/cluster-input.html";
   const hPct = dlg.setupHeightPercent != null ? Number(dlg.setupHeightPercent) : DIALOG_SIZES.SETUP.height;
   const wPct = dlg.setupWidthPercent != null ? Number(dlg.setupWidthPercent) : DIALOG_SIZES.SETUP.width;
   const dialogUrl = `${getDialogsBaseUrl()}${setupFile}?v=${Date.now()}`;
@@ -174,10 +182,10 @@ function openClusterSetupDialog() {
         try {
           const message = parseDialogMessage(arg);
           if (!message || !message.action) return;
-          if (message.action === "requestClusterSetup") {
+          if (message.action === "requestClusterSetup" || message.action === "ready" || message.action === "requestData") {
             pushClusterSetupPayload();
-          } else if (message.action === "clusterSetupRun") {
-            persistClusterSpec(message.spec || message.payload);
+          } else if (message.action === "clusterModel" || message.action === "clusterSetupRun") {
+            persistClusterSpec(message.payload || message.data || message.spec);
             const setupDlg = clusterSetupDialog;
             clusterSetupDialog = null;
             try {
@@ -706,11 +714,12 @@ function sendClusterBundle() {
   const rows = clusterRangeData.slice(1);
   let spec = {};
   try {
-    const raw = sessionStorage.getItem("clusterSpec");
+    const raw = sessionStorage.getItem("clusterModelSpec") || sessionStorage.getItem("clusterSpec");
     if (raw) spec = JSON.parse(raw);
   } catch (e) {
     spec = {};
   }
+  spec = normalizeClusterSpec(spec, headers);
   const bundle = buildClusterBundle(headers, rows, spec);
   const rawData = bundle.rawData;
   const main = Object.assign({}, bundle);

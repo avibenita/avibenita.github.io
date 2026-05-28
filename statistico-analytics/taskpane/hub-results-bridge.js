@@ -15,7 +15,9 @@
     logistic: ['logistic/logistic-input-panel.js'],
     'meta-analysis': ['meta-analysis/meta-analysis-input-panel.js'],
     cluster: ['cluster/cluster-config.js', 'cluster/cluster-input-panel.js'],
-    mixed: ['mixed/mixed-hub-results.js']
+    mixed: ['mixed/mixed-hub-results.js'],
+    pareto2080: ['pareto/pareto-input-panel.js'],
+    pareto: ['pareto/pareto-input-panel.js']
   };
 
   var CACHE_BUST = 'v=20260530';
@@ -70,7 +72,6 @@
   }
 
   function ensurePanel(key, cb) {
-    if (key === 'pareto') return cb(null);
     if (loaded[key]) return cb(null);
     if (loading[key]) {
       var wait = global.setInterval(function () {
@@ -89,42 +90,9 @@
     });
   }
 
-  function openParetoResultsFromHub() {
-    var raw;
-    try { raw = global.sessionStorage.getItem('paretoHubRunData'); } catch (_e) {}
-    if (!raw) return false;
-    var runData;
-    try {
-      runData = JSON.parse(raw);
-      global.sessionStorage.removeItem('paretoHubRunData');
-    } catch (_e2) {
-      return false;
-    }
-    if (!global.Office || !global.Office.context || !global.Office.context.ui) return false;
-    var url = getDialogsBaseUrl() + 'pareto/pareto-results.html?' + CACHE_BUST;
-    global.Office.context.ui.displayDialogAsync(url, global.DIALOG_SIZES.RESULTS, function (res) {
-      if (res.status !== global.Office.AsyncResultStatus.Succeeded) return;
-      var dlg = res.value;
-      registerDialog(dlg);
-      dlg.addEventHandler(global.Office.EventType.DialogMessageReceived, function (arg) {
-        try {
-          var msg = JSON.parse(arg.message || '{}');
-          if (msg.action === 'ready') {
-            dlg.messageChild(JSON.stringify({ type: 'PARETO_RUN_DATA', payload: runData }));
-          }
-        } catch (_e3) {}
-      });
-    });
-    return true;
-  }
-
   function open(key, delayMs) {
     delayMs = typeof delayMs === 'number' ? delayMs : 500;
     global.setTimeout(function () {
-      if (key === 'pareto') {
-        openParetoResultsFromHub();
-        return;
-      }
       ensurePanel(key, function () {
         var runner = global.StatisticoHubResults && global.StatisticoHubResults[key];
         if (typeof runner === 'function') runner();

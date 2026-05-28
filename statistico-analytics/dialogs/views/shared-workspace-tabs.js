@@ -37,7 +37,22 @@
       btn.dataset.diagTab || btn.dataset.ixTab || btn.dataset.sub || '';
   }
 
+  function isSlantBar(bar) {
+    return bar && bar.classList && bar.classList.contains('ws-mode-bar--slant');
+  }
+
+  function unwrapClusterIfSlant(bar) {
+    if (!isSlantBar(bar)) return;
+    var cluster = bar.querySelector(':scope > .ws-tab-cluster');
+    if (!cluster) return;
+    Array.prototype.slice.call(cluster.querySelectorAll('.ws-mode-tab')).forEach(function(tab) {
+      bar.insertBefore(tab, cluster);
+    });
+    cluster.remove();
+  }
+
   function ensureCluster(bar) {
+    if (isSlantBar(bar)) return null;
     var looseTabs = Array.prototype.filter.call(bar.children, function(el) {
       return el.classList && el.classList.contains('ws-mode-tab');
     });
@@ -71,6 +86,7 @@
   }
 
   function updateIndicatorForBar(bar) {
+    if (isSlantBar(bar)) return;
     var cluster = bar.querySelector('.ws-tab-cluster');
     if (!cluster) cluster = ensureCluster(bar);
     if (!cluster) return;
@@ -123,7 +139,10 @@
 
   function initWorkspaceTabBars(extraSubtitles) {
     if (extraSubtitles) Object.assign(subtitles, extraSubtitles);
-    document.querySelectorAll('.ws-mode-bar--attached').forEach(ensureCluster);
+    document.querySelectorAll('.ws-mode-bar--attached').forEach(function(bar) {
+      unwrapClusterIfSlant(bar);
+      ensureCluster(bar);
+    });
     enhanceWorkspaceTabs();
     refreshAllIndicators();
 

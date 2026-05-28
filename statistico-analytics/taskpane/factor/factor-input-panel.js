@@ -96,8 +96,6 @@ function sendDialogData() {
   if (!factorDialog || !factorRangeData) return;
   const headers = factorRangeData[0] || [];
   const rows = factorRangeData.slice(1);
-  const savedModelSpec = sessionStorage.getItem("factorModelSpec");
-  const modelSpec = savedModelSpec ? JSON.parse(savedModelSpec) : null;
 
   factorDialog.messageChild(JSON.stringify({
     type: "FACTOR_DATA",
@@ -106,7 +104,8 @@ function sendDialogData() {
       rows,
       address: factorRangeAddress,
       analysisMode: "factor",
-      savedModelSpec: modelSpec
+      // Always open the builder fresh — saved spec is only used by results dialogs.
+      savedModelSpec: null
     }
   }));
 }

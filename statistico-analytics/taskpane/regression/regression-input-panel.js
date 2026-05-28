@@ -261,10 +261,6 @@ function sendDialogData() {
 
   const headers = regressionRangeData[0] || [];
   const rows = regressionRangeData.slice(1);
-  
-  // Include saved model spec if it exists (for reopening with previous configuration)
-  const savedModelSpec = sessionStorage.getItem('regressionModelSpec');
-  const modelSpec = savedModelSpec ? JSON.parse(savedModelSpec) : null;
 
   resultsDialog.messageChild(JSON.stringify({
     type: 'REGRESSION_DATA',
@@ -272,7 +268,8 @@ function sendDialogData() {
       headers,
       rows,
       address: regressionRangeAddress,
-      savedModelSpec: modelSpec  // Include the saved model configuration
+      // Always open the builder fresh — saved spec is only consumed by the results dialog.
+      savedModelSpec: null
     }
   }));
 }

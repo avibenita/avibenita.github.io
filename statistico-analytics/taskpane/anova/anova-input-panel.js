@@ -55,7 +55,8 @@ function sendAnovaConfigData() {
   if (!anovaDialog || !anovaRangeData) return;
   const headers = anovaRangeData[0] || [];
   const rows = anovaRangeData.slice(1);
-  const savedModelSpec = JSON.parse(sessionStorage.getItem('anovaModelSpec') || 'null');
+  // Always open the builder fresh.
+  const savedModelSpec = null;
   anovaDialog.messageChild(JSON.stringify({
     type: 'ANOVA_DATA',
     payload: { headers, rows, address: anovaRangeAddress, savedModelSpec }

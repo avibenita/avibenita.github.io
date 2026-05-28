@@ -156,7 +156,8 @@ function sendDialogDataToEmbed() {
   if (!frame || !frame.contentWindow || !univariateRangeData) return;
   const headers = univariateRangeData[0] || [];
   const rows = univariateRangeData.slice(1);
-  const savedSpec = JSON.parse(sessionStorage.getItem('univariateModelSpec') || 'null');
+  // Always open the builder fresh — saved spec is only used by results dialogs.
+  const savedSpec = null;
   frame.contentWindow.postMessage(
     {
       statisticoUnivariateHost: true,
@@ -215,7 +216,8 @@ function openUnivariateBuilderDialog() {
       headers: univariateRangeData[0] || [],
       rows: univariateRangeData.slice(1),
       address: univariateRangeAddress,
-      savedSpec: JSON.parse(sessionStorage.getItem('univariateModelSpec') || 'null')
+      // Always open the builder fresh — no pre-fill from previous run.
+      savedSpec: null
     };
     localStorage.setItem('univariateConfigPayload', JSON.stringify(payload));
   } catch (_e) {}
@@ -300,7 +302,8 @@ function sendDialogData() {
   if (!univariateDialog || !univariateRangeData) return;
   const headers = univariateRangeData[0] || [];
   const rows = univariateRangeData.slice(1);
-  const savedSpec = JSON.parse(sessionStorage.getItem('univariateModelSpec') || 'null');
+  // Always open the builder fresh.
+  const savedSpec = null;
   try {
     localStorage.setItem('univariateConfigPayload', JSON.stringify({
       headers, rows, address: univariateRangeAddress, savedSpec

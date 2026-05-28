@@ -94,10 +94,8 @@ function openPcaModelBuilder() {
 
 function sendPcaDialogData() {
   if (!pcaDialog || !pcaRangeData) return;
-  const headers       = pcaRangeData[0] || [];
-  const rows          = pcaRangeData.slice(1);
-  const savedModelSpec = sessionStorage.getItem("pcaModelSpec");
-  const modelSpec     = savedModelSpec ? JSON.parse(savedModelSpec) : null;
+  const headers = pcaRangeData[0] || [];
+  const rows    = pcaRangeData.slice(1);
 
   pcaDialog.messageChild(JSON.stringify({
     type: "FACTOR_DATA",
@@ -106,7 +104,8 @@ function sendPcaDialogData() {
       rows,
       address: pcaRangeAddress,
       analysisMode: "pca",
-      savedModelSpec: modelSpec
+      // Always open the builder fresh — saved spec is only used by results dialogs.
+      savedModelSpec: null
     }
   }));
 }

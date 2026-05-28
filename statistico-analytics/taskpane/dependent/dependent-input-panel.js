@@ -88,7 +88,8 @@ function sendDialogData() {
   if (!dependentDialog || !dependentRangeData) return;
   const headers = dependentRangeData[0] || [];
   const rows = dependentRangeData.slice(1);
-  const savedModelSpec = JSON.parse(sessionStorage.getItem("dependentModelSpec") || "null");
+  // Always open the builder fresh.
+  const savedModelSpec = null;
   dependentDialog.messageChild(JSON.stringify({
     type: "DEPENDENT_DATA",
     payload: { headers, rows, address: dependentRangeAddress, savedModelSpec }

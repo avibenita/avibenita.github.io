@@ -774,11 +774,10 @@ function sendUnivariateDialogData() {
   if (!hubConfigDialog || !gr) return;
   var headers = gr.values[0] || [];
   var rows = gr.values.slice(1);
-  var savedSpec = null;
-  try { savedSpec = JSON.parse(sessionStorage.getItem("univariateModelSpec") || "null"); } catch (e) {}
+  // Always open the builder fresh.
   hubConfigDialog.messageChild(JSON.stringify({
     type: "UNIVARIATE_DATA",
-    payload: { headers: headers, rows: rows, address: gr.address || "", savedSpec: savedSpec }
+    payload: { headers: headers, rows: rows, address: gr.address || "", savedSpec: null }
   }));
 }
 
@@ -948,15 +947,14 @@ function openAnovaConfigFromHub() {
       hubAnovaDialog = res.value;
       var sendAnovaData = function () {
         if (!hubAnovaDialog || !gr) return;
-        var savedModelSpec = null;
-        try { savedModelSpec = JSON.parse(sessionStorage.getItem("anovaModelSpec") || "null"); } catch (e) {}
+        // Always open the builder fresh.
         hubAnovaDialog.messageChild(JSON.stringify({
           type: "ANOVA_DATA",
           payload: {
             headers: gr.values[0] || [],
             rows: gr.values.slice(1),
             address: gr.address || "",
-            savedModelSpec: savedModelSpec
+            savedModelSpec: null
           }
         }));
       };
@@ -1003,15 +1001,14 @@ function openIndependentConfigFromHub() {
       hubIndependentDialog = res.value;
       var sendIndependentData = function () {
         if (!hubIndependentDialog || !gr) return;
-        var savedModelSpec = null;
-        try { savedModelSpec = JSON.parse(sessionStorage.getItem("independentModelSpec") || "null"); } catch (e) {}
+        // Always open the builder fresh.
         hubIndependentDialog.messageChild(JSON.stringify({
           type: "INDEPENDENT_DATA",
           payload: {
             headers: gr.values[0] || [],
             rows: gr.values.slice(1),
             address: gr.address || "",
-            savedModelSpec: savedModelSpec
+            savedModelSpec: null
           }
         }));
       };
@@ -1119,13 +1116,12 @@ function openParetoFromHub() {
     dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "PARETO_DATA",
     payloadBuilder: function (gr) {
-      var saved = null;
-      try { saved = JSON.parse(sessionStorage.getItem("paretoModelSpec") || "null"); } catch (e) {}
+      // Always open the builder fresh.
       return {
         headers: gr.values[0] || [],
         rows: gr.values.slice(1),
         address: gr.address || "",
-        savedModelSpec: saved
+        savedModelSpec: null
       };
     },
     modelActions: ["paretoModel"],
@@ -1213,9 +1209,8 @@ function openDependentConfigFromHub() {
     dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "DEPENDENT_DATA",
     payloadBuilder: function (gr) {
-      var saved = null;
-      try { saved = JSON.parse(sessionStorage.getItem("dependentModelSpec") || "null"); } catch (e) {}
-      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", savedModelSpec: saved };
+      // Always open the builder fresh.
+      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", savedModelSpec: null };
     },
     modelActions: ["dependentModel"],
     onModel: function (msg) {
@@ -1232,9 +1227,8 @@ function openFactorConfigFromHub() {
     dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "FACTOR_DATA",
     payloadBuilder: function (gr) {
-      var saved = null;
-      try { saved = JSON.parse(sessionStorage.getItem("factorModelSpec") || "null"); } catch (e) {}
-      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", analysisMode: "factor", savedModelSpec: saved };
+      // Always open the builder fresh.
+      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", analysisMode: "factor", savedModelSpec: null };
     },
     modelActions: ["factorModel", "regressionModel"],
     onModel: function (msg) {
@@ -1283,9 +1277,8 @@ function openPcaConfigFromHub() {
     dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "FACTOR_DATA",
     payloadBuilder: function (gr) {
-      var saved = null;
-      try { saved = JSON.parse(sessionStorage.getItem("pcaModelSpec") || "null"); } catch (e) {}
-      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", analysisMode: "pca", savedModelSpec: saved };
+      // Always open the builder fresh.
+      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", analysisMode: "pca", savedModelSpec: null };
     },
     modelActions: ["factorModel", "regressionModel"],
     onModel: function (msg) {
@@ -1305,9 +1298,8 @@ function openMixedConfigFromHub() {
     dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "MIXED_DATA",
     payloadBuilder: function (gr) {
-      var saved = null;
-      try { saved = JSON.parse(sessionStorage.getItem("mixedModelSpec") || "null"); } catch (e) {}
-      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", savedModelSpec: saved };
+      // Always open the builder fresh.
+      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", savedModelSpec: null };
     },
     modelActions: ["mixedModel"],
     onModel: function (msg) {
@@ -1325,9 +1317,8 @@ function openMetaConfigFromHub() {
     dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "META_DATA",
     payloadBuilder: function (gr) {
-      var saved = null;
-      try { saved = JSON.parse(sessionStorage.getItem("metaModelSpec") || "null"); } catch (e) {}
-      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", savedSpec: saved };
+      // Always open the builder fresh.
+      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", savedSpec: null };
     },
     modelActions: ["metaModel"],
     onModel: function (msg) {
@@ -1365,15 +1356,12 @@ function openClusterConfigFromHub() {
     dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "CLUSTER_DATA",
     payloadBuilder: function (gr) {
-      var saved = null;
-      try {
-        saved = JSON.parse(sessionStorage.getItem("clusterModelSpec") || sessionStorage.getItem("clusterSpec") || "null");
-      } catch (e) {}
+      // Always open the builder fresh.
       return {
         headers: gr.values[0] || [],
         rows: gr.values.slice(1),
         address: gr.address || "",
-        savedModelSpec: saved
+        savedModelSpec: null
       };
     },
     modelActions: ["clusterModel"],

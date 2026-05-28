@@ -141,11 +141,6 @@ function normalizeClusterSpec(spec, headers) {
 function pushClusterSetupPayload() {
   if (!clusterSetupDialog || !clusterRangeData || clusterRangeData.length < 2) return;
   const headers = clusterRangeData[0] || [];
-  let savedSpec = null;
-  try {
-    const raw = sessionStorage.getItem("clusterModelSpec") || sessionStorage.getItem("clusterSpec");
-    if (raw) savedSpec = JSON.parse(raw);
-  } catch (e) {}
   try {
     clusterSetupDialog.messageChild(JSON.stringify({
       type: "CLUSTER_DATA",
@@ -153,7 +148,8 @@ function pushClusterSetupPayload() {
         headers,
         rows: clusterRangeData.slice(1),
         address: clusterRangeAddress || "",
-        savedModelSpec: savedSpec && typeof savedSpec === "object" ? savedSpec : null
+        // Always open the builder fresh — saved spec is only used by results dialogs.
+        savedModelSpec: null
       }
     }));
   } catch (e) {

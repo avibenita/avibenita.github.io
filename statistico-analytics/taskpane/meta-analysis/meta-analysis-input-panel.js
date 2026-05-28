@@ -66,14 +66,12 @@ function sendDialogData() {
     return;
   }
   
-  const savedSpec = sessionStorage.getItem("metaModelSpec");
-  const spec = savedSpec ? JSON.parse(savedSpec) : null;
-  
   const payload = {
     headers: dataPanel.values[0],
     rows: dataPanel.values.slice(1),
     address: dataPanel.address,
-    savedSpec: spec
+    // Always open the builder fresh — saved spec is only used by results dialogs.
+    savedSpec: null
   };
   
   metaDialog.messageChild(JSON.stringify({

@@ -63,12 +63,8 @@ function sendDialogDataToEmbed() {
   if (!frame || !frame.contentWindow || !independentRangeData) return;
   const headers = independentRangeData[0] || [];
   const rows = independentRangeData.slice(1);
-  let savedModelSpec = null;
-  try {
-    savedModelSpec = JSON.parse(sessionStorage.getItem("independentModelSpec") || "null");
-  } catch (_e) {
-    savedModelSpec = null;
-  }
+  // Always open the builder fresh.
+  const savedModelSpec = null;
   try {
     frame.contentWindow.postMessage(
       {
@@ -171,7 +167,8 @@ function sendDialogData() {
   if (!independentDialog || !independentRangeData) return;
   const headers = independentRangeData[0] || [];
   const rows = independentRangeData.slice(1);
-  const savedModelSpec = JSON.parse(sessionStorage.getItem("independentModelSpec") || "null");
+  // Always open the builder fresh.
+  const savedModelSpec = null;
   independentDialog.messageChild(JSON.stringify({
     type: "INDEPENDENT_DATA",
     payload: { headers, rows, address: independentRangeAddress, savedModelSpec }

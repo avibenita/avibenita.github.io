@@ -167,9 +167,13 @@ function openClusterSetupDialog() {
   const setupFile = dlg.setupFilename || "cluster/cluster-input.html";
   const dialogUrl = `${getDialogsBaseUrl()}${setupFile}?v=${Date.now()}`;
 
+  const dialogSize = typeof getInputBuilderDialogOptions === "function"
+    ? getInputBuilderDialogOptions()
+    : (typeof DIALOG_SIZES !== "undefined" ? DIALOG_SIZES.REGRESSION_BUILDER : { height: 92, width: 30, displayInIframe: false });
+
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    DIALOG_SIZES.REGRESSION_BUILDER,
+    dialogSize,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error("Failed to open cluster setup dialog:", asyncResult.error);

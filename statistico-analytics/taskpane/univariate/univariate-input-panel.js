@@ -222,7 +222,7 @@ function openUnivariateBuilderDialog() {
   const dialogUrl = `${getDialogsBaseUrl()}univariate/univariate-input.html?v=${Date.now()}`;
   Office.context.ui.displayDialogAsync(
     dialogUrl,
-    DIALOG_SIZES.SETUP,
+    DIALOG_SIZES.REGRESSION_BUILDER,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error('Failed to open univariate config dialog:', asyncResult.error.message);

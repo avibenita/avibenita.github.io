@@ -117,7 +117,7 @@ function openIndependentBuilderDialog() {
   if (!independentRangeData || independentRangeData.length < 2) return;
   Office.context.ui.displayDialogAsync(
     `${getDialogsBaseUrl()}independent/independent-input.html?v=${Date.now()}`,
-    DIALOG_SIZES.SETUP,
+    DIALOG_SIZES.REGRESSION_BUILDER,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       independentDialog = asyncResult.value;

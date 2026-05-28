@@ -789,7 +789,7 @@ function openUnivariateConfigFromHub() {
   setSelectedModuleCard("univariate", true);
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + "univariate/univariate-input.html?v=" + Date.now(),
-    DIALOG_SIZES.SETUP,
+    DIALOG_SIZES.REGRESSION_BUILDER,
     function (asyncResult) {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
         console.error("Failed to open univariate config dialog:", asyncResult.error && asyncResult.error.message);
@@ -895,7 +895,7 @@ function openRegressionConfigFromHub() {
   setSelectedModuleCard("regression", true);
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + "regression/regression-input.html?v=" + Date.now(),
-    DIALOG_SIZES.SETUP,
+    DIALOG_SIZES.REGRESSION_BUILDER,
     function (res) {
       if (res.status === Office.AsyncResultStatus.Failed) {
         console.error("Could not open regression config:", res.error && res.error.message);
@@ -939,7 +939,7 @@ function openAnovaConfigFromHub() {
   setSelectedModuleCard("anova", true);
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + "anova/anova-input.html?v=" + Date.now(),
-    DIALOG_SIZES.SETUP,
+    DIALOG_SIZES.REGRESSION_BUILDER,
     function (res) {
       if (res.status === Office.AsyncResultStatus.Failed) {
         finishHubAnovaFlow();
@@ -994,7 +994,7 @@ function openIndependentConfigFromHub() {
   setSelectedModuleCard("independent", true);
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + "independent/independent-input.html?v=" + Date.now(),
-    DIALOG_SIZES.SETUP,
+    DIALOG_SIZES.REGRESSION_BUILDER,
     function (res) {
       if (res.status === Office.AsyncResultStatus.Failed) {
         finishHubIndependentFlow();
@@ -1049,7 +1049,7 @@ function openCorrelationConfigFromHub() {
   setSelectedModuleCard("correlations", true);
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + "correlations/correlation-config.html?v=" + Date.now(),
-    DIALOG_SIZES.SETUP,
+    DIALOG_SIZES.REGRESSION_BUILDER,
     function (res) {
       if (res.status === Office.AsyncResultStatus.Failed) {
         finishHubCorrelationFlow();
@@ -1143,7 +1143,7 @@ function openBuilderDialogFromHub(options) {
   setSelectedModuleCard(options.moduleId, true);
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + options.dialogPath + (options.dialogPath.indexOf("?") >= 0 ? "&" : "?") + "v=" + Date.now(),
-    options.dialogOptions || DIALOG_SIZES.SETUP,
+    options.dialogOptions || (typeof getInputBuilderDialogOptions === "function" ? getInputBuilderDialogOptions() : DIALOG_SIZES.REGRESSION_BUILDER),
     function (res) {
       if (res.status === Office.AsyncResultStatus.Failed) {
         setSelectedModuleCard(options.moduleId, false);
@@ -1210,7 +1210,7 @@ function openDependentConfigFromHub() {
   return openBuilderDialogFromHub({
     moduleId: "dependent",
     dialogPath: "dependent/dependent-input.html",
-    dialogOptions: DIALOG_SIZES.SETUP,
+    dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "DEPENDENT_DATA",
     payloadBuilder: function (gr) {
       var saved = null;
@@ -1302,7 +1302,7 @@ function openMixedConfigFromHub() {
   return openBuilderDialogFromHub({
     moduleId: "mixed",
     dialogPath: "mixed/mixed-input.html",
-    dialogOptions: DIALOG_SIZES.MIXED_SETUP,
+    dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "MIXED_DATA",
     payloadBuilder: function (gr) {
       var saved = null;
@@ -1322,7 +1322,7 @@ function openMetaConfigFromHub() {
   return openBuilderDialogFromHub({
     moduleId: "meta-analysis",
     dialogPath: "meta-analysis/meta-input.html",
-    dialogOptions: DIALOG_SIZES.SETUP,
+    dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "META_DATA",
     payloadBuilder: function (gr) {
       var saved = null;

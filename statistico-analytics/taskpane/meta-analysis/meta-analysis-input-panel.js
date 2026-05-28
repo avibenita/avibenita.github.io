@@ -28,7 +28,7 @@ function onRangeDataLoaded(values, address) {
 function openMetaBuilder() {
   const url = window.location.origin + window.location.pathname.replace("meta-analysis.html", "../../dialogs/views/meta-analysis/meta-input.html");
   
-  Office.context.ui.displayDialogAsync(url, DIALOG_SIZES.SETUP, (result) => {
+  Office.context.ui.displayDialogAsync(url, DIALOG_SIZES.REGRESSION_BUILDER, (result) => {
     if (result.status === Office.AsyncResultStatus.Failed) {
       console.error("Failed to open meta builder dialog:", result.error.message);
       return;

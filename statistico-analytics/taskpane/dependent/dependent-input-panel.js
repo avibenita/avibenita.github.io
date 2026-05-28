@@ -48,7 +48,7 @@ function openDependentBuilder() {
   console.log("Opening configuration dialog...");
   Office.context.ui.displayDialogAsync(
     `${getDialogsBaseUrl()}dependent/dependent-input.html?v=${Date.now()}`,
-    DIALOG_SIZES.SETUP,
+    DIALOG_SIZES.REGRESSION_BUILDER,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;
       dependentDialog = asyncResult.value;

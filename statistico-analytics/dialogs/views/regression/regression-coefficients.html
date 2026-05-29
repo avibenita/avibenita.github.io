@@ -8176,7 +8176,6 @@ ${sectionsHtml}
               max="${range.max}" 
               step="${(range.max - range.min) / 100}"
               value="${range.mean}"
-              oninput="updatePrediction()"
             />
             <div class="slider-range">
               <span>Min: ${range.min.toFixed(2)}</span>
@@ -8206,7 +8205,7 @@ ${sectionsHtml}
           <div class="input-label">
             <span><i class="fa-solid fa-tags"></i> ${varName}</span>
           </div>
-          <select class="input-select" id="input-${varName}" onchange="updatePrediction()">
+          <select class="input-select" id="input-${varName}">
             ${options}
           </select>
         `;
@@ -8216,14 +8215,38 @@ ${sectionsHtml}
         predictionData.currentInputs[varName] = levels[0];
       });
 
-      // Update slider displays
+      // Wire slider events: update value display AND recompute prediction.
+      // Bound via addEventListener (rather than inline oninput) for reliability
+      // inside the Office Add-in WebView, where inline handlers can be flaky.
       xnVars.forEach(varName => {
         const slider = document.getElementById(`input-${varName}`);
-        if (slider) {
-          slider.addEventListener('input', function() {
-            document.getElementById(`value-${varName}`).textContent = parseFloat(this.value).toFixed(2);
-          });
-        }
+        if (!slider) return;
+        const valueDisplay = document.getElementById(`value-${varName}`);
+        const handleSliderInput = function () {
+          if (valueDisplay) {
+            valueDisplay.textContent = parseFloat(this.value).toFixed(2);
+          }
+          try {
+            updatePrediction();
+          } catch (err) {
+            console.error('updatePrediction failed:', err);
+          }
+        };
+        slider.addEventListener('input', handleSliderInput);
+        slider.addEventListener('change', handleSliderInput);
+      });
+
+      // Wire categorical select events: recompute prediction on change.
+      xcVars.forEach(varName => {
+        const select = document.getElementById(`input-${varName}`);
+        if (!select) return;
+        select.addEventListener('change', function () {
+          try {
+            updatePrediction();
+          } catch (err) {
+            console.error('updatePrediction failed:', err);
+          }
+        });
       });
 
       // Calculate initial prediction
@@ -8236,17 +8259,23 @@ ${sectionsHtml}
      * Update prediction based on current input values
      */
     function updatePrediction() {
+      // Defensive guard — if module wasn't initialized yet, skip silently.
+      if (!Array.isArray(predictionData.numericVars) && !Array.isArray(predictionData.categoricalVars)) {
+        return;
+      }
+
       // Collect current input values
       const inputs = {};
       
-      predictionData.numericVars.forEach(varName => {
+      (predictionData.numericVars || []).forEach(varName => {
         const input = document.getElementById(`input-${varName}`);
         if (input) {
-          inputs[varName] = parseFloat(input.value);
+          const v = parseFloat(input.value);
+          inputs[varName] = Number.isFinite(v) ? v : 0;
         }
       });
 
-      predictionData.categoricalVars.forEach(varName => {
+      (predictionData.categoricalVars || []).forEach(varName => {
         const input = document.getElementById(`input-${varName}`);
         if (input) {
           inputs[varName] = input.value;
@@ -8256,18 +8285,38 @@ ${sectionsHtml}
       predictionData.currentInputs = inputs;
 
       // Calculate prediction
-      const prediction = calculatePrediction(inputs);
+      let prediction;
+      try {
+        prediction = calculatePrediction(inputs);
+      } catch (err) {
+        console.error('calculatePrediction failed:', err);
+        return;
+      }
+
+      if (!prediction || !Number.isFinite(prediction.value)) {
+        console.warn('updatePrediction: non-finite prediction, skipping DOM update', prediction);
+        return;
+      }
 
       // Update display
-      document.getElementById('predictedValue').textContent = prediction.value.toFixed(2);
-      document.getElementById('confidenceInterval').textContent = 
+      const predEl = document.getElementById('predictedValue');
+      const ciEl = document.getElementById('confidenceInterval');
+      const piEl = document.getElementById('predictionInterval');
+      if (predEl) predEl.textContent = prediction.value.toFixed(2);
+      if (ciEl) ciEl.textContent =
         `[${prediction.ci_lower.toFixed(2)}, ${prediction.ci_upper.toFixed(2)}]`;
-      document.getElementById('predictionInterval').textContent = 
+      if (piEl) piEl.textContent =
         `[${prediction.pi_lower.toFixed(2)}, ${prediction.pi_upper.toFixed(2)}]`;
 
       // Draw visualization
-      drawPredictionVisualization(prediction);
+      try {
+        drawPredictionVisualization(prediction);
+      } catch (err) {
+        console.error('drawPredictionVisualization failed:', err);
+      }
     }
+    // Expose on window so inline handlers (legacy) and other modules can call it.
+    window.updatePrediction = updatePrediction;
 
     /**
      * Calculate prediction with confidence and prediction intervals

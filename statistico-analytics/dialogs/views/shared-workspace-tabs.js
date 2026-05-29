@@ -9,7 +9,6 @@
     'results-detail': 'Statistics & coefficients',
     'pred-overview': 'Observed vs predicted',
     'pred-scenario': 'What-if scenarios',
-    'pred-technical': 'Intervals & formulas',
     'viz-partial': 'Effect line per predictor',
     'viz-unique': 'Added-variable plots',
     'diag-overview': 'Assumption summary',

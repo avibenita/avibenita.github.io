@@ -126,13 +126,20 @@
       var labelSpan = btn.querySelector('span:not(.ws-tab-label):not(.ws-tab-sub)');
       if (!labelSpan) return;
       var key = getTabKey(btn);
-      var sub = subtitles[key] || btn.getAttribute('title') || '';
+      var titleAttr = btn.getAttribute('title') || '';
+      var sub = subtitles[key] || titleAttr;
       if (sub.length > 42) sub = sub.split('.')[0];
       var text = document.createElement('span');
       text.className = 'ws-tab-text';
       text.innerHTML = '<span class="ws-tab-label">' + labelSpan.textContent + '</span>' +
         (sub ? '<span class="ws-tab-sub">' + sub + '</span>' : '');
       labelSpan.replaceWith(text);
+      // The subtitle is now rendered inline next to the label, so a hover
+      // tooltip showing the same string is redundant. Drop it (only when
+      // the title actually duplicates the visible subtitle).
+      if (sub && titleAttr && titleAttr.trim().toLowerCase() === sub.trim().toLowerCase()) {
+        btn.removeAttribute('title');
+      }
     });
   }
 

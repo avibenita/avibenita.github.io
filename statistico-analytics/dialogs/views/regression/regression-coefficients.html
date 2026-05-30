@@ -1894,6 +1894,26 @@
       overflow: hidden;
       min-height: 0;
     }
+    /* Added Value (partial-grid): make the height chain so the chart grid fills
+       the workspace and rows/cols can be sized with 1fr regardless of N charts. */
+    #tab-partial-grid .tab-panel.ix-workspace {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #tab-partial-grid .ws-shell {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    #tab-partial-grid .ws-body {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
     #tab-residuals.active {
       overflow: hidden;
       min-height: 0;
@@ -11120,11 +11140,28 @@ ${sectionsHtml}
       const pgYLbl = document.getElementById('pgYLabel');
       if (pgYLbl) pgYLbl.textContent = yVar;
 
-      // Build a grid cell per predictor
+      // Build a grid cell per predictor.
+      // Choose a column count that keeps cells reasonably wide regardless of
+      // predictor count, then size both rows and columns with 1fr so the grid
+      // fills the available container height (no big empty space below).
       const pgGrid = document.getElementById('pgGrid');
+      const n = xnVars.length;
+      const cols = n <= 1 ? 1
+                 : n === 2 ? 2
+                 : n === 3 ? 3
+                 : n === 4 ? 2
+                 : n <= 6  ? 3
+                 : n <= 9  ? 3
+                 :           4;
+      const rows = Math.max(1, Math.ceil(n / cols));
+      pgGrid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+      pgGrid.style.gridTemplateRows    = `repeat(${rows}, minmax(0, 1fr))`;
+      pgGrid.style.gridAutoRows        = '';
+      pgGrid.style.height              = '100%';
+      pgGrid.style.overflowY           = rows > 3 ? 'auto' : 'hidden';
       pgGrid.innerHTML = xnVars.map((name, i) =>
-        `<div style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 4px 4px;">
-           <div id="pgc${i}" style="height:220px;"></div>
+        `<div style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 4px 4px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden;">
+           <div id="pgc${i}" style="flex:1 1 0;min-height:0;width:100%;"></div>
          </div>`
       ).join('');
 
@@ -11177,7 +11214,15 @@ ${sectionsHtml}
               animation: false,
               style: { fontFamily: "'Segoe UI', system-ui, sans-serif" },
               margin: [40, 12, 44, 46],
-              spacing: [4, 4, 4, 4]
+              spacing: [4, 4, 4, 4],
+              events: {
+                load: function () {
+                  // Re-fit after layout settles so the chart fills its flex cell.
+                  const c = this;
+                  setTimeout(() => { try { c.reflow(); } catch (_e) {} }, 0);
+                  setTimeout(() => { try { c.reflow(); } catch (_e) {} }, 120);
+                }
+              }
             },
             title: {
               text: xName,

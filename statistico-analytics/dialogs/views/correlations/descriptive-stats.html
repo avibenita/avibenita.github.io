@@ -1204,13 +1204,25 @@
         const min = Math.min(...selectedRow.vector);
         const max = Math.max(...selectedRow.vector);
         const binWidth = (max - min) / numBins;
-        // Scale density to match bar heights
-        const normalPoints = histData.map(d => {
-          const mid = (d.start + d.end) / 2;
+        // Sample the density at many sub-bin x values, then map each x to a
+        // fractional position on the categorical x-axis so the curve renders
+        // smoothly across the whole histogram instead of plateauing at the
+        // peak when the mean falls between two bin midpoints.
+        const sampleCount = Math.max(160, numBins * 20);
+        const normalPoints = [];
+        const dataMin = min;
+        const dataMax = max;
+        for (let i = 0; i <= sampleCount; i++) {
+          const v = dataMin + (dataMax - dataMin) * (i / sampleCount);
           const density = (1 / (stdDev * Math.sqrt(2 * Math.PI))) *
-            Math.exp(-Math.pow(mid - mean, 2) / (2 * Math.pow(stdDev, 2)));
-          return parseFloat((density * n * binWidth).toFixed(4));
-        });
+            Math.exp(-Math.pow(v - mean, 2) / (2 * Math.pow(stdDev, 2)));
+          const y = density * n * binWidth;
+          // Bin k spans [dataMin + k*binWidth, dataMin + (k+1)*binWidth)
+          // and is rendered at category index k (its center). So a value v
+          // sits at index ((v - dataMin) / binWidth) - 0.5.
+          const idx = ((v - dataMin) / binWidth) - 0.5;
+          normalPoints.push([idx, parseFloat(y.toFixed(4))]);
+        }
         series.push({
           name: 'Normal',
           type: 'spline',
@@ -1219,6 +1231,7 @@
           dashStyle: 'Dash',
           lineWidth: 2,
           marker: { enabled: false },
+          enableMouseTracking: false,
           zIndex: 2
         });
       }

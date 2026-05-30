@@ -4557,6 +4557,17 @@ const StatisticoHeader = {
       if (innerKey) return `regression-${innerKey}`;
     }
 
+    // Logistic results uses a parent-sidebar tab (e.g. model-results) plus an
+    // inner sub-view selected by data-sub on workspace tabs. Combine them so
+    // the AI prompt is anchored on the actual sub-view (overview, technical,
+    // roc-thresholds, calibration, scenario-engine, risk-profiles, etc.).
+    if (this.module === 'logistic' && tab) {
+      const subBtn = document.querySelector('.ws-mode-tab.active[data-sub]');
+      const sub = subBtn?.dataset?.sub;
+      if (sub && sub !== 'overview') return `logistic-${tab}-${sub}`;
+      if (sub === 'overview') return `logistic-${tab}-overview`;
+    }
+
     return `${this.module}-${tab || this.currentView || 'view'}`;
   },
 
@@ -4589,6 +4600,20 @@ const StatisticoHeader = {
       'logistic-diagnostics': 'Diagnostics',
       'logistic-correlations': 'Correlations',
       'logistic-descriptives': 'Descriptives',
+      'logistic-model-results-overview':       'Model Results — Overview',
+      'logistic-model-results-technical':      'Model Results — Technical',
+      'logistic-predictive-performance-overview':       'Predictive Performance — Overview',
+      'logistic-predictive-performance-roc-thresholds': 'Predictive Performance — ROC & Thresholds',
+      'logistic-predictive-performance-calibration':    'Predictive Performance — Calibration',
+      'logistic-probabilities-overview':       'Probabilities — Overview',
+      'logistic-probabilities-scenario-engine':'Probabilities — Scenario Engine',
+      'logistic-probabilities-risk-profiles':  'Probabilities — Risk Profiles',
+      'logistic-interactions-overview':        'Interactions — Overview',
+      'logistic-interactions-visualization':   'Interactions — Visualization',
+      'logistic-interactions-technical':       'Interactions — Technical',
+      'logistic-diagnostics-overview':         'Diagnostics — Overview',
+      'logistic-diagnostics-residuals':        'Diagnostics — Residuals',
+      'logistic-diagnostics-influence':        'Diagnostics — Influence',
       'factor-suitability': 'Suitability',
       'factor-extraction': 'Extraction',
       'factor-rotation': 'Rotation',
@@ -4661,9 +4686,13 @@ const StatisticoHeader = {
       'factor-extraction': 'Review eigenvalues, variance explained, communalities, and extraction choice.',
       'factor-rotation': 'Inspect rotated loadings to see whether factors become interpretable and simple.',
       'factor-diagnostics': 'Check residuals, model fit, cross-loadings, and problematic variables.',
+      'factor-scores': 'Read estimated factor scores per case + their summary statistics. Use this view to inspect score distributions, between-factor correlations of scores, and any saved-score export options.',
+      'factor-ai': 'Read an AI-assisted narrative summary of the factor solution: extraction quality, factor labels, and reporting suggestions. Use this view to draft the write-up, not to make extraction decisions.',
+      'factor-viewdata': 'Inspect the raw data window used for the analysis (rows, columns, missingness). Use this view to verify the input rather than interpret factors.',
       'pca-summary': 'Review sample adequacy, total variance, and the high-level component solution.',
       'pca-components': 'Use scree/eigenvalue views to judge how many components are worth retaining.',
       'pca-loadings': 'Inspect which variables define each component and whether loadings are clean or mixed.',
+      'pca-rotation': 'Inspect rotated component loadings (varimax, promax, oblimin, etc.). Use this view to check whether rotation makes the loading pattern simpler / more interpretable than the unrotated solution.',
       'pca-biplot': 'Read variables and observations together to understand direction, clustering, and separation.',
       'pca-scoreplot': 'Inspect observation scores for clusters, gradients, and unusual cases.',
       'pca-contribution': 'Identify variables or observations that dominate component structure.',
@@ -4706,7 +4735,38 @@ const StatisticoHeader = {
       'regression-ancova-assumptions':
         'Read the homogeneity-of-slopes verdict and the residual-diagnostic mini charts (histogram, QQ, residuals vs fitted). Use this view to decide if the ANCOVA result is trustworthy.',
       'regression-ancova-viz':
-        'Read the adjusted means, the adjusted mean difference (when there are two levels), the means-with-CI dot plot, and the group regression-lines chart. Parallel lines support homogeneity of slopes; diverging lines suggest a Factor x Covariate interaction.'
+        'Read the adjusted means, the adjusted mean difference (when there are two levels), the means-with-CI dot plot, and the group regression-lines chart. Parallel lines support homogeneity of slopes; diverging lines suggest a Factor x Covariate interaction.',
+
+      // Logistic — workspace sub-views (each describes the actual chart/table
+      // shown, not a generic "logistic regression" overview).
+      'logistic-model-results-overview':
+        'Read the headline conclusion (model converged? overall significant?), the discrimination band (AUC), and a one-line summary of the strongest effect. Use this view to decide whether the logistic model is worth interpreting in detail.',
+      'logistic-model-results-technical':
+        'Read the coefficient table on the log-odds scale, plus odds ratios with 95% CI, Wald z, p, and the omnibus likelihood-ratio chi-square. Use this view to interpret each predictor numerically.',
+      'logistic-predictive-performance-overview':
+        'Read accuracy, sensitivity, specificity, PPV, NPV, and the confusion matrix at the chosen cutoff. Use this view to judge classification quality at the operating threshold, not separation.',
+      'logistic-predictive-performance-roc-thresholds':
+        'The ROC curve plots sensitivity (true positive rate) against 1 - specificity across all possible cutoffs. AUC summarises overall discrimination (0.5 = chance, 1.0 = perfect). Use the threshold slider to read sensitivity / specificity / Youden\'s J at any cutoff and pick an operating point.',
+      'logistic-predictive-performance-calibration':
+        'A calibration plot bins observations by predicted probability and plots the observed event rate per bin against the predicted rate. The 45-degree dashed line is perfect calibration; systematic deviation above means under-prediction and below means over-prediction. Read curvature, not single points.',
+      'logistic-probabilities-overview':
+        'Read the distribution of predicted probabilities for the fitted model, optionally split by the observed outcome. Use this view to spot bimodality (good separation), pile-up near 0.5 (poor separation), or extreme probabilities (possible separation issues).',
+      'logistic-probabilities-scenario-engine':
+        'Adjust the predictor sliders / inputs to generate the predicted probability for one synthetic case, with its odds and log-odds. Use this view to communicate "if the predictor changes by X, the probability becomes Y" to a non-technical audience.',
+      'logistic-probabilities-risk-profiles':
+        'Compare predicted probabilities across user-defined subgroups or covariate strata. Read whether the absolute risk gap between profiles is clinically meaningful, not only whether the predictor is statistically significant.',
+      'logistic-interactions-overview':
+        'Read the interpretation cards and simple-slopes summary for each Predictor x Moderator term. Use this view to understand whether and how a moderator changes the effect of the focal predictor on the log-odds.',
+      'logistic-interactions-visualization':
+        'Inspect the interaction plot — predicted probability curves at representative moderator levels with the focal predictor on the x-axis. Diverging curves indicate stronger moderation; parallel curves indicate weak/no moderation. Read the spread on the probability scale, not just the log-odds.',
+      'logistic-interactions-technical':
+        'Read interaction coefficients on the log-odds scale, the likelihood-ratio test for the interaction term, and any coding notes. Use this view for the technical write-up.',
+      'logistic-diagnostics-overview':
+        'Read the assumption verdict (separation, multicollinearity, sample size per cell), and the high-level health summary. Use this view to flag warnings before trusting coefficients or probabilities.',
+      'logistic-diagnostics-residuals':
+        'Inspect deviance and Pearson residuals, optionally stratified by predicted probability bins. Patterns (curvature, large residuals at the extremes) suggest mis-specification rather than random noise.',
+      'logistic-diagnostics-influence':
+        'Read Cook\'s distance, leverage, and DFBETAS per observation against the usual thresholds. Use this view to identify single points that move the coefficients disproportionately and flag them in the table.'
     };
     return docs[key] || `This ${moduleName} ${label} view summarizes the active analysis section. Use the visible controls, tables, and plots to understand the current model state and diagnostics.`;
   },
@@ -4740,19 +4800,53 @@ const StatisticoHeader = {
     const snapshot = this._collectGenericInsightSnapshot();
     this._lastAiMeta = { primarySignal: `${moduleName} - ${label}` };
 
-    // Some regression sub-views are partial regression / partial effect
-    // visualisations, not coefficient tables. Add an extra guardrail so the
-    // AI does not recycle "coefficient + standard error + p-value" boilerplate
-    // when the user is actually looking at slopes and scatter.
-    const isPartialPlot = viewKey === 'regression-viz-partial' || viewKey === 'regression-viz-unique';
-    const partialPlotGuard = isPartialPlot
+    // Some module sub-views are chart-driven (partial regression, ROC,
+    // calibration, residual diagnostics, interaction plots, scenario
+    // sliders, etc.). Without a guardrail the LLM tends to fall back to
+    // "coefficient + standard error + p-value" boilerplate from the
+    // coefficients table. Inject a per-view nudge that names the chart
+    // and tells the model to describe the visual structure, not the
+    // numeric estimate cards from a different view.
+    const chartGuards = {
+      'regression-viz-partial':
+        'Each small chart shows how the predicted outcome changes as a single predictor changes, with the others held at their means. Describe slopes and the spread of points around them, not coefficients / SE / p-values.',
+      'regression-viz-unique':
+        'Axes are residualised: e(x | others) on x and e(y | others) on y. The slope of the fitted line equals the predictor\'s multiple-regression coefficient. Describe slopes and scatter, not coefficients / SE / p-values.',
+      'regression-pred-overview':
+        'This is an observed-vs-predicted scatter with overall fit metrics (RMSE, MAE, R^2). Describe the diagonal alignment, scatter, and any systematic curvature — not coefficient values.',
+      'regression-pred-scenario':
+        'This is an interactive what-if tool with sliders/inputs that emit one prediction with confidence and prediction intervals. Describe how the controls move the prediction, not what the coefficients table says.',
+      'regression-diag-plots':
+        'These are residual diagnostic charts (QQ, residuals vs fitted, scale-location, leverage). Describe pattern, spread, and tail behaviour — not estimate values.',
+      'regression-diag-influence':
+        'This is a Cook\'s distance bar chart with the 0.5 / 1.0 thresholds and a flagged-observations table. Describe the per-observation pattern and the flagged rows, not coefficient inference.',
+      'regression-ix-viz':
+        'This is an interaction plot with predicted lines at representative moderator levels. Describe whether the lines diverge, are parallel, or cross — not the coefficient table.',
+      'regression-ancova-viz':
+        'This view shows adjusted means with CI, an adjusted mean difference, and group regression lines. Describe the visual story (parallelism, gap between groups) — not coefficient values.',
+      'logistic-predictive-performance-roc-thresholds':
+        'This is an ROC curve with a threshold slider. Describe the curve shape, AUC band, and the trade-off the slider exposes — not coefficient inference.',
+      'logistic-predictive-performance-calibration':
+        'This is a calibration plot of observed vs predicted probability per bin. Describe deviation from the 45-degree line, not coefficient inference.',
+      'logistic-probabilities-overview':
+        'This is a histogram / density of predicted probabilities, often split by outcome. Describe separation, bimodality, or pile-up — not coefficients.',
+      'logistic-probabilities-scenario-engine':
+        'This is an interactive predictor-input panel that emits a single probability + odds. Describe how the controls move the probability, not the coefficient table.',
+      'logistic-probabilities-risk-profiles':
+        'This compares predicted probabilities across subgroups / covariate strata. Describe absolute risk gaps, not coefficient inference.',
+      'logistic-interactions-visualization':
+        'This is an interaction plot of predicted probability at representative moderator levels. Describe diverging vs parallel curves on the probability scale, not coefficient inference.',
+      'logistic-diagnostics-residuals':
+        'These are deviance/Pearson residual plots, often by probability bin. Describe pattern, large residuals, and curvature — not coefficient values.',
+      'logistic-diagnostics-influence':
+        'This is per-observation Cook\'s distance + leverage + DFBETAS with thresholds. Describe flagged points and the influence pattern, not coefficient inference.'
+    };
+    const chartGuard = chartGuards[viewKey];
+    const partialPlotGuard = chartGuard
       ? `
-THIS VIEW IS A PARTIAL REGRESSION / PARTIAL EFFECT PLOT — NOT A COEFFICIENTS TABLE
-- ${viewKey === 'regression-viz-unique'
-            ? 'Axes are residualised: e(x | others) on x and e(y | others) on y. The slope of the fitted line equals the predictor\'s multiple-regression coefficient.'
-            : 'Each small chart shows how the predicted outcome changes as a single predictor changes, with the others held at their means.'}
-- Describe slopes, the spread of points around the line, and whether the trend is clearly tilted or flat.
-- Do NOT instruct the user to read coefficient values, standard errors, or p-values from this view; that information lives on the Results / Coefficients view.
+THIS VIEW IS A CHART / INTERACTIVE TOOL — NOT A COEFFICIENTS TABLE
+- ${chartGuard}
+- Do NOT instruct the user to read coefficient values, standard errors, or p-values from this view; that information lives on the dedicated coefficients / model-results view.
 - Do NOT suggest navigating to other views.
 `
       : '';

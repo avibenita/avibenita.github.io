@@ -4532,6 +4532,31 @@ const StatisticoHeader = {
     if (this.module === 'independent') return `independent-${this._getIndependentActiveTab()}`;
     const activeSidebar = document.querySelector('.sb-item.active[data-tab], .sb-item.active[id]');
     const tab = activeSidebar?.dataset?.tab || activeSidebar?.id || this._getIndependentActiveTab();
+
+    // For modules that host an in-page workspace tab bar (regression, etc.),
+    // prefer the active inner tab so the Insight Guide can describe the
+    // specific chart the user is looking at (e.g. Predictor Effects vs
+    // Unique Contribution) instead of the broader sidebar section.
+    if (this.module === 'regression') {
+      const innerTab = document.querySelector(
+        '.tab-content.active .ws-mode-tab.active[data-viz-tab], ' +
+        '.tab-content.active .ws-mode-tab.active[data-pred-tab], ' +
+        '.tab-content.active .ws-mode-tab.active[data-diag-tab], ' +
+        '.tab-content.active .ws-mode-tab.active[data-reg-tab], ' +
+        '.tab-content.active .ws-mode-tab.active[data-ix-tab], ' +
+        '.tab-content.active .ws-mode-tab.active[data-ancova-tab]'
+      );
+      const innerKey = innerTab && (
+        innerTab.dataset.vizTab ||
+        innerTab.dataset.predTab ||
+        innerTab.dataset.diagTab ||
+        innerTab.dataset.regTab ||
+        innerTab.dataset.ixTab ||
+        innerTab.dataset.ancovaTab
+      );
+      if (innerKey) return `regression-${innerKey}`;
+    }
+
     return `${this.module}-${tab || this.currentView || 'view'}`;
   },
 
@@ -4594,7 +4619,22 @@ const StatisticoHeader = {
       'regression-overview': 'Results Overview',
       'regression-detail': 'Results Detail',
       'regression-diagnostics': 'Diagnostics',
-      'regression-residuals': 'Residuals'
+      'regression-residuals': 'Residuals',
+      'regression-results-overview': 'Model Results — Overview',
+      'regression-results-detail':   'Model Results — Technical',
+      'regression-pred-overview':    'Predictions — Overview',
+      'regression-pred-scenario':    'Predictions — Scenario Engine',
+      'regression-viz-partial':      'Visualization — Predictor Effects',
+      'regression-viz-unique':       'Visualization — Unique Contribution',
+      'regression-diag-overview':    'Diagnostics — Overview',
+      'regression-diag-plots':       'Diagnostics — Residual Plots',
+      'regression-diag-influence':   'Diagnostics — Influence',
+      'regression-ix-summary':       'Interactions — Overview',
+      'regression-ix-viz':           'Interactions — Visualization',
+      'regression-ix-details':       'Interactions — Technical',
+      'regression-ancova-results':     'ANCOVA — Results',
+      'regression-ancova-assumptions': 'ANCOVA — Assumptions',
+      'regression-ancova-viz':         'ANCOVA — Visualization'
     };
   },
 
@@ -4633,7 +4673,40 @@ const StatisticoHeader = {
       'anova-comparisons': 'Inspect post-hoc contrasts and correction methods to locate group differences.',
       'anova-diagnostics': 'Check residual assumptions, variance homogeneity, and influential patterns.',
       'anova-visuals': 'Use group plots to compare means, spread, intervals, and outliers visually.',
-      'anova-report': 'Use report wording to verify the statistical story is coherent and complete.'
+      'anova-report': 'Use report wording to verify the statistical story is coherent and complete.',
+
+      // Regression — workspace sub-views (chart-aware so the AI explanation
+      // matches what the user actually sees, not the coefficients table).
+      'regression-results-overview':
+        'Read the conclusion card, KPI strip (R^2, Adj R^2, F-test p, RMSE, n), and headline interpretation. Use this view to decide whether the model is worth reporting before drilling into individual coefficients.',
+      'regression-results-detail':
+        'Read the coefficients table (estimate, SE, t, p, 95% CI), ANOVA decomposition, and inference details. Use this view to interpret each predictor numerically once the overall model is supported.',
+      'regression-pred-overview':
+        'Inspect observed-vs-predicted, residual scatter, and overall fit quality (RMSE / MAE / R^2). Use this view to judge how well the model reproduces the sample, not which predictors matter.',
+      'regression-pred-scenario':
+        'Use the what-if sliders/inputs to generate a single point prediction with confidence and prediction intervals. Reset to means returns a baseline scenario.',
+      'regression-viz-partial':
+        'Each small chart shows the partial effect of one predictor on the outcome with the others held at their means. The axes are on the original scale of the outcome and predictor; the slope is the predictor coefficient. Read steeper / flatter lines and the spread of points around them — not standard errors or p-values.',
+      'regression-viz-unique':
+        'Each small chart is a partial regression (added-variable) plot: the x-axis shows the predictor after removing the linear influence of all other predictors (e(x | others)), and the y-axis shows the outcome with the same adjustment (e(y | others)). The slope is exactly the multiple-regression coefficient for that predictor. Read whether the line is clearly tilted (unique contribution), whether it is flat (no effect after controlling), and whether points hug the line tightly or scatter widely (how much remains unexplained).',
+      'regression-diag-overview':
+        'Read the assumption verdict strip, the residual histogram with normal overlay, and the high-level test summary. Use this view to decide if the model is trustworthy before interpreting coefficients.',
+      'regression-diag-plots':
+        'Inspect QQ plot, residuals vs fitted, scale-location, and leverage panels for pattern, spread, and tails. Use this view to localise where assumption violations come from.',
+      'regression-diag-influence':
+        'Read Cook\'s distance per observation against the 0.5 / 1.0 thresholds and the flagged-observations table. Use this view to identify single points that move the coefficients disproportionately.',
+      'regression-ix-summary':
+        'Read interaction interpretation cards and the simple-slopes summary. Use this view to understand whether and how a moderator changes the effect of the focal predictor.',
+      'regression-ix-viz':
+        'Inspect the interaction plot — fitted lines for representative moderator levels with the focal predictor on the x-axis. Diverging lines indicate a stronger moderation; parallel lines indicate weak/no moderation.',
+      'regression-ix-details':
+        'Read interaction coefficients, delta-R^2 for the interaction term, and any coding notes. Use this view for the technical write-up.',
+      'regression-ancova-results':
+        'Read the KPI strip, model formula, ANCOVA Type III table, and the auto-generated key finding. Use this view to report group differences after controlling for covariates.',
+      'regression-ancova-assumptions':
+        'Read the homogeneity-of-slopes verdict and the residual-diagnostic mini charts (histogram, QQ, residuals vs fitted). Use this view to decide if the ANCOVA result is trustworthy.',
+      'regression-ancova-viz':
+        'Read the adjusted means, the adjusted mean difference (when there are two levels), the means-with-CI dot plot, and the group regression-lines chart. Parallel lines support homogeneity of slopes; diverging lines suggest a Factor x Covariate interaction.'
     };
     return docs[key] || `This ${moduleName} ${label} view summarizes the active analysis section. Use the visible controls, tables, and plots to understand the current model state and diagnostics.`;
   },
@@ -4667,11 +4740,28 @@ const StatisticoHeader = {
     const snapshot = this._collectGenericInsightSnapshot();
     this._lastAiMeta = { primarySignal: `${moduleName} - ${label}` };
 
+    // Some regression sub-views are partial regression / partial effect
+    // visualisations, not coefficient tables. Add an extra guardrail so the
+    // AI does not recycle "coefficient + standard error + p-value" boilerplate
+    // when the user is actually looking at slopes and scatter.
+    const isPartialPlot = viewKey === 'regression-viz-partial' || viewKey === 'regression-viz-unique';
+    const partialPlotGuard = isPartialPlot
+      ? `
+THIS VIEW IS A PARTIAL REGRESSION / PARTIAL EFFECT PLOT — NOT A COEFFICIENTS TABLE
+- ${viewKey === 'regression-viz-unique'
+            ? 'Axes are residualised: e(x | others) on x and e(y | others) on y. The slope of the fitted line equals the predictor\'s multiple-regression coefficient.'
+            : 'Each small chart shows how the predicted outcome changes as a single predictor changes, with the others held at their means.'}
+- Describe slopes, the spread of points around the line, and whether the trend is clearly tilted or flat.
+- Do NOT instruct the user to read coefficient values, standard errors, or p-values from this view; that information lives on the Results / Coefficients view.
+- Do NOT suggest navigating to other views.
+`
+      : '';
+
     return `You are explaining the "${label}" view inside the ${moduleName} module of Statistico.
 
 WHAT THIS VIEW DOES:
 ${controlsDoc}
-
+${partialPlotGuard}
 VISIBLE STATE FROM THE CURRENT VIEW:
 ${snapshot.visibleText || '(No visible text captured.)'}
 

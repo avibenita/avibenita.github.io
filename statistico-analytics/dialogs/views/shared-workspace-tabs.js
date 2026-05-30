@@ -10,7 +10,7 @@
     'pred-overview': 'Observed vs predicted',
     'pred-scenario': 'What-if scenarios',
     'viz-partial': 'How the outcome changes with each predictor',
-    'viz-unique': 'What each predictor contributes beyond the others',
+    'viz-unique': 'Effect after controlling for other predictors',
     'diag-overview': 'Assumption summary',
     'diag-plots': 'QQ & leverage plots',
     'diag-influence': "Cook's distance & flags",

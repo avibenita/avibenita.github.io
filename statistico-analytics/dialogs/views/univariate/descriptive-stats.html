@@ -15,7 +15,8 @@
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
-  <script src="../../shared/views/normality-view.js"></script>
+  <script src="../../shared/uni-normality-tests.js?v=20260531n"></script>
+  <script src="../../shared/uni-normality-dashboard.js?v=20260531n"></script>
   <style>
     :root{--surface-0:#0c1624;--surface-1:#1a1f2e;--surface-2:#242938;--border:#2d3748;--accent-1:rgb(255,165,120);--text-primary:#fff;--text-secondary:rgba(255,255,255,0.85);}
     /* ── Light Theme ── */
@@ -118,12 +119,54 @@
     .close-btn:hover { color: var(--text-primary); }
     .modal-body { padding: 20px; }
     
-    /* Gauge and Test Styles */
-    .gauge-container { text-align: center; padding: 10px; height: 140px; position: relative; }
-    .gauge-title { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 5px; }
+    /* Normality dashboard (matches normality-standalone) */
+    .normality-dashboard { margin-bottom: 16px; }
+    .dashboard-body {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+    .card-wrapper {
+      background: var(--surface-2);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      min-height: 150px;
+      display: flex;
+      flex-direction: column;
+    }
+    .card-wrapper .card-header {
+      background: linear-gradient(135deg, #1e2533 0%, #15192a 100%);
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent-1);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      border-bottom: 1px solid rgba(255,165,120,0.2);
+    }
+    .card-wrapper .card-body {
+      flex: 1;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .nsi-title { display: inline-flex; align-items: center; gap: 6px; text-transform: none; letter-spacing: 0; }
+    .nsi-title sup { font-size: 8px; color: rgb(120,200,255); }
+    .normality-dashboard .summary-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      width: 100%;
+    }
+    .normality-dashboard .stat-item { text-align: center; }
+    .normality-dashboard .stat-value { font-size: 18px; font-weight: 700; color: var(--accent-1); }
+    .normality-dashboard .stat-label { font-size: 11px; color: var(--text-secondary); }
+    .normality-dashboard .alpha-slider { width: 100%; margin-top: 5px; accent-color: #ffd700; }
     .gauge { width: 100%; height: 110px; }
     .test-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 20px; }
-    .test-card { background: grey; border-radius: 8px; padding: 20px; }
+    .test-card { background: var(--surface-2); border-radius: 8px; padding: 20px; border: 1px solid var(--border); }
     .test-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .test-name { font-size: clamp(12px, 1.5vw, 14px); font-weight: bold; }
     .test-result { padding: 3px 8px; border-radius: 12px; font-size: 15px; font-weight: bold; }
@@ -233,11 +276,45 @@
         <button class="close-btn" onclick="closeNormalityModal()">&times;</button>
       </div>
       <div class="modal-body">
-        <div class="gauge-container">
-          <div class="gauge-title">Overall Normality Score</div>
-          <div class="gauge" id="gauge-chart"></div>
+        <div class="normality-dashboard">
+          <div class="dashboard-body">
+            <div class="card-wrapper">
+              <div class="card-header">Summary Statistics</div>
+              <div class="card-body">
+                <div class="summary-stats">
+                  <div class="stat-item">
+                    <div class="stat-value" id="norm-pass-count">0</div>
+                    <div class="stat-label">Tests Passed</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-value" id="norm-fail-count">0</div>
+                    <div class="stat-label">Tests Failed</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-value" id="norm-sample-size">—</div>
+                    <div class="stat-label">Sample Size</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-value" id="norm-significance">0.05</div>
+                    <div class="stat-label">Significance</div>
+                    <input class="alpha-slider" type="range" id="norm-alpha-slider" min="0.01" max="0.15" step="0.01" value="0.05"
+                           oninput="updateNormalityAlpha(this.value)">
+                    <div style="font-size: 9px; color: rgba(255,255,255,0.5); margin-top: 2px;">Adjust</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card-wrapper">
+              <div class="card-header">
+                <span class="nsi-title">NSI<sup>TM</sup> - Normality Strength Index</span>
+              </div>
+              <div class="card-body">
+                <div class="gauge" id="gauge-chart"></div>
+              </div>
+            </div>
+          </div>
         </div>
-        
+
         <div class="test-grid">
           <!-- Test cards will be populated here -->
           <div class="test-card" data-test="shapirowilk">
@@ -913,58 +990,43 @@
     function refreshNormalityFromSelection() {
       if (!selectedRow) return;
 
+      const sampleSize = selectedRow.N || selectedRow.vector?.length || 0;
       const modalSample = document.getElementById('modal-sample-size');
-      if (modalSample) {
-        modalSample.textContent = `(n=${selectedRow.N || selectedRow.vector?.length || 0})`;
-      }
+      if (modalSample) modalSample.textContent = `(n=${sampleSize})`;
       document.getElementById('modal-variable-name').textContent = VarNameSelected || (selectedRow.Variable || selectedRow.name || '');
 
-      if (selectedRow && Array.isArray(selectedRow.vector) && typeof shapiroWilkTest === 'function') {
-        const rawData = selectedRow.vector
-          .map(v => typeof v === 'number' ? v : parseFloat(v))
-          .filter(v => isFinite(v));
-        if (rawData.length < 3 || rawData.every(v => v === rawData[0])) {
-          resetNormalityCards();
-          updateGauge(0);
-          return;
-        }
-        const tests = buildNormalityResults(rawData);
-        updateNormalityTestCards(tests, 0.05);
-        calculateNormalityScore(tests);
-      } else {
-        console.warn('Normality engine not available - loading sample data');
-        setTimeout(() => {
-          loadSampleNormalityData();
-        }, 100);
+      if (!selectedRow || !Array.isArray(selectedRow.vector) || typeof UniNormalityTests === 'undefined' || typeof UniNormalityDashboard === 'undefined') {
+        console.warn('Normality engine not available');
+        return;
       }
+
+      const rawData = selectedRow.vector
+        .map(v => typeof v === 'number' ? v : parseFloat(v))
+        .filter(v => isFinite(v));
+
+      window._normalityLastRawData = rawData;
+      window._normalityLastSampleSize = sampleSize;
+      window._normalityGaugeId = 'gauge-chart';
+
+      if (rawData.length < 3 || rawData.every(v => v === rawData[0])) {
+        UniNormalityDashboard.resetTestCards();
+        return;
+      }
+
+      const alpha = UniNormalityDashboard.getAlpha();
+      UniNormalityDashboard.renderDashboard(rawData, { alpha, sampleSize, gaugeId: 'gauge-chart' });
     }
 
     function resetNormalityCards() {
-      document.querySelectorAll('.test-card').forEach(card => {
-        const detailRows = card.querySelectorAll('.detail-value');
-        detailRows.forEach(detail => detail.textContent = '-');
-        const badge = card.querySelector('.test-result');
-        if (badge) {
-          badge.textContent = '-';
-          badge.classList.remove('pass', 'fail');
-        }
-      });
+      if (typeof UniNormalityDashboard !== 'undefined') {
+        UniNormalityDashboard.resetTestCards();
+      }
     }
 
     function buildNormalityResults(rawData) {
-      const sw = shapiroWilkTest(rawData);
-      const jb = jarqueBeraTest(rawData);
-      const ks = kolmogorovSmirnovTest(rawData);
-      const ad = andersonDarlingTest(rawData);
-
-      return [
-        { name: 'Shapiro-Wilk', stat: sw.statistic, pval: sw.pValue, crit: null },
-        { name: 'Anderson-Darling', stat: ad.statistic, pval: ad.pValue, crit: null },
-        { name: 'Kolmogorov-Smirnov', stat: ks.statistic, pval: ks.pValue, crit: null },
-        { name: 'Jarque-Bera', stat: jb.statistic, pval: jb.pValue, crit: null },
-        { name: "D'Agostino-Pearson", stat: null, pval: null, crit: null },
-        { name: 'Cramer-von Mises', stat: null, pval: null, crit: null }
-      ];
+      const alpha = typeof UniNormalityDashboard !== 'undefined' ? UniNormalityDashboard.getAlpha() : 0.05;
+      const tests = UniNormalityTests.runAll(rawData, alpha);
+      return UniNormalityTests.toCardResults(tests, alpha);
     }
 
     function closeNormalityModal() {
@@ -972,62 +1034,10 @@
       document.body.style.overflow = 'auto';
     }
 
-    // Initialize gauge chart
     function initializeGaugeChart() {
-      if (typeof Highcharts === 'undefined') return;
-      
-      window.gaugeChart = Highcharts.chart('gauge-chart', {
-        chart: {
-          type: 'solidgauge',
-          backgroundColor: 'transparent',
-          height: 120
-        },
-        title: null,
-        pane: {
-          center: ['50%', '85%'],
-          size: '140%',
-          startAngle: -90,
-          endAngle: 90,
-          background: {
-            backgroundColor: '#EEE',
-            innerRadius: '60%',
-            outerRadius: '100%',
-            shape: 'arc'
-          }
-        },
-        exporting: { enabled: false },
-        tooltip: { enabled: false },
-        yAxis: {
-          stops: [
-            [0.1, '#DF5353'],
-            [0.5, '#DDDF0D'],
-            [0.9, '#55BF3B']
-          ],
-          lineWidth: 0,
-          tickWidth: 0,
-          minorTickInterval: null,
-          tickAmount: 2,
-          min: 0,
-          max: 100,
-          labels: { y: 16 }
-        },
-        plotOptions: {
-          solidgauge: {
-            dataLabels: {
-              y: 5,
-              borderWidth: 0,
-              useHTML: true
-            }
-          }
-        },
-        series: [{
-          name: 'Normality',
-          data: [75],
-          dataLabels: {
-            format: '<div style="text-align:center"><span style="font-size:25px;color:white">{y}</span><br/><span style="font-size:12px;color:silver">Score</span></div>'
-          }
-        }]
-      });
+      if (typeof UniNormalityDashboard !== 'undefined') {
+        UniNormalityDashboard.initGauge('gauge-chart');
+      }
     }
 
     // Load sample normality test data (ONLY used when VB6 is not available - for testing)
@@ -1051,8 +1061,8 @@
     }
 
     function updateGauge(score) {
-      if (window.gaugeChart && window.gaugeChart.series && window.gaugeChart.series[0]) {
-        window.gaugeChart.series[0].points[0].update(score);
+      if (typeof UniNormalityDashboard !== 'undefined') {
+        UniNormalityDashboard.updateGauge(score);
       }
     }
 
@@ -1086,9 +1096,7 @@
           });
           
           // Reset gauge to 0
-          if (window.gaugeChart && window.gaugeChart.series && window.gaugeChart.series[0]) {
-            window.gaugeChart.series[0].points[0].update(0);
-          }
+          UniNormalityDashboard.updateGauge(0);
           
           return;
         }
@@ -1104,98 +1112,27 @@
       }
     };
 
-    // Helper function to normalize test names for matching
-    function normalizeTestName(name) {
-      return (name || "")
-        .normalize("NFKD")
-        .replace(/[^a-zA-Z0 deg9]/g, "")
-        .toLowerCase();
+    function updateNormalityTestCards(results, alpha = 0.05, sampleSize) {
+      if (typeof UniNormalityDashboard === 'undefined') return;
+      initializeGaugeChart();
+      UniNormalityDashboard.updateTestCards(results, alpha, sampleSize);
     }
 
-    // Update test cards with actual results from VB6
-    function updateNormalityTestCards(results, alpha = 0.05) {
-      console.log('Updating test cards with', results.length, 'results');
-      
-      let passCount = 0;
-      let failCount = 0;
-      
-      results.forEach(testResult => {
-        const normalizedName = normalizeTestName(testResult.name);
-        const card = document.querySelector(`[data-test="${normalizedName}"]`);
-        
-        if (card) {
-          const detailRows = card.querySelectorAll('.detail-value');
-          if (detailRows.length >= 3) {
-            detailRows[0].textContent = testResult.stat !== null ? testResult.stat.toFixed(4) : '-';
-            detailRows[1].textContent = testResult.pval !== null ? testResult.pval.toFixed(4) : '-';
-            detailRows[2].textContent = testResult.crit !== null ? testResult.crit.toFixed(4) : '-';
-          }
-          
-          const badge = card.querySelector('.test-result');
-          if (badge) {
-            badge.style.backgroundColor = '';
-            badge.style.color = '';
-            if (testResult.pval !== null && testResult.pval >= alpha) {
-              badge.textContent = 'PASS';
-              badge.classList.remove('fail');
-              badge.classList.add('pass');
-              passCount++;
-            } else if (testResult.pval !== null) {
-              badge.textContent = 'FAIL';
-              badge.classList.remove('pass');
-              badge.classList.add('fail');
-              failCount++;
-            }
-          }
-        }
-      });
-      
-      console.log('? Test cards updated:', passCount, 'passed,', failCount, 'failed');
-    }
-
-    // Calculate overall normality score based on test results
     function calculateNormalityScore(results) {
+      if (typeof UniNormalityTests === 'undefined') return;
       const weights = {
-        "Shapiro-Wilk": 1.0,
-        "Anderson-Darling": 0.9,
-        "Kolmogorov-Smirnov": 0.8,
-        "Cramer-von Mises": 0.7,
+        'Shapiro-Wilk': 1.0,
+        'Anderson-Darling': 0.9,
+        'Kolmogorov-Smirnov': 0.8,
+        'Cramer-von Mises': 0.7,
         "D'Agostino-Pearson": 1.0,
-        "Jarque-Bera": 0.9
+        'Jarque-Bera': 0.9
       };
-      
-      let totalWeight = 0;
-      let weightedScore = 0;
-      
-      results.forEach(test => {
-        const p = test.pval;
-        const w = weights[test.name] || 1.0;
-        let score = 0;
-        
-        if (p === null || isNaN(p)) return;
-        
-        if (p < 0.001) {
-          score = 0;
-        } else if (p < 0.05) {
-          const logScale = Math.log10(p) - Math.log10(0.001);
-          const maxLogScale = Math.log10(0.05) - Math.log10(0.001);
-          score = 10 + (30 * logScale / maxLogScale);
-        } else if (p < 0.5) {
-          const logScale = Math.log10(p) - Math.log10(0.05);
-          const maxLogScale = Math.log10(0.5) - Math.log10(0.05);
-          score = 40 + (40 * logScale / maxLogScale);
-        } else {
-          score = 80 + (20 * (p - 0.5) / 0.5);
-        }
-        
-        weightedScore += score * w;
-        totalWeight += w;
-      });
-      
-      const finalScore = Math.round(totalWeight > 0 ? weightedScore / totalWeight : 50);
-      updateGauge(finalScore);
-      
-      console.log('Normality score calculated:', finalScore);
+      const tests = results.map((r) => ({
+        pValue: r.pval,
+        weight: weights[r.name] || 1.0
+      }));
+      updateGauge(UniNormalityTests.calculateNSI(tests));
     }
     
     // Make helper functions available globally for the callback

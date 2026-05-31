@@ -259,10 +259,61 @@
     return { label: 'Likely Non-Normal', tone: 'fail' };
   }
 
+  function getCritical(testId, alpha, n) {
+    const a = typeof alpha === 'number' ? alpha : 0.05;
+    switch (testId) {
+      case 'sw':
+        return 0.95;
+      case 'ad':
+        return andersonDarlingCritical(a);
+      case 'ks':
+        return n > 0 ? 1.36 / Math.sqrt(n) : null;
+      case 'cvm':
+        return cramerVonMisesCritical(a);
+      case 'dp':
+        return andersonDarlingCritical(a);
+      case 'jb':
+        return typeof global.jStat !== 'undefined'
+          ? global.jStat.chisquare.inv(1 - a, 2)
+          : null;
+      default:
+        return null;
+    }
+  }
+
+  /** Legacy card shape used by descriptive-stats modals and VB6 callbacks. */
+  function toCardResults(tests, alpha) {
+    const a = typeof alpha === 'number' ? alpha : (tests.alpha || 0.05);
+    const n = tests.n;
+    return tests
+      .filter((t) => t && t.name)
+      .map((t) => ({
+        name: t.name,
+        stat: Number.isFinite(t.statistic) ? t.statistic : null,
+        pval: Number.isFinite(t.pValue) ? t.pValue : null,
+        crit: getCritical(t.id, a, n)
+      }));
+  }
+
+  function countPassFail(tests, alpha) {
+    const cutoff = typeof alpha === 'number' ? alpha : 0.05;
+    let pass = 0;
+    let fail = 0;
+    tests.forEach((t) => {
+      if (!Number.isFinite(t.pValue)) return;
+      if (t.pValue >= cutoff) pass += 1;
+      else fail += 1;
+    });
+    return { pass, fail };
+  }
+
   global.UniNormalityTests = {
     runAll,
     calculateNSI,
     calculateVerdict,
+    countPassFail,
+    getCritical,
+    toCardResults,
     hasTies,
     countUnique,
     shapiroWilkTest

@@ -67,8 +67,66 @@
     #corrByGroupTable thead th.sortable i { margin-left:4px; font-size:10px; opacity:.72; vertical-align:middle; }
     #corrByGroupTable thead th.sort-active i { opacity:1; color:var(--accent-1); }
     th:first-child, td:first-child { text-align:left; }
-    th.group-col { min-width:64px; vertical-align:bottom; }
+    #corrByGroupTable th[data-key="pair"] .th-main,
+    #corrByGroupTable td.pair-cell {
+      max-width:180px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    #corrByGroupTable tr.group-zone-row th {
+      padding:7px 10px 5px;
+      font-size:9px;
+      font-weight:800;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      border-bottom:none;
+      background:transparent;
+      box-shadow:none;
+    }
+    #corrByGroupTable th.group-zone-label {
+      text-align:center;
+      color:var(--accent-2);
+      background:color-mix(in srgb, var(--accent-2) 12%, var(--surface-1));
+      border-bottom:1px solid color-mix(in srgb, var(--accent-2) 34%, var(--border));
+    }
+    #corrByGroupTable th.group-zone-label span {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:2px 10px;
+      border-radius:999px;
+      background:color-mix(in srgb, var(--accent-2) 16%, transparent);
+    }
+    th.group-col {
+      min-width:88px;
+      max-width:140px;
+      vertical-align:bottom;
+      background:linear-gradient(180deg, color-mix(in srgb, var(--accent-2) 14%, var(--surface-1)) 0%, color-mix(in srgb, var(--accent-2) 20%, var(--surface-2)) 100%) !important;
+      border-bottom-color:color-mix(in srgb, var(--accent-2) 38%, var(--border)) !important;
+    }
+    th.group-col-first { box-shadow:inset 3px 0 0 color-mix(in srgb, var(--accent-2) 72%, transparent); }
+    th.group-col .th-main {
+      display:block;
+      max-width:124px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      text-transform:none;
+      letter-spacing:.02em;
+      font-size:12px;
+      font-weight:800;
+      color:var(--accent-2);
+    }
     th.group-col .group-n { display:block; font-size:10px; font-weight:700; color:var(--text-secondary); text-transform:none; letter-spacing:0; margin-top:3px; }
+    td.group-cell {
+      background:color-mix(in srgb, var(--accent-2) 7%, var(--surface-2));
+      font-weight:650;
+    }
+    td.group-cell-first { box-shadow:inset 3px 0 0 color-mix(in srgb, var(--accent-2) 55%, transparent); }
+    tbody tr:hover td.group-cell { background:color-mix(in srgb, var(--accent-2) 14%, var(--surface-2)); }
+    html[data-theme="light"] td.group-cell { background:color-mix(in srgb, var(--accent-2) 8%, #fff); }
+    html[data-theme="light"] tbody tr:hover td.group-cell { background:color-mix(in srgb, var(--accent-2) 14%, #f8fafc); }
     th:not(.sortable) { cursor:default; }
     td.r-pos { color:var(--pos-r); font-weight:600; }
     td.r-neg { color:var(--neg-r); font-weight:600; }
@@ -475,12 +533,6 @@
         .sort((a, b) => String(a.group).localeCompare(String(b.group), undefined, { numeric: true }));
     }
 
-    function shortGroupLabel(group, index) {
-      const text = String(group);
-      if (text.length <= 6) return text;
-      return text.slice(0, 5) + '…';
-    }
-
     function tipAttr(text) {
       return String(text ?? '')
         .replace(/&/g, '&amp;')
@@ -519,10 +571,11 @@
       return `<div class="spark-wrap" tabindex="0" data-st-tip-html="${tipAttr(tipHtml)}" aria-label="Group correlation pattern">${svg}</div>`;
     }
 
-    function sortTh(key, label, extraHtml, extraClass) {
+    function sortTh(key, label, extraHtml, extraClass, title) {
       const active = sortConfig.key === key ? ' sort-active' : '';
       const cls = ['sortable', extraClass].filter(Boolean).join(' ');
-      return `<th class="${cls}${active}" data-key="${key}"><span class="th-main">${label}</span> <i class="fa fa-sort"></i>${extraHtml || ''}</th>`;
+      const titleAttr = title ? ` title="${tipAttr(title)}"` : '';
+      return `<th class="${cls}${active}" data-key="${key}"${titleAttr}><span class="th-main">${label}</span> <i class="fa fa-sort"></i>${extraHtml || ''}</th>`;
     }
 
     function getSortedRows() {
@@ -585,14 +638,19 @@
     }
 
     function renderTableHead() {
-      const head = ['<tr>', sortTh('pair', 'Pair')];
+      const groupCount = activeGroups.length;
+      const zoneRow = groupCount
+        ? `<tr class="group-zone-row"><th colspan="2"></th><th colspan="${groupCount}" class="group-zone-label"><span><i class="fa-solid fa-layer-group"></i> By group</span></th><th colspan="2"></th></tr>`
+        : '';
+      const head = [zoneRow, '<tr>', sortTh('pair', 'Pair')];
       head.push(sortTh('overall_r', 'Overall r'));
       activeGroups.forEach((g, i) => {
         head.push(sortTh(
           `group:${i}`,
-          escapeHtml(shortGroupLabel(g.group, i)),
+          escapeHtml(String(g.group)),
           `<span class="group-n">(n=${g.n})</span>`,
-          'group-col'
+          i === 0 ? 'group-col group-col-first' : 'group-col',
+          String(g.group)
         ));
       });
       head.push(sortTh('global_p', 'Global p'));
@@ -609,12 +667,13 @@
         const overallCell = Number.isFinite(row.overall.r)
           ? `<td class="${overallClass}" title="n=${row.overall.n}">${fmt(row.overall.r)}</td>`
           : '<td class="r-weak">—</td>';
-        const groupCells = row.groupResults.map((gr) => {
-          if (!Number.isFinite(gr.r)) return `<td class="r-weak" title="${escapeHtml(gr.group)}: n=${gr.n}">—</td>`;
-          return `<td class="${formatRClass(gr.r)}" title="${escapeHtml(gr.group)}: n=${gr.n}">${fmt(gr.r)}</td>`;
+        const groupCells = row.groupResults.map((gr, i) => {
+          const cellCls = `group-cell${i === 0 ? ' group-cell-first' : ''}`;
+          if (!Number.isFinite(gr.r)) return `<td class="${cellCls} r-weak" title="${escapeHtml(gr.group)}: n=${gr.n}">—</td>`;
+          return `<td class="${cellCls} ${formatRClass(gr.r)}" title="${escapeHtml(gr.group)}: n=${gr.n}">${fmt(gr.r)}</td>`;
         }).join('');
         return `<tr>
-          <td>${escapeHtml(row.pair)}</td>
+          <td class="pair-cell" title="${escapeHtml(row.pair)}">${escapeHtml(row.pair)}</td>
           ${overallCell}
           ${groupCells}
           <td>${formatP(row.overall.p)}</td>

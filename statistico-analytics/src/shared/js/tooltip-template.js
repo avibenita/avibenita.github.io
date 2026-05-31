@@ -8,6 +8,8 @@
   const STYLE_ID = 'statistico-shared-tooltip-style';
   const SCRIPT_FLAG = 'data-st-tooltip-managed';
   let activeAnchor = null;
+  let initialized = false;
+  let moveCheckRaf = null;
 
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -59,6 +61,26 @@
         color: rgba(248,250,252,0.48);
         font-style: italic;
       }
+      /* Suppress legacy CSS tooltips once managed by this script */
+      [${SCRIPT_FLAG}="1"].info-balloon::after,
+      [${SCRIPT_FLAG}="1"].info-balloon:hover::after,
+      [${SCRIPT_FLAG}="1"].info-balloon:focus::after {
+        content: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+      }
+      [${SCRIPT_FLAG}="1"] .metric-tip,
+      [${SCRIPT_FLAG}="1"]:hover .metric-tip {
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+      [${SCRIPT_FLAG}="1"].res-tooltip .res-tooltiptext,
+      [${SCRIPT_FLAG}="1"].res-tooltip:hover .res-tooltiptext {
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -80,6 +102,7 @@
     return (
       el.getAttribute('data-st-tip') ||
       el.getAttribute('data-tip') ||
+      el.getAttribute('data-info') ||
       el.getAttribute('title') ||
       ''
     ).trim();
@@ -101,6 +124,37 @@
       el.removeAttribute('title');
     }
     el.setAttribute(SCRIPT_FLAG, '1');
+  }
+
+  function prepareLegacyElements(root) {
+    const scope = root && root.querySelectorAll ? root : document;
+
+    scope.querySelectorAll('.info-balloon[data-info]').forEach((el) => {
+      if (!el.getAttribute('data-st-tip')) {
+        el.setAttribute('data-st-tip', (el.getAttribute('data-info') || '').trim());
+      }
+      prepareElement(el);
+    });
+
+    scope.querySelectorAll('.metric-help').forEach((el) => {
+      if (el.getAttribute('data-st-tip') || el.getAttribute('data-st-tip-html')) return;
+      const tip = el.querySelector('.metric-tip');
+      if (tip && tip.textContent.trim()) {
+        el.setAttribute('data-st-tip', tip.textContent.trim());
+      }
+      prepareElement(el);
+    });
+
+    scope.querySelectorAll('.res-tooltip').forEach((el) => {
+      if (el.getAttribute('data-st-tip') || el.getAttribute('data-st-tip-html')) return;
+      const tip = el.querySelector('.res-tooltiptext');
+      if (tip && tip.textContent.trim()) {
+        el.setAttribute('data-st-tip', tip.textContent.trim());
+      }
+      prepareElement(el);
+    });
+
+    scope.querySelectorAll('[data-st-tip], [data-st-tip-html], [data-tip], [title]').forEach(prepareElement);
   }
 
   function positionTooltip(anchor, node) {
@@ -155,40 +209,75 @@
 
   function closestTooltipAnchor(target) {
     if (!target || !target.closest) return null;
-    return target.closest('[data-st-tip], [data-st-tip-html], [data-tip], [title]');
+    return target.closest(`[${SCRIPT_FLAG}="1"]`);
+  }
+
+  function isPointerOverAnchor(anchor, x, y) {
+    if (!anchor) return false;
+    const under = document.elementFromPoint(x, y);
+    if (!under) return false;
+    return anchor === under || anchor.contains(under);
+  }
+
+  function handlePointerOver(ev) {
+    const anchor = closestTooltipAnchor(ev.target);
+    if (!anchor) return;
+    showFor(anchor);
+  }
+
+  function handlePointerOut(ev) {
+    if (!activeAnchor) return;
+    const anchor = closestTooltipAnchor(ev.target);
+    if (!anchor) return;
+    const to = ev.relatedTarget;
+    if (to && anchor.contains(to)) return;
+    if (activeAnchor === anchor) hide();
+  }
+
+  function handlePointerMove(ev) {
+    if (!activeAnchor) return;
+    if (moveCheckRaf) return;
+    moveCheckRaf = requestAnimationFrame(() => {
+      moveCheckRaf = null;
+      if (!activeAnchor) return;
+      if (!isPointerOverAnchor(activeAnchor, ev.clientX, ev.clientY)) {
+        hide();
+      }
+    });
+  }
+
+  function handleFocusIn(ev) {
+    const anchor = closestTooltipAnchor(ev.target);
+    if (!anchor) return;
+    if (ev.target.matches && ev.target.matches(':focus-visible')) {
+      showFor(anchor);
+    }
+  }
+
+  function handleFocusOut(ev) {
+    const anchor = closestTooltipAnchor(ev.target);
+    if (!anchor) return;
+    if (activeAnchor === anchor) hide();
   }
 
   function init() {
     ensureStyle();
     ensureTooltipNode();
+    prepareLegacyElements(document);
 
-    document.querySelectorAll('[data-st-tip], [data-st-tip-html], [data-tip], [title]').forEach(prepareElement);
+    if (initialized) return;
+    initialized = true;
 
-    document.addEventListener('mouseover', function (ev) {
-      const anchor = closestTooltipAnchor(ev.target);
-      if (!anchor) return;
-      showFor(anchor);
-    });
+    document.addEventListener('pointerover', handlePointerOver, true);
+    document.addEventListener('pointerout', handlePointerOut, true);
+    document.addEventListener('pointermove', handlePointerMove, true);
 
-    document.addEventListener('mouseout', function (ev) {
-      const anchor = closestTooltipAnchor(ev.target);
-      if (!anchor) return;
-      const to = ev.relatedTarget;
-      if (to && anchor.contains(to)) return;
-      if (activeAnchor === anchor) hide();
-    });
+    // Fallback for environments without reliable pointer events
+    document.addEventListener('mouseover', handlePointerOver, true);
+    document.addEventListener('mouseout', handlePointerOut, true);
 
-    document.addEventListener('focusin', function (ev) {
-      const anchor = closestTooltipAnchor(ev.target);
-      if (!anchor) return;
-      showFor(anchor);
-    });
-
-    document.addEventListener('focusout', function (ev) {
-      const anchor = closestTooltipAnchor(ev.target);
-      if (!anchor) return;
-      if (activeAnchor === anchor) hide();
-    });
+    document.addEventListener('focusin', handleFocusIn, true);
+    document.addEventListener('focusout', handleFocusOut, true);
 
     window.addEventListener('scroll', hide, true);
     window.addEventListener('blur', hide);
@@ -198,8 +287,7 @@
   }
 
   function refresh(scope) {
-    const root = scope && scope.querySelectorAll ? scope : document;
-    root.querySelectorAll('[data-st-tip], [data-st-tip-html], [data-tip], [title]').forEach(prepareElement);
+    prepareLegacyElements(scope && scope.querySelectorAll ? scope : document);
   }
 
   window.StatisticoTooltip = { init, refresh, hide };

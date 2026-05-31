@@ -31,7 +31,7 @@
     if (document.getElementById(scriptId)) return;
     const script = document.createElement('script');
     script.id = scriptId;
-    script.src = resolveAssetUrl('src/shared/js/tooltip-template.js?v=20260429c');
+    script.src = resolveAssetUrl('src/shared/js/tooltip-template.js?v=20260601p');
     script.async = true;
     script.onload = initTooltip;
     document.head.appendChild(script);

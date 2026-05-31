@@ -1083,7 +1083,6 @@ const StatisticoHeader = {
         icon: 'fa-chart-area',
         views: ['histogram', 'cdf', 'percentile', 'boxplot', 'kernel'],
         defaultFile: 'univariate/histogram-standalone-v2.html',
-        resultTabLimit: 2,
         tabs: [
           { view: 'histogram', tabKey: 'histogram', label: 'Histogram', icon: 'fa-chart-column', file: 'univariate/histogram-standalone-v2.html' },
           { view: 'cdf', tabKey: 'cdf', label: 'CDF', icon: 'fa-chart-line', file: 'univariate/cumulative-distribution.html' },
@@ -1146,13 +1145,13 @@ const StatisticoHeader = {
       const link = document.createElement('link');
       link.id = 'uni-ws-tabs-css';
       link.rel = 'stylesheet';
-      link.href = this.resolveDialogUrl('shared-workspace-tabs.css?v=20260531g');
+      link.href = this.resolveDialogUrl('shared-workspace-tabs.css?v=20260531h');
       document.head.appendChild(link);
     }
     if (!document.getElementById('uni-ws-tabs-js') && !globalThis.StatisticoWorkspaceTabs) {
       const script = document.createElement('script');
       script.id = 'uni-ws-tabs-js';
-      script.src = this.resolveDialogUrl('shared-workspace-tabs.js?v=20260531g');
+      script.src = this.resolveDialogUrl('shared-workspace-tabs.js?v=20260531h');
       script.onload = function () {
         try { StatisticoHeader._renderUnivariateResultsTabs(); } catch (_e) {}
       };

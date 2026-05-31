@@ -1098,7 +1098,11 @@ const StatisticoHeader = {
         icon: 'fa-layer-group',
         views: ['by-group'],
         defaultFile: 'univariate/by-group.html',
-        tabs: []
+        tabs: [
+          { tabKey: 'by-group-stats', label: 'Statistics', icon: 'fa-table', panel: 'stats', inPage: true },
+          { tabKey: 'by-group-boxplot', label: 'Box plot', icon: 'fa-chart-gantt', panel: 'boxplot', inPage: true },
+          { tabKey: 'by-group-normality', label: 'Normality', icon: 'fa-wave-square', panel: 'normality', inPage: true }
+        ]
       },
       {
         id: 'advanced',
@@ -1128,9 +1132,14 @@ const StatisticoHeader = {
 
   _buildUniWsTabBtn(opts) {
     const active = opts.active ? ' active' : '';
-    const onclick = opts.file
-      ? ` onclick="StatisticoHeader.navigateTo('${opts.file}')"`
-      : (opts.onSection ? ` onclick="StatisticoHeader.navigateTo('${opts.onSection}')"` : '');
+    let onclick = '';
+    if (opts.inPage && opts.panel) {
+      onclick = ` onclick="StatisticoHeader.setByGroupResultsTab('${opts.panel}')"`;
+    } else if (opts.file) {
+      onclick = ` onclick="StatisticoHeader.navigateTo('${opts.file}')"`;
+    } else if (opts.onSection) {
+      onclick = ` onclick="StatisticoHeader.navigateTo('${opts.onSection}')"`;
+    }
     const titleAttr = opts.title ? ` title="${opts.title.replace(/"/g, '&quot;')}"` : '';
     return `<button type="button" class="ws-mode-tab${active}" role="tab"`
       + ` aria-selected="${opts.active ? 'true' : 'false'}"`
@@ -1139,19 +1148,27 @@ const StatisticoHeader = {
       + `<span>${opts.label}</span></button>`;
   },
 
+  setByGroupResultsTab(panel) {
+    globalThis.__byGroupActiveTab = panel || 'stats';
+    if (typeof globalThis.switchByGroupTab === 'function') {
+      globalThis.switchByGroupTab(panel);
+    }
+    try { this._renderUnivariateResultsTabs(); } catch (_e) {}
+  },
+
   _ensureUnivariateWorkspaceTabAssets() {
     if (this.module !== 'univariate') return;
     if (!document.getElementById('uni-ws-tabs-css')) {
       const link = document.createElement('link');
       link.id = 'uni-ws-tabs-css';
       link.rel = 'stylesheet';
-      link.href = this.resolveDialogUrl('shared-workspace-tabs.css?v=20260531h');
+      link.href = this.resolveDialogUrl('shared-workspace-tabs.css?v=20260601a');
       document.head.appendChild(link);
     }
     if (!document.getElementById('uni-ws-tabs-js') && !globalThis.StatisticoWorkspaceTabs) {
       const script = document.createElement('script');
       script.id = 'uni-ws-tabs-js';
-      script.src = this.resolveDialogUrl('shared-workspace-tabs.js?v=20260531h');
+      script.src = this.resolveDialogUrl('shared-workspace-tabs.js?v=20260601a');
       script.onload = function () {
         try { StatisticoHeader._renderUnivariateResultsTabs(); } catch (_e) {}
       };
@@ -1168,6 +1185,7 @@ const StatisticoHeader = {
   _shouldShowUnivariateResultsTabs(activeSection) {
     const viewTabs = this._getUnivariateResultsViewTabs(activeSection);
     if (!viewTabs.length) return false;
+    if (activeSection.id === 'group' && this.currentView === 'by-group') return true;
     return viewTabs.some((t) => t.view === this.currentView);
   },
 
@@ -1202,27 +1220,36 @@ const StatisticoHeader = {
       }
     }
 
+    const activeByGroupTab = globalThis.__byGroupActiveTab || 'stats';
+
     const tabTitles = {
       histogram: 'Frequency distribution and shape',
       cdf: 'Cumulative distribution curve',
       percentile: 'Cut points and percentile lookup',
       normality: 'Formal normality test battery',
       qqplot: 'PP and QQ probability plots',
-      confidence: 'Interval estimates for mean or median'
+      confidence: 'Interval estimates for mean or median',
+      'by-group-stats': 'Grouped descriptives & histograms',
+      'by-group-boxplot': 'Compare spread by group',
+      'by-group-normality': 'Six tests & NSI by group'
     };
 
     const tabsHtml = viewTabs.map((t) => this._buildUniWsTabBtn({
       tabKey: t.tabKey,
       label: t.label,
       icon: t.icon,
-      active: t.view === this.currentView,
+      active: t.inPage ? t.panel === activeByGroupTab : t.view === this.currentView,
       file: t.file,
-      title: tabTitles[t.view] || ''
+      inPage: t.inPage,
+      panel: t.panel,
+      title: tabTitles[t.tabKey] || tabTitles[t.view] || ''
     })).join('');
 
     const ariaLabel = activeSection.id === 'advanced'
       ? 'Normality and inference views'
-      : 'Distribution views';
+      : activeSection.id === 'group'
+        ? 'By group views'
+        : 'Distribution views';
 
     stack.innerHTML =
       '<div class="ws-chrome ws-chrome--attached ws-chrome--compact">'

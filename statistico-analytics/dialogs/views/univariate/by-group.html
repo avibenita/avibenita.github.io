@@ -5,10 +5,14 @@
   <title>By Group - Univariate</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://code.highcharts.com/highcharts-more.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
-  <link rel="stylesheet" href="../shared-header.css?v=20260531k" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260601a" />
+  <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260601a" />
   <script src="../shared-brand-logo.js?v=20260519u"></script>
-  <script src="../shared-header.js?v=20260531k"></script>
+  <script src="../shared-header.js?v=20260601a"></script>
+  <script src="../shared-workspace-tabs.js?v=20260601a"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -57,6 +61,21 @@
     .hist-head strong { color:var(--accent-1); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .hist-head span { white-space:nowrap; }
     .hist-chart { height:185px; }
+    .by-group-panel { display:none; min-height:0; }
+    .by-group-panel.is-active { display:block; }
+    .boxplot-wrap { border:1px solid var(--border); border-radius:10px; background:var(--surface-2); padding:8px; }
+    #groupBoxplotChart { height:420px; min-height:320px; }
+    .norm-table-wrap { border:1px solid var(--border); border-radius:10px; overflow:auto; background:var(--surface-2); }
+    .norm-table { width:100%; border-collapse:collapse; min-width:720px; }
+    .norm-table th, .norm-table td { padding:8px 10px; border-bottom:1px solid var(--border); text-align:center; font-size:12px; }
+    .norm-table th:first-child, .norm-table td:first-child { text-align:left; font-weight:700; }
+    .norm-table thead th { position:sticky; top:0; z-index:2; background:var(--surface-1); color:var(--accent-1); text-transform:uppercase; font-size:10px; letter-spacing:.08em; }
+    .norm-table tbody tr:hover td { background:rgba(129,140,248,.1); }
+    .norm-table tfoot th, .norm-table tfoot td { background:rgba(139,92,246,.12); font-weight:700; border-top:2px solid rgba(139,92,246,.35); }
+    .p-pass { color:#34d399; font-weight:700; }
+    .p-fail { color:#fb7185; font-weight:700; }
+    .p-na { color:var(--text-secondary); }
+    .nsi-cell { color:var(--accent-2); font-size:14px; font-weight:800; }
     .empty { margin:32px auto; max-width:720px; text-align:center; color:var(--text-secondary); line-height:1.5; }
     .empty i { display:block; color:var(--accent-1); font-size:32px; margin-bottom:10px; }
     .group-dialog-overlay { position:fixed; inset:0; z-index:2147483200; display:none; align-items:center; justify-content:center; padding:16px; background:rgba(3,7,18,.64); backdrop-filter:blur(3px); }
@@ -126,6 +145,7 @@
               <div class="metric"><label>Groups</label><strong id="metricGroups">0</strong></div>
               <div class="metric"><label>Rows Used</label><strong id="metricRows">0</strong></div>
             </div>
+            <div id="byGroupPanel-stats" class="by-group-panel is-active">
             <section id="tablePanel" class="panel">
               <div class="section-title"><strong>Grouped Statistics</strong><span>Main descriptive statistics by selected group levels</span></div>
               <div class="table-wrap">
@@ -144,6 +164,25 @@
               <div class="section-title"><strong>Grouped Histograms</strong><span>Compact distribution view, 4 per row</span></div>
               <div id="histGrid" class="hist-grid"></div>
             </section>
+            </div>
+            <div id="byGroupPanel-boxplot" class="by-group-panel">
+              <section class="panel">
+                <div class="section-title"><strong>Grouped Box Plots</strong><span>One chart — compare spread and quartiles across groups</span></div>
+                <div class="boxplot-wrap"><div id="groupBoxplotChart"></div></div>
+              </section>
+            </div>
+            <div id="byGroupPanel-normality" class="by-group-panel">
+              <section class="panel">
+                <div class="section-title"><strong>Normality by Group</strong><span>Six formal tests and NSI index per group (α = 0.05)</span></div>
+                <div class="norm-table-wrap">
+                  <table class="norm-table">
+                    <thead id="normalityHead"></thead>
+                    <tbody id="normalityBody"></tbody>
+                    <tfoot id="normalityFoot"></tfoot>
+                  </table>
+                </div>
+              </section>
+            </div>
           </div>
         </div>
       </section>
@@ -175,7 +214,10 @@
     let groupStats = [];
     let previewGroupIndex = null;
     let previewLevels = [];
+    let boxplotChart = null;
+    let activeByGroupTab = 'stats';
     const levelSelections = {};
+    const NORM_ALPHA = 0.05;
 
     function fmt(value, digits = 2) {
       const n = Number(value);
@@ -429,11 +471,27 @@
       document.getElementById('subtitle').textContent = `${headers[analysisIndex] || 'Variable'} by ${headers[groupIndex] || 'group'} (${rows.length} filtered source rows)`;
       renderTable();
       renderHistograms();
+      renderGroupBoxplot();
+      renderGroupNormality();
+      switchByGroupTab(activeByGroupTab);
       if (typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.updateVariable(`${headers[analysisIndex] || 'Variable'} by ${headers[groupIndex] || 'Group'}`, rows.length);
         StatisticoHeader.updateUniFilterChrome(payload);
+        try { StatisticoHeader._renderUnivariateResultsTabs(); } catch (_e) {}
       }
     }
+
+    function switchByGroupTab(tab) {
+      activeByGroupTab = tab || 'stats';
+      window.__byGroupActiveTab = activeByGroupTab;
+      document.querySelectorAll('.by-group-panel').forEach((panel) => {
+        panel.classList.toggle('is-active', panel.id === `byGroupPanel-${activeByGroupTab}`);
+      });
+      if (activeByGroupTab === 'boxplot' && boxplotChart) {
+        try { boxplotChart.reflow(); } catch (_e) {}
+      }
+    }
+    window.switchByGroupTab = switchByGroupTab;
 
     function renderTable() {
       document.getElementById('statsBody').innerHTML = groupStats.map((g) => `
@@ -500,6 +558,261 @@
       });
     }
 
+    function renderGroupBoxplot() {
+      if (typeof Highcharts === 'undefined' || !Highcharts.seriesTypes || !Highcharts.seriesTypes.boxplot) return;
+      const categories = groupStats.map((g) => g.group);
+      const boxData = groupStats.map((g) => [g.min, g.q1, g.median, g.q3, g.max]);
+      const varLabel = headers[analysisIndex] || 'Variable';
+      boxplotChart = Highcharts.chart('groupBoxplotChart', {
+        chart: { type:'boxplot', backgroundColor:'transparent', spacing:[12, 12, 16, 12] },
+        title: { text:null },
+        credits: { enabled:false },
+        legend: { enabled:false },
+        xAxis: {
+          categories,
+          title: { text:'Group', style:{ color:'var(--text-secondary)', fontSize:'12px' } },
+          labels: { style:{ color:'var(--text-secondary)', fontSize:'11px' } },
+          lineColor:'var(--border)',
+          gridLineColor:'rgba(148,163,184,.12)'
+        },
+        yAxis: {
+          title: { text: varLabel, style:{ color:'var(--text-secondary)', fontSize:'12px' } },
+          labels: { style:{ color:'var(--text-secondary)', fontSize:'11px' } },
+          gridLineColor:'rgba(148,163,184,.18)'
+        },
+        tooltip: {
+          useHTML: true,
+          pointFormatter: function () {
+            return `<b>${this.category}</b><br/>Max: ${fmt(this.high)}<br/>Q3: ${fmt(this.q3)}<br/>Median: ${fmt(this.median)}<br/>Q1: ${fmt(this.q1)}<br/>Min: ${fmt(this.low)}`;
+          }
+        },
+        plotOptions: {
+          boxplot: {
+            fillColor:'rgba(129,140,248,.28)',
+            lineWidth:2,
+            medianColor:'rgb(255,165,120)',
+            medianWidth:3,
+            stemColor:'rgba(129,140,248,.95)',
+            stemWidth:2,
+            whiskerColor:'rgba(129,140,248,.95)',
+            whiskerLength:'24%',
+            whiskerWidth:2
+          }
+        },
+        series: [{ name: varLabel, data: boxData, color:'rgba(129,140,248,.92)' }]
+      });
+    }
+
+    function normMean(arr) { return arr.reduce((s, v) => s + v, 0) / arr.length; }
+    function normSampleStd(arr) {
+      const m = normMean(arr);
+      return Math.sqrt(arr.reduce((s, v) => s + (v - m) ** 2, 0) / (arr.length - 1));
+    }
+
+    function shapiroWilkTest(data) {
+      const n = data.length;
+      if (n < 3 || n > 5000 || typeof jStat === 'undefined') return { pValue: NaN };
+      const sorted = [...data].sort((a, b) => a - b);
+      const m = normMean(sorted);
+      const ss = sorted.reduce((s, v) => s + (v - m) ** 2, 0);
+      if (ss === 0) return { pValue: NaN };
+      const k = Math.floor(n / 2);
+      const cn = [];
+      for (let i = 1; i <= k; i++) cn.push(jStat.normal.inv((i - 0.375) / (n + 0.25), 0, 1));
+      const phi = cn.reduce((s, v) => s + v * v, 0);
+      const u = 1 / Math.sqrt(n);
+      const poly = (coef, x) => coef.reduce((s, ci) => s * x + ci, 0);
+      const an = poly([-2.706056, 4.434685, -2.071190, -0.147981, 0.221157, cn[k - 1]], u);
+      const a = new Array(k);
+      a[k - 1] = an;
+      if (k >= 2) a[k - 2] = poly([-3.582633, 5.682633, -1.752461, -0.293762, 0.042981, k >= 2 ? cn[1] : cn[0]], u);
+      const phi2 = Math.max(0, phi - 2 * an * an - (k >= 2 ? 2 * a[k - 2] * a[k - 2] : 0));
+      for (let i = 0; i < k - 2; i++) a[i] = phi2 > 0 ? -cn[i] / Math.sqrt(phi * phi2) : 0;
+      let b = 0;
+      for (let i = 0; i < k; i++) b += a[i] * (sorted[n - 1 - i] - sorted[i]);
+      const W = Math.min(1, Math.max(0, (b * b) / ss));
+      const lnW = Math.log(1 - W);
+      const lnN = Math.log(n);
+      let pValue;
+      if (n <= 11) {
+        const z = (-lnW - 0.8 - 0.15 * lnN) / (0.6 + 0.12 * lnN);
+        pValue = 1 - jStat.normal.cdf(z, 0, 1);
+      } else {
+        const mu = -1.5861 - 0.31082 * lnN - 0.083751 * lnN ** 2 + 0.0038915 * lnN ** 3;
+        const sig = Math.exp(-0.4803 - 0.082676 * lnN + 0.0030302 * lnN ** 2);
+        pValue = 1 - jStat.normal.cdf((lnW - mu) / sig, 0, 1);
+      }
+      return { pValue: Math.max(1e-6, Math.min(1 - 1e-6, pValue)) };
+    }
+
+    function jarqueBeraTest(data) {
+      const n = data.length;
+      const m = normMean(data);
+      const s2 = data.reduce((s, v) => s + (v - m) ** 2, 0) / n;
+      const sd = Math.sqrt(s2);
+      const s3 = data.reduce((s, v) => s + ((v - m) / sd) ** 3, 0) / n;
+      const s4 = data.reduce((s, v) => s + ((v - m) / sd) ** 4, 0) / n;
+      const JB = (n / 6) * (s3 ** 2 + (s4 - 3) ** 2 / 4);
+      return { pValue: 1 - jStat.chisquare.cdf(JB, 2) };
+    }
+
+    function kolmogorovSmirnovTest(data) {
+      const n = data.length;
+      const sorted = [...data].sort((a, b) => a - b);
+      const m = normMean(data);
+      const sd = normSampleStd(data);
+      if (!(sd > 0)) return { pValue: NaN };
+      let maxD = 0;
+      for (let i = 0; i < n; i++) {
+        const Ft = jStat.normal.cdf((sorted[i] - m) / sd, 0, 1);
+        maxD = Math.max(maxD, Math.abs((i + 1) / n - Ft), Math.abs(i / n - Ft));
+      }
+      const sqN = Math.sqrt(n);
+      const lam = (sqN + 0.12 + 0.11 / sqN) * maxD;
+      let pValue = 0;
+      for (let k = 1; k <= 100; k++) {
+        const term = (k % 2 === 1 ? 1 : -1) * Math.exp(-2 * k * k * lam * lam);
+        pValue += term;
+        if (Math.abs(term) < 1e-10) break;
+      }
+      return { pValue: Math.max(0, Math.min(1, 2 * pValue)) };
+    }
+
+    function andersonDarlingTest(data) {
+      const n = data.length;
+      const sorted = [...data].sort((a, b) => a - b);
+      const m = normMean(data);
+      const sd = normSampleStd(data);
+      let sum = 0;
+      for (let i = 0; i < n; i++) {
+        const Fi = jStat.normal.cdf((sorted[i] - m) / sd, 0, 1);
+        const Fni = jStat.normal.cdf((sorted[n - 1 - i] - m) / sd, 0, 1);
+        sum += (2 * i + 1) * (Math.log(Math.max(Fi, 1e-300)) + Math.log(Math.max(1 - Fni, 1e-300)));
+      }
+      const A2s = (-n - sum / n) * (1 + 0.75 / n + 2.25 / (n * n));
+      let pValue;
+      if (A2s < 0.2) pValue = 1 - Math.exp(-13.436 + 101.14 * A2s - 223.73 * A2s ** 2);
+      else if (A2s < 0.34) pValue = 1 - Math.exp(-8.318 + 42.796 * A2s - 59.938 * A2s ** 2);
+      else if (A2s < 0.6) pValue = Math.exp(0.9177 - 4.279 * A2s - 1.38 * A2s ** 2);
+      else if (A2s < 13) pValue = Math.exp(1.2937 - 5.709 * A2s + 0.0186 * A2s ** 2);
+      else pValue = 0;
+      return { pValue: Math.max(0, Math.min(1, pValue)) };
+    }
+
+    function cramerVonMisesTest(data) {
+      const n = data.length;
+      const sorted = [...data].sort((a, b) => a - b);
+      const m = normMean(data);
+      const sd = normSampleStd(data);
+      let sum = 0;
+      for (let i = 0; i < n; i++) {
+        const Fi = jStat.normal.cdf((sorted[i] - m) / sd, 0, 1);
+        sum += (Fi - (2 * i + 1) / (2 * n)) ** 2;
+      }
+      const W2s = (sum + 1 / (12 * n)) * (1 + 0.5 / n);
+      let pValue;
+      if (W2s <= 0.0275) pValue = 1 - Math.exp(-13.953 + 775.5 * W2s - 12542.6 * W2s ** 2);
+      else if (W2s <= 0.0516) pValue = 1 - Math.exp(-5.903 + 179.546 * W2s - 1515.29 * W2s ** 2);
+      else if (W2s <= 0.1954) pValue = Math.exp(0.886 - 31.62 * W2s + 10.897 * W2s ** 2);
+      else pValue = Math.exp(1.111 - 34.242 * W2s + 12.832 * W2s ** 2);
+      return { pValue: Math.max(0, Math.min(1, pValue)) };
+    }
+
+    function dagostinoPearsonTest(data) {
+      const n = data.length;
+      if (n < 8) return { pValue: NaN };
+      const m = normMean(data);
+      const s2 = data.reduce((s, v) => s + (v - m) ** 2, 0) / n;
+      const sd = Math.sqrt(s2);
+      const b1 = data.reduce((s, v) => s + ((v - m) / sd) ** 3, 0) / n;
+      const Y = b1 * Math.sqrt((n + 1) * (n + 3) / (6 * (n - 2)));
+      const B2s = 3 * (n * n + 27 * n - 70) * (n + 1) * (n + 3) / ((n - 2) * (n + 5) * (n + 7) * (n + 9));
+      const W2 = -1 + Math.sqrt(2 * (B2s - 1));
+      const del = 1 / Math.sqrt(Math.log(Math.sqrt(W2)));
+      const A = Math.sqrt(2 / (W2 - 1));
+      const Zs = del * Math.log(Y / A + Math.sqrt((Y / A) ** 2 + 1));
+      const b2 = data.reduce((s, v) => s + ((v - m) / sd) ** 4, 0) / n;
+      const Ek = 3 * (n - 1) / (n + 1);
+      const Vk = 24 * n * (n - 2) * (n - 3) / ((n + 1) ** 2 * (n + 3) * (n + 5));
+      const X = (b2 - Ek) / Math.sqrt(Vk);
+      const sqb = 6 * (n * n - 5 * n + 2) / ((n + 7) * (n + 9)) * Math.sqrt(6 * (n + 3) * (n + 5) / (n * (n - 2) * (n - 3)));
+      const Ak = 6 + (8 / sqb) * (2 / sqb + Math.sqrt(1 + 4 / sqb ** 2));
+      const t1 = 2 / (9 * Ak);
+      const t2 = (1 - 2 / Ak) / (1 + X * Math.sqrt(2 / (Ak - 4)));
+      const Zk = ((1 - t1) - Math.cbrt(t2 < 0 ? -Math.abs(t2) : t2)) / Math.sqrt(t1);
+      const K2 = Zs ** 2 + Zk ** 2;
+      return { pValue: Math.max(0, Math.min(1, 1 - jStat.chisquare.cdf(K2, 2))) };
+    }
+
+    function runGroupNormalityTests(values) {
+      return [
+        { name: 'Shapiro-Wilk', ...shapiroWilkTest(values), weight: 1.0 },
+        { name: 'Anderson-Darling', ...andersonDarlingTest(values), weight: 0.9 },
+        { name: 'Kolmogorov-Smirnov', ...kolmogorovSmirnovTest(values), weight: 0.8 },
+        { name: 'Cramer-von Mises', ...cramerVonMisesTest(values), weight: 0.7 },
+        { name: "D'Agostino-Pearson", ...dagostinoPearsonTest(values), weight: 1.0 },
+        { name: 'Jarque-Bera', ...jarqueBeraTest(values), weight: 0.9 }
+      ];
+    }
+
+    function calculateGroupNSI(tests) {
+      let totalWeight = 0;
+      let weightedScore = 0;
+      tests.forEach((test) => {
+        const p = test.pValue;
+        const w = test.weight;
+        if (p === null || !Number.isFinite(p)) return;
+        let score = 0;
+        if (p < 0.001) score = 0;
+        else if (p < 0.05) {
+          const logScale = Math.log10(p) - Math.log10(0.001);
+          const maxLogScale = Math.log10(0.05) - Math.log10(0.001);
+          score = 10 + (30 * logScale / maxLogScale);
+        } else if (p < 0.5) {
+          const logScale = Math.log10(p) - Math.log10(0.05);
+          const maxLogScale = Math.log10(0.5) - Math.log10(0.05);
+          score = 40 + (40 * logScale / maxLogScale);
+        } else {
+          score = 80 + (20 * (p - 0.5) / 0.5);
+        }
+        weightedScore += score * w;
+        totalWeight += w;
+      });
+      return Math.round(totalWeight > 0 ? weightedScore / totalWeight : 50);
+    }
+
+    function formatNormP(p) {
+      if (!Number.isFinite(p)) return '<span class="p-na">—</span>';
+      const cls = p >= NORM_ALPHA ? 'p-pass' : 'p-fail';
+      const label = p < 0.0001 ? '<0.0001' : p.toFixed(4);
+      return `<span class="${cls}">${label}</span>`;
+    }
+
+    function renderGroupNormality() {
+      if (typeof jStat === 'undefined') return;
+      const testNames = ['Shapiro-Wilk', 'Anderson-Darling', 'Kolmogorov-Smirnov', 'Cramer-von Mises', "D'Agostino-Pearson", 'Jarque-Bera'];
+      const groupResults = groupStats.map((g) => ({
+        group: g.group,
+        tests: runGroupNormalityTests(g.values),
+        nsi: 0
+      }));
+      groupResults.forEach((gr) => { gr.nsi = calculateGroupNSI(gr.tests); });
+
+      document.getElementById('normalityHead').innerHTML =
+        `<tr><th>Test</th>${groupResults.map((g) => `<th>${escapeHtml(g.group)}<div style="font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:none;letter-spacing:0;">p-value</div></th>`).join('')}</tr>`;
+
+      document.getElementById('normalityBody').innerHTML = testNames.map((name) => {
+        const cells = groupResults.map((gr) => {
+          const test = gr.tests.find((t) => t.name === name);
+          return `<td>${formatNormP(test ? test.pValue : NaN)}</td>`;
+        }).join('');
+        return `<tr><td>${escapeHtml(name)}</td>${cells}</tr>`;
+      }).join('');
+
+      document.getElementById('normalityFoot').innerHTML =
+        `<tr><th>NSI<sup style="font-size:9px;">TM</sup></th>${groupResults.map((g) => `<td class="nsi-cell">${g.nsi}</td>`).join('')}</tr>`;
+    }
+
     function escapeHtml(value) {
       return String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
     }
@@ -534,11 +847,13 @@
     }
 
     function boot() {
+      window.__byGroupActiveTab = activeByGroupTab;
       if (typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.init('by-group', 'By Group', 0, 'univariate');
         StatisticoHeader.initSidebarPage();
         StatisticoHeader.updateTitle('By Group');
       }
+      if (typeof StatisticoWorkspaceTabs !== 'undefined') StatisticoWorkspaceTabs.init();
       initializeFromPayload();
     }
 

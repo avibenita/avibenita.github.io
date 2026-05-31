@@ -387,6 +387,7 @@ const StatisticoHeader = {
       'partial-correlations': 'Partial Correlations',
       'reliability': 'Reliability Coefficients',
       'taylor-diagram': 'Taylor Diagram',
+      'correlation-by-group': 'Correlations by Group',
       'rolling-correlations': 'Rolling Correlations',
       'correlation-tests': 'Correlation Tests',
       // Regression views
@@ -630,7 +631,8 @@ const StatisticoHeader = {
       { id: 'partial-correlations', label: 'Partial Correlations', file: 'correlations/correlation-partial.html' },
       { id: 'reliability', label: 'Reliability Coefficients', file: 'correlations/correlation-reliability.html' },
       { id: 'taylor-diagram', label: 'Taylor Diagram', file: 'correlations/correlation-taylor.html' },
-      { id: 'descriptive-stats', label: 'Descriptive Statistics', file: 'correlations/descriptive-stats.html' }
+      { id: 'descriptive-stats', label: 'Descriptive Statistics', file: 'correlations/descriptive-stats.html' },
+      { id: 'correlation-by-group', label: 'Correlations by Group', file: 'correlations/by-group.html' }
     ];
 
     const regressionViews = [
@@ -785,6 +787,7 @@ const StatisticoHeader = {
       'partial-correlations': 'Control variables and compare residual links.',
       reliability: 'Evaluate internal consistency.',
       'descriptive-stats': 'Summarize variables and distributions.',
+      'correlation-by-group': 'Compare pairwise r across group levels.',
       histogram: 'Frequency view of the distribution.',
       boxplot: 'Quartiles, whiskers, and outliers.',
       cdf: 'Empirical cumulative distribution.',
@@ -882,7 +885,12 @@ const StatisticoHeader = {
               { type: 'navigate', viewIn: ['descriptive-stats'], file: 'correlations/descriptive-stats.html', icon: 'fa-list-ol', label: 'Descriptives', description: 'Per-variable mean, SD, skew, and missingness.' }
             ]
           }
-        ]
+        ],
+        pinnedNav: {
+          items: [
+            { type: 'navigate', view: 'correlation-by-group', file: 'correlations/by-group.html', icon: 'fa-layer-group', label: 'By Group', description: 'Compare pairwise r across group levels with pattern sparklines.' }
+          ]
+        }
       };
     }
 
@@ -2090,7 +2098,8 @@ const StatisticoHeader = {
       { id: 'partial', label: 'Partial Correlations', file: 'correlations/correlation-partial.html' },
       { id: 'reliability', label: 'Reliability Coefficients', file: 'correlations/correlation-reliability.html' },
       { id: 'taylor', label: 'Taylor Diagram', file: 'correlations/correlation-taylor.html' },
-      { id: 'descriptives', label: 'Descriptive Statistics', file: 'correlations/descriptive-stats.html' }
+      { id: 'descriptives', label: 'Descriptive Statistics', file: 'correlations/descriptive-stats.html' },
+      { id: 'by-group', label: 'Correlations by Group', file: 'correlations/by-group.html' }
     ]);
     const pickReportSections = (sections, onConfirm) => {
       const existing = document.getElementById('stReportExportOverlay');
@@ -6032,6 +6041,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
       reliability: 'Reliability',
       'taylor-diagram': 'Taylor Diagram',
       'descriptive-stats': 'Descriptives',
+      'correlation-by-group': 'By Group',
       correlations: 'Correlations'
     };
   },
@@ -6459,7 +6469,8 @@ READING: [1–2 sentences comparing the named groups using exact per-group numbe
       'partial-correlations': 'Partial view recalculates pairwise correlations while controlling selected variables and omitting excluded variables. Use it to check whether a relationship persists after confounders are held constant.',
       reliability: 'Reliability view evaluates whether selected variables behave like a consistent scale using alpha, omega, item-total correlations, alpha-if-deleted, and PCA dimensionality cues.',
       'taylor-diagram': 'Taylor view compares variables against a reference using correlation, standard deviation, and centered RMSE-style geometry.',
-      'descriptive-stats': 'Descriptives summarize each variable before interpreting the correlation structure.'
+      'descriptive-stats': 'Descriptives summarize each variable before interpreting the correlation structure.',
+      'correlation-by-group': 'By Group compares overall and per-level r for each variable pair, with n per group and a sparkline of group-specific correlations.'
     };
   },
 

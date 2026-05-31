@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>By Group - Correlations</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260531a" />
+  <script src="../shared-brand-logo.js?v=20260519u"></script>
+  <script src="../shared-header.js?v=20260531a"></script>
+  <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
+  <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
+  <style>
+    :root {
+      --surface-0:#0c1624; --surface-1:#1a1f2e; --surface-2:#242938; --border:#2d3748;
+      --accent-1:rgb(255,165,120); --accent-2:#78c8ff; --text-primary:#fff; --text-secondary:rgba(255,255,255,.78);
+      --pos-r:#34d399; --neg-r:#fb7185;
+    }
+    :root[data-theme="light"] {
+      --surface-0:#eef0f4; --surface-1:#fff; --surface-2:#f3f4f6; --border:#cbd5e1;
+      --accent-1:#2563eb; --accent-2:#1d4ed8; --text-primary:#111827; --text-secondary:#374151;
+      --pos-r:#15803d; --neg-r:#be123c;
+    }
+    html, body { height:100%; margin:0; overflow:hidden; }
+    body { background:var(--surface-0); color:var(--text-primary); font-family:"Segoe UI", Tahoma, sans-serif; display:flex; flex-direction:column; }
+    .right-col { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+    .view-wrap { flex:1; min-height:0; padding:12px; box-sizing:border-box; overflow:hidden; }
+    .view-card { height:100%; display:flex; flex-direction:column; background:var(--surface-1); border:1px solid var(--border); border-radius:12px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.24); }
+    .toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border-bottom:1px solid var(--border); background:linear-gradient(180deg, rgba(255,255,255,.04), transparent); flex-wrap:wrap; }
+    .title { display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .title strong { color:var(--accent-1); font-size:14px; letter-spacing:.03em; text-transform:uppercase; }
+    .title span { color:var(--text-secondary); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+    .control { display:flex; align-items:center; gap:6px; color:var(--text-secondary); font-size:12px; }
+    .group-choice-label { color:var(--text-secondary); font-size:12px; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    select, button { border:1px solid var(--border); border-radius:8px; background:var(--surface-2); color:var(--text-primary); padding:7px 10px; font-size:12px; }
+    button { cursor:pointer; font-weight:700; }
+    .content { flex:1; min-height:0; overflow:auto; padding:12px; }
+    .summary-strip { display:grid; grid-template-columns:repeat(4, minmax(110px, 1fr)); gap:10px; margin-bottom:12px; }
+    .metric { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px; }
+    .metric label { display:block; color:var(--text-secondary); font-size:10px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
+    .metric strong { font-size:18px; color:var(--accent-1); }
+    .table-wrap { border:1px solid var(--border); border-radius:10px; overflow:auto; background:var(--surface-2); }
+    table { width:100%; border-collapse:collapse; min-width:880px; }
+    th, td { padding:8px 10px; border-bottom:1px solid var(--border); text-align:right; font-size:12px; white-space:nowrap; }
+    th { position:sticky; top:0; z-index:2; background:var(--surface-1); color:var(--accent-1); text-transform:uppercase; font-size:10px; letter-spacing:.08em; }
+    th:first-child, td:first-child { text-align:left; }
+    th.group-col { min-width:56px; }
+    th.group-col .group-n { display:block; font-size:9px; font-weight:600; color:var(--text-secondary); text-transform:none; letter-spacing:0; margin-top:2px; }
+    td.r-pos { color:var(--pos-r); font-weight:600; }
+    td.r-neg { color:var(--neg-r); font-weight:600; }
+    td.r-weak { color:var(--text-secondary); }
+    td.spark-cell { width:130px; padding:4px 8px; }
+    .r-sparkline { display:block; width:120px; height:36px; }
+    .r-sparkline .spark-mid { stroke:var(--border); stroke-width:1; }
+    .r-sparkline .spark-bar { cursor:help; opacity:.92; }
+    .r-sparkline .spark-bar:hover { opacity:1; stroke:rgba(255,255,255,.35); stroke-width:1; }
+    html[data-theme="light"] .r-sparkline .spark-bar:hover { stroke:rgba(15,23,42,.25); }
+    .empty { margin:32px auto; max-width:720px; text-align:center; color:var(--text-secondary); line-height:1.5; }
+    .empty i { display:block; color:var(--accent-1); font-size:32px; margin-bottom:10px; }
+    .group-dialog-overlay { position:fixed; inset:0; z-index:2147483200; display:none; align-items:center; justify-content:center; padding:16px; background:rgba(3,7,18,.64); backdrop-filter:blur(3px); }
+    .group-dialog-overlay.is-visible { display:flex; }
+    .group-dialog { width:min(920px,96vw); max-height:86vh; display:flex; flex-direction:column; background:var(--surface-1); border:1px solid var(--border); border-radius:14px; box-shadow:0 24px 70px rgba(0,0,0,.42); overflow:hidden; }
+    .group-dialog-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:16px 18px; border-bottom:1px solid var(--border); }
+    .group-dialog-head strong { display:block; color:var(--accent-1); font-size:15px; margin-bottom:4px; }
+    .group-dialog-head span { color:var(--text-secondary); font-size:12px; line-height:1.4; }
+    .group-dialog-close { width:32px; height:32px; display:flex; align-items:center; justify-content:center; padding:0; border-radius:8px; }
+    .group-dialog-body { display:grid; grid-template-columns:minmax(250px, 1fr) minmax(280px, 1fr); gap:0; min-height:0; overflow:hidden; }
+    .group-dialog-list { padding:10px; overflow:auto; border-right:1px solid var(--border); }
+    .group-option { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; margin:4px 0; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); color:var(--text-primary); text-align:left; cursor:pointer; }
+    .group-option:hover, .group-option.is-selected { border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 45%, transparent); }
+    .group-option small { color:var(--text-secondary); font-weight:500; }
+    .level-preview { padding:12px; overflow:auto; min-height:360px; }
+    .level-preview.is-hidden { display:none; }
+    .level-placeholder { display:flex; height:100%; min-height:320px; align-items:center; justify-content:center; color:var(--text-secondary); text-align:center; padding:20px; font-size:13px; line-height:1.5; }
+    .level-placeholder i { display:block; color:var(--accent-1); font-size:28px; margin-bottom:10px; }
+    .level-preview-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:10px; }
+    .level-preview-head strong { color:var(--accent-1); font-size:13px; }
+    .level-preview-head span { display:block; color:var(--text-secondary); font-size:11px; margin-top:3px; }
+    .level-actions { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; margin-bottom:8px; }
+    .level-actions button { padding:5px 8px; font-size:11px; }
+    .group-dialog-foot { display:flex; justify-content:flex-end; align-items:center; gap:10px; padding:14px 18px 16px; border-top:1px solid var(--border); }
+    .group-dialog-done-btn { display:inline-flex; align-items:center; gap:8px; padding:11px 26px; font-size:13px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; border:none; border-radius:10px; color:#fff; cursor:pointer; background:linear-gradient(135deg, var(--accent-2) 0%, #4fc3f7 55%, var(--accent-1) 100%); box-shadow:0 10px 26px rgba(79,195,247,.32); }
+    .level-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 8px; border:1px solid var(--border); border-radius:8px; background:rgba(15,23,42,.22); margin-bottom:5px; color:var(--text-primary); font-size:12px; }
+    .level-row label { display:flex; align-items:center; gap:8px; min-width:0; cursor:pointer; }
+    .level-row input { accent-color:var(--accent-1); }
+    .level-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .level-n { color:var(--text-secondary); font-size:11px; white-space:nowrap; }
+    @media (max-width: 900px) {
+      .summary-strip { grid-template-columns:repeat(2, minmax(110px, 1fr)); }
+      .group-dialog-body { grid-template-columns:1fr; }
+      .group-dialog-list { border-right:none; border-bottom:1px solid var(--border); max-height:280px; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="sb-nav" id="sidebarNav"></nav>
+  <div class="right-col">
+    <div id="header-container"></div>
+    <div class="view-wrap">
+      <section class="view-card">
+        <div class="toolbar">
+          <div class="title">
+            <strong>Correlations by Group</strong>
+            <span id="subtitle">Compare pairwise r across group levels.</span>
+          </div>
+          <div class="controls">
+            <label class="control" for="corrTypeSelect">Type
+              <select id="corrTypeSelect" onchange="onCorrTypeChange()">
+                <option value="Pearson">Pearson</option>
+                <option value="Spearman">Spearman</option>
+              </select>
+            </label>
+            <span class="group-choice-label" id="groupChoiceLabel">No grouping column selected</span>
+            <button id="chooseGroupBtn" type="button" onclick="openGroupDialog()"><i class="fa-solid fa-layer-group"></i> Choose Group</button>
+          </div>
+        </div>
+        <div class="content">
+          <div id="emptyState" class="empty">
+            <i class="fa-solid fa-layer-group"></i>
+            Run a correlation analysis, then choose a grouping column to compare r-values across levels.
+          </div>
+          <div id="mainContent" style="display:none;">
+            <div class="summary-strip">
+              <div class="metric"><label>Variable pairs</label><strong id="metricPairs">—</strong></div>
+              <div class="metric"><label>Groups</label><strong id="metricGroups">—</strong></div>
+              <div class="metric"><label>Group column</label><strong id="metricGroupCol" style="font-size:14px;">—</strong></div>
+              <div class="metric"><label>Filtered rows</label><strong id="metricRows">—</strong></div>
+            </div>
+            <div class="table-wrap">
+              <table id="corrByGroupTable">
+                <thead id="corrByGroupHead"></thead>
+                <tbody id="corrByGroupBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="group-dialog-overlay" id="groupDialog" role="dialog" aria-modal="true" aria-labelledby="groupDialogTitle">
+    <div class="group-dialog">
+      <div class="group-dialog-head">
+        <div>
+          <strong id="groupDialogTitle">Select Grouping Column</strong>
+          <span>Choose the categorical column used to split correlations. Adjust included levels on the right.</span>
+        </div>
+        <button class="group-dialog-close" type="button" onclick="closeGroupDialog()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="group-dialog-body">
+        <div class="group-dialog-list" id="groupDialogList"></div>
+        <div class="level-preview is-hidden" id="groupLevelPreview"></div>
+        <div class="level-placeholder" id="groupLevelPlaceholder"><div><i class="fa-solid fa-hand-pointer"></i>Select a grouping column to preview its levels and n.</div></div>
+      </div>
+      <div class="group-dialog-foot">
+        <button type="button" class="group-dialog-done-btn" onclick="closeGroupDialog()"><i class="fa-solid fa-check"></i> Done</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let correlationData = null;
+    let sourceHeaders = [];
+    let analysisHeaders = [];
+    let sourceRows = [];
+    let groupIndex = null;
+    let previewGroupIndex = null;
+    let previewLevels = [];
+    let corrType = 'Pearson';
+    let tableRows = [];
+    let activeGroups = [];
+    const levelSelections = {};
+
+    function decimalDigits() {
+      if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader.getDecimalPreference === 'function') {
+        return StatisticoHeader.getDecimalPreference();
+      }
+      return 2;
+    }
+
+    function fmt(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n.toFixed(decimalDigits()) : '—';
+    }
+
+    function formatP(p) {
+      if (p == null || !Number.isFinite(p)) return '—';
+      if (p < 0.001) return '<0.001';
+      return fmt(p);
+    }
+
+    function formatRClass(r) {
+      if (!Number.isFinite(r)) return 'r-weak';
+      if (Math.abs(r) >= 0.3) return r >= 0 ? 'r-pos' : 'r-neg';
+      return 'r-weak';
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+    }
+
+    function rowValue(row, idx, name) {
+      return Array.isArray(row) ? row[idx] : row && row[name];
+    }
+
+    function levelKey(value) {
+      return value === null || value === undefined || value === '' ? '(blank)' : String(value);
+    }
+
+    function toFiniteNumber(value) {
+      const n = typeof value === 'number' ? value : parseFloat(value);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function normalizeSourceRows(cd) {
+      const headers = (Array.isArray(cd.sourceHeaders) && cd.sourceHeaders.length) ? cd.sourceHeaders.slice() : (cd.headers || []).slice();
+      let raw = cd.sourceRows;
+      if (!Array.isArray(raw) || !raw.length) raw = cd.sourceRowsAll;
+      if (!Array.isArray(raw) || !raw.length) {
+        const analysis = cd.data || [];
+        if (analysis.length && analysis[0] && typeof analysis[0] === 'object' && !Array.isArray(analysis[0])) {
+          return {
+            headers,
+            rows: analysis.map((row) => headers.map((h) => row[h]))
+          };
+        }
+        return { headers, rows: [] };
+      }
+      return {
+        headers,
+        rows: raw.map((row) => Array.isArray(row) ? row.slice() : headers.map((h) => row && row[h]))
+      };
+    }
+
+    function getLevelCounts(idx) {
+      const counts = new Map();
+      sourceRows.forEach((row) => {
+        const key = levelKey(rowValue(row, idx, sourceHeaders[idx]));
+        counts.set(key, (counts.get(key) || 0) + 1);
+      });
+      return Array.from(counts.entries())
+        .map(([level, n]) => ({ level, n }))
+        .sort((a, b) => String(a.level).localeCompare(String(b.level), undefined, { numeric: true }));
+    }
+
+    function ensureLevelSelection(idx) {
+      const key = String(idx);
+      const levels = getLevelCounts(idx);
+      if (!levelSelections[key]) levelSelections[key] = {};
+      levels.forEach((item) => {
+        if (levelSelections[key][item.level] === undefined) levelSelections[key][item.level] = true;
+      });
+      Object.keys(levelSelections[key]).forEach((level) => {
+        if (!levels.some((item) => item.level === level)) delete levelSelections[key][level];
+      });
+      return levelSelections[key];
+    }
+
+    function isLevelIncluded(idx, level) {
+      return ensureLevelSelection(idx)[level] !== false;
+    }
+
+    function setEmpty(message) {
+      document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('emptyState').innerHTML = `<i class="fa-solid fa-layer-group"></i>${escapeHtml(message)}`;
+      document.getElementById('mainContent').style.display = 'none';
+    }
+
+    function populateGroupChoices() {
+      const list = document.getElementById('groupDialogList');
+      const analysisSet = new Set(analysisHeaders);
+      list.innerHTML = sourceHeaders.map((header, idx) => {
+        const levels = getLevelCounts(idx);
+        const note = analysisSet.has(header)
+          ? `${levels.length} level${levels.length === 1 ? '' : 's'} · analysis variable`
+          : `${levels.length} level${levels.length === 1 ? '' : 's'}, n=${levels.reduce((s, item) => s + item.n, 0)}`;
+        return `<button type="button" class="group-option" data-group-index="${idx}" onclick="selectGroupColumn(${idx}, true)">
+          <span>${escapeHtml(header)}</span><small>${escapeHtml(note)}</small>
+        </button>`;
+      }).join('');
+      refreshGroupDialogSelection();
+    }
+
+    function updateGroupChoiceLabel() {
+      document.getElementById('groupChoiceLabel').textContent = groupIndex == null
+        ? 'No grouping column selected'
+        : `Group by: ${sourceHeaders[groupIndex] || 'Group'}`;
+    }
+
+    function refreshGroupDialogSelection() {
+      document.querySelectorAll('.group-option').forEach((btn) => {
+        btn.classList.toggle('is-selected', Number(btn.getAttribute('data-group-index')) === Number(groupIndex));
+      });
+    }
+
+    function hideLevelPreview() {
+      document.getElementById('groupLevelPreview').classList.add('is-hidden');
+      document.getElementById('groupLevelPreview').innerHTML = '';
+      document.getElementById('groupLevelPlaceholder').style.display = 'flex';
+    }
+
+    function renderLevelPreview(idx) {
+      previewGroupIndex = Number(idx);
+      document.getElementById('groupLevelPreview').classList.remove('is-hidden');
+      document.getElementById('groupLevelPlaceholder').style.display = 'none';
+      ensureLevelSelection(previewGroupIndex);
+      previewLevels = getLevelCounts(previewGroupIndex);
+      const selectedCount = previewLevels.filter((item) => isLevelIncluded(previewGroupIndex, item.level)).length;
+      const totalN = previewLevels.reduce((sum, item) => sum + item.n, 0);
+      document.getElementById('groupLevelPreview').innerHTML = [
+        `<div class="level-preview-head"><div><strong>${escapeHtml(sourceHeaders[previewGroupIndex] || 'Group')}</strong><span>${selectedCount} of ${previewLevels.length} levels included, n=${totalN}</span></div></div>`,
+        `<div class="level-actions"><button type="button" onclick="setAllPreviewLevels(true)">Include all</button><button type="button" onclick="setAllPreviewLevels(false)">Exclude all</button></div>`,
+        previewLevels.map((item, pos) => `
+          <div class="level-row">
+            <label title="${escapeHtml(item.level)}">
+              <input type="checkbox" ${isLevelIncluded(previewGroupIndex, item.level) ? 'checked' : ''} onchange="togglePreviewLevel(${pos}, this.checked)" />
+              <span class="level-name">${escapeHtml(item.level)}</span>
+            </label>
+            <span class="level-n">n=${item.n}</span>
+          </div>
+        `).join('')
+      ].join('');
+    }
+
+    function togglePreviewLevel(pos, included) {
+      const item = previewLevels[pos];
+      if (!item) return;
+      ensureLevelSelection(previewGroupIndex)[item.level] = !!included;
+      if (previewGroupIndex === groupIndex) renderByGroup();
+      renderLevelPreview(previewGroupIndex);
+    }
+
+    function setAllPreviewLevels(included) {
+      previewLevels.forEach((item) => { ensureLevelSelection(previewGroupIndex)[item.level] = !!included; });
+      if (previewGroupIndex === groupIndex) renderByGroup();
+      renderLevelPreview(previewGroupIndex);
+    }
+
+    function openGroupDialog() {
+      if (!sourceHeaders.length) return;
+      refreshGroupDialogSelection();
+      if (groupIndex == null) hideLevelPreview();
+      else renderLevelPreview(groupIndex);
+      document.getElementById('groupDialog').classList.add('is-visible');
+    }
+
+    function closeGroupDialog() {
+      document.getElementById('groupDialog').classList.remove('is-visible');
+    }
+
+    function selectGroupColumn(idx, keepDialogOpen) {
+      groupIndex = Number(idx);
+      updateGroupChoiceLabel();
+      refreshGroupDialogSelection();
+      renderLevelPreview(groupIndex);
+      if (!keepDialogOpen) closeGroupDialog();
+      renderByGroup();
+    }
+
+    function onCorrTypeChange() {
+      corrType = document.getElementById('corrTypeSelect').value || 'Pearson';
+      if (groupIndex != null) renderByGroup();
+    }
+
+    function getRanks(arr) {
+      const sorted = arr.map((val, idx) => ({ val, idx })).sort((a, b) => a.val - b.val);
+      const ranks = new Array(arr.length);
+      for (let i = 0; i < sorted.length; i++) {
+        let j = i;
+        while (j < sorted.length - 1 && sorted[j].val === sorted[j + 1].val) j++;
+        const avgRank = (i + j + 2) / 2;
+        for (let k = i; k <= j; k++) ranks[sorted[k].idx] = avgRank;
+        i = j;
+      }
+      return ranks;
+    }
+
+    function tDistCDF(t, df) {
+      if (typeof jStat !== 'undefined' && jStat.studentt && typeof jStat.studentt.cdf === 'function') {
+        return jStat.studentt.cdf(t, df);
+      }
+      return 0.5;
+    }
+
+    function calculatePearsonCorrelation(x, y) {
+      const pairs = x.map((xi, i) => [xi, y[i]]).filter(([xi, yi]) => Number.isFinite(xi) && Number.isFinite(yi));
+      const n = pairs.length;
+      if (n < 3) return { r: NaN, p: null, n };
+      const xV = pairs.map((p) => p[0]);
+      const yV = pairs.map((p) => p[1]);
+      const mX = xV.reduce((a, b) => a + b, 0) / n;
+      const mY = yV.reduce((a, b) => a + b, 0) / n;
+      let num = 0; let denX = 0; let denY = 0;
+      for (let i = 0; i < n; i++) {
+        const dx = xV[i] - mX;
+        const dy = yV[i] - mY;
+        num += dx * dy;
+        denX += dx * dx;
+        denY += dy * dy;
+      }
+      if (denX === 0 || denY === 0) return { r: NaN, p: null, n };
+      const r = num / Math.sqrt(denX * denY);
+      const t = r * Math.sqrt(n - 2) / Math.sqrt(Math.max(1e-12, 1 - r * r));
+      const p = 2 * (1 - tDistCDF(Math.abs(t), n - 2));
+      return { r, p, n };
+    }
+
+    function calculateSpearmanCorrelation(x, y) {
+      const pairs = x.map((xi, i) => [xi, y[i]]).filter(([xi, yi]) => Number.isFinite(xi) && Number.isFinite(yi));
+      const n = pairs.length;
+      if (n < 3) return { r: NaN, p: null, n };
+      return calculatePearsonCorrelation(getRanks(pairs.map((p) => p[0])), getRanks(pairs.map((p) => p[1])));
+    }
+
+    function correlatePair(rows, varA, varB) {
+      const idxA = sourceHeaders.indexOf(varA);
+      const idxB = sourceHeaders.indexOf(varB);
+      if (idxA < 0 || idxB < 0) return { r: NaN, p: null, n: 0 };
+      const x = [];
+      const y = [];
+      rows.forEach((row) => {
+        const a = toFiniteNumber(rowValue(row, idxA, varA));
+        const b = toFiniteNumber(rowValue(row, idxB, varB));
+        if (a != null && b != null) {
+          x.push(a);
+          y.push(b);
+        }
+      });
+      return corrType === 'Spearman'
+        ? calculateSpearmanCorrelation(x, y)
+        : calculatePearsonCorrelation(x, y);
+    }
+
+    function buildIncludedGroups() {
+      const groups = new Map();
+      sourceRows.forEach((row) => {
+        const group = levelKey(rowValue(row, groupIndex, sourceHeaders[groupIndex]));
+        if (!isLevelIncluded(groupIndex, group)) return;
+        if (!groups.has(group)) groups.set(group, []);
+        groups.get(group).push(row);
+      });
+      return Array.from(groups.entries())
+        .map(([group, rows]) => ({ group, rows, n: rows.length }))
+        .filter((g) => g.n > 0)
+        .sort((a, b) => String(a.group).localeCompare(String(b.group), undefined, { numeric: true }));
+    }
+
+    function shortGroupLabel(group, index) {
+      const text = String(group);
+      if (text.length <= 6) return text;
+      return text.slice(0, 5) + '…';
+    }
+
+    function tipAttr(text) {
+      return String(text ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    }
+
+    function buildSparklineSvg(groupResults) {
+      const w = 120;
+      const h = 36;
+      const mid = h / 2;
+      const maxHalf = mid - 3;
+      const count = groupResults.length || 1;
+      const gap = 2;
+      const barW = Math.max(4, (w - gap * (count + 1)) / count);
+      let bars = '';
+      groupResults.forEach((gr, i) => {
+        const r = Number.isFinite(gr.r) ? Math.max(-1, Math.min(1, gr.r)) : 0;
+        const barH = Math.abs(r) * maxHalf;
+        const x = gap + i * (barW + gap);
+        const y = r >= 0 ? mid - barH : mid;
+        const fill = !Number.isFinite(gr.r) ? 'rgba(148,163,184,.35)' : (r >= 0 ? 'var(--pos-r)' : 'var(--neg-r)');
+        const tip = Number.isFinite(gr.r)
+          ? `${gr.group}: r = ${fmt(gr.r)}, n = ${gr.n}`
+          : `${gr.group}: insufficient data (n = ${gr.n})`;
+        bars += `<rect class="spark-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(1, barH).toFixed(1)}" fill="${fill}" data-st-tip="${tipAttr(tip)}" />`;
+      });
+      return `<svg class="r-sparkline" viewBox="0 0 ${w} ${h}" aria-hidden="true"><line class="spark-mid" x1="0" y1="${mid}" x2="${w}" y2="${mid}" /><line class="spark-mid" x1="${(w/2).toFixed(1)}" y1="2" x2="${(w/2).toFixed(1)}" y2="${h-2}" stroke-dasharray="2 3" opacity=".45" />${bars}</svg>`;
+    }
+
+    function renderByGroup() {
+      if (groupIndex == null) return setEmpty('Choose a grouping column to compare correlations across levels.');
+      activeGroups = buildIncludedGroups();
+      if (!activeGroups.length) return setEmpty('No rows remain for the selected group levels. Adjust level filters or the row filter.');
+
+      const pairs = [];
+      for (let i = 0; i < analysisHeaders.length; i++) {
+        for (let j = i + 1; j < analysisHeaders.length; j++) {
+          const varA = analysisHeaders[i];
+          const varB = analysisHeaders[j];
+          const overall = correlatePair(sourceRows, varA, varB);
+          const groupResults = activeGroups.map((g) => {
+            const result = correlatePair(g.rows, varA, varB);
+            return { group: g.group, r: result.r, p: result.p, n: result.n };
+          });
+          pairs.push({
+            pair: `${varA}–${varB}`,
+            varA,
+            varB,
+            overall,
+            groupResults
+          });
+        }
+      }
+
+      tableRows = pairs;
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('mainContent').style.display = 'block';
+      document.getElementById('metricPairs').textContent = pairs.length;
+      document.getElementById('metricGroups').textContent = activeGroups.length;
+      document.getElementById('metricGroupCol').textContent = sourceHeaders[groupIndex] || '—';
+      document.getElementById('metricRows').textContent = sourceRows.length;
+      document.getElementById('subtitle').textContent = `${corrType} r for ${analysisHeaders.length} variables across ${activeGroups.length} groups (${sourceRows.length} filtered rows)`;
+
+      const head = [
+        '<tr><th>Pair</th>',
+        `<th title="n=${overallSafeN()}">Overall r</th>`
+      ];
+      activeGroups.forEach((g, i) => {
+        head.push(`<th class="group-col" title="${escapeHtml(g.group)}">${escapeHtml(shortGroupLabel(g.group, i))}<span class="group-n">(n=${g.n})</span></th>`);
+      });
+      head.push('<th>Global p</th><th>Pattern</th></tr>');
+      document.getElementById('corrByGroupHead').innerHTML = head.join('');
+
+      document.getElementById('corrByGroupBody').innerHTML = pairs.map((row) => {
+        const overallClass = formatRClass(row.overall.r);
+        const overallCell = Number.isFinite(row.overall.r)
+          ? `<td class="${overallClass}" title="n=${row.overall.n}">${fmt(row.overall.r)}</td>`
+          : '<td class="r-weak">—</td>';
+        const groupCells = row.groupResults.map((gr) => {
+          if (!Number.isFinite(gr.r)) return `<td class="r-weak" title="n=${gr.n}">—</td>`;
+          return `<td class="${formatRClass(gr.r)}" title="${escapeHtml(gr.group)}: n=${gr.n}">${fmt(gr.r)}</td>`;
+        }).join('');
+        return `<tr>
+          <td>${escapeHtml(row.pair)}</td>
+          ${overallCell}
+          ${groupCells}
+          <td>${formatP(row.overall.p)}</td>
+          <td class="spark-cell">${buildSparklineSvg(row.groupResults)}</td>
+        </tr>`;
+      }).join('');
+
+      if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
+        window.StatisticoTooltip.refresh(document.getElementById('corrByGroupTable'));
+      }
+      registerHeaderActions();
+      syncHeaderSample();
+    }
+
+    function overallSafeN() {
+      return sourceRows.length;
+    }
+
+    function syncHeaderSample() {
+      if (typeof StatisticoHeader === 'undefined') return;
+      StatisticoHeader.sampleSize = sourceRows.length;
+      StatisticoHeader.variableName = `${analysisHeaders.length} Variables · By Group`;
+      if (typeof StatisticoHeader.render === 'function') StatisticoHeader.render();
+    }
+
+    function registerHeaderActions() {
+      if (typeof StatisticoHeader === 'undefined') return;
+      const exportHeaders = ['Pair', 'Overall r', 'Overall n', ...activeGroups.map((g) => `${g.group} r`), 'Global p'];
+      StatisticoHeader.registerActions({
+        getData: () => ({
+          headers: exportHeaders,
+          allRows: tableRows.map((row) => [
+            row.pair,
+            Number.isFinite(row.overall.r) ? row.overall.r : '',
+            row.overall.n,
+            ...row.groupResults.map((gr) => (Number.isFinite(gr.r) ? gr.r : '')),
+            row.overall.p
+          ]),
+          usedRows: tableRows.map((row) => [
+            row.pair,
+            Number.isFinite(row.overall.r) ? row.overall.r : '',
+            row.overall.n,
+            ...row.groupResults.map((gr) => (Number.isFinite(gr.r) ? gr.r : '')),
+            row.overall.p
+          ]),
+          usedRange: 'Correlations by group',
+          notice: 'Grouped correlations use the active row filter and selected group levels.'
+        }),
+        moduleName: 'Copy grouped correlations to clipboard'
+      });
+    }
+
+    function installRowFilter() {
+      if (typeof Filter === 'undefined' || typeof Filter.attach !== 'function' || !correlationData) return;
+      const cd = correlationData;
+      const allRows = (Array.isArray(cd.sourceRowsAll) && cd.sourceRowsAll.length)
+        ? cd.sourceRowsAll
+        : (Array.isArray(cd.sourceRows) ? cd.sourceRows : []);
+      if (!sourceHeaders.length || !allRows.length) return;
+      Filter.attach({
+        headers: sourceHeaders,
+        rows: allRows,
+        initial: {
+          columnFilters: cd.columnFilters,
+          sourceRows: cd.sourceRows
+        },
+        onApply: function (filteredRows, criteria) {
+          cd.sourceRows = filteredRows;
+          cd.columnFilters = criteria;
+          cd.rowFilterActive = filteredRows.length < allRows.length;
+          if (typeof Filter.projectRows === 'function') {
+            cd.data = Filter.projectRows(filteredRows, sourceHeaders, analysisHeaders);
+          }
+          correlationData = cd;
+          window.correlationData = cd;
+          try { sessionStorage.setItem('correlationData', JSON.stringify(cd)); } catch (_e) {}
+          const normalized = normalizeSourceRows(cd);
+          sourceRows = normalized.rows;
+          if (groupIndex != null) renderByGroup();
+          else syncHeaderSample();
+        }
+      });
+    }
+
+    function initializeFromPayload(payload) {
+      correlationData = payload;
+      window.correlationData = payload;
+      analysisHeaders = (payload.headers || []).slice();
+      const normalized = normalizeSourceRows(payload);
+      sourceHeaders = normalized.headers;
+      sourceRows = normalized.rows;
+      if (!sourceHeaders.length || !analysisHeaders.length) {
+        return setEmpty('Run a correlation analysis first, then open Correlations by Group.');
+      }
+      if (sourceRows.length === 0 && Array.isArray(payload.data) && payload.data.length) {
+        sourceRows = payload.data.map((row) => sourceHeaders.map((h) => row[h]));
+      }
+      if (!sourceRows.length) return setEmpty('No source rows available. Re-run the correlation analysis or clear filters.');
+      populateGroupChoices();
+      groupIndex = null;
+      updateGroupChoiceLabel();
+      hideLevelPreview();
+      syncHeaderSample();
+      setTimeout(installRowFilter, 250);
+      openGroupDialog();
+    }
+
+    function tryLoadStored() {
+      try {
+        const raw = sessionStorage.getItem('correlationData') || localStorage.getItem('correlationData');
+        if (raw) {
+          initializeFromPayload(JSON.parse(raw));
+          return true;
+        }
+      } catch (_e) {}
+      return false;
+    }
+
+    function boot() {
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.init('correlation-by-group', 'Correlations by Group', 0, 'correlations');
+        StatisticoHeader.initSidebarPage();
+        StatisticoHeader.updateTitle('Correlations by Group');
+      }
+      if (!tryLoadStored()) {
+        setEmpty('Run a correlation analysis first, then open Correlations by Group.');
+      }
+    }
+
+    window.openGroupDialog = openGroupDialog;
+    window.closeGroupDialog = closeGroupDialog;
+    window.selectGroupColumn = selectGroupColumn;
+    window.togglePreviewLevel = togglePreviewLevel;
+    window.setAllPreviewLevels = setAllPreviewLevels;
+    window.onCorrTypeChange = onCorrTypeChange;
+
+    if (typeof Office !== 'undefined') {
+      Office.onReady(function () { boot(); });
+    } else {
+      window.addEventListener('DOMContentLoaded', boot);
+    }
+  </script>
+</body>
+</html>

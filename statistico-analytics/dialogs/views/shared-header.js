@@ -4569,6 +4569,12 @@ const StatisticoHeader = {
     if (existingAi) existingAi.remove();
     const existingProductFooter = document.getElementById('sbProductFooter');
     if (existingProductFooter) existingProductFooter.remove();
+    const existingFooter = document.getElementById('sbNavFooter');
+    if (existingFooter) existingFooter.remove();
+
+    const footer = document.createElement('div');
+    footer.id = 'sbNavFooter';
+    footer.className = 'sb-nav-footer';
 
     const actions = this._pendingActions || {};
     const hasView = typeof actions.getData === 'function';
@@ -4606,7 +4612,7 @@ const StatisticoHeader = {
           <sup class="sb-ai-sup">${aiBadge}</sup>
         </button>
       `;
-      nav.appendChild(aiSection);
+      footer.appendChild(aiSection);
     }
 
     // ── Utilities ──────────────────────────────────────────────────────────
@@ -4640,7 +4646,8 @@ const StatisticoHeader = {
         <span class="sb-item-label">JSON</span>
       </button>
     `;
-    nav.appendChild(utilities);
+    footer.appendChild(utilities);
+    nav.appendChild(footer);
 
     if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
       window.StatisticoTooltip.refresh();

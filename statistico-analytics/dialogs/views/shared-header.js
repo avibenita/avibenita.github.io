@@ -365,7 +365,7 @@ const StatisticoHeader = {
       'normality': 'Normality · Tests',
       'kernel': 'Kernel',
       'descriptive-stats': 'Descriptive Statistics',
-      'by-group': 'By Group',
+      'by-group': 'Grouped Analysis',
       'cdf': 'Distribution · CDF',
       'confidence': 'Confidence Intervals',
       'hypothesis': 'One-Sample Test',
@@ -603,8 +603,8 @@ const StatisticoHeader = {
       { id: 'boxplot', label: 'Box Plot', file: 'univariate/boxplot-standalone.html' },
       { id: 'kernel', label: 'Kernel', file: 'univariate/kernel-standalone.html' },
       { id: 'separator-core-by-group', label: '---', file: null, isSeparator: true },
-      { id: 'group-by-group', label: 'By Group', file: null, isGroup: true },
-      { id: 'by-group', label: 'By Group', file: 'univariate/by-group.html' },
+      { id: 'group-by-group', label: 'Grouped Analysis', file: null, isGroup: true },
+      { id: 'by-group', label: 'Grouped Analysis', file: 'univariate/by-group.html' },
       { id: 'separator-by-group-advanced', label: '---', file: null, isSeparator: true },
       { id: 'group-advanced', label: 'Advanced Diagnostics', file: null, isGroup: true },
       { id: 'outliers', label: 'Outliers', file: 'univariate/outliers-standalone.html' },
@@ -684,8 +684,8 @@ const StatisticoHeader = {
             </div>
           </div>
           <div class="header-tabs-row">
-            <span class="header-tab-group header-tab-group--by-group">By Group</span>
-            <div class="header-tab-row-tabs" role="tablist" aria-label="By group views">
+            <span class="header-tab-group header-tab-group--by-group">Grouped Analysis</span>
+            <div class="header-tab-row-tabs" role="tablist" aria-label="Grouped analysis views">
               ${byGroupTabs.map(renderTabButton).join('')}
             </div>
           </div>
@@ -780,7 +780,7 @@ const StatisticoHeader = {
       cdf: 'Empirical cumulative distribution.',
       percentile: 'Percentile cut points.',
       kernel: 'Smoothed density estimate.',
-      'by-group': 'Compare statistics by a grouping column.',
+      'by-group': 'Compare distributions across groups.',
       normality: 'Shapiro-Wilk, Anderson-Darling, and friends.',
       qqplot: 'PP and QQ probability plots.',
       hypothesis: 'One-sample mean / median test.',
@@ -843,9 +843,8 @@ const StatisticoHeader = {
           }
         ],
         pinnedNav: {
-          title: 'Grouped comparison',
           items: [
-            { type: 'navigate', view: 'by-group', file: 'univariate/by-group.html', icon: 'fa-layer-group', label: 'By group', description: 'Compare statistics by a grouping column.' }
+            { type: 'navigate', view: 'by-group', file: 'univariate/by-group.html', icon: 'fa-layer-group', label: 'Grouped Analysis', description: 'Compare distributions across groups.' }
           ]
         }
       };
@@ -1094,7 +1093,7 @@ const StatisticoHeader = {
       {
         id: 'group',
         tabKey: 'uni-group',
-        label: 'By group',
+        label: 'Grouped Analysis',
         icon: 'fa-layer-group',
         views: ['by-group'],
         defaultFile: 'univariate/by-group.html',
@@ -1249,7 +1248,7 @@ const StatisticoHeader = {
     const ariaLabel = activeSection.id === 'advanced'
       ? 'Normality and inference views'
       : activeSection.id === 'group'
-        ? 'By group views'
+        ? 'Grouped analysis views'
         : 'Distribution views';
 
     stack.innerHTML =
@@ -1318,13 +1317,9 @@ const StatisticoHeader = {
     if (!pinned || !Array.isArray(pinned.items) || !pinned.items.length) return '';
 
     const itemsHtml = pinned.items.map((item) => this._renderSidebarNavItem(item)).join('');
-    const titleHtml = pinned.title
-      ? `<div class="sb-pinned-nav-kicker">${pinned.title}</div>`
-      : '';
 
-    return `<div class="sb-pinned-nav" role="navigation" aria-label="${pinned.title || 'Pinned navigation'}">`
-      + titleHtml
-      + `<div class="sb-pinned-nav-body">${itemsHtml}</div></div>`;
+    return `<div class="sb-pinned-items" role="navigation" aria-label="Grouped analysis">`
+      + `<div class="sb-items-rail">${itemsHtml}</div></div>`;
   },
 
   _renderSharedSidebar() {
@@ -4794,7 +4789,7 @@ const StatisticoHeader = {
       cdf: 'CDF',
       percentile: 'Percentiles',
       kernel: 'Kernel',
-      'by-group': 'By Group',
+      'by-group': 'Grouped Analysis',
       outliers: 'Outliers',
       normality: 'Tests',
       qqplot: 'PP/QQ',

@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260601h" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260601d" />
   <script src="../shared-brand-logo.js?v=20260519u"></script>
-  <script src="../shared-header.js?v=20260601i"></script>
+  <script src="../shared-header.js?v=20260601j"></script>
   <script src="../../shared/uni-normality-tests.js?v=20260601g"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
@@ -347,6 +347,21 @@
       delete window.__byGroupAiContext;
     }
 
+    function getAnalysisVariableName() {
+      return headers[analysisIndex]
+        || (payload && payload.sourceHeaders && payload.sourceHeaders[analysisIndex])
+        || (payload && (payload.column || payload.variableName || payload.colName))
+        || 'Variable';
+    }
+
+    function syncHeaderVariable(sampleN) {
+      if (typeof StatisticoHeader === 'undefined') return;
+      const varName = getAnalysisVariableName();
+      const n = sampleN != null ? sampleN : rows.length;
+      StatisticoHeader.updateVariable(varName, n);
+      StatisticoHeader.updateUniFilterChrome(payload);
+    }
+
     function initializeFromPayload(data) {
       payload = data || loadStoredPayload();
       if (!payload) return setEmpty('Run a univariate analysis first, then open BY GROUP.');
@@ -354,6 +369,7 @@
       analysisIndex = payload.columnIndex != null ? Number(payload.columnIndex) : 0;
       rows = normalizeRows(payload);
       if (!headers.length || !rows.length) return setEmpty('BY GROUP needs source rows from the workbook range.');
+      syncHeaderVariable(rows.length);
       populateGroupChoices();
       groupIndex = null;
       updateGroupChoiceLabel();
@@ -494,11 +510,11 @@
       if (!groupStats.length) return setEmpty('No numeric values remain after grouping. Choose another grouping column or adjust filters.');
       document.getElementById('emptyState').style.display = 'none';
       document.getElementById('mainContent').style.display = 'block';
-      document.getElementById('metricVariable').textContent = headers[analysisIndex] || payload.column || 'Variable';
+      document.getElementById('metricVariable').textContent = getAnalysisVariableName();
       document.getElementById('metricGroup').textContent = headers[groupIndex] || 'Group';
       document.getElementById('metricGroups').textContent = groupStats.length;
       document.getElementById('metricRows').textContent = groupStats.reduce((sum, g) => sum + g.n, 0);
-      document.getElementById('subtitle').textContent = `${headers[analysisIndex] || 'Variable'} by ${headers[groupIndex] || 'group'} (${rows.length} filtered source rows)`;
+      document.getElementById('subtitle').textContent = `${getAnalysisVariableName()} by ${headers[groupIndex] || 'group'} (${rows.length} filtered source rows)`;
       renderTable();
       renderGroupBoxplot();
       renderGroupNormality();
@@ -506,8 +522,7 @@
       switchByGroupTab(activeByGroupTab);
       if (activeByGroupTab === 'stats') renderHistograms();
       if (typeof StatisticoHeader !== 'undefined') {
-        StatisticoHeader.updateVariable(`${headers[analysisIndex] || 'Variable'} by ${headers[groupIndex] || 'Group'}`, rows.length);
-        StatisticoHeader.updateUniFilterChrome(payload);
+        syncHeaderVariable(groupStats.reduce((sum, g) => sum + g.n, 0));
         try { StatisticoHeader._renderUnivariateResultsTabs(); } catch (_e) {}
       }
     }
@@ -619,7 +634,7 @@
       if (typeof Highcharts === 'undefined' || !Highcharts.seriesTypes || !Highcharts.seriesTypes.boxplot) return;
       const categories = groupStats.map((g) => g.group);
       const boxData = groupStats.map((g) => [g.min, g.q1, g.median, g.q3, g.max]);
-      const varLabel = headers[analysisIndex] || 'Variable';
+      const varLabel = getAnalysisVariableName();
       boxplotChart = Highcharts.chart('groupBoxplotChart', {
         chart: { type:'boxplot', backgroundColor:'transparent', spacing:[12, 12, 16, 12] },
         title: { text:null },
@@ -765,7 +780,7 @@
     function syncByGroupAiContext() {
       window.__byGroupAiContext = {
         activeTab: activeByGroupTab,
-        variable: headers[analysisIndex] || (payload && payload.column) || 'Variable',
+        variable: getAnalysisVariableName(),
         groupingColumn: headers[groupIndex] || 'Group',
         groupCount: groupStats.length,
         totalRows: groupStats.reduce((sum, g) => sum + g.n, 0),

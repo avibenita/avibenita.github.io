@@ -4335,8 +4335,17 @@ const StatisticoHeader = {
     const showing = (meta && Array.isArray(meta.filteredRows) && meta.filteredRows.length)
       ? meta.filteredRows.length
       : (payload && payload.sourceRows ? payload.sourceRows.length : (payload && payload.usedRows ? payload.usedRows.length : 0));
-    const varName = (payload && (payload.column || payload.variableName)) || this.variableName || 'Variable';
-    const n = payload && payload.values ? payload.values.length : this.sampleSize;
+    const isByGroup = this.module === 'univariate' && this.currentView === 'by-group';
+    const headerIdx = payload && payload.columnIndex != null ? Number(payload.columnIndex) : null;
+    const headerVarName = (payload && Array.isArray(payload.sourceHeaders) && headerIdx != null && payload.sourceHeaders[headerIdx])
+      ? payload.sourceHeaders[headerIdx]
+      : null;
+    const varName = isByGroup
+      ? (this.variableName || headerVarName || (payload && (payload.column || payload.variableName)) || 'Variable')
+      : ((payload && (payload.column || payload.variableName)) || this.variableName || headerVarName || 'Variable');
+    const n = isByGroup
+      ? (this.sampleSize || 0)
+      : (payload && payload.values ? payload.values.length : this.sampleSize);
 
     const varEl = document.getElementById('headerVariableName');
     if (varEl) {

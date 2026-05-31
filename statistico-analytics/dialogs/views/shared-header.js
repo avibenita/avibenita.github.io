@@ -1171,7 +1171,7 @@ const StatisticoHeader = {
     const link = document.createElement('link');
     link.id = 'statistico-minimal-css';
     link.rel = 'stylesheet';
-    link.href = this.resolveDialogUrl('shared-minimal.css?v=20260601o');
+    link.href = this.resolveDialogUrl('shared-minimal.css?v=20260601q');
     document.head.appendChild(link);
   },
 

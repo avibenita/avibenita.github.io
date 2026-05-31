@@ -96,7 +96,7 @@
       const link = document.createElement('link');
       link.id = 'statistico-minimal-css';
       link.rel = 'stylesheet';
-      link.href = '../shared-minimal.css?v=20260601o';
+      link.href = '../shared-minimal.css?v=20260601q';
       document.head.appendChild(link);
     }
   });

@@ -1164,13 +1164,13 @@ const StatisticoHeader = {
       const link = document.createElement('link');
       link.id = 'uni-ws-tabs-css';
       link.rel = 'stylesheet';
-      link.href = this.resolveDialogUrl('shared-workspace-tabs.css?v=20260601b');
+      link.href = this.resolveDialogUrl('shared-workspace-tabs.css?v=20260601c');
       document.head.appendChild(link);
     }
     if (!document.getElementById('uni-ws-tabs-js') && !globalThis.StatisticoWorkspaceTabs) {
       const script = document.createElement('script');
       script.id = 'uni-ws-tabs-js';
-      script.src = this.resolveDialogUrl('shared-workspace-tabs.js?v=20260601b');
+      script.src = this.resolveDialogUrl('shared-workspace-tabs.js?v=20260601c');
       script.onload = function () {
         try { StatisticoHeader._renderUnivariateResultsTabs(); } catch (_e) {}
       };
@@ -1231,7 +1231,7 @@ const StatisticoHeader = {
       normality: 'Formal normality test battery',
       qqplot: 'PP and QQ probability plots',
       confidence: 'Interval estimates for mean or median',
-      'by-group-histogram': 'Grouped distribution charts',
+      'by-group-histogram': 'Grouped histogram charts',
       'by-group-stats': 'Descriptive statistics by group',
       'by-group-boxplot': 'Compare spread by group',
       'by-group-normality': 'Six tests & NSI by group'

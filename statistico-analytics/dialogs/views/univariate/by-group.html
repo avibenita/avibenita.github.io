@@ -8,11 +8,11 @@
   <script src="https://code.highcharts.com/highcharts-more.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
-  <link rel="stylesheet" href="../shared-header.css?v=20260601b" />
-  <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260601b" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260601c" />
+  <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260601c" />
   <script src="../shared-brand-logo.js?v=20260519u"></script>
-  <script src="../shared-header.js?v=20260601b"></script>
-  <script src="../shared-workspace-tabs.js?v=20260601b"></script>
+  <script src="../shared-header.js?v=20260601c"></script>
+  <script src="../shared-workspace-tabs.js?v=20260601c"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -472,10 +472,10 @@
       document.getElementById('metricRows').textContent = groupStats.reduce((sum, g) => sum + g.n, 0);
       document.getElementById('subtitle').textContent = `${headers[analysisIndex] || 'Variable'} by ${headers[groupIndex] || 'group'} (${rows.length} filtered source rows)`;
       renderTable();
-      renderHistograms();
       renderGroupBoxplot();
       renderGroupNormality();
       switchByGroupTab(activeByGroupTab);
+      if (activeByGroupTab === 'histogram') renderHistograms();
       if (typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.updateVariable(`${headers[analysisIndex] || 'Variable'} by ${headers[groupIndex] || 'Group'}`, rows.length);
         StatisticoHeader.updateUniFilterChrome(payload);
@@ -484,21 +484,24 @@
     }
 
     function switchByGroupTab(tab) {
-      activeByGroupTab = tab || 'stats';
+      activeByGroupTab = tab || 'histogram';
       window.__byGroupActiveTab = activeByGroupTab;
       document.querySelectorAll('.by-group-panel').forEach((panel) => {
         panel.classList.toggle('is-active', panel.id === `byGroupPanel-${activeByGroupTab}`);
       });
+      if (activeByGroupTab === 'histogram') {
+        renderHistograms();
+        requestAnimationFrame(function () {
+          try {
+            document.querySelectorAll('#histGrid .hist-chart').forEach((el) => {
+              const chart = Highcharts.charts.find((c) => c && c.renderTo === el);
+              if (chart) chart.reflow();
+            });
+          } catch (_e) {}
+        });
+      }
       if (activeByGroupTab === 'boxplot' && boxplotChart) {
         try { boxplotChart.reflow(); } catch (_e) {}
-      }
-      if (activeByGroupTab === 'histogram') {
-        try {
-          document.querySelectorAll('#histGrid .hist-chart').forEach((el) => {
-            const chart = Highcharts.charts.find((c) => c && c.renderTo === el);
-            if (chart) chart.reflow();
-          });
-        } catch (_e) {}
       }
     }
     window.switchByGroupTab = switchByGroupTab;
@@ -542,12 +545,23 @@
         card.innerHTML = `<div class="hist-head"><strong>${escapeHtml(g.group)}</strong><span>n=${g.n}, mean=${fmt(g.mean)}</span></div><div id="${id}" class="hist-chart"></div>`;
         grid.appendChild(card);
         Highcharts.chart(id, {
-          chart: { type:'column', backgroundColor:'transparent', spacing:[6, 6, 24, 6] },
+          chart: { type:'column', backgroundColor:'transparent', spacing:[6, 6, 28, 6] },
           title: { text:null },
           credits: { enabled:false },
           legend: { enabled:false },
-          xAxis: { type:'category', labels:{ enabled:true, rotation:-45, style:{ color:'var(--text-secondary)', fontSize:'8px' } }, tickLength:0, lineColor:'var(--border)' },
-          yAxis: { min:0, title:{ text:null }, labels:{ style:{ color:'var(--text-secondary)', fontSize:'9px' } }, gridLineColor:'rgba(148,163,184,.18)' },
+          xAxis: {
+            type:'category',
+            title: { text:'Value range', style:{ color:'var(--text-secondary)', fontSize:'9px' } },
+            labels:{ enabled:true, rotation:-45, style:{ color:'var(--text-secondary)', fontSize:'8px' } },
+            tickLength:0,
+            lineColor:'var(--border)'
+          },
+          yAxis: {
+            min:0,
+            title:{ text:'Frequency', style:{ color:'var(--text-secondary)', fontSize:'9px' } },
+            labels:{ style:{ color:'var(--text-secondary)', fontSize:'9px' } },
+            gridLineColor:'rgba(148,163,184,.18)'
+          },
           tooltip: { pointFormat:'Frequency: <b>{point.y}</b><br/>Percent: <b>{point.pct:.1f}%</b>' },
           plotOptions: {
             column:{
@@ -857,7 +871,8 @@
     }
 
     function boot() {
-      window.__byGroupActiveTab = activeByGroupTab;
+      activeByGroupTab = 'histogram';
+      window.__byGroupActiveTab = 'histogram';
       if (typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.init('by-group', 'By Group', 0, 'univariate');
         StatisticoHeader.initSidebarPage();

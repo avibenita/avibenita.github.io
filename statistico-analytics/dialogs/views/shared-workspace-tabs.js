@@ -33,7 +33,7 @@
     qqplot: 'Probability plots',
     confidence: 'Mean & median CIs',
     hypothesis: 'Reference value test',
-    'by-group-histogram': 'Grouped distribution charts',
+    'by-group-histogram': 'Grouped histogram charts',
     'by-group-stats': 'Descriptive statistics by group',
     'by-group-boxplot': 'Compare spread by group',
     'by-group-normality': 'Six tests & NSI by group',

@@ -77,18 +77,18 @@
     .p-na { color:var(--text-secondary); }
     .nsi-cell { color:var(--accent-2); font-size:14px; font-weight:800; }
     .norm-footnote { display:block; margin-top:6px; color:var(--text-secondary); font-size:11px; font-weight:500; line-height:1.45; }
-    .norm-th-group { display:block; font-size:11px; letter-spacing:.04em; }
-    .norm-th-n { display:block; margin-top:2px; font-size:10px; font-weight:600; color:var(--text-secondary); text-transform:none; letter-spacing:0; }
-    .norm-row-distribution td { padding:6px 8px 4px; vertical-align:middle; background:rgba(15,23,42,.18); }
-    html[data-theme="light"] .norm-row-distribution td { background:rgba(248,250,252,.85); }
-    .norm-row-distribution td:first-child { font-weight:700; font-size:11px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.06em; }
+    .norm-th-cell { min-width:128px; vertical-align:bottom; padding:10px 8px 8px !important; }
+    .norm-th-head { display:flex; align-items:flex-end; justify-content:center; gap:8px; }
+    .norm-th-copy { display:flex; flex-direction:column; align-items:flex-start; gap:1px; min-width:0; text-align:left; }
+    .norm-th-group { display:block; font-size:11px; letter-spacing:.04em; line-height:1.2; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .norm-th-n { display:block; font-size:10px; font-weight:600; color:var(--text-secondary); text-transform:none; letter-spacing:0; }
+    .norm-sparkline { width:72px; height:40px; flex-shrink:0; }
     .norm-row-verdict td { border-bottom:2px solid rgba(139,92,246,.28); background:rgba(139,92,246,.06); }
     .norm-verdict { font-size:12px; font-weight:700; letter-spacing:.01em; }
     .norm-verdict--pass { color:#34d399; }
     .norm-verdict--mixed { color:#fbbf24; }
     .norm-verdict--fail { color:#fb7185; }
     .norm-verdict--na { color:var(--text-secondary); }
-    .norm-mini-chart { height:72px; min-width:96px; }
     .norm-sw-row td { color:var(--text-secondary); }
     .norm-sw-row td:first-child { opacity:.82; font-style:italic; }
     .p-sw-unreliable { color:rgba(148,163,184,.95); font-weight:600; cursor:help; }
@@ -191,7 +191,7 @@
             </div>
             <div id="byGroupPanel-normality" class="by-group-panel">
               <section class="panel">
-                <div class="section-title"><strong>Group Normality Analysis</strong><span>Six formal tests, distribution snapshots, and plain-English verdict per group (α = 0.05)<em id="normalityNote" class="norm-footnote"></em></span></div>
+                <div class="section-title"><strong>Group Normality Analysis</strong><span>Six formal tests, sparkline snapshots, and plain-English verdict per group (α = 0.05)<em id="normalityNote" class="norm-footnote"></em></span></div>
                 <div class="norm-table-wrap">
                   <table class="norm-table">
                     <thead id="normalityHead"></thead>
@@ -674,7 +674,7 @@
           if (existing) existing.destroy();
         }
         Highcharts.chart(el, {
-          chart: { type:'column', backgroundColor:'transparent', spacing:[2, 4, 2, 4], height:72, animation:false },
+          chart: { type:'column', backgroundColor:'transparent', spacing:[0, 0, 0, 0], height:40, width:72, animation:false },
           title: { text:null },
           credits: { enabled:false },
           legend: { enabled:false },
@@ -688,9 +688,9 @@
             column:{
               borderWidth:0,
               color:'rgba(129,140,248,.88)',
-              borderRadius:2,
-              pointPadding:0.05,
-              groupPadding:0.04
+              borderRadius:1,
+              pointPadding:0.02,
+              groupPadding:0.02
             }
           },
           series: [{ data: histogramSeries(g.values, globalMin, globalMax, bins).map((pt) => ({ y: pt.y })) }]
@@ -722,12 +722,11 @@
       }
 
       document.getElementById('normalityHead').innerHTML =
-        `<tr><th>Test</th>${normGroupResults.map((g) => `<th><span class="norm-th-group">${escapeHtml(g.group)}</span><span class="norm-th-n">(n=${g.n})</span></th>`).join('')}</tr>`;
+        `<tr><th>Test</th>${normGroupResults.map((g, i) => `<th class="norm-th-cell"><div class="norm-th-head"><div class="norm-th-copy"><span class="norm-th-group">${escapeHtml(g.group)}</span><span class="norm-th-n">(n=${g.n})</span></div><div id="normMiniHist${i}" class="norm-sparkline" title="Distribution snapshot"></div></div></th>`).join('')}</tr>`;
 
-      const distributionRow = `<tr class="norm-row-distribution"><td>Distribution</td>${normGroupResults.map((_g, i) => `<td><div id="normMiniHist${i}" class="norm-mini-chart"></div></td>`).join('')}</tr>`;
       const verdictRow = `<tr class="norm-row-verdict"><td>Verdict</td>${normGroupResults.map((g) => `<td><span class="norm-verdict norm-verdict--${g.verdict.tone}">${escapeHtml(g.verdict.label)}</span></td>`).join('')}</tr>`;
 
-      document.getElementById('normalityBody').innerHTML = distributionRow + verdictRow + testNames.map((name) => {
+      document.getElementById('normalityBody').innerHTML = verdictRow + testNames.map((name) => {
         const isSw = name === 'Shapiro-Wilk';
         const swUnreliable = isSw && normGroupResults.some((gr) => {
           const t = gr.tests.find((x) => x.name === name);

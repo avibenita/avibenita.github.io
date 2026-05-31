@@ -1347,7 +1347,7 @@ const StatisticoHeader = {
 
     return `<div class="sb-pinned-items" role="navigation" aria-label="Grouped analysis">`
       + `<div class="sb-pinned-separator" role="presentation"></div>`
-      + `<div class="sb-items-rail sb-pinned-rail">${itemsHtml}</div></div>`;
+      + `<div class="sb-pinned-rail">${itemsHtml}</div></div>`;
   },
 
   _renderSharedSidebar() {

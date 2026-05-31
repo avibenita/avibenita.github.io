@@ -1189,13 +1189,13 @@ const StatisticoHeader = {
       const link = document.createElement('link');
       link.id = 'uni-ws-tabs-css';
       link.rel = 'stylesheet';
-      link.href = this.resolveDialogUrl('shared-workspace-tabs.css?v=20260601d');
+      link.href = this.resolveDialogUrl('shared-workspace-tabs.css?v=20260601tabs');
       document.head.appendChild(link);
     }
     if (!document.getElementById('uni-ws-tabs-js') && !globalThis.StatisticoWorkspaceTabs) {
       const script = document.createElement('script');
       script.id = 'uni-ws-tabs-js';
-      script.src = this.resolveDialogUrl('shared-workspace-tabs.js?v=20260601d');
+      script.src = this.resolveDialogUrl('shared-workspace-tabs.js?v=20260601tabs');
       script.onload = function () {
         try { StatisticoHeader._renderUnivariateResultsTabs(); } catch (_e) {}
       };

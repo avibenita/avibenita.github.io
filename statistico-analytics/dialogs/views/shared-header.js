@@ -1874,10 +1874,6 @@ const StatisticoHeader = {
     const persisted = this.getDecimalPreference();
     const selected = decimalOptions.includes(persisted) ? persisted : (cfg?.defaultDecimal || '2');
     const optionsHtml = decimalOptions.map((v) => `<option value="${v}" ${v === selected ? 'selected' : ''}>${v === 'auto' ? 'Auto' : v}</option>`).join('');
-    const menuItemsHtml = decimalOptions.map((v) => {
-      const label = v === 'auto' ? 'Auto' : v;
-      return `<button class="header-decimals-option ${v === selected ? 'active' : ''}" onclick="StatisticoHeader.selectDecimalOption('${v}')">${label}</button>`;
-    }).join('');
     const theme = this.getTheme();
     const themeIcon = theme === 'light' ? '☀️' : '🌙';
     const uniFilterHtml = this._shouldRenderHeaderRowFilter()
@@ -1902,17 +1898,9 @@ const StatisticoHeader = {
     return `
       <div class="header-global-controls">
         ${uniFilterHtml}
-        <label class="header-decimals-label" for="headerDecimalBtn">Decimals Precision</label>
-        <select id="decimalSelect" class="header-decimals-hidden-select" onchange="StatisticoHeader.onDecimalChange(this.value)">
+        <select id="decimalSelect" class="header-decimals-hidden-select" aria-hidden="true" tabindex="-1" onchange="StatisticoHeader.onDecimalChange(this.value)">
           ${optionsHtml}
         </select>
-        <div class="header-decimals-wrap">
-          <button id="headerDecimalBtn" class="header-decimals-btn" onclick="StatisticoHeader.toggleDecimalMenu()" title="Change decimal precision">
-            <span id="headerDecimalValue">${selected === 'auto' ? 'Auto' : selected}</span>
-            <i class="fa-solid fa-chevron-down"></i>
-          </button>
-          <div id="headerDecimalMenu" class="header-decimals-menu">${menuItemsHtml}</div>
-        </div>
         <button id="headerThemeBtn" class="header-theme-btn" onclick="StatisticoHeader.toggleTheme()" title="Toggle light / dark theme">
           <span id="headerThemeLabel">Theme</span>
           <span id="headerThemeIcon">${themeIcon}</span>

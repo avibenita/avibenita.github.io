@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260601h" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260601d" />
   <script src="../shared-brand-logo.js?v=20260519u"></script>
-  <script src="../shared-header.js?v=20260601h"></script>
+  <script src="../shared-header.js?v=20260601i"></script>
   <script src="../../shared/uni-normality-tests.js?v=20260601g"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
@@ -334,6 +334,7 @@
       document.getElementById('emptyText').textContent = message;
       document.getElementById('emptyState').style.display = 'block';
       document.getElementById('mainContent').style.display = 'none';
+      delete window.__byGroupAiContext;
     }
 
     function initializeFromPayload(data) {
@@ -491,6 +492,7 @@
       renderTable();
       renderGroupBoxplot();
       renderGroupNormality();
+      syncByGroupAiContext();
       switchByGroupTab(activeByGroupTab);
       if (activeByGroupTab === 'stats') renderHistograms();
       if (typeof StatisticoHeader !== 'undefined') {
@@ -503,6 +505,7 @@
     function switchByGroupTab(tab) {
       activeByGroupTab = tab || 'stats';
       window.__byGroupActiveTab = activeByGroupTab;
+      if (window.__byGroupAiContext) window.__byGroupAiContext.activeTab = activeByGroupTab;
       document.querySelectorAll('.by-group-panel').forEach((panel) => {
         panel.classList.toggle('is-active', panel.id === `byGroupPanel-${activeByGroupTab}`);
       });
@@ -743,9 +746,50 @@
       document.getElementById('normalityFoot').innerHTML =
         `<tr><th>NSI<sup style="font-size:9px;">TM</sup></th>${normGroupResults.map((g) => `<td class="nsi-cell">${g.nsi}</td>`).join('')}</tr>`;
 
+      syncByGroupAiContext();
       if (activeByGroupTab === 'normality') {
         requestAnimationFrame(function () { renderNormMiniHistograms(normGroupResults); });
       }
+    }
+
+    function syncByGroupAiContext() {
+      window.__byGroupAiContext = {
+        activeTab: activeByGroupTab,
+        variable: headers[analysisIndex] || (payload && payload.column) || 'Variable',
+        groupingColumn: headers[groupIndex] || 'Group',
+        groupCount: groupStats.length,
+        totalRows: groupStats.reduce((sum, g) => sum + g.n, 0),
+        groups: groupStats.map((g) => ({
+          name: g.group,
+          n: g.n,
+          mean: g.mean,
+          median: g.median,
+          stdDev: g.stdDev,
+          variance: g.variance,
+          min: g.min,
+          max: g.max,
+          q1: g.q1,
+          q3: g.q3,
+          skew: g.skew,
+          kurtosis: g.kurtosis,
+          lcl: g.lcl,
+          ucl: g.ucl
+        })),
+        normality: normGroupResults.map((gr) => ({
+          group: gr.group,
+          n: gr.n,
+          nsi: gr.nsi,
+          verdict: gr.verdict.label,
+          verdictTone: gr.verdict.tone,
+          hasTies: gr.tests.hasTies,
+          tests: gr.tests.filter((t) => t && t.name).map((t) => ({
+            name: t.name,
+            pValue: t.pValue,
+            unreliable: !!t.unreliable,
+            pass: Number.isFinite(t.pValue) && t.pValue >= NORM_ALPHA
+          }))
+        }))
+      };
     }
 
     function escapeHtml(value) {

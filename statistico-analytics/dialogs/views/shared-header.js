@@ -4791,6 +4791,9 @@ const StatisticoHeader = {
       percentile: 'Percentiles',
       kernel: 'Kernel',
       'by-group': 'Grouped Analysis',
+      'by-group-stats': 'Grouped Statistics',
+      'by-group-boxplot': 'Grouped Box Plots',
+      'by-group-normality': 'Group Normality Analysis',
       outliers: 'Outliers',
       normality: 'Tests',
       qqplot: 'PP/QQ',
@@ -4800,6 +4803,10 @@ const StatisticoHeader = {
   },
 
   _getInsightGuideViewKey() {
+    if (this.module === 'univariate' && this.currentView === 'by-group') {
+      const tab = globalThis.__byGroupActiveTab || 'stats';
+      return `by-group-${tab}`;
+    }
     if (this.module === 'univariate' || this.module === 'correlations') return this.currentView;
     if (this.module === 'independent') return `independent-${this._getIndependentActiveTab()}`;
     const activeSidebar = document.querySelector('.sb-item.active[data-tab], .sb-item.active[id]');
@@ -5386,7 +5393,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
       const prompt = this.module === 'correlations'
         ? this._buildCorrelationStructuredPrompt(this.currentView, 'per-view')
         : this.module === 'univariate'
-          ? this._buildStructuredPrompt(this.currentView, 'per-view')
+          ? this._buildStructuredPrompt(viewKey, 'per-view')
           : this._buildGenericInsightGuidePrompt(viewKey);
       if (!prompt) { this._showAiOverlay(null, viewKey); return; }
       const raw = await this._callAiForSidebar(prompt);
@@ -5427,7 +5434,13 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
 
       const prompt = this.module === 'correlations'
         ? this._buildCorrelationStructuredPrompt(this.currentView, 'full', allData)
-        : this._buildStructuredPrompt(this.currentView, 'full', allData);
+        : this._buildStructuredPrompt(
+            (this.module === 'univariate' && this.currentView === 'by-group')
+              ? this._getInsightGuideViewKey()
+              : this.currentView,
+            'full',
+            allData
+          );
       if (!prompt) { this._showAiOverlay(null, this.currentView, 'full'); return; }
 
       const raw = await this._callAiForSidebar(prompt);
@@ -5566,6 +5579,19 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
 
     if (view === 'boxplot') {
       d.footerNote = txt('boxplot-footer');
+    }
+
+    if (view === 'by-group' || (typeof view === 'string' && view.startsWith('by-group-'))) {
+      const ctx = globalThis.__byGroupAiContext;
+      if (ctx) {
+        d.variable = ctx.variable;
+        d.groupingColumn = ctx.groupingColumn;
+        d.activeTab = ctx.activeTab;
+        d.groupCount = ctx.groupCount;
+        d.totalRows = ctx.totalRows;
+        d.groups = ctx.groups;
+        d.normality = ctx.normality;
+      }
     }
 
     return d;
@@ -6274,8 +6300,139 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
 
       confidence: `Controls available: (1) Method radios (Classical / Bootstrap) — classical uses t/chi-squared formulas; bootstrap resamples the data; (2) Parameter radios (Mean / Std Dev / Median / Percentile when bootstrap) — what population parameter to estimate; (3) Confidence level selector (90% / 95% / 99%) plus a fine-grained alpha slider; (4) Bootstrap iterations input — higher = more accurate but slower; (5) Optional finite population size — applies finite population correction.`,
 
-      hypothesis: `Controls available: hypothesis-test setup fields define the null and alternative hypothesis, alpha sets the decision threshold, and test-specific inputs determine the statistic and p-value. Use this view to connect the formal decision rule to the practical interpretation of the sample evidence.`
+      hypothesis: `Controls available: hypothesis-test setup fields define the null and alternative hypothesis, alpha sets the decision threshold, and test-specific inputs determine the statistic and p-value. Use this view to connect the formal decision rule to the practical interpretation of the sample evidence.`,
+
+      'by-group-stats': `Controls available: (1) Choose Group button — pick the categorical column that splits the numeric variable; (2) Group level checkboxes in the dialog — include or exclude specific levels; (3) Source row filter (header) — limits which rows enter every group. The table shows per-group N, mean, CI, spread, and shape statistics; histograms below use a shared bin scale for fair comparison.`,
+
+      'by-group-boxplot': `Controls available: (1) Choose Group — same grouping column as other tabs; (2) Group level filter — subset levels; (3) Source row filter — shared filtered rows. One combined box plot compares quartiles, medians, and whiskers across groups on a common y-axis.`,
+
+      'by-group-normality': `Controls available: (1) Choose Group and level filters — same as other tabs; (2) Fixed α = 0.05 for all six tests. Each column shows group name, n, a distribution sparkline, a plain-English Verdict row, six formal normality p-values, and NSI. Shapiro–Wilk is flagged (⚠) when tied/discrete scores make it unreliable; the Verdict row ignores it in that case.`
     };
+  },
+
+  _buildByGroupStructuredPrompt(view, mode) {
+    const ctx = globalThis.__byGroupAiContext;
+    if (!ctx || !Array.isArray(ctx.groups) || !ctx.groups.length) return null;
+
+    const tab = (typeof view === 'string' && view.startsWith('by-group-'))
+      ? view.replace('by-group-', '')
+      : (ctx.activeTab || 'stats');
+    const f = (v, dp = 3) => (v === null || v === undefined || !Number.isFinite(Number(v)) ? 'N/A' : Number(v).toFixed(dp));
+    const fp = (v) => (v === null || v === undefined || !Number.isFinite(Number(v)) ? 'N/A' : Number(v).toFixed(4));
+
+    const groupStatsBlock = ctx.groups.map((g) => [
+      `${g.name} (n=${g.n})`,
+      `  mean=${f(g.mean)}, SD=${f(g.stdDev)}, median=${f(g.median)}`,
+      `  Q1=${f(g.q1)}, Q3=${f(g.q3)}, min=${f(g.min)}, max=${f(g.max)}`,
+      `  skew=${f(g.skew)}, kurtosis=${f(g.kurtosis)}`,
+      g.lcl !== undefined ? `  95% CI for mean: [${f(g.lcl)}, ${f(g.ucl)}]` : ''
+    ].filter(Boolean).join('\n')).join('\n\n');
+
+    const means = ctx.groups.map((g) => ({ name: g.name, mean: g.mean, n: g.n }));
+    const meanSpread = means.length > 1
+      ? Math.max(...means.map((m) => m.mean)) - Math.min(...means.map((m) => m.mean))
+      : 0;
+    const highest = means.reduce((a, b) => (b.mean > a.mean ? b : a), means[0]);
+    const lowest = means.reduce((a, b) => (b.mean < a.mean ? b : a), means[0]);
+
+    let tabBlock = '';
+    if (tab === 'stats') {
+      tabBlock = [
+        'ACTIVE TAB: Grouped Statistics (descriptive table + per-group histograms)',
+        `Compare ${ctx.groups.length} groups on ${ctx.variable} split by ${ctx.groupingColumn}.`,
+        `Mean spread across groups: ${f(meanSpread)} (${lowest.name}=${f(lowest.mean)} vs ${highest.name}=${f(highest.mean)}).`,
+        'Focus READING on whether central tendency, spread, and shape differ meaningfully between named groups — not on a single pooled sample.'
+      ].join('\n');
+    } else if (tab === 'boxplot') {
+      tabBlock = [
+        'ACTIVE TAB: Grouped Box Plots (one chart, all groups)',
+        ctx.groups.map((g) => `${g.name} (n=${g.n}): median=${f(g.median)}, IQR=[${f(g.q1)}, ${f(g.q3)}], range=[${f(g.min)}, ${f(g.max)}]`).join('\n'),
+        'Focus READING on relative spread, median shifts, and whether whiskers/boxes overlap between groups.'
+      ].join('\n\n');
+    } else if (tab === 'normality') {
+      const normLines = (ctx.normality || []).map((gr) => {
+        const testSummary = (gr.tests || [])
+          .map((t) => `${t.name}: p=${fp(t.pValue)}${t.unreliable ? ' (unreliable ⚠)' : ''} → ${t.pass ? 'pass' : 'fail'}`)
+          .join('; ');
+        return [
+          `${gr.group} (n=${gr.n}) — Verdict: ${gr.verdict}${gr.hasTies ? ' [ties present]' : ''}`,
+          `  NSI=${gr.nsi}`,
+          `  Tests: ${testSummary || 'n/a'}`
+        ].join('\n');
+      }).join('\n\n');
+      tabBlock = [
+        'ACTIVE TAB: Group Normality Analysis (verdict + six tests per group)',
+        normLines,
+        'Focus READING on each group\'s Verdict and whether groups differ in normality support. Mention Shapiro–Wilk caution when ties are flagged.'
+      ].join('\n\n');
+    }
+
+    const viewNames = {
+      stats: 'Grouped Statistics',
+      boxplot: 'Grouped Box Plots',
+      normality: 'Group Normality Analysis'
+    };
+    const viewName = viewNames[tab] || 'Grouped Analysis';
+    const controlsDoc = this._viewControlsDoc();
+    const controlsKey = `by-group-${tab}`;
+
+    if (mode === 'full') {
+      const boxplotLines = ctx.groups.map((g) => `${g.name} (n=${g.n}): median=${f(g.median)}, IQR=[${f(g.q1)}, ${f(g.q3)}]`).join('\n');
+      const normLines = (ctx.normality || []).map((gr) => {
+        const passes = (gr.tests || []).filter((t) => t.pass && !t.unreliable).length;
+        return `${gr.group} (n=${gr.n}): Verdict=${gr.verdict}, NSI=${gr.nsi}, reliable passes=${passes}/${(gr.tests || []).filter((t) => !t.unreliable).length}`;
+      }).join('\n');
+      return `You are a senior statistician writing a grouped comparison report for "${ctx.variable}" split by "${ctx.groupingColumn}".
+
+GROUPED DATA (${ctx.totalRows} rows across ${ctx.groupCount} groups — do NOT treat as one pooled sample):
+${groupStatsBlock}
+
+[ Statistics tab ]
+Mean spread: ${f(meanSpread)} (${lowest.name}=${f(lowest.mean)} vs ${highest.name}=${f(highest.mean)})
+
+[ Box plot tab ]
+${boxplotLines}
+
+[ Normality tab ]
+${normLines || '(Run normality tab to populate)'}
+
+RULES:
+- Compare groups by name; always cite n per group
+- Do NOT report a single overall mean/SD as if there is one sample
+
+Reply ONLY in this exact format:
+CONCLUSION: [One sentence — main between-group finding]
+EVIDENCE: [group-specific fact with number] | [group-specific fact] | [group-specific fact]
+INTERPRETATION: [3 sentences comparing groups]
+IMPLICATIONS: [implication 1] | [implication 2] | [implication 3]
+ACTION: [next step 1] | [next step 2] | [next step 3]`;
+    }
+
+    return `You are explaining the "${viewName}" tab inside Statistico Grouped Analysis. The user is comparing "${ctx.variable}" across groups defined by "${ctx.groupingColumn}".
+
+THIS IS A GROUPED COMPARISON — NOT a single-sample univariate view.
+Total filtered rows: ${ctx.totalRows} across ${ctx.groupCount} groups.
+
+PER-GROUP STATISTICS:
+${groupStatsBlock}
+
+${tabBlock}
+
+CONTROLS FOR THIS TAB:
+${controlsDoc[controlsKey] || controlsDoc['by-group-stats']}
+
+RULES:
+- Compare groups explicitly (e.g., Control vs Treatment); cite n= for each group mentioned
+- Do NOT describe one pooled mean, SD, or median for all ${ctx.totalRows} observations
+- Do NOT say "the data" as a single entity — say "each group" or name groups
+- Use exact numbers from PER-GROUP STATISTICS / ACTIVE TAB blocks above
+- Be specific to this tab (${viewName}), not generic univariate advice
+
+Reply ONLY in this exact format — each key on its own line:
+ABOUT: [2–3 sentences — what this tab shows for comparing groups and why it matters]
+CONTROLS: [Control name: what it does + when to use it] | [next control] | [next control if applicable]
+PATTERNS: [Between-group pattern → analytical meaning] | [next pattern] | [next pattern]
+READING: [1–2 sentences comparing the named groups using exact per-group numbers from the data above]`;
   },
 
   _correlationControlsDoc() {
@@ -6345,6 +6502,10 @@ READING: [1-2 sentences about what the current correlation results suggest, usin
    * Full-analysis mode produces the five-section structured report.
    */
   _buildStructuredPrompt(view, mode, preCollectedData = null) {
+    if (view === 'by-group' || (typeof view === 'string' && view.startsWith('by-group-'))) {
+      return this._buildByGroupStructuredPrompt(view, mode);
+    }
+
     const d = this._getUnivariateDescriptives();
     if (!d) return null;
 
@@ -6617,6 +6778,8 @@ Always follow the exact output format requested.` },
       histogram:'Histogram', boxplot:'Box Plot', cdf:'CDF', percentile:'Percentiles',
       kernel:'Kernel', outliers:'Outliers', normality:'Tests',
       qqplot:'PP/QQ', confidence:'Confidence Intervals', hypothesis:'One-Sample Test',
+      'by-group-stats':'Grouped Statistics', 'by-group-boxplot':'Grouped Box Plots',
+      'by-group-normality':'Group Normality Analysis', 'by-group':'Grouped Analysis',
       ...this._correlationViewLabels(),
       ...this._independentViewLabels(),
       ...this._genericModuleViewLabels()

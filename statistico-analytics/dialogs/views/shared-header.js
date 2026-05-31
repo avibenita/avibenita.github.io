@@ -824,12 +824,6 @@ const StatisticoHeader = {
             ]
           },
           {
-            title: 'By group',
-            items: [
-              { type: 'navigate', view: 'by-group', file: 'univariate/by-group.html', icon: 'fa-layer-group', label: 'By group', description: 'Compare statistics by a grouping column.' }
-            ]
-          },
-          {
             title: 'Advanced diagnostics',
             items: [
               {
@@ -847,7 +841,13 @@ const StatisticoHeader = {
               { type: 'navigate', view: 'hypothesis', file: 'univariate/hypothesis-standalone.html', icon: 'fa-flask',             label: 'One-sample test', description: 'Test against a reference value.' }
             ]
           }
-        ]
+        ],
+        pinnedNav: {
+          title: 'Grouped comparison',
+          items: [
+            { type: 'navigate', view: 'by-group', file: 'univariate/by-group.html', icon: 'fa-layer-group', label: 'By group', description: 'Compare statistics by a grouping column.' }
+          ]
+        }
       };
     }
 
@@ -1235,6 +1235,70 @@ const StatisticoHeader = {
     }
   },
 
+  _renderSidebarNavItem(item) {
+    const active = this._isSidebarItemActive(item) ? ' active' : '';
+    const idAttr = item.id ? ` id="${item.id}"` : '';
+    const dataTab = item.tab ? ` data-tab="${item.tab}"` : '';
+    const dataView = item.view ? ` data-view="${item.view}"` : '';
+
+    if (Array.isArray(item.facets) && item.facets.length > 0) {
+      const isGroupActive = !!active;
+      const activeFacet = item.facets.find((f) => f.view === this.currentView);
+      const targetFacet = activeFacet || item.facets[0];
+      const navFile = targetFacet?.file || '';
+      const parentNavAttr = navFile ? ` data-nav-file="${navFile}"` : '';
+      const parentOnclick = navFile ? ` onclick="StatisticoHeader.navigateTo('${navFile}')"` : '';
+      const description = this._getSidebarItemDescription(item);
+      const facetsHtml = (this.module === 'univariate')
+        ? ''
+        : (isGroupActive
+        ? `<div class="sb-facets" role="tablist">${item.facets.map((f) => {
+            const isActive = f.view === this.currentView;
+            return `<button type="button" class="sb-facet${isActive ? ' active' : ''}"`
+              + ` role="tab" aria-selected="${isActive ? 'true' : 'false'}"`
+              + ` data-view="${f.view}" data-nav-file="${f.file}"`
+              + ` onclick="StatisticoHeader.navigateTo('${f.file}')">${f.label}</button>`;
+          }).join('')}</div>`
+        : '');
+      return `<div class="sb-faceted${isGroupActive ? ' is-active-group' : ''}">`
+        + `<button type="button" class="sb-item${active}"${idAttr}${dataTab}${dataView}${parentNavAttr}${parentOnclick}>`
+        + `<i class="fa-solid ${item.icon || 'fa-circle'} sb-item-icon"></i>`
+        + `<span class="sb-item-copy"><span class="sb-item-label">${item.label || ''}</span>`
+        + `<span class="sb-item-description">${description}</span></span></button>`
+        + facetsHtml
+        + `</div>`;
+    }
+
+    let onclick = '';
+    let navFileAttr = '';
+    if (item.type === 'navigate' && item.file) {
+      onclick = `StatisticoHeader.navigateTo('${item.file}')`;
+      navFileAttr = ` data-nav-file="${item.file}"`;
+    } else if (item.type === 'tab' && item.tab) {
+      onclick = `switchTab('${item.tab}')`;
+    } else if (item.type === 'js' && item.onclick) {
+      onclick = item.onclick;
+    }
+    const onclickAttr = onclick ? ` onclick="${onclick}"` : '';
+    const description = this._getSidebarItemDescription(item);
+
+    return `<button type="button" class="sb-item${active}"${idAttr}${dataTab}${dataView}${navFileAttr}${onclickAttr}><i class="fa-solid ${item.icon || 'fa-circle'} sb-item-icon"></i><span class="sb-item-copy"><span class="sb-item-label">${item.label || ''}</span><span class="sb-item-description">${description}</span></span></button>`;
+  },
+
+  _renderSidebarPinnedNav(cfg) {
+    const pinned = cfg && cfg.pinnedNav;
+    if (!pinned || !Array.isArray(pinned.items) || !pinned.items.length) return '';
+
+    const itemsHtml = pinned.items.map((item) => this._renderSidebarNavItem(item)).join('');
+    const titleHtml = pinned.title
+      ? `<div class="sb-pinned-nav-kicker">${pinned.title}</div>`
+      : '';
+
+    return `<div class="sb-pinned-nav" role="navigation" aria-label="${pinned.title || 'Pinned navigation'}">`
+      + titleHtml
+      + `<div class="sb-pinned-nav-body">${itemsHtml}</div></div>`;
+  },
+
   _renderSharedSidebar() {
     const nav = document.getElementById('sidebarNav');
     if (!nav || !this._isSharedSidebarModule()) return;
@@ -1242,59 +1306,7 @@ const StatisticoHeader = {
     if (!cfg) return;
 
     const groupsHtml = (cfg.groups || []).map((group) => {
-      const itemsHtml = (group.items || []).map((item) => {
-        const active = this._isSidebarItemActive(item) ? ' active' : '';
-        const idAttr = item.id ? ` id="${item.id}"` : '';
-        const dataTab = item.tab ? ` data-tab="${item.tab}"` : '';
-        const dataView = item.view ? ` data-view="${item.view}"` : '';
-
-        // Faceted item: parent label + inline pills (e.g. Distribution > [Histogram | CDF | Percentiles]).
-        // Clicking the parent navigates to the active facet (or the first one) so users can always
-        // (re)open the group from a single click. Facet pills are visible only when the parent group
-        // is the currently active section, to keep the sidebar quiet otherwise.
-        if (Array.isArray(item.facets) && item.facets.length > 0) {
-          const isGroupActive = !!active;
-          const activeFacet = item.facets.find((f) => f.view === this.currentView);
-          const targetFacet = activeFacet || item.facets[0];
-          const navFile = targetFacet?.file || '';
-          const parentNavAttr = navFile ? ` data-nav-file="${navFile}"` : '';
-          const parentOnclick = navFile ? ` onclick="StatisticoHeader.navigateTo('${navFile}')"` : '';
-          const description = this._getSidebarItemDescription(item);
-          const facetsHtml = (this.module === 'univariate')
-            ? ''
-            : (isGroupActive
-            ? `<div class="sb-facets" role="tablist">${item.facets.map((f) => {
-                const isActive = f.view === this.currentView;
-                return `<button type="button" class="sb-facet${isActive ? ' active' : ''}"`
-                  + ` role="tab" aria-selected="${isActive ? 'true' : 'false'}"`
-                  + ` data-view="${f.view}" data-nav-file="${f.file}"`
-                  + ` onclick="StatisticoHeader.navigateTo('${f.file}')">${f.label}</button>`;
-              }).join('')}</div>`
-            : '');
-          return `<div class="sb-faceted${isGroupActive ? ' is-active-group' : ''}">`
-            + `<button type="button" class="sb-item${active}"${idAttr}${dataTab}${dataView}${parentNavAttr}${parentOnclick}>`
-            + `<i class="fa-solid ${item.icon || 'fa-circle'} sb-item-icon"></i>`
-            + `<span class="sb-item-copy"><span class="sb-item-label">${item.label || ''}</span>`
-            + `<span class="sb-item-description">${description}</span></span></button>`
-            + facetsHtml
-            + `</div>`;
-        }
-
-        let onclick = '';
-        let navFileAttr = '';
-        if (item.type === 'navigate' && item.file) {
-          onclick = `StatisticoHeader.navigateTo('${item.file}')`;
-          navFileAttr = ` data-nav-file="${item.file}"`;
-        } else if (item.type === 'tab' && item.tab) {
-          onclick = `switchTab('${item.tab}')`;
-        } else if (item.type === 'js' && item.onclick) {
-          onclick = item.onclick;
-        }
-        const onclickAttr = onclick ? ` onclick="${onclick}"` : '';
-        const description = this._getSidebarItemDescription(item);
-
-        return `<button type="button" class="sb-item${active}"${idAttr}${dataTab}${dataView}${navFileAttr}${onclickAttr}><i class="fa-solid ${item.icon || 'fa-circle'} sb-item-icon"></i><span class="sb-item-copy"><span class="sb-item-label">${item.label || ''}</span><span class="sb-item-description">${description}</span></span></button>`;
-      }).join('');
+      const itemsHtml = (group.items || []).map((item) => this._renderSidebarNavItem(item)).join('');
 
       if (!itemsHtml) return '';
       return `<div class="sb-group"><div class="sb-group-title">${group.title || ''}</div><div class="sb-items-rail">${itemsHtml}</div></div>`;
@@ -1312,6 +1324,7 @@ const StatisticoHeader = {
         </button>
       </div>
       <div class="sb-body">${groupsHtml}</div>
+      ${this._renderSidebarPinnedNav(cfg)}
     `;
     if (typeof StatisticoBrandLogo !== 'undefined' && StatisticoBrandLogo.mountAll) {
       StatisticoBrandLogo.mountAll(nav);

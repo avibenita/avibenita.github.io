@@ -505,6 +505,10 @@ const StatisticoHeader = {
       }
     } catch (_e) {}
 
+    try {
+      this._renderUnivariateResultsTabs();
+    } catch (_e) {}
+
     // Inject website link into the footer (create footer if absent)
     (function injectSiteLink() {
       const SITE_URL = 'https://avibenita.github.io/Statistico-Website/index.html';
@@ -1070,6 +1074,86 @@ const StatisticoHeader = {
     return null;
   },
 
+  _getUnivariateFacetTabGroups() {
+    return [
+      {
+        id: 'distribution',
+        label: 'Distribution views',
+        views: ['histogram', 'cdf', 'percentile'],
+        tabs: [
+          { view: 'histogram', label: 'Histogram', file: 'univariate/histogram-standalone-v2.html' },
+          { view: 'cdf', label: 'CDF', file: 'univariate/cumulative-distribution.html' },
+          { view: 'percentile', label: 'Percentiles', file: 'univariate/percentile-standalone.html' }
+        ]
+      },
+      {
+        id: 'normality',
+        label: 'Normality views',
+        views: ['normality', 'qqplot'],
+        tabs: [
+          { view: 'normality', label: 'Tests', file: 'univariate/normality-standalone.html' },
+          { view: 'qqplot', label: 'PP / QQ', file: 'univariate/qqplot-standalone.html' }
+        ]
+      }
+    ];
+  },
+
+  _getActiveUnivariateFacetGroup() {
+    if (this.module !== 'univariate') return null;
+    const groups = this._getUnivariateFacetTabGroups();
+    for (let i = 0; i < groups.length; i++) {
+      if (groups[i].views.indexOf(this.currentView) !== -1) return groups[i];
+    }
+    return null;
+  },
+
+  _ensureUnivariateWorkspaceTabsCss() {
+    if (this.module !== 'univariate' || document.getElementById('uni-ws-tabs-css')) return;
+    const link = document.createElement('link');
+    link.id = 'uni-ws-tabs-css';
+    link.rel = 'stylesheet';
+    link.href = this.resolveDialogUrl('shared-workspace-tabs.css?v=20260531a');
+    document.head.appendChild(link);
+  },
+
+  _renderUnivariateResultsTabs() {
+    if (this.module !== 'univariate') return;
+    this._ensureUnivariateWorkspaceTabsCss();
+    const group = this._getActiveUnivariateFacetGroup();
+    const rightCol = document.querySelector('.right-col');
+    if (!rightCol) return;
+
+    let bar = document.getElementById('uniResultsViewTabs');
+    if (!group) {
+      if (bar) bar.remove();
+      return;
+    }
+
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'uniResultsViewTabs';
+      bar.className = 'ws-mode-bar ws-mode-bar--attached uni-results-view-bar';
+      const header = document.getElementById('header-container');
+      const results = document.getElementById('results-container') || rightCol.querySelector('.results-container');
+      if (header) {
+        header.insertAdjacentElement('afterend', bar);
+      } else if (results) {
+        results.insertAdjacentElement('beforebegin', bar);
+      } else {
+        rightCol.insertBefore(bar, rightCol.firstChild);
+      }
+    }
+
+    const tabsHtml = group.tabs.map((t) => {
+      const isActive = t.view === this.currentView;
+      return `<button type="button" class="ws-mode-tab${isActive ? ' active' : ''}"`
+        + ` role="tab" aria-selected="${isActive ? 'true' : 'false'}"`
+        + ` onclick="StatisticoHeader.navigateTo('${t.file}')">${t.label}</button>`;
+    }).join('');
+
+    bar.innerHTML = `<div class="ws-tab-cluster has-active" role="tablist" aria-label="${group.label}">${tabsHtml}</div>`;
+  },
+
   _renderSharedSidebar() {
     const nav = document.getElementById('sidebarNav');
     if (!nav || !this._isSharedSidebarModule()) return;
@@ -1095,7 +1179,9 @@ const StatisticoHeader = {
           const parentNavAttr = navFile ? ` data-nav-file="${navFile}"` : '';
           const parentOnclick = navFile ? ` onclick="StatisticoHeader.navigateTo('${navFile}')"` : '';
           const description = this._getSidebarItemDescription(item);
-          const facetsHtml = isGroupActive
+          const facetsHtml = (this.module === 'univariate')
+            ? ''
+            : (isGroupActive
             ? `<div class="sb-facets" role="tablist">${item.facets.map((f) => {
                 const isActive = f.view === this.currentView;
                 return `<button type="button" class="sb-facet${isActive ? ' active' : ''}"`
@@ -1103,7 +1189,7 @@ const StatisticoHeader = {
                   + ` data-view="${f.view}" data-nav-file="${f.file}"`
                   + ` onclick="StatisticoHeader.navigateTo('${f.file}')">${f.label}</button>`;
               }).join('')}</div>`
-            : '';
+            : '');
           return `<div class="sb-faceted${isGroupActive ? ' is-active-group' : ''}">`
             + `<button type="button" class="sb-item${active}"${idAttr}${dataTab}${dataView}${parentNavAttr}${parentOnclick}>`
             + `<i class="fa-solid ${item.icon || 'fa-circle'} sb-item-icon"></i>`
@@ -4370,6 +4456,7 @@ const StatisticoHeader = {
     this._renderSharedSidebar();
     this._ensureDefaultActions();
     this._mountSidebarUtilities();
+    try { this._renderUnivariateResultsTabs(); } catch (_e) {}
     const persistedDecimals = this.getDecimalPreference();
     this._installDecimalOverride();
     setTimeout(() => this.applyDecimalPreferenceToPage(persistedDecimals), 0);

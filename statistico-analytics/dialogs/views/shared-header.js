@@ -1098,7 +1098,9 @@ const StatisticoHeader = {
         icon: 'fa-layer-group',
         views: ['by-group'],
         defaultFile: 'univariate/by-group.html',
+        resultTabLimit: 4,
         tabs: [
+          { tabKey: 'by-group-histogram', label: 'Histogram', icon: 'fa-chart-column', panel: 'histogram', inPage: true },
           { tabKey: 'by-group-stats', label: 'Statistics', icon: 'fa-table', panel: 'stats', inPage: true },
           { tabKey: 'by-group-boxplot', label: 'Box plot', icon: 'fa-chart-gantt', panel: 'boxplot', inPage: true },
           { tabKey: 'by-group-normality', label: 'Normality', icon: 'fa-wave-square', panel: 'normality', inPage: true }
@@ -1149,7 +1151,7 @@ const StatisticoHeader = {
   },
 
   setByGroupResultsTab(panel) {
-    globalThis.__byGroupActiveTab = panel || 'stats';
+    globalThis.__byGroupActiveTab = panel || 'histogram';
     if (typeof globalThis.switchByGroupTab === 'function') {
       globalThis.switchByGroupTab(panel);
     }
@@ -1162,13 +1164,13 @@ const StatisticoHeader = {
       const link = document.createElement('link');
       link.id = 'uni-ws-tabs-css';
       link.rel = 'stylesheet';
-      link.href = this.resolveDialogUrl('shared-workspace-tabs.css?v=20260601a');
+      link.href = this.resolveDialogUrl('shared-workspace-tabs.css?v=20260601b');
       document.head.appendChild(link);
     }
     if (!document.getElementById('uni-ws-tabs-js') && !globalThis.StatisticoWorkspaceTabs) {
       const script = document.createElement('script');
       script.id = 'uni-ws-tabs-js';
-      script.src = this.resolveDialogUrl('shared-workspace-tabs.js?v=20260601a');
+      script.src = this.resolveDialogUrl('shared-workspace-tabs.js?v=20260601b');
       script.onload = function () {
         try { StatisticoHeader._renderUnivariateResultsTabs(); } catch (_e) {}
       };
@@ -1220,7 +1222,7 @@ const StatisticoHeader = {
       }
     }
 
-    const activeByGroupTab = globalThis.__byGroupActiveTab || 'stats';
+    const activeByGroupTab = globalThis.__byGroupActiveTab || 'histogram';
 
     const tabTitles = {
       histogram: 'Frequency distribution and shape',
@@ -1229,7 +1231,8 @@ const StatisticoHeader = {
       normality: 'Formal normality test battery',
       qqplot: 'PP and QQ probability plots',
       confidence: 'Interval estimates for mean or median',
-      'by-group-stats': 'Grouped descriptives & histograms',
+      'by-group-histogram': 'Grouped distribution charts',
+      'by-group-stats': 'Descriptive statistics by group',
       'by-group-boxplot': 'Compare spread by group',
       'by-group-normality': 'Six tests & NSI by group'
     };

@@ -1074,84 +1074,165 @@ const StatisticoHeader = {
     return null;
   },
 
-  _getUnivariateFacetTabGroups() {
+  _getUnivariateResultsSections() {
     return [
       {
-        id: 'distribution',
-        label: 'Distribution views',
-        views: ['histogram', 'cdf', 'percentile'],
+        id: 'core',
+        tabKey: 'uni-core',
+        label: 'Core descriptive',
+        icon: 'fa-chart-area',
+        views: ['histogram', 'cdf', 'percentile', 'boxplot', 'kernel'],
+        defaultFile: 'univariate/histogram-standalone-v2.html',
         tabs: [
-          { view: 'histogram', label: 'Histogram', file: 'univariate/histogram-standalone-v2.html' },
-          { view: 'cdf', label: 'CDF', file: 'univariate/cumulative-distribution.html' },
-          { view: 'percentile', label: 'Percentiles', file: 'univariate/percentile-standalone.html' }
+          { view: 'histogram', tabKey: 'histogram', label: 'Histogram', icon: 'fa-chart-column', file: 'univariate/histogram-standalone-v2.html' },
+          { view: 'cdf', tabKey: 'cdf', label: 'CDF', icon: 'fa-chart-line', file: 'univariate/cumulative-distribution.html' },
+          { view: 'percentile', tabKey: 'percentile', label: 'Percentiles', icon: 'fa-percent', file: 'univariate/percentile-standalone.html' },
+          { view: 'boxplot', tabKey: 'boxplot', label: 'Box plot', icon: 'fa-chart-gantt', file: 'univariate/boxplot-standalone.html' },
+          { view: 'kernel', tabKey: 'kernel', label: 'Kernel', icon: 'fa-bezier-curve', file: 'univariate/kernel-standalone.html' }
         ]
       },
       {
-        id: 'normality',
-        label: 'Normality views',
-        views: ['normality', 'qqplot'],
+        id: 'group',
+        tabKey: 'uni-group',
+        label: 'By group',
+        icon: 'fa-layer-group',
+        views: ['by-group'],
+        defaultFile: 'univariate/by-group.html',
+        tabs: []
+      },
+      {
+        id: 'advanced',
+        tabKey: 'uni-advanced',
+        label: 'Advanced diagnostics',
+        icon: 'fa-shield-halved',
+        views: ['normality', 'qqplot', 'confidence', 'hypothesis', 'outliers'],
+        defaultFile: 'univariate/normality-standalone.html',
+        resultTabLimit: 2,
         tabs: [
-          { view: 'normality', label: 'Tests', file: 'univariate/normality-standalone.html' },
-          { view: 'qqplot', label: 'PP / QQ', file: 'univariate/qqplot-standalone.html' }
+          { view: 'normality', tabKey: 'normality', label: 'Tests', icon: 'fa-wave-square', file: 'univariate/normality-standalone.html' },
+          { view: 'qqplot', tabKey: 'qqplot', label: 'PP / QQ', icon: 'fa-chart-simple', file: 'univariate/qqplot-standalone.html' },
+          { view: 'confidence', tabKey: 'confidence', label: 'Confidence intervals', icon: 'fa-ruler-horizontal', file: 'univariate/confidence-standalone.html' },
+          { view: 'hypothesis', tabKey: 'hypothesis', label: 'One-sample test', icon: 'fa-vial', file: 'univariate/hypothesis-standalone.html' }
         ]
       }
     ];
   },
 
-  _getActiveUnivariateFacetGroup() {
-    if (this.module !== 'univariate') return null;
-    const groups = this._getUnivariateFacetTabGroups();
-    for (let i = 0; i < groups.length; i++) {
-      if (groups[i].views.indexOf(this.currentView) !== -1) return groups[i];
+  _getActiveUnivariateSection() {
+    const sections = this._getUnivariateResultsSections();
+    for (let i = 0; i < sections.length; i++) {
+      if (sections[i].views.indexOf(this.currentView) !== -1) return sections[i];
     }
-    return null;
+    return sections[0];
   },
 
-  _ensureUnivariateWorkspaceTabsCss() {
-    if (this.module !== 'univariate' || document.getElementById('uni-ws-tabs-css')) return;
-    const link = document.createElement('link');
-    link.id = 'uni-ws-tabs-css';
-    link.rel = 'stylesheet';
-    link.href = this.resolveDialogUrl('shared-workspace-tabs.css?v=20260531a');
-    document.head.appendChild(link);
+  _buildUniWsTabBtn(opts) {
+    const active = opts.active ? ' active' : '';
+    const onclick = opts.file
+      ? ` onclick="StatisticoHeader.navigateTo('${opts.file}')"`
+      : (opts.onSection ? ` onclick="StatisticoHeader.navigateTo('${opts.onSection}')"` : '');
+    const titleAttr = opts.title ? ` title="${opts.title.replace(/"/g, '&quot;')}"` : '';
+    return `<button type="button" class="ws-mode-tab${active}" role="tab"`
+      + ` aria-selected="${opts.active ? 'true' : 'false'}"`
+      + ` data-uni-tab="${opts.tabKey}"${titleAttr}${onclick}>`
+      + `<i class="fa-solid ${opts.icon}" aria-hidden="true"></i>`
+      + `<span>${opts.label}</span></button>`;
+  },
+
+  _ensureUnivariateWorkspaceTabAssets() {
+    if (this.module !== 'univariate') return;
+    if (!document.getElementById('uni-ws-tabs-css')) {
+      const link = document.createElement('link');
+      link.id = 'uni-ws-tabs-css';
+      link.rel = 'stylesheet';
+      link.href = this.resolveDialogUrl('shared-workspace-tabs.css?v=20260531f');
+      document.head.appendChild(link);
+    }
+    if (!document.getElementById('uni-ws-tabs-js') && !globalThis.StatisticoWorkspaceTabs) {
+      const script = document.createElement('script');
+      script.id = 'uni-ws-tabs-js';
+      script.src = this.resolveDialogUrl('shared-workspace-tabs.js?v=20260531f');
+      script.onload = function () {
+        try { StatisticoHeader._renderUnivariateResultsTabs(); } catch (_e) {}
+      };
+      document.head.appendChild(script);
+    }
+  },
+
+  _getUnivariateResultsViewTabs(section) {
+    if (!section || !Array.isArray(section.tabs) || !section.tabs.length) return [];
+    const limit = typeof section.resultTabLimit === 'number' ? section.resultTabLimit : 3;
+    return section.tabs.slice(0, limit);
+  },
+
+  _shouldShowUnivariateResultsTabs(activeSection) {
+    const viewTabs = this._getUnivariateResultsViewTabs(activeSection);
+    if (!viewTabs.length) return false;
+    return viewTabs.some((t) => t.view === this.currentView);
   },
 
   _renderUnivariateResultsTabs() {
     if (this.module !== 'univariate') return;
-    this._ensureUnivariateWorkspaceTabsCss();
-    const group = this._getActiveUnivariateFacetGroup();
+    this._ensureUnivariateWorkspaceTabAssets();
     const rightCol = document.querySelector('.right-col');
     if (!rightCol) return;
 
-    let bar = document.getElementById('uniResultsViewTabs');
-    if (!group) {
-      if (bar) bar.remove();
+    const activeSection = this._getActiveUnivariateSection();
+    const viewTabs = this._getUnivariateResultsViewTabs(activeSection);
+    const showTabs = this._shouldShowUnivariateResultsTabs(activeSection);
+
+    let stack = document.getElementById('uniResultsViewTabs');
+    if (!showTabs) {
+      if (stack) stack.remove();
       return;
     }
 
-    if (!bar) {
-      bar = document.createElement('div');
-      bar.id = 'uniResultsViewTabs';
-      bar.className = 'ws-mode-bar ws-mode-bar--attached uni-results-view-bar';
+    if (!stack) {
+      stack = document.createElement('div');
+      stack.id = 'uniResultsViewTabs';
+      stack.className = 'uni-results-tab-stack';
       const header = document.getElementById('header-container');
       const results = document.getElementById('results-container') || rightCol.querySelector('.results-container');
       if (header) {
-        header.insertAdjacentElement('afterend', bar);
+        header.insertAdjacentElement('afterend', stack);
       } else if (results) {
-        results.insertAdjacentElement('beforebegin', bar);
+        results.insertAdjacentElement('beforebegin', stack);
       } else {
-        rightCol.insertBefore(bar, rightCol.firstChild);
+        rightCol.insertBefore(stack, rightCol.firstChild);
       }
     }
 
-    const tabsHtml = group.tabs.map((t) => {
-      const isActive = t.view === this.currentView;
-      return `<button type="button" class="ws-mode-tab${isActive ? ' active' : ''}"`
-        + ` role="tab" aria-selected="${isActive ? 'true' : 'false'}"`
-        + ` onclick="StatisticoHeader.navigateTo('${t.file}')">${t.label}</button>`;
-    }).join('');
+    const tabTitles = {
+      histogram: 'Frequency distribution and shape',
+      cdf: 'Cumulative distribution curve',
+      percentile: 'Cut points and percentile lookup',
+      normality: 'Formal normality test battery',
+      qqplot: 'PP and QQ probability plots',
+      confidence: 'Interval estimates for mean or median'
+    };
 
-    bar.innerHTML = `<div class="ws-tab-cluster has-active" role="tablist" aria-label="${group.label}">${tabsHtml}</div>`;
+    const tabsHtml = viewTabs.map((t) => this._buildUniWsTabBtn({
+      tabKey: t.tabKey,
+      label: t.label,
+      icon: t.icon,
+      active: t.view === this.currentView,
+      file: t.file,
+      title: tabTitles[t.view] || ''
+    })).join('');
+
+    const ariaLabel = activeSection.id === 'advanced'
+      ? 'Normality and inference views'
+      : 'Distribution views';
+
+    stack.innerHTML =
+      '<div class="ws-chrome ws-chrome--attached ws-chrome--compact">'
+      + '<nav class="ws-mode-bar ws-mode-bar--attached ws-mode-bar--slant" aria-label="' + ariaLabel + '">'
+      + tabsHtml
+      + '</nav></div>';
+
+    if (typeof globalThis.StatisticoWorkspaceTabs !== 'undefined') {
+      globalThis.StatisticoWorkspaceTabs.init();
+    }
   },
 
   _renderSharedSidebar() {

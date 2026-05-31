@@ -19,6 +19,20 @@
     'ix-details': 'Coefficients & ΔR²',
     overview: 'Executive interpretation',
     technical: 'Statistics & coefficients',
+    /* Univariate — section tabs */
+    'uni-core': 'Distribution & box plots',
+    'uni-group': 'Categorical breakdowns',
+    'uni-advanced': 'Normality & tests',
+    /* Univariate — view tabs */
+    histogram: 'Frequency & shape',
+    cdf: 'Cumulative curve',
+    percentile: 'Cut points & lookup',
+    boxplot: 'Quartiles & outliers',
+    kernel: 'Smoothed density',
+    normality: 'Formal test battery',
+    qqplot: 'Probability plots',
+    confidence: 'Mean & median CIs',
+    hypothesis: 'Reference value test',
     'roc-thresholds': 'ROC curve & cutoff',
     calibration: 'Observed vs predicted',
     'scenario-engine': 'What-if scenarios',
@@ -32,7 +46,7 @@
   var initialized = false;
 
   function getTabKey(btn) {
-    return btn.dataset.regTab || btn.dataset.predTab || btn.dataset.vizTab ||
+    return btn.dataset.uniTab || btn.dataset.regTab || btn.dataset.predTab || btn.dataset.vizTab ||
       btn.dataset.diagTab || btn.dataset.ixTab || btn.dataset.sub || '';
   }
 

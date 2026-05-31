@@ -359,18 +359,18 @@ const StatisticoHeader = {
   render() {
     const viewTitles = {
       // Univariate views
-      'histogram': 'Interactive Histogram',
-      'boxplot': 'Box Plot Analysis',
-      'qqplot': 'QQ/PP Plot Analysis',
-      'normality': 'Normality Tests',
-      'kernel': 'Kernel Density',
+      'histogram': 'Distribution · Histogram',
+      'boxplot': 'Box Plot',
+      'qqplot': 'Normality · PP/QQ',
+      'normality': 'Normality · Tests',
+      'kernel': 'Kernel',
       'descriptive-stats': 'Descriptive Statistics',
       'by-group': 'By Group',
-      'cdf': 'Cumulative Distribution',
+      'cdf': 'Distribution · CDF',
       'confidence': 'Confidence Intervals',
-      'hypothesis': 'Hypothesis Testing',
-      'outliers': 'Outliers Detection',
-      'percentile': 'Percentile Calculator',
+      'hypothesis': 'One-Sample Test',
+      'outliers': 'Outliers',
+      'percentile': 'Distribution · Percentiles',
       // Correlation views
       'correlation-matrix': 'Correlation Matrix',
       'correlation-network': 'Correlation Network',
@@ -593,21 +593,21 @@ const StatisticoHeader = {
   getNavigationItems() {
     const univariateViews = [
       { id: 'group-core', label: 'Core Descriptive', file: null, isGroup: true },
-      { id: 'histogram', label: 'Interactive Histogram', file: 'univariate/histogram-standalone-v2.html' },
-      { id: 'boxplot', label: 'Box Plot Analysis', file: 'univariate/boxplot-standalone.html' },
-      { id: 'cdf', label: 'Cumulative Distribution', file: 'univariate/cumulative-distribution.html' },
+      { id: 'histogram', label: 'Histogram', file: 'univariate/histogram-standalone-v2.html' },
+      { id: 'cdf', label: 'CDF', file: 'univariate/cumulative-distribution.html' },
       { id: 'percentile', label: 'Percentiles', file: 'univariate/percentile-standalone.html' },
-      { id: 'kernel', label: 'Kernel Density', file: 'univariate/kernel-standalone.html' },
+      { id: 'boxplot', label: 'Box Plot', file: 'univariate/boxplot-standalone.html' },
+      { id: 'kernel', label: 'Kernel', file: 'univariate/kernel-standalone.html' },
       { id: 'separator-core-by-group', label: '---', file: null, isSeparator: true },
       { id: 'group-by-group', label: 'By Group', file: null, isGroup: true },
       { id: 'by-group', label: 'By Group', file: 'univariate/by-group.html' },
-      { id: 'separator-core-advanced', label: '---', file: null, isSeparator: true },
+      { id: 'separator-by-group-advanced', label: '---', file: null, isSeparator: true },
       { id: 'group-advanced', label: 'Advanced Diagnostics', file: null, isGroup: true },
-      { id: 'outliers', label: 'Outliers Detection', file: 'univariate/outliers-standalone.html' },
-      { id: 'normality', label: 'Tests of Normality', file: 'univariate/normality-standalone.html' },
-      { id: 'qqplot', label: 'PP-QQ Plots', file: 'univariate/qqplot-standalone.html' },
-      { id: 'hypothesis', label: 'Hypothesis Testing', file: 'univariate/hypothesis-standalone.html' },
-      { id: 'confidence', label: 'Confidence Intervals', file: 'univariate/confidence-standalone.html' }
+      { id: 'outliers', label: 'Outliers', file: 'univariate/outliers-standalone.html' },
+      { id: 'normality', label: 'Tests', file: 'univariate/normality-standalone.html' },
+      { id: 'qqplot', label: 'PP/QQ', file: 'univariate/qqplot-standalone.html' },
+      { id: 'confidence', label: 'Confidence Intervals', file: 'univariate/confidence-standalone.html' },
+      { id: 'hypothesis', label: 'One-Sample Test', file: 'univariate/hypothesis-standalone.html' }
     ];
 
     const correlationViews = [
@@ -642,15 +642,19 @@ const StatisticoHeader = {
     if (this.module === 'univariate') {
       const views = this.getNavigationItems();
       const coreTabs = [];
+      const byGroupTabs = [];
       const advancedTabs = [];
       let bucket = 'core';
       views.forEach((view) => {
-        if (view.isSeparator || view.id === 'separator-core-advanced') {
-          bucket = 'advanced';
+        if (view.isSeparator) {
+          if (view.id === 'separator-core-by-group') bucket = 'byGroup';
+          else if (view.id === 'separator-by-group-advanced') bucket = 'advanced';
           return;
         }
         if (view.isGroup) return;
-        (bucket === 'core' ? coreTabs : advancedTabs).push(view);
+        if (bucket === 'core') coreTabs.push(view);
+        else if (bucket === 'byGroup') byGroupTabs.push(view);
+        else advancedTabs.push(view);
       });
 
       const renderTabButton = (view) => {
@@ -673,6 +677,12 @@ const StatisticoHeader = {
             <span class="header-tab-group header-tab-group--core">Core Descriptive</span>
             <div class="header-tab-row-tabs" role="tablist" aria-label="Core descriptive views">
               ${coreTabs.map(renderTabButton).join('')}
+            </div>
+          </div>
+          <div class="header-tabs-row">
+            <span class="header-tab-group header-tab-group--by-group">By Group</span>
+            <div class="header-tab-row-tabs" role="tablist" aria-label="By group views">
+              ${byGroupTabs.map(renderTabButton).join('')}
             </div>
           </div>
           <div class="header-tabs-row">
@@ -717,6 +727,7 @@ const StatisticoHeader = {
     if (item.active === true) return true;
     if (item.view && item.view === this.currentView) return true;
     if (Array.isArray(item.viewIn) && item.viewIn.includes(this.currentView)) return true;
+    if (Array.isArray(item.facets) && item.facets.some((f) => f.view === this.currentView)) return true;
     return false;
   },
 
@@ -760,16 +771,16 @@ const StatisticoHeader = {
       'partial-correlations': 'Control variables and compare residual links.',
       reliability: 'Evaluate internal consistency.',
       'descriptive-stats': 'Summarize variables and distributions.',
-      histogram: 'View distribution and frequency.',
-      boxplot: 'Compare spread and outliers.',
-      cdf: 'Inspect cumulative distribution.',
-      percentile: 'Find percentile cut points.',
-      kernel: 'Smooth the density estimate.',
-      'by-group': 'Compare statistics and histograms by a grouping column.',
-      normality: 'Test distributional normality.',
-      qqplot: 'Compare quantiles to a reference.',
-      hypothesis: 'Run a one-sample test.',
-      confidence: 'Estimate interval uncertainty.',
+      histogram: 'Frequency view of the distribution.',
+      boxplot: 'Quartiles, whiskers, and outliers.',
+      cdf: 'Empirical cumulative distribution.',
+      percentile: 'Percentile cut points.',
+      kernel: 'Smoothed density estimate.',
+      'by-group': 'Compare statistics by a grouping column.',
+      normality: 'Shapiro-Wilk, Anderson-Darling, and friends.',
+      qqplot: 'PP and QQ probability plots.',
+      hypothesis: 'One-sample mean / median test.',
+      confidence: 'Interval estimates for mean / median.',
       sbmeans: 'Power for mean comparisons.',
       sbanova: 'Power for ANOVA tests.',
       sbcorr: 'Power for correlations.',
@@ -782,6 +793,41 @@ const StatisticoHeader = {
     return descriptions[key] || 'Open this analysis section.';
   },
 
+  _getUnivariateOutputFlags() {
+    if (this.module !== 'univariate') return null;
+    try {
+      const raw = sessionStorage.getItem('univariateModelSpec');
+      if (!raw) return null;
+      const spec = JSON.parse(raw);
+      return spec.outputs || null;
+    } catch (_e) {
+      return null;
+    }
+  },
+
+  _isUnivariateViewEnabled(viewId) {
+    const flags = this._getUnivariateOutputFlags();
+    if (!flags) return true;
+    if (!viewId) return true;
+    return flags[viewId] === true;
+  },
+
+  _filterUnivariateSidebarItem(item) {
+    const flags = this._getUnivariateOutputFlags();
+    if (!flags) return item;
+
+    if (Array.isArray(item.facets) && item.facets.length > 0) {
+      const facets = item.facets.filter((f) => this._isUnivariateViewEnabled(f.view));
+      if (!facets.length) return null;
+      const copy = Object.assign({}, item, { facets: facets });
+      return copy;
+    }
+
+    const viewKey = item.view || item.tab;
+    if (viewKey && !this._isUnivariateViewEnabled(viewKey)) return null;
+    return item;
+  },
+
   _getSharedSidebarConfig() {
     if (this.module === 'univariate') {
       return {
@@ -790,29 +836,46 @@ const StatisticoHeader = {
         menuTitle: 'Menu',
         groups: [
           {
-            title: 'Core Descriptive',
+            title: 'Core descriptive',
             items: [
-              { type: 'navigate', view: 'histogram', file: 'univariate/histogram-standalone-v2.html', icon: 'fa-chart-column', label: 'Histogram' },
-              { type: 'navigate', view: 'boxplot', file: 'univariate/boxplot-standalone.html', icon: 'fa-chart-gantt', label: 'Box Plot' },
-              { type: 'navigate', view: 'cdf', file: 'univariate/cumulative-distribution.html', icon: 'fa-wave-square', label: 'CDF' },
-              { type: 'navigate', view: 'percentile', file: 'univariate/percentile-standalone.html', icon: 'fa-percent', label: 'Percentiles' },
-              { type: 'navigate', view: 'kernel', file: 'univariate/kernel-standalone.html', icon: 'fa-bezier-curve', label: 'Kernel Density' }
+              {
+                type: 'navigate',
+                view: 'distribution',
+                icon: 'fa-chart-area',
+                label: 'Distribution',
+                description: 'Histogram, CDF, and percentile views.',
+                facets: [
+                  { view: 'histogram',  file: 'univariate/histogram-standalone-v2.html', label: 'Histogram' },
+                  { view: 'cdf',        file: 'univariate/cumulative-distribution.html', label: 'CDF' },
+                  { view: 'percentile', file: 'univariate/percentile-standalone.html',   label: 'Percentiles' }
+                ]
+              },
+              { type: 'navigate', view: 'boxplot', file: 'univariate/boxplot-standalone.html', icon: 'fa-chart-gantt',  label: 'Box plot', description: 'Quartiles, whiskers, and outliers.' },
+              { type: 'navigate', view: 'kernel',  file: 'univariate/kernel-standalone.html',  icon: 'fa-bezier-curve', label: 'Kernel', description: 'Smoothed density estimate.' }
             ]
           },
           {
-            title: 'By Group',
+            title: 'By group',
             items: [
-              { type: 'navigate', view: 'by-group', file: 'univariate/by-group.html', icon: 'fa-layer-group', label: 'By Group' }
+              { type: 'navigate', view: 'by-group', file: 'univariate/by-group.html', icon: 'fa-layer-group', label: 'By group', description: 'Compare statistics by a grouping column.' }
             ]
           },
           {
-            title: 'Advanced Diagnostics',
+            title: 'Advanced diagnostics',
             items: [
-              { type: 'navigate', view: 'outliers', file: 'univariate/outliers-standalone.html', icon: 'fa-triangle-exclamation', label: 'Outliers' },
-              { type: 'navigate', view: 'normality', file: 'univariate/normality-standalone.html', icon: 'fa-wave-square', label: 'Normality Tests' },
-              { type: 'navigate', view: 'qqplot', file: 'univariate/qqplot-standalone.html', icon: 'fa-chart-line', label: 'PP-QQ Plots' },
-              { type: 'navigate', view: 'hypothesis', file: 'univariate/hypothesis-standalone.html', icon: 'fa-flask', label: 'Hypothesis' },
-              { type: 'navigate', view: 'confidence', file: 'univariate/confidence-standalone.html', icon: 'fa-ruler-horizontal', label: 'Confidence Intervals' }
+              {
+                type: 'navigate',
+                view: 'normality-group',
+                icon: 'fa-wave-square',
+                label: 'Normality',
+                description: 'Formal tests and PP/QQ probability plots.',
+                facets: [
+                  { view: 'normality', file: 'univariate/normality-standalone.html', label: 'Tests' },
+                  { view: 'qqplot',    file: 'univariate/qqplot-standalone.html',    label: 'PP / QQ' }
+                ]
+              },
+              { type: 'navigate', view: 'confidence', file: 'univariate/confidence-standalone.html', icon: 'fa-ruler-horizontal', label: 'Confidence intervals', description: 'Interval estimates for mean or median.' },
+              { type: 'navigate', view: 'hypothesis', file: 'univariate/hypothesis-standalone.html', icon: 'fa-flask',             label: 'One-sample test', description: 'Test against a reference value.' }
             ]
           }
         ]
@@ -1049,11 +1112,44 @@ const StatisticoHeader = {
     if (!cfg) return;
 
     const groupsHtml = (cfg.groups || []).map((group) => {
-      const itemsHtml = (group.items || []).map((item) => {
+      const itemsHtml = (group.items || [])
+        .map((item) => (this.module === 'univariate' ? this._filterUnivariateSidebarItem(item) : item))
+        .filter(Boolean)
+        .map((item) => {
         const active = this._isSidebarItemActive(item) ? ' active' : '';
         const idAttr = item.id ? ` id="${item.id}"` : '';
         const dataTab = item.tab ? ` data-tab="${item.tab}"` : '';
         const dataView = item.view ? ` data-view="${item.view}"` : '';
+
+        // Faceted item: parent label + inline pills (e.g. Distribution > [Histogram | CDF | Percentiles]).
+        // Clicking the parent navigates to the active facet (or the first one) so users can always
+        // (re)open the group from a single click. Facet pills are visible only when the parent group
+        // is the currently active section, to keep the sidebar quiet otherwise.
+        if (Array.isArray(item.facets) && item.facets.length > 0) {
+          const isGroupActive = !!active;
+          const activeFacet = item.facets.find((f) => f.view === this.currentView);
+          const targetFacet = activeFacet || item.facets[0];
+          const navFile = targetFacet?.file || '';
+          const parentNavAttr = navFile ? ` data-nav-file="${navFile}"` : '';
+          const parentOnclick = navFile ? ` onclick="StatisticoHeader.navigateTo('${navFile}')"` : '';
+          const description = this._getSidebarItemDescription(item);
+          const facetsHtml = isGroupActive
+            ? `<div class="sb-facets" role="tablist">${item.facets.map((f) => {
+                const isActive = f.view === this.currentView;
+                return `<button type="button" class="sb-facet${isActive ? ' active' : ''}"`
+                  + ` role="tab" aria-selected="${isActive ? 'true' : 'false'}"`
+                  + ` data-view="${f.view}" data-nav-file="${f.file}"`
+                  + ` onclick="StatisticoHeader.navigateTo('${f.file}')">${f.label}</button>`;
+              }).join('')}</div>`
+            : '';
+          return `<div class="sb-faceted${isGroupActive ? ' is-active-group' : ''}">`
+            + `<button type="button" class="sb-item${active}"${idAttr}${dataTab}${dataView}${parentNavAttr}${parentOnclick}>`
+            + `<i class="fa-solid ${item.icon || 'fa-circle'} sb-item-icon"></i>`
+            + `<span class="sb-item-copy"><span class="sb-item-label">${item.label || ''}</span>`
+            + `<span class="sb-item-description">${description}</span></span></button>`
+            + facetsHtml
+            + `</div>`;
+        }
 
         let onclick = '';
         let navFileAttr = '';
@@ -1071,6 +1167,7 @@ const StatisticoHeader = {
         return `<button type="button" class="sb-item${active}"${idAttr}${dataTab}${dataView}${navFileAttr}${onclickAttr}><i class="fa-solid ${item.icon || 'fa-circle'} sb-item-icon"></i><span class="sb-item-copy"><span class="sb-item-label">${item.label || ''}</span><span class="sb-item-description">${description}</span></span></button>`;
       }).join('');
 
+      if (!itemsHtml) return '';
       return `<div class="sb-group"><div class="sb-group-title">${group.title || ''}</div><div class="sb-items-rail">${itemsHtml}</div></div>`;
     }).join('');
 
@@ -4518,12 +4615,13 @@ const StatisticoHeader = {
       boxplot: 'Box Plot',
       cdf: 'CDF',
       percentile: 'Percentiles',
-      kernel: 'Kernel Density',
+      kernel: 'Kernel',
+      'by-group': 'By Group',
       outliers: 'Outliers',
-      normality: 'Normality Tests',
-      qqplot: 'QQ / PP Plots',
+      normality: 'Tests',
+      qqplot: 'PP/QQ',
       confidence: 'Confidence Intervals',
-      hypothesis: 'Hypothesis'
+      hypothesis: 'One-Sample Test'
     };
   },
 
@@ -5383,8 +5481,8 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
     ];
     const labels = {
       histogram:'Histogram', boxplot:'Box Plot', cdf:'CDF', percentile:'Percentiles',
-      kernel:'Kernel Density', outliers:'Outliers', normality:'Normality Tests',
-      qqplot:'QQ / PP Plots', confidence:'Confidence Intervals'
+      kernel:'Kernel', outliers:'Outliers', normality:'Tests',
+      qqplot:'PP/QQ', confidence:'Confidence Intervals', hypothesis:'One-Sample Test'
     };
 
     const total = views.length;
@@ -6212,8 +6310,9 @@ ACTION: [conditional step 1] | [conditional step 2] | [conditional step 3]`;
 
     // ── Per-view: Insight Guide (elaborate view explanation + controls guidance) ──
     const viewName = { histogram:'Histogram', boxplot:'Box Plot', cdf:'Cumulative Distribution Function',
-      percentile:'Percentile Calculator', kernel:'Kernel Density Estimation', outliers:'Outlier Detection',
-      normality:'Normality Tests', qqplot:'QQ / PP Plot', confidence:'Confidence Intervals' }[view] || view;
+      percentile:'Percentiles', kernel:'Kernel', outliers:'Outliers',
+      normality:'Tests', qqplot:'PP/QQ', confidence:'Confidence Intervals',
+      hypothesis:'One-Sample Test' }[view] || view;
 
     const controlsDoc = this._viewControlsDoc();
 
@@ -6342,8 +6441,8 @@ Always follow the exact output format requested.` },
 
     const viewLabels = {
       histogram:'Histogram', boxplot:'Box Plot', cdf:'CDF', percentile:'Percentiles',
-      kernel:'Kernel Density', outliers:'Outliers', normality:'Normality Tests',
-      qqplot:'QQ / PP Plots', confidence:'Confidence Intervals',
+      kernel:'Kernel', outliers:'Outliers', normality:'Tests',
+      qqplot:'PP/QQ', confidence:'Confidence Intervals', hypothesis:'One-Sample Test',
       ...this._correlationViewLabels(),
       ...this._independentViewLabels(),
       ...this._genericModuleViewLabels()

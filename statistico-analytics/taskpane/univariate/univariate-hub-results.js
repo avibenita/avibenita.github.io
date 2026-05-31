@@ -109,11 +109,23 @@
     });
   }
 
+  function resolveUnivariateStartViewPath() {
+    var startPath = 'univariate/histogram-standalone-v2.html';
+    try {
+      var specRaw = global.sessionStorage.getItem('univariateModelSpec');
+      if (specRaw) {
+        var spec = JSON.parse(specRaw);
+        if (spec && spec.startView) startPath = spec.startView;
+      }
+    } catch (_e) {}
+    return startPath;
+  }
+
   function openUnivariateResultsFromHub() {
     var results = loadStoredResults();
     if (!results) return false;
     try { global.sessionStorage.removeItem('univariateHubRunData'); } catch (_e) {}
-    openResultsAt(getDialogsBaseUrl() + 'univariate/histogram-standalone-v2.html?cb=' + Date.now(), results);
+    openResultsAt(getDialogsBaseUrl() + resolveUnivariateStartViewPath() + '?cb=' + Date.now(), results);
     return true;
   }
 

@@ -793,41 +793,6 @@ const StatisticoHeader = {
     return descriptions[key] || 'Open this analysis section.';
   },
 
-  _getUnivariateOutputFlags() {
-    if (this.module !== 'univariate') return null;
-    try {
-      const raw = sessionStorage.getItem('univariateModelSpec');
-      if (!raw) return null;
-      const spec = JSON.parse(raw);
-      return spec.outputs || null;
-    } catch (_e) {
-      return null;
-    }
-  },
-
-  _isUnivariateViewEnabled(viewId) {
-    const flags = this._getUnivariateOutputFlags();
-    if (!flags) return true;
-    if (!viewId) return true;
-    return flags[viewId] === true;
-  },
-
-  _filterUnivariateSidebarItem(item) {
-    const flags = this._getUnivariateOutputFlags();
-    if (!flags) return item;
-
-    if (Array.isArray(item.facets) && item.facets.length > 0) {
-      const facets = item.facets.filter((f) => this._isUnivariateViewEnabled(f.view));
-      if (!facets.length) return null;
-      const copy = Object.assign({}, item, { facets: facets });
-      return copy;
-    }
-
-    const viewKey = item.view || item.tab;
-    if (viewKey && !this._isUnivariateViewEnabled(viewKey)) return null;
-    return item;
-  },
-
   _getSharedSidebarConfig() {
     if (this.module === 'univariate') {
       return {
@@ -1112,10 +1077,7 @@ const StatisticoHeader = {
     if (!cfg) return;
 
     const groupsHtml = (cfg.groups || []).map((group) => {
-      const itemsHtml = (group.items || [])
-        .map((item) => (this.module === 'univariate' ? this._filterUnivariateSidebarItem(item) : item))
-        .filter(Boolean)
-        .map((item) => {
+      const itemsHtml = (group.items || []).map((item) => {
         const active = this._isSidebarItemActive(item) ? ' active' : '';
         const idAttr = item.id ? ` id="${item.id}"` : '';
         const dataTab = item.tab ? ` data-tab="${item.tab}"` : '';

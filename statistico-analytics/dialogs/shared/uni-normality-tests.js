@@ -237,9 +237,32 @@
     return Math.round(totalWeight > 0 ? weightedScore / totalWeight : 50);
   }
 
+  /**
+   * Plain-English normality verdict from the test battery.
+   * Unreliable Shapiro-Wilk (ties/discrete data) is excluded from the vote.
+   */
+  function calculateVerdict(tests, alpha) {
+    const cutoff = typeof alpha === 'number' ? alpha : 0.05;
+    let pool = tests.filter((t) => {
+      if (t.name === 'Shapiro-Wilk' && t.unreliable) return false;
+      return Number.isFinite(t.pValue);
+    });
+    if (!pool.length) {
+      pool = tests.filter((t) => Number.isFinite(t.pValue));
+    }
+    if (!pool.length) return { label: 'Insufficient Data', tone: 'na' };
+
+    const pass = pool.filter((t) => t.pValue >= cutoff).length;
+    const ratio = pass / pool.length;
+    if (ratio >= 0.67) return { label: 'Approximately Normal', tone: 'pass' };
+    if (ratio >= 0.4) return { label: 'Mixed Evidence', tone: 'mixed' };
+    return { label: 'Likely Non-Normal', tone: 'fail' };
+  }
+
   global.UniNormalityTests = {
     runAll,
     calculateNSI,
+    calculateVerdict,
     hasTies,
     countUnique,
     shapiroWilkTest

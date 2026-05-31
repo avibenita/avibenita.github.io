@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260601d" />
   <script src="../shared-brand-logo.js?v=20260519u"></script>
   <script src="../shared-header.js?v=20260601f"></script>
-  <script src="../../shared/uni-normality-tests.js?v=20260601d"></script>
+  <script src="../../shared/uni-normality-tests.js?v=20260601g"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -77,7 +77,23 @@
     .p-na { color:var(--text-secondary); }
     .nsi-cell { color:var(--accent-2); font-size:14px; font-weight:800; }
     .norm-footnote { display:block; margin-top:6px; color:var(--text-secondary); font-size:11px; font-weight:500; line-height:1.45; }
-    .p-caution { color:#fbbf24; font-weight:700; }
+    .norm-th-group { display:block; font-size:11px; letter-spacing:.04em; }
+    .norm-th-n { display:block; margin-top:2px; font-size:10px; font-weight:600; color:var(--text-secondary); text-transform:none; letter-spacing:0; }
+    .norm-row-distribution td { padding:6px 8px 4px; vertical-align:middle; background:rgba(15,23,42,.18); }
+    html[data-theme="light"] .norm-row-distribution td { background:rgba(248,250,252,.85); }
+    .norm-row-distribution td:first-child { font-weight:700; font-size:11px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.06em; }
+    .norm-row-verdict td { border-bottom:2px solid rgba(139,92,246,.28); background:rgba(139,92,246,.06); }
+    .norm-verdict { font-size:12px; font-weight:700; letter-spacing:.01em; }
+    .norm-verdict--pass { color:#34d399; }
+    .norm-verdict--mixed { color:#fbbf24; }
+    .norm-verdict--fail { color:#fb7185; }
+    .norm-verdict--na { color:var(--text-secondary); }
+    .norm-mini-chart { height:72px; min-width:96px; }
+    .norm-sw-row td { color:var(--text-secondary); }
+    .norm-sw-row td:first-child { opacity:.82; font-style:italic; }
+    .p-sw-unreliable { color:rgba(148,163,184,.95); font-weight:600; cursor:help; }
+    html[data-theme="light"] .p-sw-unreliable { color:#64748b; }
+    .norm-sw-warn { font-size:11px; margin-left:1px; opacity:.95; }
     .empty { margin:32px auto; max-width:720px; text-align:center; color:var(--text-secondary); line-height:1.5; }
     .empty i { display:block; color:var(--accent-1); font-size:32px; margin-bottom:10px; }
     .group-dialog-overlay { position:fixed; inset:0; z-index:2147483200; display:none; align-items:center; justify-content:center; padding:16px; background:rgba(3,7,18,.64); backdrop-filter:blur(3px); }
@@ -127,7 +143,7 @@
       <section class="view-card">
         <div class="toolbar">
           <div class="title">
-            <strong>By Group Analysis</strong>
+            <strong>Grouped Analysis</strong>
             <span id="subtitle">Compare the selected numeric variable across a grouping column.</span>
           </div>
           <div class="controls">
@@ -175,7 +191,7 @@
             </div>
             <div id="byGroupPanel-normality" class="by-group-panel">
               <section class="panel">
-                <div class="section-title"><strong>Normality by Group</strong><span>Six formal tests and NSI index per group (α = 0.05)<em id="normalityNote" class="norm-footnote"></em></span></div>
+                <div class="section-title"><strong>Group Normality Analysis</strong><span>Six formal tests, distribution snapshots, and plain-English verdict per group (α = 0.05)<em id="normalityNote" class="norm-footnote"></em></span></div>
                 <div class="norm-table-wrap">
                   <table class="norm-table">
                     <thead id="normalityHead"></thead>
@@ -218,6 +234,7 @@
     let previewLevels = [];
     let boxplotChart = null;
     let activeByGroupTab = 'stats';
+    let normGroupResults = [];
     const levelSelections = {};
     const NORM_ALPHA = 0.05;
 
@@ -503,6 +520,9 @@
       if (activeByGroupTab === 'boxplot' && boxplotChart) {
         try { boxplotChart.reflow(); } catch (_e) {}
       }
+      if (activeByGroupTab === 'normality') {
+        renderNormMiniHistograms(normGroupResults);
+      }
     }
     window.switchByGroupTab = switchByGroupTab;
 
@@ -630,45 +650,103 @@
     function formatNormP(test) {
       const p = test.pValue;
       if (!Number.isFinite(p)) return '<span class="p-na">—</span>';
-      const cls = p >= NORM_ALPHA ? 'p-pass' : (test.unreliable ? 'p-caution' : 'p-fail');
-      let label = p < 0.0001 ? '&lt;0.0001' : p.toFixed(4);
-      if (test.name === 'Shapiro-Wilk' && test.unreliable) label += ' †';
+      if (test.name === 'Shapiro-Wilk' && test.unreliable) {
+        const label = p < 0.0001 ? '&lt;0.0001' : p.toFixed(4);
+        return `<span class="p-sw-unreliable" title="Sensitive to ties/discrete values.">${label} <span class="norm-sw-warn" aria-hidden="true">⚠</span></span>`;
+      }
+      const cls = p >= NORM_ALPHA ? 'p-pass' : 'p-fail';
+      const label = p < 0.0001 ? '&lt;0.0001' : p.toFixed(4);
       return `<span class="${cls}">${label}</span>`;
+    }
+
+    function renderNormMiniHistograms(groupResults) {
+      if (typeof Highcharts === 'undefined' || !groupResults || !groupResults.length) return;
+      const allValues = groupResults.flatMap((g) => g.values);
+      if (!allValues.length) return;
+      const globalMin = Math.min(...allValues);
+      const globalMax = Math.max(...allValues);
+      const bins = Math.max(4, Math.min(8, Math.round(Math.sqrt(allValues.length / groupResults.length))));
+      groupResults.forEach((g, idx) => {
+        const el = document.getElementById(`normMiniHist${idx}`);
+        if (!el) return;
+        if (Highcharts.charts) {
+          const existing = Highcharts.charts.find((c) => c && c.renderTo === el);
+          if (existing) existing.destroy();
+        }
+        Highcharts.chart(el, {
+          chart: { type:'column', backgroundColor:'transparent', spacing:[2, 4, 2, 4], height:72, animation:false },
+          title: { text:null },
+          credits: { enabled:false },
+          legend: { enabled:false },
+          xAxis: { visible:false },
+          yAxis: { visible:false },
+          tooltip: {
+            outside:true,
+            pointFormat:'Frequency: <b>{point.y}</b>'
+          },
+          plotOptions: {
+            column:{
+              borderWidth:0,
+              color:'rgba(129,140,248,.88)',
+              borderRadius:2,
+              pointPadding:0.05,
+              groupPadding:0.04
+            }
+          },
+          series: [{ data: histogramSeries(g.values, globalMin, globalMax, bins).map((pt) => ({ y: pt.y })) }]
+        });
+      });
     }
 
     function renderGroupNormality() {
       if (typeof jStat === 'undefined' || typeof UniNormalityTests === 'undefined') return;
       const testNames = ['Shapiro-Wilk', 'Anderson-Darling', 'Kolmogorov-Smirnov', 'Cramer-von Mises', "D'Agostino-Pearson", 'Jarque-Bera'];
-      const groupResults = groupStats.map((g) => {
+      normGroupResults = groupStats.map((g) => {
         const tests = UniNormalityTests.runAll(g.values, NORM_ALPHA);
         return {
           group: g.group,
+          n: g.n,
+          values: g.values,
           tests,
-          nsi: UniNormalityTests.calculateNSI(tests)
+          nsi: UniNormalityTests.calculateNSI(tests),
+          verdict: UniNormalityTests.calculateVerdict(tests, NORM_ALPHA)
         };
       });
 
-      const anyTies = groupResults.some((gr) => gr.tests.hasTies);
+      const anyTies = normGroupResults.some((gr) => gr.tests.hasTies);
       const noteEl = document.getElementById('normalityNote');
       if (noteEl) {
         noteEl.textContent = anyTies
-          ? ' † Shapiro–Wilk assumes continuous data and can reject too often when scores are tied or discrete; weigh Anderson–Darling and Kolmogorov–Smirnov more heavily.'
+          ? ' Shapiro–Wilk (⚠) assumes continuous data and can reject too often when scores are tied or discrete; the verdict row ignores it in that case.'
           : '';
       }
 
       document.getElementById('normalityHead').innerHTML =
-        `<tr><th>Test</th>${groupResults.map((g) => `<th>${escapeHtml(g.group)}<div style="font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:none;letter-spacing:0;">p-value</div></th>`).join('')}</tr>`;
+        `<tr><th>Test</th>${normGroupResults.map((g) => `<th><span class="norm-th-group">${escapeHtml(g.group)}</span><span class="norm-th-n">(n=${g.n})</span></th>`).join('')}</tr>`;
 
-      document.getElementById('normalityBody').innerHTML = testNames.map((name) => {
-        const cells = groupResults.map((gr) => {
+      const distributionRow = `<tr class="norm-row-distribution"><td>Distribution</td>${normGroupResults.map((_g, i) => `<td><div id="normMiniHist${i}" class="norm-mini-chart"></div></td>`).join('')}</tr>`;
+      const verdictRow = `<tr class="norm-row-verdict"><td>Verdict</td>${normGroupResults.map((g) => `<td><span class="norm-verdict norm-verdict--${g.verdict.tone}">${escapeHtml(g.verdict.label)}</span></td>`).join('')}</tr>`;
+
+      document.getElementById('normalityBody').innerHTML = distributionRow + verdictRow + testNames.map((name) => {
+        const isSw = name === 'Shapiro-Wilk';
+        const swUnreliable = isSw && normGroupResults.some((gr) => {
+          const t = gr.tests.find((x) => x.name === name);
+          return t && t.unreliable;
+        });
+        const rowClass = swUnreliable ? ' class="norm-sw-row"' : '';
+        const cells = normGroupResults.map((gr) => {
           const test = gr.tests.find((t) => t.name === name);
           return `<td>${formatNormP(test || { pValue: NaN })}</td>`;
         }).join('');
-        return `<tr><td>${escapeHtml(name)}</td>${cells}</tr>`;
+        return `<tr${rowClass}><td>${escapeHtml(name)}</td>${cells}</tr>`;
       }).join('');
 
       document.getElementById('normalityFoot').innerHTML =
-        `<tr><th>NSI<sup style="font-size:9px;">TM</sup></th>${groupResults.map((g) => `<td class="nsi-cell">${g.nsi}</td>`).join('')}</tr>`;
+        `<tr><th>NSI<sup style="font-size:9px;">TM</sup></th>${normGroupResults.map((g) => `<td class="nsi-cell">${g.nsi}</td>`).join('')}</tr>`;
+
+      if (activeByGroupTab === 'normality') {
+        requestAnimationFrame(function () { renderNormMiniHistograms(normGroupResults); });
+      }
     }
 
     function escapeHtml(value) {
@@ -708,9 +786,9 @@
       activeByGroupTab = 'stats';
       window.__byGroupActiveTab = 'stats';
       if (typeof StatisticoHeader !== 'undefined') {
-        StatisticoHeader.init('by-group', 'By Group', 0, 'univariate');
+        StatisticoHeader.init('by-group', 'Grouped Analysis', 0, 'univariate');
         StatisticoHeader.initSidebarPage();
-        StatisticoHeader.updateTitle('By Group');
+        StatisticoHeader.updateTitle('Grouped Analysis');
       }
       if (typeof StatisticoWorkspaceTabs !== 'undefined') StatisticoWorkspaceTabs.init();
       initializeFromPayload();

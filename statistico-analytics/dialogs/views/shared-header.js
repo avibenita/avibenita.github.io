@@ -1231,7 +1231,7 @@ const StatisticoHeader = {
       confidence: 'Interval estimates for mean or median',
       'by-group-stats': 'Descriptive stats & histograms',
       'by-group-boxplot': 'Compare spread by group',
-      'by-group-normality': 'Six tests & NSI by group'
+      'by-group-normality': 'Verdicts, tests & mini histograms'
     };
 
     const tabsHtml = viewTabs.map((t) => this._buildUniWsTabBtn({

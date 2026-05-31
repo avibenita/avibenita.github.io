@@ -116,26 +116,35 @@ const StatisticoHeader = {
 
     /* ── Inject CSS variables directly so they beat page-level :root {} ── */
     if (theme === 'light') {
-      root.style.setProperty('--surface-0',      '#f8fafa');
+      root.style.setProperty('--surface-0',      '#f4f5f7');
       root.style.setProperty('--surface-1',      '#ffffff');
-      root.style.setProperty('--surface-2',      '#f0fdf9');
-      root.style.setProperty('--border',         '#e5e7eb');
+      root.style.setProperty('--surface-2',      '#f8f9fb');
+      root.style.setProperty('--border',         '#e2e5ea');
       root.style.setProperty('--accent-1',       '#0d9488');
       root.style.setProperty('--accent-2',       '#0ea5e9');
       root.style.setProperty('--text-primary',   '#111827');
       root.style.setProperty('--text-secondary', '#4b5563');
       root.style.setProperty('--text-muted',     '#6b7280');
-      root.style.setProperty('--panel-shadow',   '0 2px 10px rgba(0,0,0,.08)');
+      root.style.setProperty('--panel-shadow',   'none');
       root.style.setProperty('--success',        '#16a34a');
       root.style.setProperty('--warning',        '#d97706');
       root.style.setProperty('--danger',         '#dc2626');
       root.style.setProperty('--header-color',   '#0d9488');
     } else {
-      /* Remove inline overrides — let the per-page :root {} take over */
-      ['--surface-0','--surface-1','--surface-2','--border',
-       '--accent-1','--accent-2','--text-primary','--text-secondary',
-       '--text-muted','--panel-shadow','--success','--warning','--danger',
-       '--header-color'].forEach(v => root.style.removeProperty(v));
+      root.style.setProperty('--surface-0',      '#0f1115');
+      root.style.setProperty('--surface-1',      '#181b22');
+      root.style.setProperty('--surface-2',      '#1e222a');
+      root.style.setProperty('--border',         '#2a303c');
+      root.style.setProperty('--accent-1',       'rgb(255,165,120)');
+      root.style.setProperty('--accent-2',       '#818cf8');
+      root.style.setProperty('--text-primary',   '#ffffff');
+      root.style.setProperty('--text-secondary', 'rgba(255,255,255,.72)');
+      root.style.setProperty('--text-muted',     'rgba(255,255,255,.52)');
+      root.style.setProperty('--panel-shadow',   'none');
+      root.style.setProperty('--success',        '#34d399');
+      root.style.setProperty('--warning',        '#fbbf24');
+      root.style.setProperty('--danger',         '#fb7185');
+      root.style.setProperty('--header-color',   'rgb(255,165,120)');
     }
 
     try { localStorage.setItem('statistico-theme', theme); } catch(e) {}
@@ -215,6 +224,7 @@ const StatisticoHeader = {
 
     // Apply persisted theme before rendering (avoids flash of wrong theme)
     this.applyTheme(this.getTheme());
+    this._ensureMinimalStyles();
 
     // Keep univariate result dialogs visually capped to a laptop-like viewport.
     this.ensureLaptopFrame();
@@ -1154,6 +1164,15 @@ const StatisticoHeader = {
       globalThis.switchByGroupTab(panel);
     }
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
+  },
+
+  _ensureMinimalStyles() {
+    if (document.getElementById('statistico-minimal-css')) return;
+    const link = document.createElement('link');
+    link.id = 'statistico-minimal-css';
+    link.rel = 'stylesheet';
+    link.href = this.resolveDialogUrl('shared-minimal.css?v=20260601m');
+    document.head.appendChild(link);
   },
 
   _ensureUnivariateWorkspaceTabAssets() {
@@ -4581,6 +4600,7 @@ const StatisticoHeader = {
       layout.appendChild(rightCol);
     }
     this._renderSharedSidebar();
+    this._ensureMinimalStyles();
     this._ensureDefaultActions();
     this._mountSidebarUtilities();
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}

@@ -92,6 +92,13 @@
     applyTheme(getSaved());
     const btn = document.getElementById('cfgThemeToggle');
     if (btn) btn.addEventListener('click', toggleTheme);
+    if (!document.getElementById('statistico-minimal-css')) {
+      const link = document.createElement('link');
+      link.id = 'statistico-minimal-css';
+      link.rel = 'stylesheet';
+      link.href = '../shared-minimal.css?v=20260601m';
+      document.head.appendChild(link);
+    }
   });
 
   // Expose globally

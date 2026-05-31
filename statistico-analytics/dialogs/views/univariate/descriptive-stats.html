@@ -15,8 +15,8 @@
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
-  <script src="../../shared/uni-normality-tests.js?v=20260531n"></script>
-  <script src="../../shared/uni-normality-dashboard.js?v=20260531n"></script>
+  <script src="../../shared/uni-normality-tests.js?v=20260531p"></script>
+  <script src="../../shared/uni-normality-dashboard.js?v=20260531p"></script>
   <style>
     :root{--surface-0:#0c1624;--surface-1:#1a1f2e;--surface-2:#242938;--border:#2d3748;--accent-1:rgb(255,165,120);--text-primary:#fff;--text-secondary:rgba(255,255,255,0.85);}
     /* ── Light Theme ── */
@@ -454,10 +454,45 @@
     
     // Store results globally so they can be processed when page is ready
     window._pendingNormalityResults = null;
+
+    function getNormalityVectorForVariable(varName) {
+      const matchName = varName || VarNameSelected || '';
+      const row = (selectedRow && (selectedRow.Variable || selectedRow.name || '') === matchName)
+        ? selectedRow
+        : (Array.isArray(data) ? data.find((r) => (r.Variable || r.name || '') === matchName) : null);
+      if (!row || !Array.isArray(row.vector)) return null;
+      const raw = row.vector
+        .map((v) => (typeof v === 'number' ? v : parseFloat(v)))
+        .filter((v) => isFinite(v));
+      if (raw.length < 3 || raw.every((v) => v === raw[0])) return null;
+      return { row, raw };
+    }
+
+    function tryClientNormalityDashboard(varName) {
+      const resolved = getNormalityVectorForVariable(varName);
+      if (!resolved || typeof UniNormalityDashboard === 'undefined' || typeof refreshNormalityFromSelection !== 'function') {
+        return false;
+      }
+      selectedRow = resolved.row;
+      VarNameSelected = resolved.row.Variable || resolved.row.name || varName || VarNameSelected;
+      console.log('Using client-side normality battery for', VarNameSelected);
+      const modal = document.getElementById('normality-modal');
+      if (modal && modal.style.display !== 'block') {
+        document.getElementById('modal-variable-name').textContent = VarNameSelected;
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        setTimeout(() => initializeGaugeChart(), 100);
+      }
+      refreshNormalityFromSelection();
+      return true;
+    }
     
     // VB6 callback function for normality test results
     // VB6 calls: updateNormalityDashboard(resultsArray, variableName, sampleSize)
     window.updateNormalityDashboard = function(resultsJSON, variableName, sampleSize) {
+      if (tryClientNormalityDashboard(variableName)) {
+        return;
+      }
       console.log('updateNormalityDashboard CALLED!');
       console.log('   Type of resultsJSON:', typeof resultsJSON);
       console.log('   Variable:', variableName);
@@ -1069,6 +1104,9 @@
     // VB6 callback function for normality test results (OLD SIGNATURE - kept for compatibility)
     // VB6 will call this function with the actual normality test results
     window.updateNormalityTestResults = function(resultsJSON, alpha, sampleSize, stdev, columnName) {
+      if (tryClientNormalityDashboard(columnName)) {
+        return;
+      }
       try {
         console.log('Received normality test results from VB6 for:', columnName);
         

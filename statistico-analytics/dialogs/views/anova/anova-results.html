@@ -1454,28 +1454,9 @@
         <!-- ── PATTERNS (Plots + Effect Sizes) ──────────────── -->
         <div class="tab-panel" id="tab-visuals" style="display:none;">
 
-          <!-- ── Row 1: Groups + Times side by side (two-way), or Groups full-width (one-way) ── -->
+          <!-- ── Row 1: Times panel (two-way only) ───────────── -->
           <div id="mainEffectsRow" style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:10px;">
-
-            <!-- Panel A: Groups -->
-            <div class="results-panel" id="panelGroups" style="margin-bottom:0;">
-              <div class="results-panel-heading">
-                <span><i class="fa-solid fa-users"></i>&nbsp;<span id="grpTitle">Groups</span>
-                  <span id="grpEtaBadge" class="vis-eta-badge"></span>
-                </span>
-                <div style="display:flex;gap:5px;">
-                  <button class="chart-toggle-btn active" id="btnGrpBar" onclick="switchVisPanel('grp','bar')"><i class="fa-solid fa-chart-column"></i> Bar</button>
-                  <button class="chart-toggle-btn"        id="btnGrpBox" onclick="switchVisPanel('grp','box')"><i class="fa-solid fa-box-open"></i> Box</button>
-                </div>
-              </div>
-              <div class="results-panel-body" style="padding:8px;">
-                <div id="hintGrp" class="drill-hint"><i class="fa-solid fa-magnifying-glass-chart"></i> Click any bar to drill into <strong>time</strong> breakdown</div>
-                <div class="chart-wrap-std" id="grpBarChart"></div>
-                <div class="chart-wrap-std" id="grpBoxChart" style="display:none;"></div>
-              </div>
-            </div>
-
-            <!-- Panel B: Times (two-way only, injected into grid via JS) -->
+            <!-- Panel: Times (two-way only, injected into grid via JS) -->
             <div class="results-panel" id="panelTimes" style="display:none;margin-bottom:0;">
               <div class="results-panel-heading">
                 <span><i class="fa-solid fa-clock"></i>&nbsp;<span id="timTitle">Times</span>
@@ -1516,9 +1497,21 @@
             <div class="results-panel-body">
               <div class="patterns-dual-grid">
                 <div class="patterns-card">
-                  <div class="patterns-card-title"><i class="fa-solid fa-users"></i> Means by Group</div>
-                  <div id="meansByGroupChart" class="patterns-mini-chart"></div>
-                  <div id="meansByGroupTable" class="patterns-mini-table"></div>
+                  <div class="patterns-card-title">
+                    <span><i class="fa-solid fa-users"></i> Means by Group</span>
+                    <span style="display:flex;gap:5px;">
+                      <button class="chart-toggle-btn active" id="meansModeBarBtn" onclick="switchMeansMode('bar')"><i class="fa-solid fa-chart-column"></i> Bar</button>
+                      <button class="chart-toggle-btn" id="meansModeBoxBtn" onclick="switchMeansMode('box')"><i class="fa-solid fa-box-open"></i> Box</button>
+                    </span>
+                  </div>
+                  <div id="meansByGroupBarChart" class="patterns-mini-chart"></div>
+                  <div id="meansByGroupBoxChart" class="patterns-mini-chart" style="display:none;"></div>
+                  <div style="margin-top:8px;">
+                    <button class="power-btn subtle" id="meansTableToggleBtn" onclick="toggleMeansTable()"><i class="fa-solid fa-table"></i> Show table</button>
+                  </div>
+                  <div id="meansByGroupTableWrap" class="patterns-mini-table" style="display:none;">
+                    <div id="meansByGroupTable"></div>
+                  </div>
                 </div>
                 <div class="patterns-card">
                   <div class="patterns-card-title"><i class="fa-solid fa-sort-numeric-up"></i> Mean Ranks by Group</div>
@@ -2685,14 +2678,18 @@
 
   /* ── switchVisPanel: toggle bar/box within a panel ── */
   function switchVisPanel(panel, mode) {
-    var ids = panel === 'grp'
-      ? { bar:'grpBarChart', box:'grpBoxChart', btnBar:'btnGrpBar', btnBox:'btnGrpBox', key:'grp', hint:'hintGrp' }
-      : { bar:'timBarChart', box:'timBoxChart', btnBar:'btnTimBar', btnBox:'btnTimBox', key:'tim', hint:'hintTim' };
+    var ids = { bar:'timBarChart', box:'timBoxChart', btnBar:'btnTimBar', btnBox:'btnTimBox', key:'tim', hint:'hintTim' };
+    if (panel !== 'tim') return;
 
-    document.getElementById(ids.bar).style.display = mode === 'bar' ? '' : 'none';
-    document.getElementById(ids.box).style.display = mode === 'box' ? '' : 'none';
-    document.getElementById(ids.btnBar).classList.toggle('active', mode === 'bar');
-    document.getElementById(ids.btnBox).classList.toggle('active', mode === 'box');
+    var barEl = document.getElementById(ids.bar);
+    var boxEl = document.getElementById(ids.box);
+    var btnBarEl = document.getElementById(ids.btnBar);
+    var btnBoxEl = document.getElementById(ids.btnBox);
+    if (!barEl || !boxEl || !btnBarEl || !btnBoxEl) return;
+    barEl.style.display = mode === 'bar' ? '' : 'none';
+    boxEl.style.display = mode === 'box' ? '' : 'none';
+    btnBarEl.classList.toggle('active', mode === 'bar');
+    btnBoxEl.classList.toggle('active', mode === 'box');
 
     /* show drill hint only in bar mode (box has no drill) */
     var hint = document.getElementById(ids.hint);
@@ -2715,58 +2712,21 @@
     var f2 = isTwoWay ? ((b.spec && b.spec.factor2) || 'Time')  : null;
 
     /* Update panel titles */
-    var el1 = document.getElementById('grpTitle'); if (el1) el1.textContent = f1;
     var el2 = document.getElementById('timTitle'); if (el2) el2.textContent = f2 || 'Times';
 
-    /* ── Side-by-side grid when two-way ── */
+    /* Times panel row is two-way only (group panel removed by design) */
     var row = document.getElementById('mainEffectsRow');
-    if (row) row.style.gridTemplateColumns = isTwoWay ? '1fr 1fr' : '1fr';
+    if (row) row.style.display = isTwoWay ? 'grid' : 'none';
 
     /* Show/hide panels */
     document.getElementById('panelTimes').style.display       = isTwoWay ? '' : 'none';
     document.getElementById('panelInteraction').style.display = isTwoWay ? '' : 'none';
-
-    /* Drilldown hint — only for two-way */
-    var hintGrp = document.getElementById('hintGrp');
-    if (hintGrp) hintGrp.style.display = isTwoWay ? '' : 'none';
 
     /* ── Effect size badges ── */
     if (isTwoWay && b.twoWay) {
       _setEtaBadge('grpEtaBadge',  b.twoWay.etaSqA,  _etaLabel(b.twoWay.etaSqA));
       _setEtaBadge('timEtaBadge',  b.twoWay.etaSqB,  _etaLabel(b.twoWay.etaSqB));
       _setEtaBadge('abEtaBadge',   b.twoWay.etaSqAB, _etaLabel(b.twoWay.etaSqAB));
-    } else if (b.oneWay) {
-      _setEtaBadge('grpEtaBadge',  b.oneWay.etaSq,   _etaLabel(b.oneWay.etaSq));
-    } else if (b.repeated) {
-      _setEtaBadge('grpEtaBadge',  b.repeated.etaSqP, _etaLabel(b.repeated.etaSqP));
-    }
-
-    /* ─────── Groups panel (Factor A / one-way groups) ─────── */
-    var descA = b.descA || b.descriptives || [];
-    if (descA.length) {
-      var cats = descA.map(function(d){ return d.level; });
-      var singleSeries = [{
-        name: dv,
-        color: t.colors[0],
-        data: descA.map(function(d){ return isFinite(d.mean) ? +d.mean.toFixed(4) : null; })
-      }];
-      /* 95% CI error bars for one-way */
-      if (!isTwoWay) {
-        singleSeries.push({
-          name:'95% CI', type:'errorbar',
-          data: descA.map(function(d){ return [isFinite(d.ciLow)?+d.ciLow.toFixed(4):0, isFinite(d.ciHigh)?+d.ciHigh.toFixed(4):0]; }),
-          color: t.isDark ? 'rgba(255,255,255,.5)' : '#374151', stemWidth:2, whiskerWidth:8
-        });
-      }
-      var grpCfg = _colCfg(cats, singleSeries, dv, t.tc, t.gc,
-        isTwoWay ? { pointEvents:{ click: function(){ openDrillGroups(this.category, b); } } } : null);
-      if (isTwoWay) grpCfg.plotOptions.column.cursor = 'pointer';
-      _charts.grpBar = Highcharts.chart('grpBarChart', grpCfg);
-
-      /* Box chart */
-      var boxDataA = _descToBoxData(descA);
-      _charts.grpBox = Highcharts.chart('grpBoxChart',
-        _boxCfg(cats, boxDataA, dv, t.tc, t.gc, t.colors[0]));
     }
 
     /* ─────── Times panel (Factor B, two-way only) ─────────── */
@@ -2879,11 +2839,12 @@
   }
 
   function renderPatternsCompare(b) {
-    var meansChartEl = document.getElementById('meansByGroupChart');
+    var meansBarEl = document.getElementById('meansByGroupBarChart');
+    var meansBoxEl = document.getElementById('meansByGroupBoxChart');
     var meansTableEl = document.getElementById('meansByGroupTable');
     var ranksChartEl = document.getElementById('meanRanksByGroupChart');
     var ranksTableEl = document.getElementById('meanRanksByGroupTable');
-    if (!meansChartEl || !meansTableEl || !ranksChartEl || !ranksTableEl) return;
+    if (!meansBarEl || !meansBoxEl || !meansTableEl || !ranksChartEl || !ranksTableEl) return;
 
     var t = _visTheme();
     var dv = (b.spec && b.spec.dv) || 'Mean';
@@ -2892,37 +2853,63 @@
     var ranks = (b.kruskalWallis && Array.isArray(b.kruskalWallis.meanRanks)) ? b.kruskalWallis.meanRanks : [];
 
     if (_charts.meansMini) { try { _charts.meansMini.destroy(); } catch (_e) {} _charts.meansMini = null; }
+    if (_charts.meansMiniBox) { try { _charts.meansMiniBox.destroy(); } catch (_e) {} _charts.meansMiniBox = null; }
     if (_charts.ranksMini) { try { _charts.ranksMini.destroy(); } catch (_e) {} _charts.ranksMini = null; }
 
     if (means.length) {
-      var meanCats = means.map(function (d) { return d.level; });
+      var meanCats = means.map(function (d) {
+        var nTxt = isFinite(d.n) ? d.n : '?';
+        return String(d.level) + ' (n=' + nTxt + ')';
+      });
       var meanVals = means.map(function (d) { return isFinite(d.mean) ? +d.mean.toFixed(4) : null; });
-      _charts.meansMini = Highcharts.chart('meansByGroupChart', {
+      var meanCIs = means.map(function (d) {
+        return [isFinite(d.ciLow) ? +d.ciLow.toFixed(4) : null, isFinite(d.ciHigh) ? +d.ciHigh.toFixed(4) : null];
+      });
+
+      _charts.meansMini = Highcharts.chart('meansByGroupBarChart', {
         chart: { type: 'column', backgroundColor: 'transparent', height: 220, style: { fontFamily: 'Segoe UI,sans-serif' } },
         title: { text: '' },
         credits: { enabled: false },
         legend: { enabled: false },
         xAxis: { categories: meanCats, labels: { style: { color: t.tc, fontSize: '11px' } }, lineColor: t.gc },
-        yAxis: { title: { text: dv, style: { color: t.tc } }, labels: { style: { color: t.tc } }, gridLineColor: t.gc },
-        plotOptions: { column: { color: t.colors[0], borderRadius: 4, borderWidth: 0 } },
-        series: [{ name: dv, data: meanVals }],
+        yAxis: { title: { text: dv, style: { color: t.tc } }, labels: { style: { color: t.tc } }, gridLineColor: t.gc, maxPadding: 0.14 },
+        plotOptions: {
+          column: {
+            color: t.colors[0], borderRadius: 4, borderWidth: 0,
+            dataLabels: {
+              enabled: true, format: '{point.y:.2f}', crop: false, overflow: 'allow',
+              style: { color: t.tc, fontSize: '11px', fontWeight: '700', textOutline: 'none' }
+            }
+          }
+        },
+        series: [
+          { name: dv, data: meanVals },
+          { name: '95% CI', type: 'errorbar', data: meanCIs, color: t.isDark ? 'rgba(255,255,255,.55)' : '#334155', stemWidth: 2, whiskerWidth: 8, tooltip: { pointFormat: 'CI: <b>{point.low:.2f}</b> to <b>{point.high:.2f}</b><br/>' } }
+        ],
         tooltip: {
           backgroundColor: t.isDark ? '#1e293b' : '#fff',
           style: { color: t.isDark ? '#f1f5f9' : '#1f2937' },
           formatter: function () {
             var d = means[this.point.index];
-            return '<b>' + this.key + '</b><br>Mean: <b>' + fmt(this.y) + '</b>' + (d && isFinite(d.n) ? '<br>n: ' + d.n : '');
+            return '<b>' + this.key + '</b><br>Mean: <b>' + fmt(this.y) + '</b>' + (d && isFinite(d.sd) ? '<br>SD: ' + fmt(d.sd) : '');
           }
         }
       });
+
+      var boxData = _descToBoxData(means);
+      _charts.meansMiniBox = Highcharts.chart('meansByGroupBoxChart',
+        _boxCfg(meanCats, boxData, dv, t.tc, t.gc, t.colors[0]));
+
       meansTableEl.innerHTML =
-        '<table><thead><tr><th>' + factor + '</th><th class="num">n</th><th class="num">Mean</th><th class="num">SD</th></tr></thead><tbody>' +
+        '<table><thead><tr><th>' + factor + '</th><th class="num">n</th><th class="num">Mean</th><th class="num">SD</th><th class="num">95% CI Low</th><th class="num">95% CI High</th></tr></thead><tbody>' +
         means.map(function (d) {
-          return '<tr><td>' + d.level + '</td><td class="num">' + (d.n || '—') + '</td><td class="num">' + fmt(d.mean) + '</td><td class="num">' + fmt(d.sd) + '</td></tr>';
+          return '<tr><td>' + d.level + '</td><td class="num">' + (d.n || '—') + '</td><td class="num">' + fmt(d.mean) + '</td><td class="num">' + fmt(d.sd) + '</td><td class="num">' + fmt(d.ciLow) + '</td><td class="num">' + fmt(d.ciHigh) + '</td></tr>';
         }).join('') +
         '</tbody></table>';
+      switchMeansMode('bar');
     } else {
-      meansChartEl.innerHTML = '<div class="patterns-empty">No mean data available.</div>';
+      meansBarEl.innerHTML = '<div class="patterns-empty">No mean data available.</div>';
+      meansBoxEl.innerHTML = '';
       meansTableEl.innerHTML = '';
     }
 
@@ -2936,7 +2923,7 @@
         legend: { enabled: false },
         xAxis: { categories: rankCats, labels: { style: { color: t.tc, fontSize: '11px' } }, lineColor: t.gc },
         yAxis: { title: { text: 'Mean Rank', style: { color: t.tc } }, labels: { style: { color: t.tc } }, gridLineColor: t.gc },
-        plotOptions: { bar: { color: t.colors[1], borderRadius: 4, borderWidth: 0 } },
+        plotOptions: { bar: { color: t.colors[1], borderRadius: 4, borderWidth: 0, dataLabels: { enabled: true, format: '{point.y:.2f}', style: { color: t.tc, fontSize: '11px', fontWeight: '700', textOutline: 'none' } } } },
         series: [{ name: 'Mean Rank', data: rankVals }],
         tooltip: {
           backgroundColor: t.isDark ? '#1e293b' : '#fff',
@@ -2954,6 +2941,33 @@
       ranksChartEl.innerHTML = '<div class="patterns-empty">Mean ranks available for one-way Kruskal-Wallis results.</div>';
       ranksTableEl.innerHTML = '';
     }
+  }
+
+  function switchMeansMode(mode) {
+    var barEl = document.getElementById('meansByGroupBarChart');
+    var boxEl = document.getElementById('meansByGroupBoxChart');
+    var barBtn = document.getElementById('meansModeBarBtn');
+    var boxBtn = document.getElementById('meansModeBoxBtn');
+    if (!barEl || !boxEl || !barBtn || !boxBtn) return;
+    barEl.style.display = mode === 'bar' ? '' : 'none';
+    boxEl.style.display = mode === 'box' ? '' : 'none';
+    barBtn.classList.toggle('active', mode === 'bar');
+    boxBtn.classList.toggle('active', mode === 'box');
+    setTimeout(function () {
+      var c = mode === 'bar' ? _charts.meansMini : _charts.meansMiniBox;
+      if (c) { try { c.reflow(); } catch (_e) {} }
+    }, 40);
+  }
+
+  function toggleMeansTable() {
+    var wrap = document.getElementById('meansByGroupTableWrap');
+    var btn = document.getElementById('meansTableToggleBtn');
+    if (!wrap || !btn) return;
+    var opening = wrap.style.display === 'none' || !wrap.style.display;
+    wrap.style.display = opening ? 'block' : 'none';
+    btn.innerHTML = opening
+      ? '<i class="fa-solid fa-table"></i> Hide table'
+      : '<i class="fa-solid fa-table"></i> Show table';
   }
 
   /* ── Drill-down: click a Time bar → show groups for that time ── */

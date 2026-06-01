@@ -754,8 +754,8 @@ const StatisticoHeader = {
     const key = String(item.tab || item.view || item.label || item.id || '').toLowerCase();
     const descriptions = {
       explore: 'Summary stats, histograms, and group profiles.',
-      assumptions: 'Normality, equal variance, and test suitability.',
-      results: 'Omnibus outcome and between-group comparison.',
+      assumptions: 'Check trust assumptions and warnings.',
+      results: 'Review ANOVA, Welch, and Kruskal-Wallis.',
       posthoc: 'Pairwise contrasts after a significant omnibus test.',
       effects: 'Magnitude of the group difference.',
       power: 'Observed power and sample-size planning.',
@@ -778,9 +778,11 @@ const StatisticoHeader = {
       contribution: 'Rank variable influence.',
       outliers: 'Flag unusual observations.',
       overview: 'Start with the analysis summary.',
-      inference: 'Review statistical tests.',
+      inference: 'Review ANOVA, Welch, and Kruskal-Wallis.',
       comparisons: 'Inspect pairwise contrasts.',
       visuals: 'Explore charts and patterns.',
+      patterns: 'Show group differences visually.',
+      details: 'Descriptives, raw data, and technical rows.',
       'correlation-matrix': 'Scan pairwise relationships.',
       'correlation-network': 'View relationship structure.',
       'taylor-diagram': 'Compare agreement with a reference.',
@@ -1045,15 +1047,18 @@ const StatisticoHeader = {
           {
             title: 'Analysis',
             items: [
-              { type: 'tab', tab: 'inference', icon: 'fa-table', label: 'Inference' },
+              { type: 'tab', tab: 'assumptions', icon: 'fa-shield-halved', label: 'Assumptions' },
+              { type: 'tab', tab: 'results', icon: 'fa-table', label: 'Results' },
               { type: 'tab', tab: 'comparisons', icon: 'fa-code-compare', label: 'Comparisons' },
-              { type: 'tab', tab: 'diagnostics', icon: 'fa-shield-halved', label: 'Diagnostics' },
-              { type: 'tab', tab: 'visuals', icon: 'fa-chart-column', label: 'Visuals' }
+              { type: 'tab', tab: 'patterns', icon: 'fa-chart-column', label: 'Patterns' }
             ]
           },
           {
             title: 'Output',
-            items: [{ type: 'tab', tab: 'report', icon: 'fa-file-lines', label: 'Report' }]
+            items: [
+              { type: 'tab', tab: 'details', icon: 'fa-list-ol', label: 'Details' },
+              { type: 'tab', tab: 'report', icon: 'fa-file-lines', label: 'Report' }
+            ]
           }
         ]
       };

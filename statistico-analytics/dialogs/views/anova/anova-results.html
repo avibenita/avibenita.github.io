@@ -2893,32 +2893,75 @@
     }, 60);
   }
 
-  function renderTableHistSparkline(d) {
-    var min = isFinite(d && d.min) ? d.min : null;
-    var max = isFinite(d && d.max) ? d.max : null;
-    var mean = isFinite(d && d.mean) ? d.mean : null;
-    var sd = isFinite(d && d.sd) && d.sd > 0 ? d.sd : null;
-    if (!isFinite(min) || !isFinite(max) || min === max) return '';
-    if (!isFinite(mean)) mean = (min + max) / 2;
-    if (!isFinite(sd) || sd <= 0) sd = Math.max((max - min) / 6, 1e-6);
+  function _normalizeLevelKey(v) {
+    return String(v === null || v === undefined ? '' : v).trim();
+  }
+
+  function _getRawSeriesByLevel(bundle, factorName) {
+    var out = {};
+    var rows = (Array.isArray(_vdFiltered) && _vdFiltered.length ? _vdFiltered : _vdRows) || [];
+    var cols = Array.isArray(_vdCols) ? _vdCols : [];
+    var dv = bundle && bundle.spec ? bundle.spec.dv : null;
+    var factorIdx = cols.indexOf(factorName);
+    var dvIdx = cols.indexOf(dv);
+
+    if (rows.length && cols.length && dvIdx >= 0 && factorIdx >= 0) {
+      rows.forEach(function (r) {
+        if (!Array.isArray(r)) return;
+        var key = _normalizeLevelKey(r[factorIdx]);
+        if (!key) return;
+        var val = parseFloat(r[dvIdx]);
+        if (!isFinite(val)) return;
+        if (!out[key]) out[key] = [];
+        out[key].push(val);
+      });
+      return out;
+    }
+
+    // One-way filtered recompute stores grouped vectors on the bundle.
+    if (bundle && bundle.groups && typeof bundle.groups === 'object') {
+      Object.keys(bundle.groups).forEach(function (k) {
+        var arr = bundle.groups[k];
+        if (!Array.isArray(arr) || !arr.length) return;
+        out[_normalizeLevelKey(k)] = arr.filter(function (v) { return isFinite(v); }).map(function (v) { return +v; });
+      });
+    }
+    return out;
+  }
+
+  function renderTableHistSparkline(values) {
+    if (!Array.isArray(values) || !values.length) return '';
+    var nums = values.filter(function (v) { return isFinite(v); }).map(function (v) { return +v; });
+    if (!nums.length) return '';
 
     var bins = 12;
-    var vals = [];
-    for (var i = 0; i < bins; i++) {
-      var x = min + ((i + 0.5) / bins) * (max - min);
-      var z = (x - mean) / sd;
-      vals.push(Math.exp(-0.5 * z * z));
+    var counts = new Array(bins).fill(0);
+    var min = Math.min.apply(null, nums);
+    var max = Math.max.apply(null, nums);
+
+    if (min === max) {
+      counts[Math.floor(bins / 2)] = nums.length;
+    } else {
+      var width = (max - min) / bins;
+      nums.forEach(function (v) {
+        var idx = Math.floor((v - min) / width);
+        if (idx < 0) idx = 0;
+        if (idx >= bins) idx = bins - 1;
+        counts[idx] += 1;
+      });
     }
-    var maxVal = Math.max.apply(null, vals) || 1;
-    var bars = vals.map(function (v, i) {
-      var h = Math.max(2, Math.round((v / maxVal) * 14));
+
+    var maxCount = Math.max.apply(null, counts);
+    if (!isFinite(maxCount) || maxCount <= 0) return '';
+    var bars = counts.map(function (c, i) {
+      var h = c > 0 ? Math.max(2, Math.round((c / maxCount) * 14)) : 0;
       var y = 16 - h;
       var x = i * 4 + 1;
-      return '<rect x="' + x + '" y="' + y + '" width="3" height="' + h + '" rx="1" fill="var(--accent-1)"></rect>';
+      return h > 0 ? '<rect x="' + x + '" y="' + y + '" width="3" height="' + h + '" rx="1" fill="var(--accent-1)"></rect>' : '';
     }).join('');
 
-    return '<svg class="tbl-hist-spark" viewBox="0 0 48 18" role="img" aria-label="Distribution sparkline">' +
-      '<title>Distribution sparkline</title>' +
+    return '<svg class="tbl-hist-spark" viewBox="0 0 48 18" role="img" aria-label="Histogram sparkline">' +
+      '<title>Histogram sparkline</title>' +
       bars +
       '</svg>';
   }
@@ -2935,6 +2978,7 @@
     var dv = (b.spec && b.spec.dv) || 'Mean';
     var factor = (b.spec && b.spec.factor1) || (b.spec && b.spec.factor) || 'Group';
     var means = b.descA || b.descriptives || [];
+    var rawSeriesByLevel = _getRawSeriesByLevel(b, factor);
     var ranks = (b.kruskalWallis && Array.isArray(b.kruskalWallis.meanRanks)) ? b.kruskalWallis.meanRanks : [];
 
     if (_charts.meansMini) { try { _charts.meansMini.destroy(); } catch (_e) {} _charts.meansMini = null; }
@@ -2997,7 +3041,9 @@
       meansTableEl.innerHTML =
         '<table><thead><tr><th class="tbl-hist-cell"><i class="fa-solid fa-chart-simple" title="Distribution"></i></th><th>' + factor + '</th><th class="num">n</th><th class="num">Mean</th><th class="num">SD</th><th class="num">95% CI Low</th><th class="num">95% CI High</th></tr></thead><tbody>' +
         means.map(function (d) {
-          return '<tr><td class="tbl-hist-cell">' + renderTableHistSparkline(d) + '</td><td>' + d.level + '</td><td class="num">' + (d.n || '—') + '</td><td class="num">' + fmt(d.mean) + '</td><td class="num">' + fmt(d.sd) + '</td><td class="num">' + fmt(d.ciLow) + '</td><td class="num">' + fmt(d.ciHigh) + '</td></tr>';
+          var key = _normalizeLevelKey(d.level);
+          var levelVals = rawSeriesByLevel[key] || [];
+          return '<tr><td class="tbl-hist-cell">' + renderTableHistSparkline(levelVals) + '</td><td>' + d.level + '</td><td class="num">' + (d.n || '—') + '</td><td class="num">' + fmt(d.mean) + '</td><td class="num">' + fmt(d.sd) + '</td><td class="num">' + fmt(d.ciLow) + '</td><td class="num">' + fmt(d.ciHigh) + '</td></tr>';
         }).join('') +
         '</tbody></table>';
       switchMeansMode('bar');

@@ -339,6 +339,95 @@
     .badge-warn{ background:rgba(251,191,36,.14); color:#fbbf24; border:1.5px solid rgba(251,191,36,.35); }
     :root[data-theme="light"] .badge-warn{ color:#92400e; border-color:#d97706; }
 
+    /* ── Decision emphasis (overview) ────────────────────────── */
+    #panelDecision{
+      border-width:2px;
+      border-color:rgba(52,211,153,.34);
+      box-shadow:
+        0 10px 24px rgba(0,0,0,.35),
+        0 0 0 1px rgba(52,211,153,.10);
+    }
+    #panelDecision .results-panel-heading{
+      background:linear-gradient(90deg, rgba(52,211,153,.12) 0%, rgba(52,211,153,.02) 100%);
+      color:#8cf5c6;
+      font-size:16px;
+      border-bottom-color:rgba(52,211,153,.28);
+    }
+    .decision-hero{
+      display:flex;
+      align-items:flex-start;
+      gap:14px;
+      padding:12px 14px;
+      border-radius:10px;
+      border:1.5px solid rgba(148,163,184,.26);
+      background:linear-gradient(135deg, rgba(15,23,42,.38) 0%, rgba(15,23,42,.18) 100%);
+    }
+    .decision-hero.is-sig{
+      border-color:rgba(34,197,94,.42);
+      box-shadow:0 0 0 1px rgba(34,197,94,.08), 0 10px 20px rgba(16,185,129,.10);
+    }
+    .decision-hero.is-ns{
+      border-color:rgba(148,163,184,.32);
+      box-shadow:0 10px 20px rgba(15,23,42,.14);
+    }
+    .decision-copy{ min-width:0; }
+    .decision-title{
+      font-size:16px;
+      font-weight:800;
+      letter-spacing:.15px;
+      color:var(--text-primary);
+      margin-bottom:3px;
+    }
+    .decision-text{
+      font-size:14px;
+      line-height:1.55;
+      color:var(--text-secondary);
+    }
+    .decision-meta{
+      margin-top:6px;
+      font-size:12px;
+      color:var(--text-muted);
+      font-variant-numeric:tabular-nums;
+    }
+    .decision-stale-note{
+      margin-top:10px;
+      padding:8px 10px;
+      border-radius:8px;
+      border:1px solid rgba(251,191,36,.35);
+      background:rgba(251,191,36,.07);
+      font-size:12px;
+      color:var(--warning,#f0a050);
+      line-height:1.45;
+    }
+    :root[data-theme="light"] #panelDecision{
+      border-color:rgba(5,150,105,.28);
+      box-shadow:
+        0 4px 12px rgba(15,23,42,.08),
+        0 0 0 1px rgba(5,150,105,.07);
+    }
+    :root[data-theme="light"] #panelDecision .results-panel-heading{
+      background:linear-gradient(90deg, rgba(5,150,105,.10) 0%, rgba(5,150,105,.02) 100%);
+      color:#065f46;
+      border-bottom-color:rgba(5,150,105,.20);
+    }
+    :root[data-theme="light"] .decision-hero{
+      background:linear-gradient(135deg, rgba(248,250,252,.95) 0%, rgba(241,245,249,.88) 100%);
+      border-color:rgba(100,116,139,.28);
+    }
+    :root[data-theme="light"] .decision-hero.is-sig{
+      border-color:rgba(5,150,105,.36);
+      box-shadow:0 0 0 1px rgba(5,150,105,.08), 0 8px 16px rgba(5,150,105,.08);
+    }
+    :root[data-theme="light"] .decision-hero.is-ns{
+      border-color:rgba(100,116,139,.34);
+      box-shadow:0 8px 16px rgba(15,23,42,.07);
+    }
+    :root[data-theme="light"] .decision-stale-note{
+      background:rgba(251,191,36,.10);
+      border-color:rgba(217,119,6,.35);
+      color:#92400e;
+    }
+
     /* ── Stat cards (summary overview) ─────────────────────── */
     .stat-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:16px; }
     .stat-card{ background:var(--surface-2); border:1.5px solid var(--border); border-radius:9px; padding:13px 14px; text-align:center; }
@@ -1682,12 +1771,17 @@
 
     var sig = isFinite(p) && p < alpha;
     document.getElementById('overviewDecisionBody').innerHTML =
-      '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">' +
+      '<div class="decision-hero ' + (sig ? 'is-sig' : 'is-ns') + '">' +
         sigBadge(p, alpha) +
-        '<span style="font-size:12.5px;color:var(--text-secondary);">' +
-          (sig ? 'There is a statistically significant difference between the groups.'
-               : 'No statistically significant difference was detected between the groups.') +
-        '</span></div>';
+        '<div class="decision-copy">' +
+          '<div class="decision-title">' + (sig ? 'Significant group difference detected' : 'No significant group difference detected') + '</div>' +
+          '<div class="decision-text">' +
+            (sig ? 'The group means differ beyond random sampling noise at the current alpha level.'
+                 : 'Any observed mean differences are consistent with random sampling variability at the current alpha level.') +
+          '</div>' +
+          '<div class="decision-meta">Observed p-value: ' + fmtP(p) + ' | alpha: ' + alpha + '</div>' +
+        '</div>' +
+      '</div>';
 
     var typeLabel = b.type === 'one-way' ? 'One-Way ANOVA' :
                     b.type === 'two-way' ? 'Two-Way Factorial ANOVA' : 'One-Way Repeated Measures ANOVA';
@@ -2896,7 +2990,7 @@
     var bodyEl = document.getElementById('overviewDecisionBody');
     if (bodyEl) {
       var note = document.createElement('div');
-      note.style.cssText = 'margin-top:8px;font-size:12px;color:var(--warning,#f0a050);';
+      note.className = 'decision-stale-note';
       note.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> ' +
         'Row filter applies to <strong>View Data</strong> only — the analysis above ' +
         'still reflects the original sample (re-run from Excel for filtered stats).';

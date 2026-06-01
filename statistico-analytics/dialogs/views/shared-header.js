@@ -303,6 +303,13 @@ const StatisticoHeader = {
     }
   },
 
+  setAnovaSidebarContext(ctx) {
+    this.anovaSidebarContext = Object.assign({}, this.anovaSidebarContext || {}, ctx || {});
+    if (this.module !== 'anova') return;
+    this._renderSharedSidebar();
+    this._mountSidebarUtilities();
+  },
+
   _getBrandLogoSvg() {
     if (typeof StatisticoBrandLogo !== 'undefined' && StatisticoBrandLogo.getSvg) {
       return StatisticoBrandLogo.getSvg();
@@ -1035,25 +1042,45 @@ const StatisticoHeader = {
     }
 
     if (this.module === 'anova') {
+      const ctx = this.anovaSidebarContext || {};
+      const anovaType = String(ctx.type || '').toLowerCase();
+      const conditionCount = Number(ctx.conditionCount || 0);
+      const isRepeated = anovaType === 'repeated';
+      const isPaired = isRepeated && conditionCount === 2;
+      const isRepeatedKplus = isRepeated && conditionCount >= 3;
+      const resultLabel = isPaired ? 'Paired Test' : 'Test Results';
+      const analysisItems = [
+        { type: 'tab', tab: 'overview', icon: 'fa-circle-info', label: 'Summary', active: true, description: 'Start with the analysis summary.' },
+        { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: resultLabel, description: isPaired ? 'Read paired test statistics, p-value, and confidence interval.' : 'Read omnibus statistics and decision metrics.' },
+        { type: 'tab', tab: 'assumptions', icon: 'fa-shield-halved', label: 'Assumptions', description: 'Check model assumptions and warnings.' }
+      ];
+
+      if (isRepeatedKplus) {
+        analysisItems.splice(2, 0, { type: 'tab', tab: 'patterns', icon: 'fa-chart-line', label: 'Trajectories', description: 'Inspect condition trajectories across repeated measurements.' });
+      }
+      if (!isPaired) {
+        analysisItems.push({ type: 'tab', tab: 'comparisons', icon: 'fa-code-compare', label: 'Pairwise Comparisons', description: 'Inspect pairwise contrasts after omnibus testing.' });
+      }
+      const groups = [
+        {
+          title: 'Analysis',
+          items: analysisItems
+        }
+      ];
+      if (!isRepeatedKplus) {
+        groups.push({
+          title: 'Tools',
+          items: [
+            { type: 'tab', tab: 'patterns', icon: 'fa-chart-column', label: 'Descriptives', description: 'Compare group descriptives visually.' }
+          ]
+        });
+      }
+
       return {
         logoIcon: 'fa-table-cells',
         logoSub: 'ANOVA',
         menuTitle: 'Menu',
-        groups: [
-          {
-            title: 'Overview',
-            items: [{ type: 'tab', tab: 'overview', icon: 'fa-circle-info', label: 'Summary', active: true }]
-          },
-          {
-            title: 'Analysis',
-            items: [
-              { type: 'tab', tab: 'assumptions', icon: 'fa-shield-halved', label: 'Assumptions' },
-              { type: 'tab', tab: 'results', icon: 'fa-table', label: 'Results' },
-              { type: 'tab', tab: 'comparisons', icon: 'fa-code-compare', label: 'Comparisons' },
-              { type: 'tab', tab: 'patterns', icon: 'fa-chart-column', label: 'Descriptives' }
-            ]
-          }
-        ]
+        groups: groups
       };
     }
 

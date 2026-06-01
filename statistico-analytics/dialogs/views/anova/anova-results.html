@@ -14,7 +14,7 @@
   <!-- Shared Header (same version pattern as other modules) -->
   <link rel="stylesheet" href="../shared-header.css?v=20260530a"/>  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
-  <script src="../shared-header.js?v=20260601anovadsc3"></script>
+  <script src="../shared-header.js?v=20260601anovadsc4"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -1827,6 +1827,20 @@
     'visuals':     ['tab-visuals']
   };
 
+  function _syncAnovaSidebarFromBundle(b) {
+    if (!b) return;
+    var nCond = (b.spec && Array.isArray(b.spec.conditions)) ? b.spec.conditions.length : 0;
+    var isPaired = b.type === 'repeated' && nCond === 2;
+    TAB_TITLES.results = isPaired ? 'Paired Test' : 'Results';
+
+    if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader.setAnovaSidebarContext === 'function') {
+      StatisticoHeader.setAnovaSidebarContext({
+        type: b.type || '',
+        conditionCount: nCond
+      });
+    }
+  }
+
   function switchTab(id) {
     document.querySelectorAll('.tab-panel').forEach(function(p) { p.style.display = 'none'; p.classList.remove('active'); });
     document.querySelectorAll('.sb-item').forEach(function(s) { s.classList.remove('active'); });
@@ -1907,6 +1921,7 @@
         '<p style="color:var(--danger)">' + (b && b.error ? b.error : 'No results available.') + '</p>';
       return;
     }
+    _syncAnovaSidebarFromBundle(b);
     populateOverview(b);
     populateAnovaTable(b);
     populatePosthoc(b);
@@ -4272,6 +4287,9 @@
   document.addEventListener('DOMContentLoaded', function() {
     if (typeof StatisticoHeader !== 'undefined') {
       StatisticoHeader.init('anova-results', '', 0, 'anova');
+      if (typeof StatisticoHeader.setAnovaSidebarContext === 'function') {
+        StatisticoHeader.setAnovaSidebarContext({ type: 'one-way', conditionCount: 0 });
+      }
       StatisticoHeader.registerActions({
         getData: function() {
           if (!_vdCols.length || !_vdRows.length) return null;

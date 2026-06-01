@@ -1052,12 +1052,6 @@ const StatisticoHeader = {
               { type: 'tab', tab: 'comparisons', icon: 'fa-code-compare', label: 'Comparisons' },
               { type: 'tab', tab: 'patterns', icon: 'fa-chart-column', label: 'Descriptives' }
             ]
-          },
-          {
-            title: 'Output',
-            items: [
-              { type: 'tab', tab: 'report', icon: 'fa-file-lines', label: 'Report' }
-            ]
           }
         ]
       };

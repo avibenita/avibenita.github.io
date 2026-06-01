@@ -14,7 +14,7 @@
   <!-- Shared Header (same version pattern as other modules) -->
   <link rel="stylesheet" href="../shared-header.css?v=20260530a"/>  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
-  <script src="../shared-header.js?v=20260601anovadsc2"></script>
+  <script src="../shared-header.js?v=20260601anovadsc3"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -853,6 +853,19 @@
       height:18px;
       opacity:.9;
     }
+    .tbl-hist-cell{
+      width:56px;
+      text-align:center;
+      padding-left:6px;
+      padding-right:6px;
+    }
+    .tbl-hist-spark{
+      width:48px;
+      height:18px;
+      opacity:.9;
+      display:inline-block;
+      vertical-align:middle;
+    }
     /* Non-parametric summary cards should read as supporting stats, not the headline */
     #kwBody .stat-card .sv{ font-weight:650; }
     #kwBody .stat-card .sl{ font-weight:600; }
@@ -1201,15 +1214,6 @@
           </button>
         </div>
       </div>
-      <div class="sb-group">
-        <div class="sb-group-title">Output</div>
-        <div class="sb-items-rail">
-          <button class="sb-item" onclick="switchTab('report')" data-tab="report">
-            <i class="fa-solid fa-file-lines sb-item-icon"></i>
-            <span class="sb-item-label">Report</span>
-          </button>
-        </div>
-      </div>
     </div>
   </nav>
 
@@ -1524,20 +1528,20 @@
                   </div>
                   <div id="meansByGroupBarChart" class="patterns-mini-chart"></div>
                   <div id="meansByGroupBoxChart" class="patterns-mini-chart" style="display:none;"></div>
-                  <div id="meansByGroupTableWrap" class="patterns-mini-table" style="display:none;">
+                  <div id="meansByGroupTableWrap" class="patterns-mini-table" style="display:block;">
                     <div id="meansByGroupTable"></div>
                   </div>
                 </div>
                 <div class="patterns-card">
                   <div class="patterns-card-title"><i class="fa-solid fa-sort-numeric-up"></i> Mean Ranks by Group</div>
                   <div id="meanRanksByGroupChart" class="patterns-mini-chart"></div>
-                  <div id="meanRanksByGroupTableWrap" class="patterns-mini-table" style="display:none;">
+                  <div id="meanRanksByGroupTableWrap" class="patterns-mini-table" style="display:block;">
                     <div id="meanRanksByGroupTable"></div>
                   </div>
                 </div>
               </div>
               <div style="margin-top:8px;">
-                <button class="power-btn subtle" id="patternsTablesToggleBtn" onclick="toggleMeansTable()"><i class="fa-solid fa-table"></i> Show tables</button>
+                <button class="power-btn subtle" id="patternsTablesToggleBtn" onclick="toggleMeansTable()"><i class="fa-solid fa-table"></i> Hide tables</button>
               </div>
             </div>
           </div>
@@ -2889,6 +2893,36 @@
     }, 60);
   }
 
+  function renderTableHistSparkline(d) {
+    var min = isFinite(d && d.min) ? d.min : null;
+    var max = isFinite(d && d.max) ? d.max : null;
+    var mean = isFinite(d && d.mean) ? d.mean : null;
+    var sd = isFinite(d && d.sd) && d.sd > 0 ? d.sd : null;
+    if (!isFinite(min) || !isFinite(max) || min === max) return '';
+    if (!isFinite(mean)) mean = (min + max) / 2;
+    if (!isFinite(sd) || sd <= 0) sd = Math.max((max - min) / 6, 1e-6);
+
+    var bins = 12;
+    var vals = [];
+    for (var i = 0; i < bins; i++) {
+      var x = min + ((i + 0.5) / bins) * (max - min);
+      var z = (x - mean) / sd;
+      vals.push(Math.exp(-0.5 * z * z));
+    }
+    var maxVal = Math.max.apply(null, vals) || 1;
+    var bars = vals.map(function (v, i) {
+      var h = Math.max(2, Math.round((v / maxVal) * 14));
+      var y = 16 - h;
+      var x = i * 4 + 1;
+      return '<rect x="' + x + '" y="' + y + '" width="3" height="' + h + '" rx="1" fill="var(--accent-1)"></rect>';
+    }).join('');
+
+    return '<svg class="tbl-hist-spark" viewBox="0 0 48 18" role="img" aria-label="Distribution sparkline">' +
+      '<title>Distribution sparkline</title>' +
+      bars +
+      '</svg>';
+  }
+
   function renderPatternsCompare(b) {
     var meansBarEl = document.getElementById('meansByGroupBarChart');
     var meansBoxEl = document.getElementById('meansByGroupBoxChart');
@@ -2961,9 +2995,9 @@
       }
 
       meansTableEl.innerHTML =
-        '<table><thead><tr><th>' + factor + '</th><th class="num">n</th><th class="num">Mean</th><th class="num">SD</th><th class="num">95% CI Low</th><th class="num">95% CI High</th></tr></thead><tbody>' +
+        '<table><thead><tr><th class="tbl-hist-cell"><i class="fa-solid fa-chart-simple" title="Distribution"></i></th><th>' + factor + '</th><th class="num">n</th><th class="num">Mean</th><th class="num">SD</th><th class="num">95% CI Low</th><th class="num">95% CI High</th></tr></thead><tbody>' +
         means.map(function (d) {
-          return '<tr><td>' + d.level + '</td><td class="num">' + (d.n || '—') + '</td><td class="num">' + fmt(d.mean) + '</td><td class="num">' + fmt(d.sd) + '</td><td class="num">' + fmt(d.ciLow) + '</td><td class="num">' + fmt(d.ciHigh) + '</td></tr>';
+          return '<tr><td class="tbl-hist-cell">' + renderTableHistSparkline(d) + '</td><td>' + d.level + '</td><td class="num">' + (d.n || '—') + '</td><td class="num">' + fmt(d.mean) + '</td><td class="num">' + fmt(d.sd) + '</td><td class="num">' + fmt(d.ciLow) + '</td><td class="num">' + fmt(d.ciHigh) + '</td></tr>';
         }).join('') +
         '</tbody></table>';
       switchMeansMode('bar');

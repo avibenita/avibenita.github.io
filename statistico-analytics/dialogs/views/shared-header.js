@@ -887,12 +887,7 @@ const StatisticoHeader = {
               { type: 'navigate', viewIn: ['descriptive-stats'], file: 'correlations/descriptive-stats.html', icon: 'fa-list-ol', label: 'Descriptives', description: 'Per-variable mean, SD, skew, and missingness.' }
             ]
           }
-        ],
-        pinnedNav: {
-          items: [
-            { type: 'navigate', view: 'correlation-by-group', file: 'correlations/by-group.html', icon: 'fa-layer-group', label: 'By Group', description: 'Compare pairwise r across group levels with pattern sparklines.' }
-          ]
-        }
+        ]
       };
     }
 

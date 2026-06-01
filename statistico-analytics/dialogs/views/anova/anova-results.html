@@ -14,7 +14,7 @@
   <!-- Shared Header (same version pattern as other modules) -->
   <link rel="stylesheet" href="../shared-header.css?v=20260530a"/>  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
-  <script src="../shared-header.js?v=20260601anovasidebar"></script>
+  <script src="../shared-header.js?v=20260601anovadsc2"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -835,6 +835,24 @@
       color:var(--text-muted);
       padding:12px 4px 6px;
     }
+    .desc-level-cell{
+      min-width:180px;
+    }
+    .desc-level-wrap{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .desc-level-text{
+      font-weight:600;
+    }
+    .desc-hist-spark{
+      flex:0 0 auto;
+      width:48px;
+      height:18px;
+      opacity:.9;
+    }
     /* Non-parametric summary cards should read as supporting stats, not the headline */
     #kwBody .stat-card .sv{ font-weight:650; }
     #kwBody .stat-card .sl{ font-weight:600; }
@@ -1179,17 +1197,13 @@
           </button>
           <button class="sb-item" onclick="switchTab('patterns')" data-tab="patterns">
             <i class="fa-solid fa-chart-column sb-item-icon"></i>
-            <span class="sb-item-label">Patterns</span>
+            <span class="sb-item-label">Descriptives</span>
           </button>
         </div>
       </div>
       <div class="sb-group">
         <div class="sb-group-title">Output</div>
         <div class="sb-items-rail">
-          <button class="sb-item" onclick="switchTab('details')" data-tab="details">
-            <i class="fa-solid fa-list-ol sb-item-icon"></i>
-            <span class="sb-item-label">Details</span>
-          </button>
           <button class="sb-item" onclick="switchTab('report')" data-tab="report">
             <i class="fa-solid fa-file-lines sb-item-icon"></i>
             <span class="sb-item-label">Report</span>
@@ -1787,7 +1801,7 @@
     'assumptions': 'Assumptions',
     'results':     'Results',
     'comparisons': 'Comparisons',
-    'patterns':    'Patterns',
+    'patterns':    'Descriptives',
     'details':     'Details',
     'report':      'Report',
     'viewdata':    'Details'
@@ -2368,6 +2382,37 @@
     var fA   = (b.spec && b.spec.factor1) || (b.spec && b.spec.factor) || 'Group';
     var fB   = (b.spec && b.spec.factor2) || null;
 
+    function renderHistSparkline(d) {
+      var min = isFinite(d.min) ? d.min : null;
+      var max = isFinite(d.max) ? d.max : null;
+      var mean = isFinite(d.mean) ? d.mean : null;
+      var sd = isFinite(d.sd) && d.sd > 0 ? d.sd : null;
+      if (!isFinite(min) || !isFinite(max) || min === max) return '';
+      if (!isFinite(mean)) mean = (min + max) / 2;
+      if (!isFinite(sd) || sd <= 0) sd = Math.max((max - min) / 6, 1e-6);
+
+      var bins = 12;
+      var vals = [];
+      for (var i = 0; i < bins; i++) {
+        var x = min + ((i + 0.5) / bins) * (max - min);
+        var z = (x - mean) / sd;
+        vals.push(Math.exp(-0.5 * z * z));
+      }
+
+      var maxVal = Math.max.apply(null, vals) || 1;
+      var bars = vals.map(function(v, i) {
+        var h = Math.max(2, Math.round((v / maxVal) * 14));
+        var y = 16 - h;
+        var x = i * 4 + 1;
+        return '<rect x="' + x + '" y="' + y + '" width="3" height="' + h + '" rx="1" fill="var(--accent-1)"></rect>';
+      }).join('');
+
+      return '<svg class="desc-hist-spark" viewBox="0 0 48 18" role="img" aria-label="Distribution sparkline">' +
+        '<title>Distribution sparkline</title>' +
+        bars +
+        '</svg>';
+    }
+
     function descTable(factorLabel, desc) {
       if (!desc || !desc.length) return '';
       return '<div style="margin-bottom:16px;">' +
@@ -2381,7 +2426,7 @@
           '<th class="num">Min</th><th class="num">Max</th>' +
         '</tr></thead><tbody>' +
         desc.map(function(d) {
-          return '<tr><td>' + d.level + '</td>' +
+          return '<tr><td class="desc-level-cell"><div class="desc-level-wrap"><span class="desc-level-text">' + d.level + '</span>' + renderHistSparkline(d) + '</div></td>' +
             '<td class="num">' + d.n + '</td>' +
             '<td class="num">' + fmt(d.mean) + '</td>' +
             '<td class="num">' + fmt(d.sd) + '</td>' +

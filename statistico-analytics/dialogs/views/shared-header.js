@@ -781,7 +781,7 @@ const StatisticoHeader = {
       inference: 'Review ANOVA, Welch, and Kruskal-Wallis.',
       comparisons: 'Inspect pairwise contrasts.',
       visuals: 'Explore charts and patterns.',
-      patterns: 'Show group differences visually.',
+      patterns: 'Compare group descriptives visually.',
       details: 'Descriptives, raw data, and technical rows.',
       'correlation-matrix': 'Scan pairwise relationships.',
       'correlation-network': 'View relationship structure.',
@@ -1050,13 +1050,12 @@ const StatisticoHeader = {
               { type: 'tab', tab: 'assumptions', icon: 'fa-shield-halved', label: 'Assumptions' },
               { type: 'tab', tab: 'results', icon: 'fa-table', label: 'Results' },
               { type: 'tab', tab: 'comparisons', icon: 'fa-code-compare', label: 'Comparisons' },
-              { type: 'tab', tab: 'patterns', icon: 'fa-chart-column', label: 'Patterns' }
+              { type: 'tab', tab: 'patterns', icon: 'fa-chart-column', label: 'Descriptives' }
             ]
           },
           {
             title: 'Output',
             items: [
-              { type: 'tab', tab: 'details', icon: 'fa-list-ol', label: 'Details' },
               { type: 'tab', tab: 'report', icon: 'fa-file-lines', label: 'Report' }
             ]
           }

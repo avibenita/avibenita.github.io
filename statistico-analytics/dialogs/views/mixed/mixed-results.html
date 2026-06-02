@@ -3563,20 +3563,33 @@ ${sectionsHtml}
     return null;
   }
 
-  function _answerFromTypeIIIRow(row, effectLabel) {
-    if (!row) return 'Not estimable from current model output.';
-    const pRaw = parseFloat(row.pval ?? row.p ?? row.sig);
-    if (!isFinite(pRaw)) return `${effectLabel}: statistical test is available, but p-value is missing.`;
-    const sig = pRaw < 0.05;
-    return sig
-      ? `Yes — supported (${effectLabel} is significant, p = ${fmtP(pRaw)}).`
-      : `No clear evidence (${effectLabel} is not significant, p = ${fmtP(pRaw)}).`;
+  function _findFixedEffectRow(fixedEffects, predicates) {
+    if (!Array.isArray(fixedEffects)) return null;
+    for (const row of fixedEffects) {
+      const term = _mmNormText(row.parameter ?? row.name ?? row.term ?? '');
+      if (!term || term === 'intercept') continue;
+      if (predicates.some((p) => p(term))) return row;
+    }
+    return null;
+  }
+
+  function _answerWithStats(coefRow, typeRow) {
+    const bRaw = parseFloat(coefRow && (coefRow.estimate ?? coefRow.coef));
+    const pCoef = parseFloat(coefRow && (coefRow.pval ?? coefRow.p ?? coefRow.Sig ?? coefRow.sig));
+    const pType = parseFloat(typeRow && (typeRow.pval ?? typeRow.p ?? typeRow.sig));
+    const pRaw = isFinite(pCoef) ? pCoef : pType;
+    if (!isFinite(bRaw) && !isFinite(pRaw)) return 'Not estimable from current model output.';
+    const yesNo = isFinite(pRaw) ? (pRaw < 0.05 ? 'Yes' : 'No') : 'N/A';
+    const bTxt = isFinite(bRaw) ? fmt(bRaw, 3) : '—';
+    const pTxt = isFinite(pRaw) ? fmtP(pRaw) : '—';
+    return `${yesNo} (B=${bTxt}, p=${pTxt})`;
   }
 
   function renderTestedHypothesis(d) {
     const host = document.getElementById('testedHypothesisBody');
     if (!host) return;
     const typeIII = Array.isArray(d.typeIII) ? d.typeIII : [];
+    const fixedEffects = Array.isArray(d.fixedEffects ?? d.coefficients) ? (d.fixedEffects ?? d.coefficients) : [];
     const baselineRow = _findTypeIIIRow(typeIII, [
       (s) => s.includes('baseline'),
       (s) => s === 'baseline'
@@ -3592,13 +3605,21 @@ ${sectionsHtml}
       (s) => s.includes('x baseline') || s.includes('baseline x'),
       (s) => s.includes('interaction')
     ]);
+    const baselineCoef = _findFixedEffectRow(fixedEffects, [
+      (s) => s.includes('baseline') && !(s.includes('*') || s.includes('×') || s.includes(':'))
+    ]);
+    const treatmentCoef = _findFixedEffectRow(fixedEffects, [
+      (s) => (s.includes('group') || s.includes('treatment') || s.includes('arm')) && !(s.includes('baseline') || s.includes('*') || s.includes('×') || s.includes(':'))
+    ]);
+    const interactionCoef = _findFixedEffectRow(fixedEffects, [
+      (s) => s.includes('baseline') && (s.includes('group') || s.includes('treatment') || s.includes('arm') || s.includes('*') || s.includes('×') || s.includes(':')),
+      (s) => s.includes('interaction')
+    ]);
 
     const icc = parseFloat(d.ICC ?? d.icc);
-    let clusteringAnswer = 'Clustering estimate is not available.';
+    let clusteringAnswer = 'Not estimable from current model output.';
     if (isFinite(icc)) {
-      if (icc < 0.05) clusteringAnswer = `Probably no — clustering is negligible (ICC = ${(icc * 100).toFixed(1)}%).`;
-      else if (icc < 0.10) clusteringAnswer = `Possibly — modest clustering is present (ICC = ${(icc * 100).toFixed(1)}%).`;
-      else clusteringAnswer = `Yes — meaningful clustering is present (ICC = ${(icc * 100).toFixed(1)}%).`;
+      clusteringAnswer = `${icc >= 0.05 ? 'Yes' : 'No'} (ICC=${(icc * 100).toFixed(3)}%)`;
     }
 
     host.innerHTML = `
@@ -3623,17 +3644,17 @@ ${sectionsHtml}
             <tr>
               <td>Baseline</td>
               <td>Does baseline score contribute to predicting the outcome?</td>
-              <td>${_answerFromTypeIIIRow(baselineRow, 'Baseline')}</td>
+              <td>${_answerWithStats(baselineCoef, baselineRow)}</td>
             </tr>
             <tr>
               <td>Treatment</td>
               <td>Do treatment groups differ in outcome?</td>
-              <td>${_answerFromTypeIIIRow(treatmentRow, 'Treatment')}</td>
+              <td>${_answerWithStats(treatmentCoef, treatmentRow)}</td>
             </tr>
             <tr>
               <td>Baseline × Treatment</td>
               <td>Does the effect of baseline differ between treatment groups?</td>
-              <td>${_answerFromTypeIIIRow(interactionRow, 'Baseline × Treatment')}</td>
+              <td>${_answerWithStats(interactionCoef, interactionRow)}</td>
             </tr>
             <tr>
               <td>Clustering</td>

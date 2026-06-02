@@ -3694,6 +3694,29 @@ ${sectionsHtml}
     return null;
   }
 
+  function _isInteractionLabel(s) {
+    return s.includes('*') || s.includes('×') || s.includes(':') || s.includes(' x ');
+  }
+
+  function _prettyTermLabel(raw) {
+    const txt = String(raw || '').trim();
+    return txt
+      .replace(/\s*\*\s*/g, ' × ')
+      .replace(/\s*:\s*/g, ' × ')
+      .replace(/\s+x\s+/gi, ' × ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function _interactionQuestionFromTerm(rawTerm) {
+    const pretty = _prettyTermLabel(rawTerm);
+    const parts = pretty.split('×').map(function (p) { return p.trim(); }).filter(Boolean);
+    if (parts.length >= 2) {
+      return `Does the effect of ${parts[1]} differ across ${parts[0]}?`;
+    }
+    return 'Does the interaction effect differ across predictor levels?';
+  }
+
   function _answerWithStats(coefRow, typeRow) {
     const bRaw = parseFloat(coefRow && (coefRow.estimate ?? coefRow.coef));
     const pCoef = parseFloat(coefRow && (coefRow.pval ?? coefRow.p ?? coefRow.Sig ?? coefRow.sig));
@@ -3721,9 +3744,7 @@ ${sectionsHtml}
       (s) => s.includes('arm')
     ]);
     const interactionRow = _findTypeIIIRow(typeIII, [
-      (s) => (s.includes('baseline') && (s.includes('group') || s.includes('treatment'))),
-      (s) => s.includes('baseline ×'),
-      (s) => s.includes('x baseline') || s.includes('baseline x'),
+      (s) => _isInteractionLabel(s),
       (s) => s.includes('interaction')
     ]);
     const baselineCoef = _findFixedEffectRow(fixedEffects, [
@@ -3733,9 +3754,15 @@ ${sectionsHtml}
       (s) => (s.includes('group') || s.includes('treatment') || s.includes('arm')) && !(s.includes('baseline') || s.includes('*') || s.includes('×') || s.includes(':'))
     ]);
     const interactionCoef = _findFixedEffectRow(fixedEffects, [
-      (s) => s.includes('baseline') && (s.includes('group') || s.includes('treatment') || s.includes('arm') || s.includes('*') || s.includes('×') || s.includes(':')),
+      (s) => _isInteractionLabel(s),
       (s) => s.includes('interaction')
     ]);
+    const interactionRawTerm =
+      interactionCoef ? (interactionCoef.parameter ?? interactionCoef.name ?? interactionCoef.term ?? '')
+        : interactionRow ? (interactionRow.source ?? interactionRow.effect ?? interactionRow.Source ?? interactionRow.name ?? '')
+        : '';
+    const interactionLabel = interactionRawTerm ? _prettyTermLabel(interactionRawTerm) : 'Interaction';
+    const interactionQuestion = _interactionQuestionFromTerm(interactionRawTerm);
 
     const icc = parseFloat(d.ICC ?? d.icc);
     let clusteringAnswer = 'Not estimable from current model output.';
@@ -3773,8 +3800,8 @@ ${sectionsHtml}
               <td>${_answerWithStats(treatmentCoef, treatmentRow)}</td>
             </tr>
             <tr>
-              <td>Baseline × Treatment</td>
-              <td>Does the effect of baseline differ between treatment groups?</td>
+              <td>${interactionLabel}</td>
+              <td>${interactionQuestion}</td>
               <td>${_answerWithStats(interactionCoef, interactionRow)}</td>
             </tr>
             <tr>

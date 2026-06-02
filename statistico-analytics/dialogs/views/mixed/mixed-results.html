@@ -109,6 +109,30 @@
       background: #f8f9fc;
       border-top: 1px solid var(--border);
     }
+    .overview-subtabs{
+      display:flex;
+      gap:8px;
+      padding:8px 14px 10px;
+      border-bottom:1px solid var(--border);
+      margin-bottom:10px;
+    }
+    .overview-subtab-btn{
+      border:1px solid var(--border);
+      background:var(--surface-2);
+      color:var(--text-secondary);
+      border-radius:8px;
+      padding:6px 12px;
+      font-size:12px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .overview-subtab-btn.active{
+      border-color:rgba(167,139,250,.65);
+      background:rgba(167,139,250,.18);
+      color:var(--accent-3);
+    }
+    .overview-subtab-pane{ display:none; }
+    .overview-subtab-pane.active{ display:block; }
 
     #tab-descriptives {
       padding: 10px 12px;
@@ -903,13 +927,6 @@
                 <span class="sb-item-description">Conclusion, health &amp; effect visualization.</span>
               </span>
             </button>
-            <button class="sb-item" onclick="switchTab('tested-hypothesis')" data-tab="tested-hypothesis">
-              <i class="fa-solid fa-circle-question sb-item-icon"></i>
-              <span class="sb-item-copy">
-                <span class="sb-item-label">Tested Hypothesis</span>
-                <span class="sb-item-description">Questions tested and direct answers.</span>
-              </span>
-            </button>
             <button class="sb-item" onclick="switchTab('model-effects')" data-tab="model-effects">
               <i class="fa-solid fa-layer-group sb-item-icon"></i>
               <span class="sb-item-copy">
@@ -999,7 +1016,12 @@
                      TAB: OVERVIEW
                 ══════════════════════════════════════════════════════ -->
                 <div id="tab-overview" class="tab-content active">
+                  <div class="overview-subtabs">
+                    <button class="overview-subtab-btn active" data-ov-tab="summary" onclick="switchOverviewSubtab('summary')">Summary</button>
+                    <button class="overview-subtab-btn" data-ov-tab="tested" onclick="switchOverviewSubtab('tested')">Tested</button>
+                  </div>
 
+                  <div id="overviewSummaryPane" class="overview-subtab-pane active">
                   <!-- Interpretation -->
                   <div class="conclusion-card" id="conclusionCard">
                     <div class="conclusion-header"><i class="fa-solid fa-lightbulb"></i> Model Conclusion</div>
@@ -1056,22 +1078,20 @@
                     <span id="iccInterpret"></span>
                     <div id="iccTableContainer" style="display:none;"></div>
                   </div>
+                  </div>
 
-                </div><!-- /tab-overview -->
-
-                <!-- ══════════════════════════════════════════════════════
-                     TAB: TESTED HYPOTHESIS
-                ══════════════════════════════════════════════════════ -->
-                <div id="tab-tested-hypothesis" class="tab-content">
-                  <div class="mm-section">
-                    <div class="mm-section-header">
-                      <span><i class="fa-solid fa-circle-question"></i> Tested Hypothesis</span>
-                    </div>
-                    <div class="mm-section-body padded" id="testedHypothesisBody">
-                      <p style="color:var(--text-muted);font-style:italic;">Awaiting results…</p>
+                  <div id="overviewTestedPane" class="overview-subtab-pane">
+                    <div class="mm-section">
+                      <div class="mm-section-header">
+                        <span><i class="fa-solid fa-circle-question"></i> Tested Hypothesis</span>
+                      </div>
+                      <div class="mm-section-body padded" id="testedHypothesisBody">
+                        <p style="color:var(--text-muted);font-style:italic;">Awaiting results…</p>
+                      </div>
                     </div>
                   </div>
-                </div><!-- /tab-tested-hypothesis -->
+
+                </div><!-- /tab-overview -->
 
 
                 <!-- ══════════════════════════════════════════════════════
@@ -1815,7 +1835,6 @@
       const outcome = _results.outcome ?? _results.y ?? 'Outcome';
       const ALL_SECTIONS = [
         { id: 'overview',        label: 'Model Summary' },
-        { id: 'tested-hypothesis', label: 'Tested Hypothesis' },
         { id: 'model-effects',   label: 'Fixed Effects' },
         { id: 'marginal-means',  label: 'Estimated Marginal Means' },
         { id: 'diagnostics',     label: 'Diagnostics' },
@@ -5271,7 +5290,6 @@ ${sectionsHtml}
   ───────────────────────────────────────────────────────────── */
   const TAB_TITLES = {
     'overview':        'Overview',
-    'tested-hypothesis': 'Tested Hypothesis',
     'model-effects':   'Model Effects',
     'marginal-means':  'Marginal Means',
     'diagnostics':     'Diagnostics',
@@ -5280,8 +5298,23 @@ ${sectionsHtml}
     'descriptives':    'Descriptives',
   };
 
+  window.switchOverviewSubtab = function(name) {
+    const summary = document.getElementById('overviewSummaryPane');
+    const tested = document.getElementById('overviewTestedPane');
+    if (!summary || !tested) return;
+    const showTested = name === 'tested';
+    summary.classList.toggle('active', !showTested);
+    tested.classList.toggle('active', showTested);
+    document.querySelectorAll('.overview-subtab-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.ovTab === (showTested ? 'tested' : 'summary'));
+    });
+  };
+
   window.switchTab = function(name) {
-    if (name === 'descriptives' && !_prepareMixedDescriptivePayload()) {
+    if (name === 'tested-hypothesis') {
+      name = 'overview';
+      setTimeout(function(){ window.switchOverviewSubtab('tested'); }, 0);
+    } else if (name === 'descriptives' && !_prepareMixedDescriptivePayload()) {
       return;
     }
 
@@ -5294,6 +5327,10 @@ ${sectionsHtml}
 
     if (typeof StatisticoHeader !== 'undefined' && TAB_TITLES[name]) {
       StatisticoHeader.updateTitle(TAB_TITLES[name]);
+    }
+
+    if (name === 'overview') {
+      window.switchOverviewSubtab('summary');
     }
 
     // Lazy-load heavy tabs

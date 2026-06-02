@@ -1021,7 +1021,7 @@
             <button class="sb-item" onclick="switchTab('model-effects')" data-tab="model-effects">
               <i class="fa-solid fa-layer-group sb-item-icon"></i>
               <span class="sb-item-copy">
-                <span class="sb-item-label">Fixed Effects</span>
+                <span class="sb-item-label">Effects &amp; Tests</span>
                 <span class="sb-item-description">Type III tests &amp; parameter estimates.</span>
               </span>
             </button>
@@ -1202,10 +1202,10 @@
                 ══════════════════════════════════════════════════════ -->
                 <div id="tab-model-effects" class="tab-content">
 
-                  <!-- ── Fixed Effects ── -->
+                  <!-- ── Effects & Tests ── -->
                   <div class="mm-section">
                     <div class="mm-section-header">
-                      <span><i class="fa-solid fa-lock"></i> Fixed Effects — Type III Tests</span>
+                      <span><i class="fa-solid fa-lock"></i> Effects &amp; Tests — Type III</span>
                       <button class="collapse-toggle" onclick="toggleSection('fe3Body','fe3Toggle')" id="fe3Toggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
                     </div>
                     <div class="mm-section-body collapsible-content" id="fe3Body">
@@ -1213,10 +1213,11 @@
                         <table class="mm-table" id="fe3Table">
                           <thead><tr>
                             <th>Source</th>
-                            <th>Num. DF <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Numerator degrees of freedom for the F-test. Equals the number of contrasts being tested (typically number of levels − 1).</span></span></th>
-                            <th>Den. DF <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Denominator degrees of freedom, approximated by the Satterthwaite or Kenward-Roger method. Smaller values = less power.</span></span></th>
-                            <th>F <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">F-statistic for the omnibus test of this fixed effect. Tests whether any level of this factor differs from the others.</span></span></th>
+                            <th>Num. DF</th>
+                            <th>Den. DF</th>
+                            <th>F</th>
                             <th>Sig.</th>
+                            <th>Decision</th>
                             <th data-show-from="analyst">η²<sub>p</sub>
                               <span class="metric-help"><i class="fa-regular fa-circle-question"></i>
                                 <span class="metric-tip">Partial eta-squared: effect size. Small ≈ .01, Medium ≈ .06, Large ≈ .14</span>
@@ -1247,17 +1248,18 @@
                         <table class="mm-table" id="feCoefTable">
                           <thead><tr>
                             <th>Parameter</th>
-                            <th>Estimate <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Fixed-effect coefficient (β). The expected change in the outcome for a one-unit increase in this predictor, holding all others constant.</span></span></th>
-                            <th>Std. Error <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Standard error of the estimate. Smaller SE = more precise estimate. Used to compute t and CI.</span></span></th>
-                            <th>df <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Denominator degrees of freedom for the t-test, approximated by Satterthwaite. Affects the critical value and p-value.</span></span></th>
-                            <th>t <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">t = Estimate / Std. Error. Tests whether the coefficient differs significantly from zero.</span></span></th>
+                            <th>Estimate</th>
+                            <th>Std. Error</th>
+                            <th>df</th>
+                            <th>t</th>
                             <th>Sig.</th>
-                            <th>95% CI Lower <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Lower bound of the 95% confidence interval. If this interval excludes zero, the effect is significant at α = 0.05.</span></span></th>
+                            <th>Decision</th>
+                            <th>95% CI Lower</th>
                             <th>95% CI Upper</th>
                             <th data-show-from="analyst">Std. β <span class="metric-help"><i class="fa-regular fa-circle-question"></i><span class="metric-tip">Standardised coefficient (beta weight). Allows comparison of effect sizes across predictors with different units.</span></span></th>
                           </tr></thead>
                           <tbody id="feCoefRows">
-                            <tr><td colspan="9" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Awaiting results…</td></tr>
+                            <tr><td colspan="10" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">Awaiting results…</td></tr>
                           </tbody>
                         </table>
                       </div>
@@ -1938,7 +1940,7 @@
       const outcome = _results.outcome ?? _results.y ?? 'Outcome';
       const ALL_SECTIONS = [
         { id: 'overview',        label: 'Model Summary' },
-        { id: 'model-effects',   label: 'Fixed Effects' },
+        { id: 'model-effects',   label: 'Effects & Tests' },
         { id: 'marginal-means',  label: 'Estimated Marginal Means' },
         { id: 'diagnostics',     label: 'Diagnostics' },
         { id: 'advanced',        label: 'Estimation Details' },
@@ -3492,7 +3494,7 @@ ${sectionsHtml}
   ───────────────────────────────────────────────────────────── */
   function buildFE3Rows(d) {
     if (!d.typeIII || !d.typeIII.length) {
-      return `<tr><td colspan="7" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">No Type III data available.</td></tr>`;
+      return `<tr><td colspan="8" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">No Type III data available.</td></tr>`;
     }
     return d.typeIII.map(r => {
       const F = parseFloat(r.F ?? r.f ?? r.Fvalue);
@@ -3503,6 +3505,8 @@ ${sectionsHtml}
       const etaTxt  = !isNaN(eta2)  ? fmt(eta2)  : '—';
       const omTxt   = !isNaN(omega2)? fmt(omega2) : '—';
       const pval = r.pval ?? r.p ?? r.sig ?? r.Sig;
+      const pNum = parseFloat(pval);
+      const decision = isFinite(pNum) ? (pNum < 0.05 ? '✓ Significant' : '✗ Not significant') : '—';
       return `
         <tr>
           <td>${r.source ?? r.effect ?? r.Source ?? '—'}</td>
@@ -3510,6 +3514,7 @@ ${sectionsHtml}
           <td>${fmt(dfD, 1)}</td>
           <td>${fmt(F)}</td>
           <td class="${pClass(pval)}">${fmtP(pval)} ${sigStars(pval)}</td>
+          <td>${decision}</td>
           <td data-show-from="analyst">${etaTxt}</td>
           <td data-show-from="analyst">${omTxt}</td>
         </tr>`;
@@ -3529,7 +3534,7 @@ ${sectionsHtml}
     if (!tbody) return;
     const coefs = d.fixedEffects ?? d.coefficients ?? [];
     if (!coefs.length) {
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">No coefficient data available.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">No coefficient data available.</td></tr>`;
       return;
     }
 
@@ -3539,11 +3544,13 @@ ${sectionsHtml}
       // Group header for categorical levels
       const group = r.group ?? r.effect ?? null;
       if (group && group !== lastGroup) {
-        html += `<tr class="mm-section-hdr"><td colspan="9">${group}</td></tr>`;
+        html += `<tr class="mm-section-hdr"><td colspan="10">${group}</td></tr>`;
         lastGroup = group;
       }
       const pval = r.pval ?? r.p ?? r.Sig ?? r.sig;
       const beta = r.stdBeta ?? r.beta ?? null;
+      const pNum = parseFloat(pval);
+      const decision = isFinite(pNum) ? (pNum < 0.05 ? '✓ Significant' : '✗ Not significant') : '—';
       html += `
         <tr>
           <td class="coef-cell">${r.parameter ?? r.name ?? r.term ?? '—'}</td>
@@ -3552,6 +3559,7 @@ ${sectionsHtml}
           <td>${fmt(r.df ?? r.DF, 1)}</td>
           <td>${fmt(r.t ?? r.tval)}</td>
           <td class="${pClass(pval)}">${fmtP(pval)} ${sigStars(pval)}</td>
+          <td>${decision}</td>
           <td>${fmt(r.ciLow ?? r.lower95 ?? r.CI_L)}</td>
           <td>${fmt(r.ciHigh ?? r.upper95 ?? r.CI_U)}</td>
           <td data-show-from="analyst">${beta !== null ? fmt(beta) : '—'}</td>
@@ -5429,7 +5437,7 @@ ${sectionsHtml}
   ───────────────────────────────────────────────────────────── */
   const TAB_TITLES = {
     'overview':        'Overview',
-    'model-effects':   'Model Effects',
+    'model-effects':   'Effects & Tests',
     'marginal-means':  'Marginal Means',
     'diagnostics':     'Diagnostics',
     'advanced':        'Advanced',

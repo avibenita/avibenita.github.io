@@ -2896,7 +2896,7 @@ ${sectionsHtml}
       color: #94a3b8; font-size: .9rem; font-weight: 600;
       border-bottom: 3px solid transparent; transition: all .15s;
     }
-    .tab-btn.active { color: #a78bfa; border-bottom-color: #a78bfa; }
+    .tab-btn.active { color: #a78bfa; border-bottom-color: #ffffff; }
     .tab-btn:hover:not(.active) { color: #e2e8f0; }
     .view { display: none; flex: 1; padding: 36px 28px; }
     .view.active { display: flex; }
@@ -4215,7 +4215,18 @@ ${sectionsHtml}
      EMM
   ───────────────────────────────────────────────────────────── */
   function buildFactorSelectors(d) {
-    const factors = d.factors ?? d.categoricalVars ?? [];
+    let factors = d.factors ?? d.categoricalVars ?? [];
+    if ((!factors || !factors.length) && _modelSpec && _sourceHeaders && _sourceRows) {
+      factors = _mm_getCategoricalVars(_sourceHeaders, _sourceRows, _modelSpec);
+    }
+    if (_modelSpec && _modelSpec.fix && _modelSpec.fix.length) {
+      const seen = new Set();
+      factors = [...(_modelSpec.fix || []), ...factors].filter((f) => {
+        if (!f || seen.has(f)) return false;
+        seen.add(f);
+        return true;
+      });
+    }
     ['emmFactorSelect','pwFactorSelect'].forEach(id => {
       const sel = document.getElementById(id);
       if (!sel) return;
@@ -4239,95 +4250,243 @@ ${sectionsHtml}
     renderPairwise();
   };
 
+  function _mm_paramName(r) {
+    return String(r?.parameter ?? r?.name ?? r?.term ?? '').trim();
+  }
+
+  function _mm_isInterceptParam(nm) {
+    const s = String(nm).trim().replace(/[()]/g, '').toLowerCase();
+    return s === 'intercept' || s === 'constant';
+  }
+
+  function _mm_resolveFactorName(name) {
+    if (!name) return name;
+    const fix = (_modelSpec?.fix || []);
+    const hit = fix.find((f) => String(f).toLowerCase() === String(name).toLowerCase());
+    if (hit) return hit;
+    if (_sourceHeaders) {
+      const h = _sourceHeaders.find((hdr) => String(hdr).toLowerCase() === String(name).toLowerCase());
+      if (h) return h;
+    }
+    return name;
+  }
+
+  function _mm_getFactorLevels(factorName, coefs) {
+    const canon = _mm_resolveFactorName(factorName);
+    if (_sourceHeaders && _sourceRows) {
+      const stats = _mm_buildLevelCounts(_sourceHeaders, _sourceRows, canon);
+      if (stats.levels.length) return stats.levels.map((l) => l.level);
+    }
+    const escaped = canon.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`^${escaped}[\\s_\\(\\[:=]`, 'i');
+    const labels = [];
+    (coefs || []).forEach((r) => {
+      const nm = _mm_paramName(r);
+      if (!re.test(nm)) return;
+      const m = nm.match(/[\(\[](.*?)[\)\]]$/) ?? nm.match(/[\s_:=](\S+)$/);
+      if (m) labels.push(m[1]);
+    });
+    return [...new Set(labels)];
+  }
+
+  function _mm_collectFactorContrasts(factorName, coefs, modelSpec) {
+    const canon = _mm_resolveFactorName(factorName);
+    const spec = modelSpec || _modelSpec || {};
+    const intercept = (coefs || []).find((r) => _mm_isInterceptParam(_mm_paramName(r)));
+    if (!intercept) return null;
+
+    const allLevels = _mm_getFactorLevels(canon, coefs);
+    const refLevel = _mm_getReferenceLevel(spec, canon, allLevels.length ? allLevels : ['1']);
+    const nonRef = allLevels.length
+      ? allLevels.filter((l) => String(l) !== String(refLevel))
+      : [];
+
+    const contrasts = [];
+    const escapeRx = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    nonRef.forEach((level) => {
+      const lv = String(level);
+      const row = (coefs || []).find((r) => {
+        const nm = _mm_paramName(r);
+        if (_mm_isInterceptParam(nm)) return false;
+        const patterns = [
+          new RegExp(`^${escapeRx(canon)}\\s*[\\(\\[]\\s*${escapeRx(lv)}\\s*[\\)\\]]`, 'i'),
+          new RegExp(`^${escapeRx(canon)}\\s*[=:]\\s*${escapeRx(lv)}\\b`, 'i'),
+          new RegExp(`^${escapeRx(canon)}\\[T\\.${escapeRx(lv)}\\]`, 'i'),
+          new RegExp(`^${escapeRx(canon)}_${escapeRx(lv)}$`, 'i'),
+        ];
+        return patterns.some((p) => p.test(nm));
+      });
+      if (row) contrasts.push({ label: lv, coef: row });
+    });
+
+    if (!contrasts.length) {
+      const escaped = canon.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(`^${escaped}[\\s_\\(\\[:=]`, 'i');
+      (coefs || []).forEach((r) => {
+        const nm = _mm_paramName(r);
+        if (!re.test(nm) || _mm_isInterceptParam(nm)) return;
+        const m = nm.match(/[\(\[](.*?)[\)\]]$/) ?? nm.match(/[\s_:=](\S+)$/);
+        contrasts.push({ label: m ? m[1] : nm, coef: r });
+      });
+    }
+
+    const onlyLinear = (coefs || []).some((r) => {
+      const nm = _mm_paramName(r);
+      return new RegExp(`^${escapeRx(canon)}$`, 'i').test(nm);
+    });
+    console.warn('[EMM contrasts] factor:', canon, 'allLevels:', allLevels, 'refLevel:', refLevel, 'contrasts:', contrasts.map(c=>c.label), 'onlyLinear:', onlyLinear, 'coef params:', (coefs||[]).map(r=>_mm_paramName(r)));
+    if (!contrasts.length && onlyLinear) return null;
+
+    return { canon, intercept, contrasts, refLevel, allLevels };
+  }
+
+  function _deriveEMMFromObservedMeans(factorName, modelSpec) {
+    const canon = _mm_resolveFactorName(factorName);
+    const spec = modelSpec || _modelSpec || {};
+
+    // ── Shared helper: group outcome by factor value, both treated as strings ──
+    // This is the core of the user's suggestion: convert ALL categorical values
+    // to strings so that numeric~factor variables (time=1,2,3,4) are handled
+    // identically to string categoricals (group="Control","Treatment").
+    function _buildGroupStats(fVec, yVec) {
+      const levelSet = new Map();
+      fVec.forEach((val, i) => {
+        if (val === null || val === undefined || val === '') return;
+        // Normalize: trim whitespace, convert numbers to canonical string
+        // e.g. 1.0 → "1", "2.00" → "2", "Control" → "Control"
+        let key = String(val).trim();
+        const num = parseFloat(key);
+        if (isFinite(num) && String(num) === key.replace(/\.0+$/, '') ) key = String(num);
+        if (!levelSet.has(key)) levelSet.set(key, []);
+        const yv = parseFloat(yVec[i]);
+        if (isFinite(yv)) levelSet.get(key).push(yv);
+      });
+      // Apply fixCategories filter if the user selected specific levels in the modal
+      const allowedLevels = spec.fixCategories && spec.fixCategories[canon]
+        ? new Set(spec.fixCategories[canon].map(String))
+        : null;
+      const levels = [...levelSet.keys()]
+        .filter(k => !allowedLevels || allowedLevels.has(k))
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+      if (levels.length < 2) return null;
+      return levels.map((level) => {
+        const vals = levelSet.get(level) || [];
+        const n = vals.length;
+        const mean = n ? vals.reduce((a, b) => a + b, 0) / n : 0;
+        const sd = n > 1
+          ? Math.sqrt(vals.reduce((s, v) => s + (v - mean) ** 2, 0) / (n - 1))
+          : 0;
+        const se = n > 0 ? sd / Math.sqrt(n) : 0;
+        return {
+          level, mean, se,
+          df: Math.max(n - 1, 0),
+          ciLow: mean - 1.96 * se,
+          ciHigh: mean + 1.96 * se,
+          _derived: true, _fromObservedMeans: true,
+        };
+      });
+    }
+
+    // ── Primary path: full source rows ─────────────────────────────
+    if (_sourceHeaders && _sourceRows) {
+      const yName = spec.dep || spec.y || _results?.outcome || _results?.y;
+      let yi = _sourceHeaders.indexOf(yName);
+      let fi = _sourceHeaders.indexOf(canon);
+      // Case-insensitive fallback
+      if (yi < 0 && yName) {
+        const yLow = String(yName).toLowerCase();
+        yi = _sourceHeaders.findIndex(h => String(h).toLowerCase() === yLow);
+      }
+      if (fi < 0) {
+        const fLow = String(canon).toLowerCase();
+        fi = _sourceHeaders.findIndex(h => String(h).toLowerCase() === fLow);
+      }
+      if (yi >= 0 && fi >= 0) {
+        const rows = _sourceRows.map((row) => _mm_rowValues(row, _sourceHeaders));
+        const fVec = rows.map(r => r[fi]);
+        const yVec = rows.map(r => r[yi]);
+        const levelStats = _buildGroupStats(fVec, yVec);
+        if (levelStats) {
+          return { factor: canon, levels: levelStats, _derived: true, _fromObservedMeans: true };
+        }
+      }
+    }
+
+    // ── Fallback: _rawData vectors (when _sourceHeaders is absent) ──
+    if (_rawData && _rawData.outcomeVector && _rawData.fixedVectors) {
+      // Try exact key first, then case-insensitive search across all keys
+      const fvKeys = Object.keys(_rawData.fixedVectors);
+      const canonLow = String(canon).toLowerCase();
+      const matchKey = fvKeys.find(k => k === canon || k === factorName)
+                    ?? fvKeys.find(k => String(k).toLowerCase() === canonLow);
+      const fVec = matchKey ? _rawData.fixedVectors[matchKey] : null;
+      if (fVec) {
+        const levelStats = _buildGroupStats(fVec, _rawData.outcomeVector);
+        if (levelStats) {
+          return { factor: canon, levels: levelStats, _derived: true, _fromObservedMeans: true };
+        }
+      }
+    }
+
+    return null;
+  }
+
   /* ─────────────────────────────────────────────────────────────
      EMM FALLBACK — derive group means from fixed-effect coefficients
      when VB6 has not sent Case 702.
 
-     Statistico encodes categorical fixed effects as dummy contrasts:
-       Intercept          → mean of the reference level
-       group (Treatment)  → difference from reference
-       group (Control)    → difference from reference (if > 2 levels)
-     We reconstruct each level's EMM = Intercept + contrast_coefficient.
-     SE of each EMM ≈ SE of Intercept (conservative; VB6 gives exact delta-method SE).
+     Categorical factors (including numeric codes like time = 1..4)
+     use dummy contrasts: Intercept = reference level; each contrast row
+     is a non-reference level vs reference.
   ───────────────────────────────────────────────────────────── */
-  function _deriveEMMFromCoefficients(factorName) {
-    if (!_results) return null;
-    const coefs = _results.fixedEffects ?? _results.coefficients ?? [];
+  function _deriveEMMFromCoefficients(factorName, coefsIn, modelSpecIn) {
+    const coefs = coefsIn || (_results?.fixedEffects ?? _results?.coefficients ?? []);
     if (!coefs.length) return null;
 
-    // Find intercept
-    const intercept = coefs.find(r =>
-      /^intercept$/i.test(r.parameter ?? r.name ?? r.term ?? ''));
-    if (!intercept) return null;
+    const parsed = _mm_collectFactorContrasts(factorName, coefs, modelSpecIn);
+    if (!parsed) {
+      return _deriveEMMFromObservedMeans(factorName, modelSpecIn);
+    }
+
+    const { canon, intercept, contrasts, refLevel } = parsed;
+    if (!contrasts.length) {
+      return _deriveEMMFromObservedMeans(canon, modelSpecIn);
+    }
 
     const intEst = parseFloat(intercept.estimate ?? intercept.coef ?? 0);
     const intSE  = parseFloat(intercept.se ?? intercept.stderr ?? 0);
-
-    // Find all coefficients that belong to this factor
-    // Pattern: "<factorName> (Level)" or "<factorName>[Level]" or "<factorName>_Level"
-    const escaped = factorName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const re = new RegExp(`^${escaped}[\\s_\\(\\[]`, 'i');
-
-    const contrasts = coefs.filter(r => {
-      const nm = r.parameter ?? r.name ?? r.term ?? '';
-      return re.test(nm);
-    });
-
-    if (!contrasts.length) return null;
-
-    // Extract level labels from parameter names
-    const levels = contrasts.map(r => {
-      const nm = r.parameter ?? r.name ?? r.term ?? '';
-      // e.g. "group (Treatment)" → "Treatment", "group[Treatment]" → "Treatment"
-      const m = nm.match(/[\(\[](.*?)[\)\]]$/) ?? nm.match(/[\s_](\S+)$/);
-      return { label: m ? m[1] : nm, coef: r };
-    });
-
-    // Reference level EMM = intercept (no contrast row for reference in dummy coding)
-    // Detect reference by checking if contrasts cover all levels in typeIII
-    // We always add a synthetic "Reference" row first
     const allLevels = [];
 
-    // Reference level: EMM = intercept
-    const refLabel = (() => {
-      // Try to guess from modelSpec or factor name
-      const spec = _modelSpec;
-      if (spec && spec.refLevels && spec.refLevels[factorName])
-        return spec.refLevels[factorName];
-      return 'Reference';
-    })();
-
     allLevels.push({
-      level:  refLabel,
-      mean:   intEst,
-      se:     intSE,
-      df:     parseFloat(intercept.df ?? 0),
-      ciLow:  parseFloat(intercept.ciLow ?? intercept.lower95 ?? (intEst - 1.96 * intSE)),
+      level: refLevel,
+      mean: intEst,
+      se: intSE,
+      df: parseFloat(intercept.df ?? 0),
+      ciLow: parseFloat(intercept.ciLow ?? intercept.lower95 ?? (intEst - 1.96 * intSE)),
       ciHigh: parseFloat(intercept.ciHigh ?? intercept.upper95 ?? (intEst + 1.96 * intSE)),
       _derived: true,
     });
 
-    // Non-reference levels: EMM = intercept + contrast
-    levels.forEach(({ label, coef }) => {
+    contrasts.forEach(({ label, coef }) => {
       const est  = parseFloat(coef.estimate ?? coef.coef ?? 0);
       const se   = parseFloat(coef.se ?? coef.stderr ?? 0);
       const mean = intEst + est;
-      // Combined SE ≈ sqrt(SE_int² + SE_contrast²) (ignores covariance — conservative)
       const cse  = Math.sqrt(intSE ** 2 + se ** 2);
       const df   = parseFloat(coef.df ?? intercept.df ?? 0);
-      const t95  = df > 0 ? 2.0 : 1.96;   // approximate; exact requires jStat
+      const t95  = df > 0 ? 2.0 : 1.96;
       allLevels.push({
-        level:  label,
-        mean:   mean,
-        se:     cse,
-        df:     df,
-        ciLow:  mean - t95 * cse,
+        level: label,
+        mean,
+        se: cse,
+        df,
+        ciLow: mean - t95 * cse,
         ciHigh: mean + t95 * cse,
         _derived: true,
       });
     });
 
-    return { factor: factorName, levels: allLevels, _derived: true };
+    return { factor: canon, levels: allLevels, _derived: true };
   }
 
   function renderEMM() {
@@ -4340,20 +4499,32 @@ ${sectionsHtml}
       return;
     }
 
-    // Request from VB6 if not cached; also attempt JS fallback from fixedEffects
-    if (!_emmData[factor]) {
+    // Determine whether the cached EMM has usable levels.
+    // An object with 0 or 1 levels (e.g. from a failed coefficient match for
+    // numeric~factor) is treated as absent so the observed-means path runs.
+    const _cachedLevels = (_emmData[factor]?.levels ?? []).length;
+    if (!_emmData[factor] || _cachedLevels < 2) {
       sendToHost('requestEMM', { factor });
 
-      // JS fallback: derive EMM from fixed-effect coefficients in _results
-      const fallback = _deriveEMMFromCoefficients(factor);
-      if (fallback) {
-        _emmData[factor] = fallback;
-        // don't return — fall through to render
+      // Always try observed-group means first for factors where each value is
+      // treated as a category (the user's suggestion: convert values to strings
+      // and group — this works for numeric~factor e.g. time = 1,2,3,4).
+      const obsFallback = _deriveEMMFromObservedMeans(factor);
+      if (obsFallback && (obsFallback.levels ?? []).length >= 2) {
+        _emmData[factor] = obsFallback;
+        // fall through to render
       } else {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">No estimated marginal means available for <strong>${factor}</strong>. Select a categorical factor with level contrasts.</td></tr>`;
-        const emmChartEl = document.getElementById('emmChart');
-        if (emmChartEl) emmChartEl.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-style:italic;">No EMM chart for this factor.</div>`;
-        return;
+        // Secondary: derive from fixed-effect coefficients
+        const coefFallback = _deriveEMMFromCoefficients(factor);
+        if (coefFallback && (coefFallback.levels ?? []).length >= 2) {
+          _emmData[factor] = coefFallback;
+          // fall through to render
+        } else {
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">No estimated marginal means available for <strong>${factor}</strong>. Select a categorical factor with level contrasts.</td></tr>`;
+          const emmChartEl = document.getElementById('emmChart');
+          if (emmChartEl) emmChartEl.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-style:italic;">No EMM chart for this factor.</div>`;
+          return;
+        }
       }
     }
 
@@ -4370,9 +4541,10 @@ ${sectionsHtml}
 
     if (emm._derived) {
       const note = document.createElement('tr');
-      note.innerHTML = `<td colspan="6" style="font-size:.7rem;color:var(--text-muted);padding:6px 8px;font-style:italic;">
-        ~ Values derived from fixed-effect coefficients (SE is conservative).
-      </td>`;
+      const noteTxt = emm._fromObservedMeans
+        ? '~ Group means from raw data (approximate; model-adjusted EMM requires level contrasts in fixed effects).'
+        : '~ Values derived from fixed-effect coefficients (SE is conservative).';
+      note.innerHTML = `<td colspan="6" style="font-size:.7rem;color:var(--text-muted);padding:6px 8px;font-style:italic;">${noteTxt}</td>`;
       tbody.appendChild(note);
     }
 
@@ -4440,46 +4612,32 @@ ${sectionsHtml}
      t  = meanDiff / SE
      p  = 2-sided t p-value approximated from normal distribution
   ───────────────────────────────────────────────────────────── */
-  function _derivePairwiseFromCoefficients(factorName) {
-    if (!_results) return null;
-    const coefs = _results.fixedEffects ?? _results.coefficients ?? [];
+  function _derivePairwiseFromCoefficients(factorName, coefsIn, modelSpecIn) {
+    const coefs = coefsIn || (_results?.fixedEffects ?? _results?.coefficients ?? []);
     if (!coefs.length) return null;
 
-    const intercept = coefs.find(r =>
-      /^intercept$/i.test(r.parameter ?? r.name ?? r.term ?? ''));
-    if (!intercept) return null;
+    const parsed = _mm_collectFactorContrasts(factorName, coefs, modelSpecIn);
+    if (!parsed || !parsed.contrasts.length) return null;
 
-    const escaped = factorName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const re = new RegExp(`^${escaped}[\\s_\\(\\[]`, 'i');
-
-    const contrasts = coefs.filter(r =>
-      re.test(r.parameter ?? r.name ?? r.term ?? ''));
-    if (!contrasts.length) return null;
-
-    // Helper: extract level label from coefficient name
-    const getLabel = r => {
-      const nm = r.parameter ?? r.name ?? r.term ?? '';
-      const m = nm.match(/[\(\[](.*?)[\)\]]$/) ?? nm.match(/[\s_](\S+)$/);
-      return m ? m[1] : nm;
-    };
-
-    // Build level list: reference first, then contrasts
-    const refLabel = (() => {
-      if (_modelSpec?.refLevels?.[factorName]) return _modelSpec.refLevels[factorName];
-      return 'Reference';
-    })();
+    const { intercept, contrasts, refLevel, canon } = parsed;
 
     const levels = [
-      { label: refLabel, est: parseFloat(intercept.estimate ?? intercept.coef ?? 0), se: parseFloat(intercept.se ?? intercept.stderr ?? 0), df: parseFloat(intercept.df ?? 0), _ref: true },
-      ...contrasts.map(r => ({
-        label: getLabel(r),
-        est: parseFloat(intercept.estimate ?? 0) + parseFloat(r.estimate ?? r.coef ?? 0),
-        _coefEst: parseFloat(r.estimate ?? r.coef ?? 0),
-        _coefSE: parseFloat(r.se ?? r.stderr ?? 0),
-        se: null,  // computed per-pair below
-        df: parseFloat(r.df ?? intercept.df ?? 0),
+      {
+        label: refLevel,
+        est: parseFloat(intercept.estimate ?? intercept.coef ?? 0),
+        se: parseFloat(intercept.se ?? intercept.stderr ?? 0),
+        df: parseFloat(intercept.df ?? 0),
+        _ref: true,
+      },
+      ...contrasts.map((r) => ({
+        label: r.label,
+        est: parseFloat(intercept.estimate ?? 0) + parseFloat(r.coef.estimate ?? r.coef.coef ?? 0),
+        _coefEst: parseFloat(r.coef.estimate ?? r.coef.coef ?? 0),
+        _coefSE: parseFloat(r.coef.se ?? r.coef.stderr ?? 0),
+        se: null,
+        df: parseFloat(r.coef.df ?? intercept.df ?? 0),
         _ref: false,
-      }))
+      })),
     ];
 
     // Normal quantile for two-sided p-value approximation
@@ -4524,7 +4682,45 @@ ${sectionsHtml}
       }
     }
 
-    return { factor: factorName, comparisons, _derived: true };
+    return { factor: canon, comparisons, _derived: true };
+  }
+
+  // Build pairwise contrasts directly from observed-means EMM levels.
+  // All comparisons use the Welch-like SE = sqrt(se_i² + se_j²) approximation.
+  function _derivePairwiseFromObservedMeans(factorName) {
+    // Re-use or compute the observed-means EMM for this factor
+    const emm = _deriveEMMFromObservedMeans(factorName);
+    if (!emm || (emm.levels ?? []).length < 2) return null;
+
+    const normPval = t => {
+      const x = Math.abs(t);
+      const t1 = 1 / (1 + 0.2316419 * x);
+      const poly = t1 * (0.319381530 + t1 * (-0.356563782 + t1 * (1.781477937 + t1 * (-1.821255978 + t1 * 1.330274429))));
+      return Math.min(1, 2 * Math.exp(-x * x / 2) / Math.sqrt(2 * Math.PI) * poly);
+    };
+
+    const levels = emm.levels;
+    const comparisons = [];
+    for (let i = 0; i < levels.length; i++) {
+      for (let j = i + 1; j < levels.length; j++) {
+        const lI = levels[i], lJ = levels[j];
+        const meanDiff = (lJ.mean ?? lJ.emmean ?? 0) - (lI.mean ?? lI.emmean ?? 0);
+        const seI = lI.se ?? 0, seJ = lJ.se ?? 0;
+        const se = Math.sqrt(seI ** 2 + seJ ** 2);
+        const df = Math.max(lI.df ?? 0, lJ.df ?? 0) || 0;
+        const tval = se > 0 ? meanDiff / se : 0;
+        const pval = normPval(tval);
+        comparisons.push({
+          levelI: lI.level ?? lI.label ?? '—',
+          levelJ: lJ.level ?? lJ.label ?? '—',
+          meanDiff, se, df, t: tval, pval, p: pval,
+          ciLow: meanDiff - 1.96 * se,
+          ciHigh: meanDiff + 1.96 * se,
+          _derived: true, _fromObservedMeans: true,
+        });
+      }
+    }
+    return comparisons.length ? { factor: factorName, comparisons, _derived: true, _fromObservedMeans: true } : null;
   }
 
   function renderPairwise() {
@@ -4539,18 +4735,27 @@ ${sectionsHtml}
       return;
     }
 
-    if (!_pwData[factor]) {
+    const _cachedPW = _pwData[factor];
+    const _cachedPWLen = (_cachedPW?.comparisons ?? []).length;
+    if (!_cachedPW || _cachedPWLen < 1) {
       sendToHost('requestPairwise', { factor, adjustment: adj });
 
-      // JS fallback: derive pairwise contrasts from fixedEffects
-      const fallback = _derivePairwiseFromCoefficients(factor);
-      if (fallback) {
-        _pwData[factor] = fallback;
+      // Try observed-means pairwise first (reliable for numeric~factor variables)
+      const obsFallback = _derivePairwiseFromObservedMeans(factor);
+      if (obsFallback && (obsFallback.comparisons ?? []).length) {
+        _pwData[factor] = obsFallback;
         // fall through to render
       } else {
-        tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">No pairwise contrasts available for <strong>${factor}</strong>. Select a categorical factor with multiple levels.</td></tr>`;
-        renderPWSigMatrix(null, null);
-        return;
+        // Secondary: derive from fixed-effect coefficients
+        const coefFallback = _derivePairwiseFromCoefficients(factor);
+        if (coefFallback) {
+          _pwData[factor] = coefFallback;
+          // fall through to render
+        } else {
+          tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:20px;font-style:italic;color:var(--text-muted);">No pairwise contrasts available for <strong>${factor}</strong>. Select a categorical factor with multiple levels.</td></tr>`;
+          renderPWSigMatrix(null, null);
+          return;
+        }
       }
     }
 
@@ -5225,7 +5430,13 @@ ${sectionsHtml}
   }
 
   function _mm_buildLevelCounts(headers, rows, varName) {
-    const idx = headers.indexOf(varName);
+    let idx = headers.indexOf(varName);
+    if (idx < 0) {
+      // Case-insensitive fallback — handles numeric~factor variables whose header
+      // casing may differ between modelSpec.fix and the actual spreadsheet headers.
+      const lower = String(varName).toLowerCase();
+      idx = headers.findIndex(h => String(h).toLowerCase() === lower);
+    }
     if (idx < 0) return { total: 0, missing: 0, levels: [] };
     let missing = 0;
     const counts = new Map();
@@ -5930,13 +6141,38 @@ STRENGTH: [High, Moderate, or Low — short reason based on p-values, ICC, conve
     if (res.emmMinority) _emmData['Minority']   = res.emmMinority;
     if (res.pwFemale)    _pwData['Female']     = res.pwFemale;
     if (res.pwMinority)  _pwData['Minority']   = res.pwMinority;
+    if (res.emmByFactor && typeof res.emmByFactor === 'object') {
+      Object.assign(_emmData, res.emmByFactor);
+    }
+    if (res.pwByFactor && typeof res.pwByFactor === 'object') {
+      Object.assign(_pwData, res.pwByFactor);
+    }
     // Dynamic EMM / pairwise from any factor key
     Object.keys(res).forEach(k => {
-      const m = k.match(/^emm(.+)$/);
-      if (m) _emmData[m[1]] = res[k];
-      const p = k.match(/^pw(.+)$/);
-      if (p) _pwData[p[1]] = res[k];
+      const m = k.match(/^emm(.+)$/i);
+      if (m && m[1] !== 'ByFactor') _emmData[m[1]] = res[k];
+      const p = k.match(/^pw(.+)$/i);
+      if (p && p[1] !== 'ByFactor') _pwData[p[1]] = res[k];
     });
+
+    const factorList = res.factors ?? res.categoricalVars ?? (_modelSpec?.fix || []);
+    factorList.forEach((f) => {
+      if (!f) return;
+      const canon = _mm_resolveFactorName(f);
+      if (!_emmData[canon] && !_emmData[f]) {
+        let emm = _deriveEMMFromCoefficients(canon, res.fixedEffects ?? res.coefficients, _modelSpec);
+        // Fallback to observed group means for numeric~factor variables whose
+        // coefficient names didn't match the level-contrast regex.
+        if (!emm) emm = _deriveEMMFromObservedMeans(canon, _modelSpec);
+        console.warn('[wireEMM] factor:', canon, '→', emm ? `${(emm.levels||[]).length} levels (${emm._fromObservedMeans?'obs-means':'coef-based'})` : 'null');
+        if (emm) _emmData[canon] = emm;
+      }
+      if (!_pwData[canon] && !_pwData[f]) {
+        const pw = _derivePairwiseFromCoefficients(canon, res.fixedEffects ?? res.coefficients, _modelSpec);
+        if (pw) _pwData[canon] = pw;
+      }
+    });
+
     if (res.varianceComponents) {
       const vc = res.varianceComponents;
       const labels = vc.map(v => v.parameter);
@@ -5969,8 +6205,14 @@ STRENGTH: [High, Moderate, or Low — short reason based on p-values, ICC, conve
     const dfMeth = (modelSpec.options && modelSpec.options.df)     || 'Satterthwaite';
     const covG   = (modelSpec.options && modelSpec.options.covG)   || 'VC';
 
-    // ── Index columns ──────────────────────────────────────────────
-    function colIdx(name) { return headers.indexOf(name); }
+    // ── Index columns (case-insensitive header match) ───────────────
+    function colIdx(name) {
+      if (!name) return -1;
+      let i = headers.indexOf(name);
+      if (i >= 0) return i;
+      const lower = String(name).toLowerCase();
+      return headers.findIndex((h) => String(h).toLowerCase() === lower);
+    }
 
     const yIdx  = colIdx(dep);
     const rndIdx= colIdx(rndVar);
@@ -6000,16 +6242,27 @@ STRENGTH: [High, Moderate, or Low — short reason based on p-values, ICC, conve
     const Y = complete.map(r => parseFloat(r[yIdx]));
 
     // ── Build design matrix X ──────────────────────────────────────
-    // Detect categorical vars (string cols) and encode as dummies
-    // Include repVar in catSets detection so interactions with it work correctly
+    // Treat variables declared as fixed factors in modelSpec as categorical
+    // even when coded numerically (e.g., time = 1..4).
+    // Include repVar in catSets detection so interactions with it work correctly.
     const catSets = {};
+    const forcedCategorical = new Set([...(modelSpec.fix || []), ...(repVar ? [repVar] : [])].filter(Boolean));
     const allModelVars = fixVars.concat(repVar ? [repVar] : []);
     allModelVars.forEach(v => {
       const idx = colIdx(v);
       if (idx === -1) return;
       const uniq = [...new Set(complete.map(r => r[idx]).filter(x => x !== '' && x != null))];
+      if (!uniq.length) return;
       const allNum = uniq.every(x => !isNaN(parseFloat(x)));
-      if (!allNum) catSets[v] = uniq.sort().slice(1); // drop first (reference)
+      const sortedLevels = uniq
+        .map(String)
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+      const refLevel = modelSpec?.refLevels?.[v] != null
+        ? String(modelSpec.refLevels[v])
+        : sortedLevels[0];
+      if (forcedCategorical.has(v) || !allNum) {
+        catSets[v] = sortedLevels.filter(l => l !== refLevel); // drop reference level
+      }
     });
 
     function buildRow(r) {
@@ -6464,6 +6717,21 @@ STRENGTH: [High, Moderate, or Low — short reason based on p-values, ICC, conve
         }
       }
     })();
+
+    const emmByFactor = {};
+    const pwByFactor = {};
+    (modelSpec.fix || []).forEach((f) => {
+      if (!f) return;
+      let emm = _deriveEMMFromCoefficients(f, result.fixedEffects, modelSpec);
+      // For numeric~factor variables whose coefficient names don't match the
+      // level-contrast regex, fall back to observed group means from source data.
+      if (!emm) emm = _deriveEMMFromObservedMeans(f, modelSpec);
+      const pw  = _derivePairwiseFromCoefficients(f, result.fixedEffects, modelSpec);
+      if (emm) emmByFactor[f] = emm;
+      if (pw) pwByFactor[f] = pw;
+    });
+    result.emmByFactor = emmByFactor;
+    result.pwByFactor = pwByFactor;
 
     return result;
   }

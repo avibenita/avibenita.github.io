@@ -1531,6 +1531,100 @@
       box-shadow: none;
       text-shadow: none;
     }
+
+    /* ── Categories modal (same look as regression) ───────────── */
+    .mx-cat-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 9000;
+      align-items: center;
+      justify-content: center;
+    }
+    .mx-cat-modal-overlay.active { display: flex; }
+    .mx-cat-modal {
+      background: var(--cfg-surface, #1e293b);
+      border: 1px solid var(--cfg-border, rgba(255,255,255,.1));
+      border-radius: 12px;
+      width: 420px;
+      max-width: 95vw;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    }
+    .mx-cat-modal-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--cfg-border, rgba(255,255,255,.08));
+    }
+    .mx-cat-modal-header h3 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--mx-fix, #4fc3f7);
+    }
+    .mx-cat-modal-body {
+      padding: 14px 18px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .mx-cat-info {
+      background: var(--cfg-bg, rgba(255,255,255,.03));
+      border: 1px solid var(--cfg-border, rgba(255,255,255,.06));
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 14px;
+    }
+    .mx-cat-info-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--cfg-text2, #94a3b8);
+      padding: 3px 0;
+    }
+    .mx-cat-info-value {
+      font-weight: 700;
+      color: var(--cfg-text1, #e2e8f0);
+    }
+    .mx-cat-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .mx-cat-table th {
+      padding: 6px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--cfg-text3, #64748b);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      border-bottom: 1px solid var(--cfg-border, rgba(255,255,255,.07));
+    }
+    .mx-cat-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--cfg-border, rgba(255,255,255,.04));
+      color: var(--cfg-text1, #e2e8f0);
+    }
+    .mx-cat-modal-footer {
+      padding: 12px 18px;
+      border-top: 1px solid var(--cfg-border, rgba(255,255,255,.08));
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    [data-theme="light"] .mx-cat-modal {
+      background: #ffffff;
+      border-color: #e2e8f0;
+    }
+    [data-theme="light"] .mx-cat-modal-header h3 { color: var(--mx-fix, #0369a1); }
+    [data-theme="light"] .mx-cat-info { background: #f8fafc; border-color: #e2e8f0; }
+    [data-theme="light"] .mx-cat-info-row { color: #475569; }
+    [data-theme="light"] .mx-cat-info-value { color: #0f172a; }
+    [data-theme="light"] .mx-cat-table th { color: #64748b; border-color: #e2e8f0; }
+    [data-theme="light"] .mx-cat-table td { color: #0f172a; border-color: #f1f5f9; }
+    [data-theme="light"] .mx-cat-modal-footer { border-color: #e2e8f0; }
   </style>
 </head>
 
@@ -2382,6 +2476,15 @@ function handleDrop(zone, name, isNumeric) {
     a.dep = name;
   } else if (zone === 'fix') {
     if (a.fix.indexOf(name) !== -1) return;
+    // Show category selection modal (same as regression) so the user can
+    // review/select which category levels to include before model runs.
+    var stats = STATE.variableStats[name];
+    var cats  = (stats && stats.categories) ? stats.categories : [];
+    if (cats.length > 0) {
+      showMxCategoryModal(name, stats);
+      return; // modal's confirm button will call _commitFixDrop(name)
+    }
+    // No category info available — add directly
     a.fix.push(name);
   } else if (zone === 'cov') {
     if (a.cov.indexOf(name) !== -1) return;
@@ -2804,8 +2907,10 @@ function detectStructure(variables) {
     var n         = Math.max(v.validCount || 1, 1);
     var cats      = v.categories || [];
     var nUniq     = cats.length || 1;
+    // categories may be [{value,freq}] objects or plain strings — handle both
     var numInts   = cats.filter(function(c) {
-      var f = parseFloat(c); return !isNaN(f) && f === Math.round(f) && f >= 0;
+      var str = (c && typeof c === 'object') ? c.value : String(c);
+      var f = parseFloat(str); return !isNaN(f) && f === Math.round(f) && f >= 0;
     }).length;
     return {
       name:         v.name,
@@ -3213,9 +3318,19 @@ qs('btnRun').addEventListener('click', function() {
   a.fix.forEach(addRange);
   a.cov.forEach(addRange);
 
+  // Collect per-factor selected categories (set by the categories modal)
+  var fixCategories = {};
+  a.fix.forEach(function(name) {
+    var vs = STATE.variableStats[name];
+    if (vs && vs.selectedCategories && vs.selectedCategories.length) {
+      fixCategories[name] = vs.selectedCategories;
+    }
+  });
+
   var modelSpec = {
     dep:           a.dep,
     fix:           a.fix,
+    fixCategories: Object.keys(fixCategories).length ? fixCategories : undefined,
     cov:           a.cov,
     rnd:           a.rnd,
     rep:           a.rep || null,
@@ -3473,10 +3588,10 @@ window.loadMixedModelData = function(payload) {
       return row;
     });
 
-    // Build varStats — include ALL unique values (numeric + string) for categories
+    // Build varStats — categories stored as [{value, freq}] to match regression modal
     var stats = {};
     headers.forEach(function(h) {
-      stats[h] = { count:0, numeric:0, string:0, missing:0, categories:[], rangeAddress:'' };
+      stats[h] = { count:0, numeric:0, string:0, missing:0, categories:[], _catFreq:{}, rangeAddress:'' };
     });
     STATE.rawRows.forEach(function(row) {
       headers.forEach(function(h) {
@@ -3486,10 +3601,17 @@ window.loadMixedModelData = function(payload) {
         var isNum = (typeof v === 'number') || !isNaN(parseFloat(v));
         if (isNum) stats[h].numeric++;
         else       stats[h].string++;
-        // Collect unique values regardless of type
-        var str = String(v);
-        if (stats[h].categories.indexOf(str) === -1) stats[h].categories.push(str);
+        // Track frequency per unique string value
+        var str = String(v).trim();
+        stats[h]._catFreq[str] = (stats[h]._catFreq[str] || 0) + 1;
       });
+    });
+    // Convert _catFreq map → [{value, freq}] array
+    headers.forEach(function(h) {
+      stats[h].categories = Object.keys(stats[h]._catFreq).map(function(val) {
+        return { value: val, freq: stats[h]._catFreq[val] };
+      });
+      delete stats[h]._catFreq;
     });
 
     if (data.address) {
@@ -3512,6 +3634,115 @@ window.loadMixedModelData = function(payload) {
 
 // ============================================================================
 // OFFICE DIALOG INITIALIZATION  (receives data from taskpane via messageChild)
+// ============================================================================
+// CATEGORIES MODAL — mirrors regression's showCategoryModal
+// ============================================================================
+var _mxPendingCatDrop = null; // {name} of variable awaiting confirmation
+
+function showMxCategoryModal(name, stats) {
+  var cats = (stats && stats.categories) ? stats.categories : [];
+  if (cats.length > 20) {
+    showToast('"' + name + '" has ' + cats.length + ' levels (max 20 for categorical). Drag to a numeric predictor instead.', 'warning', 6000);
+    return;
+  }
+  _mxPendingCatDrop = { name: name };
+  qs('mxCatModalTitle').textContent = 'Categories: ' + name;
+  qs('mxCatVarName').textContent = name;
+  _mxPopulateCatModal(cats, stats ? (stats.count || 0) : 0);
+  qs('mxCatModal').classList.add('active');
+}
+
+function _mxPopulateCatModal(cats, totalObs) {
+  qs('mxCatTotalObs').textContent = totalObs;
+  qs('mxCatUniqueCount').textContent = cats.length;
+  qs('mxCatSelectedCount').textContent = cats.length;
+  qs('mxCatIncludedObs').textContent = totalObs;
+  var tbody = qs('mxCatTableBody');
+  tbody.innerHTML = '';
+  if (!cats.length) {
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--cfg-text3);">No categories</td></tr>';
+    return;
+  }
+  // Sort by frequency descending (same as regression)
+  var sorted = cats.slice().sort(function(a, b) { return b.freq - a.freq; });
+  sorted.forEach(function(cat) {
+    var tr = document.createElement('tr');
+    var cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = true;
+    cb.className = 'mx-cat-checkbox';
+    cb.style.cssText = 'cursor:pointer;width:15px;height:15px;';
+    cb.dataset.value = cat.value;
+    cb.dataset.freq  = cat.freq;
+    cb.addEventListener('change', _mxUpdateCatStats);
+    var td1 = document.createElement('td'); td1.style.textAlign = 'center'; td1.appendChild(cb);
+    var td2 = document.createElement('td'); td2.textContent = cat.value === '' ? '(empty)' : cat.value;
+    var td3 = document.createElement('td');
+    td3.style.cssText = 'text-align:center;font-weight:700;color:var(--mx-fix);';
+    td3.textContent = cat.freq;
+    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+    tbody.appendChild(tr);
+  });
+}
+
+function _mxUpdateCatStats() {
+  var checkboxes = document.querySelectorAll('.mx-cat-checkbox');
+  var sel = 0, inc = 0;
+  checkboxes.forEach(function(cb) { if (cb.checked) { sel++; inc += parseInt(cb.dataset.freq) || 0; } });
+  qs('mxCatSelectedCount').textContent = sel + ' of ' + checkboxes.length;
+  qs('mxCatIncludedObs').textContent = inc;
+  var btn = qs('mxBtnCatConfirm');
+  if (btn) { btn.disabled = sel === 0; btn.style.opacity = sel === 0 ? '.5' : '1'; }
+}
+
+function _mxHideCatModal() {
+  qs('mxCatModal').classList.remove('active');
+  _mxPendingCatDrop = null;
+}
+
+function _mxConfirmCatDrop() {
+  if (!_mxPendingCatDrop) return;
+  var name = _mxPendingCatDrop.name;
+  var checkboxes = document.querySelectorAll('.mx-cat-checkbox');
+  var selectedCategories = [], includedObs = 0;
+  checkboxes.forEach(function(cb) {
+    if (cb.checked) { selectedCategories.push(cb.dataset.value); includedObs += parseInt(cb.dataset.freq) || 0; }
+  });
+  if (!selectedCategories.length) { showToast('Select at least one category.', 'warning'); return; }
+  // Store selected categories on STATE so the model can filter levels
+  if (STATE.variableStats[name]) {
+    STATE.variableStats[name].selectedCategories = selectedCategories;
+    STATE.variableStats[name].includedObs = includedObs;
+  }
+  STATE.assignments.fix.push(name);
+  _mxHideCatModal();
+  refreshAllZones();
+  refreshInteractionUI();
+  refreshRandomSlopeSection();
+  refreshRepNote();
+  refreshRunButton();
+}
+
+// Wire modal buttons after DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+  var btnCancel  = qs('mxBtnCatCancel');
+  var btnConfirm = qs('mxBtnCatConfirm');
+  var btnSelAll  = qs('mxBtnSelectAll');
+  var btnDeselAll= qs('mxBtnDeselectAll');
+  if (btnCancel)  btnCancel.addEventListener('click', _mxHideCatModal);
+  if (btnConfirm) btnConfirm.addEventListener('click', _mxConfirmCatDrop);
+  if (btnSelAll)  btnSelAll.addEventListener('click', function() {
+    document.querySelectorAll('.mx-cat-checkbox').forEach(function(cb){ cb.checked = true; });
+    _mxUpdateCatStats();
+  });
+  if (btnDeselAll) btnDeselAll.addEventListener('click', function() {
+    document.querySelectorAll('.mx-cat-checkbox').forEach(function(cb){ cb.checked = false; });
+    _mxUpdateCatStats();
+  });
+  // Close on backdrop click
+  var overlay = qs('mxCatModal');
+  if (overlay) overlay.addEventListener('click', function(e) { if (e.target === overlay) _mxHideCatModal(); });
+});
+
 // ============================================================================
 function onMessageFromParent(arg) {
   try {
@@ -3986,6 +4217,41 @@ function renderInputDiagramHier(spec, elId) {
       </button>
       <button class="varfilter-btn-secondary" id="varFilterUseAll">Use all variables</button>
       <span class="varfilter-count" id="varFilterCount"></span>
+    </div>
+  </div>
+</div>
+
+<!-- Categories modal — appears when a numeric variable is dropped onto Categorical Predictors -->
+<div class="mx-cat-modal-overlay" id="mxCatModal">
+  <div class="mx-cat-modal">
+    <div class="mx-cat-modal-header">
+      <h3><i class="fa-solid fa-tags"></i> <span id="mxCatModalTitle">Categories</span></h3>
+    </div>
+    <div class="mx-cat-modal-body">
+      <div class="mx-cat-info">
+        <div class="mx-cat-info-row"><span>Variable:</span><span class="mx-cat-info-value" id="mxCatVarName"></span></div>
+        <div class="mx-cat-info-row"><span>Total Observations:</span><span class="mx-cat-info-value" id="mxCatTotalObs"></span></div>
+        <div class="mx-cat-info-row"><span>Included Observations:</span><span class="mx-cat-info-value" id="mxCatIncludedObs" style="color:var(--mx-fix);"></span></div>
+        <div class="mx-cat-info-row"><span>Selected Categories:</span><span class="mx-cat-info-value" id="mxCatSelectedCount"></span></div>
+        <div class="mx-cat-info-row"><span>Total Categories:</span><span class="mx-cat-info-value" id="mxCatUniqueCount"></span></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-size:11px;font-weight:600;color:var(--cfg-text3,#64748b);">Select Categories to Include:</span>
+        <div style="display:flex;gap:6px;">
+          <button id="mxBtnSelectAll" style="font-size:10px;padding:3px 7px;border:1px solid var(--cfg-border);border-radius:5px;background:var(--cfg-surface);color:var(--cfg-text3);cursor:pointer;">Select All</button>
+          <button id="mxBtnDeselectAll" style="font-size:10px;padding:3px 7px;border:1px solid var(--cfg-border);border-radius:5px;background:var(--cfg-surface);color:var(--cfg-text3);cursor:pointer;">Deselect All</button>
+        </div>
+      </div>
+      <table class="mx-cat-table">
+        <thead><tr><th style="width:40px;text-align:center;">Include</th><th>Category</th><th style="text-align:center;">Frequency</th></tr></thead>
+        <tbody id="mxCatTableBody"></tbody>
+      </table>
+    </div>
+    <div class="mx-cat-modal-footer">
+      <button id="mxBtnCatCancel" style="padding:6px 14px;border:1px solid var(--cfg-border);border-radius:7px;background:var(--cfg-surface);color:var(--cfg-text3);cursor:pointer;font-size:11px;">Cancel</button>
+      <button id="mxBtnCatConfirm" style="padding:6px 14px;border:none;border-radius:7px;background:var(--mx-fix);color:#fff;cursor:pointer;font-size:11px;font-weight:700;">
+        <i class="fa-solid fa-check"></i> Assign to Categorical
+      </button>
     </div>
   </div>
 </div>

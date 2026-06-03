@@ -6763,26 +6763,53 @@ STRENGTH: [High, Moderate, or Low — short reason based on p-values, ICC, conve
               }
               _modelSpec = spec;   // store so renderModelDiagram can reach it
               _sourceHeaders = headers.slice();
-              _sourceRows = rows.slice();
 
-              // Populate _rawData from spreadsheet rows so View Data works
+              // ── Apply fixCategories row filter ──────────────────────────────
+              // When the user selected specific category levels in the modal,
+              // exclude rows whose factor value is not in the selected set.
+              let filteredRows = rows.slice();
+              if (spec.fixCategories && typeof spec.fixCategories === 'object') {
+                Object.keys(spec.fixCategories).forEach(factorName => {
+                  const allowed = new Set(spec.fixCategories[factorName].map(String));
+                  const fi = headers.indexOf(factorName);
+                  if (fi < 0) {
+                    // Case-insensitive fallback
+                    const fLow = factorName.toLowerCase();
+                    const fi2 = headers.findIndex(h => String(h).toLowerCase() === fLow);
+                    if (fi2 >= 0) {
+                      filteredRows = filteredRows.filter(r => {
+                        const v = Array.isArray(r) ? r[fi2] : r[factorName];
+                        return v !== null && v !== undefined && v !== '' && allowed.has(String(v).trim());
+                      });
+                    }
+                  } else {
+                    filteredRows = filteredRows.filter(r => {
+                      const v = Array.isArray(r) ? r[fi] : r[factorName];
+                      return v !== null && v !== undefined && v !== '' && allowed.has(String(v).trim());
+                    });
+                  }
+                });
+              }
+              _sourceRows = filteredRows;
+
+              // Populate _rawData from (filtered) rows so View Data and EMM work
               const _depIdx = headers.indexOf(spec.dep || spec.y || '');
               const _repIdx = headers.indexOf(spec.rep || spec.subject || spec.rnd || '');
               const _fixVars = (spec.fix || []).concat(spec.cov || []);
               if (_depIdx >= 0) {
                 _rawData = {
-                  outcomeVector: rows.map(r => r[_depIdx]),
-                  subjectVector: _repIdx >= 0 ? rows.map(r => r[_repIdx]) : [],
+                  outcomeVector: filteredRows.map(r => Array.isArray(r) ? r[_depIdx] : r[spec.dep]),
+                  subjectVector: _repIdx >= 0 ? filteredRows.map(r => Array.isArray(r) ? r[_repIdx] : r[spec.rep]) : [],
                   fixedVectors:  {}
                 };
                 _fixVars.forEach(f => {
                   const fi = headers.indexOf(f);
-                  if (fi >= 0) _rawData.fixedVectors[f] = rows.map(r => r[fi]);
+                  if (fi >= 0) _rawData.fixedVectors[f] = filteredRows.map(r => Array.isArray(r) ? r[fi] : r[f]);
                 });
               }
 
               try {
-                const results = computeMixedModel(headers, rows, spec);
+                const results = computeMixedModel(headers, filteredRows, spec);
                 receiveMixedModelResults(results);
                 setTimeout(() => wirePostResultsData(results), 400);
               } catch(e) {

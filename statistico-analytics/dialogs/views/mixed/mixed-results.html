@@ -7410,5 +7410,240 @@ STRENGTH: [High, Moderate, or Low — short reason based on p-values, ICC, conve
   <!-- Tooltip (shared, outside modal so it's always on top) -->
   <div id="msdTooltip" class="msd-tooltip" style="display:none;"></div>
 
+  <!-- ══ Explain View Button ══════════════════════════════════════════════ -->
+  <button id="mmExplainBtn" onclick="openMmExplainPanel()"
+    style="position:fixed;bottom:22px;right:22px;z-index:4000;
+           display:flex;align-items:center;gap:7px;
+           padding:9px 16px;border-radius:24px;border:none;cursor:pointer;
+           background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;
+           font-size:.78rem;font-weight:600;box-shadow:0 4px 16px rgba(99,102,241,.45);
+           transition:transform .15s,box-shadow .15s;">
+    <i class="fa-solid fa-compass" style="font-size:.85rem;"></i>
+    <span>Explain View</span>
+    <sup style="font-size:.55rem;font-weight:700;letter-spacing:.04em;
+                background:rgba(255,255,255,.25);border-radius:4px;padding:1px 4px;margin-left:1px;">AI</sup>
+  </button>
+
+  <!-- ══ Explain View Panel ═══════════════════════════════════════════════ -->
+  <div id="mmExplainPanel" style="display:none;position:fixed;top:0;right:0;bottom:0;width:360px;
+       z-index:4100;background:#1a1f2e;border-left:1px solid rgba(255,255,255,.1);
+       display:flex;flex-direction:column;transform:translateX(100%);
+       transition:transform .3s cubic-bezier(.25,.8,.25,1);box-shadow:-8px 0 32px rgba(0,0,0,.5);">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                padding:16px 18px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:9px;">
+        <i class="fa-solid fa-compass" style="color:#818cf8;font-size:.9rem;"></i>
+        <span id="mmExplainTitle" style="font-size:.85rem;font-weight:700;color:rgba(255,255,255,.9);">
+          Insight Guide</span>
+      </div>
+      <button onclick="closeMmExplainPanel()"
+        style="background:none;border:none;color:rgba(255,255,255,.5);font-size:1rem;
+               cursor:pointer;padding:4px;border-radius:4px;">✕</button>
+    </div>
+    <!-- Body -->
+    <div id="mmExplainBody" style="flex:1;overflow-y:auto;padding:18px;"></div>
+    <!-- Footer -->
+    <div style="padding:10px 18px;border-top:1px solid rgba(255,255,255,.06);
+                font-size:.65rem;color:rgba(255,255,255,.3);flex-shrink:0;">
+      Insight guides are decision aids — verify critical findings with domain experts.
+    </div>
+  </div>
+  <!-- Overlay backdrop -->
+  <div id="mmExplainOverlay" onclick="closeMmExplainPanel()"
+    style="display:none;position:fixed;inset:0;z-index:4050;background:rgba(0,0,0,.35);"></div>
+
+  <style>
+    #mmExplainBtn:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(99,102,241,.6); }
+    .mm-eg-about { font-size:.82rem;line-height:1.65;color:rgba(255,255,255,.82);margin-bottom:16px; }
+    .mm-eg-questions { margin-bottom:18px;background:rgba(129,140,248,.07);
+                       border:1px solid rgba(129,140,248,.2);border-radius:8px;padding:13px 16px; }
+    .mm-eg-questions-title { font-size:.68rem;font-weight:700;letter-spacing:.07em;
+                              color:#818cf8;margin-bottom:10px;text-transform:uppercase; }
+    .mm-eg-questions ul { margin:0;padding-left:16px;color:rgba(255,255,255,.78);font-size:.78rem;line-height:1.7; }
+    .mm-eg-section { margin-bottom:4px;border-radius:7px;overflow:hidden;
+                     border:1px solid rgba(255,255,255,.07); }
+    .mm-eg-sec-hdr { display:flex;align-items:center;justify-content:space-between;
+                     padding:10px 14px;cursor:pointer;font-size:.77rem;font-weight:600;
+                     color:rgba(255,255,255,.75);background:rgba(255,255,255,.04);
+                     user-select:none; }
+    .mm-eg-sec-hdr:hover { background:rgba(255,255,255,.07); }
+    .mm-eg-sec-body { padding:10px 14px 12px;font-size:.75rem;line-height:1.7;
+                      color:rgba(255,255,255,.68);display:none; }
+    .mm-eg-sec-body ul { margin:0;padding-left:15px; }
+    .mm-eg-sec-body li { margin-bottom:5px; }
+    .mm-eg-chevron { transition:transform .2s;font-size:.7rem;color:rgba(255,255,255,.4); }
+    .mm-eg-section.open .mm-eg-chevron { transform:rotate(180deg); }
+    .mm-eg-section.open .mm-eg-sec-body { display:block; }
+  </style>
+
+  <script>
+  /* ── Explain View Panel ──────────────────────────────────────────── */
+
+  const _MM_EXPLAIN = {
+    overview: {
+      title: 'Insight Guide — Model Summary',
+      about: 'The Model Summary provides a holistic snapshot of your mixed model — convergence status, overall fit, effect size, and a plain-English conclusion — so you can judge in seconds whether the model is trustworthy and what it reveals.',
+      questions: [
+        'Did the model converge and is it reliable?',
+        'How much variance is explained by the fixed predictors?',
+        'Is there meaningful clustering in the data (ICC)?',
+        'Which factors show statistically significant effects?',
+        'What is the overall conclusion about the outcome variable?'
+      ],
+      interact: [
+        'Switch between <strong>Summary</strong> and <strong>Questions Tested</strong> sub-tabs for different lenses on the model.',
+        'Hover over any KPI card to see its tooltip definition.',
+        'Click <strong>Model Structure</strong> in the sidebar for a visual diagram of the model.'
+      ],
+      lookFor: [
+        '<strong>Converged: Yes</strong> — if No, the model is unreliable; simplify the random structure.',
+        '<strong>ICC > 30%</strong> — substantial clustering; the mixed model is well justified.',
+        '<strong>R²m near R²c</strong> — random effects contribute little; a simpler model may suffice.',
+        'Significant effects (green highlights) in the KPI row indicate predictors worth investigating.'
+      ]
+    },
+    'model-effects': {
+      title: 'Insight Guide — Effects & Tests',
+      about: 'The Effects & Tests tab provides the core inferential output: Type III F-tests per predictor, coefficient estimates, standard errors, confidence intervals, and standardised betas. This is where you determine which fixed effects matter and by how much.',
+      questions: [
+        'Is each fixed-effect predictor statistically significant?',
+        'What is the estimated effect size (β coefficient) for each predictor?',
+        'How precise are the estimates (95% CI)?',
+        'Which factor levels differ from the reference category?',
+        'Which predictor contributes most to the outcome?'
+      ],
+      interact: [
+        'Hover column headers (ⓘ) for precise statistical definitions.',
+        'Sort the table by p-value to prioritise significant predictors.',
+        'The <strong>Analyst</strong> depth level reveals standardised betas and additional diagnostics.'
+      ],
+      lookFor: [
+        '<strong>p < .05</strong> — significant predictor; the effect is unlikely due to chance.',
+        '<strong>Wide 95% CI</strong> — high uncertainty; check sample size and model specification.',
+        '<strong>Std. Beta near 0</strong> — weak contribution relative to other predictors.',
+        '<strong>Type III F</strong> tests the overall significance of each factor across all its levels.'
+      ]
+    },
+    'marginal-means': {
+      title: 'Insight Guide — Estimated Marginal Means',
+      about: 'Estimated Marginal Means (EMMs) are the model-adjusted group means — the predicted average of the outcome for each level of a categorical factor, holding all other predictors constant. Pairwise contrasts then quantify which groups differ significantly.',
+      questions: [
+        'What is the model-adjusted mean for each group or time point?',
+        'Which pairs of groups differ significantly from each other?',
+        'How large are the pairwise differences (in original units)?',
+        'After adjusting for covariates, does the factor still show an effect?',
+        'What is the effect size (Cohen\'s d) for each pairwise comparison?'
+      ],
+      interact: [
+        'Use the factor selector to switch between different categorical predictors.',
+        'Toggle between the <strong>EMM Plot</strong> and the <strong>Pairwise table</strong> to move from visual to numeric.',
+        'The <strong>Significance Matrix</strong> (Analyst level) gives a quick grid of all pairwise p-values.'
+      ],
+      lookFor: [
+        '<strong>Non-overlapping CIs</strong> in the EMM plot — strong evidence of a difference.',
+        '<strong>Adj. Sig. < .05</strong> in pairwise table — significant after multiple-comparison correction.',
+        '<strong>Large Cohen\'s d</strong> (> 0.8) — practically important group difference.',
+        'A reference level marked "(ref)" — all other levels are contrasted against it.'
+      ]
+    },
+    diagnostics: {
+      title: 'Insight Guide — Diagnostics',
+      about: 'The Diagnostics tab checks the key assumptions of the linear mixed model: normality of residuals, homogeneity of variance, absence of influential observations, and zero mean of residuals. Assumption violations can distort inference and should be addressed before drawing conclusions.',
+      questions: [
+        'Are the residuals approximately normally distributed?',
+        'Is variance homogeneous across groups (homoscedasticity)?',
+        'Are there influential observations that disproportionately drive the results?',
+        'Are residuals centred at zero (no systematic bias)?',
+        'Overall, can I trust the model\'s inference?'
+      ],
+      interact: [
+        'Use the four inner tabs — <strong>Overview, Residuals, Normality, Influence</strong> — to focus on one assumption at a time.',
+        'In the Residuals tab, adjust the <strong>Bins slider</strong> and toggle <strong>Show Normal</strong> to explore the distribution.',
+        'The <strong>Overview tab</strong> gives an at-a-glance health score so you can prioritise which assumption to investigate.'
+      ],
+      lookFor: [
+        '<strong>QQ Plot</strong>: points hugging the diagonal line = normality met; heavy tails = violation.',
+        '<strong>Residuals vs Fitted</strong>: random scatter = good; funnel shape = heteroscedasticity.',
+        '<strong>Cook\'s D > 1</strong> or <strong>DFFITS exceeded</strong> = influential observation; consider re-running without it.',
+        '<strong>Shapiro-Wilk p > .05</strong> = normality not rejected; p < .01 = significant departure.'
+      ]
+    },
+    advanced: {
+      title: 'Insight Guide — Estimation Details',
+      about: 'The Estimation Details tab exposes the technical machinery behind the model: information criteria for model comparison, pseudo R² measures, variance components, the likelihood ratio test, and a summary of how each predictor contributes to the fit.',
+      questions: [
+        'Which model (among competing specifications) fits the data best?',
+        'How much variance is explained by fixed effects alone vs. also including random effects?',
+        'How strong is the clustering effect (ICC)?',
+        'Did the model converge, and which estimation method was used?',
+        'Which fixed-effect predictors contribute most to explaining the outcome?'
+      ],
+      interact: [
+        'Use <strong>AIC / BIC</strong> to compare models — refit with different covariance structures using the selector.',
+        'The <strong>Fixed Effects Contribution</strong> bars show relative importance by |t|-value.',
+        'The <strong>Covariance Structure</strong> selector lets you switch (e.g. AR1 for time series) and refit instantly.'
+      ],
+      lookFor: [
+        '<strong>ΔAIC > 2</strong> between models — meaningful difference in fit; prefer the lower AIC model.',
+        '<strong>ICC > 30%</strong> — clustering is substantial; the mixed model adds real value over OLS.',
+        '<strong>R²m ≈ R²c</strong> — random effects contribute little; consider a simpler model.',
+        '<strong>LRT p < .05</strong> — the full model fits significantly better than intercept-only.'
+      ]
+    }
+  };
+
+  function openMmExplainPanel() {
+    // Determine active tab
+    const activeBtn = document.querySelector('.sb-item.active');
+    const tabKey = activeBtn?.dataset?.tab ?? 'overview';
+    const content = _MM_EXPLAIN[tabKey] ?? _MM_EXPLAIN.overview;
+
+    document.getElementById('mmExplainTitle').textContent = content.title;
+
+    const questions = content.questions.map(q => `<li>${q}</li>`).join('');
+    const interactItems = (content.interact ?? []).map(i => `<li>${i}</li>`).join('');
+    const lookItems = (content.lookFor ?? []).map(l => `<li>${l}</li>`).join('');
+
+    document.getElementById('mmExplainBody').innerHTML = `
+      <p class="mm-eg-about">${content.about}</p>
+      <div class="mm-eg-questions">
+        <div class="mm-eg-questions-title"><i class="fa-solid fa-circle-question" style="margin-right:5px;"></i>What Questions This View Answers</div>
+        <ul>${questions}</ul>
+      </div>
+      ${interactItems ? `
+      <div class="mm-eg-section" onclick="this.classList.toggle('open')">
+        <div class="mm-eg-sec-hdr">
+          <span><i class="fa-solid fa-sliders" style="margin-right:7px;color:#818cf8;"></i>How to Interact</span>
+          <i class="fa-solid fa-chevron-down mm-eg-chevron"></i>
+        </div>
+        <div class="mm-eg-sec-body"><ul>${interactItems}</ul></div>
+      </div>` : ''}
+      ${lookItems ? `
+      <div class="mm-eg-section" onclick="this.classList.toggle('open')">
+        <div class="mm-eg-sec-hdr">
+          <span><i class="fa-solid fa-chart-line" style="margin-right:7px;color:#34d399;"></i>What to Look For</span>
+          <i class="fa-solid fa-chevron-down mm-eg-chevron"></i>
+        </div>
+        <div class="mm-eg-sec-body"><ul>${lookItems}</ul></div>
+      </div>` : ''}
+    `;
+
+    const panel = document.getElementById('mmExplainPanel');
+    const overlay = document.getElementById('mmExplainOverlay');
+    panel.style.display = 'flex';
+    overlay.style.display = 'block';
+    requestAnimationFrame(() => { panel.style.transform = 'translateX(0)'; });
+  }
+
+  function closeMmExplainPanel() {
+    const panel = document.getElementById('mmExplainPanel');
+    const overlay = document.getElementById('mmExplainOverlay');
+    panel.style.transform = 'translateX(100%)';
+    overlay.style.display = 'none';
+    setTimeout(() => { panel.style.display = 'none'; }, 310);
+  }
+  </script>
+
 </body>
 </html>

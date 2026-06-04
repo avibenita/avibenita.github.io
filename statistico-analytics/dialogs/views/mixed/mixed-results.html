@@ -1106,7 +1106,7 @@
               <i class="fa-solid fa-stethoscope sb-item-icon"></i>
               <span class="sb-item-copy">
                 <span class="sb-item-label">Diagnostics</span>
-                <span class="sb-item-description">Residual QQ, fitted vs residuals &amp; influential cases.</span>
+                <span class="sb-item-description">Assumption checks &amp; residual diagnostics.</span>
               </span>
             </button>
             <button class="sb-item" onclick="switchTab('advanced')" data-tab="advanced">
@@ -5034,8 +5034,16 @@ ${sectionsHtml}
     const nInfl  = (_results.influentialCases ?? []).length;
     const inflOk = nInfl === 0 ? 'ok' : nInfl <= 2 ? 'warn' : 'fail';
     const meanOk = Math.abs(res.mean ?? 0) < 0.05 * (Math.abs(res.max ?? 1) || 1) ? 'ok' : 'warn';
-    const dacLabel = { ok: '✓ Pass', warn: '⚠ Borderline', fail: '✗ Concern', na: '— Not tested' };
-    const dacCls   = { ok: 'dac-ok', warn: 'dac-warn', fail: 'dac-fail', na: 'dac-na' };
+    const dacLabel = { ok: '✓ Pass', warn: '⚠ Review Recommended', fail: '⚠ Potential Issue', na: '— Not tested' };
+    const dacCls   = { ok: 'dac-ok', warn: 'dac-warn', fail: 'dac-warn', na: 'dac-na' };
+
+    // ── Overall assumption health score ───────────────────────────
+    const scores = [normOk, homoOk, meanOk, inflOk].map(s => s === 'ok' ? 100 : s === 'warn' ? 60 : s === 'fail' ? 20 : 70);
+    const overallScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+    const overallLabel = overallScore >= 85 ? 'Assumptions Met'
+                       : overallScore >= 60 ? 'Partially Satisfied'
+                       : 'Review Recommended';
+    const overallCls   = overallScore >= 85 ? 'dac-ok' : overallScore >= 60 ? 'dac-warn' : 'dac-warn';
 
     // ── Diagnostic conclusion sentences ───────────────────────────
     const dciIcon = { ok: 'fa-check dci-ok', warn: 'fa-triangle-exclamation dci-warn', fail: 'fa-xmark dci-fail', na: 'fa-minus dci-na' };
@@ -5084,6 +5092,11 @@ ${sectionsHtml}
             <div class="dac-label">Influential Cases</div>
             <div class="dac-status ${dacCls[inflOk]}">${inflOk === 'ok' ? '✓ None' : `⚠ ${nInfl} found`}</div>
             <div class="dac-detail">${nInfl === 0 ? 'No action needed' : 'See Influence tab'}</div>
+          </div>
+          <div class="diag-assumption-card" style="border-color:rgba(129,140,248,.25);background:rgba(129,140,248,.06);">
+            <div class="dac-label" style="color:var(--accent-1,#818cf8);">Assumption Health</div>
+            <div class="dac-status ${overallCls}" style="font-size:1.1rem;">${overallScore} / 100</div>
+            <div class="dac-detail">${overallLabel}</div>
           </div>
         </div>
         <div class="diag-conclusion">
@@ -5160,17 +5173,21 @@ ${sectionsHtml}
                 <div class="stat-field"><span class="stat-label">W statistic:</span><span class="stat-value">${fmt(res.swW)}</span></div>
                 <div class="stat-field"><span class="stat-label">p-value:</span><span class="stat-value ${pClass(res.swP)}">${fmtP(res.swP)}</span></div>
                 <p style="font-size:.72rem;color:var(--text-muted);margin-top:8px;">
-                  ${res.swP == null ? 'Not computed.' : res.swP > .05 ? '✓ No significant departure from normality.' : '⚠ Significant departure from normality detected.'}
+                  ${res.swP == null ? 'Not computed.' : res.swP > .05
+                    ? `✓ Residuals are consistent with a normal distribution (W = ${fmt(res.swW)}, p = ${fmtP(res.swP)}).`
+                    : res.swP > .01
+                    ? `⚠ Residuals exhibit mild deviation from normality (W = ${fmt(res.swW)}, p = ${fmtP(res.swP)}). Proceed with caution.`
+                    : `⚠ Residuals exhibit statistically significant deviation from normality (W = ${fmt(res.swW)}, p = ${fmtP(res.swP)}). Consider robust methods.`}
                 </p>
               </div>
             </div>
             <div class="mm-section">
-              <div class="mm-section-header"><span><i class="fa-solid fa-ruler"></i> Shape Statistics</span></div>
+              <div class="mm-section-header"><span><i class="fa-solid fa-ruler"></i> Skewness &amp; Kurtosis</span></div>
               <div class="mm-section-body padded">
                 <div class="stat-field"><span class="stat-label">Skewness:</span><span class="stat-value">${fmt(res.skewness)}</span></div>
                 <div class="stat-field"><span class="stat-label">Kurtosis:</span><span class="stat-value">${fmt(res.kurtosis)}</span></div>
                 <p style="font-size:.72rem;color:var(--text-muted);margin-top:8px;">
-                  Normal distribution: Skewness ≈ 0, Kurtosis = 3 (excess = 0).
+                  Values near 0 (skewness) and 3 (kurtosis) indicate a normal distribution.
                 </p>
               </div>
             </div>
@@ -5443,19 +5460,32 @@ ${sectionsHtml}
       { type:'line', data:[[theoretical[0], theoretical[0] * (sorted[n-1]-sorted[0])/(theoretical[n-1]-theoretical[0]) + sorted[0]], [theoretical[n-1], sorted[n-1]]], color:'rgba(255,165,120,.6)', dashStyle:'Dash', enableMouseTracking:false }
     ]);
 
-    // Histogram
+    // Histogram with normal curve overlay
     const bins = 20;
-    const min = Math.min(...residuals), max = Math.max(...residuals);
-    const bw  = (max - min) / bins;
+    const rMin = Math.min(...residuals), rMax = Math.max(...residuals);
+    const bw   = (rMax - rMin) / bins;
     const counts = new Array(bins).fill(0);
-    residuals.forEach(r => { const bi = Math.min(bins-1, Math.floor((r-min)/bw)); counts[bi]++; });
+    residuals.forEach(r => { const bi = Math.min(bins-1, Math.floor((r-rMin)/bw)); counts[bi]++; });
+    const rN    = residuals.length;
+    const rMean = residuals.reduce((s,v)=>s+v,0)/rN;
+    const rSd   = Math.sqrt(residuals.reduce((s,v)=>s+(v-rMean)**2,0)/(rN-1));
+    // Normal curve scaled to histogram counts
+    const normalCurve = counts.map((_,i) => {
+      const x = rMin + i*bw + bw/2;
+      const pdf = Math.exp(-0.5*((x-rMean)/rSd)**2) / (rSd * Math.sqrt(2*Math.PI));
+      return parseFloat((pdf * rN * bw).toFixed(4));
+    });
     Highcharts.chart('resHistChart', {
-      chart:{ type:'column', backgroundColor:'transparent', height:240, animation:false },
-      title:{ text:'Residual Distribution', style:{color:'rgba(255,255,255,.7)',fontSize:'11px'} },
-      xAxis:{ categories: counts.map((_,i) => fmt(min + i*bw + bw/2, 2)), tickInterval:4, labels:{style:{color:'rgba(255,255,255,.55)',fontSize:'10px'}} },
-      yAxis:{ title:{text:'Frequency',style:{color:'rgba(255,255,255,.5)',fontSize:'10px'}}, labels:{style:{color:'rgba(255,255,255,.55)',fontSize:'10px'}}, gridLineColor:'rgba(255,255,255,.06)' },
-      series:[{ name:'Count', data:counts, color:'rgba(167,139,250,.65)', pointPadding:0, groupPadding:0, borderRadius:2 }],
-      legend:{ enabled:false }, exporting:{ enabled:false }, credits:{ enabled:false }
+      chart:{ backgroundColor:'transparent', height:260, animation:false },
+      title:{ text:'Residual Distribution with Normal Curve', style:{color:'rgba(255,255,255,.7)',fontSize:'11px'} },
+      xAxis:{ categories: counts.map((_,i) => fmt(rMin + i*bw + bw/2, 2)), tickInterval:4, labels:{style:{color:'rgba(255,255,255,.55)',fontSize:'10px'}} },
+      yAxis:{ title:{text:'Count',style:{color:'rgba(255,255,255,.5)',fontSize:'10px'}}, labels:{style:{color:'rgba(255,255,255,.55)',fontSize:'10px'}}, gridLineColor:'rgba(255,255,255,.06)' },
+      series:[
+        { type:'column', name:'Residuals', data:counts, color:'rgba(167,139,250,.55)', pointPadding:0, groupPadding:0, borderRadius:2, borderWidth:0 },
+        { type:'spline', name:'Normal', data:normalCurve, color:'rgba(251,191,36,.85)', lineWidth:2, marker:{enabled:false}, enableMouseTracking:false }
+      ],
+      legend:{ enabled:true, itemStyle:{color:'rgba(255,255,255,.65)',fontSize:'10px'}, backgroundColor:'transparent' },
+      exporting:{ enabled:false }, credits:{ enabled:false }
     });
 
     // Scale-Location
@@ -5485,18 +5515,49 @@ ${sectionsHtml}
     }
 
     const cases = _results.influentialCases ?? [];
+    // Build max-metrics summary from full diagnostics if available
+    const diagRows = _results.allDiagnostics ?? _results.caseDiagnostics ?? [];
+    const nChecked = diagRows.length || (_sourceRows ? _sourceRows.length : '—');
+    const maxCook  = diagRows.length ? Math.max(...diagRows.map(r => Math.abs(r.cooksD ?? 0))) : null;
+    const maxLev   = diagRows.length ? Math.max(...diagRows.map(r => Math.abs(r.leverage ?? 0))) : null;
+    const maxDff   = diagRows.length ? Math.max(...diagRows.map(r => Math.abs(r.dffits ?? 0))) : null;
+
+    const metricSummaryHtml = (maxCook != null) ? `
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:14px 18px;margin:14px;">
+        <div style="font-size:.75rem;font-weight:600;color:rgba(255,255,255,.65);margin-bottom:10px;letter-spacing:.04em;">INFLUENCE SUMMARY — Cases Checked: ${nChecked}</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+          <div style="text-align:center;">
+            <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:2px;">Cook's D</div>
+            <div style="font-size:1.05rem;font-weight:600;color:rgba(255,255,255,.85);">${fmt(maxCook)}</div>
+            <div style="font-size:.65rem;color:var(--text-muted);">Max / threshold 1.0</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:2px;">Leverage</div>
+            <div style="font-size:1.05rem;font-weight:600;color:rgba(255,255,255,.85);">${fmt(maxLev)}</div>
+            <div style="font-size:.65rem;color:var(--text-muted);">Max / threshold 0.5</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:2px;">DFFITS</div>
+            <div style="font-size:1.05rem;font-weight:600;color:rgba(255,255,255,.85);">${fmt(maxDff)}</div>
+            <div style="font-size:.65rem;color:var(--text-muted);">Max / threshold 2√(p/n)</div>
+          </div>
+        </div>
+      </div>` : '';
+
     if (!cases.length) {
       panel.innerHTML = `
         ${infoHtml}
-        <div class="awaiting-state" style="padding:28px 20px 16px;">
+        ${metricSummaryHtml}
+        <div class="awaiting-state" style="padding:18px 20px 16px;">
           <i class="fa-solid fa-check-circle" style="color:var(--success);"></i>
-          <p>No influential cases detected.</p>
+          <p>No observations exceeded diagnostic thresholds.</p>
         </div>`;
       return;
     }
 
     panel.innerHTML = `
       ${infoHtml}
+      ${metricSummaryHtml}
       <div class="mm-section">
         <div class="mm-section-header"><span><i class="fa-solid fa-triangle-exclamation"></i> Influential Observations (${cases.length} flagged)</span></div>
         <div class="mm-section-body">

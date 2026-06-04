@@ -998,6 +998,63 @@
     /* ── Tab section grid helpers ── */
     .two-col-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
     @media(max-width:900px) { .two-col-grid { grid-template-columns:1fr; } }
+
+    /* ── Inner Diagnostic Tabs ────────────────────────────────── */
+    .diag-tabs-nav {
+      display: flex; gap: 2px; padding: 10px 14px 0;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.015);
+    }
+    .diag-tab-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border: none; border-radius: 6px 6px 0 0;
+      background: transparent; color: var(--text-muted);
+      font-size: .78rem; font-weight: 600; cursor: pointer;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: color .15s, border-color .15s, background .15s;
+    }
+    .diag-tab-btn:hover { color: var(--text-primary); background: rgba(255,255,255,.04); }
+    .diag-tab-btn.active {
+      color: var(--accent-1, #818cf8);
+      border-bottom-color: var(--accent-1, #818cf8);
+      background: rgba(129,140,248,.06);
+    }
+    .diag-tab-btn .dtb-icon { font-size: .8rem; }
+    .diag-tab-panel { display: none; }
+    .diag-tab-panel.active { display: block; }
+
+    /* ── Assumption Health Cards (Overview tab) ───────────────── */
+    .diag-assumption-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px; padding: 14px;
+    }
+    .diag-assumption-card {
+      background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07);
+      border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;
+    }
+    .dac-label { font-size: .7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .07em; color: var(--text-muted); }
+    .dac-status { font-size: .82rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+    .dac-ok   { color: #4ade80; }
+    .dac-warn { color: #fbbf24; }
+    .dac-fail { color: #fb7185; }
+    .dac-na   { color: #64748b; }
+    .dac-detail { font-size: .72rem; color: var(--text-muted); }
+
+    /* ── Diagnostic Conclusion panel ─────────────────────────── */
+    .diag-conclusion {
+      margin: 0 14px 14px; padding: 12px 14px;
+      background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.07);
+      border-radius: 8px;
+    }
+    .diag-conclusion-item {
+      display: flex; align-items: flex-start; gap: 8px;
+      font-size: .82rem; color: var(--text-secondary); padding: 4px 0;
+    }
+    .diag-conclusion-item .dci-icon { font-size: .75rem; margin-top: 2px; flex-shrink: 0; }
+    .dci-ok   { color: #4ade80; }
+    .dci-warn { color: #fbbf24; }
+    .dci-fail { color: #fb7185; }
   </style>
 </head>
 <body>
@@ -1384,29 +1441,47 @@
                 ══════════════════════════════════════════════════════ -->
                 <div id="tab-diagnostics" class="tab-content">
 
-                  <!-- Residuals section -->
-                  <div class="mm-section">
-                    <div class="mm-section-header">
-                      <span><i class="fa-solid fa-gauge-high"></i> Residual Diagnostics</span>
-                      <button class="collapse-toggle" onclick="toggleSection('residualsDiagBody','residualsDiagToggle')" id="residualsDiagToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
-                    </div>
-                    <div class="mm-section-body collapsible-content" id="residualsDiagBody">
-                      <div class="res-workspace" id="residualsPanel">
-                        <div class="awaiting-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading residual diagnostics…</p></div>
-                      </div>
+                  <!-- Inner diagnostic tab nav -->
+                  <div class="diag-tabs-nav">
+                    <button class="diag-tab-btn active" onclick="switchDiagTab('overview',this)">
+                      <i class="fa-solid fa-gauge dtb-icon"></i> Overview
+                    </button>
+                    <button class="diag-tab-btn" onclick="switchDiagTab('residuals',this)">
+                      <i class="fa-solid fa-chart-scatter dtb-icon"></i> Residuals
+                    </button>
+                    <button class="diag-tab-btn" onclick="switchDiagTab('normality',this)">
+                      <i class="fa-solid fa-chart-line dtb-icon"></i> Normality
+                    </button>
+                    <button class="diag-tab-btn" onclick="switchDiagTab('influence',this)">
+                      <i class="fa-solid fa-triangle-exclamation dtb-icon"></i> Influence
+                    </button>
+                  </div>
+
+                  <!-- Overview tab: assumption health + conclusion + key stats -->
+                  <div id="diag-panel-overview" class="diag-tab-panel active">
+                    <div id="diagOverviewContent">
+                      <div class="awaiting-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading diagnostics…</p></div>
                     </div>
                   </div>
 
-                  <!-- Influential cases section -->
-                  <div class="mm-section">
-                    <div class="mm-section-header">
-                      <span><i class="fa-solid fa-triangle-exclamation"></i> Influential Cases</span>
-                      <button class="collapse-toggle" onclick="toggleSection('influentialDiagBody','influentialDiagToggle')" id="influentialDiagToggle"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
+                  <!-- Residuals tab: Residuals vs Fitted, Scale-Location, Histogram -->
+                  <div id="diag-panel-residuals" class="diag-tab-panel">
+                    <div id="diagResidualsContent" class="res-workspace">
+                      <div class="awaiting-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading residual plots…</p></div>
                     </div>
-                    <div class="mm-section-body collapsible-content" id="influentialDiagBody">
-                      <div class="res-workspace" id="influentialPanel">
-                        <div class="awaiting-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading influential case diagnostics…</p></div>
-                      </div>
+                  </div>
+
+                  <!-- Normality tab: QQ Plot + normality statistics -->
+                  <div id="diag-panel-normality" class="diag-tab-panel">
+                    <div id="diagNormalityContent" class="res-workspace">
+                      <div class="awaiting-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading normality diagnostics…</p></div>
+                    </div>
+                  </div>
+
+                  <!-- Influence tab: Influential cases -->
+                  <div id="diag-panel-influence" class="diag-tab-panel">
+                    <div class="res-workspace" id="influentialPanel">
+                      <div class="awaiting-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading influential case diagnostics…</p></div>
                     </div>
                   </div>
 
@@ -4863,8 +4938,7 @@ ${sectionsHtml}
      RESIDUALS TAB
   ───────────────────────────────────────────────────────────── */
   function loadResidualsTab() {
-    const panel = document.getElementById('residualsPanel');
-    if (!panel || !_results) return;
+    if (!_results) return;
 
     const res    = _results.residuals ?? {};
     const sigma2 = _results.sigma2 ?? _results.varResidual ?? NaN;
@@ -4952,63 +5026,155 @@ ${sectionsHtml}
       }
     }
 
-    panel.innerHTML = `
-        <div class="mm-section" style="margin-bottom:14px;">
-        <div class="mm-section-header"><span><i class="fa-solid fa-circle-check"></i> Summary Statistics <span class="metric-help">ⓘ<span class="metric-tip">Summary statistics and hypothesis tests on model residuals. Bartlett and Levene tests require a group factor and are shown when sent by VB6.</span></span></span></div>
-        <div class="mm-section-body padded">
+    // ── Assumption health status helpers ──────────────────────────
+    const normOk = res.swP != null ? (res.swP > .05 ? 'ok' : res.swP > .01 ? 'warn' : 'fail') : 'na';
+    const homoOk = (res.leveneP != null || res.bartlettP != null)
+      ? (() => { const p = res.leveneP ?? res.bartlettP; return p > .05 ? 'ok' : p > .01 ? 'warn' : 'fail'; })()
+      : 'na';
+    const nInfl  = (_results.influentialCases ?? []).length;
+    const inflOk = nInfl === 0 ? 'ok' : nInfl <= 2 ? 'warn' : 'fail';
+    const meanOk = Math.abs(res.mean ?? 0) < 0.05 * (Math.abs(res.max ?? 1) || 1) ? 'ok' : 'warn';
+    const dacLabel = { ok: '✓ Pass', warn: '⚠ Borderline', fail: '✗ Concern', na: '— Not tested' };
+    const dacCls   = { ok: 'dac-ok', warn: 'dac-warn', fail: 'dac-fail', na: 'dac-na' };
+
+    // ── Diagnostic conclusion sentences ───────────────────────────
+    const dciIcon = { ok: 'fa-check dci-ok', warn: 'fa-triangle-exclamation dci-warn', fail: 'fa-xmark dci-fail', na: 'fa-minus dci-na' };
+    const conclusions = [];
+    conclusions.push({ cls: meanOk, text: Math.abs(res.mean ?? 0) < 1e-6
+      ? 'Residuals are centered at zero — no systematic bias detected.'
+      : `Mean residual = ${fmt(res.mean)}. A non-zero mean may suggest a missing fixed effect.` });
+    if (res.swP != null) conclusions.push({ cls: normOk, text: res.swP > .05
+      ? `Shapiro-Wilk not significant (W = ${fmt(res.swW)}, p = ${fmtP(res.swP)}) — normality assumption met.`
+      : res.swP > .01
+      ? `Shapiro-Wilk borderline (W = ${fmt(res.swW)}, p = ${fmtP(res.swP)}) — mild deviation from normality.`
+      : `Shapiro-Wilk significant (W = ${fmt(res.swW)}, p = ${fmtP(res.swP)}) — residuals deviate from normality.` });
+    if (res.leveneP != null || res.bartlettP != null) {
+      const hp = res.leveneP ?? res.bartlettP;
+      conclusions.push({ cls: homoOk, text: hp > .05
+        ? `Homogeneity of variance met (Levene p = ${fmtP(hp)}).`
+        : `Variance may be unequal across groups (Levene p = ${fmtP(hp)}).` });
+    } else {
+      conclusions.push({ cls: 'na', text: 'Homoscedasticity not tested (no group variable available).' });
+    }
+    conclusions.push({ cls: inflOk, text: nInfl === 0
+      ? 'No influential observations detected.'
+      : `${nInfl} influential observation${nInfl > 1 ? 's' : ''} detected — review the Influence tab.` });
+
+    // ── Overview tab ──────────────────────────────────────────────
+    const overviewEl = document.getElementById('diagOverviewContent');
+    if (overviewEl) {
+      overviewEl.innerHTML = `
+        <div class="diag-assumption-grid">
+          <div class="diag-assumption-card">
+            <div class="dac-label">Normality</div>
+            <div class="dac-status ${dacCls[normOk]}">${dacLabel[normOk]}</div>
+            <div class="dac-detail">Shapiro-Wilk${res.swP != null ? ` p = ${fmtP(res.swP)}` : ': not computed'}</div>
+          </div>
+          <div class="diag-assumption-card">
+            <div class="dac-label">Homoscedasticity</div>
+            <div class="dac-status ${dacCls[homoOk]}">${dacLabel[homoOk]}</div>
+            <div class="dac-detail">Levene${res.leveneP != null ? ` p = ${fmtP(res.leveneP)}` : ': not tested'}</div>
+          </div>
+          <div class="diag-assumption-card">
+            <div class="dac-label">Residual Centering</div>
+            <div class="dac-status ${dacCls[meanOk]}">${dacLabel[meanOk]}</div>
+            <div class="dac-detail">Mean = ${fmt(res.mean ?? 0)}</div>
+          </div>
+          <div class="diag-assumption-card">
+            <div class="dac-label">Influential Cases</div>
+            <div class="dac-status ${dacCls[inflOk]}">${inflOk === 'ok' ? '✓ None' : `⚠ ${nInfl} found`}</div>
+            <div class="dac-detail">${nInfl === 0 ? 'No action needed' : 'See Influence tab'}</div>
+          </div>
+        </div>
+        <div class="diag-conclusion">
+          ${conclusions.map(c => `<div class="diag-conclusion-item">
+            <i class="fa-solid ${dciIcon[c.cls]} dci-icon"></i><span>${c.text}</span>
+          </div>`).join('')}
+        </div>
+        <div style="padding:0 14px 14px;">
           <div class="stats-row">
             <div class="stat-panel" style="min-width:unset;flex:1;">
               <div class="stat-panel-heading">Residual Statistics</div>
               <div class="stat-panel-body">
-                <div class="stat-field"><span class="stat-label">σ² (Residual):<span class="metric-help">ⓘ<span class="metric-tip">Estimated residual variance — unexplained within-group variance after accounting for all fixed and random effects.</span></span></span>    <span class="stat-value">${fmt(sigma2)}</span></div>
-                <div class="stat-field"><span class="stat-label">σ (Std. Dev):<span class="metric-help">ⓘ<span class="metric-tip">Residual standard deviation = √σ². On the same scale as the outcome; smaller values indicate a better model fit.</span></span></span>     <span class="stat-value">${fmt(Math.sqrt(sigma2))}</span></div>
-                <div class="stat-field"><span class="stat-label">Min Residual:<span class="metric-help">ⓘ<span class="metric-tip">The most negative observed residual (observed − fitted). Large absolute values may indicate outliers.</span></span></span>      <span class="stat-value">${fmt(res.min)}</span></div>
-                <div class="stat-field"><span class="stat-label">Max Residual:<span class="metric-help">ⓘ<span class="metric-tip">The largest positive observed residual. Compare with Min Residual to assess symmetry of the residual distribution.</span></span></span>      <span class="stat-value">${fmt(res.max)}</span></div>
-                <div class="stat-field"><span class="stat-label">Mean Residual:<span class="metric-help">ⓘ<span class="metric-tip">Should be approximately zero in a well-specified model. A non-zero mean suggests systematic bias or a missing fixed effect.</span></span></span>     <span class="stat-value">${fmt(res.mean)}</span></div>
+                <div class="stat-field"><span class="stat-label">σ² (Residual):</span><span class="stat-value">${fmt(sigma2)}</span></div>
+                <div class="stat-field"><span class="stat-label">σ (Std. Dev):</span><span class="stat-value">${fmt(Math.sqrt(sigma2))}</span></div>
+                <div class="stat-field"><span class="stat-label">Min Residual:</span><span class="stat-value">${fmt(res.min)}</span></div>
+                <div class="stat-field"><span class="stat-label">Max Residual:</span><span class="stat-value">${fmt(res.max)}</span></div>
+                <div class="stat-field"><span class="stat-label">Mean Residual:</span><span class="stat-value">${fmt(res.mean)}</span></div>
               </div>
             </div>
             <div class="stat-panel" style="min-width:unset;flex:1;">
-              <div class="stat-panel-heading">Normality Tests</div>
+              <div class="stat-panel-heading">Normality</div>
               <div class="stat-panel-body">
-                <div class="stat-field"><span class="stat-label">Shapiro-Wilk W:<span class="metric-help">ⓘ<span class="metric-tip">Shapiro-Wilk test statistic W (0–1). Values close to 1 indicate normality. Computed from the residual vector.</span></span></span>   <span class="stat-value">${fmt(res.swW)}</span></div>
-                <div class="stat-field"><span class="stat-label">S-W p-value:<span class="metric-help">ⓘ<span class="metric-tip">p-value for the Shapiro-Wilk test. p &lt; 0.05 suggests significant departure from normality. Small samples have low power; large samples may reject even trivial deviations.</span></span></span>      <span class="stat-value ${pClass(res.swP)}">${fmtP(res.swP)}</span></div>
-                <div class="stat-field"><span class="stat-label">Skewness:<span class="metric-help">ⓘ<span class="metric-tip">Third standardised moment of the residuals. Values near 0 indicate symmetry. |Skewness| &gt; 1 is typically considered substantial.</span></span></span>          <span class="stat-value">${fmt(res.skewness)}</span></div>
-                <div class="stat-field"><span class="stat-label">Kurtosis:<span class="metric-help">ⓘ<span class="metric-tip">Fourth standardised moment. Normal distribution = 3 (excess = 0). Values &gt; 3 indicate heavy tails; &lt; 3 indicate light tails.</span></span></span>          <span class="stat-value">${fmt(res.kurtosis)}</span></div>
+                <div class="stat-field"><span class="stat-label">Shapiro-Wilk W:</span><span class="stat-value">${fmt(res.swW)}</span></div>
+                <div class="stat-field"><span class="stat-label">S-W p-value:</span><span class="stat-value ${pClass(res.swP)}">${fmtP(res.swP)}</span></div>
+                <div class="stat-field"><span class="stat-label">Skewness:</span><span class="stat-value">${fmt(res.skewness)}</span></div>
+                <div class="stat-field"><span class="stat-label">Kurtosis:</span><span class="stat-value">${fmt(res.kurtosis)}</span></div>
               </div>
             </div>
             <div class="stat-panel" style="min-width:unset;flex:1;">
-              <div class="stat-panel-heading">Homoscedasticity${res._groupName ? ` <span style="font-size:.72rem;font-weight:400;color:var(--text-muted);">by ${res._groupName}</span>` : ' <span style="font-size:.7rem;font-weight:400;color:var(--text-muted);">(requires groups)</span>'}</div>
+              <div class="stat-panel-heading">Homoscedasticity${res._groupName ? ` <span style="font-size:.7rem;font-weight:400;color:var(--text-muted);">by ${res._groupName}</span>` : ''}</div>
               <div class="stat-panel-body">
-                <div class="stat-field"><span class="stat-label">Bartlett χ²:<span class="metric-help">ⓘ<span class="metric-tip">Bartlett's test statistic for equality of variance across groups. Sensitive to non-normality — use Levene's test when normality is questionable.</span></span></span>      <span class="stat-value">${res.bartlettChi != null ? fmt(res.bartlettChi) : '<span style="color:var(--text-muted);">—</span>'}</span></div>
-                <div class="stat-field"><span class="stat-label">Bartlett p:<span class="metric-help">ⓘ<span class="metric-tip">p-value for Bartlett's test. p &lt; 0.05 suggests unequal variances across groups (heteroscedasticity).</span></span></span>        <span class="stat-value ${pClass(res.bartlettP)}">${res.bartlettP != null ? fmtP(res.bartlettP) : '<span style="color:var(--text-muted);">—</span>'}</span></div>
-                <div class="stat-field"><span class="stat-label">Levene F:<span class="metric-help">ⓘ<span class="metric-tip">Levene's test statistic — robust alternative to Bartlett. Based on absolute deviations from group medians.</span></span></span>          <span class="stat-value">${res.leveneF != null ? fmt(res.leveneF) : '<span style="color:var(--text-muted);">—</span>'}</span></div>
-                <div class="stat-field"><span class="stat-label">Levene p:<span class="metric-help">ⓘ<span class="metric-tip">p-value for Levene's test. Preferred over Bartlett when residuals are non-normal. p &lt; 0.05 indicates heteroscedasticity.</span></span></span>          <span class="stat-value ${pClass(res.leveneP)}">${res.leveneP != null ? fmtP(res.leveneP) : '<span style="color:var(--text-muted);">—</span>'}</span></div>
+                <div class="stat-field"><span class="stat-label">Bartlett χ²:</span><span class="stat-value">${res.bartlettChi != null ? fmt(res.bartlettChi) : '<span style="color:var(--text-muted)">—</span>'}</span></div>
+                <div class="stat-field"><span class="stat-label">Bartlett p:</span><span class="stat-value ${pClass(res.bartlettP)}">${res.bartlettP != null ? fmtP(res.bartlettP) : '<span style="color:var(--text-muted)">—</span>'}</span></div>
+                <div class="stat-field"><span class="stat-label">Levene F:</span><span class="stat-value">${res.leveneF != null ? fmt(res.leveneF) : '<span style="color:var(--text-muted)">—</span>'}</span></div>
+                <div class="stat-field"><span class="stat-label">Levene p:</span><span class="stat-value ${pClass(res.leveneP)}">${res.leveneP != null ? fmtP(res.leveneP) : '<span style="color:var(--text-muted)">—</span>'}</span></div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </div>`;
+    }
 
-      <!-- Plot grid -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-        <div class="mm-section">
-          <div class="mm-section-header"><span><i class="fa-solid fa-chart-scatter"></i> Residuals vs Fitted <span class="metric-help">ⓘ<span class="metric-tip">Plot of residuals against fitted values. A random scatter around zero (horizontal band) indicates a well-specified model. Patterns or funnels suggest missing predictors or heteroscedasticity.</span></span></span></div>
-          <div class="mm-section-body padded"><div id="resVsFittedChart" style="height:240px;"></div></div>
+    // ── Residuals tab ─────────────────────────────────────────────
+    const residualsEl = document.getElementById('diagResidualsContent');
+    if (residualsEl) {
+      residualsEl.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px;">
+          <div class="mm-section">
+            <div class="mm-section-header"><span><i class="fa-solid fa-chart-scatter"></i> Residuals vs Fitted</span></div>
+            <div class="mm-section-body padded"><div id="resVsFittedChart" style="height:260px;"></div></div>
+          </div>
+          <div class="mm-section">
+            <div class="mm-section-header"><span><i class="fa-solid fa-chart-scatter"></i> Scale-Location</span></div>
+          <div class="mm-section-body padded"><div id="scaleLocChart" style="height:260px;"></div></div>
         </div>
-        <div class="mm-section">
-          <div class="mm-section-header"><span><i class="fa-solid fa-chart-line"></i> Normal Q-Q Plot <span class="metric-help">ⓘ<span class="metric-tip">Quantile-quantile plot comparing residuals to a theoretical normal distribution. Points following the diagonal line indicate normality. Deviations at the tails suggest non-normality.</span></span></span></div>
-          <div class="mm-section-body padded"><div id="qqChart" style="height:240px;"></div></div>
+        <div class="mm-section" style="grid-column:1/-1;">
+          <div class="mm-section-header"><span><i class="fa-solid fa-chart-bar"></i> Residual Histogram</span></div>
+          <div class="mm-section-body padded"><div id="resHistChart" style="height:260px;"></div></div>
         </div>
-        <div class="mm-section">
-          <div class="mm-section-header"><span><i class="fa-solid fa-chart-bar"></i> Residual Histogram <span class="metric-help">ⓘ<span class="metric-tip">Frequency distribution of residuals. A roughly bell-shaped distribution centred at zero supports the normality assumption of the mixed model.</span></span></span></div>
-          <div class="mm-section-body padded"><div id="resHistChart" style="height:240px;"></div></div>
-        </div>
-        <div class="mm-section">
-          <div class="mm-section-header"><span><i class="fa-solid fa-chart-scatter"></i> Scale-Location <span class="metric-help">ⓘ<span class="metric-tip">Plots √|standardised residuals| against fitted values. A horizontal band with equally spread points indicates homoscedasticity. An increasing trend suggests variance grows with the fitted value.</span></span></span></div>
-          <div class="mm-section-body padded"><div id="scaleLocChart" style="height:240px;"></div></div>
-        </div>
-      </div>
-    `;
+      </div>`;
+      // end diagResidualsContent
+
+      const normalityEl = document.getElementById('diagNormalityContent');
+      if (normalityEl) {
+        normalityEl.innerHTML = `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px;">
+            <div class="mm-section" style="grid-column:1/-1;">
+              <div class="mm-section-header"><span><i class="fa-solid fa-chart-line"></i> Normal Q-Q Plot</span></div>
+              <div class="mm-section-body padded"><div id="qqChart" style="height:280px;"></div></div>
+            </div>
+            <div class="mm-section">
+              <div class="mm-section-header"><span><i class="fa-solid fa-flask"></i> Shapiro-Wilk Test</span></div>
+              <div class="mm-section-body padded">
+                <div class="stat-field"><span class="stat-label">W statistic:</span><span class="stat-value">${fmt(res.swW)}</span></div>
+                <div class="stat-field"><span class="stat-label">p-value:</span><span class="stat-value ${pClass(res.swP)}">${fmtP(res.swP)}</span></div>
+                <p style="font-size:.72rem;color:var(--text-muted);margin-top:8px;">
+                  ${res.swP == null ? 'Not computed.' : res.swP > .05 ? '✓ No significant departure from normality.' : '⚠ Significant departure from normality detected.'}
+                </p>
+              </div>
+            </div>
+            <div class="mm-section">
+              <div class="mm-section-header"><span><i class="fa-solid fa-ruler"></i> Shape Statistics</span></div>
+              <div class="mm-section-body padded">
+                <div class="stat-field"><span class="stat-label">Skewness:</span><span class="stat-value">${fmt(res.skewness)}</span></div>
+                <div class="stat-field"><span class="stat-label">Kurtosis:</span><span class="stat-value">${fmt(res.kurtosis)}</span></div>
+                <p style="font-size:.72rem;color:var(--text-muted);margin-top:8px;">
+                  Normal distribution: Skewness ≈ 0, Kurtosis = 3 (excess = 0).
+                </p>
+              </div>
+            </div>
+          </div>`;
+      }
 
     setTimeout(() => {
       if (typeof Highcharts !== 'undefined' && _results.residuals?.fitted) {
@@ -5355,6 +5521,19 @@ ${sectionsHtml}
           <p class="table-footnote" style="margin:6px 12px 10px;">Flagged when: |Std. Residual| > 3, Leverage > 0.5, Cook's D > 1, or |DFFITS| > 2√(p/n).</p>
         </div>
       </div>`;
+  }
+
+  function switchDiagTab(name, btn) {
+    document.querySelectorAll('.diag-tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.diag-tab-btn').forEach(b => b.classList.remove('active'));
+    const panel = document.getElementById('diag-panel-' + name);
+    if (panel) panel.classList.add('active');
+    if (btn) btn.classList.add('active');
+    // Charts need a visible container — re-render when switching to chart tabs
+    if ((name === 'residuals' || name === 'normality') && typeof Highcharts !== 'undefined' && _results?.residuals?.fitted) {
+      setTimeout(() => renderResidualCharts(_results.residuals), 30);
+    }
+    if (name === 'influence') loadInfluentialTab();
   }
 
   /* ─────────────────────────────────────────────────────────────

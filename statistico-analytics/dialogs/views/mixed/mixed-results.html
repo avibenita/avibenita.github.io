@@ -5638,29 +5638,58 @@ ${sectionsHtml}
     const maxLev   = diagRows.length ? Math.max(...diagRows.map(r => Math.abs(r.leverage ?? 0))) : null;
     const maxDff   = diagRows.length ? Math.max(...diagRows.map(r => Math.abs(r.dffits ?? 0))) : null;
 
-    // Clean vertical summary matching the Cursor100 design
-    const metricSummaryHtml = (maxCook != null) ? `
-      <div class="mm-section" style="margin:14px;">
-        <div class="mm-section-header"><span><i class="fa-solid fa-chart-column"></i> Influence Summary</span></div>
-        <div class="mm-section-body padded" style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;padding:0;">
-          <div style="padding:16px 20px;border-right:1px solid rgba(255,255,255,.07);">
-            <div style="font-size:.7rem;font-weight:600;letter-spacing:.05em;color:var(--text-muted);margin-bottom:8px;">COOK'S D</div>
-            <div style="font-size:1.4rem;font-weight:700;color:rgba(255,255,255,.9);line-height:1;">${fmt(maxCook)}</div>
-            <div style="font-size:.7rem;color:var(--text-muted);margin-top:4px;">Max &nbsp;·&nbsp; threshold 1.0</div>
-          </div>
-          <div style="padding:16px 20px;border-right:1px solid rgba(255,255,255,.07);">
-            <div style="font-size:.7rem;font-weight:600;letter-spacing:.05em;color:var(--text-muted);margin-bottom:8px;">LEVERAGE</div>
-            <div style="font-size:1.4rem;font-weight:700;color:rgba(255,255,255,.9);line-height:1;">${fmt(maxLev)}</div>
-            <div style="font-size:.7rem;color:var(--text-muted);margin-top:4px;">Max &nbsp;·&nbsp; threshold 0.5</div>
-          </div>
-          <div style="padding:16px 20px;">
-            <div style="font-size:.7rem;font-weight:600;letter-spacing:.05em;color:var(--text-muted);margin-bottom:8px;">DFFITS</div>
-            <div style="font-size:1.4rem;font-weight:700;color:rgba(255,255,255,.9);line-height:1;">${fmt(maxDff)}</div>
-            <div style="font-size:.7rem;color:var(--text-muted);margin-top:4px;">Max &nbsp;·&nbsp; threshold 2√(p/n)</div>
-          </div>
+    const dffitThresh = _results.dffitThresh ?? null;
+    const levThresh   = _results.levThresh   ?? 0.5;
+
+    // Metric summary table with actual threshold values
+    const metricSummaryHtml = (maxCook != null) ? (() => {
+      const cookOk = maxCook < 1;
+      const levOk  = maxLev  < 0.5;
+      const dffOk  = dffitThresh == null || maxDff < dffitThresh;
+      const metricRow = (label, maxVal, thresh, ok) =>
+        `<tr style="border-bottom:1px solid rgba(255,255,255,.06);">
+           <td style="padding:8px 14px;color:rgba(255,255,255,.75);font-size:.78rem;">${label}</td>
+           <td style="padding:8px 14px;font-weight:600;font-size:.85rem;color:${ok ? 'rgba(255,255,255,.9)' : '#fbbf24'};">${fmt(maxVal)}</td>
+           <td style="padding:8px 14px;font-size:.78rem;color:rgba(255,255,255,.5);">${thresh}</td>
+           <td style="padding:8px 14px;font-size:.78rem;">${ok
+             ? '<span style="color:#4ade80;">✓ OK</span>'
+             : '<span style="color:#fbbf24;">⚠ Exceeded</span>'}</td>
+         </tr>`;
+      return `
+      <div class="mm-section" style="margin:14px 14px 0;">
+        <div class="mm-section-header"><span><i class="fa-solid fa-chart-column"></i> Influence Summary &nbsp;<small style="font-weight:400;opacity:.6;">Cases checked: ${nChecked}</small></span></div>
+        <div class="mm-section-body" style="padding:0;">
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr style="border-bottom:1px solid rgba(255,255,255,.1);">
+              <th style="padding:7px 14px;text-align:left;font-size:.72rem;letter-spacing:.05em;color:var(--text-muted);font-weight:600;">METRIC</th>
+              <th style="padding:7px 14px;text-align:left;font-size:.72rem;letter-spacing:.05em;color:var(--text-muted);font-weight:600;">MAXIMUM</th>
+              <th style="padding:7px 14px;text-align:left;font-size:.72rem;letter-spacing:.05em;color:var(--text-muted);font-weight:600;">THRESHOLD</th>
+              <th style="padding:7px 14px;text-align:left;font-size:.72rem;letter-spacing:.05em;color:var(--text-muted);font-weight:600;">STATUS</th>
+            </tr></thead>
+            <tbody>
+              ${metricRow("Cook's D",  maxCook, '1.0',                              cookOk)}
+              ${metricRow('Leverage',  maxLev,  '0.5',                              levOk)}
+              ${metricRow('DFFITS',    maxDff,  dffitThresh != null ? fmt(dffitThresh) + ' (2√p/n)' : '2√(p/n)', dffOk)}
+            </tbody>
+          </table>
         </div>
-        <div style="padding:10px 20px 14px;font-size:.75rem;color:var(--text-muted);">
-          Cases checked: <strong>${nChecked}</strong>
+      </div>`; })() : '';
+
+    // Interpretation panel
+    const allOk = maxCook != null && maxCook < 1 && maxLev < 0.5 &&
+                  (dffitThresh == null || maxDff < dffitThresh);
+    const interpHtml = (maxCook != null) ? `
+      <div style="margin:14px;padding:14px 18px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;">
+        <div style="font-size:.75rem;font-weight:600;color:rgba(255,255,255,.6);letter-spacing:.04em;margin-bottom:8px;">INFLUENCE ASSESSMENT</div>
+        <div style="font-size:.82rem;color:rgba(255,255,255,.8);line-height:1.6;">
+          Maximum Cook's D = ${fmt(maxCook)} &nbsp;·&nbsp;
+          Maximum Leverage = ${fmt(maxLev)} &nbsp;·&nbsp;
+          Maximum DFFITS = ${fmt(maxDff)}
+        </div>
+        <div style="font-size:.78rem;color:${allOk ? '#4ade80' : '#fbbf24'};margin-top:8px;">
+          ${allOk
+            ? '✓ No observations exhibit substantial influence on model estimates.'
+            : `⚠ ${cases.length} observation${cases.length > 1 ? 's' : ''} exceeded at least one diagnostic threshold — review the table below.`}
         </div>
       </div>` : '';
 
@@ -5668,39 +5697,49 @@ ${sectionsHtml}
       panel.innerHTML = `
         ${infoHtml}
         ${metricSummaryHtml}
-        <div class="awaiting-state" style="padding:18px 20px 16px;">
+        ${interpHtml}
+        <div class="awaiting-state" style="padding:14px 20px 16px;">
           <i class="fa-solid fa-check-circle" style="color:var(--success);"></i>
-          <p>No observations exceeded diagnostic thresholds.</p>
+          <p>${nChecked} observations reviewed — none exceeded diagnostic thresholds.</p>
         </div>`;
       return;
     }
 
+    const severityColor = { mild:'rgba(251,191,36,.15)', moderate:'rgba(249,115,22,.2)', severe:'rgba(239,68,68,.2)' };
+    const severityLabel = { mild:'Mild', moderate:'Moderate', severe:'Severe' };
+
     panel.innerHTML = `
       ${infoHtml}
       ${metricSummaryHtml}
-      <div class="mm-section">
-        <div class="mm-section-header"><span><i class="fa-solid fa-triangle-exclamation"></i> Influential Observations (${cases.length} flagged)</span></div>
+      ${interpHtml}
+      <div class="mm-section" style="margin:14px 14px 0;">
+        <div class="mm-section-header"><span><i class="fa-solid fa-triangle-exclamation"></i> Flagged Observations (${cases.length})</span></div>
         <div class="mm-section-body">
           <div class="mm-table-wrap">
             <table class="mm-table">
               <thead><tr>
-                <th>Obs #</th><th>Std. Residual</th><th>Leverage (h<sub>ii</sub>)</th>
-                <th>Cook's D</th><th>DFFITS</th><th>Flag</th>
+                <th>Obs #</th><th>Severity</th><th>Std. Residual</th><th>Leverage (h<sub>ii</sub>)</th>
+                <th>Cook's D</th><th>DFFITS</th><th>Reason</th>
               </tr></thead>
               <tbody>
-                ${cases.map(r => `
-                  <tr>
+                ${cases.map(r => {
+                  const sev = r.severity ?? 'mild';
+                  return `
+                  <tr style="background:${severityColor[sev] ?? 'transparent'};">
                     <td>${r.obs ?? r.id ?? '—'}</td>
+                    <td><span style="font-size:.7rem;font-weight:600;letter-spacing:.04em;">${severityLabel[sev]}</span></td>
                     <td class="${Math.abs(parseFloat(r.stdRes ?? 0)) > 3 ? 'pval-bad' : ''}">${fmt(r.stdRes)}</td>
                     <td class="${parseFloat(r.leverage ?? 0) > 0.5 ? 'pval-warning' : ''}">${fmt(r.leverage)}</td>
                     <td class="${parseFloat(r.cooksD ?? 0) > 1 ? 'pval-bad' : parseFloat(r.cooksD ?? 0) > 0.5 ? 'pval-warning' : ''}">${fmt(r.cooksD)}</td>
                     <td>${fmt(r.dffits)}</td>
-                    <td>${(r.flags ?? []).join(', ') || '—'}</td>
-                  </tr>`).join('')}
+                    <td style="font-size:.72rem;color:rgba(255,255,255,.7);">${(r.flags ?? []).join('<br>') || '—'}</td>
+                  </tr>`;}).join('')}
               </tbody>
             </table>
           </div>
-          <p class="table-footnote" style="margin:6px 12px 10px;">Flagged when: |Std. Residual| > 3, Leverage > 0.5, Cook's D > 1, or |DFFITS| > 2√(p/n).</p>
+          <p class="table-footnote" style="margin:6px 12px 10px;">
+            Thresholds: |Std. Residual| > 3 · Leverage > 0.5 · Cook's D > 1 · |DFFITS| > ${dffitThresh != null ? fmt(dffitThresh) : '2√(p/n)'} (2√p/n)
+          </p>
         </div>
       </div>`;
   }
@@ -7092,7 +7131,10 @@ STRENGTH: [High, Moderate, or Low — short reason based on p-values, ICC, conve
       return xi.reduce((s, xij, j) => s + xij * v[j], 0);
     });
     const mse    = sigma2;
-    const dffit_thresh = 2 * Math.sqrt(p / n);
+    // Use total model parameters (fixed + variance components) for DFFITS threshold
+    // so the threshold is correctly calibrated (2√(nParams/n))
+    const dffit_thresh = 2 * Math.sqrt(nParams / n);
+    const lev_thresh   = 2 * nParams / n;   // leverage threshold: 2p/n
 
     const allCaseDiag = finalResid.map((ei, i) => {
       const hi   = Math.min(Math.max(hatVals[i] ?? (1/n), 1e-6), 0.9999);
@@ -7110,15 +7152,20 @@ STRENGTH: [High, Moderate, or Low — short reason based on p-values, ICC, conve
                    r.cooksD > 1 || Math.abs(r.dffits) > dffit_thresh)
       .map(r => {
         const flags = [];
-        if (Math.abs(r.stdRes) > 3) flags.push('|Std.Res|>3');
-        if (r.leverage > 0.5)       flags.push('Leverage>0.5');
-        if (r.cooksD > 1)           flags.push("Cook's D>1");
-        if (Math.abs(r.dffits) > dffit_thresh) flags.push('DFFITS');
-        return { ...r, flags };
+        if (Math.abs(r.stdRes) > 3) flags.push('High residual');
+        if (r.leverage > 0.5)       flags.push('High leverage');
+        if (r.cooksD > 1)           flags.push("High Cook's D");
+        if (Math.abs(r.dffits) > dffit_thresh) flags.push('DFFITS exceeded threshold');
+        // Severity: severe if any threshold badly exceeded, moderate if Cook's D > 0.5, else mild
+        const severity = (Math.abs(r.stdRes) > 3 || r.cooksD > 1)
+          ? 'severe' : r.cooksD > 0.5 || r.leverage > 0.4 ? 'moderate' : 'mild';
+        return { ...r, flags, severity };
       });
 
-    result.allCaseDiag    = allCaseDiag;
+    result.allCaseDiag      = allCaseDiag;
     result.influentialCases = influentialCases;
+    result.dffitThresh      = parseFloat(dffit_thresh.toFixed(4));
+    result.levThresh        = parseFloat(lev_thresh.toFixed(4));
 
     const emmByFactor = {};
     const pwByFactor = {};

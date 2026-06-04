@@ -5504,38 +5504,55 @@ ${sectionsHtml}
     const rMax = Math.max(...residuals);
     const bw   = (rMax - rMin) / bins;
 
+    // Bin counts + bin-range category labels (matching Descriptives format)
     const counts = new Array(bins).fill(0);
     residuals.forEach(r => {
       const bi = Math.min(bins - 1, Math.floor((r - rMin) / bw));
       counts[bi]++;
     });
     const cats = counts.map((_, i) => {
-      const v = rMin + i * bw + bw / 2;
-      return (Math.abs(v) < 1e-10 ? '0' : v.toFixed(2));
+      const start = rMin + i * bw;
+      const end   = rMin + (i + 1) * bw;
+      return `${start.toFixed(1)}-${end.toFixed(1)}`;
     });
+    const maxCnt = Math.max(...counts, 1);
 
+    // Normal curve: 50 smooth points mapped to floating category-axis index positions
     const rN    = residuals.length;
     const rMean = residuals.reduce((s, v) => s + v, 0) / rN;
     const rSd   = Math.sqrt(residuals.reduce((s, v) => s + (v - rMean) ** 2, 0) / Math.max(1, rN - 1));
-    const maxCnt = Math.max(...counts);
-
-    const normalPoints = counts.map((_, i) => {
-      const x   = rMin + i * bw + bw / 2;
+    const range = rMax - rMin;
+    const NORM_PTS = 60;
+    const step  = range * 1.2 / NORM_PTS;
+    const rawNorm = [];
+    for (let x = rMin - range * 0.1; x <= rMax + range * 0.1; x += step) {
       const pdf = Math.exp(-0.5 * ((x - rMean) / rSd) ** 2) / (rSd * Math.sqrt(2 * Math.PI));
-      return parseFloat((pdf * rN * bw).toFixed(4));
+      rawNorm.push({ x, y: pdf });
+    }
+    const maxPdf = Math.max(...rawNorm.map(p => p.y));
+    const normalPoints = rawNorm.map(p => {
+      const idx = (p.x - rMin) / bw - 0.5;      // float category-axis position
+      return [idx, (p.y / maxPdf) * maxCnt * 0.85];
     });
-    const maxNorm = Math.max(...normalPoints);
-    const scaledNorm = normalPoints.map(v => parseFloat((v / maxNorm * maxCnt * 0.92).toFixed(4)));
 
     const seriesData = [
-      { type:'column', name:'Residuals', data:counts,
-        color:'rgba(120,160,255,.65)', borderColor:'rgba(120,160,255,.3)',
-        borderWidth:1, pointPadding:0.02, groupPadding:0, borderRadius:2 }
+      { type:'column', name:'Count',
+        data:counts,
+        color:'rgba(120,160,255,.75)',
+        borderColor:'rgba(120,160,255,.35)',
+        borderWidth:1,
+        pointPadding:0.05, groupPadding:0, borderRadius:2 }
     ];
     if (showNormal) {
-      seriesData.push({ type:'spline', name:'Normal', data:scaledNorm,
-        color:'rgba(251,191,36,.9)', dashStyle:'ShortDash', lineWidth:2,
-        marker:{enabled:false}, enableMouseTracking:false });
+      seriesData.push({
+        type:'spline', name:'Normal',
+        data:normalPoints,
+        color:'rgba(251,191,36,.9)',
+        dashStyle:'ShortDash',
+        lineWidth:2,
+        marker:{ enabled:false },
+        enableMouseTracking:false
+      });
     }
 
     const existing = Highcharts.charts.find(c => c && c.renderTo?.id === 'resHistChart');
@@ -5543,7 +5560,7 @@ ${sectionsHtml}
       existing.xAxis[0].setCategories(cats, false);
       existing.series[0].setData(counts, false);
       if (showNormal) {
-        if (existing.series[1]) { existing.series[1].setData(scaledNorm, false); existing.series[1].setVisible(true, false); }
+        if (existing.series[1]) { existing.series[1].setData(normalPoints, false); existing.series[1].setVisible(true, false); }
         else existing.addSeries(seriesData[1], false);
       } else if (existing.series[1]) {
         existing.series[1].setVisible(false, false);
@@ -5555,24 +5572,24 @@ ${sectionsHtml}
 
     Highcharts.chart('resHistChart', {
       chart:{ backgroundColor:'transparent', height:280, animation:false,
-              marginTop:28, marginBottom:60 },
+              marginTop:28, marginBottom:70, spacingTop:8, spacingBottom:6 },
       title:{ text:'' },
       xAxis:{ categories:cats,
-              labels:{ rotation:-45, style:{color:'rgba(255,255,255,.55)',fontSize:'9px'},
-                       step:Math.ceil(bins/8), y:14 },
-              gridLineColor:'rgba(255,255,255,.06)',
+              labels:{ rotation:-45, style:{color:'rgba(255,255,255,.6)',fontSize:'9px'},
+                       step:Math.ceil(bins / 8), y:14 },
+              gridLineColor:'rgba(255,255,255,.07)',
               lineColor:'rgba(255,255,255,.15)', tickColor:'rgba(255,255,255,.15)' },
-      yAxis:{ title:{text:'Count',style:{color:'rgba(255,255,255,.5)',fontSize:'10px'}},
-              labels:{style:{color:'rgba(255,255,255,.55)',fontSize:'10px'}},
-              gridLineColor:'rgba(255,255,255,.06)' },
+      yAxis:{ title:{ text:'Count', style:{color:'rgba(255,255,255,.6)',fontSize:'11px'} },
+              labels:{ style:{color:'rgba(255,255,255,.6)'} },
+              gridLineColor:'rgba(255,255,255,.07)' },
       legend:{ enabled:showNormal, align:'right', verticalAlign:'top',
                floating:true, x:-6, y:0, layout:'horizontal',
-               itemStyle:{color:'rgba(255,255,255,.8)',fontSize:'10px'},
+               itemStyle:{color:'rgba(255,255,255,.85)',fontSize:'11px'},
                backgroundColor:'rgba(15,23,42,.72)', borderWidth:0,
                borderRadius:6, padding:6, symbolRadius:3 },
       credits:{ enabled:false }, exporting:{ enabled:false },
       plotOptions:{ series:{states:{inactive:{opacity:1}}},
-                    column:{pointPadding:0.02,groupPadding:0,borderRadius:2} },
+                    column:{pointPadding:0.05, groupPadding:0, borderRadius:2} },
       tooltip:{ formatter(){ return `<b>${this.x}</b><br>Count: <b>${this.y}</b>`; },
                 backgroundColor:'rgba(26,31,46,.92)',
                 borderColor:'rgba(120,160,255,.3)', style:{color:'#fff'} },

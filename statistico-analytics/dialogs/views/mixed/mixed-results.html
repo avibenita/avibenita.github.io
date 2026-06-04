@@ -5152,8 +5152,25 @@ ${sectionsHtml}
           <div class="mm-section-body padded"><div id="scaleLocChart" style="height:260px;"></div></div>
         </div>
         <div class="mm-section" style="grid-column:1/-1;">
-          <div class="mm-section-header"><span><i class="fa-solid fa-chart-bar"></i> Residual Histogram</span></div>
-          <div class="mm-section-body padded"><div id="resHistChart" style="height:260px;"></div></div>
+          <div class="mm-section-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <span><i class="fa-solid fa-chart-bar"></i> Residual Histogram</span>
+            <span style="display:flex;align-items:center;gap:12px;font-size:.72rem;font-weight:400;color:rgba(255,255,255,.65);">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                Bins:
+                <input type="range" id="resHistBins" min="5" max="30" value="20"
+                  style="width:80px;accent-color:rgba(167,139,250,.9);"
+                  oninput="document.getElementById('resHistBinsVal').textContent=this.value; _renderResHist();">
+                <span id="resHistBinsVal">20</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+                Show Normal:
+                <input type="checkbox" id="resHistNormal" checked
+                  style="accent-color:rgba(251,191,36,.9);width:14px;height:14px;"
+                  onchange="_renderResHist();">
+              </label>
+            </span>
+          </div>
+          <div class="mm-section-body padded"><div id="resHistChart" style="height:280px;"></div></div>
         </div>
       </div>`;
     }  // end if (residualsEl)
@@ -5460,39 +5477,107 @@ ${sectionsHtml}
       { type:'line', data:[[theoretical[0], theoretical[0] * (sorted[n-1]-sorted[0])/(theoretical[n-1]-theoretical[0]) + sorted[0]], [theoretical[n-1], sorted[n-1]]], color:'rgba(255,165,120,.6)', dashStyle:'Dash', enableMouseTracking:false }
     ]);
 
-    // Histogram with normal curve overlay
-    const bins = 20;
-    const rMin = Math.min(...residuals), rMax = Math.max(...residuals);
-    const bw   = (rMax - rMin) / bins;
-    const counts = new Array(bins).fill(0);
-    residuals.forEach(r => { const bi = Math.min(bins-1, Math.floor((r-rMin)/bw)); counts[bi]++; });
-    const rN    = residuals.length;
-    const rMean = residuals.reduce((s,v)=>s+v,0)/rN;
-    const rSd   = Math.sqrt(residuals.reduce((s,v)=>s+(v-rMean)**2,0)/(rN-1));
-    // Normal curve scaled to histogram counts
-    const normalCurve = counts.map((_,i) => {
-      const x = rMin + i*bw + bw/2;
-      const pdf = Math.exp(-0.5*((x-rMean)/rSd)**2) / (rSd * Math.sqrt(2*Math.PI));
-      return parseFloat((pdf * rN * bw).toFixed(4));
-    });
-    Highcharts.chart('resHistChart', {
-      chart:{ backgroundColor:'transparent', height:260, animation:false },
-      title:{ text:'Residual Distribution with Normal Curve', style:{color:'rgba(255,255,255,.7)',fontSize:'11px'} },
-      xAxis:{ categories: counts.map((_,i) => fmt(rMin + i*bw + bw/2, 2)), tickInterval:4, labels:{style:{color:'rgba(255,255,255,.55)',fontSize:'10px'}} },
-      yAxis:{ title:{text:'Count',style:{color:'rgba(255,255,255,.5)',fontSize:'10px'}}, labels:{style:{color:'rgba(255,255,255,.55)',fontSize:'10px'}}, gridLineColor:'rgba(255,255,255,.06)' },
-      series:[
-        { type:'column', name:'Residuals', data:counts, color:'rgba(167,139,250,.55)', pointPadding:0, groupPadding:0, borderRadius:2, borderWidth:0 },
-        { type:'spline', name:'Normal', data:normalCurve, color:'rgba(251,191,36,.85)', lineWidth:2, marker:{enabled:false}, enableMouseTracking:false }
-      ],
-      legend:{ enabled:true, itemStyle:{color:'rgba(255,255,255,.65)',fontSize:'10px'}, backgroundColor:'transparent' },
-      exporting:{ enabled:false }, credits:{ enabled:false }
-    });
+    // Histogram — drawn by _renderResHist() so the controls can re-trigger it
+    _renderResHist();
 
     // Scale-Location
     commonCfg('scaleLocChart','Scale-Location','Fitted Values','√|Standardised Residuals|',[{
       type:'scatter',
       data: fitted.map((f,i) => [f, Math.sqrt(Math.abs(stdRes[i]))])
     }]);
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     RESIDUAL HISTOGRAM (interactive — called by slider / checkbox)
+  ───────────────────────────────────────────────────────────── */
+  function _renderResHist() {
+    const el = document.getElementById('resHistChart');
+    if (!el || !_results?.residuals) return;
+
+    const residuals  = _results.residuals.values ?? [];
+    if (!residuals.length) return;
+
+    const bins       = parseInt(document.getElementById('resHistBins')?.value ?? 20, 10);
+    const showNormal = document.getElementById('resHistNormal')?.checked !== false;
+
+    const rMin = Math.min(...residuals);
+    const rMax = Math.max(...residuals);
+    const bw   = (rMax - rMin) / bins;
+
+    const counts = new Array(bins).fill(0);
+    residuals.forEach(r => {
+      const bi = Math.min(bins - 1, Math.floor((r - rMin) / bw));
+      counts[bi]++;
+    });
+    const cats = counts.map((_, i) => {
+      const v = rMin + i * bw + bw / 2;
+      return (Math.abs(v) < 1e-10 ? '0' : v.toFixed(2));
+    });
+
+    const rN    = residuals.length;
+    const rMean = residuals.reduce((s, v) => s + v, 0) / rN;
+    const rSd   = Math.sqrt(residuals.reduce((s, v) => s + (v - rMean) ** 2, 0) / Math.max(1, rN - 1));
+    const maxCnt = Math.max(...counts);
+
+    const normalPoints = counts.map((_, i) => {
+      const x   = rMin + i * bw + bw / 2;
+      const pdf = Math.exp(-0.5 * ((x - rMean) / rSd) ** 2) / (rSd * Math.sqrt(2 * Math.PI));
+      return parseFloat((pdf * rN * bw).toFixed(4));
+    });
+    const maxNorm = Math.max(...normalPoints);
+    const scaledNorm = normalPoints.map(v => parseFloat((v / maxNorm * maxCnt * 0.92).toFixed(4)));
+
+    const seriesData = [
+      { type:'column', name:'Residuals', data:counts,
+        color:'rgba(120,160,255,.65)', borderColor:'rgba(120,160,255,.3)',
+        borderWidth:1, pointPadding:0.02, groupPadding:0, borderRadius:2 }
+    ];
+    if (showNormal) {
+      seriesData.push({ type:'spline', name:'Normal', data:scaledNorm,
+        color:'rgba(251,191,36,.9)', dashStyle:'ShortDash', lineWidth:2,
+        marker:{enabled:false}, enableMouseTracking:false });
+    }
+
+    const existing = Highcharts.charts.find(c => c && c.renderTo?.id === 'resHistChart');
+    if (existing) {
+      existing.xAxis[0].setCategories(cats, false);
+      existing.series[0].setData(counts, false);
+      if (showNormal) {
+        if (existing.series[1]) { existing.series[1].setData(scaledNorm, false); existing.series[1].setVisible(true, false); }
+        else existing.addSeries(seriesData[1], false);
+      } else if (existing.series[1]) {
+        existing.series[1].setVisible(false, false);
+      }
+      existing.legend.update({ enabled: showNormal }, false);
+      existing.redraw();
+      return;
+    }
+
+    Highcharts.chart('resHistChart', {
+      chart:{ backgroundColor:'transparent', height:280, animation:false,
+              marginTop:28, marginBottom:60 },
+      title:{ text:'' },
+      xAxis:{ categories:cats,
+              labels:{ rotation:-45, style:{color:'rgba(255,255,255,.55)',fontSize:'9px'},
+                       step:Math.ceil(bins/8), y:14 },
+              gridLineColor:'rgba(255,255,255,.06)',
+              lineColor:'rgba(255,255,255,.15)', tickColor:'rgba(255,255,255,.15)' },
+      yAxis:{ title:{text:'Count',style:{color:'rgba(255,255,255,.5)',fontSize:'10px'}},
+              labels:{style:{color:'rgba(255,255,255,.55)',fontSize:'10px'}},
+              gridLineColor:'rgba(255,255,255,.06)' },
+      legend:{ enabled:showNormal, align:'right', verticalAlign:'top',
+               floating:true, x:-6, y:0, layout:'horizontal',
+               itemStyle:{color:'rgba(255,255,255,.8)',fontSize:'10px'},
+               backgroundColor:'rgba(15,23,42,.72)', borderWidth:0,
+               borderRadius:6, padding:6, symbolRadius:3 },
+      credits:{ enabled:false }, exporting:{ enabled:false },
+      plotOptions:{ series:{states:{inactive:{opacity:1}}},
+                    column:{pointPadding:0.02,groupPadding:0,borderRadius:2} },
+      tooltip:{ formatter(){ return `<b>${this.x}</b><br>Count: <b>${this.y}</b>`; },
+                backgroundColor:'rgba(26,31,46,.92)',
+                borderColor:'rgba(120,160,255,.3)', style:{color:'#fff'} },
+      series: seriesData
+    });
   }
 
   /* ─────────────────────────────────────────────────────────────

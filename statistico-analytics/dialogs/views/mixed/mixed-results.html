@@ -5635,33 +5635,36 @@ ${sectionsHtml}
       return;
     }
 
-    const cases = _results.influentialCases ?? [];
-    // Build max-metrics summary from full diagnostics if available
-    const diagRows = _results.allDiagnostics ?? _results.caseDiagnostics ?? [];
+    const cases    = _results.influentialCases ?? [];
+    const diagRows = _results.allCaseDiag ?? [];
     const nChecked = diagRows.length || (_sourceRows ? _sourceRows.length : '—');
     const maxCook  = diagRows.length ? Math.max(...diagRows.map(r => Math.abs(r.cooksD ?? 0))) : null;
     const maxLev   = diagRows.length ? Math.max(...diagRows.map(r => Math.abs(r.leverage ?? 0))) : null;
     const maxDff   = diagRows.length ? Math.max(...diagRows.map(r => Math.abs(r.dffits ?? 0))) : null;
 
+    // Clean vertical summary matching the Cursor100 design
     const metricSummaryHtml = (maxCook != null) ? `
-      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:14px 18px;margin:14px;">
-        <div style="font-size:.75rem;font-weight:600;color:rgba(255,255,255,.65);margin-bottom:10px;letter-spacing:.04em;">INFLUENCE SUMMARY — Cases Checked: ${nChecked}</div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
-          <div style="text-align:center;">
-            <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:2px;">Cook's D</div>
-            <div style="font-size:1.05rem;font-weight:600;color:rgba(255,255,255,.85);">${fmt(maxCook)}</div>
-            <div style="font-size:.65rem;color:var(--text-muted);">Max / threshold 1.0</div>
+      <div class="mm-section" style="margin:14px;">
+        <div class="mm-section-header"><span><i class="fa-solid fa-chart-column"></i> Influence Summary</span></div>
+        <div class="mm-section-body padded" style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;padding:0;">
+          <div style="padding:16px 20px;border-right:1px solid rgba(255,255,255,.07);">
+            <div style="font-size:.7rem;font-weight:600;letter-spacing:.05em;color:var(--text-muted);margin-bottom:8px;">COOK'S D</div>
+            <div style="font-size:1.4rem;font-weight:700;color:rgba(255,255,255,.9);line-height:1;">${fmt(maxCook)}</div>
+            <div style="font-size:.7rem;color:var(--text-muted);margin-top:4px;">Max &nbsp;·&nbsp; threshold 1.0</div>
           </div>
-          <div style="text-align:center;">
-            <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:2px;">Leverage</div>
-            <div style="font-size:1.05rem;font-weight:600;color:rgba(255,255,255,.85);">${fmt(maxLev)}</div>
-            <div style="font-size:.65rem;color:var(--text-muted);">Max / threshold 0.5</div>
+          <div style="padding:16px 20px;border-right:1px solid rgba(255,255,255,.07);">
+            <div style="font-size:.7rem;font-weight:600;letter-spacing:.05em;color:var(--text-muted);margin-bottom:8px;">LEVERAGE</div>
+            <div style="font-size:1.4rem;font-weight:700;color:rgba(255,255,255,.9);line-height:1;">${fmt(maxLev)}</div>
+            <div style="font-size:.7rem;color:var(--text-muted);margin-top:4px;">Max &nbsp;·&nbsp; threshold 0.5</div>
           </div>
-          <div style="text-align:center;">
-            <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:2px;">DFFITS</div>
-            <div style="font-size:1.05rem;font-weight:600;color:rgba(255,255,255,.85);">${fmt(maxDff)}</div>
-            <div style="font-size:.65rem;color:var(--text-muted);">Max / threshold 2√(p/n)</div>
+          <div style="padding:16px 20px;">
+            <div style="font-size:.7rem;font-weight:600;letter-spacing:.05em;color:var(--text-muted);margin-bottom:8px;">DFFITS</div>
+            <div style="font-size:1.4rem;font-weight:700;color:rgba(255,255,255,.9);line-height:1;">${fmt(maxDff)}</div>
+            <div style="font-size:.7rem;color:var(--text-muted);margin-top:4px;">Max &nbsp;·&nbsp; threshold 2√(p/n)</div>
           </div>
+        </div>
+        <div style="padding:10px 20px 14px;font-size:.75rem;color:var(--text-muted);">
+          Cases checked: <strong>${nChecked}</strong>
         </div>
       </div>` : '';
 
@@ -7079,6 +7082,42 @@ STRENGTH: [High, Moderate, or Low — short reason based on p-values, ICC, conve
         }
       }
     })();
+
+    // ── Per-case influence diagnostics ──────────────────────────────
+    // Hat values h_ii = x_i' (X'X)^{-1} x_i  (OLS approximation for mixed model)
+    const hatVals = X.map(xi => {
+      // xi' * XtXinv * xi
+      const v = vecMul(XtXinv, xi);   // (X'X)^{-1} xi
+      return xi.reduce((s, xij, j) => s + xij * v[j], 0);
+    });
+    const mse    = sigma2;
+    const dffit_thresh = 2 * Math.sqrt(p / n);
+
+    const allCaseDiag = finalResid.map((ei, i) => {
+      const hi   = Math.min(Math.max(hatVals[i] ?? (1/n), 1e-6), 0.9999);
+      const stdR = ei / (Math.sqrt(mse) * Math.sqrt(1 - hi));
+      const cook = (ei * ei * hi) / (p * mse * (1 - hi) * (1 - hi));
+      const dfft = stdR * Math.sqrt(hi / (1 - hi));
+      return { obs: i + 1, stdRes: parseFloat(stdR.toFixed(4)),
+               leverage: parseFloat(hi.toFixed(4)),
+               cooksD:   parseFloat(cook.toFixed(4)),
+               dffits:   parseFloat(dfft.toFixed(4)) };
+    });
+
+    const influentialCases = allCaseDiag
+      .filter(r => Math.abs(r.stdRes) > 3 || r.leverage > 0.5 ||
+                   r.cooksD > 1 || Math.abs(r.dffits) > dffit_thresh)
+      .map(r => {
+        const flags = [];
+        if (Math.abs(r.stdRes) > 3) flags.push('|Std.Res|>3');
+        if (r.leverage > 0.5)       flags.push('Leverage>0.5');
+        if (r.cooksD > 1)           flags.push("Cook's D>1");
+        if (Math.abs(r.dffits) > dffit_thresh) flags.push('DFFITS');
+        return { ...r, flags };
+      });
+
+    result.allCaseDiag    = allCaseDiag;
+    result.influentialCases = influentialCases;
 
     const emmByFactor = {};
     const pwByFactor = {};

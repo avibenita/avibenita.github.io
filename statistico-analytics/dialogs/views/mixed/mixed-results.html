@@ -5145,11 +5145,11 @@ ${sectionsHtml}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px;">
           <div class="mm-section">
             <div class="mm-section-header"><span><i class="fa-solid fa-chart-scatter"></i> Residuals vs Fitted</span></div>
-            <div class="mm-section-body padded"><div id="resVsFittedChart" style="height:260px;"></div></div>
+            <div class="mm-section-body padded"><div id="resVsFittedChart" style="height:280px;"></div></div>
           </div>
           <div class="mm-section">
             <div class="mm-section-header"><span><i class="fa-solid fa-chart-scatter"></i> Scale-Location</span></div>
-          <div class="mm-section-body padded"><div id="scaleLocChart" style="height:260px;"></div></div>
+          <div class="mm-section-body padded"><div id="scaleLocChart" style="height:280px;"></div></div>
         </div>
         <div class="mm-section" style="grid-column:1/-1;">
           <div class="mm-section-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
@@ -5157,10 +5157,10 @@ ${sectionsHtml}
             <span style="display:flex;align-items:center;gap:12px;font-size:.72rem;font-weight:400;color:rgba(255,255,255,.65);">
               <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
                 Bins:
-                <input type="range" id="resHistBins" min="5" max="30" value="20"
+                <input type="range" id="resHistBins" min="5" max="30" value="5"
                   style="width:80px;accent-color:rgba(167,139,250,.9);"
                   oninput="document.getElementById('resHistBinsVal').textContent=this.value; _renderResHist();">
-                <span id="resHistBinsVal">20</span>
+                <span id="resHistBinsVal">5</span>
               </label>
               <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
                 Show Normal:
@@ -5170,7 +5170,7 @@ ${sectionsHtml}
               </label>
             </span>
           </div>
-          <div class="mm-section-body padded"><div id="resHistChart" style="height:280px;"></div></div>
+          <div class="mm-section-body padded"><div id="resHistChart" style="height:340px;"></div></div>
         </div>
       </div>`;
     }  // end if (residualsEl)
@@ -5182,7 +5182,7 @@ ${sectionsHtml}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px;">
             <div class="mm-section" style="grid-column:1/-1;">
               <div class="mm-section-header"><span><i class="fa-solid fa-chart-line"></i> Normal Q-Q Plot</span></div>
-              <div class="mm-section-body padded"><div id="qqChart" style="height:280px;"></div></div>
+              <div class="mm-section-body padded"><div id="qqChart" style="height:320px;"></div></div>
             </div>
             <div class="mm-section">
               <div class="mm-section-header"><span><i class="fa-solid fa-flask"></i> Shapiro-Wilk Test</span></div>
@@ -5447,14 +5447,20 @@ ${sectionsHtml}
 
     const commonCfg = (id, title, xTitle, yTitle, series) => {
       Highcharts.chart(id, {
-        chart:{ backgroundColor:'transparent', height:240, animation:false },
-        title:{ text:title, style:{color:'rgba(255,255,255,.7)',fontSize:'11px'} },
-        xAxis:{ title:{text:xTitle,style:{color:'rgba(255,255,255,.5)',fontSize:'10px'}}, labels:{style:{color:'rgba(255,255,255,.55)',fontSize:'10px'}}, gridLineColor:'rgba(255,255,255,.06)' },
-        yAxis:{ title:{text:yTitle,style:{color:'rgba(255,255,255,.5)',fontSize:'10px'}}, labels:{style:{color:'rgba(255,255,255,.55)',fontSize:'10px'}}, gridLineColor:'rgba(255,255,255,.06)', plotLines:[{value:0,color:'rgba(255,255,255,.3)',width:1,dashStyle:'Dash'}] },
+        chart:{ backgroundColor:'transparent', height:260, animation:false },
+        title:{ text:title, style:{color:'rgba(255,255,255,.9)',fontSize:'12px',fontWeight:'600'} },
+        xAxis:{ title:{text:xTitle,style:{color:'rgba(255,255,255,.8)',fontSize:'11px'}},
+                labels:{style:{color:'rgba(255,255,255,.8)',fontSize:'10px'}},
+                gridLineColor:'rgba(255,255,255,.1)',
+                lineColor:'rgba(255,255,255,.25)', tickColor:'rgba(255,255,255,.25)' },
+        yAxis:{ title:{text:yTitle,style:{color:'rgba(255,255,255,.8)',fontSize:'11px'}},
+                labels:{style:{color:'rgba(255,255,255,.8)',fontSize:'10px'}},
+                gridLineColor:'rgba(255,255,255,.1)',
+                plotLines:[{value:0,color:'rgba(255,255,255,.4)',width:1,dashStyle:'Dash'}] },
         legend:{ enabled:false },
         exporting:{ enabled:false },
         credits:{ enabled:false },
-        plotOptions:{ scatter:{ marker:{radius:3,fillColor:'rgba(167,139,250,.7)'} } },
+        plotOptions:{ scatter:{ marker:{radius:3.5,fillColor:'rgba(167,139,250,.85)'} } },
         series
       });
     };
@@ -5497,23 +5503,24 @@ ${sectionsHtml}
     const residuals  = _results.residuals.values ?? [];
     if (!residuals.length) return;
 
-    const bins       = parseInt(document.getElementById('resHistBins')?.value ?? 20, 10);
+    const bins       = parseInt(document.getElementById('resHistBins')?.value ?? 5, 10);
     const showNormal = document.getElementById('resHistNormal')?.checked !== false;
 
     const rMin = Math.min(...residuals);
     const rMax = Math.max(...residuals);
     const bw   = (rMax - rMin) / bins;
 
-    // Bin counts + bin-range category labels (matching Descriptives format)
+    // Bin counts + compact category labels
     const counts = new Array(bins).fill(0);
     residuals.forEach(r => {
       const bi = Math.min(bins - 1, Math.floor((r - rMin) / bw));
       counts[bi]++;
     });
+    const dp = bw >= 2 ? 0 : bw >= 0.2 ? 1 : 2;   // decimal places based on bin width
     const cats = counts.map((_, i) => {
       const start = rMin + i * bw;
       const end   = rMin + (i + 1) * bw;
-      return `${start.toFixed(1)}-${end.toFixed(1)}`;
+      return `${start.toFixed(dp)} to ${end.toFixed(dp)}`;
     });
     const maxCnt = Math.max(...counts, 1);
 
@@ -5555,9 +5562,16 @@ ${sectionsHtml}
       });
     }
 
+    const labelRotation = bins <= 8 ? -30 : -45;
+    const labelStep     = bins <= 10 ? 1 : Math.ceil(bins / 8);
+    const marginBottom  = bins <= 8 ? 55 : 75;
+
     const existing = Highcharts.charts.find(c => c && c.renderTo?.id === 'resHistChart');
     if (existing) {
       existing.xAxis[0].setCategories(cats, false);
+      existing.xAxis[0].update({ labels:{ rotation:labelRotation, step:labelStep, y:14,
+        style:{color:'rgba(255,255,255,.85)',fontSize:'10px'} } }, false);
+      existing.update({ chart:{ marginBottom } }, false);
       existing.series[0].setData(counts, false);
       if (showNormal) {
         if (existing.series[1]) { existing.series[1].setData(normalPoints, false); existing.series[1].setVisible(true, false); }
@@ -5570,21 +5584,26 @@ ${sectionsHtml}
       return;
     }
 
+    const labelRotation = bins <= 8 ? -30 : -45;
+    const labelStep     = bins <= 10 ? 1 : Math.ceil(bins / 8);
+    const marginBottom  = bins <= 8 ? 55 : 75;
+
     Highcharts.chart('resHistChart', {
-      chart:{ backgroundColor:'transparent', height:280, animation:false,
-              marginTop:28, marginBottom:70, spacingTop:8, spacingBottom:6 },
+      chart:{ backgroundColor:'transparent', height:340, animation:false,
+              marginTop:28, marginBottom, spacingTop:8, spacingBottom:6 },
       title:{ text:'' },
       xAxis:{ categories:cats,
-              labels:{ rotation:-45, style:{color:'rgba(255,255,255,.6)',fontSize:'9px'},
-                       step:Math.ceil(bins / 8), y:14 },
-              gridLineColor:'rgba(255,255,255,.07)',
-              lineColor:'rgba(255,255,255,.15)', tickColor:'rgba(255,255,255,.15)' },
-      yAxis:{ title:{ text:'Count', style:{color:'rgba(255,255,255,.6)',fontSize:'11px'} },
-              labels:{ style:{color:'rgba(255,255,255,.6)'} },
-              gridLineColor:'rgba(255,255,255,.07)' },
+              labels:{ rotation:labelRotation,
+                       style:{color:'rgba(255,255,255,.85)',fontSize:'10px'},
+                       step:labelStep, y:14 },
+              gridLineColor:'rgba(255,255,255,.1)',
+              lineColor:'rgba(255,255,255,.25)', tickColor:'rgba(255,255,255,.25)' },
+      yAxis:{ title:{ text:'Count', style:{color:'rgba(255,255,255,.8)',fontSize:'11px'} },
+              labels:{ style:{color:'rgba(255,255,255,.8)',fontSize:'10px'} },
+              gridLineColor:'rgba(255,255,255,.1)' },
       legend:{ enabled:showNormal, align:'right', verticalAlign:'top',
                floating:true, x:-6, y:0, layout:'horizontal',
-               itemStyle:{color:'rgba(255,255,255,.85)',fontSize:'11px'},
+               itemStyle:{color:'rgba(255,255,255,.9)',fontSize:'11px'},
                backgroundColor:'rgba(15,23,42,.72)', borderWidth:0,
                borderRadius:6, padding:6, symbolRadius:3 },
       credits:{ enabled:false }, exporting:{ enabled:false },

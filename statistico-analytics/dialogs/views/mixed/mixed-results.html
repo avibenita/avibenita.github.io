@@ -6188,6 +6188,8 @@ ${sectionsHtml}
     });
   };
 
+  window._mmActiveTab = 'overview';   // track for Explain View
+
   window.switchTab = function(name) {
     if (name === 'tested-hypothesis') {
       name = 'overview';
@@ -6195,6 +6197,7 @@ ${sectionsHtml}
     } else if (name === 'descriptives' && !_prepareMixedDescriptivePayload()) {
       return;
     }
+    window._mmActiveTab = name;
 
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     const tab = document.getElementById(`tab-${name}`);
@@ -7575,13 +7578,54 @@ STRENGTH: [High, Moderate, or Low — short reason based on p-values, ICC, conve
         '<strong>R²m ≈ R²c</strong> — random effects contribute little; consider a simpler model.',
         '<strong>LRT p < .05</strong> — the full model fits significantly better than intercept-only.'
       ]
+    },
+    descriptives: {
+      title: 'Insight Guide — Descriptives',
+      about: 'The Descriptives tab summarises the continuous variables included in the model — showing means, standard deviations, min/max, and a histogram for each variable. Use it to check data quality, spot outliers, and understand the distributions before interpreting model estimates.',
+      questions: [
+        'What is the typical value and spread for each continuous variable?',
+        'Are there extreme values or outliers that could influence the model?',
+        'Is the outcome variable approximately normally distributed?',
+        'Are predictors on comparable scales, or would standardising help interpretation?',
+        'Do the group sample sizes look balanced across clusters?'
+      ],
+      interact: [
+        'Click any row in the statistics table to highlight its histogram.',
+        'Adjust the <strong>Bins</strong> slider to explore the histogram resolution.',
+        'Toggle <strong>Show Normal</strong> to overlay a reference normal curve on the histogram.'
+      ],
+      lookFor: [
+        '<strong>High skewness (|skew| > 1)</strong> — transformation may improve normality.',
+        '<strong>Min or Max far from the mean</strong> — potential outliers worth investigating.',
+        '<strong>Small N</strong> in a cluster — low-leverage group; estimates may be unstable.',
+        '<strong>Histogram shape</strong>: multi-modal distributions may indicate subgroups not modelled.'
+      ]
+    },
+    'model-structure': {
+      title: 'Insight Guide — Model Structure',
+      about: 'The Model Structure diagram visualises the hierarchical architecture of your mixed model — showing fixed predictors, random grouping factors, and the nesting of observations within clusters. It helps you confirm the model is specified as intended before relying on its results.',
+      questions: [
+        'Is the nesting structure (e.g. students within schools) correctly captured?',
+        'Which predictors are modelled as fixed vs. random effects?',
+        'How many levels does each grouping factor have?',
+        'Is the random intercept included for each cluster?',
+        'Does the diagram match the research design?'
+      ],
+      interact: [
+        'Switch between <strong>Regression view</strong> and <strong>Hierarchy view</strong> for different perspectives.',
+        'Toggle <strong>Show estimates</strong> to overlay coefficient values on the diagram.',
+        'Use this diagram alongside your research design document to verify specification.'
+      ],
+      lookFor: [
+        '<strong>Unexpected nesting</strong> — a cluster with very few levels may not provide reliable variance estimates.',
+        '<strong>Missing random slope</strong> — if a time-varying predictor is fixed-only, consider adding a random slope.',
+        '<strong>Model formula</strong> shown below the diagram — confirm it matches your planned model.'
+      ]
     }
   };
 
   function openMmExplainPanel() {
-    // Determine active tab
-    const activeBtn = document.querySelector('.sb-item.active');
-    const tabKey = activeBtn?.dataset?.tab ?? 'overview';
+    const tabKey = window._mmActiveTab ?? 'overview';
     const content = _MM_EXPLAIN[tabKey] ?? _MM_EXPLAIN.overview;
 
     document.getElementById('mmExplainTitle').textContent = content.title;

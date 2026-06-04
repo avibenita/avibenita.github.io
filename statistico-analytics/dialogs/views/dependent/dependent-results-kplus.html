@@ -7,7 +7,10 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <script src="https://code.highcharts.com/highcharts-more.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
+  <script src="../../shared/uni-normality-tests.js?v=20260531p"></script>
+  <script src="../../shared/uni-normality-dashboard.js?v=20260531p"></script>
 
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20260530a" />  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
@@ -58,7 +61,7 @@
     .tab-button:hover{color:rgba(255,255,255,.82);}
     .tab-button:active{opacity:.7;}
     .tab-button i{opacity:.9;}
-    .tab-button.active{color:#fff;font-weight:900;border-bottom-color:#4fc3f7;}
+    .tab-button.active{color:#fff;font-weight:900;border-bottom-color:#ffffff;}
     .tab-button.active::before{content:'';position:absolute;inset:0;background:rgba(79,195,247,.09);border-radius:8px 8px 0 0;pointer-events:none;}
     .tab-controls-right{margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding-left:6px;}
     .tab-decimal-select{height:34px;padding:0 10px;border-radius:8px;border:1px solid rgba(148,163,184,.45);background:rgba(15,23,42,.82);color:#fff;font-size:13px;font-weight:700;}
@@ -219,6 +222,36 @@
 .desc-summary-stats strong{color:var(--text-secondary);}
 .desc-summary-stats span{color:var(--accent-2);font-weight:700;}
 .modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background-color:rgba(0,0,0,0.7);z-index:1000;backdrop-filter:blur(3px);}
+.modal-content{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;max-width:900px;max-height:90vh;background-color:var(--surface-1);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.4);border:1px solid var(--border);overflow-y:auto;}
+.modal-header{background-color:var(--surface-0);padding:15px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.modal-title{color:var(--accent-1);font-size:1.2rem;font-weight:600;}
+.close-btn{background:none;border:none;color:var(--text-secondary);font-size:1.5rem;cursor:pointer;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;}
+.close-btn:hover{color:var(--text-primary);}
+.modal-body{padding:20px;}
+.normality-dashboard{margin-bottom:16px;}
+.dashboard-body{display:grid;grid-template-columns:1fr 1fr;gap:15px;}
+.card-wrapper{background:var(--surface-2);border:2px solid var(--border);border-radius:8px;overflow:hidden;min-height:150px;display:flex;flex-direction:column;}
+.card-wrapper .card-header{background:linear-gradient(135deg,#1e2533,#15192a);padding:6px 12px;font-size:11px;font-weight:700;color:var(--accent-1);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(255,165,120,.2);}
+.card-wrapper .card-body{flex:1;padding:10px;display:flex;align-items:center;justify-content:center;}
+.nsi-title{display:inline-flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;}
+.nsi-title sup{font-size:8px;color:rgb(120,200,255);}
+.normality-dashboard .summary-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%;}
+.normality-dashboard .stat-item{text-align:center;}
+.normality-dashboard .stat-value{font-size:18px;font-weight:700;color:var(--accent-1);}
+.normality-dashboard .stat-label{font-size:11px;color:var(--text-secondary);}
+.normality-dashboard .alpha-slider{width:100%;margin-top:5px;accent-color:#ffd700;}
+.gauge{width:100%;height:110px;}
+.test-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:20px;}
+.test-card{background:var(--surface-2);border-radius:8px;padding:20px;border:1px solid var(--border);}
+.test-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.test-name{font-size:clamp(12px,1.5vw,14px);font-weight:bold;}
+.test-result{padding:3px 8px;border-radius:12px;font-size:15px;font-weight:bold;}
+.pass{background-color:ghostwhite;color:#2ecc71;}
+.fail{background-color:ghostwhite;color:#e74c3c;}
+.test-details{font-size:15px;}
+.detail-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.1);}
+.detail-label{color:rgba(255,255,255,.7);}
+.detail-value{font-weight:500;}
 .normality-button:hover{background:linear-gradient(to right,rgb(255,160,160),rgb(255,192,192));transform:translateY(-2px);}
 
 /* Non-explore tabs: font size upgrades */
@@ -1457,22 +1490,118 @@
   
   <!-- Normality Tests Modal -->
   <div class="modal-overlay" id="normality-modal" style="display:none;">
-    <div class="modal-content" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;max-width:900px;max-height:90vh;background-color:var(--surface-1);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.4);border:1px solid var(--border);overflow-y:auto;">
-      <div class="modal-header" style="background-color:var(--surface-0);padding:15px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-        <div class="modal-title" style="color:var(--accent-1);font-size:1.2rem;font-weight:600;">
-          Normality Tests - <span id="modal-variable-name">Variable</span> <span id="modal-sample-size">(n=-)</span>
-        </div>
-        <button class="close-btn" onclick="closeNormalityModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.5rem;cursor:pointer;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;">&times;</button>
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">Normality Tests - <span id="modal-variable-name">Variable</span> <span id="modal-sample-size">(n=—)</span></div>
+        <button class="close-btn" onclick="closeNormalityModal()">&times;</button>
       </div>
-      <div class="modal-body" style="padding:20px;">
-        <div style="text-align:center;padding:10px;font-size:14px;font-weight:bold;">
-          Normality testing placeholder (can be wired to Python service if needed)
+      <div class="modal-body">
+        <div class="normality-dashboard">
+          <div class="dashboard-body">
+            <div class="card-wrapper">
+              <div class="card-header">Summary Statistics</div>
+              <div class="card-body">
+                <div class="summary-stats">
+                  <div class="stat-item">
+                    <div class="stat-value" id="norm-pass-count">0</div>
+                    <div class="stat-label">Tests Passed</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-value" id="norm-fail-count">0</div>
+                    <div class="stat-label">Tests Failed</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-value" id="norm-sample-size">—</div>
+                    <div class="stat-label">Sample Size</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-value" id="norm-significance">0.05</div>
+                    <div class="stat-label">Significance</div>
+                    <input class="alpha-slider" type="range" id="norm-alpha-slider" min="0.01" max="0.15" step="0.01" value="0.05"
+                           oninput="updateNormalityAlpha(this.value)">
+                    <div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px;">Adjust</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card-wrapper">
+              <div class="card-header">
+                <span class="nsi-title">NSI<sup>TM</sup> - Normality Strength Index</span>
+              </div>
+              <div class="card-body">
+                <div class="gauge" id="gauge-chart"></div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div style="padding:20px;background:rgba(255,165,120,.1);border-left:3px solid var(--accent-1);margin-top:10px;">
-          <strong>Selected Variable:</strong> <span id="modal-variable-detail">-</span><br/>
-          <strong>Sample Size:</strong> <span id="modal-n-detail">-</span><br/>
-          <strong>Mean:</strong> <span id="modal-mean-detail">-</span><br/>
-          <strong>StdDev:</strong> <span id="modal-sd-detail">-</span>
+
+        <div class="test-grid">
+          <div class="test-card" data-test="shapirowilk">
+            <div class="test-header">
+              <div class="test-name">Shapiro-Wilk</div>
+              <div class="test-result pass">—</div>
+            </div>
+            <div class="test-details">
+              <div class="detail-row"><div class="detail-label">Statistic:</div><div class="detail-value">—</div></div>
+              <div class="detail-row"><div class="detail-label">p-value:</div><div class="detail-value">—</div></div>
+              <div class="detail-row"><div class="detail-label">Critical:</div><div class="detail-value">—</div></div>
+            </div>
+          </div>
+          <div class="test-card" data-test="andersondarling">
+            <div class="test-header">
+              <div class="test-name">Anderson-Darling</div>
+              <div class="test-result pass">—</div>
+            </div>
+            <div class="test-details">
+              <div class="detail-row"><div class="detail-label">Statistic:</div><div class="detail-value">—</div></div>
+              <div class="detail-row"><div class="detail-label">p-value:</div><div class="detail-value">—</div></div>
+              <div class="detail-row"><div class="detail-label">Critical:</div><div class="detail-value">—</div></div>
+            </div>
+          </div>
+          <div class="test-card" data-test="kolmogorovsmirnov">
+            <div class="test-header">
+              <div class="test-name">Kolmogorov-Smirnov</div>
+              <div class="test-result pass">—</div>
+            </div>
+            <div class="test-details">
+              <div class="detail-row"><div class="detail-label">Statistic:</div><div class="detail-value">—</div></div>
+              <div class="detail-row"><div class="detail-label">p-value:</div><div class="detail-value">—</div></div>
+              <div class="detail-row"><div class="detail-label">Critical:</div><div class="detail-value">—</div></div>
+            </div>
+          </div>
+          <div class="test-card" data-test="cramervonmises">
+            <div class="test-header">
+              <div class="test-name">Cramer-von Mises</div>
+              <div class="test-result pass">—</div>
+            </div>
+            <div class="test-details">
+              <div class="detail-row"><div class="detail-label">Statistic:</div><div class="detail-value">—</div></div>
+              <div class="detail-row"><div class="detail-label">p-value:</div><div class="detail-value">—</div></div>
+              <div class="detail-row"><div class="detail-label">Critical:</div><div class="detail-value">—</div></div>
+            </div>
+          </div>
+          <div class="test-card" data-test="dagostinopearson">
+            <div class="test-header">
+              <div class="test-name">D'Agostino-Pearson</div>
+              <div class="test-result fail">—</div>
+            </div>
+            <div class="test-details">
+              <div class="detail-row"><div class="detail-label">Statistic:</div><div class="detail-value">—</div></div>
+              <div class="detail-row"><div class="detail-label">p-value:</div><div class="detail-value">—</div></div>
+              <div class="detail-row"><div class="detail-label">Critical:</div><div class="detail-value">—</div></div>
+            </div>
+          </div>
+          <div class="test-card" data-test="jarquebera">
+            <div class="test-header">
+              <div class="test-name">Jarque-Bera</div>
+              <div class="test-result fail">—</div>
+            </div>
+            <div class="test-details">
+              <div class="detail-row"><div class="detail-label">Statistic:</div><div class="detail-value">—</div></div>
+              <div class="detail-row"><div class="detail-label">p-value:</div><div class="detail-value">—</div></div>
+              <div class="detail-row"><div class="detail-label">Critical:</div><div class="detail-value">—</div></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2693,13 +2822,19 @@
         counts.push(c);
       }
 
-      // Normal curve scaled to count axis
-      const normalPts = cats.map((_, i) => {
-        const mid     = minV + (i + 0.5) * bw;
+      // Normal curve: sample 160+ points at fractional category-axis positions
+      // so the spline is smooth and never plateaus (one point per bin causes flat roof).
+      const normalPts = [];
+      const sampleCount = Math.max(160, numBins * 20);
+      for (let i = 0; i <= sampleCount; i++) {
+        const v = minV + (maxV - minV) * (i / sampleCount);
         const density = (1 / (stdDev * Math.sqrt(2 * Math.PI))) *
-                        Math.exp(-0.5 * Math.pow((mid - mean) / stdDev, 2));
-        return +(density * bw * n).toFixed(4);
-      });
+          Math.exp(-Math.pow(v - mean, 2) / (2 * Math.pow(stdDev, 2)));
+        const y = density * n * bw;
+        // map real value → fractional category index (centre of bin k is at index k)
+        const idx = ((v - minV) / bw) - 0.5;
+        normalPts.push([idx, parseFloat(y.toFixed(4))]);
+      }
 
       // Destroy previous chart then create fresh
       if (_descHistChart) { _descHistChart.destroy(); _descHistChart = null; }
@@ -2755,18 +2890,39 @@
         alert('Please select a variable first');
         return;
       }
-      
       document.getElementById('modal-variable-name').textContent = descSelectedRow.Variable;
-      document.getElementById('modal-sample-size').textContent = `(n=${descSelectedRow.N})`;
-      document.getElementById('modal-variable-detail').textContent = descSelectedRow.Variable;
-      document.getElementById('modal-n-detail').textContent = descSelectedRow.N;
-      document.getElementById('modal-mean-detail').textContent = fmt(descSelectedRow.Mean);
-      document.getElementById('modal-sd-detail').textContent = fmt(descSelectedRow.StdDev);
-      
+      document.getElementById('modal-sample-size').textContent = `(n=${descSelectedRow.N || (descSelectedRow.vector && descSelectedRow.vector.length) || 0})`;
       document.getElementById('normality-modal').style.display = 'block';
       document.body.style.overflow = 'hidden';
+      setTimeout(() => {
+        if (typeof UniNormalityDashboard !== 'undefined') UniNormalityDashboard.initGauge('gauge-chart');
+      }, 100);
+      _refreshNormalityModal();
     }
-    
+
+    function _refreshNormalityModal() {
+      if (!descSelectedRow) return;
+      if (typeof UniNormalityTests === 'undefined' || typeof UniNormalityDashboard === 'undefined') {
+        console.warn('Normality engine not loaded');
+        return;
+      }
+      const rawData = (descSelectedRow.vector || [])
+        .map(v => typeof v === 'number' ? v : parseFloat(v))
+        .filter(v => isFinite(v));
+      if (rawData.length < 3) return;
+      window._normalityLastRawData   = rawData;
+      window._normalityLastSampleSize = rawData.length;
+      window._normalityGaugeId       = 'gauge-chart';
+      const alpha = UniNormalityDashboard.getAlpha();
+      UniNormalityDashboard.renderDashboard(rawData, { alpha, sampleSize: rawData.length, gaugeId: 'gauge-chart' });
+    }
+
+    function updateNormalityAlpha(val) {
+      if (typeof UniNormalityDashboard !== 'undefined') UniNormalityDashboard.setAlpha(parseFloat(val));
+      document.getElementById('norm-significance').textContent = parseFloat(val).toFixed(2);
+      _refreshNormalityModal();
+    }
+
     function closeNormalityModal() {
       document.getElementById('normality-modal').style.display = 'none';
       document.body.style.overflow = 'auto';

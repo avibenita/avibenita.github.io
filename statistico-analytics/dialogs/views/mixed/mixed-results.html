@@ -5142,15 +5142,15 @@ ${sectionsHtml}
     const residualsEl = document.getElementById('diagResidualsContent');
     if (residualsEl) {
       residualsEl.innerHTML = `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px;">
-          <div class="mm-section">
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:14px;">
+          <div class="mm-section" style="min-width:0;overflow:hidden;">
             <div class="mm-section-header"><span><i class="fa-solid fa-chart-scatter"></i> Residuals vs Fitted</span></div>
-            <div class="mm-section-body padded"><div id="resVsFittedChart" style="height:280px;"></div></div>
+            <div class="mm-section-body padded"><div id="resVsFittedChart" style="height:280px;width:100%;"></div></div>
           </div>
-          <div class="mm-section">
+          <div class="mm-section" style="min-width:0;overflow:hidden;">
             <div class="mm-section-header"><span><i class="fa-solid fa-chart-scatter"></i> Scale-Location</span></div>
-          <div class="mm-section-body padded"><div id="scaleLocChart" style="height:280px;"></div></div>
-        </div>
+            <div class="mm-section-body padded"><div id="scaleLocChart" style="height:280px;width:100%;"></div></div>
+          </div>
         <div class="mm-section" style="grid-column:1/-1;">
           <div class="mm-section-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
             <span><i class="fa-solid fa-chart-bar"></i> Residual Histogram</span>
@@ -5179,12 +5179,12 @@ ${sectionsHtml}
     const normalityEl = document.getElementById('diagNormalityContent');
       if (normalityEl) {
         normalityEl.innerHTML = `
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px;">
-            <div class="mm-section" style="grid-column:1/-1;">
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:14px;">
+            <div class="mm-section" style="grid-column:1/-1;min-width:0;overflow:hidden;">
               <div class="mm-section-header"><span><i class="fa-solid fa-chart-line"></i> Normal Q-Q Plot</span></div>
-              <div class="mm-section-body padded"><div id="qqChart" style="height:320px;"></div></div>
+              <div class="mm-section-body padded"><div id="qqChart" style="height:320px;width:100%;"></div></div>
             </div>
-            <div class="mm-section">
+            <div class="mm-section" style="min-width:0;overflow:hidden;">
               <div class="mm-section-header"><span><i class="fa-solid fa-flask"></i> Shapiro-Wilk Test</span></div>
               <div class="mm-section-body padded">
                 <div class="stat-field"><span class="stat-label">W statistic:</span><span class="stat-value">${fmt(res.swW)}</span></div>
@@ -5198,7 +5198,7 @@ ${sectionsHtml}
                 </p>
               </div>
             </div>
-            <div class="mm-section">
+            <div class="mm-section" style="min-width:0;overflow:hidden;">
               <div class="mm-section-header"><span><i class="fa-solid fa-ruler"></i> Skewness &amp; Kurtosis</span></div>
               <div class="mm-section-body padded">
                 <div class="stat-field"><span class="stat-label">Skewness:</span><span class="stat-value">${fmt(res.skewness)}</span></div>
@@ -5711,11 +5711,16 @@ ${sectionsHtml}
     const panel = document.getElementById('diag-panel-' + name);
     if (panel) panel.classList.add('active');
     if (btn) btn.classList.add('active');
-    // Charts need a visible container — re-render when switching to chart tabs
-    if ((name === 'residuals' || name === 'normality') && typeof Highcharts !== 'undefined' && _results?.residuals?.fitted) {
-      setTimeout(() => renderResidualCharts(_results.residuals), 30);
-    }
-    if (name === 'influence') loadInfluentialTab();
+    // After the panel is visible, reflow all charts so they fill the correct width
+    setTimeout(() => {
+      if (typeof Highcharts !== 'undefined') {
+        Highcharts.charts.forEach(c => { if (c) { try { c.reflow(); } catch(e) {} } });
+      }
+      if ((name === 'residuals' || name === 'normality') && _results?.residuals?.fitted) {
+        renderResidualCharts(_results.residuals);
+      }
+      if (name === 'influence') loadInfluentialTab();
+    }, 40);
   }
 
   /* ─────────────────────────────────────────────────────────────

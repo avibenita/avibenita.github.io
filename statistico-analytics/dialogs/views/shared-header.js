@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('Loading shared-header.js VERSION 2026-05-26-recovery');
+console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
 
 (function () {
   function sanitizeDialogHostInfoParam() {
@@ -225,6 +225,7 @@ const StatisticoHeader = {
     // Apply persisted theme before rendering (avoids flash of wrong theme)
     this.applyTheme(this.getTheme());
     this._ensureMinimalStyles();
+    this._ensurePlainTabUnderlineStyles();
 
     // Keep univariate result dialogs visually capped to a laptop-like viewport.
     this.ensureLaptopFrame();
@@ -270,6 +271,7 @@ const StatisticoHeader = {
   updateTitle(title) {
     const el = document.getElementById('headerViewName');
     if (el) el.textContent = title;
+    this._refreshQuestionsAnsweredControl(title);
   },
 
   /**
@@ -451,6 +453,7 @@ const StatisticoHeader = {
     
     const actionButtonsHtml = this._pendingActions ? this._renderActionButtons(this._pendingActions) : '';
     const headerGlobalControls = this._renderHeaderGlobalControls();
+    const questionsAnsweredHtml = this._renderQuestionsAnsweredControl();
 
     // All sidebar-based modules hide the shared-header navrow to avoid duplicate navigation.
     const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate' || this.module === 'mixed-model');
@@ -472,6 +475,7 @@ const StatisticoHeader = {
         </div>
         <div class="header-right">
           ${hideNavrow ? '' : actionButtonsHtml}
+          ${questionsAnsweredHtml}
           ${headerGlobalControls}
         </div>
       </div>
@@ -560,6 +564,312 @@ const StatisticoHeader = {
     }
     setTimeout(() => this._injectPerViewAiButton(), 0);
     this._syncRowFilterHeader();
+    this._wireQuestionsAnsweredEvents();
+    this._refreshQuestionsAnsweredControl();
+  },
+
+  _normalizeQuestionKey(s) {
+    return String(s || '')
+      .toLowerCase()
+      .replace(/&/g, ' and ')
+      .replace(/[^\w\s-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  },
+
+  _getQuestionsAnsweredContent(forcedTitle = null) {
+    const titleText = forcedTitle || (document.getElementById('headerViewName')?.textContent || '');
+    const viewKey = this._getInsightGuideViewKey();
+    const key = this._normalizeQuestionKey(viewKey);
+    const titleKey = this._normalizeQuestionKey(titleText);
+    const module = this.module || 'univariate';
+
+    const byView = {
+      'histogram': [
+        'Is the variable roughly symmetric, skewed, or multi-peaked?',
+        'Where are most observations concentrated, and how wide is the spread?',
+        'Are there sparse regions, heavy tails, or unusual spikes worth investigating?',
+        'Would a transformation or robust method likely improve downstream analysis?'
+      ],
+      'cdf': [
+        'What proportion of observations falls below any chosen cutoff?',
+        'At which value do we reach key thresholds (for example 50%, 80%, 95%)?',
+        'How quickly does the cumulative curve rise, and where does it flatten?',
+        'How can this variable be translated into probability-style statements for stakeholders?'
+      ],
+      'percentile': [
+        'What are the concrete values at key percentiles (P25, median, P75, P90, etc.)?',
+        'How can an individual score be interpreted relative to the sample?',
+        'Where do natural low/typical/high bands begin and end?',
+        'Which percentile cutoffs are appropriate for reporting or decision rules?'
+      ],
+      'boxplot': [
+        'Where is the median, and how wide is the interquartile range?',
+        'Is variability balanced on both sides, or is the distribution skewed?',
+        'Which points are flagged as potential outliers by IQR rules?',
+        'Does spread appear stable enough for methods assuming similar variance?'
+      ],
+      'kernel': [
+        'What smooth distribution pattern emerges beyond histogram bin choices?',
+        'Are there hidden sub-peaks suggesting mixed subpopulations?',
+        'How do tail behaviors compare between left and right sides?',
+        'Is the overall shape consistent with assumptions behind planned tests/models?'
+      ],
+      'by-group': [
+        'How does the variable differ across groups in center, spread, and shape?',
+        'Which groups look practically different before formal testing?',
+        'Are outliers or skew concentrated in specific groups?',
+        'Do visual patterns support the test family selected in the Results section?'
+      ],
+      'by-group-stats': [
+        'Which groups differ in mean/median and variability?',
+        'Are observed group gaps large enough to be practically meaningful?',
+        'Do sample-size differences make some group summaries less stable?',
+        'Which group comparisons should be prioritized in follow-up tests?'
+      ],
+      'by-group-boxplot': [
+        'Which groups show the highest/lowest central tendency?',
+        'Where is variability widest or tightest across groups?',
+        'Are outliers concentrated in particular groups?',
+        'Do group distribution differences suggest unequal-variance procedures?'
+      ],
+      'by-group-normality': [
+        'Which groups satisfy normality assumptions, and which do not?',
+        'Are departures mild (tail effects) or strong enough to change test choice?',
+        'Is assumption failure isolated to one group or systemic across groups?',
+        'Should analysis proceed with parametric, robust, or non-parametric methods?'
+      ],
+      'qqplot': [
+        'How closely do observed quantiles track the theoretical normal line?',
+        'Are deviations mainly in tails, center, or both?',
+        'Do deviations suggest skewness, heavy tails, or outlier influence?',
+        'Is a normal-theory test/model still acceptable for this variable?'
+      ],
+      'normality': [
+        'What do formal normality tests agree on, and where do they differ?',
+        'How strong is the statistical evidence against normality?',
+        'Could sample size be making tiny deviations look significant?',
+        'Should we keep parametric methods or switch to robust/non-parametric alternatives?'
+      ],
+      'outliers': [
+        'Which cases are statistically unusual, and by what rule are they flagged?',
+        'Are extreme values isolated errors, valid rare events, or subgroup effects?',
+        'How sensitive are summary statistics/tests to these observations?',
+        'What is the most defensible handling choice (keep, winsorize, transform, analyze separately)?'
+      ],
+      'confidence': [
+        'What range of population values is plausible given this sample?',
+        'How precise is the estimate, and is precision adequate for decisions?',
+        'Would a larger sample materially narrow uncertainty?',
+        'Does the interval imply practical importance, not just statistical significance?'
+      ],
+      'hypothesis': [
+        'Is the observed sample evidence consistent with the null reference value?',
+        'What is the effect direction and magnitude, beyond p-value alone?',
+        'How does uncertainty affect confidence in the decision?',
+        'Is the finding statistically significant and practically meaningful?'
+      ],
+      'correlation matrix': [
+        'Which variable pairs are most strongly associated?',
+        'Are associations positive or negative and how stable are they?',
+        'Do patterns suggest multicollinearity or latent structure?'
+      ],
+      'partial correlations': [
+        'Do associations remain after controlling for covariates?',
+        'Which relationships are direct vs confounded?',
+        'How much unique association remains after adjustment?'
+      ],
+      'correlation network': [
+        'Which variables are central in the dependency structure?',
+        'Are there clusters/communities of related variables?',
+        'Where are the strongest links in the system?'
+      ],
+      'anova': [
+        'Do group means differ overall?',
+        'Which pairs/groups differ and by how much?',
+        'Are assumptions sufficiently met for this conclusion?'
+      ],
+      'marginal means': [
+        'What are adjusted means for each factor level?',
+        'Which levels differ after controlling for other terms?',
+        'Which pairwise differences remain significant after correction?'
+      ],
+      'diagnostics': [
+        'Are model assumptions reasonably satisfied?',
+        'Are influential observations driving results?',
+        'Can model-based conclusions be trusted?'
+      ],
+      'model effects': [
+        'Which fixed effects are statistically supported?',
+        'How large are estimated effects and uncertainty intervals?',
+        'Which terms are practically meaningful vs negligible?'
+      ],
+      'regression results': [
+        'Which predictors explain outcome variance?',
+        'What is each predictor effect direction and magnitude?',
+        'How well does the model fit overall?'
+      ],
+      'residual diagnostics': [
+        'Are residuals approximately random and unbiased?',
+        'Is variance roughly constant across fitted values?',
+        'Are there influential points or structure left unexplained?'
+      ],
+      'logistic regression': [
+        'How well does the model separate classes?',
+        'Which threshold balances sensitivity and specificity?',
+        'Which predictors most affect event odds?'
+      ],
+      'factor analysis': [
+        'Which variables define each latent factor?',
+        'Are there problematic cross-loadings?',
+        'Can factors be interpreted coherently?'
+      ],
+      'principal component analysis': [
+        'How many components capture most variance?',
+        'Which variables drive each component?',
+        'Can dimensionality be reduced with minimal information loss?'
+      ],
+      'cluster analysis': [
+        'How many meaningful clusters are present?',
+        'How distinct and compact are discovered clusters?',
+        'Which variables differentiate clusters most strongly?'
+      ]
+    };
+
+    const byModule = {
+      'univariate': [
+        'What does this variable look like in terms of center, spread, and shape?',
+        'Which assumptions seem acceptable, and which require caution?',
+        'Which observations or regions are atypical and potentially influential?',
+        'What clear, stakeholder-ready takeaway should this specific view support?'
+      ],
+      'correlations': [
+        'Which variables are associated and in what direction?',
+        'Which relationships remain after controls or subgrouping?',
+        'Which associations are strongest and actionable?'
+      ],
+      'regression': [
+        'Which predictors materially explain the outcome?',
+        'How reliable and stable are coefficient estimates?',
+        'Is model fit adequate for inference or prediction?'
+      ],
+      'independent': [
+        'Do groups differ on the outcome?',
+        'How large are those differences in practical terms?',
+        'Which comparisons remain significant after correction?'
+      ],
+      'dependent': [
+        'Do repeated/paired measurements change over conditions or time?',
+        'Where are the largest within-subject differences?',
+        'Are assumptions acceptable for repeated-measures conclusions?'
+      ],
+      'anova': [
+        'Is there an overall group effect?',
+        'Which groups/levels drive the effect?',
+        'How robust is the conclusion under assumption checks?'
+      ],
+      'mixed-model': [
+        'Which fixed effects are supported after accounting for hierarchy?',
+        'How much variance is attributable to random structure (ICC)?',
+        'Which adjusted means/contrasts are substantively important?'
+      ],
+      'logistic': [
+        'How well does the model classify outcomes?',
+        'Which predictors most affect event probability?',
+        'What operating threshold is most appropriate?'
+      ],
+      'factor': [
+        'What latent dimensions explain covariance patterns?',
+        'Which indicators map cleanly to each factor?',
+        'Is the factor solution interpretable and stable?'
+      ],
+      'pca': [
+        'How many components summarize most variance?',
+        'Which loadings define each component?',
+        'Is reduced-dimensional representation adequate?'
+      ],
+      'cluster': [
+        'Are natural subgroups present in the data?',
+        'How separated are clusters?',
+        'Which features characterize each cluster?'
+      ],
+      'power': [
+        'Is planned sample size sufficient for target power/precision?',
+        'How sensitive are conclusions to effect-size assumptions?',
+        'What design changes most improve power efficiency?'
+      ]
+    };
+
+    const keys = [key, titleKey].filter(Boolean);
+    for (const k of keys) {
+      if (byView[k]) return byView[k];
+    }
+    return byModule[module] || [];
+  },
+
+  _renderQuestionsAnsweredControl() {
+    const items = this._getQuestionsAnsweredContent();
+    if (!items.length) return '';
+    return `
+      <div class="header-qa-wrap" id="headerQaWrap">
+        <button class="header-qa-btn"
+                id="headerQaBtn"
+                type="button"
+                aria-expanded="false"
+                aria-controls="headerQaPanel"
+                title="What questions this view answers"
+                onclick="StatisticoHeader._toggleQuestionsAnsweredPanel(event)">
+          <i class="fa-solid fa-bullseye"></i>
+          <span>Questions Answered</span>
+        </button>
+        <div class="header-qa-panel" id="headerQaPanel" role="dialog" aria-label="Questions this view answers">
+          <div class="header-qa-title">Questions this view answers</div>
+          <ul class="header-qa-list" id="headerQaList">
+            ${items.map((q) => `<li>${q}</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+    `;
+  },
+
+  _refreshQuestionsAnsweredControl(forcedTitle = null) {
+    const wrap = document.getElementById('headerQaWrap');
+    const list = document.getElementById('headerQaList');
+    if (!wrap || !list) return;
+    const items = this._getQuestionsAnsweredContent(forcedTitle);
+    if (!items.length) {
+      wrap.style.display = 'none';
+      return;
+    }
+    wrap.style.display = '';
+    list.innerHTML = items.map((q) => `<li>${q}</li>`).join('');
+  },
+
+  _toggleQuestionsAnsweredPanel(evt) {
+    if (evt) {
+      evt.preventDefault();
+      evt.stopPropagation();
+    }
+    const panel = document.getElementById('headerQaPanel');
+    const btn = document.getElementById('headerQaBtn');
+    if (!panel || !btn) return;
+    const open = !panel.classList.contains('show');
+    panel.classList.toggle('show', open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  },
+
+  _wireQuestionsAnsweredEvents() {
+    if (this._qaOutsideBound) return;
+    this._qaOutsideBound = true;
+    document.addEventListener('click', (e) => {
+      const wrap = document.getElementById('headerQaWrap');
+      const panel = document.getElementById('headerQaPanel');
+      const btn = document.getElementById('headerQaBtn');
+      if (!wrap || !panel || !btn) return;
+      if (wrap.contains(e.target)) return;
+      panel.classList.remove('show');
+      btn.setAttribute('aria-expanded', 'false');
+    });
   },
 
   _syncRowFilterHeader() {
@@ -1173,6 +1483,24 @@ const StatisticoHeader = {
     return sections[0];
   },
 
+  _getUniTabSubtitle(tabKey) {
+    const subs = {
+      histogram: 'Frequency & shape',
+      cdf: 'Cumulative curve',
+      percentile: 'Cut points & lookup',
+      boxplot: 'Quartiles & outliers',
+      kernel: 'Smoothed density',
+      normality: 'Formal test battery',
+      qqplot: 'Probability plots',
+      confidence: 'Mean & median CIs',
+      hypothesis: 'Reference value test',
+      'by-group-stats': 'Descriptive stats & histograms',
+      'by-group-boxplot': 'Compare spread by group',
+      'by-group-normality': 'Six tests & NSI by group'
+    };
+    return subs[tabKey] || '';
+  },
+
   _buildUniWsTabBtn(opts) {
     const active = opts.active ? ' active' : '';
     let onclick = '';
@@ -1184,11 +1512,15 @@ const StatisticoHeader = {
       onclick = ` onclick="StatisticoHeader.navigateTo('${opts.onSection}')"`;
     }
     const titleAttr = opts.title ? ` title="${opts.title.replace(/"/g, '&quot;')}"` : '';
-    return `<button type="button" class="ws-mode-tab${active}" role="tab"`
+    const sub = this._getUniTabSubtitle(opts.tabKey);
+    return `<button type="button" class="overview-subtab-btn${active}" role="tab"`
       + ` aria-selected="${opts.active ? 'true' : 'false'}"`
       + ` data-uni-tab="${opts.tabKey}"${titleAttr}${onclick}>`
       + `<i class="fa-solid ${opts.icon}" aria-hidden="true"></i>`
-      + `<span>${opts.label}</span></button>`;
+      + `<span class="overview-subtab-copy">`
+      + `<span class="overview-subtab-label">${opts.label}</span>`
+      + (sub ? `<span class="overview-subtab-sub">${sub}</span>` : '')
+      + `</span></button>`;
   },
 
   setByGroupResultsTab(panel) {
@@ -1199,28 +1531,64 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
+  _TAB_ASSET_VER: '20260602uniw',
+
+  _ensurePlainTabUnderlineStyles() {
+    const id = 'statistico-tab-underline-fix';
+    let style = document.getElementById(id);
+    if (!style) {
+      style = document.createElement('style');
+      style.id = id;
+      document.head.appendChild(style);
+    }
+    style.textContent = [
+      '.overview-subtab-btn.active::before,',
+      '.ws-mode-bar--slant .ws-mode-tab.active::before,',
+      '.ws-tab-cluster.has-active .ws-tab-indicator {',
+      '  background: #ffffff !important;',
+      '  box-shadow: none !important;',
+      '}',
+      'html[data-theme="light"] .overview-subtab-btn.active::before,',
+      'html[data-theme="light"] .ws-mode-bar--slant .ws-mode-tab.active::before {',
+      '  background: #ffffff !important;',
+      '  box-shadow: none !important;',
+      '}'
+    ].join('\n');
+  },
+
   _ensureMinimalStyles() {
-    if (document.getElementById('statistico-minimal-css')) return;
-    const link = document.createElement('link');
+    const ver = this._TAB_ASSET_VER;
+    const href = this.resolveDialogUrl('shared-minimal.css?v=' + ver);
+    let link = document.getElementById('statistico-minimal-css');
+    if (link) {
+      link.href = href;
+      return;
+    }
+    link = document.createElement('link');
     link.id = 'statistico-minimal-css';
     link.rel = 'stylesheet';
-    link.href = this.resolveDialogUrl('shared-minimal.css?v=20260601s');
+    link.href = href;
     document.head.appendChild(link);
   },
 
   _ensureUnivariateWorkspaceTabAssets() {
     if (this.module !== 'univariate') return;
-    if (!document.getElementById('uni-ws-tabs-css')) {
-      const link = document.createElement('link');
+    const ver = this._TAB_ASSET_VER;
+    let link = document.getElementById('uni-ws-tabs-css');
+    const cssHref = this.resolveDialogUrl('shared-workspace-tabs.css?v=' + ver);
+    if (link) {
+      link.href = cssHref;
+    } else {
+      link = document.createElement('link');
       link.id = 'uni-ws-tabs-css';
       link.rel = 'stylesheet';
-      link.href = this.resolveDialogUrl('shared-workspace-tabs.css?v=20260601tabs');
+      link.href = cssHref;
       document.head.appendChild(link);
     }
     if (!document.getElementById('uni-ws-tabs-js') && !globalThis.StatisticoWorkspaceTabs) {
       const script = document.createElement('script');
       script.id = 'uni-ws-tabs-js';
-      script.src = this.resolveDialogUrl('shared-workspace-tabs.js?v=20260601tabs');
+      script.src = this.resolveDialogUrl('shared-workspace-tabs.js?v=' + ver);
       script.onload = function () {
         try { StatisticoHeader._renderUnivariateResultsTabs(); } catch (_e) {}
       };
@@ -1304,14 +1672,11 @@ const StatisticoHeader = {
         : 'Distribution views';
 
     stack.innerHTML =
-      '<div class="ws-chrome ws-chrome--attached ws-chrome--compact">'
-      + '<nav class="ws-mode-bar ws-mode-bar--attached ws-mode-bar--slant" aria-label="' + ariaLabel + '">'
+      '<div class="overview-subtabs uni-view-tabs" role="tablist" aria-label="' + ariaLabel + '">'
       + tabsHtml
-      + '</nav></div>';
+      + '</div>';
 
-    if (typeof globalThis.StatisticoWorkspaceTabs !== 'undefined') {
-      globalThis.StatisticoWorkspaceTabs.init();
-    }
+    this._ensurePlainTabUnderlineStyles();
   },
 
   _renderSidebarNavItem(item) {
@@ -4623,6 +4988,7 @@ const StatisticoHeader = {
     }
     this._renderSharedSidebar();
     this._ensureMinimalStyles();
+    this._ensurePlainTabUnderlineStyles();
     this._ensureDefaultActions();
     this._mountSidebarUtilities();
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
@@ -6872,8 +7238,18 @@ Always follow the exact output format requested.` },
         ${sections.ABOUT ? `
         <div class="sb-ai-section sb-ai-section--about sb-ai-about-hero">
           <div class="sb-ai-section-body sb-ai-about-line">${sections.ABOUT}</div>
-        </div>
-        <div class="sb-ai-divider"></div>` : ''}
+        </div>` : ''}
+
+        ${/* ── What Questions This View Answers (static, per-view only) ── */ ''}
+        ${mode === 'per-view' ? (() => {
+          const qs = this._getQuestionsAnsweredContent();
+          if (!qs.length) return '';
+          return `<div class="sb-ai-section sb-ai-section--questions">
+            <div class="sb-ai-section-label"><i class="fa-solid fa-circle-question" style="margin-right:5px;"></i>What Questions This View Answers</div>
+            <div class="sb-ai-section-body"><ul class="sb-ai-list">${qs.map(q => `<li>${q}</li>`).join('')}</ul></div>
+          </div>`;
+        })() : ''}
+        <div class="sb-ai-divider"></div>
 
         ${/* ── Per-view structure ── */ ''}
         ${sections.INSIGHT ? `

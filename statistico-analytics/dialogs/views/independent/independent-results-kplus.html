@@ -74,8 +74,9 @@
     .tab-panel.active{display:block;overflow-y:auto;}          /* default: block + scroll */
     #tab-results.tab-panel.active{overflow-x:hidden;overflow-y:auto;}
     #block-parametric{height:auto;min-height:0;display:flex;flex-direction:column;gap:8px;}
-    #block-parametric>.stat-panel:first-child{flex:0 0 auto;}
-    #block-parametric>.stats-container{flex:0 0 auto;min-height:0;margin-top:0!important;}
+    #block-parametric>.stat-panel.anova-panel{flex:0 0 auto;}
+    #block-parametric>.stat-panel.anova-panel .table-container{width:90%;margin-right:auto;}
+    #block-parametric>.stats-container{flex:0 0 auto;min-height:0;margin-top:28px!important;}
     #block-parametric>.stats-container>.stat-panel{min-height:0;display:flex;flex-direction:column;}
     #block-parametric>.stats-container>.stat-panel>.stat-panel-body{flex:0 0 auto;min-height:0;}
     #groupChartContainer{height:280px!important;min-height:220px;}
@@ -559,7 +560,7 @@
 
           <!-- PARAMETRIC BLOCK -->
           <div id="block-parametric">
-            <div class="stat-panel">
+            <div class="stat-panel anova-panel">
               <div class="stat-panel-heading parametric" id="anovaResultsHeading">Independent Measures ANOVA</div>
               <div class="stat-panel-body" style="padding:10px;">
                 <div class="table-container" style="margin:0;max-height:none;">
@@ -577,16 +578,19 @@
               </div>
             </div>
 
-            <div class="stats-container" style="margin-top:12px;">
+            <div class="stats-container">
               <div class="stat-panel">
                 <div class="stat-panel-heading">
-                  Group Visualization
+                  Variable Visualization
                   <div style="float:right;display:inline-flex;gap:12px;font-size:13px;font-weight:600;">
                     <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
                       <input type="radio" name="chartMetric" value="means" checked onchange="updateGroupChart()"> Means
                     </label>
                     <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
                       <input type="radio" name="chartMetric" value="variances" onchange="updateGroupChart()"> Variances
+                    </label>
+                    <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
+                      <input type="radio" name="chartMetric" value="boxplot" onchange="updateGroupChart()"> Box Plot
                     </label>
                   </div>
                 </div>
@@ -652,7 +656,7 @@
                 <div class="stat-panel-body" style="padding:10px;">
                   <div class="table-container" style="margin:0;max-height:none;">
                     <table class="analysis-table">
-                      <thead><tr><th>Group</th><th>n</th><th>Mean Rank</th><th>Median</th><th>IQR</th></tr></thead>
+                      <thead><tr><th>Variable</th><th>n</th><th>Mean Rank</th><th>Median</th><th>IQR</th></tr></thead>
                       <tbody id="rankDescBody">
                         <tr><td colspan="4" style="text-align:center;opacity:.6;">No data</td></tr>
                       </tbody>
@@ -662,7 +666,7 @@
               </div>
               <div class="stat-panel">
                 <div class="stat-panel-heading nonparametric" style="display:flex;align-items:center;justify-content:space-between;">
-                  <span>Group Visualization</span>
+                  <span>Variable Visualization</span>
                   <div style="display:inline-flex;gap:14px;font-size:13px;font-weight:600;text-transform:none;">
                     <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
                       <input type="radio" name="npChartMetric" value="ranks" checked onchange="setNpChartMode('ranks')"> Mean Ranks
@@ -1247,8 +1251,13 @@
       
       const metricType = document.querySelector('input[name="chartMetric"]:checked')?.value || 'means';
       console.log("Metric type:", metricType);
+
+      if (metricType === 'boxplot') {
+        renderVariableBoxplotChart('groupChartContainer', '_kplusChart');
+        return;
+      }
       
-      const categories = groupData.map(cs => cs.name || 'Group');
+      const categories = groupData.map(cs => cs.name || 'Variable');
       console.log("Categories:", categories);
       
       const data = groupData.map(cs => {
@@ -1266,7 +1275,7 @@
       }
       console.log("Highcharts version:", Highcharts.version);
       
-      const chartTitle = metricType === 'means' ? 'Group Means' : 'Group Variances';
+      const chartTitle = metricType === 'means' ? 'Variable Means' : 'Variable Variances';
       const yAxisTitle = metricType === 'means' ? 'Mean' : 'Variance';
       
       console.log("About to create chart...");
@@ -1608,7 +1617,7 @@
       if (_rankChart) { try { _rankChart.destroy(); } catch(e){} _rankChart = null; }
       _rankChart = Highcharts.chart('rankChartContainer', {
         chart: { type: 'bar', backgroundColor: 'transparent', style: { fontFamily: 'Segoe UI,Tahoma,sans-serif' }, animation: false },
-        title: { text: 'Mean Ranks by Group', style: { color: '#fff', fontSize: '13px' } },
+        title: { text: 'Mean Ranks by Variable', style: { color: '#fff', fontSize: '13px' } },
         xAxis: { categories: categories, labels: { style: { color: '#ccc', fontSize: '12px' } } },
         yAxis: { title: { text: 'Mean Rank', style: { color: '#ccc', fontSize: '12px' } }, labels: { style: { color: '#ccc' } }, gridLineColor: 'rgba(255,255,255,.1)' },
         legend: { enabled: false },
@@ -1620,10 +1629,10 @@
       });
     }
 
-    // Boxplot chart (horizontal, one box per group)
-    function renderBoxplotChart() {
+    // Boxplot chart (horizontal, one box per variable)
+    function renderVariableBoxplotChart(containerId, chartVar) {
       if (typeof Highcharts === 'undefined') return;
-      var container = document.getElementById('rankChartContainer');
+      var container = document.getElementById(containerId);
       if (!container || !lastBundle) return;
       var colStats = (lastBundle.explore && Array.isArray(lastBundle.explore.selectedColumnStats))
         ? lastBundle.explore.selectedColumnStats.filter(function(cs){ return parseMaybeNumber(cs.n) > 0; })
@@ -1631,7 +1640,7 @@
       var categories = colStats.map(function(cs){ return cs.name || ''; });
       var colours = ['#4fc3f7','#81c784','#ffb74d','#f06292','#ba68c8','#4dd0e1','#aed581','#ff8a65'];
 
-      var boxRows = categories.map(function(name, i) {
+      var boxRows = categories.map(function(name) {
         var ds = Array.isArray(descData) ? descData.find(function(d){ return d.Variable === name; }) : null;
         if (!ds || !ds.vector || ds.vector.length === 0) return null;
         var sv = ds.vector.slice().sort(function(a,b){ return a-b; });
@@ -1644,10 +1653,10 @@
         return;
       }
 
-      if (_rankChart) { try { _rankChart.destroy(); } catch(e){} _rankChart = null; }
-      _rankChart = Highcharts.chart('rankChartContainer', {
+      if (window[chartVar]) { try { window[chartVar].destroy(); } catch(e){} window[chartVar] = null; }
+      window[chartVar] = Highcharts.chart(containerId, {
         chart: { type: 'boxplot', inverted: true, backgroundColor: 'transparent', style: { fontFamily: 'Segoe UI,Tahoma,sans-serif' }, animation: false },
-        title: { text: 'Group Distributions', style: { color: '#fff', fontSize: '13px' } },
+        title: { text: 'Variable Distributions', style: { color: '#fff', fontSize: '13px' } },
         xAxis: { categories: categories, labels: { style: { color: '#ccc', fontSize: '12px' } } },
         yAxis: { title: { text: 'Value', style: { color: '#ccc', fontSize: '12px' } }, labels: { style: { color: '#ccc' } }, gridLineColor: 'rgba(255,255,255,.1)' },
         legend: { enabled: false },
@@ -1664,6 +1673,9 @@
           whiskerWidth: 2, stemWidth: 1 }],
         credits: { enabled: false }
       });
+    }
+    function renderBoxplotChart() {
+      renderVariableBoxplotChart('rankChartContainer', '_rankChart');
     }
 
     function updatePosthocDisplay() {

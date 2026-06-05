@@ -465,7 +465,7 @@
           </div></div></div>
         </section>
         <section id="tab-results" class="tab-panel active">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;height:100%;overflow:hidden;box-sizing:border-box;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;min-height:320px;overflow:hidden;box-sizing:border-box;">
             <!-- Left column: stat panels -->
             <div style="display:flex;flex-direction:column;gap:6px;overflow-y:auto;min-height:0;">
               <div class="stat-panel"><div class="stat-panel-heading">Primary Results</div><div class="stat-panel-body" style="padding:6px 14px;">
@@ -1404,11 +1404,21 @@
       window._indepChart = indepChart;
     }
     // Layout engine
+    function getLayoutBottomReserve() {
+      const H = document.body.clientHeight || window.innerHeight;
+      let reserve = 28;
+      const footer = document.querySelector('.ind-footer');
+      const aiBtn = document.getElementById('sbAiFloatBtn');
+      if (footer) {
+        const fb = footer.getBoundingClientRect();
+        if (fb.height > 0 && fb.top < H) reserve = Math.max(reserve, H - fb.top + 6);
+      }
+      if (aiBtn && aiBtn.offsetParent !== null) reserve = Math.max(reserve, (aiBtn.offsetHeight || 44) + 36);
+      return reserve;
+    }
     function fitIndependentLayout() {
       const H = document.body.clientHeight;
-      const footer = document.querySelector('.ind-footer');
-      const footerH = footer ? footer.offsetHeight : 0;
-      const bottomGap = footerH + 24;  // keep chart bottom frame/axis visible
+      const bottomGap = getLayoutBottomReserve();  // keep chart bottom frame/axis visible
 
       // Size view-container: stops above footer
       const vc = document.querySelector('.view-container');
@@ -1416,10 +1426,10 @@
         vc.style.height = Math.max(80, H - vc.getBoundingClientRect().top - bottomGap) + 'px';
       }
 
-      // Size active tab (fills vc content area; vc padding 6px - 2 = 12px)
+      // Size active tab (fills vc content area)
       const tab = document.querySelector('.tab-panel.active');
       if (tab && vc) {
-        tab.style.height = Math.max(60, vc.clientHeight - 12) + 'px';
+        tab.style.height = Math.max(120, vc.clientHeight - 16) + 'px';
       }
 
       // Histogram container: anchor to just above footer gap

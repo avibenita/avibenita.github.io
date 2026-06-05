@@ -60,9 +60,9 @@ function hideIndependentConfigEmbed() {
 
 function sendDialogDataToEmbed() {
   const frame = document.getElementById("independentConfigFrame");
-  if (!frame || !frame.contentWindow || !independentRangeData) return;
-  const headers = independentRangeData[0] || [];
-  const rows = independentRangeData.slice(1);
+  if (!frame || !frame.contentWindow) return;
+  const headers = (independentRangeData && independentRangeData.length) ? (independentRangeData[0] || []) : [];
+  const rows = (independentRangeData && independentRangeData.length > 1) ? independentRangeData.slice(1) : [];
   // Always open the builder fresh.
   const savedModelSpec = null;
   try {
@@ -110,7 +110,6 @@ function attachIndEmbedListener() {
 
 /** Fallback: floating Office dialog (used only if task pane has no embed host). */
 function openIndependentBuilderDialog() {
-  if (!independentRangeData || independentRangeData.length < 2) return;
   Office.context.ui.displayDialogAsync(
     `${getDialogsBaseUrl()}independent/independent-input.html?v=${Date.now()}`,
     DIALOG_SIZES.REGRESSION_BUILDER,
@@ -146,7 +145,6 @@ function openIndependentBuilderDialog() {
 }
 
 function openIndependentBuilder() {
-  if (!independentRangeData || independentRangeData.length < 2) return;
   const host = document.getElementById("independentConfigHost");
   const frame = document.getElementById("independentConfigFrame");
   if (!host || !frame) {
@@ -164,9 +162,9 @@ function openIndependentBuilder() {
 }
 
 function sendDialogData() {
-  if (!independentDialog || !independentRangeData) return;
-  const headers = independentRangeData[0] || [];
-  const rows = independentRangeData.slice(1);
+  if (!independentDialog) return;
+  const headers = (independentRangeData && independentRangeData.length) ? (independentRangeData[0] || []) : [];
+  const rows = (independentRangeData && independentRangeData.length > 1) ? independentRangeData.slice(1) : [];
   // Always open the builder fresh.
   const savedModelSpec = null;
   independentDialog.messageChild(JSON.stringify({
@@ -441,11 +439,18 @@ function computePosthocRows(grouped, levels, framework, correction) {
         rawP.push(mw.p);
       } else {
         const w = computeWelch(a, b, "two-sided");
+        const n1 = a.length, n2 = b.length;
+        const v1 = variance(a), v2 = variance(b);
+        const sp = Math.sqrt((((Math.max(0, n1 - 1)) * v1) + ((Math.max(0, n2 - 1)) * v2)) / Math.max(1, n1 + n2 - 2));
+        const cohenD = sp > 0 ? (w.diff / sp) : 0;
         rows.push({
           comparison: `${levels[i]} vs ${levels[j]}`,
           statistic: `t=${w.t.toFixed(2)}`,
           rawP: w.p,
-          estimate: w.diff
+          estimate: w.diff,
+          ciLower: w.ciLow,
+          ciUpper: w.ciHigh,
+          cohenD: cohenD
         });
         rawP.push(w.p);
       }
@@ -457,7 +462,10 @@ function computePosthocRows(grouped, levels, framework, correction) {
     statistic: r.statistic,
     rawP: r.rawP,
     adjP: adj[i],
-    estimate: r.estimate
+    estimate: r.estimate,
+    ciLower: r.ciLower,
+    ciUpper: r.ciUpper,
+    cohenD: r.cohenD
   }));
 }
 

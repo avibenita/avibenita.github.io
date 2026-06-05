@@ -165,6 +165,32 @@
     /* Post-hoc table - larger text */
     #posthocTable th{font-size:15px;padding:11px 14px;}
     #posthocTable td{font-size:15px;padding:10px 14px;}
+    #tab-posthoc.tab-panel.active{padding:4px 4px 0;box-sizing:border-box;overflow-y:auto!important;}
+    .posthoc-summary{margin-bottom:14px;padding:12px 14px;border:1px solid rgba(74,144,226,.28);border-radius:8px;background:rgba(46,95,138,.1);}
+    .posthoc-summary-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#7eb8f0;margin:0 0 8px;}
+    .posthoc-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px 16px;font-size:13px;color:var(--text-secondary);}
+    .posthoc-summary-grid strong{color:var(--text-primary);}
+    .posthoc-view-toggle{display:flex;gap:12px;align-items:center;margin-bottom:12px;font-size:13px;font-weight:600;color:var(--text-secondary);}
+    .posthoc-view-toggle label{display:inline-flex;align-items:center;gap:5px;cursor:pointer;}
+    .posthoc-ref-radios{display:flex;flex-direction:column;gap:6px;margin-top:4px;}
+    .posthoc-ref-radios label{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--text-secondary);cursor:pointer;}
+    .posthoc-ref-card--inactive{opacity:.55;}
+    .ph-mag{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;}
+    .ph-mag--negligible{background:rgba(100,116,139,.12);border:1px solid rgba(100,116,139,.3);color:#94a3b8;}
+    .ph-mag--small{background:rgba(120,200,255,.12);border:1px solid rgba(120,200,255,.35);color:#7eb8f0;}
+    .ph-mag--medium{background:rgba(251,191,36,.14);border:1px solid rgba(251,191,36,.4);color:#fbbf24;}
+    .ph-mag--large{background:rgba(74,222,128,.14);border:1px solid rgba(74,222,128,.45);color:#4ade80;}
+    .ph-mag--verylarge{background:rgba(244,114,182,.14);border:1px solid rgba(244,114,182,.45);color:#f472b6;}
+    .posthoc-heatmap-wrap{overflow:auto;margin-bottom:12px;display:none;}
+    .posthoc-heatmap{border-collapse:collapse;font-size:12px;min-width:280px;}
+    .posthoc-heatmap th,.posthoc-heatmap td{border:1px solid rgba(255,255,255,.12);padding:8px 10px;text-align:center;min-width:72px;}
+    .posthoc-heatmap th{background:rgba(22,78,141,.85);color:#fff;font-weight:600;}
+    .posthoc-heatmap td:first-child{font-weight:700;text-align:left;background:rgba(255,255,255,.04);}
+    .posthoc-heatmap .ph-cell--sig{font-weight:700;color:#fff;}
+    .posthoc-interpret{margin-top:12px;padding:12px 14px;border-left:4px solid #4a90e2;border-radius:8px;background:rgba(46,95,138,.1);font-size:13px;line-height:1.65;color:var(--text-secondary);}
+    .posthoc-interpret-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#7eb8f0;margin:0 0 6px;}
+    .posthoc-tab-footer-spacer{height:88px;pointer-events:none;}
+    .right-col:has(#tab-posthoc.active) .sb-ai-float-btn{bottom:52px;right:24px;}
     .section-note{margin-top:8px;padding:10px 14px;border-left:3px solid var(--accent-1);background:rgba(255,165,120,.1);color:var(--text-muted);font-size:14px;}
     .framework-select{height:32px;padding:0 10px;border-radius:6px;border:1px solid rgba(148,163,184,.45);background:rgba(15,23,42,.82);color:#fff;font-size:13px;}
     .agreement-good{color:#4ade80;font-weight:700;}
@@ -893,12 +919,13 @@
                   </div>
                   <div class="posthoc-menu-card-sub">Show every contrast or focus on one reference group.</div>
                 </div>
-                <div class="posthoc-menu-card">
+                <div class="posthoc-menu-card" id="posthocRefCard">
                   <div class="posthoc-menu-card-title">Reference</div>
-                  <select id="posthocRefGroup" onchange="updatePosthocDisplay()">
+                  <div id="posthocRefRadios" class="posthoc-ref-radios"></div>
+                  <select id="posthocRefGroup" onchange="updatePosthocDisplay()" style="display:none;">
                     <option value="">Select group...</option>
                   </select>
-                  <div class="posthoc-menu-card-sub">Used only when "vs reference" is selected.</div>
+                  <div class="posthoc-menu-card-sub">Choose the reference group when using "vs reference".</div>
                 </div>
               </div>
 
@@ -906,18 +933,29 @@
               <div id="posthocWarning" style="display:none;padding:8px 12px;margin-bottom:12px;background:rgba(251,191,36,.15);border-left:3px solid #fbbf24;border-radius:4px;">
                 <span style="font-size:14px;color:#fbbf24;font-weight:600;">Omnibus test not significant (p > alpha). Interpret post-hoc comparisons with caution.</span>
               </div>
+
+              <div id="posthocSummaryCard" class="posthoc-summary" style="display:none;">
+                <div class="posthoc-summary-title">Pairwise Summary</div>
+                <div class="posthoc-summary-grid" id="posthocSummaryBody"></div>
+              </div>
+
+              <div class="posthoc-view-toggle">
+                <span>View:</span>
+                <label><input type="radio" name="posthocViewMode" value="table" checked onchange="updatePosthocDisplay()"> Table</label>
+                <label><input type="radio" name="posthocViewMode" value="heatmap" onchange="updatePosthocDisplay()"> Heatmap</label>
+              </div>
               
-              <div class="table-container" style="margin:0;">
+              <div class="table-container" id="posthocTableWrap" style="margin:0;">
                 <table class="analysis-table" id="posthocTable">
                   <thead>
                     <tr>
-                      <th style="cursor:pointer;" onclick="sortPosthocTable('comparison')">Comparison sort</th>
-                      <th style="cursor:pointer;" onclick="sortPosthocTable('statistic')">Statistic sort</th>
-                      <th style="cursor:pointer;" onclick="sortPosthocTable('rawp')">Raw p sort</th>
-                      <th style="cursor:pointer;" onclick="sortPosthocTable('adjp')">Adj p sort</th>
-                      <th style="cursor:pointer;" onclick="sortPosthocTable('estimate')" title="Rank-biserial correlation r (non-parametric) or mean difference (parametric)">Effect Est. sort</th>
-                      <th style="cursor:pointer;" onclick="sortPosthocTable('ci')" title="95% confidence interval (available when host sends SE)">95% CI sort</th>
-                      <th style="text-align:center;">Sig</th>
+                      <th style="cursor:pointer;" onclick="sortPosthocTable('comparison')">Comparison</th>
+                      <th style="cursor:pointer;" onclick="sortPosthocTable('statistic')">Statistic</th>
+                      <th style="cursor:pointer;" onclick="sortPosthocTable('rawp')">Raw p</th>
+                      <th style="cursor:pointer;" onclick="sortPosthocTable('adjp')">Adj p</th>
+                      <th style="cursor:pointer;" onclick="sortPosthocTable('estimate')" title="Mean difference (parametric) or rank-biserial r (non-parametric)">Difference</th>
+                      <th style="cursor:pointer;" onclick="sortPosthocTable('ci')" title="95% confidence interval">95% CI</th>
+                      <th style="text-align:center;">Magnitude</th>
                     </tr>
                   </thead>
                   <tbody id="posthocBody">
@@ -925,11 +963,21 @@
                   </tbody>
                 </table>
               </div>
+
+              <div id="posthocHeatmapWrap" class="posthoc-heatmap-wrap">
+                <table class="posthoc-heatmap" id="posthocHeatmap"></table>
+              </div>
               
+              <div id="posthocInterpretBox" class="posthoc-interpret" style="display:none;">
+                <div class="posthoc-interpret-title">Interpretation</div>
+                <div id="posthocInterpretText"></div>
+              </div>
+
               <div style="margin-top:12px;padding:10px 14px;background:rgba(120,200,255,.08);border-radius:4px;font-size:13px;color:var(--text-secondary);">
                 <strong>Note:</strong> <span id="posthocMethodNote">...</span>
                 <span id="posthocEstimateNote" style="margin-left:10px;opacity:.75;"></span>
               </div>
+              <div class="posthoc-tab-footer-spacer" aria-hidden="true"></div>
             </div>
           </div>
         </section>
@@ -1765,7 +1813,117 @@
     let posthocData = [];
     let posthocSortColumn = 'adjp';
     let posthocSortAsc = true;
-    
+    let posthocGroups = [];
+
+    function posthocMagnitudeBadge(row, isNP) {
+      var val = isNP ? Math.abs(parseMaybeNumber(row.estimate)) : Math.abs(parseMaybeNumber(row.cohenD != null ? row.cohenD : row.estimate));
+      var label = 'Negligible';
+      var cls = 'negligible';
+      if (isNP) {
+        if (val >= 0.5) { label = 'Large'; cls = 'large'; }
+        else if (val >= 0.3) { label = 'Medium'; cls = 'medium'; }
+        else if (val >= 0.1) { label = 'Small'; cls = 'small'; }
+      } else {
+        if (val >= 1.2) { label = 'Very Large'; cls = 'verylarge'; }
+        else if (val >= 0.8) { label = 'Large'; cls = 'large'; }
+        else if (val >= 0.5) { label = 'Medium'; cls = 'medium'; }
+        else if (val >= 0.2) { label = 'Small'; cls = 'small'; }
+      }
+      return '<span class="ph-mag ph-mag--' + cls + '">' + label + '</span>';
+    }
+
+    function updatePosthocSummary(displayData, isNP) {
+      var card = document.getElementById('posthocSummaryCard');
+      var body = document.getElementById('posthocSummaryBody');
+      if (!card || !body || !displayData.length) {
+        if (card) card.style.display = 'none';
+        return;
+      }
+      var sig = displayData.filter(function(r) { return r.significant; });
+      var sortedByAbs = displayData.slice().sort(function(a, b) { return Math.abs(b.estimate) - Math.abs(a.estimate); });
+      var strongest = sortedByAbs[0];
+      var weakest = sortedByAbs[sortedByAbs.length - 1];
+      body.innerHTML = ''
+        + '<div><strong>Total comparisons:</strong> ' + displayData.length + '</div>'
+        + '<div><strong>Significant:</strong> ' + sig.length + '</div>'
+        + '<div><strong>Non-significant:</strong> ' + (displayData.length - sig.length) + '</div>'
+        + '<div><strong>Strongest contrast:</strong><br/>' + (strongest ? strongest.comparison : '—') + '<br/>Difference = ' + (strongest ? fmt(strongest.estimate) : '—') + '</div>'
+        + '<div><strong>Weakest contrast:</strong><br/>' + (weakest ? weakest.comparison : '—') + '<br/>Difference = ' + (weakest ? fmt(weakest.estimate) : '—') + '</div>';
+      card.style.display = 'block';
+    }
+
+    function updatePosthocInterpretation(displayData, correction) {
+      var box = document.getElementById('posthocInterpretBox');
+      var text = document.getElementById('posthocInterpretText');
+      if (!box || !text || !displayData.length) {
+        if (box) box.style.display = 'none';
+        return;
+      }
+      var sig = displayData.filter(function(r) { return r.significant; });
+      var sorted = displayData.slice().sort(function(a, b) { return Math.abs(b.estimate) - Math.abs(a.estimate); });
+      var strongest = sorted[0];
+      var weakest = sorted[sorted.length - 1];
+      var html = '';
+      if (sig.length === displayData.length) {
+        html += '<p>All ' + displayData.length + ' pairwise comparisons remain significant after ' + (correction || 'Holm') + ' correction.</p>';
+      } else if (sig.length === 0) {
+        html += '<p>No pairwise comparisons remain significant after ' + (correction || 'Holm') + ' correction.</p>';
+      } else {
+        html += '<p>' + sig.length + ' of ' + displayData.length + ' comparisons remain significant after ' + (correction || 'Holm') + ' correction.</p>';
+      }
+      if (strongest) html += '<p>The largest difference is between <strong>' + strongest.comparison.replace(/\s*vs\.?\s*/i, '</strong> vs <strong>') + '</strong> (difference = ' + fmt(strongest.estimate) + ').</p>';
+      if (weakest && weakest.comparison !== strongest.comparison) html += '<p>The smallest difference is between <strong>' + weakest.comparison.replace(/\s*vs\.?\s*/i, '</strong> vs <strong>') + '</strong> (difference = ' + fmt(weakest.estimate) + ').</p>';
+      text.innerHTML = html;
+      box.style.display = 'block';
+    }
+
+    function buildPosthocHeatmap(displayData, groups) {
+      var table = document.getElementById('posthocHeatmap');
+      if (!table || !groups.length) return;
+      var map = {};
+      displayData.forEach(function(r) {
+        var parts = r.comparison.split(/\s*vs\.?\s*/i);
+        if (parts.length !== 2) return;
+        var g1 = parts[0].trim();
+        var g2 = parts[1].trim();
+        map[g1 + '|' + g2] = r;
+        map[g2 + '|' + g1] = r;
+      });
+      var maxAbs = 0;
+      displayData.forEach(function(r) { maxAbs = Math.max(maxAbs, Math.abs(r.estimate)); });
+      if (!(maxAbs > 0)) maxAbs = 1;
+      var hdr = '<tr><th></th>' + groups.map(function(g) { return '<th>' + g + '</th>'; }).join('') + '</tr>';
+      var rows = groups.map(function(g1) {
+        var cells = groups.map(function(g2) {
+          if (g1 === g2) return '<td style="background:rgba(255,255,255,.06);">—</td>';
+          var r = map[g1 + '|' + g2];
+          if (!r) return '<td>—</td>';
+          var intensity = Math.min(1, Math.abs(r.estimate) / maxAbs);
+          var bg = r.significant
+            ? 'rgba(74,222,128,' + (0.15 + intensity * 0.55) + ')'
+            : 'rgba(100,116,139,' + (0.08 + intensity * 0.2) + ')';
+          return '<td class="' + (r.significant ? 'ph-cell--sig' : '') + '" style="background:' + bg + ';" title="' + r.comparison + ': ' + fmt(r.estimate) + ', adj p ' + fmtP(r.adjP) + '">' + (r.significant ? '✓' : '·') + '</td>';
+        }).join('');
+        return '<tr><td>' + g1 + '</td>' + cells + '</tr>';
+      }).join('');
+      table.innerHTML = hdr + rows;
+    }
+
+    function syncPosthocReferenceUI(groups) {
+      var grouping = document.querySelector('input[name="posthocGrouping"]:checked')?.value || 'all';
+      var refCard = document.getElementById('posthocRefCard');
+      var refRadios = document.getElementById('posthocRefRadios');
+      var refSelect = document.getElementById('posthocRefGroup');
+      if (refCard) refCard.classList.toggle('posthoc-ref-card--inactive', grouping !== 'ref');
+      if (refRadios && groups.length) {
+        var current = refSelect ? refSelect.value : groups[0];
+        refRadios.innerHTML = groups.map(function(g, idx) {
+          var checked = (current === g) || (!current && idx === 0);
+          return '<label><input type="radio" name="posthocRefRadio" value="' + g + '"' + (checked ? ' checked' : '') + ' onchange="updatePosthocDisplay()"> ' + g + '</label>';
+        }).join('');
+        refRadios.style.display = grouping === 'ref' ? 'flex' : 'none';
+      }
+    }
     function renderPosthoc(posthoc, compareMode){
       const body = document.getElementById("posthocBody");
       const heading = document.getElementById("posthocHeading");
@@ -1818,8 +1976,8 @@
       const estNoteEl = document.getElementById("posthocEstimateNote");
       if (estNoteEl) {
         estNoteEl.textContent = isNP
-          ? "Effect Est. = rank-biserial correlation r (range -1 to +1)"
-          : "Effect Est. = mean difference (group A - group B)";
+          ? "Difference = rank-biserial correlation r (range -1 to +1)"
+          : "Difference = mean difference (group A - group B); magnitude uses Cohen's d";
       }
       
       const rows = posthoc.rows || [];
@@ -1854,32 +2012,32 @@
           estimate: parseMaybeNumber(r.estimate),
           ciLower: ciLower,
           ciUpper: ciUpper,
+          cohenD: parseMaybeNumber(r.cohenD),
           significant: parseMaybeNumber(r.adjP) < 0.05
         };
       });
       
-      // Populate reference group dropdown
+      // Populate reference group dropdown and radios
+      posthocGroups = [];
       if (refSelect) {
-        const groups = [];
         posthocData.forEach(function(r) {
           const parts = r.comparison.split(/\s*vs\.?\s*/i);
           if (parts.length === 2) {
             const g1 = parts[0].trim();
             const g2 = parts[1].trim();
-            if (g1 && groups.indexOf(g1) === -1) groups.push(g1);
-            if (g2 && groups.indexOf(g2) === -1) groups.push(g2);
+            if (g1 && posthocGroups.indexOf(g1) === -1) posthocGroups.push(g1);
+            if (g2 && posthocGroups.indexOf(g2) === -1) posthocGroups.push(g2);
           }
         });
         
-        if (groups.length > 0) {
-          refSelect.innerHTML = '<option value="">All groups</option>' + 
-            groups.map(g => '<option value="' + g + '">' + g + '</option>').join('');
-          // Auto-select first group for better UX
-          if (groups.length > 0) refSelect.value = groups[0];
+        if (posthocGroups.length > 0) {
+          refSelect.innerHTML = posthocGroups.map(function(g) { return '<option value="' + g + '">' + g + '</option>'; }).join('');
+          refSelect.value = posthocGroups[0];
         } else {
           refSelect.innerHTML = '<option value="">No groups available</option>';
         }
       }
+      syncPosthocReferenceUI(posthocGroups);
       
       updatePosthocDisplay();
     }
@@ -2437,34 +2595,32 @@
     function updatePosthocDisplay() {
       const body = document.getElementById("posthocBody");
       const refSelect = document.getElementById("posthocRefGroup");
+      const tableWrap = document.getElementById("posthocTableWrap");
+      const heatmapWrap = document.getElementById("posthocHeatmapWrap");
+      const isNP = primaryFramework === "nonparametric";
+      const correction = (lastBundle && lastBundle.results && lastBundle.results.posthoc && lastBundle.results.posthoc.correction) || "Holm";
       if (!body || !posthocData.length) return;
       
-      // Get grouping mode
       const grouping = document.querySelector('input[name="posthocGrouping"]:checked')?.value || 'all';
-      const refGroup = refSelect ? refSelect.value : '';
+      const refRadio = document.querySelector('input[name="posthocRefRadio"]:checked');
+      let refGroup = refRadio ? refRadio.value : (refSelect ? refSelect.value : '');
+      if (refSelect && refGroup) refSelect.value = refGroup;
+      syncPosthocReferenceUI(posthocGroups);
       
-      // Show/hide reference dropdown
-      if (refSelect) {
-        refSelect.style.display = (grouping === 'ref') ? 'inline-block' : 'none';
-      }
-      
-      // Filter data
-      let displayData = posthocData;
+      let displayData = posthocData.slice();
       if (grouping === 'ref' && refGroup) {
         displayData = posthocData.filter(function(r) {
-          // Match if refGroup appears in the comparison
           const parts = r.comparison.split(/\s*vs\.?\s*/i);
-          return parts.some(p => p.trim().toLowerCase() === refGroup.toLowerCase());
+          return parts.some(function(p) { return p.trim().toLowerCase() === refGroup.toLowerCase(); });
         });
       }
       
-      // Sort data
       displayData.sort(function(a, b) {
         let valA, valB;
         if (posthocSortColumn === 'comparison') {
           return posthocSortAsc ? a.comparison.localeCompare(b.comparison) : b.comparison.localeCompare(a.comparison);
         } else if (posthocSortColumn === 'statistic') {
-          valA = a.statistic; valB = b.statistic;
+          valA = extractStatNum(a.statistic); valB = extractStatNum(b.statistic);
         } else if (posthocSortColumn === 'rawp') {
           valA = a.rawP; valB = b.rawP;
         } else if (posthocSortColumn === 'adjp') {
@@ -2472,12 +2628,29 @@
         } else if (posthocSortColumn === 'estimate') {
           valA = Math.abs(a.estimate); valB = Math.abs(b.estimate);
         } else if (posthocSortColumn === 'ci') {
-          valA = a.ciUpper - a.ciLower; valB = b.ciUpper - b.ciLower;
+          valA = (isFinite(a.ciUpper) && isFinite(a.ciLower)) ? (a.ciUpper - a.ciLower) : NaN;
+          valB = (isFinite(b.ciUpper) && isFinite(b.ciLower)) ? (b.ciUpper - b.ciLower) : NaN;
+        } else {
+          valA = 0; valB = 0;
         }
+        if (posthocSortColumn === 'comparison') return 0;
+        if (!isFinite(valA)) valA = posthocSortAsc ? Infinity : -Infinity;
+        if (!isFinite(valB)) valB = posthocSortAsc ? Infinity : -Infinity;
         return posthocSortAsc ? (valA - valB) : (valB - valA);
       });
       
-      // Render table
+      updatePosthocSummary(displayData, isNP);
+      updatePosthocInterpretation(displayData, correction);
+      
+      const viewMode = document.querySelector('input[name="posthocViewMode"]:checked')?.value || 'table';
+      if (tableWrap) tableWrap.style.display = viewMode === 'table' ? 'block' : 'none';
+      if (heatmapWrap) {
+        heatmapWrap.style.display = viewMode === 'heatmap' ? 'block' : 'none';
+        if (viewMode === 'heatmap') buildPosthocHeatmap(grouping === 'ref' ? posthocData : displayData, posthocGroups);
+      }
+      
+      if (viewMode !== 'table') return;
+      
       body.innerHTML = "";
       const MAX_RENDER = 200;
       const rowsToRender = displayData.slice(0, MAX_RENDER);
@@ -2485,53 +2658,42 @@
       rowsToRender.forEach(function(r){
         const tr = document.createElement("tr");
         
-        // Comparison
         let td = document.createElement("td");
         td.textContent = r.comparison;
         tr.appendChild(td);
         
-        // Statistic
         td = document.createElement("td");
         td.textContent = fmt(r.statistic);
         td.style.fontFamily = "monospace";
         tr.appendChild(td);
         
-        // Raw p
         td = document.createElement("td");
         td.textContent = fmtP(r.rawP);
         td.style.fontFamily = "monospace";
         tr.appendChild(td);
         
-        // Adj p
         td = document.createElement("td");
         td.textContent = fmtP(r.adjP);
         td.style.fontFamily = "monospace";
         tr.appendChild(td);
         
-        // Estimate
         td = document.createElement("td");
         td.textContent = fmt(r.estimate);
         td.style.fontFamily = "monospace";
         tr.appendChild(td);
         
-        // 95% CI
         td = document.createElement("td");
         td.style.fontFamily = "monospace";
         if (isFinite(r.ciLower) && isFinite(r.ciUpper)) {
           td.textContent = "[" + fmt(r.ciLower) + ", " + fmt(r.ciUpper) + "]";
         } else {
-          td.innerHTML = '<span title="CI requires standard error from host (not available for U-statistic)" style="display:inline-block;padding:2px 7px;border-radius:4px;background:rgba(100,116,139,.18);color:#94a3b8;font-size:12px;font-family:sans-serif;letter-spacing:.3px;">n/a</span>';
+          td.innerHTML = '<span title="CI not available for this statistic" style="display:inline-block;padding:2px 7px;border-radius:4px;background:rgba(100,116,139,.18);color:#94a3b8;font-size:12px;font-family:sans-serif;">n/a</span>';
         }
         tr.appendChild(td);
         
-        // Significance indicator - pill badge
         td = document.createElement("td");
         td.style.textAlign = "center";
-        if (r.significant) {
-          td.innerHTML = '<span style="display:inline-block;padding:3px 10px;border-radius:20px;background:rgba(74,222,128,.18);border:1px solid rgba(74,222,128,.5);color:#4ade80;font-size:12px;font-weight:800;letter-spacing:.5px;">SIG</span>';
-        } else {
-          td.innerHTML = '<span style="display:inline-block;padding:3px 10px;border-radius:20px;background:rgba(100,116,139,.12);border:1px solid rgba(100,116,139,.3);color:#94a3b8;font-size:12px;font-weight:700;letter-spacing:.5px;">ns</span>';
-        }
+        td.innerHTML = posthocMagnitudeBadge(r, isNP);
         tr.appendChild(td);
         
         body.appendChild(tr);

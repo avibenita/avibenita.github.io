@@ -304,6 +304,12 @@
     .assump-score-icon.ok{color:#4ade80;}
     .assump-score-icon.warn{color:#fbbf24;}
     .assump-score-icon.design{color:#94a3b8;}
+    .assump-score-info-btn{background:none;border:none;color:#94a3b8;cursor:pointer;font-size:15px;font-weight:700;padding:0;min-width:20px;line-height:1;flex:0 0 auto;}
+    .assump-score-info-btn:hover,.assump-score-info-btn[aria-expanded="true"]{color:#cbd5e1;}
+    .assump-score-popover{display:none;margin:0 0 8px;padding:8px 10px;font-size:12px;line-height:1.55;color:var(--text-secondary);background:rgba(0,0,0,.28);border-radius:6px;border:1px solid rgba(255,255,255,.1);}
+    .assump-design-info-btn{background:none;border:none;color:#94a3b8;cursor:pointer;font-size:12px;font-weight:700;padding:0;margin-left:4px;vertical-align:baseline;}
+    .assump-design-info-btn:hover,.assump-design-info-btn[aria-expanded="true"]{color:#cbd5e1;}
+    .assump-item-detail.collapsed{display:none;}
     .assump-score-overall{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.1);font-size:13px;font-weight:700;color:#80cbc4;}
     .assump-detail-block{margin-bottom:18px;padding:12px 14px;border:1px solid rgba(255,255,255,.08);border-radius:8px;background:rgba(0,0,0,.12);}
     .assump-detail-block h4{margin:0 0 8px;font-size:14px;font-weight:700;color:var(--accent-1);}
@@ -1883,6 +1889,26 @@
     }
 
     // Schema toggle: show parametric or non-parametric result block
+    var ASSUMP_DESIGN_INFO = {
+      independence: "Assumed by the independent-measures design — each observation belongs to one variable only. Statistico cannot verify independence from the summary data alone.",
+      randomSampling: "Assumed from study design. Statistico cannot confirm how participants or cases were recruited."
+    };
+    function toggleAssumpScoreInfo(btn) {
+      if (!btn) return;
+      var host = document.getElementById("assumpScoreBody");
+      var row = btn.closest(".assump-score-row");
+      var pop = row && row.nextElementSibling && row.nextElementSibling.classList.contains("assump-score-popover")
+        ? row.nextElementSibling : null;
+      if (!pop) return;
+      var willOpen = pop.style.display !== "block";
+      if (host) host.querySelectorAll(".assump-score-popover").forEach(function(p) { p.style.display = "none"; });
+      if (host) host.querySelectorAll(".assump-score-info-btn").forEach(function(b) { b.setAttribute("aria-expanded", "false"); });
+      if (willOpen) {
+        pop.style.display = "block";
+        btn.setAttribute("aria-expanded", "true");
+      }
+    }
+    window.toggleAssumpScoreInfo = toggleAssumpScoreInfo;
     function assumpItemHtml(status, title, detail, kind, resultLine) {
       kind = kind || "verified";
       if (kind === "design") {
@@ -1890,7 +1916,8 @@
           + '<div class="assump-item assump-item--design">'
           + '<span class="assump-item-icon">ⓘ</span>'
           + '<div class="assump-item-body">'
-          + '<div class="assump-item-title">' + title + '</div>'
+          + '<div class="assump-item-title">' + title
+          + ' <span style="font-size:11px;font-weight:500;color:var(--text-muted);">(assumed, not tested)</span></div>'
           + (detail ? '<p class="assump-item-detail">' + detail + '</p>' : '')
           + '</div></div>';
       }
@@ -1906,8 +1933,8 @@
     }
     function assumpDesignItemsHtml() {
       return ''
-        + assumpItemHtml("design", "Independence of observations", "Assumed by the independent-measures design — each observation belongs to one variable only. Cannot be verified from the summary data alone.", "design")
-        + assumpItemHtml("design", "Random sampling", "Assumed from study design. Statistico cannot confirm how participants or cases were recruited.", "design");
+        + assumpItemHtml("design", "Independence of observations", ASSUMP_DESIGN_INFO.independence, "design")
+        + assumpItemHtml("design", "Random sampling", ASSUMP_DESIGN_INFO.randomSampling, "design");
     }
     function buildShapeEvidenceBlock(descRows, shape) {
       if (!Array.isArray(descRows) || !descRows.length) {
@@ -1923,8 +1950,11 @@
         + '<p class="assump-item-detail"><strong>Assessment:</strong> ' + (shape.assessment || shape.detail) + '</p>'
         + '</div>';
     }
-    function assumpScoreIcon(status, kind) {
-      if (kind === "design") return '<span class="assump-score-icon design">ⓘ</span>';
+    function assumpScoreIcon(status, kind, detailKey) {
+      if (kind === "design") {
+        var tip = detailKey && ASSUMP_DESIGN_INFO[detailKey] ? ASSUMP_DESIGN_INFO[detailKey] : "Study design assumption — not verified from data.";
+        return '<button type="button" class="assump-score-info-btn" aria-expanded="false" aria-label="About ' + (detailKey || "design assumption") + '" title="Click for explanation" onclick="toggleAssumpScoreInfo(this)">ⓘ</button>';
+      }
       if (status === "ok") return '<span class="assump-score-icon ok">✓</span>';
       if (status === "warn") return '<span class="assump-score-icon warn">!</span>';
       return '<span class="assump-score-icon design">·</span>';
@@ -1933,7 +1963,11 @@
       var host = document.getElementById("assumpScoreBody");
       if (!host) return;
       host.innerHTML = rows.map(function(r) {
-        return '<div class="assump-score-row"><span>' + r.label + '</span>' + assumpScoreIcon(r.status, r.kind) + '</div>';
+        var icon = assumpScoreIcon(r.status, r.kind, r.detailKey);
+        var pop = (r.kind === "design" && r.detailKey && ASSUMP_DESIGN_INFO[r.detailKey])
+          ? '<div class="assump-score-popover">' + ASSUMP_DESIGN_INFO[r.detailKey] + '</div>'
+          : '';
+        return '<div class="assump-score-row"><span>' + r.label + '</span>' + icon + '</div>' + pop;
       }).join("")
         + '<div class="assump-score-overall">Overall: ' + overallOk + '/' + overallTotal + '</div>';
     }
@@ -1949,6 +1983,13 @@
       });
       return grouped;
     }
+    function formatDesignBalanceText(minN, maxN, ratio) {
+      var nRange = Math.round(minN) === Math.round(maxN)
+        ? "each group n = " + Math.round(minN)
+        : "group sizes n = " + Math.round(minN) + "–" + Math.round(maxN);
+      var ratioNote = ratio === 1 ? "" : " (largest ÷ smallest = " + ratio.toFixed(2) + "×)";
+      return nRange + ratioNote;
+    }
     function computeDesignBalance(explore) {
       var stats = (explore && Array.isArray(explore.selectedColumnStats)) ? explore.selectedColumnStats : [];
       var nValues = stats.map(function(cs) { return parseMaybeNumber(cs.n); }).filter(function(n) { return isFinite(n) && n > 0; });
@@ -1956,22 +1997,23 @@
       var maxN = Math.max.apply(null, nValues);
       var minN = Math.min.apply(null, nValues);
       var ratio = minN > 0 ? maxN / minN : NaN;
+      var sizeText = formatDesignBalanceText(minN, maxN, ratio);
       var text = "...";
       var status = "info";
       if (ratio === 1) {
-        text = "Perfectly balanced (all n = " + Math.round(minN) + ")";
+        text = "Perfectly balanced — " + sizeText;
         status = "ok";
       } else if (ratio < 1.2) {
-        text = "Well balanced (max/min n = " + ratio.toFixed(2) + ")";
+        text = "Well balanced — " + sizeText;
         status = "ok";
       } else if (ratio < 1.5) {
-        text = "Mildly unbalanced (max/min n = " + ratio.toFixed(2) + ")";
+        text = "Mildly unbalanced — " + sizeText;
         status = "warn";
       } else {
-        text = "Substantially unbalanced (max/min n = " + ratio.toFixed(2) + ")";
+        text = "Substantially unbalanced — " + sizeText;
         status = "warn";
       }
-      return { status: status, text: text, ratio: ratio, minN: minN, maxN: maxN };
+      return { status: status, text: text, ratio: ratio, minN: minN, maxN: maxN, sizeText: sizeText };
     }
     function assessNormalityFromDesc(descRows) {
       if (!Array.isArray(descRows) || !descRows.length) {
@@ -2216,7 +2258,7 @@
         ];
         var scoreOk = verifiedRows.filter(function(r) { return r.status === "ok"; }).length;
         renderAssumptionScore(
-          verifiedRows.concat([{ label: "Independence", status: "design", kind: "design" }]),
+          verifiedRows.concat([{ label: "Independence", status: "design", kind: "design", detailKey: "independence" }]),
           scoreOk,
           verifiedRows.length
         );

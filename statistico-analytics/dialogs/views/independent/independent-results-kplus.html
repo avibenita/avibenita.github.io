@@ -165,6 +165,19 @@
     .fw-dropdown:focus{outline:none;border-color:var(--accent-2);box-shadow:0 0 0 2px rgba(120,200,255,.2);}
     .fw-dropdown.parametric:focus{border-color:#4a90e2;box-shadow:0 0 0 2px rgba(74,144,226,.25);}
     .fw-dropdown.nonparametric:focus{border-color:#26a69a;box-shadow:0 0 0 2px rgba(38,166,154,.25);}
+    .fw-select{position:relative;display:inline-block;min-width:195px;}
+    .fw-select .fw-dropdown{width:100%;min-width:195px;display:inline-flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;}
+    .fw-select-caret{font-size:10px;opacity:.85;transition:transform .15s;flex:0 0 auto;}
+    .fw-select.open .fw-select-caret{transform:rotate(180deg);}
+    .fw-select-menu{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:80;border-radius:8px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.12);}
+    .fw-select.open .fw-select-menu{display:block;}
+    .fw-select-option{display:block;width:100%;padding:9px 12px;border:none;border-bottom:1px solid rgba(255,255,255,.1);font-size:13px;font-weight:600;color:#fff;cursor:pointer;text-align:left;font-family:inherit;}
+    .fw-select-option:last-child{border-bottom:none;}
+    .fw-select-option.parametric{background:#2e5f8a;}
+    .fw-select-option.nonparametric{background:#00695c;}
+    .fw-select-option:hover{filter:brightness(1.1);}
+    .fw-select-option.selected{box-shadow:inset 0 0 0 2px rgba(255,255,255,.35);}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
     :root[data-theme="light"] .fw-dropdown{background:var(--surface-2);color:var(--text-primary);border-color:var(--border);}
     :root[data-theme="light"] .fw-dropdown.parametric{background:#2e5f8a;color:#fff;border-color:#4a90e2;}
     :root[data-theme="light"] .fw-dropdown.nonparametric{background:#00695c;color:#fff;border-color:#26a69a;}
@@ -355,11 +368,21 @@
 
           <!-- Framework dropdown (replaces radio group) -->
           <div style="display:flex;align-items:center;gap:8px;flex:0 0 auto;">
-            <label for="fwFrameworkSelect" style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;">Framework</label>
-            <select id="fwFrameworkSelect" class="fw-dropdown parametric" onchange="setFrameworkButtons(this.value);notifySettingsChanged();">
-              <option value="parametric">Parametric (means)</option>
-              <option value="nonparametric">Non-parametric (ranks)</option>
-            </select>
+            <label for="fwFrameworkBtn" style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;">Framework</label>
+            <div class="fw-select" id="fwFrameworkSelectWrap">
+              <button type="button" class="fw-dropdown parametric" id="fwFrameworkBtn" aria-haspopup="listbox" aria-expanded="false">
+                <span id="fwFrameworkLabel">Parametric (means)</span>
+                <i class="fa-solid fa-chevron-down fw-select-caret"></i>
+              </button>
+              <div class="fw-select-menu" id="fwFrameworkMenu" role="listbox">
+                <button type="button" class="fw-select-option parametric selected" data-value="parametric" role="option" aria-selected="true">Parametric (means)</button>
+                <button type="button" class="fw-select-option nonparametric" data-value="nonparametric" role="option" aria-selected="false">Non-parametric (ranks)</button>
+              </div>
+              <select id="fwFrameworkSelect" class="sr-only" aria-hidden="true" tabindex="-1">
+                <option value="parametric">Parametric (means)</option>
+                <option value="nonparametric">Non-parametric (ranks)</option>
+              </select>
+            </div>
           </div>
           <!-- Hidden radio inputs kept for JS compat (setFrameworkButtons syncs them) -->
           <input id="fwParametric" type="radio" name="frameworkMode" value="parametric" checked style="display:none"/>
@@ -982,15 +1005,62 @@
       var validVals = isNonParam ? ["dunn","conover"] : ["games-howell","tukey"];
       if (validVals.indexOf(sel.value) < 0) sel.value = validVals[0];
     }
+    var FW_FRAMEWORK_LABELS = { parametric: "Parametric (means)", nonparametric: "Non-parametric (ranks)" };
+    function syncFrameworkSelectUI(mode) {
+      var m = mode === "nonparametric" ? "nonparametric" : "parametric";
+      var fwSel = document.getElementById("fwFrameworkSelect");
+      var btn = document.getElementById("fwFrameworkBtn");
+      var label = document.getElementById("fwFrameworkLabel");
+      var menu = document.getElementById("fwFrameworkMenu");
+      if (fwSel) fwSel.value = m;
+      if (btn) {
+        btn.classList.remove("parametric", "nonparametric");
+        btn.classList.add(m);
+      }
+      if (label) label.textContent = FW_FRAMEWORK_LABELS[m] || m;
+      if (menu) {
+        menu.querySelectorAll(".fw-select-option").forEach(function(opt) {
+          var selected = opt.dataset.value === m;
+          opt.classList.toggle("selected", selected);
+          opt.setAttribute("aria-selected", selected ? "true" : "false");
+        });
+      }
+    }
+    function initFrameworkSelect() {
+      var wrap = document.getElementById("fwFrameworkSelectWrap");
+      var btn = document.getElementById("fwFrameworkBtn");
+      var menu = document.getElementById("fwFrameworkMenu");
+      if (!wrap || !btn || !menu) return;
+      btn.addEventListener("click", function(e) {
+        e.stopPropagation();
+        var open = wrap.classList.toggle("open");
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+      menu.querySelectorAll(".fw-select-option").forEach(function(opt) {
+        opt.addEventListener("click", function(e) {
+          e.stopPropagation();
+          var val = opt.dataset.value;
+          wrap.classList.remove("open");
+          btn.setAttribute("aria-expanded", "false");
+          if (val !== primaryFramework) {
+            setFrameworkButtons(val);
+            notifySettingsChanged();
+          } else {
+            syncFrameworkSelectUI(val);
+          }
+        });
+      });
+      document.addEventListener("click", function() {
+        if (wrap.classList.contains("open")) {
+          wrap.classList.remove("open");
+          btn.setAttribute("aria-expanded", "false");
+        }
+      });
+      syncFrameworkSelectUI(primaryFramework);
+    }
     function setFrameworkButtons(mode){
       primaryFramework = mode === "nonparametric" ? "nonparametric" : "parametric";
-      // Sync the framework dropdown
-      var fwSel = document.getElementById("fwFrameworkSelect");
-      if (fwSel) {
-        fwSel.value = primaryFramework;
-        fwSel.classList.remove("parametric", "nonparametric");
-        fwSel.classList.add(primaryFramework === "nonparametric" ? "nonparametric" : "parametric");
-      }
+      syncFrameworkSelectUI(primaryFramework);
       var rp = document.getElementById("fwParametric");
       var rn = document.getElementById("fwNonparametric");
       if (rp) rp.checked = primaryFramework === "parametric";
@@ -2364,7 +2434,8 @@
         });
       });
       document.querySelectorAll('input[name="h1Orientation"]').forEach(function(el){ el.addEventListener("change", notifySettingsChanged); });
-      // Framework is now handled by #fwFrameworkSelect dropdown (onchange wired in HTML)
+      // Framework custom select wired in initFrameworkSelect()
+      initFrameworkSelect();
       setFrameworkButtons(primaryFramework);
       organizePosthocMenu();
       refreshSettingsVisibility();

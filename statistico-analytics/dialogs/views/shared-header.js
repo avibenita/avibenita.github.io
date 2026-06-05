@@ -1223,8 +1223,7 @@ const StatisticoHeader = {
       }
       analysisItems.push(
         { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effect Sizes' },
-        { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power Analysis' },
-        { type: 'tab', tab: 'report', icon: 'fa-file-lines', label: 'APA Report' }
+        { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power Analysis' }
       );
       return {
         logoIcon: 'fa-equals',
@@ -5655,8 +5654,7 @@ READING: [1-2 sentences about what the currently visible state suggests, using e
       'independent-results': 'Test Results',
       'independent-posthoc': 'Pairwise Comparisons',
       'independent-effects': 'Effect Sizes',
-      'independent-power': 'Power Analysis',
-      'independent-report': 'APA Report'
+      'independent-power': 'Power Analysis'
     };
   },
 
@@ -5675,8 +5673,7 @@ READING: [1-2 sentences about what the currently visible state suggests, using e
       'Test Results',
       ...(hasPosthoc ? ['Pairwise Comparisons'] : []),
       'Effect Sizes',
-      ...(hasPower ? ['Power Analysis'] : []),
-      'APA Report'
+      ...(hasPower ? ['Power Analysis'] : [])
     ];
   },
 

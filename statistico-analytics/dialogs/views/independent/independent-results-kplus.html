@@ -289,6 +289,7 @@
     .assump-item--fail .assump-item-icon{background:rgba(248,113,113,.18);color:#f87171;border:1px solid rgba(248,113,113,.45);}
     .assump-item--info .assump-item-icon{background:rgba(120,200,255,.14);color:#7eb8f0;border:1px solid rgba(120,200,255,.35);}
     .assump-item--design .assump-item-icon{background:rgba(148,163,184,.12);color:#94a3b8;border:1px solid rgba(148,163,184,.35);font-size:12px;font-weight:700;}
+    .assump-item--quality .assump-item-icon{background:rgba(148,163,184,.1);color:#94a3b8;border:1px solid rgba(148,163,184,.3);font-size:11px;font-weight:700;}
     .assump-item-body{min-width:0;flex:1 1 auto;}
     .assump-item-title{font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 3px;}
     .assump-item-detail{font-size:13px;color:var(--text-secondary);line-height:1.55;margin:0;}
@@ -309,6 +310,7 @@
     .assump-score-icon.ok{color:#4ade80;}
     .assump-score-icon.warn{color:#fbbf24;}
     .assump-score-icon.design{color:#94a3b8;}
+    .assump-score-icon.quality{color:#94a3b8;}
     .assump-score-info-btn{background:none;border:none;color:#94a3b8;cursor:pointer;font-size:15px;font-weight:700;padding:0;min-width:20px;line-height:1;flex:0 0 auto;}
     .assump-score-info-btn:hover,.assump-score-info-btn[aria-expanded="true"]{color:#cbd5e1;}
     .assump-score-popover{display:none;margin:0 0 8px;padding:8px 10px;font-size:12px;line-height:1.55;color:var(--text-secondary);background:rgba(0,0,0,.28);border-radius:6px;border:1px solid rgba(255,255,255,.1);}
@@ -643,7 +645,11 @@
             <div class="stat-panel-heading parametric" id="assumpPanelHeading">Assumption Testing</div>
             <div class="stat-panel-body">
               <div id="designBalanceInfo" style="margin-bottom:16px;padding:10px 14px;background:rgba(120,200,255,.08);border-left:3px solid var(--accent-2);border-radius:4px;">
-                <span style="font-size:14px;color:var(--text-secondary);"><strong>Design:</strong> <span id="balanceText">...</span></span>
+                <span style="font-size:14px;color:var(--text-secondary);"><strong>Sample sizes:</strong> <span id="balanceText">...</span></span>
+              </div>
+              <div class="assump-section" id="assumpBalanceSection">
+                <div class="assump-section-title">Design quality (not required)</div>
+                <div class="assump-checklist" id="assumpBalanceQuality"></div>
               </div>
 
               <div id="assumpParametric" class="assump-framework-block">
@@ -1916,8 +1922,26 @@
       }
     }
     window.toggleAssumpScoreInfo = toggleAssumpScoreInfo;
+    function assumpBalanceItemHtml(balance) {
+      var detail = balance.sizeText + ". Not required for ANOVA or Kruskal-Wallis — mainly affects power and which post-hoc methods are most reliable.";
+      if (balance.status === "warn") {
+        detail += " With uneven sizes, prefer Welch ANOVA / Games-Howell when variances differ.";
+      }
+      return assumpItemHtml(balance.status, "Sample size balance", detail, "quality");
+    }
     function assumpItemHtml(status, title, detail, kind, resultLine) {
       kind = kind || "verified";
+      if (kind === "quality") {
+        var qIcon = status === "warn" ? "!" : "○";
+        return ''
+          + '<div class="assump-item assump-item--quality">'
+          + '<span class="assump-item-icon">' + qIcon + '</span>'
+          + '<div class="assump-item-body">'
+          + '<div class="assump-item-title">' + title
+          + ' <span style="font-size:11px;font-weight:500;color:var(--text-muted);">(optional)</span></div>'
+          + (detail ? '<p class="assump-item-detail">' + detail + '</p>' : '')
+          + '</div></div>';
+      }
       if (kind === "design") {
         return ''
           + '<div class="assump-item assump-item--design">'
@@ -1958,6 +1982,7 @@
         + '</div>';
     }
     function assumpScoreIcon(status, kind, detailKey) {
+      if (kind === "quality") return '<span class="assump-score-icon quality">○</span>';
       if (kind === "design") {
         var tip = detailKey && ASSUMP_DESIGN_INFO[detailKey] ? ASSUMP_DESIGN_INFO[detailKey] : "Study design assumption — not verified from data.";
         return '<button type="button" class="assump-score-info-btn" aria-expanded="false" aria-label="About ' + (detailKey || "design assumption") + '" title="Click for explanation" onclick="toggleAssumpScoreInfo(this)">ⓘ</button>';
@@ -1976,7 +2001,7 @@
           : '';
         return '<div class="assump-score-row"><span>' + r.label + '</span>' + icon + '</div>' + pop;
       }).join("")
-        + '<div class="assump-score-overall">Overall: ' + overallOk + '/' + overallTotal + '</div>';
+        + '<div class="assump-score-overall">Verified checks: ' + overallOk + '/' + overallTotal + '</div>';
     }
     function getGroupedValuesFromData(selectedColumns) {
       var grouped = {};
@@ -2028,7 +2053,15 @@
         text = "Substantially unbalanced — " + sizeText;
         status = "warn";
       }
-      return { status: status, text: text, ratio: ratio, minN: minN, maxN: maxN, sizeText: sizeText };
+      return {
+        status: status,
+        text: text,
+        bannerText: sizeText + " (balance not required for these tests)",
+        ratio: ratio,
+        minN: minN,
+        maxN: maxN,
+        sizeText: sizeText
+      };
     }
     function assessNormalityFromDesc(descRows) {
       if (!Array.isArray(descRows) || !descRows.length) {
@@ -2190,7 +2223,9 @@
       }
       if (recoTitle) recoTitle.textContent = "Overall Assessment";
       var balance = computeDesignBalance(explore);
-      setText("balanceText", balance.text);
+      setText("balanceText", balance.bannerText || balance.sizeText || balance.text);
+      var balanceQuality = document.getElementById("assumpBalanceQuality");
+      if (balanceQuality) balanceQuality.innerHTML = assumpBalanceItemHtml(balance);
       var descRows = Array.isArray(descData) ? descData.slice() : [];
       var grouped = getGroupedValuesFromData((lastBundle && lastBundle.setup && lastBundle.setup.selectedColumns) || []);
       var leveneP = parseMaybeNumber((ob.levene || {}).p);
@@ -2219,7 +2254,6 @@
         var paramDesign = document.getElementById("assumpParamDesign");
         if (paramVerified) {
           paramVerified.innerHTML = ''
-            + assumpItemHtml(balance.status, "Design balance", balance.text, "verified")
             + assumpItemHtml(norm.status, norm.title, norm.detail, "verified")
             + assumpItemHtml(leveneStatus, "Equal variances (Levene)", leveneDetail, "verified")
             + assumpItemHtml(welchStatus, "Robust alternative (Welch)", welchDetail, "verified");
@@ -2228,12 +2262,12 @@
         var scorePanel = document.getElementById("assumpScorePanel");
         if (scorePanel) scorePanel.style.display = "none";
         var paramNotes = [];
-        if (balance.status === "ok") paramNotes.push("Design is well balanced");
         if (norm.status === "ok") paramNotes.push("No strong normality flags");
         if (leveneStatus === "ok") paramNotes.push("Equal variances supported");
         else if (leveneStatus === "warn") paramNotes.push("Unequal variances detected");
         if (welchStatus === "ok" && anovaSig === welchSig) paramNotes.push("Welch confirms ANOVA conclusion");
-        var paramIssues = [balance.status, norm.status, leveneStatus, welchStatus].filter(function(s) { return s === "warn" || s === "fail"; }).length;
+        if (balance.status === "warn") paramNotes.push("Uneven sample sizes — see design quality note");
+        var paramIssues = [norm.status, leveneStatus, welchStatus].filter(function(s) { return s === "warn" || s === "fail"; }).length;
         if (headlineEl) {
           headlineEl.textContent = paramIssues === 0
             ? "✓ ANOVA assumptions largely satisfied"
@@ -2259,21 +2293,21 @@
         var npDesign = document.getElementById("assumpNpDesign");
         if (npVerified) {
           npVerified.innerHTML = ''
-            + assumpItemHtml(balance.status, "Design balance", balance.text, "verified")
             + buildShapeEvidenceBlock(descRows, shape)
             + assumpItemHtml(ties.status, ties.title, ties.detail, "verified", ties.result)
             + assumpItemHtml(sizes.status, sizes.title, sizes.detail, "verified");
         }
         if (npDesign) npDesign.innerHTML = assumpDesignItemsHtml();
         var verifiedRows = [
-          { label: "Design Balance", status: balance.status, kind: "verified" },
           { label: "Shape Similarity", status: shape.status, kind: "verified" },
           { label: "Ties", status: ties.status, kind: "verified" },
           { label: "Sample Size", status: sizes.status, kind: "verified" }
         ];
         var scoreOk = verifiedRows.filter(function(r) { return r.status === "ok"; }).length;
         renderAssumptionScore(
-          verifiedRows.concat([{ label: "Independence", status: "design", kind: "design", detailKey: "independence" }]),
+          [{ label: "Size balance", status: balance.status, kind: "quality" }]
+            .concat(verifiedRows)
+            .concat([{ label: "Independence", status: "design", kind: "design", detailKey: "independence" }]),
           scoreOk,
           verifiedRows.length
         );
@@ -2286,7 +2320,7 @@
         else npNotes.push("Sample sizes may limit χ² approximation");
         if (ties.hasTies) npNotes.push("Tie correction applied (average ranks)");
         else npNotes.push("No tied values detected");
-        if (balance.status !== "ok") npNotes.push("Design balance: " + balance.text);
+        if (balance.status === "warn") npNotes.push("Uneven sample sizes — optional design note above");
         var npIssues = verifiedRows.filter(function(r) { return r.status === "warn" || r.status === "fail"; }).length;
         if (headlineEl) {
           headlineEl.textContent = npIssues === 0

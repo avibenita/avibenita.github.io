@@ -71,6 +71,32 @@ def _rm_df(n: int, k: int, epsilon: float) -> tuple:
     return df1, df2
 
 
+def _pillai_v_from_f(effect_size_f: float) -> float:
+    """G*Power univariate RM within effect: Pillai V equals partial eta squared."""
+    if effect_size_f <= 0:
+        return 0.0
+    return (effect_size_f ** 2) / (1 + effect_size_f ** 2)
+
+
+def _rm_output_extras(
+    n: int, k: int, effect_size_f: float, alpha: float, rho: float, epsilon: float
+) -> Dict[str, float]:
+    """Critical F, df, lambda, Pillai V for G*Power-style output panel."""
+    df1, df2 = _rm_df(n, k, epsilon)
+    ncp = _rm_ncp(n, k, effect_size_f, rho)
+    try:
+        f_crit = float(stats.f.ppf(1 - alpha, df1, df2))
+    except Exception:
+        f_crit = float("nan")
+    return {
+        "noncentrality_parameter": ncp,
+        "critical_f": f_crit,
+        "df_between": df1,
+        "df_error": df2,
+        "pillai_v": _pillai_v_from_f(effect_size_f),
+    }
+
+
 def _power_at_cohen_f_rm_anova(
     effect_size_f: float,
     n: int,
@@ -193,17 +219,18 @@ def handle_power_analysis(data: Dict[str, Any]) -> Dict[str, Any]:
         observed_power = _power_at_cohen_f_rm_anova(
             effect_size_f, n, k, alpha, rho, epsilon
         )
-        ncp = _rm_ncp(n, k, effect_size_f, rho)
-        df1, df2 = _rm_df(n, k, epsilon)
+        extras = _rm_output_extras(n, k, effect_size_f, alpha, rho, epsilon)
 
         results = {
             "observed_power": observed_power,
             "effect_size_cohen_f": effect_size_f,
-            "noncentrality_parameter": ncp,
+            "noncentrality_parameter": extras["noncentrality_parameter"],
+            "critical_f": extras["critical_f"],
+            "pillai_v": extras["pillai_v"],
             "avg_correlation": rho,
             "epsilon": epsilon,
-            "df_between": df1,
-            "df_error": df2,
+            "df_between": extras["df_between"],
+            "df_error": extras["df_error"],
             "n": n,
             "num_timepoints": k,
             "interpretation": _interpret_power(observed_power),
@@ -213,8 +240,14 @@ def handle_power_analysis(data: Dict[str, Any]) -> Dict[str, Any]:
             results["required_for_80pct"] = _calculate_required_sample_size_rm_anova(
                 effect_size_f, k, 0.80, alpha, rho, epsilon
             )
+            results["required_for_85pct"] = _calculate_required_sample_size_rm_anova(
+                effect_size_f, k, 0.85, alpha, rho, epsilon
+            )
             results["required_for_90pct"] = _calculate_required_sample_size_rm_anova(
                 effect_size_f, k, 0.90, alpha, rho, epsilon
+            )
+            results["required_for_95pct"] = _calculate_required_sample_size_rm_anova(
+                effect_size_f, k, 0.95, alpha, rho, epsilon
             )
 
     elif mode == "required":
@@ -234,6 +267,7 @@ def handle_power_analysis(data: Dict[str, Any]) -> Dict[str, Any]:
         achieved_power = _power_at_cohen_f_rm_anova(
             effect_size_f, required_n, k, alpha, rho, epsilon
         )
+        extras = _rm_output_extras(required_n, k, effect_size_f, alpha, rho, epsilon)
 
         results = {
             "required_sample_size": required_n,
@@ -243,7 +277,12 @@ def handle_power_analysis(data: Dict[str, Any]) -> Dict[str, Any]:
             "num_timepoints": k,
             "avg_correlation": rho,
             "epsilon": epsilon,
-            "noncentrality_parameter": _rm_ncp(required_n, k, effect_size_f, rho),
+            "noncentrality_parameter": extras["noncentrality_parameter"],
+            "critical_f": extras["critical_f"],
+            "pillai_v": extras["pillai_v"],
+            "df_between": extras["df_between"],
+            "df_error": extras["df_error"],
+            "n": required_n,
             "interpretation": f"You need {required_n} subjects to achieve {target_power*100:.0f}% power",
         }
 
@@ -263,6 +302,7 @@ def handle_power_analysis(data: Dict[str, Any]) -> Dict[str, Any]:
         )
         min_eta = (min_f ** 2) / (1 + min_f ** 2) if min_f > 0 else 0.0
         achieved_power = _power_at_cohen_f_rm_anova(min_f, n, k, alpha, rho, epsilon)
+        extras = _rm_output_extras(n, k, min_f, alpha, rho, epsilon)
 
         results = {
             "min_detectable_cohen_f": float(min_f),
@@ -273,7 +313,11 @@ def handle_power_analysis(data: Dict[str, Any]) -> Dict[str, Any]:
             "num_timepoints": k,
             "avg_correlation": rho,
             "epsilon": epsilon,
-            "noncentrality_parameter": _rm_ncp(n, k, min_f, rho),
+            "noncentrality_parameter": extras["noncentrality_parameter"],
+            "critical_f": extras["critical_f"],
+            "pillai_v": extras["pillai_v"],
+            "df_between": extras["df_between"],
+            "df_error": extras["df_error"],
             "interpretation": (
                 f"With n={n}, the smallest detectable effect is Cohen's f={min_f:.3f} "
                 f"(partial eta^2={min_eta:.3f}) at {target_power*100:.0f}% power"

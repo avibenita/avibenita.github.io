@@ -16,8 +16,8 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260530a" />  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
   <script src="../shared-header.js?v=20260524b"></script>
-  <link rel="stylesheet" href="../shared-power-template.css?v=20260606e" />
-  <script src="../shared-power-template.js?v=20260606e"></script>
+  <link rel="stylesheet" href="../shared-power-template.css?v=20260607" />
+  <script src="../shared-power-template.js?v=20260607"></script>
 
   <script src="../../../src/shared/js/ai-config.js?v=20260429a"></script>
   <style>
@@ -3213,6 +3213,59 @@
       setText('powEpsilon', epsDisplay);
     }
 
+    function fmtPowerOutNum(v, decimals) {
+      if (v == null || !isFinite(v)) return '—';
+      return Number(v).toFixed(decimals == null ? 4 : decimals);
+    }
+
+    function buildPowerOutputParams(n, k, f, alpha, rho, epsilon, power, partialEta, cloudResult) {
+      if (!n || !k || k < 2 || !f || f <= 0) return null;
+      rho = isFinite(rho) ? rho : 0;
+      epsilon = isFinite(epsilon) ? epsilon : 1;
+      const df1 = (cloudResult && isFinite(cloudResult.df_between))
+        ? cloudResult.df_between
+        : (k - 1) * epsilon;
+      const df2 = (cloudResult && isFinite(cloudResult.df_error))
+        ? cloudResult.df_error
+        : (n - 1) * (k - 1) * epsilon;
+      const lambda = (cloudResult && isFinite(cloudResult.noncentrality_parameter))
+        ? cloudResult.noncentrality_parameter
+        : rmNcp(n, k, f, rho);
+      let critF = cloudResult && cloudResult.critical_f;
+      if (!isFinite(critF) && typeof jStat !== 'undefined' && jStat.centralF && jStat.centralF.inv) {
+        critF = jStat.centralF.inv(1 - (alpha || 0.05), df1, df2);
+      }
+      const eta = partialEta || (f * f) / (1 + f * f);
+      const pillaiV = (cloudResult && isFinite(cloudResult.pillai_v)) ? cloudResult.pillai_v : eta;
+      const actualPower = (cloudResult && isFinite(cloudResult.observed_power))
+        ? cloudResult.observed_power
+        : ((cloudResult && isFinite(cloudResult.achieved_power)) ? cloudResult.achieved_power : power);
+      return {
+        lambda: lambda,
+        critical_f: critF,
+        df1: df1,
+        df2: df2,
+        n: n,
+        actual_power: actualPower,
+        pillai_v: pillaiV
+      };
+    }
+
+    function updatePowerOutputParams(params) {
+      const ids = ['powOutLambda', 'powOutCritF', 'powOutDf1', 'powOutDf2', 'powOutN', 'powOutPower', 'powOutPillaiV'];
+      if (!params) {
+        ids.forEach(function(id) { setText(id, '—'); });
+        return;
+      }
+      setText('powOutLambda', fmtPowerOutNum(params.lambda, 3));
+      setText('powOutCritF', fmtPowerOutNum(params.critical_f, 4));
+      setText('powOutDf1', fmtPowerOutNum(params.df1, 3));
+      setText('powOutDf2', fmtPowerOutNum(params.df2, 3));
+      setText('powOutN', isFinite(params.n) ? String(Math.round(params.n)) : '—');
+      setText('powOutPower', isFinite(params.actual_power) ? (params.actual_power * 100).toFixed(1) + '%' : '—');
+      setText('powOutPillaiV', fmtPowerOutNum(params.pillai_v, 4));
+    }
+
     /* G*Power-aligned RM lambda: N * m * f^2 / (1 - rho) */
     function rmNcp(n, k, f, rho) {
       const denom = Math.max(1e-9, 1 - rho);
@@ -3384,7 +3437,9 @@
         effect_size_cohen_f, 
         partial_eta_squared,
         required_for_80pct,
+        required_for_85pct,
         required_for_90pct,
+        required_for_95pct,
         fallback,
         local,
         error
@@ -3400,6 +3455,7 @@
         setText("powReq90", "N/A");
         setText("powReq95", "N/A");
         setText("powPartialEta", "N/A");
+        updatePowerOutputParams(null);
         updatePowerStatus("? Insufficient data for power analysis", "warning");
         return;
       }
@@ -3411,33 +3467,56 @@
       setText("powSampleSize", currentN || "N/A");
       setText("powAlpha", (alpha || 0.05).toFixed(3));
       setText("powPartialEta", (partial_eta_squared || partialEta || 0).toFixed(3));
+
+      const setupPow = (lastBundle && lastBundle.setup) || {};
+      const kPow = (setupPow.selectedColumns || []).length;
+      const explorePow = (lastBundle && lastBundle.explore) || {};
+      const omnibusPow = (lastBundle && lastBundle.results && lastBundle.results.omnibus) || {};
+      const ctxPow = getPowerContext(omnibusPow, explorePow);
       
-      // Required sample sizes - calculate 85% from 80% and 90%
-      if (required_for_80pct && required_for_90pct) {
-        // Interpolate between 80% and 90% to get 85%
-        const req85 = Math.round(required_for_80pct + (required_for_90pct - required_for_80pct) * 0.5);
+      // Required sample sizes — use exact cloud/binary-search values (not interpolation)
+      const req85 = required_for_85pct
+        || (effect_size_cohen_f && kPow >= 2
+          ? estimateRequiredN(effect_size_cohen_f, kPow, 0.85, alpha, ctxPow.avgR, ctxPow.epsilon)
+          : null);
+      const req95 = required_for_95pct
+        || (effect_size_cohen_f && kPow >= 2
+          ? estimateRequiredN(effect_size_cohen_f, kPow, 0.95, alpha, ctxPow.avgR, ctxPow.epsilon)
+          : null);
+
+      if (required_for_80pct) {
         setText("powReq80", required_for_80pct);
-        setText("powRequired", req85);
-        setText("powReq85", req85);
-      } else if (required_for_80pct) {
-        // Approximate 85% as ~10% more than 80%
-        const req85 = Math.ceil(required_for_80pct * 1.05);
-        setText("powReq80", required_for_80pct);
-        setText("powRequired", req85);
-        setText("powReq85", req85);
       } else {
         setText("powReq80", "N/A");
+      }
+
+      if (req85) {
+        setText("powRequired", req85);
+        setText("powReq85", req85);
+        const customInp = document.getElementById('customPowerInput');
+        const customN = document.getElementById('customRequiredN');
+        if (customInp && customN && Math.abs(parseFloat(customInp.value) - 0.85) < 0.001) {
+          customN.textContent = req85;
+          customN.style.color = '#7fdb9f';
+        }
+      } else if (required_for_80pct) {
+        const approx85 = Math.ceil(required_for_80pct * 1.05);
+        setText("powRequired", approx85);
+        setText("powReq85", approx85);
+      } else {
         setText("powRequired", "N/A");
         setText("powReq85", "N/A");
       }
-      
+
       if (required_for_90pct) {
         setText("powReq90", required_for_90pct);
-        // Calculate 95% power requirement (approximate)
-        const req95 = Math.ceil(required_for_90pct * 1.2);
-        setText("powReq95", req95);
       } else {
         setText("powReq90", "N/A");
+      }
+
+      if (req95) {
+        setText("powReq95", req95);
+      } else {
         setText("powReq95", "N/A");
       }
       
@@ -3477,6 +3556,18 @@
       }
       
       updatePowerStatus(statusMsg, statusType);
+
+      updatePowerOutputParams(buildPowerOutputParams(
+        currentN,
+        kPow,
+        effect_size_cohen_f,
+        alpha,
+        ctxPow.avgR,
+        ctxPow.epsilon,
+        observed_power,
+        partial_eta_squared || partialEta,
+        results
+      ));
 
       /* Sync planning card label+value to whichever chip is currently selected */
       if (window.StatisticoPowerTemplate && window.StatisticoPowerTemplate.syncDefaultChip) {
@@ -3731,6 +3822,9 @@
 
         setText('powMinDetectableF', minF.toFixed(3));
         setText('powMinDetectableEta', minEta.toFixed(3));
+        updatePowerOutputParams(buildPowerOutputParams(
+          n, k, minF, alpha || 0.05, ctx.avgR, ctx.epsilon, targetPower, minEta, r
+        ));
 
         if (engineNote) {
           engineNote.innerHTML = '<i class="fa-solid fa-cloud"></i> Detectable effect calculated via Python Google Cloud Functions (non-central F distribution).';
@@ -3743,6 +3837,9 @@
       const local = calculateDetectableEffectLocal(n, k, targetPower, alpha || 0.05, ctx.avgR, ctx.epsilon);
       setText('powMinDetectableF', local.minF.toFixed(3));
       setText('powMinDetectableEta', local.minEta.toFixed(3));
+      updatePowerOutputParams(buildPowerOutputParams(
+        n, k, local.minF, alpha || 0.05, ctx.avgR, ctx.epsilon, targetPower, local.minEta, null
+      ));
 
       if (engineNote) {
         engineNote.innerHTML = '<i class="fa-solid fa-calculator"></i> Detectable effect calculated using local approximation (cloud function unavailable).';

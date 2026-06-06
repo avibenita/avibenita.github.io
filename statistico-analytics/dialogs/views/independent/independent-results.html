@@ -100,6 +100,8 @@
     .card{background:var(--surface-0);}
     #tab-results.tab-panel.active{display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;height:100%;}
     #tab-results .results-grid{flex:1 1 0;min-height:0;}
+    .chart-metric-options{display:inline-flex;align-items:center;gap:10px;font-size:11px;font-weight:600;text-transform:none;letter-spacing:0;}
+    .chart-metric-options label{display:inline-flex;align-items:center;gap:4px;cursor:pointer;color:var(--text-secondary);white-space:nowrap;}
     #tab-results,#tab-assumptions,#tab-effects,#tab-power{padding:4px 0;}
     .stats-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;}
     .stat-panel{background:var(--surface-1);border:2px solid var(--border);border-radius:var(--panel-radius);overflow:hidden;box-shadow:var(--panel-shadow);}
@@ -553,7 +555,14 @@
             </div>
             <!-- Right column: comparison chart -->
             <div class="stat-panel" style="display:flex;flex-direction:column;min-height:0;">
-              <div class="stat-panel-heading">Comparison of Means</div>
+              <div class="stat-panel-heading" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                <span>Comparison of Means</span>
+                <div class="chart-metric-options">
+                  <label><input type="radio" name="chartMetric" value="means" checked onchange="updateGroupChart()"> Means</label>
+                  <label><input type="radio" name="chartMetric" value="variances" onchange="updateGroupChart()"> Variances</label>
+                  <label><input type="radio" name="chartMetric" value="boxplot" onchange="updateGroupChart()"> Box Plot</label>
+                </div>
+              </div>
               <div class="stat-panel-body" style="flex:1;min-height:0;padding:4px 8px;">
                 <div id="groupChart" style="height:100%;min-height:180px;"></div>
               </div>
@@ -1388,75 +1397,134 @@
       });
     }
     
+    function ptile(sorted, p) {
+      if (!sorted || !sorted.length) return NaN;
+      const idx = (sorted.length - 1) * (p / 100);
+      const lo = Math.floor(idx);
+      const hi = Math.ceil(idx);
+      if (lo === hi) return sorted[lo];
+      return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+    }
+    function indepExtractVector(colName) {
+      const src = (window.independentAnalysisRows && window.independentAnalysisRows.length)
+        ? window.independentAnalysisRows
+        : window.independentRangeData;
+      if (!src || !colName) return null;
+      const headers = src[0] || [];
+      const colIdx = headers.indexOf(colName);
+      if (colIdx === -1) return null;
+      return src.slice(1)
+        .map(r => parseFloat(r[colIdx]))
+        .filter(v => isFinite(v));
+    }
+    function getChartMetricType() {
+      return (document.querySelector('input[name="chartMetric"]:checked') || {}).value || 'means';
+    }
     function updateGroupChart() {
       if (typeof Highcharts === 'undefined') return;
-      if (!lastBundle || !lastBundle.explore) return;
-      
+      const container = document.getElementById('groupChart');
+      if (!container || !lastBundle || !lastBundle.explore) return;
+
       const e = lastBundle.explore;
       const s = lastBundle.setup || {};
       const groupAName = s.groupA || 'Group A';
       const groupBName = s.groupB || 'Group B';
-      
+      const categories = [groupAName, groupBName];
       const n1 = parseMaybeNumber(e.n1) || 0;
       const n2 = parseMaybeNumber(e.n2) || 0;
       const mean1 = parseMaybeNumber(e.mean1);
       const mean2 = parseMaybeNumber(e.mean2);
       const sd1 = parseMaybeNumber(e.sd1);
       const sd2 = parseMaybeNumber(e.sd2);
-      
+      const vec1 = indepExtractVector(groupAName);
+      const vec2 = indepExtractVector(groupBName);
+      const metricType = getChartMetricType();
+
+      if (window._indepChart) {
+        try { window._indepChart.destroy(); } catch (err) {}
+        window._indepChart = null;
+      }
+
+      if (metricType === 'boxplot') {
+        const vectors = [vec1, vec2];
+        const boxRows = vectors.map(function(vec) {
+          if (!vec || !vec.length) return null;
+          const sv = vec.slice().sort(function(a, b) { return a - b; });
+          return [sv[0], ptile(sv, 25), ptile(sv, 50), ptile(sv, 75), sv[sv.length - 1]];
+        });
+        if (!boxRows.some(function(r) { return r !== null; })) {
+          container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:13px;">No raw data available for box plot.</div>';
+          return;
+        }
+        container.innerHTML = '';
+        window._indepChart = Highcharts.chart('groupChart', {
+          chart: { type: 'boxplot', inverted: true, backgroundColor: 'transparent', height: null, style: { fontFamily: 'Segoe UI,Tahoma,sans-serif' } },
+          title: { text: 'Group Distributions', style: { color: '#fff', fontSize: '12px', fontWeight: '600' } },
+          xAxis: { categories: categories, labels: { style: { color: '#fff', fontSize: '12px' } } },
+          yAxis: { title: { text: 'Value', style: { color: '#fff' } }, labels: { style: { color: '#fff' } }, gridLineColor: 'rgba(255,255,255,0.1)' },
+          legend: { enabled: false },
+          tooltip: { formatter: function() {
+            const pt = this.point;
+            return '<b>' + this.key + '</b><br/>Min: ' + fmt(pt.low) + '<br/>Q1: ' + fmt(pt.q1) + '<br/>Median: ' + fmt(pt.median) + '<br/>Q3: ' + fmt(pt.q3) + '<br/>Max: ' + fmt(pt.high);
+          }},
+          series: [{ name: 'Distribution', colorByPoint: true, colors: ['#74b9ff', '#81c784'],
+            data: boxRows.map(function(r) { return r || [null, null, null, null, null]; }),
+            fillColor: 'rgba(120,200,255,.15)', lineWidth: 2, medianWidth: 3, whiskerWidth: 2, stemWidth: 1 }],
+          credits: { enabled: false }
+        });
+        requestAnimationFrame(fitIndependentLayout);
+        return;
+      }
+
       if (!isFinite(mean1) || !isFinite(mean2)) return;
-      
-      // Always use Welch (separate variance) - correct default
+
+      if (metricType === 'variances') {
+        const var1 = isFinite(sd1) ? sd1 * sd1 : 0;
+        const var2 = isFinite(sd2) ? sd2 * sd2 : 0;
+        window._indepChart = Highcharts.chart('groupChart', {
+          chart: { type: 'column', backgroundColor: 'transparent', height: null },
+          title: { text: 'Group Variances', style: { color: '#fff', fontSize: '12px', fontWeight: '600' } },
+          xAxis: { categories: categories, labels: { style: { color: '#fff', fontSize: '12px' } } },
+          yAxis: { title: { text: 'Variance', style: { color: '#fff' } }, labels: { style: { color: '#fff' } }, gridLineColor: 'rgba(255,255,255,0.1)' },
+          legend: { enabled: false },
+          plotOptions: { column: { dataLabels: { enabled: true, format: '{y:.2f}', style: { color: '#fff', textOutline: 'none' } } } },
+          tooltip: { backgroundColor: '#1a1f2e', style: { color: '#fff' },
+            formatter: function() {
+              const idx = this.point.index;
+              const n = idx === 0 ? n1 : n2;
+              const sd = idx === 0 ? sd1 : sd2;
+              return '<b>' + this.x + '</b><br/>n: ' + n + '<br/>Variance: ' + this.y.toFixed(2) + '<br/>SD: ' + (isFinite(sd) ? sd.toFixed(2) : '—');
+            }},
+          series: [{ name: 'Variance', data: [var1, var2], color: '#74b9ff' }],
+          credits: { enabled: false }
+        });
+        requestAnimationFrame(fitIndependentLayout);
+        return;
+      }
+
       const se1 = isFinite(sd1) && n1 > 0 ? sd1 / Math.sqrt(n1) : 0;
       const se2 = isFinite(sd2) && n2 > 0 ? sd2 / Math.sqrt(n2) : 0;
       const ci1 = 1.96 * se1;
       const ci2 = 1.96 * se2;
-      
-      // Calculate grand mean
       const grandMean = (mean1 * n1 + mean2 * n2) / (n1 + n2);
-      
-      const indepChart = Highcharts.chart('groupChart', {
+
+      window._indepChart = Highcharts.chart('groupChart', {
         chart: { type: 'column', backgroundColor: 'transparent', height: null },
-        title: { 
-          text: 'Welch (Separate Variance)',
-          style: { color: '#fff', fontSize: '12px', fontWeight: '600' }
-        },
-        xAxis: {
-          categories: [groupAName, groupBName],
-          labels: { style: { color: '#fff', fontSize: '12px' } }
-        },
+        title: { text: 'Welch (Separate Variance)', style: { color: '#fff', fontSize: '12px', fontWeight: '600' } },
+        xAxis: { categories: categories, labels: { style: { color: '#fff', fontSize: '12px' } } },
         yAxis: {
           title: { text: 'Mean', style: { color: '#fff' } },
           labels: { style: { color: '#fff' } },
           gridLineColor: 'rgba(255,255,255,0.1)',
           plotLines: [{
-            value: grandMean,
-            color: '#fbbf24',
-            width: 2,
-            dashStyle: 'Dash',
-            zIndex: 5,
-            label: {
-              text: 'Grand Mean',
-              style: { color: '#fbbf24', fontSize: '10px', fontWeight: 'bold' },
-              align: 'right'
-            }
+            value: grandMean, color: '#fbbf24', width: 2, dashStyle: 'Dash', zIndex: 5,
+            label: { text: 'Grand Mean', style: { color: '#fbbf24', fontSize: '10px', fontWeight: 'bold' }, align: 'right' }
           }]
         },
         legend: { enabled: false },
-        plotOptions: {
-          column: {
-            dataLabels: {
-              enabled: true,
-              format: '{y:.2f}',
-              style: { color: '#fff', textOutline: 'none' }
-            }
-          }
-        },
+        plotOptions: { column: { dataLabels: { enabled: true, format: '{y:.2f}', style: { color: '#fff', textOutline: 'none' } } } },
         tooltip: {
-          shared: true,
-          backgroundColor: '#1a1f2e',
-          style: { color: '#fff' },
-          useHTML: true,
+          shared: true, backgroundColor: '#1a1f2e', style: { color: '#fff' }, useHTML: true,
           formatter: function() {
             const pointIndex = this.point.index;
             const n = pointIndex === 0 ? n1 : n2;
@@ -1464,31 +1532,19 @@
             const sd = pointIndex === 0 ? sd1 : sd2;
             const se = pointIndex === 0 ? se1 : se2;
             const ci = pointIndex === 0 ? ci1 : ci2;
-            return `<b>${this.x}</b><br/>` +
-                   `n: ${n}<br/>` +
-                   `Mean: ${mean.toFixed(2)}<br/>` +
-                   `SD: ${sd.toFixed(2)}<br/>` +
-                   `SE: ${se.toFixed(3)}<br/>` +
-                   `95% CI: [${(mean - ci).toFixed(2)}, ${(mean + ci).toFixed(2)}]`;
+            return '<b>' + this.x + '</b><br/>n: ' + n + '<br/>Mean: ' + mean.toFixed(2) + '<br/>SD: ' + sd.toFixed(2) + '<br/>SE: ' + se.toFixed(3) + '<br/>95% CI: [' + (mean - ci).toFixed(2) + ', ' + (mean + ci).toFixed(2) + ']';
           }
         },
         series: [{
-          name: 'Mean',
-          data: [mean1, mean2],
-          color: '#74b9ff'
+          name: 'Mean', data: [mean1, mean2], color: '#74b9ff'
         }, {
-          name: '95% CI',
-          type: 'errorbar',
-          data: [
-            [mean1 - ci1, mean1 + ci1],
-            [mean2 - ci2, mean2 + ci2]
-          ],
-          color: 'rgba(255,255,255,0.4)',
-          lineWidth: 1.5,
-          whiskerLength: '80%'
-        }]
+          name: '95% CI', type: 'errorbar',
+          data: [[mean1 - ci1, mean1 + ci1], [mean2 - ci2, mean2 + ci2]],
+          color: 'rgba(255,255,255,0.4)', lineWidth: 1.5, whiskerLength: '80%'
+        }],
+        credits: { enabled: false }
       });
-      window._indepChart = indepChart;
+      requestAnimationFrame(fitIndependentLayout);
     }
     // Layout engine
     function getLayoutBottomReserve() {

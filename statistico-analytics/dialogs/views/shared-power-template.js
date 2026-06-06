@@ -84,7 +84,7 @@
     }).join('\n          ');
 
     container.innerHTML = [
-      '<div class="pwstd-shell pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260609">',
+      '<div class="pwstd-shell pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260609b">',
       '  <h2 class="pwstd-title"><i class="fa-solid fa-bolt"></i> ' + esc(title) + '</h2>',
       '  <div class="pwstd-grid pwstd-grid--top">',
       '    <div class="pwstd-card pwstd-card--context">',
@@ -115,13 +115,13 @@
       '  </div>',
       '  <div class="pwstd-grid pwstd-grid--technicals">',
       '    <div class="pwstd-card pwstd-card--technicals pwstd-tech-panel" id="pwstd-tech-panel">',
-      '      <button type="button" class="pwstd-card-h pwstd-card-h--toggle" id="pwstd-tech-panel-toggle" aria-expanded="true"',
+      '      <button type="button" class="pwstd-card-h pwstd-card-h--toggle" id="pwstd-tech-panel-toggle" aria-expanded="false"',
       '        onclick="window.StatisticoPowerTemplate._toggleTechPanel()">',
       '        <i class="fa-solid fa-chevron-right pwstd-tech-chevron" aria-hidden="true"></i>',
       '        <span>Technicals</span>',
       '        <span class="pwstd-tech-panel-hint">click to expand</span>',
       '      </button>',
-      '      <div class="pwstd-card-b pwstd-card-b--technicals" id="pwstd-tech-panel-body">',
+      '      <div class="pwstd-card-b pwstd-card-b--technicals" id="pwstd-tech-panel-body" hidden>',
       '        <div class="pwstd-row pwstd-row--engine">',
       '          <span class="pwstd-label">Power engine</span>',
       '          <select class="pwstd-select" id="' + id(ids,'powerMethod','powPowerMethod') + '"',
@@ -194,8 +194,6 @@
 
     _syncTaskUI('fromN');
     _updateDfFormulaLabel();
-    var techPanel = document.getElementById('pwstd-tech-panel');
-    if (techPanel) techPanel.classList.add('pwstd-tech-panel--open');
   }
 
   function _updateDfFormulaLabel() {

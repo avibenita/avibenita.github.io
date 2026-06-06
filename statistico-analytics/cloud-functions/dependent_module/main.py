@@ -59,6 +59,27 @@ def _calculate_observed_power_rm_anova(
         return 0.0
 
 
+def _power_at_cohen_f_rm_anova(
+    effect_size_f: float,
+    n: int,
+    num_timepoints: int,
+    alpha: float = 0.05,
+) -> float:
+    """Achieved power for a given Cohen's f, n, and number of timepoints."""
+    if effect_size_f <= 0 or n < 2 or num_timepoints < 2:
+        return 0.0
+
+    df_between = num_timepoints - 1
+    df_error = (n - 1) * df_between
+    ncp = n * (effect_size_f ** 2) * df_between
+
+    try:
+        f_crit = stats.f.ppf(1 - alpha, df_between, df_error)
+        return float(max(0.0, min(1.0, 1 - stats.ncf.cdf(f_crit, df_between, df_error, ncp))))
+    except Exception:
+        return 0.0
+
+
 def _calculate_required_sample_size_rm_anova(
     effect_size_f: float,
     num_timepoints: int,
@@ -93,6 +114,31 @@ def _calculate_required_sample_size_rm_anova(
             n_min = n + 1
     
     return n_max if n_max >= 2 else 2
+
+
+def _calculate_detectable_effect_size_rm_anova(
+    n: int,
+    num_timepoints: int,
+    target_power: float = 0.80,
+    alpha: float = 0.05,
+    max_iterations: int = 60,
+) -> float:
+    """Minimum Cohen's f detectable at target power with fixed n (binary search)."""
+    if n < 2 or num_timepoints < 2:
+        return 0.0
+
+    target_power = max(0.50, min(0.99, target_power))
+    lo, hi = 0.001, 5.0
+
+    for _ in range(max_iterations):
+        f_mid = (lo + hi) / 2
+        power = _power_at_cohen_f_rm_anova(f_mid, n, num_timepoints, alpha)
+        if power >= target_power:
+            hi = f_mid
+        else:
+            lo = f_mid
+
+    return (lo + hi) / 2
 
 
 def handle_power_analysis(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -173,6 +219,34 @@ def handle_power_analysis(data: Dict[str, Any]) -> Dict[str, Any]:
             "target_power": target_power,
             "num_timepoints": k,
             "interpretation": f"You need {required_n} subjects to achieve {target_power*100:.0f}% power"
+        }
+
+    elif mode == "detectable":
+        n = int(data.get("n", 0))
+        k = int(data.get("k", 3))
+        if n < 2:
+            raise ValueError("Sample size n must be at least 2")
+        if k < 2:
+            raise ValueError("Number of timepoints must be at least 2")
+
+        target_power = float(data.get("target_power", 0.80))
+        target_power = max(0.50, min(0.99, target_power))
+
+        min_f = _calculate_detectable_effect_size_rm_anova(n, k, target_power, alpha)
+        min_eta = (min_f ** 2) / (1 + min_f ** 2) if min_f > 0 else 0.0
+        achieved_power = _power_at_cohen_f_rm_anova(min_f, n, k, alpha)
+
+        results = {
+            "min_detectable_cohen_f": float(min_f),
+            "min_detectable_partial_eta_squared": float(min_eta),
+            "achieved_power": float(achieved_power),
+            "target_power": target_power,
+            "n": n,
+            "num_timepoints": k,
+            "interpretation": (
+                f"With n={n}, the smallest detectable effect is Cohen's f={min_f:.3f} "
+                f"(partial eta^2={min_eta:.3f}) at {target_power*100:.0f}% power"
+            ),
         }
     
     return {

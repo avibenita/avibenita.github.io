@@ -17,7 +17,37 @@ dependent_module/
 
 Calculate statistical power for repeated measures ANOVA.
 
-**Request:**
+**Modes:** `observed` | `required` | `detectable`
+
+**Detectable effect (mode: `detectable`):**
+
+```json
+{
+  "operation": "power",
+  "mode": "detectable",
+  "n": 20,
+  "k": 3,
+  "target_power": 0.80,
+  "alpha": 0.05
+}
+```
+
+**Response:**
+```json
+{
+  "ok": true,
+  "results": {
+    "min_detectable_cohen_f": 0.310,
+    "min_detectable_partial_eta_squared": 0.088,
+    "achieved_power": 0.801,
+    "target_power": 0.80,
+    "n": 20,
+    "num_timepoints": 3
+  }
+}
+```
+
+**Observed power (mode: `observed`):**
 ```json
 {
   "operation": "power",

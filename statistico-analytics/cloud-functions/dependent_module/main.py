@@ -31,7 +31,11 @@ def _response(payload: Dict[str, Any], status: int = 200):
     return body, status, headers
 
 
-# ===== POWER ANALYSIS =====
+# ===== POWER ANALYSIS (G*Power-aligned RM-ANOVA within-subjects) =====
+# Reference: Potvin & Schutz (2000); G*Power 3 manual (univariate RM approach)
+#   lambda = N * m * f^2 / (1 - rho)   [within-subjects main effect, one between group]
+#   df1 = (m - 1) * epsilon,  df2 = (N - 1)(m - 1) * epsilon
+
 
 def _calculate_cohen_f_from_partial_eta_squared(partial_eta_sq: float) -> float:
     """Convert partial eta squared to Cohen's f"""
@@ -40,23 +44,31 @@ def _calculate_cohen_f_from_partial_eta_squared(partial_eta_sq: float) -> float:
     return math.sqrt(partial_eta_sq / (1 - partial_eta_sq))
 
 
-def _calculate_observed_power_rm_anova(
-    f_statistic: float,
-    df_between: int,
-    df_error: int,
-    alpha: float = 0.05
-) -> float:
-    """Calculate observed power using non-central F distribution"""
-    if f_statistic <= 0 or df_between <= 0 or df_error <= 0:
+def _parse_rho(data: Dict[str, Any]) -> float:
+    rho = float(data.get("avg_correlation", data.get("rho", 0.0)))
+    return max(-0.999, min(0.999, rho))
+
+
+def _parse_epsilon(data: Dict[str, Any]) -> float:
+    eps = float(data.get("epsilon", data.get("nonsphericity_epsilon", 1.0)))
+    return max(0.1, min(1.0, eps))
+
+
+def _rm_ncp(n: int, k: int, effect_size_f: float, rho: float) -> float:
+    """Noncentrality parameter for RM-ANOVA within effect (G*Power)."""
+    if effect_size_f <= 0 or n < 1 or k < 2:
         return 0.0
-    
-    try:
-        f_crit = stats.f.ppf(1 - alpha, df_between, df_error)
-        ncp = f_statistic * df_between
-        power = 1 - stats.ncf.cdf(f_crit, df_between, df_error, ncp)
-        return float(max(0.0, min(1.0, power)))
-    except Exception:
-        return 0.0
+    denom = 1.0 - rho
+    if denom <= 1e-9:
+        denom = 1e-9
+    return n * k * (effect_size_f ** 2) / denom
+
+
+def _rm_df(n: int, k: int, epsilon: float) -> tuple:
+    """Sphericity-adjusted df for the within-subjects effect."""
+    df1 = (k - 1) * epsilon
+    df2 = (n - 1) * (k - 1) * epsilon
+    return df1, df2
 
 
 def _power_at_cohen_f_rm_anova(
@@ -64,18 +76,19 @@ def _power_at_cohen_f_rm_anova(
     n: int,
     num_timepoints: int,
     alpha: float = 0.05,
+    rho: float = 0.0,
+    epsilon: float = 1.0,
 ) -> float:
-    """Achieved power for a given Cohen's f, n, and number of timepoints."""
+    """Achieved power for Cohen's f with RM correlation and sphericity correction."""
     if effect_size_f <= 0 or n < 2 or num_timepoints < 2:
         return 0.0
 
-    df_between = num_timepoints - 1
-    df_error = (n - 1) * df_between
-    ncp = n * (effect_size_f ** 2) * df_between
+    ncp = _rm_ncp(n, num_timepoints, effect_size_f, rho)
+    df1, df2 = _rm_df(n, num_timepoints, epsilon)
 
     try:
-        f_crit = stats.f.ppf(1 - alpha, df_between, df_error)
-        return float(max(0.0, min(1.0, 1 - stats.ncf.cdf(f_crit, df_between, df_error, ncp))))
+        f_crit = stats.f.ppf(1 - alpha, df1, df2)
+        return float(max(0.0, min(1.0, 1 - stats.ncf.cdf(f_crit, df1, df2, ncp))))
     except Exception:
         return 0.0
 
@@ -85,34 +98,31 @@ def _calculate_required_sample_size_rm_anova(
     num_timepoints: int,
     target_power: float = 0.80,
     alpha: float = 0.05,
-    max_iterations: int = 100
+    rho: float = 0.0,
+    epsilon: float = 1.0,
+    max_iterations: int = 100,
 ) -> int:
-    """Calculate required sample size for target power"""
+    """Required N for target power (binary search)."""
     if effect_size_f <= 0 or num_timepoints < 2:
         return 0
-    
-    df_between = num_timepoints - 1
-    n_min, n_max = 2, 1000
-    
+
+    target_power = max(0.50, min(0.99, target_power))
+    n_min, n_max = 2, 2000
+
     for _ in range(max_iterations):
         n = (n_min + n_max) // 2
-        df_error = (n - 1) * df_between
-        ncp = n * (effect_size_f ** 2) * df_between
-        
-        try:
-            f_crit = stats.f.ppf(1 - alpha, df_between, df_error)
-            power = 1 - stats.ncf.cdf(f_crit, df_between, df_error, ncp)
-            
-            if abs(power - target_power) < 0.01:
-                return n
-            
-            if power < target_power:
-                n_min = n + 1
-            else:
-                n_max = n - 1
-        except Exception:
+        power = _power_at_cohen_f_rm_anova(
+            effect_size_f, n, num_timepoints, alpha, rho, epsilon
+        )
+
+        if abs(power - target_power) < 0.005:
+            return n
+
+        if power < target_power:
             n_min = n + 1
-    
+        else:
+            n_max = n - 1
+
     return n_max if n_max >= 2 else 2
 
 
@@ -121,9 +131,11 @@ def _calculate_detectable_effect_size_rm_anova(
     num_timepoints: int,
     target_power: float = 0.80,
     alpha: float = 0.05,
+    rho: float = 0.0,
+    epsilon: float = 1.0,
     max_iterations: int = 60,
 ) -> float:
-    """Minimum Cohen's f detectable at target power with fixed n (binary search)."""
+    """Minimum Cohen's f detectable at target power with fixed n."""
     if n < 2 or num_timepoints < 2:
         return 0.0
 
@@ -132,7 +144,9 @@ def _calculate_detectable_effect_size_rm_anova(
 
     for _ in range(max_iterations):
         f_mid = (lo + hi) / 2
-        power = _power_at_cohen_f_rm_anova(f_mid, n, num_timepoints, alpha)
+        power = _power_at_cohen_f_rm_anova(
+            f_mid, n, num_timepoints, alpha, rho, epsilon
+        )
         if power >= target_power:
             hi = f_mid
         else:
@@ -141,84 +155,96 @@ def _calculate_detectable_effect_size_rm_anova(
     return (lo + hi) / 2
 
 
+def _resolve_effect_size_f(data: Dict[str, Any], n: int, k: int) -> float:
+    """Resolve Cohen's f from request payload."""
+    if "effect_size_f" in data:
+        f = float(data["effect_size_f"])
+        if f > 0:
+            return f
+    if "partial_eta_squared" in data:
+        f = _calculate_cohen_f_from_partial_eta_squared(float(data["partial_eta_squared"]))
+        if f > 0:
+            return f
+    f_stat = float(data.get("f_statistic", 0))
+    df_between = int(data.get("df_between", k - 1 if k > 1 else 0))
+    if f_stat > 0 and n > 0 and df_between > 0:
+        return math.sqrt(f_stat * df_between / n)
+    return 0.0
+
+
 def handle_power_analysis(data: Dict[str, Any]) -> Dict[str, Any]:
     """Handle power analysis requests"""
     mode = str(data.get("mode", "observed")).strip().lower()
     alpha = float(data.get("alpha", 0.05))
     alpha = max(0.001, min(0.25, alpha))
-    
-    # Extract effect size
-    effect_size_f = None
-    if "effect_size_f" in data:
-        effect_size_f = float(data["effect_size_f"])
-    elif "partial_eta_squared" in data:
-        partial_eta_sq = float(data["partial_eta_squared"])
-        effect_size_f = _calculate_cohen_f_from_partial_eta_squared(partial_eta_sq)
-    
-    results = {}
-    
+    rho = _parse_rho(data)
+    epsilon = _parse_epsilon(data)
+
+    effect_size_f = _resolve_effect_size_f(data, int(data.get("n", 0)), int(data.get("k", 0)))
+    results: Dict[str, Any] = {}
+
     if mode == "observed":
-        f_stat = float(data.get("f_statistic", 0))
-        df_between = int(data.get("df_between", 0))
-        df_error = int(data.get("df_error", 0))
         n = int(data.get("n", 0))
         k = int(data.get("k", 0))
-        
-        if f_stat <= 0 or df_between <= 0 or df_error <= 0:
-            raise ValueError("Invalid F statistic or degrees of freedom")
-        
-        observed_power = _calculate_observed_power_rm_anova(f_stat, df_between, df_error, alpha)
-        
-        if effect_size_f is None and n > 0 and k > 0:
-            effect_size_f = math.sqrt(f_stat * df_between / n)
-        
+
+        if effect_size_f <= 0 or n < 2 or k < 2:
+            raise ValueError("Need n, k, and effect size (partial eta² or Cohen's f)")
+
+        observed_power = _power_at_cohen_f_rm_anova(
+            effect_size_f, n, k, alpha, rho, epsilon
+        )
+        ncp = _rm_ncp(n, k, effect_size_f, rho)
+        df1, df2 = _rm_df(n, k, epsilon)
+
         results = {
             "observed_power": observed_power,
-            "effect_size_cohen_f": effect_size_f if effect_size_f else 0.0,
-            "f_statistic": f_stat,
-            "df_between": df_between,
-            "df_error": df_error,
-            "interpretation": _interpret_power(observed_power)
+            "effect_size_cohen_f": effect_size_f,
+            "noncentrality_parameter": ncp,
+            "avg_correlation": rho,
+            "epsilon": epsilon,
+            "df_between": df1,
+            "df_error": df2,
+            "n": n,
+            "num_timepoints": k,
+            "interpretation": _interpret_power(observed_power),
         }
-        
-        if effect_size_f and effect_size_f > 0 and k > 0:
+
+        if effect_size_f > 0 and k > 0:
             results["required_for_80pct"] = _calculate_required_sample_size_rm_anova(
-                effect_size_f, k, 0.80, alpha
+                effect_size_f, k, 0.80, alpha, rho, epsilon
             )
             results["required_for_90pct"] = _calculate_required_sample_size_rm_anova(
-                effect_size_f, k, 0.90, alpha
+                effect_size_f, k, 0.90, alpha, rho, epsilon
             )
-    
+
     elif mode == "required":
-        if effect_size_f is None or effect_size_f <= 0:
+        if effect_size_f <= 0:
             raise ValueError("Effect size required")
-        
+
         k = int(data.get("k", 3))
         if k < 2:
             raise ValueError("Number of timepoints must be at least 2")
-        
+
         target_power = float(data.get("target_power", 0.80))
         target_power = max(0.50, min(0.99, target_power))
-        
-        required_n = _calculate_required_sample_size_rm_anova(effect_size_f, k, target_power, alpha)
-        
-        df_between = k - 1
-        df_error = (required_n - 1) * df_between
-        ncp = required_n * (effect_size_f ** 2) * df_between
-        
-        try:
-            f_crit = stats.f.ppf(1 - alpha, df_between, df_error)
-            achieved_power = 1 - stats.ncf.cdf(f_crit, df_between, df_error, ncp)
-        except Exception:
-            achieved_power = target_power
-        
+
+        required_n = _calculate_required_sample_size_rm_anova(
+            effect_size_f, k, target_power, alpha, rho, epsilon
+        )
+        achieved_power = _power_at_cohen_f_rm_anova(
+            effect_size_f, required_n, k, alpha, rho, epsilon
+        )
+
         results = {
             "required_sample_size": required_n,
             "achieved_power": float(achieved_power),
             "effect_size_cohen_f": effect_size_f,
             "target_power": target_power,
             "num_timepoints": k,
-            "interpretation": f"You need {required_n} subjects to achieve {target_power*100:.0f}% power"
+            "avg_correlation": rho,
+            "epsilon": epsilon,
+            "noncentrality_parameter": _rm_ncp(required_n, k, effect_size_f, rho),
+            "interpretation": f"You need {required_n} subjects to achieve {target_power*100:.0f}% power",
         }
 
     elif mode == "detectable":
@@ -232,9 +258,11 @@ def handle_power_analysis(data: Dict[str, Any]) -> Dict[str, Any]:
         target_power = float(data.get("target_power", 0.80))
         target_power = max(0.50, min(0.99, target_power))
 
-        min_f = _calculate_detectable_effect_size_rm_anova(n, k, target_power, alpha)
+        min_f = _calculate_detectable_effect_size_rm_anova(
+            n, k, target_power, alpha, rho, epsilon
+        )
         min_eta = (min_f ** 2) / (1 + min_f ** 2) if min_f > 0 else 0.0
-        achieved_power = _power_at_cohen_f_rm_anova(min_f, n, k, alpha)
+        achieved_power = _power_at_cohen_f_rm_anova(min_f, n, k, alpha, rho, epsilon)
 
         results = {
             "min_detectable_cohen_f": float(min_f),
@@ -243,17 +271,20 @@ def handle_power_analysis(data: Dict[str, Any]) -> Dict[str, Any]:
             "target_power": target_power,
             "n": n,
             "num_timepoints": k,
+            "avg_correlation": rho,
+            "epsilon": epsilon,
+            "noncentrality_parameter": _rm_ncp(n, k, min_f, rho),
             "interpretation": (
                 f"With n={n}, the smallest detectable effect is Cohen's f={min_f:.3f} "
                 f"(partial eta^2={min_eta:.3f}) at {target_power*100:.0f}% power"
             ),
         }
-    
+
     return {
         "ok": True,
         "operation": "power_analysis",
-        "input": {"mode": mode, "alpha": alpha},
-        "results": results
+        "input": {"mode": mode, "alpha": alpha, "avg_correlation": rho, "epsilon": epsilon},
+        "results": results,
     }
 
 

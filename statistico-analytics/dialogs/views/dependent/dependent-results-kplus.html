@@ -3168,7 +3168,7 @@
     let powerAnalysisData = null;
     const DEPENDENT_MODULE_URL = 'https://dependent-module-625149856249.us-central1.run.app';
 
-    function updatePowerTechnicals(omnibus, explore) {
+    function getPowerContext(omnibus, explore) {
       const corrMatrix = (explore || {}).correlationMatrix || {};
       let avgR = parseMaybeNumber(corrMatrix.avgR);
       if (!isFinite(avgR) && Array.isArray(corrMatrix.correlations)) {
@@ -3177,24 +3177,74 @@
           .filter(function(r){ return isFinite(r); });
         if (rs.length) avgR = rs.reduce(function(a, b){ return a + b; }, 0) / rs.length;
       }
-      setText('powAvgCorrelation', isFinite(avgR) ? avgR.toFixed(3) : '—');
+      if (!isFinite(avgR)) avgR = 0;
+      avgR = Math.max(-0.999, Math.min(0.999, avgR));
 
       const sph = (omnibus || {}).sphericity || {};
       const gg = parseMaybeNumber(sph.epsilonGG);
       const hf = parseMaybeNumber(sph.epsilonHF);
+      const mauchlyP = parseMaybeNumber(sph.p);
+      const violated = sph.sphericityMet === false || (isFinite(mauchlyP) && mauchlyP < 0.05);
+      let epsilon = 1.0;
+      if (isFinite(gg)) epsilon = gg;
+      else if (isFinite(hf)) epsilon = hf;
+      if (violated && isFinite(gg)) epsilon = gg;
+
+      return {
+        avgR: avgR,
+        epsilon: Math.max(0.1, Math.min(1.0, epsilon)),
+        epsilonGG: gg,
+        epsilonHF: hf
+      };
+    }
+
+    function updatePowerTechnicals(omnibus, explore) {
+      const ctx = getPowerContext(omnibus, explore);
+      setText('powAvgCorrelation', isFinite(ctx.avgR) ? ctx.avgR.toFixed(3) : '—');
+
       let epsDisplay = '—';
-      if (isFinite(gg) && isFinite(hf)) {
-        epsDisplay = 'GG ' + gg.toFixed(3) + ' · HF ' + hf.toFixed(3);
-      } else if (isFinite(gg)) {
-        epsDisplay = 'GG ' + gg.toFixed(3);
-      } else if (isFinite(hf)) {
-        epsDisplay = 'HF ' + hf.toFixed(3);
+      if (isFinite(ctx.epsilonGG) && isFinite(ctx.epsilonHF)) {
+        epsDisplay = 'GG ' + ctx.epsilonGG.toFixed(3) + ' · HF ' + ctx.epsilonHF.toFixed(3);
+      } else if (isFinite(ctx.epsilonGG)) {
+        epsDisplay = 'GG ' + ctx.epsilonGG.toFixed(3);
+      } else if (isFinite(ctx.epsilonHF)) {
+        epsDisplay = 'HF ' + ctx.epsilonHF.toFixed(3);
       }
       setText('powEpsilon', epsDisplay);
     }
+
+    /* G*Power-aligned RM lambda: N * m * f^2 / (1 - rho) */
+    function rmNcp(n, k, f, rho) {
+      const denom = Math.max(1e-9, 1 - rho);
+      return n * k * f * f / denom;
+    }
+
+    function rmPowerAtFLocal(n, k, f, alpha, rho, epsilon) {
+      if (!f || f <= 0 || !n || n < 2 || !k || k < 2) return 0;
+      const ncp = rmNcp(n, k, f, rho);
+      const zCrit = (alpha || 0.05) <= 0.05 ? 1.644854 : 1.281552;
+      return Math.max(0, Math.min(1, 1 - normalCdf(zCrit - Math.sqrt(Math.max(0, ncp)))));
+    }
+
+    function estimateRequiredN(effectF, k, targetPower, alpha, rho, epsilon) {
+      if (!effectF || effectF <= 0 || !k || k < 2) return 0;
+      rho = isFinite(rho) ? rho : 0;
+      epsilon = isFinite(epsilon) ? epsilon : 1;
+      let nMin = 2, nMax = 2000;
+      for (let iter = 0; iter < 60; iter++) {
+        const n = Math.floor((nMin + nMax) / 2);
+        const power = rmPowerAtFLocal(n, k, effectF, alpha, rho, epsilon);
+        if (Math.abs(power - targetPower) < 0.01) return n;
+        if (power < targetPower) nMin = n + 1;
+        else nMax = n - 1;
+      }
+      return nMax;
+    }
     
     async function calculatePowerAnalysis(omnibus, setup) {
-      updatePowerTechnicals(omnibus, (lastBundle && lastBundle.explore) || {});
+      const explore = (lastBundle && lastBundle.explore) || {};
+      const ctx = getPowerContext(omnibus, explore);
+      updatePowerTechnicals(omnibus, explore);
       console.log("Calculating power analysis...");
       console.log("Omnibus data:", omnibus);
       console.log("Setup data:", setup);
@@ -3238,17 +3288,22 @@
         }
       }
       
-      console.log("Parsed values:", { fStat, df1, df2, partialEta, cohenF, n, k, alpha, effectSizeSource });
+      if (!cohenF && isFinite(partialEta) && partialEta > 0) {
+        cohenF = Math.sqrt(partialEta / (1 - partialEta));
+      }
       
-      if (!fStat || fStat <= 0 || !df1 || !df2 || !n || n < 2 || !k || k < 2) {
-        console.warn("? Insufficient data for power analysis", { fStat, df1, df2, n, k });
-        // Use local approximation with available data
-        if (fStat > 0 && df1 > 0 && df2 > 0 && n > 1) {
-          const localPower = calculateLocalPowerApproximation(fStat, df1, df2, n);
+      console.log("Parsed values:", { fStat, df1, df2, partialEta, cohenF, n, k, alpha, effectSizeSource, ctx });
+      
+      if (!n || n < 2 || !k || k < 2 || !cohenF || cohenF <= 0) {
+        console.warn("? Insufficient data for power analysis", { cohenF, n, k });
+        if (cohenF > 0 && n > 1 && k > 1) {
+          const localPower = rmPowerAtFLocal(n, k, cohenF, alpha, ctx.avgR, ctx.epsilon);
           updatePowerUI({ 
             observed_power: localPower,
-            effect_size_cohen_f: cohenF || 0,
+            effect_size_cohen_f: cohenF,
             partial_eta_squared: partialEta || 0,
+            required_for_80pct: estimateRequiredN(cohenF, k, 0.80, alpha, ctx.avgR, ctx.epsilon),
+            required_for_90pct: estimateRequiredN(cohenF, k, 0.90, alpha, ctx.avgR, ctx.epsilon),
             local: true 
           }, n, alpha, partialEta, effectSizeSource);
         } else {
@@ -3263,7 +3318,7 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            operation: 'power',  // ? NEW: Specify operation
+            operation: 'power',
             mode: 'observed',
             f_statistic: fStat,
             df_between: df1,
@@ -3271,6 +3326,9 @@
             n: n,
             k: k,
             partial_eta_squared: partialEta,
+            effect_size_f: cohenF,
+            avg_correlation: ctx.avgR,
+            epsilon: ctx.epsilon,
             alpha: alpha || 0.05
           }),
           timeout: 5000
@@ -3295,17 +3353,14 @@
         console.warn("? Cloud function unavailable, using local approximation:", error);
       }
       
-      // Fallback to local approximation
-      const localPower = calculateLocalPowerApproximation(fStat, df1, df2, n);
-      const effectF = cohenF || Math.sqrt(fStat * df1 / n);
-      
-      // Calculate required sample sizes locally
-      const req80 = estimateRequiredN(effectF, k, 0.80, alpha);
-      const req90 = estimateRequiredN(effectF, k, 0.90, alpha);
+      // Fallback to local G*Power-aligned approximation
+      const localPower = rmPowerAtFLocal(n, k, cohenF, alpha, ctx.avgR, ctx.epsilon);
+      const req80 = estimateRequiredN(cohenF, k, 0.80, alpha, ctx.avgR, ctx.epsilon);
+      const req90 = estimateRequiredN(cohenF, k, 0.90, alpha, ctx.avgR, ctx.epsilon);
       
       updatePowerUI({ 
         observed_power: localPower,
-        effect_size_cohen_f: effectF,
+        effect_size_cohen_f: cohenF,
         partial_eta_squared: partialEta || 0,
         required_for_80pct: req80,
         required_for_90pct: req90,
@@ -3323,49 +3378,6 @@
       return z >= 0 ? 1 - p : p;
     }
 
-    function calculateLocalPowerApproximation(fStat, df1, df2, n) {
-      // Simple approximation using normal distribution
-      // Power approx 1 - Phi(z_critical - sqrt(lambda))
-      // where lambda = n * f^2 * df1
-      
-      if (!fStat || fStat <= 0 || !df1 || !n || n < 2) return 0;
-      
-      const effectSizeF = Math.sqrt(fStat * df1 / n);
-      const ncp = n * effectSizeF * effectSizeF * df1;
-      const zCrit = 1.96;  // for alpha = 0.05, two-tailed
-      const power = 1 - normalCdf(zCrit - Math.sqrt(ncp));
-      
-      return Math.max(0, Math.min(1, power));
-    }
-    
-    function estimateRequiredN(effectF, k, targetPower, alpha) {
-      // Binary search for required N
-      if (!effectF || effectF <= 0 || !k || k < 2) return 0;
-      
-      const df1 = k - 1;
-      let nMin = 2, nMax = 500;
-      
-      for (let iter = 0; iter < 50; iter++) {
-        const n = Math.floor((nMin + nMax) / 2);
-        const df2 = (n - 1) * df1;
-        const ncp = n * effectF * effectF * df1;
-        
-        // Approximate power
-        const zCrit = alpha <= 0.05 ? 1.96 : 1.645;
-        const power = 1 - normalCdf(zCrit - Math.sqrt(ncp));
-        
-        if (Math.abs(power - targetPower) < 0.01) return n;
-        
-        if (power < targetPower) {
-          nMin = n + 1;
-        } else {
-          nMax = n - 1;
-        }
-      }
-      
-      return nMax;
-    }
-    
     function updatePowerUI(results, currentN, alpha, partialEta, effectSizeSource = "parametric") {
       const { 
         observed_power, 
@@ -3451,7 +3463,7 @@
         if (fallback || local) {
           noteText = '<i class="fa-solid fa-calculator"></i> Power calculated using statistical approximation (cloud function unavailable).';
         } else {
-          noteText = '<i class="fa-solid fa-cloud"></i> Power calculated via Python Google Cloud Functions using non-central F distribution.';
+          noteText = '<i class="fa-solid fa-cloud"></i> Power calculated via Python Google Cloud Functions (G*Power RM-ANOVA model: λ = N·m·f²/(1−ρ), df adjusted by ε).';
         }
         
         // Add effect size source note
@@ -3522,50 +3534,27 @@
         
         const omnibus = lastBundle.results.omnibus;
         const setup = lastBundle.setup || {};
+        const explore = lastBundle.explore || {};
+        const ctx = getPowerContext(omnibus, explore);
         const alpha = 0.05;
         
-        // Extract required values from omnibus
-        const fStat = parseMaybeNumber(omnibus.anovaF);
+        const partialEtaSq = parseMaybeNumber(omnibus.partialEtaSquared);
+        let n = parseMaybeNumber(omnibus.n) || parseMaybeNumber(omnibus.N);
+        const k = (setup.selectedColumns || []).length;
         const df1 = parseMaybeNumber(omnibus.anovaDf1);
         const df2 = parseMaybeNumber(omnibus.anovaDf2);
-        const partialEtaSq = parseMaybeNumber(omnibus.partialEtaSquared);
-        let n = parseMaybeNumber(omnibus.n);
-        const k = (setup.selectedColumns || []).length;
         
-        // Calculate n from degrees of freedom if missing
-        if (!n || isNaN(n)) {
-          if (df1 && df2 && k > 1) {
-            n = Math.round((df2 / df1) + 1);
-            console.log("Calculated n from df for custom power:", n);
-          }
+        if ((!n || isNaN(n)) && df1 && df2 && k > 1) {
+          n = Math.round((df2 / df1) + 1);
         }
         
-        console.log("Custom power data check:", { 
-          fStat, df1, df2, partialEtaSq, n, k, 
-          hasOmnibus: !!omnibus,
-          omnibusKeys: Object.keys(omnibus || {})
-        });
-        
-        // Validate data - relax k requirement
-        if (!fStat || !df1 || !df2 || !partialEtaSq || isNaN(partialEtaSq)) {
-          console.error("? Missing required data:", { fStat, df1, df2, partialEtaSq });
+        if (!partialEtaSq || isNaN(partialEtaSq) || !n) {
           throw new Error('Insufficient data for power analysis');
         }
         
-        if (!n) {
-          console.error("? Could not determine sample size");
-          throw new Error('Cannot determine sample size from data');
-        }
-        
-        // Use k from degrees of freedom if not available
         const numMeasurements = k || (df1 + 1);
-        
-        // Convert effect size
         const cohensF = Math.sqrt(partialEtaSq / (1 - partialEtaSq));
         
-        console.log("Custom power calculation:", { targetPower, cohensF, numMeasurements, n, df1, df2 });
-        
-        // Call cloud function for required N
         const response = await fetch(DEPENDENT_MODULE_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -3575,6 +3564,8 @@
             target_power: targetPower,
             effect_size_f: cohensF,
             k: numMeasurements,
+            avg_correlation: ctx.avgR,
+            epsilon: ctx.epsilon,
             alpha: alpha
           })
         });
@@ -3645,21 +3636,15 @@
     }
 
     /* ── Detectable effect size via cloud (mode: detectable) ── */
-    function calculateDetectableEffectLocal(n, k, targetPower, alpha) {
-      const df1 = k - 1;
-      const df2 = (n - 1) * df1;
+    function calculateDetectableEffectLocal(n, k, targetPower, alpha, rho, epsilon) {
+      rho = isFinite(rho) ? rho : 0;
+      epsilon = isFinite(epsilon) ? epsilon : 1;
       let lo = 0.001, hi = 5.0;
       for (let i = 0; i < 60; i++) {
         const f = (lo + hi) / 2;
-        const ncp = n * f * f * df1;
-        try {
-          const fCrit = 1.96; /* approximate for alpha=0.05 */
-          const pw = 1 - normalCdf(fCrit - Math.sqrt(Math.max(0, ncp)));
-          if (pw >= targetPower) hi = f;
-          else lo = f;
-        } catch (e) {
-          lo = f;
-        }
+        const pw = rmPowerAtFLocal(n, k, f, alpha, rho, epsilon);
+        if (pw >= targetPower) hi = f;
+        else lo = f;
       }
       const minF = (lo + hi) / 2;
       const minEta = minF * minF / (1 + minF * minF);
@@ -3669,6 +3654,8 @@
     async function calculateDetectableEffect() {
       const ob = (lastBundle && lastBundle.results && lastBundle.results.omnibus) || {};
       const s  = (lastBundle && lastBundle.setup) || {};
+      const explore = (lastBundle && lastBundle.explore) || {};
+      const ctx = getPowerContext(ob, explore);
 
       const df1 = parseMaybeNumber(ob.anovaDf1);
       const df2 = parseMaybeNumber(ob.anovaDf2);
@@ -3717,6 +3704,8 @@
             n: n,
             k: k,
             target_power: targetPower,
+            avg_correlation: ctx.avgR,
+            epsilon: ctx.epsilon,
             alpha: alpha || 0.05
           })
         });
@@ -3751,7 +3740,7 @@
         console.warn('Detectable effect cloud unavailable, using local approximation:', error);
       }
 
-      const local = calculateDetectableEffectLocal(n, k, targetPower, alpha || 0.05);
+      const local = calculateDetectableEffectLocal(n, k, targetPower, alpha || 0.05, ctx.avgR, ctx.epsilon);
       setText('powMinDetectableF', local.minF.toFixed(3));
       setText('powMinDetectableEta', local.minEta.toFixed(3));
 

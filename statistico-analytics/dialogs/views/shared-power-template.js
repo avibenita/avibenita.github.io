@@ -84,7 +84,7 @@
     }).join('\n          ');
 
     container.innerHTML = [
-      '<div class="pwstd-shell pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260608">',
+      '<div class="pwstd-shell pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260609">',
       '  <h2 class="pwstd-title"><i class="fa-solid fa-bolt"></i> ' + esc(title) + '</h2>',
       '  <div class="pwstd-grid pwstd-grid--top">',
       '    <div class="pwstd-card pwstd-card--context">',
@@ -114,9 +114,14 @@
       '    </div>',
       '  </div>',
       '  <div class="pwstd-grid pwstd-grid--technicals">',
-      '    <div class="pwstd-card pwstd-card--technicals">',
-      '      <div class="pwstd-card-h">Technicals</div>',
-      '      <div class="pwstd-card-b pwstd-card-b--technicals">',
+      '    <div class="pwstd-card pwstd-card--technicals pwstd-tech-panel" id="pwstd-tech-panel">',
+      '      <button type="button" class="pwstd-card-h pwstd-card-h--toggle" id="pwstd-tech-panel-toggle" aria-expanded="true"',
+      '        onclick="window.StatisticoPowerTemplate._toggleTechPanel()">',
+      '        <i class="fa-solid fa-chevron-right pwstd-tech-chevron" aria-hidden="true"></i>',
+      '        <span>Technicals</span>',
+      '        <span class="pwstd-tech-panel-hint">click to expand</span>',
+      '      </button>',
+      '      <div class="pwstd-card-b pwstd-card-b--technicals" id="pwstd-tech-panel-body">',
       '        <div class="pwstd-row pwstd-row--engine">',
       '          <span class="pwstd-label">Power engine</span>',
       '          <select class="pwstd-select" id="' + id(ids,'powerMethod','powPowerMethod') + '"',
@@ -125,7 +130,7 @@
       '            <option value="gpower_manova">G*Power MANOVA-style</option>',
       '          </select>',
       '        </div>',
-      '        <div class="pwstd-row pwstd-row--engine"><span class="pwstd-label">df formulas</span>',
+      '        <div class="pwstd-row pwstd-row--engine pwstd-row--formula"><span class="pwstd-label">df formulas</span>',
       '          <span class="pwstd-value pwstd-value--formula" id="' + id(ids,'dfFormula','powDfFormula') + '">df1=(k−1)·ε · df2=(N−1)(k−1)·ε</span></div>',
       '        <div class="pwstd-row"><span class="pwstd-label">Average correlation among repeated measures</span><span class="pwstd-value" id="' + id(ids,'avgCorrelation','powAvgCorrelation') + '">...</span></div>',
       '        <div class="pwstd-row"><span class="pwstd-label">Nonsphericity correction ε</span><span class="pwstd-value" id="' + id(ids,'epsilon','powEpsilon') + '">...</span></div>',
@@ -133,19 +138,9 @@
       '        <div class="pwstd-row"><span class="pwstd-label">df1</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outDf1','powOutDf1') + '">—</span></div>',
       '        <div class="pwstd-row"><span class="pwstd-label">df2</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outDf2','powOutDf2') + '">—</span></div>',
       '        <div class="pwstd-row"><span class="pwstd-label">Critical F</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outCritF','powOutCritF') + '">—</span></div>',
-      '        <div class="pwstd-tech-details" id="pwstd-tech-details">',
-      '          <button type="button" class="pwstd-tech-details-sum" id="pwstd-tech-toggle" aria-expanded="false"',
-      '            onclick="window.StatisticoPowerTemplate._toggleTechDetails()">',
-      '            <i class="fa-solid fa-chevron-right pwstd-tech-chevron" aria-hidden="true"></i>',
-      '            <span>Output parameters</span>',
-      '            <span class="pwstd-tech-details-hint">G*Power-style · click to expand</span>',
-      '          </button>',
-      '          <div class="pwstd-tech-details-body" id="pwstd-tech-details-body" hidden>',
-      '            <div class="pwstd-row"><span class="pwstd-label">Total sample size</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outN','powOutN') + '">—</span></div>',
-      '            <div class="pwstd-row"><span class="pwstd-label">Actual power</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outPower','powOutPower') + '">—</span></div>',
-      '            <div class="pwstd-row"><span class="pwstd-label">Pillai V</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outPillaiV','powOutPillaiV') + '">—</span></div>',
-      '          </div>',
-      '        </div>',
+      '        <div class="pwstd-row"><span class="pwstd-label">Total sample size</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outN','powOutN') + '">—</span></div>',
+      '        <div class="pwstd-row"><span class="pwstd-label">Actual power</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outPower','powOutPower') + '">—</span></div>',
+      '        <div class="pwstd-row"><span class="pwstd-label">Pillai V</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outPillaiV','powOutPillaiV') + '">—</span></div>',
       '      </div>',
       '    </div>',
       '  </div>',
@@ -199,6 +194,8 @@
 
     _syncTaskUI('fromN');
     _updateDfFormulaLabel();
+    var techPanel = document.getElementById('pwstd-tech-panel');
+    if (techPanel) techPanel.classList.add('pwstd-tech-panel--open');
   }
 
   function _updateDfFormulaLabel() {
@@ -312,15 +309,15 @@
     if (sel && sel.value !== mode) sel.value = mode;
   }
 
-  function _toggleTechDetails() {
-    var wrap = document.getElementById('pwstd-tech-details');
-    var body = document.getElementById('pwstd-tech-details-body');
-    var btn  = document.getElementById('pwstd-tech-toggle');
+  function _toggleTechPanel() {
+    var body = document.getElementById('pwstd-tech-panel-body');
+    var btn  = document.getElementById('pwstd-tech-panel-toggle');
+    var card = document.getElementById('pwstd-tech-panel');
     if (!body) return;
     var open = body.hidden;
     body.hidden = !open;
     if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (wrap) wrap.classList.toggle('pwstd-tech-details--open', open);
+    if (card) card.classList.toggle('pwstd-tech-panel--open', open);
   }
 
   function _setCard(card, isPrimary) {
@@ -341,8 +338,9 @@
     _onTaskChange:    function(mode){ _syncTaskUI(mode); },
     _onChipClick:     _onChipClick,
     _onCustomInput:   _onCustomInput,
-    _toggleTechDetails: _toggleTechDetails,
+    _toggleTechDetails: _toggleTechPanel,
     _onPowerMethodChange: _onPowerMethodChange,
+    _toggleTechPanel:   _toggleTechPanel,
     _recalcFn: null,
     _computeDetectable: null
   };

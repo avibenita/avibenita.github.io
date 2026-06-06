@@ -1928,31 +1928,38 @@
             const dfSubjects = parseMaybeNumber(ob.anovaDfSubjects);
             const dfTotal = isFinite(dfTime) && isFinite(dfError) && isFinite(dfSubjects) ? dfTime + dfError + dfSubjects : NaN;
 
-            // Compute F and p locally to handle degenerate MSError=0 case
-            const mstRaw = parseMaybeNumber(ob.anovaMSTime || ob.anovaMSBetween);
-            const mseRaw = parseMaybeNumber(ob.anovaMSError || ob.anovaMSWithin);
-            const fRaw   = parseMaybeNumber(ob.anovaF);
+            // Compute F and p locally to handle degenerate/near-zero MSError cases
+            const mstRaw    = parseMaybeNumber(ob.anovaMSTime || ob.anovaMSBetween);
+            const mseRaw    = parseMaybeNumber(ob.anovaMSError || ob.anovaMSWithin);
+            const fRaw      = parseMaybeNumber(ob.anovaF);
             const ssErrorRaw = parseMaybeNumber(ob.anovaSSError || ob.anovaSSWithin);
-            const degenerateError = isFinite(ssErrorRaw) && ssErrorRaw === 0;
+            // Treat both exact-zero and near-zero (floating-point dust) as degenerate
+            const degenerateError = isFinite(ssErrorRaw) && ssErrorRaw < 1e-6;
+
+            // Helper: format F — cap absurdly large values from near-zero MSError
+            function fmtF(f) {
+              if (!isFinite(f)) return '—';
+              if (f > 1e6) return '∞';
+              return fmt(f);
+            }
 
             let fDisplay, pDisplay;
             if (degenerateError) {
-              // Zero error SS: F is undefined (∞), p is undefined
               fDisplay = isFinite(mstRaw) && mstRaw > 0 ? '∞' : '—';
-              pDisplay = '<span title="p-value undefined: error term is zero (perfect within-subject consistency)" style="color:#f0a500;">—*</span>';
+              pDisplay = '<span title="p-value undefined: error term is effectively zero (near-perfect within-subject consistency)" style="color:#f0a500;">—*</span>';
             } else if (isFinite(fRaw) && fRaw > 0) {
-              fDisplay = fmt(fRaw);
+              fDisplay = fmtF(fRaw);
               pDisplay = '<strong>' + fmtP(ob.anovaP) + '</strong>';
             } else if (isFinite(mstRaw) && isFinite(mseRaw) && mseRaw > 0) {
-              fDisplay = fmt(mstRaw / mseRaw);
+              fDisplay = fmtF(mstRaw / mseRaw);
               pDisplay = '<strong>' + fmtP(ob.anovaP) + '</strong>';
             } else {
-              fDisplay = fmt(fRaw);
+              fDisplay = fmtF(fRaw);
               pDisplay = '<strong>' + fmtP(ob.anovaP) + '</strong>';
             }
 
             const errorNote = degenerateError
-              ? '<tr><td colspan="6" style="font-size:10px;color:#f0a500;padding:4px 8px;">* Error SS = 0: all subjects changed identically across timepoints. F and p are undefined (degenerate case).</td></tr>'
+              ? '<tr><td colspan="6" style="font-size:10px;color:#f0a500;padding:4px 8px;">* Error SS ≈ 0: within-subject residual variance is negligible. F and p are undefined (degenerate case).</td></tr>'
               : '';
 
             // Proper RM-ANOVA table: Time, Subjects, Error

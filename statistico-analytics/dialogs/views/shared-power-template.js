@@ -235,7 +235,12 @@
     var targets  = document.getElementById('pwstd-card-targets');
 
     if (suite) {
-      suite.classList.toggle('pwstd-planning-suite--active', mode === 'fromN' || mode === 'requiredN');
+      suite.classList.remove('pwstd-planning-suite--active', 'pwstd-planning-suite--dim');
+      if (mode === 'requiredN' || mode === 'detectable') {
+        suite.classList.add('pwstd-planning-suite--active');
+      } else if (mode === 'fromN') {
+        suite.classList.add('pwstd-planning-suite--dim');
+      }
     }
     if (planCard) planCard.classList.remove('pwstd-card--primary');
     if (targets)  targets.classList.remove('pwstd-card--primary');

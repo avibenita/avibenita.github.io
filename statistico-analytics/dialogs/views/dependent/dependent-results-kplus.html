@@ -3598,6 +3598,47 @@
         calculatePowerAnalysis(lastBundle.results.omnibus || {}, lastBundle.setup || {});
       }
     }
+
+    /* ── Detectable effect size (client-side, mode 3) ── */
+    function calculateDetectableEffect() {
+      const ob  = (lastBundle && lastBundle.results && lastBundle.results.omnibus) || {};
+      const s   = (lastBundle && lastBundle.setup) || {};
+
+      const n   = parseMaybeNumber(ob.N) || parseMaybeNumber(s.n) || 0;
+      const k   = parseMaybeNumber(ob.df1 != null ? ob.df1 + 1 : null)
+                  || (Array.isArray(s.selectedColumns) ? s.selectedColumns.length : 0);
+      const alpha = parseMaybeNumber(s.alpha) || 0.05;
+
+      const targetInput = document.getElementById('powDetectableTarget');
+      const targetPower = targetInput ? (parseFloat(targetInput.value) || 0.80) : 0.80;
+
+      if (!n || n < 2 || !k || k < 2) {
+        setText('powMinDetectableF',   '—');
+        setText('powMinDetectableEta', '—');
+        return;
+      }
+
+      /* Binary search: smallest Cohen's f where power >= targetPower */
+      const df1  = k - 1;
+      const zCrit = alpha <= 0.05 ? 1.96 : 1.645;
+      let lo = 0.001, hi = 5.0;
+      for (let i = 0; i < 60; i++) {
+        const f   = (lo + hi) / 2;
+        const ncp = n * f * f * df1;
+        const pw  = 1 - normalCdf(zCrit - Math.sqrt(ncp));
+        if (pw >= targetPower) hi = f;
+        else                   lo = f;
+      }
+      const minF   = (lo + hi) / 2;
+      const minEta = minF * minF / (1 + minF * minF); /* f → partial η² */
+
+      setText('powMinDetectableF',   minF.toFixed(3));
+      setText('powMinDetectableEta', minEta.toFixed(3));
+
+      /* Mirror N into the detectable-mode display */
+      const detN = document.getElementById('pwstd-det-n');
+      if (detN) detN.textContent = n;
+    }
     
     function refreshPowerAnalysisWithTarget() {
       const refreshIcon = document.getElementById('refreshIcon');
@@ -3653,28 +3694,35 @@
         window.StatisticoPowerTemplate.renderById('sharedPowerTemplateMount', {
           title: 'Power & Sample Size',
           customHandler: 'calculateCustomPower()',
+          detectableHandler: 'calculateDetectableEffect()',
           ids: {
-            target: 'powTargetWhat',
-            design: 'powDesignType',
-            effectSource: 'powEffectSource',
-            taskMode: 'powTaskMode',
-            observed: 'powObserved',
-            effectSize: 'powEffectSize',
-            sampleSize: 'powSampleSize',
-            alpha: 'powAlpha',
-            requiredN: 'powRequired',
-            partialEta: 'powPartialEta',
-            req85: 'powReq85',
-            req90: 'powReq90',
-            req95: 'powReq95',
-            reqCustom: 'customRequiredN',
-            customInput: 'customPowerInput',
-            customIcon: 'customPowerIcon',
-            customStatus: 'customPowerStatus',
-            status: 'powStatusMessage',
-            engineNote: 'powEngineNote'
+            target:          'powTargetWhat',
+            design:          'powDesignType',
+            effectSource:    'powEffectSource',
+            taskMode:        'powTaskMode',
+            observed:        'powObserved',
+            effectSize:      'powEffectSize',
+            sampleSize:      'powSampleSize',
+            alpha:           'powAlpha',
+            requiredN:       'powRequired',
+            partialEta:      'powPartialEta',
+            req80:           'powReq80',
+            req85:           'powReq85',
+            req90:           'powReq90',
+            req95:           'powReq95',
+            reqCustom:       'customRequiredN',
+            customInput:     'customPowerInput',
+            customIcon:      'customPowerIcon',
+            customStatus:    'customPowerStatus',
+            detectableTarget:'powDetectableTarget',
+            minF:            'powMinDetectableF',
+            minEta:          'powMinDetectableEta',
+            status:          'powStatusMessage',
+            engineNote:      'powEngineNote'
           }
         });
+        /* Expose detectable compute to the template's button */
+        window.StatisticoPowerTemplate._computeDetectable = calculateDetectableEffect;
       }
 
       // Initialize shared header

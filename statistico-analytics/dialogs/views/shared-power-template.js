@@ -24,7 +24,7 @@
       return '<div class="pwstd-chip pwstd-chip--selectable' + (isDefault ? ' pwstd-chip--selected' : '') + '"'
            + ' data-pct="' + c.pct + '" data-value-id="' + valueId + '"'
            + ' onclick="window.StatisticoPowerTemplate._onChipClick(this)">'
-           + '<div class="pwstd-chip-label">' + c.pct + (c.pct !== 'Custom' ? '' : '') + '</div>'
+           + '<div class="pwstd-chip-label">' + (c.pct === 'Custom' ? 'Custom' : c.pct + '%') + '</div>'
            + '<div class="pwstd-chip-value" id="' + valueId + '">...</div>'
            + '<div class="pwstd-chip-check"><i class="fa-solid fa-check"></i></div>'
            + '</div>';

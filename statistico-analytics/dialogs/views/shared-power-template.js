@@ -122,6 +122,7 @@
       '      </div>',
       '    </div>',
       '  </div>',
+      '  <div class="pwstd-planning-suite" id="pwstd-planning-suite">',
       '  <div class="pwstd-grid pwstd-grid--bottom">',
       '    <div class="pwstd-card pwstd-card--planning" id="pwstd-card-planning">',
       '      <div class="pwstd-card-h" id="pwstd-head-planning">Sample Size Planning</div>',
@@ -162,6 +163,7 @@
       '        <span id="' + id(ids,'customStatus','customPowerStatus') + '" class="pwstd-custom-status"><i class="fa-solid fa-spinner fa-spin"></i> Calculating...</span>',
       '      </div>',
       '    </div>',
+      '  </div>',
       '  </div>',
       '  <div class="pwstd-band" id="' + id(ids,'status','powStatusMessage') + '">Run analysis to populate power results.</div>',
       '  <div class="pwstd-engine"><i class="fa-solid fa-cloud"></i> <span id="' + id(ids,'engineNote','powEngineNote') + '">Power engine configured per module.</span></div>',
@@ -229,20 +231,25 @@
     var obsHead  = document.getElementById('pwstd-head-observed');
     var planCard = document.getElementById('pwstd-card-planning');
     var planHead = document.getElementById('pwstd-head-planning');
+    var suite    = document.getElementById('pwstd-planning-suite');
+    var targets  = document.getElementById('pwstd-card-targets');
+
+    if (suite) {
+      suite.classList.toggle('pwstd-planning-suite--active', mode === 'fromN' || mode === 'requiredN');
+    }
+    if (planCard) planCard.classList.remove('pwstd-card--primary');
+    if (targets)  targets.classList.remove('pwstd-card--primary');
 
     if (mode === 'fromN') {
       _setCard(obsCard,  true);
-      _setCard(planCard, false);
       if (obsHead)  obsHead.textContent  = 'Observed Data Power';
       if (planHead) planHead.textContent = 'Sample Size Reference';
     } else if (mode === 'requiredN') {
       _setCard(obsCard,  false);
-      _setCard(planCard, true);
       if (obsHead)  obsHead.textContent  = 'Current Study Power';
       if (planHead) planHead.textContent = 'Sample Size Planning';
     } else if (mode === 'detectable') {
       _setCard(obsCard,  false);
-      _setCard(planCard, true);
       if (obsHead)  obsHead.textContent  = 'Study Context';
       if (planHead) planHead.textContent = 'Detectable Effect Planning';
       var nEl  = document.getElementById('powSampleSize');

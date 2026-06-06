@@ -69,6 +69,17 @@
 
       '  </div>',
 
+      /* ── Technicals (RM-ANOVA design parameters) ── */
+      '  <div class="pwstd-grid pwstd-grid--technicals">',
+      '    <div class="pwstd-card pwstd-card--technicals">',
+      '      <div class="pwstd-card-h">Technicals</div>',
+      '      <div class="pwstd-card-b pwstd-card-b--technicals">',
+      '        <div class="pwstd-row"><span class="pwstd-label">Average correlation among repeated measures</span><span class="pwstd-value" id="' + id(ids,'avgCorrelation','powAvgCorrelation') + '">...</span></div>',
+      '        <div class="pwstd-row"><span class="pwstd-label">Nonsphericity correction ε</span><span class="pwstd-value" id="' + id(ids,'epsilon','powEpsilon') + '">...</span></div>',
+      '      </div>',
+      '    </div>',
+      '  </div>',
+
       /* ── Row 2: Planning  +  Targets ── */
       '  <div class="pwstd-grid pwstd-grid--bottom">',
 

@@ -16,8 +16,8 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260530a" />  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
   <script src="../shared-header.js?v=20260524b"></script>
-  <link rel="stylesheet" href="../shared-power-template.css?v=20260607" />
-  <script src="../shared-power-template.js?v=20260607"></script>
+  <link rel="stylesheet" href="../shared-power-template.css?v=20260608" />
+  <script src="../shared-power-template.js?v=20260608"></script>
 
   <script src="../../../src/shared/js/ai-config.js?v=20260429a"></script>
   <style>
@@ -3218,16 +3218,43 @@
       return Number(v).toFixed(decimals == null ? 4 : decimals);
     }
 
-    function buildPowerOutputParams(n, k, f, alpha, rho, epsilon, power, partialEta, cloudResult) {
+    function getPowerMethod() {
+      const el = document.getElementById('powPowerMethod');
+      return (el && el.value === 'gpower_manova') ? 'gpower_manova' : 'univariate';
+    }
+
+    function rmDf(n, k, epsilon, method, numGroups) {
+      numGroups = numGroups || 1;
+      epsilon = isFinite(epsilon) ? epsilon : 1;
+      const df1 = (k - 1) * epsilon;
+      let df2;
+      if (method === 'gpower_manova') {
+        df2 = Math.max(1, n - numGroups - df1 + 1);
+      } else {
+        df2 = (n - 1) * (k - 1) * epsilon;
+      }
+      return { df1: df1, df2: df2 };
+    }
+
+    function pillaiVLocal(method, f, ncp, n) {
+      if (method === 'gpower_manova') {
+        return (ncp > 0 && n > 0) ? ncp / (ncp + n) : 0;
+      }
+      return (f > 0) ? (f * f) / (1 + f * f) : 0;
+    }
+
+    function buildPowerOutputParams(n, k, f, alpha, rho, epsilon, power, partialEta, cloudResult, method) {
       if (!n || !k || k < 2 || !f || f <= 0) return null;
+      method = method || getPowerMethod();
       rho = isFinite(rho) ? rho : 0;
       epsilon = isFinite(epsilon) ? epsilon : 1;
+      const localDf = rmDf(n, k, epsilon, method, 1);
       const df1 = (cloudResult && isFinite(cloudResult.df_between))
         ? cloudResult.df_between
-        : (k - 1) * epsilon;
+        : localDf.df1;
       const df2 = (cloudResult && isFinite(cloudResult.df_error))
         ? cloudResult.df_error
-        : (n - 1) * (k - 1) * epsilon;
+        : localDf.df2;
       const lambda = (cloudResult && isFinite(cloudResult.noncentrality_parameter))
         ? cloudResult.noncentrality_parameter
         : rmNcp(n, k, f, rho);
@@ -3236,7 +3263,8 @@
         critF = jStat.centralF.inv(1 - (alpha || 0.05), df1, df2);
       }
       const eta = partialEta || (f * f) / (1 + f * f);
-      const pillaiV = (cloudResult && isFinite(cloudResult.pillai_v)) ? cloudResult.pillai_v : eta;
+      let pillaiV = cloudResult && isFinite(cloudResult.pillai_v) ? cloudResult.pillai_v : null;
+      if (!isFinite(pillaiV)) pillaiV = pillaiVLocal(method, f, lambda, n);
       const actualPower = (cloudResult && isFinite(cloudResult.observed_power))
         ? cloudResult.observed_power
         : ((cloudResult && isFinite(cloudResult.achieved_power)) ? cloudResult.achieved_power : power);
@@ -3247,7 +3275,8 @@
         df2: df2,
         n: n,
         actual_power: actualPower,
-        pillai_v: pillaiV
+        pillai_v: pillaiV,
+        power_method: method
       };
     }
 
@@ -3272,21 +3301,29 @@
       return n * k * f * f / denom;
     }
 
-    function rmPowerAtFLocal(n, k, f, alpha, rho, epsilon) {
+    function rmPowerAtFLocal(n, k, f, alpha, rho, epsilon, method, numGroups) {
       if (!f || f <= 0 || !n || n < 2 || !k || k < 2) return 0;
+      method = method || getPowerMethod();
+      numGroups = numGroups || 1;
       const ncp = rmNcp(n, k, f, rho);
-      const zCrit = (alpha || 0.05) <= 0.05 ? 1.644854 : 1.281552;
-      return Math.max(0, Math.min(1, 1 - normalCdf(zCrit - Math.sqrt(Math.max(0, ncp)))));
+      const dfs = rmDf(n, k, epsilon, method, numGroups);
+      if (typeof jStat === 'undefined' || !jStat.centralF || !jStat.centralF.inv) return 0;
+      const fcrit = jStat.centralF.inv(1 - (alpha || 0.05), dfs.df1, dfs.df2);
+      const c = 1 + ncp / dfs.df1;
+      const power = 1 - jStat.centralF.cdf(fcrit / c, dfs.df1, dfs.df2);
+      return Math.max(0, Math.min(1, power));
     }
 
-    function estimateRequiredN(effectF, k, targetPower, alpha, rho, epsilon) {
+    function estimateRequiredN(effectF, k, targetPower, alpha, rho, epsilon, method, numGroups) {
       if (!effectF || effectF <= 0 || !k || k < 2) return 0;
+      method = method || getPowerMethod();
+      numGroups = numGroups || 1;
       rho = isFinite(rho) ? rho : 0;
       epsilon = isFinite(epsilon) ? epsilon : 1;
       let nMin = 2, nMax = 2000;
       for (let iter = 0; iter < 60; iter++) {
         const n = Math.floor((nMin + nMax) / 2);
-        const power = rmPowerAtFLocal(n, k, effectF, alpha, rho, epsilon);
+        const power = rmPowerAtFLocal(n, k, effectF, alpha, rho, epsilon, method, numGroups);
         if (Math.abs(power - targetPower) < 0.01) return n;
         if (power < targetPower) nMin = n + 1;
         else nMax = n - 1;
@@ -3314,6 +3351,7 @@
       let n = parseMaybeNumber(omnibus.n);
       const k = (setup.selectedColumns || []).length;
       const alpha = 1 - parseMaybeNumber(setup.confidence || 0.95);
+      const powerMethod = getPowerMethod();
       setText("powTargetWhat", isNonparametric ? "Friedman omnibus (rank-based)" : "RM-ANOVA omnibus");
       setText("powDesignType", "Repeated measures \u00b7 " + (k || "...") + " timepoints");
       
@@ -3350,13 +3388,16 @@
       if (!n || n < 2 || !k || k < 2 || !cohenF || cohenF <= 0) {
         console.warn("? Insufficient data for power analysis", { cohenF, n, k });
         if (cohenF > 0 && n > 1 && k > 1) {
-          const localPower = rmPowerAtFLocal(n, k, cohenF, alpha, ctx.avgR, ctx.epsilon);
+          const localPower = rmPowerAtFLocal(n, k, cohenF, alpha, ctx.avgR, ctx.epsilon, powerMethod, 1);
           updatePowerUI({ 
             observed_power: localPower,
             effect_size_cohen_f: cohenF,
             partial_eta_squared: partialEta || 0,
-            required_for_80pct: estimateRequiredN(cohenF, k, 0.80, alpha, ctx.avgR, ctx.epsilon),
-            required_for_90pct: estimateRequiredN(cohenF, k, 0.90, alpha, ctx.avgR, ctx.epsilon),
+            power_method: powerMethod,
+            required_for_80pct: estimateRequiredN(cohenF, k, 0.80, alpha, ctx.avgR, ctx.epsilon, powerMethod, 1),
+            required_for_85pct: estimateRequiredN(cohenF, k, 0.85, alpha, ctx.avgR, ctx.epsilon, powerMethod, 1),
+            required_for_90pct: estimateRequiredN(cohenF, k, 0.90, alpha, ctx.avgR, ctx.epsilon, powerMethod, 1),
+            required_for_95pct: estimateRequiredN(cohenF, k, 0.95, alpha, ctx.avgR, ctx.epsilon, powerMethod, 1),
             local: true 
           }, n, alpha, partialEta, effectSizeSource);
         } else {
@@ -3382,6 +3423,8 @@
             effect_size_f: cohenF,
             avg_correlation: ctx.avgR,
             epsilon: ctx.epsilon,
+            power_method: powerMethod,
+            num_groups: 1,
             alpha: alpha || 0.05
           }),
           timeout: 5000
@@ -3407,16 +3450,16 @@
       }
       
       // Fallback to local G*Power-aligned approximation
-      const localPower = rmPowerAtFLocal(n, k, cohenF, alpha, ctx.avgR, ctx.epsilon);
-      const req80 = estimateRequiredN(cohenF, k, 0.80, alpha, ctx.avgR, ctx.epsilon);
-      const req90 = estimateRequiredN(cohenF, k, 0.90, alpha, ctx.avgR, ctx.epsilon);
-      
+      const localPower = rmPowerAtFLocal(n, k, cohenF, alpha, ctx.avgR, ctx.epsilon, powerMethod, 1);
       updatePowerUI({ 
         observed_power: localPower,
         effect_size_cohen_f: cohenF,
         partial_eta_squared: partialEta || 0,
-        required_for_80pct: req80,
-        required_for_90pct: req90,
+        power_method: powerMethod,
+        required_for_80pct: estimateRequiredN(cohenF, k, 0.80, alpha, ctx.avgR, ctx.epsilon, powerMethod, 1),
+        required_for_85pct: estimateRequiredN(cohenF, k, 0.85, alpha, ctx.avgR, ctx.epsilon, powerMethod, 1),
+        required_for_90pct: estimateRequiredN(cohenF, k, 0.90, alpha, ctx.avgR, ctx.epsilon, powerMethod, 1),
+        required_for_95pct: estimateRequiredN(cohenF, k, 0.95, alpha, ctx.avgR, ctx.epsilon, powerMethod, 1),
         fallback: true 
       }, n, alpha, partialEta, effectSizeSource);
     }
@@ -3477,11 +3520,11 @@
       // Required sample sizes — use exact cloud/binary-search values (not interpolation)
       const req85 = required_for_85pct
         || (effect_size_cohen_f && kPow >= 2
-          ? estimateRequiredN(effect_size_cohen_f, kPow, 0.85, alpha, ctxPow.avgR, ctxPow.epsilon)
+          ? estimateRequiredN(effect_size_cohen_f, kPow, 0.85, alpha, ctxPow.avgR, ctxPow.epsilon, getPowerMethod(), 1)
           : null);
       const req95 = required_for_95pct
         || (effect_size_cohen_f && kPow >= 2
-          ? estimateRequiredN(effect_size_cohen_f, kPow, 0.95, alpha, ctxPow.avgR, ctxPow.epsilon)
+          ? estimateRequiredN(effect_size_cohen_f, kPow, 0.95, alpha, ctxPow.avgR, ctxPow.epsilon, getPowerMethod(), 1)
           : null);
 
       if (required_for_80pct) {
@@ -3540,9 +3583,15 @@
         
         // Determine calculation method
         if (fallback || local) {
-          noteText = '<i class="fa-solid fa-calculator"></i> Power calculated using statistical approximation (cloud function unavailable).';
+          noteText = '<i class="fa-solid fa-calculator"></i> Power calculated using local non-central F approximation (cloud unavailable).';
         } else {
-          noteText = '<i class="fa-solid fa-cloud"></i> Power calculated via Python Google Cloud Functions (G*Power RM-ANOVA model: λ = N·m·f²/(1−ρ), df adjusted by ε).';
+          noteText = '<i class="fa-solid fa-cloud"></i> Power calculated via Python cloud function.';
+        }
+        const method = results.power_method || getPowerMethod();
+        if (method === 'gpower_manova') {
+          noteText += ' Engine: <strong>G*Power MANOVA-style</strong> — df1=(k−1)·ε, df2=N−groups−df1+1, λ=N·m·f²/(1−ρ). Matches G*Power “MANOVA: Repeated measures, within factors”.';
+        } else {
+          noteText += ' Engine: <strong>Univariate RM-ANOVA</strong> — df1=(k−1)·ε, df2=(N−1)(k−1)·ε, λ=N·m·f²/(1−ρ). Matches your RM-ANOVA F table.';
         }
         
         // Add effect size source note
@@ -3566,7 +3615,8 @@
         ctxPow.epsilon,
         observed_power,
         partial_eta_squared || partialEta,
-        results
+        results,
+        results.power_method || getPowerMethod()
       ));
 
       /* Sync planning card label+value to whichever chip is currently selected */
@@ -3657,6 +3707,8 @@
             k: numMeasurements,
             avg_correlation: ctx.avgR,
             epsilon: ctx.epsilon,
+            power_method: getPowerMethod(),
+            num_groups: 1,
             alpha: alpha
           })
         });
@@ -3727,13 +3779,15 @@
     }
 
     /* ── Detectable effect size via cloud (mode: detectable) ── */
-    function calculateDetectableEffectLocal(n, k, targetPower, alpha, rho, epsilon) {
+    function calculateDetectableEffectLocal(n, k, targetPower, alpha, rho, epsilon, method, numGroups) {
+      method = method || getPowerMethod();
+      numGroups = numGroups || 1;
       rho = isFinite(rho) ? rho : 0;
       epsilon = isFinite(epsilon) ? epsilon : 1;
       let lo = 0.001, hi = 5.0;
       for (let i = 0; i < 60; i++) {
         const f = (lo + hi) / 2;
-        const pw = rmPowerAtFLocal(n, k, f, alpha, rho, epsilon);
+        const pw = rmPowerAtFLocal(n, k, f, alpha, rho, epsilon, method, numGroups);
         if (pw >= targetPower) hi = f;
         else lo = f;
       }
@@ -3797,6 +3851,8 @@
             target_power: targetPower,
             avg_correlation: ctx.avgR,
             epsilon: ctx.epsilon,
+            power_method: getPowerMethod(),
+            num_groups: 1,
             alpha: alpha || 0.05
           })
         });
@@ -3823,7 +3879,7 @@
         setText('powMinDetectableF', minF.toFixed(3));
         setText('powMinDetectableEta', minEta.toFixed(3));
         updatePowerOutputParams(buildPowerOutputParams(
-          n, k, minF, alpha || 0.05, ctx.avgR, ctx.epsilon, targetPower, minEta, r
+          n, k, minF, alpha || 0.05, ctx.avgR, ctx.epsilon, targetPower, minEta, r, getPowerMethod()
         ));
 
         if (engineNote) {
@@ -3834,11 +3890,11 @@
         console.warn('Detectable effect cloud unavailable, using local approximation:', error);
       }
 
-      const local = calculateDetectableEffectLocal(n, k, targetPower, alpha || 0.05, ctx.avgR, ctx.epsilon);
+      const local = calculateDetectableEffectLocal(n, k, targetPower, alpha || 0.05, ctx.avgR, ctx.epsilon, getPowerMethod(), 1);
       setText('powMinDetectableF', local.minF.toFixed(3));
       setText('powMinDetectableEta', local.minEta.toFixed(3));
       updatePowerOutputParams(buildPowerOutputParams(
-        n, k, local.minF, alpha || 0.05, ctx.avgR, ctx.epsilon, targetPower, local.minEta, null
+        n, k, local.minF, alpha || 0.05, ctx.avgR, ctx.epsilon, targetPower, local.minEta, null, getPowerMethod()
       ));
 
       if (engineNote) {
@@ -3932,6 +3988,7 @@
         /* Expose detectable compute to the template's button */
         window.StatisticoPowerTemplate._computeDetectable = calculateDetectableEffect;
         window.StatisticoPowerTemplate._customComputeFn = calculateCustomPower;
+        window.StatisticoPowerTemplate._recalcFn = refreshPowerAnalysis;
       }
 
       // Initialize shared header

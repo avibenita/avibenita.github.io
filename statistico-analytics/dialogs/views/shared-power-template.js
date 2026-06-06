@@ -84,7 +84,7 @@
     }).join('\n          ');
 
     container.innerHTML = [
-      '<div class="pwstd-shell pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260607">',
+      '<div class="pwstd-shell pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260608">',
       '  <h2 class="pwstd-title"><i class="fa-solid fa-bolt"></i> ' + esc(title) + '</h2>',
       '  <div class="pwstd-grid pwstd-grid--top">',
       '    <div class="pwstd-card pwstd-card--context">',
@@ -117,6 +117,16 @@
       '    <div class="pwstd-card pwstd-card--technicals">',
       '      <div class="pwstd-card-h">Technicals</div>',
       '      <div class="pwstd-card-b pwstd-card-b--technicals">',
+      '        <div class="pwstd-row pwstd-row--engine">',
+      '          <span class="pwstd-label">Power engine</span>',
+      '          <select class="pwstd-select" id="' + id(ids,'powerMethod','powPowerMethod') + '"',
+      '            onchange="window.StatisticoPowerTemplate._onPowerMethodChange()">',
+      '            <option value="univariate">Univariate RM-ANOVA</option>',
+      '            <option value="gpower_manova">G*Power MANOVA-style</option>',
+      '          </select>',
+      '        </div>',
+      '        <div class="pwstd-row pwstd-row--engine"><span class="pwstd-label">df formulas</span>',
+      '          <span class="pwstd-value pwstd-value--formula" id="' + id(ids,'dfFormula','powDfFormula') + '">df1=(k−1)·ε · df2=(N−1)(k−1)·ε</span></div>',
       '        <div class="pwstd-row"><span class="pwstd-label">Average correlation among repeated measures</span><span class="pwstd-value" id="' + id(ids,'avgCorrelation','powAvgCorrelation') + '">...</span></div>',
       '        <div class="pwstd-row"><span class="pwstd-label">Nonsphericity correction ε</span><span class="pwstd-value" id="' + id(ids,'epsilon','powEpsilon') + '">...</span></div>',
       '        <div class="pwstd-row"><span class="pwstd-label">Noncentrality λ</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outLambda','powOutLambda') + '">—</span></div>',
@@ -188,6 +198,25 @@
     ].join('\n');
 
     _syncTaskUI('fromN');
+    _updateDfFormulaLabel();
+  }
+
+  function _updateDfFormulaLabel() {
+    var el = document.getElementById('powDfFormula');
+    var sel = document.getElementById('powPowerMethod');
+    if (!el || !sel) return;
+    if (sel.value === 'gpower_manova') {
+      el.textContent = 'df1=(k−1)·ε · df2=N−groups−df1+1';
+    } else {
+      el.textContent = 'df1=(k−1)·ε · df2=(N−1)(k−1)·ε';
+    }
+  }
+
+  function _onPowerMethodChange() {
+    _updateDfFormulaLabel();
+    if (typeof window.StatisticoPowerTemplate._recalcFn === 'function') {
+      window.StatisticoPowerTemplate._recalcFn();
+    }
   }
 
   function _onChipClick(chipEl) {
@@ -313,6 +342,8 @@
     _onChipClick:     _onChipClick,
     _onCustomInput:   _onCustomInput,
     _toggleTechDetails: _toggleTechDetails,
+    _onPowerMethodChange: _onPowerMethodChange,
+    _recalcFn: null,
     _computeDetectable: null
   };
 })();

@@ -31,10 +31,12 @@ def _response(payload: Dict[str, Any], status: int = 200):
     return body, status, headers
 
 
-# ===== POWER ANALYSIS (G*Power-aligned RM-ANOVA within-subjects) =====
-# Reference: Potvin & Schutz (2000); G*Power 3 manual (univariate RM approach)
-#   lambda = N * m * f^2 / (1 - rho)   [within-subjects main effect, one between group]
-#   df1 = (m - 1) * epsilon,  df2 = (N - 1)(m - 1) * epsilon
+# ===== POWER ANALYSIS =====
+# Two engines (select via power_method):
+#   univariate       — matches RM-ANOVA F table: df2 = (N-1)(m-1)·ε
+#   gpower_manova    — G*Power "MANOVA: Repeated measures, within factors":
+#                      df2 = N - groups - df1 + 1  (groups=1 for one-sample RM)
+# Both use λ = N·m·f²/(1-ρ) for the within-subjects main effect (Potvin & Schutz / G*Power).
 
 
 def _calculate_cohen_f_from_partial_eta_squared(partial_eta_sq: float) -> float:
@@ -54,6 +56,17 @@ def _parse_epsilon(data: Dict[str, Any]) -> float:
     return max(0.1, min(1.0, eps))
 
 
+def _parse_power_method(data: Dict[str, Any]) -> str:
+    method = str(data.get("power_method", "univariate")).strip().lower()
+    if method in ("gpower_manova", "manova", "gpower"):
+        return "gpower_manova"
+    return "univariate"
+
+
+def _parse_num_groups(data: Dict[str, Any]) -> int:
+    return max(1, int(data.get("num_groups", data.get("groups", 1))))
+
+
 def _rm_ncp(n: int, k: int, effect_size_f: float, rho: float) -> float:
     """Noncentrality parameter for RM-ANOVA within effect (G*Power)."""
     if effect_size_f <= 0 or n < 1 or k < 2:
@@ -64,11 +77,33 @@ def _rm_ncp(n: int, k: int, effect_size_f: float, rho: float) -> float:
     return n * k * (effect_size_f ** 2) / denom
 
 
-def _rm_df(n: int, k: int, epsilon: float) -> tuple:
-    """Sphericity-adjusted df for the within-subjects effect."""
+def _rm_df(
+    n: int,
+    k: int,
+    epsilon: float,
+    power_method: str = "univariate",
+    num_groups: int = 1,
+) -> tuple:
+    """Numerator/denominator df for the within-subjects effect."""
     df1 = (k - 1) * epsilon
-    df2 = (n - 1) * (k - 1) * epsilon
+    if power_method == "gpower_manova":
+        df2 = max(1.0, float(n - num_groups - df1 + 1))
+    else:
+        df2 = (n - 1) * (k - 1) * epsilon
     return df1, df2
+
+
+def _pillai_v(
+    power_method: str,
+    effect_size_f: float,
+    ncp: float,
+    n: int,
+) -> float:
+    if power_method == "gpower_manova":
+        if ncp <= 0 or n <= 0:
+            return 0.0
+        return float(ncp / (ncp + n))
+    return _pillai_v_from_f(effect_size_f)
 
 
 def _pillai_v_from_f(effect_size_f: float) -> float:
@@ -79,10 +114,17 @@ def _pillai_v_from_f(effect_size_f: float) -> float:
 
 
 def _rm_output_extras(
-    n: int, k: int, effect_size_f: float, alpha: float, rho: float, epsilon: float
+    n: int,
+    k: int,
+    effect_size_f: float,
+    alpha: float,
+    rho: float,
+    epsilon: float,
+    power_method: str = "univariate",
+    num_groups: int = 1,
 ) -> Dict[str, float]:
-    """Critical F, df, lambda, Pillai V for G*Power-style output panel."""
-    df1, df2 = _rm_df(n, k, epsilon)
+    """Critical F, df, lambda, Pillai V for output panel."""
+    df1, df2 = _rm_df(n, k, epsilon, power_method, num_groups)
     ncp = _rm_ncp(n, k, effect_size_f, rho)
     try:
         f_crit = float(stats.f.ppf(1 - alpha, df1, df2))
@@ -93,24 +135,26 @@ def _rm_output_extras(
         "critical_f": f_crit,
         "df_between": df1,
         "df_error": df2,
-        "pillai_v": _pillai_v_from_f(effect_size_f),
+        "pillai_v": _pillai_v(power_method, effect_size_f, ncp, n),
     }
 
 
-def _power_at_cohen_f_rm_anova(
+def _power_at_cohen_f_rm(
     effect_size_f: float,
     n: int,
     num_timepoints: int,
     alpha: float = 0.05,
     rho: float = 0.0,
     epsilon: float = 1.0,
+    power_method: str = "univariate",
+    num_groups: int = 1,
 ) -> float:
-    """Achieved power for Cohen's f with RM correlation and sphericity correction."""
+    """Achieved power for Cohen's f with RM correlation and chosen df engine."""
     if effect_size_f <= 0 or n < 2 or num_timepoints < 2:
         return 0.0
 
     ncp = _rm_ncp(n, num_timepoints, effect_size_f, rho)
-    df1, df2 = _rm_df(n, num_timepoints, epsilon)
+    df1, df2 = _rm_df(n, num_timepoints, epsilon, power_method, num_groups)
 
     try:
         f_crit = stats.f.ppf(1 - alpha, df1, df2)
@@ -119,13 +163,29 @@ def _power_at_cohen_f_rm_anova(
         return 0.0
 
 
-def _calculate_required_sample_size_rm_anova(
+# Backward-compatible alias
+def _power_at_cohen_f_rm_anova(
+    effect_size_f: float,
+    n: int,
+    num_timepoints: int,
+    alpha: float = 0.05,
+    rho: float = 0.0,
+    epsilon: float = 1.0,
+) -> float:
+    return _power_at_cohen_f_rm(
+        effect_size_f, n, num_timepoints, alpha, rho, epsilon, "univariate", 1
+    )
+
+
+def _calculate_required_sample_size_rm(
     effect_size_f: float,
     num_timepoints: int,
     target_power: float = 0.80,
     alpha: float = 0.05,
     rho: float = 0.0,
     epsilon: float = 1.0,
+    power_method: str = "univariate",
+    num_groups: int = 1,
     max_iterations: int = 100,
 ) -> int:
     """Required N for target power (binary search)."""
@@ -137,8 +197,15 @@ def _calculate_required_sample_size_rm_anova(
 
     for _ in range(max_iterations):
         n = (n_min + n_max) // 2
-        power = _power_at_cohen_f_rm_anova(
-            effect_size_f, n, num_timepoints, alpha, rho, epsilon
+        power = _power_at_cohen_f_rm(
+            effect_size_f,
+            n,
+            num_timepoints,
+            alpha,
+            rho,
+            epsilon,
+            power_method,
+            num_groups,
         )
 
         if abs(power - target_power) < 0.005:
@@ -152,13 +219,37 @@ def _calculate_required_sample_size_rm_anova(
     return n_max if n_max >= 2 else 2
 
 
-def _calculate_detectable_effect_size_rm_anova(
+def _calculate_required_sample_size_rm_anova(
+    effect_size_f: float,
+    num_timepoints: int,
+    target_power: float = 0.80,
+    alpha: float = 0.05,
+    rho: float = 0.0,
+    epsilon: float = 1.0,
+    max_iterations: int = 100,
+) -> int:
+    return _calculate_required_sample_size_rm(
+        effect_size_f,
+        num_timepoints,
+        target_power,
+        alpha,
+        rho,
+        epsilon,
+        "univariate",
+        1,
+        max_iterations,
+    )
+
+
+def _calculate_detectable_effect_size_rm(
     n: int,
     num_timepoints: int,
     target_power: float = 0.80,
     alpha: float = 0.05,
     rho: float = 0.0,
     epsilon: float = 1.0,
+    power_method: str = "univariate",
+    num_groups: int = 1,
     max_iterations: int = 60,
 ) -> float:
     """Minimum Cohen's f detectable at target power with fixed n."""
@@ -170,8 +261,15 @@ def _calculate_detectable_effect_size_rm_anova(
 
     for _ in range(max_iterations):
         f_mid = (lo + hi) / 2
-        power = _power_at_cohen_f_rm_anova(
-            f_mid, n, num_timepoints, alpha, rho, epsilon
+        power = _power_at_cohen_f_rm(
+            f_mid,
+            n,
+            num_timepoints,
+            alpha,
+            rho,
+            epsilon,
+            power_method,
+            num_groups,
         )
         if power >= target_power:
             hi = f_mid
@@ -179,6 +277,20 @@ def _calculate_detectable_effect_size_rm_anova(
             lo = f_mid
 
     return (lo + hi) / 2
+
+
+def _calculate_detectable_effect_size_rm_anova(
+    n: int,
+    num_timepoints: int,
+    target_power: float = 0.80,
+    alpha: float = 0.05,
+    rho: float = 0.0,
+    epsilon: float = 1.0,
+    max_iterations: int = 60,
+) -> float:
+    return _calculate_detectable_effect_size_rm(
+        n, num_timepoints, target_power, alpha, rho, epsilon, "univariate", 1, max_iterations
+    )
 
 
 def _resolve_effect_size_f(data: Dict[str, Any], n: int, k: int) -> float:
@@ -205,6 +317,8 @@ def handle_power_analysis(data: Dict[str, Any]) -> Dict[str, Any]:
     alpha = max(0.001, min(0.25, alpha))
     rho = _parse_rho(data)
     epsilon = _parse_epsilon(data)
+    power_method = _parse_power_method(data)
+    num_groups = _parse_num_groups(data)
 
     effect_size_f = _resolve_effect_size_f(data, int(data.get("n", 0)), int(data.get("k", 0)))
     results: Dict[str, Any] = {}
@@ -216,14 +330,18 @@ def handle_power_analysis(data: Dict[str, Any]) -> Dict[str, Any]:
         if effect_size_f <= 0 or n < 2 or k < 2:
             raise ValueError("Need n, k, and effect size (partial eta² or Cohen's f)")
 
-        observed_power = _power_at_cohen_f_rm_anova(
-            effect_size_f, n, k, alpha, rho, epsilon
+        observed_power = _power_at_cohen_f_rm(
+            effect_size_f, n, k, alpha, rho, epsilon, power_method, num_groups
         )
-        extras = _rm_output_extras(n, k, effect_size_f, alpha, rho, epsilon)
+        extras = _rm_output_extras(
+            n, k, effect_size_f, alpha, rho, epsilon, power_method, num_groups
+        )
 
         results = {
             "observed_power": observed_power,
             "effect_size_cohen_f": effect_size_f,
+            "power_method": power_method,
+            "num_groups": num_groups,
             "noncentrality_parameter": extras["noncentrality_parameter"],
             "critical_f": extras["critical_f"],
             "pillai_v": extras["pillai_v"],
@@ -237,17 +355,17 @@ def handle_power_analysis(data: Dict[str, Any]) -> Dict[str, Any]:
         }
 
         if effect_size_f > 0 and k > 0:
-            results["required_for_80pct"] = _calculate_required_sample_size_rm_anova(
-                effect_size_f, k, 0.80, alpha, rho, epsilon
+            results["required_for_80pct"] = _calculate_required_sample_size_rm(
+                effect_size_f, k, 0.80, alpha, rho, epsilon, power_method, num_groups
             )
-            results["required_for_85pct"] = _calculate_required_sample_size_rm_anova(
-                effect_size_f, k, 0.85, alpha, rho, epsilon
+            results["required_for_85pct"] = _calculate_required_sample_size_rm(
+                effect_size_f, k, 0.85, alpha, rho, epsilon, power_method, num_groups
             )
-            results["required_for_90pct"] = _calculate_required_sample_size_rm_anova(
-                effect_size_f, k, 0.90, alpha, rho, epsilon
+            results["required_for_90pct"] = _calculate_required_sample_size_rm(
+                effect_size_f, k, 0.90, alpha, rho, epsilon, power_method, num_groups
             )
-            results["required_for_95pct"] = _calculate_required_sample_size_rm_anova(
-                effect_size_f, k, 0.95, alpha, rho, epsilon
+            results["required_for_95pct"] = _calculate_required_sample_size_rm(
+                effect_size_f, k, 0.95, alpha, rho, epsilon, power_method, num_groups
             )
 
     elif mode == "required":
@@ -261,19 +379,23 @@ def handle_power_analysis(data: Dict[str, Any]) -> Dict[str, Any]:
         target_power = float(data.get("target_power", 0.80))
         target_power = max(0.50, min(0.99, target_power))
 
-        required_n = _calculate_required_sample_size_rm_anova(
-            effect_size_f, k, target_power, alpha, rho, epsilon
+        required_n = _calculate_required_sample_size_rm(
+            effect_size_f, k, target_power, alpha, rho, epsilon, power_method, num_groups
         )
-        achieved_power = _power_at_cohen_f_rm_anova(
-            effect_size_f, required_n, k, alpha, rho, epsilon
+        achieved_power = _power_at_cohen_f_rm(
+            effect_size_f, required_n, k, alpha, rho, epsilon, power_method, num_groups
         )
-        extras = _rm_output_extras(required_n, k, effect_size_f, alpha, rho, epsilon)
+        extras = _rm_output_extras(
+            required_n, k, effect_size_f, alpha, rho, epsilon, power_method, num_groups
+        )
 
         results = {
             "required_sample_size": required_n,
             "achieved_power": float(achieved_power),
             "effect_size_cohen_f": effect_size_f,
             "target_power": target_power,
+            "power_method": power_method,
+            "num_groups": num_groups,
             "num_timepoints": k,
             "avg_correlation": rho,
             "epsilon": epsilon,
@@ -297,18 +419,24 @@ def handle_power_analysis(data: Dict[str, Any]) -> Dict[str, Any]:
         target_power = float(data.get("target_power", 0.80))
         target_power = max(0.50, min(0.99, target_power))
 
-        min_f = _calculate_detectable_effect_size_rm_anova(
-            n, k, target_power, alpha, rho, epsilon
+        min_f = _calculate_detectable_effect_size_rm(
+            n, k, target_power, alpha, rho, epsilon, power_method, num_groups
         )
         min_eta = (min_f ** 2) / (1 + min_f ** 2) if min_f > 0 else 0.0
-        achieved_power = _power_at_cohen_f_rm_anova(min_f, n, k, alpha, rho, epsilon)
-        extras = _rm_output_extras(n, k, min_f, alpha, rho, epsilon)
+        achieved_power = _power_at_cohen_f_rm(
+            min_f, n, k, alpha, rho, epsilon, power_method, num_groups
+        )
+        extras = _rm_output_extras(
+            n, k, min_f, alpha, rho, epsilon, power_method, num_groups
+        )
 
         results = {
             "min_detectable_cohen_f": float(min_f),
             "min_detectable_partial_eta_squared": float(min_eta),
             "achieved_power": float(achieved_power),
             "target_power": target_power,
+            "power_method": power_method,
+            "num_groups": num_groups,
             "n": n,
             "num_timepoints": k,
             "avg_correlation": rho,

@@ -2,7 +2,8 @@
   function esc(v){ return String(v == null ? "" : v); }
   function id(map, key, fallback){ return esc((map && map[key]) || fallback || ""); }
 
-  /* IDs for the five standard chips */
+  var _customTimer = null;
+
   var CHIPS = [
     { pct: '80',     key: 'req80',     fallback: 'powReq80'      },
     { pct: '85',     key: 'req85',     fallback: 'powReq85'      },
@@ -11,34 +12,81 @@
     { pct: 'Custom', key: 'reqCustom', fallback: 'customRequiredN' }
   ];
 
+  function _formatTargetLabel(pct) {
+    if (pct === 'Custom') {
+      var inp = document.getElementById('customPowerInput');
+      var v = inp ? parseFloat(inp.value) : NaN;
+      if (isFinite(v)) return Math.round(v * 100) + '%';
+      return 'Custom';
+    }
+    return pct + '%';
+  }
+
+  function _updatePlanningCard(pct, n) {
+    var label  = document.getElementById('pwstd-reqN-label');
+    var reqEl  = document.getElementById('powRequired');
+    var target = _formatTargetLabel(pct);
+    if (label) label.textContent = 'Required N (' + target + ' target)';
+    if (reqEl && n != null) reqEl.textContent = n;
+    var selEl = document.getElementById('pwstd-selected-target');
+    if (selEl) selEl.textContent = target;
+  }
+
+  function _scheduleCustomCompute() {
+    var chip = document.querySelector('.pwstd-chip--selected[data-pct="Custom"]');
+    if (!chip) return;
+    clearTimeout(_customTimer);
+    _customTimer = setTimeout(function(){
+      if (typeof window.StatisticoPowerTemplate._customComputeFn === 'function') {
+        window.StatisticoPowerTemplate._customComputeFn();
+      }
+    }, 450);
+  }
+
   function render(container, opts){
     if (!container) return;
     var o   = opts || {};
     var ids = o.ids || {};
     var title = o.title || "Power & Sample Size";
+    var customHandler = esc(o.customHandler || 'calculateCustomPower()');
 
-    /* Build chip HTML */
     var chipHtml = CHIPS.map(function(c){
       var valueId = id(ids, c.key, c.fallback);
       var isDefault = c.pct === '85';
-      return '<div class="pwstd-chip pwstd-chip--selectable' + (isDefault ? ' pwstd-chip--selected' : '') + '"'
-           + ' data-pct="' + c.pct + '" data-value-id="' + valueId + '"'
-           + ' onclick="window.StatisticoPowerTemplate._onChipClick(this)">'
-           + '<div class="pwstd-chip-label">' + (c.pct === 'Custom' ? 'Custom' : c.pct + '%') + '</div>'
-           + '<div class="pwstd-chip-value" id="' + valueId + '">...</div>'
-           + '<div class="pwstd-chip-check"><i class="fa-solid fa-check"></i></div>'
-           + '</div>';
+
+      if (c.pct === 'Custom') {
+        return ''
+          + '<div class="pwstd-chip pwstd-chip--selectable pwstd-chip--custom" data-pct="Custom" data-value-id="' + valueId + '"'
+          + ' onclick="window.StatisticoPowerTemplate._onChipClick(this)">'
+          + '  <div class="pwstd-chip-check"><i class="fa-solid fa-check"></i></div>'
+          + '  <div class="pwstd-chip-label">Custom</div>'
+          + '  <div class="pwstd-chip-custom-ctrl" onclick="event.stopPropagation()">'
+          + '    <input class="pwstd-select pwstd-chip-input" type="number" id="' + id(ids,'customInput','customPowerInput') + '"'
+          + ' min="0.5" max="0.99" step="0.01" value="0.85"'
+          + ' oninput="window.StatisticoPowerTemplate._onCustomInput()"'
+          + ' onclick="event.stopPropagation()">'
+          + '    <button type="button" class="pwstd-chip-btn" onclick="event.stopPropagation();' + customHandler + '" title="Recalculate">'
+          + '      <i class="fa-solid fa-sync" id="' + id(ids,'customIcon','customPowerIcon') + '"></i>'
+          + '    </button>'
+          + '  </div>'
+          + '  <div class="pwstd-chip-value" id="' + valueId + '">--</div>'
+          + '</div>';
+      }
+
+      return ''
+        + '<div class="pwstd-chip pwstd-chip--selectable' + (isDefault ? ' pwstd-chip--selected' : '') + '"'
+        + ' data-pct="' + c.pct + '" data-value-id="' + valueId + '"'
+        + ' onclick="window.StatisticoPowerTemplate._onChipClick(this)">'
+        + '  <div class="pwstd-chip-check"><i class="fa-solid fa-check"></i></div>'
+        + '  <div class="pwstd-chip-label">' + c.pct + '%</div>'
+        + '  <div class="pwstd-chip-value" id="' + valueId + '">...</div>'
+        + '</div>';
     }).join('\n          ');
 
     container.innerHTML = [
       '<div class="pwstd-shell pwstd-mode-fromN" id="pwstd-shell">',
-
-      /* ── Title ── */
       '  <h2 class="pwstd-title"><i class="fa-solid fa-bolt"></i> ' + esc(title) + '</h2>',
-
-      /* ── Row 1: Context  +  Observed ── */
       '  <div class="pwstd-grid pwstd-grid--top">',
-
       '    <div class="pwstd-card pwstd-card--context">',
       '      <div class="pwstd-card-h">What is being powered?</div>',
       '      <div class="pwstd-card-b">',
@@ -55,8 +103,6 @@
       '        </div>',
       '      </div>',
       '    </div>',
-
-      /* Observed Power card – PRIMARY in fromN */
       '    <div class="pwstd-card pwstd-card--observed" id="pwstd-card-observed">',
       '      <div class="pwstd-card-h" id="pwstd-head-observed">Observed Data Power</div>',
       '      <div class="pwstd-card-b">',
@@ -66,10 +112,7 @@
       '        <div class="pwstd-row"><span class="pwstd-label">Alpha</span><span class="pwstd-value" id="' + id(ids,'alpha','powAlpha') + '">0.050</span></div>',
       '      </div>',
       '    </div>',
-
       '  </div>',
-
-      /* ── Technicals (RM-ANOVA design parameters) ── */
       '  <div class="pwstd-grid pwstd-grid--technicals">',
       '    <div class="pwstd-card pwstd-card--technicals">',
       '      <div class="pwstd-card-h">Technicals</div>',
@@ -79,16 +122,14 @@
       '      </div>',
       '    </div>',
       '  </div>',
-
-      /* ── Row 2: Planning  +  Targets ── */
       '  <div class="pwstd-grid pwstd-grid--bottom">',
-
-      /* Planning card – PRIMARY in requiredN & detectable */
       '    <div class="pwstd-card pwstd-card--planning" id="pwstd-card-planning">',
       '      <div class="pwstd-card-h" id="pwstd-head-planning">Sample Size Planning</div>',
       '      <div class="pwstd-card-b">',
-
-      /* main rows (fromN + requiredN) */
+      '        <div class="pwstd-row pwstd-for-main">',
+      '          <span class="pwstd-label">Selected target</span>',
+      '          <span class="pwstd-value" id="pwstd-selected-target">85%</span>',
+      '        </div>',
       '        <div class="pwstd-row pwstd-for-main">',
       '          <span class="pwstd-label" id="pwstd-reqN-label">Required N</span>',
       '          <span class="pwstd-value" id="' + id(ids,'requiredN','powRequired') + '">...</span>',
@@ -97,8 +138,6 @@
       '          <span class="pwstd-label">Partial η² used</span>',
       '          <span class="pwstd-value" id="' + id(ids,'partialEta','powPartialEta') + '">...</span>',
       '        </div>',
-
-      /* detectable rows */
       '        <div class="pwstd-row pwstd-for-detectable">',
       '          <span class="pwstd-label">Target power</span>',
       '          <span class="pwstd-value" style="display:flex;gap:6px;align-items:center;min-width:unset;background:none;border:none;padding:0;">',
@@ -114,47 +153,30 @@
       '            <i class="fa-solid fa-calculator"></i>&nbsp;Compute',
       '          </button>',
       '        </div>',
-
       '      </div>',
       '    </div>',
-
-      /* Targets card */
       '    <div class="pwstd-card pwstd-card--targets" id="pwstd-card-targets">',
       '      <div class="pwstd-card-h">Power Targets — click to select</div>',
       '      <div class="pwstd-card-b">',
-      '        <div class="pwstd-targets">',
-      '          ' + chipHtml,
-      '        </div>',
-      '        <div class="pwstd-custom-row">',
-      '          <input class="pwstd-select" type="number" id="' + id(ids,'customInput','customPowerInput') + '" min="0.5" max="0.99" step="0.01" value="0.85" style="width:80px;"'
-           + ' oninput="window.StatisticoPowerTemplate._onCustomInput()">',
-      '          <button type="button" class="hero-action-btn" onclick="' + esc(o.customHandler || 'calculateCustomPower()') + '"><i class="fa-solid fa-sync" id="' + id(ids,'customIcon','customPowerIcon') + '"></i></button>',
-      '          <span id="' + id(ids,'customStatus','customPowerStatus') + '" style="display:none;color:var(--text-muted);font-size:12px;"><i class="fa-solid fa-spinner fa-spin"></i> Calculating...</span>',
-      '        </div>',
+      '        <div class="pwstd-targets">' + chipHtml + '</div>',
+      '        <span id="' + id(ids,'customStatus','customPowerStatus') + '" class="pwstd-custom-status"><i class="fa-solid fa-spinner fa-spin"></i> Calculating...</span>',
       '      </div>',
       '    </div>',
-
       '  </div>',
-
       '  <div class="pwstd-band" id="' + id(ids,'status','powStatusMessage') + '">Run analysis to populate power results.</div>',
       '  <div class="pwstd-engine"><i class="fa-solid fa-cloud"></i> <span id="' + id(ids,'engineNote','powEngineNote') + '">Power engine configured per module.</span></div>',
-
       '</div>'
     ].join('\n');
 
     _syncTaskUI('fromN');
   }
 
-  /* ─── Chip selection ─── */
   function _onChipClick(chipEl) {
-    /* Deselect all */
-    var all = document.querySelectorAll('.pwstd-chip--selectable');
-    all.forEach(function(c){ c.classList.remove('pwstd-chip--selected'); });
-
-    /* Select clicked */
+    document.querySelectorAll('.pwstd-chip--selectable').forEach(function(c){
+      c.classList.remove('pwstd-chip--selected');
+    });
     chipEl.classList.add('pwstd-chip--selected');
 
-    /* Read value and pct from chip */
     var pct     = chipEl.getAttribute('data-pct');
     var valueId = chipEl.getAttribute('data-value-id');
     var valEl   = valueId ? document.getElementById(valueId) : null;
@@ -162,50 +184,40 @@
 
     _updatePlanningCard(pct, n);
 
-    /* If Custom chip selected, also select the custom input row */
     if (pct === 'Custom') {
       var inp = document.getElementById('customPowerInput');
       if (inp) inp.focus();
+      _scheduleCustomCompute();
     }
   }
 
-  /* Called when custom input changes while Custom chip is selected */
   function _onCustomInput() {
     var customChip = document.querySelector('.pwstd-chip--selected[data-pct="Custom"]');
     if (!customChip) return;
-    var valueId = customChip.getAttribute('data-value-id');
-    var valEl   = valueId ? document.getElementById(valueId) : null;
-    var n       = valEl ? valEl.textContent : '--';
+    var valEl = document.getElementById('customRequiredN');
+    var n = valEl ? valEl.textContent : '--';
     _updatePlanningCard('Custom', n);
+    _scheduleCustomCompute();
   }
 
-  /* Called by host after custom calculation completes — updates planning card if Custom is selected */
   function _onCustomComplete(n) {
     var customChip = document.querySelector('.pwstd-chip--selected[data-pct="Custom"]');
     if (!customChip) return;
-    var inp   = document.getElementById('customPowerInput');
-    var pct   = inp ? Math.round(parseFloat(inp.value) * 100) + '%' : 'Custom';
-    _updatePlanningCard(pct, n);
+    _updatePlanningCard('Custom', n);
   }
 
-  function _updatePlanningCard(pct, n) {
-    var label  = document.getElementById('pwstd-reqN-label');
-    var reqEl  = document.getElementById('powRequired');
-    var suffix = pct === 'Custom' ? 'custom target' : (pct + '% target');
-    if (label) label.textContent = 'Required N (' + suffix + ')';
-    if (reqEl) reqEl.textContent = n;
-  }
-
-  /* Sync initial 85% chip → planning card (called after values are populated) */
   function _syncDefaultChip() {
-    var chip = document.querySelector('.pwstd-chip--selected[data-pct="85"]');
+    var chip = document.querySelector('.pwstd-chip--selected');
+    if (!chip) {
+      chip = document.querySelector('.pwstd-chip[data-pct="85"]');
+      if (chip) chip.classList.add('pwstd-chip--selected');
+    }
     if (!chip) return;
     var valueId = chip.getAttribute('data-value-id');
     var valEl   = valueId ? document.getElementById(valueId) : null;
-    if (valEl) _updatePlanningCard('85', valEl.textContent);
+    if (valEl) _updatePlanningCard(chip.getAttribute('data-pct'), valEl.textContent);
   }
 
-  /* ─── Mode sync ─── */
   function _syncTaskUI(mode) {
     var shell = document.getElementById('pwstd-shell');
     if (!shell) return;
@@ -223,13 +235,11 @@
       _setCard(planCard, false);
       if (obsHead)  obsHead.textContent  = 'Observed Data Power';
       if (planHead) planHead.textContent = 'Sample Size Reference';
-
     } else if (mode === 'requiredN') {
       _setCard(obsCard,  false);
       _setCard(planCard, true);
       if (obsHead)  obsHead.textContent  = 'Current Study Power';
       if (planHead) planHead.textContent = 'Sample Size Planning';
-
     } else if (mode === 'detectable') {
       _setCard(obsCard,  false);
       _setCard(planCard, true);
@@ -252,13 +262,13 @@
 
   window.StatisticoPowerTemplate = {
     renderById: function(containerId, opts){
-      var el = document.getElementById(containerId);
-      render(el, opts);
+      render(document.getElementById(containerId), opts);
     },
     render: render,
     syncTaskUI:       _syncTaskUI,
     syncDefaultChip:  _syncDefaultChip,
     onCustomComplete: _onCustomComplete,
+    _customComputeFn: null,
     _onTaskChange:    function(mode){ _syncTaskUI(mode); },
     _onChipClick:     _onChipClick,
     _onCustomInput:   _onCustomInput,

@@ -16,8 +16,8 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260530a" />  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
   <script src="../shared-header.js?v=20260524b"></script>
-  <link rel="stylesheet" href="../shared-power-template.css?v=20260609b" />
-  <script src="../shared-power-template.js?v=20260609b"></script>
+  <link rel="stylesheet" href="../shared-power-template.css?v=20260609c" />
+  <script src="../shared-power-template.js?v=20260609c"></script>
 
   <script src="../../../src/shared/js/ai-config.js?v=20260429a"></script>
   <style>
@@ -3518,24 +3518,22 @@
       setText("powAlpha", (alpha || 0.05).toFixed(3));
       setText("powPartialEta", (partial_eta_squared || partialEta || 0).toFixed(3));
 
-      const setupPow = (lastBundle && lastBundle.setup) || {};
-      const kPow = (setupPow.selectedColumns || []).length;
-      const explorePow = (lastBundle && lastBundle.explore) || {};
-      const omnibusPow = (lastBundle && lastBundle.results && lastBundle.results.omnibus) || {};
-      const ctxPow = getPowerContext(omnibusPow, explorePow);
-      
-      // Required sample sizes — use exact cloud/binary-search values (not interpolation)
-      const req85 = required_for_85pct
+      const useCloudReqN = cloudMatches && !fallback && !local;
+
+      // Required sample sizes — use cloud values only when engine matches
+      const req85 = (useCloudReqN && required_for_85pct)
         || (effect_size_cohen_f && kPow >= 2
-          ? estimateRequiredN(effect_size_cohen_f, kPow, 0.85, alpha, ctxPow.avgR, ctxPow.epsilon, getPowerMethod(), 1)
+          ? estimateRequiredN(effect_size_cohen_f, kPow, 0.85, alpha, ctxPow.avgR, ctxPow.epsilon, method, 1)
           : null);
-      const req95 = required_for_95pct
+      const req95 = (useCloudReqN && required_for_95pct)
         || (effect_size_cohen_f && kPow >= 2
-          ? estimateRequiredN(effect_size_cohen_f, kPow, 0.95, alpha, ctxPow.avgR, ctxPow.epsilon, getPowerMethod(), 1)
+          ? estimateRequiredN(effect_size_cohen_f, kPow, 0.95, alpha, ctxPow.avgR, ctxPow.epsilon, method, 1)
           : null);
 
-      if (required_for_80pct) {
+      if (useCloudReqN && required_for_80pct) {
         setText("powReq80", required_for_80pct);
+      } else if (effect_size_cohen_f && kPow >= 2) {
+        setText("powReq80", estimateRequiredN(effect_size_cohen_f, kPow, 0.80, alpha, ctxPow.avgR, ctxPow.epsilon, method, 1));
       } else {
         setText("powReq80", "N/A");
       }
@@ -3574,7 +3572,7 @@
       
       // Status message
       let statusMsg, statusType;
-      if (observed_power >= 0.80) {
+      if (displayPower >= 0.80) {
         statusMsg = `? Excellent power (${powerPct}) with n=${currentN}. Effect detected reliably.`;
         statusType = "success";
       } else if (displayPower >= 0.60) {

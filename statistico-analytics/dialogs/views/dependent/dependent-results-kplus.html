@@ -139,7 +139,11 @@
     .stat-panel-body{padding:10px 16px;font-size:14px;}
     .stat-field{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);}
     .stat-field:last-child{border-bottom:none;}
-    .stat-label{color:var(--text-secondary);font-weight:600;font-size:14px;}
+    .stat-label{color:var(--text-secondary);font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;}
+    .stat-info-tip{display:inline-flex;align-items:center;justify-content:center;position:relative;width:14px;height:14px;border-radius:50%;border:1px solid rgba(148,163,184,.45);color:var(--text-muted);font-size:9px;cursor:help;line-height:1;flex-shrink:0;}
+    :root[data-theme="light"] .stat-info-tip{border-color:rgba(100,116,139,.45);color:#475569;}
+    .stat-info-tip--wrapped::after{content:attr(data-tip);position:absolute;left:50%;top:calc(100% + 8px);transform:translateX(-50%);width:max-content;max-width:240px;padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.92);color:#f8fafc;font-size:11px;font-weight:600;line-height:1.35;letter-spacing:0;text-transform:none;white-space:normal;text-align:left;box-shadow:0 8px 20px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.16);opacity:0;pointer-events:none;z-index:40;}
+    .stat-info-tip--wrapped:hover::after,.stat-info-tip--wrapped:focus-visible::after{opacity:1;}
     .stat-value{font-variant-numeric:tabular-nums;color:var(--accent-2);font-weight:700;background:rgba(120,200,255,.12);border:1px solid rgba(120,200,255,.32);padding:7px 11px;border-radius:6px;min-width:106px;text-align:center;font-size:14px;}
     .table-container{margin-top:8px;overflow:auto;max-height:350px;}
     .analysis-table{width:100%;border-collapse:collapse;}
@@ -346,6 +350,15 @@
 #posthocWarning span{font-size:13px !important;}
 /* Power */
 #tab-effects .stat-panel-heading{font-size:1em !important;}
+    .effect-magnitude-card{width:100%;max-width:1100px;margin:0 auto 10px;padding:12px 16px;border-radius:10px;border:1px solid rgba(120,200,255,.28);background:rgba(120,200,255,.08);box-sizing:border-box;}
+    .effect-magnitude-card.nonparametric{border-color:rgba(38,166,154,.32);background:rgba(38,166,154,.08);}
+    .effect-magnitude-card.mag-negligible .effect-magnitude-label{color:#94a3b8;}
+    .effect-magnitude-card.mag-small .effect-magnitude-label{color:#fbbf24;}
+    .effect-magnitude-card.mag-medium .effect-magnitude-label{color:#fb923c;}
+    .effect-magnitude-card.mag-large .effect-magnitude-label{color:#4ade80;}
+    .effect-magnitude-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent-1);margin-bottom:6px;}
+    .effect-magnitude-label{font-size:22px;font-weight:800;line-height:1.2;margin-bottom:4px;}
+    .effect-magnitude-detail{font-size:12px;color:var(--text-muted);font-weight:500;line-height:1.45;}
 #tab-power .stat-panel-heading{font-size:1em !important;}
 #tab-power #sharedPowerTemplateMount .stat-label{font-size:13px !important;}
 #tab-power #sharedPowerTemplateMount .stat-value{font-size:14px !important;}
@@ -818,7 +831,7 @@
 
   </style>
 </head>
-<body data-ui-version="20260610g-kplus-effects-dim">
+<body data-ui-version="20260610h-kplus-effect-tips">
   <!-- ── Sidebar Navigation ── -->
   <nav class="sb-nav" id="sidebarNav">
     <div class="sb-logo">
@@ -1363,23 +1376,28 @@
         </section>
 
         <section id="tab-effects" class="tab-panel">
+          <div class="effect-magnitude-card parametric" id="effectMagnitudeCard">
+            <div class="effect-magnitude-title">Overall Effect Magnitude</div>
+            <div class="effect-magnitude-label" id="effectMagnitudeLabel">...</div>
+            <div class="effect-magnitude-detail" id="effectMagnitudeDetail">Run analysis to summarize practical impact.</div>
+          </div>
           <div class="stats-container">
             <div class="stat-panel" id="effectsParametricPanel">
-              <div class="stat-panel-heading parametric framework-fixed">Parametric Effect Sizes</div>
+              <div class="stat-panel-heading parametric framework-fixed">Parametric Effect Sizes <span class="stat-info-tip" title="Variance-based effect measures from RM-ANOVA. Recommended when the parametric framework is selected."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></span></div>
               <div class="stat-panel-body">
-                <div class="stat-field"><span class="stat-label">Partial eta^2 (SPSS)</span><span class="stat-value" id="efPartialEta">...</span></div>
-                <div class="stat-field"><span class="stat-label">Generalized eta^2 (JASP)</span><span class="stat-value" id="efGeneralizedEta">...</span></div>
-                <div class="stat-field"><span class="stat-label">Eta squared</span><span class="stat-value" id="efEta">...</span></div>
-                <div class="stat-field"><span class="stat-label">Omega squared</span><span class="stat-value" id="efOmega">...</span></div>
-                <div class="stat-field"><span class="stat-label">Cohen's f</span><span class="stat-value" id="efCohenF">...</span></div>
+                <div class="stat-field"><span class="stat-label">Partial eta^2 (SPSS) <span class="stat-info-tip stat-info-tip--wrapped" data-tip="Share of timepoint-related variance in RM-ANOVA (SPSS convention). Primary parametric effect size; ~0.01 small, ~0.06 medium, ~0.14 large."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></span></span><span class="stat-value" id="efPartialEta">...</span></div>
+                <div class="stat-field"><span class="stat-label">Generalized eta^2 (JASP) <span class="stat-info-tip" title="Bias-adjusted variance explained; comparable across designs. Reported in JASP."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></span></span><span class="stat-value" id="efGeneralizedEta">...</span></div>
+                <div class="stat-field"><span class="stat-label">Eta squared <span class="stat-info-tip" title="Total variance explained by timepoints divided by total variance. Can overestimate compared with partial eta^2."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></span></span><span class="stat-value" id="efEta">...</span></div>
+                <div class="stat-field"><span class="stat-label">Omega squared <span class="stat-info-tip stat-info-tip--wrapped" data-tip="Less biased estimate of population variance explained. Negative values are sampling noise and are shown as 0 (negligible); hover the value for the raw statistic."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></span></span><span class="stat-value" id="efOmega">...</span></div>
+                <div class="stat-field"><span class="stat-label">Cohen's f <span class="stat-info-tip stat-info-tip--wrapped" data-tip="Standardized effect used for power analysis. Benchmarks: &lt;0.10 negligible, 0.10–0.25 small, 0.25–0.40 medium, ≥0.40 large."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></span></span><span class="stat-value" id="efCohenF">...</span></div>
               </div>
             </div>
             <div class="stat-panel" id="effectsNonparametricPanel">
-              <div class="stat-panel-heading nonparametric framework-fixed">Non-parametric Effect Sizes</div>
+              <div class="stat-panel-heading nonparametric framework-fixed">Non-parametric Effect Sizes <span class="stat-info-tip" title="Rank-based effect measures from the Friedman test. Recommended when the non-parametric framework is selected."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></span></div>
               <div class="stat-panel-body">
-                <div class="stat-field"><span class="stat-label">Kendall's W</span><span class="stat-value" id="efKendallW">...</span></div>
-                <div class="stat-field"><span class="stat-label">Friedman chi-square</span><span class="stat-value" id="efFriedmanChi">...</span></div>
-                <div class="stat-field"><span class="stat-label">Epsilon squared</span><span class="stat-value" id="efEpsilonSq">...</span></div>
+                <div class="stat-field"><span class="stat-label">Kendall's W <span class="stat-info-tip stat-info-tip--wrapped" data-tip="Coefficient of concordance: agreement among subjects' rank orders across timepoints (0 = none, 1 = perfect). Primary Friedman effect size."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></span></span><span class="stat-value" id="efKendallW">...</span></div>
+                <div class="stat-field"><span class="stat-label">Friedman chi-square <span class="stat-info-tip" title="Omnibus Friedman statistic comparing mean ranks across timepoints. Not an effect size by itself."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></span></span><span class="stat-value" id="efFriedmanChi">...</span></div>
+                <div class="stat-field"><span class="stat-label">Epsilon squared <span class="stat-info-tip" title="Non-parametric effect size derived from Friedman; estimates rank variability explained by timepoint differences."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></span></span><span class="stat-value" id="efEpsilonSq">...</span></div>
               </div>
             </div>
           </div>
@@ -1841,6 +1859,7 @@
       });
       
       syncFrameworkPanelEmphasis();
+      updateEffectMagnitudeSummary((lastBundle && lastBundle.results && lastBundle.results.omnibus) ? lastBundle.results.omnibus : {});
       updatePosthocOptions();
       refreshHypothesisFrames();
     }
@@ -1934,6 +1953,74 @@
       if (n < 0.30) return "Small";
       if (n < 0.50) return "Medium";
       return "Large";
+    }
+    function kplusPartialEtaMagnitude(eta) {
+      const n = parseMaybeNumber(eta);
+      if (!isFinite(n)) return "...";
+      if (n < 0.01) return "Negligible";
+      if (n < 0.06) return "Small";
+      if (n < 0.14) return "Medium";
+      return "Large";
+    }
+    function kplusPartialEtaMagClass(eta) {
+      const label = kplusPartialEtaMagnitude(eta);
+      if (label === "Small") return "mag-small";
+      if (label === "Medium") return "mag-medium";
+      if (label === "Large") return "mag-large";
+      return "mag-negligible";
+    }
+    function kplusKendallWMagClass(w) {
+      const label = kplusKendallWMagnitude(w);
+      if (label === "Small") return "mag-small";
+      if (label === "Medium") return "mag-medium";
+      if (label === "Large") return "mag-large";
+      return "mag-negligible";
+    }
+    function setOmegaSquaredDisplay(raw) {
+      const el = document.getElementById("efOmega");
+      if (!el) return;
+      const n = parseMaybeNumber(raw);
+      if (!isFinite(n)) {
+        el.textContent = "...";
+        el.title = "";
+        return;
+      }
+      if (n < 0) {
+        el.textContent = "0.000 (negligible)";
+        el.title = "Raw \u03c9\u00b2 = " + fmt(n) + ". Negative omega-squared reflects sampling noise and is reported as negligible.";
+      } else {
+        el.textContent = fmt(n);
+        el.title = "Less biased estimate of population variance explained by timepoint differences.";
+      }
+    }
+    function updateEffectMagnitudeSummary(ob) {
+      const card = document.getElementById("effectMagnitudeCard");
+      const labelEl = document.getElementById("effectMagnitudeLabel");
+      const detailEl = document.getElementById("effectMagnitudeDetail");
+      if (!labelEl || !detailEl) return;
+      const isNonParam = primaryFramework === "nonparametric";
+      if (card) {
+        card.classList.remove("parametric", "nonparametric", "mag-negligible", "mag-small", "mag-medium", "mag-large");
+        card.classList.add(primaryFramework);
+      }
+      if (isNonParam) {
+        const w = parseMaybeNumber(ob.kendallW || ob.friedmanW);
+        const mag = kplusKendallWMagnitude(w);
+        labelEl.textContent = mag;
+        detailEl.textContent = "Kendall\u2019s W = " + fmt(w) + " \u00b7 rank agreement across timepoints";
+        if (card) card.classList.add(kplusKendallWMagClass(w));
+      } else {
+        const partialEta = parseMaybeNumber(ob.partialEtaSquared);
+        let cohenF = parseMaybeNumber(ob.cohenF);
+        if (!isFinite(cohenF) && isFinite(partialEta) && partialEta > 0 && partialEta < 1) {
+          cohenF = Math.sqrt(partialEta / (1 - partialEta));
+        }
+        const mag = kplusCohenFMagnitude(cohenF);
+        const pct = isFinite(partialEta) ? (Math.max(0, partialEta) * 100).toFixed(1) : "...";
+        labelEl.textContent = mag;
+        detailEl.textContent = "Partial \u03b7\u00b2 = " + fmt(partialEta) + " \u00b7 approximately " + pct + "% of variance explained";
+        if (card) card.classList.add(kplusPartialEtaMagClass(partialEta));
+      }
     }
     function kplusPlainP(p) {
       const s = fmtP(p);
@@ -3450,11 +3537,12 @@
       setText("efPartialEta", fmt(ob.partialEtaSquared));
       setText("efGeneralizedEta", fmt(ob.generalizedEtaSquared));
       setText("efEta", fmt(ob.etaSquared));
-      setText("efOmega", fmt(ob.omegaSquared));
+      setOmegaSquaredDisplay(ob.omegaSquared);
       setText("efCohenF", fmt(ob.cohenF));
       setText("efKendallW", fmt(ob.kendallW || ob.friedmanW));
       setText("efFriedmanChi", fmt(ob.friedmanChiSquare || ob.kwH));
       setText("efEpsilonSq", fmt(ob.epsilonSquared));
+      updateEffectMagnitudeSummary(ob);
       
       setText("powNote", p.note); setText("powEndpoint", p.suggestedEndpoint); setText("powVal", fmt(p.placeholderPower));
       setText("repAnova", "RM-ANOVA: F(" + Math.round(ob.anovaDf1) + ", " + Math.round(ob.anovaDf2) + ") = " + fmt(ob.anovaF) + ", p " + fmtP(ob.anovaP) + ".");

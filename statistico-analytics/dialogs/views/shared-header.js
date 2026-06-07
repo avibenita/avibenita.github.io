@@ -47,7 +47,7 @@ console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
 
   const script = document.createElement('script');
   script.id = 'st-tooltip-template-script';
-  script.src = resolveAssetUrl('src/shared/js/tooltip-template.js?v=20260601p');
+  script.src = resolveAssetUrl('src/shared/js/tooltip-template.js?v=20260610a');
   script.async = true;
   script.onload = initTooltip;
   document.head.appendChild(script);

@@ -75,6 +75,13 @@
         visibility: hidden !important;
         pointer-events: none !important;
       }
+      [${SCRIPT_FLAG}="1"].stat-info-tip--wrapped::after,
+      [${SCRIPT_FLAG}="1"].stat-info-tip--wrapped:hover::after,
+      [${SCRIPT_FLAG}="1"].stat-info-tip--wrapped:focus-visible::after {
+        content: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+      }
       [${SCRIPT_FLAG}="1"].res-tooltip .res-tooltiptext,
       [${SCRIPT_FLAG}="1"].res-tooltip:hover .res-tooltiptext {
         opacity: 0 !important;

@@ -1255,7 +1255,10 @@ const StatisticoHeader = {
         analysisItems.push({ type: 'tab', tab: 'posthoc', icon: 'fa-table-cells', label: 'Pairwise Comparisons' });
       }
       if (isKplus) {
-        analysisItems.push({ type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effect Size & Power' });
+        analysisItems.push(
+          { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effect Sizes' },
+          { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power & Sample Size' }
+        );
       } else {
         analysisItems.push(
           { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effect Sizes' },

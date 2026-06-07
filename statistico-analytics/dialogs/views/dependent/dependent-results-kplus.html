@@ -84,6 +84,14 @@
     .tab-panel.active{display:block;overflow-y:auto;}
     #tab-results.tab-panel.active{display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;height:100%;}
     #tab-results .results-grid{flex:1 1 0;min-height:0;}
+    #tab-results .results-left-col{display:flex;flex-direction:column;gap:6px;overflow-y:auto;min-height:0;flex:1;padding-bottom:4px;}
+    #tab-results .results-left-col .stat-panel{flex-shrink:0;}
+    #omnibusDetailPanel .table-container{max-height:none;margin-top:0;}
+    #omnibusDetailPanel .analysis-table th,#omnibusDetailPanel .analysis-table td{padding:6px 10px;font-size:12px;}
+    #omnibusDetailPanel .omnibus-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:8px;}
+    #omnibusDetailPanel .omnibus-summary-cell{padding:6px 8px;border:1px solid rgba(255,255,255,.12);border-radius:6px;background:rgba(255,255,255,.04);font-size:11px;line-height:1.35;}
+    #omnibusDetailPanel .omnibus-summary-cell span{display:block;color:var(--text-muted);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;}
+    #omnibusDetailPanel .omnibus-summary-cell strong{display:block;color:var(--accent-2);font-size:13px;font-weight:700;}
     .stat-field.rc{padding:4px 0;}
     .stat-value.rc{padding:4px 9px;font-size:13px;min-width:90px;}
     .chart-metric-options{display:inline-flex;align-items:center;gap:10px;font-size:11px;font-weight:600;text-transform:none;letter-spacing:0;}
@@ -118,7 +126,7 @@
       overflow-x: auto;
     }
     .stat-panel{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
-    .stat-panel.secondary{opacity:0.7;transform:scale(0.95);border-color:rgba(45,55,72,0.4);}
+    .stat-panel.secondary{opacity:0.82;border-color:rgba(45,55,72,0.4);}
     .stat-panel.secondary .stat-panel-heading{background:#37474f;font-size:10px;padding:6px 8px;border-bottom:1px solid rgba(255,165,120,.4);}
     .stat-panel.secondary .stat-field{padding:5px 0;}
     .stat-panel.secondary .stat-label{font-size:12px;opacity:0.85;}
@@ -807,7 +815,7 @@
 
   </style>
 </head>
-<body data-ui-version="20260610c-kplus-ux">
+<body data-ui-version="20260610d-kplus-omnibus">
   <!-- ── Sidebar Navigation ── -->
   <nav class="sb-nav" id="sidebarNav">
     <div class="sb-logo">
@@ -1205,7 +1213,7 @@
             <span class="key-finding-detail" id="keyFindingDetail"></span>
           </div>
           <div class="results-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;min-height:320px;overflow:hidden;box-sizing:border-box;">
-            <div style="display:flex;flex-direction:column;gap:6px;overflow-y:auto;min-height:0;">
+            <div class="results-left-col">
               <div class="stat-panel">
                 <div class="stat-panel-heading">Primary Results</div>
                 <div class="stat-panel-body" style="padding:6px 14px;">
@@ -1235,7 +1243,7 @@
                   <span id="omnibusDetailToggle" style="font-size:11px;font-weight:600;opacity:.85;">▼ Show</span>
                 </div>
                 <div class="stat-panel-body" id="omnibusDetailBody" style="padding:8px;display:none;">
-                  <div class="table-container" style="margin:0;max-height:280px;">
+                  <div class="table-container" style="margin:0;">
                     <table class="analysis-table" id="primaryTestTable">
                       <thead id="primaryTestTableHead">
                         <tr><th>Source</th><th>SS</th><th>df</th><th>MS</th><th>F</th><th>p-value</th></tr>
@@ -1959,6 +1967,29 @@
       }
       return String(key).replace(/^Timepoint\s*/i, "") || key;
     }
+    function getFriedmanTimepointRows(ob, s) {
+      const meanRanks = ob.friedmanMeanRanks || ob.meanRanks || {};
+      const gd = Array.isArray(ob.groupDescriptives) ? ob.groupDescriptives : [];
+      if (gd.length) {
+        const legacyKeys = Object.keys(meanRanks);
+        return gd.map(function(g, idx) {
+          const rawName = g.name || ("Timepoint " + (idx + 1));
+          let rank = parseMaybeNumber(meanRanks[rawName]);
+          if (!isFinite(rank) && legacyKeys[idx] != null) rank = parseMaybeNumber(meanRanks[legacyKeys[idx]]);
+          if (!isFinite(rank)) rank = parseMaybeNumber(meanRanks["Timepoint " + (idx + 1)]);
+          return {
+            name: friedmanTimepointLabel(rawName, idx, s, ob),
+            rank: rank
+          };
+        });
+      }
+      return Object.keys(meanRanks).map(function(key, idx) {
+        return {
+          name: friedmanTimepointLabel(key, idx, s, ob),
+          rank: parseMaybeNumber(meanRanks[key])
+        };
+      });
+    }
     function toggleOmnibusDetail() {
       const body = document.getElementById("omnibusDetailBody");
       const toggle = document.getElementById("omnibusDetailToggle");
@@ -2092,29 +2123,32 @@
           // Friedman Test (Non-parametric)
           if (primaryTestHeading) primaryTestHeading.textContent = "Omnibus Detail \u00b7 Friedman Test";
           if (primaryTestTableHead) {
-            primaryTestTableHead.innerHTML = '<tr><th>Timepoint</th><th>Mean Rank</th><th>chi-square</th><th>df</th><th>p-value</th><th>Kendall W</th></tr>';
+            primaryTestTableHead.innerHTML = '<tr><th>Timepoint</th><th>Mean Rank</th></tr>';
           }
           if (anovaBody) {
-            const meanRanks = ob.friedmanMeanRanks || ob.meanRanks || {};
-            const rankKeys = Object.keys(meanRanks);
             const chiSquare = ob.friedmanChiSquare || ob.kwH;
             const df = ob.friedmanDf || ob.kwDf;
             const pValue = ob.friedmanP || ob.kwP;
             const kendallW = ob.kendallW || ob.friedmanW || 0;
-            
-            let rowsHtml = rankKeys.map(function(key, idx) {
-              return '<tr>' 
-                + '<td>' + friedmanTimepointLabel(key, idx, s, ob) + '</td>'
-                + '<td>' + fmt(meanRanks[key]) + '</td>'
-                + '<td>' + (idx === 0 ? '<strong>' + fmt(chiSquare) + '</strong>' : '') + '</td>'
-                + '<td>' + (idx === 0 ? Math.round(df) : '') + '</td>'
-                + '<td>' + (idx === 0 ? '<strong>' + fmtP(pValue) + '</strong>' : '') + '</td>'
-                + '<td>' + (idx === 0 ? fmt(kendallW) + ' <span style="font-size:9px;color:#aaa;">(effect size)</span>' : '') + '</td>'
-                + '</tr>';
+            const timepoints = getFriedmanTimepointRows(ob, s);
+            const summaryHtml = '<div class="omnibus-summary-grid">'
+              + '<div class="omnibus-summary-cell"><span>\u03c7\u00b2</span><strong>' + fmt(chiSquare) + '</strong></div>'
+              + '<div class="omnibus-summary-cell"><span>df</span><strong>' + Math.round(df) + '</strong></div>'
+              + '<div class="omnibus-summary-cell"><span>p-value</span><strong>' + fmtP(pValue) + '</strong></div>'
+              + '<div class="omnibus-summary-cell"><span>Kendall W</span><strong>' + fmt(kendallW) + '</strong></div>'
+              + '</div>';
+            let rowsHtml = timepoints.map(function(tp) {
+              return '<tr><td>' + tp.name + '</td><td>' + (isFinite(tp.rank) ? fmt(tp.rank) : "\u2014") + '</td></tr>';
             }).join('');
-            
-            if (rankKeys.length === 0) {
-              rowsHtml = '<tr><td colspan="6" style="text-align:center;">No rank data available</td></tr>';
+            if (timepoints.length === 0) {
+              rowsHtml = '<tr><td colspan="2" style="text-align:center;">No rank data available</td></tr>';
+            }
+            const tableWrap = anovaBody.closest(".table-container");
+            if (tableWrap && tableWrap.previousElementSibling && tableWrap.previousElementSibling.classList.contains("omnibus-summary-grid")) {
+              tableWrap.previousElementSibling.remove();
+            }
+            if (tableWrap) {
+              tableWrap.insertAdjacentHTML("beforebegin", summaryHtml);
             }
             anovaBody.innerHTML = rowsHtml;
             console.log("Friedman test table populated successfully");
@@ -2126,6 +2160,10 @@
             primaryTestTableHead.innerHTML = '<tr><th>Source</th><th>SS</th><th>df</th><th>MS</th><th>F</th><th>p-value</th></tr>';
           }
           if (anovaBody) {
+            const tableWrapRm = anovaBody.closest(".table-container");
+            if (tableWrapRm && tableWrapRm.previousElementSibling && tableWrapRm.previousElementSibling.classList.contains("omnibus-summary-grid")) {
+              tableWrapRm.previousElementSibling.remove();
+            }
             const dfTime = parseMaybeNumber(ob.anovaDf1);
             const dfError = parseMaybeNumber(ob.anovaDf2);
             const dfSubjects = parseMaybeNumber(ob.anovaDfSubjects);

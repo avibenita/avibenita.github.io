@@ -1262,13 +1262,9 @@ const StatisticoHeader = {
       } else {
         analysisItems.push(
           { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effect Sizes' },
-          { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power Analysis' }
+          { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power Analysis' },
+          { type: 'tab', tab: 'report', icon: 'fa-file-lines', label: 'APA Report' }
         );
-      }
-      if (isKplus) {
-        analysisItems.push({ type: 'tab', tab: 'ai-interpretation', icon: 'fa-brain', label: 'AI Interpretation' });
-      } else {
-        analysisItems.push({ type: 'tab', tab: 'report', icon: 'fa-file-lines', label: 'APA Report' });
       }
       return {
         logoIcon: 'fa-clock-rotate-left',
@@ -5029,32 +5025,38 @@ const StatisticoHeader = {
     const hasJson = typeof actions.exportJson === 'function';
 
     // ── AI pill — above utilities ─────────────────────────────────────────
+    const isDependentKplus = this.module === 'dependent' && this.currentView === 'dependent-results-kplus';
     const supportsIndependentAi = this.module === 'independent';
     const supportsMixedAi = this.module === 'mixed-model';
     const supportsSharedAi = (this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations' || supportsIndependentAi || supportsMixedAi;
-    if (supportsSharedAi) {
+    const supportsFullAiPill = supportsIndependentAi || isDependentKplus;
+    if (supportsSharedAi || isDependentKplus) {
       const aiSection = document.createElement('div');
       aiSection.id = 'sbAiSection';
       aiSection.className = 'sb-ai-section-wrap';
       const isCorrelation = this.module === 'correlations';
       const aiClick = supportsIndependentAi
         ? 'StatisticoHeader._sbAiIndependentInterpret()'
+        : isDependentKplus
+          ? 'StatisticoHeader._sbAiDependentKplusInterpret()'
         : supportsMixedAi
           ? 'requestMixedModelAI()'
           : 'StatisticoHeader._sbAiGlobalInterpret()';
       const aiTitle = supportsIndependentAi
         ? 'AI statistical summary for this independent means analysis'
+        : isDependentKplus
+          ? 'Full AI interpretation of this repeated-measures analysis'
         : supportsMixedAi
           ? 'AI interpretation of the mixed model results'
           : (isCorrelation ? 'Full correlation analysis - synthesises all correlation views into one report' : 'Full variable analysis - synthesises all diagnostics into one report');
-      const aiLabel = supportsIndependentAi ? 'Full AI Analysis' : 'Full Analysis';
-      const aiBadge = supportsIndependentAi ? 'ALL' : 'AI';
+      const aiLabel = supportsFullAiPill ? 'Full AI Analysis' : 'Full Analysis';
+      const aiBadge = supportsFullAiPill ? 'ALL' : 'AI';
       aiSection.innerHTML = `
-        <button class="sb-ai-sidebar-pill ${supportsIndependentAi ? 'sb-ai-sidebar-pill--full' : ''}"
+        <button class="sb-ai-sidebar-pill ${supportsFullAiPill ? 'sb-ai-sidebar-pill--full' : ''}"
                 id="sbAiBtn"
                 onclick="${aiClick}"
                 title="${aiTitle}">
-          <i class="fa-solid ${supportsIndependentAi ? 'fa-layer-group' : 'fa-brain'}"></i>
+          <i class="fa-solid ${supportsFullAiPill ? 'fa-layer-group' : 'fa-brain'}"></i>
           <span>${aiLabel}</span>
           <sup class="sb-ai-sup">${aiBadge}</sup>
         </button>
@@ -5584,6 +5586,26 @@ ABOUT: [2-3 sentences explaining what this view answers]
 CONTROLS: [Control or interaction: what it does + when to use it] | [next control/interaction] | [next control/interaction]
 PATTERNS: [Pattern description -> what it means analytically] | [next pattern] | [next pattern]
 READING: [1-2 sentences about what the currently visible state suggests, using exact values only if present]`;
+  },
+
+  async _sbAiDependentKplusInterpret() {
+    const sidebarBtn = document.getElementById('sbAiBtn');
+    const setBusy = (busy) => {
+      if (!sidebarBtn) return;
+      sidebarBtn.disabled = busy;
+      sidebarBtn.innerHTML = busy
+        ? '<i class="fa-solid fa-spinner fa-spin"></i><span>Generating...</span>'
+        : '<i class="fa-solid fa-layer-group"></i><span>Full AI Analysis</span><sup class="sb-ai-sup">ALL</sup>';
+    };
+    if (typeof switchTab === 'function') switchTab('ai-interpretation');
+    setBusy(true);
+    try {
+      if (typeof generateAIInterpretation === 'function') {
+        await generateAIInterpretation();
+      }
+    } finally {
+      setBusy(false);
+    }
   },
 
   async _sbAiIndependentInterpret() {

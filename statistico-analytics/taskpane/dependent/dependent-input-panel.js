@@ -41,10 +41,6 @@ function getDialogsBaseUrl() {
 function openDependentBuilder() {
   console.log("=== openDependentBuilder CLICKED ===");
   console.log("dependentRangeData:", dependentRangeData);
-  if (!dependentRangeData || dependentRangeData.length < 2) {
-    console.log("openDependentBuilder: early exit, no data");
-    return;
-  }
   console.log("Opening configuration dialog...");
   Office.context.ui.displayDialogAsync(
     `${getDialogsBaseUrl()}dependent/dependent-input.html?v=${Date.now()}`,
@@ -85,9 +81,9 @@ function openDependentBuilder() {
 }
 
 function sendDialogData() {
-  if (!dependentDialog || !dependentRangeData) return;
-  const headers = dependentRangeData[0] || [];
-  const rows = dependentRangeData.slice(1);
+  if (!dependentDialog) return;
+  const headers = (dependentRangeData && dependentRangeData.length) ? (dependentRangeData[0] || []) : [];
+  const rows = (dependentRangeData && dependentRangeData.length > 1) ? dependentRangeData.slice(1) : [];
   // Always open the builder fresh.
   const savedModelSpec = null;
   dependentDialog.messageChild(JSON.stringify({
@@ -314,7 +310,7 @@ function computeRepeatedMeasuresANOVA(headers, rows, selectedColumns, primaryFra
   const cohenF = partialEtaSquared < 1 ? Math.sqrt(partialEtaSquared / (1 - partialEtaSquared)) : 0;
   
   // Friedman test (nonparametric alternative)
-  const friedman = computeFriedmanTest(completeCases, k, n);
+  const friedman = computeFriedmanTest(completeCases, k, n, selectedColumns);
   
   // Kendall's W (effect size for Friedman) - Coefficient of concordance
   const kendallW = friedman.W || 0;
@@ -459,7 +455,7 @@ function approximateFTest(f, df1, df2) {
   return 0.001;
 }
 
-function computeFriedmanTest(completeCases, k, n) {
+function computeFriedmanTest(completeCases, k, n, levelNames) {
   // Friedman test: nonparametric alternative to repeated measures ANOVA
   // Rank each row independently
   const rankedData = completeCases.map(row => {
@@ -483,7 +479,8 @@ function computeFriedmanTest(completeCases, k, n) {
   // Mean ranks
   const meanRanks = {};
   rankSums.forEach((sum, j) => {
-    meanRanks[`Timepoint ${j + 1}`] = sum / n;
+    const name = (Array.isArray(levelNames) && levelNames[j]) ? levelNames[j] : ("Timepoint " + (j + 1));
+    meanRanks[name] = sum / n;
   });
   
   // Friedman test statistic (Chi-square)

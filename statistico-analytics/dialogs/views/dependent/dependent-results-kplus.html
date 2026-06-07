@@ -460,7 +460,7 @@
   .stat-value { min-width: auto; width: 100%; font-size: 11px; }
   
   /* Power cards - single column on very small screens */
-  #tab-power .stats-container { grid-template-columns: 1fr !important; }
+  #tab-effects .stats-container { grid-template-columns: 1fr !important; }
 }
 
 /* Responsive grid for power level cards */
@@ -1948,7 +1948,17 @@
       const mag = kplusKendallWMagnitude(kendallW);
       return mag + "\n(Kendall's W = " + fmt(kendallW) + ")";
     }
-    function toggleOmnibusDetail() {
+    function friedmanTimepointLabel(key, idx, s, ob) {
+      if (/^Timepoint\s+\d+$/i.test(String(key))) {
+        const n = parseInt(String(key).replace(/\D/g, ""), 10) - 1;
+        const gd = Array.isArray(ob.groupDescriptives) ? ob.groupDescriptives : [];
+        if (gd[n] && gd[n].name) return gd[n].name;
+        const cols = (s && s.selectedColumns) || [];
+        if (cols[n]) return cols[n];
+        return "Time " + (n + 1);
+      }
+      return String(key).replace(/^Timepoint\s*/i, "") || key;
+    }
       const body = document.getElementById("omnibusDetailBody");
       const toggle = document.getElementById("omnibusDetailToggle");
       if (!body) return;
@@ -2093,7 +2103,7 @@
             
             let rowsHtml = rankKeys.map(function(key, idx) {
               return '<tr>' 
-                + '<td>' + key.replace('Timepoint', 'Time') + '</td>'
+                + '<td>' + friedmanTimepointLabel(key, idx, s, ob) + '</td>'
                 + '<td>' + fmt(meanRanks[key]) + '</td>'
                 + '<td>' + (idx === 0 ? '<strong>' + fmt(chiSquare) + '</strong>' : '') + '</td>'
                 + '<td>' + (idx === 0 ? Math.round(df) : '') + '</td>'

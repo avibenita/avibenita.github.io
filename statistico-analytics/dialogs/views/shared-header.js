@@ -1247,17 +1247,21 @@ const StatisticoHeader = {
     if (this.module === 'dependent') {
       const isKplus = this.currentView === 'dependent-results-kplus';
       const analysisItems = [
-        { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: 'Test Results', active: true },
+        { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: isKplus ? 'Overview' : 'Test Results', active: true },
         { type: 'tab', tab: 'assumptions', icon: 'fa-shield-halved', label: 'Assumptions' }
       ];
       if (isKplus) {
         analysisItems.splice(1, 0, { type: 'tab', tab: 'trajectories', icon: 'fa-chart-line', label: 'Trajectories' });
         analysisItems.push({ type: 'tab', tab: 'posthoc', icon: 'fa-table-cells', label: 'Pairwise Comparisons' });
       }
-      analysisItems.push(
-        { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effect Sizes' },
-        { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power Analysis' }
-      );
+      if (isKplus) {
+        analysisItems.push({ type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effect Size & Power' });
+      } else {
+        analysisItems.push(
+          { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effect Sizes' },
+          { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power Analysis' }
+        );
+      }
       if (isKplus) {
         analysisItems.push({ type: 'tab', tab: 'ai-interpretation', icon: 'fa-brain', label: 'AI Interpretation' });
       } else {

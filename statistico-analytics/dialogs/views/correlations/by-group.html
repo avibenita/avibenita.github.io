@@ -43,23 +43,23 @@
     .metric strong { font-size:18px; color:var(--accent-1); }
     .table-wrap { border:1px solid var(--border); border-radius:10px; overflow:auto; background:var(--surface-2); }
     table { width:100%; border-collapse:collapse; min-width:880px; }
-    th, td { padding:10px 12px; border-bottom:1px solid var(--border); text-align:right; font-size:13px; white-space:nowrap; }
+    th, td { padding:11px 14px; border-bottom:1px solid var(--border); text-align:right; font-size:14px; white-space:nowrap; }
     #corrByGroupTable thead th {
       position:sticky; top:0; z-index:3;
-      padding:12px 12px 10px;
+      padding:13px 14px 11px;
       background:linear-gradient(180deg, var(--surface-1) 0%, color-mix(in srgb, var(--accent-1) 10%, var(--surface-1)) 100%);
       border-bottom:2px solid color-mix(in srgb, var(--accent-1) 42%, var(--border));
       color:var(--text-primary);
-      font-size:11px;
+      font-size:13px;
       font-weight:800;
-      letter-spacing:.09em;
+      letter-spacing:.06em;
       text-transform:uppercase;
       box-shadow:0 2px 0 rgba(0,0,0,.18);
     }
     html[data-theme="light"] #corrByGroupTable thead th {
       box-shadow:0 2px 0 rgba(15,23,42,.06);
     }
-    #corrByGroupTable thead th .th-main { display:block; color:var(--accent-1); font-size:11px; line-height:1.2; }
+    #corrByGroupTable thead th .th-main { display:block; color:var(--accent-1); font-size:13px; line-height:1.25; }
     #corrByGroupTable thead th.sortable { cursor:pointer; user-select:none; transition:background .12s ease; }
     #corrByGroupTable thead th.sortable:hover {
       background:linear-gradient(180deg, color-mix(in srgb, var(--accent-1) 16%, var(--surface-1)) 0%, color-mix(in srgb, var(--accent-1) 24%, var(--surface-2)) 100%);
@@ -75,10 +75,10 @@
       white-space:nowrap;
     }
     #corrByGroupTable tr.group-zone-row th {
-      padding:7px 10px 5px;
-      font-size:9px;
+      padding:8px 12px 6px;
+      font-size:11px;
       font-weight:800;
-      letter-spacing:.14em;
+      letter-spacing:.12em;
       text-transform:uppercase;
       border-bottom:none;
       background:transparent;
@@ -114,11 +114,14 @@
       white-space:nowrap;
       text-transform:none;
       letter-spacing:.02em;
-      font-size:12px;
+      font-size:13px;
       font-weight:800;
       color:var(--accent-2);
     }
-    th.group-col .group-n { display:block; font-size:10px; font-weight:700; color:var(--text-secondary); text-transform:none; letter-spacing:0; margin-top:3px; }
+    th.group-col .group-n { display:block; font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:none; letter-spacing:0; margin-top:3px; }
+    #corrByGroupTable td.r-pos,
+    #corrByGroupTable td.r-neg,
+    #corrByGroupTable td.group-cell { font-variant-numeric:tabular-nums; font-size:14px; }
     td.group-cell {
       background:color-mix(in srgb, var(--accent-2) 7%, var(--surface-2));
       font-weight:650;
@@ -259,16 +262,24 @@
     let sortConfig = { key: 'pair', direction: 'ascending' };
     const levelSelections = {};
 
-    function decimalDigits() {
+    function decimalDigits(autoDefault) {
+      const fallback = Number.isFinite(autoDefault) ? autoDefault : 3;
       if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader.getDecimalPreference === 'function') {
-        return StatisticoHeader.getDecimalPreference();
+        const pref = StatisticoHeader.getDecimalPreference();
+        if (pref === 'auto' || pref === null || pref === '') return fallback;
+        const parsed = parseInt(pref, 10);
+        return Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : fallback;
       }
-      return 2;
+      return fallback;
     }
 
-    function fmt(value) {
+    function fmt(value, autoDefault) {
       const n = Number(value);
-      return Number.isFinite(n) ? n.toFixed(decimalDigits()) : '—';
+      return Number.isFinite(n) ? n.toFixed(decimalDigits(autoDefault)) : '—';
+    }
+
+    function fmtR(value) {
+      return fmt(value, 3);
     }
 
     function formatP(p) {
@@ -543,7 +554,7 @@
 
     function buildSparklineTipHtml(groupResults) {
       return groupResults.map((gr) => {
-        const val = Number.isFinite(gr.r) ? fmt(gr.r) : '—';
+        const val = Number.isFinite(gr.r) ? fmtR(gr.r) : '—';
         return `<div style="display:flex;justify-content:space-between;gap:12px;line-height:1.45;"><span><strong>${escapeHtml(gr.group)}</strong></span><span>r = ${val} <span style="opacity:.75">(n=${gr.n})</span></span></div>`;
       }).join('');
     }
@@ -665,12 +676,12 @@
       document.getElementById('corrByGroupBody').innerHTML = rows.map((row) => {
         const overallClass = formatRClass(row.overall.r);
         const overallCell = Number.isFinite(row.overall.r)
-          ? `<td class="${overallClass}" title="n=${row.overall.n}">${fmt(row.overall.r)}</td>`
+          ? `<td class="${overallClass}" title="n=${row.overall.n}">${fmtR(row.overall.r)}</td>`
           : '<td class="r-weak">—</td>';
         const groupCells = row.groupResults.map((gr, i) => {
           const cellCls = `group-cell${i === 0 ? ' group-cell-first' : ''}`;
           if (!Number.isFinite(gr.r)) return `<td class="${cellCls} r-weak" title="${escapeHtml(gr.group)}: n=${gr.n}">—</td>`;
-          return `<td class="${cellCls} ${formatRClass(gr.r)}" title="${escapeHtml(gr.group)}: n=${gr.n}">${fmt(gr.r)}</td>`;
+          return `<td class="${cellCls} ${formatRClass(gr.r)}" title="${escapeHtml(gr.group)}: n=${gr.n}">${fmtR(gr.r)}</td>`;
         }).join('');
         return `<tr>
           <td class="pair-cell" title="${escapeHtml(row.pair)}">${escapeHtml(row.pair)}</td>

@@ -43,7 +43,6 @@ function getDialogsBaseUrl() {
 }
 
 function openPcaModelBuilder() {
-  if (!pcaRangeData || pcaRangeData.length < 2) return;
   const dialogUrl = `${getDialogsBaseUrl()}factor/factor-input.html?mode=pca&v=${Date.now()}`;
 
   Office.context.ui.displayDialogAsync(
@@ -93,9 +92,9 @@ function openPcaModelBuilder() {
 }
 
 function sendPcaDialogData() {
-  if (!pcaDialog || !pcaRangeData) return;
-  const headers = pcaRangeData[0] || [];
-  const rows    = pcaRangeData.slice(1);
+  if (!pcaDialog) return;
+  const headers = (pcaRangeData && pcaRangeData.length) ? (pcaRangeData[0] || []) : [];
+  const rows    = (pcaRangeData && pcaRangeData.length > 1) ? pcaRangeData.slice(1) : [];
 
   pcaDialog.messageChild(JSON.stringify({
     type: "FACTOR_DATA",

@@ -105,7 +105,11 @@
     .key-finding-text{margin:0;font-size:14px;line-height:1.55;color:var(--text-primary);font-weight:600;}
     .key-finding-detail{display:block;margin-top:6px;font-size:11px;color:var(--text-muted);font-weight:500;}
     .stat-value.effect-magnitude{font-size:13px;line-height:1.35;white-space:normal;text-align:center;min-width:100px;}
-    /* Explore tab only: flex column */
+    /* Explore tab only: flex column; hide shared analysis-context hero */
+    body.kplus-tab-explore .hero-section,
+    .card.kplus-descriptives-active .hero-section{display:none !important;}
+    body.kplus-tab-explore .view-container::before,
+    .card.kplus-descriptives-active .view-container::before{display:none;}
     #tab-explore.tab-panel.active{display:flex;flex-direction:column;gap:8px;overflow:hidden;box-sizing:border-box;}
     /* Panel shell */
     .xp{background:var(--surface-1);border:2px solid var(--border);border-radius:var(--panel-radius);overflow:hidden;flex:0 0 auto;box-shadow:var(--panel-shadow),0 0 0 1px rgba(255,255,255,.08);}
@@ -282,7 +286,7 @@
 #desc-stats-table tbody tr:nth-child(even) td{background:rgba(255,255,255,.05)}
 #desc-stats-table tbody tr:hover td{background:rgba(255,221,87,.18)}
 #desc-stats-table tbody tr.selected td{background:rgba(255,165,120,.3)}
-#histogram-container-kplus{min-height:0;}
+#histogram-container-kplus{min-height:0;overflow:visible;padding-bottom:8px;box-sizing:border-box;}
 .histogram-bar{fill:#74b9ff;stroke:#0984e3;stroke-width:1px;}
 .histogram-bar:hover{fill:#0984e3;}
 .normal-curve{fill:none;stroke:yellow;stroke-width:2px;stroke-dasharray:5,5;}
@@ -838,7 +842,7 @@
 
   </style>
 </head>
-<body data-ui-version="20260610p-kplus-ai-pill">
+<body data-ui-version="20260610t-kplus-desc-hero-hist">
   <!-- ── Sidebar Navigation ── -->
   <nav class="sb-nav" id="sidebarNav">
     <div class="sb-logo">
@@ -1036,6 +1040,62 @@
             </div>
           </div>
 
+          <!-- Panel: Correlation Matrix -->
+          <div class="xp xp--grow" id="xp-desc-corr" style="min-height:160px;">
+            <div class="xp-hdr">
+              <span style="color:var(--accent-1)"><i class="fa-solid fa-grip"></i> Correlation Matrix</span>
+              <span style="font-size:13px;font-weight:400;color:var(--text-muted);">Pairwise correlations between timepoints (click cells for scatter plots)</span>
+            </div>
+            <div class="xp-body" style="padding:10px 12px;overflow:auto;display:flex;flex-direction:column;gap:8px;min-height:0;">
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:13px;flex:0 0 auto;">
+                <div style="flex:0 0 auto;">
+                  <label style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:3px;display:block;">Type:</label>
+                  <div style="display:flex;gap:4px;">
+                    <button class="corr-type-btn active" data-type="pearson" onclick="switchCorrType('pearson')" style="padding:5px 10px;font-size:12px;border:2px solid #5c6bc0;background:#5c6bc0;color:#fff;border-radius:3px;cursor:pointer;font-weight:600;">Pearson</button>
+                    <button class="corr-type-btn" data-type="spearman" onclick="switchCorrType('spearman')" style="padding:5px 10px;font-size:12px;border:2px solid #5c6bc0;background:transparent;color:#5c6bc0;border-radius:3px;cursor:pointer;font-weight:600;">Spearman</button>
+                    <button class="corr-type-btn" data-type="kendall" onclick="switchCorrType('kendall')" style="padding:5px 10px;font-size:12px;border:2px solid #5c6bc0;background:transparent;color:#5c6bc0;border-radius:3px;cursor:pointer;font-weight:600;">Kendall</button>
+                  </div>
+                </div>
+                <div style="flex:0 0 auto;">
+                  <label style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:3px;display:block;">View:</label>
+                  <div style="display:flex;gap:4px;">
+                    <button class="corr-view-btn active" data-view="table" data-corr-scope="desc" onclick="switchCorrView('table','desc')" style="padding:5px 10px;font-size:12px;border:2px solid #f57c00;background:#f57c00;color:#fff;border-radius:3px;cursor:pointer;font-weight:600;">Table</button>
+                    <button class="corr-view-btn" data-view="heatmap" data-corr-scope="desc" onclick="switchCorrView('heatmap','desc')" style="padding:5px 10px;font-size:12px;border:2px solid #f57c00;background:transparent;color:#f57c00;border-radius:3px;cursor:pointer;font-weight:600;">Heatmap</button>
+                  </div>
+                </div>
+                <div style="flex:1 1 auto;display:flex;align-items:center;gap:8px;justify-content:flex-end;font-size:13px;">
+                  <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                    <input type="checkbox" id="showCorrPValue" onchange="toggleCorrColumns()" style="width:14px;height:14px;" checked>
+                    <span style="color:var(--text-secondary);font-weight:600;">p-value</span>
+                  </label>
+                  <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                    <input type="checkbox" id="showCorrN" onchange="toggleCorrColumns()" style="width:14px;height:14px;" checked>
+                    <span style="color:var(--text-secondary);font-weight:600;">n</span>
+                  </label>
+                </div>
+              </div>
+              <div id="correlationMatrixContainer" style="flex:1 1 auto;min-height:0;padding:8px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:6px;overflow:auto;">
+                <div id="correlationHeatmap" style="display:none;overflow-x:auto;"></div>
+                <div style="overflow-x:auto;">
+                  <table id="correlationTable" style="width:100%;border-collapse:collapse;font-size:10px;">
+                    <thead>
+                      <tr id="corrTableHeader" style="background:#003366cc;"></tr>
+                    </thead>
+                    <tbody id="corrTableBody"></tbody>
+                  </table>
+                </div>
+                <div id="corrSummary" style="margin-top:8px;padding:8px 10px;background:rgba(120,200,255,.08);border-left:3px solid var(--accent-2);border-radius:3px;font-size:13px;">
+                  <div style="display:flex;flex-wrap:wrap;gap:12px;">
+                    <span><strong>Avg r:</strong> <span id="corrAvgR" style="color:var(--accent-2);font-weight:700;">...</span></span>
+                    <span><strong>Range:</strong> <span id="corrRange" style="color:var(--accent-2);font-weight:700;">...</span></span>
+                    <span><strong>Symmetry:</strong> <span id="corrCompound" style="color:var(--accent-2);font-weight:700;">...</span></span>
+                    <span><strong>Temporal Stability:</strong> <span id="corrTemporalStability" style="color:var(--accent-2);font-weight:700;">...</span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Panel: Histogram (grows to fill remaining height) -->
           <div class="xp xp--grow" id="desc-histogram-panel" style="display:none;">
             <div class="xp-hdr">
@@ -1044,8 +1104,8 @@
               </span>
               <div style="display:flex;align-items:center;gap:12px;">
                 <label for="histogramBins" style="font-size:13px;color:var(--text-secondary);font-weight:700;white-space:nowrap;">Bins:</label>
-                <input type="range" id="histogramBins" min="5" max="30" value="10" step="1" style="width:100px;height:4px;opacity:0.8;accent-color:#4a90e2;cursor:pointer;">
-                <span id="histogramBinsValue" style="font-size:13px;color:var(--accent-2);font-weight:700;min-width:24px;text-align:center;">10</span>
+                <input type="range" id="histogramBins" min="5" max="30" value="5" step="1" style="width:100px;height:4px;opacity:0.8;accent-color:#4a90e2;cursor:pointer;">
+                <span id="histogramBinsValue" style="font-size:13px;color:var(--accent-2);font-weight:700;min-width:24px;text-align:center;">5</span>
                 <button class="normality-button" onclick="openNormalityModal()"
                   style="background:linear-gradient(to right,rgb(255,192,192),rgb(255,160,160));color:#000;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-weight:700;font-size:11px;">
                   Normality Tests
@@ -1070,100 +1130,94 @@
             <div class="stat-panel-heading">Trajectory Analysis</div>
             <div class="stat-panel-body" style="padding:12px;">
               
-              <!-- Two-column layout for side-by-side panels -->
+              <!-- Two-column: Profile Plot + Correlation Matrix -->
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
-                
-                <!-- LEFT: Profile Plot (Spaghetti + Mean Line) -->
-                <div>
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <div style="font-weight:700;color:var(--accent-1);font-size:15px;">
-                      <i class="fa-solid fa-chart-line"></i> <span id="profilePlotTitle">Profile Plot</span>
-                    </div>
-                    <div style="display:flex;gap:4px;">
-                      <button onclick="switchProfileView('trajectory')" id="btnTrajectory" class="profile-view-btn active" style="padding:5px 10px;background:#ff9800;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">
-                        <i class="fa-solid fa-chart-line"></i> Trajectory
-                      </button>
-                      <button onclick="switchProfileView('sd')" id="btnSD" class="profile-view-btn" style="padding:5px 10px;background:transparent;color:#9c27b0;border:2px solid #9c27b0;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">
-                        <i class="fa-solid fa-chart-bar"></i> SD
-                      </button>
-                    </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px;flex-wrap:wrap;">
+                  <div style="font-weight:700;color:var(--accent-1);font-size:15px;display:flex;align-items:center;gap:6px;">
+                    <i class="fa-solid fa-chart-line"></i> <span id="profilePlotTitle">Profile Plot</span>
+                    <i class="fa-regular fa-circle-question stat-help" id="profilePlotHelp" data-tip="SD envelope = mean ± 1 SD at each timepoint. Range = Min–Max envelope. CI95 = mean ± 1.96 × SEM."></i>
                   </div>
-                  <p style="margin:0 0 8px 0;color:var(--text-muted);font-size:13px;line-height:1.5;">
-                    <strong>Purpose:</strong> <span id="profilePurpose">Group mean trajectory with Min-Max range envelope.</span>
-                  </p>
-                  <div style="padding:8px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:6px;">
-                    <div id="profilePlot" style="width:100%;height:320px;"></div>
-                    <div id="profileNote" style="margin-top:6px;padding:6px 10px;background:rgba(79,195,247,0.12);border-left:3px solid #4fc3f7;border-radius:3px;font-size:12px;color:#81d4fa;">
-                      <i class="fa-solid fa-info-circle"></i> Blue shaded area = Min-Max range at each timepoint.
+                  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+                    <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;">
+                      <span style="font-size:11px;color:var(--text-muted);align-self:center;margin-right:4px;">Envelope:</span>
+                      <button onclick="switchProfileView('trajectory')" id="btnTrajectory" class="profile-view-btn" style="padding:5px 10px;background:transparent;color:#ff9800;border:2px solid #ff9800;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">Trajectory</button>
+                      <button onclick="switchProfileView('sd')" id="btnSD" class="profile-view-btn active" style="padding:5px 10px;background:#9c27b0;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">SD</button>
+                      <button onclick="switchProfileView('ci95')" id="btnCI95" class="profile-view-btn" style="padding:5px 10px;background:transparent;color:#26a69a;border:2px solid #26a69a;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">CI95</button>
+                      <button onclick="switchProfileView('range')" id="btnRange" class="profile-view-btn" style="padding:5px 10px;background:transparent;color:#4fc3f7;border:2px solid #4fc3f7;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">Range</button>
+                    </div>
+                    <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;">
+                      <span style="font-size:11px;color:var(--text-muted);align-self:center;margin-right:4px;">Show:</span>
+                      <button onclick="switchTrajectoryDisplay('mean')" id="btnTrajMean" class="traj-display-btn active" style="padding:5px 10px;background:#ff9800;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">Mean</button>
+                      <button onclick="switchTrajectoryDisplay('individuals')" id="btnTrajIndividuals" class="traj-display-btn" style="padding:5px 10px;background:transparent;color:#78909c;border:2px solid #78909c;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">Individuals</button>
+                      <button onclick="switchTrajectoryDisplay('both')" id="btnTrajBoth" class="traj-display-btn" style="padding:5px 10px;background:transparent;color:#78909c;border:2px solid #78909c;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">Both</button>
                     </div>
                   </div>
                 </div>
-                
-                <!-- RIGHT: Correlation Matrix with Heatmap -->
-                <div>
-                  <div style="font-weight:700;margin-bottom:8px;color:var(--accent-1);font-size:15px;">
-                    <i class="fa-solid fa-grip"></i> Correlation Matrix
-                  </div>
-                  <p style="margin:0 0 8px 0;color:var(--text-muted);font-size:13px;line-height:1.5;">
-                    <strong>Purpose:</strong> Pairwise correlations between timepoints (click cells for scatter plots).
-                  </p>
-                  
-                  <!-- Interactive Controls (Compact) -->
-                  <div style="padding:8px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:6px;margin-bottom:8px;">
-                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:13px;">
-                      <div style="flex:0 0 auto;">
-                        <label style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:3px;display:block;">Type:</label>
-                        <div style="display:flex;gap:4px;">
-                          <button class="corr-type-btn active" data-type="pearson" onclick="switchCorrType('pearson')" style="padding:5px 10px;font-size:12px;border:2px solid #5c6bc0;background:#5c6bc0;color:#fff;border-radius:3px;cursor:pointer;font-weight:600;">Pearson</button>
-                          <button class="corr-type-btn" data-type="spearman" onclick="switchCorrType('spearman')" style="padding:5px 10px;font-size:12px;border:2px solid #5c6bc0;background:transparent;color:#5c6bc0;border-radius:3px;cursor:pointer;font-weight:600;">Spearman</button>
-                          <button class="corr-type-btn" data-type="kendall" onclick="switchCorrType('kendall')" style="padding:5px 10px;font-size:12px;border:2px solid #5c6bc0;background:transparent;color:#5c6bc0;border-radius:3px;cursor:pointer;font-weight:600;">Kendall</button>
-                        </div>
-                      </div>
-                      
-                      <div style="flex:0 0 auto;">
-                        <label style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:3px;display:block;">View:</label>
-                        <div style="display:flex;gap:4px;">
-                          <button class="corr-view-btn active" data-view="table" onclick="switchCorrView('table')" style="padding:5px 10px;font-size:12px;border:2px solid #f57c00;background:#f57c00;color:#fff;border-radius:3px;cursor:pointer;font-weight:600;">Table</button>
-                          <button class="corr-view-btn" data-view="heatmap" onclick="switchCorrView('heatmap')" style="padding:5px 10px;font-size:12px;border:2px solid #f57c00;background:transparent;color:#f57c00;border-radius:3px;cursor:pointer;font-weight:600;">Heatmap</button>
-                        </div>
-                      </div>
-                      
-                      <div style="flex:1 1 auto;display:flex;align-items:center;gap:8px;justify-content:flex-end;font-size:13px;">
-                        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
-                          <input type="checkbox" id="showCorrPValue" onchange="toggleCorrColumns()" style="width:14px;height:14px;">
-                          <span style="color:var(--text-secondary);font-weight:600;">p-value</span>
-                        </label>
-                        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
-                          <input type="checkbox" id="showCorrN" onchange="toggleCorrColumns()" style="width:14px;height:14px;">
-                          <span style="color:var(--text-secondary);font-weight:600;">n</span>
-                        </label>
+                <p style="margin:0 0 8px 0;color:var(--text-muted);font-size:13px;line-height:1.5;">
+                  <strong>Purpose:</strong> <span id="profilePurpose">Group mean trajectory with SD envelope (default).</span>
+                </p>
+                <div style="padding:8px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:6px;">
+                  <div id="profilePlot" style="width:100%;height:320px;"></div>
+                </div>
+              </div>
+
+              <!-- Correlation Matrix -->
+              <div>
+                <div style="font-weight:700;margin-bottom:8px;color:var(--accent-1);font-size:15px;">
+                  <i class="fa-solid fa-grip"></i> Correlation Matrix
+                </div>
+                <p style="margin:0 0 8px 0;color:var(--text-muted);font-size:13px;line-height:1.5;">
+                  <strong>Purpose:</strong> Pairwise correlations between timepoints (click cells for scatter plots).
+                </p>
+                <div style="padding:8px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:6px;margin-bottom:8px;">
+                  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:13px;">
+                    <div style="flex:0 0 auto;">
+                      <label style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:3px;display:block;">Type:</label>
+                      <div style="display:flex;gap:4px;">
+                        <button class="corr-type-btn active" data-type="pearson" data-corr-scope="traj" onclick="switchCorrType('pearson')" style="padding:5px 10px;font-size:12px;border:2px solid #5c6bc0;background:#5c6bc0;color:#fff;border-radius:3px;cursor:pointer;font-weight:600;">Pearson</button>
+                        <button class="corr-type-btn" data-type="spearman" data-corr-scope="traj" onclick="switchCorrType('spearman')" style="padding:5px 10px;font-size:12px;border:2px solid #5c6bc0;background:transparent;color:#5c6bc0;border-radius:3px;cursor:pointer;font-weight:600;">Spearman</button>
+                        <button class="corr-type-btn" data-type="kendall" data-corr-scope="traj" onclick="switchCorrType('kendall')" style="padding:5px 10px;font-size:12px;border:2px solid #5c6bc0;background:transparent;color:#5c6bc0;border-radius:3px;cursor:pointer;font-weight:600;">Kendall</button>
                       </div>
                     </div>
+                    <div style="flex:0 0 auto;">
+                      <label style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:3px;display:block;">View:</label>
+                      <div style="display:flex;gap:4px;">
+                        <button class="corr-view-btn active" data-view="table" data-corr-scope="traj" onclick="switchCorrView('table','traj')" style="padding:5px 10px;font-size:12px;border:2px solid #f57c00;background:#f57c00;color:#fff;border-radius:3px;cursor:pointer;font-weight:600;">Table</button>
+                        <button class="corr-view-btn" data-view="heatmap" data-corr-scope="traj" onclick="switchCorrView('heatmap','traj')" style="padding:5px 10px;font-size:12px;border:2px solid #f57c00;background:transparent;color:#f57c00;border-radius:3px;cursor:pointer;font-weight:600;">Heatmap</button>
+                      </div>
+                    </div>
+                    <div style="flex:1 1 auto;display:flex;align-items:center;gap:8px;justify-content:flex-end;font-size:13px;">
+                      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                        <input type="checkbox" id="trajShowCorrPValue" onchange="toggleCorrColumns()" style="width:14px;height:14px;" checked>
+                        <span style="color:var(--text-secondary);font-weight:600;">p-value</span>
+                      </label>
+                      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                        <input type="checkbox" id="trajShowCorrN" onchange="toggleCorrColumns()" style="width:14px;height:14px;" checked>
+                        <span style="color:var(--text-secondary);font-weight:600;">n</span>
+                      </label>
+                    </div>
                   </div>
-                
-                <!-- Correlation Heatmap/Table -->
-                <div id="correlationMatrixContainer" style="padding:8px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:6px;">
-                  <div id="correlationHeatmap" style="display:none;overflow-x:auto;"></div>
+                </div>
+                <div id="trajCorrelationMatrixContainer" style="padding:8px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:6px;">
+                  <div id="trajCorrelationHeatmap" style="display:none;overflow-x:auto;"></div>
                   <div style="overflow-x:auto;max-height:320px;">
-                    <table id="correlationTable" style="width:100%;border-collapse:collapse;font-size:10px;">
-                      <thead>
-                        <tr id="corrTableHeader" style="background:#003366cc;"></tr>
-                      </thead>
-                      <tbody id="corrTableBody"></tbody>
+                    <table id="trajCorrelationTable" style="width:100%;border-collapse:collapse;font-size:10px;">
+                      <thead><tr id="trajCorrTableHeader" style="background:#003366cc;"></tr></thead>
+                      <tbody id="trajCorrTableBody"></tbody>
                     </table>
                   </div>
-                  
-                  <!-- Summary Statistics (Compact) -->
-                  <div id="corrSummary" style="margin-top:8px;padding:8px 10px;background:rgba(120,200,255,.08);border-left:3px solid var(--accent-2);border-radius:3px;font-size:13px;">
+                  <div style="margin-top:8px;padding:8px 10px;background:rgba(120,200,255,.08);border-left:3px solid var(--accent-2);border-radius:3px;font-size:13px;">
                     <div style="display:flex;flex-wrap:wrap;gap:12px;">
-                      <span><strong>Avg r:</strong> <span id="corrAvgR" style="color:var(--accent-2);font-weight:700;">...</span></span>
-                      <span><strong>Range:</strong> <span id="corrRange" style="color:var(--accent-2);font-weight:700;">...</span></span>
-                      <span><strong>Symmetry:</strong> <span id="corrCompound" style="color:var(--accent-2);font-weight:700;">...</span></span>
+                      <span><strong>Avg r:</strong> <span id="trajCorrAvgR" style="color:var(--accent-2);font-weight:700;">...</span></span>
+                      <span><strong>Range:</strong> <span id="trajCorrRange" style="color:var(--accent-2);font-weight:700;">...</span></span>
+                      <span><strong>Symmetry:</strong> <span id="trajCorrCompound" style="color:var(--accent-2);font-weight:700;">...</span></span>
+                      <span><strong>Temporal Stability:</strong> <span id="trajCorrTemporalStability" style="color:var(--accent-2);font-weight:700;">...</span></span>
                     </div>
                   </div>
                 </div>
-                
-              </div><!-- End of two-column grid -->
+              </div>
+              </div>
               
             </div>
           </div>
@@ -1697,6 +1751,15 @@
     function setDecimalPrecision(){ globalDecimalPrecision=(document.getElementById("decimalSelect")||{value:"auto"}).value; if(lastBundle) populateBundle(lastBundle); }
     function setText(id,val){ const el=document.getElementById(id); if(el) el.textContent = (val!==undefined&&val!==null&&val!=="")?val:"..."; }
     let activeTab = "results";
+    function syncExploreChrome(tab) {
+      const isExplore = tab === "explore";
+      document.body.classList.toggle("kplus-tab-explore", isExplore);
+      const card = document.querySelector(".card");
+      if (card) card.classList.toggle("kplus-descriptives-active", isExplore);
+      const hero = document.querySelector(".hero-section");
+      if (hero) hero.style.display = isExplore ? "none" : "";
+    }
+    window.syncExploreChrome = syncExploreChrome;
     function switchTab(tab){
       if (!tab || tab === activeTab) return;
       const tabTitles = {
@@ -1718,8 +1781,10 @@
       if (prevPanel) prevPanel.classList.remove("active");
       if (nextPanel) nextPanel.classList.add("active");
       activeTab = tab;
+      syncExploreChrome(tab);
       requestAnimationFrame(fitDependentKplusLayout);
     }
+    window.switchTab = switchTab;
     function sendToHost(cmd,data){ if(Office&&Office.context&&Office.context.ui&&Office.context.ui.messageParent) Office.context.ui.messageParent(JSON.stringify({action:"HOST_EVENT",cmd:cmd,data:data||{}})); }
     function fillSelect(id, options, selected){
       const el = document.getElementById(id);
@@ -3165,7 +3230,7 @@
       const stdDev  = descSelectedRow.StdDev;
       const n       = values.length;
       const binsSlider = document.getElementById('histogramBins');
-      const numBins = binsSlider ? parseInt(binsSlider.value) : 10;
+      const numBins = binsSlider ? parseInt(binsSlider.value, 10) : 5;
       const minV    = Math.min(...values);
       const maxV    = Math.max(...values);
       const range   = (maxV - minV) || 1;
@@ -3204,12 +3269,19 @@
           backgroundColor: 'transparent',
           animation: false,
           style: { fontFamily: 'inherit' },
-          margin: [20, 20, 55, 45]
+          margin: [16, 16, 92, 52],
+          spacingBottom: 4
         },
         title: { text: null },
         xAxis: {
           categories: cats,
-          labels: { style: { color: '#9ba8b5', fontSize: '11px' }, rotation: -45 },
+          labels: {
+            style: { color: '#9ba8b5', fontSize: '11px' },
+            rotation: -45,
+            align: 'right',
+            x: -2,
+            y: 16
+          },
           gridLineColor: 'rgba(255,255,255,.07)',
           lineColor:     'rgba(255,255,255,.2)',
           tickColor:     'rgba(255,255,255,.2)'
@@ -4510,474 +4582,360 @@
     });
     
     // === Profile View Switcher ===
-    let currentProfileView = 'trajectory';
+    let currentProfileView = 'sd';
+    let currentTrajectoryDisplay = 'mean';
     let cachedOmnibusData = null;
-    
+
+    const PROFILE_ENVELOPE_STYLES = {
+      trajectory: { color: '#ff9800', border: '#ff9800' },
+      sd:         { color: '#9c27b0', border: '#9c27b0' },
+      ci95:       { color: '#26a69a', border: '#26a69a' },
+      range:      { color: '#4fc3f7', border: '#4fc3f7' }
+    };
+
+    function temporalStabilityLabel(avgR) {
+      const r = parseMaybeNumber(avgR);
+      if (!isFinite(r)) return '...';
+      if (r < 0.40) return 'Low';
+      if (r <= 0.70) return 'Moderate';
+      return 'High';
+    }
+
+    function getCompleteCaseSubjectTrajectories() {
+      if (!window.dependentRangeData || !lastBundle?.setup?.selectedColumns) return [];
+      const headers = window.dependentRangeData[0] || [];
+      const dataRows = window.dependentRangeData.slice(1);
+      const selectedCols = lastBundle.setup.selectedColumns;
+      const trajectories = [];
+      dataRows.forEach(row => {
+        const values = selectedCols.map(col => {
+          const idx = headers.indexOf(col);
+          return idx >= 0 ? parseFloat(row[idx]) : NaN;
+        });
+        if (values.every(v => isFinite(v))) trajectories.push(values);
+      });
+      return trajectories;
+    }
+
+    function buildProfileEnvelope(view, groupDescriptives, means, minMaxData) {
+      if (view === 'trajectory') return null;
+      const n = parseMaybeNumber(groupDescriptives[0]?.n) || parseMaybeNumber(lastBundle?.results?.omnibus?.N) || 0;
+      if (view === 'range') {
+        return {
+          name: 'Min-Max Range',
+          data: minMaxData,
+          color: 'rgba(79, 195, 247, 0.45)',
+          fillOpacity: 0.45
+        };
+      }
+      if (view === 'sd') {
+        return {
+          name: 'Mean ± SD',
+          data: groupDescriptives.map(g => [g.mean - g.sd, g.mean + g.sd]),
+          color: 'rgba(156, 39, 176, 0.45)',
+          fillOpacity: 0.45
+        };
+      }
+      if (view === 'ci95') {
+        const z = 1.96;
+        return {
+          name: '95% CI',
+          data: groupDescriptives.map(g => {
+            const sem = n > 0 ? g.sd / Math.sqrt(n) : 0;
+            return [g.mean - z * sem, g.mean + z * sem];
+          }),
+          color: 'rgba(38, 166, 154, 0.45)',
+          fillOpacity: 0.45
+        };
+      }
+      return null;
+    }
+
+    function profilePurposeText(view) {
+      if (view === 'trajectory') return 'Group mean trajectory without envelope.';
+      if (view === 'sd') return 'Group mean trajectory with SD envelope (default).';
+      if (view === 'ci95') return 'Group mean trajectory with 95% confidence interval envelope.';
+      return 'Group mean trajectory with Min-Max range envelope.';
+    }
+
+    function profileHelpText(view) {
+      if (view === 'trajectory') return 'Trajectory = group mean line only.';
+      if (view === 'sd') return 'SD envelope = mean ± 1 SD at each timepoint.';
+      if (view === 'ci95') return 'CI95 envelope = mean ± 1.96 × SEM at each timepoint.';
+      return 'Range envelope = Min–Max spread at each timepoint.';
+    }
+
+    function updateProfileEnvelopeButtons(view) {
+      const map = {
+        trajectory: 'btnTrajectory',
+        sd: 'btnSD',
+        ci95: 'btnCI95',
+        range: 'btnRange'
+      };
+      Object.keys(map).forEach(key => {
+        const btn = document.getElementById(map[key]);
+        if (!btn) return;
+        const style = PROFILE_ENVELOPE_STYLES[key];
+        const active = key === view;
+        btn.classList.toggle('active', active);
+        btn.style.background = active ? style.color : 'transparent';
+        btn.style.color = active ? '#fff' : style.border;
+        btn.style.border = active ? 'none' : '2px solid ' + style.border;
+      });
+    }
+
+    function updateTrajectoryDisplayButtons(mode) {
+      ['mean', 'individuals', 'both'].forEach(key => {
+        const btn = document.getElementById('btnTraj' + key.charAt(0).toUpperCase() + key.slice(1));
+        if (!btn) return;
+        const active = key === mode;
+        btn.classList.toggle('active', active);
+        btn.style.background = active ? '#ff9800' : 'transparent';
+        btn.style.color = active ? '#fff' : '#78909c';
+        btn.style.border = active ? 'none' : '2px solid #78909c';
+      });
+    }
+
     function switchProfileView(view) {
       currentProfileView = view;
-      
-      // Update button states
-      document.querySelectorAll('.profile-view-btn').forEach(btn => {
-        btn.classList.remove('active');
-        btn.style.background = 'transparent';
-      });
-      
-      if (view === 'trajectory') {
-        const btn = document.getElementById('btnTrajectory');
-        btn.classList.add('active');
-        btn.style.background = '#ff9800';
-        
-        // Regenerate trajectory plot
-        if (cachedOmnibusData) {
-          populateProfilePlot(null, cachedOmnibusData);
-        }
-      } else if (view === 'sd') {
-        const btn = document.getElementById('btnSD');
-        btn.classList.add('active');
-        btn.style.background = '#9c27b0';
-        btn.style.color = 'white';
-        
-        // Generate SD chart in the same container
-        if (cachedOmnibusData) {
-          populateSDChart(cachedOmnibusData);
-        }
-      }
+      updateProfileEnvelopeButtons(view);
+      if (cachedOmnibusData) renderProfileChart(cachedOmnibusData);
     }
-    
-    // === SD Chart Function (Highcharts) - Now renders in profilePlot container ===
-    function populateSDChart(omnibus) {
+
+    function switchTrajectoryDisplay(mode) {
+      currentTrajectoryDisplay = mode;
+      updateTrajectoryDisplayButtons(mode);
+      if (cachedOmnibusData) renderProfileChart(cachedOmnibusData);
+    }
+
+    function renderProfileChart(ob) {
       const container = document.getElementById('profilePlot');
-      if (!container || !omnibus) return;
-      
-      const groupDescriptives = omnibus.groupDescriptives || [];
-      if (groupDescriptives.length === 0) return;
-      
-      const labels = groupDescriptives.map(g => g.name);
-      const sdData = groupDescriptives.map(g => g.sd);
-      const meanData = groupDescriptives.map(g => g.mean);
-      
-      // Calculate coefficient of variation (CV) for each timepoint
-      const cvData = groupDescriptives.map(g => (g.sd / g.mean * 100).toFixed(1));
-      
-      // Update UI text
-      document.getElementById('profilePlotTitle').textContent = 'Variability (SD) by Timepoint';
-      document.getElementById('profilePurpose').textContent = 'Shows the spread (Standard Deviation) of values at each timepoint. Higher SD indicates more variability among subjects.';
-      document.getElementById('profileNote').innerHTML = '<i class="fa-solid fa-info-circle"></i> <strong>Note:</strong> Each bar shows the Standard Deviation at that timepoint. The coefficient of variation (CV) is shown in the tooltip.';
-      document.getElementById('profileNote').style.background = 'rgba(156,39,176,0.12)';
-      document.getElementById('profileNote').style.borderColor = '#9c27b0';
-      document.getElementById('profileNote').style.color = '#ce93d8';
-      
-      Highcharts.chart(container, {
-        chart: {
-          type: 'column',
-          backgroundColor: '#1a2332',
-          height: 400,
-          style: {
-            fontFamily: 'Segoe UI, Tahoma, sans-serif',
-            color: '#e0e0e0'
-          }
-        },
-        title: {
-          text: null
-        },
-        credits: {
-          enabled: false
-        },
-        xAxis: {
-          categories: labels,
-          labels: {
-            style: {
-              color: '#e0e0e0',
-              fontSize: '11px',
-              fontWeight: '600'
-            }
-          },
-          lineColor: '#555',
-          tickColor: '#555'
-        },
-        yAxis: {
-          title: {
-            text: 'Standard Deviation',
-            style: { color: '#a0a0a0' }
-          },
-          labels: {
-            style: { color: '#e0e0e0' }
-          },
-          gridLineColor: '#333',
-          min: 0
-        },
-        legend: {
-          enabled: false
-        },
-        tooltip: {
-          shared: false,
-          backgroundColor: 'rgba(30,30,30,0.9)',
-          borderColor: '#555',
-          style: {
-            color: '#ffffff'
-          },
-          formatter: function() {
-            const idx = this.point.index;
-            return `<b>${this.x}</b><br/>` +
-                   `SD: <b>${this.y.toFixed(2)}</b><br/>` +
-                   `Mean: <b>${meanData[idx].toFixed(2)}</b><br/>` +
-                   `CV: <b>${cvData[idx]}%</b>`;
-          }
-        },
-        plotOptions: {
-          column: {
-            animation: {
-              duration: 600
-            },
-            dataLabels: {
-              enabled: true,
-              format: '{y:.2f}',
-              style: {
-                color: '#fff',
-                fontSize: '11px',
-                fontWeight: '600',
-                textOutline: 'none'
-              }
-            },
-            color: {
-              linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
-              stops: [
-                [0, '#9c27b0'],
-                [1, '#6a1b9a']
-              ]
-            },
-            borderRadius: 3
-          }
-        },
-        series: [{
-          name: 'Standard Deviation',
-          data: sdData,
-          color: {
-            linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
-            stops: [
-              [0, '#9c27b0'],
-              [1, '#6a1b9a']
-            ]
-          }
-        }]
-      });
-    }
-    
-    // === Profile Plot Function (Highcharts) ===
-    function populateProfilePlot(e, ob) {
-      const container = document.getElementById("profilePlot");
       if (!container || !ob) return;
-      
-      // Cache omnibus data for view switching
-      cachedOmnibusData = ob;
-      
-      // Reset UI text for trajectory view
-      document.getElementById('profilePlotTitle').textContent = 'Profile Plot';
-      document.getElementById('profilePurpose').textContent = 'Visualize the group mean trajectory with a shaded envelope showing the full range of individual values (Min-Max). This reveals patterns of change and where variability is highest across timepoints.';
-      document.getElementById('profileNote').innerHTML = '<i class="fa-solid fa-info-circle"></i> <strong>Note:</strong> The blue shaded area represents the full range of individual values (Min-Max), showing the complete spread at each timepoint. Wider areas indicate higher variability.';
-      document.getElementById('profileNote').style.background = 'rgba(79,195,247,0.12)';
-      document.getElementById('profileNote').style.borderColor = '#4fc3f7';
-      document.getElementById('profileNote').style.color = '#81d4fa';
-      
-      // Get timepoint means and raw data
+
       const groupDescriptives = ob.groupDescriptives || [];
       if (groupDescriptives.length === 0) return;
-      
-      const k = groupDescriptives.length;
+
       const means = groupDescriptives.map(g => g.mean);
       const labels = groupDescriptives.map(g => g.name);
-      
-      // Calculate Min-Max range from individual subject data
-      let minMaxData = [];
-      
-      if (window.dependentRangeData && lastBundle.setup && lastBundle.setup.selectedColumns) {
-        const headers = window.dependentRangeData[0] || [];
-        const dataRows = window.dependentRangeData.slice(1);
-        const selectedCols = lastBundle.setup.selectedColumns;
-        
-        // For each timepoint, find min and max across all subjects
-        selectedCols.forEach((col, tpIdx) => {
-          const colIdx = headers.indexOf(col);
-          const values = [];
-          
-          dataRows.forEach(row => {
-            const val = parseFloat(row[colIdx]);
-            if (isFinite(val)) {
-              values.push(val);
-            }
-          });
-          
-          if (values.length > 0) {
-            minMaxData.push([Math.min(...values), Math.max(...values)]);
-          } else {
-            // Fallback to mean - SD if no raw data
-            minMaxData.push([means[tpIdx] - groupDescriptives[tpIdx].sd, means[tpIdx] + groupDescriptives[tpIdx].sd]);
-          }
-        });
-      } else {
-        // Fallback: use mean - SD
-        minMaxData = means.map((mean, i) => [mean - groupDescriptives[i].sd, mean + groupDescriptives[i].sd]);
-      }
-      
-      console.log(`Plotting mean trajectory with Min-Max envelope`);
-      
-      // Prepare series data
-      const series = [];
-      
-      // Add area range (Min-Max)
-      series.push({
-        name: 'Min-Max Range',
-        data: minMaxData,
-        type: 'arearange',
-        lineWidth: 0,
-        color: 'rgba(79, 195, 247, 0.5)',  // Increased from 0.3 to 0.5 for more prominence
-        fillOpacity: 0.5,  // Increased from 0.3 to 0.5
-        zIndex: 0,
-        marker: {
-          enabled: false
-        },
-        enableMouseTracking: true,
-        tooltip: {
-          pointFormat: '<span style="color:{point.color}">\u25CF</span> {series.name}: <b>{point.low:.2f} - {point.high:.2f}</b><br/>'
+      const minMaxData = [];
+      const subjectTrajectories = getCompleteCaseSubjectTrajectories();
+
+      if (subjectTrajectories.length > 0) {
+        for (let tpIdx = 0; tpIdx < labels.length; tpIdx++) {
+          const values = subjectTrajectories.map(row => row[tpIdx]);
+          minMaxData.push([Math.min(...values), Math.max(...values)]);
         }
-      });
-      
-      // Add group mean line
-      series.push({
-        name: 'Group Mean',
-        data: means,
-        type: 'line',
-        color: '#ff9800',
-        lineWidth: 4,
-        marker: {
-          enabled: true,
-          radius: 6,
-          fillColor: '#ff9800',
-          lineColor: '#1a2332',
-          lineWidth: 2
-        },
-        zIndex: 10,
-        showInLegend: true
-      });
-      
-      // Create Highcharts chart
-      Highcharts.chart('profilePlot', {
+      } else {
+        means.forEach((mean, i) => {
+          minMaxData.push([mean - groupDescriptives[i].sd, mean + groupDescriptives[i].sd]);
+        });
+      }
+
+      document.getElementById('profilePlotTitle').textContent = 'Profile Plot';
+      document.getElementById('profilePurpose').textContent = profilePurposeText(currentProfileView);
+      const helpEl = document.getElementById('profilePlotHelp');
+      if (helpEl) helpEl.setAttribute('data-tip', profileHelpText(currentProfileView));
+
+      const series = [];
+      const envelope = buildProfileEnvelope(currentProfileView, groupDescriptives, means, minMaxData);
+      if (envelope) {
+        series.push({
+          name: envelope.name,
+          data: envelope.data,
+          type: 'arearange',
+          lineWidth: 0,
+          color: envelope.color,
+          fillOpacity: envelope.fillOpacity,
+          zIndex: 0,
+          marker: { enabled: false },
+          enableMouseTracking: true
+        });
+      }
+
+      if (currentTrajectoryDisplay === 'individuals' || currentTrajectoryDisplay === 'both') {
+        subjectTrajectories.forEach((values, idx) => {
+          series.push({
+            name: idx === 0 ? 'Individuals' : undefined,
+            data: values,
+            type: 'line',
+            color: 'rgba(176, 190, 197, 0.55)',
+            lineWidth: 1,
+            marker: { enabled: false },
+            enableMouseTracking: false,
+            showInLegend: idx === 0,
+            zIndex: 1,
+            states: { inactive: { opacity: 1 } }
+          });
+        });
+      }
+
+      if (currentTrajectoryDisplay === 'mean' || currentTrajectoryDisplay === 'both') {
+        series.push({
+          name: 'Group Mean',
+          data: means,
+          type: 'line',
+          color: '#ff9800',
+          lineWidth: 4,
+          marker: {
+            enabled: true,
+            radius: 6,
+            fillColor: '#ff9800',
+            lineColor: '#1a2332',
+            lineWidth: 2
+          },
+          zIndex: 10,
+          showInLegend: true
+        });
+      }
+
+      if (window._trajChart) {
+        window._trajChart.destroy();
+        window._trajChart = null;
+      }
+
+      window._trajChart = Highcharts.chart('profilePlot', {
         chart: {
           backgroundColor: '#1a2332',
           borderRadius: 4,
-          style: {
-            fontFamily: 'Segoe UI, Tahoma, sans-serif'
-          }
+          style: { fontFamily: 'Segoe UI, Tahoma, sans-serif' }
         },
-        title: {
-          text: null
-        },
-        credits: {
-          enabled: false
-        },
+        title: { text: null },
+        credits: { enabled: false },
         xAxis: {
           categories: labels,
-          labels: {
-            style: {
-              color: '#b0b0b0',
-              fontSize: '11px',
-              fontWeight: '600'
-            }
-          },
+          labels: { style: { color: '#b0b0b0', fontSize: '11px', fontWeight: '600' } },
           gridLineColor: '#2d3748',
-          gridLineWidth: 1,
           lineColor: '#4a5568',
           tickColor: '#4a5568'
         },
         yAxis: {
-          title: {
-            text: 'Value',
-            style: {
-              color: '#b0b0b0',
-              fontSize: '12px',
-              fontWeight: '700'
-            }
-          },
-          labels: {
-            style: {
-              color: '#b0b0b0',
-              fontSize: '11px'
-            }
-          },
-          gridLineColor: '#2d3748',
-          gridLineWidth: 1
+          title: { text: 'Value', style: { color: '#b0b0b0', fontSize: '12px', fontWeight: '700' } },
+          labels: { style: { color: '#b0b0b0', fontSize: '11px' } },
+          gridLineColor: '#2d3748'
         },
         tooltip: {
           shared: false,
           backgroundColor: 'rgba(0, 0, 0, 0.85)',
           borderColor: '#4fc3f7',
           borderRadius: 8,
-          style: {
-            color: '#fff',
-            fontSize: '12px'
-          },
-          formatter: function() {
-            const isGroupMean = this.series.name === 'Group Mean';
-            return `<b>${this.series.name}</b><br/>
-                    <b>${this.x}:</b> ${this.y.toFixed(2)}${isGroupMean ? '<br/><span style="color:#ff9800">?</span> Group average' : ''}`;
-          }
+          style: { color: '#fff', fontSize: '12px' }
         },
         legend: {
           enabled: true,
           align: 'center',
           verticalAlign: 'bottom',
-          itemStyle: {
-            color: '#b0b0b0',
-            fontSize: '11px',
-            fontWeight: '600'
-          },
-          itemHoverStyle: {
-            color: '#fff'
-          },
-          symbolRadius: 0,
-          symbolHeight: 3,
-          symbolWidth: 24,
-          margin: 15
+          itemStyle: { color: '#b0b0b0', fontSize: '11px', fontWeight: '600' }
         },
         plotOptions: {
-          line: {
-            animation: {
-              duration: 800
-            }
-          },
-          series: {
-            lineWidth: 1,
-            states: {
-              inactive: {
-                opacity: 0.15
-              }
-            }
-          }
+          line: { animation: { duration: 800 } },
+          series: { states: { inactive: { opacity: 0.15 } } }
         },
         series: series
       });
     }
+
+    function populateProfilePlot(e, ob) {
+      const container = document.getElementById('profilePlot');
+      if (!container || !ob) return;
+      cachedOmnibusData = ob;
+      currentProfileView = currentProfileView || 'sd';
+      updateProfileEnvelopeButtons(currentProfileView);
+      updateTrajectoryDisplayButtons(currentTrajectoryDisplay);
+      renderProfileChart(ob);
+    }
     
     // === Correlation Matrix Function ===
-    function populateCorrelationMatrix(e) {
-      console.log("populateCorrelationMatrix called with explore:", e);
-      const corrMatrix = e.correlationMatrix;
-      if (!corrMatrix) {
-        console.warn("No correlation matrix data found in explore object");
-        return;
+    const CORR_PANELS = [
+      {
+        scope: 'desc',
+        tbody: 'corrTableBody',
+        heatmap: 'correlationHeatmap',
+        header: 'corrTableHeader',
+        table: 'correlationTable',
+        pValueId: 'showCorrPValue',
+        nId: 'showCorrN',
+        avgR: 'corrAvgR',
+        range: 'corrRange',
+        compound: 'corrCompound',
+        temporal: 'corrTemporalStability'
+      },
+      {
+        scope: 'traj',
+        tbody: 'trajCorrTableBody',
+        heatmap: 'trajCorrelationHeatmap',
+        header: 'trajCorrTableHeader',
+        table: 'trajCorrelationTable',
+        pValueId: 'trajShowCorrPValue',
+        nId: 'trajShowCorrN',
+        avgR: 'trajCorrAvgR',
+        range: 'trajCorrRange',
+        compound: 'trajCorrCompound',
+        temporal: 'trajCorrTemporalStability'
       }
-      
-      console.log("Correlation matrix data:", corrMatrix);
-      
-      const tbody = document.getElementById("corrTableBody");
-      const heatmapContainer = document.getElementById("correlationHeatmap");
-      if (!tbody && !heatmapContainer) {
-        console.error("? Could not find corrTableBody or correlationHeatmap elements");
-        return;
-      }
-      
-      // Get timepoint names from setup or omnibus data
-      const timepoints = lastBundle?.setup?.selectedColumns || lastBundle?.results?.omnibus?.levels || [];
-      console.log("Timepoints:", timepoints);
-      
-      if (timepoints.length === 0) {
-        console.error("? No timepoint names available");
-        return;
-      }
-      
-      const correlations = corrMatrix.correlations || [];
-      console.log("Correlations array:", correlations);
-      
-      if (correlations.length === 0) {
-        console.warn("No correlations computed");
-        return;
-      }
-      
-      // Build correlation matrix (2D array)
+    ];
+
+    function buildCorrelationGrid(timepoints, correlations, sampleSize) {
       const n = timepoints.length;
       const corrGrid = Array(n).fill(null).map(() => Array(n).fill(null));
-      
-      // Get sample size from first correlation or omnibus
-      const sampleSize = lastBundle?.results?.omnibus?.N || correlations[0]?.n || 0;
-      
-      // Fill diagonal with 1.0 (marked as diagonal)
       for (let i = 0; i < n; i++) {
-        corrGrid[i][i] = {r: 1.0, p: 0, n: sampleSize, isDiagonal: true};
+        corrGrid[i][i] = { r: 1.0, p: 0, n: sampleSize, isDiagonal: true };
       }
-      
-      // Fill from correlations array
       correlations.forEach(corr => {
         const i = corr.time1 || 0;
         const j = corr.time2 || 0;
-        corrGrid[i][j] = {r: corr.r, p: corr.p || 0, n: sampleSize, isDiagonal: false};
-        corrGrid[j][i] = {r: corr.r, p: corr.p || 0, n: sampleSize, isDiagonal: false}; // Symmetric
+        corrGrid[i][j] = { r: corr.r, p: corr.p || 0, n: sampleSize, isDiagonal: false };
+        corrGrid[j][i] = { r: corr.r, p: corr.p || 0, n: sampleSize, isDiagonal: false };
       });
-      
-      // Render Heatmap
+      return corrGrid;
+    }
+
+    function renderCorrelationPanel(corrMatrix, timepoints, corrGrid, panel) {
+      const tbody = document.getElementById(panel.tbody);
+      const heatmapContainer = document.getElementById(panel.heatmap);
+      if (!tbody && !heatmapContainer) return;
+
+      const showPVal = document.getElementById(panel.pValueId)?.checked || false;
+      const showN = document.getElementById(panel.nId)?.checked || false;
+
       if (heatmapContainer) {
         let html = '<div style="display:inline-block;overflow-x:auto;max-width:100%;">';
         html += '<table style="border-collapse:collapse;font-size:11px;margin:0 auto;">';
-        
-        // Header row
         html += '<tr><th style="padding:8px;min-width:80px;border:1px solid rgba(255,255,255,.1);background:#1e3a5f;color:#fff;font-weight:700;"></th>';
         timepoints.forEach(tp => {
           html += `<th style="padding:8px;min-width:80px;border:1px solid rgba(255,255,255,.1);background:#1e3a5f;color:#fff;font-weight:700;">${tp}</th>`;
         });
         html += '</tr>';
-        
-        // Data rows
         timepoints.forEach((tp, i) => {
           html += `<tr><th style="padding:8px;border:1px solid rgba(255,255,255,.1);background:#1e3a5f;color:#fff;font-weight:700;text-align:right;">${tp}</th>`;
           timepoints.forEach((_, j) => {
             const cell = corrGrid[i][j];
-            if (cell) {
-              const isDiag = cell.isDiagonal;
+            if (cell && cell.isDiagonal) {
+              html += '<td style="padding:8px;border:1px solid rgba(255,255,255,.15);background:#2a3a4a;color:#8899aa;text-align:center;font-weight:600;font-style:italic;"><div style="font-size:13px;">1.000</div></td>';
+            } else if (cell) {
               const absR = Math.abs(cell.r);
-              
-              // Diagonal gets special styling
-              if (isDiag) {
-                html += `<td style="padding:8px;border:1px solid rgba(255,255,255,.15);background:#2a3a4a;color:#8899aa;text-align:center;font-weight:600;font-style:italic;">`;
-                html += `<div style="font-size:13px;">1.000</div>`;
-                html += '</td>';
-              } else {
-                const intensity = absR * 255;
-                const bgColor = cell.r >= 0 
-                  ? `rgb(${255-intensity}, ${200 + intensity*0.2}, ${255-intensity*0.7})` // Blue for positive
-                  : `rgb(${200 + intensity*0.2}, ${255-intensity*0.8}, ${255-intensity})`;  // Red for negative
-                
-                const textColor = absR > 0.5 ? '#fff' : '#263238';
-                const showPVal = document.getElementById('showCorrPValue')?.checked !== false;
-                const showN = document.getElementById('showCorrN')?.checked !== false;
-                
-                html += `<td style="padding:8px;border:1px solid rgba(255,255,255,.1);background:${bgColor};color:${textColor};text-align:center;font-weight:700;cursor:pointer;text-decoration:underline;" 
-                  onclick="openCorrScatterPlot(${i}, ${j}, ${cell.r})" 
-                  title="r = ${cell.r.toFixed(3)}, p = ${cell.p.toFixed(4)}, n = ${cell.n}. Click to view scatter plot.">`;
-                html += `<div style="font-size:13px;text-decoration:underline;">${cell.r.toFixed(3)}</div>`;
-                if (showPVal) html += `<div style="font-size:9px;opacity:0.8;">p = ${cell.p < 0.001 ? '<0.001' : cell.p.toFixed(3)}</div>`;
-                if (showN) html += `<div style="font-size:9px;opacity:0.7;">N = ${cell.n}</div>`;
-                html += '</td>';
-              }
+              const intensity = absR * 255;
+              const bgColor = cell.r >= 0
+                ? `rgb(${255 - intensity}, ${200 + intensity * 0.2}, ${255 - intensity * 0.7})`
+                : `rgb(${200 + intensity * 0.2}, ${255 - intensity * 0.8}, ${255 - intensity})`;
+              const textColor = absR > 0.5 ? '#fff' : '#263238';
+              html += `<td style="padding:8px;border:1px solid rgba(255,255,255,.1);background:${bgColor};color:${textColor};text-align:center;font-weight:700;cursor:pointer;" onclick="openCorrScatterPlot(${i}, ${j}, ${cell.r})">`;
+              html += `<div style="font-size:13px;text-decoration:underline;">${cell.r.toFixed(3)}</div>`;
+              if (showPVal) html += `<div style="font-size:9px;opacity:0.8;text-decoration:none;">p = ${cell.p < 0.001 ? '<0.001' : cell.p.toFixed(3)}</div>`;
+              if (showN) html += `<div style="font-size:9px;opacity:0.7;text-decoration:none;">N = ${cell.n}</div>`;
+              html += '</td>';
             } else {
               html += '<td style="padding:8px;border:1px solid rgba(255,255,255,.1);background:#333;"></td>';
             }
           });
           html += '</tr>';
         });
-        
         html += '</table></div>';
         heatmapContainer.innerHTML = html;
       }
-      
-      // Also populate table view
+
       if (tbody) {
         tbody.innerHTML = '';
-        
-        // Check if we should show p-value and n
-        const showPVal = document.getElementById('showCorrPValue')?.checked || false;
-        const showN = document.getElementById('showCorrN')?.checked || false;
-        
-        // Table header
-        const tableHeader = document.getElementById('corrTableHeader');
+        const tableHeader = document.getElementById(panel.header);
         if (tableHeader) {
           let headerHTML = '<th style="padding:6px 8px;border:1px solid rgba(255,255,255,.18);color:#fff;"></th>';
           timepoints.forEach(tp => {
@@ -4985,13 +4943,9 @@
           });
           tableHeader.innerHTML = headerHTML;
         }
-        
-        // Table body
         timepoints.forEach((tp, i) => {
           const tr = document.createElement('tr');
           if (i % 2 === 1) tr.style.background = 'rgba(255,255,255,.05)';
-          
-          // Row header
           const th = document.createElement('th');
           th.textContent = tp;
           th.style.padding = '6px 8px';
@@ -5000,111 +4954,104 @@
           th.style.color = '#fff';
           th.style.textAlign = 'right';
           tr.appendChild(th);
-          
-          // Cells
           timepoints.forEach((_, j) => {
             const td = document.createElement('td');
             const cell = corrGrid[i][j];
-            if (cell) {
-              const isDiag = cell.isDiagonal;
-              
-              // Diagonal cells get special styling
-              if (isDiag) {
-                td.style.background = '#2a3a4a';
-                td.style.color = '#8899aa';
-                td.style.fontWeight = '600';
-                td.style.fontStyle = 'italic';
-                const rDiv = document.createElement('div');
-                rDiv.textContent = '1.000';
-                rDiv.style.fontSize = '13px';
-                td.appendChild(rDiv);
-              } else {
-                // Non-diagonal cells are clickable
-                td.style.cursor = 'pointer';
-                td.style.textDecoration = 'underline';
-                td.setAttribute('title', `r = ${cell.r.toFixed(3)}, p = ${cell.p.toFixed(4)}, n = ${cell.n}. Click to view scatter plot.`);
-                td.onclick = () => openCorrScatterPlot(i, j, cell.r);
-                
-                // Create container div for multi-line content
-                const container = document.createElement('div');
-                
-                // R value (always shown)
-                const rDiv = document.createElement('div');
-                rDiv.textContent = cell.r.toFixed(3);
-                rDiv.style.fontWeight = '700';
-                rDiv.style.fontSize = '13px';
-                rDiv.style.textDecoration = 'underline';
-                rDiv.style.color = cell.r > 0.7 ? '#4caf50' : cell.r > 0.4 ? '#ff9800' : cell.r < -0.3 ? '#f44336' : 'inherit';
-                container.appendChild(rDiv);
-                
-                // P-value (conditional)
-                if (showPVal) {
-                  const pDiv = document.createElement('div');
-                  pDiv.textContent = `p = ${cell.p < 0.001 ? '<0.001' : cell.p.toFixed(3)}`;
-                  pDiv.style.fontSize = '9px';
-                  pDiv.style.opacity = '0.7';
-                  pDiv.style.marginTop = '2px';
-                  container.appendChild(pDiv);
-                }
-                
-                // N value (conditional) - skip for diagonal
-                if (showN) {
-                  const nDiv = document.createElement('div');
-                  nDiv.textContent = `N = ${cell.n}`;
-                  nDiv.style.fontSize = '9px';
-                  nDiv.style.opacity = '0.6';
-                  nDiv.style.marginTop = '2px';
-                  container.appendChild(nDiv);
-                }
-                
-                td.appendChild(container);
+            if (cell && cell.isDiagonal) {
+              td.style.background = '#2a3a4a';
+              td.style.color = '#8899aa';
+              td.style.fontWeight = '600';
+              td.style.fontStyle = 'italic';
+              const rDiv = document.createElement('div');
+              rDiv.textContent = '1.000';
+              rDiv.style.fontSize = '13px';
+              td.appendChild(rDiv);
+            } else if (cell) {
+              td.style.cursor = 'pointer';
+              td.setAttribute('title', `r = ${cell.r.toFixed(3)}, p = ${cell.p.toFixed(4)}, n = ${cell.n}. Click to view scatter plot.`);
+              td.onclick = () => openCorrScatterPlot(i, j, cell.r);
+              const container = document.createElement('div');
+              const rDiv = document.createElement('div');
+              rDiv.textContent = cell.r.toFixed(3);
+              rDiv.style.fontWeight = '700';
+              rDiv.style.fontSize = '13px';
+              rDiv.style.textDecoration = 'underline';
+              rDiv.style.color = cell.r > 0.7 ? '#4caf50' : cell.r > 0.4 ? '#ff9800' : cell.r < -0.3 ? '#f44336' : 'inherit';
+              container.appendChild(rDiv);
+              if (showPVal) {
+                const pDiv = document.createElement('div');
+                pDiv.textContent = `p = ${cell.p < 0.001 ? '<0.001' : cell.p.toFixed(3)}`;
+                pDiv.style.fontSize = '9px';
+                pDiv.style.opacity = '0.7';
+                pDiv.style.marginTop = '2px';
+                pDiv.style.textDecoration = 'none';
+                container.appendChild(pDiv);
               }
+              if (showN) {
+                const nDiv = document.createElement('div');
+                nDiv.textContent = `N = ${cell.n}`;
+                nDiv.style.fontSize = '9px';
+                nDiv.style.opacity = '0.6';
+                nDiv.style.marginTop = '2px';
+                nDiv.style.textDecoration = 'none';
+                container.appendChild(nDiv);
+              }
+              td.appendChild(container);
             }
             td.style.padding = '6px 8px';
             td.style.border = '1px solid rgba(255,255,255,.18)';
             td.style.textAlign = 'center';
             tr.appendChild(td);
           });
-          
           tbody.appendChild(tr);
         });
       }
-      
-      // Populate summary statistics
+
       if (corrMatrix.avgR !== undefined) {
-        setText("corrAvgR", corrMatrix.avgR.toFixed(3));
-        setText("corrRange", corrMatrix.range.toFixed(3) + " (" + corrMatrix.minR.toFixed(2) + " to " + corrMatrix.maxR.toFixed(2) + ")");
-        setText("corrCompound", corrMatrix.compoundSymmetry);
-        setText("corrInterpretation", corrMatrix.interpretation);
+        setText(panel.avgR, corrMatrix.avgR.toFixed(3));
+        setText(panel.range, corrMatrix.range.toFixed(3) + ' (' + corrMatrix.minR.toFixed(2) + ' to ' + corrMatrix.maxR.toFixed(2) + ')');
+        setText(panel.compound, corrMatrix.compoundSymmetry);
+        setText(panel.temporal, temporalStabilityLabel(corrMatrix.avgR));
       }
+    }
+
+    function populateCorrelationMatrix(e) {
+      const corrMatrix = e?.correlationMatrix;
+      if (!corrMatrix) return;
+
+      const timepoints = lastBundle?.setup?.selectedColumns || lastBundle?.results?.omnibus?.levels || [];
+      if (timepoints.length === 0) return;
+
+      const correlations = corrMatrix.correlations || [];
+      if (correlations.length === 0) return;
+
+      const sampleSize = lastBundle?.results?.omnibus?.N || correlations[0]?.n || 0;
+      const corrGrid = buildCorrelationGrid(timepoints, correlations, sampleSize);
+      CORR_PANELS.forEach(panel => renderCorrelationPanel(corrMatrix, timepoints, corrGrid, panel));
     }
     
     // === Event Handlers for Correlation Controls ===
-    function switchCorrView(view) {
-      const heatmap = document.getElementById('correlationHeatmap');
-      const table = document.getElementById('correlationTable');
-      
-      // Update button styles
-      document.querySelectorAll('.corr-view-btn').forEach(btn => {
-        if (btn.getAttribute('data-view') === view) {
-          btn.classList.add('active');
-          btn.style.background = '#f57c00';
-          btn.style.color = '#fff';
+    function switchCorrView(view, scope) {
+      const scopes = scope ? [scope] : ['desc', 'traj'];
+      scopes.forEach(sc => {
+        const panel = CORR_PANELS.find(p => p.scope === sc);
+        if (!panel) return;
+        const heatmap = document.getElementById(panel.heatmap);
+        const table = document.getElementById(panel.table);
+        document.querySelectorAll('.corr-view-btn[data-corr-scope="' + sc + '"]').forEach(btn => {
+          const active = btn.getAttribute('data-view') === view;
+          btn.classList.toggle('active', active);
+          btn.style.background = active ? '#f57c00' : 'transparent';
+          btn.style.color = active ? '#fff' : '#f57c00';
+        });
+        if (view === 'heatmap') {
+          if (heatmap) heatmap.style.display = 'block';
+          if (table) table.style.display = 'none';
         } else {
-          btn.classList.remove('active');
-          btn.style.background = 'transparent';
-          btn.style.color = '#f57c00';
+          if (heatmap) heatmap.style.display = 'none';
+          if (table) table.style.display = 'table';
         }
       });
-      
-      // Toggle views
-      if (view === 'heatmap') {
-        if (heatmap) heatmap.style.display = 'block';
-        if (table) table.style.display = 'none';
-      } else {
-        if (heatmap) heatmap.style.display = 'none';
-        if (table) table.style.display = 'table';
-      }
     }
     
     function updateCorrHighlight(value) {
@@ -6717,14 +6664,18 @@ TONE: Professional, precise, but accessible to researchers in applied fields.`
       const histCont  = document.getElementById('histogram-container-kplus');
       if (histPanel && histPanel.style.display !== 'none' && histCont) {
         const top   = histCont.getBoundingClientRect().top;
-        const histH = Math.max(100, H - top - bottomGap);
+        const histH = Math.max(120, H - top - bottomGap);
         histCont.style.height = histH + 'px';
+        histCont.style.minHeight = '180px';
         const grid = histPanel.querySelector('.hist-grid');
         if (grid) grid.style.height = histH + 'px';
       }
 
       // Reflow Highcharts
-      if (_descHistChart)             _descHistChart.reflow();
+      if (_descHistChart) {
+        _descHistChart.reflow();
+        _descHistChart.update({ chart: { margin: [16, 16, 92, 52], spacingBottom: 4 } }, false);
+      }
       if (window._trajChart)          window._trajChart.reflow();
       if (window._corrHeatmapChart)   window._corrHeatmapChart.reflow();
       if (window._depKplusChart)      window._depKplusChart.reflow();

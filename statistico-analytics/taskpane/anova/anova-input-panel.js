@@ -16,7 +16,6 @@ function getDialogsBaseUrl() {
 }
 
 function openAnovaBuilder() {
-  if (!anovaRangeData || anovaRangeData.length < 2) return;
   Office.context.ui.displayDialogAsync(
     `${getDialogsBaseUrl()}anova/anova-input.html?v=${Date.now()}`,
     DIALOG_SIZES.REGRESSION_BUILDER,
@@ -52,9 +51,9 @@ function openAnovaBuilder() {
 }
 
 function sendAnovaConfigData() {
-  if (!anovaDialog || !anovaRangeData) return;
-  const headers = anovaRangeData[0] || [];
-  const rows = anovaRangeData.slice(1);
+  if (!anovaDialog) return;
+  const headers = (anovaRangeData && anovaRangeData.length) ? (anovaRangeData[0] || []) : [];
+  const rows = (anovaRangeData && anovaRangeData.length > 1) ? anovaRangeData.slice(1) : [];
   // Always open the builder fresh.
   const savedModelSpec = null;
   anovaDialog.messageChild(JSON.stringify({

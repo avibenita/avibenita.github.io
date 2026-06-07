@@ -138,7 +138,7 @@
     /* Card background fills text-only tabs */
     .card{background:var(--surface-0);}
     /* non-explore tabs: ensure padding and scrollability */
-    #tab-results,#tab-assumptions,#tab-posthoc,#tab-effects,#tab-power,#tab-report{padding:4px 0;}
+    #tab-results,#tab-assumptions,#tab-posthoc,#tab-effects,#tab-power{padding:4px 0;}
     #tab-assumptions.tab-panel.active{padding:4px 4px 0;box-sizing:border-box;overflow-y:auto!important;-webkit-overflow-scrolling:touch;}
     .stats-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;}
     .stat-panel{background:var(--surface-1);border:1px solid rgba(0,0,0,.55)!important;border-top:2px solid rgba(0,0,0,.78)!important;border-bottom:1px solid rgba(255,255,255,.1)!important;border-radius:var(--panel-radius);overflow:hidden;box-shadow:inset 0 5px 16px rgba(0,0,0,.62),inset 0 2px 0 rgba(0,0,0,.55),inset 0 -2px 0 rgba(255,255,255,.07),0 1px 0 rgba(255,255,255,.04)!important;}
@@ -485,10 +485,6 @@
           <button class="sb-item" onclick="switchTab('power')" data-tab="power">
             <i class="fa-solid fa-bolt sb-item-icon"></i>
             <span class="sb-item-label">Power Analysis</span>
-          </button>
-          <button class="sb-item" onclick="switchTab('report')" data-tab="report">
-            <i class="fa-solid fa-file-lines sb-item-icon"></i>
-            <span class="sb-item-label">APA Report</span>
           </button>
         </div>
       </div>
@@ -1142,54 +1138,6 @@
             </div>
           </div>
         </section>
-        <section id="tab-report" class="tab-panel">
-          <!-- AI Statistical Summary Panel -->
-          <div class="stat-panel" id="aiSummaryPanel" style="display:none;margin-bottom:16px;border:2px solid #6366f1;">
-            <div class="stat-panel-heading" style="background:#6366f1;border-bottom-color:#a5b4fc;display:flex;justify-content:space-between;align-items:center;">
-              <span><i class="fa-solid fa-brain"></i> AI Statistical Summary</span>
-              <button onclick="copyAISummary()" class="hero-action-btn" style="padding:4px 8px;font-size:10px;margin:0;" title="Copy AI summary to clipboard">
-                <i class="fa-solid fa-copy"></i> Copy
-              </button>
-            </div>
-            <div class="stat-panel-body">
-              <div id="aiSummaryContent" style="line-height:1.7;color:var(--text-secondary);">
-                <!-- AI summary will be inserted here -->
-              </div>
-              <div id="aiSummaryLoading" style="display:none;text-align:center;padding:30px;">
-                <i class="fa-solid fa-spinner fa-spin" style="font-size:24px;color:var(--accent-2);"></i>
-                <div style="margin-top:10px;font-size:14px;color:var(--text-muted);">Generating AI interpretation...</div>
-              </div>
-              <div id="aiSummaryError" style="display:none;padding:12px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);border-radius:6px;color:#fca5a5;">
-                <!-- Error message will be inserted here -->
-              </div>
-            </div>
-          </div>
-          
-          <div class="stat-panel">
-            <div class="stat-panel-heading">Parametric vs Nonparametric Summary</div>
-            <div class="stat-panel-body" style="padding:0;">
-              <div class="table-container" style="margin:0;max-height:none;">
-                <table class="analysis-table">
-                  <thead><tr><th>Parametric</th><th>Nonparametric</th></tr></thead>
-                  <tbody id="methodComparisonBodyReport">
-                    <tr><td>ANOVA F: ...</td><td>Kruskal H: ...</td></tr>
-                    <tr><td>Means: ...</td><td>Mean ranks: ...</td></tr>
-                    <tr><td>Eta^2 / Omega^2: ... / ...</td><td>Epsilon^2 / Eta^2(H): ... / ...</td></tr>
-                    <tr><td>Post-hoc: Tukey / Games-Howell</td><td>Post-hoc: Dunn / Conover</td></tr>
-                    <tr><td>Levene p: ...</td><td>Tie/normality info: rank-based robust</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <div class="stat-panel" style="margin-top:12px;">
-            <div class="stat-panel-heading">APA-ready Report</div>
-            <div class="stat-panel-body">
-              <div id="repAnova"></div><br/><div id="repKw"></div><br/><div id="repCons"></div>
-            </div>
-          </div>
-        </section>
       </div>
     </section>
   </div>
@@ -1240,8 +1188,7 @@
         'results':     'Test Results',
         'posthoc':     'Pairwise Comparisons',
         'effects':     'Effect Sizes',
-        'power':       'Power Analysis',
-        'report':      'APA Report'
+        'power':       'Power Analysis'
       };
       if (tabTitles[tab] && typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.updateTitle(tabTitles[tab]);
@@ -1591,27 +1538,6 @@
           renderNpChart();
         }
 
-        const compareBodyReport = document.getElementById("methodComparisonBodyReport");
-        if (compareBodyReport) {
-          const explore = (lastBundle && lastBundle.explore) ? lastBundle.explore : {};
-          const colStats = Array.isArray(explore.selectedColumnStats) ? explore.selectedColumnStats.filter(function(cs){
-            return isFinite(parseMaybeNumber(cs && cs.n)) && parseMaybeNumber(cs.n) > 0;
-          }) : [];
-          const meansSummary = colStats.slice(0, 3).map(function(cs){
-            return (cs.name || "Var") + "=" + fmt(cs.mean);
-          }).join(" | ") || "...";
-          const meanRanks = ob.meanRanks || {};
-          const rankKeys = Object.keys(meanRanks || {}).slice(0, 3);
-          const meanRankSummary = rankKeys.length
-            ? rankKeys.map(function(k){ return k + "=" + fmt(meanRanks[k]); }).join(" | ")
-            : "...";
-          compareBodyReport.innerHTML = ''
-            + '<tr><td>ANOVA F: ' + fmt(ob.anovaF) + '</td><td>Kruskal H: ' + fmt(ob.kwH) + '</td></tr>'
-            + '<tr><td>Means: ' + meansSummary + '</td><td>Mean ranks: ' + meanRankSummary + '</td></tr>'
-            + '<tr><td>Eta^2 / Omega^2: ' + fmt(ob.etaSquared) + ' / ' + fmt(ob.omegaSquared) + '</td><td>Epsilon^2 / Eta^2(H): ' + fmt(ob.epsilonSquared) + ' / ' + fmt(ob.etaSquaredH) + '</td></tr>'
-            + '<tr><td>Post-hoc: Tukey / Games-Howell</td><td>Post-hoc: Dunn / Conover</td></tr>'
-            + '<tr><td>Levene p: ' + fmtP((ob.levene || {}).p) + '</td><td>Tie/normality info: rank-based robust</td></tr>';
-        }
       }
     }
     function updateAnovaConclusion(ob, alpha) {
@@ -3453,9 +3379,6 @@
       updateResultsPanels(r, fx, s, 1 - (parseMaybeNumber(s.confidence) || 0.95));
       renderPosthoc(r.posthoc || {}, "k-plus");
       updateEffectsPanel(ob);
-      setText("repAnova", "ANOVA: F(" + Math.round(ob.anovaDf1) + ", " + Math.round(ob.anovaDf2) + ") = " + fmt(ob.anovaF) + ", p " + fmtP(ob.anovaP) + ".");
-      setText("repKw", "Kruskal-Wallis: H(" + Math.round(ob.kwDf) + ") = " + fmt(ob.kwH) + ", p " + fmtP(ob.kwP) + ".");
-      setText("repCons", rep.consistency);
       // Re-run layout AFTER all DOM has been populated (settings-bar now has correct height)
       requestAnimationFrame(() => {
         fitIndependentLayout();
@@ -3856,102 +3779,13 @@
     }
     window.buildAIPayload = buildAIPayload;
     
-    /**
-     * Generate AI summary by calling Groq API
-     */
-    function showAISummary(message) {
-      const panel = document.getElementById('aiSummaryPanel');
-      const loading = document.getElementById('aiSummaryLoading');
-      const content = document.getElementById('aiSummaryContent');
-      const error = document.getElementById('aiSummaryError');
-      if (panel) panel.style.display = 'block';
-      if (loading) loading.style.display = 'none';
-      if (content) content.style.display = 'none';
-      if (error) {
-        error.innerHTML = message;
-        error.style.display = 'block';
-      }
-      switchTab('report');
-    }
-
     async function generateAISummary() {
       if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader._sbAiIndependentInterpret === 'function') {
         return StatisticoHeader._sbAiIndependentInterpret();
       }
-      showAISummary('AI summary is not available for this view yet.');
+      console.warn('AI summary is not available for this view yet.');
     }
     window.generateAISummary = generateAISummary;
-    
-    /**
-     * Format AI response with proper styling
-     */
-    function formatAISummary(text) {
-      // Split into sections and add styling
-      let formatted = text
-        .replace(/### (.*?)$/gm, '<h3 style="color:var(--accent-1);font-size:14px;font-weight:700;margin:16px 0 8px 0;text-transform:uppercase;letter-spacing:0.5px;">$1</h3>')
-        .replace(/## (.*?)$/gm, '<h2 style="color:var(--accent-2);font-size:16px;font-weight:700;margin:18px 0 10px 0;">$1</h2>')
-        .replace(/# (.*?)$/gm, '<h1 style="color:#fff;font-size:18px;font-weight:700;margin:20px 0 12px 0;">$1</h1>')
-        .replace(/^\* (.*?)$/gm, '<li style="margin:6px 0;padding-left:8px;">$1</li>')
-        .replace(/^- (.*?)$/gm, '<li style="margin:6px 0;padding-left:8px;">$1</li>')
-        .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--accent-1);font-weight:700;">$1</strong>')
-        .replace(/\n\n/g, '</p><p style="margin:10px 0;line-height:1.7;">')
-        .replace(/\n/g, '<br/>');
-      
-      // Wrap orphan list items in ul
-      formatted = formatted.replace(/(<li.*?<\/li>)+/g, '<ul style="margin:10px 0;padding-left:20px;">$&</ul>');
-      
-      // Wrap in paragraph if no block elements
-      if (!formatted.includes('<h') && !formatted.includes('<ul')) {
-        formatted = '<p style="margin:10px 0;line-height:1.7;">' + formatted + '</p>';
-      }
-      
-      return formatted;
-    }
-    
-    /**
-     * Copy AI summary to clipboard
-     */
-    function copyAISummary() {
-      const content = document.getElementById('aiSummaryContent');
-      if (!content || !content.textContent) {
-        alert('No AI summary to copy');
-        return;
-      }
-      
-      const text = content.innerText || content.textContent;
-      
-      // Try modern clipboard API first
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(function() {
-          alert('AI summary copied to clipboard!');
-        }).catch(function(err) {
-          console.error('Clipboard error:', err);
-          fallbackCopy(text);
-        });
-      } else {
-        fallbackCopy(text);
-      }
-    }
-    
-    /**
-     * Fallback clipboard copy for older browsers
-     */
-    function fallbackCopy(text) {
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.select();
-      try {
-        document.execCommand('copy');
-        alert('AI summary copied to clipboard!');
-      } catch (err) {
-        console.error('Fallback copy failed:', err);
-        alert('Failed to copy. Please select and copy manually.');
-      }
-      document.body.removeChild(textarea);
-    }
 
     // Layout engine
     // Strategy: use getBoundingClientRect().top on each container AFTER setting
@@ -3982,7 +3816,7 @@
 
       // Scroll-friendly tabs: auto height with max-height; chart tabs: fixed fill height
       const tab = document.querySelector('.tab-panel.active');
-      const scrollTabIds = ['tab-assumptions', 'tab-power', 'tab-report'];
+      const scrollTabIds = ['tab-assumptions', 'tab-power'];
       if (tab && vc) {
         const maxH = Math.max(60, vc.clientHeight - 12);
         if (scrollTabIds.indexOf(tab.id) >= 0) {

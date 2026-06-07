@@ -83,10 +83,7 @@ function getDialogsBaseUrl() {
  * Open correlation configuration dialog
  */
 function openCorrelationConfig() {
-  if (!correlationRangeData) {
-    alert('No data loaded. Please select a range first.');
-    return;
-  }
+  if (!correlationRangeData) correlationRangeData = { values: [], address: '' };
   
   const dialogUrl = `${getDialogsBaseUrl()}correlations/correlation-config.html`;
   

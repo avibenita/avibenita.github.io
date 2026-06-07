@@ -43,7 +43,6 @@ function getDialogsBaseUrl() {
 }
 
 function openFactorModelBuilder() {
-  if (!factorRangeData || factorRangeData.length < 2) return;
   const dialogUrl = `${getDialogsBaseUrl()}factor/factor-input.html?v=${Date.now()}`;
 
   Office.context.ui.displayDialogAsync(
@@ -93,9 +92,9 @@ function openFactorModelBuilder() {
 }
 
 function sendDialogData() {
-  if (!factorDialog || !factorRangeData) return;
-  const headers = factorRangeData[0] || [];
-  const rows = factorRangeData.slice(1);
+  if (!factorDialog) return;
+  const headers = (factorRangeData && factorRangeData.length) ? (factorRangeData[0] || []) : [];
+  const rows = (factorRangeData && factorRangeData.length > 1) ? factorRangeData.slice(1) : [];
 
   factorDialog.messageChild(JSON.stringify({
     type: "FACTOR_DATA",

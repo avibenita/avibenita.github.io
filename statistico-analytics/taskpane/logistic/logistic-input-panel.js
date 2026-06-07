@@ -59,8 +59,6 @@ function closeLogisticDialogIfOpen() {
 }
 
 function openLogisticModelBuilder() {
-  if (!logisticRangeData || logisticRangeData.length < 2) return;
-
   // Always start with a fresh model-assignment session when opening the builder.
   closeLogisticDialogIfOpen();
   sessionStorage.removeItem("logisticModelSpec");
@@ -117,9 +115,9 @@ function openLogisticModelBuilder() {
 }
 
 function sendDialogData() {
-  if (!logisticDialog || !logisticRangeData) return;
-  const headers = logisticRangeData[0] || [];
-  const rows = logisticRangeData.slice(1);
+  if (!logisticDialog) return;
+  const headers = (logisticRangeData && logisticRangeData.length) ? (logisticRangeData[0] || []) : [];
+  const rows = (logisticRangeData && logisticRangeData.length > 1) ? logisticRangeData.slice(1) : [];
 
   logisticDialog.messageChild(JSON.stringify({
     type: "LOGISTIC_DATA",

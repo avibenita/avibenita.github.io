@@ -529,7 +529,6 @@
     }
 
     function onConfigureClick() {
-      if (!rangeData) return;
       if (selectedModelId) {
         const m = savedModels.find(m => m.id === selectedModelId);
         if (m) sessionStorage.setItem('regressionModelSpec', JSON.stringify(m.config));
@@ -549,7 +548,6 @@
     }
 
     function openModelBuilder() {
-      if (!rangeData) return;
       const url = `${getDialogsBaseUrl()}regression/regression-input.html`;
       Office.context.ui.displayDialogAsync(url, DIALOG_SIZES.REGRESSION_BUILDER, (res) => {
         if (res.status === Office.AsyncResultStatus.Failed) {
@@ -608,12 +606,14 @@
     }
 
     function sendBuilderData() {
-      if (!activeDialog || !rangeData) return;
+      if (!activeDialog) return;
+      const headers = (rangeData && rangeData.length) ? (rangeData[0] || []) : [];
+      const rows = (rangeData && rangeData.length > 1) ? rangeData.slice(1) : [];
       activeDialog.messageChild(JSON.stringify({
         type: 'REGRESSION_DATA',
         payload: {
-          headers: rangeData[0] || [],
-          rows: rangeData.slice(1),
+          headers,
+          rows,
           address: rangeAddress,
           // Always open the builder fresh — saved spec is only used by results dialogs.
           savedModelSpec: null
@@ -666,7 +666,7 @@
         } else {
           await autoDetectRange();
           updateConfigureBtn();
-          if (autoFromHub && rangeData) {
+          if (openedFromHub || autoFromHub) {
             if (!selectedModelId) {
               setTimeout(function () { openModelBuilder(); }, openedFromHub ? 0 : 450);
             } else {

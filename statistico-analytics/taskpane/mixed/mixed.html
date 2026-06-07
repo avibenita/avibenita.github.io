@@ -522,7 +522,6 @@
     }
 
     function onConfigureClick() {
-      if (!rangeData) return;
       if (selectedModelId) {
         const m = savedModels.find(m => m.id === selectedModelId);
         if (m) sessionStorage.setItem('mixedModelSpec', JSON.stringify(m.config));
@@ -543,7 +542,6 @@
 
     // Step 1 — open mixed-input.html (model builder)
     function openMixedInputDialog() {
-      if (!rangeData) return;
       const url = `${getDialogsBaseUrl()}mixed/mixed-input.html`;
       Office.context.ui.displayDialogAsync(url, DIALOG_SIZES.REGRESSION_BUILDER, (res) => {
         if (res.status === Office.AsyncResultStatus.Failed) {
@@ -607,12 +605,14 @@
 
     // Send data to mixed-input.html
     function sendBuilderData() {
-      if (!activeDialog || !rangeData) return;
+      if (!activeDialog) return;
+      const headers = (rangeData && rangeData.length) ? (rangeData[0] || []) : [];
+      const rows = (rangeData && rangeData.length > 1) ? rangeData.slice(1) : [];
       activeDialog.messageChild(JSON.stringify({
         type: 'MIXED_DATA',
         payload: {
-          headers: rangeData[0] || [],
-          rows: rangeData.slice(1),
+          headers,
+          rows,
           address: rangeAddress,
           // Always open the builder fresh — saved spec is only used by results dialogs.
           savedModelSpec: null
@@ -668,7 +668,7 @@
         } else {
           await autoDetectRange();
           updateConfigureBtn();
-          if ((autoFromHub || openResultsFromHub) && rangeData) {
+          if (openedFromHub || autoFromHub || openResultsFromHub) {
             if (openResultsFromHub) {
               setTimeout(function () { openMixedResultsDialog(); }, openedFromHub ? 0 : 450);
             } else if (!selectedModelId) {

@@ -50,10 +50,6 @@ function updateSummary(address, rows, cols) {
 
 function openModelBuilder() {
   console.log('🪟 Open Model Builder clicked');
-  if (!regressionRangeData || regressionRangeData.length < 2) {
-    console.warn('No range data available for model builder');
-    return;
-  }
 
   const dialogUrl = `${getDialogsBaseUrl()}regression/regression-input.html`;
 
@@ -257,10 +253,10 @@ function openLogisticResultsDialog() {
 window.openLogisticResultsDialog = openLogisticResultsDialog;
 
 function sendDialogData() {
-  if (!resultsDialog || !regressionRangeData) return;
+  if (!resultsDialog) return;
 
-  const headers = regressionRangeData[0] || [];
-  const rows = regressionRangeData.slice(1);
+  const headers = (regressionRangeData && regressionRangeData.length) ? (regressionRangeData[0] || []) : [];
+  const rows = (regressionRangeData && regressionRangeData.length > 1) ? regressionRangeData.slice(1) : [];
 
   resultsDialog.messageChild(JSON.stringify({
     type: 'REGRESSION_DATA',

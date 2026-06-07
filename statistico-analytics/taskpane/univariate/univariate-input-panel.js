@@ -201,7 +201,6 @@ function attachUniEmbedListener() {
 
 // ─── OPEN CONFIG: DIALOG FALLBACK ────────────────────────────────────────────
 function openUnivariateBuilderDialog() {
-  if (!univariateRangeData || univariateRangeData.length < 2) return;
   stopUnivariateDialogDataPump();
   if (univariateDialog) {
     try { univariateDialog.close(); } catch (_e) {}
@@ -212,9 +211,11 @@ function openUnivariateBuilderDialog() {
     univariateResultsDialog = null;
   }
   try {
+    const headers = (univariateRangeData && univariateRangeData.length) ? (univariateRangeData[0] || []) : [];
+    const rows = (univariateRangeData && univariateRangeData.length > 1) ? univariateRangeData.slice(1) : [];
     const payload = {
-      headers: univariateRangeData[0] || [],
-      rows: univariateRangeData.slice(1),
+      headers,
+      rows,
       address: univariateRangeAddress,
       // Always open the builder fresh — no pre-fill from previous run.
       savedSpec: null
@@ -299,9 +300,9 @@ function openUnivariateBuilder() {
 }
 
 function sendDialogData() {
-  if (!univariateDialog || !univariateRangeData) return;
-  const headers = univariateRangeData[0] || [];
-  const rows = univariateRangeData.slice(1);
+  if (!univariateDialog) return;
+  const headers = (univariateRangeData && univariateRangeData.length) ? (univariateRangeData[0] || []) : [];
+  const rows = (univariateRangeData && univariateRangeData.length > 1) ? univariateRangeData.slice(1) : [];
   // Always open the builder fresh.
   const savedSpec = null;
   try {

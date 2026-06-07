@@ -139,14 +139,15 @@ function normalizeClusterSpec(spec, headers) {
 }
 
 function pushClusterSetupPayload() {
-  if (!clusterSetupDialog || !clusterRangeData || clusterRangeData.length < 2) return;
-  const headers = clusterRangeData[0] || [];
+  if (!clusterSetupDialog) return;
+  const headers = (clusterRangeData && clusterRangeData.length) ? (clusterRangeData[0] || []) : [];
+  const setupRows = (clusterRangeData && clusterRangeData.length > 1) ? clusterRangeData.slice(1) : [];
   try {
     clusterSetupDialog.messageChild(JSON.stringify({
       type: "CLUSTER_DATA",
       payload: {
         headers,
-        rows: clusterRangeData.slice(1),
+        rows: setupRows,
         address: clusterRangeAddress || "",
         // Always open the builder fresh — saved spec is only used by results dialogs.
         savedModelSpec: null
@@ -158,7 +159,6 @@ function pushClusterSetupPayload() {
 }
 
 function openClusterSetupDialog() {
-  if (!clusterRangeData || clusterRangeData.length < 2) return;
   const dlg = clusterCfg().dialog || {};
   const setupFile = dlg.setupFilename || "cluster/cluster-input.html";
   const dialogUrl = `${getDialogsBaseUrl()}${setupFile}?v=${Date.now()}`;

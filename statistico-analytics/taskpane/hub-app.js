@@ -782,8 +782,7 @@ function sendUnivariateDialogData() {
 }
 
 function openUnivariateConfigFromHub() {
-  var gr = getGlobalRangePayload();
-  if (!gr) return false;
+  var gr = getGlobalRangePayload() || { values: [], address: "", mode: "used" };
   hubUnivariateFlowActive = true;
   setSelectedModuleCard("univariate", true);
   Office.context.ui.displayDialogAsync(
@@ -882,8 +881,7 @@ function openRegressionResultsFromHub() {
 }
 
 function openRegressionConfigFromHub() {
-  var gr = getGlobalRangePayload();
-  if (!gr) return false;
+  var gr = getGlobalRangePayload() || { values: [], address: "", mode: "used" };
   hubRegressionDataPayload = {
     headers: gr.values[0] || [],
     rows: gr.values.slice(1),
@@ -932,8 +930,7 @@ function openRegressionConfigFromHub() {
 }
 
 function openAnovaConfigFromHub() {
-  var gr = getGlobalRangePayload();
-  if (!gr) return false;
+  var gr = getGlobalRangePayload() || { values: [], address: "", mode: "used" };
   hubAnovaFlowActive = true;
   setSelectedModuleCard("anova", true);
   Office.context.ui.displayDialogAsync(
@@ -986,8 +983,7 @@ function openAnovaConfigFromHub() {
 }
 
 function openIndependentConfigFromHub() {
-  var gr = getGlobalRangePayload();
-  if (!gr) return false;
+  var gr = getGlobalRangePayload() || { values: [], address: "", mode: "used" };
   hubIndependentFlowActive = true;
   setSelectedModuleCard("independent", true);
   Office.context.ui.displayDialogAsync(
@@ -1040,8 +1036,7 @@ function openIndependentConfigFromHub() {
 }
 
 function openCorrelationConfigFromHub() {
-  var gr = getGlobalRangePayload();
-  if (!gr) return false;
+  var gr = getGlobalRangePayload() || { values: [], address: "", mode: "used" };
   hubCorrelationFlowActive = true;
   setSelectedModuleCard("correlations", true);
   Office.context.ui.displayDialogAsync(
@@ -1134,8 +1129,7 @@ function openParetoFromHub() {
 }
 
 function openBuilderDialogFromHub(options) {
-  var gr = getGlobalRangePayload();
-  if (!gr) return false;
+  var gr = getGlobalRangePayload() || { values: [], address: "", mode: "used" };
   setSelectedModuleCard(options.moduleId, true);
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + options.dialogPath + (options.dialogPath.indexOf("?") >= 0 ? "&" : "?") + "v=" + Date.now(),
@@ -1414,43 +1408,43 @@ function dismissAllHubDialogs() {
 
 function navigateToModuleCore(id) {
   var gr = getGlobalRangePayload();
-  if (id === "univariate" && gr && gr.values && gr.values.length >= 2) {
+  if (id === "univariate") {
     if (openUnivariateConfigFromHub()) return;
   }
-  if (id === "regression" && gr && gr.values && gr.values.length >= 2) {
+  if (id === "regression") {
     if (openRegressionConfigFromHub()) return;
   }
-  if (id === "anova" && gr && gr.values && gr.values.length >= 2) {
+  if (id === "anova") {
     if (openAnovaConfigFromHub()) return;
   }
-  if (id === "independent" && gr && gr.values && gr.values.length >= 2) {
+  if (id === "independent") {
     if (openIndependentConfigFromHub()) return;
   }
-  if (id === "correlations" && gr && gr.values && gr.values.length >= 2) {
+  if (id === "correlations") {
     if (openCorrelationConfigFromHub()) return;
   }
-  if (id === "dependent" && gr && gr.values && gr.values.length >= 2) {
+  if (id === "dependent") {
     if (openDependentConfigFromHub()) return;
   }
-  if (id === "factor" && gr && gr.values && gr.values.length >= 2) {
+  if (id === "factor") {
     if (openFactorConfigFromHub()) return;
   }
-  if (id === "logistic" && gr && gr.values && gr.values.length >= 2) {
+  if (id === "logistic") {
     if (openLogisticConfigFromHub()) return;
   }
-  if (id === "pca" && gr && gr.values && gr.values.length >= 2) {
+  if (id === "pca") {
     if (openPcaConfigFromHub()) return;
   }
-  if (id === "meta-analysis" && gr && gr.values && gr.values.length >= 2) {
+  if (id === "meta-analysis") {
     if (openMetaConfigFromHub()) return;
   }
-  if (id === "mixed" && gr && gr.values && gr.values.length >= 2) {
+  if (id === "mixed") {
     if (openMixedConfigFromHub()) return;
   }
-  if (id === "cluster" && gr && gr.values && gr.values.length >= 2) {
+  if (id === "cluster") {
     if (openClusterConfigFromHub()) return;
   }
-  if (id === "pareto2080" && gr && gr.values && gr.values.length >= 2) {
+  if (id === "pareto2080") {
     if (openParetoFromHub()) return;
   }
   var url = "./" + id + "/" + id + ".html?v=" + Date.now() + "&fromHub=1";

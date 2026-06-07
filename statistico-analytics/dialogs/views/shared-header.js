@@ -81,6 +81,10 @@ if (typeof window !== 'undefined' && typeof window.switchTab !== 'function') {
       panel.classList.toggle('active', panel.id === `tab-${tab}`);
     });
 
+    if (typeof window.syncExploreChrome === 'function') {
+      window.syncExploreChrome(tab);
+    }
+
     const fitLayout =
       window.fitIndependentLayout ||
       window.fitDependentKplusLayout ||

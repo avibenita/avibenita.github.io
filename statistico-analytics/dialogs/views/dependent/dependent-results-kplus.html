@@ -1373,8 +1373,8 @@
         <section id="tab-posthoc" class="tab-panel">
           <div class="stat-panel">
             <div class="stat-panel-heading parametric" id="posthocHeading">
-              Post-hoc Pairwise Comparisons (Paired t-tests)
-              <div style="float:right;display:inline-flex;gap:8px;align-items:center;font-size:13px;font-weight:600;text-transform:none;">
+              <span id="posthocHeadingTitle">Post-hoc Pairwise Comparisons (Paired t-tests)</span>
+              <div id="posthocFilterControls" style="float:right;display:inline-flex;gap:8px;align-items:center;font-size:13px;font-weight:600;text-transform:none;">
                 <span style="opacity:0.8;">Filter:</span>
                 <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
                   <input type="radio" name="posthocGrouping" value="all" checked onchange="updatePosthocDisplay()"> All pairs
@@ -2786,18 +2786,36 @@
     let posthocTimepoints = [];
 
     function posthocFilterControlsHtml() {
-      return '<div style="float:right;display:inline-flex;gap:8px;align-items:center;font-size:11px;font-weight:600;text-transform:none;">' +
-        '<span style="opacity:0.8;">Filter:</span>' +
-        '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">' +
-        '<input type="radio" name="posthocGrouping" value="all" checked onchange="updatePosthocDisplay()"> All pairs' +
-        '</label>' +
-        '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">' +
-        '<input type="radio" name="posthocGrouping" value="ref" onchange="updatePosthocDisplay()"> vs Reference' +
-        '</label>' +
-        '<select id="posthocRefGroup" style="height:24px;padding:0 6px;border-radius:4px;background:#ffffff;border:1px solid rgba(255,255,255,0.2);color:#263238;font-size:11px;display:none;" onchange="updatePosthocDisplay()">' +
-        '<option value="">Select timepoint...</option>' +
-        '</select>' +
-        '</div>';
+      return document.getElementById('posthocFilterControls')?.outerHTML || '';
+    }
+
+    function populatePosthocRefDropdown(rows, preferredRef) {
+      const refSelect = document.getElementById('posthocRefGroup');
+      if (!refSelect) return;
+      const timepoints = getPosthocTimepoints(rows || []);
+      if (!timepoints.length) {
+        refSelect.innerHTML = '<option value="">No timepoints available</option>';
+        return;
+      }
+      refSelect.innerHTML = timepoints.map(function(tp) {
+        return '<option value="' + tp + '">' + tp + '</option>';
+      }).join('');
+      const pick = preferredRef && timepoints.indexOf(preferredRef) >= 0 ? preferredRef : timepoints[0];
+      refSelect.value = pick;
+    }
+
+    function posthocRowMatchesRef(row, refGroup) {
+      if (!refGroup) return false;
+      const ref = String(refGroup).trim().toLowerCase();
+      const tp1 = String(row.timepoint1 || '').trim().toLowerCase();
+      const tp2 = String(row.timepoint2 || '').trim().toLowerCase();
+      if (tp1 && tp2) return tp1 === ref || tp2 === ref;
+      const parts = String(row.comparison || '').split(/\s*vs\.?\s*/i);
+      return parts.some(function(p) { return p.trim().toLowerCase() === ref; });
+    }
+
+    function getPosthocGroupingState() {
+      return document.querySelector('input[name="posthocGrouping"]:checked')?.value || 'all';
     }
 
     function posthocMethodHeadingLabel(isNonParam, currentMethod) {
@@ -2944,7 +2962,7 @@
       syncPosthocInsightsRow();
     }
 
-    function renderPosthocSummary(rows, isNonParam, isExploratory, correctionName) {
+    function renderPosthocSummary(rows, isNonParam, isExploratory, correctionName, refFilter) {
       const panel = document.getElementById('posthocSummaryPanel');
       const textEl = document.getElementById('posthocSummaryText');
       if (!panel || !textEl || !rows.length) {
@@ -2954,6 +2972,9 @@
       }
       const sigRows = rows.filter(function(r) { return parseMaybeNumber(r.adjP) < 0.05; });
       let summary = '';
+      if (refFilter) {
+        summary = 'Showing comparisons involving reference timepoint <strong>' + refFilter + '</strong>. ';
+      }
       if (sigRows.length === 0) {
         summary = 'No pairwise comparison remained significant after ' + correctionName + ' correction.';
       } else {
@@ -2994,10 +3015,11 @@
     function renderPosthoc(posthoc, compareMode){
       const body = document.getElementById("posthocBody");
       const heading = document.getElementById("posthocHeading");
+      const headingTitle = document.getElementById("posthocHeadingTitle");
       const warningEl = document.getElementById("posthocWarning");
       const noteEl = document.getElementById("posthocMethodNote");
-      const refSelect = document.getElementById("posthocRefGroup");
-      const tableHeader = document.querySelector("#posthocTable thead tr");
+      const prevGrouping = getPosthocGroupingState();
+      const prevRef = (document.getElementById("posthocRefGroup") || { value: '' }).value;
       
       if (!body) return;
       
@@ -3013,13 +3035,14 @@
       const tableWrap = document.getElementById('posthocTableWrap');
       if (tableWrap) tableWrap.classList.toggle('exploratory-mode', !posthocOmnibusSignificant);
       
-      // Update heading text and color based on framework
+      // Update heading title only — keep stable filter controls in the DOM
       if (heading) {
         heading.className = "stat-panel-heading " + (isNonParam ? "nonparametric" : "parametric");
-        heading.innerHTML = headingPrefix + ' (' + methodLabel + ')' + headingExploratoryNote + posthocFilterControlsHtml();
       }
-      
-      // Update table header based on framework
+      if (headingTitle) {
+        headingTitle.innerHTML = headingPrefix + ' (' + methodLabel + ')' + headingExploratoryNote;
+      }
+      const tableHeader = document.querySelector("#posthocTable thead tr");
       if (tableHeader && isNonParam) {
         tableHeader.innerHTML = `
           <th style="cursor:pointer;" onclick="sortPosthocTable('comparison')">Comparison</th>
@@ -3041,24 +3064,12 @@
         `;
       }
       
-      // Populate reference dropdown with timepoint names
-      const refSelectNew = document.getElementById("posthocRefGroup");
-      if (refSelectNew && posthoc && posthoc.rows && posthoc.rows.length > 0) {
-        // Extract unique timepoint names from comparison strings
-        const timepointSet = new Set();
-        posthoc.rows.forEach(function(row) {
-          if (row.timepoint1) timepointSet.add(row.timepoint1);
-          if (row.timepoint2) timepointSet.add(row.timepoint2);
-        });
-        const timepoints = Array.from(timepointSet);
-        
-        // Populate dropdown
-        let options = '<option value="">Select timepoint...</option>';
-        timepoints.forEach(function(tp) {
-          options += '<option value="' + tp + '">' + tp + '</option>';
-        });
-        refSelectNew.innerHTML = options;
+      // Populate reference dropdown (stable element — do not recreate in heading)
+      if (posthoc && posthoc.rows && posthoc.rows.length > 0) {
+        populatePosthocRefDropdown(posthoc.rows, prevRef);
       }
+      const groupingRadio = document.querySelector('input[name="posthocGrouping"][value="' + prevGrouping + '"]');
+      if (groupingRadio) groupingRadio.checked = true;
       
       if (compareMode !== "k-plus" || !posthoc || !posthoc.enabled) {
         body.innerHTML = isNonParam ? '<tr><td colspan="6">No post-hoc comparisons available</td></tr>' : '<tr><td colspan="7">No post-hoc comparisons available</td></tr>';
@@ -3130,29 +3141,6 @@
 
       posthocTimepoints = getPosthocTimepoints(rows);
       
-      // Populate reference group dropdown
-      if (refSelect) {
-        const groups = [];
-        posthocData.forEach(function(r) {
-          const parts = r.comparison.split(/\s*vs\.?\s*/i);
-          if (parts.length === 2) {
-            const g1 = parts[0].trim();
-            const g2 = parts[1].trim();
-            if (g1 && groups.indexOf(g1) === -1) groups.push(g1);
-            if (g2 && groups.indexOf(g2) === -1) groups.push(g2);
-          }
-        });
-        
-        if (groups.length > 0) {
-          refSelect.innerHTML = '<option value="">All groups</option>' + 
-            groups.map(g => '<option value="' + g + '">' + g + '</option>').join('');
-          // Auto-select first group for better UX
-          if (groups.length > 0) refSelect.value = groups[0];
-        } else {
-          refSelect.innerHTML = '<option value="">No groups available</option>';
-        }
-      }
-      
       updatePosthocDisplay();
     }
     
@@ -3161,23 +3149,24 @@
       const refSelect = document.getElementById("posthocRefGroup");
       if (!body || !posthocData.length) return;
       
-      // Get grouping mode
-      const grouping = document.querySelector('input[name="posthocGrouping"]:checked')?.value || 'all';
-      const refGroup = refSelect ? refSelect.value : '';
+      const grouping = getPosthocGroupingState();
+      let refGroup = refSelect ? refSelect.value : '';
       
-      // Show/hide reference dropdown
       if (refSelect) {
         refSelect.style.display = (grouping === 'ref') ? 'inline-block' : 'none';
+        if (grouping === 'ref' && !refGroup && refSelect.options.length) {
+          refSelect.selectedIndex = 0;
+          refGroup = refSelect.value;
+        }
       }
       
-      // Filter data
       let displayData = posthocData;
-      if (grouping === 'ref' && refGroup) {
-        displayData = posthocData.filter(function(r) {
-          // Match if refGroup appears in the comparison
-          const parts = r.comparison.split(/\s*vs\.?\s*/i);
-          return parts.some(p => p.trim().toLowerCase() === refGroup.toLowerCase());
-        });
+      if (grouping === 'ref') {
+        if (!refGroup) {
+          displayData = [];
+        } else {
+          displayData = posthocData.filter(function(r) { return posthocRowMatchesRef(r, refGroup); });
+        }
       }
       
       // Sort data
@@ -3214,8 +3203,22 @@
                              correction === "bonferroni" ? "Bonferroni" :
                              correction === "none" ? "None" : "Holm";
 
-      renderPosthocSummary(posthocData, isNonParam, !posthocOmnibusSignificant, correctionName);
-      renderPosthocSigMatrix(posthocTimepoints, posthocData);
+      renderPosthocSummary(displayData, isNonParam, !posthocOmnibusSignificant, correctionName, grouping === 'ref' ? refGroup : '');
+      renderPosthocSigMatrix(posthocTimepoints, displayData.length ? displayData : posthocData);
+      
+      if (!rowsToRender.length) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = isNonParam ? 6 : 7;
+        td.textContent = grouping === 'ref'
+          ? ('No comparisons include reference timepoint "' + refGroup + '".')
+          : 'No post-hoc comparisons available';
+        td.style.textAlign = 'center';
+        td.style.fontStyle = 'italic';
+        td.style.color = 'var(--text-muted)';
+        tr.appendChild(td);
+        body.appendChild(tr);
+      }
       
       rowsToRender.forEach(function(r){
         const tr = document.createElement("tr");
@@ -3304,6 +3307,7 @@
         body.appendChild(tr);
       }
     }
+    window.updatePosthocDisplay = updatePosthocDisplay;
     
     function sortPosthocTable(column) {
       if (posthocSortColumn === column) {

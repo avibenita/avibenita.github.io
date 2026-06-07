@@ -775,7 +775,7 @@ function computeRMPostHocComparisons(completeCases, timepointNames, n, k, primar
       
       if (diffs.length === 0) continue;
       
-      let statistic, pRaw, estimate, ciLower, ciUpper, effectSize;
+      let statistic, pRaw, estimate, ciLower, ciUpper, effectSize, medianDiffVal;
       
       if (useWilcoxon) {
         // WILCOXON SIGNED-RANK TEST
@@ -791,12 +791,14 @@ function computeRMPostHocComparisons(completeCases, timepointNames, n, k, primar
         
         // Effect size r = Z / sqrt(N) for Wilcoxon
         const effectSizeR = Math.abs(zStat) / Math.sqrt(nPairs);
-        
-        estimate = effectSizeR; // Effect size r (between 0 and 1)
-        statistic = zStat; // Z-statistic (standardized)
-        ciLower = NaN; // No CI for nonparametric
+        const medianDiff = median(diffs);
+
+        estimate = medianDiff;
+        statistic = zStat;
+        ciLower = NaN;
         ciUpper = NaN;
         effectSize = effectSizeR;
+        medianDiffVal = medianDiff;
       } else {
         // PAIRED T-TEST (PARAMETRIC)
         const meanDiff = mean(diffs);
@@ -819,6 +821,7 @@ function computeRMPostHocComparisons(completeCases, timepointNames, n, k, primar
         statistic = tStat;
         estimate = meanDiff; // Mean difference
         effectSize = cohenD;
+        medianDiffVal = median(diffs);
       }
       
       // Format comparison label for RM (use "Time" terminology)
@@ -830,6 +833,7 @@ function computeRMPostHocComparisons(completeCases, timepointNames, n, k, primar
         timepoint1: timepointNames[i],
         timepoint2: timepointNames[j],
         estimate: estimate,
+        medianDiff: medianDiffVal,
         statistic: statistic,
         rawP: pRaw,
         adjP: pRaw, // Will be updated with correction

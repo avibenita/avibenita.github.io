@@ -203,6 +203,18 @@
     .posthoc-radio:hover{background:rgba(255,255,255,0.06);}
     .posthoc-radio input[type="radio"]{margin:0;width:16px;height:16px;cursor:pointer;accent-color:var(--accent-2);}
     .posthoc-radio input[type="radio"]:checked + span{color:var(--accent-2);font-weight:600;}
+    #posthocSummaryPanel{margin-bottom:12px;padding:12px 14px;background:rgba(120,200,255,.08);border-left:3px solid var(--accent-2);border-radius:4px;font-size:13px;line-height:1.55;color:var(--text-secondary);}
+    #posthocSummaryPanel strong{color:var(--text-primary);}
+    #posthocSigMatrixPanel{margin-bottom:12px;padding:10px 12px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:6px;overflow-x:auto;}
+    #posthocSigMatrixPanel .sig-matrix-title{font-size:12px;font-weight:700;color:var(--accent-1);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;}
+    #posthocSigMatrix table{border-collapse:collapse;font-size:12px;margin:0 auto;}
+    #posthocSigMatrix th,#posthocSigMatrix td{padding:6px 10px;border:1px solid rgba(255,255,255,.14);text-align:center;min-width:72px;}
+    #posthocSigMatrix th{background:#1e3a5f;color:#fff;font-weight:700;}
+    #posthocSigMatrix td.sig-diag{background:#2a3a4a;color:#8899aa;font-weight:600;}
+    #posthocSigMatrix td.sig-ns{color:var(--text-muted);}
+    #posthocSigMatrix td.sig-star{color:#4ade80;font-weight:700;}
+    #posthocTableWrap.exploratory-mode{opacity:.78;}
+    #posthocTableWrap.exploratory-mode .analysis-table tbody td{color:var(--text-secondary);}
     #setPosthocWrap,#setCorrectionWrap{min-width:180px;max-width:220px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;}
     #setPosthocWrap label,#setCorrectionWrap label{white-space:nowrap;line-height:1;margin-bottom:0;font-size:11px;}
     .inference-row{display:flex;align-items:stretch;justify-content:flex-start;gap:12px;flex-wrap:wrap;width:100%;}
@@ -842,7 +854,7 @@
 
   </style>
 </head>
-<body data-ui-version="20260610t-kplus-desc-hero-hist">
+<body data-ui-version="20260610u-kplus-posthoc-cursor100">
   <!-- ── Sidebar Navigation ── -->
   <nav class="sb-nav" id="sidebarNav">
     <div class="sb-logo">
@@ -1369,7 +1381,17 @@
             <div class="stat-panel-body" style="padding:8px;">
               <!-- Omnibus Warning -->
               <div id="posthocWarning" style="display:none;padding:10px 14px;margin-bottom:12px;background:rgba(251,191,36,.15);border-left:3px solid #fbbf24;border-radius:4px;">
-                <span style="font-size:13px;color:#fbbf24;font-weight:600;">Omnibus test not significant (p > alpha). Interpret post-hoc comparisons with caution.</span>
+                <span id="posthocWarningText" style="font-size:13px;color:#fbbf24;font-weight:600;">Exploratory pairwise comparisons — no significant omnibus effect detected. Interpret with caution.</span>
+              </div>
+
+              <div id="posthocSummaryPanel" style="display:none;">
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent-1);margin-bottom:6px;">Pairwise Summary</div>
+                <div id="posthocSummaryText">...</div>
+              </div>
+
+              <div id="posthocSigMatrixPanel" style="display:none;">
+                <div class="sig-matrix-title">Significance Matrix</div>
+                <div id="posthocSigMatrix"></div>
               </div>
               
               <!-- Post-hoc Configuration Controls -->
@@ -1406,7 +1428,7 @@
                 </div>
               </div>
               
-              <div class="table-container" style="margin:0;">
+              <div class="table-container" id="posthocTableWrap" style="margin:0;">
                 <table class="analysis-table" id="posthocTable">
                   <thead>
                     <tr>
@@ -2741,6 +2763,128 @@
     let posthocData = [];
     let posthocSortColumn = 'adjp';
     let posthocSortAsc = true;
+    let posthocOmnibusSignificant = true;
+    let posthocTimepoints = [];
+
+    function posthocFilterControlsHtml() {
+      return '<div style="float:right;display:inline-flex;gap:8px;align-items:center;font-size:11px;font-weight:600;text-transform:none;">' +
+        '<span style="opacity:0.8;">Filter:</span>' +
+        '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">' +
+        '<input type="radio" name="posthocGrouping" value="all" checked onchange="updatePosthocDisplay()"> All pairs' +
+        '</label>' +
+        '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">' +
+        '<input type="radio" name="posthocGrouping" value="ref" onchange="updatePosthocDisplay()"> vs Reference' +
+        '</label>' +
+        '<select id="posthocRefGroup" style="height:24px;padding:0 6px;border-radius:4px;background:#ffffff;border:1px solid rgba(255,255,255,0.2);color:#263238;font-size:11px;display:none;" onchange="updatePosthocDisplay()">' +
+        '<option value="">Select timepoint...</option>' +
+        '</select>' +
+        '</div>';
+    }
+
+    function posthocMethodHeadingLabel(isNonParam, currentMethod) {
+      if (isNonParam) {
+        if (currentMethod === 'conover') return 'Conover';
+        if (currentMethod === 'nemenyi') return 'Nemenyi';
+        return 'Wilcoxon Signed-Rank';
+      }
+      return 'Paired t-tests';
+    }
+
+    function posthocSigMatrixLabel(adjP) {
+      const p = parseMaybeNumber(adjP);
+      if (!isFinite(p) || p >= 0.05) return { text: 'NS', cls: 'sig-ns' };
+      if (p < 0.001) return { text: '***', cls: 'sig-star' };
+      if (p < 0.01) return { text: '**', cls: 'sig-star' };
+      return { text: '*', cls: 'sig-star' };
+    }
+
+    function getPosthocTimepoints(rows) {
+      const fromSetup = lastBundle?.setup?.selectedColumns || [];
+      if (fromSetup.length) return fromSetup.slice();
+      const set = new Set();
+      (rows || []).forEach(function(row) {
+        if (row.timepoint1) set.add(row.timepoint1);
+        if (row.timepoint2) set.add(row.timepoint2);
+      });
+      return Array.from(set);
+    }
+
+    function renderPosthocSigMatrix(timepoints, rows) {
+      const panel = document.getElementById('posthocSigMatrixPanel');
+      const host = document.getElementById('posthocSigMatrix');
+      if (!panel || !host || !timepoints.length || !rows.length) {
+        if (panel) panel.style.display = 'none';
+        return;
+      }
+      const lookup = {};
+      rows.forEach(function(r) {
+        if (!r.timepoint1 || !r.timepoint2) return;
+        const key = r.timepoint1 + '||' + r.timepoint2;
+        const keyRev = r.timepoint2 + '||' + r.timepoint1;
+        lookup[key] = r;
+        lookup[keyRev] = r;
+      });
+      let html = '<table><thead><tr><th></th>';
+      timepoints.forEach(function(tp) { html += '<th>' + tp + '</th>'; });
+      html += '</tr></thead><tbody>';
+      timepoints.forEach(function(rowTp, i) {
+        html += '<tr><th style="text-align:right;">' + rowTp + '</th>';
+        timepoints.forEach(function(colTp, j) {
+          if (i === j) {
+            html += '<td class="sig-diag">—</td>';
+          } else {
+            const cell = lookup[rowTp + '||' + colTp];
+            const label = cell ? posthocSigMatrixLabel(cell.adjP) : { text: '—', cls: 'sig-ns' };
+            html += '<td class="' + label.cls + '" title="' + (cell ? (cell.comparison + ', adj p = ' + fmtP(cell.adjP)) : '') + '">' + label.text + '</td>';
+          }
+        });
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      host.innerHTML = html;
+      panel.style.display = 'block';
+    }
+
+    function renderPosthocSummary(rows, isNonParam, isExploratory, correctionName) {
+      const panel = document.getElementById('posthocSummaryPanel');
+      const textEl = document.getElementById('posthocSummaryText');
+      if (!panel || !textEl || !rows.length) {
+        if (panel) panel.style.display = 'none';
+        return;
+      }
+      const sigRows = rows.filter(function(r) { return parseMaybeNumber(r.adjP) < 0.05; });
+      let summary = '';
+      if (sigRows.length === 0) {
+        summary = 'No pairwise comparison remained significant after ' + correctionName + ' correction.';
+      } else {
+        summary = sigRows.length + ' of ' + rows.length + ' comparison' + (rows.length === 1 ? '' : 's') +
+          ' remained significant after ' + correctionName + ' correction.';
+      }
+      const ranked = rows.slice().sort(function(a, b) {
+        return Math.abs(parseMaybeNumber(b.estimate) || 0) - Math.abs(parseMaybeNumber(a.estimate) || 0);
+      });
+      const top = ranked[0];
+      if (top) {
+        const diffLabel = isNonParam ? 'Median Difference' : 'Mean Difference';
+        summary += '<br><br><strong>Largest observed difference:</strong> ' + top.comparison +
+          '<br>' + diffLabel + ' = ' + fmt(isNonParam ? (top.medianDiff ?? top.estimate) : top.estimate) +
+          '<br>Adjusted p = ' + fmtP(top.adjP);
+      }
+      if (isExploratory) {
+        summary = '<span style="color:#fbbf24;font-weight:600;">Exploratory mode:</span> omnibus test not significant. ' + summary;
+      }
+      textEl.innerHTML = summary;
+      panel.style.display = 'block';
+    }
+
+    function isPosthocOmnibusSignificant() {
+      const ob = lastBundle?.results?.omnibus;
+      if (!ob) return true;
+      const isNonParam = primaryFramework === 'nonparametric';
+      const relevantP = parseMaybeNumber(isNonParam ? ob.kwP : ob.anovaP);
+      const alpha = parseMaybeNumber((document.getElementById('setAlpha') || { value: '0.05' }).value) || 0.05;
+      return isFinite(relevantP) && relevantP <= alpha;
+    }
     
     function renderPosthoc(posthoc, compareMode){
       const body = document.getElementById("posthocBody");
@@ -2756,69 +2900,38 @@
       const isNonParam = primaryFramework === "nonparametric";
       const posthocMethodRadio = document.querySelector('input[name="posthocMethod"]:checked');
       const currentMethod = posthocMethodRadio ? posthocMethodRadio.value : (isNonParam ? "wilcoxon" : "paired");
+      posthocOmnibusSignificant = isPosthocOmnibusSignificant();
+      const headingPrefix = posthocOmnibusSignificant ? 'Post-hoc Pairwise Comparisons' : 'Exploratory Pairwise Comparisons';
+      const headingExploratoryNote = posthocOmnibusSignificant ? '' :
+        ' <span style="font-size:11px;font-weight:600;opacity:.85;">(No significant omnibus effect detected)</span>';
+      const methodLabel = posthocMethodHeadingLabel(isNonParam, currentMethod);
+      const tableWrap = document.getElementById('posthocTableWrap');
+      if (tableWrap) tableWrap.classList.toggle('exploratory-mode', !posthocOmnibusSignificant);
       
       // Update heading text and color based on framework
       if (heading) {
         heading.className = "stat-panel-heading " + (isNonParam ? "nonparametric" : "parametric");
-        
-        // Context-aware heading text
-        if (isNonParam) {
-          if (currentMethod === "wilcoxon") {
-            heading.innerHTML = 'Post-hoc Pairwise Comparisons (Wilcoxon Signed-Rank)' + 
-              '<div style="float:right;display:inline-flex;gap:8px;align-items:center;font-size:11px;font-weight:600;text-transform:none;">' +
-              '<span style="opacity:0.8;">Filter:</span>' +
-              '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">' +
-              '<input type="radio" name="posthocGrouping" value="all" checked onchange="updatePosthocDisplay()"> All pairs' +
-              '</label>' +
-              '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">' +
-              '<input type="radio" name="posthocGrouping" value="ref" onchange="updatePosthocDisplay()"> vs Reference' +
-              '</label>' +
-              '<select id="posthocRefGroup" style="height:24px;padding:0 6px;border-radius:4px;background:#ffffff;border:1px solid rgba(255,255,255,0.2);color:#263238;font-size:11px;display:none;" onchange="updatePosthocDisplay()">' +
-              '<option value="">Select timepoint...</option>' +
-              '</select>' +
-              '</div>';
-          } else if (currentMethod === "conover") {
-            heading.textContent = 'Post-hoc Pairwise Comparisons (Conover)';
-          } else if (currentMethod === "nemenyi") {
-            heading.textContent = 'Post-hoc Pairwise Comparisons (Nemenyi)';
-          } else {
-            heading.textContent = 'Post-hoc Pairwise Comparisons (Rank-based)';
-          }
-        } else {
-          heading.innerHTML = 'Post-hoc Pairwise Comparisons (Paired t-tests)' +
-            '<div style="float:right;display:inline-flex;gap:8px;align-items:center;font-size:11px;font-weight:600;text-transform:none;">' +
-            '<span style="opacity:0.8;">Filter:</span>' +
-            '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">' +
-            '<input type="radio" name="posthocGrouping" value="all" checked onchange="updatePosthocDisplay()"> All pairs' +
-            '</label>' +
-            '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">' +
-            '<input type="radio" name="posthocGrouping" value="ref" onchange="updatePosthocDisplay()"> vs Reference' +
-            '</label>' +
-            '<select id="posthocRefGroup" style="height:24px;padding:0 6px;border-radius:4px;background:#ffffff;border:1px solid rgba(255,255,255,0.2);color:#263238;font-size:11px;display:none;" onchange="updatePosthocDisplay()">' +
-            '<option value="">Select timepoint...</option>' +
-            '</select>' +
-            '</div>';
-        }
+        heading.innerHTML = headingPrefix + ' (' + methodLabel + ')' + headingExploratoryNote + posthocFilterControlsHtml();
       }
       
       // Update table header based on framework
       if (tableHeader && isNonParam) {
         tableHeader.innerHTML = `
-          <th style="cursor:pointer;" onclick="sortPosthocTable('comparison')">Comparison sort</th>
-          <th style="cursor:pointer;" onclick="sortPosthocTable('statistic')">Z sort</th>
-          <th style="cursor:pointer;" onclick="sortPosthocTable('rawp')">Raw p sort</th>
-          <th style="cursor:pointer;" onclick="sortPosthocTable('adjp')">Adj p sort</th>
-          <th style="cursor:pointer;" onclick="sortPosthocTable('estimate')">Effect size r sort</th>
+          <th style="cursor:pointer;" onclick="sortPosthocTable('comparison')">Comparison</th>
+          <th style="cursor:pointer;" onclick="sortPosthocTable('median')">Median Difference</th>
+          <th style="cursor:pointer;" onclick="sortPosthocTable('statistic')">Z</th>
+          <th style="cursor:pointer;" onclick="sortPosthocTable('adjp')">Adj p</th>
+          <th style="cursor:pointer;" onclick="sortPosthocTable('effectsize')">Effect size r</th>
           <th style="text-align:center;">Sig</th>
         `;
       } else if (tableHeader && !isNonParam) {
         tableHeader.innerHTML = `
-          <th style="cursor:pointer;" onclick="sortPosthocTable('comparison')">Comparison sort</th>
-          <th style="cursor:pointer;" onclick="sortPosthocTable('statistic')">Statistic sort</th>
-          <th style="cursor:pointer;" onclick="sortPosthocTable('rawp')">Raw p sort</th>
-          <th style="cursor:pointer;" onclick="sortPosthocTable('adjp')">Adj p sort</th>
-          <th style="cursor:pointer;" onclick="sortPosthocTable('estimate')">Estimate sort</th>
-          <th style="cursor:pointer;" onclick="sortPosthocTable('ci')">95% CI sort</th>
+          <th style="cursor:pointer;" onclick="sortPosthocTable('comparison')">Comparison</th>
+          <th style="cursor:pointer;" onclick="sortPosthocTable('statistic')">Statistic</th>
+          <th style="cursor:pointer;" onclick="sortPosthocTable('rawp')">Raw p</th>
+          <th style="cursor:pointer;" onclick="sortPosthocTable('adjp')">Adj p</th>
+          <th style="cursor:pointer;" onclick="sortPosthocTable('estimate')">Mean Difference</th>
+          <th style="cursor:pointer;" onclick="sortPosthocTable('ci')">95% CI</th>
           <th style="text-align:center;">Sig</th>
         `;
       }
@@ -2849,12 +2962,7 @@
       
       // Check omnibus significance and show warning
       if (warningEl && lastBundle && lastBundle.results && lastBundle.results.omnibus) {
-        const ob = lastBundle.results.omnibus;
-        const anovaP = parseMaybeNumber(ob.anovaP);
-        const friedmanP = parseMaybeNumber(ob.kwP);
-        const relevantP = isNonParam ? friedmanP : anovaP;
-        const alpha = 0.05;
-        if (relevantP > alpha) {
+        if (!posthocOmnibusSignificant) {
           warningEl.style.display = 'block';
         } else {
           warningEl.style.display = 'none';
@@ -2917,15 +3025,21 @@
         
         return {
           comparison: r.comparison || "",
+          timepoint1: r.timepoint1 || "",
+          timepoint2: r.timepoint2 || "",
           statistic: r.statistic,
           rawP: parseMaybeNumber(r.rawP),
           adjP: parseMaybeNumber(r.adjP),
           estimate: parseMaybeNumber(r.estimate),
+          medianDiff: parseMaybeNumber(r.medianDiff),
+          effectSize: parseMaybeNumber(r.effectSize),
           ciLower: ciLower,
           ciUpper: ciUpper,
           significant: parseMaybeNumber(r.adjP) < 0.05
         };
       });
+
+      posthocTimepoints = getPosthocTimepoints(rows);
       
       // Populate reference group dropdown
       if (refSelect) {
@@ -2990,6 +3104,10 @@
           valA = a.adjP; valB = b.adjP;
         } else if (posthocSortColumn === 'estimate') {
           valA = Math.abs(a.estimate); valB = Math.abs(b.estimate);
+        } else if (posthocSortColumn === 'median') {
+          valA = Math.abs(a.medianDiff ?? a.estimate); valB = Math.abs(b.medianDiff ?? b.estimate);
+        } else if (posthocSortColumn === 'effectsize') {
+          valA = a.effectSize ?? a.estimate; valB = b.effectSize ?? b.estimate;
         } else if (posthocSortColumn === 'ci') {
           valA = a.ciUpper - a.ciLower; valB = b.ciUpper - b.ciLower;
         }
@@ -3001,6 +3119,14 @@
       const MAX_RENDER = 200;
       const rowsToRender = displayData.slice(0, MAX_RENDER);
       const isNonParam = primaryFramework === "nonparametric";
+      const pCorrectionRadio = document.querySelector('input[name="pCorrection"]:checked');
+      const correction = pCorrectionRadio ? pCorrectionRadio.value : "holm";
+      const correctionName = correction === "bh" ? "FDR (Benjamini-Hochberg)" :
+                             correction === "bonferroni" ? "Bonferroni" :
+                             correction === "none" ? "None" : "Holm";
+
+      renderPosthocSummary(posthocData, isNonParam, !posthocOmnibusSignificant, correctionName);
+      renderPosthocSigMatrix(posthocTimepoints, posthocData);
       
       rowsToRender.forEach(function(r){
         const tr = document.createElement("tr");
@@ -3009,33 +3135,48 @@
         let td = document.createElement("td");
         td.textContent = r.comparison;
         tr.appendChild(td);
-        
-        // Statistic (label as Z for nonparametric, t for parametric)
-        td = document.createElement("td");
-        td.textContent = fmt(r.statistic);
-        td.style.fontFamily = "monospace";
-        tr.appendChild(td);
-        
-        // Raw p
-        td = document.createElement("td");
-        td.textContent = fmtP(r.rawP);
-        td.style.fontFamily = "monospace";
-        tr.appendChild(td);
-        
-        // Adj p
-        td = document.createElement("td");
-        td.textContent = fmtP(r.adjP);
-        td.style.fontFamily = "monospace";
-        tr.appendChild(td);
-        
-        // Estimate (effect size r for nonparametric, mean diff for parametric)
-        td = document.createElement("td");
-        td.textContent = fmt(r.estimate);
-        td.style.fontFamily = "monospace";
-        tr.appendChild(td);
-        
-        // 95% CI (only for parametric)
-        if (!isNonParam) {
+
+        if (isNonParam) {
+          td = document.createElement("td");
+          td.textContent = fmt(isFinite(r.medianDiff) ? r.medianDiff : r.estimate);
+          td.style.fontFamily = "monospace";
+          tr.appendChild(td);
+
+          td = document.createElement("td");
+          td.textContent = fmt(r.statistic);
+          td.style.fontFamily = "monospace";
+          tr.appendChild(td);
+
+          td = document.createElement("td");
+          td.textContent = fmtP(r.adjP);
+          td.style.fontFamily = "monospace";
+          tr.appendChild(td);
+
+          td = document.createElement("td");
+          td.textContent = fmt(isFinite(r.effectSize) ? r.effectSize : r.estimate);
+          td.style.fontFamily = "monospace";
+          tr.appendChild(td);
+        } else {
+          td = document.createElement("td");
+          td.textContent = fmt(r.statistic);
+          td.style.fontFamily = "monospace";
+          tr.appendChild(td);
+
+          td = document.createElement("td");
+          td.textContent = fmtP(r.rawP);
+          td.style.fontFamily = "monospace";
+          tr.appendChild(td);
+
+          td = document.createElement("td");
+          td.textContent = fmtP(r.adjP);
+          td.style.fontFamily = "monospace";
+          tr.appendChild(td);
+
+          td = document.createElement("td");
+          td.textContent = fmt(r.estimate);
+          td.style.fontFamily = "monospace";
+          tr.appendChild(td);
+
           td = document.createElement("td");
           if (isFinite(r.ciLower) && isFinite(r.ciUpper)) {
             td.textContent = "[" + fmt(r.ciLower) + ", " + fmt(r.ciUpper) + "]";
@@ -3052,6 +3193,8 @@
         td.style.textAlign = "center";
         if (r.significant) {
           td.textContent = 'Yes';
+          td.style.color = '#4ade80';
+          td.style.fontWeight = '700';
         } else {
           td.textContent = 'No';
         }

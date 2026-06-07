@@ -3249,25 +3249,21 @@
       rho = isFinite(rho) ? rho : 0;
       epsilon = isFinite(epsilon) ? epsilon : 1;
       const localDf = rmDf(n, k, epsilon, method, 1);
-      const df1 = (cloudResult && isFinite(cloudResult.df_between))
-        ? cloudResult.df_between
-        : localDf.df1;
-      const df2 = (cloudResult && isFinite(cloudResult.df_error))
-        ? cloudResult.df_error
-        : localDf.df2;
-      const lambda = (cloudResult && isFinite(cloudResult.noncentrality_parameter))
+      const cloudOk = cloudResult && cloudResult.power_method === method;
+      const df1 = localDf.df1;
+      const df2 = localDf.df2;
+      const lambda = (cloudOk && isFinite(cloudResult.noncentrality_parameter))
         ? cloudResult.noncentrality_parameter
         : rmNcp(n, k, f, rho);
-      let critF = cloudResult && cloudResult.critical_f;
-      if (!isFinite(critF) && typeof jStat !== 'undefined' && jStat.centralF && jStat.centralF.inv) {
+      let critF = null;
+      if (typeof jStat !== 'undefined' && jStat.centralF && jStat.centralF.inv) {
         critF = jStat.centralF.inv(1 - (alpha || 0.05), df1, df2);
+      } else if (cloudOk && isFinite(cloudResult.critical_f)) {
+        critF = cloudResult.critical_f;
       }
-      const eta = partialEta || (f * f) / (1 + f * f);
-      let pillaiV = cloudResult && isFinite(cloudResult.pillai_v) ? cloudResult.pillai_v : null;
-      if (!isFinite(pillaiV)) pillaiV = pillaiVLocal(method, f, lambda, n);
-      const actualPower = (cloudResult && isFinite(cloudResult.observed_power))
-        ? cloudResult.observed_power
-        : ((cloudResult && isFinite(cloudResult.achieved_power)) ? cloudResult.achieved_power : power);
+      let pillaiV = pillaiVLocal(method, f, lambda, n);
+      if (cloudOk && isFinite(cloudResult.pillai_v)) pillaiV = cloudResult.pillai_v;
+      const actualPower = rmPowerAtFLocal(n, k, f, alpha, rho, epsilon, method, 1);
       return {
         lambda: lambda,
         critical_f: critF,
@@ -3503,8 +3499,19 @@
         return;
       }
       
-      // Observed statistics
-      const powerPct = (observed_power * 100).toFixed(1) + "%";
+      // Observed statistics — always align power with selected engine
+      const setupPow = (lastBundle && lastBundle.setup) || {};
+      const kPow = (setupPow.selectedColumns || []).length;
+      const explorePow = (lastBundle && lastBundle.explore) || {};
+      const omnibusPow = (lastBundle && lastBundle.results && lastBundle.results.omnibus) || {};
+      const ctxPow = getPowerContext(omnibusPow, explorePow);
+      const method = getPowerMethod();
+      const cloudMatches = results.power_method === method;
+      let displayPower = observed_power;
+      if ((!cloudMatches || fallback || local) && effect_size_cohen_f && currentN && kPow >= 2) {
+        displayPower = rmPowerAtFLocal(currentN, kPow, effect_size_cohen_f, alpha, ctxPow.avgR, ctxPow.epsilon, method, 1);
+      }
+      const powerPct = (displayPower * 100).toFixed(1) + "%";
       setText("powObserved", powerPct);
       setText("powEffectSize", effect_size_cohen_f ? effect_size_cohen_f.toFixed(3) : "N/A");
       setText("powSampleSize", currentN || "N/A");
@@ -3551,8 +3558,10 @@
         setText("powReq85", "N/A");
       }
 
-      if (required_for_90pct) {
+      if (useCloudReqN && required_for_90pct) {
         setText("powReq90", required_for_90pct);
+      } else if (effect_size_cohen_f && kPow >= 2) {
+        setText("powReq90", estimateRequiredN(effect_size_cohen_f, kPow, 0.90, alpha, ctxPow.avgR, ctxPow.epsilon, method, 1));
       } else {
         setText("powReq90", "N/A");
       }
@@ -3568,11 +3577,16 @@
       if (observed_power >= 0.80) {
         statusMsg = `? Excellent power (${powerPct}) with n=${currentN}. Effect detected reliably.`;
         statusType = "success";
-      } else if (observed_power >= 0.60) {
+      } else if (displayPower >= 0.60) {
         statusMsg = `Moderate power (${powerPct}) with n=${currentN}. Recommend n approx ${required_for_80pct || 'N/A'} for 80% power.`;
         statusType = "warning";
       } else {
-        statusMsg = `Low power (${powerPct}) with n=${currentN}. Need n approx ${required_for_80pct || 'N/A'} for adequate detection.`;
+        const req80Display = useCloudReqN && required_for_80pct
+          ? required_for_80pct
+          : (effect_size_cohen_f && kPow >= 2
+            ? estimateRequiredN(effect_size_cohen_f, kPow, 0.80, alpha, ctxPow.avgR, ctxPow.epsilon, method, 1)
+            : 'N/A');
+        statusMsg = `Low power (${powerPct}) with n=${currentN}. Need n approx ${req80Display} for adequate detection.`;
         statusType = "error";
       }
       
@@ -3616,7 +3630,7 @@
         observed_power,
         partial_eta_squared || partialEta,
         results,
-        results.power_method || getPowerMethod()
+        method
       ));
 
       /* Sync planning card label+value to whichever chip is currently selected */

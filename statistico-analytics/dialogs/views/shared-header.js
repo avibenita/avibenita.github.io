@@ -1903,9 +1903,7 @@ const StatisticoHeader = {
           }
         } catch(e) {}
       }
-      if (window.regressionData) {
-        try { sessionStorage.setItem('regressionNavData', JSON.stringify(window.regressionData)); } catch(e) {}
-      }
+      this._syncRegressionNavStorage();
       if (this.module === 'univariate') {
         this._syncLiveDataToStorage();
       }
@@ -5010,8 +5008,49 @@ const StatisticoHeader = {
     this._injectUniFilterAssets();
   },
 
+  _isValidRegressionNavPayload(payload) {
+    return !!(payload && payload.modelSpec && payload.modelSpec.y
+      && Array.isArray(payload.headers) && payload.headers.length
+      && (Array.isArray(payload.rows) ? payload.rows.length : (Array.isArray(payload.sourceRows) && payload.sourceRows.length)));
+  },
+
+  _syncRegressionNavStorage() {
+    try {
+      let payload = null;
+      if (window.regressionNavData && this._isValidRegressionNavPayload(window.regressionNavData)) {
+        payload = window.regressionNavData;
+      }
+      if (!payload) {
+        const raw = sessionStorage.getItem('regressionNavData');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (this._isValidRegressionNavPayload(parsed)) payload = parsed;
+        }
+      }
+      if (!payload && window.regressionHeaders && window.regressionRows && window.regressionModelSpec) {
+        payload = {
+          results: window.regressionResults || null,
+          headers: window.regressionHeaders,
+          rows: window.regressionRows,
+          address: window.regressionAddress || '',
+          modelSpec: window.regressionModelSpec
+        };
+      }
+      if (payload && this._isValidRegressionNavPayload(payload)) {
+        if (!Array.isArray(payload.rows) && Array.isArray(payload.sourceRows)) {
+          payload.rows = payload.sourceRows;
+        }
+        sessionStorage.setItem('regressionNavData', JSON.stringify(payload));
+        window.regressionNavData = payload;
+      }
+    } catch (e) {
+      console.warn('Regression nav storage sync failed.', e);
+    }
+  },
+
   _ensureRegressionByGroupNav(nav) {
     if (this.module !== 'regression' || !nav) return;
+    if (!document.getElementById('regSidebarMain')) return;
     if (document.getElementById('regByGroupNav')) return;
     const pinned = document.createElement('div');
     pinned.id = 'regByGroupNav';

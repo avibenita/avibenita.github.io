@@ -1211,7 +1211,7 @@ const StatisticoHeader = {
         ],
         pinnedNav: {
           items: [
-            { type: 'navigate', view: 'correlation-by-group', file: 'correlations/by-group.html', icon: 'fa-layer-group', label: 'By Group', description: 'Compare pairwise r across group levels with pattern sparklines.' }
+            { type: 'navigate', view: 'correlation-by-group', file: 'correlations/by-group.html', icon: 'fa-sitemap', label: 'By Group', description: 'Compare pairwise r across group levels with pattern sparklines.' }
           ]
         }
       };

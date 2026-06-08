@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>By Group - Regression</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260606regbg" />
+  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
+  <script src="../shared-header.js?v=20260606regbg"></script>
+  <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
+  <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
+  <script src="../../shared/uni-normality-tests.js?v=20260524a"></script>
+  <script src="../../../src/shared/js/core/regression-compute.js"></script>
+  <style>
+    :root {
+      --surface-0:#0c1624; --surface-1:#1a1f2e; --surface-2:#242938; --border:#2d3748;
+      --accent-1:rgb(255,165,120); --accent-2:#78c8ff; --text-primary:#fff; --text-secondary:rgba(255,255,255,.78);
+      --pos-r:#34d399; --neg-r:#fb7185;
+      --grid-line:#334155; --grid-inner:#1e293b; --grid-block-group:#60a5fa; --grid-block-overall:#fb923c;
+    }
+    :root[data-theme="light"] {
+      --surface-0:#eef0f4; --surface-1:#fff; --surface-2:#f3f4f6; --border:#cbd5e1;
+      --accent-1:#2563eb; --accent-2:#1d4ed8; --text-primary:#111827; --text-secondary:#374151;
+      --pos-r:#15803d; --neg-r:#be123c;
+      --grid-line:#d1d5db; --grid-inner:#e5e7eb; --grid-block-group:#93c5fd; --grid-block-overall:#fdba74;
+    }
+    html, body { height:100%; margin:0; overflow:hidden; }
+    body { background:var(--surface-0); color:var(--text-primary); font-family:"Segoe UI", Tahoma, sans-serif; display:flex; flex-direction:column; }
+    .right-col { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+    .view-wrap { flex:1; min-height:0; padding:12px; box-sizing:border-box; overflow:hidden; }
+    .view-card { height:100%; display:flex; flex-direction:column; background:var(--surface-1); border:1px solid var(--border); border-radius:12px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.24); }
+    .toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border-bottom:1px solid var(--border); background:linear-gradient(180deg, rgba(255,255,255,.04), transparent); flex-wrap:wrap; }
+    .title { display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .title strong { color:var(--accent-1); font-size:14px; letter-spacing:.03em; text-transform:uppercase; }
+    .title span { color:var(--text-secondary); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+    .group-choice-label { color:var(--text-secondary); font-size:12px; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    select, button { border:1px solid var(--border); border-radius:8px; background:var(--surface-2); color:var(--text-primary); padding:7px 10px; font-size:12px; }
+    button { cursor:pointer; font-weight:700; }
+    .content { flex:1; min-height:0; overflow:auto; padding:12px; }
+    .summary-strip { display:grid; grid-template-columns:repeat(4, minmax(110px, 1fr)); gap:10px; margin-bottom:12px; }
+    .metric { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px; }
+    .metric label { display:block; color:var(--text-secondary); font-size:10px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
+    .metric strong { font-size:18px; color:var(--accent-1); }
+    .fit-strip { margin-bottom:12px; padding:12px 14px; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); }
+    .fit-strip-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+    .fit-strip-head strong { color:var(--accent-1); font-size:13px; letter-spacing:.04em; text-transform:uppercase; }
+    .fit-strip-head strong i { margin-right:6px; opacity:.9; }
+    .fit-strip-head span { color:var(--text-secondary); font-size:12px; }
+    .fit-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:10px; }
+    .fit-card { border:1px solid var(--border); border-radius:10px; padding:12px 14px; background:var(--surface-1); min-width:0; }
+    .fit-card-overall { border-color:color-mix(in srgb, var(--accent-1) 42%, var(--border)); background:linear-gradient(180deg, color-mix(in srgb, var(--accent-1) 10%, var(--surface-1)) 0%, var(--surface-1) 100%); }
+    .fit-card-group { border-color:color-mix(in srgb, var(--accent-2) 42%, var(--border)); background:linear-gradient(180deg, color-mix(in srgb, var(--accent-2) 10%, var(--surface-1)) 0%, var(--surface-1) 100%); }
+    .fit-card-label { font-size:14px; font-weight:800; color:var(--accent-2); margin-bottom:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .fit-card-overall .fit-card-label { color:var(--accent-1); }
+    .fit-metrics { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px 10px; margin-bottom:10px; font-size:11px; }
+    .fit-metrics span { color:var(--text-secondary); }
+    .fit-metrics strong { display:block; font-size:13px; color:var(--text-primary); font-variant-numeric:tabular-nums; }
+    .fit-residual-row { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-top:8px; border-top:1px solid var(--border); }
+    .fit-residual-label { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-secondary); }
+    .fit-norm { text-align:right; font-size:11px; font-weight:700; line-height:1.35; }
+    .fit-norm-ok { color:var(--pos-r); }
+    .fit-norm-bad { color:var(--neg-r); }
+    .fit-norm-na { color:var(--text-secondary); }
+    .resid-sparkline { display:block; width:120px; height:36px; }
+    .resid-sparkline .spark-bar { opacity:.9; fill:var(--accent-2); }
+    .table-wrap { overflow:auto; border:1px solid var(--border); border-radius:10px; }
+    #regByGroupTable { width:100%; border-collapse:separate; border-spacing:0; font-size:13px; }
+    #regByGroupTable th, #regByGroupTable td { border-bottom:1px solid var(--grid-inner); border-right:1px solid var(--grid-inner); padding:8px 10px; }
+    #regByGroupTable th { position:sticky; top:0; z-index:2; background:var(--surface-2); color:var(--text-secondary); }
+    #regByGroupTable th.sortable { cursor:pointer; user-select:none; }
+    #regByGroupTable th.sort-active { color:var(--accent-1); }
+    #regByGroupTable .term-cell { font-weight:650; color:var(--text-primary); position:sticky; left:0; z-index:1; background:var(--surface-1); min-width:160px; }
+    #regByGroupTable thead th.term-col { z-index:3; left:0; }
+    td.coef-pos { color:var(--pos-r); font-weight:600; }
+    td.coef-neg { color:var(--neg-r); font-weight:600; }
+    td.group-cell, td.overall-cell { text-align:center; font-variant-numeric:tabular-nums; min-width:52px; }
+    td.group-cell { background:color-mix(in srgb, var(--accent-2) 7%, var(--surface-2)); font-weight:650; }
+    td.overall-cell { background:color-mix(in srgb, var(--accent-1) 6%, var(--surface-2)); font-weight:600; }
+    td.group-block-first { border-left:2px solid var(--grid-block-group); }
+    td.group-block-overall-first { border-left:2px solid var(--grid-block-overall); }
+    th.group-category { text-align:center; border-bottom:2px solid var(--grid-block-group); }
+    th.group-category-overall { border-bottom-color:var(--grid-block-overall); }
+    .group-category-name { display:block; font-size:13px; font-weight:800; color:var(--accent-2); }
+    th.group-category-overall .group-category-name { color:var(--accent-1); }
+    .group-category-meta { display:block; margin-top:4px; font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.04em; }
+    .r-sparkline { display:block; width:120px; height:36px; pointer-events:none; }
+    .r-sparkline .spark-mid { stroke:var(--border); stroke-width:1; }
+    .spark-wrap { display:flex; align-items:center; justify-content:center; width:120px; height:36px; cursor:help; border-radius:6px; outline:none; }
+    .spark-wrap:hover, .spark-wrap:focus-visible { background:rgba(120,200,255,.08); box-shadow:inset 0 0 0 1px rgba(120,200,255,.22); }
+    .empty { margin:32px auto; max-width:720px; text-align:center; color:var(--text-secondary); line-height:1.5; }
+    .empty i { display:block; color:var(--accent-1); font-size:32px; margin-bottom:10px; }
+    .group-dialog-overlay { position:fixed; inset:0; z-index:2147483200; display:none; align-items:center; justify-content:center; padding:16px; background:rgba(3,7,18,.64); backdrop-filter:blur(3px); }
+    .group-dialog-overlay.is-visible { display:flex; }
+    .group-dialog { width:min(920px,96vw); max-height:86vh; display:flex; flex-direction:column; background:var(--surface-1); border:1px solid var(--border); border-radius:14px; box-shadow:0 24px 70px rgba(0,0,0,.42); overflow:hidden; }
+    .group-dialog-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:16px 18px; border-bottom:1px solid var(--border); }
+    .group-dialog-head strong { display:block; color:var(--accent-1); font-size:15px; margin-bottom:4px; }
+    .group-dialog-head span { color:var(--text-secondary); font-size:12px; line-height:1.4; }
+    .group-dialog-close { width:32px; height:32px; display:flex; align-items:center; justify-content:center; padding:0; border-radius:8px; }
+    .group-dialog-body { display:grid; grid-template-columns:minmax(250px, 1fr) minmax(280px, 1fr); gap:0; min-height:0; overflow:hidden; }
+    .group-dialog-list { padding:10px; overflow:auto; border-right:1px solid var(--border); }
+    .group-option { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; margin:4px 0; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); color:var(--text-primary); text-align:left; cursor:pointer; }
+    .group-option:hover, .group-option.is-selected { border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 45%, transparent); }
+    .group-option small { color:var(--text-secondary); font-weight:500; }
+    .level-preview { padding:12px; overflow:auto; min-height:360px; }
+    .level-preview.is-hidden { display:none; }
+    .level-placeholder { display:flex; height:100%; min-height:320px; align-items:center; justify-content:center; color:var(--text-secondary); text-align:center; padding:20px; font-size:13px; line-height:1.5; }
+    .level-placeholder i { display:block; color:var(--accent-1); font-size:28px; margin-bottom:10px; }
+    .level-preview-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:10px; }
+    .level-preview-head strong { color:var(--accent-1); font-size:13px; }
+    .level-preview-head span { display:block; color:var(--text-secondary); font-size:11px; margin-top:3px; }
+    .level-actions { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; margin-bottom:8px; }
+    .level-actions button { padding:5px 8px; font-size:11px; }
+    .group-dialog-foot { display:flex; justify-content:flex-end; align-items:center; gap:10px; padding:14px 18px 16px; border-top:1px solid var(--border); }
+    .group-dialog-done-btn { display:inline-flex; align-items:center; gap:8px; padding:11px 26px; font-size:13px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; border:none; border-radius:10px; color:#fff; cursor:pointer; background:linear-gradient(135deg, var(--accent-2) 0%, #4fc3f7 55%, var(--accent-1) 100%); box-shadow:0 10px 26px rgba(79,195,247,.32); }
+    .level-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 8px; border:1px solid var(--border); border-radius:8px; background:rgba(15,23,42,.22); margin-bottom:5px; color:var(--text-primary); font-size:12px; }
+    .level-row label { display:flex; align-items:center; gap:8px; min-width:0; cursor:pointer; }
+    .level-row input { accent-color:var(--accent-1); }
+    .level-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .level-n { color:var(--text-secondary); font-size:11px; white-space:nowrap; }
+    @media (max-width: 900px) {
+      .summary-strip { grid-template-columns:repeat(2, minmax(110px, 1fr)); }
+      .group-dialog-body { grid-template-columns:1fr; }
+      .group-dialog-list { border-right:none; border-bottom:1px solid var(--border); max-height:280px; }
+    }
+  </style>
+</head>
+<body data-page-version="20260606-reg-bygroup-v1">
+  <nav class="sb-nav" id="sidebarNav"></nav>
+  <div class="right-col">
+    <div id="header-container"></div>
+    <div class="view-wrap">
+      <section class="view-card">
+        <div class="toolbar">
+          <div class="title">
+            <strong>Regression by Group</strong>
+            <span id="subtitle">Compare coefficients and residual normality across group levels.</span>
+          </div>
+          <div class="controls">
+            <span class="group-choice-label" id="groupChoiceLabel">No grouping column selected</span>
+            <button id="chooseGroupBtn" type="button" onclick="openGroupDialog()"><i class="fa-solid fa-layer-group"></i> Choose Group</button>
+          </div>
+        </div>
+        <div class="content">
+          <div id="emptyState" class="empty">
+            <i class="fa-solid fa-sitemap"></i>
+            Run a regression analysis, then choose a grouping column to compare model parameters across levels.
+          </div>
+          <div id="mainContent" style="display:none;">
+            <div class="summary-strip">
+              <div class="metric"><label>Predictors</label><strong id="metricPredictors">—</strong></div>
+              <div class="metric"><label>Groups</label><strong id="metricGroups">—</strong></div>
+              <div class="metric"><label>Group column</label><strong id="metricGroupCol" style="font-size:14px;">—</strong></div>
+              <div class="metric"><label>Filtered rows</label><strong id="metricRows">—</strong></div>
+            </div>
+            <div id="fitStrip" class="fit-strip" style="display:none;">
+              <div class="fit-strip-head">
+                <strong><i class="fa-solid fa-gauge-high"></i> Model fit &amp; residuals</strong>
+                <span id="fitStripSubtitle">R², RMSE, residual histogram, and Shapiro–Wilk normality by level</span>
+              </div>
+              <div class="fit-cards" id="fitCards"></div>
+            </div>
+            <div class="table-wrap">
+              <table id="regByGroupTable">
+                <thead id="regByGroupHead"></thead>
+                <tbody id="regByGroupBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="group-dialog-overlay" id="groupDialog" role="dialog" aria-modal="true" aria-labelledby="groupDialogTitle">
+    <div class="group-dialog">
+      <div class="group-dialog-head">
+        <div>
+          <strong id="groupDialogTitle">Select Grouping Column</strong>
+          <span>Choose the categorical column used to split the regression. Adjust included levels on the right.</span>
+        </div>
+        <button class="group-dialog-close" type="button" onclick="closeGroupDialog()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="group-dialog-body">
+        <div class="group-dialog-list" id="groupDialogList"></div>
+        <div class="level-preview is-hidden" id="groupLevelPreview"></div>
+        <div class="level-placeholder" id="groupLevelPlaceholder"><div><i class="fa-solid fa-hand-pointer"></i>Select a grouping column to preview its levels and n.</div></div>
+      </div>
+      <div class="group-dialog-foot">
+        <button type="button" class="group-dialog-done-btn" onclick="closeGroupDialog()"><i class="fa-solid fa-check"></i> Done</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let regressionPayload = null;
+    let modelSpec = null;
+    let sourceHeaders = [];
+    let sourceRows = [];
+    let groupIndex = null;
+    let previewGroupIndex = null;
+    let previewLevels = [];
+    let activeGroups = [];
+    let fixedCategoricalInfo = null;
+    let displayTerms = [];
+    let tableRows = [];
+    let overallFit = null;
+    let sortConfig = { key: 'term', direction: 'ascending' };
+    const levelSelections = {};
+
+    function decimalDigits(autoDefault) {
+      const fallback = Number.isFinite(autoDefault) ? autoDefault : 3;
+      if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader.getDecimalPreference === 'function') {
+        const pref = StatisticoHeader.getDecimalPreference();
+        if (pref === 'auto' || pref === null || pref === '') return fallback;
+        const parsed = parseInt(pref, 10);
+        return Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : fallback;
+      }
+      return fallback;
+    }
+
+    function fmt(value, autoDefault) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n.toFixed(decimalDigits(autoDefault)) : '—';
+    }
+
+    function formatP(p) {
+      if (p == null || !Number.isFinite(p)) return '—';
+      if (p < 0.001) return '<0.001';
+      return fmt(p);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+    }
+
+    function tipAttr(text) {
+      return String(text ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function rowValue(row, idx, name) {
+      return Array.isArray(row) ? row[idx] : row && row[name];
+    }
+
+    function levelKey(value) {
+      return value === null || value === undefined || value === '' ? '(blank)' : String(value);
+    }
+
+    function normalizeInteractionTerms(interactions) {
+      if (!Array.isArray(interactions)) return [];
+      return interactions
+        .map((ix) => {
+          if (!ix) return null;
+          const var1 = ix.var1 || ix.v1;
+          const var2 = ix.var2 || ix.v2;
+          return (var1 && var2) ? { var1: String(var1), var2: String(var2) } : null;
+        })
+        .filter(Boolean);
+    }
+
+    function getUniqueCategories(rows, colIndex) {
+      const categories = new Set();
+      for (const row of rows) {
+        const val = row[colIndex];
+        if (val !== null && val !== undefined && val !== '') categories.add(String(val));
+      }
+      return Array.from(categories).sort();
+    }
+
+    function createDummyVariables(value, categories) {
+      const dummies = [];
+      const strValue = String(value);
+      for (let i = 1; i < categories.length; i++) {
+        dummies.push(strValue === categories[i] ? 1 : 0);
+      }
+      return dummies;
+    }
+
+    function buildCategoricalInfo(rows, headers, xcSorted) {
+      const info = [];
+      for (const varName of xcSorted) {
+        const xcIdx = headers.indexOf(varName);
+        if (xcIdx === -1) continue;
+        const categories = getUniqueCategories(rows, xcIdx);
+        if (categories.length < 2) continue;
+        info.push({
+          name: varName,
+          index: xcIdx,
+          categories,
+          dummyNames: categories.slice(1).map((cat) => `${varName}_${cat}`)
+        });
+      }
+      return info;
+    }
+
+    function buildRegressionMatrices(rows, headers, spec, categoricalInfoOverride) {
+      if (!spec || !rows || !rows.length) return null;
+      const { y, xn = [], xc = [], intercept } = spec;
+      const interactions = normalizeInteractionTerms(spec.interactions);
+      const includeIntercept = intercept === 1 || intercept === true;
+      const yIndex = headers.indexOf(y);
+      if (yIndex === -1) return null;
+
+      const xnSorted = [...xn].sort((a, b) => headers.indexOf(a) - headers.indexOf(b));
+      const xcSorted = [...xc].sort((a, b) => headers.indexOf(a) - headers.indexOf(b));
+      const xnIndices = xnSorted.map((varName) => headers.indexOf(varName));
+      const categoricalInfo = categoricalInfoOverride || buildCategoricalInfo(rows, headers, xcSorted);
+
+      const variableNames = [...xnSorted];
+      categoricalInfo.forEach((catInfo) => variableNames.push(...catInfo.dummyNames));
+
+      const interactionInfo = interactions.map((ix) => {
+        const v1 = ix.var1;
+        const v2 = ix.var2;
+        return {
+          v1, v2,
+          v1IsNumeric: xnSorted.indexOf(v1) >= 0,
+          v2IsNumeric: xnSorted.indexOf(v2) >= 0,
+          v1Cat: categoricalInfo.find((c) => c.name === v1),
+          v2Cat: categoricalInfo.find((c) => c.name === v2),
+          v1Idx: headers.indexOf(v1),
+          v2Idx: headers.indexOf(v2)
+        };
+      });
+
+      const interactionColumnNames = [];
+      interactionInfo.forEach((ixi) => {
+        if (ixi.v1IsNumeric && ixi.v2IsNumeric) {
+          interactionColumnNames.push(`${ixi.v1} × ${ixi.v2}`);
+        } else if (ixi.v1IsNumeric && ixi.v2Cat) {
+          ixi.v2Cat.dummyNames.forEach((d) => interactionColumnNames.push(`${ixi.v1} × ${d}`));
+        } else if (ixi.v1Cat && ixi.v2IsNumeric) {
+          ixi.v1Cat.dummyNames.forEach((d) => interactionColumnNames.push(`${d} × ${ixi.v2}`));
+        } else if (ixi.v1Cat && ixi.v2Cat) {
+          ixi.v1Cat.dummyNames.forEach((d1) => ixi.v2Cat.dummyNames.forEach((d2) => interactionColumnNames.push(`${d1} × ${d2}`)));
+        }
+      });
+      variableNames.push(...interactionColumnNames);
+
+      const xMatrix = [];
+      const yVector = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const yVal = parseFloat(row[yIndex]);
+        if (isNaN(yVal)) continue;
+
+        const xRow = [];
+        let validRow = true;
+
+        for (const xnIdx of xnIndices) {
+          const val = parseFloat(row[xnIdx]);
+          if (isNaN(val)) { validRow = false; break; }
+          xRow.push(val);
+        }
+        if (!validRow) continue;
+
+        for (const catInfo of categoricalInfo) {
+          const catValue = row[catInfo.index];
+          if (catValue === null || catValue === undefined || catValue === '') {
+            validRow = false;
+            break;
+          }
+          xRow.push(...createDummyVariables(catValue, catInfo.categories));
+        }
+        if (!validRow) continue;
+
+        for (const ixi of interactionInfo) {
+          if (ixi.v1IsNumeric && ixi.v2IsNumeric) {
+            xRow.push(parseFloat(row[ixi.v1Idx]) * parseFloat(row[ixi.v2Idx]));
+          } else if (ixi.v1IsNumeric && ixi.v2Cat) {
+            const v1Val = parseFloat(row[ixi.v1Idx]);
+            createDummyVariables(row[ixi.v2Cat.index], ixi.v2Cat.categories).forEach((d) => xRow.push(v1Val * d));
+          } else if (ixi.v1Cat && ixi.v2IsNumeric) {
+            const v2Val = parseFloat(row[ixi.v2Idx]);
+            createDummyVariables(row[ixi.v1Cat.index], ixi.v1Cat.categories).forEach((d) => xRow.push(d * v2Val));
+          } else if (ixi.v1Cat && ixi.v2Cat) {
+            const dums1 = createDummyVariables(row[ixi.v1Cat.index], ixi.v1Cat.categories);
+            const dums2 = createDummyVariables(row[ixi.v2Cat.index], ixi.v2Cat.categories);
+            dums1.forEach((d1) => dums2.forEach((d2) => xRow.push(d1 * d2)));
+          }
+        }
+
+        xMatrix.push(xRow);
+        yVector.push(yVal);
+      }
+
+      if (!xMatrix.length || xMatrix.length !== yVector.length) return null;
+
+      const displayNames = includeIntercept ? ['Intercept', ...variableNames] : variableNames.slice();
+      const paramCount = xMatrix[0].length + (includeIntercept ? 1 : 0);
+
+      return {
+        xMatrix,
+        yVector,
+        includeIntercept,
+        variableNames,
+        displayNames,
+        paramCount,
+        categoricalInfo
+      };
+    }
+
+    function fitRegression(rows, categoricalInfoOverride) {
+      const built = buildRegressionMatrices(rows, sourceHeaders, modelSpec, categoricalInfoOverride);
+      if (!built || built.yVector.length <= built.paramCount) return null;
+      try {
+        const results = computeOLS(built.xMatrix, built.yVector, built.includeIntercept, 0.05);
+        return {
+          label: null,
+          n: results.n,
+          results,
+          displayNames: built.displayNames,
+          residuals: results.residuals || []
+        };
+      } catch (_err) {
+        return null;
+      }
+    }
+
+    function residualNormality(residuals) {
+      if (!Array.isArray(residuals) || residuals.length < 3 || typeof UniNormalityTests === 'undefined') {
+        return { p: NaN, verdict: '—', unreliable: false };
+      }
+      const sw = UniNormalityTests.shapiroWilkTest(residuals, { allowTies: true });
+      let verdict = '—';
+      if (Number.isFinite(sw.pValue)) {
+        verdict = sw.pValue >= 0.05 ? 'Normal' : 'Non-normal';
+        if (sw.unreliable) verdict += ' (SW ⚠)';
+      }
+      return { p: sw.pValue, statistic: sw.statistic, verdict, unreliable: sw.unreliable };
+    }
+
+    function buildResidualHistSvg(residuals) {
+      const w = 120;
+      const h = 36;
+      if (!Array.isArray(residuals) || residuals.length < 3) {
+        return `<svg class="resid-sparkline" viewBox="0 0 ${w} ${h}" aria-hidden="true"><text x="60" y="20" text-anchor="middle" fill="var(--text-secondary)" font-size="10">—</text></svg>`;
+      }
+      const bins = 10;
+      const min = Math.min(...residuals);
+      const max = Math.max(...residuals);
+      const range = max - min || 1;
+      const counts = new Array(bins).fill(0);
+      residuals.forEach((r) => {
+        let b = Math.floor(((r - min) / range) * bins);
+        if (b >= bins) b = bins - 1;
+        if (b < 0) b = 0;
+        counts[b]++;
+      });
+      const maxC = Math.max(...counts, 1);
+      const gap = 2;
+      const barW = Math.max(3, (w - gap * (bins + 1)) / bins);
+      let bars = '';
+      counts.forEach((c, i) => {
+        const barH = Math.max(1, (c / maxC) * (h - 6));
+        const x = gap + i * (barW + gap);
+        const y = h - 3 - barH;
+        bars += `<rect class="spark-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" />`;
+      });
+      const zeroX = gap + Math.max(0, Math.min(bins - 1, Math.floor(((-min) / range) * bins))) * (barW + gap) + barW / 2;
+      return `<svg class="resid-sparkline" viewBox="0 0 ${w} ${h}" aria-hidden="true">${bars}<line x1="${zeroX.toFixed(1)}" y1="2" x2="${zeroX.toFixed(1)}" y2="${h - 2}" stroke="var(--accent-1)" stroke-width="1" opacity=".55" stroke-dasharray="2 2" /></svg>`;
+    }
+
+    function buildCoefSparklineSvg(groupCoefs) {
+      const w = 120;
+      const h = 36;
+      const mid = h / 2;
+      const maxHalf = mid - 3;
+      const count = groupCoefs.length || 1;
+      const gap = 2;
+      const barW = Math.max(4, (w - gap * (count + 1)) / count);
+      let bars = '';
+      groupCoefs.forEach((gr, i) => {
+        const hasB = Number.isFinite(gr.beta);
+        const beta = hasB ? gr.beta : 0;
+        const maxAbs = Math.max(...groupCoefs.filter((g) => Number.isFinite(g.beta)).map((g) => Math.abs(g.beta)), 1e-6);
+        const norm = hasB ? Math.max(-1, Math.min(1, beta / maxAbs)) : 0;
+        const barH = hasB ? Math.max(2, Math.abs(norm) * maxHalf) : 2;
+        const x = gap + i * (barW + gap);
+        const y = hasB && norm >= 0 ? mid - barH : mid;
+        const fill = !hasB ? 'rgba(148,163,184,.35)' : (norm >= 0 ? 'var(--pos-r)' : 'var(--neg-r)');
+        bars += `<rect class="spark-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" fill="${fill}" />`;
+      });
+      const tipHtml = groupCoefs.map((gr) => {
+        const val = Number.isFinite(gr.beta) ? fmt(gr.beta, 4) : '—';
+        return `<div style="display:flex;justify-content:space-between;gap:12px;line-height:1.45;"><span><strong>${escapeHtml(gr.group)}</strong></span><span>β = ${val}, p = ${formatP(gr.p)}</span></div>`;
+      }).join('');
+      const svg = `<svg class="r-sparkline" viewBox="0 0 ${w} ${h}" aria-hidden="true"><line class="spark-mid" x1="0" y1="${mid}" x2="${w}" y2="${mid}" />${bars}</svg>`;
+      return `<div class="spark-wrap" tabindex="0" data-st-tip-html="${tipAttr(tipHtml)}" aria-label="Coefficient pattern across groups">${svg}</div>`;
+    }
+
+    function coefClass(value) {
+      if (!Number.isFinite(value)) return '';
+      if (Math.abs(value) < 1e-12) return '';
+      return value > 0 ? 'coef-pos' : 'coef-neg';
+    }
+
+    function getLevelCounts(idx) {
+      const counts = new Map();
+      sourceRows.forEach((row) => {
+        const key = levelKey(rowValue(row, idx, sourceHeaders[idx]));
+        counts.set(key, (counts.get(key) || 0) + 1);
+      });
+      return Array.from(counts.entries())
+        .map(([level, n]) => ({ level, n }))
+        .sort((a, b) => String(a.level).localeCompare(String(b.level), undefined, { numeric: true }));
+    }
+
+    function ensureLevelSelection(idx) {
+      const key = String(idx);
+      const levels = getLevelCounts(idx);
+      if (!levelSelections[key]) levelSelections[key] = {};
+      levels.forEach((item) => {
+        if (levelSelections[key][item.level] === undefined) levelSelections[key][item.level] = true;
+      });
+      Object.keys(levelSelections[key]).forEach((level) => {
+        if (!levels.some((item) => item.level === level)) delete levelSelections[key][level];
+      });
+      return levelSelections[key];
+    }
+
+    function isLevelIncluded(idx, level) {
+      return ensureLevelSelection(idx)[level] !== false;
+    }
+
+    function setEmpty(message) {
+      document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('emptyState').innerHTML = `<i class="fa-solid fa-sitemap"></i>${escapeHtml(message)}`;
+      document.getElementById('mainContent').style.display = 'none';
+    }
+
+    function populateGroupChoices() {
+      const list = document.getElementById('groupDialogList');
+      list.innerHTML = sourceHeaders.map((header, idx) => {
+        const levels = getLevelCounts(idx);
+        const note = `${levels.length} level${levels.length === 1 ? '' : 's'}, n=${levels.reduce((s, item) => s + item.n, 0)}`;
+        return `<button type="button" class="group-option" data-group-index="${idx}" onclick="selectGroupColumn(${idx}, true)">
+          <span>${escapeHtml(header)}</span><small>${escapeHtml(note)}</small>
+        </button>`;
+      }).join('');
+      refreshGroupDialogSelection();
+    }
+
+    function updateGroupChoiceLabel() {
+      document.getElementById('groupChoiceLabel').textContent = groupIndex == null
+        ? 'No grouping column selected'
+        : `Group by: ${sourceHeaders[groupIndex] || 'Group'}`;
+    }
+
+    function refreshGroupDialogSelection() {
+      document.querySelectorAll('.group-option').forEach((btn) => {
+        btn.classList.toggle('is-selected', Number(btn.getAttribute('data-group-index')) === Number(groupIndex));
+      });
+    }
+
+    function hideLevelPreview() {
+      document.getElementById('groupLevelPreview').classList.add('is-hidden');
+      document.getElementById('groupLevelPreview').innerHTML = '';
+      document.getElementById('groupLevelPlaceholder').style.display = 'flex';
+    }
+
+    function renderLevelPreview(idx) {
+      previewGroupIndex = Number(idx);
+      document.getElementById('groupLevelPreview').classList.remove('is-hidden');
+      document.getElementById('groupLevelPlaceholder').style.display = 'none';
+      ensureLevelSelection(previewGroupIndex);
+      previewLevels = getLevelCounts(previewGroupIndex);
+      const selectedCount = previewLevels.filter((item) => isLevelIncluded(previewGroupIndex, item.level)).length;
+      const totalN = previewLevels.reduce((sum, item) => sum + item.n, 0);
+      document.getElementById('groupLevelPreview').innerHTML = [
+        `<div class="level-preview-head"><div><strong>${escapeHtml(sourceHeaders[previewGroupIndex] || 'Group')}</strong><span>${selectedCount} of ${previewLevels.length} levels included, n=${totalN}</span></div></div>`,
+        `<div class="level-actions"><button type="button" onclick="setAllPreviewLevels(true)">Include all</button><button type="button" onclick="setAllPreviewLevels(false)">Exclude all</button></div>`,
+        previewLevels.map((item, pos) => `
+          <div class="level-row">
+            <label title="${escapeHtml(item.level)}">
+              <input type="checkbox" ${isLevelIncluded(previewGroupIndex, item.level) ? 'checked' : ''} onchange="togglePreviewLevel(${pos}, this.checked)" />
+              <span class="level-name">${escapeHtml(item.level)}</span>
+            </label>
+            <span class="level-n">n=${item.n}</span>
+          </div>
+        `).join('')
+      ].join('');
+    }
+
+    function togglePreviewLevel(pos, included) {
+      const item = previewLevels[pos];
+      if (!item) return;
+      ensureLevelSelection(previewGroupIndex)[item.level] = !!included;
+      if (previewGroupIndex === groupIndex) renderByGroup();
+      renderLevelPreview(previewGroupIndex);
+    }
+
+    function setAllPreviewLevels(included) {
+      previewLevels.forEach((item) => { ensureLevelSelection(previewGroupIndex)[item.level] = !!included; });
+      if (previewGroupIndex === groupIndex) renderByGroup();
+      renderLevelPreview(previewGroupIndex);
+    }
+
+    function openGroupDialog() {
+      if (!sourceHeaders.length) return;
+      refreshGroupDialogSelection();
+      if (groupIndex == null) hideLevelPreview();
+      else renderLevelPreview(groupIndex);
+      document.getElementById('groupDialog').classList.add('is-visible');
+    }
+
+    function closeGroupDialog() {
+      document.getElementById('groupDialog').classList.remove('is-visible');
+    }
+
+    function selectGroupColumn(idx, keepDialogOpen) {
+      groupIndex = Number(idx);
+      updateGroupChoiceLabel();
+      refreshGroupDialogSelection();
+      renderLevelPreview(groupIndex);
+      if (!keepDialogOpen) closeGroupDialog();
+      renderByGroup();
+    }
+
+    function buildIncludedGroups() {
+      const groups = new Map();
+      sourceRows.forEach((row) => {
+        const group = levelKey(rowValue(row, groupIndex, sourceHeaders[groupIndex]));
+        if (!isLevelIncluded(groupIndex, group)) return;
+        if (!groups.has(group)) groups.set(group, []);
+        groups.get(group).push(row);
+      });
+      return Array.from(groups.entries())
+        .map(([group, rows]) => ({ group, rows, n: rows.length }))
+        .filter((g) => g.n > 0)
+        .sort((a, b) => String(a.group).localeCompare(String(b.group), undefined, { numeric: true }));
+    }
+
+    function extractCoef(fit, termIndex) {
+      if (!fit || !fit.results) return { beta: NaN, se: NaN, p: NaN, n: fit ? fit.n : NaN };
+      const r = fit.results;
+      return {
+        beta: r.coefficients[termIndex],
+        se: r.std_errors[termIndex],
+        p: r.p_values[termIndex],
+        n: r.n
+      };
+    }
+
+    function renderFitStrip(overall, groups) {
+      const strip = document.getElementById('fitStrip');
+      const cards = document.getElementById('fitCards');
+      if (!strip || !cards) return;
+
+      const entries = [{ label: 'Overall', fit: overall, type: 'overall' }]
+        .concat(groups.map((g) => ({ label: String(g.group), fit: g.fit, type: 'group' })));
+
+      strip.style.display = 'block';
+      document.getElementById('fitStripSubtitle').textContent =
+        `Same model specification · dummy coding fixed from overall sample · α = 0.05 for Shapiro–Wilk on residuals`;
+
+      cards.innerHTML = entries.map((entry) => {
+        const fit = entry.fit;
+        const cardType = entry.type === 'overall' ? 'fit-card-overall' : 'fit-card-group';
+        if (!fit || !fit.results) {
+          return `<div class="fit-card ${cardType}">
+            <div class="fit-card-label" title="${escapeHtml(entry.label)}">${escapeHtml(entry.label)}</div>
+            <div class="fit-metrics"><span>Status<strong>Insufficient n</strong></span></div>
+          </div>`;
+        }
+        const norm = residualNormality(fit.residuals);
+        const normCls = !Number.isFinite(norm.p) ? 'fit-norm-na' : (norm.p >= 0.05 ? 'fit-norm-ok' : 'fit-norm-bad');
+        const histTip = `Residual histogram (n=${fit.n}). Min=${fmt(Math.min(...fit.residuals), 3)}, max=${fmt(Math.max(...fit.residuals), 3)}.`;
+        return `<div class="fit-card ${cardType}">
+          <div class="fit-card-label" title="${escapeHtml(entry.label)}">${escapeHtml(entry.label)}</div>
+          <div class="fit-metrics">
+            <span>R²<strong>${fmt(fit.results.R2, 3)}</strong></span>
+            <span>Adj R²<strong>${fmt(fit.results.R2_adj, 3)}</strong></span>
+            <span>RMSE<strong>${fmt(fit.results.RMSE, 3)}</strong></span>
+            <span>F p<strong>${formatP(fit.results.F_pvalue)}</strong></span>
+          </div>
+          <div class="fit-residual-row">
+            <div>
+              <div class="fit-residual-label">Residuals</div>
+              <div class="spark-wrap" tabindex="0" data-st-tip="${tipAttr(histTip)}" aria-label="Residual histogram">${buildResidualHistSvg(fit.residuals)}</div>
+            </div>
+            <div class="fit-norm ${normCls}">
+              <div>Shapiro p</div>
+              <div>${formatP(norm.p)}</div>
+              <div>${escapeHtml(norm.verdict)}</div>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+
+      if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
+        window.StatisticoTooltip.refresh(strip);
+      }
+    }
+
+    function sortTh(key, label, extraClass) {
+      const active = sortConfig.key === key ? ' sort-active' : '';
+      const cls = ['sortable', extraClass].filter(Boolean).join(' ');
+      return `<th class="${cls}${active}" data-key="${key}"><span class="th-main">${label}</span> <i class="fa fa-sort"></i></th>`;
+    }
+
+    function sortThRowspan(key, label, extraClass) {
+      const active = sortConfig.key === key ? ' sort-active' : '';
+      const cls = ['sortable', extraClass].filter(Boolean).join(' ');
+      return `<th rowspan="2" class="${cls}${active}" data-key="${key}"><span class="th-main">${label}</span> <i class="fa fa-sort"></i></th>`;
+    }
+
+    function categoryTh(label, meta, colspan, extraClass) {
+      return `<th colspan="${colspan}" class="group-category ${extraClass || ''}">
+        <span class="group-category-name">${escapeHtml(label)}</span>
+        ${meta ? `<span class="group-category-meta">${escapeHtml(meta)}</span>` : ''}
+      </th>`;
+    }
+
+    function renderTableHead() {
+      const row1 = ['<tr>', sortThRowspan('term', 'Term', 'term-col')];
+      row1.push(categoryTh('Overall', overallFit ? `n=${overallFit.n}` : '', 3, 'group-category-overall'));
+      activeGroups.forEach((g, i) => {
+        row1.push(categoryTh(String(g.group), `n=${g.n}`, 3, i === 0 ? 'group-category-first' : ''));
+      });
+      row1.push('<th rowspan="2"><span class="th-main">β pattern</span></th></tr>');
+
+      const row2 = ['<tr>'];
+      row2.push(sortTh('overall_beta', 'β', 'group-block-overall-first'));
+      row2.push(sortTh('overall_se', 'SE'));
+      row2.push(sortTh('overall_p', 'p'));
+      activeGroups.forEach((g, i) => {
+        const first = i === 0 ? ' group-block-first' : '';
+        row2.push(sortTh(`group:${i}:beta`, 'β', first));
+        row2.push(sortTh(`group:${i}:se`, 'SE'));
+        row2.push(sortTh(`group:${i}:p`, 'p'));
+      });
+      row2.push('</tr>');
+
+      document.getElementById('regByGroupHead').innerHTML = row1.join('') + row2.join('');
+      document.querySelectorAll('#regByGroupHead th.sortable').forEach((th) => {
+        th.onclick = () => requestSort(th.getAttribute('data-key'));
+      });
+    }
+
+    function metricForRow(row, key) {
+      if (key === 'term') return row.term;
+      if (key === 'overall_beta') return row.overall.beta;
+      if (key === 'overall_se') return row.overall.se;
+      if (key === 'overall_p') return row.overall.p;
+      const match = key.match(/^group:(\d+):(beta|se|p)$/);
+      if (match) {
+        const gr = row.groupCoefs[Number(match[1])];
+        if (!gr) return NaN;
+        if (match[2] === 'beta') return gr.beta;
+        if (match[2] === 'se') return gr.se;
+        return gr.p;
+      }
+      return NaN;
+    }
+
+    function getSortedRows() {
+      const sorted = tableRows.slice();
+      const dir = sortConfig.direction === 'ascending' ? 1 : -1;
+      sorted.sort((a, b) => {
+        if (sortConfig.key === 'term') {
+          return dir * String(a.term).localeCompare(String(b.term), undefined, { numeric: true });
+        }
+        const aVal = metricForRow(a, sortConfig.key);
+        const bVal = metricForRow(b, sortConfig.key);
+        const aNum = Number.isFinite(aVal) ? aVal : null;
+        const bNum = Number.isFinite(bVal) ? bVal : null;
+        if (aNum == null && bNum == null) return 0;
+        if (aNum == null) return 1;
+        if (bNum == null) return -1;
+        return dir * (aNum - bNum);
+      });
+      return sorted;
+    }
+
+    function requestSort(key) {
+      let direction = 'ascending';
+      if (sortConfig.key === key && sortConfig.direction === 'ascending') direction = 'descending';
+      sortConfig = { key, direction };
+      renderTableBody();
+    }
+
+    function renderMetricCells(values, overall) {
+      const [beta, se, pVal] = values;
+      const firstCls = overall ? 'overall-cell group-block-overall-first' : 'group-cell';
+      return [
+        `<td class="${firstCls} ${coefClass(beta)}">${fmt(beta, 4)}</td>`,
+        `<td class="${overall ? 'overall-cell' : 'group-cell'}">${fmt(se, 4)}</td>`,
+        `<td class="${overall ? 'overall-cell' : 'group-cell'}">${formatP(pVal)}</td>`
+      ].join('');
+    }
+
+    function renderTableBody() {
+      const body = document.getElementById('regByGroupBody');
+      const rows = getSortedRows();
+      body.innerHTML = rows.map((row) => {
+        const groupCells = row.groupCoefs.map((gr) => renderMetricCells([gr.beta, gr.se, gr.p], false)).join('');
+        return `<tr>
+          <td class="term-cell">${escapeHtml(row.term)}</td>
+          ${renderMetricCells([row.overall.beta, row.overall.se, row.overall.p], true)}
+          ${groupCells}
+          <td class="spark-cell">${buildCoefSparklineSvg(row.groupCoefs)}</td>
+        </tr>`;
+      }).join('');
+
+      document.querySelectorAll('#regByGroupHead th.sortable').forEach((th) => {
+        th.classList.toggle('sort-active', th.getAttribute('data-key') === sortConfig.key);
+        const icon = th.querySelector('i');
+        if (!icon) return;
+        icon.className = th.getAttribute('data-key') === sortConfig.key
+          ? (sortConfig.direction === 'ascending' ? 'fa fa-sort-up' : 'fa fa-sort-down')
+          : 'fa fa-sort';
+      });
+
+      if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
+        window.StatisticoTooltip.refresh(document.getElementById('regByGroupTable'));
+      }
+    }
+
+    function renderTable() {
+      renderTableHead();
+      renderTableBody();
+    }
+
+    function renderByGroup() {
+      if (groupIndex == null) return setEmpty('Choose a grouping column to compare regression parameters across levels.');
+      activeGroups = buildIncludedGroups();
+      if (!activeGroups.length) return setEmpty('No rows remain for the selected group levels. Adjust level filters or the row filter.');
+
+      const xcSorted = [...(modelSpec.xc || [])].sort((a, b) => sourceHeaders.indexOf(a) - sourceHeaders.indexOf(b));
+      fixedCategoricalInfo = buildCategoricalInfo(sourceRows, sourceHeaders, xcSorted);
+
+      overallFit = fitRegression(sourceRows, fixedCategoricalInfo);
+      if (!overallFit) return setEmpty('Could not fit the model on filtered rows. Check predictors, missing data, or sample size.');
+
+      displayTerms = overallFit.displayNames;
+      const groupFits = activeGroups.map((g) => ({
+        group: g.group,
+        n: g.n,
+        fit: fitRegression(g.rows, fixedCategoricalInfo)
+      }));
+
+      tableRows = displayTerms.map((term, termIndex) => {
+        const overall = extractCoef(overallFit, termIndex);
+        const groupCoefs = groupFits.map((gf) => ({
+          group: gf.group,
+          ...extractCoef(gf.fit, termIndex)
+        }));
+        return { term, overall, groupCoefs };
+      });
+
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('mainContent').style.display = 'block';
+      document.getElementById('metricPredictors').textContent = displayTerms.length;
+      document.getElementById('metricGroups').textContent = activeGroups.length;
+      document.getElementById('metricGroupCol').textContent = sourceHeaders[groupIndex] || '—';
+      document.getElementById('metricRows').textContent = sourceRows.length;
+
+      const y = modelSpec.y || 'Y';
+      const preds = [...(modelSpec.xn || []), ...(modelSpec.xc || [])].join(' + ');
+      document.getElementById('subtitle').textContent =
+        `${y} ~ ${preds} · ${displayTerms.length} terms · ${activeGroups.length} groups · ${sourceRows.length} filtered rows`;
+
+      renderFitStrip(overallFit, groupFits);
+      renderTable();
+      registerHeaderActions(groupFits);
+      syncHeaderSample();
+    }
+
+    function syncHeaderSample() {
+      if (typeof StatisticoHeader === 'undefined') return;
+      StatisticoHeader.sampleSize = sourceRows.length;
+      StatisticoHeader.variableName = (modelSpec && modelSpec.y) ? `${modelSpec.y} · By Group` : 'Regression · By Group';
+      if (typeof StatisticoHeader.render === 'function') StatisticoHeader.render();
+    }
+
+    function registerHeaderActions(groupFits) {
+      if (typeof StatisticoHeader === 'undefined') return;
+      const exportHeaders = [
+        'Term',
+        'Overall β', 'Overall SE', 'Overall p',
+        ...activeGroups.flatMap((g) => [`${g.group} β`, `${g.group} SE`, `${g.group} p`])
+      ];
+      const exportRows = getSortedRows();
+      StatisticoHeader.registerActions({
+        getData: () => ({
+          headers: exportHeaders,
+          allRows: exportRows.map((row) => [
+            row.term,
+            row.overall.beta, row.overall.se, row.overall.p,
+            ...row.groupCoefs.flatMap((gr) => [gr.beta, gr.se, gr.p])
+          ]),
+          usedRows: exportRows.map((row) => [
+            row.term,
+            row.overall.beta, row.overall.se, row.overall.p,
+            ...row.groupCoefs.flatMap((gr) => [gr.beta, gr.se, gr.p])
+          ]),
+          usedRange: 'Regression by group',
+          notice: 'Grouped regressions refit the same model on each level using dummy coding categories fixed from the overall filtered sample.'
+        }),
+        moduleName: 'Copy grouped regression to clipboard'
+      });
+    }
+
+    function installRowFilter() {
+      if (typeof Filter === 'undefined' || typeof Filter.attach !== 'function' || !regressionPayload) return;
+      const payload = regressionPayload;
+      const allRows = Array.isArray(payload.rows) ? payload.rows.slice() : [];
+      if (!sourceHeaders.length || !allRows.length) return;
+      Filter.attach({
+        headers: sourceHeaders,
+        rows: allRows,
+        initial: {
+          columnFilters: payload.columnFilters,
+          sourceRows: payload.sourceRows || sourceRows
+        },
+        onApply(filteredRows, criteria) {
+          payload.sourceRows = filteredRows;
+          payload.columnFilters = criteria;
+          payload.rowFilterActive = filteredRows.length < allRows.length;
+          sourceRows = filteredRows.slice();
+          if (groupIndex != null) renderByGroup();
+          syncHeaderSample();
+        }
+      });
+    }
+
+    function initializeFromPayload(payload) {
+      regressionPayload = payload;
+      modelSpec = payload.modelSpec || null;
+      sourceHeaders = (payload.headers || []).slice();
+      sourceRows = (payload.sourceRows || payload.rows || []).slice();
+      if (!modelSpec || !modelSpec.y) {
+        return setEmpty('Run a regression analysis first, then open Regression by Group.');
+      }
+      if (!sourceHeaders.length || !sourceRows.length) {
+        return setEmpty('No source rows available. Re-run the regression or clear filters.');
+      }
+      populateGroupChoices();
+      groupIndex = null;
+      updateGroupChoiceLabel();
+      hideLevelPreview();
+      syncHeaderSample();
+      setTimeout(installRowFilter, 250);
+      openGroupDialog();
+    }
+
+    function tryLoadStored() {
+      try {
+        const raw = sessionStorage.getItem('regressionNavData') || localStorage.getItem('regressionNavData');
+        if (raw) {
+          initializeFromPayload(JSON.parse(raw));
+          return true;
+        }
+      } catch (_e) {}
+      return false;
+    }
+
+    function boot() {
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.init('regression-by-group', 'Regression by Group', 0, 'regression');
+        StatisticoHeader.initSidebarPage();
+        StatisticoHeader.updateTitle('Regression by Group');
+      }
+      if (!tryLoadStored()) {
+        setEmpty('Run a regression analysis first, then open Regression by Group.');
+      }
+    }
+
+    let appStarted = false;
+    function bootOnce() {
+      if (appStarted) return;
+      appStarted = true;
+      boot();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', bootOnce, { once: true });
+    } else {
+      bootOnce();
+    }
+
+    if (typeof Office !== 'undefined' && typeof Office.onReady === 'function') {
+      try { Office.onReady(bootOnce); } catch (_officeErr) { bootOnce(); }
+    }
+
+    window.openGroupDialog = openGroupDialog;
+    window.closeGroupDialog = closeGroupDialog;
+    window.selectGroupColumn = selectGroupColumn;
+    window.togglePreviewLevel = togglePreviewLevel;
+    window.setAllPreviewLevels = setAllPreviewLevels;
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeGroupDialog();
+    });
+  </script>
+</body>
+</html>

@@ -407,6 +407,7 @@ const StatisticoHeader = {
       'regression-input': 'Model Setup',
       'regression-results': 'Regression Results',
       'regression-residuals': 'Residual Diagnostics',
+      'regression-by-group': 'Regression by Group',
       // Logistic regression views
       'logistic-results': 'Logistic Regression',
 
@@ -938,7 +939,8 @@ const StatisticoHeader = {
 
     const regressionViews = [
       { id: 'regression-results',   label: 'Regression Results',   file: 'regression/regression-coefficients.html' },
-      { id: 'regression-residuals', label: 'Residual Diagnostics', file: 'regression/regression-residuals.html' }
+      { id: 'regression-residuals', label: 'Residual Diagnostics', file: 'regression/regression-residuals.html' },
+      { id: 'regression-by-group',  label: 'Regression by Group',  file: 'regression/regression-by-group.html' }
     ];
 
     const independentViews = [
@@ -1091,6 +1093,7 @@ const StatisticoHeader = {
       reliability: 'Evaluate internal consistency.',
       'descriptive-stats': 'Summarize variables and distributions.',
       'correlation-by-group': 'Compare pairwise r across group levels.',
+      'regression-by-group': 'Compare coefficients and residual normality across group levels.',
       histogram: 'Frequency view of the distribution.',
       boxplot: 'Quartiles, whiskers, and outliers.',
       cdf: 'Empirical cumulative distribution.',
@@ -1225,6 +1228,28 @@ const StatisticoHeader = {
             ]
           }
         ]
+      };
+    }
+
+    if (this.module === 'regression') {
+      return {
+        logoIcon: 'fa-chart-line',
+        logoSub: 'Regression',
+        menuTitle: 'Menu',
+        groups: [
+          {
+            title: 'Analysis',
+            items: [
+              { type: 'navigate', view: 'regression-results', file: 'regression/regression-coefficients.html', icon: 'fa-square-poll-vertical', label: 'Model Results', description: 'Coefficients, fit statistics, and inference.' },
+              { type: 'navigate', view: 'regression-residuals', file: 'regression/regression-residuals.html', icon: 'fa-stethoscope', label: 'Residual Diagnostics', description: 'Residual plots, influence, and assumptions.' }
+            ]
+          }
+        ],
+        pinnedNav: {
+          items: [
+            { type: 'navigate', view: 'regression-by-group', file: 'regression/regression-by-group.html', icon: 'fa-sitemap', label: 'By Group', description: 'Compare coefficients and residual normality across group levels.' }
+          ]
+        }
       };
     }
 
@@ -4985,9 +5010,32 @@ const StatisticoHeader = {
     this._injectUniFilterAssets();
   },
 
+  _ensureRegressionByGroupNav(nav) {
+    if (this.module !== 'regression' || !nav) return;
+    if (document.getElementById('regByGroupNav')) return;
+    const pinned = document.createElement('div');
+    pinned.id = 'regByGroupNav';
+    pinned.className = 'sb-pinned-items';
+    pinned.innerHTML = `
+      <div class="sb-pinned-separator" role="presentation"></div>
+      <div class="sb-pinned-rail">
+        <button type="button" class="sb-item" id="regByGroupNavBtn"
+                onclick="StatisticoHeader.navigateTo('regression/regression-by-group.html')"
+                data-nav-file="regression/regression-by-group.html"
+                title="Compare coefficients and residual normality across group levels.">
+          <i class="fa-solid fa-sitemap sb-item-icon"></i>
+          <span class="sb-item-copy"><span class="sb-item-label">By Group</span><span class="sb-item-description">Coefficients &amp; residuals by level</span></span>
+        </button>
+      </div>`;
+    const footer = document.getElementById('sbNavFooter');
+    if (footer && footer.parentNode === nav) nav.insertBefore(pinned, footer);
+    else nav.appendChild(pinned);
+  },
+
   _mountSidebarUtilities() {
     const nav = document.getElementById('sidebarNav');
     if (!nav) return;
+    this._ensureRegressionByGroupNav(nav);
     this._bindSidebarNavigation(nav);
 
     const existing = document.getElementById('sbUtilities');

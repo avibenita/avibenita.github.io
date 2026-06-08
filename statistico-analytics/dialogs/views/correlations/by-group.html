@@ -522,7 +522,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260610-bygroup-v4">
+<body data-page-version="20260610-bygroup-v5">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -670,6 +670,7 @@
 
     function cronbachAlphaCI(alpha, n, k, confidence) {
       const level = confidence != null ? confidence : alphaConfidenceLevel();
+      const pVal = 1 - level;
       if (!Number.isFinite(alpha) || !Number.isFinite(n) || !Number.isFinite(k) || n < 3 || k < 2) {
         return { lower: NaN, upper: NaN, level };
       }
@@ -679,8 +680,13 @@
         return { lower: NaN, upper: NaN, level };
       }
       const z = 1 - alpha;
-      const lower = clampAlpha(1 - z * jStat.centralF.inv(1 - level / 2, df2, df1));
-      const upper = clampAlpha(1 - z * jStat.centralF.inv(level / 2, df2, df1));
+      let lower = clampAlpha(1 - z * jStat.centralF.inv(1 - pVal / 2, df1, df2));
+      let upper = clampAlpha(1 - z * jStat.centralF.inv(pVal / 2, df1, df2));
+      if (Number.isFinite(lower) && Number.isFinite(upper) && lower > upper) {
+        const swap = lower;
+        lower = upper;
+        upper = swap;
+      }
       return { lower, upper, level };
     }
 

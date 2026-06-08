@@ -1232,22 +1232,33 @@ const StatisticoHeader = {
     }
 
     if (this.module === 'regression') {
+      const regTab = (tab) => `regression/regression-coefficients.html?regTab=${encodeURIComponent(tab)}`;
       return {
         logoIcon: 'fa-chart-line',
         logoSub: 'Regression',
         menuTitle: 'Menu',
         groups: [
           {
-            title: 'Analysis',
+            title: 'Model',
             items: [
-              { type: 'navigate', view: 'regression-results', file: 'regression/regression-coefficients.html', icon: 'fa-square-poll-vertical', label: 'Model Results', description: 'Coefficients, fit statistics, and inference.' },
-              { type: 'navigate', view: 'regression-residuals', file: 'regression/regression-residuals.html', icon: 'fa-stethoscope', label: 'Residual Diagnostics', description: 'Residual plots, influence, and assumptions.' }
+              { type: 'navigate', view: 'regression-results', file: regTab('results-overview'), icon: 'fa-square-poll-vertical', label: 'Model Results', description: 'Overview & technical specification' },
+              { type: 'navigate', file: regTab('ix-summary'), icon: 'fa-arrows-split-up-and-left', label: 'Interactions', description: 'Moderation, plots & tests' },
+              { type: 'navigate', file: regTab('pred-overview'), icon: 'fa-crosshairs', label: 'Predictions', description: 'Fit, what-if & intervals' },
+              { type: 'navigate', file: regTab('viz-partial'), icon: 'fa-chart-line', label: 'Visualization', description: 'Predictor effects & unique contribution' },
+              { type: 'navigate', file: regTab('diag-overview'), icon: 'fa-stethoscope', label: 'Diagnostics', description: 'Assumptions & residuals' }
+            ]
+          },
+          {
+            title: 'Descriptives',
+            items: [
+              { type: 'navigate', file: regTab('correlations'), icon: 'fa-diagram-project', label: 'Correlations', description: 'Pairwise r among variables' },
+              { type: 'navigate', file: regTab('descriptive'), icon: 'fa-chart-column', label: 'Descriptives', description: 'Mean, SD, skew & missingness' }
             ]
           }
         ],
         pinnedNav: {
           items: [
-            { type: 'navigate', view: 'regression-by-group', file: 'regression/regression-by-group.html', icon: 'fa-sitemap', label: 'By Group', description: 'Compare coefficients and residual normality across group levels.' }
+            { type: 'navigate', view: 'regression-by-group', file: 'regression/regression-by-group.html', icon: 'fa-sitemap', label: 'By Group', description: 'Coefficients & residuals by level' }
           ]
         }
       };

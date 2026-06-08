@@ -119,18 +119,33 @@
     html[data-theme="light"] .alpha-card.alpha-acceptable .alpha-card-value { color:#b45309; }
     html[data-theme="light"] .alpha-card.alpha-questionable .alpha-card-value { color:#c2410c; }
     html[data-theme="light"] .alpha-card.alpha-poor .alpha-card-value { color:#be123c; }
-    #corrByGroupTable tbody tr.pair-row { cursor:pointer; }
-    #corrByGroupTable tbody tr.pair-row:hover td { background:color-mix(in srgb, var(--accent-2) 8%, var(--surface-2)); }
-    #corrByGroupTable tbody tr.pair-row:hover td.pair-cell { color:var(--accent-1); }
-    #corrByGroupTable tbody tr.pair-row:hover td.overall-cell { background:color-mix(in srgb, var(--accent-1) 14%, var(--surface-2)); }
     #corrByGroupTable tbody tr.pair-row:hover td.group-cell { background:color-mix(in srgb, var(--accent-2) 16%, var(--surface-2)); }
     #corrByGroupTable td.pair-cell {
-      color:var(--accent-2);
+      color:var(--text-primary);
       font-weight:650;
-      text-decoration:underline;
-      text-decoration-color:color-mix(in srgb, var(--accent-2) 45%, transparent);
-      text-underline-offset:3px;
     }
+    #corrByGroupTable th.chart-col,
+    #corrByGroupTable td.chart-cell {
+      text-align:center;
+      width:58px;
+      min-width:58px;
+      padding:6px 8px;
+      border-left:1px solid var(--grid-inner);
+      background:color-mix(in srgb, var(--surface-1) 88%, var(--surface-2));
+    }
+    .pair-chart-btn {
+      display:inline-flex; align-items:center; justify-content:center;
+      width:34px; height:30px; padding:0;
+      border:1px solid color-mix(in srgb, var(--accent-2) 42%, var(--border));
+      border-radius:8px; background:var(--surface-1); color:var(--accent-2);
+      cursor:pointer; transition:background .12s ease, border-color .12s ease, transform .12s ease;
+    }
+    .pair-chart-btn:hover {
+      border-color:var(--accent-2);
+      background:color-mix(in srgb, var(--accent-2) 14%, var(--surface-1));
+      transform:translateY(-1px);
+    }
+    .pair-chart-btn:focus-visible { outline:2px solid var(--accent-2); outline-offset:2px; }
     .scatter-dialog-overlay {
       position:fixed; inset:0; z-index:2147483300; display:none; align-items:center; justify-content:center;
       padding:16px; background:rgba(3,7,18,.72); backdrop-filter:blur(4px);
@@ -151,7 +166,55 @@
       width:34px; height:34px; display:flex; align-items:center; justify-content:center;
       padding:0; border-radius:8px; border:1px solid var(--border); background:var(--surface-2); cursor:pointer;
     }
+    .scatter-dialog-toolbar {
+      display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+      padding:10px 18px; border-bottom:1px solid var(--border);
+      background:linear-gradient(180deg, rgba(255,255,255,.03), transparent);
+    }
+    .scatter-view-toggle {
+      display:inline-flex; align-items:center; gap:10px; cursor:pointer;
+      color:var(--text-secondary); font-size:13px; font-weight:650; user-select:none;
+    }
+    .scatter-view-toggle input { position:absolute; opacity:0; width:0; height:0; }
+    .scatter-toggle-ui {
+      width:42px; height:24px; border-radius:999px; position:relative;
+      background:var(--border); transition:background .15s ease;
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
+    }
+    .scatter-toggle-ui::after {
+      content:''; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%;
+      background:#fff; transition:transform .15s ease;
+      box-shadow:0 1px 4px rgba(0,0,0,.28);
+    }
+    .scatter-view-toggle input:checked + .scatter-toggle-ui {
+      background:linear-gradient(135deg, var(--accent-2), color-mix(in srgb, var(--accent-1) 55%, var(--accent-2)));
+    }
+    .scatter-view-toggle input:checked + .scatter-toggle-ui::after { transform:translateX(18px); }
+    .scatter-view-toggle input:focus-visible + .scatter-toggle-ui { outline:2px solid var(--accent-2); outline-offset:2px; }
     .scatter-dialog-body { padding:14px 16px 18px; overflow:auto; }
+    .scatter-combined-wrap { display:block; }
+    .scatter-combined-panel {
+      border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--surface-2);
+    }
+    .scatter-combined-head {
+      padding:10px 12px; border-bottom:1px solid var(--border);
+      background:linear-gradient(180deg, rgba(255,255,255,.04), transparent);
+    }
+    .scatter-combined-head strong { color:var(--accent-1); font-size:14px; }
+    .scatter-legend {
+      display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:8px;
+    }
+    .scatter-legend-item {
+      display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:700;
+      color:var(--text-secondary); font-variant-numeric:tabular-nums;
+    }
+    .scatter-legend-swatch {
+      width:22px; height:0; border-top:3px solid var(--accent-2); border-radius:999px;
+    }
+    .scatter-legend-item.overall .scatter-legend-swatch { border-top-color:var(--accent-1); }
+    .scatter-combined-svg { display:block; width:100%; height:auto; min-height:320px; }
+    .scatter-combined-svg .scatter-fit-combined { stroke-width:2.5; fill:none; opacity:.92; }
+    .scatter-combined-svg .scatter-dot-combined { opacity:.55; }
     .scatter-panel-grid {
       display:grid;
       grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
@@ -511,6 +574,13 @@
         </div>
         <button class="scatter-dialog-close" type="button" onclick="closeScatterPopup()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
       </div>
+      <div class="scatter-dialog-toolbar">
+        <label class="scatter-view-toggle" for="scatterCombinedToggle">
+          <input type="checkbox" id="scatterCombinedToggle" onchange="toggleScatterCombinedView(this.checked)" />
+          <span class="scatter-toggle-ui" aria-hidden="true"></span>
+          <span>All curves in one chart</span>
+        </label>
+      </div>
       <div class="scatter-dialog-body">
         <div class="scatter-panel-grid" id="scatterPanels"></div>
       </div>
@@ -531,6 +601,8 @@
     let sortConfig = { key: 'pair', direction: 'ascending' };
     const levelSelections = {};
     let reliabilitySummary = null;
+    let scatterPopupState = { panels: [], varA: '', varB: '', combined: false };
+    const scatterGroupColors = ['#78c8ff', '#4ade80', '#c084fc', '#fbbf24', '#fb7185', '#38bdf8', '#a3e635'];
 
     function decimalDigits(autoDefault) {
       const fallback = Number.isFinite(autoDefault) ? autoDefault : 3;
@@ -934,6 +1006,58 @@
       return { min, max };
     }
 
+    function computeLinearFit(points) {
+      if (!points || points.length < 2) return null;
+      const xs = points.map((p) => p[0]);
+      const ys = points.map((p) => p[1]);
+      const n = points.length;
+      const mx = xs.reduce((a, b) => a + b, 0) / n;
+      const my = ys.reduce((a, b) => a + b, 0) / n;
+      let num = 0;
+      let den = 0;
+      for (let i = 0; i < n; i++) {
+        num += (xs[i] - mx) * (ys[i] - my);
+        den += (xs[i] - mx) ** 2;
+      }
+      if (!den) return null;
+      const slope = num / den;
+      return { slope, intercept: my - slope * mx };
+    }
+
+    function buildPlotScales(xRange, yRange, w, h, pad) {
+      const plotW = w - pad.l - pad.r;
+      const plotH = h - pad.t - pad.b;
+      const sx = (x) => pad.l + ((x - xRange.min) / (xRange.max - xRange.min)) * plotW;
+      const sy = (y) => pad.t + plotH - ((y - yRange.min) / (yRange.max - yRange.min)) * plotH;
+      return { sx, sy, plotW, plotH };
+    }
+
+    function buildGridSvg(pad, plotW, plotH) {
+      let grid = '';
+      for (let i = 0; i <= 4; i++) {
+        const gx = pad.l + (plotW * i) / 4;
+        const gy = pad.t + (plotH * i) / 4;
+        grid += `<line class="scatter-grid" x1="${gx.toFixed(1)}" y1="${pad.t}" x2="${gx.toFixed(1)}" y2="${(pad.t + plotH).toFixed(1)}" />`;
+        grid += `<line class="scatter-grid" x1="${pad.l}" y1="${gy.toFixed(1)}" x2="${(pad.l + plotW).toFixed(1)}" y2="${gy.toFixed(1)}" />`;
+      }
+      return grid;
+    }
+
+    function buildFitLineSvg(sx, sy, fit, xRange, extraClass, strokeColor) {
+      if (!fit) return '';
+      const x1 = xRange.min;
+      const x2 = xRange.max;
+      const y1 = fit.slope * x1 + fit.intercept;
+      const y2 = fit.slope * x2 + fit.intercept;
+      const colorAttr = strokeColor ? ` stroke="${strokeColor}"` : '';
+      return `<line class="scatter-fit${extraClass || ''}"${colorAttr} x1="${sx(x1).toFixed(1)}" y1="${sy(y1).toFixed(1)}" x2="${sx(x2).toFixed(1)}" y2="${sy(y2).toFixed(1)}" />`;
+    }
+
+    function scatterPanelColor(panel, groupIdx) {
+      if (panel.variant === 'overall') return 'rgb(255,165,120)';
+      return scatterGroupColors[groupIdx % scatterGroupColors.length];
+    }
+
     function buildScatterPanel(panel, xLabel, yLabel) {
       const { label, points, stats, variant } = panel;
       const head = `<div class="scatter-panel-head">
@@ -947,43 +1071,13 @@
       const w = 280;
       const h = 210;
       const pad = { l: 48, r: 16, t: 16, b: 40 };
-      const plotW = w - pad.l - pad.r;
-      const plotH = h - pad.t - pad.b;
       const xs = points.map((p) => p[0]);
       const ys = points.map((p) => p[1]);
       const xRange = paddedRange(xs);
       const yRange = paddedRange(ys);
-      const sx = (x) => pad.l + ((x - xRange.min) / (xRange.max - xRange.min)) * plotW;
-      const sy = (y) => pad.t + plotH - ((y - yRange.min) / (yRange.max - yRange.min)) * plotH;
-
-      let grid = '';
-      for (let i = 0; i <= 4; i++) {
-        const gx = pad.l + (plotW * i) / 4;
-        const gy = pad.t + (plotH * i) / 4;
-        grid += `<line class="scatter-grid" x1="${gx.toFixed(1)}" y1="${pad.t}" x2="${gx.toFixed(1)}" y2="${(pad.t + plotH).toFixed(1)}" />`;
-        grid += `<line class="scatter-grid" x1="${pad.l}" y1="${gy.toFixed(1)}" x2="${(pad.l + plotW).toFixed(1)}" y2="${gy.toFixed(1)}" />`;
-      }
-
-      let fitLine = '';
-      if (points.length >= 2) {
-        const n = points.length;
-        const mx = xs.reduce((a, b) => a + b, 0) / n;
-        const my = ys.reduce((a, b) => a + b, 0) / n;
-        let num = 0;
-        let den = 0;
-        for (let i = 0; i < n; i++) {
-          num += (xs[i] - mx) * (ys[i] - my);
-          den += (xs[i] - mx) ** 2;
-        }
-        if (den) {
-          const slope = num / den;
-          const intercept = my - slope * mx;
-          const x1 = xRange.min;
-          const x2 = xRange.max;
-          fitLine = `<line class="scatter-fit" x1="${sx(x1).toFixed(1)}" y1="${sy(slope * x1 + intercept).toFixed(1)}" x2="${sx(x2).toFixed(1)}" y2="${sy(slope * x2 + intercept).toFixed(1)}" />`;
-        }
-      }
-
+      const { sx, sy, plotW, plotH } = buildPlotScales(xRange, yRange, w, h, pad);
+      const grid = buildGridSvg(pad, plotW, plotH);
+      const fitLine = buildFitLineSvg(sx, sy, computeLinearFit(points), xRange, '', null);
       const dots = points.map(([x, y]) =>
         `<circle class="scatter-dot" cx="${sx(x).toFixed(1)}" cy="${sy(y).toFixed(1)}" r="3.6" />`
       ).join('');
@@ -996,6 +1090,80 @@
       </svg>`;
 
       return `<div class="scatter-panel scatter-panel-${variant}">${head}${svg}</div>`;
+    }
+
+    function buildCombinedScatterChart(panels, xLabel, yLabel) {
+      const withPoints = panels.filter((panel) => panel.points.length);
+      if (!withPoints.length) {
+        return '<div class="scatter-empty">Not enough valid pairs to plot combined curves</div>';
+      }
+
+      const allXs = [];
+      const allYs = [];
+      withPoints.forEach((panel) => {
+        panel.points.forEach(([x, y]) => { allXs.push(x); allYs.push(y); });
+      });
+      const xRange = paddedRange(allXs);
+      const yRange = paddedRange(allYs);
+      const w = 920;
+      const h = 360;
+      const pad = { l: 54, r: 20, t: 18, b: 44 };
+      const { sx, sy, plotW, plotH } = buildPlotScales(xRange, yRange, w, h, pad);
+      const grid = buildGridSvg(pad, plotW, plotH);
+
+      let lines = '';
+      let dots = '';
+      const legend = [];
+      let groupIdx = 0;
+      panels.forEach((panel) => {
+        if (!panel.points.length) return;
+        const color = scatterPanelColor(panel, groupIdx);
+        if (panel.variant !== 'overall') groupIdx += 1;
+        const fit = computeLinearFit(panel.points);
+        lines += buildFitLineSvg(sx, sy, fit, xRange, ' scatter-fit-combined', color);
+        panel.points.forEach(([x, y]) => {
+          dots += `<circle class="scatter-dot scatter-dot-combined" fill="${color}" cx="${sx(x).toFixed(1)}" cy="${sy(y).toFixed(1)}" r="3.2" />`;
+        });
+        legend.push(`<span class="scatter-legend-item${panel.variant === 'overall' ? ' overall' : ''}">
+          <span class="scatter-legend-swatch" style="border-top-color:${color}"></span>
+          <span>${escapeHtml(panel.label)} · r=${fmtR(panel.stats.r)} · n=${panel.stats.n}</span>
+        </span>`);
+      });
+
+      const svg = `<svg class="scatter-combined-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="Combined regression curves">
+        <rect class="scatter-bg" x="${pad.l}" y="${pad.t}" width="${plotW}" height="${plotH}" rx="4" />
+        ${grid}${lines}${dots}
+        <text class="scatter-axis-label" x="${(pad.l + plotW / 2).toFixed(1)}" y="${h - 12}">${escapeHtml(xLabel)}</text>
+        <text class="scatter-axis-label scatter-axis-y" x="16" y="${(pad.t + plotH / 2).toFixed(1)}" transform="rotate(-90 16 ${(pad.t + plotH / 2).toFixed(1)})">${escapeHtml(yLabel)}</text>
+      </svg>`;
+
+      return `<div class="scatter-combined-panel">
+        <div class="scatter-combined-head">
+          <strong>Combined regression curves</strong>
+          <div class="scatter-legend">${legend.join('')}</div>
+        </div>
+        ${svg}
+      </div>`;
+    }
+
+    function renderScatterDialogContent() {
+      const { panels, varA, varB, combined } = scatterPopupState;
+      const container = document.getElementById('scatterPanels');
+      const toggle = document.getElementById('scatterCombinedToggle');
+      if (!container) return;
+      if (toggle) toggle.checked = !!combined;
+      if (combined) {
+        container.className = 'scatter-combined-wrap';
+        container.innerHTML = buildCombinedScatterChart(panels, varA, varB);
+      } else {
+        container.className = 'scatter-panel-grid';
+        container.innerHTML = panels.map((panel) => buildScatterPanel(panel, varA, varB)).join('');
+      }
+    }
+
+    function toggleScatterCombinedView(checked) {
+      scatterPopupState.combined = !!checked;
+      renderScatterDialogContent();
     }
 
     function openScatterPopup(varA, varB) {
@@ -1015,12 +1183,11 @@
           variant: 'group'
         });
       });
+      scatterPopupState = { panels, varA, varB, combined: scatterPopupState.combined };
       document.getElementById('scatterDialogTitle').textContent = `${varA} vs ${varB}`;
       document.getElementById('scatterDialogSubtitle').textContent =
         `${corrType} scatter plots · grouped by ${sourceHeaders[groupIndex] || 'group'}`;
-      document.getElementById('scatterPanels').innerHTML = panels
-        .map((panel) => buildScatterPanel(panel, varA, varB))
-        .join('');
+      renderScatterDialogContent();
       document.getElementById('scatterDialog').classList.add('is-visible');
     }
 
@@ -1028,14 +1195,15 @@
       document.getElementById('scatterDialog').classList.remove('is-visible');
     }
 
-    function bindPairRowClicks() {
+    function bindChartButtons() {
       const body = document.getElementById('corrByGroupBody');
       if (!body) return;
       body.onclick = (event) => {
         if (event.target.closest('.spark-wrap')) return;
-        const tr = event.target.closest('tr.pair-row');
-        if (!tr) return;
-        openScatterPopup(tr.getAttribute('data-var-a'), tr.getAttribute('data-var-b'));
+        const btn = event.target.closest('.pair-chart-btn');
+        if (!btn) return;
+        event.stopPropagation();
+        openScatterPopup(btn.getAttribute('data-var-a'), btn.getAttribute('data-var-b'));
       };
     }
 
@@ -1204,6 +1372,7 @@
           String(g.group)
         ));
       });
+      row1.push('<th rowspan="2" class="chart-col" title="Open scatter plots"><span class="th-main"><i class="fa-solid fa-chart-scatter"></i></span></th>');
       row1.push('<th rowspan="2" class="pattern-col"><span class="th-main">Pattern</span></th></tr>');
 
       const row2 = ['<tr class="group-metric-row">'];
@@ -1251,10 +1420,15 @@
           `group-cell${i === 0 ? ' group-block-first' : ''}`,
           { dividerStart: i === 0, dividerEnd: true }
         )).join('');
-        return `<tr class="pair-row" data-var-a="${escapeHtml(row.varA)}" data-var-b="${escapeHtml(row.varB)}" title="Click row to view scatter plots">
-          <td class="pair-cell" title="${escapeHtml(row.pair)} · click for scatter plots">${escapeHtml(row.pair)}</td>
+        return `<tr class="pair-row" data-var-a="${escapeHtml(row.varA)}" data-var-b="${escapeHtml(row.varB)}">
+          <td class="pair-cell" title="${escapeHtml(row.pair)}">${escapeHtml(row.pair)}</td>
           ${overallCells}
           ${groupCells}
+          <td class="chart-cell">
+            <button type="button" class="pair-chart-btn" data-var-a="${escapeHtml(row.varA)}" data-var-b="${escapeHtml(row.varB)}" title="Scatter plots for ${escapeHtml(row.pair)}" aria-label="Scatter plots for ${escapeHtml(row.pair)}">
+              <i class="fa-solid fa-chart-scatter"></i>
+            </button>
+          </td>
           <td class="spark-cell">${buildSparklineSvg(row.groupResults)}</td>
         </tr>`;
       }).join('');
@@ -1270,7 +1444,7 @@
     function renderTable() {
       renderTableHead();
       renderTableBody();
-      bindPairRowClicks();
+      bindChartButtons();
       syncCategoryRowHeight();
       if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
         window.StatisticoTooltip.refresh(document.getElementById('corrByGroupTable'));
@@ -1453,6 +1627,7 @@
 
     window.openScatterPopup = openScatterPopup;
     window.closeScatterPopup = closeScatterPopup;
+    window.toggleScatterCombinedView = toggleScatterCombinedView;
 
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') closeScatterPopup();

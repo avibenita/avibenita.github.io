@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
   <title>Correlation Analysis</title>
 
   <script>
@@ -437,11 +439,61 @@
     }
 
     #resultsContainer,
-    #heatmapContainer {
+    #heatmapContainer,
+    #pairsContainer {
       flex: 1 1 auto;
       min-height: 0;
       overflow: hidden;
       flex-direction: column;
+    }
+
+    #pairsTable {
+      width: 100%;
+      min-width: 100%;
+    }
+
+    #pairsTable thead th.pairs-sortable {
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.12s ease;
+    }
+
+    #pairsTable thead th.pairs-sortable:hover {
+      background: linear-gradient(135deg, rgba(255,165,120,0.16), #2d3545);
+    }
+
+    #pairsTable thead th.pairs-sort-active {
+      color: var(--accent-1);
+    }
+
+    #pairsTable thead th.pairs-sortable i {
+      margin-left: 5px;
+      font-size: 11px;
+      opacity: 0.75;
+    }
+
+    #pairsTable tbody td.pairs-name {
+      text-align: left;
+      font-weight: 700;
+      color: var(--accent-2);
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    #pairsTable tbody td.pairs-p,
+    #pairsTable tbody td.pairs-n {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    #pairsTable tbody tr.threshold-highlight-row {
+      background: rgba(255,165,120,0.12) !important;
+      box-shadow: inset 0 0 0 1px rgba(255,165,120,0.28);
+    }
+
+    #pairsTable tbody tr.threshold-highlight-row td.pairs-name {
+      color: var(--accent-1);
     }
 
     /* Table container inherits the global premium scrollbar from shared-header.css */
@@ -951,7 +1003,7 @@
     .right-col{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}
   </style>
 </head>
-<body>
+<body data-page-version="20260610-matrix-pairs-v1">
   <!-- ++ Sidebar Navigation ++ -->
   <nav class="sb-nav" id="sidebarNav">
     <div class="sb-logo">
@@ -1093,6 +1145,7 @@
               <label>View:</label>
               <div class="view-toggle">
                 <button type="button" id="viewTableBtn" class="active" onclick="setMatrixView('table')">Table</button>
+                <button type="button" id="viewPairsBtn" onclick="setMatrixView('pairs')">Pairs</button>
                 <button type="button" id="viewHeatmapBtn" onclick="setMatrixView('heatmap')">Heatmap</button>
               </div>
             </div>
@@ -1117,6 +1170,20 @@
               <table id="correlationTable">
                 <thead id="tableHead"></thead>
                 <tbody id="tableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Pairs View -->
+          <div id="pairsContainer" style="display:none;">
+            <div class="scroll-hint">
+              <span class="scatter-hint-icon" aria-hidden="true"></span>
+              Click a pair or r to view scatter plot
+            </div>
+            <div class="table-container" id="pairsTableContainer">
+              <table id="pairsTable">
+                <thead id="pairsHead"></thead>
+                <tbody id="pairsBody"></tbody>
               </table>
             </div>
           </div>
@@ -1222,6 +1289,8 @@
   let currentView      = 'table';
   let currentMatrix    = null;
   let currentHeaders   = null;
+  let pairRowsCache    = [];
+  let pairSortConfig   = { key: 'pair', direction: 'asc' };
   let scatterPointsCache = new Map();
 
   let scatterState = {
@@ -1814,6 +1883,7 @@
     });
 
     buildHeatmapMatrix(headers, matrix);
+    buildPairsTable(headers, matrix);
     toggleDisplay();
     applyThresholdFilter();
 
@@ -1834,26 +1904,150 @@
     }
   }
 
+  function collectPairRows(headers, matrix) {
+    const rows = [];
+    for (let i = 0; i < headers.length; i++) {
+      for (let j = i + 1; j < headers.length; j++) {
+        const cell = matrix[i][j];
+        rows.push({
+          pair: `${headers[i]} – ${headers[j]}`,
+          varA: headers[i],
+          varB: headers[j],
+          r: cell.r,
+          p: cell.p,
+          n: cell.n
+        });
+      }
+    }
+    return rows;
+  }
+
+  function getSortedPairRows() {
+    const sorted = pairRowsCache.slice();
+    const dir = pairSortConfig.direction === 'asc' ? 1 : -1;
+    const key = pairSortConfig.key;
+    sorted.sort((a, b) => {
+      if (key === 'pair') {
+        return dir * a.pair.localeCompare(b.pair, undefined, { numeric: true, sensitivity: 'base' });
+      }
+      const aVal = a[key];
+      const bVal = b[key];
+      const aNum = Number.isFinite(aVal) ? aVal : null;
+      const bNum = Number.isFinite(bVal) ? bVal : null;
+      if (aNum == null && bNum == null) return 0;
+      if (aNum == null) return 1;
+      if (bNum == null) return -1;
+      return dir * (aNum - bNum);
+    });
+    return sorted;
+  }
+
+  function formatPairP(p) {
+    if (p == null || !Number.isFinite(p)) return '—';
+    if (p < 0.0001) return '<0.0001';
+    return p.toFixed(4);
+  }
+
+  function renderPairsTableHead() {
+    const head = document.getElementById('pairsHead');
+    if (!head) return;
+    const cols = [
+      { key: 'pair', label: 'Pair' },
+      { key: 'r', label: 'r' },
+      { key: 'p', label: 'p' },
+      { key: 'n', label: 'N' }
+    ];
+    const tr = document.createElement('tr');
+    cols.forEach((col) => {
+      const th = document.createElement('th');
+      th.className = 'pairs-sortable' + (pairSortConfig.key === col.key ? ' pairs-sort-active' : '');
+      th.setAttribute('data-key', col.key);
+      th.innerHTML = `${col.label} <i class="fa ${pairSortConfig.key === col.key ? (pairSortConfig.direction === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'}"></i>`;
+      th.addEventListener('click', () => requestPairSort(col.key));
+      tr.appendChild(th);
+    });
+    head.innerHTML = '';
+    head.appendChild(tr);
+  }
+
+  function renderPairsTableBody() {
+    const body = document.getElementById('pairsBody');
+    if (!body) return;
+    body.innerHTML = '';
+    getSortedPairRows().forEach((row) => {
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-r', row.r);
+
+      const pairTd = document.createElement('td');
+      pairTd.className = 'pairs-name';
+      pairTd.textContent = row.pair;
+      pairTd.title = 'View scatter plot';
+      pairTd.addEventListener('click', () => openScatterModal(row.varA, row.varB, row.r));
+      tr.appendChild(pairTd);
+
+      const rTd = document.createElement('td');
+      const rVal = document.createElement('div');
+      rVal.className = 'corr-value pairs-r';
+      rVal.setAttribute('data-corr', row.r);
+      rVal.textContent = row.r.toFixed(3);
+      rVal.title = 'View scatter plot';
+      rVal.addEventListener('click', () => openScatterModal(row.varA, row.varB, row.r));
+      rTd.appendChild(rVal);
+      tr.appendChild(rTd);
+
+      const pTd = document.createElement('td');
+      pTd.className = 'pairs-p';
+      pTd.textContent = 'p = ' + formatPairP(row.p);
+      tr.appendChild(pTd);
+
+      const nTd = document.createElement('td');
+      nTd.className = 'pairs-n';
+      nTd.textContent = 'N = ' + row.n;
+      tr.appendChild(nTd);
+
+      body.appendChild(tr);
+    });
+  }
+
+  function requestPairSort(key) {
+    let direction = 'asc';
+    if (pairSortConfig.key === key && pairSortConfig.direction === 'asc') direction = 'desc';
+    pairSortConfig = { key, direction };
+    renderPairsTableHead();
+    renderPairsTableBody();
+    toggleDisplay();
+    applyThresholdFilter();
+  }
+
+  function buildPairsTable(headers, matrix) {
+    pairRowsCache = collectPairRows(headers, matrix);
+    renderPairsTableHead();
+    renderPairsTableBody();
+  }
+
   function setMatrixView(view) {
     currentView = view;
     const results = document.getElementById('resultsContainer');
+    const pairs = document.getElementById('pairsContainer');
     const heatmap = document.getElementById('heatmapContainer');
     const tBtn    = document.getElementById('viewTableBtn');
+    const pBtn    = document.getElementById('viewPairsBtn');
     const hBtn    = document.getElementById('viewHeatmapBtn');
 
-    if (view === 'heatmap') {
-      results.style.display = 'none';
-      heatmap.style.display = 'flex';
-    } else {
-      results.style.display = 'flex';
-      heatmap.style.display = 'none';
-    }
+    results.style.display = view === 'table' ? 'flex' : 'none';
+    if (pairs) pairs.style.display = view === 'pairs' ? 'flex' : 'none';
+    heatmap.style.display = view === 'heatmap' ? 'flex' : 'none';
 
     tBtn.classList.toggle('active', view === 'table');
+    if (pBtn) pBtn.classList.toggle('active', view === 'pairs');
     hBtn.classList.toggle('active', view === 'heatmap');
 
-    if (currentHeaders && currentMatrix && view === 'heatmap') {
-      buildHeatmapMatrix(currentHeaders, currentMatrix);
+    if (currentHeaders && currentMatrix) {
+      if (view === 'heatmap') {
+        buildHeatmapMatrix(currentHeaders, currentMatrix);
+      } else if (view === 'pairs') {
+        buildPairsTable(currentHeaders, currentMatrix);
+      }
       applyThresholdFilter();
     }
   }
@@ -1911,8 +2105,8 @@
   function toggleDisplay() {
     const showP = document.getElementById('showPValue').checked;
     const showN = document.getElementById('showN').checked;
-    document.querySelectorAll('.p-value').forEach(el => el.style.display = showP ? 'block' : 'none');
-    document.querySelectorAll('.n-value').forEach(el => el.style.display = showN ? 'block' : 'none');
+    document.querySelectorAll('.p-value, #pairsTable .pairs-p').forEach(el => el.style.display = showP ? '' : 'none');
+    document.querySelectorAll('.n-value, #pairsTable .pairs-n').forEach(el => el.style.display = showN ? '' : 'none');
   }
 
   function updateThreshold(value) {
@@ -1938,6 +2132,10 @@
       const isPerfect = Math.abs(Math.abs(cv) - 1.0) < 0.001;
       cell.classList.toggle('threshold-highlight',
         Math.abs(cv) >= threshold && !isDiag && !isPerfect && threshold > 0);
+    });
+    document.querySelectorAll('#pairsTable tbody tr').forEach(row => {
+      const cv = parseFloat(row.getAttribute('data-r'));
+      row.classList.toggle('threshold-highlight-row', Number.isFinite(cv) && Math.abs(cv) >= threshold && threshold > 0);
     });
   }
 

@@ -119,6 +119,81 @@
     html[data-theme="light"] .alpha-card.alpha-acceptable .alpha-card-value { color:#b45309; }
     html[data-theme="light"] .alpha-card.alpha-questionable .alpha-card-value { color:#c2410c; }
     html[data-theme="light"] .alpha-card.alpha-poor .alpha-card-value { color:#be123c; }
+    #corrByGroupTable tbody tr.pair-row { cursor:pointer; }
+    #corrByGroupTable tbody tr.pair-row:hover td { background:color-mix(in srgb, var(--accent-2) 8%, var(--surface-2)); }
+    #corrByGroupTable tbody tr.pair-row:hover td.pair-cell { color:var(--accent-1); }
+    #corrByGroupTable tbody tr.pair-row:hover td.overall-cell { background:color-mix(in srgb, var(--accent-1) 14%, var(--surface-2)); }
+    #corrByGroupTable tbody tr.pair-row:hover td.group-cell { background:color-mix(in srgb, var(--accent-2) 16%, var(--surface-2)); }
+    #corrByGroupTable td.pair-cell {
+      color:var(--accent-2);
+      font-weight:650;
+      text-decoration:underline;
+      text-decoration-color:color-mix(in srgb, var(--accent-2) 45%, transparent);
+      text-underline-offset:3px;
+    }
+    .scatter-dialog-overlay {
+      position:fixed; inset:0; z-index:2147483300; display:none; align-items:center; justify-content:center;
+      padding:16px; background:rgba(3,7,18,.72); backdrop-filter:blur(4px);
+    }
+    .scatter-dialog-overlay.is-visible { display:flex; }
+    .scatter-dialog {
+      width:min(1180px,98vw); max-height:90vh; display:flex; flex-direction:column;
+      background:var(--surface-1); border:1px solid var(--border); border-radius:14px;
+      box-shadow:0 24px 70px rgba(0,0,0,.45); overflow:hidden;
+    }
+    .scatter-dialog-head {
+      display:flex; align-items:flex-start; justify-content:space-between; gap:14px;
+      padding:16px 18px; border-bottom:1px solid var(--border);
+    }
+    .scatter-dialog-head strong { display:block; color:var(--accent-1); font-size:16px; margin-bottom:4px; }
+    .scatter-dialog-head span { color:var(--text-secondary); font-size:12px; line-height:1.45; }
+    .scatter-dialog-close {
+      width:34px; height:34px; display:flex; align-items:center; justify-content:center;
+      padding:0; border-radius:8px; border:1px solid var(--border); background:var(--surface-2); cursor:pointer;
+    }
+    .scatter-dialog-body { padding:14px 16px 18px; overflow:auto; }
+    .scatter-panel-grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
+      gap:12px;
+    }
+    .scatter-panel {
+      border:1px solid var(--border);
+      border-radius:12px;
+      overflow:hidden;
+      background:var(--surface-2);
+      min-width:0;
+    }
+    .scatter-panel-overall { border-color:color-mix(in srgb, var(--accent-1) 42%, var(--border)); }
+    .scatter-panel-group { border-color:color-mix(in srgb, var(--accent-2) 42%, var(--border)); }
+    .scatter-panel-head {
+      display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+      padding:10px 12px; border-bottom:1px solid var(--border);
+      background:linear-gradient(180deg, rgba(255,255,255,.04), transparent);
+    }
+    .scatter-panel-overall .scatter-panel-head strong { color:var(--accent-1); }
+    .scatter-panel-group .scatter-panel-head strong { color:var(--accent-2); }
+    .scatter-panel-head strong { font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .scatter-panel-head span {
+      font-size:11px; font-weight:700; color:var(--text-secondary);
+      white-space:nowrap; font-variant-numeric:tabular-nums;
+    }
+    .scatter-svg { display:block; width:100%; height:auto; }
+    .scatter-svg .scatter-bg { fill:rgba(0,0,0,.16); stroke:var(--border); stroke-width:1; }
+    html[data-theme="light"] .scatter-svg .scatter-bg { fill:rgba(15,23,42,.03); }
+    .scatter-svg .scatter-grid { stroke:var(--border); stroke-width:1; opacity:.55; }
+    .scatter-svg .scatter-dot { fill:color-mix(in srgb, var(--accent-2) 82%, #fff); opacity:.88; }
+    .scatter-panel-overall .scatter-svg .scatter-dot { fill:color-mix(in srgb, var(--accent-1) 82%, #fff); }
+    .scatter-svg .scatter-fit { stroke:var(--accent-1); stroke-width:2; opacity:.85; pointer-events:none; }
+    .scatter-panel-group .scatter-svg .scatter-fit { stroke:var(--accent-2); }
+    .scatter-svg .scatter-axis-label {
+      fill:var(--text-secondary); font-size:10px; font-weight:700; text-anchor:middle;
+    }
+    .scatter-svg .scatter-axis-label.scatter-axis-y { text-anchor:middle; }
+    .scatter-empty {
+      min-height:180px; display:flex; align-items:center; justify-content:center;
+      color:var(--text-secondary); font-size:13px; padding:20px; text-align:center;
+    }
     .table-wrap { border:1px solid var(--border); border-radius:10px; overflow:auto; background:var(--surface-2); }
     #corrByGroupTable {
       --grid-line: color-mix(in srgb, var(--border) 88%, #fff 12%);
@@ -423,6 +498,21 @@
       </div>
       <div class="group-dialog-foot">
         <button type="button" class="group-dialog-done-btn" onclick="closeGroupDialog()"><i class="fa-solid fa-check"></i> Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="scatter-dialog-overlay" id="scatterDialog" role="dialog" aria-modal="true" aria-labelledby="scatterDialogTitle">
+    <div class="scatter-dialog">
+      <div class="scatter-dialog-head">
+        <div>
+          <strong id="scatterDialogTitle">Scatter plots</strong>
+          <span id="scatterDialogSubtitle">Compare the pair across Overall and each group level.</span>
+        </div>
+        <button class="scatter-dialog-close" type="button" onclick="closeScatterPopup()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="scatter-dialog-body">
+        <div class="scatter-panel-grid" id="scatterPanels"></div>
       </div>
     </div>
   </div>
@@ -815,6 +905,140 @@
         : calculatePearsonCorrelation(x, y);
     }
 
+    function extractPairPoints(rows, varA, varB) {
+      const idxA = sourceHeaders.indexOf(varA);
+      const idxB = sourceHeaders.indexOf(varB);
+      if (idxA < 0 || idxB < 0) return [];
+      const points = [];
+      rows.forEach((row) => {
+        const a = toFiniteNumber(rowValue(row, idxA, varA));
+        const b = toFiniteNumber(rowValue(row, idxB, varB));
+        if (a != null && b != null) points.push([a, b]);
+      });
+      return points;
+    }
+
+    function paddedRange(values) {
+      if (!values.length) return { min: 0, max: 1 };
+      let min = Math.min(...values);
+      let max = Math.max(...values);
+      if (min === max) {
+        const pad = Math.abs(min || 1) * 0.1;
+        min -= pad;
+        max += pad;
+      } else {
+        const pad = (max - min) * 0.08;
+        min -= pad;
+        max += pad;
+      }
+      return { min, max };
+    }
+
+    function buildScatterPanel(panel, xLabel, yLabel) {
+      const { label, points, stats, variant } = panel;
+      const head = `<div class="scatter-panel-head">
+        <strong title="${escapeHtml(label)}">${escapeHtml(label)}</strong>
+        <span>r=${fmtR(stats.r)} · p=${formatP(stats.p)} · n=${stats.n}</span>
+      </div>`;
+      if (!points.length) {
+        return `<div class="scatter-panel scatter-panel-${variant}">${head}<div class="scatter-empty">Not enough valid pairs</div></div>`;
+      }
+
+      const w = 280;
+      const h = 210;
+      const pad = { l: 48, r: 16, t: 16, b: 40 };
+      const plotW = w - pad.l - pad.r;
+      const plotH = h - pad.t - pad.b;
+      const xs = points.map((p) => p[0]);
+      const ys = points.map((p) => p[1]);
+      const xRange = paddedRange(xs);
+      const yRange = paddedRange(ys);
+      const sx = (x) => pad.l + ((x - xRange.min) / (xRange.max - xRange.min)) * plotW;
+      const sy = (y) => pad.t + plotH - ((y - yRange.min) / (yRange.max - yRange.min)) * plotH;
+
+      let grid = '';
+      for (let i = 0; i <= 4; i++) {
+        const gx = pad.l + (plotW * i) / 4;
+        const gy = pad.t + (plotH * i) / 4;
+        grid += `<line class="scatter-grid" x1="${gx.toFixed(1)}" y1="${pad.t}" x2="${gx.toFixed(1)}" y2="${(pad.t + plotH).toFixed(1)}" />`;
+        grid += `<line class="scatter-grid" x1="${pad.l}" y1="${gy.toFixed(1)}" x2="${(pad.l + plotW).toFixed(1)}" y2="${gy.toFixed(1)}" />`;
+      }
+
+      let fitLine = '';
+      if (points.length >= 2) {
+        const n = points.length;
+        const mx = xs.reduce((a, b) => a + b, 0) / n;
+        const my = ys.reduce((a, b) => a + b, 0) / n;
+        let num = 0;
+        let den = 0;
+        for (let i = 0; i < n; i++) {
+          num += (xs[i] - mx) * (ys[i] - my);
+          den += (xs[i] - mx) ** 2;
+        }
+        if (den) {
+          const slope = num / den;
+          const intercept = my - slope * mx;
+          const x1 = xRange.min;
+          const x2 = xRange.max;
+          fitLine = `<line class="scatter-fit" x1="${sx(x1).toFixed(1)}" y1="${sy(slope * x1 + intercept).toFixed(1)}" x2="${sx(x2).toFixed(1)}" y2="${sy(slope * x2 + intercept).toFixed(1)}" />`;
+        }
+      }
+
+      const dots = points.map(([x, y]) =>
+        `<circle class="scatter-dot" cx="${sx(x).toFixed(1)}" cy="${sy(y).toFixed(1)}" r="3.6" />`
+      ).join('');
+
+      const svg = `<svg class="scatter-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="${escapeHtml(label)} scatter">
+        <rect class="scatter-bg" x="${pad.l}" y="${pad.t}" width="${plotW}" height="${plotH}" rx="4" />
+        ${grid}${fitLine}${dots}
+        <text class="scatter-axis-label" x="${(pad.l + plotW / 2).toFixed(1)}" y="${h - 10}">${escapeHtml(xLabel)}</text>
+        <text class="scatter-axis-label scatter-axis-y" x="14" y="${(pad.t + plotH / 2).toFixed(1)}" transform="rotate(-90 14 ${(pad.t + plotH / 2).toFixed(1)})">${escapeHtml(yLabel)}</text>
+      </svg>`;
+
+      return `<div class="scatter-panel scatter-panel-${variant}">${head}${svg}</div>`;
+    }
+
+    function openScatterPopup(varA, varB) {
+      const row = tableRows.find((item) => item.varA === varA && item.varB === varB);
+      if (!row) return;
+      const panels = [{
+        label: 'Overall',
+        points: extractPairPoints(sourceRows, varA, varB),
+        stats: row.overall,
+        variant: 'overall'
+      }];
+      activeGroups.forEach((g, i) => {
+        panels.push({
+          label: String(g.group),
+          points: extractPairPoints(g.rows, varA, varB),
+          stats: row.groupResults[i] || { r: NaN, p: null, n: 0 },
+          variant: 'group'
+        });
+      });
+      document.getElementById('scatterDialogTitle').textContent = `${varA} vs ${varB}`;
+      document.getElementById('scatterDialogSubtitle').textContent =
+        `${corrType} scatter plots · grouped by ${sourceHeaders[groupIndex] || 'group'}`;
+      document.getElementById('scatterPanels').innerHTML = panels
+        .map((panel) => buildScatterPanel(panel, varA, varB))
+        .join('');
+      document.getElementById('scatterDialog').classList.add('is-visible');
+    }
+
+    function closeScatterPopup() {
+      document.getElementById('scatterDialog').classList.remove('is-visible');
+    }
+
+    function bindPairRowClicks() {
+      const body = document.getElementById('corrByGroupBody');
+      if (!body) return;
+      body.onclick = (event) => {
+        if (event.target.closest('.spark-wrap')) return;
+        const tr = event.target.closest('tr.pair-row');
+        if (!tr) return;
+        openScatterPopup(tr.getAttribute('data-var-a'), tr.getAttribute('data-var-b'));
+      };
+    }
+
     function buildIncludedGroups() {
       const groups = new Map();
       sourceRows.forEach((row) => {
@@ -1027,8 +1251,8 @@
           `group-cell${i === 0 ? ' group-block-first' : ''}`,
           { dividerStart: i === 0, dividerEnd: true }
         )).join('');
-        return `<tr>
-          <td class="pair-cell" title="${escapeHtml(row.pair)}">${escapeHtml(row.pair)}</td>
+        return `<tr class="pair-row" data-var-a="${escapeHtml(row.varA)}" data-var-b="${escapeHtml(row.varB)}" title="Click row to view scatter plots">
+          <td class="pair-cell" title="${escapeHtml(row.pair)} · click for scatter plots">${escapeHtml(row.pair)}</td>
           ${overallCells}
           ${groupCells}
           <td class="spark-cell">${buildSparklineSvg(row.groupResults)}</td>
@@ -1046,6 +1270,7 @@
     function renderTable() {
       renderTableHead();
       renderTableBody();
+      bindPairRowClicks();
       syncCategoryRowHeight();
       if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
         window.StatisticoTooltip.refresh(document.getElementById('corrByGroupTable'));
@@ -1225,6 +1450,16 @@
     window.togglePreviewLevel = togglePreviewLevel;
     window.setAllPreviewLevels = setAllPreviewLevels;
     window.onCorrTypeChange = onCorrTypeChange;
+
+    window.openScatterPopup = openScatterPopup;
+    window.closeScatterPopup = closeScatterPopup;
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeScatterPopup();
+    });
+    document.getElementById('scatterDialog').addEventListener('click', (event) => {
+      if (event.target.id === 'scatterDialog') closeScatterPopup();
+    });
 
     if (typeof Office !== 'undefined') {
       Office.onReady(function () { boot(); });

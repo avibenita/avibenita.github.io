@@ -340,6 +340,35 @@
       box-shadow: 0 2px 6px rgba(255,165,120,0.35);
     }
 
+    .var-focus-select {
+      min-width: 120px;
+      max-width: 220px;
+      padding: 5px 28px 5px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.25);
+      color: var(--text-primary);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, var(--text-secondary) 50%), linear-gradient(135deg, var(--text-secondary) 50%, transparent 50%);
+      background-position: calc(100% - 14px) calc(50% - 2px), calc(100% - 9px) calc(50% - 2px);
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+    }
+
+    .var-focus-select:focus {
+      outline: none;
+      border-color: var(--accent-1);
+      box-shadow: 0 0 0 2px rgba(255,165,120,0.2);
+    }
+
+    :root[data-theme="light"] .var-focus-select {
+      background-color: rgba(255,255,255,0.9);
+      border-color: rgba(0,0,0,0.12);
+    }
+
     /* Slider — inherits .control-group border/pill, no extra needed */
     .slider-container { gap: 10px; }
 
@@ -1003,7 +1032,7 @@
     .right-col{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}
   </style>
 </head>
-<body data-page-version="20260610-matrix-pairs-v1">
+<body data-page-version="20260610-matrix-pairs-v2">
   <!-- ++ Sidebar Navigation ++ -->
   <nav class="sb-nav" id="sidebarNav">
     <div class="sb-logo">
@@ -1149,6 +1178,12 @@
                 <button type="button" id="viewHeatmapBtn" onclick="setMatrixView('heatmap')">Heatmap</button>
               </div>
             </div>
+            <div class="control-group">
+              <label for="varFocusSelect">Variable:</label>
+              <select id="varFocusSelect" class="var-focus-select" onchange="setVarFocusFilter(this.value)">
+                <option value="">All variables</option>
+              </select>
+            </div>
             <div class="control-group slider-container">
               <span class="slider-label">Highlight r ≥</span>
               <input type="range" id="thresholdSlider" min="0" max="1" step="0.05" value="0" oninput="updateThreshold(this.value)">
@@ -1291,6 +1326,7 @@
   let currentHeaders   = null;
   let pairRowsCache    = [];
   let pairSortConfig   = { key: 'pair', direction: 'asc' };
+  let varFocusFilter   = '';
   let scatterPointsCache = new Map();
 
   let scatterState = {
@@ -1840,19 +1876,79 @@
     currentMatrix  = matrix;
     currentHeaders = headers;
 
-    const thead = document.getElementById('tableHead');
-    const tbody  = document.getElementById('tableBody');
-    thead.innerHTML = '';
-    tbody.innerHTML  = '';
+    buildMatrixTable(headers, matrix);
+    buildHeatmapMatrix(headers, matrix);
+    populateVarFocusSelect(headers);
+    buildPairsTable(headers, matrix);
+    toggleDisplay();
+    applyThresholdFilter();
 
-    // Header row
+    // Show results container
+    document.getElementById('resultsContainer').style.display = 'flex';
+  }
+
+  function updateCorrelationHeaderSummary() {
+    if (isInIframe || typeof StatisticoHeader === 'undefined') return;
+    try {
+      const varCount = correlationData && correlationData.headers ? correlationData.headers.length : 0;
+      StatisticoHeader.sampleSize = correlationData && correlationData.data ? correlationData.data.length : 0;
+      StatisticoHeader.variableName = `${varCount} Variables`;
+      StatisticoHeader.render();
+      registerHeaderActions();
+    } catch (e) {
+      console.warn('Correlation header refresh skipped:', e);
+    }
+  }
+
+  function getMatrixRowHeaders(headers) {
+    if (varFocusFilter && headers.includes(varFocusFilter)) return [varFocusFilter];
+    return headers;
+  }
+
+  function populateVarFocusSelect(headers) {
+    const sel = document.getElementById('varFocusSelect');
+    if (!sel) return;
+    const prev = varFocusFilter;
+    sel.innerHTML = '<option value="">All variables</option>';
+    headers.forEach((h) => {
+      const opt = document.createElement('option');
+      opt.value = h;
+      opt.textContent = h;
+      sel.appendChild(opt);
+    });
+    if (prev && headers.includes(prev)) {
+      sel.value = prev;
+      varFocusFilter = prev;
+    } else {
+      varFocusFilter = '';
+      sel.value = '';
+    }
+  }
+
+  function setVarFocusFilter(value) {
+    varFocusFilter = value || '';
+    if (!currentHeaders || !currentMatrix) return;
+    buildMatrixTable(currentHeaders, currentMatrix);
+    buildHeatmapMatrix(currentHeaders, currentMatrix);
+    renderPairsTableBody();
+    toggleDisplay();
+    applyThresholdFilter();
+  }
+
+  function buildMatrixTable(headers, matrix) {
+    const thead = document.getElementById('tableHead');
+    const tbody = document.getElementById('tableBody');
+    if (!thead || !tbody) return;
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+
     const hr = document.createElement('tr');
     const corner = document.createElement('th'); corner.textContent = 'Variable'; hr.appendChild(corner);
     headers.forEach(col => { const th = document.createElement('th'); th.textContent = col; hr.appendChild(th); });
     thead.appendChild(hr);
 
-    // Data rows
-    headers.forEach((rowCol, i) => {
+    getMatrixRowHeaders(headers).forEach((rowCol) => {
+      const i = headers.indexOf(rowCol);
       const row = document.createElement('tr');
       const rowTh = document.createElement('td'); rowTh.textContent = rowCol; row.appendChild(rowTh);
 
@@ -1881,27 +1977,6 @@
       });
       tbody.appendChild(row);
     });
-
-    buildHeatmapMatrix(headers, matrix);
-    buildPairsTable(headers, matrix);
-    toggleDisplay();
-    applyThresholdFilter();
-
-    // Show results container
-    document.getElementById('resultsContainer').style.display = 'flex';
-  }
-
-  function updateCorrelationHeaderSummary() {
-    if (isInIframe || typeof StatisticoHeader === 'undefined') return;
-    try {
-      const varCount = correlationData && correlationData.headers ? correlationData.headers.length : 0;
-      StatisticoHeader.sampleSize = correlationData && correlationData.data ? correlationData.data.length : 0;
-      StatisticoHeader.variableName = `${varCount} Variables`;
-      StatisticoHeader.render();
-      registerHeaderActions();
-    } catch (e) {
-      console.warn('Correlation header refresh skipped:', e);
-    }
   }
 
   function collectPairRows(headers, matrix) {
@@ -1923,7 +1998,11 @@
   }
 
   function getSortedPairRows() {
-    const sorted = pairRowsCache.slice();
+    let rows = pairRowsCache.slice();
+    if (varFocusFilter) {
+      rows = rows.filter((row) => row.varA === varFocusFilter || row.varB === varFocusFilter);
+    }
+    const sorted = rows;
     const dir = pairSortConfig.direction === 'asc' ? 1 : -1;
     const key = pairSortConfig.key;
     sorted.sort((a, b) => {
@@ -2043,11 +2122,14 @@
     hBtn.classList.toggle('active', view === 'heatmap');
 
     if (currentHeaders && currentMatrix) {
-      if (view === 'heatmap') {
+      if (view === 'table') {
+        buildMatrixTable(currentHeaders, currentMatrix);
+      } else if (view === 'heatmap') {
         buildHeatmapMatrix(currentHeaders, currentMatrix);
       } else if (view === 'pairs') {
         buildPairsTable(currentHeaders, currentMatrix);
       }
+      toggleDisplay();
       applyThresholdFilter();
     }
   }
@@ -2064,6 +2146,7 @@
     head.appendChild(hr);
 
     headers.forEach((rowCol, i) => {
+      if (varFocusFilter && rowCol !== varFocusFilter) return;
       const row = document.createElement('tr');
       const rowTh = document.createElement('td'); rowTh.textContent = rowCol; row.appendChild(rowTh);
       headers.forEach((colCol, j) => {

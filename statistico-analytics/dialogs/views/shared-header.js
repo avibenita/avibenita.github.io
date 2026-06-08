@@ -5155,12 +5155,98 @@ const StatisticoHeader = {
    * Inject a contextual floating "Explain this view" button into .right-col.
    * Only shown for univariate views that are not hypothesis.
    */
+  _mountFloatingAiButton(btn) {
+    if (!btn) return;
+    document.body.appendChild(btn);
+    this._wireSbAiFloatDrag(btn);
+  },
+
+  _wireSbAiFloatDrag(btn) {
+    if (!btn || btn.dataset.floatDragWired === '1') return;
+    btn.dataset.floatDragWired = '1';
+    const storageKey = 'statistico.sbAiFloatPos';
+    btn.title = (btn.title ? btn.title + ' — ' : '') + 'Drag to reposition';
+
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
+      if (saved && Number.isFinite(saved.left) && Number.isFinite(saved.top)) {
+        btn.style.left = saved.left + 'px';
+        btn.style.top = saved.top + 'px';
+        btn.style.right = 'auto';
+        btn.style.bottom = 'auto';
+        btn.classList.add('is-floating-free');
+      }
+    } catch (_e) {}
+
+    let dragging = false;
+    let moved = false;
+    let startX = 0;
+    let startY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+
+    const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
+
+    btn.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      dragging = true;
+      moved = false;
+      const rect = btn.getBoundingClientRect();
+      startX = e.clientX;
+      startY = e.clientY;
+      if (!btn.classList.contains('is-floating-free')) {
+        btn.style.left = rect.left + 'px';
+        btn.style.top = rect.top + 'px';
+        btn.style.right = 'auto';
+        btn.style.bottom = 'auto';
+        btn.classList.add('is-floating-free');
+      }
+      startLeft = parseFloat(btn.style.left) || rect.left;
+      startTop = parseFloat(btn.style.top) || rect.top;
+      btn.classList.add('sb-ai-float-btn--dragging');
+      try { btn.setPointerCapture(e.pointerId); } catch (_e) {}
+    });
+
+    btn.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (!moved && Math.abs(dx) + Math.abs(dy) < 5) return;
+      moved = true;
+      e.preventDefault();
+      btn.style.left = clamp(startLeft + dx, 8, window.innerWidth - btn.offsetWidth - 8) + 'px';
+      btn.style.top = clamp(startTop + dy, 8, window.innerHeight - btn.offsetHeight - 8) + 'px';
+    });
+
+    const endDrag = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      btn.classList.remove('sb-ai-float-btn--dragging');
+      try { btn.releasePointerCapture(e.pointerId); } catch (_e) {}
+      if (moved) {
+        sessionStorage.setItem(storageKey, JSON.stringify({
+          left: parseFloat(btn.style.left),
+          top: parseFloat(btn.style.top)
+        }));
+        btn.dataset.suppressClick = '1';
+        setTimeout(() => { delete btn.dataset.suppressClick; }, 0);
+      }
+    };
+
+    btn.addEventListener('pointerup', endDrag);
+    btn.addEventListener('pointercancel', endDrag);
+
+    btn.addEventListener('click', (e) => {
+      if (btn.dataset.suppressClick) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    }, true);
+  },
+
   _injectPerViewAiButton() {
     if (!this._supportsInsightGuide()) return;
     if (document.getElementById('sbAiFloatBtn')) return;
-
-    const rightCol = document.querySelector('.right-col');
-    if (!rightCol) return;
 
     if (this.module === 'independent') {
       const btn = document.createElement('button');
@@ -5169,8 +5255,7 @@ const StatisticoHeader = {
       btn.title = 'Start explaining the active Independent Means view';
       btn.innerHTML = '<i class="fa-solid fa-compass"></i><span>Explain View</span><sup class="sb-ai-sup">AI</sup>';
       btn.addEventListener('click', () => StatisticoHeader._sbAiIndependentTabInterpret());
-      rightCol.style.position = 'relative';
-      rightCol.appendChild(btn);
+      this._mountFloatingAiButton(btn);
       return;
     }
 
@@ -5183,8 +5268,7 @@ const StatisticoHeader = {
     btn.innerHTML = `<i class="fa-solid fa-compass"></i><span>Explain View</span><sup class="sb-ai-sup">AI</sup>`;
     btn.addEventListener('click', () => StatisticoHeader._sbAiPerViewInterpret());
 
-    rightCol.style.position = 'relative';
-    rightCol.appendChild(btn);
+    this._mountFloatingAiButton(btn);
   },
 
   _supportsInsightGuide() {

@@ -5157,25 +5157,43 @@ const StatisticoHeader = {
    */
   _mountFloatingAiButton(btn) {
     if (!btn) return;
-    document.body.appendChild(btn);
+    btn.type = 'button';
+    let host = document.getElementById('sbAiFloatHost');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'sbAiFloatHost';
+      host.className = 'sb-ai-float-host';
+      document.documentElement.appendChild(host);
+    }
+    host.appendChild(btn);
     this._wireSbAiFloatDrag(btn);
   },
 
   _wireSbAiFloatDrag(btn) {
     if (!btn || btn.dataset.floatDragWired === '1') return;
     btn.dataset.floatDragWired = '1';
-    const storageKey = 'statistico.sbAiFloatPos';
-    btn.title = (btn.title ? btn.title + ' — ' : '') + 'Drag to reposition';
+    const storageKey = 'statistico.sbAiFloatPos.v2';
+    if (!btn.title.includes('Drag to reposition')) {
+      btn.title = (btn.title ? btn.title + ' — ' : '') + 'Drag to reposition';
+    }
+
+    const applySavedPos = (saved) => {
+      if (!saved || !Number.isFinite(saved.left) || !Number.isFinite(saved.top)) return;
+      const maxLeft = Math.max(8, window.innerWidth - btn.offsetWidth - 8);
+      const maxTop = Math.max(8, window.innerHeight - btn.offsetHeight - 8);
+      const left = Math.min(Math.max(8, saved.left), maxLeft);
+      const top = Math.min(Math.max(8, saved.top), maxTop);
+      btn.style.left = left + 'px';
+      btn.style.top = top + 'px';
+      btn.style.right = 'auto';
+      btn.style.bottom = 'auto';
+      btn.style.width = 'max-content';
+      btn.classList.add('is-floating-free');
+    };
 
     try {
       const saved = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
-      if (saved && Number.isFinite(saved.left) && Number.isFinite(saved.top)) {
-        btn.style.left = saved.left + 'px';
-        btn.style.top = saved.top + 'px';
-        btn.style.right = 'auto';
-        btn.style.bottom = 'auto';
-        btn.classList.add('is-floating-free');
-      }
+      requestAnimationFrame(() => applySavedPos(saved));
     } catch (_e) {}
 
     let dragging = false;
@@ -5199,6 +5217,7 @@ const StatisticoHeader = {
         btn.style.top = rect.top + 'px';
         btn.style.right = 'auto';
         btn.style.bottom = 'auto';
+        btn.style.width = 'max-content';
         btn.classList.add('is-floating-free');
       }
       startLeft = parseFloat(btn.style.left) || rect.left;

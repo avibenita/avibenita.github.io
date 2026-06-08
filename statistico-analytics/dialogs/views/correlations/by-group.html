@@ -41,6 +41,84 @@
     .metric { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px; }
     .metric label { display:block; color:var(--text-secondary); font-size:10px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
     .metric strong { font-size:18px; color:var(--accent-1); }
+    .alpha-strip {
+      margin-bottom:12px;
+      padding:12px 14px;
+      border:1px solid var(--border);
+      border-radius:10px;
+      background:var(--surface-2);
+    }
+    .alpha-strip-head {
+      display:flex;
+      align-items:baseline;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom:10px;
+    }
+    .alpha-strip-head strong {
+      color:var(--accent-1);
+      font-size:13px;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+    }
+    .alpha-strip-head strong i { margin-right:6px; opacity:.9; }
+    .alpha-strip-head span { color:var(--text-secondary); font-size:12px; }
+    .alpha-cards {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+      gap:10px;
+    }
+    .alpha-card {
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:12px 14px;
+      background:var(--surface-1);
+      min-width:0;
+    }
+    .alpha-card-overall {
+      border-color:color-mix(in srgb, var(--accent-1) 42%, var(--border));
+      background:linear-gradient(180deg, color-mix(in srgb, var(--accent-1) 10%, var(--surface-1)) 0%, var(--surface-1) 100%);
+    }
+    .alpha-card-group {
+      border-color:color-mix(in srgb, var(--accent-2) 42%, var(--border));
+      background:linear-gradient(180deg, color-mix(in srgb, var(--accent-2) 10%, var(--surface-1)) 0%, var(--surface-1) 100%);
+    }
+    .alpha-card-label {
+      font-size:15px;
+      font-weight:800;
+      color:var(--accent-2);
+      margin-bottom:6px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .alpha-card-overall .alpha-card-label { color:var(--accent-1); }
+    .alpha-card-value {
+      font-size:24px;
+      font-weight:800;
+      font-variant-numeric:tabular-nums;
+      line-height:1.1;
+      margin-bottom:4px;
+    }
+    .alpha-card-meta {
+      font-size:11px;
+      font-weight:700;
+      color:var(--text-secondary);
+      letter-spacing:.03em;
+      text-transform:uppercase;
+    }
+    .alpha-card.alpha-excellent .alpha-card-value { color:#34d399; }
+    .alpha-card.alpha-good .alpha-card-value { color:#4ade80; }
+    .alpha-card.alpha-acceptable .alpha-card-value { color:#fbbf24; }
+    .alpha-card.alpha-questionable .alpha-card-value { color:#fb923c; }
+    .alpha-card.alpha-poor .alpha-card-value { color:#fb7185; }
+    .alpha-card.alpha-na .alpha-card-value { color:var(--text-secondary); font-size:18px; }
+    html[data-theme="light"] .alpha-card.alpha-excellent .alpha-card-value { color:#15803d; }
+    html[data-theme="light"] .alpha-card.alpha-good .alpha-card-value { color:#16a34a; }
+    html[data-theme="light"] .alpha-card.alpha-acceptable .alpha-card-value { color:#b45309; }
+    html[data-theme="light"] .alpha-card.alpha-questionable .alpha-card-value { color:#c2410c; }
+    html[data-theme="light"] .alpha-card.alpha-poor .alpha-card-value { color:#be123c; }
     .table-wrap { border:1px solid var(--border); border-radius:10px; overflow:auto; background:var(--surface-2); }
     #corrByGroupTable {
       --grid-line: color-mix(in srgb, var(--border) 88%, #fff 12%);
@@ -310,6 +388,13 @@
               <div class="metric"><label>Group column</label><strong id="metricGroupCol" style="font-size:14px;">—</strong></div>
               <div class="metric"><label>Filtered rows</label><strong id="metricRows">—</strong></div>
             </div>
+            <div id="alphaReliabilityStrip" class="alpha-strip" style="display:none;">
+              <div class="alpha-strip-head">
+                <strong><i class="fa-solid fa-check-double"></i> Cronbach's α</strong>
+                <span id="alphaStripSubtitle">Internal consistency by group level</span>
+              </div>
+              <div class="alpha-cards" id="alphaCards"></div>
+            </div>
             <div class="table-wrap">
               <table id="corrByGroupTable">
                 <thead id="corrByGroupHead"></thead>
@@ -355,6 +440,7 @@
     let activeGroups = [];
     let sortConfig = { key: 'pair', direction: 'ascending' };
     const levelSelections = {};
+    let reliabilitySummary = null;
 
     function decimalDigits(autoDefault) {
       const fallback = Number.isFinite(autoDefault) ? autoDefault : 3;
@@ -374,6 +460,111 @@
 
     function fmtR(value) {
       return fmt(value, 3);
+    }
+
+    function fmtAlpha(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n.toFixed(3) : '—';
+    }
+
+    function alphaQualityClass(value) {
+      if (!Number.isFinite(value)) return 'alpha-na';
+      if (value >= 0.9) return 'alpha-excellent';
+      if (value >= 0.8) return 'alpha-good';
+      if (value >= 0.7) return 'alpha-acceptable';
+      if (value >= 0.6) return 'alpha-questionable';
+      return 'alpha-poor';
+    }
+
+    function buildCompleteCaseMatrix(rows) {
+      const matrix = [];
+      rows.forEach((row) => {
+        const values = analysisHeaders.map((header) => {
+          const idx = sourceHeaders.indexOf(header);
+          return toFiniteNumber(rowValue(row, idx, header));
+        });
+        if (values.every((v) => v != null)) matrix.push(values);
+      });
+      return matrix;
+    }
+
+    function cronbachAlpha(matrix) {
+      if (!Array.isArray(matrix) || matrix.length < 2 || !Array.isArray(matrix[0]) || matrix[0].length < 2) {
+        return NaN;
+      }
+      const k = matrix[0].length;
+      const transpose = (m) => m[0].map((_, i) => m.map((row) => row[i]));
+      const variance = (arr) => {
+        if (!Array.isArray(arr) || arr.length < 2) return NaN;
+        const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+        return arr.reduce((sum, x) => sum + Math.pow(x - avg, 2), 0) / (arr.length - 1);
+      };
+      const items = transpose(matrix);
+      const itemVars = items.map(variance);
+      const totalScores = matrix.map((row) => row.reduce((a, b) => a + b, 0));
+      const totalVar = variance(totalScores);
+      if (!Number.isFinite(totalVar) || totalVar <= 0 || itemVars.some((v) => !Number.isFinite(v))) {
+        return NaN;
+      }
+      const alpha = (k / (k - 1)) * (1 - itemVars.reduce((a, b) => a + b, 0) / totalVar);
+      return Number.isFinite(alpha) ? alpha : NaN;
+    }
+
+    function computeReliabilitySummary() {
+      if (analysisHeaders.length < 2) return null;
+      const overallMatrix = buildCompleteCaseMatrix(sourceRows);
+      const summary = {
+        groupColumn: sourceHeaders[groupIndex] || 'Group',
+        overall: {
+          label: 'Overall',
+          alpha: cronbachAlpha(overallMatrix),
+          k: analysisHeaders.length,
+          n: overallMatrix.length
+        },
+        groups: activeGroups.map((g) => {
+          const matrix = buildCompleteCaseMatrix(g.rows);
+          return {
+            label: String(g.group),
+            alpha: cronbachAlpha(matrix),
+            k: analysisHeaders.length,
+            n: matrix.length
+          };
+        })
+      };
+      return summary;
+    }
+
+    function renderReliabilityStrip(summary) {
+      const strip = document.getElementById('alphaReliabilityStrip');
+      const cards = document.getElementById('alphaCards');
+      if (!strip || !cards) return;
+      if (!summary || analysisHeaders.length < 2) {
+        strip.style.display = 'none';
+        cards.innerHTML = '';
+        return;
+      }
+      strip.style.display = 'block';
+      document.getElementById('alphaStripSubtitle').textContent =
+        `${summary.overall.k} items · complete cases · by ${summary.groupColumn}`;
+      const allCards = [summary.overall, ...summary.groups];
+      cards.innerHTML = allCards.map((item, i) => {
+        const quality = alphaQualityClass(item.alpha);
+        const cardType = i === 0 ? 'alpha-card-overall' : 'alpha-card-group';
+        return `<div class="alpha-card ${cardType} ${quality}">
+          <div class="alpha-card-label" title="${escapeHtml(item.label)}">${escapeHtml(item.label)}</div>
+          <div class="alpha-card-value">${fmtAlpha(item.alpha)}</div>
+          <div class="alpha-card-meta">${item.k} items · n=${item.n}</div>
+        </div>`;
+      }).join('');
+    }
+
+    function reliabilityNotice(summary) {
+      if (!summary) return '';
+      const parts = [`Overall α=${fmtAlpha(summary.overall.alpha)} (n=${summary.overall.n})`];
+      summary.groups.forEach((g) => {
+        parts.push(`${g.label} α=${fmtAlpha(g.alpha)} (n=${g.n})`);
+      });
+      return `Cronbach alpha by ${summary.groupColumn}: ${parts.join('; ')}.`;
     }
 
     function formatP(p) {
@@ -887,6 +1078,7 @@
       }
 
       tableRows = pairs;
+      reliabilitySummary = computeReliabilitySummary();
       document.getElementById('emptyState').style.display = 'none';
       document.getElementById('mainContent').style.display = 'block';
       document.getElementById('metricPairs').textContent = pairs.length;
@@ -894,6 +1086,7 @@
       document.getElementById('metricGroupCol').textContent = sourceHeaders[groupIndex] || '—';
       document.getElementById('metricRows').textContent = sourceRows.length;
       document.getElementById('subtitle').textContent = `${corrType} r for ${analysisHeaders.length} variables across ${activeGroups.length} groups (${sourceRows.length} filtered rows)`;
+      renderReliabilityStrip(reliabilitySummary);
       renderTable();
       registerHeaderActions();
       syncHeaderSample();
@@ -940,7 +1133,10 @@
             ])
           ]),
           usedRange: 'Correlations by group',
-          notice: 'Grouped correlations use the active row filter and selected group levels.'
+          notice: [
+            'Grouped correlations use the active row filter and selected group levels.',
+            reliabilityNotice(reliabilitySummary)
+          ].filter(Boolean).join(' ')
         }),
         moduleName: 'Copy grouped correlations to clipboard'
       });

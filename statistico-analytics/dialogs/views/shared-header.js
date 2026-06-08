@@ -812,28 +812,8 @@ const StatisticoHeader = {
   },
 
   _renderQuestionsAnsweredControl() {
-    const items = this._getQuestionsAnsweredContent();
-    if (!items.length) return '';
-    return `
-      <div class="header-qa-wrap" id="headerQaWrap">
-        <button class="header-qa-btn"
-                id="headerQaBtn"
-                type="button"
-                aria-expanded="false"
-                aria-controls="headerQaPanel"
-                title="What questions this view answers"
-                onclick="StatisticoHeader._toggleQuestionsAnsweredPanel(event)">
-          <i class="fa-solid fa-bullseye"></i>
-          <span>Questions Answered</span>
-        </button>
-        <div class="header-qa-panel" id="headerQaPanel" role="dialog" aria-label="Questions this view answers">
-          <div class="header-qa-title">Questions this view answers</div>
-          <ul class="header-qa-list" id="headerQaList">
-            ${items.map((q) => `<li>${q}</li>`).join('')}
-          </ul>
-        </div>
-      </div>
-    `;
+    // Header chip removed — questions list lives in the AI Explain overlay only.
+    return '';
   },
 
   _refreshQuestionsAnsweredControl(forcedTitle = null) {

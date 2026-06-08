@@ -104,6 +104,15 @@
       line-height:1.1;
       margin-bottom:4px;
     }
+    .alpha-card-ci {
+      display:block;
+      margin-bottom:5px;
+      font-size:11px;
+      font-weight:700;
+      color:var(--text-secondary);
+      font-variant-numeric:tabular-nums;
+      letter-spacing:.01em;
+    }
     .alpha-card-meta {
       font-size:11px;
       font-weight:700;
@@ -650,6 +659,52 @@
       return Number.isFinite(n) ? n.toFixed(3) : '—';
     }
 
+    function alphaConfidenceLevel() {
+      return 0.95;
+    }
+
+    function clampAlpha(value) {
+      if (!Number.isFinite(value)) return NaN;
+      return Math.max(0, Math.min(1, value));
+    }
+
+    function cronbachAlphaCI(alpha, n, k, confidence) {
+      const level = confidence != null ? confidence : alphaConfidenceLevel();
+      if (!Number.isFinite(alpha) || !Number.isFinite(n) || !Number.isFinite(k) || n < 3 || k < 2) {
+        return { lower: NaN, upper: NaN, level };
+      }
+      const df1 = n - 1;
+      const df2 = (n - 1) * (k - 1);
+      if (df1 < 1 || df2 < 1 || typeof jStat === 'undefined' || !jStat.centralF || typeof jStat.centralF.inv !== 'function') {
+        return { lower: NaN, upper: NaN, level };
+      }
+      const z = 1 - alpha;
+      const lower = clampAlpha(1 - z * jStat.centralF.inv(1 - level / 2, df2, df1));
+      const upper = clampAlpha(1 - z * jStat.centralF.inv(level / 2, df2, df1));
+      return { lower, upper, level };
+    }
+
+    function reliabilityEntry(label, matrix, k) {
+      const n = matrix.length;
+      const alpha = cronbachAlpha(matrix);
+      const ci = cronbachAlphaCI(alpha, n, k);
+      return {
+        label,
+        alpha,
+        k,
+        n,
+        ciLower: ci.lower,
+        ciUpper: ci.upper,
+        ciLevel: ci.level
+      };
+    }
+
+    function fmtAlphaCI(item) {
+      if (!Number.isFinite(item.ciLower) || !Number.isFinite(item.ciUpper)) return '95% CI —';
+      const pct = Math.round((item.ciLevel || alphaConfidenceLevel()) * 100);
+      return `${pct}% CI [${fmtAlpha(item.ciLower)}, ${fmtAlpha(item.ciUpper)}]`;
+    }
+
     function alphaQualityClass(value) {
       if (!Number.isFinite(value)) return 'alpha-na';
       if (value >= 0.9) return 'alpha-excellent';
@@ -698,21 +753,8 @@
       const overallMatrix = buildCompleteCaseMatrix(sourceRows);
       const summary = {
         groupColumn: sourceHeaders[groupIndex] || 'Group',
-        overall: {
-          label: 'Overall',
-          alpha: cronbachAlpha(overallMatrix),
-          k: analysisHeaders.length,
-          n: overallMatrix.length
-        },
-        groups: activeGroups.map((g) => {
-          const matrix = buildCompleteCaseMatrix(g.rows);
-          return {
-            label: String(g.group),
-            alpha: cronbachAlpha(matrix),
-            k: analysisHeaders.length,
-            n: matrix.length
-          };
-        })
+        overall: reliabilityEntry('Overall', overallMatrix, analysisHeaders.length),
+        groups: activeGroups.map((g) => reliabilityEntry(String(g.group), buildCompleteCaseMatrix(g.rows), analysisHeaders.length))
       };
       return summary;
     }
@@ -728,7 +770,7 @@
       }
       strip.style.display = 'block';
       document.getElementById('alphaStripSubtitle').textContent =
-        `${summary.overall.k} items · complete cases · by ${summary.groupColumn}`;
+        `${summary.overall.k} items · complete cases · by ${summary.groupColumn} · ${Math.round(alphaConfidenceLevel() * 100)}% CI (Feldt)`;
       const allCards = [summary.overall, ...summary.groups];
       cards.innerHTML = allCards.map((item, i) => {
         const quality = alphaQualityClass(item.alpha);
@@ -736,6 +778,7 @@
         return `<div class="alpha-card ${cardType} ${quality}">
           <div class="alpha-card-label" title="${escapeHtml(item.label)}">${escapeHtml(item.label)}</div>
           <div class="alpha-card-value">${fmtAlpha(item.alpha)}</div>
+          <div class="alpha-card-ci">${fmtAlphaCI(item)}</div>
           <div class="alpha-card-meta">${item.k} items · n=${item.n}</div>
         </div>`;
       }).join('');
@@ -743,10 +786,9 @@
 
     function reliabilityNotice(summary) {
       if (!summary) return '';
-      const parts = [`Overall α=${fmtAlpha(summary.overall.alpha)} (n=${summary.overall.n})`];
-      summary.groups.forEach((g) => {
-        parts.push(`${g.label} α=${fmtAlpha(g.alpha)} (n=${g.n})`);
-      });
+      const fmtEntry = (item) => `${item.label} α=${fmtAlpha(item.alpha)} ${fmtAlphaCI(item)} (n=${item.n})`;
+      const parts = [fmtEntry(summary.overall)];
+      summary.groups.forEach((g) => { parts.push(fmtEntry(g)); });
       return `Cronbach alpha by ${summary.groupColumn}: ${parts.join('; ')}.`;
     }
 
@@ -1455,7 +1497,7 @@
           ${overallCells}
           ${groupCells}
           <td class="chart-cell">
-            <button type="button" class="pair-chart-btn" data-var-a="${escapeHtml(row.varA)}" data-var-b="${escapeHtml(row.varB)}" title="Scatter plots for ${escapeHtml(row.pair)}" aria-label="Scatter plots for ${escapeHtml(row.pair)}">
+            <button type="button" class="pair-chart-btn" data-var-a="${escapeHtml(row.varA)}" data-var-b="${escapeHtml(row.varB)}" title="Open scatterplot for ${escapeHtml(row.pair)}" aria-label="Open scatterplot for ${escapeHtml(row.pair)}">
               ${scatterChartIcon()}
             </button>
           </td>

@@ -84,7 +84,7 @@
     }).join('\n          ');
 
     container.innerHTML = [
-      '<div class="pwstd-shell pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260609c">',
+      '<div class="pwstd-shell pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260609e">',
       '  <h2 class="pwstd-title"><i class="fa-solid fa-bolt"></i> ' + esc(title) + '</h2>',
       '  <div class="pwstd-grid pwstd-grid--top">',
       '    <div class="pwstd-card pwstd-card--context">',
@@ -112,6 +112,16 @@
       '        <div class="pwstd-row"><span class="pwstd-label">Alpha</span><span class="pwstd-value" id="' + id(ids,'alpha','powAlpha') + '">0.050</span></div>',
       '      </div>',
       '    </div>',
+      '  </div>',
+      '  <div class="pwstd-r2-compare pwstd-for-r2compare" id="pwstd-r2-compare" hidden>',
+      '    <table class="pwstd-mini-table">',
+      '      <thead><tr><th>Metric</th><th>Value</th></tr></thead>',
+      '      <tbody>',
+      '        <tr><td>Observed R²</td><td id="pwstd-r2-observed">—</td></tr>',
+      '        <tr><td>Detectable R²</td><td id="pwstd-r2-detectable">—</td></tr>',
+      '      </tbody>',
+      '    </table>',
+      '    <p class="pwstd-r2-insight" id="pwstd-r2-insight"></p>',
       '  </div>',
       '  <div class="pwstd-grid pwstd-grid--technicals">',
       '    <div class="pwstd-card pwstd-card--technicals pwstd-tech-panel" id="pwstd-tech-panel">',
@@ -170,6 +180,7 @@
       '        <div class="pwstd-row pwstd-for-detectable"><span class="pwstd-label">Current sample size</span><span class="pwstd-value" id="pwstd-det-n">...</span></div>',
       '        <div class="pwstd-row pwstd-for-detectable"><span class="pwstd-label">Min detectable Cohen\'s f</span><span class="pwstd-value" id="' + id(ids,'minF','powMinDetectableF') + '">—</span></div>',
       '        <div class="pwstd-row pwstd-for-detectable"><span class="pwstd-label">Min detectable partial η²</span><span class="pwstd-value" id="' + id(ids,'minEta','powMinDetectableEta') + '">—</span></div>',
+      '        <p class="pwstd-det-interpret pwstd-for-detectable" id="pwstd-det-interpret"></p>',
       '        <div class="pwstd-row pwstd-for-detectable" style="justify-items:end;">',
       '          <span></span>',
       '          <button type="button" class="hero-action-btn" style="font-size:12px;padding:5px 12px;" onclick="' + esc(o.detectableHandler || "window.StatisticoPowerTemplate._computeDetectable && window.StatisticoPowerTemplate._computeDetectable()") + '">',
@@ -350,7 +361,7 @@
       if (planHead) planHead.textContent = 'Sample Size Planning';
     } else if (mode === 'detectable') {
       _setCard(obsCard,  false);
-      if (obsHead)  obsHead.textContent  = 'Study Context';
+      if (obsHead)  obsHead.textContent  = 'Current Study';
       if (planHead) planHead.textContent = 'Detectable Effect Planning';
       var nEl  = document.getElementById('powSampleSize');
       var detN = document.getElementById('pwstd-det-n');
@@ -387,7 +398,12 @@
     syncDefaultChip:  _syncDefaultChip,
     onCustomComplete: _onCustomComplete,
     _customComputeFn: null,
-    _onTaskChange:    function(mode){ _syncTaskUI(mode); },
+    _onTaskChange:    function(mode){
+      _syncTaskUI(mode);
+      if (typeof window.StatisticoPowerTemplate._recalcFn === 'function') {
+        window.StatisticoPowerTemplate._recalcFn();
+      }
+    },
     _onChipClick:     _onChipClick,
     _onCustomInput:   _onCustomInput,
     _toggleTechDetails: _toggleTechPanel,

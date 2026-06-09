@@ -30,8 +30,8 @@
   <script src="../shared-brand-logo.js?v=20260601gauss"></script>
   <script src="../shared-header.js?v=20260606u16"></script>
   <script src="../shared-workspace-tabs.js?v=20260606u16"></script>
-  <link rel="stylesheet" href="../shared-power-template.css?v=20260609d" />
-  <script src="../shared-power-template.js?v=20260609d"></script>
+  <link rel="stylesheet" href="../shared-power-template.css?v=20260609e" />
+  <script src="../shared-power-template.js?v=20260609e"></script>
 
   <style>
     /* Dark Theme (Default) */
@@ -10885,19 +10885,46 @@ ${sectionsHtml}
       const statusEl = document.getElementById('powStatusMessage');
       if (!statusEl) return;
       statusEl.textContent = message;
-      if (type === 'success') {
-        statusEl.style.background = '#2d5f3f';
-        statusEl.style.color = '#7fdb9f';
-      } else if (type === 'warning') {
-        statusEl.style.background = '#5f4a2d';
-        statusEl.style.color = '#dbb07f';
-      } else if (type === 'error') {
-        statusEl.style.background = '#5f2d2d';
-        statusEl.style.color = '#db7f7f';
-      } else {
-        statusEl.style.background = '';
-        statusEl.style.color = '';
+      statusEl.className = 'pwstd-band';
+      if (type === 'success') statusEl.classList.add('pwstd-band--success');
+      else if (type === 'warning') statusEl.classList.add('pwstd-band--warning');
+      else if (type === 'error') statusEl.classList.add('pwstd-band--error');
+    }
+
+    function updateRegressionR2Compare(ctx, detectableR2, targetPower) {
+      const block = document.getElementById('pwstd-r2-compare');
+      if (!block) return;
+      if (!ctx) {
+        block.hidden = true;
+        return;
       }
+      const obsEl = document.getElementById('pwstd-r2-observed');
+      const detEl = document.getElementById('pwstd-r2-detectable');
+      const insightEl = document.getElementById('pwstd-r2-insight');
+      const interpretEl = document.getElementById('pwstd-det-interpret');
+      if (obsEl) obsEl.textContent = ctx.r2.toFixed(3);
+      if (detEl) detEl.textContent = isFinite(detectableR2) ? detectableR2.toFixed(3) : '—';
+      block.hidden = !isFinite(detectableR2);
+      const tp = isFinite(targetPower) ? targetPower : 0.80;
+      if (interpretEl && isFinite(detectableR2)) {
+        const pct = (detectableR2 * 100).toFixed(1);
+        interpretEl.textContent = 'With N=' + ctx.n + ', the study can reliably detect (at ' + Math.round(tp * 100) + '% power) effects explaining at least ' + pct + '% of outcome variance.';
+      }
+      if (insightEl && isFinite(detectableR2)) {
+        if (ctx.r2 > detectableR2 + 0.001) {
+          insightEl.textContent = 'Observed R² exceeds the detectable threshold — sufficient power to detect this effect.';
+        } else if (Math.abs(ctx.r2 - detectableR2) <= 0.001) {
+          insightEl.textContent = 'Observed R² is near the detectable threshold — power is borderline for this effect size.';
+        } else {
+          insightEl.textContent = 'Observed R² is below the detectable threshold — this effect may be too small to detect reliably at this sample size.';
+        }
+      }
+    }
+
+    function getRegressionDetectableR2(ctx, targetPower) {
+      if (!ctx) return NaN;
+      const minF2 = estimateRegressionDetectableF2(ctx.n, ctx.p, targetPower, ctx.alpha, ctx.withIntercept);
+      return regressionR2FromF2(minF2);
     }
 
     function calculateRegressionPower(results) {
@@ -10910,10 +10937,14 @@ ${sectionsHtml}
         powSetText('powRequired', '—');
         ['powReq80', 'powReq85', 'powReq90', 'powReq95'].forEach(id => powSetText(id, '—'));
         updateRegressionPowerOutputParams(null);
+        updateRegressionR2Compare(null);
         updateRegressionPowerStatus('Run a regression model to populate power results.', 'info');
         return;
       }
 
+      const targetInput = document.getElementById('powDetectableTarget');
+      const detectTargetPower = targetInput ? (parseFloat(targetInput.value) || 0.80) : 0.80;
+      const detectableR2 = getRegressionDetectableR2(ctx, detectTargetPower);
       const observedPower = regressionPowerAtF2(ctx.n, ctx.p, ctx.f2, ctx.alpha, ctx.withIntercept);
       const powerPct = (observedPower * 100).toFixed(1) + '%';
       const mag = regressionCohenMagnitude(ctx.f2);
@@ -10935,14 +10966,19 @@ ${sectionsHtml}
       if (observedPower >= 0.80) {
         statusMsg = 'Adequate power (' + powerPct + ') for the observed R² with n=' + ctx.n + '. Effect size f²=' + ctx.f2.toFixed(3) + ' (' + mag + ').';
         statusType = 'success';
-      } else if (observedPower >= 0.60) {
-        statusMsg = 'Moderate power (' + powerPct + ') with n=' + ctx.n + '. For 80% power at this R², plan n≈' + (req80 || '—') + '.';
+      } else if (observedPower >= 0.70) {
+        statusMsg = 'Borderline power (' + powerPct + ') with n=' + ctx.n + '. For 80% power at this R², plan n≈' + (req80 || '—') + '.';
         statusType = 'warning';
       } else {
         statusMsg = 'Low power (' + powerPct + ') with n=' + ctx.n + '. For 80% power at this R², plan n≈' + (req80 || '—') + '.';
         statusType = 'error';
       }
       updateRegressionPowerStatus(statusMsg, statusType);
+
+      const minF2 = estimateRegressionDetectableF2(ctx.n, ctx.p, detectTargetPower, ctx.alpha, ctx.withIntercept);
+      powSetText('powMinDetectableF', minF2.toFixed(4) + (regressionCohenMagnitude(minF2) ? ' (' + regressionCohenMagnitude(minF2) + ')' : ''));
+      powSetText('powMinDetectableEta', detectableR2.toFixed(4));
+      updateRegressionR2Compare(ctx, detectableR2, detectTargetPower);
 
       updateRegressionPowerOutputParams(buildRegressionPowerOutputParams(ctx, ctx.f2, observedPower));
 
@@ -11023,6 +11059,7 @@ ${sectionsHtml}
 
       powSetText('powMinDetectableF', minF2.toFixed(4) + (mag ? ' (' + mag + ')' : ''));
       powSetText('powMinDetectableEta', minR2.toFixed(4));
+      updateRegressionR2Compare(ctx, minR2, targetPower);
     }
 
     function refreshRegressionPowerAnalysis() {
@@ -11040,6 +11077,12 @@ ${sectionsHtml}
       window.StatisticoPowerTemplate._computeDetectable = calculateRegressionDetectableEffect;
       window.StatisticoPowerTemplate._customComputeFn = calculateRegressionCustomPower;
       window.StatisticoPowerTemplate._recalcFn = refreshRegressionPowerAnalysis;
+      const detTarget = document.getElementById('powDetectableTarget');
+      if (detTarget && !detTarget.dataset.regPowBound) {
+        detTarget.dataset.regPowBound = '1';
+        detTarget.addEventListener('input', refreshRegressionPowerAnalysis);
+        detTarget.addEventListener('change', refreshRegressionPowerAnalysis);
+      }
       refreshRegressionPowerAnalysis();
     }
 

@@ -1553,7 +1553,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260602uniw',
+  _TAB_ASSET_VER: '20260606u3',
 
   _ensurePlainTabUnderlineStyles() {
     const id = 'statistico-tab-underline-fix';

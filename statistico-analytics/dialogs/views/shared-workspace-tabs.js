@@ -101,8 +101,21 @@
     return cluster;
   }
 
+  function isConnectedBar(bar) {
+    return bar && bar.classList && bar.classList.contains('ws-mode-bar--connected');
+  }
+
+  function ensureConnectedBar(bar) {
+    if (!bar || !bar.classList) return;
+    if (bar.classList.contains('ws-mode-bar--legacy-slant')) return;
+    if (bar.classList.contains('ws-mode-bar--slant')) {
+      bar.classList.remove('ws-mode-bar--slant');
+    }
+    bar.classList.add('ws-mode-bar--connected');
+  }
+
   function updateIndicatorForBar(bar) {
-    if (isSlantBar(bar)) return;
+    if (isSlantBar(bar) || isConnectedBar(bar)) return;
     var cluster = bar.querySelector('.ws-tab-cluster');
     if (!cluster) cluster = ensureCluster(bar);
     if (!cluster) return;
@@ -163,6 +176,7 @@
   function initWorkspaceTabBars(extraSubtitles) {
     if (extraSubtitles) Object.assign(subtitles, extraSubtitles);
     document.querySelectorAll('.ws-mode-bar--attached').forEach(function(bar) {
+      ensureConnectedBar(bar);
       unwrapClusterIfSlant(bar);
       ensureCluster(bar);
     });

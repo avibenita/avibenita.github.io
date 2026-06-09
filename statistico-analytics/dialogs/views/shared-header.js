@@ -229,6 +229,7 @@ const StatisticoHeader = {
     // Apply persisted theme before rendering (avoids flash of wrong theme)
     this.applyTheme(this.getTheme());
     this._ensureMinimalStyles();
+    this._ensureWorkspaceTabAssets();
     this._ensurePlainTabUnderlineStyles();
 
     // Keep univariate result dialogs visually capped to a laptop-like viewport.
@@ -1535,13 +1536,13 @@ const StatisticoHeader = {
     }
     const titleAttr = opts.title ? ` title="${opts.title.replace(/"/g, '&quot;')}"` : '';
     const sub = this._getUniTabSubtitle(opts.tabKey);
-    return `<button type="button" class="overview-subtab-btn${active}" role="tab"`
+    return `<button type="button" class="ws-mode-tab${active}" role="tab"`
       + ` aria-selected="${opts.active ? 'true' : 'false'}"`
       + ` data-uni-tab="${opts.tabKey}"${titleAttr}${onclick}>`
       + `<i class="fa-solid ${opts.icon}" aria-hidden="true"></i>`
-      + `<span class="overview-subtab-copy">`
-      + `<span class="overview-subtab-label">${opts.label}</span>`
-      + (sub ? `<span class="overview-subtab-sub">${sub}</span>` : '')
+      + `<span class="ws-tab-text">`
+      + `<span class="ws-tab-label">${opts.label}</span>`
+      + (sub ? `<span class="ws-tab-sub">${sub}</span>` : '')
       + `</span></button>`;
   },
 
@@ -1553,7 +1554,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260606u12',
+  _TAB_ASSET_VER: '20260606u13',
 
   _ensurePlainTabUnderlineStyles() {
     const id = 'statistico-tab-underline-fix';
@@ -1627,8 +1628,7 @@ const StatisticoHeader = {
       '  color: #a78bfa !important;',
       '  opacity: 0.85 !important;',
       '}',
-      '.ws-mode-bar--connected .ws-mode-tab.active,',
-      '.diag-workspace-tabs.ws-mode-bar--connected .ws-mode-tab.active {',
+      '.ws-mode-bar--connected .ws-mode-tab.active {',
       '  position: relative !important;',
       '  box-sizing: border-box !important;',
       '  background: #ffffff !important;',
@@ -1643,19 +1643,16 @@ const StatisticoHeader = {
       '  color: #0f172a !important;',
       '  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12) !important;',
       '}',
-      '.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-text,',
-      '.diag-workspace-tabs.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-text {',
+      '.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-text {',
       '  gap: 1px !important;',
       '}',
-      '.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-label,',
-      '.diag-workspace-tabs.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-label {',
+      '.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-label {',
       '  color: #0f172a !important;',
       '  font-size: 14.5px !important;',
       '  font-weight: 800 !important;',
       '  line-height: 1.15 !important;',
       '}',
-      '.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-sub,',
-      '.diag-workspace-tabs.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-sub {',
+      '.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-sub {',
       '  color: #475569 !important;',
       '  line-height: 1.15 !important;',
       '  margin-bottom: 0 !important;',
@@ -1733,29 +1730,41 @@ const StatisticoHeader = {
     document.head.appendChild(link);
   },
 
-  _ensureUnivariateWorkspaceTabAssets() {
-    if (this.module !== 'univariate') return;
+  _ensureWorkspaceTabAssets() {
     const ver = this._TAB_ASSET_VER;
-    let link = document.getElementById('uni-ws-tabs-css');
+    let link = document.getElementById('statistico-ws-tabs-css');
     const cssHref = this.resolveDialogUrl('shared-workspace-tabs.css?v=' + ver);
     if (link) {
       link.href = cssHref;
     } else {
       link = document.createElement('link');
-      link.id = 'uni-ws-tabs-css';
+      link.id = 'statistico-ws-tabs-css';
       link.rel = 'stylesheet';
       link.href = cssHref;
       document.head.appendChild(link);
     }
-    if (!document.getElementById('uni-ws-tabs-js') && !globalThis.StatisticoWorkspaceTabs) {
+
+    const runInit = () => {
+      try {
+        if (globalThis.StatisticoWorkspaceTabs) {
+          globalThis.StatisticoWorkspaceTabs.init();
+        }
+      } catch (_e) {}
+    };
+
+    if (!document.getElementById('statistico-ws-tabs-js') && !globalThis.StatisticoWorkspaceTabs) {
       const script = document.createElement('script');
-      script.id = 'uni-ws-tabs-js';
+      script.id = 'statistico-ws-tabs-js';
       script.src = this.resolveDialogUrl('shared-workspace-tabs.js?v=' + ver);
-      script.onload = function () {
-        try { StatisticoHeader._renderUnivariateResultsTabs(); } catch (_e) {}
-      };
+      script.onload = runInit;
       document.head.appendChild(script);
+    } else {
+      runInit();
     }
+  },
+
+  _ensureUnivariateWorkspaceTabAssets() {
+    this._ensureWorkspaceTabAssets();
   },
 
   _getUnivariateResultsViewTabs(section) {
@@ -1834,10 +1843,15 @@ const StatisticoHeader = {
         : 'Distribution views';
 
     stack.innerHTML =
-      '<div class="overview-subtabs uni-view-tabs" role="tablist" aria-label="' + ariaLabel + '">'
+      '<div class="ws-shell ws-shell--view-tabs">'
+      + '<div class="ws-chrome ws-chrome--attached">'
+      + '<nav class="ws-mode-bar ws-mode-bar--attached ws-mode-bar--connected uni-view-tabs" role="tablist" aria-label="' + ariaLabel + '">'
       + tabsHtml
-      + '</div>';
+      + '</nav></div></div>';
 
+    if (globalThis.StatisticoWorkspaceTabs) {
+      try { globalThis.StatisticoWorkspaceTabs.init(); } catch (_e) {}
+    }
     this._ensurePlainTabUnderlineStyles();
   },
 
@@ -5148,6 +5162,7 @@ const StatisticoHeader = {
     }
     this._renderSharedSidebar();
     this._ensureMinimalStyles();
+    this._ensureWorkspaceTabAssets();
     this._ensurePlainTabUnderlineStyles();
     this._ensureDefaultActions();
     this._mountSidebarUtilities();

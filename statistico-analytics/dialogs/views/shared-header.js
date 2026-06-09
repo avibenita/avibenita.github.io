@@ -1246,7 +1246,8 @@ const StatisticoHeader = {
               { type: 'navigate', file: regTab('ix-summary'), icon: 'fa-arrows-split-up-and-left', label: 'Interactions', description: 'Moderation, plots & tests' },
               { type: 'navigate', file: regTab('pred-overview'), icon: 'fa-crosshairs', label: 'Predictions', description: 'Fit, what-if & intervals' },
               { type: 'navigate', file: regTab('viz-partial'), icon: 'fa-chart-line', label: 'Visualization', description: 'Predictor effects & unique contribution' },
-              { type: 'navigate', file: regTab('diag-overview'), icon: 'fa-stethoscope', label: 'Diagnostics', description: 'Assumptions & residuals' }
+              { type: 'navigate', file: regTab('diag-overview'), icon: 'fa-stethoscope', label: 'Diagnostics', description: 'Assumptions & residuals' },
+              { type: 'navigate', file: regTab('power'), icon: 'fa-bolt', label: 'Power & Sample Size', description: 'Required N, achieved power & detectable R²' }
             ]
           },
           {

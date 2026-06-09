@@ -30,6 +30,8 @@
   <script src="../shared-brand-logo.js?v=20260601gauss"></script>
   <script src="../shared-header.js?v=20260606u15"></script>
   <script src="../shared-workspace-tabs.js?v=20260606u15"></script>
+  <link rel="stylesheet" href="../shared-power-template.css?v=20260609c" />
+  <script src="../shared-power-template.js?v=20260609c"></script>
 
   <style>
     /* Dark Theme (Default) */
@@ -2077,6 +2079,20 @@
       min-height: 0;
     }
 
+    #tab-power.tab-content.active {
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      box-sizing: border-box;
+      height: 100%;
+      min-height: 0;
+      padding: 8px 0;
+    }
+    #tab-power #sharedPowerTemplateMount {
+      flex: 1 1 0;
+      min-height: 0;
+    }
+
     /* Diagnostics: flex column so ws-body scrolls and bottom panels are not clipped */
     #tab-residuals .tab-panel.ix-workspace,
     #tab-res-plots .tab-panel.ix-workspace,
@@ -3963,6 +3979,10 @@
                 <i class="fa-solid fa-stethoscope sb-item-icon"></i>
                 <span class="sb-item-copy"><span class="sb-item-label">Diagnostics</span><span class="sb-item-description">Assumptions &amp; residuals</span></span>
               </button>
+              <button class="sb-item" onclick="switchTab('power')" data-tab="power" title="Required sample size, achieved power, and detectable R².">
+                <i class="fa-solid fa-bolt sb-item-icon"></i>
+                <span class="sb-item-copy"><span class="sb-item-label">Power &amp; Sample Size</span><span class="sb-item-description">Required N, achieved power &amp; detectable R²</span></span>
+              </button>
             </div>
           </div>
 
@@ -4987,6 +5007,13 @@
           </div>
         </div>
 
+        <!-- Tab: Power & Sample Size -->
+        <div id="tab-power" class="tab-content">
+          <div class="tab-panel" id="powerPanel">
+            <div id="sharedPowerTemplateMount"></div>
+          </div>
+        </div>
+
         <!-- Tab: AI Assessment -->
         <div id="tab-ai-assessment" class="tab-content">
           <div class="ai-assessment-container">
@@ -5422,6 +5449,7 @@
         'diag-influence':    'Diagnostics \u2013 Influence',
         'correlations':      'Correlations',
         'descriptive':       'Descriptives',
+        'power':             'Power & Sample Size',
         'ancova':            'ANCOVA',
         'ancova-results':     'ANCOVA \u2013 Results',
         'ancova-assumptions': 'ANCOVA \u2013 Assumptions',
@@ -5512,6 +5540,8 @@
         loadCorrelationsTab();
       } else if (tabName === 'descriptive' && !window.descriptiveLoaded) {
         loadDescriptiveTab();
+      } else if (tabName === 'power') {
+        refreshRegressionPowerAnalysis();
       } else if (tabName === 'pred-scenario' && !window.predictionsLoaded) {
         initializePredictions();
         window.predictionsLoaded = true;
@@ -6583,6 +6613,7 @@ ${sectionsHtml}
         StatisticoHeader.updateTitle('Model Results \u2013 Overview');
       }
       restoreRegressionTabFromUrl();
+      initRegressionPowerTemplate();
     });
 
     function restoreRegressionTabFromUrl() {
@@ -7373,6 +7404,7 @@ ${sectionsHtml}
       // Build the Insight-mode conclusion card, then apply current depth
       buildConclusionCard(results);
       applyDepth(window._analysisDepth || 'insight');
+      if (typeof calculateRegressionPower === 'function') calculateRegressionPower(results);
     }
 
     // Function to trigger VB6 regression
@@ -10793,6 +10825,282 @@ ${sectionsHtml}
       if (noteEl) {
         noteEl.innerHTML = '† p<.10 &nbsp; * p<.05 &nbsp; ** p<.01 &nbsp; *** p<.001 &nbsp;|&nbsp; Partial η²: small ≥.01, medium ≥.06, large ≥.14 (Cohen 1988). &nbsp; SS decomposition uses t²×MSE per predictor (Type III approximation).';
       }
+    }
+
+    // ===== REGRESSION POWER & SAMPLE SIZE =====
+
+    function powSetText(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    }
+
+    function regressionF2FromR2(r2) {
+      if (!isFinite(r2) || r2 <= 0) return 0;
+      if (r2 >= 1) return Infinity;
+      return r2 / (1 - r2);
+    }
+
+    function regressionR2FromF2(f2) {
+      if (!isFinite(f2) || f2 <= 0) return 0;
+      return f2 / (1 + f2);
+    }
+
+    function regressionCohenMagnitude(f2) {
+      if (!isFinite(f2) || f2 <= 0) return '';
+      if (f2 < 0.02) return 'negligible';
+      if (f2 < 0.15) return 'small';
+      if (f2 < 0.35) return 'medium';
+      return 'large';
+    }
+
+    function getRegressionPowerContext(results) {
+      const res = results || window.regressionResults;
+      if (!res) return null;
+      const n = parseInt(res.n, 10);
+      const withIntercept = res.includeIntercept !== false;
+      const p = withIntercept ? Math.max(0, (res.k || 1) - 1) : (res.k || 0);
+      const r2 = parseFloat(res.R2 ?? res.rSquared);
+      const alpha = 0.05;
+      if (!n || n < 3 || !p || p < 1 || !isFinite(r2) || r2 < 0) return null;
+      const f2 = regressionF2FromR2(r2);
+      const df1 = p;
+      const df2 = withIntercept ? (n - p - 1) : (n - p);
+      if (df2 < 1) return null;
+      return { n, p, r2, f2, alpha, withIntercept, df1, df2 };
+    }
+
+    function regressionPowerAtF2(n, p, f2, alpha, withIntercept) {
+      if (!f2 || f2 <= 0 || !n || !p || p < 1) return 0;
+      if (typeof jStat === 'undefined' || !jStat.centralF || !jStat.centralF.inv) return 0;
+      const df1 = p;
+      const df2 = withIntercept ? (n - p - 1) : (n - p);
+      if (df2 < 1) return 0;
+      const ncp = n * f2;
+      const fcrit = jStat.centralF.inv(1 - (alpha || 0.05), df1, df2);
+      const c = 1 + ncp / df1;
+      const power = 1 - jStat.centralF.cdf(fcrit / c, df1, df2);
+      return Math.max(0, Math.min(1, power));
+    }
+
+    function estimateRegressionRequiredN(f2, p, targetPower, alpha, withIntercept) {
+      if (!f2 || f2 <= 0 || !p || p < 1) return 0;
+      let nMin = Math.max(p + (withIntercept ? 2 : 1), 5);
+      let nMax = 5000;
+      for (let iter = 0; iter < 60; iter++) {
+        const n = Math.floor((nMin + nMax) / 2);
+        const power = regressionPowerAtF2(n, p, f2, alpha, withIntercept);
+        if (Math.abs(power - targetPower) < 0.005) return n;
+        if (power < targetPower) nMin = n + 1;
+        else nMax = n - 1;
+      }
+      return Math.max(nMin, 1);
+    }
+
+    function estimateRegressionDetectableF2(n, p, targetPower, alpha, withIntercept) {
+      if (!n || n < 3 || !p || p < 1) return 0;
+      let lo = 0.0001;
+      let hi = 50;
+      for (let i = 0; i < 60; i++) {
+        const f2 = (lo + hi) / 2;
+        const pw = regressionPowerAtF2(n, p, f2, alpha, withIntercept);
+        if (pw >= targetPower) hi = f2;
+        else lo = f2;
+      }
+      return (lo + hi) / 2;
+    }
+
+    function buildRegressionPowerOutputParams(ctx, f2, power) {
+      if (!ctx || !f2 || f2 <= 0) return null;
+      let critF = null;
+      if (typeof jStat !== 'undefined' && jStat.centralF && jStat.centralF.inv) {
+        critF = jStat.centralF.inv(1 - ctx.alpha, ctx.df1, ctx.df2);
+      }
+      return {
+        lambda: ctx.n * f2,
+        critical_f: critF,
+        df1: ctx.df1,
+        df2: ctx.df2,
+        n: ctx.n,
+        actual_power: power,
+        pillai_v: null
+      };
+    }
+
+    function updateRegressionPowerOutputParams(params) {
+      const ids = ['powOutLambda', 'powOutCritF', 'powOutDf1', 'powOutDf2', 'powOutN', 'powOutPower', 'powOutPillaiV'];
+      if (!params) {
+        ids.forEach(id => powSetText(id, '—'));
+        return;
+      }
+      powSetText('powOutLambda', isFinite(params.lambda) ? params.lambda.toFixed(3) : '—');
+      powSetText('powOutCritF', isFinite(params.critical_f) ? params.critical_f.toFixed(4) : '—');
+      powSetText('powOutDf1', isFinite(params.df1) ? String(params.df1) : '—');
+      powSetText('powOutDf2', isFinite(params.df2) ? String(params.df2) : '—');
+      powSetText('powOutN', isFinite(params.n) ? String(Math.round(params.n)) : '—');
+      powSetText('powOutPower', isFinite(params.actual_power) ? (params.actual_power * 100).toFixed(1) + '%' : '—');
+      powSetText('powOutPillaiV', '—');
+    }
+
+    function updateRegressionPowerStatus(message, type) {
+      const statusEl = document.getElementById('powStatusMessage');
+      if (!statusEl) return;
+      statusEl.textContent = message;
+      if (type === 'success') {
+        statusEl.style.background = '#2d5f3f';
+        statusEl.style.color = '#7fdb9f';
+      } else if (type === 'warning') {
+        statusEl.style.background = '#5f4a2d';
+        statusEl.style.color = '#dbb07f';
+      } else if (type === 'error') {
+        statusEl.style.background = '#5f2d2d';
+        statusEl.style.color = '#db7f7f';
+      } else {
+        statusEl.style.background = '';
+        statusEl.style.color = '';
+      }
+    }
+
+    function calculateRegressionPower(results) {
+      const ctx = getRegressionPowerContext(results);
+      if (!ctx) {
+        powSetText('powObserved', '—');
+        powSetText('powEffectSize', '—');
+        powSetText('powSampleSize', '—');
+        powSetText('powPartialEta', '—');
+        powSetText('powRequired', '—');
+        ['powReq80', 'powReq85', 'powReq90', 'powReq95'].forEach(id => powSetText(id, '—'));
+        updateRegressionPowerOutputParams(null);
+        updateRegressionPowerStatus('Run a regression model to populate power results.', 'info');
+        return;
+      }
+
+      const observedPower = regressionPowerAtF2(ctx.n, ctx.p, ctx.f2, ctx.alpha, ctx.withIntercept);
+      const powerPct = (observedPower * 100).toFixed(1) + '%';
+      const mag = regressionCohenMagnitude(ctx.f2);
+
+      powSetText('powObserved', powerPct);
+      powSetText('powEffectSize', ctx.f2.toFixed(4) + (mag ? ' (' + mag + ')' : ''));
+      powSetText('powSampleSize', String(ctx.n));
+      powSetText('powPartialEta', ctx.r2.toFixed(4));
+      powSetText('powAlpha', ctx.alpha.toFixed(3));
+      powSetText('powRequired', estimateRegressionRequiredN(ctx.f2, ctx.p, 0.85, ctx.alpha, ctx.withIntercept) || '—');
+      powSetText('powReq80', estimateRegressionRequiredN(ctx.f2, ctx.p, 0.80, ctx.alpha, ctx.withIntercept) || '—');
+      powSetText('powReq85', estimateRegressionRequiredN(ctx.f2, ctx.p, 0.85, ctx.alpha, ctx.withIntercept) || '—');
+      powSetText('powReq90', estimateRegressionRequiredN(ctx.f2, ctx.p, 0.90, ctx.alpha, ctx.withIntercept) || '—');
+      powSetText('powReq95', estimateRegressionRequiredN(ctx.f2, ctx.p, 0.95, ctx.alpha, ctx.withIntercept) || '—');
+
+      const req80 = estimateRegressionRequiredN(ctx.f2, ctx.p, 0.80, ctx.alpha, ctx.withIntercept);
+      let statusMsg;
+      let statusType;
+      if (observedPower >= 0.80) {
+        statusMsg = 'Adequate power (' + powerPct + ') for the observed R² with n=' + ctx.n + '. Effect size f²=' + ctx.f2.toFixed(3) + ' (' + mag + ').';
+        statusType = 'success';
+      } else if (observedPower >= 0.60) {
+        statusMsg = 'Moderate power (' + powerPct + ') with n=' + ctx.n + '. For 80% power at this R², plan n≈' + (req80 || '—') + '.';
+        statusType = 'warning';
+      } else {
+        statusMsg = 'Low power (' + powerPct + ') with n=' + ctx.n + '. For 80% power at this R², plan n≈' + (req80 || '—') + '.';
+        statusType = 'error';
+      }
+      updateRegressionPowerStatus(statusMsg, statusType);
+
+      updateRegressionPowerOutputParams(buildRegressionPowerOutputParams(ctx, ctx.f2, observedPower));
+
+      const engineNote = document.getElementById('powEngineNote');
+      if (engineNote) {
+        engineNote.innerHTML = '<i class="fa-solid fa-calculator"></i> Omnibus regression F-test (Cohen, 1988): λ=N·f², f²=R²/(1−R²), p=' + ctx.p + ' predictors. Post-hoc power is descriptive; use Required N or Detectable R² for planning.';
+      }
+
+      if (window.StatisticoPowerTemplate && window.StatisticoPowerTemplate.syncDefaultChip) {
+        window.StatisticoPowerTemplate.syncDefaultChip();
+      }
+    }
+
+    function calculateRegressionCustomPower() {
+      const customPowerInput = document.getElementById('customPowerInput');
+      const customRequiredN = document.getElementById('customRequiredN');
+      const customPowerStatus = document.getElementById('customPowerStatus');
+      const customPowerIcon = document.getElementById('customPowerIcon');
+      const targetPower = parseFloat(customPowerInput && customPowerInput.value);
+
+      if (isNaN(targetPower) || targetPower < 0.5 || targetPower > 0.99) {
+        if (customRequiredN) {
+          customRequiredN.textContent = 'Invalid';
+          customRequiredN.style.color = '#ff6b6b';
+        }
+        return;
+      }
+
+      if (customPowerIcon) customPowerIcon.classList.add('fa-spin');
+      if (customPowerStatus) customPowerStatus.style.display = 'block';
+
+      try {
+        const ctx = getRegressionPowerContext();
+        if (!ctx) throw new Error('No regression results available.');
+        const requiredN = estimateRegressionRequiredN(ctx.f2, ctx.p, targetPower, ctx.alpha, ctx.withIntercept);
+        if (!requiredN) throw new Error('Could not estimate required N.');
+        if (customRequiredN) {
+          customRequiredN.textContent = requiredN;
+          customRequiredN.style.color = '#7fdb9f';
+        }
+        if (window.StatisticoPowerTemplate && window.StatisticoPowerTemplate.onCustomComplete) {
+          window.StatisticoPowerTemplate.onCustomComplete(requiredN);
+        }
+      } catch (err) {
+        if (customRequiredN) {
+          customRequiredN.textContent = 'Error';
+          customRequiredN.style.color = '#ff6b6b';
+        }
+      } finally {
+        if (customPowerIcon) customPowerIcon.classList.remove('fa-spin');
+        if (customPowerStatus) customPowerStatus.style.display = 'none';
+      }
+    }
+
+    function calculateRegressionDetectableEffect() {
+      const ctx = getRegressionPowerContext();
+      const targetInput = document.getElementById('powDetectableTarget');
+      const targetPower = targetInput ? (parseFloat(targetInput.value) || 0.80) : 0.80;
+
+      if (isNaN(targetPower) || targetPower < 0.5 || targetPower > 0.99) {
+        powSetText('powMinDetectableF', 'Invalid');
+        powSetText('powMinDetectableEta', '—');
+        return;
+      }
+
+      if (!ctx) {
+        powSetText('powMinDetectableF', '—');
+        powSetText('powMinDetectableEta', '—');
+        return;
+      }
+
+      const detN = document.getElementById('pwstd-det-n');
+      if (detN) detN.textContent = String(ctx.n);
+
+      const minF2 = estimateRegressionDetectableF2(ctx.n, ctx.p, targetPower, ctx.alpha, ctx.withIntercept);
+      const minR2 = regressionR2FromF2(minF2);
+      const mag = regressionCohenMagnitude(minF2);
+
+      powSetText('powMinDetectableF', minF2.toFixed(4) + (mag ? ' (' + mag + ')' : ''));
+      powSetText('powMinDetectableEta', minR2.toFixed(4));
+    }
+
+    function refreshRegressionPowerAnalysis() {
+      calculateRegressionPower(window.regressionResults);
+    }
+
+    function initRegressionPowerTemplate() {
+      if (!window.StatisticoPowerTemplate || typeof window.StatisticoPowerTemplate.renderById !== 'function') return;
+      window.StatisticoPowerTemplate.renderById('sharedPowerTemplateMount', {
+        title: 'Power & Sample Size',
+        variant: 'regression',
+        customHandler: 'calculateRegressionCustomPower()',
+        detectableHandler: 'calculateRegressionDetectableEffect()'
+      });
+      window.StatisticoPowerTemplate._computeDetectable = calculateRegressionDetectableEffect;
+      window.StatisticoPowerTemplate._customComputeFn = calculateRegressionCustomPower;
+      window.StatisticoPowerTemplate._recalcFn = refreshRegressionPowerAnalysis;
+      refreshRegressionPowerAnalysis();
     }
 
     /**

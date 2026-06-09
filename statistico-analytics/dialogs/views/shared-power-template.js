@@ -84,7 +84,7 @@
     }).join('\n          ');
 
     container.innerHTML = [
-      '<div class="pwstd-shell pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260609b">',
+      '<div class="pwstd-shell pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260609c">',
       '  <h2 class="pwstd-title"><i class="fa-solid fa-bolt"></i> ' + esc(title) + '</h2>',
       '  <div class="pwstd-grid pwstd-grid--top">',
       '    <div class="pwstd-card pwstd-card--context">',
@@ -193,13 +193,67 @@
     ].join('\n');
 
     _syncTaskUI('fromN');
-    _updateDfFormulaLabel();
+    _updateDfFormulaLabel(o);
+    _applyVariant(o);
   }
 
-  function _updateDfFormulaLabel() {
+  function _setRowLabel(valueId, text) {
+    var el = document.getElementById(valueId);
+    if (!el) return;
+    var row = el.closest('.pwstd-row');
+    if (!row) return;
+    var lbl = row.querySelector('.pwstd-label');
+    if (lbl) lbl.textContent = text;
+  }
+
+  function _hidePowerRow(valueId) {
+    var el = document.getElementById(valueId);
+    if (!el) return;
+    var row = el.closest('.pwstd-row');
+    if (row) row.style.display = 'none';
+  }
+
+  function _applyVariant(opts) {
+    var o = opts || {};
+    var variant = o.variant || 'rm';
+    var shell = document.getElementById('pwstd-shell');
+    if (!shell) return;
+    shell.setAttribute('data-variant', variant);
+
+    if (variant !== 'regression') return;
+
+    var target = document.getElementById('powTargetWhat');
+    var design = document.getElementById('powDesignType');
+    var source = document.getElementById('powEffectSource');
+    if (target) target.textContent = o.targetLabel || 'Global regression model (R²)';
+    if (design) design.textContent = o.designLabel || 'Linear regression';
+    if (source) source.textContent = o.effectSourceLabel || 'From observed R²';
+
+    _setRowLabel('powEffectSize', "Cohen's f²");
+    _setRowLabel('powPartialEta', 'R² used');
+    _setRowLabel('powMinDetectableF', "Min detectable Cohen's f²");
+    _setRowLabel('powMinDetectableEta', 'Min detectable R²');
+
+    ['powPowerMethod', 'powAvgCorrelation', 'powEpsilon', 'powOutPillaiV'].forEach(_hidePowerRow);
+
+    var dfEl = document.getElementById('powDfFormula');
+    if (dfEl) dfEl.textContent = 'df1=p · df2=N−p−1';
+    var engine = document.getElementById('powEngineNote');
+    if (engine) {
+      engine.innerHTML = '<i class="fa-solid fa-calculator"></i> Multiple regression omnibus F-test — λ=N·f², f²=R²/(1−R²). Cohen benchmarks: 0.02 small, 0.15 medium, 0.35 large.';
+    }
+  }
+
+  function _updateDfFormulaLabel(opts) {
     var el = document.getElementById('powDfFormula');
+    if (!el) return;
+    var shell = document.getElementById('pwstd-shell');
+    if (shell && shell.getAttribute('data-variant') === 'regression') {
+      el.textContent = 'df1=p · df2=N−p−1';
+      return;
+    }
     var sel = document.getElementById('powPowerMethod');
-    if (!el || !sel) return;
+    if (!sel) return;
     if (sel.value === 'gpower_manova') {
       el.textContent = 'df1=(k−1)·ε · df2=N−groups−df1+1';
     } else {

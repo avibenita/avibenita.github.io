@@ -1553,7 +1553,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260606u6',
+  _TAB_ASSET_VER: '20260606u7',
 
   _ensurePlainTabUnderlineStyles() {
     const id = 'statistico-tab-underline-fix';
@@ -1589,7 +1589,7 @@ const StatisticoHeader = {
       '  background: var(--surface-1, #1a1f2e) !important;',
       '}',
       '.ws-shell:has(.ws-mode-bar--connected) > .ws-body {',
-      '  background: #ffffff !important;',
+      '  background: var(--surface-1, #1a1f2e) !important;',
       '  border-top: none !important;',
       '}',
       '.ws-mode-bar--connected .ws-tab-cluster {',
@@ -1625,7 +1625,7 @@ const StatisticoHeader = {
       '  background-image: none !important;',
       '  border: 1px solid rgba(148, 163, 184, 0.32) !important;',
       '  border-top: 3px solid #8b5cf6 !important;',
-      '  border-bottom-color: #ffffff !important;',
+      '  border-bottom-color: var(--surface-1, #1a1f2e) !important;',
       '  border-radius: 8px 8px 0 0 !important;',
       '  margin-bottom: -1px !important;',
       '  padding-top: 8px !important;',

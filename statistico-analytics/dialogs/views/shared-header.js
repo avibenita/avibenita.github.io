@@ -1553,7 +1553,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260606u10',
+  _TAB_ASSET_VER: '20260606u11',
 
   _ensurePlainTabUnderlineStyles() {
     const id = 'statistico-tab-underline-fix';
@@ -1636,8 +1636,8 @@ const StatisticoHeader = {
       '  border-radius: 8px 8px 0 0 !important;',
       '  margin-bottom: -3px !important;',
       '  padding-top: 8px !important;',
-      '  padding-bottom: 13px !important;',
-      '  min-height: 56px !important;',
+      '  padding-bottom: 8px !important;',
+      '  min-height: 50px !important;',
       '  z-index: 2 !important;',
       '  color: #0f172a !important;',
       '  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12) !important;',

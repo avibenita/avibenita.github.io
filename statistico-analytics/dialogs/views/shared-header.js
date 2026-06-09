@@ -1554,7 +1554,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260606u13',
+  _TAB_ASSET_VER: '20260606u14',
 
   _ensurePlainTabUnderlineStyles() {
     const id = 'statistico-tab-underline-fix';
@@ -1940,8 +1940,7 @@ const StatisticoHeader = {
           <i class="fa-solid fa-chevron-left"></i>
         </button>
       </div>
-      <div class="sb-body">${groupsHtml}</div>
-      ${this._renderSidebarPinnedNav(cfg)}
+      <div class="sb-body">${groupsHtml}${this._renderSidebarPinnedNav(cfg)}</div>
     `;
     if (typeof StatisticoBrandLogo !== 'undefined' && StatisticoBrandLogo.mountAll) {
       StatisticoBrandLogo.mountAll(nav);
@@ -5217,6 +5216,10 @@ const StatisticoHeader = {
   _ensureRegressionByGroupNav(nav) {
     if (this.module !== 'regression' || !nav) return;
     if (!document.getElementById('regSidebarMain')) return;
+    const main = document.getElementById('regSidebarMain');
+    const body = nav.querySelector('.sb-body');
+    const anchor = main || body;
+    if (!anchor) return;
     if (document.getElementById('regByGroupNav')) return;
     const pinned = document.createElement('div');
     pinned.id = 'regByGroupNav';
@@ -5232,9 +5235,7 @@ const StatisticoHeader = {
           <span class="sb-item-copy"><span class="sb-item-label">By Group</span><span class="sb-item-description">Coefficients &amp; residuals by level</span></span>
         </button>
       </div>`;
-    const footer = document.getElementById('sbNavFooter');
-    if (footer && footer.parentNode === nav) nav.insertBefore(pinned, footer);
-    else nav.appendChild(pinned);
+    anchor.appendChild(pinned);
   },
 
   _mountSidebarUtilities() {

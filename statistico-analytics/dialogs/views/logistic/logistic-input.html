@@ -1224,6 +1224,35 @@
       return '0: ' + zero + ' · 1: ' + one;
     }
 
+    function getOutcomeEligibleCount(varName) {
+      var stats = STATE.variableStats && STATE.variableStats[varName];
+      if (!stats) return 0;
+
+      var recode = getActiveYRecode(varName);
+      if (recode && stats.categories && stats.categories.length) {
+        var recoded = 0;
+        stats.categories.forEach(function(c) {
+          var v = String(c.value);
+          if (v === String(recode.level0) || v === String(recode.level1)) {
+            recoded += c.freq || 0;
+          }
+        });
+        return recoded;
+      }
+
+      if (stats.categories && stats.categories.length) {
+        var zero = 0, one = 0;
+        stats.categories.forEach(function(c) {
+          var n = Number(String(c.value).trim());
+          if (n === 0) zero += c.freq || 0;
+          else if (n === 1) one += c.freq || 0;
+        });
+        if (zero + one > 0) return zero + one;
+      }
+
+      return stats.numeric || 0;
+    }
+
     // ============================================================================
     // RENDER VARIABLES (Mixed-style rows)
     // ============================================================================
@@ -1533,7 +1562,10 @@
       var eligibleCount = Infinity, totalRows = 0;
       if (STATE.assignments.y) {
         var yStats = STATE.variableStats[STATE.assignments.y];
-        if (yStats) { eligibleCount = Math.min(eligibleCount, yStats.numeric || 0); totalRows = (yStats.numeric||0)+(yStats.string||0)+(yStats.missing||0); }
+        if (yStats) {
+          eligibleCount = Math.min(eligibleCount, getOutcomeEligibleCount(STATE.assignments.y));
+          totalRows = (yStats.numeric||0)+(yStats.string||0)+(yStats.missing||0);
+        }
       }
       for (var i = 0; i < STATE.assignments.xn.length; i++) {
         var s = STATE.variableStats[STATE.assignments.xn[i]];

@@ -1233,7 +1233,6 @@ const StatisticoHeader = {
     }
 
     if (this.module === 'regression') {
-      const regTab = (tab) => `regression/regression-coefficients.html?regTab=${encodeURIComponent(tab)}`;
       return {
         logoIcon: 'fa-chart-line',
         logoSub: 'Regression',
@@ -1242,19 +1241,19 @@ const StatisticoHeader = {
           {
             title: 'Model',
             items: [
-              { type: 'navigate', view: 'regression-results', file: regTab('results-overview'), icon: 'fa-square-poll-vertical', label: 'Model Results', description: 'Overview & technical specification' },
-              { type: 'navigate', file: regTab('ix-summary'), icon: 'fa-arrows-split-up-and-left', label: 'Interactions', description: 'Moderation, plots & tests' },
-              { type: 'navigate', file: regTab('pred-overview'), icon: 'fa-crosshairs', label: 'Predictions', description: 'Fit, what-if & intervals' },
-              { type: 'navigate', file: regTab('viz-partial'), icon: 'fa-chart-line', label: 'Visualization', description: 'Predictor effects & unique contribution' },
-              { type: 'navigate', file: regTab('diag-overview'), icon: 'fa-stethoscope', label: 'Diagnostics', description: 'Assumptions & residuals' },
-              { type: 'navigate', file: regTab('power'), icon: 'fa-bolt', label: 'Power & Sample Size', description: 'Required N, achieved power & detectable R²' }
+              { type: 'tab', tab: 'results-overview', navTab: 'model-results', id: 'modelResultsNavBtn', icon: 'fa-square-poll-vertical', label: 'Model Results', description: 'Overview & technical specification', active: true },
+              { type: 'tab', tab: 'ix-summary', navTab: 'interactions', id: 'interactionsNavBtn', icon: 'fa-arrows-split-up-and-left', label: 'Interactions', description: 'Moderation, plots & tests' },
+              { type: 'tab', tab: 'pred-overview', navTab: 'predictions', icon: 'fa-crosshairs', label: 'Predictions', description: 'Fit, what-if & intervals' },
+              { type: 'tab', tab: 'viz-partial', navTab: 'visualization', icon: 'fa-chart-line', label: 'Visualization', description: 'Predictor effects & unique contribution' },
+              { type: 'tab', tab: 'diag-overview', navTab: 'diagnostics', icon: 'fa-stethoscope', label: 'Diagnostics', description: 'Assumptions & residuals' },
+              { type: 'tab', tab: 'power', navTab: 'power', id: 'regPowerNavBtn', icon: 'fa-bolt', label: 'Power & Sample Size', description: 'Required N, achieved power & detectable R²' }
             ]
           },
           {
             title: 'Descriptives',
             items: [
-              { type: 'navigate', file: regTab('correlations'), icon: 'fa-diagram-project', label: 'Correlations', description: 'Pairwise r among variables' },
-              { type: 'navigate', file: regTab('descriptive'), icon: 'fa-chart-column', label: 'Descriptives', description: 'Mean, SD, skew & missingness' }
+              { type: 'tab', tab: 'correlations', icon: 'fa-diagram-project', label: 'Correlations', description: 'Pairwise r among variables' },
+              { type: 'tab', tab: 'descriptive', icon: 'fa-chart-column', label: 'Descriptives', description: 'Mean, SD, skew & missingness' }
             ]
           }
         ],
@@ -1555,7 +1554,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260606u15',
+  _TAB_ASSET_VER: '20260606u16',
 
   _ensurePlainTabUnderlineStyles() {
     const id = 'statistico-tab-underline-fix';
@@ -1859,7 +1858,7 @@ const StatisticoHeader = {
   _renderSidebarNavItem(item) {
     const active = this._isSidebarItemActive(item) ? ' active' : '';
     const idAttr = item.id ? ` id="${item.id}"` : '';
-    const dataTab = item.tab ? ` data-tab="${item.tab}"` : '';
+    const dataTab = (item.navTab || item.tab) ? ` data-tab="${item.navTab || item.tab}"` : '';
     const dataView = item.view ? ` data-view="${item.view}"` : '';
 
     if (Array.isArray(item.facets) && item.facets.length > 0) {
@@ -5214,8 +5213,49 @@ const StatisticoHeader = {
     }
   },
 
+  _ensureRegressionAncovaNav(nav) {
+    if (this.module !== 'regression' || !nav) return;
+    if (document.getElementById('ancovaGroupNav')) return;
+    const body = nav.querySelector('.sb-body');
+    if (!body) return;
+    const wrap = document.createElement('div');
+    wrap.id = 'ancovaGroupNav';
+    wrap.style.display = 'none';
+    wrap.innerHTML = ''
+      + '<button type="button" class="sb-item" id="ancovaNavBtn" onclick="switchTab(\'ancova-results\')"'
+      + ' data-tab="ancova" title="Adjusted group differences with covariate control.">'
+      + '<i class="fa-solid fa-layer-group sb-item-icon"></i>'
+      + '<span class="sb-item-copy"><span class="sb-item-label">ANCOVA</span>'
+      + '<span class="sb-item-description">Adjusted means, assumptions &amp; plots</span></span>'
+      + '</button>';
+    const groups = body.querySelectorAll('.sb-group');
+    if (groups.length >= 2) body.insertBefore(wrap, groups[1]);
+    else body.appendChild(wrap);
+  },
+
+  _ensureRegressionPowerNav(nav) {
+    if (this.module !== 'regression' || !nav) return;
+    if (document.getElementById('regPowerNavBtn')) return;
+    const rail = nav.querySelector('.sb-group .sb-items-rail')
+      || (document.getElementById('regSidebarMain') && document.getElementById('regSidebarMain').querySelector('.sb-group .sb-items-rail'));
+    if (!rail) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sb-item';
+    btn.id = 'regPowerNavBtn';
+    btn.setAttribute('data-tab', 'power');
+    btn.setAttribute('title', 'Required sample size, achieved power, and detectable R².');
+    btn.setAttribute('onclick', "switchTab('power')");
+    btn.innerHTML = ''
+      + '<i class="fa-solid fa-bolt sb-item-icon"></i>'
+      + '<span class="sb-item-copy"><span class="sb-item-label">Power &amp; Sample Size</span>'
+      + '<span class="sb-item-description">Required N, achieved power &amp; detectable R²</span></span>';
+    rail.appendChild(btn);
+  },
+
   _ensureRegressionByGroupNav(nav) {
     if (this.module !== 'regression' || !nav) return;
+    if (document.getElementById('regByGroupNav')) return;
     if (!document.getElementById('regSidebarMain')) return;
     const main = document.getElementById('regSidebarMain');
     const body = nav.querySelector('.sb-body');
@@ -5243,6 +5283,16 @@ const StatisticoHeader = {
     const nav = document.getElementById('sidebarNav');
     if (!nav) return;
     this._ensureRegressionByGroupNav(nav);
+    this._ensureRegressionAncovaNav(nav);
+    this._ensureRegressionPowerNav(nav);
+    if (this.module === 'regression' && nav && !document.getElementById('regSidebarScrollHint')) {
+      const hint = document.createElement('div');
+      hint.id = 'regSidebarScrollHint';
+      hint.className = 'sb-scroll-hint';
+      hint.setAttribute('aria-hidden', 'true');
+      hint.innerHTML = '<i class="fa-solid fa-chevron-down"></i><span>More items below</span>';
+      nav.appendChild(hint);
+    }
     this._bindSidebarNavigation(nav);
 
     const existing = document.getElementById('sbUtilities');

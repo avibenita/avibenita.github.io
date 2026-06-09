@@ -30,8 +30,8 @@
   <script src="../shared-brand-logo.js?v=20260601gauss"></script>
   <script src="../shared-header.js?v=20260606u16"></script>
   <script src="../shared-workspace-tabs.js?v=20260606u16"></script>
-  <link rel="stylesheet" href="../shared-power-template.css?v=20260609c" />
-  <script src="../shared-power-template.js?v=20260609c"></script>
+  <link rel="stylesheet" href="../shared-power-template.css?v=20260609d" />
+  <script src="../shared-power-template.js?v=20260609d"></script>
 
   <style>
     /* Dark Theme (Default) */
@@ -10788,6 +10788,28 @@ ${sectionsHtml}
       return { n, p, r2, f2, alpha, withIntercept, df1, df2 };
     }
 
+    /**
+     * Noncentral F CDF via Poisson-weighted incomplete beta (SciPy/Boost / G*Power).
+     * F(x; df1, df2, λ) = Σ e^{-λ/2}(λ/2)^j/j! · I_x(df1/2+j, df2/2), x = f·df1/(f·df1+df2)
+     */
+    function noncentralFCdf(f, df1, df2, ncp) {
+      if (!isFinite(f) || f <= 0 || !df1 || !df2 || df1 <= 0 || df2 <= 0) return 0;
+      if (typeof jStat === 'undefined' || !jStat.centralF || !jStat.beta || !jStat.beta.cdf) {
+        return jStat.centralF.cdf(f, df1, df2);
+      }
+      if (!ncp || ncp <= 0) return jStat.centralF.cdf(f, df1, df2);
+      const bx = (f * df1) / (f * df1 + df2);
+      const b0 = df2 / 2;
+      let sum = 0;
+      let w = Math.exp(-ncp / 2);
+      for (let j = 0; j < 300; j++) {
+        if (j > 0) w *= (ncp / 2) / j;
+        sum += w * jStat.beta.cdf(bx, df1 / 2 + j, b0);
+        if (w < 1e-15) break;
+      }
+      return Math.max(0, Math.min(1, sum));
+    }
+
     function regressionPowerAtF2(n, p, f2, alpha, withIntercept) {
       if (!f2 || f2 <= 0 || !n || !p || p < 1) return 0;
       if (typeof jStat === 'undefined' || !jStat.centralF || !jStat.centralF.inv) return 0;
@@ -10796,8 +10818,7 @@ ${sectionsHtml}
       if (df2 < 1) return 0;
       const ncp = n * f2;
       const fcrit = jStat.centralF.inv(1 - (alpha || 0.05), df1, df2);
-      const c = 1 + ncp / df1;
-      const power = 1 - jStat.centralF.cdf(fcrit / c, df1, df2);
+      const power = 1 - noncentralFCdf(fcrit, df1, df2, ncp);
       return Math.max(0, Math.min(1, power));
     }
 
@@ -10927,7 +10948,7 @@ ${sectionsHtml}
 
       const engineNote = document.getElementById('powEngineNote');
       if (engineNote) {
-        engineNote.innerHTML = '<i class="fa-solid fa-calculator"></i> Omnibus regression F-test (Cohen, 1988): λ=N·f², f²=R²/(1−R²), p=' + ctx.p + ' predictors. Post-hoc power is descriptive; use Required N or Detectable R² for planning.';
+        engineNote.innerHTML = '<i class="fa-solid fa-calculator"></i> Exact noncentral F (G*Power / Cohen fixed model): λ=N·f², f²=R²/(1−R²), df1=p, df2=N−p−1. Post-hoc power is descriptive; use Required N or Detectable R² for planning.';
       }
 
       if (window.StatisticoPowerTemplate && window.StatisticoPowerTemplate.syncDefaultChip) {

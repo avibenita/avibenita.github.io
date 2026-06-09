@@ -240,7 +240,7 @@
     if (dfEl) dfEl.textContent = 'df1=p · df2=N−p−1';
     var engine = document.getElementById('powEngineNote');
     if (engine) {
-      engine.innerHTML = '<i class="fa-solid fa-calculator"></i> Multiple regression omnibus F-test — λ=N·f², f²=R²/(1−R²). Cohen benchmarks: 0.02 small, 0.15 medium, 0.35 large.';
+      engine.innerHTML = '<i class="fa-solid fa-calculator"></i> Exact noncentral F — λ=N·f², f²=R²/(1−R²). Cohen benchmarks: 0.02 small, 0.15 medium, 0.35 large.';
     }
   }
 

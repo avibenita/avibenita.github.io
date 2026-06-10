@@ -806,6 +806,69 @@
       return isFinite(p) && p <= 0.05;
     }
     var _perfCache = { optimalThreshold: 0.5, brier: NaN, calQuality: "Moderate", meanAbsCalErr: NaN };
+    var _rocChartInst = null;
+    var _calChartInst = null;
+
+    function hcThemeText() {
+      return document.documentElement.getAttribute("data-theme") === "light" ? "#1f2937" : "#e2e8f0";
+    }
+    function hcAxis(title) {
+      var color = hcThemeText();
+      return {
+        min: 0,
+        max: 1,
+        title: { text: title, style: { color: color, fontSize: "13px", fontWeight: "700" }, margin: 12 },
+        labels: { style: { color: color, fontSize: "12px", fontWeight: "600" }, format: "{value:.1f}" },
+        gridLineColor: "rgba(148,163,184,.22)",
+        lineColor: "rgba(148,163,184,.4)",
+        tickColor: "rgba(148,163,184,.4)",
+        tickLength: 5
+      };
+    }
+    function hcChartOpts(chartType) {
+      return {
+        chart: { type: chartType, backgroundColor: "transparent", animation: false, spacing: [12, 14, 16, 12] },
+        title: { text: null },
+        credits: { enabled: false },
+        legend: { enabled: false },
+        plotOptions: {
+          series: { animation: false, states: { hover: { animation: { duration: 0 } }, inactive: { animation: { duration: 0 } } } },
+          line: { animation: false },
+          scatter: { animation: false }
+        },
+        tooltip: {
+          animation: false,
+          hideDelay: 0,
+          valueDecimals: 2,
+          headerFormat: "",
+          pointFormat: "<span style=\"color:{point.color}\">\u25CF</span> {series.name}: <b>({point.x:.2f}, {point.y:.2f})</b><br/>"
+        }
+      };
+    }
+    function initHighchartsDefaults() {
+      if (typeof Highcharts === "undefined") return;
+      Highcharts.setOptions({
+        chart: { animation: false, style: { fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" } },
+        plotOptions: { series: { animation: false } }
+      });
+    }
+    function rocPointAtThreshold(pairs, threshold) {
+      var pos = pairs.filter(function (d) { return d.y === 1; }).length;
+      var neg = pairs.length - pos;
+      if (!pos || !neg) return null;
+      var c = confusionCounts(pairs, threshold);
+      var sens = (c.tp + c.fn) ? c.tp / (c.tp + c.fn) : 0;
+      var fpr = (c.fp + c.tn) ? c.fp / (c.fp + c.tn) : 0;
+      return [fpr, sens];
+    }
+    function updateRocThresholdMarker(threshold) {
+      if (!_rocChartInst || !_rocChartInst.series[3]) return;
+      var pairs = predictionPairs();
+      var pt = pairs.length ? rocPointAtThreshold(pairs, threshold) : null;
+      if (!pt) return;
+      _rocChartInst.series[3].setData([pt], false, false);
+      _rocChartInst.redraw(false);
+    }
 
     function confusionCounts(pairs, threshold) {
       var tp = 0, fp = 0, tn = 0, fn = 0;
@@ -1362,8 +1425,16 @@
       var pairs = predictionPairs();
       var el = document.getElementById("rocChart");
       if (!el || typeof Highcharts === "undefined") return;
+      if (_rocChartInst) {
+        try { _rocChartInst.destroy(); } catch (_e) {}
+        _rocChartInst = null;
+      }
       if (pairs.length < 2) {
-        Highcharts.chart(el, { chart: { type: "line", backgroundColor: "transparent" }, title: { text: null }, credits: { enabled: false }, series: [{ data: [[0,0],[1,1]] }] });
+        _rocChartInst = Highcharts.chart(el, Object.assign(hcChartOpts("line"), {
+          xAxis: hcAxis("False Positive Rate"),
+          yAxis: hcAxis("True Positive Rate"),
+          series: [{ data: [[0, 0], [1, 1]], enableMouseTracking: false }]
+        }));
         return;
       }
       var pos = pairs.filter((d) => d.y === 1).length;
@@ -1376,19 +1447,20 @@
         return [fp / neg, tp / pos];
       }).sort((a, b) => a[0] - b[0]);
       var opt = _perfCache.optimalThreshold || 0.5;
-      var optCounts = confusionCounts(pairs, opt);
-      var optSens = (optCounts.tp + optCounts.fn) ? optCounts.tp / (optCounts.tp + optCounts.fn) : 0;
-      var optFpr = (optCounts.fp + optCounts.tn) ? optCounts.fp / (optCounts.fp + optCounts.tn) : 0;
-      Highcharts.chart(el, {
-        chart: { type: "line", backgroundColor: "transparent" },
-        title: { text: null }, credits: { enabled: false }, legend: { enabled: false },
-        xAxis: { min:0, max:1, title:{ text:"False Positive Rate" } }, yAxis: { min:0, max:1, title:{ text:"True Positive Rate" } },
+      var optPt = rocPointAtThreshold(pairs, opt) || [0, 0];
+      var thrEl = document.getElementById("thr");
+      var curThr = thrEl ? Number(thrEl.value) || 0.5 : 0.5;
+      var curPt = rocPointAtThreshold(pairs, curThr) || [0, 0];
+      _rocChartInst = Highcharts.chart(el, Object.assign(hcChartOpts("line"), {
+        xAxis: hcAxis("False Positive Rate"),
+        yAxis: hcAxis("True Positive Rate"),
         series: [
-          { data: [[0,0],[1,1]], dashStyle:"Dash", enableMouseTracking:false, color:"rgba(148,163,184,.5)" },
-          { data: points, color:"#5aa7ff", lineWidth:3, name:"ROC" },
-          { type:"scatter", data:[[optFpr, optSens]], color:"#fbbf24", marker:{ radius:6, symbol:"diamond" }, name:"Optimal", enableMouseTracking:true }
+          { data: [[0, 0], [1, 1]], dashStyle: "Dash", enableMouseTracking: false, color: "rgba(148,163,184,.55)", lineWidth: 1 },
+          { data: points, color: "#5aa7ff", lineWidth: 3, name: "ROC", enableMouseTracking: true },
+          { type: "scatter", data: [optPt], color: "#fbbf24", name: "Optimal", marker: { radius: 6, symbol: "diamond" }, enableMouseTracking: true },
+          { type: "scatter", data: [curPt], color: "#f97316", name: "Current threshold", marker: { radius: 7, symbol: "circle", lineWidth: 2, lineColor: "#fff" }, enableMouseTracking: true, zIndex: 5 }
         ]
-      });
+      }));
     }
     function renderCalibration() {
       var pairs = predictionPairs();
@@ -1424,12 +1496,18 @@
       _perfCache.meanAbsCalErr = meanAbsCalErr;
       var calQ = brierQualityLabel(brier);
       var calAdv = calibrationSlopeIntercept(pairs);
-      Highcharts.chart(el, {
-        chart: { type: "scatter", backgroundColor: "transparent" },
-        title: { text: null }, credits: { enabled: false }, legend: { enabled: false },
-        xAxis: { min:0, max:1, title:{ text:"Predicted probability" } }, yAxis: { min:0, max:1, title:{ text:"Observed event rate" } },
-        series: [{ type:"line", data:[[0,0],[1,1]], dashStyle:"Dash", enableMouseTracking:false }, { data: pts, color:"#5aa7ff" }]
-      });
+      if (_calChartInst) {
+        try { _calChartInst.destroy(); } catch (_e) {}
+        _calChartInst = null;
+      }
+      _calChartInst = Highcharts.chart(el, Object.assign(hcChartOpts("scatter"), {
+        xAxis: hcAxis("Predicted probability"),
+        yAxis: hcAxis("Observed event rate"),
+        series: [
+          { type: "line", data: [[0, 0], [1, 1]], dashStyle: "Dash", enableMouseTracking: false, color: "rgba(148,163,184,.55)", lineWidth: 1, name: "Perfect calibration" },
+          { type: "scatter", data: pts, color: "#5aa7ff", name: "Binned rates", marker: { radius: 5 } }
+        ]
+      }));
       txt.innerHTML = "Brier score: <b>" + brier.toFixed(3) + "</b><br>Quality: <b>" + calQ.label + "</b> (lower is better).";
 
       if (qualityEl) {
@@ -1874,6 +1952,7 @@
         StatisticoHeader.updateTitle("Model Results");
       }
       initLogisticPowerTemplate();
+      initHighchartsDefaults();
       switchTab("model-results");
       var thr = document.getElementById("thr");
       if (thr) {
@@ -1881,6 +1960,7 @@
           var v = Number(this.value).toFixed(2);
           document.getElementById("thrVal").textContent = v;
           renderThresholdMetrics(Number(v));
+          updateRocThresholdMarker(Number(v));
           var pairs = predictionPairs();
           var cmEl = document.getElementById("cmMatrix");
           if (cmEl && pairs.length) cmEl.innerHTML = renderConfusionMatrixHtml(confusionCounts(pairs, Number(v)));

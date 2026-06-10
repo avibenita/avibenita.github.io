@@ -165,7 +165,7 @@ function openClusterSetupDialog() {
 
   const dialogSize = typeof getInputBuilderDialogOptions === "function"
     ? getInputBuilderDialogOptions()
-    : (typeof DIALOG_SIZES !== "undefined" ? DIALOG_SIZES.REGRESSION_BUILDER : { height: 92, width: 30, displayInIframe: false });
+    : (typeof DIALOG_SIZES !== "undefined" ? DIALOG_SIZES.REGRESSION_BUILDER : { height: 74, width: 30, displayInIframe: false });
 
   Office.context.ui.displayDialogAsync(
     dialogUrl,

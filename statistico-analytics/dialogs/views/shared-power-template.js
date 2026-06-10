@@ -231,19 +231,27 @@
     if (!shell) return;
     shell.setAttribute('data-variant', variant);
 
-    if (variant !== 'regression') return;
+    if (variant !== 'regression' && variant !== 'logistic') return;
 
     var target = document.getElementById('powTargetWhat');
     var design = document.getElementById('powDesignType');
     var source = document.getElementById('powEffectSource');
-    if (target) target.textContent = o.targetLabel || 'Global regression model (R²)';
-    if (design) design.textContent = o.designLabel || 'Linear regression';
-    if (source) source.textContent = o.effectSourceLabel || 'From observed R²';
+    if (variant === 'logistic') {
+      if (target) target.textContent = o.targetLabel || 'Global logistic model (Nagelkerke R²)';
+      if (design) design.textContent = o.designLabel || 'Logistic regression';
+      if (source) source.textContent = o.effectSourceLabel || 'From observed Nagelkerke R²';
+      _setRowLabel('powPartialEta', 'Nagelkerke R² used');
+      _setRowLabel('powMinDetectableEta', 'Min detectable Nagelkerke R²');
+    } else {
+      if (target) target.textContent = o.targetLabel || 'Global regression model (R²)';
+      if (design) design.textContent = o.designLabel || 'Linear regression';
+      if (source) source.textContent = o.effectSourceLabel || 'From observed R²';
+      _setRowLabel('powPartialEta', 'R² used');
+      _setRowLabel('powMinDetectableEta', 'Min detectable R²');
+    }
 
     _setRowLabel('powEffectSize', "Cohen's f²");
-    _setRowLabel('powPartialEta', 'R² used');
     _setRowLabel('powMinDetectableF', "Min detectable Cohen's f²");
-    _setRowLabel('powMinDetectableEta', 'Min detectable R²');
 
     ['powPowerMethod', 'powAvgCorrelation', 'powEpsilon', 'powOutPillaiV'].forEach(_hidePowerRow);
 
@@ -251,7 +259,11 @@
     if (dfEl) dfEl.textContent = 'df1=p · df2=N−p−1';
     var engine = document.getElementById('powEngineNote');
     if (engine) {
-      engine.innerHTML = '<i class="fa-solid fa-calculator"></i> Exact noncentral F — λ=N·f², f²=R²/(1−R²). Cohen benchmarks: 0.02 small, 0.15 medium, 0.35 large.';
+      if (variant === 'logistic') {
+        engine.innerHTML = '<i class="fa-solid fa-calculator"></i> Omnibus logistic power (Cohen f² approximation): Nagelkerke R² → f²=R²/(1−R²), λ=N·f², exact noncentral F. Post-hoc power is descriptive.';
+      } else {
+        engine.innerHTML = '<i class="fa-solid fa-calculator"></i> Exact noncentral F — λ=N·f², f²=R²/(1−R²). Cohen benchmarks: 0.02 small, 0.15 medium, 0.35 large.';
+      }
     }
   }
 
@@ -259,7 +271,8 @@
     var el = document.getElementById('powDfFormula');
     if (!el) return;
     var shell = document.getElementById('pwstd-shell');
-    if (shell && shell.getAttribute('data-variant') === 'regression') {
+    var v = shell && shell.getAttribute('data-variant');
+    if (v === 'regression' || v === 'logistic') {
       el.textContent = 'df1=p · df2=N−p−1';
       return;
     }

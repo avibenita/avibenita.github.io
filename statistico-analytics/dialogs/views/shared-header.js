@@ -1319,7 +1319,8 @@ const StatisticoHeader = {
               { type: 'tab', tab: 'predictive-performance', icon: 'fa-chart-area', label: 'Predictive Performance' },
               { type: 'tab', tab: 'probabilities', icon: 'fa-wand-magic-sparkles', label: 'Probabilities' },
               { type: 'tab', tab: 'interactions', icon: 'fa-brain', label: 'Interactions' },
-              { type: 'tab', tab: 'diagnostics', icon: 'fa-stethoscope', label: 'Diagnostics' }
+              { type: 'tab', tab: 'diagnostics', icon: 'fa-stethoscope', label: 'Diagnostics' },
+              { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power & Sample Size', description: 'Required N, achieved power & detectable R²' }
             ]
           },
           {
@@ -5721,6 +5722,7 @@ const StatisticoHeader = {
       'logistic-diagnostics-overview':         'Diagnostics — Overview',
       'logistic-diagnostics-residuals':        'Diagnostics — Residuals',
       'logistic-diagnostics-influence':        'Diagnostics — Influence',
+      'logistic-power':                        'Power & Sample Size',
       'factor-suitability': 'Suitability',
       'factor-extraction': 'Extraction',
       'factor-rotation': 'Rotation',
@@ -5788,6 +5790,7 @@ const StatisticoHeader = {
       'logistic-probabilities': 'Inspect predicted probabilities and risk patterns across observations and scenarios.',
       'logistic-interactions': 'Examine interaction effects on event probability for combined predictor conditions.',
       'logistic-diagnostics': 'Use residual and influence diagnostics to check separation, leverage, and model stability.',
+      'logistic-power': 'Plan sample size and assess power for the omnibus logistic model using Nagelkerke R² and Cohen f².',
       'logistic-correlations': 'Inspect quick correlation-style screening indicators before deeper model interpretation.',
       'factor-suitability': 'Check KMO, Bartlett, determinant, and correlation adequacy before trusting factor extraction.',
       'factor-extraction': 'Review eigenvalues, variance explained, communalities, and extraction choice.',

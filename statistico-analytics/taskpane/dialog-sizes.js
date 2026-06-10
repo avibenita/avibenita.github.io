@@ -15,7 +15,7 @@
 
 /** All *-input.html / model-builder Office dialogs (Multiple Regression reference size). */
 function inputBuilderSize() {
-  return { height: 92, width: 30, displayInIframe: false };
+  return { height: 74, width: 30, displayInIframe: false };
 }
 
 const DIALOG_SIZE_PRESETS = {
@@ -47,7 +47,7 @@ function getDialogOptions(key) {
   return cloneDialogOptions(preset);
 }
 
-/** Fresh options for every model-builder / config input dialog (92% × 30%). */
+/** Fresh options for every model-builder / config input dialog (74% × 30%). */
 function getInputBuilderDialogOptions() {
   return getDialogOptions('REGRESSION_BUILDER');
 }

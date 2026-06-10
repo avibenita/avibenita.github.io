@@ -328,6 +328,83 @@
       border-color: rgba(120,200,255,.55);
     }
 
+    .cm-matrix {
+      width: 100%;
+      max-width: 360px;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .cm-matrix th, .cm-matrix td {
+      border: 1px solid rgba(255,255,255,.15);
+      padding: 10px 8px;
+      text-align: center;
+    }
+    .cm-matrix th {
+      background: rgba(120,200,255,.1);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .cm-matrix .cm-corner { background: transparent; border-color: transparent; }
+    .cm-cell--tp { background: rgba(34,197,94,.18); font-weight: 800; }
+    .cm-cell--tn { background: rgba(34,197,94,.1); font-weight: 700; }
+    .cm-cell--fp { background: rgba(239,68,68,.16); font-weight: 700; }
+    .cm-cell--fn { background: rgba(239,68,68,.24); font-weight: 800; }
+    .cm-row-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); text-align: right !important; }
+    .perf-secondary {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .perf-secondary strong { color: var(--accent-2); font-size: 16px; }
+    .opt-threshold-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(120,200,255,.25);
+      background: rgba(120,200,255,.08);
+      font-size: 12px;
+    }
+    .opt-threshold-bar strong { color: var(--accent-2); }
+    .opt-thr-btn {
+      margin-left: auto;
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(120,200,255,.45);
+      background: rgba(120,200,255,.15);
+      color: var(--text-primary);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .opt-thr-btn:hover { background: rgba(120,200,255,.28); }
+    .thr-effects-table { width: 100%; margin-top: 10px; font-size: 11px; }
+    .thr-effects-table th, .thr-effects-table td { padding: 5px 8px; text-align: center; }
+    .deploy-overall {
+      padding: 8px 12px;
+      border-top: 1px solid rgba(255,255,255,.08);
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+    .deploy-overall--good { color: #86efac; }
+    .deploy-overall--moderate { color: #fde68a; }
+    .deploy-overall--weak { color: #fca5a5; }
+    .cal-advanced {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed rgba(255,255,255,.12);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
     .subview { display:none; }
     .subview.active { display:block; }
     .tab-obs-filter-bar {
@@ -509,17 +586,32 @@
                   <div class="insight-body" id="perfInterpretation">Awaiting predictive metrics...</div>
                 </div>
                 <div class="grid kpi">
+                  <div class="panel"><div class="panel-b"><div class="kpi-val" id="perfAucVal">-</div><div class="kpi-lab">AUC</div></div></div>
                   <div class="panel"><div class="panel-b"><div class="kpi-val" id="accVal">-</div><div class="kpi-lab">Accuracy</div></div></div>
                   <div class="panel"><div class="panel-b"><div class="kpi-val" id="sensVal">-</div><div class="kpi-lab">Sensitivity</div></div></div>
                   <div class="panel"><div class="panel-b"><div class="kpi-val" id="specVal">-</div><div class="kpi-lab">Specificity</div></div></div>
-                  <div class="panel"><div class="panel-b"><div class="kpi-val" id="f1Val">-</div><div class="kpi-lab">F1</div></div></div>
                 </div>
-                <div class="panel" style="margin-top:12px;"><div class="panel-h">Confusion Matrix</div><div class="panel-b tiny" id="cmText"></div></div>
+                <div class="perf-secondary">F1 score: <strong id="f1Val">-</strong></div>
+                <div class="panel" style="margin-top:12px;">
+                  <div class="panel-h">Confusion Matrix</div>
+                  <div class="panel-b" id="cmMatrix"><div class="empty">Awaiting classification counts...</div></div>
+                </div>
               </section>
               <section class="subview" data-parent="predictive-performance" data-sub="roc-thresholds">
-                <div class="controls"><label for="thr">Threshold</label><input id="thr" type="range" min="0.30" max="0.70" step="0.01" value="0.50"><span id="thrVal">0.50</span></div>
+                <div class="opt-threshold-bar" id="optThresholdBar">
+                  <span>Recommended threshold: <strong id="optThresholdVal">—</strong> <span class="tiny">(maximum Youden index)</span></span>
+                  <button type="button" class="opt-thr-btn" id="useOptThresholdBtn"><i class="fa-solid fa-crosshairs"></i> Use optimal threshold</button>
+                </div>
+                <div class="controls"><label for="thr">Threshold</label><input id="thr" type="range" min="0.05" max="0.95" step="0.01" value="0.50"><span id="thrVal">0.50</span></div>
                 <div class="split-two">
-                  <div class="panel"><div class="panel-h">ROC Curve</div><div class="panel-b"><div id="rocChart" style="height:300px;"></div></div></div>
+                  <div class="panel">
+                    <div class="panel-h">ROC Curve</div>
+                    <div class="panel-b"><div id="rocChart" style="height:280px;"></div></div>
+                    <div class="panel-b" style="border-top:1px solid var(--border); padding-top:8px;">
+                      <div class="tiny" style="margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Threshold trade-offs</div>
+                      <table class="thr-effects-table"><thead><tr><th>Threshold</th><th>Sens</th><th>Spec</th></tr></thead><tbody id="thrEffectsBody"></tbody></table>
+                    </div>
+                  </div>
                   <div class="panel">
                     <div class="panel-h">Threshold Interpretation</div>
                     <div class="panel-b">
@@ -529,6 +621,8 @@
                           <tr><td>AUC Band</td><td id="aucBand">-</td></tr>
                           <tr><td>Sensitivity</td><td id="thrSens">-</td></tr>
                           <tr><td>Specificity</td><td id="thrSpec">-</td></tr>
+                          <tr><td>False Positive Rate</td><td id="thrFpr">-</td></tr>
+                          <tr><td>False Negative Rate</td><td id="thrFnr">-</td></tr>
                           <tr><td>Precision (PPV)</td><td id="thrPrec">-</td></tr>
                           <tr><td>Accuracy</td><td id="thrAcc">-</td></tr>
                           <tr><td>F1</td><td id="thrF1">-</td></tr>
@@ -539,7 +633,7 @@
                 </div>
               </section>
               <section class="subview" data-parent="predictive-performance" data-sub="calibration">
-                <div class="panel"><div class="panel-h">Calibration</div><div class="panel-b"><div id="calChart" style="height:300px;"></div></div></div>
+                <div class="panel"><div class="panel-h">Calibration</div><div class="panel-b"><div id="calChart" style="height:280px;"></div></div></div>
                 <div class="grid two" style="margin-top:12px;">
                   <div class="panel">
                     <div class="panel-h">Calibration Stats</div>
@@ -550,11 +644,19 @@
                     <div class="panel-b tiny">
                       <div style="margin-bottom:8px;">Calibration quality: <span id="calQuality" class="quality-pill moderate">-</span></div>
                       <div id="calInterpretation" style="margin-bottom:8px;">Awaiting calibration assessment...</div>
-                      <div class="tiny" style="opacity:.86;">Reference line (45°): perfect calibration means predicted probabilities match observed event rates across risk bins.</div>
+                      <div class="cal-advanced" id="calAdvanced"></div>
+                      <div class="tiny" style="opacity:.86;margin-top:8px;">Reference line (45°): perfect calibration means predicted probabilities match observed event rates across risk bins.</div>
                     </div>
                   </div>
                 </div>
               </section>
+              <div class="panel" style="margin-top:12px;">
+                <div class="panel-h">Deployment Readiness</div>
+                <div class="panel-b" style="padding:0;">
+                  <div class="traffic-row" id="deployRow"></div>
+                  <div class="deploy-overall deploy-overall--moderate" id="deployOverall">Awaiting deployment assessment...</div>
+                </div>
+              </div>
             </section>
 
             <section class="tab-panel" data-view="probabilities">
@@ -703,6 +805,189 @@
     function isStatSig(p) {
       return isFinite(p) && p <= 0.05;
     }
+    var _perfCache = { optimalThreshold: 0.5, brier: NaN, calQuality: "Moderate", meanAbsCalErr: NaN };
+
+    function confusionCounts(pairs, threshold) {
+      var tp = 0, fp = 0, tn = 0, fn = 0;
+      pairs.forEach(function (d) {
+        var pred = d.p >= threshold ? 1 : 0;
+        if (pred === 1 && d.y === 1) tp++;
+        else if (pred === 1 && d.y === 0) fp++;
+        else if (pred === 0 && d.y === 0) tn++;
+        else fn++;
+      });
+      return { tp: tp, fp: fp, tn: tn, fn: fn };
+    }
+    function metricsFromCounts(counts, total) {
+      var tp = counts.tp, fp = counts.fp, tn = counts.tn, fn = counts.fn;
+      var sensitivity = (tp + fn) ? tp / (tp + fn) : NaN;
+      var specificity = (tn + fp) ? tn / (tn + fp) : NaN;
+      var precision = (tp + fp) ? tp / (tp + fp) : NaN;
+      var accuracy = total ? (tp + tn) / total : NaN;
+      var f1 = (isFinite(precision) && isFinite(sensitivity) && (precision + sensitivity))
+        ? (2 * precision * sensitivity) / (precision + sensitivity) : NaN;
+      var fpr = isFinite(specificity) ? 1 - specificity : NaN;
+      var fnr = isFinite(sensitivity) ? 1 - sensitivity : NaN;
+      return { sensitivity: sensitivity, specificity: specificity, precision: precision, accuracy: accuracy, f1: f1, fpr: fpr, fnr: fnr };
+    }
+    function findYoudenThreshold(pairs) {
+      if (!pairs.length) return 0.5;
+      var bestT = 0.5, bestJ = -Infinity;
+      for (var i = 5; i <= 95; i++) {
+        var t = i / 100;
+        var m = metricsFromCounts(confusionCounts(pairs, t), pairs.length);
+        var j = (isFinite(m.sensitivity) ? m.sensitivity : 0) + (isFinite(m.specificity) ? m.specificity : 0) - 1;
+        if (j > bestJ) { bestJ = j; bestT = t; }
+      }
+      return bestT;
+    }
+    function renderConfusionMatrixHtml(counts) {
+      return "<table class='cm-matrix'><thead><tr><th class='cm-corner'></th><th>Actual +</th><th>Actual −</th></tr></thead><tbody>" +
+        "<tr><td class='cm-row-label'>Predicted +</td><td class='cm-cell--tp'>" + counts.tp + "</td><td class='cm-cell--fp'>" + counts.fp + "</td></tr>" +
+        "<tr><td class='cm-row-label'>Predicted −</td><td class='cm-cell--fn'>" + counts.fn + "</td><td class='cm-cell--tn'>" + counts.tn + "</td></tr>" +
+        "</tbody></table>";
+    }
+    function buildExplicitPerfInterpretation(sens, spec, aucInfo) {
+      if (!isFinite(sens) || !isFinite(spec)) return "Awaiting classification metrics at the default threshold.";
+      var sensPct = (sens * 100).toFixed(0);
+      var specPct = (spec * 100).toFixed(0);
+      var lead = aucInfo ? (aucInfo.detail + " ") : "";
+      if (sens >= 0.995 && spec <= 0.05) {
+        return lead + "The model identifies all positive cases (" + sensPct + "% sensitivity) but incorrectly classifies every negative case as positive (" + specPct + "% specificity). Practical usefulness is therefore limited.";
+      }
+      if (sens >= 0.995 && spec < 0.2) {
+        return lead + "The model captures nearly all positive cases (" + sensPct + "% sensitivity) but misses most negatives (" + specPct + "% specificity). False positives may dominate operational use.";
+      }
+      if (sens >= 0.75 && spec >= 0.75) {
+        return lead + "The model balances sensitivity (" + sensPct + "%) and specificity (" + specPct + "%) reasonably well at the default cutoff.";
+      }
+      if (sens < 0.5 && spec < 0.5) {
+        return lead + "Both sensitivity (" + sensPct + "%) and specificity (" + specPct + "%) are weak at the default cutoff — classification utility is limited.";
+      }
+      return lead + "At the default cutoff, sensitivity is " + sensPct + "% and specificity is " + specPct + "%. Review threshold tuning before deployment.";
+    }
+    function brierQualityLabel(brier) {
+      if (!isFinite(brier)) return { label: "Unknown", cls: "moderate" };
+      if (brier <= 0.10) return { label: "Excellent", cls: "strong" };
+      if (brier <= 0.15) return { label: "Good", cls: "strong" };
+      if (brier <= 0.25) return { label: "Moderate", cls: "moderate" };
+      return { label: "Poor", cls: "weak" };
+    }
+    function calibrationSlopeIntercept(pairs) {
+      var xs = [], ys = [];
+      pairs.forEach(function (d) {
+        var p = Math.min(0.999, Math.max(0.001, d.p));
+        xs.push(Math.log(p / (1 - p)));
+        ys.push(d.y);
+      });
+      var nPts = xs.length;
+      if (nPts < 4) return { slope: NaN, intercept: NaN };
+      var mx = xs.reduce(function (a, b) { return a + b; }, 0) / nPts;
+      var my = ys.reduce(function (a, b) { return a + b; }, 0) / nPts;
+      var num = 0, den = 0;
+      for (var i = 0; i < nPts; i++) {
+        num += (xs[i] - mx) * (ys[i] - my);
+        den += (xs[i] - mx) * (xs[i] - mx);
+      }
+      var slope = den ? num / den : NaN;
+      return { slope: slope, intercept: my - slope * mx };
+    }
+    function renderThresholdEffectsTable(pairs) {
+      var body = document.getElementById("thrEffectsBody");
+      if (!body) return;
+      if (!pairs.length) { body.innerHTML = "<tr><td colspan='3' class='empty'>No predictions</td></tr>"; return; }
+      var thresholds = [0.30, 0.50, 0.70];
+      if (isFinite(_perfCache.optimalThreshold) && thresholds.indexOf(_perfCache.optimalThreshold) < 0) {
+        thresholds.push(_perfCache.optimalThreshold);
+        thresholds.sort(function (a, b) { return a - b; });
+      }
+      body.innerHTML = thresholds.map(function (t) {
+        var m = metricsFromCounts(confusionCounts(pairs, t), pairs.length);
+        var tag = (Math.abs(t - _perfCache.optimalThreshold) < 0.005) ? " *" : "";
+        return "<tr><td>" + t.toFixed(2) + tag + "</td><td>" + (isFinite(m.sensitivity) ? (m.sensitivity * 100).toFixed(0) + "%" : "—") +
+          "</td><td>" + (isFinite(m.specificity) ? (m.specificity * 100).toFixed(0) + "%" : "—") + "</td></tr>";
+      }).join("");
+    }
+    function renderDeploymentReadiness(auc, brier, meanAbsCalErr) {
+      var row = document.getElementById("deployRow");
+      var overall = document.getElementById("deployOverall");
+      if (!row || !overall) return;
+      var disc = assessDiscrimination(auc);
+      var calQ = brierQualityLabel(brier);
+      var calLevel = calQ.label === "Excellent" || calQ.label === "Good" ? "good" : (calQ.label === "Moderate" ? "moderate" : "weak");
+      var calLabel = calQ.label;
+      var thrNeedsTuning = isFinite(_perfCache.optimalThreshold) && Math.abs(_perfCache.optimalThreshold - 0.5) > 0.12;
+      var thrLevel = thrNeedsTuning ? "moderate" : "good";
+      var thrLabel = thrNeedsTuning ? "Requires tuning" : "Adequate";
+      row.innerHTML =
+        trafficItem("Discrimination", "discrimination", disc.level, disc.label) +
+        trafficItem("Calibration", "calibration", calLevel, calLabel) +
+        trafficItem("Stability", "sample", "moderate", "Unknown") +
+        trafficItem("Threshold", "threshold", thrLevel, thrLabel);
+      var deployText;
+      var deployCls;
+      if (disc.level === "good" && calLevel === "good" && !thrNeedsTuning) {
+        deployText = "Overall: Reasonably ready for guided operational use.";
+        deployCls = "good";
+      } else if (disc.level === "weak" && calLevel === "weak") {
+        deployText = "Overall: Not ready for operational deployment — discrimination and calibration need improvement.";
+        deployCls = "weak";
+      } else {
+        deployText = "Overall: Suitable for exploratory use, not yet ready for operational deployment.";
+        deployCls = "moderate";
+      }
+      overall.textContent = deployText;
+      overall.className = "deploy-overall deploy-overall--" + deployCls;
+    }
+    function renderPredictivePerformance() {
+      var r = state.results || {};
+      var pairs = predictionPairs();
+      var auc = toUnit(r.auc);
+      var aucInfo = aucBand(auc);
+      var defaultThr = 0.5;
+      var thrEl = document.getElementById("thr");
+      if (thrEl) defaultThr = Number(thrEl.value) || 0.5;
+      _perfCache.optimalThreshold = pairs.length ? findYoudenThreshold(pairs) : 0.5;
+
+      var optVal = document.getElementById("optThresholdVal");
+      if (optVal) optVal.textContent = _perfCache.optimalThreshold.toFixed(2);
+
+      var counts = pairs.length ? confusionCounts(pairs, defaultThr) : { tp: n(r.tp) || 0, fp: n(r.fp) || 0, tn: n(r.tn) || 0, fn: n(r.fn) || 0 };
+      var m = pairs.length ? metricsFromCounts(counts, pairs.length) : {
+        sensitivity: toUnit(r.sensitivity), specificity: toUnit(r.specificity),
+        precision: toUnit(r.precision || r.ppv), accuracy: toUnit(r.accuracy), f1: toUnit(r.f1)
+      };
+
+      var perfAuc = document.getElementById("perfAucVal");
+      if (perfAuc) perfAuc.textContent = toFixedOrDash(auc, 2);
+      document.getElementById("accVal").textContent = isFinite(m.accuracy) ? formatPctCell(m.accuracy) : formatPctCell(r.accuracy);
+      document.getElementById("sensVal").textContent = isFinite(m.sensitivity) ? formatPctCell(m.sensitivity) : formatPctCell(r.sensitivity);
+      document.getElementById("specVal").textContent = isFinite(m.specificity) ? formatPctCell(m.specificity) : formatPctCell(r.specificity);
+      document.getElementById("f1Val").textContent = isFinite(m.f1) ? formatPctCell(m.f1) : formatPctCell(r.f1);
+
+      var cmEl = document.getElementById("cmMatrix");
+      if (cmEl) cmEl.innerHTML = renderConfusionMatrixHtml(counts);
+
+      var perfInterp = document.getElementById("perfInterpretation");
+      if (perfInterp) {
+        perfInterp.textContent = buildExplicitPerfInterpretation(
+          isFinite(m.sensitivity) ? m.sensitivity : toUnit(r.sensitivity),
+          isFinite(m.specificity) ? m.specificity : toUnit(r.specificity),
+          aucInfo
+        );
+      }
+
+      document.getElementById("rocInterpretation").textContent = isFinite(auc)
+        ? "AUC = " + toFixedOrDash(auc, 2) + ". " + aucInfo.detail
+        : "Awaiting ROC interpretation...";
+      document.getElementById("aucBand").textContent = aucInfo.label;
+
+      renderThresholdMetrics(defaultThr);
+      renderThresholdEffectsTable(pairs);
+      renderRoc();
+      renderCalibration();
+      renderDeploymentReadiness(auc, _perfCache.brier, _perfCache.meanAbsCalErr);
+    }
     function friendlyVarName(name) {
       return String(name || "").replace(/_/g, " ").trim();
     }
@@ -710,7 +995,9 @@
       discrimination: "How well the model separates events from non-events, based on AUC.",
       statistical: "Whether the omnibus model test supports a real association (overall p-value).",
       sample: "Whether sample size and events-per-predictor support stable estimates.",
-      balance: "How evenly events and non-events are represented in the data."
+      balance: "How evenly events and non-events are represented in the data.",
+      calibration: "How closely predicted probabilities match observed event rates.",
+      threshold: "Whether the default cutoff is close to an optimal balance of sensitivity and specificity."
     };
     function infoTip(tip) {
       return "<span class='stat-info-tip' title=\"" + esc(tip) + "\" aria-label=\"" + esc(tip) + "\"><i class='fa-solid fa-circle-info' aria-hidden='true'></i></span>";
@@ -936,8 +1223,8 @@
         StatisticoWorkspaceTabs.onActiveChanged();
         StatisticoWorkspaceTabs.pulseBody(document.querySelector(".ws-body"));
       }
-      if (parent === "predictive-performance" && sub === "roc-thresholds") renderRoc();
-      if (parent === "predictive-performance" && sub === "calibration") renderCalibration();
+      if (parent === "predictive-performance" && sub === "roc-thresholds") renderPredictivePerformance();
+      if (parent === "predictive-performance" && sub === "calibration") renderPredictivePerformance();
     }
     function mountSubtabs(tab) {
       var host = document.getElementById("subtabs");
@@ -969,6 +1256,7 @@
       if (tab === "correlations" && !correlationsLoaded) loadCorrelationsTab();
       if (tab === "descriptives" && !descriptiveLoaded) loadDescriptiveTab();
       if (tab === "power") refreshLogisticPowerAnalysis();
+      if (tab === "predictive-performance") renderPredictivePerformance();
       if (typeof StatisticoHeader !== "undefined") {
         var labels = {
           "model-results": "Model Results",
@@ -986,11 +1274,6 @@
 
     function renderKPIs() {
       var r = state.results || {};
-      document.getElementById("accVal").textContent = r.accuracy || "-";
-      document.getElementById("sensVal").textContent = r.sensitivity || "-";
-      document.getElementById("specVal").textContent = r.specificity || "-";
-      document.getElementById("f1Val").textContent = r.f1 || "-";
-      document.getElementById("cmText").innerHTML = "TP: <b>" + (r.tp || 0) + "</b> &nbsp; FP: <b>" + (r.fp || 0) + "</b> &nbsp; TN: <b>" + (r.tn || 0) + "</b> &nbsp; FN: <b>" + (r.fn || 0) + "</b>";
       var _obs = firstDefined(r, ["observations", "n", "sampleSize"], "-");
       var _evt = firstDefined(r, ["events", "eventCount"], "-");
       var _nonEvt = (isFinite(n(_obs)) && isFinite(n(_evt))) ? Math.max(0, n(_obs) - n(_evt)) : firstDefined(r, ["nonEvents", "nonevents"], "-");
@@ -1035,28 +1318,8 @@
       document.getElementById("diagResiduals").innerHTML = "Deviance SD: <b>" + (state.diagnostics.devianceResidualSd || "-") + "</b><br>Pearson SD: <b>" + (state.diagnostics.pearsonResidualSd || "-") + "</b>";
       document.getElementById("diagInfluence").innerHTML = "Max leverage: <b>" + (state.diagnostics.maxLeverage || "-") + "</b><br>Max Cook's D: <b>" + (state.diagnostics.maxCooksDistance || "-") + "</b><br>Max |DFBETA|: <b>" + (state.diagnostics.maxDfbeta || "-") + "</b>";
 
-      var auc = toUnit(r.auc);
-      var aucInfo = aucBand(auc);
-      var perfParts = [];
-      if (isFinite(auc)) perfParts.push("AUC " + toFixedOrDash(auc, 2) + " (" + aucInfo.label + ")");
-      if (r.accuracy != null && r.accuracy !== "") perfParts.push("Accuracy " + formatPctCell(r.accuracy));
-      if (r.sensitivity != null && r.sensitivity !== "") perfParts.push("Sensitivity " + formatPctCell(r.sensitivity));
-      if (r.specificity != null && r.specificity !== "") perfParts.push("Specificity " + formatPctCell(r.specificity));
-      document.getElementById("perfInterpretation").textContent = perfParts.length
-        ? aucInfo.detail + " Key operating metrics: " + perfParts.join(", ") + "."
-        : "Awaiting predictive metrics...";
-
-      document.getElementById("rocInterpretation").textContent = isFinite(auc)
-        ? "AUC = " + toFixedOrDash(auc, 2) + ". " + aucInfo.detail
-        : "Awaiting ROC interpretation...";
-      document.getElementById("aucBand").textContent = aucInfo.label;
-      document.getElementById("thrSens").textContent = formatPctCell(r.sensitivity);
-      document.getElementById("thrSpec").textContent = formatPctCell(r.specificity);
-      document.getElementById("thrPrec").textContent = formatPctCell(r.precision || r.ppv);
-      document.getElementById("thrAcc").textContent = formatPctCell(r.accuracy);
-      document.getElementById("thrF1").textContent = formatPctCell(r.f1);
-
       renderModelOverview();
+      renderPredictivePerformance();
     }
     function renderTables() {
       var coef = state.coefficients || [];
@@ -1085,26 +1348,15 @@
     function renderThresholdMetrics(threshold) {
       var pairs = predictionPairs();
       if (!pairs.length) return;
-      let tp = 0, fp = 0, tn = 0, fn = 0;
-      pairs.forEach((d) => {
-        var pred = d.p >= threshold ? 1 : 0;
-        if (pred === 1 && d.y === 1) tp++;
-        else if (pred === 1 && d.y === 0) fp++;
-        else if (pred === 0 && d.y === 0) tn++;
-        else fn++;
-      });
-      var sensitivity = (tp + fn) ? tp / (tp + fn) : NaN;
-      var specificity = (tn + fp) ? tn / (tn + fp) : NaN;
-      var precision = (tp + fp) ? tp / (tp + fp) : NaN;
-      var accuracy = (tp + tn) / pairs.length;
-      var f1 = (isFinite(precision) && isFinite(sensitivity) && (precision + sensitivity))
-        ? (2 * precision * sensitivity) / (precision + sensitivity)
-        : NaN;
-      document.getElementById("thrSens").textContent = isFinite(sensitivity) ? (sensitivity * 100).toFixed(1) + "%" : "-";
-      document.getElementById("thrSpec").textContent = isFinite(specificity) ? (specificity * 100).toFixed(1) + "%" : "-";
-      document.getElementById("thrPrec").textContent = isFinite(precision) ? (precision * 100).toFixed(1) + "%" : "-";
-      document.getElementById("thrAcc").textContent = isFinite(accuracy) ? (accuracy * 100).toFixed(1) + "%" : "-";
-      document.getElementById("thrF1").textContent = isFinite(f1) ? (f1 * 100).toFixed(1) + "%" : "-";
+      var counts = confusionCounts(pairs, threshold);
+      var m = metricsFromCounts(counts, pairs.length);
+      document.getElementById("thrSens").textContent = isFinite(m.sensitivity) ? (m.sensitivity * 100).toFixed(1) + "%" : "-";
+      document.getElementById("thrSpec").textContent = isFinite(m.specificity) ? (m.specificity * 100).toFixed(1) + "%" : "-";
+      document.getElementById("thrFpr").textContent = isFinite(m.fpr) ? (m.fpr * 100).toFixed(1) + "%" : "-";
+      document.getElementById("thrFnr").textContent = isFinite(m.fnr) ? (m.fnr * 100).toFixed(1) + "%" : "-";
+      document.getElementById("thrPrec").textContent = isFinite(m.precision) ? (m.precision * 100).toFixed(1) + "%" : "-";
+      document.getElementById("thrAcc").textContent = isFinite(m.accuracy) ? (m.accuracy * 100).toFixed(1) + "%" : "-";
+      document.getElementById("thrF1").textContent = isFinite(m.f1) ? (m.f1 * 100).toFixed(1) + "%" : "-";
     }
     function renderRoc() {
       var pairs = predictionPairs();
@@ -1123,11 +1375,19 @@
         pairs.forEach((d) => { if (d.p >= t) { if (d.y === 1) tp++; else fp++; } });
         return [fp / neg, tp / pos];
       }).sort((a, b) => a[0] - b[0]);
+      var opt = _perfCache.optimalThreshold || 0.5;
+      var optCounts = confusionCounts(pairs, opt);
+      var optSens = (optCounts.tp + optCounts.fn) ? optCounts.tp / (optCounts.tp + optCounts.fn) : 0;
+      var optFpr = (optCounts.fp + optCounts.tn) ? optCounts.fp / (optCounts.fp + optCounts.tn) : 0;
       Highcharts.chart(el, {
         chart: { type: "line", backgroundColor: "transparent" },
         title: { text: null }, credits: { enabled: false }, legend: { enabled: false },
         xAxis: { min:0, max:1, title:{ text:"False Positive Rate" } }, yAxis: { min:0, max:1, title:{ text:"True Positive Rate" } },
-        series: [{ data: [[0,0],[1,1]], dashStyle:"Dash", enableMouseTracking:false }, { data: points, color:"#5aa7ff", lineWidth:3 }]
+        series: [
+          { data: [[0,0],[1,1]], dashStyle:"Dash", enableMouseTracking:false, color:"rgba(148,163,184,.5)" },
+          { data: points, color:"#5aa7ff", lineWidth:3, name:"ROC" },
+          { type:"scatter", data:[[optFpr, optSens]], color:"#fbbf24", marker:{ radius:6, symbol:"diamond" }, name:"Optimal", enableMouseTracking:true }
+        ]
       });
     }
     function renderCalibration() {
@@ -1160,40 +1420,42 @@
       var meanAbsCalErr = pts.length
         ? pts.reduce((s, d) => s + Math.abs(d[0] - d[1]), 0) / pts.length
         : NaN;
+      _perfCache.brier = brier;
+      _perfCache.meanAbsCalErr = meanAbsCalErr;
+      var calQ = brierQualityLabel(brier);
+      var calAdv = calibrationSlopeIntercept(pairs);
       Highcharts.chart(el, {
         chart: { type: "scatter", backgroundColor: "transparent" },
         title: { text: null }, credits: { enabled: false }, legend: { enabled: false },
         xAxis: { min:0, max:1, title:{ text:"Predicted probability" } }, yAxis: { min:0, max:1, title:{ text:"Observed event rate" } },
         series: [{ type:"line", data:[[0,0],[1,1]], dashStyle:"Dash", enableMouseTracking:false }, { data: pts, color:"#5aa7ff" }]
       });
-      txt.textContent = "Brier score: " + brier.toFixed(4) + " (lower is better).";
+      txt.innerHTML = "Brier score: <b>" + brier.toFixed(3) + "</b><br>Quality: <b>" + calQ.label + "</b> (lower is better).";
 
-      let quality = "Moderate";
-      let qualityClass = "moderate";
-      if (brier <= 0.12) { quality = "Strong"; qualityClass = "strong"; }
-      else if (brier >= 0.22) { quality = "Weak"; qualityClass = "weak"; }
       if (qualityEl) {
-        qualityEl.textContent = quality;
-        qualityEl.className = "quality-pill " + qualityClass;
+        qualityEl.textContent = calQ.label;
+        qualityEl.className = "quality-pill " + calQ.cls;
       }
       if (interpEl) {
-        var zone = isFinite(meanAbsCalErr) && meanAbsCalErr > 0.08
-          ? "noticeable miscalibration at moderate-risk levels"
-          : "alignment with observed risk is reasonably stable across bins";
-        interpEl.textContent = "Calibration appears " + quality.toLowerCase() + "; average bin error is " +
-          (isFinite(meanAbsCalErr) ? meanAbsCalErr.toFixed(3) : "-") + ", indicating " + zone + ".";
+        var pctErr = isFinite(meanAbsCalErr) ? (meanAbsCalErr * 100).toFixed(0) : "—";
+        interpEl.textContent = isFinite(meanAbsCalErr)
+          ? "Predicted probabilities differ from observed event rates by about " + pctErr + " percentage points on average."
+          : "Awaiting calibration assessment...";
       }
+      var advEl = document.getElementById("calAdvanced");
+      if (advEl) {
+        advEl.innerHTML = isFinite(calAdv.slope) && isFinite(calAdv.intercept)
+          ? "<strong>Advanced:</strong> Calibration intercept = " + calAdv.intercept.toFixed(3) +
+            ", slope = " + calAdv.slope.toFixed(3) +
+            " (ideal slope ≈ 1, intercept ≈ 0)."
+          : "";
+      }
+      _perfCache.calQuality = calQ.label;
     }
     function renderAll() {
       renderKPIs();
       renderTables();
       renderProbabilityBands();
-      var thrEl = document.getElementById("thr");
-      if (thrEl) renderThresholdMetrics(Number(thrEl.value || 0.5));
-      if (currentPrimary === "predictive-performance") {
-        renderRoc();
-        renderCalibration();
-      }
       if (logisticPowerReady) refreshLogisticPowerAnalysis();
     }
 
@@ -1619,7 +1881,19 @@
           var v = Number(this.value).toFixed(2);
           document.getElementById("thrVal").textContent = v;
           renderThresholdMetrics(Number(v));
+          var pairs = predictionPairs();
+          var cmEl = document.getElementById("cmMatrix");
+          if (cmEl && pairs.length) cmEl.innerHTML = renderConfusionMatrixHtml(confusionCounts(pairs, Number(v)));
+          renderThresholdEffectsTable(pairs);
           sendToHost("logisticThresholdChanged", { threshold: Number(v) });
+        });
+      }
+      var useOptBtn = document.getElementById("useOptThresholdBtn");
+      if (useOptBtn && thr) {
+        useOptBtn.addEventListener("click", function () {
+          var opt = _perfCache.optimalThreshold || 0.5;
+          thr.value = String(opt);
+          thr.dispatchEvent(new Event("input"));
         });
       }
       if (typeof Office !== "undefined") {

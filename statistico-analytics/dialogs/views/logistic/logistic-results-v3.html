@@ -215,7 +215,7 @@
     .quality-pill.moderate{ color:#fde68a; background:rgba(234,179,8,.2); border-color:rgba(234,179,8,.45); }
     .quality-pill.weak{ color:#fecaca; background:rgba(239,68,68,.18); border-color:rgba(239,68,68,.42); }
 
-    .exec-section { margin-bottom: 14px; }
+    .exec-section { margin-bottom: 10px; }
     .exec-section-label {
       font-size: 10px;
       font-weight: 800;
@@ -228,23 +228,63 @@
       border-color: rgba(16,185,129,.35);
       background: linear-gradient(135deg, rgba(16,185,129,.14), rgba(16,185,129,.05));
     }
-    .traffic-table td:last-child { font-weight: 700; white-space: nowrap; }
-    .traffic-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    .stat-info-tip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 10px;
+      cursor: help;
+      line-height: 1;
+      opacity: .85;
+    }
+    .stat-info-tip:hover { opacity: 1; color: var(--accent-2); }
+    .traffic-row {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      min-height: 0;
+    }
+    .traffic-item {
+      flex: 1 1 0;
+      min-width: 0;
+      padding: 7px 10px;
+      border-right: 1px solid rgba(255,255,255,.08);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 3px;
+    }
+    .traffic-item:last-child { border-right: none; }
+    .traffic-item-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--text-muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .traffic-item-status {
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .traffic-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
     .traffic-dot--good { background: #22c55e; box-shadow: 0 0 0 2px rgba(34,197,94,.25); }
     .traffic-dot--moderate { background: #eab308; box-shadow: 0 0 0 2px rgba(234,179,8,.25); }
     .traffic-dot--weak { background: #ef4444; box-shadow: 0 0 0 2px rgba(239,68,68,.25); }
-    .overall-assessment {
-      margin-top: 10px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      border: 1px solid rgba(234,179,8,.35);
-      background: rgba(234,179,8,.1);
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--text-primary);
+    .traffic-item--overall {
+      background: rgba(234,179,8,.08);
+      border-left: 1px solid rgba(234,179,8,.25);
     }
-    .overall-assessment--good { border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.1); }
-    .overall-assessment--weak { border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.1); }
+    .traffic-item--overall.traffic-item--good { background: rgba(34,197,94,.08); border-left-color: rgba(34,197,94,.25); }
+    .traffic-item--overall.traffic-item--weak { background: rgba(239,68,68,.08); border-left-color: rgba(239,68,68,.25); }
+    .traffic-item--overall .traffic-item-status { font-size: 11px; line-height: 1.25; white-space: normal; }
     .sig-summary {
       padding: 8px 10px;
       border-radius: 8px;
@@ -379,12 +419,8 @@
                   </div>
                   <div class="panel" style="margin-top:12px;">
                     <div class="panel-h">Traffic-Light Assessment</div>
-                    <div class="panel-b">
-                      <table class="metric-table traffic-table">
-                        <thead><tr><th>Area</th><th>Status</th></tr></thead>
-                        <tbody id="trafficBody"></tbody>
-                      </table>
-                      <div class="overall-assessment" id="overallAssessment">Awaiting assessment...</div>
+                    <div class="panel-b" style="padding:0;">
+                      <div class="traffic-row" id="trafficRow"></div>
                     </div>
                   </div>
                   <div class="insight-banner insight-banner--practical" style="margin-top:12px;">
@@ -670,9 +706,25 @@
     function friendlyVarName(name) {
       return String(name || "").replace(/_/g, " ").trim();
     }
+    var TRAFFIC_TIPS = {
+      discrimination: "How well the model separates events from non-events, based on AUC.",
+      statistical: "Whether the omnibus model test supports a real association (overall p-value).",
+      sample: "Whether sample size and events-per-predictor support stable estimates.",
+      balance: "How evenly events and non-events are represented in the data."
+    };
+    function infoTip(tip) {
+      return "<span class='stat-info-tip' title=\"" + esc(tip) + "\" aria-label=\"" + esc(tip) + "\"><i class='fa-solid fa-circle-info' aria-hidden='true'></i></span>";
+    }
     function trafficCell(level, label) {
       var cls = level === "good" ? "good" : (level === "moderate" ? "moderate" : "weak");
-      return "<span class='traffic-dot traffic-dot--" + cls + "' aria-hidden='true'></span>" + esc(label);
+      return "<span class='traffic-item-status'><span class='traffic-dot traffic-dot--" + cls + "' aria-hidden='true'></span>" + esc(label) + "</span>";
+    }
+    function trafficItem(area, tipKey, level, label) {
+      var tip = TRAFFIC_TIPS[tipKey] || "";
+      return "<div class='traffic-item'>" +
+        "<span class='traffic-item-label'>" + esc(area) + infoTip(tip) + "</span>" +
+        trafficCell(level, label) +
+        "</div>";
     }
     function assessDiscrimination(auc) {
       if (!isFinite(auc)) return { level: "weak", label: "Unknown" };
@@ -743,11 +795,9 @@
       }
       return { cls: "confidence-note--caution", text: "Only " + (isFinite(n) ? n : "—") + " observations were available. Results should be interpreted cautiously." };
     }
-    function metricRow(label, value) {
-      return "<tr><td>" + esc(label) + "</td><td>" + esc(value) + "</td></tr>";
-    }
-    function trafficRow(area, statusHtml) {
-      return "<tr><td>" + esc(area) + "</td><td>" + statusHtml + "</td></tr>";
+    function metricRow(label, value, tip) {
+      var tipHtml = tip ? infoTip(tip) : "";
+      return "<tr><td>" + esc(label) + tipHtml + "</td><td>" + esc(value) + "</td></tr>";
     }
     function renderModelOverview() {
       var r = state.results || {};
@@ -789,28 +839,26 @@
           toFixedOrDash(auc, 2) + "). " + statPhrase;
       }
 
-      var trafficEl = document.getElementById("trafficBody");
+      var trafficEl = document.getElementById("trafficRow");
       if (trafficEl) {
         trafficEl.innerHTML =
-          trafficRow("Discrimination", trafficCell(disc.level, disc.label)) +
-          trafficRow("Statistical Evidence", trafficCell(stat.level, stat.label)) +
-          trafficRow("Sample Size", trafficCell(sample.level, sample.label)) +
-          trafficRow("Class Balance", trafficCell(balance.level, balance.label));
-      }
-
-      var overallEl = document.getElementById("overallAssessment");
-      if (overallEl) {
-        overallEl.textContent = "Overall Assessment: " + overall.text;
-        overallEl.className = "overall-assessment overall-assessment--" + overall.level;
+          trafficItem("Discrimination", "discrimination", disc.level, disc.label) +
+          trafficItem("Statistical Evidence", "statistical", stat.level, stat.label) +
+          trafficItem("Sample Size", "sample", sample.level, sample.label) +
+          trafficItem("Class Balance", "balance", balance.level, balance.label) +
+          "<div class='traffic-item traffic-item--overall traffic-item--" + overall.level + "'>" +
+            "<span class='traffic-item-label'>Overall" + infoTip("Combined read of discrimination, statistical support, sample size, and class balance.") + "</span>" +
+            "<span class='traffic-item-status'>" + esc(overall.text) + "</span>" +
+          "</div>";
       }
 
       var qualityEl = document.getElementById("modelQualityBody");
       if (qualityEl) {
         qualityEl.innerHTML =
-          metricRow("AUC", toFixedOrDash(auc, 2)) +
-          metricRow("Accuracy", formatPctCell(r.accuracy)) +
-          metricRow("Sensitivity", formatPctCell(r.sensitivity)) +
-          metricRow("Specificity", formatPctCell(r.specificity));
+          metricRow("AUC", toFixedOrDash(auc, 2), "Area under the ROC curve — ability to rank events above non-events.") +
+          metricRow("Accuracy", formatPctCell(r.accuracy), "Share of cases classified correctly at the default cutoff.") +
+          metricRow("Sensitivity", formatPctCell(r.sensitivity), "True positive rate — events correctly identified.") +
+          metricRow("Specificity", formatPctCell(r.specificity), "True negative rate — non-events correctly identified.");
       }
 
       var sampleEl = document.getElementById("sampleEventsBody");

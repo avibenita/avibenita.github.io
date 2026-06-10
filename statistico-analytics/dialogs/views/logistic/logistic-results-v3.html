@@ -404,6 +404,15 @@
       font-size: 11px;
       color: var(--text-muted);
     }
+    .prob-risk-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .prob-risk-summary span strong { color: var(--text-primary); }
 
     .subview { display:none; }
     .subview.active { display:block; }
@@ -661,14 +670,42 @@
 
             <section class="tab-panel" data-view="probabilities">
               <section class="subview active" data-parent="probabilities" data-sub="overview">
-                <div class="panel"><div class="panel-h">Probability Bands</div><div class="panel-b" id="probBands"></div></div>
+                <div class="insight-banner">
+                  <div class="insight-title">Key Takeaway</div>
+                  <div class="insight-body" id="probKeyTakeaway">Awaiting probability distribution...</div>
+                </div>
+                <div class="grid two">
+                  <div class="panel">
+                    <div class="panel-h">Risk Distribution</div>
+                    <div class="panel-b">
+                      <div id="probRiskChart" style="height:160px;"></div>
+                      <div class="prob-risk-summary" id="probRiskSummary"></div>
+                    </div>
+                  </div>
+                  <div class="panel">
+                    <div class="panel-h">Probability Distribution</div>
+                    <div class="panel-b"><div id="probHistChart" style="height:200px;"></div></div>
+                  </div>
+                </div>
+                <div class="panel" style="margin-top:12px;">
+                  <div class="panel-h">Risk Segmentation</div>
+                  <div class="panel-b">
+                    <table class="metric-table">
+                      <thead><tr><th>Risk Band</th><th>Count</th><th>Event Rate</th></tr></thead>
+                      <tbody id="probSegBody"></tbody>
+                    </table>
+                  </div>
+                </div>
               </section>
-              <section class="subview" data-parent="probabilities" data-sub="scenario-engine">
-                <div class="panel"><div class="panel-h">Scenario Engine</div><div class="panel-b tiny">Adjust threshold in ROC & Thresholds to inspect class transitions.</div></div>
-                <div class="panel" style="margin-top:12px;"><div class="panel-h">Prediction Sample</div><div class="panel-b"><table><thead><tr><th>Observed</th><th>Probability</th><th>Class</th></tr></thead><tbody id="predBody"></tbody></table></div></div>
-              </section>
-              <section class="subview" data-parent="probabilities" data-sub="risk-profiles">
-                <div class="panel"><div class="panel-h">Risk Profiles</div><div class="panel-b tiny" id="riskProfiles"></div></div>
+              <section class="subview" data-parent="probabilities" data-sub="predictions">
+                <div class="insight-banner insight-banner--practical">
+                  <div class="insight-title">Individual Predictions</div>
+                  <div class="insight-body">Observed outcome, predicted probability, and class at the current classification threshold. Interactive predictor sliders (scenario engine) can be added when the builder exposes live scoring.</div>
+                </div>
+                <div class="panel">
+                  <div class="panel-h">Prediction Sample</div>
+                  <div class="panel-b"><table><thead><tr><th>Observed</th><th>Probability</th><th>Class</th></tr></thead><tbody id="predBody"></tbody></table></div>
+                </div>
               </section>
             </section>
 
@@ -711,7 +748,7 @@
     var SUBTAB_CONFIG = {
       "model-results": ["overview", "technical"],
       "predictive-performance": ["overview", "roc-thresholds", "calibration"],
-      "probabilities": ["overview", "scenario-engine", "risk-profiles"],
+      "probabilities": ["overview", "predictions"],
       "interactions": ["overview", "visualization", "technical"],
       "diagnostics": ["overview", "residuals", "influence"],
       "correlations": [],
@@ -720,7 +757,7 @@
     };
     var SUBTAB_LABELS = {
       overview: "Overview", technical: "Technical", "roc-thresholds": "ROC & Thresholds", calibration: "Calibration",
-      "scenario-engine": "Scenario Engine", "risk-profiles": "Risk Profiles", visualization: "Visualization",
+      predictions: "Predictions", visualization: "Visualization",
       residuals: "Residuals", influence: "Influence"
     };
     var SUBTAB_SUBTITLES = {
@@ -728,8 +765,7 @@
       technical: "Statistics & coefficients",
       "roc-thresholds": "ROC curve & cutoff",
       calibration: "Observed vs predicted",
-      "scenario-engine": "What-if scenarios",
-      "risk-profiles": "Subgroup comparisons",
+      predictions: "Observed vs predicted class",
       visualization: "Interaction plots",
       residuals: "Deviance & Pearson",
       influence: "Cook's & leverage"
@@ -739,8 +775,7 @@
       technical: "fa-flask",
       "roc-thresholds": "fa-chart-line",
       calibration: "fa-bullseye",
-      "scenario-engine": "fa-sliders",
-      "risk-profiles": "fa-user-group",
+      predictions: "fa-table-list",
       visualization: "fa-chart-area",
       residuals: "fa-wave-square",
       influence: "fa-crosshairs"
@@ -808,6 +843,8 @@
     var _perfCache = { optimalThreshold: 0.5, brier: NaN, calQuality: "Moderate", meanAbsCalErr: NaN };
     var _rocChartInst = null;
     var _calChartInst = null;
+    var _probRiskChartInst = null;
+    var _probHistChartInst = null;
 
     function hcThemeText() {
       return document.documentElement.getAttribute("data-theme") === "light" ? "#1f2937" : "#e2e8f0";
@@ -1320,6 +1357,7 @@
       if (tab === "descriptives" && !descriptiveLoaded) loadDescriptiveTab();
       if (tab === "power") refreshLogisticPowerAnalysis();
       if (tab === "predictive-performance") renderPredictivePerformance();
+      if (tab === "probabilities") renderProbabilities();
       if (typeof StatisticoHeader !== "undefined") {
         var labels = {
           "model-results": "Model Results",
@@ -1399,14 +1437,111 @@
         ? predRows.slice(0, 60).map((r) => "<tr><td>" + esc(r.Observed) + "</td><td>" + esc(r.Probability) + "</td><td>" + esc(r.PredictedClass) + "</td></tr>").join("")
         : "<tr><td colspan='3' class='empty'>No predictions</td></tr>";
     }
-    function renderProbabilityBands() {
+    function riskBandStats(pairs) {
+      var bands = {
+        low: { label: "Low", n: 0, events: 0 },
+        mid: { label: "Medium", n: 0, events: 0 },
+        high: { label: "High", n: 0, events: 0 }
+      };
+      pairs.forEach(function (d) {
+        var key = d.p < 0.33 ? "low" : (d.p < 0.66 ? "mid" : "high");
+        bands[key].n++;
+        if (d.y === 1) bands[key].events++;
+      });
+      return bands;
+    }
+    function renderProbabilities() {
       var pairs = predictionPairs();
-      if (!pairs.length) { document.getElementById("probBands").innerHTML = "<div class='empty'>Awaiting prediction rows...</div>"; return; }
-      var counts = { low: 0, mid: 0, high: 0 };
-      pairs.forEach((d) => { if (d.p < 0.33) counts.low++; else if (d.p < 0.66) counts.mid++; else counts.high++; });
+      var takeawayEl = document.getElementById("probKeyTakeaway");
+      var summaryEl = document.getElementById("probRiskSummary");
+      var segEl = document.getElementById("probSegBody");
+      if (!pairs.length) {
+        if (takeawayEl) takeawayEl.textContent = "Awaiting prediction rows...";
+        if (summaryEl) summaryEl.innerHTML = "";
+        if (segEl) segEl.innerHTML = "<tr><td colspan='3' class='empty'>No predictions</td></tr>";
+        return;
+      }
+      var bands = riskBandStats(pairs);
       var total = pairs.length;
-      document.getElementById("probBands").innerHTML = "Low risk: <b>" + counts.low + " (" + pct(counts.low / total) + ")</b><br>Medium risk: <b>" + counts.mid + " (" + pct(counts.mid / total) + ")</b><br>High risk: <b>" + counts.high + " (" + pct(counts.high / total) + ")</b>";
-      document.getElementById("riskProfiles").innerHTML = "High-risk share: <b>" + pct(counts.high / total) + "</b><br>Non-low risk: <b>" + pct((counts.mid + counts.high) / total) + "</b>";
+      var counts = { low: bands.low.n, mid: bands.mid.n, high: bands.high.n };
+      var dominant = "low";
+      if (counts.mid >= counts.low && counts.mid >= counts.high) dominant = "mid";
+      if (counts.high >= counts.low && counts.high >= counts.mid) dominant = "high";
+      var domPct = (counts[dominant] / total * 100).toFixed(0);
+      var domLabel = bands[dominant].label.toLowerCase() + "-risk";
+      if (takeawayEl) {
+        takeawayEl.textContent = domPct + "% of subjects fall into the " + domLabel + " category" +
+          (dominant === "high" ? " — review calibration and threshold before operational use." : ".");
+      }
+      if (summaryEl) {
+        summaryEl.innerHTML =
+          "<span>Low: <strong>" + counts.low + "</strong> (" + pct(counts.low / total) + ")</span>" +
+          "<span>Medium: <strong>" + counts.mid + "</strong> (" + pct(counts.mid / total) + ")</span>" +
+          "<span>High: <strong>" + counts.high + "</strong> (" + pct(counts.high / total) + ")</span>";
+      }
+      if (segEl) {
+        segEl.innerHTML = ["low", "mid", "high"].map(function (k) {
+          var b = bands[k];
+          var rate = b.n ? pct(b.events / b.n) : "—";
+          return "<tr><td>" + esc(b.label) + "</td><td>" + b.n + "</td><td>" + rate + "</td></tr>";
+        }).join("");
+      }
+
+      var riskEl = document.getElementById("probRiskChart");
+      var histEl = document.getElementById("probHistChart");
+      if (typeof Highcharts === "undefined") return;
+      var axisColor = hcThemeText();
+      if (riskEl) {
+        if (_probRiskChartInst) { try { _probRiskChartInst.destroy(); } catch (_e) {} }
+        _probRiskChartInst = Highcharts.chart(riskEl, Object.assign(hcChartOpts("bar"), {
+          chart: { type: "bar", backgroundColor: "transparent", animation: false, height: 160 },
+          xAxis: { categories: ["Subjects"], labels: { style: { color: axisColor, fontWeight: "600" } }, lineColor: "rgba(148,163,184,.4)" },
+          yAxis: {
+            min: 0,
+            title: { text: "Count", style: { color: axisColor, fontSize: "12px", fontWeight: "700" } },
+            labels: { style: { color: axisColor, fontSize: "11px", fontWeight: "600" } },
+            gridLineColor: "rgba(148,163,184,.22)"
+          },
+          plotOptions: { series: { stacking: "normal", animation: false } },
+          series: [
+            { name: "Low risk", data: [counts.low], color: "#22c55e" },
+            { name: "Medium risk", data: [counts.mid], color: "#eab308" },
+            { name: "High risk", data: [counts.high], color: "#ef4444" }
+          ]
+        }));
+      }
+      if (histEl) {
+        var bins = 10;
+        var hist = new Array(bins).fill(0);
+        pairs.forEach(function (d) {
+          var idx = Math.min(bins - 1, Math.floor(Math.max(0, Math.min(0.999, d.p)) * bins));
+          hist[idx]++;
+        });
+        var cats = [];
+        for (var i = 0; i < bins; i++) {
+          cats.push((i / bins).toFixed(1) + "–" + ((i + 1) / bins).toFixed(1));
+        }
+        if (_probHistChartInst) { try { _probHistChartInst.destroy(); } catch (_e2) {} }
+        _probHistChartInst = Highcharts.chart(histEl, Object.assign(hcChartOpts("column"), {
+          chart: { type: "column", backgroundColor: "transparent", animation: false, height: 200 },
+          xAxis: {
+            categories: cats,
+            title: { text: "Predicted probability", style: { color: axisColor, fontSize: "12px", fontWeight: "700" } },
+            labels: { style: { color: axisColor, fontSize: "10px", fontWeight: "600" }, rotation: -45 }
+          },
+          yAxis: {
+            min: 0,
+            allowDecimals: false,
+            title: { text: "Count", style: { color: axisColor, fontSize: "12px", fontWeight: "700" } },
+            labels: { style: { color: axisColor, fontSize: "11px", fontWeight: "600" } },
+            gridLineColor: "rgba(148,163,184,.22)"
+          },
+          series: [{ name: "Subjects", data: hist, color: "#5aa7ff" }]
+        }));
+      }
+    }
+    function renderProbabilityBands() {
+      renderProbabilities();
     }
     function renderThresholdMetrics(threshold) {
       var pairs = predictionPairs();

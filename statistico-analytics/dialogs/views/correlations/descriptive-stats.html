@@ -366,39 +366,67 @@
     }
     html.embed-mode.embed-regression .chart-container { min-height: 0; height: 100% !important; }
 
-    /* Logistic embed: table-first, no split histogram stealing vertical space */
+    /* Logistic embed: compact table on top, histogram below (regression-style split) */
     html.embed-mode.embed-logistic .wrap {
       display: flex !important;
       flex-direction: column !important;
       height: 100% !important;
       min-height: 0 !important;
       padding: 4px 6px !important;
-      gap: 0 !important;
+      gap: 6px !important;
+      overflow: hidden !important;
     }
     html.embed-mode.embed-logistic #stats-card {
-      flex: 1 1 auto !important;
-      min-height: 220px !important;
-      max-height: none !important;
+      flex: 0 0 auto !important;
+      min-height: 0 !important;
+      max-height: 42% !important;
     }
     html.embed-mode.embed-logistic #stats-card .card-head {
       padding: 6px 12px;
       font-size: 12px;
     }
     html.embed-mode.embed-logistic #stats-card .card-body {
-      flex: 1 1 auto;
+      flex: 0 1 auto;
       min-height: 0;
       overflow: hidden;
     }
     html.embed-mode.embed-logistic #stats-card .table-wrap {
-      flex: 1 1 auto;
-      min-height: 180px;
-      overflow: auto;
+      flex: 0 0 auto;
+      min-height: 0;
+      max-height: 170px;
+      overflow-y: auto;
     }
     html.embed-mode.embed-logistic #stats-table thead th {
       position: static;
     }
     html.embed-mode.embed-logistic #histogram-panel {
-      display: none !important;
+      flex: 1 1 0 !important;
+      min-height: 220px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      overflow: hidden;
+    }
+    html.embed-mode.embed-logistic #histogram-panel .card-body {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+    html.embed-mode.embed-logistic .flex-container {
+      min-height: 0;
+      height: 100%;
+    }
+    html.embed-mode.embed-logistic .chart-wrapper {
+      flex: 1.35;
+      min-height: 0;
+    }
+    html.embed-mode.embed-logistic .chart-container {
+      min-height: 180px !important;
+      height: 100% !important;
+    }
+    html.embed-mode.embed-logistic .summary-container {
+      flex: 0 0 150px;
+      min-height: 0;
+      overflow-y: auto;
     }
   </style>
   <style>
@@ -823,6 +851,9 @@
           applyTheme(event.data.theme);
         } else if (event.data && event.data.type === 'EMBED_RESIZE') {
           scheduleStatsTableReflow();
+          if (selectedRow && typeof renderHistogram === 'function') {
+            requestAnimationFrame(function () { renderHistogram(); });
+          }
         }
       });
       
@@ -1005,12 +1036,12 @@
       }
 
       if (document.documentElement.classList.contains('embed-mixed') ||
-          document.documentElement.classList.contains('embed-regression')) {
+          document.documentElement.classList.contains('embed-regression') ||
+          document.documentElement.classList.contains('embed-logistic')) {
         const wrap = document.getElementById('descriptivesWrap');
         const panel = document.getElementById('histogram-panel');
-        const isLogisticEmbed = document.documentElement.classList.contains('embed-logistic');
-        if (wrap && !isLogisticEmbed) wrap.classList.add('histogram-visible');
-        if (panel && !isLogisticEmbed) {
+        if (wrap) wrap.classList.add('histogram-visible');
+        if (panel) {
           panel.style.display = 'flex';
           panel.classList.add('active');
         }
@@ -1153,8 +1184,12 @@
       const wrap = document.querySelector('#stats-card .table-wrap');
       if (!table || !tbody || !wrap) return;
       const rowCount = tbody.querySelectorAll('tr').length;
-      const targetH = Math.max(180, 52 + Math.max(rowCount, 1) * 46);
+      const isLogisticEmbed = document.documentElement.classList.contains('embed-logistic');
+      const targetH = isLogisticEmbed
+        ? Math.min(170, 52 + Math.max(rowCount, 1) * 46)
+        : Math.max(180, 52 + Math.max(rowCount, 1) * 46);
       wrap.style.minHeight = targetH + 'px';
+      if (isLogisticEmbed) wrap.style.height = '';
       table.style.display = 'none';
       void table.offsetHeight;
       table.style.display = '';
@@ -1166,6 +1201,9 @@
         row.style.height = '44px';
       });
       window.dispatchEvent(new Event('resize'));
+      if (isLogisticEmbed && selectedRow && typeof renderHistogram === 'function') {
+        requestAnimationFrame(function () { renderHistogram(); });
+      }
     }
 
     function scheduleStatsTableReflow() {

@@ -9,13 +9,11 @@
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <link rel="stylesheet" href="../shared-header.css?v=20260610a" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260609j" />
-  <link rel="stylesheet" href="../shared-power-template.css?v=20260610a" />
+  <link rel="stylesheet" href="../shared-logistic-power.css?v=20260611a" />
   <script src="../shared-brand-logo.js?v=20260601gauss"></script>
   <script src="../shared-header.js?v=20260610a"></script>
   <script src="../shared-workspace-tabs.js?v=20260609j"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
-  <script src="../shared-power-calc.js?v=20260610a"></script>
-  <script src="../shared-power-template.js?v=20260610a"></script>
+  <script src="../shared-logistic-power.js?v=20260611a"></script>
 
   <style>
     :root{
@@ -816,7 +814,7 @@
       box-sizing: border-box;
       min-height: 0;
     }
-    .tab-panel[data-view="power"] #sharedPowerTemplateMount { min-height: 0; }
+    .tab-panel[data-view="power"] #logisticPowerMount { min-height: 0; }
 
     @media (max-width:1200px){
       .grid.kpi{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
@@ -1194,7 +1192,7 @@
               </div>
             </section>
             <section class="tab-panel" data-view="power">
-              <div id="sharedPowerTemplateMount"></div>
+              <div id="logisticPowerMount"></div>
             </section>
             </div>
           </div>
@@ -1830,7 +1828,7 @@
       if (first) switchSub(tab, first);
       if (tab === "correlations" && !correlationsLoaded) loadCorrelationsTab();
       if (tab === "descriptives" && !descriptiveLoaded) loadDescriptiveTab();
-      if (tab === "power") refreshLogisticPowerAnalysis();
+      if (tab === "power") initLogisticPowerCloud(true);
       if (tab === "predictive-performance") renderPredictivePerformance();
       if (tab === "probabilities") renderProbabilities();
       updateEmbedTabHeader(tab);
@@ -2549,241 +2547,62 @@
           initLogisticScenarioEngine();
         }
       }
-      if (logisticPowerReady) refreshLogisticPowerAnalysis();
+      if (logisticPowerReady && currentPrimary === "power") initLogisticPowerCloud(true);
     }
 
-    // ===== LOGISTIC POWER & SAMPLE SIZE (Cursor100 UX) =====
+    // ===== LOGISTIC POWER — Python cloud (JS UI only) =====
     var logisticPowerReady = false;
 
-    function powSetText(id, text) {
-      var el = document.getElementById(id);
-      if (el) el.textContent = text;
-    }
-
-    function getLogisticPowerContext() {
-      var PC = window.StatisticoPowerCalc;
-      if (!PC) return null;
+    function buildLogisticPowerPrefill() {
       var r = state.results || {};
-      var nObs = parseInt(r.observations, 10);
-      var withIntercept = r.includeIntercept !== false;
-      var p = parseInt(r.predictors, 10);
-      if (!isFinite(p) || p < 1) {
-        p = (state.coefficients || []).filter(function (c) {
+      var nTotal = parseInt(firstDefined(r, ["observations", "n", "sampleSize"], 0), 10);
+      var nEvents = parseInt(firstDefined(r, ["events", "eventCount"], NaN), 10);
+      if (!isFinite(nEvents) && isFinite(nTotal)) {
+        var prev = n(firstDefined(r, ["eventRate", "prevalence"], NaN));
+        if (isFinite(prev)) nEvents = Math.round(nTotal * prev);
+      }
+      if (!isFinite(nEvents) && isFinite(nTotal)) {
+        var evt = n(firstDefined(r, ["events"], NaN));
+        if (isFinite(evt)) nEvents = Math.round(evt);
+      }
+      var nPred = parseInt(firstDefined(r, ["predictors", "predictorsCount"], NaN), 10);
+      if (!isFinite(nPred) || nPred < 1) {
+        nPred = (state.coefficients || []).filter(function (c) {
           return String(c.Variable || "").toLowerCase() !== "intercept";
         }).length;
       }
-      var r2 = n(firstDefined(r, ["nagelkerkeR2", "nagelkerke"], NaN));
-      return PC.buildContext(nObs, p, r2, 0.05, withIntercept);
-    }
-
-    function updateLogisticPowerOutputParams(params) {
-      var ids = ["powOutLambda", "powOutCritF", "powOutDf1", "powOutDf2", "powOutN", "powOutPower", "powOutPillaiV"];
-      if (!params) {
-        ids.forEach(function (id) { powSetText(id, "—"); });
-        return;
-      }
-      powSetText("powOutLambda", isFinite(params.lambda) ? params.lambda.toFixed(3) : "—");
-      powSetText("powOutCritF", isFinite(params.critical_f) ? params.critical_f.toFixed(4) : "—");
-      powSetText("powOutDf1", isFinite(params.df1) ? String(params.df1) : "—");
-      powSetText("powOutDf2", isFinite(params.df2) ? String(params.df2) : "—");
-      powSetText("powOutN", isFinite(params.n) ? String(Math.round(params.n)) : "—");
-      powSetText("powOutPower", isFinite(params.actual_power) ? (params.actual_power * 100).toFixed(1) + "%" : "—");
-      powSetText("powOutPillaiV", "—");
-    }
-
-    function updateLogisticPowerStatus(message, type) {
-      var statusEl = document.getElementById("powStatusMessage");
-      if (!statusEl) return;
-      statusEl.textContent = message;
-      statusEl.className = "pwstd-band";
-      if (type === "success") statusEl.classList.add("pwstd-band--success");
-      else if (type === "warning") statusEl.classList.add("pwstd-band--warning");
-      else if (type === "error") statusEl.classList.add("pwstd-band--error");
-    }
-
-    function updateLogisticR2Compare(ctx, detectableR2, targetPower) {
-      var block = document.getElementById("pwstd-r2-compare");
-      if (!block) return;
-      if (!ctx) {
-        block.hidden = true;
-        return;
-      }
-      var obsEl = document.getElementById("pwstd-r2-observed");
-      var detEl = document.getElementById("pwstd-r2-detectable");
-      var insightEl = document.getElementById("pwstd-r2-insight");
-      var interpretEl = document.getElementById("pwstd-det-interpret");
-      if (obsEl) obsEl.textContent = ctx.r2.toFixed(3);
-      if (detEl) detEl.textContent = isFinite(detectableR2) ? detectableR2.toFixed(3) : "—";
-      block.hidden = !isFinite(detectableR2);
-      var tp = isFinite(targetPower) ? targetPower : 0.80;
-      if (interpretEl && isFinite(detectableR2)) {
-        var pct = (detectableR2 * 100).toFixed(1);
-        interpretEl.textContent = "With N=" + ctx.n + ", the study can reliably detect (at " + Math.round(tp * 100) + "% power) effects explaining at least " + pct + "% of outcome variance (Nagelkerke R²).";
-      }
-      if (insightEl && isFinite(detectableR2)) {
-        if (ctx.r2 > detectableR2 + 0.001) {
-          insightEl.textContent = "Observed Nagelkerke R² exceeds the detectable threshold — sufficient power to detect this effect.";
-        } else if (Math.abs(ctx.r2 - detectableR2) <= 0.001) {
-          insightEl.textContent = "Observed Nagelkerke R² is near the detectable threshold — power is borderline for this effect size.";
-        } else {
-          insightEl.textContent = "Observed Nagelkerke R² is below the detectable threshold — this effect may be too small to detect reliably at this sample size.";
-        }
-      }
-    }
-
-    function calculateLogisticPower() {
-      var PC = window.StatisticoPowerCalc;
-      var ctx = getLogisticPowerContext();
-      if (!PC || !ctx) {
-        ["powObserved", "powEffectSize", "powSampleSize", "powPartialEta", "powRequired", "powReq80", "powReq85", "powReq90", "powReq95"].forEach(function (id) { powSetText(id, "—"); });
-        updateLogisticPowerOutputParams(null);
-        updateLogisticR2Compare(null);
-        updateLogisticPowerStatus("Run a logistic model to populate power results.", "info");
-        return;
-      }
-
-      var targetInput = document.getElementById("powDetectableTarget");
-      var detectTargetPower = targetInput ? (parseFloat(targetInput.value) || 0.80) : 0.80;
-      var detectableR2 = PC.detectableR2(ctx, detectTargetPower);
-      var observedPower = PC.powerAtF2(ctx.n, ctx.p, ctx.f2, ctx.alpha, ctx.withIntercept);
-      var powerPct = (observedPower * 100).toFixed(1) + "%";
-      var mag = PC.cohenMagnitude(ctx.f2);
-      var r2Label = "Nagelkerke R²";
-
-      powSetText("powObserved", powerPct);
-      powSetText("powEffectSize", ctx.f2.toFixed(4) + (mag ? " (" + mag + ")" : ""));
-      powSetText("powSampleSize", String(ctx.n));
-      powSetText("powPartialEta", ctx.r2.toFixed(4));
-      powSetText("powAlpha", ctx.alpha.toFixed(3));
-      powSetText("powRequired", PC.estimateRequiredN(ctx.f2, ctx.p, 0.85, ctx.alpha, ctx.withIntercept) || "—");
-      powSetText("powReq80", PC.estimateRequiredN(ctx.f2, ctx.p, 0.80, ctx.alpha, ctx.withIntercept) || "—");
-      powSetText("powReq85", PC.estimateRequiredN(ctx.f2, ctx.p, 0.85, ctx.alpha, ctx.withIntercept) || "—");
-      powSetText("powReq90", PC.estimateRequiredN(ctx.f2, ctx.p, 0.90, ctx.alpha, ctx.withIntercept) || "—");
-      powSetText("powReq95", PC.estimateRequiredN(ctx.f2, ctx.p, 0.95, ctx.alpha, ctx.withIntercept) || "—");
-
-      var req80 = PC.estimateRequiredN(ctx.f2, ctx.p, 0.80, ctx.alpha, ctx.withIntercept);
-      var statusMsg;
-      var statusType;
-      if (observedPower >= 0.80) {
-        statusMsg = "Adequate power (" + powerPct + ") for the observed " + r2Label + " with n=" + ctx.n + ". Effect size f²=" + ctx.f2.toFixed(3) + (mag ? " (" + mag + ")." : ".");
-        statusType = "success";
-      } else if (observedPower >= 0.70) {
-        statusMsg = "Borderline power (" + powerPct + ") with n=" + ctx.n + ". For 80% power at this " + r2Label + ", plan n≈" + (req80 || "—") + ".";
-        statusType = "warning";
-      } else {
-        statusMsg = "Low power (" + powerPct + ") with n=" + ctx.n + ". For 80% power at this " + r2Label + ", plan n≈" + (req80 || "—") + ".";
-        statusType = "error";
-      }
-      updateLogisticPowerStatus(statusMsg, statusType);
-
-      var minF2 = PC.estimateDetectableF2(ctx.n, ctx.p, detectTargetPower, ctx.alpha, ctx.withIntercept);
-      powSetText("powMinDetectableF", minF2.toFixed(4) + (PC.cohenMagnitude(minF2) ? " (" + PC.cohenMagnitude(minF2) + ")" : ""));
-      powSetText("powMinDetectableEta", detectableR2.toFixed(4));
-      updateLogisticR2Compare(ctx, detectableR2, detectTargetPower);
-      updateLogisticPowerOutputParams(PC.buildOutputParams(ctx, ctx.f2, observedPower));
-
-      if (window.StatisticoPowerTemplate && window.StatisticoPowerTemplate.syncDefaultChip) {
-        window.StatisticoPowerTemplate.syncDefaultChip();
-      }
-    }
-
-    function calculateLogisticCustomPower() {
-      var customPowerInput = document.getElementById("customPowerInput");
-      var customRequiredN = document.getElementById("customRequiredN");
-      var customPowerStatus = document.getElementById("customPowerStatus");
-      var customPowerIcon = document.getElementById("customPowerIcon");
-      var targetPower = parseFloat(customPowerInput && customPowerInput.value);
-      var PC = window.StatisticoPowerCalc;
-
-      if (isNaN(targetPower) || targetPower < 0.5 || targetPower > 0.99) {
-        if (customRequiredN) {
-          customRequiredN.textContent = "Invalid";
-          customRequiredN.style.color = "#ff6b6b";
-        }
-        return;
-      }
-      if (customPowerIcon) customPowerIcon.classList.add("fa-spin");
-      if (customPowerStatus) customPowerStatus.style.display = "block";
-      try {
-        var ctx = getLogisticPowerContext();
-        if (!ctx || !PC) throw new Error("No logistic results available.");
-        var requiredN = PC.estimateRequiredN(ctx.f2, ctx.p, targetPower, ctx.alpha, ctx.withIntercept);
-        if (!requiredN) throw new Error("Could not estimate required N.");
-        if (customRequiredN) {
-          customRequiredN.textContent = requiredN;
-          customRequiredN.style.color = "#7fdb9f";
-        }
-        if (window.StatisticoPowerTemplate && window.StatisticoPowerTemplate.onCustomComplete) {
-          window.StatisticoPowerTemplate.onCustomComplete(requiredN);
-        }
-      } catch (_err) {
-        if (customRequiredN) {
-          customRequiredN.textContent = "Error";
-          customRequiredN.style.color = "#ff6b6b";
-        }
-      } finally {
-        if (customPowerIcon) customPowerIcon.classList.remove("fa-spin");
-        if (customPowerStatus) customPowerStatus.style.display = "none";
-      }
-    }
-
-    function calculateLogisticDetectableEffect() {
-      var PC = window.StatisticoPowerCalc;
-      var ctx = getLogisticPowerContext();
-      var targetInput = document.getElementById("powDetectableTarget");
-      var targetPower = targetInput ? (parseFloat(targetInput.value) || 0.80) : 0.80;
-
-      if (isNaN(targetPower) || targetPower < 0.5 || targetPower > 0.99) {
-        powSetText("powMinDetectableF", "Invalid");
-        powSetText("powMinDetectableEta", "—");
-        return;
-      }
-      if (!ctx || !PC) {
-        powSetText("powMinDetectableF", "—");
-        powSetText("powMinDetectableEta", "—");
-        updateLogisticR2Compare(null);
-        return;
-      }
-
-      var detN = document.getElementById("pwstd-det-n");
-      if (detN) detN.textContent = String(ctx.n);
-
-      var minF2 = PC.estimateDetectableF2(ctx.n, ctx.p, targetPower, ctx.alpha, ctx.withIntercept);
-      var minR2 = PC.r2FromF2(minF2);
-      var mag = PC.cohenMagnitude(minF2);
-      powSetText("powMinDetectableF", minF2.toFixed(4) + (mag ? " (" + mag + ")" : ""));
-      powSetText("powMinDetectableEta", minR2.toFixed(4));
-      updateLogisticR2Compare(ctx, minR2, targetPower);
-    }
-
-    function refreshLogisticPowerAnalysis() {
-      if (!logisticPowerReady) return;
-      calculateLogisticPower();
-    }
-
-    function initLogisticPowerTemplate() {
-      if (!window.StatisticoPowerTemplate || typeof window.StatisticoPowerTemplate.renderById !== "function") return;
-      window.StatisticoPowerTemplate.renderById("sharedPowerTemplateMount", {
-        title: "Power & Sample Size",
-        variant: "logistic",
-        customHandler: "calculateLogisticCustomPower()",
-        detectableHandler: "calculateLogisticDetectableEffect()"
+      var prevalence = (isFinite(nTotal) && nTotal > 0 && isFinite(nEvents)) ? nEvents / nTotal : NaN;
+      var coefs = (state.coefficients || []).filter(function (c) {
+        return String(c.Variable || "").toLowerCase() !== "intercept";
       });
-      window.StatisticoPowerTemplate._computeDetectable = calculateLogisticDetectableEffect;
-      window.StatisticoPowerTemplate._customComputeFn = calculateLogisticCustomPower;
-      window.StatisticoPowerTemplate._recalcFn = refreshLogisticPowerAnalysis;
-      var detTarget = document.getElementById("powDetectableTarget");
-      if (detTarget && !detTarget.dataset.logPowBound) {
-        detTarget.dataset.logPowBound = "1";
-        detTarget.addEventListener("input", refreshLogisticPowerAnalysis);
-        detTarget.addEventListener("change", refreshLogisticPowerAnalysis);
-      }
-      logisticPowerReady = true;
-      refreshLogisticPowerAnalysis();
+      var ors = coefs.map(function (c) { return n(c.OR); }).filter(isFinite);
+      var topOr = ors.length ? ors.reduce(function (best, v) {
+        var dBest = Math.abs(Math.log(best));
+        var dV = Math.abs(Math.log(v));
+        return dV > dBest ? v : best;
+      }, ors[0]) : 1.5;
+      return {
+        n_total: isFinite(nTotal) ? nTotal : 0,
+        n_events: isFinite(nEvents) ? nEvents : 0,
+        n_predictors: Math.max(1, nPred || 1),
+        prevalence: isFinite(prevalence) ? prevalence : 0.3,
+        top_odds_ratio: isFinite(topOr) ? topOr : 1.5,
+        odds_ratios: ors.length ? ors.slice(0, 10) : [1.5],
+        alpha: 0.05
+      };
     }
 
-    window.calculateLogisticCustomPower = calculateLogisticCustomPower;
-    window.calculateLogisticDetectableEffect = calculateLogisticDetectableEffect;
+    function initLogisticPowerCloud(refreshPrefill) {
+      if (typeof window.StatisticoLogisticPower === "undefined") return;
+      window._logisticPowerPrefillFn = buildLogisticPowerPrefill;
+      if (!logisticPowerReady) {
+        window.StatisticoLogisticPower.mount("logisticPowerMount", buildLogisticPowerPrefill());
+        logisticPowerReady = true;
+      } else if (refreshPrefill) {
+        window.StatisticoLogisticPower.applyPrefill(buildLogisticPowerPrefill());
+      }
+    }
+
     function applyMessage(message) {
       if (!message || !message.type) return;
       if (message.type === "LOGISTIC_BUNDLE" && message.payload) {
@@ -3023,7 +2842,7 @@
         StatisticoHeader.initSidebarPage();
         StatisticoHeader.updateTitle("Model Results");
       }
-      initLogisticPowerTemplate();
+      initLogisticPowerCloud(false);
       initHighchartsDefaults();
       switchTab("model-results");
       var thr = document.getElementById("thr");

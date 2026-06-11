@@ -5790,7 +5790,7 @@ const StatisticoHeader = {
       'logistic-probabilities': 'Inspect predicted probabilities and risk patterns across observations and scenarios.',
       'logistic-interactions': 'Examine interaction effects on event probability for combined predictor conditions.',
       'logistic-diagnostics': 'Use residual and influence diagnostics to check separation, leverage, and model stability.',
-      'logistic-power': 'Plan sample size and assess power for the omnibus logistic model using Nagelkerke R² and Cohen f².',
+      'logistic-power': 'Plan sample size with EPV rules, single-predictor Hsieh power (Python/scipy), or multivariable Monte Carlo simulation.',
       'logistic-correlations': 'Inspect quick correlation-style screening indicators before deeper model interpretation.',
       'factor-suitability': 'Check KMO, Bartlett, determinant, and correlation adequacy before trusting factor extraction.',
       'factor-extraction': 'Review eigenvalues, variance explained, communalities, and extraction choice.',

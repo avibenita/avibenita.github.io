@@ -28,6 +28,9 @@
           if (p.get('parent') === 'regression' || p.get('parent') === 'logistic') {
             document.documentElement.classList.add('embed-regression');
           }
+          if (p.get('parent') === 'logistic') {
+            document.documentElement.classList.add('embed-logistic');
+          }
         }
       } catch (e) {}
     })();
@@ -143,6 +146,31 @@
     html.embed-mode .right-col { width: 100% !important; max-width: 100% !important; flex: 1 1 auto !important; }
     html.embed-mode body { overflow: hidden !important; }
     html.embed-mode #mainContent { flex: 1; min-height: 0; height: 100%; }
+
+    html.embed-mode.embed-regression html,
+    html.embed-mode.embed-regression body,
+    html.embed-mode.embed-regression .right-col,
+    html.embed-mode.embed-regression #mainContent,
+    html.embed-mode.embed-regression .tab-panels-wrap {
+      height: 100% !important;
+      min-height: 0 !important;
+      overflow: hidden !important;
+    }
+    html.embed-mode.embed-regression #tab-matrix .tab-inner {
+      flex: 1 1 auto !important;
+      min-height: 0 !important;
+      height: 100% !important;
+      overflow: hidden !important;
+    }
+    html.embed-mode.embed-regression #resultsContainer,
+    html.embed-mode.embed-regression #pairsContainer,
+    html.embed-mode.embed-regression #heatmapContainer {
+      flex: 1 1 0 !important;
+      min-height: 180px !important;
+    }
+    html.embed-mode.embed-regression .table-container {
+      min-height: 160px !important;
+    }
 
     /* ── Header action buttons in navrow ── */
     .navrow-actions {
@@ -1510,6 +1538,14 @@
     // finishes first; we then re-init with our own onApply, mirroring univariate.
     setTimeout(installCorrelationRowFilter, 250);
     setTimeout(installCorrelationRowFilter, 800);
+    if (isEmbedMode) {
+      [0, 120, 400, 900].forEach(function (ms) {
+        setTimeout(function () {
+          window.dispatchEvent(new Event('resize'));
+          if (typeof scatterState !== 'undefined' && scatterState.chart) scatterState.chart.reflow();
+        }, ms);
+      });
+    }
     return true;
   }
 
@@ -1739,6 +1775,9 @@
         receiveCorrelationData(incomingMsg, 'postMessage');
       } else if (event.data && event.data.type === 'THEME_CHANGE') {
         applyTheme(event.data.theme);
+      } else if (event.data && event.data.type === 'EMBED_RESIZE') {
+        window.dispatchEvent(new Event('resize'));
+        if (correlationData && typeof renderMatrix === 'function') renderMatrix();
       }
     });
 

@@ -27,6 +27,9 @@
           if (p.get('parent') === 'regression' || p.get('parent') === 'logistic') {
             document.documentElement.classList.add('embed-regression');
           }
+          if (p.get('parent') === 'logistic') {
+            document.documentElement.classList.add('embed-logistic');
+          }
         }
       } catch (e) {}
     })();
@@ -362,6 +365,41 @@
       overflow-y: auto;
     }
     html.embed-mode.embed-regression .chart-container { min-height: 0; height: 100% !important; }
+
+    /* Logistic embed: table-first, no split histogram stealing vertical space */
+    html.embed-mode.embed-logistic .wrap {
+      display: flex !important;
+      flex-direction: column !important;
+      height: 100% !important;
+      min-height: 0 !important;
+      padding: 4px 6px !important;
+      gap: 0 !important;
+    }
+    html.embed-mode.embed-logistic #stats-card {
+      flex: 1 1 auto !important;
+      min-height: 220px !important;
+      max-height: none !important;
+    }
+    html.embed-mode.embed-logistic #stats-card .card-head {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+    html.embed-mode.embed-logistic #stats-card .card-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+    }
+    html.embed-mode.embed-logistic #stats-card .table-wrap {
+      flex: 1 1 auto;
+      min-height: 180px;
+      overflow: auto;
+    }
+    html.embed-mode.embed-logistic #stats-table thead th {
+      position: static;
+    }
+    html.embed-mode.embed-logistic #histogram-panel {
+      display: none !important;
+    }
   </style>
   <style>
     html,body{height:100%!important;overflow:hidden!important;}
@@ -783,6 +821,8 @@
         } else if (event.data && event.data.type === 'THEME_CHANGE') {
           console.log('🎨 Theme change received:', event.data.theme);
           applyTheme(event.data.theme);
+        } else if (event.data && event.data.type === 'EMBED_RESIZE') {
+          scheduleStatsTableReflow();
         }
       });
       
@@ -968,12 +1008,14 @@
           document.documentElement.classList.contains('embed-regression')) {
         const wrap = document.getElementById('descriptivesWrap');
         const panel = document.getElementById('histogram-panel');
-        if (wrap) wrap.classList.add('histogram-visible');
-        if (panel) {
+        const isLogisticEmbed = document.documentElement.classList.contains('embed-logistic');
+        if (wrap && !isLogisticEmbed) wrap.classList.add('histogram-visible');
+        if (panel && !isLogisticEmbed) {
           panel.style.display = 'flex';
           panel.classList.add('active');
         }
       }
+      scheduleStatsTableReflow();
     }
 
     function sendMessageToParent(payload) {
@@ -1105,6 +1147,33 @@
       renderTable();
     }
 
+    function forceStatsTableReflow() {
+      const table = document.getElementById('stats-table');
+      const tbody = document.getElementById('stats-body');
+      const wrap = document.querySelector('#stats-card .table-wrap');
+      if (!table || !tbody || !wrap) return;
+      const rowCount = tbody.querySelectorAll('tr').length;
+      const targetH = Math.max(180, 52 + Math.max(rowCount, 1) * 46);
+      wrap.style.minHeight = targetH + 'px';
+      table.style.display = 'none';
+      void table.offsetHeight;
+      table.style.display = '';
+      tbody.style.display = 'none';
+      void tbody.offsetHeight;
+      tbody.style.display = '';
+      tbody.querySelectorAll('tr').forEach(function (row) {
+        row.style.display = 'table-row';
+        row.style.height = '44px';
+      });
+      window.dispatchEvent(new Event('resize'));
+    }
+
+    function scheduleStatsTableReflow() {
+      [0, 80, 250, 600, 1200].forEach(function (ms) {
+        setTimeout(forceStatsTableReflow, ms);
+      });
+    }
+
     function renderTable() {
       const sortedData = getSortedData();
       const tbody = document.getElementById('stats-body');
@@ -1155,34 +1224,7 @@
       });
       
       // Force table reflow to fix rendering issue (especially in iframe context)
-      // This addresses the bug where table content doesn't show until zoom/resize
-      setTimeout(() => {
-        const table = document.getElementById('stats-table');
-        const tbody = document.getElementById('stats-body');
-        
-        if (table && tbody) {
-          // Multiple reflow techniques to ensure visibility
-          
-          // Technique 1: Force display recalculation
-          table.style.display = 'none';
-          table.offsetHeight; // Trigger reflow
-          table.style.display = '';
-          
-          // Technique 2: Force tbody to recalculate
-          tbody.style.display = 'none';
-          tbody.offsetHeight; // Trigger reflow
-          tbody.style.display = '';
-          
-          // Technique 3: Force all rows to be visible
-          const rows = tbody.querySelectorAll('tr');
-          rows.forEach(row => {
-            row.style.height = '44px';
-            row.style.display = 'table-row';
-          });
-          
-          console.log(`✅ Table reflow forced (${rows.length} rows rendered)`);
-        }
-      }, 100);
+      scheduleStatsTableReflow();
     }
 
     // Handle row click - select row and show histogram (used for auto-selection)
@@ -1804,8 +1846,11 @@
         document.documentElement.classList.add('embed-mode');
         if (embedParent === 'mixed') {
           document.documentElement.classList.add('embed-mixed');
-        } else if (embedParent === 'regression' || embedParent === 'logistic') {
+        } else         if (embedParent === 'regression' || embedParent === 'logistic') {
           document.documentElement.classList.add('embed-regression');
+        }
+        if (embedParent === 'logistic') {
+          document.documentElement.classList.add('embed-logistic');
         }
       }
       if (!isEmbed && typeof StatisticoHeader !== 'undefined') {

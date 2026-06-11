@@ -118,10 +118,28 @@
       border-left: none;
       border-right: none;
     }
+    .tab-panel[data-view="descriptives"] > .panel:first-child .panel-h {
+      padding: 8px 14px;
+      font-size: 11px;
+    }
+    .tab-panel[data-view="descriptives"] > .panel:first-child .panel-b {
+      padding: 6px 14px 8px;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+    #corrEmbedPanel,
+    #descEmbedPanel {
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      background: transparent;
+    }
     #corrEmbedPanel iframe,
     #descEmbedPanel iframe {
       flex: 1;
-      min-height: 360px;
+      min-height: 0;
+      height: calc(100vh - 210px);
+      min-height: 420px;
       width: 100%;
       border: none;
       background: transparent;
@@ -134,6 +152,7 @@
       --ws-tab-slant: 16px;
       display:flex;
       flex-direction:column;
+      flex:1;
       min-height:0;
       width:100%;
       max-width:none;
@@ -1170,7 +1189,7 @@
             </section>
             <section class="tab-panel" data-view="descriptives">
               <div class="panel"><div class="panel-h">Descriptives</div><div class="panel-b tiny" id="descSummary"></div></div>
-              <div class="panel" id="descEmbedPanel" style="margin-top:12px;">
+              <div class="panel" id="descEmbedPanel">
                 <div class="panel-b tiny">Loading descriptive statistics...</div>
               </div>
             </section>
@@ -2806,13 +2825,18 @@
     }
     function _sendDataToIframe(iframe, filteredHeaders, filteredData, address, delayMs) {
       var doSend = () => {
+        if (!iframe || !iframe.contentWindow) return;
         iframe.contentWindow.postMessage({
           type: "CORRELATION_DATA",
           payload: { headers: filteredHeaders, data: filteredData, address: address || "", source: "logistic-model" }
         }, "*");
+        iframe.contentWindow.postMessage({ type: "EMBED_RESIZE" }, "*");
         var currentTheme = document.documentElement.getAttribute("data-theme") || "dark";
         setTimeout(() => {
-          iframe.contentWindow.postMessage({ type: "THEME_CHANGE", theme: currentTheme }, "*");
+          if (iframe.contentWindow) {
+            iframe.contentWindow.postMessage({ type: "THEME_CHANGE", theme: currentTheme }, "*");
+            iframe.contentWindow.postMessage({ type: "EMBED_RESIZE" }, "*");
+          }
         }, 100);
       };
       if (delayMs > 0) setTimeout(doSend, delayMs);

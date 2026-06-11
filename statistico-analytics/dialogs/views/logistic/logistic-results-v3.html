@@ -76,12 +76,56 @@
     .card-body{
       flex:1;
       min-height:0;
-      overflow:auto;
+      overflow:hidden;
       padding:0;
+      display:flex;
+      flex-direction:column;
     }
 
-    .tab-panel { display:none; }
-    .tab-panel.active { display:block; }
+    .ws-chrome--attached { margin: 0; padding: 0; border-bottom: none; background: transparent; }
+    .ws-chrome--compact { padding-top: 0; }
+    .ws-body {
+      padding: 6px 16px 18px;
+      background: var(--ws-fill);
+      min-height: 0;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .ws-body:has(.tab-panel[data-view="correlations"].active),
+    .ws-body:has(.tab-panel[data-view="descriptives"].active) {
+      padding: 0;
+    }
+    .tab-panel[data-view="correlations"],
+    .tab-panel[data-view="descriptives"] {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      padding: 0;
+      flex-direction: column;
+    }
+    .tab-panel[data-view="correlations"] #corrEmbedPanel,
+    .tab-panel[data-view="descriptives"] #descEmbedPanel {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .tab-panel[data-view="descriptives"] > .panel:first-child {
+      flex-shrink: 0;
+      margin: 0;
+      border-radius: 0;
+      border-left: none;
+      border-right: none;
+    }
+    #corrEmbedPanel iframe,
+    #descEmbedPanel iframe {
+      flex: 1;
+      min-height: 360px;
+      width: 100%;
+      border: none;
+      background: transparent;
+    }
 
     .ws-shell {
       --ws-bd: rgba(148,163,184,.45);
@@ -111,10 +155,12 @@
     }
     .ws-chrome--attached { margin: 0; padding: 0; border-bottom: none; background: transparent; }
     .ws-chrome--compact { padding-top: 0; }
-    .ws-body {
-      padding: 6px 16px 18px;
-      background: var(--ws-fill);
-      min-height: 0;
+
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+    .tab-panel[data-view="correlations"].active,
+    .tab-panel[data-view="descriptives"].active {
+      display: flex;
     }
 
     .grid { display:grid; gap:12px; }
@@ -1182,6 +1228,7 @@
     let currentPrimary = "model-results";
     let correlationsLoaded = false;
     let descriptiveLoaded = false;
+    var _embedTabPayload = { corr: null, desc: null };
 
     function sendToHost(cmd, data) {
       try {
@@ -1724,6 +1771,16 @@
       if (parent === "predictive-performance" && sub === "roc-thresholds") renderPredictivePerformance();
       if (parent === "predictive-performance" && sub === "calibration") renderPredictivePerformance();
       if (parent === "probabilities" && sub === "scenario-engine") initLogisticScenarioEngine();
+      updateEmbedTabHeader(parent);
+    }
+    function updateEmbedTabHeader(tab) {
+      if (typeof StatisticoHeader === "undefined") return;
+      if (tab !== "correlations" && tab !== "descriptives") return;
+      var ctx = state.dataContext;
+      if (!ctx || !Array.isArray(ctx.headers) || !Array.isArray(ctx.rows)) return;
+      var parts = _modelVariableIndices(ctx.headers, ctx.modelSpec || {});
+      var usedCount = ctx.rows.filter(function (row) { return _isUsedRow(row, parts.indices); }).length;
+      StatisticoHeader.updateVariable(parts.filteredHeaders.length + " Variables", usedCount || ctx.rows.length);
     }
     function mountSubtabs(tab) {
       var host = document.getElementById("subtabs");
@@ -1757,6 +1814,7 @@
       if (tab === "power") refreshLogisticPowerAnalysis();
       if (tab === "predictive-performance") renderPredictivePerformance();
       if (tab === "probabilities") renderProbabilities();
+      updateEmbedTabHeader(tab);
       if (typeof StatisticoHeader !== "undefined") {
         var labels = {
           "model-results": "Model Results",
@@ -2723,6 +2781,7 @@
       else if (message.type === "LOGISTIC_DESCRIPTIVES") state.descriptives = message.payload || {};
       else if (message.type === "LOGISTIC_DATA_CONTEXT") state.dataContext = message.payload || null;
       renderAll();
+      refreshEmbedTabsIfNeeded();
     }
 
     function _dialogsBaseUrl() {
@@ -2765,11 +2824,41 @@
       var y = spec.y;
       var xn = Array.isArray(spec.xn) ? spec.xn : [];
       var xc = Array.isArray(spec.xc) ? spec.xc : [];
-      var names = [y].concat(xn).concat(xc).filter(Boolean);
-      var uniq = [];
-      names.forEach((name) => { if (uniq.indexOf(name) === -1) uniq.push(name); });
-      var idx = uniq.map((v) => headers.indexOf(v)).filter((i) => i !== -1);
-      return { indices: idx, filteredHeaders: idx.map((i) => headers[i]) };
+      var names = [];
+      if (y) names.push(y);
+      xn.forEach(function (n) { if (n && names.indexOf(n) < 0) names.push(n); });
+      xc.forEach(function (n) { if (n && names.indexOf(n) < 0) names.push(n); });
+      (state.coefficients || []).forEach(function (c) {
+        var v = String(c.Variable || "");
+        if (!v || v.toLowerCase() === "intercept") return;
+        var base = v.indexOf("_") > 0 ? v.substring(0, v.indexOf("_")) : v;
+        if (headers.indexOf(base) >= 0 && names.indexOf(base) < 0) names.push(base);
+        else if (headers.indexOf(v) >= 0 && names.indexOf(v) < 0) names.push(v);
+      });
+      if (!names.length && headers.length) {
+        headers.forEach(function (h) { if (h && names.indexOf(h) < 0) names.push(h); });
+      }
+      var idx = names.map(function (v) { return headers.indexOf(v); }).filter(function (i) { return i !== -1; });
+      return { indices: idx, filteredHeaders: idx.map(function (i) { return headers[i]; }) };
+    }
+
+    function _rememberEmbedPayload(kind, iframe, filteredHeaders, filteredData, address) {
+      _embedTabPayload[kind] = {
+        iframe: iframe,
+        headers: filteredHeaders,
+        data: filteredData,
+        address: address || ""
+      };
+    }
+    function _flushEmbedPayload(kind, delayMs) {
+      var payload = _embedTabPayload[kind];
+      if (!payload || !payload.iframe || !payload.iframe.contentWindow) return;
+      _sendDataToIframe(payload.iframe, payload.headers, payload.data, payload.address, delayMs || 0);
+    }
+    function _scheduleEmbedPayload(kind) {
+      [0, 200, 600, 1200, 2400].forEach(function (ms) {
+        setTimeout(function () { _flushEmbedPayload(kind, 0); }, ms);
+      });
     }
 
     function loadCorrelationsTab() {
@@ -2806,10 +2895,13 @@
         "<iframe id='corrIframe' style='width:100%;flex:1;min-height:0;border:none;background:transparent;' src='" + iframeUrl + "'></iframe>";
 
       var iframe = document.getElementById("corrIframe");
-      iframe.onload = function() {
+      function pushCorrData() {
         var data = _buildIframeData(rows, parts.filteredHeaders, parts.indices, usedOnly);
-        _sendDataToIframe(iframe, parts.filteredHeaders, data, address, 200);
-      };
+        _rememberEmbedPayload("corr", iframe, parts.filteredHeaders, data, address);
+        _scheduleEmbedPayload("corr");
+      }
+      iframe.onload = pushCorrData;
+      pushCorrData();
 
       function applyFilter(useUsedOnly) {
         usedOnly = useUsedOnly;
@@ -2818,11 +2910,13 @@
         var shownCount = usedOnly ? usedCount : totalCount;
         document.getElementById("corrObsInfo").innerHTML = "Showing <strong>" + shownCount + "</strong> " + (usedOnly ? "used obs" : "all rows") + " of " + totalCount + " total";
         var data = _buildIframeData(rows, parts.filteredHeaders, parts.indices, usedOnly);
-        if (iframe.contentWindow) _sendDataToIframe(iframe, parts.filteredHeaders, data, address, 0);
+        _rememberEmbedPayload("corr", iframe, parts.filteredHeaders, data, address);
+        _flushEmbedPayload("corr", 0);
       }
       document.getElementById("corrBtnUsed").onclick = function() { applyFilter(true); };
       document.getElementById("corrBtnAll").onclick = function() { applyFilter(false); };
       correlationsLoaded = true;
+      updateEmbedTabHeader("correlations");
     }
 
     function loadDescriptiveTab() {
@@ -2859,10 +2953,13 @@
         "<iframe id='descIframe' style='width:100%;flex:1;min-height:0;border:none;background:transparent;' src='" + iframeUrl + "'></iframe>";
 
       var iframe = document.getElementById("descIframe");
-      iframe.onload = function() {
+      function pushDescData() {
         var data = _buildIframeData(rows, parts.filteredHeaders, parts.indices, usedOnly);
-        _sendDataToIframe(iframe, parts.filteredHeaders, data, address, 200);
-      };
+        _rememberEmbedPayload("desc", iframe, parts.filteredHeaders, data, address);
+        _scheduleEmbedPayload("desc");
+      }
+      iframe.onload = pushDescData;
+      pushDescData();
 
       function applyFilter(useUsedOnly) {
         usedOnly = useUsedOnly;
@@ -2871,11 +2968,24 @@
         var shownCount = usedOnly ? usedCount : totalCount;
         document.getElementById("descObsInfo").innerHTML = "Showing <strong>" + shownCount + "</strong> " + (usedOnly ? "used obs" : "all rows") + " of " + totalCount + " total";
         var data = _buildIframeData(rows, parts.filteredHeaders, parts.indices, usedOnly);
-        if (iframe.contentWindow) _sendDataToIframe(iframe, parts.filteredHeaders, data, address, 0);
+        _rememberEmbedPayload("desc", iframe, parts.filteredHeaders, data, address);
+        _flushEmbedPayload("desc", 0);
       }
       document.getElementById("descBtnUsed").onclick = function() { applyFilter(true); };
       document.getElementById("descBtnAll").onclick = function() { applyFilter(false); };
       descriptiveLoaded = true;
+      updateEmbedTabHeader("descriptives");
+    }
+
+    function refreshEmbedTabsIfNeeded() {
+      if (!state.dataContext || !Array.isArray(state.dataContext.headers)) return;
+      if (currentPrimary === "correlations") {
+        correlationsLoaded = false;
+        loadCorrelationsTab();
+      } else if (currentPrimary === "descriptives") {
+        descriptiveLoaded = false;
+        loadDescriptiveTab();
+      }
     }
 
     document.addEventListener("DOMContentLoaded", function () {
@@ -2925,6 +3035,13 @@
           } catch (_e) {}
         });
       }
+      window.addEventListener("message", function (event) {
+        if (!event.data) return;
+        if (event.data.type === "CORRELATION_READY" || (event.data.action === "ready" && event.data.type === "CORRELATION_READY")) {
+          _flushEmbedPayload("corr", 0);
+          _flushEmbedPayload("desc", 0);
+        }
+      });
     });
 
     window.switchTab = switchTab;

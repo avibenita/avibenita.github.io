@@ -5,7 +5,7 @@
 (function (global) {
   "use strict";
 
-  var DEFAULT_URL = "https://logistic-power-625149856249.us-central1.run.app";
+  var DEFAULT_URL = "https://logistic-power-359524197306.us-central1.run.app";
   var _currentMode = "epv";
   var _busy = false;
   var _prefill = null;

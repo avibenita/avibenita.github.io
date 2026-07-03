@@ -18,7 +18,7 @@
   <!-- Shared Components -->
   <link rel="stylesheet" href="../shared-header.css?v=20260602tabsw">  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
-  <script src="../shared-header.js?v=20260609boxtabs2"></script>
+  <script src="../shared-header.js?v=20260609boxtabs3"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -280,34 +280,37 @@
     function fitLayout() {
       const frame   = document.querySelector('.right-col') || document.querySelector('.laptop-frame') || document.body;
       const shell   = document.querySelector('.statistico-shell');
+      const tabStack = document.getElementById('uniResultsViewTabs');
       const headerH = shell ? shell.offsetHeight : 52;
-      const availH  = (frame.clientHeight || window.innerHeight) - headerH;
+      const tabStackH = tabStack ? tabStack.offsetHeight : 0;
+      const availH  = (frame.clientHeight || window.innerHeight) - headerH - tabStackH;
 
       const container = document.querySelector('.responsive-container');
       const frameW = frame.clientWidth || window.innerWidth;
       if (container) {
         container.style.height = availH + 'px';
-        container.style.width  = frameW + 'px';  // explicit: bypasses flex-cache width issue
+        container.style.width  = frameW + 'px';
         container.style.maxWidth = '100%';
         container.style.boxSizing = 'border-box';
       }
 
       const activeBoxplotPanel = document.querySelector('.boxplot-panel.is-active');
-      const padding = 6 + 6;
+      const containerPad = 12;
       const footer = document.getElementById('boxplot-footer');
       const footerH = (footer && footer.style.display !== 'none') ? footer.offsetHeight + 8 : 0;
+      const contentH = Math.max(220, availH - containerPad - footerH);
 
       if (activeBoxplotPanel && activeBoxplotPanel.id === 'boxplotPanel-main') {
         const panels = activeBoxplotPanel.querySelectorAll('.chart-panel');
         if (panels.length) {
           const gaps = 4 * (panels.length - 1);
-          const panelH = Math.floor((availH - padding - gaps - footerH) / panels.length);
+          const panelH = Math.floor((contentH - gaps) / panels.length);
           panels.forEach((p) => { p.style.height = Math.max(160, panelH) + 'px'; });
         }
       } else if (activeBoxplotPanel && activeBoxplotPanel.id === 'boxplotPanel-outliers') {
-        const frame = document.getElementById('outliersEmbedFrame');
-        if (frame) {
-          frame.style.height = Math.max(220, availH - padding - footerH) + 'px';
+        const embedFrame = document.getElementById('outliersEmbedFrame');
+        if (embedFrame) {
+          embedFrame.style.height = contentH + 'px';
         }
       }
 
@@ -519,6 +522,7 @@
         setTimeout(fitLayout, 150);
         if (typeof StatisticoHeader !== 'undefined') {
           try { StatisticoHeader._renderUnivariateResultsTabs(); } catch (_e) {}
+          setTimeout(fitLayout, 200);
         }
         
       } catch (error) {

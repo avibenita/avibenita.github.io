@@ -95,6 +95,7 @@
   function ensureTooltipNode() {
     let node = document.getElementById(TOOLTIP_ID);
     if (node) return node;
+    if (!document.body) return null;
     node = document.createElement('div');
     node.id = TOOLTIP_ID;
     node.className = 'st-tooltip';
@@ -268,6 +269,10 @@
   }
 
   function init() {
+    if (!document.body) {
+      document.addEventListener('DOMContentLoaded', init, { once: true });
+      return;
+    }
     ensureStyle();
     ensureTooltipNode();
     prepareLegacyElements(document);

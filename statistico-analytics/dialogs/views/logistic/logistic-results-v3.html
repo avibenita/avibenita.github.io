@@ -478,6 +478,44 @@
     .cm-cell--fp { background: rgba(239,68,68,.16); font-weight: 700; }
     .cm-cell--fn { background: rgba(239,68,68,.24); font-weight: 800; }
     .cm-row-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); text-align: right !important; }
+    .cm-interpret {
+      margin-top: 14px;
+      padding: 10px 12px 10px 14px;
+      border-left: 3px solid rgba(120, 200, 255, 0.35);
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 0 8px 8px 0;
+      max-width: 520px;
+    }
+    .cm-interpret-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+    .cm-interpret-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .cm-interpret-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-secondary);
+    }
+    .cm-interpret-item i {
+      flex-shrink: 0;
+      margin-top: 2px;
+      font-size: 11px;
+    }
+    .cm-interpret-item--success i { color: #86efac; }
+    .cm-interpret-item--warning i { color: #fde68a; }
+    .cm-interpret-item--info i { color: var(--text-muted); }
     .perf-secondary {
       display: flex;
       align-items: center;
@@ -1467,11 +1505,85 @@
       }
       return bestT;
     }
+    function buildConfusionMatrixInterpretation(counts) {
+      var tp = counts.tp || 0, fp = counts.fp || 0, tn = counts.tn || 0, fn = counts.fn || 0;
+      var actualPos = tp + fn;
+      var actualNeg = fp + tn;
+      var sens = actualPos > 0 ? tp / actualPos : NaN;
+      var spec = actualNeg > 0 ? tn / actualNeg : NaN;
+      var bullets = [];
+
+      if (actualPos > 0) {
+        var sensPct = Math.round(sens * 100);
+        if (fn === 0) {
+          bullets.push({
+            type: "success",
+            text: "The model detected " + sensPct + "% of the positive cases (" + tp + "/" + actualPos + ")."
+          });
+        } else if (sens >= 0.75) {
+          bullets.push({
+            type: "success",
+            text: "The model detected " + sensPct + "% of the positive cases (" + tp + "/" + actualPos + ")."
+          });
+        } else {
+          bullets.push({
+            type: "warning",
+            text: "The model missed " + fn + " of " + actualPos + " positive cases (" + sensPct + "% sensitivity)."
+          });
+        }
+      }
+
+      if (actualNeg > 0) {
+        if (fp === 0) {
+          bullets.push({
+            type: "success",
+            text: "No negative cases were incorrectly labeled as positive."
+          });
+        } else if (fp === actualNeg) {
+          bullets.push({
+            type: "warning",
+            text: "It incorrectly labeled all " + actualNeg + " negative cases as positive."
+          });
+        } else {
+          bullets.push({
+            type: "warning",
+            text: "It incorrectly labeled " + fp + " of " + actualNeg + " negative cases as positive."
+          });
+        }
+      }
+
+      if (isFinite(sens) && isFinite(spec)) {
+        var summary;
+        if (sens >= 0.85 && spec < 0.5) {
+          summary = "Overall, the model favors high sensitivity over high specificity, making it suitable when missing positives is more serious than generating false alarms.";
+        } else if (spec >= 0.85 && sens < 0.5) {
+          summary = "Overall, the model favors high specificity over high sensitivity, making it suitable when false alarms are more costly than missed positives.";
+        } else if (sens >= 0.75 && spec >= 0.75) {
+          summary = "Overall, the model balances sensitivity and specificity reasonably well at this cutoff.";
+        } else if (sens < 0.5 && spec < 0.5) {
+          summary = "Overall, both sensitivity and specificity are weak at this cutoff — consider threshold tuning or model improvement.";
+        } else {
+          summary = "Overall, sensitivity is " + Math.round(sens * 100) + "% and specificity is " + Math.round(spec * 100) + "% — review whether this trade-off fits your use case.";
+        }
+        bullets.push({ type: "info", text: summary });
+      }
+
+      return bullets;
+    }
+    function renderConfusionMatrixInterpretationHtml(bullets) {
+      if (!bullets.length) return "";
+      var icons = { success: "fa-circle-check", warning: "fa-triangle-exclamation", info: "fa-circle-info" };
+      var items = bullets.map(function (b) {
+        return "<li class='cm-interpret-item cm-interpret-item--" + b.type + "'><i class='fa-solid " + icons[b.type] + "' aria-hidden='true'></i><span>" + esc(b.text) + "</span></li>";
+      }).join("");
+      return "<div class='cm-interpret'><div class='cm-interpret-title'>Interpretation</div><ul class='cm-interpret-list'>" + items + "</ul></div>";
+    }
     function renderConfusionMatrixHtml(counts) {
       return "<table class='cm-matrix'><thead><tr><th class='cm-corner'></th><th>Actual +</th><th>Actual −</th></tr></thead><tbody>" +
         "<tr><td class='cm-row-label'>Predicted +</td><td class='cm-cell--tp'>" + counts.tp + "</td><td class='cm-cell--fp'>" + counts.fp + "</td></tr>" +
         "<tr><td class='cm-row-label'>Predicted −</td><td class='cm-cell--fn'>" + counts.fn + "</td><td class='cm-cell--tn'>" + counts.tn + "</td></tr>" +
-        "</tbody></table>";
+        "</tbody></table>" +
+        renderConfusionMatrixInterpretationHtml(buildConfusionMatrixInterpretation(counts));
     }
     function buildExplicitPerfInterpretation(sens, spec, aucInfo) {
       if (!isFinite(sens) || !isFinite(spec)) return "Awaiting classification metrics at the default threshold.";

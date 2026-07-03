@@ -7134,7 +7134,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
     return {
       histogram: `Controls available: (1) Binning Method dropdown (Manual / Sturges / Scott / Freedman-Diaconis) — changes how bars are grouped; (2) Bin Count slider (1–50, only active in Manual mode) — drag to increase/decrease bar count; (3) Show Normal Curve checkbox — toggles a theoretical normal overlay on the histogram; (4) Left/Right Truncation sliders — trim extreme observations by percentile to focus on the core distribution.`,
 
-      boxplot: `The box plot renders automatically from the data. The left chart includes all data points (with outliers marked as dots beyond the whiskers); the right chart shows the same distribution with outliers excluded, so the core spread is more visible. No manual sliders — navigate to other views using the sidebar.`,
+      boxplot: `The box plot renders automatically from the data. It shows quartiles, whiskers, and the full data range with min/max labels. Outlier detection is available separately under Advanced Diagnostics. No manual sliders — navigate to other views using the sidebar.`,
 
       cdf: `Controls available: (1) Distribution overlay dropdown (None / Normal / Log-Normal / Exponential / Uniform) — adds a theoretical CDF curve for visual comparison; (2) Toggle Distribution button — shows or hides the theoretical overlay; (3) Value slider (noUiSlider) — drag the marker along the x-axis to read F(x), the cumulative probability at any point; (4) Quartile shortcut cards (Q1, Median, Q3, P95) — click to jump the slider to those key positions.`,
 

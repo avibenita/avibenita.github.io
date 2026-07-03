@@ -372,6 +372,7 @@
       align-items: stretch;
       gap: 0;
       min-height: 0;
+      flex-wrap: wrap;
     }
     .traffic-item {
       flex: 1 1 0;
@@ -918,7 +919,88 @@
     }
     .tab-panel[data-view="power"] #logisticPowerMount { min-height: 0; }
 
-    @media (max-width:1200px){
+    .exec-questions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .exec-q-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+      gap: 10px;
+      align-items: baseline;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .exec-q { color: var(--text-muted); font-weight: 600; }
+    .exec-a { color: var(--text-primary); font-weight: 700; text-align: right; }
+    .exec-a--good { color: #86efac; }
+    .exec-a--moderate { color: #fde68a; }
+    .exec-a--weak { color: #fca5a5; }
+    .metric-auc-band {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .auc-band-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border: 1px solid transparent;
+    }
+    .auc-band-pill--excellent { color: #86efac; border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.12); }
+    .auc-band-pill--good { color: #93c5fd; border-color: rgba(59,130,246,.35); background: rgba(59,130,246,.12); }
+    .auc-band-pill--fair { color: #fde68a; border-color: rgba(234,179,8,.35); background: rgba(234,179,8,.12); }
+    .auc-band-pill--poor { color: #fca5a5; border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.12); }
+    .epv-band-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      margin-left: 6px;
+    }
+    .epv-band-pill--good { color: #86efac; background: rgba(34,197,94,.12); }
+    .epv-band-pill--moderate { color: #fde68a; background: rgba(234,179,8,.12); }
+    .epv-band-pill--weak { color: #fca5a5; background: rgba(239,68,68,.12); }
+    .key-drivers-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .key-driver-block {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface-0);
+    }
+    .key-driver-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .key-driver-value {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1.35;
+    }
+    .key-driver-value--muted { color: var(--text-secondary); font-weight: 600; }
+    @media (max-width: 900px) {
+      .key-drivers-grid { grid-template-columns: 1fr; }
+      .exec-q-row { grid-template-columns: 1fr; }
+      .exec-a { text-align: left; }
+    }
       .grid.kpi{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
       .grid.two{ grid-template-columns:1fr; }
       .grid.three{ grid-template-columns:1fr; }
@@ -972,7 +1054,7 @@
 
                 <div class="exec-section">
                   <div class="exec-section-label">Model Performance</div>
-                  <div class="grid two">
+                  <div class="grid three">
                     <div class="panel">
                       <div class="panel-h">Model Quality</div>
                       <div class="panel-b">
@@ -989,6 +1071,14 @@
                         </table>
                       </div>
                     </div>
+                    <div class="panel">
+                      <div class="panel-h">Classification Summary</div>
+                      <div class="panel-b">
+                        <table class="metric-table">
+                          <tbody id="classificationSummaryBody"></tbody>
+                        </table>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -996,7 +1086,7 @@
                   <div class="exec-section-label">Data Characteristics</div>
                   <div class="grid two">
                     <div class="panel">
-                      <div class="panel-h">Event Balance</div>
+                      <div class="panel-h">Outcome Distribution</div>
                       <div class="panel-b tiny" id="eventBalance">Awaiting event prevalence...</div>
                     </div>
                     <div class="panel">
@@ -1011,7 +1101,7 @@
                   <div class="panel">
                     <div class="panel-b">
                       <div class="sig-summary" id="sigPredictorsSummary">Awaiting predictors...</div>
-                      <ul class="key-drivers-list" id="keyDriversList"></ul>
+                      <div id="keyDriversList"></div>
                     </div>
                   </div>
                 </div>
@@ -1394,12 +1484,65 @@
       return isFinite(x) ? (x * 100).toFixed(1) + "%" : "-";
     }
     function aucBand(auc) {
-      if (!isFinite(auc)) return { label: "Not available", detail: "AUC unavailable for interpretation." };
-      if (auc >= 0.9) return { label: "Excellent", detail: "Discrimination is excellent and clinically strong." };
-      if (auc >= 0.8) return { label: "Good", detail: "Discrimination is good for decision support." };
-      if (auc >= 0.7) return { label: "Fair", detail: "Discrimination is fair but not robust." };
-      if (auc >= 0.6) return { label: "Weak", detail: "Discrimination is weak and near limited utility." };
-      return { label: "Very weak", detail: "Discrimination is only slightly better than random guessing." };
+      if (!isFinite(auc)) return { label: "Not available", detail: "AUC unavailable for interpretation.", cls: "poor" };
+      if (auc >= 0.9) return { label: "Excellent", detail: "Discrimination is excellent.", cls: "excellent" };
+      if (auc >= 0.8) return { label: "Very Good", detail: "Discrimination is very good for decision support.", cls: "good" };
+      if (auc >= 0.7) return { label: "Good", detail: "Discrimination is good but should be validated.", cls: "good" };
+      if (auc >= 0.6) return { label: "Fair", detail: "Discrimination is fair but not robust.", cls: "fair" };
+      if (auc >= 0.5) return { label: "Poor", detail: "Discrimination is poor and near limited utility.", cls: "poor" };
+      return { label: "Very Poor", detail: "Discrimination is only slightly better than random guessing.", cls: "poor" };
+    }
+    function formatAucCell(auc) {
+      if (!isFinite(auc)) return "—";
+      var band = aucBand(auc);
+      return "<span class='metric-auc-band'><span>" + toFixedOrDash(auc, 2) + "</span><span class='auc-band-pill auc-band-pill--" + band.cls + "'>" + esc(band.label) + "</span></span>";
+    }
+    function quickBrier(pairs) {
+      if (!pairs || !pairs.length) return NaN;
+      var s = 0;
+      pairs.forEach(function (d) { s += Math.pow(d.p - d.y, 2); });
+      return s / pairs.length;
+    }
+    function overviewClassification(r, pairs, obsCount) {
+      var counts = pairs.length ? confusionCounts(pairs, 0.5) : {
+        tp: n(r.tp) || 0, fp: n(r.fp) || 0, tn: n(r.tn) || 0, fn: n(r.fn) || 0
+      };
+      var total = pairs.length || obsCount || (counts.tp + counts.fp + counts.tn + counts.fn);
+      var m = metricsFromCounts(counts, total);
+      var npv = (counts.tn + counts.fn) > 0 ? counts.tn / (counts.tn + counts.fn) : NaN;
+      var balancedAcc = (isFinite(m.sensitivity) && isFinite(m.specificity))
+        ? (m.sensitivity + m.specificity) / 2 : NaN;
+      return { counts: counts, metrics: m, npv: npv, balancedAcc: balancedAcc, threshold: 0.5 };
+    }
+    function assessEpv(events, numPred) {
+      var epv = isFinite(events) ? events / Math.max(1, numPred || 1) : NaN;
+      if (!isFinite(epv)) return { value: NaN, level: "weak", label: "Unknown" };
+      if (epv >= 15) return { value: epv, level: "good", label: "Adequate" };
+      if (epv >= 10) return { value: epv, level: "moderate", label: "Borderline" };
+      if (epv >= 5) return { value: epv, level: "moderate", label: "Borderline" };
+      return { value: epv, level: "weak", label: "Insufficient" };
+    }
+    function formatEpvCell(epvAssess) {
+      if (!isFinite(epvAssess.value)) return "—";
+      var cls = epvAssess.level === "good" ? "good" : (epvAssess.level === "moderate" ? "moderate" : "weak");
+      return epvAssess.value.toFixed(1) + " <span class='epv-band-pill epv-band-pill--" + cls + "'>" + esc(epvAssess.label) + "</span>";
+    }
+    function assessPredictionUsefulness(auc, sens, spec) {
+      if (!isFinite(auc)) return { level: "weak", label: "Unknown" };
+      if (auc >= 0.75 && isFinite(sens) && sens >= 0.7 && isFinite(spec) && spec >= 0.6) {
+        return { level: "good", label: "Good" };
+      }
+      if (auc < 0.6 || (isFinite(spec) && spec < 0.25) || (isFinite(sens) && sens > 0.95 && isFinite(spec) && spec < 0.15)) {
+        return { level: "weak", label: "Limited" };
+      }
+      return { level: "moderate", label: "Moderate" };
+    }
+    function assessCalibration(brier) {
+      if (!isFinite(brier)) return { level: "moderate", label: "Unknown" };
+      var q = brierQualityLabel(brier);
+      if (q.label === "Excellent" || q.label === "Good") return { level: "good", label: q.label };
+      if (q.label === "Moderate") return { level: "moderate", label: q.label };
+      return { level: "weak", label: q.label };
     }
     function isStatSig(p) {
       return isFinite(p) && p <= 0.05;
@@ -1731,10 +1874,11 @@
     }
     var TRAFFIC_TIPS = {
       discrimination: "How well the model separates events from non-events, based on AUC.",
-      statistical: "Whether the omnibus model test supports a real association (overall p-value).",
+      significance: "Whether the omnibus likelihood-ratio test supports a real association (overall p-value).",
+      statistical: "Whether the omnibus likelihood-ratio test supports a real association (overall p-value).",
       sample: "Whether sample size and events-per-predictor support stable estimates.",
       balance: "How evenly events and non-events are represented in the data.",
-      calibration: "How closely predicted probabilities match observed event rates.",
+      calibration: "How closely predicted probabilities match observed event rates (Brier score).",
       threshold: "Whether the default cutoff is close to an optimal balance of sensitivity and specificity."
     };
     function infoTip(tip) {
@@ -1754,10 +1898,10 @@
     }
     function assessDiscrimination(auc) {
       if (!isFinite(auc)) return { level: "weak", label: "Unknown" };
-      if (auc >= 0.8) return { level: "good", label: "Good" };
-      if (auc >= 0.7) return { level: "moderate", label: "Fair" };
-      if (auc >= 0.6) return { level: "moderate", label: "Weak" };
-      return { level: "weak", label: "Very weak" };
+      var band = aucBand(auc);
+      if (auc >= 0.7) return { level: "good", label: band.label };
+      if (auc >= 0.6) return { level: "moderate", label: band.label };
+      return { level: "weak", label: band.label };
     }
     function assessStatEvidence(p) {
       if (!isFinite(p)) return { level: "weak", label: "Unknown" };
@@ -1810,20 +1954,82 @@
       }
       return "Higher " + label + " tends to " + strength + " decrease the odds by about " + pct.toFixed(0) + "%" + evidence + ".";
     }
-    function buildConfidenceNote(n, events, numPred) {
+    function buildConfidenceNote(n, events, numPred, p, epvAssess) {
       numPred = numPred || 1;
-      var sample = assessSampleSize(n, events, numPred);
-      if (sample.level === "good") {
-        return { cls: "confidence-note--ok", text: "Sample size is adequate for stable estimation." };
+      epvAssess = epvAssess || assessEpv(events, numPred);
+      var level = "moderate";
+      if (isFinite(n) && n >= 100 && epvAssess.level === "good") level = "good";
+      else if ((!isFinite(n) || n < 50) || epvAssess.level === "weak" || (isFinite(epvAssess.value) && epvAssess.value < 5)) level = "weak";
+
+      var confWord = level === "good" ? "High" : (level === "moderate" ? "Moderate" : "Low");
+      var parts = [confWord + " confidence."];
+      if (isFinite(n)) {
+        parts.push("The model contains only " + Math.round(n) + " observation" + (n === 1 ? "" : "s"));
       }
-      if (sample.level === "moderate") {
-        return { cls: "", text: "Only " + (isFinite(n) ? n : "—") + " observations were available. Some estimates may be unstable — interpret cautiously." };
+      if (isFinite(epvAssess.value)) {
+        parts.push("and approximately " + epvAssess.value.toFixed(1) + " events per predictor");
       }
-      return { cls: "confidence-note--caution", text: "Only " + (isFinite(n) ? n : "—") + " observations were available. Results should be interpreted cautiously." };
+      var text = parts.join(" ") + ". Coefficients may therefore be unstable and should be validated on an independent dataset.";
+      if (!isStatSig(p)) text += " The overall model is not statistically significant.";
+      else if (isFinite(p)) text += " Overall model significance is supported (p = " + p.toFixed(3) + ").";
+
+      return {
+        cls: level === "good" ? "confidence-note--ok" : (level === "weak" ? "confidence-note--caution" : ""),
+        text: text
+      };
+    }
+    function metricRowHtml(label, valueHtml, tip) {
+      var tipHtml = tip ? infoTip(tip) : "";
+      return "<tr><td><span class=\"metric-label\">" + esc(label) + "</span>" + tipHtml + "</td><td>" + (valueHtml || "—") + "</td></tr>";
     }
     function metricRow(label, value, tip) {
-      var tipHtml = tip ? infoTip(tip) : "";
-      return "<tr><td><span class=\"metric-label\">" + esc(label) + "</span>" + tipHtml + "</td><td>" + esc(value) + "</td></tr>";
+      return metricRowHtml(label, esc(value), tip);
+    }
+    function buildKeyDriversHtml(coef) {
+      var usable = coef.map(function (c) {
+        return { name: c.Variable, or: n(c.OR), p: n(c.PValue) };
+      }).filter(function (c) { return isFinite(c.or) && c.or > 0; });
+
+      if (!usable.length) return "<div class='key-driver-value key-driver-value--muted'>Awaiting coefficients...</div>";
+
+      var increases = usable.filter(function (c) { return c.or >= 1; })
+        .sort(function (a, b) { return b.or - a.or; });
+      var decreases = usable.filter(function (c) { return c.or < 1; })
+        .sort(function (a, b) { return a.or - b.or; });
+      var byMag = usable.slice().sort(function (a, b) {
+        return Math.abs(Math.log(b.or)) - Math.abs(Math.log(a.or));
+      });
+      var sig = usable.filter(function (c) { return isStatSig(c.p); });
+
+      function driverLine(c, up) {
+        var pct = Math.round(Math.abs((c.or - 1) * 100));
+        var arrow = up ? "↑" : "↓";
+        var sign = up ? "+" : "−";
+        return arrow + " " + friendlyVarName(c.name) + " (" + sign + pct + "%)";
+      }
+
+      var topInc = increases[0];
+      var topDec = decreases[0];
+      var topInf = byMag[0];
+      var sigText = sig.length
+        ? sig.map(function (c) { return friendlyVarName(c.name); }).slice(0, 3).join(", ") + (sig.length > 3 ? "…" : "")
+        : "None";
+
+      return [
+        "<div class='key-drivers-grid'>",
+        "  <div class='key-driver-block'><div class='key-driver-label'>Largest increase in odds</div><div class='key-driver-value'>" +
+          (topInc ? esc(driverLine(topInc, true)) : "—") + "</div></div>",
+        "  <div class='key-driver-block'><div class='key-driver-label'>Largest decrease in odds</div><div class='key-driver-value'>" +
+          (topDec ? esc(driverLine(topDec, false)) : "—") + "</div></div>",
+        "  <div class='key-driver-block'><div class='key-driver-label'>Most influential predictor</div><div class='key-driver-value'>" +
+          (topInf ? esc(friendlyVarName(topInf.name)) : "—") + "</div></div>",
+        "  <div class='key-driver-block'><div class='key-driver-label'>Statistically significant predictors</div><div class='key-driver-value key-driver-value--muted'>" +
+          esc(sigText) + "</div></div>",
+        "</div>"
+      ].join("");
+    }
+    function execAnswerClass(level) {
+      return level === "good" ? "exec-a--good" : (level === "moderate" ? "exec-a--moderate" : "exec-a--weak");
     }
     function renderModelOverview() {
       var r = state.results || {};
@@ -1846,45 +2052,73 @@
       var sigCount = coef.filter(function (c) { return isStatSig(n(c.PValue)); }).length;
       var nonsigCount = Math.max(0, coef.length - sigCount);
 
+      var pairs = predictionPairs();
+      var cls = overviewClassification(r, pairs, obsCount);
+      var clsM = cls.metrics;
+      var epvAssess = assessEpv(eventCount, numPred);
+      var brier = isFinite(_perfCache.brier) ? _perfCache.brier : quickBrier(pairs);
+      if (!isFinite(brier)) brier = n(firstDefined(r, ["brier", "brierScore"], NaN));
+      var cal = assessCalibration(brier);
+      var usefulness = assessPredictionUsefulness(auc, clsM.sensitivity, clsM.specificity);
+      var sigWord = isStatSig(p) ? "Yes" : "No";
+
       var conclusionEl = document.getElementById("modelConclusion");
       if (conclusionEl) {
-        var sigWord = isStatSig(p) ? "statistically significant" : "not statistically significant";
-        conclusionEl.textContent =
-          "The model shows " + aucInfo.label.toLowerCase() + " discrimination (AUC = " + toFixedOrDash(auc, 2) +
-          ") and is " + sigWord + " (p = " + (isFinite(p) ? p.toFixed(3) : "—") + ").";
+        conclusionEl.innerHTML = [
+          "<div class='exec-questions'>",
+          "  <div class='exec-q-row'><span class='exec-q'>Does the model discriminate?</span><span class='exec-a " + execAnswerClass(disc.level) + "'>" +
+            esc(disc.label) + " (AUC=" + toFixedOrDash(auc, 2) + ")</span></div>",
+          "  <div class='exec-q-row'><span class='exec-q'>Is it statistically reliable?</span><span class='exec-a " + execAnswerClass(stat.level) + "'>" +
+            esc(sigWord) + " (p=" + (isFinite(p) ? p.toFixed(3) : "—") + ")</span></div>",
+          "  <div class='exec-q-row'><span class='exec-q'>Is it useful for prediction?</span><span class='exec-a " + execAnswerClass(usefulness.level) + "'>" +
+            esc(usefulness.label) + "</span></div>",
+          "</div>"
+        ].join("");
       }
 
       var practicalEl = document.getElementById("practicalInterpretation");
       if (practicalEl) {
-        var discPhrase = disc.level === "good" ? "high" : (disc.level === "moderate" ? "moderate" : "limited");
+        var discPhrase = disc.level === "good" ? "good" : (disc.level === "moderate" ? "fair" : "limited");
         var statPhrase = isStatSig(p)
           ? "The overall model is statistically significant, suggesting effects may generalize beyond this sample."
           : "However, the overall model is not statistically significant, suggesting that performance may not generalize beyond this sample.";
+        var calPhrase = isFinite(brier)
+          ? " Calibration is " + cal.label.toLowerCase() + " (Brier=" + brier.toFixed(3) + ")."
+          : "";
         practicalEl.textContent =
-          "The model can distinguish between positive and negative cases with " + discPhrase + " accuracy (AUC = " +
-          toFixedOrDash(auc, 2) + "). " + statPhrase;
+          "The model can distinguish between positive and negative cases with " + discPhrase +
+          " discrimination (AUC = " + toFixedOrDash(auc, 2) + ", " + aucInfo.label + "). " + statPhrase + calPhrase;
       }
 
       var trafficEl = document.getElementById("trafficRow");
       if (trafficEl) {
         trafficEl.innerHTML =
           trafficItem("Discrimination", "discrimination", disc.level, disc.label) +
-          trafficItem("Statistical Evidence", "statistical", stat.level, stat.label) +
+          trafficItem("Model Significance", "significance", stat.level, stat.label) +
+          trafficItem("Calibration", "calibration", cal.level, cal.label) +
           trafficItem("Sample Size", "sample", sample.level, sample.label) +
           trafficItem("Class Balance", "balance", balance.level, balance.label) +
           "<div class='traffic-item traffic-item--overall traffic-item--" + overall.level + "'>" +
-            "<span class='traffic-item-label'>Overall" + infoTip("Combined read of discrimination, statistical support, sample size, and class balance.") + "</span>" +
+            "<span class='traffic-item-label'>Overall" + infoTip("Combined read of discrimination, model significance, calibration, sample size, and class balance.") + "</span>" +
             "<span class='traffic-item-status'>" + esc(overall.text) + "</span>" +
           "</div>";
       }
 
       var qualityEl = document.getElementById("modelQualityBody");
       if (qualityEl) {
+        var prec = isFinite(clsM.precision) ? clsM.precision : toUnit(r.precision || r.ppv);
+        var npv = isFinite(cls.npv) ? cls.npv : toUnit(r.npv);
+        var f1 = isFinite(clsM.f1) ? clsM.f1 : toUnit(r.f1);
+        var balAcc = isFinite(cls.balancedAcc) ? cls.balancedAcc : NaN;
         qualityEl.innerHTML =
-          metricRow("AUC", toFixedOrDash(auc, 2), "Area under the ROC curve — ability to rank events above non-events.") +
-          metricRow("Accuracy", formatPctCell(r.accuracy), "Share of cases classified correctly at the default cutoff.") +
-          metricRow("Sensitivity", formatPctCell(r.sensitivity), "True positive rate — events correctly identified.") +
-          metricRow("Specificity", formatPctCell(r.specificity), "True negative rate — non-events correctly identified.");
+          metricRowHtml("AUC", formatAucCell(auc), "Area under the ROC curve — ability to rank events above non-events.") +
+          metricRow("Accuracy", isFinite(clsM.accuracy) ? formatPctCell(clsM.accuracy) : formatPctCell(r.accuracy), "Share of cases classified correctly at the default cutoff.") +
+          metricRow("Sensitivity", isFinite(clsM.sensitivity) ? formatPctCell(clsM.sensitivity) : formatPctCell(r.sensitivity), "True positive rate — events correctly identified.") +
+          metricRow("Specificity", isFinite(clsM.specificity) ? formatPctCell(clsM.specificity) : formatPctCell(r.specificity), "True negative rate — non-events correctly identified.") +
+          metricRow("Precision (PPV)", formatPctCell(prec), "Positive predictive value — share of predicted positives that are true events.") +
+          metricRow("NPV", formatPctCell(npv), "Negative predictive value — share of predicted negatives that are true non-events.") +
+          metricRow("F1-score", formatPctCell(f1), "Harmonic mean of precision and sensitivity.") +
+          metricRow("Balanced accuracy", formatPctCell(balAcc), "Average of sensitivity and specificity — useful when classes are imbalanced.");
       }
 
       var sampleEl = document.getElementById("sampleEventsBody");
@@ -1892,8 +2126,22 @@
         sampleEl.innerHTML =
           metricRow("Observations (N)", isFinite(obsCount) ? String(Math.round(obsCount)) : "—") +
           metricRow("Events", isFinite(eventCount) ? String(Math.round(eventCount)) : "—") +
+          metricRowHtml("Events per variable (EPV)", formatEpvCell(epvAssess), "Events ÷ predictors — rule-of-thumb for stable logistic estimates (aim for 10–15+).") +
           metricRow("Overall p-value", isFinite(p) ? p.toFixed(4) : "—") +
           metricRow("Predictors", isFinite(numPred) ? String(numPred) : String(coef.length || "—"));
+      }
+
+      var classEl = document.getElementById("classificationSummaryBody");
+      if (classEl) {
+        var c = cls.counts;
+        var actualPos = c.tp + c.fn;
+        var actualNeg = c.fp + c.tn;
+        classEl.innerHTML =
+          metricRow("Correct positives", actualPos > 0 ? (c.tp + " / " + actualPos) : "—", "True positives at threshold 0.50.") +
+          metricRow("Correct negatives", actualNeg > 0 ? (c.tn + " / " + actualNeg) : "—", "True negatives at threshold 0.50.") +
+          metricRow("False alarms", String(c.fp), "Negative cases incorrectly labeled positive.") +
+          metricRow("Missed positives", String(c.fn), "Positive cases incorrectly labeled negative.") +
+          metricRow("Decision threshold", cls.threshold.toFixed(2), "Probability cutoff used for these counts.");
       }
 
       var nonEventCount = isFinite(obsCount) && isFinite(eventCount) ? Math.max(0, obsCount - eventCount) : NaN;
@@ -1905,7 +2153,7 @@
           "Event prevalence: <b>" + (isFinite(prevalence) ? (prevalence * 100).toFixed(1) + "%" : "—") + "</b>";
       }
 
-      var conf = buildConfidenceNote(obsCount, eventCount, numPred);
+      var conf = buildConfidenceNote(obsCount, eventCount, numPred, p, epvAssess);
       var confEl = document.getElementById("confidenceNote");
       if (confEl) {
         confEl.textContent = conf.text;
@@ -1927,31 +2175,7 @@
 
       var driversEl = document.getElementById("keyDriversList");
       if (driversEl) {
-        var usable = coef
-          .map(function (c) {
-            return { name: c.Variable, or: n(c.OR), p: n(c.PValue) };
-          })
-          .filter(function (c) { return isFinite(c.or); });
-        if (!usable.length) {
-          driversEl.innerHTML = "<li>Awaiting coefficients...</li>";
-        } else {
-          var byMag = usable.slice().sort(function (a, b) {
-            return Math.abs(Math.log(b.or || 1)) - Math.abs(Math.log(a.or || 1));
-          });
-          var sigSorted = usable.filter(function (c) { return isStatSig(c.p); })
-            .sort(function (a, b) { return a.p - b.p; });
-          var bullets = [];
-          sigSorted.slice(0, 2).forEach(function (c) {
-            bullets.push(orPlainEnglish(c.name, c.or, c.p));
-          });
-          if (bullets.length < 3 && byMag.length) {
-            byMag.slice(0, 3).forEach(function (c) {
-              var line = orPlainEnglish(c.name, c.or, c.p);
-              if (bullets.indexOf(line) < 0) bullets.push(line);
-            });
-          }
-          driversEl.innerHTML = bullets.slice(0, 4).map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("");
-        }
+        driversEl.innerHTML = buildKeyDriversHtml(coef);
       }
     }
 

@@ -18,7 +18,7 @@
   <!-- Shared Components -->
   <link rel="stylesheet" href="../shared-header.css?v=20260602tabsw">  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
-  <script src="../shared-header.js?v=20260609boxtabs"></script>
+  <script src="../shared-header.js?v=20260609boxtabs2"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -155,6 +155,19 @@
       display: flex;
     }
 
+    #boxplotPanel-main {
+      gap: 4px;
+    }
+
+    .boxplot-embed-frame {
+      flex: 1 1 0;
+      min-height: 0;
+      width: 100%;
+      border: none;
+      border-radius: 8px;
+      background: var(--surface-1);
+    }
+
     /* Loading State */
     .awaiting-overlay {
       display: flex;
@@ -240,18 +253,19 @@
     <!-- Results Container -->
     <div class="results-container" id="results-container">
       
-      <!-- Box Plot With Outliers -->
+      <!-- Tab 1: both box plots stacked -->
       <div id="boxplotPanel-main" class="boxplot-panel is-active">
         <div class="chart-panel">
           <div class="chart-container" id="withOutliers"></div>
         </div>
-      </div>
-
-      <!-- Box Plot Without Outliers -->
-      <div id="boxplotPanel-outliers" class="boxplot-panel">
         <div class="chart-panel">
           <div class="chart-container" id="withoutOutliers"></div>
         </div>
+      </div>
+
+      <!-- Tab 2: full outliers detection module -->
+      <div id="boxplotPanel-outliers" class="boxplot-panel">
+        <iframe id="outliersEmbedFrame" class="boxplot-embed-frame" title="Outliers detection" src="about:blank"></iframe>
       </div>
       
       <!-- Footer Notice -->
@@ -278,11 +292,23 @@
         container.style.boxSizing = 'border-box';
       }
 
-      // Size only the active tab panel to full height
-      const activePanel = document.querySelector('.boxplot-panel.is-active .chart-panel');
-      if (activePanel) {
-        const padding = 6 + 6;
-        activePanel.style.height = Math.max(220, availH - padding) + 'px';
+      const activeBoxplotPanel = document.querySelector('.boxplot-panel.is-active');
+      const padding = 6 + 6;
+      const footer = document.getElementById('boxplot-footer');
+      const footerH = (footer && footer.style.display !== 'none') ? footer.offsetHeight + 8 : 0;
+
+      if (activeBoxplotPanel && activeBoxplotPanel.id === 'boxplotPanel-main') {
+        const panels = activeBoxplotPanel.querySelectorAll('.chart-panel');
+        if (panels.length) {
+          const gaps = 4 * (panels.length - 1);
+          const panelH = Math.floor((availH - padding - gaps - footerH) / panels.length);
+          panels.forEach((p) => { p.style.height = Math.max(160, panelH) + 'px'; });
+        }
+      } else if (activeBoxplotPanel && activeBoxplotPanel.id === 'boxplotPanel-outliers') {
+        const frame = document.getElementById('outliersEmbedFrame');
+        if (frame) {
+          frame.style.height = Math.max(220, availH - padding - footerH) + 'px';
+        }
       }
 
       // Reflow charts
@@ -297,12 +323,20 @@
     let currentSampleSize = 0;
     let activeBoxplotTab = 'main';
 
+    function ensureOutliersEmbed() {
+      const frame = document.getElementById('outliersEmbedFrame');
+      if (!frame || frame.dataset.loaded === '1') return;
+      frame.src = 'outliers-standalone.html?embed=1&parent=boxplot&cb=' + Date.now();
+      frame.dataset.loaded = '1';
+    }
+
     function switchBoxplotTab(tab) {
       activeBoxplotTab = tab || 'main';
       window.__boxplotActiveTab = activeBoxplotTab;
       document.querySelectorAll('.boxplot-panel').forEach((panel) => {
         panel.classList.toggle('is-active', panel.id === `boxplotPanel-${activeBoxplotTab}`);
       });
+      if (activeBoxplotTab === 'outliers') ensureOutliersEmbed();
       fitLayout();
       requestAnimationFrame(function () {
         try {

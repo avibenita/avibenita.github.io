@@ -10,6 +10,13 @@
     } else {
       window.Office = window.Office || {};
     }
+    (function () {
+      var p = new URLSearchParams(location.search);
+      if (p.get('embed') === '1') {
+        document.documentElement.classList.add('embed-mode');
+        if (p.get('parent') === 'boxplot') document.documentElement.classList.add('embed-boxplot');
+      }
+    })();
   </script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
   <script src="https://code.highcharts.com/highcharts.js"></script>
@@ -410,6 +417,17 @@
         grid-template-columns: repeat(2, 1fr);
       }
     }
+
+    html.embed-mode .sb-nav { display: none !important; }
+    html.embed-mode .sb-layout { display: block !important; }
+    html.embed-mode .right-col { width: 100% !important; max-width: 100% !important; flex: 1 1 auto !important; }
+    html.embed-mode #header-container { display: none !important; }
+    html.embed-mode #uniResultsViewTabs { display: none !important; }
+    html.embed-mode #sbUtilities,
+    html.embed-mode #sbAiSection,
+    html.embed-mode .statistico-footer,
+    html.embed-mode #sbAiFloatBtn { display: none !important; }
+    html.embed-mode .results-container { padding: 6px 8px !important; overflow-y: auto; }
   </style>
   <style>
     html,body{height:100%!important;overflow:hidden!important;}
@@ -507,9 +525,10 @@
   <script>
     // fitLayout: fill dialog width+height (boxplot pattern)
     function fitLayout() {
-      const frame   = document.querySelector('.laptop-frame') || document.body;
+      const isEmbed = document.documentElement.classList.contains('embed-mode');
+      const frame   = document.querySelector('.right-col') || document.querySelector('.laptop-frame') || document.body;
       const shell   = document.querySelector('.statistico-shell');
-      const headerH = shell ? shell.offsetHeight : 88;
+      const headerH = isEmbed ? 0 : (shell ? shell.offsetHeight : 88);
       const availH  = (frame.clientHeight || window.innerHeight) - headerH;
       const frameW  = frame.clientWidth || window.innerWidth;
 
@@ -1020,7 +1039,9 @@
       const initHeader = function() {
         if (typeof StatisticoHeader !== 'undefined') {
           StatisticoHeader.init('outliers', 'Variable', 0);
-          StatisticoHeader.initSidebarPage();
+          if (!document.documentElement.classList.contains('embed-mode')) {
+            StatisticoHeader.initSidebarPage();
+          }
           StatisticoHeader.updateTitle('Outliers');
           setTimeout(fitLayout, 150);
           console.log('? Shared header initialized');

@@ -182,6 +182,7 @@
 
     .grid { display:grid; gap:12px; }
     .grid.kpi { grid-template-columns:repeat(4, minmax(0, 1fr)); }
+    .grid.kpi.perf-kpi { grid-template-columns: repeat(6, minmax(0, 1fr)); }
     .grid.two { grid-template-columns:repeat(2, minmax(0, 1fr)); }
     .grid.three { grid-template-columns:repeat(3, minmax(0, 1fr)); }
     .panel{
@@ -207,6 +208,33 @@
     }
     .panel-b{ padding:10px; }
     .kpi-val{ font-size:22px; font-weight:800; color:var(--accent-2); line-height:1; }
+    .kpi-sublab {
+      margin-top: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-muted);
+      line-height: 1.2;
+    }
+    .kpi-sublab--fair { color: #fde68a; }
+    .kpi-sublab--good { color: #86efac; }
+    .kpi-sublab--poor { color: #fca5a5; }
+    .perf-overview-split {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+      gap: 12px;
+      margin-top: 12px;
+      align-items: start;
+    }
+    .perf-overview-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+    .perf-glance-table { width: 100%; font-size: 12px; border-collapse: collapse; }
+    .perf-glance-table td { padding: 6px 4px; border-bottom: 1px solid rgba(255,255,255,.06); vertical-align: middle; }
+    .perf-glance-table td:first-child { color: var(--text-muted); font-weight: 600; width: 42%; }
+    .perf-glance-table td:last-child { font-weight: 700; color: var(--text-primary); }
+    .perf-glance-table tr:last-child td { border-bottom: none; }
+    .perf-glance-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    .perf-glance-dot--good { background: #22c55e; }
+    .perf-glance-dot--moderate { background: #eab308; }
+    .perf-glance-dot--weak { background: #ef4444; }
     .kpi-lab{ font-size:12px; color:var(--text-muted); margin-top:6px; }
 
     table { width:100%; border-collapse:collapse; }
@@ -458,20 +486,23 @@
 
     .cm-matrix {
       width: 100%;
-      max-width: 360px;
+      max-width: 520px;
       border-collapse: collapse;
-      font-size: 12px;
+      font-size: 15px;
     }
     .cm-matrix th, .cm-matrix td {
       border: 1px solid rgba(255,255,255,.15);
-      padding: 10px 8px;
+      padding: 18px 12px;
       text-align: center;
     }
     .cm-matrix th {
       background: rgba(120,200,255,.1);
-      font-size: 10px;
+      font-size: 11px;
       text-transform: uppercase;
       letter-spacing: .04em;
+    }
+    .cm-cell--tp, .cm-cell--tn, .cm-cell--fp, .cm-cell--fn {
+      font-size: 1.35rem;
     }
     .cm-matrix .cm-corner { background: transparent; border-color: transparent; }
     .cm-cell--tp { background: rgba(34,197,94,.18); font-weight: 800; }
@@ -554,15 +585,28 @@
     .thr-effects-table { width: 100%; margin-top: 10px; font-size: 11px; }
     .thr-effects-table th, .thr-effects-table td { padding: 5px 8px; text-align: center; }
     .deploy-overall {
-      padding: 8px 12px;
+      padding: 14px 16px;
       border-top: 1px solid rgba(255,255,255,.08);
-      font-size: 12px;
+      font-size: 14px;
       font-weight: 700;
-      line-height: 1.45;
+      line-height: 1.5;
+      text-align: center;
     }
-    .deploy-overall--good { color: #86efac; }
-    .deploy-overall--moderate { color: #fde68a; }
-    .deploy-overall--weak { color: #fca5a5; }
+    .deploy-overall--good {
+      color: #86efac;
+      background: rgba(34, 197, 94, 0.1);
+      border-top-color: rgba(34, 197, 94, 0.25);
+    }
+    .deploy-overall--moderate {
+      color: #fde68a;
+      background: rgba(234, 179, 8, 0.1);
+      border-top-color: rgba(234, 179, 8, 0.25);
+    }
+    .deploy-overall--weak {
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.1);
+      border-top-color: rgba(239, 68, 68, 0.25);
+    }
     .cal-advanced {
       margin-top: 8px;
       padding-top: 8px;
@@ -1002,6 +1046,8 @@
       .exec-a { text-align: left; }
     }
       .grid.kpi{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+      .grid.kpi.perf-kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .perf-overview-split { grid-template-columns: 1fr; }
       .grid.two{ grid-template-columns:1fr; }
       .grid.three{ grid-template-columns:1fr; }
       .split-two{ grid-template-columns:1fr; }
@@ -1139,16 +1185,37 @@
                   <div class="insight-title">Performance Interpretation</div>
                   <div class="insight-body" id="perfInterpretation">Awaiting predictive metrics...</div>
                 </div>
-                <div class="grid kpi">
-                  <div class="panel"><div class="panel-b"><div class="kpi-val" id="perfAucVal">-</div><div class="kpi-lab">AUC</div></div></div>
-                  <div class="panel"><div class="panel-b"><div class="kpi-val" id="accVal">-</div><div class="kpi-lab">Accuracy</div></div></div>
+                <div class="panel" style="margin-top:12px;">
+                  <div class="panel-h">Performance at a Glance</div>
+                  <div class="panel-b" id="perfAtGlance"><div class="empty">Awaiting metrics...</div></div>
+                </div>
+                <div class="grid kpi perf-kpi" style="margin-top:12px;">
+                  <div class="panel"><div class="panel-b"><div class="kpi-val" id="perfAucVal">-</div><div class="kpi-lab">AUC</div><div class="kpi-sublab" id="perfAucBand">—</div></div></div>
                   <div class="panel"><div class="panel-b"><div class="kpi-val" id="sensVal">-</div><div class="kpi-lab">Sensitivity</div></div></div>
                   <div class="panel"><div class="panel-b"><div class="kpi-val" id="specVal">-</div><div class="kpi-lab">Specificity</div></div></div>
+                  <div class="panel"><div class="panel-b"><div class="kpi-val" id="precVal">-</div><div class="kpi-lab">Precision</div></div></div>
+                  <div class="panel"><div class="panel-b"><div class="kpi-val" id="accVal">-</div><div class="kpi-lab">Accuracy</div></div></div>
+                  <div class="panel"><div class="panel-b"><div class="kpi-val" id="f1Val">-</div><div class="kpi-lab">F1 Score</div></div></div>
                 </div>
-                <div class="perf-secondary">F1 score: <strong id="f1Val">-</strong></div>
-                <div class="panel" style="margin-top:12px;">
-                  <div class="panel-h">Confusion Matrix</div>
-                  <div class="panel-b" id="cmMatrix"><div class="empty">Awaiting classification counts...</div></div>
+                <div class="perf-overview-split">
+                  <div class="panel">
+                    <div class="panel-h">Confusion Matrix</div>
+                    <div class="panel-b" id="cmMatrix"><div class="empty">Awaiting classification counts...</div></div>
+                  </div>
+                  <div class="perf-overview-side">
+                    <div class="panel">
+                      <div class="panel-h">Classification Metrics</div>
+                      <div class="panel-b">
+                        <table class="metric-table"><tbody id="perfClassMetrics"></tbody></table>
+                      </div>
+                    </div>
+                    <div class="panel">
+                      <div class="panel-h">Threshold Summary</div>
+                      <div class="panel-b">
+                        <table class="metric-table"><tbody id="perfThresholdSummary"></tbody></table>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </section>
               <section class="subview" data-parent="predictive-performance" data-sub="roc-thresholds">
@@ -1637,6 +1704,109 @@
       var fnr = isFinite(sensitivity) ? 1 - sensitivity : NaN;
       return { sensitivity: sensitivity, specificity: specificity, precision: precision, accuracy: accuracy, f1: f1, fpr: fpr, fnr: fnr };
     }
+    function extendedMetrics(counts, total) {
+      var m = metricsFromCounts(counts, total);
+      var npv = (counts.tn + counts.fn) > 0 ? counts.tn / (counts.tn + counts.fn) : NaN;
+      var balancedAcc = (isFinite(m.sensitivity) && isFinite(m.specificity))
+        ? (m.sensitivity + m.specificity) / 2 : NaN;
+      return Object.assign({}, m, { npv: npv, balancedAcc: balancedAcc });
+    }
+    function assessStability(events, numPred) {
+      var epv = isFinite(events) ? events / Math.max(1, numPred || 1) : NaN;
+      if (!isFinite(epv)) return { level: "moderate", label: "Unknown" };
+      if (epv >= 20) return { level: "good", label: "Stable" };
+      if (epv >= 10) return { level: "moderate", label: "Borderline" };
+      return { level: "weak", label: "Unstable" };
+    }
+    function assessSensQuality(sens) {
+      if (!isFinite(sens)) return { level: "moderate", label: "Unknown" };
+      if (sens >= 0.9) return { level: "good", label: "Excellent" };
+      if (sens >= 0.7) return { level: "moderate", label: "Good" };
+      if (sens >= 0.5) return { level: "moderate", label: "Moderate" };
+      return { level: "weak", label: "Poor" };
+    }
+    function assessSpecQuality(spec) {
+      if (!isFinite(spec)) return { level: "moderate", label: "Unknown" };
+      if (spec >= 0.8) return { level: "good", label: "Excellent" };
+      if (spec >= 0.6) return { level: "moderate", label: "Good" };
+      if (spec >= 0.4) return { level: "moderate", label: "Moderate" };
+      return { level: "weak", label: "Poor" };
+    }
+    function assessFalseAlarms(counts) {
+      var actualNeg = (counts.fp || 0) + (counts.tn || 0);
+      if (actualNeg <= 0) return { level: "moderate", label: "Unknown" };
+      var rate = counts.fp / actualNeg;
+      if (rate >= 0.75) return { level: "weak", label: "High" };
+      if (rate >= 0.35) return { level: "moderate", label: "Moderate" };
+      return { level: "good", label: "Low" };
+    }
+    function describeOperatingPoint(m) {
+      if (!isFinite(m.sensitivity) || !isFinite(m.specificity)) return "—";
+      var sens = m.sensitivity >= 0.85 ? "High sensitivity" : (m.sensitivity >= 0.6 ? "Moderate sensitivity" : "Low sensitivity");
+      var spec = m.specificity >= 0.7 ? "High specificity" : (m.specificity >= 0.4 ? "Moderate specificity" : "Low specificity");
+      return sens + " · " + spec;
+    }
+    function hosmerLemeshow(pairs, groups) {
+      groups = groups || 10;
+      if (!pairs || pairs.length < groups * 2) return { chi2: NaN, df: NaN };
+      var sorted = pairs.slice().sort(function (a, b) { return a.p - b.p; });
+      var chunkSize = Math.floor(sorted.length / groups);
+      var chi2 = 0, used = 0;
+      for (var g = 0; g < groups; g++) {
+        var chunk = sorted.slice(g * chunkSize, g === groups - 1 ? sorted.length : (g + 1) * chunkSize);
+        if (!chunk.length) continue;
+        var nG = chunk.length;
+        var obs = chunk.reduce(function (s, d) { return s + d.y; }, 0);
+        var exp = chunk.reduce(function (s, d) { return s + d.p; }, 0);
+        var pBar = exp / nG;
+        if (pBar <= 0.001 || pBar >= 0.999) continue;
+        var denom = nG * pBar * (1 - pBar);
+        if (denom <= 0) continue;
+        chi2 += Math.pow(obs - exp, 2) / denom;
+        used++;
+      }
+      return { chi2: chi2, df: Math.max(1, used - 2) };
+    }
+    function renderPerfGlanceRow(label, level, text) {
+      return "<tr><td>" + esc(label) + "</td><td><span class='perf-glance-dot perf-glance-dot--" + level + "' aria-hidden='true'></span>" + esc(text) + "</td></tr>";
+    }
+    function renderPerfAtGlance(auc, m, brier, counts, deployCls) {
+      var el = document.getElementById("perfAtGlance");
+      if (!el) return;
+      var disc = assessDiscrimination(auc);
+      var cal = assessCalibration(brier);
+      var sensQ = assessSensQuality(m.sensitivity);
+      var specQ = assessSpecQuality(m.specificity);
+      var fa = assessFalseAlarms(counts);
+      var overallLabel = deployCls === "good" ? "Ready" : (deployCls === "weak" ? "Limited" : "Exploratory");
+      var overallLevel = deployCls === "good" ? "good" : (deployCls === "weak" ? "weak" : "moderate");
+      el.innerHTML = "<table class='perf-glance-table'>" +
+        renderPerfGlanceRow("Discrimination", disc.level, disc.label) +
+        renderPerfGlanceRow("Calibration", cal.level, cal.label) +
+        renderPerfGlanceRow("Sensitivity", sensQ.level, sensQ.label) +
+        renderPerfGlanceRow("Specificity", specQ.level, specQ.label) +
+        renderPerfGlanceRow("False alarms", fa.level, fa.label) +
+        renderPerfGlanceRow("Overall", overallLevel, overallLabel) +
+        "</table>";
+    }
+    function renderPerfClassMetrics(counts, m) {
+      var el = document.getElementById("perfClassMetrics");
+      if (!el) return;
+      el.innerHTML =
+        metricRow("Precision (PPV)", formatPctCell(m.precision), "Share of predicted positives that are true events.") +
+        metricRow("Negative predictive value", formatPctCell(m.npv), "Share of predicted negatives that are true non-events.") +
+        metricRow("Balanced accuracy", formatPctCell(m.balancedAcc), "Average of sensitivity and specificity — useful when classes are imbalanced.") +
+        metricRow("False positive rate", formatPctCell(m.fpr), "Share of negatives incorrectly flagged as positive.") +
+        metricRow("False negative rate", formatPctCell(m.fnr), "Share of positives missed by the model.");
+    }
+    function renderPerfThresholdSummary(defaultThr, optThr, m) {
+      var el = document.getElementById("perfThresholdSummary");
+      if (!el) return;
+      el.innerHTML =
+        metricRow("Decision threshold", defaultThr.toFixed(2), "Current probability cutoff for classifying events.") +
+        metricRow("Optimal threshold (Youden)", optThr.toFixed(2), "Threshold maximizing sensitivity + specificity − 1.") +
+        metricRow("Current operating point", describeOperatingPoint(m), "Qualitative read of the trade-off at the decision threshold.");
+    }
     function findYoudenThreshold(pairs) {
       if (!pairs.length) return 0.5;
       var bestT = 0.5, bestJ = -Infinity;
@@ -1657,37 +1827,35 @@
       var bullets = [];
 
       if (actualPos > 0) {
-        var sensPct = Math.round(sens * 100);
         if (fn === 0) {
           bullets.push({
             type: "success",
-            text: "The model detected " + sensPct + "% of the positive cases (" + tp + "/" + actualPos + ")."
+            text: "Correctly detected all positive cases (" + tp + "/" + actualPos + ")."
           });
         } else if (sens >= 0.75) {
           bullets.push({
             type: "success",
-            text: "The model detected " + sensPct + "% of the positive cases (" + tp + "/" + actualPos + ")."
+            text: "Detected " + Math.round(sens * 100) + "% of positive cases (" + tp + "/" + actualPos + ")."
           });
         } else {
           bullets.push({
             type: "warning",
-            text: "The model missed " + fn + " of " + actualPos + " positive cases (" + sensPct + "% sensitivity)."
+            text: "Missed " + fn + " of " + actualPos + " positive cases (" + Math.round(sens * 100) + "% sensitivity)."
           });
         }
       }
 
       if (actualNeg > 0) {
-        if (fp === 0) {
-          bullets.push({
-            type: "success",
-            text: "No negative cases were incorrectly labeled as positive."
-          });
-        } else if (fp === actualNeg) {
+        bullets.push({
+          type: tn === actualNeg ? "success" : "warning",
+          text: "Correctly rejected only " + tn + " of " + actualNeg + " negative cases."
+        });
+        if (fp >= actualNeg * 0.5) {
           bullets.push({
             type: "warning",
-            text: "It incorrectly labeled all " + actualNeg + " negative cases as positive."
+            text: "Nearly every negative case was classified as positive, resulting in many false alarms."
           });
-        } else {
+        } else if (fp > 0) {
           bullets.push({
             type: "warning",
             text: "It incorrectly labeled " + fp + " of " + actualNeg + " negative cases as positive."
@@ -1696,19 +1864,32 @@
       }
 
       if (isFinite(sens) && isFinite(spec)) {
-        var summary;
         if (sens >= 0.85 && spec < 0.5) {
-          summary = "Overall, the model favors high sensitivity over high specificity, making it suitable when missing positives is more serious than generating false alarms.";
+          bullets.push({
+            type: "success",
+            text: "This operating point is appropriate only when missing positives is substantially more costly than generating false positives."
+          });
         } else if (spec >= 0.85 && sens < 0.5) {
-          summary = "Overall, the model favors high specificity over high sensitivity, making it suitable when false alarms are more costly than missed positives.";
+          bullets.push({
+            type: "info",
+            text: "This operating point favors specificity — suitable when false alarms are more costly than missed positives."
+          });
         } else if (sens >= 0.75 && spec >= 0.75) {
-          summary = "Overall, the model balances sensitivity and specificity reasonably well at this cutoff.";
+          bullets.push({
+            type: "success",
+            text: "Sensitivity and specificity are reasonably balanced at this cutoff."
+          });
         } else if (sens < 0.5 && spec < 0.5) {
-          summary = "Overall, both sensitivity and specificity are weak at this cutoff — consider threshold tuning or model improvement.";
+          bullets.push({
+            type: "warning",
+            text: "Both sensitivity and specificity are weak at this cutoff — consider threshold tuning or model improvement."
+          });
         } else {
-          summary = "Overall, sensitivity is " + Math.round(sens * 100) + "% and specificity is " + Math.round(spec * 100) + "% — review whether this trade-off fits your use case.";
+          bullets.push({
+            type: "info",
+            text: "Review whether this sensitivity/specificity trade-off fits your use case before deployment."
+          });
         }
-        bullets.push({ type: "info", text: summary });
       }
 
       return bullets;
@@ -1789,22 +1970,23 @@
           "</td><td>" + (isFinite(m.specificity) ? (m.specificity * 100).toFixed(0) + "%" : "—") + "</td></tr>";
       }).join("");
     }
-    function renderDeploymentReadiness(auc, brier, meanAbsCalErr) {
+    function renderDeploymentReadiness(auc, brier, meanAbsCalErr, events, numPred) {
       var row = document.getElementById("deployRow");
       var overall = document.getElementById("deployOverall");
-      if (!row || !overall) return;
+      if (!row || !overall) return { cls: "moderate", text: "" };
       var disc = assessDiscrimination(auc);
       var calQ = brierQualityLabel(brier);
       var calLevel = calQ.label === "Excellent" || calQ.label === "Good" ? "good" : (calQ.label === "Moderate" ? "moderate" : "weak");
       var calLabel = calQ.label;
+      var stability = assessStability(events, numPred);
       var thrNeedsTuning = isFinite(_perfCache.optimalThreshold) && Math.abs(_perfCache.optimalThreshold - 0.5) > 0.12;
       var thrLevel = thrNeedsTuning ? "moderate" : "good";
       var thrLabel = thrNeedsTuning ? "Requires tuning" : "Adequate";
       row.innerHTML =
         trafficItem("Discrimination", "discrimination", disc.level, disc.label) +
         trafficItem("Calibration", "calibration", calLevel, calLabel) +
-        trafficItem("Stability", "sample", "moderate", "Unknown") +
-        trafficItem("Threshold", "threshold", thrLevel, thrLabel);
+        trafficItem("Stability", "sample", stability.level, stability.label) +
+        trafficItem("Operating Threshold", "threshold", thrLevel, thrLabel);
       var deployText;
       var deployCls;
       if (disc.level === "good" && calLevel === "good" && !thrNeedsTuning) {
@@ -1819,6 +2001,7 @@
       }
       overall.textContent = deployText;
       overall.className = "deploy-overall deploy-overall--" + deployCls;
+      return { cls: deployCls, text: deployText };
     }
     function renderPredictivePerformance() {
       var r = state.results || {};
@@ -1834,20 +2017,39 @@
       if (optVal) optVal.textContent = _perfCache.optimalThreshold.toFixed(2);
 
       var counts = pairs.length ? confusionCounts(pairs, defaultThr) : { tp: n(r.tp) || 0, fp: n(r.fp) || 0, tn: n(r.tn) || 0, fn: n(r.fn) || 0 };
-      var m = pairs.length ? metricsFromCounts(counts, pairs.length) : {
-        sensitivity: toUnit(r.sensitivity), specificity: toUnit(r.specificity),
-        precision: toUnit(r.precision || r.ppv), accuracy: toUnit(r.accuracy), f1: toUnit(r.f1)
-      };
+      var totalN = pairs.length || n(r.observations) || (counts.tp + counts.fp + counts.tn + counts.fn);
+      var m = pairs.length ? extendedMetrics(counts, pairs.length) : extendedMetrics(counts, totalN);
+      if (!isFinite(m.precision)) m.precision = toUnit(r.precision || r.ppv);
+      if (!isFinite(m.sensitivity)) m.sensitivity = toUnit(r.sensitivity);
+      if (!isFinite(m.specificity)) m.specificity = toUnit(r.specificity);
+      if (!isFinite(m.accuracy)) m.accuracy = toUnit(r.accuracy);
+      if (!isFinite(m.f1)) m.f1 = toUnit(r.f1);
+
+      var coef = (state.coefficients || []).filter(function (c) {
+        return String(c.Variable || "").toLowerCase() !== "intercept";
+      });
+      var numPred = coef.length || n(firstDefined(r, ["predictors", "predictorsCount"], 1));
+      var eventCount = n(r.events) || (counts.tp + counts.fn);
 
       var perfAuc = document.getElementById("perfAucVal");
       if (perfAuc) perfAuc.textContent = toFixedOrDash(auc, 2);
-      document.getElementById("accVal").textContent = isFinite(m.accuracy) ? formatPctCell(m.accuracy) : formatPctCell(r.accuracy);
-      document.getElementById("sensVal").textContent = isFinite(m.sensitivity) ? formatPctCell(m.sensitivity) : formatPctCell(r.sensitivity);
-      document.getElementById("specVal").textContent = isFinite(m.specificity) ? formatPctCell(m.specificity) : formatPctCell(r.specificity);
-      document.getElementById("f1Val").textContent = isFinite(m.f1) ? formatPctCell(m.f1) : formatPctCell(r.f1);
+      var perfAucBand = document.getElementById("perfAucBand");
+      if (perfAucBand) {
+        perfAucBand.textContent = isFinite(auc) ? (aucInfo.label + " discrimination") : "—";
+        perfAucBand.className = "kpi-sublab kpi-sublab--" + (aucInfo.cls || "fair");
+      }
+      var precEl = document.getElementById("precVal");
+      if (precEl) precEl.textContent = formatPctCell(m.precision);
+      document.getElementById("accVal").textContent = formatPctCell(m.accuracy);
+      document.getElementById("sensVal").textContent = formatPctCell(m.sensitivity);
+      document.getElementById("specVal").textContent = formatPctCell(m.specificity);
+      document.getElementById("f1Val").textContent = formatPctCell(m.f1);
 
       var cmEl = document.getElementById("cmMatrix");
       if (cmEl) cmEl.innerHTML = renderConfusionMatrixHtml(counts);
+
+      renderPerfClassMetrics(counts, m);
+      renderPerfThresholdSummary(defaultThr, _perfCache.optimalThreshold, m);
 
       var perfInterp = document.getElementById("perfInterpretation");
       if (perfInterp) {
@@ -1867,7 +2069,10 @@
       renderThresholdEffectsTable(pairs);
       renderRoc();
       renderCalibration();
-      renderDeploymentReadiness(auc, _perfCache.brier, _perfCache.meanAbsCalErr);
+
+      var brier = isFinite(_perfCache.brier) ? _perfCache.brier : quickBrier(pairs);
+      var deploy = renderDeploymentReadiness(auc, brier, _perfCache.meanAbsCalErr, eventCount, numPred);
+      renderPerfAtGlance(auc, m, brier, counts, deploy.cls);
     }
     function friendlyVarName(name) {
       return String(name || "").replace(/_/g, " ").trim();
@@ -1876,7 +2081,7 @@
       discrimination: "How well the model separates events from non-events, based on AUC.",
       significance: "Whether the omnibus likelihood-ratio test supports a real association (overall p-value).",
       statistical: "Whether the omnibus likelihood-ratio test supports a real association (overall p-value).",
-      sample: "Whether sample size and events-per-predictor support stable estimates.",
+      sample: "Whether sample size and events-per-predictor (EPV) support stable coefficient estimates.",
       balance: "How evenly events and non-events are represented in the data.",
       calibration: "How closely predicted probabilities match observed event rates (Brier score).",
       threshold: "Whether the default cutoff is close to an optimal balance of sensitivity and specificity."
@@ -2186,6 +2391,7 @@
         StatisticoWorkspaceTabs.onActiveChanged();
         StatisticoWorkspaceTabs.pulseBody(document.querySelector(".ws-body"));
       }
+      if (parent === "predictive-performance" && sub === "overview") renderPredictivePerformance();
       if (parent === "predictive-performance" && sub === "roc-thresholds") renderPredictivePerformance();
       if (parent === "predictive-performance" && sub === "calibration") renderPredictivePerformance();
       if (parent === "probabilities" && sub === "scenario-engine") initLogisticScenarioEngine();
@@ -2916,7 +3122,10 @@
           { type: "scatter", data: pts, color: "#5aa7ff", name: "Binned rates", marker: { radius: 5 } }
         ]
       }));
-      txt.innerHTML = "Brier score: <b>" + brier.toFixed(3) + "</b><br>Quality: <b>" + calQ.label + "</b> (lower is better).";
+      txt.innerHTML = [
+        "Brier score: <b>" + brier.toFixed(3) + "</b> (lower is better)",
+        "Quality: <b>" + calQ.label + "</b>"
+      ].join("<br>");
 
       if (qualityEl) {
         qualityEl.textContent = calQ.label;
@@ -2928,13 +3137,17 @@
           ? "Predicted probabilities differ from observed event rates by about " + pctErr + " percentage points on average."
           : "Awaiting calibration assessment...";
       }
+      var hl = hosmerLemeshow(pairs);
       var advEl = document.getElementById("calAdvanced");
       if (advEl) {
-        advEl.innerHTML = isFinite(calAdv.slope) && isFinite(calAdv.intercept)
-          ? "<strong>Advanced:</strong> Calibration intercept = " + calAdv.intercept.toFixed(3) +
-            ", slope = " + calAdv.slope.toFixed(3) +
-            " (ideal slope ≈ 1, intercept ≈ 0)."
-          : "";
+        var parts = [];
+        if (isFinite(calAdv.slope) && isFinite(calAdv.intercept)) {
+          parts.push("Calibration intercept = " + calAdv.intercept.toFixed(3) + ", slope = " + calAdv.slope.toFixed(3) + " (ideal: 0 and 1).");
+        }
+        if (isFinite(hl.chi2)) {
+          parts.push("Hosmer–Lemeshow χ² = " + hl.chi2.toFixed(2) + " (df=" + hl.df + ") — large values suggest miscalibration.");
+        }
+        advEl.innerHTML = parts.length ? parts.join(" ") : "";
       }
       _perfCache.calQuality = calQ.label;
     }
@@ -3254,8 +3467,11 @@
           renderThresholdMetrics(Number(v));
           updateRocThresholdMarker(Number(v));
           var pairs = predictionPairs();
-          var cmEl = document.getElementById("cmMatrix");
-          if (cmEl && pairs.length) cmEl.innerHTML = renderConfusionMatrixHtml(confusionCounts(pairs, Number(v)));
+          if (pairs.length) renderPredictivePerformance();
+          else {
+            var cmEl = document.getElementById("cmMatrix");
+            if (cmEl) cmEl.innerHTML = renderConfusionMatrixHtml(confusionCounts(pairs, Number(v)));
+          }
           renderThresholdEffectsTable(pairs);
           sendToHost("logisticThresholdChanged", { threshold: Number(v) });
           if (logScenarioData.initialized) updateLogisticScenario();

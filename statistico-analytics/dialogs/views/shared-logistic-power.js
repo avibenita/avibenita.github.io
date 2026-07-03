@@ -10,6 +10,31 @@
   var _busy = false;
   var _prefill = null;
 
+  var MODE_EXPLAIN = {
+    epv: {
+      title: "Mode 1 · EPV planner",
+      body: "EPV (Events Per Variable) = outcome events ÷ number of predictors. It is a sample-size rule-of-thumb for logistic regression: aim for about 10–15 events per predictor (some use 20 for conservative planning). This mode checks whether your study has enough events relative to model complexity — it does not compute formal statistical power."
+    },
+    single_predictor: {
+      title: "Mode 2 · Single predictor",
+      body: "Uses the Hsieh et al. (1999) normal approximation for one binary exposure. Enter prevalence, odds ratio, and α to get observed power at your N, or the N needed for a target power (e.g. 80%). Best when one predictor is the primary hypothesis."
+    },
+    multivariable_simulation: {
+      title: "Mode 3 · Multivariable simulation",
+      body: "Monte Carlo power for several predictors. The engine simulates datasets with your assumed odds ratios and predictor correlation, fits logistic models repeatedly, and estimates the chance of detecting a chosen coefficient at α. Use this when the model has multiple covariates or correlated predictors."
+    }
+  };
+
+  function updateModeExplain(mode) {
+    var box = document.getElementById("logPowModeExplain");
+    var info = MODE_EXPLAIN[mode] || MODE_EXPLAIN.epv;
+    if (!box) return;
+    box.innerHTML = [
+      '<div class="logpow-mode-explain__title"><i class="fa-solid fa-circle-info"></i> ' + esc(info.title) + '</div>',
+      '<p class="logpow-mode-explain__body">' + esc(info.body) + '</p>'
+    ].join("");
+  }
+
   function url() {
     return global.LOGISTIC_POWER_URL || DEFAULT_URL;
   }
@@ -392,6 +417,7 @@
     document.querySelectorAll(".logpow-result-panel").forEach(function (p) {
       p.classList.toggle("active", p.dataset.mode === mode);
     });
+    updateModeExplain(mode);
   }
 
   function applyPrefill(ctx) {
@@ -433,6 +459,7 @@
       '    <button type="button" class="logpow-mode-btn" data-mode="single_predictor" onclick="StatisticoLogisticPower.switchMode(\'single_predictor\')">Mode 2 · Single predictor</button>',
       '    <button type="button" class="logpow-mode-btn" data-mode="multivariable_simulation" onclick="StatisticoLogisticPower.switchMode(\'multivariable_simulation\')">Mode 3 · Multivariable sim</button>',
       '  </div>',
+      '  <div class="logpow-mode-explain" id="logPowModeExplain"></div>',
       '  <div class="logpow-grid">',
       '    <div class="logpow-card">',
       '      <div class="logpow-card-h">Inputs</div>',

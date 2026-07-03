@@ -18,7 +18,7 @@
   <!-- Shared Components -->
   <link rel="stylesheet" href="../shared-header.css?v=20260602tabsw">  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
-  <script src="../shared-header.js?v=20260602uniw"></script>
+  <script src="../shared-header.js?v=20260609boxtabs"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -144,6 +144,17 @@
       background: transparent;
     }
 
+    .boxplot-panel {
+      display: none;
+      flex: 1 1 0;
+      min-height: 0;
+      flex-direction: column;
+    }
+
+    .boxplot-panel.is-active {
+      display: flex;
+    }
+
     /* Loading State */
     .awaiting-overlay {
       display: flex;
@@ -229,9 +240,18 @@
     <!-- Results Container -->
     <div class="results-container" id="results-container">
       
-      <!-- Box Plot -->
-      <div class="chart-panel">
-        <div class="chart-container" id="withOutliers"></div>
+      <!-- Box Plot With Outliers -->
+      <div id="boxplotPanel-main" class="boxplot-panel is-active">
+        <div class="chart-panel">
+          <div class="chart-container" id="withOutliers"></div>
+        </div>
+      </div>
+
+      <!-- Box Plot Without Outliers -->
+      <div id="boxplotPanel-outliers" class="boxplot-panel">
+        <div class="chart-panel">
+          <div class="chart-container" id="withoutOutliers"></div>
+        </div>
       </div>
       
       <!-- Footer Notice -->
@@ -258,13 +278,11 @@
         container.style.boxSizing = 'border-box';
       }
 
-      // Split charts grid evenly
-      const panels = document.querySelectorAll('.chart-panel');
-      if (panels.length) {
-        const padding = 6 + 6; // top + bottom padding
-        const gaps   = 4 * (panels.length - 1);
-        const panelH = Math.floor((availH - padding - gaps) / panels.length);
-        panels.forEach(p => { p.style.height = panelH + 'px'; });
+      // Size only the active tab panel to full height
+      const activePanel = document.querySelector('.boxplot-panel.is-active .chart-panel');
+      if (activePanel) {
+        const padding = 6 + 6;
+        activePanel.style.height = Math.max(220, availH - padding) + 'px';
       }
 
       // Reflow charts
@@ -277,6 +295,27 @@
     let originalData = [];
     let currentVariableName = 'Variable';
     let currentSampleSize = 0;
+    let activeBoxplotTab = 'main';
+
+    function switchBoxplotTab(tab) {
+      activeBoxplotTab = tab || 'main';
+      window.__boxplotActiveTab = activeBoxplotTab;
+      document.querySelectorAll('.boxplot-panel').forEach((panel) => {
+        panel.classList.toggle('is-active', panel.id === `boxplotPanel-${activeBoxplotTab}`);
+      });
+      fitLayout();
+      requestAnimationFrame(function () {
+        try {
+          if (typeof Highcharts !== 'undefined' && Highcharts.charts) {
+            Highcharts.charts.forEach((c) => { if (c && c.reflow) c.reflow(); });
+          }
+        } catch (_e) {}
+      });
+      if (typeof StatisticoHeader !== 'undefined') {
+        try { StatisticoHeader._renderUnivariateResultsTabs(); } catch (_e) {}
+      }
+    }
+    window.switchBoxplotTab = switchBoxplotTab;
 
     // Initialize Office.js
     if (typeof Office !== 'undefined') {
@@ -438,11 +477,15 @@
         
         // Calculate and display
         displayBoxPlot();
+        switchBoxplotTab(window.__boxplotActiveTab || activeBoxplotTab || 'main');
         
         // Hide awaiting, show results
         document.getElementById('awaitingPanel').style.display = 'none';
         document.getElementById('results-container').classList.add('show');
         setTimeout(fitLayout, 150);
+        if (typeof StatisticoHeader !== 'undefined') {
+          try { StatisticoHeader._renderUnivariateResultsTabs(); } catch (_e) {}
+        }
         
       } catch (error) {
         console.error('? Error handling data:', error);
@@ -521,6 +564,7 @@
       
       // Create charts with n display
       createBoxPlotWithOutliers(boxData, nDisplay);
+      createBoxPlotWithoutOutliers(boxData, nDisplay);
     }
 
     // Create box plot with outliers
@@ -612,6 +656,116 @@
             enabled: true,
             formatter: function() { return this.point.name; },
             style: { color: 'rgb(255, 165, 120)', fontSize: '11px', textOutline: 'none' }
+          }
+        }]
+      });
+    }
+
+    // Create box plot without outliers
+    function createBoxPlotWithoutOutliers(boxData, nDisplay) {
+      const boxArray = [boxData.minWithoutOutliers, boxData.q1, boxData.median, boxData.q3, boxData.maxWithoutOutliers];
+      const nWithoutOutliers = boxData.dataWithoutOutliers.length;
+
+      Highcharts.chart('withoutOutliers', {
+        chart: {
+          type: 'boxplot',
+          inverted: true,
+          backgroundColor: 'transparent',
+          marginTop: 40,
+          marginBottom: 55,
+          marginLeft: 95,
+          marginRight: 30,
+          spacingTop: 5,
+          spacingBottom: 5,
+          spacingLeft: 5,
+          spacingRight: 5
+        },
+        title: {
+          text: `Box Plot Without Outliers (n=${nWithoutOutliers} of ${nDisplay})`,
+          style: { color: 'rgb(255,165,120)', fontSize: '14px', fontWeight: '600' },
+          margin: 10
+        },
+        legend: { enabled: false },
+        credits: { enabled: false },
+        xAxis: {
+          categories: [currentVariableName],
+          title: {
+            text: 'Distribution',
+            style: { color: '#ffffff', fontSize: '12px' }
+          },
+          labels: { style: { color: '#ffffff', fontSize: '12px' } },
+          gridLineColor: 'rgba(255, 255, 255, 0.1)'
+        },
+        yAxis: {
+          title: {
+            text: 'Values',
+            style: { color: '#ffffff', fontSize: '12px' }
+          },
+          labels: { style: { color: '#ffffff', fontSize: '11px' } },
+          gridLineColor: 'rgba(255, 255, 255, 0.1)'
+        },
+        plotOptions: {
+          boxplot: {
+            fillColor: 'rgba(120, 200, 255, 0.3)',
+            lineWidth: 2,
+            medianColor: 'rgb(120, 200, 255)',
+            medianWidth: 3,
+            stemColor: 'rgb(120, 200, 255)',
+            stemDashStyle: 'solid',
+            stemWidth: 2,
+            whiskerColor: 'rgb(120, 200, 255)',
+            whiskerLength: '20%',
+            whiskerWidth: 2
+          }
+        },
+        series: [{
+          name: currentVariableName,
+          data: [[boxArray[0], boxArray[1], boxArray[2], boxArray[3], boxArray[4]]],
+          tooltip: {
+            headerFormat: '<em>{point.key}</em><br/>',
+            pointFormatter: function() {
+              return `
+                <b>Maximum (no outliers):</b> ${this.high != null ? this.high.toFixed(2) : '--'}<br/>
+                <b>Q3 (75%):</b> ${this.q3 != null ? this.q3.toFixed(2) : '--'}<br/>
+                <b>Median:</b> ${this.median != null ? this.median.toFixed(2) : '--'}<br/>
+                <b>Q1 (25%):</b> ${this.q1 != null ? this.q1.toFixed(2) : '--'}<br/>
+                <b>Minimum (no outliers):</b> ${this.low != null ? this.low.toFixed(2) : '--'}<br/>
+                <b>n = ${boxData.dataWithoutOutliers.length}</b> (outliers excluded)
+              `;
+            }
+          }
+        }, {
+          name: 'Outlier Points',
+          type: 'scatter',
+          data: boxData.outliers.map(v => [0, v]),
+          marker: {
+            symbol: 'diamond',
+            fillColor: 'rgba(255, 100, 100, 0.6)',
+            lineWidth: 1,
+            lineColor: 'rgb(255, 100, 100)',
+            radius: 5
+          },
+          tooltip: {
+            pointFormatter: function() {
+              return `<b>Outlier Point:</b> ${this.y != null ? this.y.toFixed(2) : '--'}`;
+            }
+          }
+        }, {
+          name: 'Stat Labels',
+          type: 'scatter',
+          data: [
+            { x: 0, y: boxArray[0], name: `Min: ${boxArray[0].toFixed(1)}` },
+            { x: 0, y: boxArray[1], name: `Q1: ${boxArray[1].toFixed(1)}` },
+            { x: 0, y: boxArray[2], name: `Median: ${boxArray[2].toFixed(1)}` },
+            { x: 0, y: boxArray[3], name: `Q3: ${boxArray[3].toFixed(1)}` },
+            { x: 0, y: boxArray[4], name: `Max: ${boxArray[4].toFixed(1)}` }
+          ],
+          marker: { enabled: false },
+          enableMouseTracking: false,
+          dataLabels: {
+            enabled: true,
+            formatter: function() { return this.point.name; },
+            style: { color: 'rgb(120, 200, 255)', fontSize: '11px', textOutline: 'none' }
           }
         }]
       });

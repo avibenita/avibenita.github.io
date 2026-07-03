@@ -1513,6 +1513,8 @@ const StatisticoHeader = {
       cdf: 'Cumulative curve',
       percentile: 'Cut points & lookup',
       boxplot: 'Quartiles & outliers',
+      'boxplot-main': 'Full range with outliers',
+      'boxplot-outliers': 'IQR fence view',
       kernel: 'Smoothed density',
       normality: 'Formal test battery',
       qqplot: 'Probability plots',
@@ -1529,7 +1531,11 @@ const StatisticoHeader = {
     const active = opts.active ? ' active' : '';
     let onclick = '';
     if (opts.inPage && opts.panel) {
-      onclick = ` onclick="StatisticoHeader.setByGroupResultsTab('${opts.panel}')"`;
+      if (opts.tabKey && opts.tabKey.indexOf('boxplot-') === 0) {
+        onclick = ` onclick="StatisticoHeader.setBoxplotResultsTab('${opts.panel}')"`;
+      } else {
+        onclick = ` onclick="StatisticoHeader.setByGroupResultsTab('${opts.panel}')"`;
+      }
     } else if (opts.file) {
       onclick = ` onclick="StatisticoHeader.navigateTo('${opts.file}')"`;
     } else if (opts.onSection) {
@@ -1551,6 +1557,14 @@ const StatisticoHeader = {
     globalThis.__byGroupActiveTab = panel || 'stats';
     if (typeof globalThis.switchByGroupTab === 'function') {
       globalThis.switchByGroupTab(panel);
+    }
+    try { this._renderUnivariateResultsTabs(); } catch (_e) {}
+  },
+
+  setBoxplotResultsTab(panel) {
+    globalThis.__boxplotActiveTab = panel || 'main';
+    if (typeof globalThis.switchBoxplotTab === 'function') {
+      globalThis.switchBoxplotTab(panel);
     }
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
@@ -1781,6 +1795,12 @@ const StatisticoHeader = {
 
   _getUnivariateResultsViewTabs(section) {
     if (!section || !Array.isArray(section.tabs) || !section.tabs.length) return [];
+    if (section.id === 'core' && this.currentView === 'boxplot') {
+      return [
+        { tabKey: 'boxplot-main', label: 'Box plot', icon: 'fa-chart-gantt', panel: 'main', inPage: true },
+        { tabKey: 'boxplot-outliers', label: 'Outliers excluded', icon: 'fa-filter-circle-xmark', panel: 'outliers', inPage: true }
+      ];
+    }
     const limit = typeof section.resultTabLimit === 'number' ? section.resultTabLimit : 3;
     return section.tabs.slice(0, limit);
   },
@@ -1789,6 +1809,7 @@ const StatisticoHeader = {
     const viewTabs = this._getUnivariateResultsViewTabs(activeSection);
     if (!viewTabs.length) return false;
     if (activeSection.id === 'group' && this.currentView === 'by-group') return true;
+    if (activeSection.id === 'core' && this.currentView === 'boxplot') return true;
     return viewTabs.some((t) => t.view === this.currentView);
   },
 
@@ -1823,7 +1844,9 @@ const StatisticoHeader = {
       }
     }
 
-    const activeByGroupTab = globalThis.__byGroupActiveTab || 'stats';
+    const activeInPageTab = this.currentView === 'boxplot'
+      ? (globalThis.__boxplotActiveTab || 'main')
+      : (globalThis.__byGroupActiveTab || 'stats');
 
     const tabTitles = {
       histogram: 'Frequency distribution and shape',
@@ -1832,6 +1855,8 @@ const StatisticoHeader = {
       normality: 'Formal normality test battery',
       qqplot: 'PP and QQ probability plots',
       confidence: 'Interval estimates for mean or median',
+      'boxplot-main': 'Full data range with quartiles and whiskers',
+      'boxplot-outliers': 'Whiskers clamped to IQR fences',
       'by-group-stats': 'Descriptive stats & histograms',
       'by-group-boxplot': 'Compare spread by group',
       'by-group-normality': 'Verdicts, tests & mini histograms'
@@ -1841,7 +1866,7 @@ const StatisticoHeader = {
       tabKey: t.tabKey,
       label: t.label,
       icon: t.icon,
-      active: t.inPage ? t.panel === activeByGroupTab : t.view === this.currentView,
+      active: t.inPage ? t.panel === activeInPageTab : t.view === this.currentView,
       file: t.file,
       inPage: t.inPage,
       panel: t.panel,
@@ -1852,7 +1877,9 @@ const StatisticoHeader = {
       ? 'Normality and inference views'
       : activeSection.id === 'group'
         ? 'Grouped analysis views'
-        : 'Distribution views';
+        : (this.currentView === 'boxplot')
+          ? 'Box plot views'
+          : 'Distribution views';
 
     stack.innerHTML =
       '<div class="ws-shell ws-shell--view-tabs">'
@@ -7134,7 +7161,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
     return {
       histogram: `Controls available: (1) Binning Method dropdown (Manual / Sturges / Scott / Freedman-Diaconis) — changes how bars are grouped; (2) Bin Count slider (1–50, only active in Manual mode) — drag to increase/decrease bar count; (3) Show Normal Curve checkbox — toggles a theoretical normal overlay on the histogram; (4) Left/Right Truncation sliders — trim extreme observations by percentile to focus on the core distribution.`,
 
-      boxplot: `The box plot renders automatically from the data. It shows quartiles, whiskers, and the full data range with min/max labels. Outlier detection is available separately under Advanced Diagnostics. No manual sliders — navigate to other views using the sidebar.`,
+      boxplot: `Two tabbed views under Box plot: (1) Box plot — full data range with quartiles, whiskers, and min/max labels; (2) Outliers excluded — same quartiles but whiskers clamped to IQR fences with outlier points shown separately. Switch tabs in the header bar. No manual sliders.`,
 
       cdf: `Controls available: (1) Distribution overlay dropdown (None / Normal / Log-Normal / Exponential / Uniform) — adds a theoretical CDF curve for visual comparison; (2) Toggle Distribution button — shows or hides the theoretical overlay; (3) Value slider (noUiSlider) — drag the marker along the x-axis to read F(x), the cumulative probability at any point; (4) Quartile shortcut cards (Q1, Median, Q3, P95) — click to jump the slider to those key positions.`,
 

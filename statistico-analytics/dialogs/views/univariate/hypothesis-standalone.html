@@ -867,6 +867,10 @@
       align-items: center;
     }
 
+    .results-actions.is-awaiting {
+      display: none !important;
+    }
+
     /* Alpha Slider in Header */
     .alpha-slider-control {
       display: flex;
@@ -1664,10 +1668,10 @@
     </div>
 
     <!-- Results Section -->
-    <div class="results-section" id="results-section" style="display: none;">
+    <div class="results-section" id="results-section">
       <div class="results-header">
         <div class="section-header" style="margin: 0;">Hypothesis Test Results</div>
-        <div class="results-actions">
+        <div class="results-actions is-awaiting" id="results-actions">
           <div class="alpha-slider-control">
             <label>?:</label>
             <input type="range" id="alpha-slider" min="0.01" max="0.15" step="0.01" value="0.05" oninput="updateAlpha()">
@@ -2178,12 +2182,25 @@
       setAwaitingState();
     };
 
+    function setResultsToolbarVisible(visible) {
+      const actions = document.getElementById('results-actions');
+      if (!actions) return;
+      actions.classList.toggle('is-awaiting', !visible);
+    }
+
     // Set awaiting state (hide results, show awaiting message)
     function setAwaitingState() {
       const resultsSection = document.getElementById('results-section');
-      if (resultsSection.style.display !== 'none') {
+      const hasData = resultsData && resultsData.values && resultsData.values.length;
+      if (!resultsSection) return;
+
+      if (hasData) {
+        resultsSection.style.display = 'flex';
         document.getElementById('awaiting-results').style.display = 'block';
         document.getElementById('actual-results').style.display = 'none';
+        setResultsToolbarVisible(false);
+      } else {
+        resultsSection.style.display = 'none';
       }
     }
 
@@ -2245,6 +2262,7 @@
       document.getElementById('results-section').style.display = 'flex';
       document.getElementById('awaiting-results').style.display = 'none';
       document.getElementById('actual-results').style.display = 'flex';
+      setResultsToolbarVisible(true);
       
       // If bootstrap, show calculating overlay
       if (currentMethod === 'bootstrap') {
@@ -2493,6 +2511,7 @@
       // Show actual results, hide awaiting
       document.getElementById('awaiting-results').style.display = 'none';
       document.getElementById('actual-results').style.display = 'flex';
+      setResultsToolbarVisible(true);
     }
 
     // Office.js initialization
@@ -2583,6 +2602,7 @@
       StatisticoHeader.updateVariable(variableName, resultsData.n);
       console.log('? Header updated with data:', variableName, 'n=', resultsData.n);
       renderMainMoments(resultsData.values, resultsData.descriptive);
+      setAwaitingState();
     }
 
     function loadSampleData() {

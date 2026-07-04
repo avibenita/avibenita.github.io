@@ -771,6 +771,65 @@
       box-shadow: 0 0 20px rgba(255,165,120,0.5);
     }
 
+    .moments-section {
+      margin-bottom: 16px;
+      padding: 14px 16px;
+      background: rgba(20, 25, 35, 0.45);
+      border: 2px solid rgba(120, 200, 255, 0.28);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    .moments-section .section-header {
+      margin-bottom: 10px;
+    }
+
+    .moments-subtitle {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-left: 8px;
+    }
+
+    .moments-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 8px;
+    }
+
+    .moment-card {
+      background: linear-gradient(135deg, rgba(120, 200, 255, 0.08), rgba(100, 180, 255, 0.04));
+      border: 1px solid rgba(120, 200, 255, 0.22);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .moment-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+    }
+
+    .moment-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .moment-value.is-integer {
+      font-size: 18px;
+    }
+
     /* Results Section */
     .results-section {
       margin-top: 16px;
@@ -1583,6 +1642,25 @@
       <button class="run-button" onclick="runTest()">
         <i class="fa-solid fa-play"></i> Run the Test
       </button>
+    </div>
+
+    <!-- Actual Main Moments -->
+    <div class="moments-section" id="moments-section" style="display: none;">
+      <div class="section-header">
+        Actual Main Moments
+        <span class="moments-subtitle">Sample statistics for the current variable</span>
+      </div>
+      <div class="moments-grid">
+        <div class="moment-card"><span class="moment-label">n</span><span class="moment-value is-integer" id="moment-n">--</span></div>
+        <div class="moment-card"><span class="moment-label">Mean</span><span class="moment-value" id="moment-mean">--</span></div>
+        <div class="moment-card"><span class="moment-label">Variance</span><span class="moment-value" id="moment-variance">--</span></div>
+        <div class="moment-card"><span class="moment-label">Std Dev</span><span class="moment-value" id="moment-stddev">--</span></div>
+        <div class="moment-card"><span class="moment-label">Skewness</span><span class="moment-value" id="moment-skewness">--</span></div>
+        <div class="moment-card"><span class="moment-label">Kurtosis</span><span class="moment-value" id="moment-kurtosis">--</span></div>
+        <div class="moment-card"><span class="moment-label">Median</span><span class="moment-value" id="moment-median">--</span></div>
+        <div class="moment-card"><span class="moment-label">Min</span><span class="moment-value" id="moment-min">--</span></div>
+        <div class="moment-card"><span class="moment-label">Max</span><span class="moment-value" id="moment-max">--</span></div>
+      </div>
     </div>
 
     <!-- Results Section -->
@@ -2495,7 +2573,8 @@
       resultsData = {
         values: data.values || data.data || [],
         column: data.column || 'Variable',
-        n: data.n || (data.values ? data.values.length : 0)
+        n: data.n || (data.values ? data.values.length : 0),
+        descriptive: data.descriptive || null
       };
       window.data = resultsData.values;  // expose for console: copy(JSON.stringify(data, null, 2))
       
@@ -2503,6 +2582,7 @@
       const variableName = resultsData.column || 'Variable';
       StatisticoHeader.updateVariable(variableName, resultsData.n);
       console.log('? Header updated with data:', variableName, 'n=', resultsData.n);
+      renderMainMoments(resultsData.values, resultsData.descriptive);
     }
 
     function loadSampleData() {
@@ -2536,6 +2616,80 @@
       const upper = Math.ceil(index);
       const weight = index - lower;
       return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+    }
+
+    function fmtMoment(value, decimals) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return '--';
+      const d = typeof decimals === 'number' ? decimals : 4;
+      return n.toFixed(d);
+    }
+
+    function calculateMainMoments(data) {
+      if (!Array.isArray(data) || !data.length) return null;
+      const n = data.length;
+      const sorted = [...data].sort((a, b) => a - b);
+      const mean = data.reduce((a, b) => a + b, 0) / n;
+      const variance = n > 1
+        ? data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / (n - 1)
+        : 0;
+      const stdDev = Math.sqrt(variance);
+      const median = calculatePercentile(data, 0.5);
+      const skewness = n >= 3 && stdDev > 0
+        ? (n / ((n - 1) * (n - 2))) * data.reduce((acc, val) => acc + Math.pow((val - mean) / stdDev, 3), 0)
+        : null;
+      const kurtosis = n >= 4 && stdDev > 0
+        ? ((n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3))) * data.reduce((acc, val) => acc + Math.pow((val - mean) / stdDev, 4), 0) - (3 * Math.pow(n - 1, 2)) / ((n - 2) * (n - 3))
+        : null;
+      return {
+        n,
+        mean,
+        variance,
+        stdDev,
+        skewness,
+        kurtosis,
+        median,
+        min: sorted[0],
+        max: sorted[n - 1]
+      };
+    }
+
+    function renderMainMoments(data, descriptive) {
+      const section = document.getElementById('moments-section');
+      if (!section) return;
+
+      let stats = null;
+      if (descriptive && Number.isFinite(Number(descriptive.mean))) {
+        stats = {
+          n: descriptive.n || (Array.isArray(data) ? data.length : null),
+          mean: descriptive.mean,
+          variance: descriptive.variance,
+          stdDev: descriptive.stdDev,
+          skewness: descriptive.skewness,
+          kurtosis: descriptive.kurtosis,
+          median: descriptive.median,
+          min: descriptive.min,
+          max: descriptive.max
+        };
+      } else {
+        stats = calculateMainMoments(data);
+      }
+
+      if (!stats || !stats.n) {
+        section.style.display = 'none';
+        return;
+      }
+
+      section.style.display = 'block';
+      document.getElementById('moment-n').textContent = String(stats.n);
+      document.getElementById('moment-mean').textContent = fmtMoment(stats.mean);
+      document.getElementById('moment-variance').textContent = fmtMoment(stats.variance);
+      document.getElementById('moment-stddev').textContent = fmtMoment(stats.stdDev);
+      document.getElementById('moment-skewness').textContent = fmtMoment(stats.skewness);
+      document.getElementById('moment-kurtosis').textContent = fmtMoment(stats.kurtosis);
+      document.getElementById('moment-median').textContent = fmtMoment(stats.median);
+      document.getElementById('moment-min').textContent = fmtMoment(stats.min);
+      document.getElementById('moment-max').textContent = fmtMoment(stats.max);
     }
 
     // ========================================

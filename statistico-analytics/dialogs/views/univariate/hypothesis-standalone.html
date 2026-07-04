@@ -498,6 +498,33 @@
       line-height: 1.4;
     }
 
+    .power-method-note {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-top: 10px;
+      font-size: 11px;
+      line-height: 1.55;
+      color: var(--text-muted);
+      text-align: left;
+    }
+
+    .power-method-note strong {
+      display: block;
+      color: var(--accent-2);
+      font-size: 11px;
+      margin-bottom: 4px;
+      letter-spacing: 0.02em;
+    }
+
+    .power-stat--method {
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: normal;
+      text-align: left;
+    }
+
     @media (max-width: 768px) {
       .power-columns {
         grid-template-columns: 1fr;
@@ -1672,6 +1699,10 @@
               <label>Sample Size</label>
               <div class="power-stat" id="overlaySampleSize">--</div>
             </div>
+            <div class="power-field">
+              <label>Calculation method</label>
+              <div class="power-stat power-stat--method" id="overlayMethodSummary">--</div>
+            </div>
           </div>
 
           <div class="power-panel-card">
@@ -1698,6 +1729,11 @@
               <div class="power-stat" id="overlayVarianceRatio">--</div>
             </div>
           </div>
+        </div>
+
+        <div class="power-method-note" id="overlayMethodNote">
+          <strong>How power is calculated</strong>
+          <span id="overlayMethodText">Run the test to see the method details.</span>
         </div>
 
         <div class="power-footer-note" id="overlayFooterNote">
@@ -3145,6 +3181,28 @@ Decision: ${testData.decision}`;
       }
     }
 
+    function buildPowerMethodCopy(cache) {
+      const tailLabel = cache.orientation || 'Two-tailed';
+      const alphaStr = (cache.alpha != null && isFinite(cache.alpha)) ? cache.alpha.toFixed(3) : '0.050';
+      if (cache.testType === 'variance') {
+        return {
+          summary: 'Noncentral χ² · one-sample variance test',
+          note: 'Effect size is the variance ratio |test statistic| / df (df = n − 1). '
+            + 'Observed power is P(reject H₀ | ratio, n, α) from the one-sample variance cloud function. '
+            + 'Required n is the smallest sample size that reaches the target power at the same ratio and α. '
+            + 'Tail: ' + tailLabel + ' · α = ' + alphaStr + '. Classical test only (bootstrap not used for power).'
+        };
+      }
+      const dStr = (cache.cohenD != null && isFinite(cache.cohenD)) ? cache.cohenD.toFixed(4) : '—';
+      return {
+        summary: 'Noncentral t · one-sample mean test',
+        note: 'Effect size Cohen\'s d = |t| / √n = ' + dStr + ' using the observed t statistic from your classical test. '
+          + 'Observed power is P(reject H₀ | d, n, α) under the noncentral t distribution. '
+          + 'Required n is the smallest sample size that reaches the target power at the same d and α. '
+          + 'Tail: ' + tailLabel + ' · α = ' + alphaStr + '. Computed via cloud service (GetPowerAndSampleSizeTtest).'
+      };
+    }
+
     async function calculateMeanPowerAnalysis(results, alpha, n, orientation) {
       console.log('');
       console.log('---------------------------------------------------------');
@@ -3233,7 +3291,9 @@ Decision: ${testData.decision}`;
           alpha,
           sampleSize: n,
           method: 'cloud',
-          testType: 'mean'
+          testType: 'mean',
+          orientation,
+          tailType
         };
         
         console.log('? Cloud calculation successful');
@@ -3354,7 +3414,9 @@ Decision: ${testData.decision}`;
           alpha,
           sampleSize: n,
           method: 'cloud',
-          testType: 'variance'
+          testType: 'variance',
+          orientation,
+          tailType
         };
         
         console.log('? Cloud calculation successful');
@@ -3405,6 +3467,12 @@ Decision: ${testData.decision}`;
       
       document.getElementById('overlaySampleSize').textContent = 
         cache.sampleSize || '--';
+
+      const methodCopy = buildPowerMethodCopy(cache);
+      const methodSummaryEl = document.getElementById('overlayMethodSummary');
+      const methodTextEl = document.getElementById('overlayMethodText');
+      if (methodSummaryEl) methodSummaryEl.textContent = methodCopy.summary;
+      if (methodTextEl) methodTextEl.textContent = methodCopy.note;
 
       // Target Power Scenario
       document.getElementById('overlayTargetPower').value = 
@@ -3461,10 +3529,10 @@ Decision: ${testData.decision}`;
         footer.style.color = '#88ff88';
       }
 
-      // Update method badge (always cloud)
+      // Update method badge
       const methodBadge = document.getElementById('powerMethodBadge');
       if (methodBadge) {
-        methodBadge.innerHTML = '<i class="fas fa-cloud"></i> Cloud';
+        methodBadge.innerHTML = '<i class="fas fa-calculator"></i> ' + methodCopy.summary;
         methodBadge.style.background = 'rgba(100,200,255,0.2)';
         methodBadge.style.color = '#88ccff';
         methodBadge.style.borderColor = 'rgba(100,200,255,0.3)';

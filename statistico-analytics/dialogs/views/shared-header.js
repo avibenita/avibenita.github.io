@@ -388,7 +388,7 @@ const StatisticoHeader = {
     const viewTitles = {
       // Univariate views
       'histogram': 'Distribution · Histogram',
-      'boxplot': 'Box Plot',
+      'boxplot': 'Box Plot & Outliers',
       'qqplot': 'Normality · PP/QQ',
       'normality': 'Normality · Tests',
       'kernel': 'Kernel',
@@ -918,7 +918,7 @@ const StatisticoHeader = {
       { id: 'histogram', label: 'Histogram', file: 'univariate/histogram-standalone-v2.html' },
       { id: 'cdf', label: 'CDF', file: 'univariate/cumulative-distribution.html' },
       { id: 'percentile', label: 'Percentiles', file: 'univariate/percentile-standalone.html' },
-      { id: 'boxplot', label: 'Box Plot', file: 'univariate/boxplot-standalone.html' },
+      { id: 'boxplot', label: 'Box Plot & Outliers', file: 'univariate/boxplot-standalone.html' },
       { id: 'kernel', label: 'Kernel', file: 'univariate/kernel-standalone.html' },
       { id: 'separator-core-by-group', label: '---', file: null, isSeparator: true },
       { id: 'group-by-group', label: 'Grouped Analysis', file: null, isGroup: true },
@@ -1143,7 +1143,7 @@ const StatisticoHeader = {
                   { view: 'percentile', file: 'univariate/percentile-standalone.html',   label: 'Percentiles' }
                 ]
               },
-              { type: 'navigate', view: 'boxplot', file: 'univariate/boxplot-standalone.html', icon: 'fa-chart-gantt',  label: 'Box plot', description: 'Quartiles, whiskers, and outliers.' },
+              { type: 'navigate', view: 'boxplot', file: 'univariate/boxplot-standalone.html', icon: 'fa-chart-gantt',  label: 'Box plot & outliers', description: 'Quartiles, whiskers, and outlier detection.' },
               { type: 'navigate', view: 'kernel',  file: 'univariate/kernel-standalone.html',  icon: 'fa-bezier-curve', label: 'Kernel', description: 'Smoothed density estimate.' }
             ]
           },
@@ -1467,7 +1467,7 @@ const StatisticoHeader = {
           { view: 'histogram', tabKey: 'histogram', label: 'Histogram', icon: 'fa-chart-column', file: 'univariate/histogram-standalone-v2.html' },
           { view: 'cdf', tabKey: 'cdf', label: 'CDF', icon: 'fa-chart-line', file: 'univariate/cumulative-distribution.html' },
           { view: 'percentile', tabKey: 'percentile', label: 'Percentiles', icon: 'fa-percent', file: 'univariate/percentile-standalone.html' },
-          { view: 'boxplot', tabKey: 'boxplot', label: 'Box plot', icon: 'fa-chart-gantt', file: 'univariate/boxplot-standalone.html' },
+          { view: 'boxplot', tabKey: 'boxplot', label: 'Box plot & outliers', icon: 'fa-chart-gantt', file: 'univariate/boxplot-standalone.html' },
           { view: 'kernel', tabKey: 'kernel', label: 'Kernel', icon: 'fa-bezier-curve', file: 'univariate/kernel-standalone.html' }
         ]
       },
@@ -5646,7 +5646,7 @@ const StatisticoHeader = {
   _getUnivariateViewLabels() {
     return {
       histogram: 'Histogram',
-      boxplot: 'Box Plot',
+      boxplot: 'Box Plot & Outliers',
       cdf: 'CDF',
       percentile: 'Percentiles',
       kernel: 'Kernel',
@@ -6560,7 +6560,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
       { id: 'confidence', url: 'univariate/confidence-standalone.html'     }
     ];
     const labels = {
-      histogram:'Histogram', boxplot:'Box Plot', cdf:'CDF', percentile:'Percentiles',
+      histogram:'Histogram', boxplot:'Box Plot & Outliers', cdf:'CDF', percentile:'Percentiles',
       kernel:'Kernel', outliers:'Outliers', normality:'Tests',
       qqplot:'PP/QQ', confidence:'Confidence Intervals', hypothesis:'One-Sample Test'
     };
@@ -7526,7 +7526,7 @@ ACTION: [conditional step 1] | [conditional step 2] | [conditional step 3]`;
     }
 
     // ── Per-view: Insight Guide (elaborate view explanation + controls guidance) ──
-    const viewName = { histogram:'Histogram', boxplot:'Box Plot', cdf:'Cumulative Distribution Function',
+    const viewName = { histogram:'Histogram', boxplot:'Box Plot & Outliers', cdf:'Cumulative Distribution Function',
       percentile:'Percentiles', kernel:'Kernel', outliers:'Outliers',
       normality:'Tests', qqplot:'PP/QQ', confidence:'Confidence Intervals',
       hypothesis:'One-Sample Test' }[view] || view;
@@ -7657,7 +7657,7 @@ Always follow the exact output format requested.` },
     if (existing) existing.remove();
 
     const viewLabels = {
-      histogram:'Histogram', boxplot:'Box Plot', cdf:'CDF', percentile:'Percentiles',
+      histogram:'Histogram', boxplot:'Box Plot & Outliers', cdf:'CDF', percentile:'Percentiles',
       kernel:'Kernel', outliers:'Outliers', normality:'Tests',
       qqplot:'PP/QQ', confidence:'Confidence Intervals', hypothesis:'One-Sample Test',
       'by-group-stats':'Grouped Statistics', 'by-group-boxplot':'Grouped Box Plots',

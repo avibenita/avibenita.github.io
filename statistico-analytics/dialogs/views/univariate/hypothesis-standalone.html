@@ -23,26 +23,6 @@
   
   <!-- AI Configuration -->
   <script src="../../../src/shared/js/ai-config.js"></script>
-  <script>
-    // fitLayout: fill dialog width+height (boxplot pattern)
-    function fitLayout() {
-      const frame   = document.querySelector('.laptop-frame') || document.body;
-      const shell   = document.querySelector('.statistico-shell');
-      const headerH = shell ? shell.offsetHeight : 88;
-      const availH  = (frame.clientHeight || window.innerHeight) - headerH;
-      const container = document.querySelector('.results-container') || document.querySelector('.container');
-      const frameW = frame.clientWidth || window.innerWidth;
-      if (container) {
-        container.style.height = availH + 'px';
-        container.style.width  = frameW + 'px';  // explicit: bypasses flex-cache width issue
-      }
-      setTimeout(() => {
-        if (typeof Highcharts !== 'undefined')
-          Highcharts.charts.forEach(c => c && c.reflow && c.reflow());
-      }, 50);
-    // See .github/workflows/deploy.yml
-           
-  </script>
   
   <style>
     /* AI Button Styles */
@@ -1668,7 +1648,7 @@
     </div>
 
     <!-- Results Section -->
-    <div class="results-section" id="results-section">
+    <div class="results-section" id="results-section" style="display: none;">
       <div class="results-header">
         <div class="section-header" style="margin: 0;">Hypothesis Test Results</div>
         <div class="results-actions is-awaiting" id="results-actions">
@@ -1950,6 +1930,7 @@
     let currentAlpha = 0.05;
     let headerInitialized = false;
     let librariesLoaded = false;
+    let testHasRun = false;
     
     // Initialize
         // ── Export JSON ────────────────────────────────────────────────────
@@ -2191,17 +2172,19 @@
     // Set awaiting state (hide results, show awaiting message)
     function setAwaitingState() {
       const resultsSection = document.getElementById('results-section');
-      const hasData = resultsData && resultsData.values && resultsData.values.length;
+      const momentsSection = document.getElementById('moments-section');
       if (!resultsSection) return;
 
-      if (hasData) {
-        resultsSection.style.display = 'flex';
-        document.getElementById('awaiting-results').style.display = 'block';
-        document.getElementById('actual-results').style.display = 'none';
-        setResultsToolbarVisible(false);
-      } else {
+      if (!testHasRun) {
         resultsSection.style.display = 'none';
+        if (momentsSection) momentsSection.style.display = 'none';
+        return;
       }
+
+      resultsSection.style.display = 'flex';
+      document.getElementById('awaiting-results').style.display = 'block';
+      document.getElementById('actual-results').style.display = 'none';
+      setResultsToolbarVisible(false);
     }
 
     // Refresh bootstrap (re-run with new random seed)
@@ -2257,6 +2240,9 @@
         showNotification('No data available. Please load data first.', 'error');
         return;
       }
+
+      testHasRun = true;
+      renderMainMoments(resultsData.values, resultsData.descriptive);
       
       // Show results section and actual results immediately
       document.getElementById('results-section').style.display = 'flex';
@@ -2601,8 +2587,6 @@
       const variableName = resultsData.column || 'Variable';
       StatisticoHeader.updateVariable(variableName, resultsData.n);
       console.log('? Header updated with data:', variableName, 'n=', resultsData.n);
-      renderMainMoments(resultsData.values, resultsData.descriptive);
-      setAwaitingState();
     }
 
     function loadSampleData() {

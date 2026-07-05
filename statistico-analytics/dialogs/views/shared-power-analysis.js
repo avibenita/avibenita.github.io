@@ -325,6 +325,15 @@
       else if (type === 'error') statusEl.classList.add('pwstd-band--error');
     }
 
+    function clientToSvgPoint(svg, clientX, clientY) {
+      var pt = svg.createSVGPoint();
+      pt.x = clientX;
+      pt.y = clientY;
+      var ctm = svg.getScreenCTM();
+      if (!ctm) return null;
+      return pt.matrixTransform(ctm.inverse());
+    }
+
     function bindCurveInteraction(svg) {
       if (!svg || svg._pwCurveBound) return;
       svg._pwCurveBound = true;
@@ -333,6 +342,7 @@
 
       function hideHover() {
         if (tooltip) tooltip.hidden = true;
+        svg.style.cursor = '';
         var hover = svg.querySelector('.pwstd-curve-hover');
         if (hover) hover.setAttribute('opacity', '0');
       }
@@ -340,14 +350,23 @@
       function showHover(clientX, clientY) {
         var data = svg._pwCurve;
         if (!data || !tooltip || !wrap) return;
-        var rect = svg.getBoundingClientRect();
-        if (!rect.width) return;
-        var svgX = ((clientX - rect.left) / rect.width) * data.W;
-        var clampedX = Math.max(data.pad.l, Math.min(data.pad.l + data.plotW, svgX));
-        var n = Math.round(data.minN + ((clampedX - data.pad.l) / data.plotW) * (data.maxN - data.minN));
+        var pt = clientToSvgPoint(svg, clientX, clientY);
+        if (!pt) {
+          hideHover();
+          return;
+        }
+        var plotL = data.pad.l;
+        var plotR = data.pad.l + data.plotW;
+        var plotT = data.pad.t;
+        var plotB = data.pad.t + data.plotH;
+        if (pt.x < plotL || pt.x > plotR || pt.y < plotT || pt.y > plotB) {
+          hideHover();
+          return;
+        }
+        var n = Math.round(data.minN + ((pt.x - plotL) / data.plotW) * (data.maxN - data.minN));
         var power = interpolatePowerAtN(data.points, n);
-        var x = data.pad.l + ((n - data.minN) / (data.maxN - data.minN)) * data.plotW;
-        var y = data.pad.t + data.plotH - (power * data.plotH);
+        var x = plotL + ((n - data.minN) / (data.maxN - data.minN)) * data.plotW;
+        var y = plotT + data.plotH - (power * data.plotH);
         var hover = svg.querySelector('.pwstd-curve-hover');
         if (!hover) {
           hover = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -356,10 +375,11 @@
           svg.appendChild(hover);
         }
         hover.setAttribute('opacity', '1');
+        svg.style.cursor = 'crosshair';
         hover.querySelector('.pwstd-curve-crosshair-v').setAttribute('x1', x.toFixed(1));
         hover.querySelector('.pwstd-curve-crosshair-v').setAttribute('x2', x.toFixed(1));
-        hover.querySelector('.pwstd-curve-crosshair-v').setAttribute('y1', data.pad.t);
-        hover.querySelector('.pwstd-curve-crosshair-v').setAttribute('y2', (data.pad.t + data.plotH).toFixed(1));
+        hover.querySelector('.pwstd-curve-crosshair-v').setAttribute('y1', plotT);
+        hover.querySelector('.pwstd-curve-crosshair-v').setAttribute('y2', plotB.toFixed(1));
         hover.querySelector('.pwstd-curve-hover-dot').setAttribute('cx', x.toFixed(1));
         hover.querySelector('.pwstd-curve-hover-dot').setAttribute('cy', y.toFixed(1));
         tooltip.innerHTML = '<strong>N = ' + n + '</strong>Power = ' + (power * 100).toFixed(1) + '%';
@@ -747,6 +767,6 @@
       if (global.StatisticoPowerAnalysis._activeEngine) global.StatisticoPowerAnalysis._activeEngine.calculateDetectableEffect();
     },
     _activeEngine: null,
-    VERSION: '20260705j'
+    VERSION: '20260705m'
   };
 })(window);

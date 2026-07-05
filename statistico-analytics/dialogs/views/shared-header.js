@@ -5293,6 +5293,28 @@ const StatisticoHeader = {
     rail.appendChild(btn);
   },
 
+  _ensureAnovaPowerNav(nav) {
+    if (this.module !== 'anova' || !nav) return;
+    if (nav.querySelector('.sb-item[data-tab="power"]')) return;
+    const rails = nav.querySelectorAll('.sb-group .sb-items-rail');
+    const analysisRail = rails[0];
+    if (!analysisRail) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sb-item';
+    btn.id = 'anovaPowerNavBtn';
+    btn.setAttribute('data-tab', 'power');
+    btn.setAttribute('title', 'Required sample size, achieved power, and detectable η².');
+    btn.setAttribute('onclick', "switchTab('power')");
+    btn.innerHTML = ''
+      + '<i class="fa-solid fa-bolt sb-item-icon"></i>'
+      + '<span class="sb-item-copy"><span class="sb-item-label">Power &amp; Sample Size</span>'
+      + '<span class="sb-item-description">Required N, achieved power &amp; detectable η²</span></span>';
+    const comparisonsBtn = analysisRail.querySelector('.sb-item[data-tab="comparisons"]');
+    if (comparisonsBtn) analysisRail.insertBefore(btn, comparisonsBtn);
+    else analysisRail.appendChild(btn);
+  },
+
   _ensureRegressionByGroupNav(nav) {
     if (this.module !== 'regression' || !nav) return;
     if (document.getElementById('regByGroupNav')) return;
@@ -5325,6 +5347,7 @@ const StatisticoHeader = {
     this._ensureRegressionByGroupNav(nav);
     this._ensureRegressionAncovaNav(nav);
     this._ensureRegressionPowerNav(nav);
+    this._ensureAnovaPowerNav(nav);
     if (this.module === 'regression' && nav && !document.getElementById('regSidebarScrollHint')) {
       const hint = document.createElement('div');
       hint.id = 'regSidebarScrollHint';

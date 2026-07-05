@@ -30,8 +30,8 @@
   <script src="../shared-brand-logo.js?v=20260601gauss"></script>
   <script src="../shared-header.js?v=20260609h"></script>
   <script src="../shared-workspace-tabs.js?v=20260609h"></script>
-  <link rel="stylesheet" href="../shared-power-template.css?v=20260705c" />
-  <script src="../shared-power-template.js?v=20260705c"></script>
+  <link rel="stylesheet" href="../shared-power-template.css?v=20260705d" />
+  <script src="../shared-power-template.js?v=20260705d"></script>
 
   <style>
     /* Dark Theme (Default) */
@@ -2082,15 +2082,25 @@
     #tab-power.tab-content.active {
       display: flex;
       flex-direction: column;
-      overflow-y: auto;
+      overflow: hidden;
       box-sizing: border-box;
       height: 100%;
       min-height: 0;
-      padding: 8px 0;
+      padding: 4px 0 0;
     }
     #tab-power #sharedPowerTemplateMount {
       flex: 1 1 0;
       min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    #tab-power #sharedPowerTemplateMount .pwstd-shell--analysis {
+      flex: 1 1 0;
+      min-height: 0;
+    }
+    #tab-power .pwstd-shell--analysis .pwstd-tech-panel {
+      display: none;
     }
 
     /* Diagnostics: flex column so ws-body scrolls and bottom panels are not clipped */
@@ -11079,13 +11089,11 @@ ${sectionsHtml}
     function renderRegressionPowerCurve(ctx, targetPower, requiredN) {
       const svg = document.getElementById('pwstd-power-curve-svg');
       const tooltip = document.getElementById('pwstd-curve-tooltip');
-      const note = document.getElementById('pwstd-curve-note');
       if (!svg) return;
       if (!ctx) {
         svg.innerHTML = '';
         svg.classList.remove('pwstd-power-curve--ready');
         if (tooltip) tooltip.hidden = true;
-        if (note) note.textContent = 'Exact noncentral F curve at fixed f² and α — hover to read power at any N.';
         return;
       }
 
@@ -11102,7 +11110,7 @@ ${sectionsHtml}
         points.push({ n: maxN, power: regressionPowerAtF2(maxN, ctx.p, ctx.f2, ctx.alpha, ctx.withIntercept) });
       }
 
-      const W = 640, H = 260, pad = { l: 56, r: 34, t: 22, b: 46 };
+      const W = 640, H = 200, pad = { l: 56, r: 34, t: 22, b: 46 };
       const plotW = W - pad.l - pad.r;
       const plotH = H - pad.t - pad.b;
       const xScale = function(n) { return pad.l + ((n - minN) / (maxN - minN)) * plotW; };
@@ -11156,9 +11164,6 @@ ${sectionsHtml}
       svg.classList.add('pwstd-power-curve--ready');
       bindRegressionPowerCurveInteraction(svg);
 
-      if (note) {
-        note.textContent = 'Computed from exact noncentral F (f²=' + ctx.f2.toFixed(3) + ', α=' + ctx.alpha.toFixed(3) + ', df1=' + ctx.p + ') — hover the curve to inspect any N.';
-      }
       if (tooltip) tooltip.hidden = true;
     }
 
@@ -11236,7 +11241,7 @@ ${sectionsHtml}
 
       const engineNote = document.getElementById('powEngineNote');
       if (engineNote) {
-        engineNote.innerHTML = '<i class="fa-solid fa-calculator"></i> Exact noncentral F (G*Power / Cohen fixed model): λ=N·f², f²=R²/(1−R²), df1=p, df2=N−p−1. Post-hoc power is descriptive; use Required N or Detectable R² for planning.';
+        engineNote.textContent = 'Exact noncentral F (G*Power fixed regression): λ=N·f², f²=R²/(1−R²), df1=' + ctx.p + ', df2=N−' + ctx.p + (ctx.withIntercept ? '−1' : '') + ' — computed in browser via jStat.';
       }
 
       if (window.StatisticoPowerTemplate && window.StatisticoPowerTemplate.syncDefaultChip) {

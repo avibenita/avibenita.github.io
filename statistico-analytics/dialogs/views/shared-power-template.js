@@ -76,6 +76,8 @@
     var ids = o.ids || {};
     var title = o.title || 'Power & Sample Size';
     var customHandler = esc(o.customHandler || 'window.StatisticoPowerTemplate.runCustomCompute()');
+    var effectMetricLabel = o.effectMetric || 'Observed R²';
+    var effectSizeMetricLabel = o.effectSizeMetric || "Effect Size f²";
 
     var chipHtml = CHIPS.map(function(c){
       var valueId = id(ids, c.key, c.fallback);
@@ -108,7 +110,7 @@
     }).join('\n');
 
     container.innerHTML = [
-      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260705h">',
+      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260705j">',
       '  <header class="pwstd-page-header">',
       '    <h2 class="pwstd-title"><i class="fa-solid fa-bolt"></i> ' + esc(title) + '</h2>',
       '    <p class="pwstd-subtitle">Required N, achieved power, and detectable effect</p>',
@@ -133,8 +135,8 @@
       '  <div class="pwstd-metrics-row">',
       '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Achieved Power</div><div class="pwstd-metric-value" id="' + id(ids,'observed','powObserved') + '">—</div></div>',
       '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Current N</div><div class="pwstd-metric-value" id="' + id(ids,'sampleSize','powSampleSize') + '">—</div></div>',
-      '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Observed R²</div><div class="pwstd-metric-value" id="pwstd-metric-r2">—</div></div>',
-      '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Effect Size f²</div><div class="pwstd-metric-value" id="' + id(ids,'effectSize','powEffectSize') + '">—</div></div>',
+      '    <div class="pwstd-metric-card"><div class="pwstd-metric-label" id="pwstd-metric-effect-label">' + esc(effectMetricLabel) + '</div><div class="pwstd-metric-value" id="pwstd-metric-r2">—</div></div>',
+      '    <div class="pwstd-metric-card"><div class="pwstd-metric-label" id="pwstd-metric-f-label">' + esc(effectSizeMetricLabel) + '</div><div class="pwstd-metric-value" id="' + id(ids,'effectSize','powEffectSize') + '">—</div></div>',
       '  </div>',
       '  <div class="pwstd-grid pwstd-grid--analysis">',
       '    <div class="pwstd-card pwstd-card--planning pwstd-card--primary" id="pwstd-card-planning">',

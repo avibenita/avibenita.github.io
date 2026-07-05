@@ -154,7 +154,7 @@
       if (labels.design) powSetText('powDesignType', labels.design);
       if (labels.target) powSetText('powTargetWhat', labels.target);
       if (labels.effectSource) powSetText('powEffectSource', labels.effectSource);
-      var metric = document.querySelector('#tab-power .pwstd-metric-card:nth-child(3) .pwstd-metric-label');
+      var metric = document.getElementById('pwstd-metric-effect-label');
       if (metric && labels.effectMetric) metric.textContent = labels.effectMetric;
       var partial = document.querySelector('#pwstd-card-planning .pwstd-planning-stat.pwstd-for-main span');
       if (partial && labels.planningEffect) partial.textContent = labels.planningEffect;
@@ -163,7 +163,7 @@
         if (labels.detectableObserved) detItems[0].textContent = labels.detectableObserved;
         if (labels.detectableThreshold) detItems[1].textContent = labels.detectableThreshold;
       }
-      var fMetric = document.querySelector('#tab-power .pwstd-metric-card:nth-child(4) .pwstd-metric-label');
+      var fMetric = document.getElementById('pwstd-metric-f-label');
       if (fMetric && labels.effectSizeMetric) fMetric.textContent = labels.effectSizeMetric;
       if (labels.minDetectableF) {
         var minFEl = document.getElementById('powMinDetectableF');
@@ -189,9 +189,12 @@
     }
 
     function formatEffectSize(ctx) {
-      if (cfg.variant === 'anova' && isFinite(ctx.cohenF)) {
-        var fMag = cohenFMagnitude(ctx.cohenF);
-        return ctx.cohenF.toFixed(3) + (fMag ? ' — ' + fMag.charAt(0).toUpperCase() + fMag.slice(1) : '');
+      if (cfg.variant === 'anova') {
+        var f = isFinite(ctx.cohenF) ? ctx.cohenF : (ctx.f2 > 0 ? Math.sqrt(ctx.f2) : NaN);
+        if (isFinite(f)) {
+          var fMag = cohenFMagnitude(f);
+          return f.toFixed(3) + (fMag ? ' — ' + fMag.charAt(0).toUpperCase() + fMag.slice(1) : '');
+        }
       }
       var mag = cohenMagnitude(ctx.f2);
       return ctx.f2.toFixed(3) + (mag ? ' — ' + mag.charAt(0).toUpperCase() + mag.slice(1) : '');
@@ -605,10 +608,13 @@
       mountOpts = mountOpts || {};
       if (!global.StatisticoPowerTemplate || typeof global.StatisticoPowerTemplate.renderById !== 'function') return engine;
       var mountId = mountOpts.mountId || 'sharedPowerTemplateMount';
+      var labels = cfg.labels || {};
       global.StatisticoPowerTemplate.renderById(mountId, {
         title: mountOpts.title || 'Power & Sample Size',
         layout: 'analysis',
         variant: mountOpts.variant || cfg.variant || 'regression',
+        effectMetric: labels.effectMetric,
+        effectSizeMetric: labels.effectSizeMetric,
         customHandler: mountOpts.customHandler || 'window.StatisticoPowerTemplate.runCustomCompute()',
         detectableHandler: mountOpts.detectableHandler || 'StatisticoPowerAnalysis._computeDetectable()'
       });
@@ -741,6 +747,6 @@
       if (global.StatisticoPowerAnalysis._activeEngine) global.StatisticoPowerAnalysis._activeEngine.calculateDetectableEffect();
     },
     _activeEngine: null,
-    VERSION: '20260705i'
+    VERSION: '20260705j'
   };
 })(window);

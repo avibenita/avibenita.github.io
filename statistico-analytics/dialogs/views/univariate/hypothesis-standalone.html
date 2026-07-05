@@ -1497,6 +1497,10 @@
     }
 
     /* Chart specific styles */
+    .chart-wrap {
+      position: relative;
+    }
+
     #chart {
       height: 380px;
       background: var(--surface-2);
@@ -1504,6 +1508,27 @@
       padding: 8px;
       border: 1px solid var(--border);
     }
+
+    .chart-offscale-marker {
+      display: none;
+      position: absolute;
+      top: 52%;
+      transform: translateY(-50%);
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: rgba(20, 24, 36, 0.94);
+      border: 2px solid rgb(255, 215, 0);
+      color: rgb(255, 215, 0);
+      font-size: 12px;
+      font-weight: 700;
+      pointer-events: none;
+      z-index: 5;
+      white-space: nowrap;
+      box-shadow: 0 0 14px rgba(255, 215, 0, 0.35);
+    }
+
+    .chart-offscale-marker.is-left { left: 12px; }
+    .chart-offscale-marker.is-right { right: 12px; }
 
     .chart-slider-row {
       display: flex;
@@ -1969,7 +1994,10 @@
           </label>
           <input class="slider" id="alphaChartSlider" max="0.15" min="0.01" step="0.01" type="range" value="0.05" oninput="updateChartAlpha()"/>
         </div>
-        <div id="chart"></div>
+        <div class="chart-wrap">
+          <div id="chart"></div>
+          <div id="chart-offscale-marker" class="chart-offscale-marker" aria-hidden="true"></div>
+        </div>
         <div class="interpretation-toggle">
           <button class="interpretation-toggle-btn" id="toggleInterpretationBtn" onclick="toggleInterpretation()">
             <i class="fa-solid fa-chevron-down"></i>
@@ -2849,19 +2877,36 @@
     // VISUALIZATION FUNCTIONS
     // ========================================
     
-    window.openVisualization = function() {
+    function setInterpretationOpen(isOpen) {
+      const explanation = document.getElementById('chartExplanation');
+      const btn = document.getElementById('toggleInterpretationBtn');
+      const btnText = document.getElementById('toggleInterpretationText');
+      if (!explanation || !btn || !btnText) return;
+      explanation.classList.toggle('show', isOpen);
+      btn.classList.toggle('expanded', isOpen);
+      btnText.textContent = isOpen ? 'Hide Interpretation' : 'Show Interpretation';
+    }
+
+    function showVisualizationModal() {
       const modal = document.getElementById('visualModal');
       if (!modal) return;
-      
-      // Check if we have results to visualize
+
       if (document.getElementById('actual-results').style.display === 'none') {
         showNotification('Please run a hypothesis test first before visualizing.', 'error');
         return;
       }
-      
+
       modal.classList.add('show');
-      setTimeout(() => updateChart(), 200); // Wait for animation to start
-    };
+      setInterpretationOpen(true);
+
+      setTimeout(function () {
+        updateChart();
+        const chart = Highcharts.charts.find(function (c) { return c && c.renderTo && c.renderTo.id === 'chart'; });
+        if (chart && chart.reflow) chart.reflow();
+      }, 120);
+    }
+
+    window.openVisualization = showVisualizationModal;
 
     window.closeVisualization = function() {
       const modal = document.getElementById('visualModal');
@@ -2872,61 +2917,11 @@
 
     window.toggleInterpretation = function() {
       const explanation = document.getElementById('chartExplanation');
-      const btn = document.getElementById('toggleInterpretationBtn');
-      const btnText = document.getElementById('toggleInterpretationText');
-      
-      if (explanation.classList.contains('show')) {
-        explanation.classList.remove('show');
-        btn.classList.remove('expanded');
-        btnText.textContent = 'Show Interpretation';
-      } else {
-        explanation.classList.add('show');
-        btn.classList.add('expanded');
-        btnText.textContent = 'Hide Interpretation';
-      }
+      if (!explanation) return;
+      setInterpretationOpen(!explanation.classList.contains('show'));
     };
 
-    // Open visualization modal with interpretation expanded
-    window.openVisualizationWithInterpretation = function() {
-      // First, open the visualization modal
-      const modal = document.getElementById('visualModal');
-      if (!modal) return;
-      
-      // Check if we have results to visualize
-      if (document.getElementById('actual-results').style.display === 'none') {
-        showNotification('Please run a hypothesis test first before visualizing.', 'error');
-        return;
-      }
-      
-      // Open modal
-      modal.classList.add('show');
-      
-      // Update chart after a short delay to ensure modal is visible
-      setTimeout(() => {
-        updateChart();
-        
-        // Expand interpretation section after chart loads
-        setTimeout(() => {
-          const explanation = document.getElementById('chartExplanation');
-          const btn = document.getElementById('toggleInterpretationBtn');
-          const btnText = document.getElementById('toggleInterpretationText');
-          
-          if (explanation && !explanation.classList.contains('show')) {
-            explanation.classList.add('show');
-            btn.classList.add('expanded');
-            btnText.textContent = 'Hide Interpretation';
-          }
-          
-          // Smooth scroll to interpretation section
-          setTimeout(() => {
-            const toggleBtn = document.getElementById('toggleInterpretationBtn');
-            if (toggleBtn) {
-              toggleBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-          }, 300);
-        }, 500);
-      }, 100);
-    };
+    window.openVisualizationWithInterpretation = showVisualizationModal;
 
     window.updateChartAlpha = function() {
       const slider = document.getElementById('alphaChartSlider');
@@ -2978,62 +2973,47 @@
         };
       }
 
+      const isLeft = testStat < CHART_X_MIN;
+      const edgeX = isLeft ? CHART_X_MIN : CHART_X_MAX;
+      const arrow = isLeft ? '\u25C0' : '\u25B6';
+
       return {
         inRange: false,
-        plotLine: null,
-        offScale: {
-          testStat,
-          isLeft: testStat < CHART_X_MIN,
-          edgeX: testStat < CHART_X_MIN ? CHART_X_MIN : CHART_X_MAX
-        }
+        plotLine: {
+          value: edgeX,
+          color: 'rgb(255,215,0)',
+          width: 3,
+          zIndex: 6,
+          label: {
+            text: isLeft ? `${arrow} z = ${testStat.toFixed(3)}` : `z = ${testStat.toFixed(3)} ${arrow}`,
+            align: isLeft ? 'left' : 'right',
+            x: isLeft ? 8 : -8,
+            y: 22,
+            style: { color: 'rgb(255,215,0)', fontSize: '12px', fontWeight: '700' }
+          }
+        },
+        offScale: { testStat: testStat, isLeft: isLeft }
       };
     }
 
-    function clearOffScaleMarker(chart) {
-      if (!chart || !chart._offScaleGfx) return;
-      chart._offScaleGfx.forEach(function (g) {
-        try { g.destroy(); } catch (_e) {}
-      });
-      chart._offScaleGfx = null;
-    }
+    function updateOffScaleOverlay(statDisplay) {
+      const el = document.getElementById('chart-offscale-marker');
+      if (!el) return;
 
-    function renderOffScaleMarker(chart, offScale) {
-      clearOffScaleMarker(chart);
-      if (!offScale || !chart.xAxis || !chart.xAxis[0]) return;
-
-      const testStat = offScale.testStat;
-      const isLeft = offScale.isLeft;
-      const edgeX = offScale.edgeX;
-      const x = chart.xAxis[0].toPixels(edgeX, false);
-      if (!Number.isFinite(x)) return;
-
-      const y = chart.plotTop + chart.plotHeight * 0.68;
-      const arrow = isLeft ? '\u25C0' : '\u25B6';
-      const labelText = isLeft ? `${arrow} z = ${testStat.toFixed(3)}` : `z = ${testStat.toFixed(3)} ${arrow}`;
-      const triSize = 10;
-      const triPath = isLeft
-        ? ['M', x + triSize, y - triSize * 0.75, 'L', x, y, 'L', x + triSize, y + triSize * 0.75, 'Z']
-        : ['M', x - triSize, y - triSize * 0.75, 'L', x, y, 'L', x - triSize, y + triSize * 0.75, 'Z'];
-      const gfx = [];
-
-      gfx.push(chart.renderer.path(triPath)
-        .attr({ fill: 'rgb(255,215,0)', stroke: 'rgba(255,255,255,0.65)', 'stroke-width': 1, zIndex: 8 })
-        .add());
-
-      gfx.push(chart.renderer.text(labelText, x + (isLeft ? triSize + 4 : -(triSize + 4)), y + 4, true)
-        .css({ color: 'rgb(255,215,0)', fontWeight: '700', fontSize: '11px' })
-        .attr({ align: isLeft ? 'left' : 'right', zIndex: 8 })
-        .add());
-
-      chart._offScaleGfx = gfx;
-    }
-
-    function finalizeChartMarkers(chart, statDisplay) {
-      if (statDisplay && statDisplay.offScale) {
-        renderOffScaleMarker(chart, statDisplay.offScale);
-      } else {
-        clearOffScaleMarker(chart);
+      if (!statDisplay || statDisplay.inRange || !statDisplay.offScale) {
+        el.style.display = 'none';
+        el.className = 'chart-offscale-marker';
+        el.setAttribute('aria-hidden', 'true');
+        return;
       }
+
+      const testStat = statDisplay.offScale.testStat;
+      const isLeft = statDisplay.offScale.isLeft;
+      const arrow = isLeft ? '\u25C0' : '\u25B6';
+      el.textContent = isLeft ? `${arrow} z = ${testStat.toFixed(3)}` : `z = ${testStat.toFixed(3)} ${arrow}`;
+      el.className = 'chart-offscale-marker ' + (isLeft ? 'is-left' : 'is-right');
+      el.style.display = 'block';
+      el.setAttribute('aria-hidden', 'false');
     }
 
     function updateChart() {
@@ -3119,9 +3099,7 @@
           style: { color: 'rgba(200,220,255,0.7)', fontSize: '12px' },
           useHTML: true
         }, false);
-        existing._statDisplay = statDisplay;
         existing.redraw();
-        finalizeChartMarkers(existing, statDisplay);
       } else {
         const series = [{
           data: pts,
@@ -3132,17 +3110,12 @@
           fillOpacity: 1
         }];
 
-        const chart = Highcharts.chart('chart', {
+        Highcharts.chart('chart', {
           chart: {
             type: 'area',
             backgroundColor: 'transparent',
             animation: false,
-            style: { fontFamily: "'Segoe UI', Tahoma, sans-serif" },
-            events: {
-              redraw: function () {
-                finalizeChartMarkers(this, this._statDisplay);
-              }
-            }
+            style: { fontFamily: "'Segoe UI', Tahoma, sans-serif" }
           },
           title: {
             text: testType,
@@ -3180,9 +3153,9 @@
           },
           series: series
         });
-        chart._statDisplay = statDisplay;
-        finalizeChartMarkers(chart, statDisplay);
       }
+
+      updateOffScaleOverlay(statDisplay);
 
       // Update explanation
       const explanation = document.getElementById('chartExplanation');

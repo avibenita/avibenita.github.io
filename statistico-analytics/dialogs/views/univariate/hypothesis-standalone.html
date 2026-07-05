@@ -2950,6 +2950,93 @@
       return p < 0.5 ? -z : z;
     }
 
+    const CHART_X_MIN = -4;
+    const CHART_X_MAX = 4;
+
+    function getTestStatDisplay(testStat) {
+      if (Number.isNaN(testStat)) {
+        return { inRange: true, plotLine: null, markerSeries: null };
+      }
+
+      const inRange = testStat >= CHART_X_MIN && testStat <= CHART_X_MAX;
+      if (inRange) {
+        return {
+          inRange: true,
+          plotLine: {
+            value: testStat,
+            color: 'rgb(255,215,0)',
+            width: 3,
+            zIndex: 5,
+            label: {
+              text: `z = ${testStat.toFixed(3)}`,
+              style: { color: 'rgb(255,215,0)', fontSize: '11px', fontWeight: '700' },
+              rotation: 0,
+              y: 30
+            }
+          },
+          markerSeries: null
+        };
+      }
+
+      const isLeft = testStat < CHART_X_MIN;
+      const edgeX = isLeft ? CHART_X_MIN : CHART_X_MAX;
+      const arrow = isLeft ? '\u25C0' : '\u25B6';
+
+      return {
+        inRange: false,
+        plotLine: null,
+        markerSeries: {
+          type: 'scatter',
+          name: 'Test Statistic',
+          data: [{ x: edgeX, y: 0.03, testStat: testStat }],
+          enableMouseTracking: true,
+          zIndex: 6,
+          marker: {
+            symbol: isLeft ? 'triangle-left' : 'triangle-right',
+            radius: 9,
+            fillColor: 'rgb(255,215,0)',
+            lineColor: 'rgba(255,255,255,0.55)',
+            lineWidth: 1
+          },
+          dataLabels: {
+            enabled: true,
+            useHTML: true,
+            formatter: function () {
+              const z = this.point.testStat;
+              return `<span style="color:rgb(255,215,0);font-weight:700;font-size:11px;">${arrow} z = ${z.toFixed(3)}</span>`;
+            },
+            align: isLeft ? 'left' : 'right',
+            verticalAlign: 'bottom',
+            x: isLeft ? 8 : -8,
+            y: -4
+          },
+          tooltip: {
+            pointFormatter: function () {
+              return `<b>Test statistic</b><br>z = ${this.testStat.toFixed(4)}<br><span style="opacity:0.8">(outside visible range)</span>`;
+            }
+          }
+        }
+      };
+    }
+
+    function syncTestStatMarkerSeries(chart, markerSeries) {
+      const marker = chart.series.find(s => s.name === 'Test Statistic');
+      if (markerSeries) {
+        if (marker) {
+          marker.update({
+            data: markerSeries.data,
+            marker: markerSeries.marker,
+            dataLabels: markerSeries.dataLabels,
+            tooltip: markerSeries.tooltip
+          }, false);
+        } else {
+          chart.addSeries(markerSeries, false);
+        }
+      } else if (marker) {
+        marker.remove(false);
+      }
+    }
+
     function updateChart() {
       if (typeof Highcharts === 'undefined') {
         console.error('Highcharts not available');
@@ -2978,7 +3065,7 @@
 
       // Distribution data: -4 … +4 in steps of 0.04
       const pts = [];
-      for (let v = -4; v <= 4; v += 0.04) {
+      for (let v = CHART_X_MIN; v <= CHART_X_MAX; v += 0.04) {
         pts.push([parseFloat(v.toFixed(4)), normalPDF(v)]);
       }
 
@@ -3010,27 +3097,44 @@
           label: { text: `Crit ${critRight.toFixed(3)}`, style: { color: 'rgb(255,165,120)', fontSize: '11px' }, rotation: 0, y: 16 }
         });
       }
-      if (testStat !== 0) {
-        plotLines.push({
-          value: testStat, color: 'rgb(255,215,0)', width: 3,
-          label: { text: `z = ${testStat.toFixed(3)}`, style: { color: 'rgb(255,215,0)', fontSize: '11px', fontWeight: '700' }, rotation: 0, y: 30 }
-        });
+      const statDisplay = getTestStatDisplay(testStat);
+      if (statDisplay.plotLine) {
+        plotLines.push(statDisplay.plotLine);
       }
+
+      const offScaleNote = !statDisplay.inRange && testStat
+        ? ` <span style="opacity:0.75">(${testStat < CHART_X_MIN ? 'off scale \u25C0' : 'off scale \u25B6'})</span>`
+        : '';
+      const subtitleText = `z = ${testStat.toFixed(4)} &nbsp;|&nbsp; p = ${pValue.toFixed(4)} &nbsp;|&nbsp; \u03B1 = ${alpha.toFixed(2)}${offScaleNote}`;
 
       const existing = Highcharts.charts.find(c => c && c.renderTo && c.renderTo.id === 'chart');
       if (existing) {
         existing.series[0].setData(pts, false);
         existing.series[0].update({ zoneAxis: 'x', zones }, false);
-        existing.xAxis[0].update({ plotLines }, false);
+        existing.xAxis[0].update({ min: CHART_X_MIN, max: CHART_X_MAX, plotLines }, false);
+        syncTestStatMarkerSeries(existing, statDisplay.markerSeries);
         existing.setTitle({
           text: `${testType}`,
           style: { color: 'rgba(255,255,255,0.9)', fontSize: '14px', fontWeight: '700' }
         }, {
-          text: `z = ${testStat.toFixed(4)} &nbsp;|&nbsp; p = ${pValue.toFixed(4)} &nbsp;|&nbsp; \u03B1 = ${alpha.toFixed(2)}`,
-          style: { color: 'rgba(200,220,255,0.7)', fontSize: '12px' }
+          text: subtitleText,
+          style: { color: 'rgba(200,220,255,0.7)', fontSize: '12px' },
+          useHTML: true
         }, false);
         existing.redraw();
       } else {
+        const series = [{
+          data: pts,
+          zoneAxis: 'x',
+          zones,
+          marker: { enabled: false },
+          lineWidth: 2.5,
+          fillOpacity: 1
+        }];
+        if (statDisplay.markerSeries) {
+          series.push(statDisplay.markerSeries);
+        }
+
         Highcharts.chart('chart', {
           chart: {
             type: 'area',
@@ -3043,11 +3147,13 @@
             style: { color: 'rgba(255,255,255,0.9)', fontSize: '14px', fontWeight: '700' }
           },
           subtitle: {
-            text: `z = ${testStat.toFixed(4)} &nbsp;|&nbsp; p = ${pValue.toFixed(4)} &nbsp;|&nbsp; \u03B1 = ${alpha.toFixed(2)}`,
+            text: subtitleText,
             style: { color: 'rgba(200,220,255,0.7)', fontSize: '12px' },
             useHTML: true
           },
           xAxis: {
+            min: CHART_X_MIN,
+            max: CHART_X_MAX,
             title: { text: 'Test Statistic', style: { color: 'rgba(255,255,255,0.7)' } },
             labels: { style: { color: 'rgba(255,255,255,0.6)' } },
             gridLineColor: 'rgba(255,255,255,0.07)',
@@ -3070,14 +3176,7 @@
             borderColor: 'rgba(120,200,255,0.3)',
             style: { color: '#fff' }
           },
-          series: [{
-            data: pts,
-            zoneAxis: 'x',
-            zones,
-            marker: { enabled: false },
-            lineWidth: 2.5,
-            fillOpacity: 1
-          }]
+          series: series
         });
       }
 
@@ -3087,6 +3186,12 @@
       const decision = reject
         ? '<strong style="color: rgb(255,100,100);">Reject H\u2080</strong>'
         : '<strong style="color: rgb(100,255,100);">Fail to Reject H\u2080</strong>';
+      const statPositionNote = !statDisplay.inRange && testStat
+        ? `<div style="margin-top: 4px; font-size: 12px; color: rgb(255,215,0);">
+             <i class="fa-solid fa-location-arrow" style="margin-right: 6px;"></i>
+             Test statistic is outside the visible range and is shown symbolically at the chart edge (${testStat < CHART_X_MIN ? 'left' : 'right'}).
+           </div>`
+        : '';
 
       explanation.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -3099,15 +3204,16 @@
             <div style="color: var(--text-muted);">Alpha Level:</div>
             <div>&alpha; = ${alpha.toFixed(2)} <span style="color: var(--accent-2);">(${(100 * (1 - alpha)).toFixed(0)}% confidence)</span></div>
             <div style="color: var(--text-muted);">Test Statistic:</div>
-            <div style="font-weight: 600; color: rgb(255,215,0);">${testStat.toFixed(4)}</div>
+            <div style="font-weight: 600; color: rgb(255,215,0);">${testStat.toFixed(4)}${!statDisplay.inRange ? ` <span style="font-size: 11px; opacity: 0.85;">(${testStat < CHART_X_MIN ? 'left of chart' : 'right of chart'})</span>` : ''}</div>
             <div style="color: var(--text-muted);">P-Value:</div>
             <div style="font-weight: 600; color: var(--accent-2);">${pValue.toFixed(4)}</div>
             <div style="color: var(--text-muted);">Decision:</div>
             <div style="font-size: 14px;">${decision}</div>
           </div>
+          ${statPositionNote}
           <div style="margin-top: 8px; padding: 10px; background: rgba(120,200,255,0.05); border-left: 3px solid var(--accent-2); border-radius: 4px; font-size: 12px; font-style: italic; color: var(--text-secondary);">
             <i class="fa-solid fa-lightbulb" style="color: var(--accent-2); margin-right: 6px;"></i>
-            The shaded red areas represent the rejection region(s). If the test statistic (yellow line) falls within these regions, we reject the null hypothesis.
+            The shaded red areas represent the rejection region(s). If the test statistic falls within these regions, we reject the null hypothesis.${statDisplay.inRange ? ' The yellow line marks the observed test statistic.' : ' When the statistic is off-scale, the yellow arrow at the chart edge marks its direction and value.'}
           </div>
         </div>
       `;

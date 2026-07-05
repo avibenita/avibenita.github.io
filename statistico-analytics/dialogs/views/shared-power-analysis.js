@@ -134,7 +134,7 @@
       return powerAtF2(ctx.n, ctx.df1, ctx.df2, ctx.f2, ctx.alpha);
     }
 
-    function requiredN(ctx, targetPower) {
+    function computeRequiredN(ctx, targetPower) {
       return estimateRequiredN(ctx.f2, ctx.df1, minN(ctx), function (n) { return df2AtN(ctx, n); }, targetPower, ctx.alpha);
     }
 
@@ -191,7 +191,7 @@
       var target = global.StatisticoPowerTemplate && global.StatisticoPowerTemplate.getSelectedTargetPower
         ? global.StatisticoPowerTemplate.getSelectedTargetPower()
         : { pct: '85%', power: 0.85 };
-      var reqN = requiredN(ctx, target.power);
+      var reqN = computeRequiredN(ctx, target.power);
       if (!reqN) {
         el.textContent = 'Select a target power to see required sample size.';
         return;
@@ -341,7 +341,7 @@
 
       var target = targetPower || 0.85;
       var lo = minN(ctx);
-      var req95 = requiredN(ctx, 0.95) || ctx.n;
+      var req95 = computeRequiredN(ctx, 0.95) || ctx.n;
       var maxN = Math.max(ctx.n + 15, req95 + 10, lo + 20);
       var step = Math.max(1, Math.floor((maxN - lo) / 80));
       var points = [];
@@ -426,10 +426,10 @@
       var power = observedPower(ctx);
       var mag = cohenMagnitude(ctx.f2);
       var reqMap = {
-        '80': requiredN(ctx, 0.80),
-        '85': requiredN(ctx, 0.85),
-        '90': requiredN(ctx, 0.90),
-        '95': requiredN(ctx, 0.95)
+        '80': computeRequiredN(ctx, 0.80),
+        '85': computeRequiredN(ctx, 0.85),
+        '90': computeRequiredN(ctx, 0.90),
+        '95': computeRequiredN(ctx, 0.95)
       };
       var detectable = detectableEffect(ctx, targetSel.power);
 
@@ -445,9 +445,10 @@
       powSetText('powReq90', reqMap['90'] || '—');
       powSetText('powReq95', reqMap['95'] || '—');
 
+      var reqNAtTarget = computeRequiredN(ctx, targetSel.power);
+
       updateExecutiveSummary(ctx, power);
       updatePlanningSummary(ctx);
-      renderCurve(ctx, targetSel.power, requiredN(ctx, targetSel.power));
       updateStatus(ctx, power, reqMap);
 
       var minF2 = estimateDetectableF2(ctx.n, ctx.df1, minN(ctx), function (n) { return df2AtN(ctx, n); }, detectTargetPower, ctx.alpha);
@@ -455,6 +456,12 @@
       powSetText('powMinDetectableEta', detectableEffect(ctx, detectTargetPower).toFixed(4));
       updateEffectCompare(ctx, detectable, targetSel.power);
       updateOutputParams(ctx, power);
+
+      try {
+        renderCurve(ctx, targetSel.power, reqNAtTarget);
+      } catch (curveErr) {
+        console.error('[StatisticoPowerAnalysis] renderCurve failed:', curveErr);
+      }
 
       var engineNote = document.getElementById('powEngineNote');
       if (engineNote && cfg.engineNote) {
@@ -480,7 +487,7 @@
       try {
         var ctx = getContext();
         if (!ctx) throw new Error('No analysis results available.');
-        var req = requiredN(ctx, targetPower);
+        var req = computeRequiredN(ctx, targetPower);
         if (!req) throw new Error('Could not estimate required N.');
         if (customRequiredN) { customRequiredN.textContent = req; customRequiredN.style.color = '#7fdb9f'; }
         if (global.StatisticoPowerTemplate && global.StatisticoPowerTemplate.onCustomComplete) {
@@ -537,7 +544,7 @@
         updatePlanningSummary(ctx);
         if (!ctx) return;
         var target = global.StatisticoPowerTemplate.getSelectedTargetPower();
-        renderCurve(ctx, target.power, requiredN(ctx, target.power));
+        renderCurve(ctx, target.power, computeRequiredN(ctx, target.power));
       };
       var detTarget = document.getElementById('powDetectableTarget');
       if (detTarget && !detTarget.dataset.powBound) {
@@ -645,6 +652,7 @@
     _computeDetectable: function () {
       if (global.StatisticoPowerAnalysis._activeEngine) global.StatisticoPowerAnalysis._activeEngine.calculateDetectableEffect();
     },
-    _activeEngine: null
+    _activeEngine: null,
+    VERSION: '20260705g'
   };
 })(window);

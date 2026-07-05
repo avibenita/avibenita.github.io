@@ -81,7 +81,7 @@
     }).join('\n');
 
     container.innerHTML = [
-      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260705d">',
+      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260705g">',
       '  <header class="pwstd-page-header">',
       '    <h2 class="pwstd-title"><i class="fa-solid fa-bolt"></i> ' + esc(title) + '</h2>',
       '    <p class="pwstd-subtitle">Required N, achieved power, and detectable effect</p>',

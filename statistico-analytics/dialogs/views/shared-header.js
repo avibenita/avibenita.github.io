@@ -1975,11 +1975,7 @@ const StatisticoHeader = {
     nav.innerHTML = `
       <div class="sb-logo">
         <div class="sb-logo-icon" data-statistico-brand-logo></div>
-      </div>
-      <div class="sb-header">
-        <i class="fa-solid fa-bars-staggered sb-menu-icon"></i>
-        <span class="sb-menu-title">${cfg.menuTitle || 'Menu'}</span>
-        <button class="sb-toggle-btn" onclick="StatisticoHeader.toggleSidebar()" title="Collapse / expand">
+        <button class="sb-toggle-btn sb-toggle-btn--logo" onclick="StatisticoHeader.toggleSidebar()" title="Collapse / expand sidebar" aria-label="Collapse sidebar">
           <i class="fa-solid fa-chevron-left"></i>
         </button>
       </div>

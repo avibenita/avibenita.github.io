@@ -30,8 +30,8 @@
   <script src="../shared-brand-logo.js?v=20260601gauss"></script>
   <script src="../shared-header.js?v=20260609h"></script>
   <script src="../shared-workspace-tabs.js?v=20260609h"></script>
-  <link rel="stylesheet" href="../shared-power-template.css?v=20260705b" />
-  <script src="../shared-power-template.js?v=20260705b"></script>
+  <link rel="stylesheet" href="../shared-power-template.css?v=20260705c" />
+  <script src="../shared-power-template.js?v=20260705c"></script>
 
   <style>
     /* Dark Theme (Default) */
@@ -10991,47 +10991,175 @@ ${sectionsHtml}
       return 'Recommendation: current sample size is sufficient for ' + parts.join(', ') + ' power' + (parts.length < 4 ? ', but not for all standard targets.' : '.');
     }
 
+    function powerCurveNiceStep(min, max, targetTicks) {
+      const span = Math.max(1, max - min);
+      const raw = span / Math.max(2, targetTicks);
+      const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+      const norm = raw / mag;
+      let nice = 10;
+      if (norm <= 1) nice = 1;
+      else if (norm <= 2) nice = 2;
+      else if (norm <= 5) nice = 5;
+      return Math.max(1, nice * mag);
+    }
+
+    function interpolatePowerAtN(points, n) {
+      if (!points || !points.length) return 0;
+      if (n <= points[0].n) return points[0].power;
+      if (n >= points[points.length - 1].n) return points[points.length - 1].power;
+      for (let i = 1; i < points.length; i++) {
+        const a = points[i - 1];
+        const b = points[i];
+        if (n <= b.n) {
+          const t = (n - a.n) / (b.n - a.n);
+          return a.power + t * (b.power - a.power);
+        }
+      }
+      return points[points.length - 1].power;
+    }
+
+    function bindRegressionPowerCurveInteraction(svg) {
+      if (!svg || svg._pwCurveBound) return;
+      svg._pwCurveBound = true;
+      const tooltip = document.getElementById('pwstd-curve-tooltip');
+      const wrap = svg.closest('.pwstd-curve-interactive');
+
+      function hideHover() {
+        if (tooltip) tooltip.hidden = true;
+        const hover = svg.querySelector('.pwstd-curve-hover');
+        if (hover) hover.setAttribute('opacity', '0');
+      }
+
+      function showHover(clientX, clientY) {
+        const data = svg._pwCurve;
+        if (!data || !tooltip || !wrap) return;
+        const rect = svg.getBoundingClientRect();
+        if (!rect.width) return;
+        const svgX = ((clientX - rect.left) / rect.width) * data.W;
+        const clampedX = Math.max(data.pad.l, Math.min(data.pad.l + data.plotW, svgX));
+        const n = Math.round(data.minN + ((clampedX - data.pad.l) / data.plotW) * (data.maxN - data.minN));
+        const power = interpolatePowerAtN(data.points, n);
+        const x = data.pad.l + ((n - data.minN) / (data.maxN - data.minN)) * data.plotW;
+        const y = data.pad.t + data.plotH - (power * data.plotH);
+
+        let hover = svg.querySelector('.pwstd-curve-hover');
+        if (!hover) {
+          hover = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          hover.setAttribute('class', 'pwstd-curve-hover');
+          hover.innerHTML = ''
+            + '<line class="pwstd-curve-crosshair-v" stroke="rgba(255,255,255,.35)" stroke-width="1" stroke-dasharray="4 3"/>'
+            + '<circle class="pwstd-curve-hover-dot" r="5" fill="#78c8ff" stroke="#fff" stroke-width="1.5"/>';
+          svg.appendChild(hover);
+        }
+        hover.setAttribute('opacity', '1');
+        hover.querySelector('.pwstd-curve-crosshair-v').setAttribute('x1', x.toFixed(1));
+        hover.querySelector('.pwstd-curve-crosshair-v').setAttribute('x2', x.toFixed(1));
+        hover.querySelector('.pwstd-curve-crosshair-v').setAttribute('y1', data.pad.t);
+        hover.querySelector('.pwstd-curve-crosshair-v').setAttribute('y2', (data.pad.t + data.plotH).toFixed(1));
+        hover.querySelector('.pwstd-curve-hover-dot').setAttribute('cx', x.toFixed(1));
+        hover.querySelector('.pwstd-curve-hover-dot').setAttribute('cy', y.toFixed(1));
+
+        tooltip.innerHTML = '<strong>N = ' + n + '</strong>Power = ' + (power * 100).toFixed(1) + '%';
+        tooltip.hidden = false;
+        const wrapRect = wrap.getBoundingClientRect();
+        tooltip.style.left = (clientX - wrapRect.left) + 'px';
+        tooltip.style.top = (clientY - wrapRect.top) + 'px';
+      }
+
+      svg.addEventListener('mousemove', function(e) { showHover(e.clientX, e.clientY); });
+      svg.addEventListener('mouseleave', hideHover);
+      svg.addEventListener('touchmove', function(e) {
+        if (!e.touches || !e.touches[0]) return;
+        e.preventDefault();
+        showHover(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+      svg.addEventListener('touchend', hideHover);
+    }
+
     function renderRegressionPowerCurve(ctx, targetPower, requiredN) {
       const svg = document.getElementById('pwstd-power-curve-svg');
-      if (!svg || !ctx) return;
+      const tooltip = document.getElementById('pwstd-curve-tooltip');
+      const note = document.getElementById('pwstd-curve-note');
+      if (!svg) return;
+      if (!ctx) {
+        svg.innerHTML = '';
+        svg.classList.remove('pwstd-power-curve--ready');
+        if (tooltip) tooltip.hidden = true;
+        if (note) note.textContent = 'Exact noncentral F curve at fixed f² and α — hover to read power at any N.';
+        return;
+      }
 
+      const target = targetPower || 0.85;
       const minN = Math.max(ctx.p + (ctx.withIntercept ? 3 : 2), 8);
       const req95 = estimateRegressionRequiredN(ctx.f2, ctx.p, 0.95, ctx.alpha, ctx.withIntercept) || ctx.n;
       const maxN = Math.max(ctx.n + 15, req95 + 10, minN + 20);
-      const step = Math.max(1, Math.floor((maxN - minN) / 50));
+      const step = Math.max(1, Math.floor((maxN - minN) / 80));
       const points = [];
       for (let n = minN; n <= maxN; n += step) {
         points.push({ n: n, power: regressionPowerAtF2(n, ctx.p, ctx.f2, ctx.alpha, ctx.withIntercept) });
       }
+      if (points[points.length - 1].n !== maxN) {
+        points.push({ n: maxN, power: regressionPowerAtF2(maxN, ctx.p, ctx.f2, ctx.alpha, ctx.withIntercept) });
+      }
 
-      const W = 640, H = 220, pad = { l: 48, r: 16, t: 16, b: 36 };
+      const W = 640, H = 260, pad = { l: 56, r: 34, t: 22, b: 46 };
       const plotW = W - pad.l - pad.r;
       const plotH = H - pad.t - pad.b;
       const xScale = function(n) { return pad.l + ((n - minN) / (maxN - minN)) * plotW; };
       const yScale = function(p) { return pad.t + plotH - (p * plotH); };
+      const fmtPct = function(p) { return Math.round(p * 100) + '%'; };
 
       let path = '';
       points.forEach(function(pt, i) {
-        const cmd = i === 0 ? 'M' : 'L';
-        path += cmd + xScale(pt.n).toFixed(1) + ' ' + yScale(pt.power).toFixed(1) + ' ';
+        path += (i === 0 ? 'M' : 'L') + xScale(pt.n).toFixed(1) + ' ' + yScale(pt.power).toFixed(1) + ' ';
       });
 
+      const curPower = regressionPowerAtF2(ctx.n, ctx.p, ctx.f2, ctx.alpha, ctx.withIntercept);
       const curX = xScale(ctx.n);
-      const tgtY = yScale(targetPower || 0.85);
+      const curY = yScale(curPower);
+      const tgtY = yScale(target);
       const reqX = requiredN ? xScale(requiredN) : null;
 
-      svg.innerHTML = ''
-        + '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="transparent"/>'
-        + '<line x1="' + pad.l + '" y1="' + (pad.t + plotH) + '" x2="' + (pad.l + plotW) + '" y2="' + (pad.t + plotH) + '" stroke="rgba(255,255,255,.2)"/>'
-        + '<line x1="' + pad.l + '" y1="' + pad.t + '" x2="' + pad.l + '" y2="' + (pad.t + plotH) + '" stroke="rgba(255,255,255,.2)"/>'
-        + '<line x1="' + pad.l + '" y1="' + tgtY.toFixed(1) + '" x2="' + (pad.l + plotW) + '" y2="' + tgtY.toFixed(1) + '" stroke="rgb(255,215,0)" stroke-dasharray="6 4" stroke-width="1.5"/>'
-        + '<path d="' + path.trim() + '" fill="none" stroke="#78c8ff" stroke-width="2.5"/>'
-        + '<line x1="' + curX.toFixed(1) + '" y1="' + pad.t + '" x2="' + curX.toFixed(1) + '" y2="' + (pad.t + plotH) + '" stroke="rgb(255,165,120)" stroke-width="2"/>'
-        + (reqX ? '<circle cx="' + reqX.toFixed(1) + '" cy="' + tgtY.toFixed(1) + '" r="4" fill="rgb(255,215,0)"/>' : '')
-        + '<text x="' + pad.l + '" y="' + (H - 10) + '" fill="rgba(255,255,255,.55)" font-size="11">Sample size (N)</text>'
-        + '<text x="8" y="' + (pad.t + 12) + '" fill="rgba(255,255,255,.55)" font-size="11">Power</text>'
-        + '<text x="' + (pad.l + plotW - 4) + '" y="' + (pad.t + plotH + 14) + '" text-anchor="end" fill="rgba(255,255,255,.45)" font-size="10">' + maxN + '</text>'
-        + '<text x="' + pad.l + '" y="' + (pad.t + plotH + 14) + '" fill="rgba(255,255,255,.45)" font-size="10">' + minN + '</text>';
+      let svgParts = [];
+      svgParts.push('<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="transparent"/>');
+
+      [0, 0.2, 0.4, 0.6, 0.8, 1].forEach(function(p) {
+        const y = yScale(p);
+        svgParts.push('<line x1="' + pad.l + '" y1="' + y.toFixed(1) + '" x2="' + (pad.l + plotW) + '" y2="' + y.toFixed(1) + '" stroke="rgba(255,255,255,.08)" stroke-width="1"/>');
+        svgParts.push('<text x="' + (pad.l - 8) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end" fill="rgba(255,255,255,.55)" font-size="10" font-weight="600">' + fmtPct(p) + '</text>');
+      });
+
+      const xStep = powerCurveNiceStep(minN, maxN, 5);
+      for (let tickN = Math.ceil(minN / xStep) * xStep; tickN <= maxN; tickN += xStep) {
+        const x = xScale(tickN);
+        svgParts.push('<line x1="' + x.toFixed(1) + '" y1="' + pad.t + '" x2="' + x.toFixed(1) + '" y2="' + (pad.t + plotH) + '" stroke="rgba(255,255,255,.06)" stroke-width="1"/>');
+        svgParts.push('<text x="' + x.toFixed(1) + '" y="' + (pad.t + plotH + 16) + '" text-anchor="middle" fill="rgba(255,255,255,.55)" font-size="10" font-weight="600">' + tickN + '</text>');
+      }
+
+      svgParts.push('<line x1="' + pad.l + '" y1="' + (pad.t + plotH) + '" x2="' + (pad.l + plotW) + '" y2="' + (pad.t + plotH) + '" stroke="rgba(255,255,255,.28)" stroke-width="1.2"/>');
+      svgParts.push('<line x1="' + pad.l + '" y1="' + pad.t + '" x2="' + pad.l + '" y2="' + (pad.t + plotH) + '" stroke="rgba(255,255,255,.28)" stroke-width="1.2"/>');
+      svgParts.push('<line x1="' + pad.l + '" y1="' + tgtY.toFixed(1) + '" x2="' + (pad.l + plotW) + '" y2="' + tgtY.toFixed(1) + '" stroke="rgb(255,215,0)" stroke-dasharray="6 4" stroke-width="1.5"/>');
+      svgParts.push('<text x="' + (pad.l + plotW + 2) + '" y="' + (tgtY + 4).toFixed(1) + '" fill="rgb(255,215,0)" font-size="10" font-weight="700">Target ' + fmtPct(target) + '</text>');
+      svgParts.push('<path d="' + path.trim() + '" fill="none" stroke="#78c8ff" stroke-width="2.5"/>');
+      svgParts.push('<line x1="' + curX.toFixed(1) + '" y1="' + pad.t + '" x2="' + curX.toFixed(1) + '" y2="' + (pad.t + plotH) + '" stroke="rgb(255,165,120)" stroke-width="2"/>');
+      svgParts.push('<circle cx="' + curX.toFixed(1) + '" cy="' + curY.toFixed(1) + '" r="5" fill="rgb(255,165,120)" stroke="#fff" stroke-width="1.5"/>');
+      svgParts.push('<text x="' + curX.toFixed(1) + '" y="' + (pad.t - 6) + '" text-anchor="middle" fill="rgb(255,165,120)" font-size="10" font-weight="700">Current N=' + ctx.n + ' (' + fmtPct(curPower) + ')</text>');
+      if (reqX) {
+        svgParts.push('<circle cx="' + reqX.toFixed(1) + '" cy="' + tgtY.toFixed(1) + '" r="5" fill="rgb(255,215,0)" stroke="#fff" stroke-width="1.5"/>');
+        svgParts.push('<text x="' + reqX.toFixed(1) + '" y="' + (tgtY - 8).toFixed(1) + '" text-anchor="middle" fill="rgb(255,215,0)" font-size="10" font-weight="700">Required N=' + requiredN + '</text>');
+      }
+      svgParts.push('<text x="' + (pad.l + plotW / 2).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle" fill="rgba(255,255,255,.55)" font-size="11" font-weight="600">Sample size (N)</text>');
+      svgParts.push('<text x="14" y="' + (pad.t + plotH / 2).toFixed(1) + '" transform="rotate(-90 14 ' + (pad.t + plotH / 2).toFixed(1) + ')" text-anchor="middle" fill="rgba(255,255,255,.55)" font-size="11" font-weight="600">Statistical power</text>');
+
+      svg.innerHTML = svgParts.join('');
+      svg._pwCurve = { points: points, minN: minN, maxN: maxN, pad: pad, W: W, H: H, plotW: plotW, plotH: plotH };
+      svg.classList.add('pwstd-power-curve--ready');
+      bindRegressionPowerCurveInteraction(svg);
+
+      if (note) {
+        note.textContent = 'Computed from exact noncentral F (f²=' + ctx.f2.toFixed(3) + ', α=' + ctx.alpha.toFixed(3) + ', df1=' + ctx.p + ') — hover the curve to inspect any N.';
+      }
+      if (tooltip) tooltip.hidden = true;
     }
 
     function calculateRegressionPower(results) {

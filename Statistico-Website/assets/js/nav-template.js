@@ -63,6 +63,10 @@ const NAV_TEMPLATE = `
     <ul class="nav-menu" id="navMenu">
       <li class="nav-item">
         <a href="javascript:void(0)" class="nav-link" data-page="home" id="link-home">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2 7.5L8 2.5L14 7.5"/>
+            <path d="M3.5 7V14H12.5V7"/>
+          </svg>
           Home
         </a>
       </li>

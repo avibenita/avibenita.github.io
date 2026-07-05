@@ -2097,7 +2097,7 @@
     };
 
     window.addEventListener('DOMContentLoaded', function() {
-      console.log('? Hypothesis Testing loaded');
+      console.log('[hypothesis] loaded');
       updatePopSizeState();  // Set initial pop size state
       setAwaitingState();
       pollForDependencies();
@@ -2116,15 +2116,15 @@
       if (!headerInitialized && typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.init('hypothesis', 'Variable', 0);
       if (typeof StatisticoHeader !== 'undefined') { StatisticoHeader.initSidebarPage(); StatisticoHeader.updateTitle('One-Sample Test'); };
-        StatisticoHeader.registerActions({ exportJson: () => window.exportHypothesisJson() });
+        StatisticoHeader.registerActions({});
           setTimeout(fitLayout, 150);
         headerInitialized = true;
-        console.log('? Shared header initialized');
+        console.log('[hypothesis] Shared header initialized');
       }
       
       if (!librariesLoaded && typeof jStat !== 'undefined') {
         librariesLoaded = true;
-        console.log('? jStat library loaded');
+        console.log('[hypothesis] jStat library loaded');
       }
       
       if (headerInitialized && librariesLoaded) {
@@ -2584,7 +2584,7 @@
           }
         }
         
-        console.log('? Bootstrap styling applied');
+        console.log('[hypothesis] Bootstrap styling applied');
       } else {
         // Remove Bootstrap styling classes
         statBoxes.forEach(box => box.classList.remove('bootstrap-mode'));
@@ -2595,7 +2595,7 @@
         const badge = document.querySelector('.bootstrap-badge');
         if (badge) badge.remove();
         
-        console.log('? Bootstrap styling removed');
+        console.log('[hypothesis] Bootstrap styling removed');
       }
     }
 
@@ -2619,7 +2619,7 @@
         effectSize: parseFloat(_effectSize.toFixed(4))
       };
       
-      console.log('? Test results stored:', window.currentTestResults);
+      console.log('[hypothesis] Test results stored:', window.currentTestResults);
       
       document.getElementById('result-test-type').textContent = result.testType;
       document.getElementById('result-orientation').textContent = result.orientation;
@@ -2646,7 +2646,7 @@
 
     // Office.js initialization
     Office.initialize = function (reason) {
-      console.log('? Hypothesis Testing - Office.js initialized:', reason);
+      console.log('[hypothesis] Hypothesis Testing - Office.js initialized:', reason);
       
       if (Office.context && Office.context.ui) {
         Office.context.ui.addHandlerAsync(
@@ -2673,7 +2673,7 @@
               handleDataReceived(parsedData);
               return;
             } catch (e) {
-              console.error('? Error parsing localStorage data:', e);
+              console.error('[hypothesis] Error parsing localStorage data:', e);
             }
           }
         }
@@ -2714,9 +2714,9 @@
       // Save to localStorage for view switching
       try {
         localStorage.setItem('univariateResults', JSON.stringify(data));
-        console.log('? Saved data to localStorage');
+        console.log('[hypothesis] Saved data to localStorage');
       } catch (e) {
-        console.error('? Error saving to localStorage:', e);
+        console.error('[hypothesis] Error saving to localStorage:', e);
       }
       
       resultsData = {
@@ -2733,7 +2733,7 @@
       // Update header with variable name and sample size
       const variableName = resultsData.column || 'Variable';
       StatisticoHeader.updateVariable(variableName, resultsData.n);
-      console.log('? Header updated with data:', variableName, 'n=', resultsData.n);
+      console.log('[hypothesis] Header updated with data:', variableName, 'n=', resultsData.n);
       refreshMainMomentsIfReady();
       setAwaitingState();
     }
@@ -2955,7 +2955,7 @@
 
     function getTestStatDisplay(testStat) {
       if (Number.isNaN(testStat)) {
-        return { inRange: true, plotLine: null, markerSeries: null };
+        return { inRange: true, plotLine: null, offScale: null };
       }
 
       const inRange = testStat >= CHART_X_MIN && testStat <= CHART_X_MAX;
@@ -2974,66 +2974,65 @@
               y: 30
             }
           },
-          markerSeries: null
+          offScale: null
         };
       }
-
-      const isLeft = testStat < CHART_X_MIN;
-      const edgeX = isLeft ? CHART_X_MIN : CHART_X_MAX;
-      const arrow = isLeft ? '\u25C0' : '\u25B6';
 
       return {
         inRange: false,
         plotLine: null,
-        markerSeries: {
-          type: 'scatter',
-          name: 'Test Statistic',
-          data: [{ x: edgeX, y: 0.03, testStat: testStat }],
-          enableMouseTracking: true,
-          zIndex: 6,
-          marker: {
-            symbol: isLeft ? 'triangle-left' : 'triangle-right',
-            radius: 9,
-            fillColor: 'rgb(255,215,0)',
-            lineColor: 'rgba(255,255,255,0.55)',
-            lineWidth: 1
-          },
-          dataLabels: {
-            enabled: true,
-            useHTML: true,
-            formatter: function () {
-              const z = this.point.testStat;
-              return `<span style="color:rgb(255,215,0);font-weight:700;font-size:11px;">${arrow} z = ${z.toFixed(3)}</span>`;
-            },
-            align: isLeft ? 'left' : 'right',
-            verticalAlign: 'bottom',
-            x: isLeft ? 8 : -8,
-            y: -4
-          },
-          tooltip: {
-            pointFormatter: function () {
-              return `<b>Test statistic</b><br>z = ${this.testStat.toFixed(4)}<br><span style="opacity:0.8">(outside visible range)</span>`;
-            }
-          }
+        offScale: {
+          testStat,
+          isLeft: testStat < CHART_X_MIN,
+          edgeX: testStat < CHART_X_MIN ? CHART_X_MIN : CHART_X_MAX
         }
       };
     }
 
-    function syncTestStatMarkerSeries(chart, markerSeries) {
-      const marker = chart.series.find(s => s.name === 'Test Statistic');
-      if (markerSeries) {
-        if (marker) {
-          marker.update({
-            data: markerSeries.data,
-            marker: markerSeries.marker,
-            dataLabels: markerSeries.dataLabels,
-            tooltip: markerSeries.tooltip
-          }, false);
-        } else {
-          chart.addSeries(markerSeries, false);
-        }
-      } else if (marker) {
-        marker.remove(false);
+    function clearOffScaleMarker(chart) {
+      if (!chart || !chart._offScaleGfx) return;
+      chart._offScaleGfx.forEach(function (g) {
+        try { g.destroy(); } catch (_e) {}
+      });
+      chart._offScaleGfx = null;
+    }
+
+    function renderOffScaleMarker(chart, offScale) {
+      clearOffScaleMarker(chart);
+      if (!offScale || !chart.xAxis || !chart.xAxis[0]) return;
+
+      const testStat = offScale.testStat;
+      const isLeft = offScale.isLeft;
+      const edgeX = offScale.edgeX;
+      const x = chart.xAxis[0].toPixels(edgeX, false);
+      if (!Number.isFinite(x)) return;
+
+      const y = chart.plotTop + chart.plotHeight * 0.68;
+      const arrow = isLeft ? '\u25C0' : '\u25B6';
+      const labelText = isLeft ? `${arrow} z = ${testStat.toFixed(3)}` : `z = ${testStat.toFixed(3)} ${arrow}`;
+      const triSize = 10;
+      const triPath = isLeft
+        ? ['M', x + triSize, y - triSize * 0.75, 'L', x, y, 'L', x + triSize, y + triSize * 0.75, 'Z']
+        : ['M', x - triSize, y - triSize * 0.75, 'L', x, y, 'L', x - triSize, y + triSize * 0.75, 'Z'];
+      const gfx = [];
+
+      gfx.push(chart.renderer.path(triPath)
+        .attr({ fill: 'rgb(255,215,0)', stroke: 'rgba(255,255,255,0.65)', 'stroke-width': 1, zIndex: 8 })
+        .add());
+
+      gfx.push(chart.renderer.text(labelText, x + (isLeft ? triSize + 4 : -(triSize + 4)), y + 4, true)
+        .css({ color: 'rgb(255,215,0)', fontWeight: '700', fontSize: '11px' })
+        .attr({ align: isLeft ? 'left' : 'right', zIndex: 8 })
+        .add());
+
+      chart._offScaleGfx = gfx;
+    }
+
+    function finalizeChartMarkers(chart, statDisplay) {
+      if (statDisplay && statDisplay.offScale) {
+        renderOffScaleMarker(chart, statDisplay.offScale);
+      } else {
+        clearOffScaleMarker(chart);
       }
     }
 
@@ -3112,7 +3111,6 @@
         existing.series[0].setData(pts, false);
         existing.series[0].update({ zoneAxis: 'x', zones }, false);
         existing.xAxis[0].update({ min: CHART_X_MIN, max: CHART_X_MAX, plotLines }, false);
-        syncTestStatMarkerSeries(existing, statDisplay.markerSeries);
         existing.setTitle({
           text: `${testType}`,
           style: { color: 'rgba(255,255,255,0.9)', fontSize: '14px', fontWeight: '700' }
@@ -3121,7 +3119,9 @@
           style: { color: 'rgba(200,220,255,0.7)', fontSize: '12px' },
           useHTML: true
         }, false);
+        existing._statDisplay = statDisplay;
         existing.redraw();
+        finalizeChartMarkers(existing, statDisplay);
       } else {
         const series = [{
           data: pts,
@@ -3131,16 +3131,18 @@
           lineWidth: 2.5,
           fillOpacity: 1
         }];
-        if (statDisplay.markerSeries) {
-          series.push(statDisplay.markerSeries);
-        }
 
-        Highcharts.chart('chart', {
+        const chart = Highcharts.chart('chart', {
           chart: {
             type: 'area',
             backgroundColor: 'transparent',
             animation: false,
-            style: { fontFamily: "'Segoe UI', Tahoma, sans-serif" }
+            style: { fontFamily: "'Segoe UI', Tahoma, sans-serif" },
+            events: {
+              redraw: function () {
+                finalizeChartMarkers(this, this._statDisplay);
+              }
+            }
           },
           title: {
             text: testType,
@@ -3178,6 +3180,8 @@
           },
           series: series
         });
+        chart._statDisplay = statDisplay;
+        finalizeChartMarkers(chart, statDisplay);
       }
 
       // Update explanation
@@ -3377,7 +3381,7 @@ Decision: ${testData.decision}`;
         showNotification('AI interpretation ready', 'success', 2000);
 
       } catch (error) {
-        console.error('? AI error:', error);
+        console.error('[hypothesis] AI error:', error);
         showNotification('AI failed: ' + error.message, 'error', 5000);
       }
     };
@@ -3443,9 +3447,9 @@ Decision: ${testData.decision}`;
           let errorBody = '';
           try {
             errorBody = await response.text();
-            console.error('? Error Response Body:', errorBody);
+            console.error('[hypothesis] Error Response Body:', errorBody);
           } catch (e) {
-            console.error('? Could not read error body');
+            console.error('[hypothesis] Could not read error body');
           }
           
           throw new Error(`HTTP ${response.status}: ${response.statusText}\nBody: ${errorBody.substring(0, 500)}`);
@@ -3465,8 +3469,8 @@ Decision: ${testData.decision}`;
           console.warn('Network error - offline or unreachable');
           return { success: false, error: 'offline', message: 'Offline or service unreachable' };
         } else {
-          console.error('? Cloud function error:', error);
-          console.error('? Error stack:', error.stack);
+          console.error('[hypothesis] Cloud function error:', error);
+          console.error('[hypothesis] Error stack:', error.stack);
           return { success: false, error: 'error', message: error.message };
         }
       }
@@ -3484,7 +3488,7 @@ Decision: ${testData.decision}`;
       }
 
       try {
-        console.log('? Power Analysis requested - opening modal');
+        console.log('[hypothesis] Power Analysis requested - opening modal');
 
         // Get modal elements
         const overlay = document.getElementById('powerOverlay');
@@ -3492,12 +3496,12 @@ Decision: ${testData.decision}`;
         const content = document.getElementById('powerOverlayContent');
         
         if (!overlay) {
-          console.error('? powerOverlay element not found!');
+          console.error('[hypothesis] powerOverlay element not found!');
           showNotification('Power Analysis modal not found', 'error');
           return;
         }
 
-        console.log('? Modal elements found, opening...');
+        console.log('[hypothesis] Modal elements found, opening...');
         
         overlay.classList.add('open');
         loader.style.display = 'flex';
@@ -3509,16 +3513,16 @@ Decision: ${testData.decision}`;
             await calculatePowerAnalysis();
             loader.style.display = 'none';
             content.classList.remove('hidden');
-            console.log('? Power analysis displayed');
+            console.log('[hypothesis] Power analysis displayed');
           } catch (calcError) {
-            console.error('? Error calculating power:', calcError);
+            console.error('[hypothesis] Error calculating power:', calcError);
             showNotification('Error calculating power: ' + calcError.message, 'error');
             closePowerAnalysis();
           }
         }, 300);
 
       } catch (error) {
-        console.error('? Error opening power analysis:', error);
+        console.error('[hypothesis] Error opening power analysis:', error);
         showNotification('Error opening power analysis: ' + error.message, 'error', 5000);
       }
     };
@@ -3709,12 +3713,12 @@ Decision: ${testData.decision}`;
           tailType
         };
         
-        console.log('? Cloud calculation successful');
+        console.log('[hypothesis] Cloud calculation successful');
         showNotification('? Power analysis completed', 'success', 2000);
         displayPowerAnalysisResults();
       } else {
         // FAILURE: Cloud function failed - no fallback
-        console.error('? Cloud function failed:', powerResult.error || sampleResult.error);
+        console.error('[hypothesis] Cloud function failed:', powerResult.error || sampleResult.error);
         
         let errorTitle = 'Power Analysis Unavailable';
         let errorMessage = '';
@@ -3832,12 +3836,12 @@ Decision: ${testData.decision}`;
           tailType
         };
         
-        console.log('? Cloud calculation successful');
+        console.log('[hypothesis] Cloud calculation successful');
         showNotification('? Power analysis completed', 'success', 2000);
         displayPowerAnalysisResults();
       } else {
         // FAILURE: Cloud function failed - no fallback
-        console.error('? Cloud function failed:', powerResult.error || sampleResult.error);
+        console.error('[hypothesis] Cloud function failed:', powerResult.error || sampleResult.error);
         
         let errorTitle = 'Power Analysis Unavailable';
         let errorMessage = '';
@@ -3952,7 +3956,7 @@ Decision: ${testData.decision}`;
         methodBadge.style.display = 'inline-block';
       }
 
-      console.log('? Power Analysis Results:', cache);
+      console.log('[hypothesis] Power Analysis Results:', cache);
     }
 
     window.validateTargetPower = function() {

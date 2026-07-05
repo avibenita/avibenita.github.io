@@ -327,7 +327,7 @@
       svg.addEventListener('mouseleave', hideHover);
     }
 
-    function renderCurve(ctx, targetPower, requiredN) {
+    function renderCurve(ctx, targetPower, selectedReqN) {
       var svg = document.getElementById('pwstd-power-curve-svg');
       var tooltip = document.getElementById('pwstd-curve-tooltip');
       var note = document.getElementById('pwstd-curve-note');
@@ -370,7 +370,7 @@
       var curX = xScale(ctx.n);
       var curY = yScale(curPower);
       var tgtY = yScale(target);
-      var reqX = requiredN ? xScale(requiredN) : null;
+      var reqX = selectedReqN ? xScale(selectedReqN) : null;
       var parts = ['<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="transparent"/>'];
       [0, 0.2, 0.4, 0.6, 0.8, 1].forEach(function (p) {
         var y = yScale(p);
@@ -393,7 +393,7 @@
       parts.push('<text x="' + curX.toFixed(1) + '" y="' + (pad.t - 6) + '" text-anchor="middle" fill="rgb(255,165,120)" font-size="10" font-weight="700">Current N=' + ctx.n + ' (' + fmtPct(curPower) + ')</text>');
       if (reqX) {
         parts.push('<circle cx="' + reqX.toFixed(1) + '" cy="' + tgtY.toFixed(1) + '" r="5" fill="rgb(255,215,0)" stroke="#fff" stroke-width="1.5"/>');
-        parts.push('<text x="' + reqX.toFixed(1) + '" y="' + (tgtY - 8).toFixed(1) + '" text-anchor="middle" fill="rgb(255,215,0)" font-size="10" font-weight="700">Required N=' + requiredN + '</text>');
+        parts.push('<text x="' + reqX.toFixed(1) + '" y="' + (tgtY - 8).toFixed(1) + '" text-anchor="middle" fill="rgb(255,215,0)" font-size="10" font-weight="700">Required N=' + selectedReqN + '</text>');
       }
       parts.push('<text x="' + (pad.l + plotW / 2).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle" fill="rgba(255,255,255,.55)" font-size="11" font-weight="600">Sample size (N)</text>');
       svg.innerHTML = parts.join('');

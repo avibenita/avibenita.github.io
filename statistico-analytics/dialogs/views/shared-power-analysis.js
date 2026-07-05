@@ -445,6 +445,19 @@
       powSetText('powReq90', reqMap['90'] || '—');
       powSetText('powReq95', reqMap['95'] || '—');
 
+      var customInput = document.getElementById('customPowerInput');
+      if (customInput) {
+        var customTarget = parseFloat(customInput.value);
+        if (isFinite(customTarget) && customTarget >= 0.5 && customTarget <= 0.99) {
+          var customReq = computeRequiredN(ctx, customTarget);
+          var customEl = document.getElementById('customRequiredN');
+          if (customEl) {
+            customEl.textContent = customReq || '—';
+            customEl.style.color = customReq ? '#7fdb9f' : '#ff6b6b';
+          }
+        }
+      }
+
       var reqNAtTarget = computeRequiredN(ctx, targetSel.power);
 
       updateExecutiveSummary(ctx, power);
@@ -475,29 +488,46 @@
     function calculateCustomPower() {
       var customPowerInput = document.getElementById('customPowerInput');
       var customRequiredN = document.getElementById('customRequiredN');
-      var customPowerStatus = document.getElementById('customPowerStatus');
-      var customPowerIcon = document.getElementById('customPowerIcon');
       var targetPower = parseFloat(customPowerInput && customPowerInput.value);
       if (isNaN(targetPower) || targetPower < 0.5 || targetPower > 0.99) {
-        if (customRequiredN) { customRequiredN.textContent = 'Invalid'; customRequiredN.style.color = '#ff6b6b'; }
+        if (customRequiredN) {
+          customRequiredN.textContent = 'Invalid';
+          customRequiredN.style.color = '#ff6b6b';
+        }
         return;
       }
-      if (customPowerIcon) customPowerIcon.classList.add('fa-spin');
-      if (customPowerStatus) customPowerStatus.style.display = 'block';
-      try {
-        var ctx = getContext();
-        if (!ctx) throw new Error('No analysis results available.');
-        var req = computeRequiredN(ctx, targetPower);
-        if (!req) throw new Error('Could not estimate required N.');
-        if (customRequiredN) { customRequiredN.textContent = req; customRequiredN.style.color = '#7fdb9f'; }
-        if (global.StatisticoPowerTemplate && global.StatisticoPowerTemplate.onCustomComplete) {
-          global.StatisticoPowerTemplate.onCustomComplete(req);
+      var ctx = getContext();
+      if (!ctx) {
+        if (customRequiredN) {
+          customRequiredN.textContent = 'Error';
+          customRequiredN.style.color = '#ff6b6b';
         }
-      } catch (err) {
-        if (customRequiredN) { customRequiredN.textContent = 'Error'; customRequiredN.style.color = '#ff6b6b'; }
-      } finally {
-        if (customPowerIcon) customPowerIcon.classList.remove('fa-spin');
-        if (customPowerStatus) customPowerStatus.style.display = 'none';
+        return;
+      }
+      var req = computeRequiredN(ctx, targetPower);
+      if (!req) {
+        if (customRequiredN) {
+          customRequiredN.textContent = 'Error';
+          customRequiredN.style.color = '#ff6b6b';
+        }
+        return;
+      }
+      if (customRequiredN) {
+        customRequiredN.textContent = req;
+        customRequiredN.style.color = '#7fdb9f';
+      }
+      if (global.StatisticoPowerTemplate && global.StatisticoPowerTemplate.onCustomComplete) {
+        global.StatisticoPowerTemplate.onCustomComplete(req);
+      }
+      var targetSel = global.StatisticoPowerTemplate && global.StatisticoPowerTemplate.getSelectedTargetPower
+        ? global.StatisticoPowerTemplate.getSelectedTargetPower()
+        : { pct: Math.round(targetPower * 100) + '%', power: targetPower };
+      if (targetSel.power === targetPower) {
+        try {
+          renderCurve(ctx, targetPower, req);
+        } catch (curveErr) {
+          console.error('[StatisticoPowerAnalysis] renderCurve failed:', curveErr);
+        }
       }
     }
 
@@ -532,7 +562,7 @@
         title: mountOpts.title || 'Power & Sample Size',
         layout: 'analysis',
         variant: mountOpts.variant || cfg.variant || 'regression',
-        customHandler: mountOpts.customHandler || 'StatisticoPowerAnalysis._customCompute()',
+        customHandler: mountOpts.customHandler || 'window.StatisticoPowerTemplate.runCustomCompute()',
         detectableHandler: mountOpts.detectableHandler || 'StatisticoPowerAnalysis._computeDetectable()'
       });
       global.StatisticoPowerAnalysis._activeEngine = engine;
@@ -647,12 +677,16 @@
       }).mount(Object.assign({ getSource: function () { return global._bundle; } }, opts || {}));
     },
     _customCompute: function () {
+      if (global.StatisticoPowerTemplate && typeof global.StatisticoPowerTemplate.runCustomCompute === 'function') {
+        global.StatisticoPowerTemplate.runCustomCompute();
+        return;
+      }
       if (global.StatisticoPowerAnalysis._activeEngine) global.StatisticoPowerAnalysis._activeEngine.calculateCustomPower();
     },
     _computeDetectable: function () {
       if (global.StatisticoPowerAnalysis._activeEngine) global.StatisticoPowerAnalysis._activeEngine.calculateDetectableEffect();
     },
     _activeEngine: null,
-    VERSION: '20260705g'
+    VERSION: '20260705h'
   };
 })(window);

@@ -37,10 +37,37 @@
     if (!chip) return;
     clearTimeout(_customTimer);
     _customTimer = setTimeout(function(){
-      if (typeof window.StatisticoPowerTemplate._customComputeFn === 'function') {
-        window.StatisticoPowerTemplate._customComputeFn();
+      if (window.StatisticoPowerTemplate && typeof window.StatisticoPowerTemplate.runCustomCompute === 'function') {
+        window.StatisticoPowerTemplate.runCustomCompute();
       }
-    }, 450);
+    }, 350);
+  }
+
+  function runCustomCompute() {
+    var tpl = window.StatisticoPowerTemplate;
+    if (!tpl || tpl._customBusy) return;
+    tpl._customBusy = true;
+    var icon = document.getElementById('customPowerIcon');
+    var status = document.getElementById('customPowerStatus');
+    var valEl = document.getElementById('customRequiredN');
+    if (icon) icon.classList.add('fa-spin');
+    if (status) status.style.display = 'block';
+    if (valEl && (valEl.textContent === '--' || valEl.textContent === '…')) valEl.textContent = '…';
+    var finish = function () {
+      tpl._customBusy = false;
+      if (icon) icon.classList.remove('fa-spin');
+      if (status) status.style.display = 'none';
+    };
+    var safety = setTimeout(finish, 8000);
+    try {
+      if (typeof tpl._customComputeFn === 'function') tpl._customComputeFn();
+    } catch (err) {
+      console.error('[StatisticoPowerTemplate] custom compute failed:', err);
+      if (valEl) { valEl.textContent = 'Error'; valEl.style.color = '#ff6b6b'; }
+    } finally {
+      clearTimeout(safety);
+      finish();
+    }
   }
 
   function renderAnalysisLayout(container, opts) {
@@ -48,7 +75,7 @@
     var o = opts || {};
     var ids = o.ids || {};
     var title = o.title || 'Power & Sample Size';
-    var customHandler = esc(o.customHandler || 'calculateCustomPower()');
+    var customHandler = esc(o.customHandler || 'window.StatisticoPowerTemplate.runCustomCompute()');
 
     var chipHtml = CHIPS.map(function(c){
       var valueId = id(ids, c.key, c.fallback);
@@ -81,7 +108,7 @@
     }).join('\n');
 
     container.innerHTML = [
-      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260705g">',
+      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260705h">',
       '  <header class="pwstd-page-header">',
       '    <h2 class="pwstd-title"><i class="fa-solid fa-bolt"></i> ' + esc(title) + '</h2>',
       '    <p class="pwstd-subtitle">Required N, achieved power, and detectable effect</p>',
@@ -193,7 +220,7 @@
     }
     var ids = o.ids || {};
     var title = o.title || "Power & Sample Size";
-    var customHandler = esc(o.customHandler || 'calculateCustomPower()');
+    var customHandler = esc(o.customHandler || 'window.StatisticoPowerTemplate.runCustomCompute()');
 
     var chipHtml = CHIPS.map(function(c){
       var valueId = id(ids, c.key, c.fallback);
@@ -457,7 +484,7 @@
     if (pct === 'Custom') {
       var inp = document.getElementById('customPowerInput');
       if (inp) inp.focus();
-      _scheduleCustomCompute();
+      window.StatisticoPowerTemplate.runCustomCompute();
     }
   }
 
@@ -576,6 +603,8 @@
     syncTaskUI:       _syncTaskUI,
     syncDefaultChip:  _syncDefaultChip,
     onCustomComplete: _onCustomComplete,
+    runCustomCompute: runCustomCompute,
+    _customBusy: false,
     _customComputeFn: null,
     _onTaskChange:    function(mode){
       _syncTaskUI(mode);

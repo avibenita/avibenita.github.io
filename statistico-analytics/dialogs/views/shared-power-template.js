@@ -43,9 +43,148 @@
     }, 450);
   }
 
+  function renderAnalysisLayout(container, opts) {
+    if (!container) return;
+    var o = opts || {};
+    var ids = o.ids || {};
+    var title = o.title || 'Power & Sample Size';
+    var customHandler = esc(o.customHandler || 'calculateCustomPower()');
+
+    var chipHtml = CHIPS.map(function(c){
+      var valueId = id(ids, c.key, c.fallback);
+      var isDefault = c.pct === '85';
+      if (c.pct === 'Custom') {
+        return ''
+          + '<div class="pwstd-chip pwstd-chip--selectable pwstd-chip--custom" data-pct="Custom" data-value-id="' + valueId + '"'
+          + ' onclick="window.StatisticoPowerTemplate._onChipClick(this)">'
+          + '  <div class="pwstd-chip-check"><i class="fa-solid fa-check"></i></div>'
+          + '  <div class="pwstd-chip-label">Custom</div>'
+          + '  <div class="pwstd-chip-custom-ctrl" onclick="event.stopPropagation()">'
+          + '    <input class="pwstd-select pwstd-chip-input" type="number" id="' + id(ids,'customInput','customPowerInput') + '"'
+          + ' min="0.5" max="0.99" step="0.01" value="0.85"'
+          + ' oninput="window.StatisticoPowerTemplate._onCustomInput()" onclick="event.stopPropagation()">'
+          + '    <button type="button" class="pwstd-chip-btn" onclick="event.stopPropagation();' + customHandler + '" title="Recalculate">'
+          + '      <i class="fa-solid fa-sync" id="' + id(ids,'customIcon','customPowerIcon') + '"></i>'
+          + '    </button>'
+          + '  </div>'
+          + '  <div class="pwstd-chip-value" id="' + valueId + '">--</div>'
+          + '</div>';
+      }
+      return ''
+        + '<div class="pwstd-chip pwstd-chip--selectable' + (isDefault ? ' pwstd-chip--selected' : '') + '"'
+        + ' data-pct="' + c.pct + '" data-value-id="' + valueId + '"'
+        + ' onclick="window.StatisticoPowerTemplate._onChipClick(this)">'
+        + '  <div class="pwstd-chip-check"><i class="fa-solid fa-check"></i></div>'
+        + '  <div class="pwstd-chip-label">' + c.pct + '%</div>'
+        + '  <div class="pwstd-chip-value" id="' + valueId + '">...</div>'
+        + '</div>';
+    }).join('\n');
+
+    container.innerHTML = [
+      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260705a">',
+      '  <header class="pwstd-page-header">',
+      '    <h2 class="pwstd-title"><i class="fa-solid fa-bolt"></i> ' + esc(title) + '</h2>',
+      '    <p class="pwstd-subtitle">Required N, achieved power, and detectable effect</p>',
+      '    <div class="pwstd-meta-strip">',
+      '      <span class="pwstd-meta-chip"><span class="pwstd-meta-k">Analysis</span><span class="pwstd-meta-v" id="' + id(ids,'design','powDesignType') + '">Linear regression</span></span>',
+      '      <span class="pwstd-meta-chip"><span class="pwstd-meta-k">Target</span><span class="pwstd-meta-v" id="' + id(ids,'target','powTargetWhat') + '">Global model R²</span></span>',
+      '      <span class="pwstd-meta-chip"><span class="pwstd-meta-k">Effect</span><span class="pwstd-meta-v" id="' + id(ids,'effectSource','powEffectSource') + '">Observed R²</span></span>',
+      '      <span class="pwstd-meta-chip pwstd-meta-chip--task">',
+      '        <span class="pwstd-meta-k">Task</span>',
+      '        <select class="pwstd-select pwstd-select--compact" id="' + id(ids,'taskMode','powTaskMode') + '" onchange="window.StatisticoPowerTemplate._onTaskChange(this.value)">',
+      '          <option value="fromN">Power from N</option>',
+      '          <option value="requiredN">Required N</option>',
+      '          <option value="detectable">Detectable effect</option>',
+      '        </select>',
+      '      </span>',
+      '      <span class="pwstd-meta-chip"><span class="pwstd-meta-k">Alpha</span><span class="pwstd-meta-v" id="' + id(ids,'alpha','powAlpha') + '">0.050</span></span>',
+      '    </div>',
+      '  </header>',
+      '  <div class="pwstd-exec pwstd-exec--neutral" id="pwstd-exec-summary">Run a regression model to populate power results.</div>',
+      '  <div class="pwstd-metrics-row">',
+      '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Achieved Power</div><div class="pwstd-metric-value" id="' + id(ids,'observed','powObserved') + '">—</div></div>',
+      '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Current N</div><div class="pwstd-metric-value" id="' + id(ids,'sampleSize','powSampleSize') + '">—</div></div>',
+      '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Observed R²</div><div class="pwstd-metric-value" id="pwstd-metric-r2">—</div></div>',
+      '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Effect Size f²</div><div class="pwstd-metric-value" id="' + id(ids,'effectSize','powEffectSize') + '">—</div></div>',
+      '  </div>',
+      '  <div class="pwstd-grid pwstd-grid--analysis">',
+      '    <div class="pwstd-card pwstd-card--planning pwstd-card--primary" id="pwstd-card-planning">',
+      '      <div class="pwstd-card-h" id="pwstd-head-planning">Sample Size Planning</div>',
+      '      <div class="pwstd-card-b">',
+      '        <div class="pwstd-targets">' + chipHtml + '</div>',
+      '        <span id="' + id(ids,'customStatus','customPowerStatus') + '" class="pwstd-custom-status"><i class="fa-solid fa-spinner fa-spin"></i> Calculating...</span>',
+      '        <div class="pwstd-planning-stats">',
+      '          <div class="pwstd-planning-stat"><span>Selected target</span><strong id="pwstd-selected-target">85%</strong></div>',
+      '          <div class="pwstd-planning-stat"><span id="pwstd-reqN-label">Required N (85% target)</span><strong id="' + id(ids,'requiredN','powRequired') + '">—</strong></div>',
+      '          <div class="pwstd-planning-stat pwstd-for-main"><span>R² used</span><strong id="' + id(ids,'partialEta','powPartialEta') + '">—</strong></div>',
+      '        </div>',
+      '        <p class="pwstd-planning-summary" id="pwstd-planning-summary">Select a target power to see required sample size.</p>',
+      '        <div class="pwstd-for-detectable">',
+      '          <div class="pwstd-row"><span class="pwstd-label">Target power</span><input class="pwstd-select" type="number" id="' + id(ids,'detectableTarget','powDetectableTarget') + '" min="0.5" max="0.99" step="0.05" value="0.80"></div>',
+      '          <div class="pwstd-row"><span class="pwstd-label">Current N</span><span class="pwstd-value" id="pwstd-det-n">—</span></div>',
+      '          <div class="pwstd-row"><span class="pwstd-label">Min detectable f²</span><span class="pwstd-value" id="' + id(ids,'minF','powMinDetectableF') + '">—</span></div>',
+      '          <div class="pwstd-row"><span class="pwstd-label">Min detectable R²</span><span class="pwstd-value" id="' + id(ids,'minEta','powMinDetectableEta') + '">—</span></div>',
+      '          <p class="pwstd-det-interpret pwstd-for-detectable" id="pwstd-det-interpret"></p>',
+      '          <button type="button" class="hero-action-btn pwstd-det-btn" onclick="' + esc(o.detectableHandler || "window.StatisticoPowerTemplate._computeDetectable && window.StatisticoPowerTemplate._computeDetectable()") + '"><i class="fa-solid fa-calculator"></i> Compute</button>',
+      '        </div>',
+      '      </div>',
+      '    </div>',
+      '    <div class="pwstd-card pwstd-card--detectable" id="pwstd-card-detectable">',
+      '      <div class="pwstd-card-h">Detectable Effect</div>',
+      '      <div class="pwstd-card-b">',
+      '        <div class="pwstd-detectable-grid">',
+      '          <div class="pwstd-detectable-item"><span>Observed R²</span><strong id="pwstd-r2-observed">—</strong></div>',
+      '          <div class="pwstd-detectable-item"><span>Detectable R²</span><strong id="pwstd-r2-detectable">—</strong></div>',
+      '        </div>',
+      '        <p class="pwstd-r2-insight" id="pwstd-r2-insight">Detectable threshold appears after analysis runs.</p>',
+      '      </div>',
+      '    </div>',
+      '  </div>',
+      '  <div class="pwstd-r2-compare pwstd-for-r2compare" id="pwstd-r2-compare" hidden></div>',
+      '  <div class="pwstd-card pwstd-card--curve">',
+      '    <div class="pwstd-card-h">Power Curve</div>',
+      '    <div class="pwstd-card-b pwstd-curve-wrap">',
+      '      <svg id="pwstd-power-curve-svg" class="pwstd-power-curve" viewBox="0 0 640 220" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>',
+      '      <div class="pwstd-curve-legend">',
+      '        <span><i class="pwstd-legend-line pwstd-legend-line--curve"></i> Power vs N</span>',
+      '        <span><i class="pwstd-legend-line pwstd-legend-line--current"></i> Current N</span>',
+      '        <span><i class="pwstd-legend-line pwstd-legend-line--target"></i> Target power</span>',
+      '      </div>',
+      '    </div>',
+      '  </div>',
+      '  <div class="pwstd-card pwstd-card--technicals pwstd-tech-panel" id="pwstd-tech-panel">',
+      '    <button type="button" class="pwstd-card-h pwstd-card-h--toggle" id="pwstd-tech-panel-toggle" aria-expanded="false" onclick="window.StatisticoPowerTemplate._toggleTechPanel()">',
+      '      <i class="fa-solid fa-chevron-right pwstd-tech-chevron"></i><span>Technical Details</span><span class="pwstd-tech-panel-hint">click to expand</span>',
+      '    </button>',
+      '    <div class="pwstd-card-b pwstd-card-b--technicals" id="pwstd-tech-panel-body" hidden>',
+      '      <p class="pwstd-tech-note" id="pwstd-tech-note">Power is calculated using the exact noncentral F distribution for the fixed-model regression test.</p>',
+      '      <div class="pwstd-row pwstd-row--formula"><span class="pwstd-label">df formulas</span><span class="pwstd-value pwstd-value--formula" id="' + id(ids,'dfFormula','powDfFormula') + '">df1=p · df2=N−p−1</span></div>',
+      '      <div class="pwstd-row"><span class="pwstd-label">Noncentrality λ</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outLambda','powOutLambda') + '">—</span></div>',
+      '      <div class="pwstd-row"><span class="pwstd-label">df1</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outDf1','powOutDf1') + '">—</span></div>',
+      '      <div class="pwstd-row"><span class="pwstd-label">df2</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outDf2','powOutDf2') + '">—</span></div>',
+      '      <div class="pwstd-row"><span class="pwstd-label">Critical F</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outCritF','powOutCritF') + '">—</span></div>',
+      '      <div class="pwstd-row"><span class="pwstd-label">Sample size</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outN','powOutN') + '">—</span></div>',
+      '      <div class="pwstd-row"><span class="pwstd-label">Actual power</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outPower','powOutPower') + '">—</span></div>',
+      '    </div>',
+      '  </div>',
+      '  <div class="pwstd-band pwstd-band--recommend" id="' + id(ids,'status','powStatusMessage') + '">Run analysis to populate power results.</div>',
+      '  <div class="pwstd-engine"><i class="fa-solid fa-calculator"></i> <span id="' + id(ids,'engineNote','powEngineNote') + '">Exact noncentral F — post-hoc power is descriptive; use Required N or Detectable R² for planning.</span></div>',
+      '</div>'
+    ].join('\n');
+
+    _syncTaskUI('fromN');
+    _updateDfFormulaLabel(o);
+    _applyVariant(o);
+    _syncDefaultChip();
+  }
+
   function render(container, opts){
     if (!container) return;
     var o   = opts || {};
+    if (o.layout === 'analysis' || o.variant === 'regression' || o.variant === 'logistic') {
+      renderAnalysisLayout(container, o);
+      return;
+    }
     var ids = o.ids || {};
     var title = o.title || "Power & Sample Size";
     var customHandler = esc(o.customHandler || 'calculateCustomPower()');
@@ -245,7 +384,7 @@
     } else {
       if (target) target.textContent = o.targetLabel || 'Global regression model (R²)';
       if (design) design.textContent = o.designLabel || 'Linear regression';
-      if (source) source.textContent = o.effectSourceLabel || 'From observed R²';
+      if (source) source.textContent = o.effectSourceLabel || 'Observed R²';
       _setRowLabel('powPartialEta', 'R² used');
       _setRowLabel('powMinDetectableEta', 'Min detectable R²');
     }
@@ -305,6 +444,10 @@
 
     _updatePlanningCard(pct, n);
 
+    if (typeof window.StatisticoPowerTemplate._updatePlanningSummaryFn === 'function') {
+      window.StatisticoPowerTemplate._updatePlanningSummaryFn();
+    }
+
     if (pct === 'Custom') {
       var inp = document.getElementById('customPowerInput');
       if (inp) inp.focus();
@@ -337,6 +480,9 @@
     var valueId = chip.getAttribute('data-value-id');
     var valEl   = valueId ? document.getElementById(valueId) : null;
     if (valEl) _updatePlanningCard(chip.getAttribute('data-pct'), valEl.textContent);
+    if (typeof window.StatisticoPowerTemplate._updatePlanningSummaryFn === 'function') {
+      window.StatisticoPowerTemplate._updatePlanningSummaryFn();
+    }
   }
 
   function _syncTaskUI(mode) {
@@ -345,6 +491,20 @@
 
     shell.classList.remove('pwstd-mode-fromN', 'pwstd-mode-requiredN', 'pwstd-mode-detectable');
     shell.classList.add('pwstd-mode-' + mode);
+
+    if (shell.classList.contains('pwstd-shell--analysis')) {
+      var planCard = document.getElementById('pwstd-card-planning');
+      var detectCard = document.getElementById('pwstd-card-detectable');
+      if (planCard) planCard.classList.toggle('pwstd-card--primary', mode !== 'detectable');
+      if (detectCard) detectCard.classList.toggle('pwstd-card--primary', mode === 'detectable');
+      var planHead = document.getElementById('pwstd-head-planning');
+      if (planHead) {
+        planHead.textContent = mode === 'detectable' ? 'Detectable Effect Planning' : 'Sample Size Planning';
+      }
+      var sel = document.getElementById('powTaskMode');
+      if (sel && sel.value !== mode) sel.value = mode;
+      return;
+    }
 
     var obsCard  = document.getElementById('pwstd-card-observed');
     var obsHead  = document.getElementById('pwstd-head-observed');
@@ -423,6 +583,19 @@
     _onPowerMethodChange: _onPowerMethodChange,
     _toggleTechPanel:   _toggleTechPanel,
     _recalcFn: null,
-    _computeDetectable: null
+    _computeDetectable: null,
+    _updatePlanningSummaryFn: null,
+    getSelectedTargetPower: function() {
+      var chip = document.querySelector('.pwstd-chip--selected');
+      if (!chip) return { pct: '85%', power: 0.85 };
+      var pct = chip.getAttribute('data-pct');
+      if (pct === 'Custom') {
+        var inp = document.getElementById('customPowerInput');
+        var v = inp ? parseFloat(inp.value) : 0.85;
+        if (!isFinite(v)) v = 0.85;
+        return { pct: Math.round(v * 100) + '%', power: v };
+      }
+      return { pct: pct + '%', power: parseInt(pct, 10) / 100 };
+    }
   };
 })();

@@ -30,8 +30,8 @@
   <script src="../shared-brand-logo.js?v=20260601gauss"></script>
   <script src="../shared-header.js?v=20260609h"></script>
   <script src="../shared-workspace-tabs.js?v=20260609h"></script>
-  <link rel="stylesheet" href="../shared-power-template.css?v=20260609e" />
-  <script src="../shared-power-template.js?v=20260609e"></script>
+  <link rel="stylesheet" href="../shared-power-template.css?v=20260705a" />
+  <script src="../shared-power-template.js?v=20260705a"></script>
 
   <style>
     /* Dark Theme (Default) */
@@ -10904,7 +10904,7 @@ ${sectionsHtml}
       const interpretEl = document.getElementById('pwstd-det-interpret');
       if (obsEl) obsEl.textContent = ctx.r2.toFixed(3);
       if (detEl) detEl.textContent = isFinite(detectableR2) ? detectableR2.toFixed(3) : '—';
-      block.hidden = !isFinite(detectableR2);
+      if (block) block.hidden = !isFinite(detectableR2);
       const tp = isFinite(targetPower) ? targetPower : 0.80;
       if (interpretEl && isFinite(detectableR2)) {
         const pct = (detectableR2 * 100).toFixed(1);
@@ -10927,6 +10927,113 @@ ${sectionsHtml}
       return regressionR2FromF2(minF2);
     }
 
+    function updateRegressionExecutiveSummary(ctx, observedPower, mag) {
+      const el = document.getElementById('pwstd-exec-summary');
+      if (!el) return;
+      if (!ctx) {
+        el.textContent = 'Run a regression model to populate power results.';
+        el.className = 'pwstd-exec pwstd-exec--neutral';
+        return;
+      }
+      const powerPct = (observedPower * 100).toFixed(1);
+      let cls = 'pwstd-exec--neutral';
+      let text;
+      if (observedPower >= 0.80) {
+        cls = 'pwstd-exec--success';
+        text = 'Current sample size is adequate for the observed effect. Achieved power is ' + powerPct + '% with n = ' + ctx.n + ', α = ' + ctx.alpha.toFixed(2) + ', and observed R² = ' + ctx.r2.toFixed(3) + '.';
+      } else if (observedPower >= 0.70) {
+        cls = 'pwstd-exec--warning';
+        text = 'Power is borderline (' + powerPct + '%) for the observed R² with n = ' + ctx.n + '. Consider increasing sample size or lowering the target effect.';
+      } else {
+        cls = 'pwstd-exec--error';
+        text = 'Current sample size appears underpowered (' + powerPct + '%) for the observed R² with n = ' + ctx.n + ' (f² = ' + ctx.f2.toFixed(3) + ', ' + mag + ').';
+      }
+      el.textContent = text;
+      el.className = 'pwstd-exec ' + cls;
+    }
+
+    function updateRegressionPlanningSummary(ctx) {
+      const el = document.getElementById('pwstd-planning-summary');
+      if (!el || !ctx) return;
+      const target = window.StatisticoPowerTemplate && window.StatisticoPowerTemplate.getSelectedTargetPower
+        ? window.StatisticoPowerTemplate.getSelectedTargetPower()
+        : { pct: '85%', power: 0.85 };
+      const reqN = estimateRegressionRequiredN(ctx.f2, ctx.p, target.power, ctx.alpha, ctx.withIntercept);
+      if (!reqN) {
+        el.textContent = 'Select a target power to see required sample size.';
+        return;
+      }
+      let gap;
+      if (ctx.n >= reqN) {
+        gap = 'Current N = ' + ctx.n + ' meets or exceeds this target.';
+      } else if (ctx.n >= reqN - 3) {
+        gap = 'Current N = ' + ctx.n + ', so the study is just below this target.';
+      } else {
+        gap = 'Current N = ' + ctx.n + ' is below this target by ' + (reqN - ctx.n) + ' observations.';
+      }
+      el.textContent = 'For ' + target.pct + ' power, approximately ' + reqN + ' observations are required. ' + gap;
+    }
+
+    function buildRegressionPowerRecommendation(ctx, observedPower, reqMap) {
+      if (!ctx) return 'Run analysis to populate power results.';
+      const parts = [];
+      ['80', '85', '90', '95'].forEach(function(pct) {
+        const req = reqMap[pct];
+        if (!req) return;
+        if (ctx.n >= req) parts.push(pct + '%');
+      });
+      if (parts.length === 4) {
+        return 'Recommendation: current sample size is sufficient for 80%, 85%, 90%, and 95% power at the observed R².';
+      }
+      if (parts.length === 0) {
+        return 'Recommendation: current N = ' + ctx.n + ' is below the required N for standard targets (80%–95%) at the observed R².';
+      }
+      return 'Recommendation: current sample size is sufficient for ' + parts.join(', ') + ' power' + (parts.length < 4 ? ', but not for all standard targets.' : '.');
+    }
+
+    function renderRegressionPowerCurve(ctx, targetPower, requiredN) {
+      const svg = document.getElementById('pwstd-power-curve-svg');
+      if (!svg || !ctx) return;
+
+      const minN = Math.max(ctx.p + (ctx.withIntercept ? 3 : 2), 8);
+      const req95 = estimateRegressionRequiredN(ctx.f2, ctx.p, 0.95, ctx.alpha, ctx.withIntercept) || ctx.n;
+      const maxN = Math.max(ctx.n + 15, req95 + 10, minN + 20);
+      const step = Math.max(1, Math.floor((maxN - minN) / 50));
+      const points = [];
+      for (let n = minN; n <= maxN; n += step) {
+        points.push({ n: n, power: regressionPowerAtF2(n, ctx.p, ctx.f2, ctx.alpha, ctx.withIntercept) });
+      }
+
+      const W = 640, H = 220, pad = { l: 48, r: 16, t: 16, b: 36 };
+      const plotW = W - pad.l - pad.r;
+      const plotH = H - pad.t - pad.b;
+      const xScale = function(n) { return pad.l + ((n - minN) / (maxN - minN)) * plotW; };
+      const yScale = function(p) { return pad.t + plotH - (p * plotH); };
+
+      let path = '';
+      points.forEach(function(pt, i) {
+        const cmd = i === 0 ? 'M' : 'L';
+        path += cmd + xScale(pt.n).toFixed(1) + ' ' + yScale(pt.power).toFixed(1) + ' ';
+      });
+
+      const curX = xScale(ctx.n);
+      const tgtY = yScale(targetPower || 0.85);
+      const reqX = requiredN ? xScale(requiredN) : null;
+
+      svg.innerHTML = ''
+        + '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="transparent"/>'
+        + '<line x1="' + pad.l + '" y1="' + (pad.t + plotH) + '" x2="' + (pad.l + plotW) + '" y2="' + (pad.t + plotH) + '" stroke="rgba(255,255,255,.2)"/>'
+        + '<line x1="' + pad.l + '" y1="' + pad.t + '" x2="' + pad.l + '" y2="' + (pad.t + plotH) + '" stroke="rgba(255,255,255,.2)"/>'
+        + '<line x1="' + pad.l + '" y1="' + tgtY.toFixed(1) + '" x2="' + (pad.l + plotW) + '" y2="' + tgtY.toFixed(1) + '" stroke="rgb(255,215,0)" stroke-dasharray="6 4" stroke-width="1.5"/>'
+        + '<path d="' + path.trim() + '" fill="none" stroke="#78c8ff" stroke-width="2.5"/>'
+        + '<line x1="' + curX.toFixed(1) + '" y1="' + pad.t + '" x2="' + curX.toFixed(1) + '" y2="' + (pad.t + plotH) + '" stroke="rgb(255,165,120)" stroke-width="2"/>'
+        + (reqX ? '<circle cx="' + reqX.toFixed(1) + '" cy="' + tgtY.toFixed(1) + '" r="4" fill="rgb(255,215,0)"/>' : '')
+        + '<text x="' + pad.l + '" y="' + (H - 10) + '" fill="rgba(255,255,255,.55)" font-size="11">Sample size (N)</text>'
+        + '<text x="8" y="' + (pad.t + 12) + '" fill="rgba(255,255,255,.55)" font-size="11">Power</text>'
+        + '<text x="' + (pad.l + plotW - 4) + '" y="' + (pad.t + plotH + 14) + '" text-anchor="end" fill="rgba(255,255,255,.45)" font-size="10">' + maxN + '</text>'
+        + '<text x="' + pad.l + '" y="' + (pad.t + plotH + 14) + '" fill="rgba(255,255,255,.45)" font-size="10">' + minN + '</text>';
+    }
+
     function calculateRegressionPower(results) {
       const ctx = getRegressionPowerContext(results);
       if (!ctx) {
@@ -10935,36 +11042,53 @@ ${sectionsHtml}
         powSetText('powSampleSize', '—');
         powSetText('powPartialEta', '—');
         powSetText('powRequired', '—');
+        powSetText('pwstd-metric-r2', '—');
         ['powReq80', 'powReq85', 'powReq90', 'powReq95'].forEach(id => powSetText(id, '—'));
         updateRegressionPowerOutputParams(null);
         updateRegressionR2Compare(null);
+        updateRegressionExecutiveSummary(null);
+        updateRegressionPlanningSummary(null);
+        renderRegressionPowerCurve(null);
         updateRegressionPowerStatus('Run a regression model to populate power results.', 'info');
         return;
       }
 
       const targetInput = document.getElementById('powDetectableTarget');
       const detectTargetPower = targetInput ? (parseFloat(targetInput.value) || 0.80) : 0.80;
-      const detectableR2 = getRegressionDetectableR2(ctx, detectTargetPower);
+      const targetSel = window.StatisticoPowerTemplate && window.StatisticoPowerTemplate.getSelectedTargetPower
+        ? window.StatisticoPowerTemplate.getSelectedTargetPower()
+        : { pct: '85%', power: 0.85 };
+      const detectableR2 = getRegressionDetectableR2(ctx, targetSel.power);
       const observedPower = regressionPowerAtF2(ctx.n, ctx.p, ctx.f2, ctx.alpha, ctx.withIntercept);
       const powerPct = (observedPower * 100).toFixed(1) + '%';
       const mag = regressionCohenMagnitude(ctx.f2);
 
       powSetText('powObserved', powerPct);
-      powSetText('powEffectSize', ctx.f2.toFixed(4) + (mag ? ' (' + mag + ')' : ''));
+      powSetText('powEffectSize', ctx.f2.toFixed(3) + (mag ? ' — ' + mag.charAt(0).toUpperCase() + mag.slice(1) : ''));
       powSetText('powSampleSize', String(ctx.n));
       powSetText('powPartialEta', ctx.r2.toFixed(4));
+      powSetText('pwstd-metric-r2', ctx.r2.toFixed(3));
       powSetText('powAlpha', ctx.alpha.toFixed(3));
-      powSetText('powRequired', estimateRegressionRequiredN(ctx.f2, ctx.p, 0.85, ctx.alpha, ctx.withIntercept) || '—');
-      powSetText('powReq80', estimateRegressionRequiredN(ctx.f2, ctx.p, 0.80, ctx.alpha, ctx.withIntercept) || '—');
-      powSetText('powReq85', estimateRegressionRequiredN(ctx.f2, ctx.p, 0.85, ctx.alpha, ctx.withIntercept) || '—');
-      powSetText('powReq90', estimateRegressionRequiredN(ctx.f2, ctx.p, 0.90, ctx.alpha, ctx.withIntercept) || '—');
-      powSetText('powReq95', estimateRegressionRequiredN(ctx.f2, ctx.p, 0.95, ctx.alpha, ctx.withIntercept) || '—');
-
       const req80 = estimateRegressionRequiredN(ctx.f2, ctx.p, 0.80, ctx.alpha, ctx.withIntercept);
+      const req85 = estimateRegressionRequiredN(ctx.f2, ctx.p, 0.85, ctx.alpha, ctx.withIntercept);
+      const req90 = estimateRegressionRequiredN(ctx.f2, ctx.p, 0.90, ctx.alpha, ctx.withIntercept);
+      const req95 = estimateRegressionRequiredN(ctx.f2, ctx.p, 0.95, ctx.alpha, ctx.withIntercept);
+      powSetText('powRequired', req85 || '—');
+      powSetText('powReq80', req80 || '—');
+      powSetText('powReq85', req85 || '—');
+      powSetText('powReq90', req90 || '—');
+      powSetText('powReq95', req95 || '—');
+
+      const selectedReqN = estimateRegressionRequiredN(ctx.f2, ctx.p, targetSel.power, ctx.alpha, ctx.withIntercept);
+
+      updateRegressionExecutiveSummary(ctx, observedPower, mag);
+      updateRegressionPlanningSummary(ctx);
+      renderRegressionPowerCurve(ctx, targetSel.power, selectedReqN);
+
       let statusMsg;
       let statusType;
       if (observedPower >= 0.80) {
-        statusMsg = 'Adequate power (' + powerPct + ') for the observed R² with n=' + ctx.n + '. Effect size f²=' + ctx.f2.toFixed(3) + ' (' + mag + ').';
+        statusMsg = buildRegressionPowerRecommendation(ctx, observedPower, { '80': req80, '85': req85, '90': req90, '95': req95 });
         statusType = 'success';
       } else if (observedPower >= 0.70) {
         statusMsg = 'Borderline power (' + powerPct + ') with n=' + ctx.n + '. For 80% power at this R², plan n≈' + (req80 || '—') + '.';
@@ -10978,7 +11102,7 @@ ${sectionsHtml}
       const minF2 = estimateRegressionDetectableF2(ctx.n, ctx.p, detectTargetPower, ctx.alpha, ctx.withIntercept);
       powSetText('powMinDetectableF', minF2.toFixed(4) + (regressionCohenMagnitude(minF2) ? ' (' + regressionCohenMagnitude(minF2) + ')' : ''));
       powSetText('powMinDetectableEta', detectableR2.toFixed(4));
-      updateRegressionR2Compare(ctx, detectableR2, detectTargetPower);
+      updateRegressionR2Compare(ctx, detectableR2, targetSel.power);
 
       updateRegressionPowerOutputParams(buildRegressionPowerOutputParams(ctx, ctx.f2, observedPower));
 
@@ -11070,11 +11194,20 @@ ${sectionsHtml}
       if (!window.StatisticoPowerTemplate || typeof window.StatisticoPowerTemplate.renderById !== 'function') return;
       window.StatisticoPowerTemplate.renderById('sharedPowerTemplateMount', {
         title: 'Power & Sample Size',
+        layout: 'analysis',
         variant: 'regression',
         customHandler: 'calculateRegressionCustomPower()',
         detectableHandler: 'calculateRegressionDetectableEffect()'
       });
       window.StatisticoPowerTemplate._computeDetectable = calculateRegressionDetectableEffect;
+      window.StatisticoPowerTemplate._updatePlanningSummaryFn = function() {
+        updateRegressionPlanningSummary(getRegressionPowerContext());
+        const ctx = getRegressionPowerContext();
+        if (!ctx) return;
+        const target = window.StatisticoPowerTemplate.getSelectedTargetPower();
+        const reqN = estimateRegressionRequiredN(ctx.f2, ctx.p, target.power, ctx.alpha, ctx.withIntercept);
+        renderRegressionPowerCurve(ctx, target.power, reqN);
+      };
       window.StatisticoPowerTemplate._customComputeFn = calculateRegressionCustomPower;
       window.StatisticoPowerTemplate._recalcFn = refreshRegressionPowerAnalysis;
       const detTarget = document.getElementById('powDetectableTarget');

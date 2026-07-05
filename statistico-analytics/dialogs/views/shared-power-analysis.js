@@ -342,7 +342,6 @@
 
       function hideHover() {
         if (tooltip) tooltip.hidden = true;
-        svg.style.cursor = '';
         var hover = svg.querySelector('.pwstd-curve-hover');
         if (hover) hover.setAttribute('opacity', '0');
       }

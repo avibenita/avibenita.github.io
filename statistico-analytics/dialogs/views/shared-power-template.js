@@ -110,7 +110,7 @@
     }).join('\n');
 
     container.innerHTML = [
-      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260705j">',
+      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260705k">',
       '  <header class="pwstd-page-header">',
       '    <h2 class="pwstd-title"><i class="fa-solid fa-bolt"></i> ' + esc(title) + '</h2>',
       '    <p class="pwstd-subtitle">Required N, achieved power, and detectable effect</p>',
@@ -144,11 +144,10 @@
       '      <div class="pwstd-card-b">',
       '        <div class="pwstd-targets">' + chipHtml + '</div>',
       '        <span id="' + id(ids,'customStatus','customPowerStatus') + '" class="pwstd-custom-status"><i class="fa-solid fa-spinner fa-spin"></i> Calculating...</span>',
-      '        <div class="pwstd-planning-stats">',
-      '          <div class="pwstd-planning-stat"><span>Selected target</span><strong id="pwstd-selected-target">85%</strong></div>',
-      '          <div class="pwstd-planning-stat"><span id="pwstd-reqN-label">Required N (85% target)</span><strong id="' + id(ids,'requiredN','powRequired') + '">—</strong></div>',
-      '          <div class="pwstd-planning-stat pwstd-for-main"><span>R² used</span><strong id="' + id(ids,'partialEta','powPartialEta') + '">—</strong></div>',
-      '        </div>',
+      '        <span id="pwstd-selected-target" hidden aria-hidden="true"></span>',
+      '        <span id="pwstd-reqN-label" hidden aria-hidden="true"></span>',
+      '        <span id="' + id(ids,'requiredN','powRequired') + '" hidden aria-hidden="true"></span>',
+      '        <span id="' + id(ids,'partialEta','powPartialEta') + '" hidden aria-hidden="true"></span>',
       '        <p class="pwstd-planning-summary" id="pwstd-planning-summary">Select a target power to see required sample size.</p>',
       '        <div class="pwstd-for-detectable">',
       '          <div class="pwstd-row"><span class="pwstd-label">Target power</span><input class="pwstd-select" type="number" id="' + id(ids,'detectableTarget','powDetectableTarget') + '" min="0.5" max="0.99" step="0.05" value="0.80"></div>',

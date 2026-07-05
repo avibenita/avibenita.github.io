@@ -156,7 +156,7 @@
       if (labels.effectSource) powSetText('powEffectSource', labels.effectSource);
       var metric = document.getElementById('pwstd-metric-effect-label');
       if (metric && labels.effectMetric) metric.textContent = labels.effectMetric;
-      var partial = document.querySelector('#pwstd-card-planning .pwstd-planning-stat.pwstd-for-main span');
+      var partial = document.getElementById('pwstd-planning-effect-label');
       if (partial && labels.planningEffect) partial.textContent = labels.planningEffect;
       var detItems = document.querySelectorAll('#pwstd-card-detectable .pwstd-detectable-item span');
       if (detItems.length >= 2) {

@@ -1396,6 +1396,7 @@ const StatisticoHeader = {
       if (isRepeatedKplus) {
         analysisItems.splice(2, 0, { type: 'tab', tab: 'patterns', icon: 'fa-chart-line', label: 'Trajectories', description: 'Inspect condition trajectories across repeated measurements.' });
       }
+      analysisItems.push({ type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power & Sample Size', description: 'Required N, achieved power & detectable η²' });
       if (!isPaired) {
         analysisItems.push({ type: 'tab', tab: 'comparisons', icon: 'fa-code-compare', label: 'Pairwise Comparisons', description: 'Inspect pairwise contrasts after omnibus testing.' });
       }

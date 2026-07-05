@@ -81,7 +81,7 @@
     }).join('\n');
 
     container.innerHTML = [
-      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260705c">',
+      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260705d">',
       '  <header class="pwstd-page-header">',
       '    <h2 class="pwstd-title"><i class="fa-solid fa-bolt"></i> ' + esc(title) + '</h2>',
       '    <p class="pwstd-subtitle">Required N, achieved power, and detectable effect</p>',
@@ -187,7 +187,7 @@
   function render(container, opts){
     if (!container) return;
     var o   = opts || {};
-    if (o.layout === 'analysis' || o.variant === 'regression' || o.variant === 'logistic') {
+    if (o.layout === 'analysis' || o.variant === 'regression' || o.variant === 'logistic' || o.variant === 'anova') {
       renderAnalysisLayout(container, o);
       return;
     }

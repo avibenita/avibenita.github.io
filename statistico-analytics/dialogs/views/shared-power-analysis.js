@@ -29,6 +29,13 @@
     return 'large';
   }
 
+  function cohenFMagnitude(f) {
+    if (!isFinite(f) || f <= 0) return '';
+    if (f < 0.10) return 'small';
+    if (f < 0.25) return 'medium';
+    return 'large';
+  }
+
   function noncentralFCdf(f, df1, df2, ncp) {
     if (!isFinite(f) || f <= 0 || !df1 || !df2 || df1 <= 0 || df2 <= 0) return 0;
     if (typeof jStat === 'undefined' || !jStat.centralF || !jStat.beta || !jStat.beta.cdf) {
@@ -156,6 +163,38 @@
         if (labels.detectableObserved) detItems[0].textContent = labels.detectableObserved;
         if (labels.detectableThreshold) detItems[1].textContent = labels.detectableThreshold;
       }
+      var fMetric = document.querySelector('#tab-power .pwstd-metric-card:nth-child(4) .pwstd-metric-label');
+      if (fMetric && labels.effectSizeMetric) fMetric.textContent = labels.effectSizeMetric;
+      if (labels.minDetectableF) {
+        var minFEl = document.getElementById('powMinDetectableF');
+        if (minFEl) {
+          var minFRow = minFEl.closest('.pwstd-row');
+          if (minFRow) {
+            var minFLbl = minFRow.querySelector('.pwstd-label');
+            if (minFLbl) minFLbl.textContent = labels.minDetectableF;
+          }
+        }
+      }
+      if (labels.gpowerField) {
+        var gpowEl = document.getElementById('powOutPillaiV');
+        if (gpowEl) {
+          var gpowRow = gpowEl.closest('.pwstd-row');
+          if (gpowRow) {
+            var gpowLbl = gpowRow.querySelector('.pwstd-label');
+            if (gpowLbl) gpowLbl.textContent = labels.gpowerField;
+            gpowRow.style.display = '';
+          }
+        }
+      }
+    }
+
+    function formatEffectSize(ctx) {
+      if (cfg.variant === 'anova' && isFinite(ctx.cohenF)) {
+        var fMag = cohenFMagnitude(ctx.cohenF);
+        return ctx.cohenF.toFixed(3) + (fMag ? ' — ' + fMag.charAt(0).toUpperCase() + fMag.slice(1) : '');
+      }
+      var mag = cohenMagnitude(ctx.f2);
+      return ctx.f2.toFixed(3) + (mag ? ' — ' + mag.charAt(0).toUpperCase() + mag.slice(1) : '');
     }
 
     function updateExecutiveSummary(ctx, power) {
@@ -243,7 +282,11 @@
       powSetText('powOutDf2', String(ctx.df2));
       powSetText('powOutN', String(ctx.n));
       powSetText('powOutPower', isFinite(power) ? (power * 100).toFixed(1) + '%' : '—');
-      powSetText('powOutPillaiV', '—');
+      if (cfg.variant === 'anova' && isFinite(ctx.cohenF)) {
+        powSetText('powOutPillaiV', ctx.cohenF.toFixed(4));
+      } else {
+        powSetText('powOutPillaiV', '—');
+      }
       var formula = document.getElementById('powDfFormula');
       if (formula && cfg.dfFormula) formula.textContent = cfg.dfFormula;
     }
@@ -424,7 +467,7 @@
         ? global.StatisticoPowerTemplate.getSelectedTargetPower()
         : { pct: '85%', power: 0.85 };
       var power = observedPower(ctx);
-      var mag = cohenMagnitude(ctx.f2);
+      var mag = cfg.variant === 'anova' ? cohenFMagnitude(ctx.cohenF) : cohenMagnitude(ctx.f2);
       var reqMap = {
         '80': computeRequiredN(ctx, 0.80),
         '85': computeRequiredN(ctx, 0.85),
@@ -434,7 +477,7 @@
       var detectable = detectableEffect(ctx, targetSel.power);
 
       powSetText('powObserved', (power * 100).toFixed(1) + '%');
-      powSetText('powEffectSize', ctx.f2.toFixed(3) + (mag ? ' — ' + mag.charAt(0).toUpperCase() + mag.slice(1) : ''));
+      powSetText('powEffectSize', formatEffectSize(ctx));
       powSetText('powSampleSize', String(ctx.n));
       powSetText('powPartialEta', ctx.effect.toFixed(4));
       powSetText('pwstd-metric-r2', ctx.effect.toFixed(3));
@@ -465,7 +508,9 @@
       updateStatus(ctx, power, reqMap);
 
       var minF2 = estimateDetectableF2(ctx.n, ctx.df1, minN(ctx), function (n) { return df2AtN(ctx, n); }, detectTargetPower, ctx.alpha);
-      powSetText('powMinDetectableF', minF2.toFixed(4) + (cohenMagnitude(minF2) ? ' (' + cohenMagnitude(minF2) + ')' : ''));
+      var minFDisplay = cfg.variant === 'anova' ? Math.sqrt(minF2) : minF2;
+      var minMag = cfg.variant === 'anova' ? cohenFMagnitude(minFDisplay) : cohenMagnitude(minF2);
+      powSetText('powMinDetectableF', minFDisplay.toFixed(4) + (minMag ? ' (' + minMag + ')' : ''));
       powSetText('powMinDetectableEta', detectableEffect(ctx, detectTargetPower).toFixed(4));
       updateEffectCompare(ctx, detectable, targetSel.power);
       updateOutputParams(ctx, power);
@@ -548,8 +593,10 @@
       var detN = document.getElementById('pwstd-det-n');
       if (detN) detN.textContent = String(ctx.n);
       var minF2 = estimateDetectableF2(ctx.n, ctx.df1, minN(ctx), function (n) { return df2AtN(ctx, n); }, targetPower, ctx.alpha);
+      var minFDisplay = cfg.variant === 'anova' ? Math.sqrt(minF2) : minF2;
+      var minMag = cfg.variant === 'anova' ? cohenFMagnitude(minFDisplay) : cohenMagnitude(minF2);
       var minEffect = detectableEffect(ctx, targetPower);
-      powSetText('powMinDetectableF', minF2.toFixed(4) + (cohenMagnitude(minF2) ? ' (' + cohenMagnitude(minF2) + ')' : ''));
+      powSetText('powMinDetectableF', minFDisplay.toFixed(4) + (minMag ? ' (' + minMag + ')' : ''));
       powSetText('powMinDetectableEta', minEffect.toFixed(4));
       updateEffectCompare(ctx, minEffect, targetPower);
     }
@@ -622,10 +669,11 @@
     var alpha = (b.spec && isFinite(b.spec.alpha)) ? b.spec.alpha : 0.05;
     if (!n || !k || k < 2 || !isFinite(eta) || eta < 0) return null;
     var f2 = isFinite(ow.cohenF) ? ow.cohenF * ow.cohenF : f2FromEffect(eta);
+    var cohenF = isFinite(ow.cohenF) ? ow.cohenF : (f2 > 0 ? Math.sqrt(f2) : NaN);
     var df1 = k - 1;
     var df2 = n - k;
     if (df2 < 1) return null;
-    return { n: n, k: k, f2: f2, effect: eta, alpha: alpha, df1: df1, df2: df2, df2Offset: k };
+    return { n: n, k: k, f2: f2, cohenF: cohenF, effect: eta, alpha: alpha, df1: df1, df2: df2, df2Offset: k };
   }
 
   global.StatisticoPowerAnalysis = {
@@ -664,15 +712,21 @@
           target: 'Omnibus F test',
           effectSource: 'Observed η²',
           effectMetric: 'Observed η²',
+          effectSizeMetric: "Cohen's f",
           planningEffect: 'η² used',
           detectableObserved: 'Observed η²',
-          detectableThreshold: 'Detectable η²'
+          detectableThreshold: 'Detectable η²',
+          minDetectableF: "Min detectable Cohen's f",
+          gpowerField: "Cohen's f (G*Power)"
         },
         getContext: function (source) { return anovaOneWayContext(source); },
         minN: function (ctx) { return Math.max(ctx.k + 1, 8); },
         df2AtN: function (ctx, n) { return n - ctx.k; },
         engineNote: function (ctx) {
-          return 'Exact noncentral F (Cohen one-way ANOVA): λ=N·f², f²=η²/(1−η²), df1=' + (ctx.k - 1) + ', df2=N−' + ctx.k + ' — computed in browser via jStat.';
+          var f = isFinite(ctx.cohenF) ? ctx.cohenF : Math.sqrt(ctx.f2);
+          return 'Exact noncentral F (G*Power one-way ANOVA): enter Cohen\'s f = ' + f.toFixed(3) + ' in G*Power (not f²). '
+            + 'λ = N·f² = ' + (ctx.n * ctx.f2).toFixed(3) + ', f² = η²/(1−η²) = ' + ctx.f2.toFixed(3)
+            + ', df1 = ' + (ctx.k - 1) + ', df2 = N−' + ctx.k + '.';
         }
       }).mount(Object.assign({ getSource: function () { return global._bundle; } }, opts || {}));
     },
@@ -687,6 +741,6 @@
       if (global.StatisticoPowerAnalysis._activeEngine) global.StatisticoPowerAnalysis._activeEngine.calculateDetectableEffect();
     },
     _activeEngine: null,
-    VERSION: '20260705h'
+    VERSION: '20260705i'
   };
 })(window);

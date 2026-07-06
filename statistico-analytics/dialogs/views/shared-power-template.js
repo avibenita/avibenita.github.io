@@ -83,9 +83,25 @@
       + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Achieved Power</div><div class="pwstd-metric-value" id="' + id(ids,'observed','powObserved') + '">—</div></div>'
       + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Subjects</div><div class="pwstd-metric-value" id="powMetricSubjects">—</div></div>'
       + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Observations</div><div class="pwstd-metric-value" id="powMetricObservations">—</div></div>'
-      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label" id="pwstd-metric-effect-label">Effect Size</div><div class="pwstd-metric-value" id="' + id(ids,'effectSize','powEffectSize') + '">—</div></div>'
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label" id="pwstd-metric-effect-label">Partial η²</div><div class="pwstd-metric-value" id="pwstd-metric-r2">—</div></div>'
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label" id="pwstd-metric-f-label">Cohen\'s f²</div><div class="pwstd-metric-value" id="' + id(ids,'effectSize','powEffectSize') + '">—</div></div>'
       + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">ICC</div><div class="pwstd-metric-value" id="powMetricICC">—</div></div>'
       + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Meas. / Subject</div><div class="pwstd-metric-value" id="powMetricMeasPerSub">—</div></div>';
+  }
+
+  function buildMixedDesignAssumptionsHtml() {
+    return ''
+      + '  <div class="pwstd-card pwstd-card--design-assumptions" id="pwstd-design-assumptions">'
+      + '    <div class="pwstd-card-h">Design Assumptions</div>'
+      + '    <div class="pwstd-card-b">'
+      + '      <div class="pwstd-design-assumptions-grid">'
+      + '        <div class="pwstd-design-assumption"><span>Repeated measurements</span><strong id="powDesignMeas">—</strong></div>'
+      + '        <div class="pwstd-design-assumption"><span>ICC</span><strong id="powDesignICC">—</strong></div>'
+      + '        <div class="pwstd-design-assumption"><span>Dropout</span><strong id="powDesignDropout">0%</strong></div>'
+      + '        <div class="pwstd-design-assumption"><span>Random structure</span><strong id="powDesignRandom">—</strong></div>'
+      + '      </div>'
+      + '    </div>'
+      + '  </div>';
   }
 
   function renderAnalysisLayout(container, opts) {
@@ -108,6 +124,10 @@
       ? '        <span class="pwstd-meta-chip"><span class="pwstd-meta-k">Design</span><span class="pwstd-meta-v" id="powDesignPattern">—</span></span>\n'
       : '';
 
+    var chipSubHtml = variant === 'mixed'
+      ? function (valueId) { return '  <div class="pwstd-chip-sub" id="' + valueId + 'Sub"></div>'; }
+      : function () { return ''; };
+
     var chipHtml = CHIPS.map(function(c){
       var valueId = id(ids, c.key, c.fallback);
       var isDefault = c.pct === '85';
@@ -126,6 +146,7 @@
           + '    </button>'
           + '  </div>'
           + '  <div class="pwstd-chip-value" id="' + valueId + '">--</div>'
+          + chipSubHtml(valueId)
           + '</div>';
       }
       return ''
@@ -135,6 +156,7 @@
         + '  <div class="pwstd-chip-check"><i class="fa-solid fa-check"></i></div>'
         + '  <div class="pwstd-chip-label">' + c.pct + '%</div>'
         + '  <div class="pwstd-chip-value" id="' + valueId + '">...</div>'
+        + chipSubHtml(valueId)
         + '</div>';
     }).join('\n');
 
@@ -165,6 +187,7 @@
       '  <div class="' + metricsRowClass + '">',
       metricsHtml,
       '  </div>',
+      variant === 'mixed' ? buildMixedDesignAssumptionsHtml() : '',
       '  <div class="pwstd-grid pwstd-grid--analysis">',
       '    <div class="pwstd-card pwstd-card--planning pwstd-card--primary" id="pwstd-card-planning">',
       '      <div class="pwstd-card-h" id="pwstd-head-planning">Sample Size Planning</div>',
@@ -440,13 +463,15 @@
       if (design) design.textContent = o.designLabel || 'Linear Mixed Model';
       if (source) source.textContent = o.effectSourceLabel || 'Observed estimate';
       _setRowLabel('powPartialEta', 'Partial η² used');
-      _setRowLabel('powMinDetectableEta', 'Min detectable partial η²');
+      _setRowLabel('powMinDetectableEta', 'Minimum detectable partial η²');
       _setRowLabel('powEffectSize', "Cohen's f²");
-      _setRowLabel('powMinDetectableF', 'Min detectable f²');
+      _setRowLabel('powMinDetectableF', 'Minimum detectable f²');
+      var detCardHead = document.querySelector('#pwstd-card-detectable .pwstd-card-h');
+      if (detCardHead) detCardHead.textContent = 'Minimum Detectable Effect';
       var detItems = document.querySelectorAll('#pwstd-card-detectable .pwstd-detectable-item span');
       if (detItems.length >= 2) {
         detItems[0].textContent = 'Observed partial η²';
-        detItems[1].textContent = 'Detectable partial η²';
+        detItems[1].textContent = 'Minimum detectable partial η²';
       }
       var headPlanning = document.getElementById('pwstd-head-planning');
       if (headPlanning) headPlanning.textContent = 'Sample Size Planning';

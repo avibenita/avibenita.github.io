@@ -609,6 +609,9 @@
         customRequiredN.textContent = req;
         customRequiredN.style.color = '#7fdb9f';
       }
+      if (cfg.variant === 'mixed') {
+        updateMixedChipSubs(ctx, null);
+      }
       if (global.StatisticoPowerTemplate && global.StatisticoPowerTemplate.onCustomComplete) {
         global.StatisticoPowerTemplate.onCustomComplete(req);
       }
@@ -735,6 +738,62 @@
     return 'Cross-sectional';
   }
 
+  function formatMixedIcc(ctx) {
+    if (!ctx || ctx.iccEstimated === false || !isFinite(ctx.icc)) return 'Not estimated';
+    if (ctx.icc < 0.005) return '≈0';
+    return ctx.icc.toFixed(2);
+  }
+
+  function mixedRandomStructure(ctx) {
+    if (!ctx) return '—';
+    if (ctx.hasRandomSlope) return 'Random intercept + slope';
+    return 'Random intercept';
+  }
+
+  function formatMixedEffectF2(ctx) {
+    if (!ctx) return '—';
+    var mag = cohenMagnitude(ctx.f2);
+    return ctx.f2.toFixed(2) + (mag ? ' — ' + mag.charAt(0).toUpperCase() + mag.slice(1) : '');
+  }
+
+  function updateMixedChipSubs(ctx, reqMap) {
+    if (!ctx || !reqMap) return;
+    ['80', '85', '90', '95'].forEach(function (p) {
+      var req = reqMap[p];
+      var sub = document.getElementById('powReq' + p + 'Sub');
+      if (!sub) return;
+      if (req && isFinite(ctx.measurementsPerSubject)) {
+        sub.textContent = '≈' + Math.round(req * ctx.measurementsPerSubject) + ' obs';
+      } else {
+        sub.textContent = '';
+      }
+    });
+    var customReqEl = document.getElementById('customRequiredN');
+    var customSub = document.getElementById('customRequiredNSub');
+    if (customSub && customReqEl) {
+      var customReq = parseInt(customReqEl.textContent, 10);
+      if (customReq > 0 && isFinite(ctx.measurementsPerSubject)) {
+        customSub.textContent = '≈' + Math.round(customReq * ctx.measurementsPerSubject) + ' obs';
+      } else {
+        customSub.textContent = '';
+      }
+    }
+  }
+
+  function updateMixedDesignAssumptions(ctx) {
+    if (!ctx) {
+      ['powDesignMeas', 'powDesignICC', 'powDesignRandom'].forEach(function (id) { powSetText(id, '—'); });
+      powSetText('powDesignDropout', '0%');
+      return;
+    }
+    powSetText('powDesignMeas', isFinite(ctx.measurementsPerSubject)
+      ? ctx.measurementsPerSubject.toFixed(1).replace(/\.0$/, '')
+      : 'Not estimated');
+    powSetText('powDesignICC', formatMixedIcc(ctx));
+    powSetText('powDesignDropout', '0%');
+    powSetText('powDesignRandom', mixedRandomStructure(ctx));
+  }
+
   function mixedContext(results) {
     var d = results || global._mixedResults || global.mixedResults;
     if (!d) return null;
@@ -770,7 +829,9 @@
     if (!isFinite(etaP) || etaP < 0) etaP = 0;
     if (etaP >= 1) etaP = 0.999;
     var f2 = f2FromEffect(etaP);
-    var icc = parseFloat(d.ICC != null ? d.ICC : d.icc);
+    var iccRaw = d.ICC != null ? d.ICC : d.icc;
+    var iccEstimated = iccRaw !== undefined && iccRaw !== null && iccRaw !== '';
+    var icc = iccEstimated ? parseFloat(iccRaw) : NaN;
 
     var vc = d.varianceComponents || d.randomEffects || [];
     var hasRandomSlope = vc.some(function (r) {
@@ -795,6 +856,7 @@
       df2Subjects: subjects,
       targetEffectName: String(target.source || target.effect || target.term || 'Fixed effect'),
       icc: icc,
+      iccEstimated: iccEstimated,
       F: F,
       hasRepeatedMeasures: isFinite(measPerSub) && measPerSub > 1.05,
       hasGroups: groups >= 2,
@@ -806,17 +868,25 @@
 
   function mixedExecutiveSummary(ctx, power) {
     var pct = (power * 100).toFixed(1);
-    var iccTxt = isFinite(ctx.icc) ? ', and an estimated ICC of ' + ctx.icc.toFixed(2) : '';
-    var measTxt = isFinite(ctx.measurementsPerSubject)
-      ? ctx.measurementsPerSubject.toFixed(1).replace(/\.0$/, '') + ' measurements per subject'
+    var measRounded = isFinite(ctx.measurementsPerSubject) ? Math.round(ctx.measurementsPerSubject) : null;
+    var measTxt = measRounded
+      ? 'approximately ' + measRounded + ' repeated measurements per subject'
       : 'the current repeated-measures structure';
-    var text = 'Current design provides ' + pct + '% estimated power to detect the selected fixed effect ('
-      + ctx.targetEffectName + '). The design includes ' + ctx.subjects + ' subjects, '
-      + measTxt + ', and ' + (ctx.observations || '—') + ' total observations' + iccTxt + '.';
     var cls = 'pwstd-exec--neutral';
-    if (power >= 0.80 && ctx.converged !== false) cls = 'pwstd-exec--success';
-    else if (power >= 0.70) cls = 'pwstd-exec--warning';
-    else cls = 'pwstd-exec--error';
+    var lead;
+    if (power >= 0.80 && ctx.converged !== false) {
+      cls = 'pwstd-exec--success';
+      lead = 'The current design is adequately powered.';
+    } else if (power >= 0.70) {
+      cls = 'pwstd-exec--warning';
+      lead = 'The current design is borderline for conventional power targets.';
+    } else {
+      cls = 'pwstd-exec--error';
+      lead = 'The current design appears underpowered for the observed effect.';
+    }
+    var text = lead + ' Based on ' + ctx.subjects + ' subjects and ' + measTxt
+      + ', the estimated power to detect ' + ctx.targetEffectName + ' is ' + pct + '%'
+      + (power >= 0.80 ? ', exceeding the conventional 80% target.' : (power >= 0.70 ? ', slightly below the 80% target.' : ', below the conventional 80% target.'));
     if (ctx.subjects < 30) {
       text += ' Small number of subjects may produce unstable mixed-model estimates.';
     }
@@ -832,7 +902,8 @@
     }, target.power, ctx.alpha);
     if (!req) return 'Select a target power to see required subjects.';
     var meas = isFinite(ctx.measurementsPerSubject) ? ctx.measurementsPerSubject.toFixed(1).replace(/\.0$/, '') : '—';
-    var iccPart = isFinite(ctx.icc) ? ' and ICC = ' + ctx.icc.toFixed(2) : '';
+    var iccPart = formatMixedIcc(ctx);
+    iccPart = iccPart === 'Not estimated' ? '' : ' and ICC = ' + iccPart;
     var obsPart = isFinite(ctx.measurementsPerSubject) ? ' (' + Math.round(req * ctx.measurementsPerSubject) + ' total observations)' : '';
     var gap = ctx.subjects >= req
       ? ' Current design meets this target.'
@@ -936,7 +1007,7 @@
           effectMetric: 'Partial η²',
           planningEffect: 'Partial η² used',
           detectableObserved: 'Observed partial η²',
-          detectableThreshold: 'Detectable partial η²',
+          detectableThreshold: 'Minimum detectable partial η²',
           effectSizeMetric: "Cohen's f²",
           minDetectableF: 'Min detectable f²'
         },
@@ -953,26 +1024,32 @@
         formatStatus: mixedStatus,
         formatCurveTooltip: function (ctx, n, power) {
           var obs = isFinite(ctx.measurementsPerSubject) ? Math.round(n * ctx.measurementsPerSubject) : '—';
-          var icc = isFinite(ctx.icc) ? ctx.icc.toFixed(2) : '—';
+          var icc = formatMixedIcc(ctx);
           var meas = isFinite(ctx.measurementsPerSubject) ? ctx.measurementsPerSubject.toFixed(1).replace(/\.0$/, '') : '—';
           return '<br>Observations = ' + obs
             + '<br>Meas./subject = ' + meas
             + '<br>Assumed ICC = ' + icc;
         },
-        onCalculate: function (ctx, power) {
+        onCalculate: function (ctx, power, reqMap) {
           if (!ctx) {
             ['powMetricSubjects', 'powMetricObservations', 'powMetricICC', 'powMetricMeasPerSub', 'powDesignPattern'].forEach(function (id) {
               powSetText(id, '—');
             });
+            updateMixedDesignAssumptions(null);
+            updateMixedChipSubs(null, null);
             return;
           }
           powSetText('powMetricSubjects', String(ctx.subjects));
+          powSetText('pwstd-metric-r2', ctx.effect.toFixed(3));
+          powSetText('powEffectSize', formatMixedEffectF2(ctx));
           powSetText('powMetricObservations', ctx.observations ? String(ctx.observations) : 'Not estimated');
-          powSetText('powMetricICC', isFinite(ctx.icc) ? ctx.icc.toFixed(2) : 'Not estimated');
+          powSetText('powMetricICC', formatMixedIcc(ctx));
           powSetText('powMetricMeasPerSub', isFinite(ctx.measurementsPerSubject)
             ? ctx.measurementsPerSubject.toFixed(1).replace(/\.0$/, '')
             : 'Not estimated');
           powSetText('powDesignPattern', mixedDesignLabel(ctx));
+          updateMixedDesignAssumptions(ctx);
+          updateMixedChipSubs(ctx, reqMap);
           var targetEl = document.getElementById('powTargetWhat');
           if (targetEl) targetEl.textContent = ctx.targetEffectName;
           var insightEl = document.getElementById('pwstd-r2-insight');
@@ -981,11 +1058,11 @@
             var det = detEl ? parseFloat(detEl.textContent) : NaN;
             if (isFinite(det)) {
               if (ctx.effect > det + 0.001) {
-                insightEl.textContent = 'Observed partial η² (f² = ' + ctx.f2.toFixed(2) + ') exceeds the detectable threshold — the current design is above the planning threshold.';
+                insightEl.textContent = 'Observed partial η² (f² = ' + ctx.f2.toFixed(2) + ') exceeds the minimum detectable threshold — the current design is above the planning threshold.';
               } else if (Math.abs(ctx.effect - det) <= 0.001) {
-                insightEl.textContent = 'Observed effect is near the detectable threshold — power is borderline for this effect size.';
+                insightEl.textContent = 'Observed effect is near the minimum detectable threshold — power is borderline for this effect size.';
               } else {
-                insightEl.textContent = 'Detectable effect at current design: partial η² = ' + det.toFixed(3) + '. Observed partial η² = ' + ctx.effect.toFixed(3) + '.';
+                insightEl.textContent = 'Minimum detectable partial η² at current design: ' + det.toFixed(3) + '. Observed partial η² = ' + ctx.effect.toFixed(3) + '.';
               }
             }
           }
@@ -1014,6 +1091,6 @@
       if (global.StatisticoPowerAnalysis._activeEngine) global.StatisticoPowerAnalysis._activeEngine.calculateDetectableEffect();
     },
     _activeEngine: null,
-    VERSION: '20260706a'
+    VERSION: '20260706b'
   };
 })(window);

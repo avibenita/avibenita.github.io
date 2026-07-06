@@ -13,6 +13,10 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260530a" />  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
   <script src="../shared-header.js?v=20260524t"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
+  <link rel="stylesheet" href="../shared-power-template.css?v=20260706g" />
+  <script src="../shared-power-template.js?v=20260706g"></script>
+  <script src="../shared-power-analysis.js?v=20260706g"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524e" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524e" data-filter-api="1"></script>
@@ -103,6 +107,22 @@
     .chart-metric-options{display:inline-flex;align-items:center;gap:10px;font-size:11px;font-weight:600;text-transform:none;letter-spacing:0;}
     .chart-metric-options label{display:inline-flex;align-items:center;gap:4px;cursor:pointer;color:var(--text-secondary);white-space:nowrap;}
     #tab-results,#tab-assumptions,#tab-effects,#tab-power{padding:4px 0;}
+    #tab-power.tab-panel.active {
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      box-sizing: border-box;
+      height: 100%;
+      min-height: 0;
+      padding: 8px 12px 20px;
+    }
+    #tab-power #sharedPowerTemplateMount {
+      flex: 1 1 auto;
+      min-height: 0;
+      width: 100%;
+    }
+    .right-col:has(#tab-power.active) .hero-section,
+    .right-col:has(#tab-power.active) .settings-bar { display: none; }
     .stats-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;}
     .stat-panel{background:var(--surface-1);border:2px solid var(--border);border-radius:var(--panel-radius);overflow:hidden;box-shadow:var(--panel-shadow);}
     .stat-panel.secondary{opacity:0.7;transform:scale(0.95);border-color:rgba(45,55,72,0.4);}
@@ -578,12 +598,7 @@
           </div></div></div>
         </section>
         <section id="tab-power" class="tab-panel">
-          <div class="stats-container"><div class="stat-panel"><div class="stat-panel-heading">Power & Sample Size (Python)</div><div class="stat-panel-body">
-            <div class="stat-field"><span class="stat-label">Status</span><span class="stat-value" id="powNote">...</span></div>
-            <div class="stat-field"><span class="stat-label">Endpoint</span><span class="stat-value" id="powEndpoint">...</span></div>
-            <div class="stat-field"><span class="stat-label">Placeholder Power</span><span class="stat-value" id="powVal">...</span></div>
-          </div></div></div>
-          <div class="section-note">Power is designed to call a Python service endpoint with exact/simulation routines.</div>
+          <div id="sharedPowerTemplateMount"></div>
         </section>
       </div>
     </section>
@@ -603,19 +618,33 @@
     function fmtP(v){ const n=parseMaybeNumber(v); if(!isFinite(n)) return v==null?"...":String(v); if(n < 0.001) return "< 0.001"; return globalDecimalPrecision === "auto" ? n.toFixed(4) : n.toFixed(Math.max(3, parseInt(globalDecimalPrecision,10))); }
     function setDecimalPrecision(){ globalDecimalPrecision=(document.getElementById("decimalSelect")||{value:"auto"}).value; if(lastBundle) populateBundle(lastBundle); }
     function setText(id,val){ const el=document.getElementById(id); if(el) el.textContent = (val!==undefined&&val!==null&&val!=="")?val:"..."; }
+    let activeTab = "results";
     function switchTab(tab){
+      if (!tab) return;
       const tabTitles = {
         'explore':     'Descriptives',
         'assumptions': 'Assumptions',
         'results':     'Test Results',
         'effects':     'Effect Sizes',
-        'power':       'Power Analysis'
+        'power':       'Power & Sample Size'
       };
       if (tabTitles[tab] && typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.updateTitle(tabTitles[tab]);
       }
       document.querySelectorAll(".sb-item[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
-      document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === "tab-" + tab));
+      const prevPanel = document.getElementById("tab-" + activeTab);
+      const nextPanel = document.getElementById("tab-" + tab);
+      if (prevPanel) prevPanel.classList.remove("active");
+      if (nextPanel) nextPanel.classList.add("active");
+      activeTab = tab;
+      if (tab === 'power' && window.StatisticoPowerAnalysis) {
+        var powerMount = document.getElementById('sharedPowerTemplateMount');
+        if (powerMount && !powerMount.querySelector('#pwstd-shell') && typeof window.StatisticoPowerAnalysis.mountIndependent === 'function') {
+          window.StatisticoPowerAnalysis.mountIndependent({ mountId: 'sharedPowerTemplateMount' });
+        } else if (window.StatisticoPowerAnalysis._activeEngine) {
+          window.StatisticoPowerAnalysis._activeEngine.calculate(window._independentBundle || lastBundle);
+        }
+      }
       requestAnimationFrame(fitIndependentLayout);
     }
     window.switchTab = switchTab;
@@ -1022,6 +1051,8 @@
 
     function populateBundle(b){
       lastBundle = b || {};
+      window._independentBundle = lastBundle;
+      window.lastIndependentBundle = lastBundle;
       const s=b.setup||{}, e=b.explore||{}, a=b.assumptions||{}, r=b.results||{}, fx=b.effects||{}, p=b.power||{}, rep=b.report||{};
       if ((s.compareMode === "k-plus" || s.mode === "k-plus") && window.location.pathname.indexOf("independent-results-kplus.html") === -1) {
         var next = window.location.href.replace("independent-results.html", "independent-results-kplus.html");
@@ -1054,8 +1085,11 @@
       updateResultsPanels(r, fx, s, 1 - (parseMaybeNumber(s.confidence) || 0.95));
       renderPosthoc(r.posthoc || {}, s.compareMode || "two-vars");
       setText("efG", fmt(fx.hedgesG)); setText("efDelta", fmt(fx.cliffsDelta)); setText("efRrb", fmt(fx.rankBiserial)); setText("efPs", fmt(fx.probabilitySuperiority));
-      setText("powNote", p.note); setText("powEndpoint", p.suggestedEndpoint); setText("powVal", fmt(p.placeholderPower));
       
+      if (window.StatisticoPowerAnalysis && window.StatisticoPowerAnalysis._activeEngine) {
+        window.StatisticoPowerAnalysis._activeEngine.calculate(window._independentBundle || lastBundle);
+      }
+
       // Update descriptive stats table
       populateDescriptiveStats(s, e);
       
@@ -1565,7 +1599,7 @@
       }
 
       const tab = document.querySelector('.tab-panel.active');
-      const scrollTabIds = ['tab-assumptions', 'tab-effects', 'tab-power'];
+      const scrollTabIds = ['tab-assumptions', 'tab-effects'];
       if (tab && vc) {
         const maxH = Math.max(120, vc.clientHeight - 16);
         if (scrollTabIds.indexOf(tab.id) >= 0) {
@@ -1738,6 +1772,10 @@
         });
         StatisticoHeader.initSidebarPage();
         switchTab('results');
+      }
+
+      if (window.StatisticoPowerAnalysis && typeof window.StatisticoPowerAnalysis.mountIndependent === 'function') {
+        window.StatisticoPowerAnalysis.mountIndependent({ mountId: 'sharedPowerTemplateMount' });
       }
 
       // Sidebar navigation — tab switching handled by sidebar onclick handlers

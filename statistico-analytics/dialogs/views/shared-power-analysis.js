@@ -735,23 +735,35 @@
     var b = bundle || global._independentBundle || global.lastIndependentBundle;
     if (!b) return null;
     var ob = (b.results && b.results.omnibus) || {};
+    var res = b.results || {};
     var setup = b.setup || {};
+    var explore = b.explore || {};
     var fx = b.effects || {};
     var isNP = setup.primaryFramework === 'nonparametric';
 
     var n = parseInt(ob.N, 10);
-    if (!n && b.explore && b.explore.kplusSummary) {
-      n = parseInt(b.explore.kplusSummary.totalN, 10);
+    if (!n && explore.kplusSummary) {
+      n = parseInt(explore.kplusSummary.totalN, 10);
     }
     if (!n && Array.isArray(ob.levels)) {
       n = ob.levels.reduce(function (sum, lvl) {
         return sum + (parseInt(lvl.n, 10) || 0);
       }, 0);
     }
+    if (!n) {
+      var n1 = parseInt(explore.n1, 10);
+      var n2 = parseInt(explore.n2, 10);
+      if (n1 > 0 && n2 > 0) n = n1 + n2;
+    }
 
     var k = parseInt(ob.k, 10);
     if (!k && Array.isArray(ob.levels)) k = ob.levels.length;
     if (!k && Array.isArray(setup.selectedColumns)) k = setup.selectedColumns.length;
+    if ((!k || k < 2) && setup.compareMode !== 'k-plus') {
+      var exN1 = parseInt(explore.n1, 10);
+      var exN2 = parseInt(explore.n2, 10);
+      if (exN1 > 0 && exN2 > 0) k = 2;
+    }
 
     var alpha = 0.05;
     if (setup.confidence != null && isFinite(parseFloat(setup.confidence))) {
@@ -772,6 +784,25 @@
         if (isFinite(fStat) && n > 0 && isFinite(df1obs) && df1obs > 0) {
           cohenF = Math.sqrt(Math.max(0, fStat * df1obs / n));
         }
+      }
+    }
+    if ((!isFinite(cohenF) || cohenF <= 0) && k === 2) {
+      var hedgesD = parseFloat(fx.hedgesG);
+      if (isFinite(hedgesD) && hedgesD !== 0) {
+        cohenF = Math.abs(hedgesD) / 2;
+      } else {
+        var tStat = parseFloat(res.welchT != null ? res.welchT : res.studentT);
+        if (isFinite(tStat) && n > 0) cohenF = Math.abs(tStat) / Math.sqrt(n);
+      }
+    }
+    if ((!isFinite(eta) || eta < 0) && isFinite(cohenF) && cohenF > 0) {
+      eta = f2FromEffect(cohenF * cohenF);
+    }
+    if (isNP && (!isFinite(eta) || eta < 0)) {
+      var rrb = parseFloat(fx.rankBiserial);
+      if (isFinite(rrb)) {
+        var r2 = rrb * rrb;
+        if (r2 < 1) eta = r2 / Math.max(1e-12, 1 - r2);
       }
     }
 
@@ -1206,6 +1237,6 @@
       if (global.StatisticoPowerAnalysis._activeEngine) global.StatisticoPowerAnalysis._activeEngine.calculateDetectableEffect();
     },
     _activeEngine: null,
-    VERSION: '20260706f'
+    VERSION: '20260706g'
   };
 })(window);

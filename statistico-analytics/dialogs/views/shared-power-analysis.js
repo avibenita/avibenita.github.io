@@ -743,6 +743,24 @@
     return { n: n, k: k, f2: f2, cohenF: cohenF, effect: eta, alpha: alpha, df1: df1, df2: df2, df2Offset: k };
   }
 
+  function readIndependentFramework(setup) {
+    if (typeof document !== 'undefined') {
+      var fwSel = document.getElementById('fwFrameworkSelect');
+      if (fwSel && (fwSel.value === 'parametric' || fwSel.value === 'nonparametric')) {
+        return fwSel.value;
+      }
+      var npRadio = document.getElementById('fwNonparametric');
+      if (npRadio && npRadio.checked) return 'nonparametric';
+      var pRadio = document.getElementById('fwParametric');
+      if (pRadio && pRadio.checked) return 'parametric';
+    }
+    if (global._independentPrimaryFramework === 'parametric' || global._independentPrimaryFramework === 'nonparametric') {
+      return global._independentPrimaryFramework;
+    }
+    var fromSetup = setup && setup.primaryFramework;
+    return fromSetup === 'nonparametric' ? 'nonparametric' : 'parametric';
+  }
+
   function independentMeansContext(bundle) {
     var b = bundle || global._independentBundle || global.lastIndependentBundle;
     if (!b) return null;
@@ -751,7 +769,8 @@
     var setup = b.setup || {};
     var explore = b.explore || {};
     var fx = b.effects || {};
-    var framework = global._independentPrimaryFramework || setup.primaryFramework || 'parametric';
+    var framework = readIndependentFramework(setup);
+    global._independentPrimaryFramework = framework;
     var isNP = framework === 'nonparametric';
     var compareMode = setup.compareMode || 'two-vars';
 
@@ -1380,6 +1399,6 @@
       if (global.StatisticoPowerAnalysis._activeEngine) global.StatisticoPowerAnalysis._activeEngine.calculateDetectableEffect();
     },
     _activeEngine: null,
-    VERSION: '20260706h'
+    VERSION: '20260706i'
   };
 })(window);

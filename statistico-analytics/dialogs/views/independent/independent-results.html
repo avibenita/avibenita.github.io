@@ -14,9 +14,9 @@
 
   <script src="../shared-header.js?v=20260524t"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
-  <link rel="stylesheet" href="../shared-power-template.css?v=20260706h" />
-  <script src="../shared-power-template.js?v=20260706h"></script>
-  <script src="../shared-power-analysis.js?v=20260706h"></script>
+  <link rel="stylesheet" href="../shared-power-template.css?v=20260706i" />
+  <script src="../shared-power-template.js?v=20260706i"></script>
+  <script src="../shared-power-analysis.js?v=20260706i"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524e" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524e" data-filter-api="1"></script>
@@ -550,14 +550,14 @@
                 <div class="stat-field rc"><span class="stat-label">Statistic</span><span class="stat-value rc" id="resPrimaryStat">...</span></div>
                 <div class="stat-field rc"><span class="stat-label">p-value</span><span class="stat-value rc" id="resPrimaryP">...</span></div>
                 <div class="stat-field rc"><span class="stat-label">Decision</span><span class="stat-value rc" id="resDecision" style="font-weight:800;">...</span></div>
-                <div class="stat-field rc"><span class="stat-label">Mean Diff + 95% CI</span><span class="stat-value rc" id="resPrimaryEstimate">...</span></div>
-                <div class="stat-field rc"><span class="stat-label">Effect Size (Hedges g)</span><span class="stat-value rc" id="resEffectSize" style="background:rgba(120,200,255,.15);border-color:rgba(120,200,255,.4);">...</span></div>
+                <div class="stat-field rc"><span class="stat-label" id="resPrimaryEstimateLabel">Mean Diff + 95% CI</span><span class="stat-value rc" id="resPrimaryEstimate">...</span></div>
+                <div class="stat-field rc"><span class="stat-label" id="resPrimaryEffectLabel">Effect Size (Hedges g)</span><span class="stat-value rc" id="resEffectSize" style="background:rgba(120,200,255,.15);border-color:rgba(120,200,255,.4);">...</span></div>
               </div></div>
               <div class="stat-panel secondary"><div class="stat-panel-heading">Robustness Check</div><div class="stat-panel-body" style="padding:6px 14px;">
                 <div class="stat-field rc"><span class="stat-label">Secondary Test</span><span class="stat-value rc" id="resSecondaryTest">...</span></div>
                 <div class="stat-field rc"><span class="stat-label">Statistic</span><span class="stat-value rc" id="resSecondaryStat">...</span></div>
                 <div class="stat-field rc"><span class="stat-label">p-value</span><span class="stat-value rc" id="resSecondaryP">...</span></div>
-                <div class="stat-field rc"><span class="stat-label">Rank-biserial r</span><span class="stat-value rc" id="resRankBiserial">...</span></div>
+                <div class="stat-field rc"><span class="stat-label" id="resSecondaryEffectLabel">Rank-biserial r</span><span class="stat-value rc" id="resRankBiserial">...</span></div>
                 <div class="stat-field rc"><span class="stat-label">Agreement</span><span class="stat-value rc" id="resAgreement">...</span></div>
                 <div class="stat-field rc"><span class="stat-label">Interpretation</span><span class="stat-value rc" id="resHint" style="font-size:12px;">...</span></div>
               </div></div>
@@ -641,8 +641,8 @@
         var powerMount = document.getElementById('sharedPowerTemplateMount');
         if (powerMount && !powerMount.querySelector('#pwstd-shell') && typeof window.StatisticoPowerAnalysis.mountIndependent === 'function') {
           window.StatisticoPowerAnalysis.mountIndependent({ mountId: 'sharedPowerTemplateMount' });
-        } else if (window.StatisticoPowerAnalysis._activeEngine) {
-          window.StatisticoPowerAnalysis._activeEngine.calculate(window._independentBundle || lastBundle);
+        } else {
+          recalculateIndependentPower();
         }
       }
       requestAnimationFrame(fitIndependentLayout);
@@ -818,6 +818,10 @@
         testBadge.textContent = "Test: " + text;
       }
       refreshHypothesisFrames();
+      if (lastBundle && lastBundle.results) {
+        updateResultsPanels(lastBundle.results, lastBundle.effects || {}, lastBundle.setup || {}, 1 - (parseMaybeNumber((lastBundle.setup && lastBundle.setup.confidence) || 0.95) || 0.95));
+      }
+      updateGroupChart();
       recalculateIndependentPower();
     }
     function notifySettingsChanged(){
@@ -919,6 +923,26 @@
       const welchSig = parseMaybeNumber(r.welchP) < alpha;
       const mwSig = parseMaybeNumber(r.mwP) < alpha;
       const primaryParametric = primaryFramework !== "nonparametric";
+      const estLbl = document.getElementById("resPrimaryEstimateLabel");
+      const effLbl = document.getElementById("resPrimaryEffectLabel");
+      const secEffLbl = document.getElementById("resSecondaryEffectLabel");
+
+      function hedgesMagnitudeLabel(g) {
+        const absG = Math.abs(parseMaybeNumber(g));
+        if (!isFinite(absG)) return "";
+        if (absG < 0.2) return " (negligible)";
+        if (absG < 0.5) return " (small)";
+        if (absG < 0.8) return " (medium)";
+        return " (large)";
+      }
+      function rankMagnitudeLabel(r) {
+        const absRb = Math.abs(parseMaybeNumber(r));
+        if (!isFinite(absRb)) return "";
+        if (absRb < 0.1) return " (negligible)";
+        if (absRb < 0.3) return " (small)";
+        if (absRb < 0.5) return " (medium)";
+        return " (large)";
+      }
 
       // Determine primary p-value and decision
       let primaryP = 0;
@@ -953,6 +977,9 @@
       }
 
       if (primaryParametric) {
+        if (estLbl) estLbl.textContent = "Mean Diff + 95% CI";
+        if (effLbl) effLbl.textContent = "Effect Size (Hedges g)";
+        if (secEffLbl) secEffLbl.textContent = "Rank-biserial r";
         const chosen = currentPrimaryTest || "welch";
         
         // Set test rationale
@@ -981,42 +1008,26 @@
           setText("resPrimaryEstimate", fmt(r.meanDiff) + " [" + fmt(r.ciLow) + ", " + fmt(r.ciHigh) + "]");
         }
         
-        // Effect size
-        const hedgesG = parseMaybeNumber(fx.hedgesG);
-        let effectLabel = "";
-        if (isFinite(hedgesG)) {
-          const absG = Math.abs(hedgesG);
-          if (absG < 0.2) effectLabel = " (negligible)";
-          else if (absG < 0.5) effectLabel = " (small)";
-          else if (absG < 0.8) effectLabel = " (medium)";
-          else effectLabel = " (large)";
-        }
-        setText("resEffectSize", fmt(fx.hedgesG) + effectLabel);
+        setText("resEffectSize", fmt(fx.hedgesG) + hedgesMagnitudeLabel(fx.hedgesG));
         
         setText("resSecondaryTest", "Mann-Whitney U (rank-based)");
         setText("resSecondaryStat", "U = " + fmt(r.u));
         setText("resSecondaryP", fmtP(r.mwP));
-        setText("resRankBiserial", fmt(fx.rankBiserial));
+        setText("resRankBiserial", fmt(fx.rankBiserial) + rankMagnitudeLabel(fx.rankBiserial));
       } else {
+        if (estLbl) estLbl.textContent = "P(X>Y)";
+        if (effLbl) effLbl.textContent = "Rank-biserial r";
+        if (secEffLbl) secEffLbl.textContent = "Hedges g (parametric)";
         setText("resTestRationale", "Non-parametric test for ordinal/skewed data");
         setText("resPrimaryTest", "Mann-Whitney U");
         setText("resPrimaryStat", "U = " + fmt(r.u));
         setText("resPrimaryP", fmtP(r.mwP));
         setText("resPrimaryEstimate", "P(X>Y) = " + fmt(fx.probabilitySuperiority));
-        const rankBis = parseMaybeNumber(fx.rankBiserial);
-        let rbLabel = "";
-        if (isFinite(rankBis)) {
-          const absRb = Math.abs(rankBis);
-          if (absRb < 0.1) rbLabel = " (negligible)";
-          else if (absRb < 0.3) rbLabel = " (small)";
-          else if (absRb < 0.5) rbLabel = " (medium)";
-          else rbLabel = " (large)";
-        }
-        setText("resEffectSize", fmt(fx.rankBiserial) + rbLabel);
+        setText("resEffectSize", fmt(fx.rankBiserial) + rankMagnitudeLabel(fx.rankBiserial));
         setText("resSecondaryTest", "Welch t-test (parametric)");
         setText("resSecondaryStat", "t(" + fmt(r.welchDf) + ") = " + fmt(r.welchT));
         setText("resSecondaryP", fmtP(r.welchP));
-        setText("resRankBiserial", fmt(fx.rankBiserial) + rbLabel);
+        setText("resRankBiserial", fmt(fx.hedgesG) + hedgesMagnitudeLabel(fx.hedgesG));
       }
 
       const agreeEl = document.getElementById("resAgreement");
@@ -1062,7 +1073,6 @@
       window._independentBundle = lastBundle;
       window.lastIndependentBundle = lastBundle;
       const s=b.setup||{}, e=b.explore||{}, a=b.assumptions||{}, r=b.results||{}, fx=b.effects||{}, p=b.power||{}, rep=b.report||{};
-      window._independentPrimaryFramework = s.primaryFramework || primaryFramework;
       if ((s.compareMode === "k-plus" || s.mode === "k-plus") && window.location.pathname.indexOf("independent-results-kplus.html") === -1) {
         var next = window.location.href.replace("independent-results.html", "independent-results-kplus.html");
         window.location.replace(next);
@@ -1078,6 +1088,7 @@
       var testSel = document.getElementById("setPrimaryTest");
       if (testSel) testSel.value = currentPrimaryTest;
       setFrameworkButtons(s.primaryFramework || primaryFramework);
+      window._independentPrimaryFramework = primaryFramework;
       var alphaEl = document.getElementById("setAlpha");
       if (alphaEl) alphaEl.value = String(1 - (parseMaybeNumber(s.confidence) || 0.95));
       var orientation = s.hypothesis || "two-sided";
@@ -1095,9 +1106,7 @@
       renderPosthoc(r.posthoc || {}, s.compareMode || "two-vars");
       setText("efG", fmt(fx.hedgesG)); setText("efDelta", fmt(fx.cliffsDelta)); setText("efRrb", fmt(fx.rankBiserial)); setText("efPs", fmt(fx.probabilitySuperiority));
       
-      if (window.StatisticoPowerAnalysis && window.StatisticoPowerAnalysis._activeEngine) {
-        window.StatisticoPowerAnalysis._activeEngine.calculate(window._independentBundle || lastBundle);
-      }
+      recalculateIndependentPower();
 
       // Update descriptive stats table
       populateDescriptiveStats(s, e);
@@ -1553,7 +1562,7 @@
 
       window._indepChart = Highcharts.chart('groupChart', {
         chart: { type: 'column', backgroundColor: 'transparent', height: null },
-        title: { text: 'Welch (Separate Variance)', style: { color: '#fff', fontSize: '12px', fontWeight: '600' } },
+        title: { text: primaryFramework === 'nonparametric' ? 'Group means (descriptive)' : 'Welch (separate variance)', style: { color: '#fff', fontSize: '12px', fontWeight: '600' } },
         xAxis: { categories: categories, labels: { style: { color: '#fff', fontSize: '12px' } } },
         yAxis: {
           title: { text: 'Mean', style: { color: '#fff' } },

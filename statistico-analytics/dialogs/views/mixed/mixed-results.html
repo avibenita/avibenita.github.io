@@ -18,6 +18,9 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260610float"/>  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
   <script src="../shared-header.js?v=20260610float"></script>
+  <link rel="stylesheet" href="../shared-power-template.css?v=20260706a" />
+  <script src="../shared-power-template.js?v=20260706a"></script>
+  <script src="../shared-power-analysis.js?v=20260706a"></script>
 
   <style>
     /* ── Design tokens ── */
@@ -293,6 +296,15 @@
       scroll-padding-bottom:24px;
       gap: 20px;
       animation: fadeIn .2s ease;
+    }
+    #tab-power.tab-content.active {
+      padding: 8px 12px 20px;
+      gap: 0;
+    }
+    #tab-power #sharedPowerTemplateMount {
+      flex: 1 1 0;
+      min-height: 0;
+      width: 100%;
     }
     /* Keep extra bottom breathing room so panel borders never look clipped */
     .tab-content .mm-section { margin-bottom: 10px; }
@@ -1028,6 +1040,13 @@
                 <span class="sb-item-description">AIC/BIC, covariance, REML &amp; variance components.</span>
               </span>
             </button>
+            <button class="sb-item" onclick="switchTab('power')" data-tab="power">
+              <i class="fa-solid fa-bolt sb-item-icon"></i>
+              <span class="sb-item-copy">
+                <span class="sb-item-label">Power &amp; Sample Size</span>
+                <span class="sb-item-description">Required subjects, observations, and detectable effect.</span>
+              </span>
+            </button>
           </div>
         </div>
 
@@ -1713,6 +1732,13 @@
                   </div>
 
                 </div><!-- /tab-advanced -->
+
+                <!-- ══════════════════════════════════════════════════════
+                     TAB: POWER & SAMPLE SIZE
+                ══════════════════════════════════════════════════════ -->
+                <div id="tab-power" class="tab-content">
+                  <div id="sharedPowerTemplateMount"></div>
+                </div>
 
                 <!-- ══════════════════════════════════════════════════════
                      TAB: MODEL STRUCTURE
@@ -2536,6 +2562,8 @@ ${sectionsHtml}
   ───────────────────────────────────────────────────────────── */
   function receiveMixedModelResults(d) {
     _results = d;
+    window._mixedResults = d;
+    window.mixedResults = d;
     hideLoading();
 
     // populate everything
@@ -2577,6 +2605,10 @@ ${sectionsHtml}
 
     // Enable Export HTML and AI pill now that results are available
     if (typeof window._registerMixedActions === 'function') window._registerMixedActions();
+
+    if (window.StatisticoPowerAnalysis && window.StatisticoPowerAnalysis._activeEngine) {
+      window.StatisticoPowerAnalysis._activeEngine.calculate(d);
+    }
   }
 
   /* ─────────────────────────────────────────────────────────────
@@ -6085,6 +6117,7 @@ ${sectionsHtml}
     'marginal-means':  'Marginal Means',
     'diagnostics':     'Diagnostics',
     'advanced':        'Advanced',
+    'power':           'Power & Sample Size',
     'model-structure': 'Model Structure',
     'descriptives':    'Descriptives',
   };
@@ -6136,6 +6169,9 @@ ${sectionsHtml}
     if (name === 'advanced'    && _results) { updateCovStructure(); renderCovCompChart(); }
     if (name === 'model-structure' && _results) { _renderInlineMsd(); }
     if (name === 'descriptives') { _loadMixedDescriptivesTab(); }
+    if (name === 'power' && window.StatisticoPowerAnalysis && window.StatisticoPowerAnalysis._activeEngine) {
+      window.StatisticoPowerAnalysis._activeEngine.calculate(window._mixedResults || _results);
+    }
 
     const cardBody = document.querySelector('.card-body');
     if (cardBody) cardBody.scrollTop = 0;
@@ -6394,6 +6430,9 @@ STRENGTH: [High, Moderate, or Low — short reason based on p-values, ICC, conve
   document.addEventListener('DOMContentLoaded', () => {
     applyDepth(_depth);
     if (typeof window._mm_syncHeader === 'function') window._mm_syncHeader();
+    if (window.StatisticoPowerAnalysis && typeof window.StatisticoPowerAnalysis.mountMixed === 'function') {
+      window.StatisticoPowerAnalysis.mountMixed({ mountId: 'sharedPowerTemplateMount' });
+    }
     sendToHost('mixedModelDashboardReady', {});
     console.log('🚀 Mixed Model dashboard ready');
 

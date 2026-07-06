@@ -70,14 +70,43 @@
     }
   }
 
+  function buildDefaultMetricsHtml(ids, effectMetricLabel, effectSizeMetricLabel) {
+    return ''
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Achieved Power</div><div class="pwstd-metric-value" id="' + id(ids,'observed','powObserved') + '">—</div></div>'
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Current N</div><div class="pwstd-metric-value" id="' + id(ids,'sampleSize','powSampleSize') + '">—</div></div>'
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label" id="pwstd-metric-effect-label">' + esc(effectMetricLabel) + '</div><div class="pwstd-metric-value" id="pwstd-metric-r2">—</div></div>'
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label" id="pwstd-metric-f-label">' + esc(effectSizeMetricLabel) + '</div><div class="pwstd-metric-value" id="' + id(ids,'effectSize','powEffectSize') + '">—</div></div>';
+  }
+
+  function buildMixedMetricsHtml(ids) {
+    return ''
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Achieved Power</div><div class="pwstd-metric-value" id="' + id(ids,'observed','powObserved') + '">—</div></div>'
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Subjects</div><div class="pwstd-metric-value" id="powMetricSubjects">—</div></div>'
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Observations</div><div class="pwstd-metric-value" id="powMetricObservations">—</div></div>'
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label" id="pwstd-metric-effect-label">Effect Size</div><div class="pwstd-metric-value" id="' + id(ids,'effectSize','powEffectSize') + '">—</div></div>'
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">ICC</div><div class="pwstd-metric-value" id="powMetricICC">—</div></div>'
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Meas. / Subject</div><div class="pwstd-metric-value" id="powMetricMeasPerSub">—</div></div>';
+  }
+
   function renderAnalysisLayout(container, opts) {
     if (!container) return;
     var o = opts || {};
     var ids = o.ids || {};
     var title = o.title || 'Power & Sample Size';
+    var variant = o.variant || 'regression';
+    var subtitle = o.subtitle || (variant === 'mixed'
+      ? 'Required subjects, achieved power, and detectable effect'
+      : 'Required N, achieved power, and detectable effect');
     var customHandler = esc(o.customHandler || 'window.StatisticoPowerTemplate.runCustomCompute()');
     var effectMetricLabel = o.effectMetric || 'Observed R²';
     var effectSizeMetricLabel = o.effectSizeMetric || "Effect Size f²";
+    var metricsHtml = variant === 'mixed'
+      ? buildMixedMetricsHtml(ids)
+      : buildDefaultMetricsHtml(ids, effectMetricLabel, effectSizeMetricLabel);
+    var metricsRowClass = variant === 'mixed' ? 'pwstd-metrics-row pwstd-metrics-row--mixed' : 'pwstd-metrics-row';
+    var designChip = variant === 'mixed'
+      ? '        <span class="pwstd-meta-chip"><span class="pwstd-meta-k">Design</span><span class="pwstd-meta-v" id="powDesignPattern">—</span></span>\n'
+      : '';
 
     var chipHtml = CHIPS.map(function(c){
       var valueId = id(ids, c.key, c.fallback);
@@ -113,10 +142,11 @@
       '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260705l">',
       '  <header class="pwstd-page-header">',
       '    <h2 class="pwstd-title"><i class="fa-solid fa-bolt"></i> ' + esc(title) + '</h2>',
-      '    <p class="pwstd-subtitle">Required N, achieved power, and detectable effect</p>',
+      '    <p class="pwstd-subtitle">' + esc(subtitle) + '</p>',
       '    <div class="pwstd-header-meta">',
       '      <div class="pwstd-meta-strip">',
       '        <span class="pwstd-meta-chip"><span class="pwstd-meta-k">Analysis</span><span class="pwstd-meta-v" id="' + id(ids,'design','powDesignType') + '">Linear regression</span></span>',
+      designChip,
       '        <span class="pwstd-meta-chip"><span class="pwstd-meta-k">Target</span><span class="pwstd-meta-v" id="' + id(ids,'target','powTargetWhat') + '">Global model R²</span></span>',
       '        <span class="pwstd-meta-chip"><span class="pwstd-meta-k">Effect</span><span class="pwstd-meta-v" id="' + id(ids,'effectSource','powEffectSource') + '">Observed R²</span></span>',
       '        <span class="pwstd-meta-chip"><span class="pwstd-meta-k">Alpha</span><span class="pwstd-meta-v" id="' + id(ids,'alpha','powAlpha') + '">0.050</span></span>',
@@ -131,12 +161,9 @@
       '      </div>',
       '    </div>',
       '  </header>',
-      '  <div class="pwstd-exec pwstd-exec--neutral" id="pwstd-exec-summary">Run a regression model to populate power results.</div>',
-      '  <div class="pwstd-metrics-row">',
-      '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Achieved Power</div><div class="pwstd-metric-value" id="' + id(ids,'observed','powObserved') + '">—</div></div>',
-      '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Current N</div><div class="pwstd-metric-value" id="' + id(ids,'sampleSize','powSampleSize') + '">—</div></div>',
-      '    <div class="pwstd-metric-card"><div class="pwstd-metric-label" id="pwstd-metric-effect-label">' + esc(effectMetricLabel) + '</div><div class="pwstd-metric-value" id="pwstd-metric-r2">—</div></div>',
-      '    <div class="pwstd-metric-card"><div class="pwstd-metric-label" id="pwstd-metric-f-label">' + esc(effectSizeMetricLabel) + '</div><div class="pwstd-metric-value" id="' + id(ids,'effectSize','powEffectSize') + '">—</div></div>',
+      '  <div class="pwstd-exec pwstd-exec--neutral" id="pwstd-exec-summary">' + esc(o.emptySummary || 'Run analysis to populate power results.') + '</div>',
+      '  <div class="' + metricsRowClass + '">',
+      metricsHtml,
       '  </div>',
       '  <div class="pwstd-grid pwstd-grid--analysis">',
       '    <div class="pwstd-card pwstd-card--planning pwstd-card--primary" id="pwstd-card-planning">',
@@ -215,7 +242,7 @@
   function render(container, opts){
     if (!container) return;
     var o   = opts || {};
-    if (o.layout === 'analysis' || o.variant === 'regression' || o.variant === 'logistic' || o.variant === 'anova') {
+    if (o.layout === 'analysis' || o.variant === 'regression' || o.variant === 'logistic' || o.variant === 'anova' || o.variant === 'mixed') {
       renderAnalysisLayout(container, o);
       return;
     }
@@ -404,11 +431,38 @@
     if (!shell) return;
     shell.setAttribute('data-variant', variant);
 
-    if (variant !== 'regression' && variant !== 'logistic') return;
-
     var target = document.getElementById('powTargetWhat');
     var design = document.getElementById('powDesignType');
     var source = document.getElementById('powEffectSource');
+
+    if (variant === 'mixed') {
+      if (target) target.textContent = o.targetLabel || 'Primary fixed effect';
+      if (design) design.textContent = o.designLabel || 'Linear Mixed Model';
+      if (source) source.textContent = o.effectSourceLabel || 'Observed estimate';
+      _setRowLabel('powPartialEta', 'Partial η² used');
+      _setRowLabel('powMinDetectableEta', 'Min detectable partial η²');
+      _setRowLabel('powEffectSize', "Cohen's f²");
+      _setRowLabel('powMinDetectableF', 'Min detectable f²');
+      var detItems = document.querySelectorAll('#pwstd-card-detectable .pwstd-detectable-item span');
+      if (detItems.length >= 2) {
+        detItems[0].textContent = 'Observed partial η²';
+        detItems[1].textContent = 'Detectable partial η²';
+      }
+      var headPlanning = document.getElementById('pwstd-head-planning');
+      if (headPlanning) headPlanning.textContent = 'Sample Size Planning';
+      var engine = document.getElementById('powEngineNote');
+      if (engine) {
+        engine.innerHTML = '<i class="fa-solid fa-calculator"></i> Approximate mixed-model power (noncentral F). Observed power is descriptive; use required subjects or detectable effect for planning.';
+      }
+      var tech = document.getElementById('pwstd-tech-note');
+      if (tech) {
+        tech.textContent = 'Power is approximated using an effective sample size / noncentral F approximation for the selected fixed effect. Suitable for screening — confirm with simulation before final design validation.';
+      }
+      return;
+    }
+
+    if (variant !== 'regression' && variant !== 'logistic') return;
+
     if (variant === 'logistic') {
       if (target) target.textContent = o.targetLabel || 'Global logistic model (Nagelkerke R²)';
       if (design) design.textContent = o.designLabel || 'Logistic regression';

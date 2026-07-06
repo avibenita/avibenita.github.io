@@ -149,8 +149,16 @@
       return effectFromF2(estimateDetectableF2(ctx.n, ctx.df1, minN(ctx), function (n) { return df2AtN(ctx, n); }, targetPower, ctx.alpha));
     }
 
-    function updateMetaLabels(ctx) {
+    function resolveLabelsForCtx(ctx) {
       var labels = cfg.labels || {};
+      if (typeof cfg.resolveLabels === 'function') {
+        labels = Object.assign({}, labels, cfg.resolveLabels(ctx) || {});
+      }
+      return labels;
+    }
+
+    function updateMetaLabels(ctx) {
+      var labels = resolveLabelsForCtx(ctx);
       if (labels.design) powSetText('powDesignType', labels.design);
       if (labels.target) powSetText('powTargetWhat', labels.target);
       if (labels.effectSource) powSetText('powEffectSource', labels.effectSource);
@@ -219,7 +227,7 @@
       }
       var pct = (power * 100).toFixed(1);
       var mag = cohenMagnitude(ctx.f2);
-      var effectName = cfg.effectName || 'effect';
+      var effectName = ctx.effectName || cfg.effectName || 'effect';
       var cls = 'pwstd-exec--neutral';
       var text;
       if (power >= 0.80) {
@@ -267,7 +275,7 @@
       if (detEl) detEl.textContent = isFinite(detectableEffectVal) ? detectableEffectVal.toFixed(3) : '—';
       if (block) block.hidden = !ctx || !isFinite(detectableEffectVal);
       var tp = isFinite(targetPower) ? targetPower : 0.80;
-      var effectName = cfg.effectName || 'effect';
+      var effectName = ctx.effectName || cfg.effectName || 'effect';
       if (interpretEl && ctx && isFinite(detectableEffectVal)) {
         interpretEl.textContent = 'With N=' + ctx.n + ', the study can reliably detect (at ' + Math.round(tp * 100) + '% power) ' + effectName + ' values of at least ' + detectableEffectVal.toFixed(3) + '.';
       }
@@ -489,7 +497,11 @@
       svg._pwCurve = { points: points, minN: lo, maxN: maxN, pad: pad, W: W, H: H, plotW: plotW, plotH: plotH, ctx: ctx };
       svg.classList.add('pwstd-power-curve--ready');
       bindCurveInteraction(svg);
-      if (note) note.textContent = cfg.curveNote || 'Exact noncentral F curve at fixed f² and α — hover to read power at any N.';
+      if (note) {
+        note.textContent = typeof cfg.formatCurveNote === 'function'
+          ? cfg.formatCurveNote(ctx)
+          : (cfg.curveNote || 'Exact noncentral F curve at fixed f² and α — hover to read power at any N.');
+      }
       if (tooltip) tooltip.hidden = true;
     }
 
@@ -739,7 +751,9 @@
     var setup = b.setup || {};
     var explore = b.explore || {};
     var fx = b.effects || {};
-    var isNP = setup.primaryFramework === 'nonparametric';
+    var framework = global._independentPrimaryFramework || setup.primaryFramework || 'parametric';
+    var isNP = framework === 'nonparametric';
+    var compareMode = setup.compareMode || 'two-vars';
 
     var n = parseInt(ob.N, 10);
     if (!n && explore.kplusSummary) {
@@ -751,15 +765,15 @@
       }, 0);
     }
     if (!n) {
-      var n1 = parseInt(explore.n1, 10);
-      var n2 = parseInt(explore.n2, 10);
-      if (n1 > 0 && n2 > 0) n = n1 + n2;
+      var n1tot = parseInt(explore.n1, 10);
+      var n2tot = parseInt(explore.n2, 10);
+      if (n1tot > 0 && n2tot > 0) n = n1tot + n2tot;
     }
 
     var k = parseInt(ob.k, 10);
     if (!k && Array.isArray(ob.levels)) k = ob.levels.length;
     if (!k && Array.isArray(setup.selectedColumns)) k = setup.selectedColumns.length;
-    if ((!k || k < 2) && setup.compareMode !== 'k-plus') {
+    if ((!k || k < 2) && compareMode !== 'k-plus') {
       var exN1 = parseInt(explore.n1, 10);
       var exN2 = parseInt(explore.n2, 10);
       if (exN1 > 0 && exN2 > 0) k = 2;
@@ -770,49 +784,82 @@
       alpha = 1 - parseFloat(setup.confidence);
     }
     if (!isFinite(alpha) || alpha <= 0 || alpha >= 1) alpha = 0.05;
+    if (typeof document !== 'undefined') {
+      var alphaEl = document.getElementById('setAlpha');
+      if (alphaEl && isFinite(parseFloat(alphaEl.value))) {
+        var liveAlpha = parseFloat(alphaEl.value);
+        if (liveAlpha > 0 && liveAlpha < 1) alpha = liveAlpha;
+      }
+    }
 
     var eta = parseFloat(fx.eta2 != null ? fx.eta2 : (fx.etaSquared != null ? fx.etaSquared : ob.etaSquared));
     var epsilon = parseFloat(fx.epsilon2 != null ? fx.epsilon2 : (fx.epsilonSquared != null ? fx.epsilonSquared : ob.epsilonSquared));
-    if (isNP && (!isFinite(eta) || eta < 0) && isFinite(epsilon) && epsilon >= 0) eta = epsilon;
+    var isTwoGroup = k === 2;
+    var cohenF = NaN;
+    var effect = NaN;
 
-    var cohenF = parseFloat(ob.cohenF);
-    if (!isFinite(cohenF) || cohenF <= 0) {
-      if (isFinite(eta) && eta >= 0 && eta < 1) cohenF = Math.sqrt(eta / Math.max(1e-12, 1 - eta));
-      else {
-        var fStat = parseFloat(ob.anovaF != null ? ob.anovaF : (ob.anova && ob.anova.F));
-        var df1obs = parseFloat(ob.anovaDf1 != null ? ob.anovaDf1 : (ob.anova && ob.anova.df1));
-        if (isFinite(fStat) && n > 0 && isFinite(df1obs) && df1obs > 0) {
-          cohenF = Math.sqrt(Math.max(0, fStat * df1obs / n));
+    if (isNP) {
+      if (!isFinite(epsilon) || epsilon < 0) {
+        var kwH = parseFloat(ob.kwH);
+        if (isFinite(kwH) && n > k) {
+          epsilon = Math.max(0, (kwH - k + 1) / (n - k));
         }
       }
-    }
-    if ((!isFinite(cohenF) || cohenF <= 0) && k === 2) {
-      var hedgesD = parseFloat(fx.hedgesG);
-      if (isFinite(hedgesD) && hedgesD !== 0) {
-        cohenF = Math.abs(hedgesD) / 2;
-      } else {
-        var tStat = parseFloat(res.welchT != null ? res.welchT : res.studentT);
-        if (isFinite(tStat) && n > 0) cohenF = Math.abs(tStat) / Math.sqrt(n);
+      if ((!isFinite(epsilon) || epsilon < 0) && isTwoGroup) {
+        var u = parseFloat(res.u);
+        var n1 = parseInt(explore.n1, 10);
+        var n2 = parseInt(explore.n2, 10);
+        if (isFinite(u) && n1 > 0 && n2 > 0 && (n1 + n2) > 2) {
+          var mu = n1 * n2 / 2;
+          var sigmaU = Math.sqrt(n1 * n2 * (n1 + n2 + 1) / 12);
+          if (sigmaU > 0) {
+            var H2 = Math.pow((u - mu) / sigmaU, 2);
+            epsilon = Math.max(0, (H2 - 1) / (n1 + n2 - 2));
+          }
+        }
       }
-    }
-    if ((!isFinite(eta) || eta < 0) && isFinite(cohenF) && cohenF > 0) {
-      eta = f2FromEffect(cohenF * cohenF);
-    }
-    if (isNP && (!isFinite(eta) || eta < 0)) {
-      var rrb = parseFloat(fx.rankBiserial);
-      if (isFinite(rrb)) {
-        var r2 = rrb * rrb;
-        if (r2 < 1) eta = r2 / Math.max(1e-12, 1 - r2);
+      effect = isFinite(epsilon) && epsilon >= 0 ? epsilon : NaN;
+      if (isFinite(effect) && effect > 0 && effect < 1) {
+        cohenF = Math.sqrt(effect / Math.max(1e-12, 1 - effect));
+      }
+    } else {
+      cohenF = parseFloat(ob.cohenF);
+      if (!isFinite(cohenF) || cohenF <= 0) {
+        if (isFinite(eta) && eta >= 0 && eta < 1) cohenF = Math.sqrt(eta / Math.max(1e-12, 1 - eta));
+        else {
+          var fStat = parseFloat(ob.anovaF != null ? ob.anovaF : (ob.anova && ob.anova.F));
+          var df1obs = parseFloat(ob.anovaDf1 != null ? ob.anovaDf1 : (ob.anova && ob.anova.df1));
+          if (isFinite(fStat) && n > 0 && isFinite(df1obs) && df1obs > 0) {
+            cohenF = Math.sqrt(Math.max(0, fStat * df1obs / n));
+          }
+        }
+      }
+      if ((!isFinite(cohenF) || cohenF <= 0) && isTwoGroup) {
+        var hedgesD = parseFloat(fx.hedgesG);
+        if (isFinite(hedgesD) && hedgesD !== 0) {
+          cohenF = Math.abs(hedgesD) / 2;
+        } else {
+          var tStat = parseFloat(res.welchT != null ? res.welchT : res.studentT);
+          if (isFinite(tStat) && n > 0) cohenF = Math.abs(tStat) / Math.sqrt(n);
+        }
+      }
+      effect = isFinite(eta) && eta >= 0 ? eta : NaN;
+      if ((!isFinite(effect) || effect < 0) && isFinite(cohenF) && cohenF > 0) {
+        effect = f2FromEffect(cohenF * cohenF);
       }
     }
 
     if (!n || !k || k < 2 || !isFinite(cohenF) || cohenF <= 0) return null;
 
     var f2 = cohenF * cohenF;
-    var effect = isFinite(eta) && eta >= 0 ? eta : f2FromEffect(f2);
+    if (!isFinite(effect) || effect < 0) effect = f2FromEffect(f2);
     var df1 = k - 1;
     var df2 = n - k;
     if (df2 < 1) return null;
+
+    var testLabel = isNP
+      ? (isTwoGroup ? 'Mann-Whitney U' : 'Kruskal-Wallis')
+      : (isTwoGroup ? 'Welch / Student t' : 'One-way ANOVA');
 
     return {
       n: n,
@@ -824,8 +871,101 @@
       df1: df1,
       df2: df2,
       df2Offset: k,
-      isNonparametric: isNP
+      isNonparametric: isNP,
+      isTwoGroup: isTwoGroup,
+      effectName: isNP ? 'ε²' : 'η²',
+      testLabel: testLabel
     };
+  }
+
+  function independentPowerLabels(ctx) {
+    if (!ctx) return {};
+    if (ctx.isNonparametric) {
+      return {
+        design: 'Independent Means · Nonparametric',
+        target: ctx.isTwoGroup ? 'Mann-Whitney rank comparison' : 'Kruskal-Wallis omnibus',
+        effectSource: 'Observed ε²',
+        effectMetric: 'Observed ε²',
+        effectSizeMetric: "Cohen's f (approx.)",
+        planningEffect: 'ε² used for planning',
+        detectableObserved: 'Observed ε²',
+        detectableThreshold: 'Detectable ε²',
+        minDetectableF: "Min detectable Cohen's f",
+        gpowerField: "Cohen's f (G*Power)"
+      };
+    }
+    return {
+      design: 'Independent Means · Parametric',
+      target: ctx.isTwoGroup ? 'Two-group mean difference' : 'One-way ANOVA omnibus',
+      effectSource: 'Observed η²',
+      effectMetric: 'Observed η²',
+      effectSizeMetric: "Cohen's f",
+      planningEffect: 'η² used for planning',
+      detectableObserved: 'Observed η²',
+      detectableThreshold: 'Detectable η²',
+      minDetectableF: "Min detectable Cohen's f",
+      gpowerField: "Cohen's f (G*Power)"
+    };
+  }
+
+  function independentExecutiveSummary(ctx, power) {
+    if (!ctx) return null;
+    var pct = (power * 100).toFixed(1);
+    var effectName = ctx.effectName || 'effect';
+    var cls = 'pwstd-exec--neutral';
+    var text;
+    var testPart = ctx.testLabel ? (' for the ' + ctx.testLabel + ' test') : '';
+    if (power >= 0.80) {
+      cls = 'pwstd-exec--success';
+      text = 'Current sample size is adequate' + testPart + '. Achieved power is ' + pct + '% with n = ' + ctx.n
+        + ', α = ' + ctx.alpha.toFixed(3) + ', and observed ' + effectName + ' = ' + ctx.effect.toFixed(3) + '.';
+    } else if (power >= 0.70) {
+      cls = 'pwstd-exec--warning';
+      text = 'Power is borderline (' + pct + '%)' + testPart + ' for observed ' + effectName + ' = ' + ctx.effect.toFixed(3)
+        + ' with n = ' + ctx.n + '. Consider increasing sample size.';
+    } else {
+      var f = isFinite(ctx.cohenF) ? ctx.cohenF : Math.sqrt(ctx.f2);
+      text = 'Current sample size appears underpowered (' + pct + '%)' + testPart + ' with n = ' + ctx.n
+        + ' (' + effectName + ' = ' + ctx.effect.toFixed(3) + ", Cohen's f = " + f.toFixed(3) + ').';
+    }
+    if (ctx.isNonparametric) {
+      text += ' Rank-based planning uses a Cohen\'s f approximation mapped from ε².';
+    }
+    return { text: text, className: cls };
+  }
+
+  function independentPlanningSummary(ctx) {
+    var target = global.StatisticoPowerTemplate && global.StatisticoPowerTemplate.getSelectedTargetPower
+      ? global.StatisticoPowerTemplate.getSelectedTargetPower()
+      : { pct: '85%', power: 0.85 };
+    var reqN = estimateRequiredN(ctx.f2, ctx.df1, Math.max(ctx.k + 1, 8), function (n) { return n - ctx.k; }, target.power, ctx.alpha);
+    if (!reqN) return 'Select a target power to see required sample size.';
+    var gap = ctx.n >= reqN
+      ? 'Current N = ' + ctx.n + ' meets or exceeds this target.'
+      : 'Current N = ' + ctx.n + ' is below this target by ' + (reqN - ctx.n) + ' observations.';
+    var effectName = ctx.isNonparametric ? 'ε²' : 'η²';
+    return 'For ' + target.pct + ' power (' + (ctx.testLabel || 'omnibus test') + ', ' + effectName + ' = '
+      + ctx.effect.toFixed(3) + '), approximately ' + reqN + ' observations are required. ' + gap;
+  }
+
+  function independentEngineNote(ctx) {
+    var f = isFinite(ctx.cohenF) ? ctx.cohenF : Math.sqrt(ctx.f2);
+    if (ctx.isNonparametric) {
+      return 'Approximate planning power for ' + (ctx.testLabel || 'rank test')
+        + ': maps observed ε² to Cohen\'s f = ' + f.toFixed(3)
+        + ' and uses noncentral F with df1 = ' + (ctx.k - 1) + ', df2 = N−' + ctx.k
+        + ' (Kruskal-Wallis df structure). Treat as planning guidance, not exact rank-test power.';
+    }
+    return 'Exact noncentral F (G*Power one-way ANOVA / independent groups): Cohen\'s f = ' + f.toFixed(3)
+      + ', k = ' + ctx.k + ' groups, λ = N·f² = ' + (ctx.n * ctx.f2).toFixed(3)
+      + ', df1 = ' + (ctx.k - 1) + ', df2 = N−' + ctx.k + '.';
+  }
+
+  function independentCurveNote(ctx) {
+    if (ctx.isNonparametric) {
+      return 'Approximate power curve at fixed ε²-derived Cohen\'s f and α — hover to read planning power at any N (rank-test approximation).';
+    }
+    return 'Exact noncentral F curve at fixed Cohen\'s f and α — hover to read power at any sample size.';
   }
 
   function mixedDesignLabel(ctx) {
@@ -1109,27 +1249,30 @@
           minDetectableF: "Min detectable Cohen's f",
           gpowerField: "Cohen's f (G*Power)"
         },
+        resolveLabels: independentPowerLabels,
+        formatExecutiveSummary: independentExecutiveSummary,
+        formatPlanningSummary: independentPlanningSummary,
+        formatCurveNote: independentCurveNote,
         getContext: function (source) { return independentMeansContext(source); },
         minN: function (ctx) { return Math.max(ctx.k + 1, 8); },
         df2AtN: function (ctx, n) { return n - ctx.k; },
         onCalculate: function (ctx) {
-          if (!ctx) return;
-          var effectLabel = ctx.isNonparametric ? 'Observed ε²' : 'Observed η²';
-          var effectSource = document.getElementById('powEffectSource');
-          var metric = document.getElementById('pwstd-metric-effect-label');
-          var detItems = document.querySelectorAll('#pwstd-card-detectable .pwstd-detectable-item span');
-          if (effectSource) effectSource.textContent = effectLabel;
-          if (metric) metric.textContent = effectLabel;
-          if (detItems.length >= 1) detItems[0].textContent = effectLabel;
+          var shell = document.getElementById('pwstd-shell');
+          if (shell) shell.classList.toggle('pwstd-shell--nonparametric', !!(ctx && ctx.isNonparametric));
+          var techNote = document.getElementById('pwstd-tech-note');
+          if (techNote && ctx) {
+            techNote.textContent = ctx.isNonparametric
+              ? 'Planning power maps observed ε² to Cohen\'s f and uses Kruskal-Wallis df (k−1, N−k). This is an approximation for rank-based omnibus tests — use for sample-size guidance, not exact rank-test calibration.'
+              : 'Power uses the exact noncentral F distribution for the one-way ANOVA omnibus test with independent groups (Welch/Student two-group tests share the same df structure when k = 2).';
+          }
+          var dfFormula = document.getElementById('powDfFormula');
+          if (dfFormula && ctx) {
+            dfFormula.textContent = ctx.isNonparametric
+              ? 'df1=k−1 · df2=N−k (KW structure)'
+              : 'df1=k−1 · df2=N−k';
+          }
         },
-        engineNote: function (ctx) {
-          var f = isFinite(ctx.cohenF) ? ctx.cohenF : Math.sqrt(ctx.f2);
-          var npNote = ctx.isNonparametric
-            ? ' Nonparametric omnibus test — power uses parametric Cohen\'s f approximation for planning.'
-            : '';
-          return 'Exact noncentral F (G*Power one-way ANOVA / independent groups): Cohen\'s f = ' + f.toFixed(3)
-            + ', k = ' + ctx.k + ' groups, λ = N·f² = ' + (ctx.n * ctx.f2).toFixed(3) + '.' + npNote;
-        }
+        engineNote: independentEngineNote
       }).mount(Object.assign({
         getSource: function () { return global._independentBundle || global.lastIndependentBundle; },
         title: 'Power & Sample Size',
@@ -1237,6 +1380,6 @@
       if (global.StatisticoPowerAnalysis._activeEngine) global.StatisticoPowerAnalysis._activeEngine.calculateDetectableEffect();
     },
     _activeEngine: null,
-    VERSION: '20260706g'
+    VERSION: '20260706h'
   };
 })(window);

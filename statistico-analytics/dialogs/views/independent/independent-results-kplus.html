@@ -14,9 +14,9 @@
 
   <script src="../shared-header.js?v=20260524t"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
-  <link rel="stylesheet" href="../shared-power-template.css?v=20260706g" />
-  <script src="../shared-power-template.js?v=20260706g"></script>
-  <script src="../shared-power-analysis.js?v=20260706g"></script>
+  <link rel="stylesheet" href="../shared-power-template.css?v=20260706h" />
+  <script src="../shared-power-template.js?v=20260706h"></script>
+  <script src="../shared-power-analysis.js?v=20260706h"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -1309,8 +1309,15 @@
       });
       syncFrameworkSelectUI(primaryFramework);
     }
+    function recalculateIndependentPower() {
+      window._independentPrimaryFramework = primaryFramework;
+      if (window.StatisticoPowerAnalysis && window.StatisticoPowerAnalysis._activeEngine) {
+        window.StatisticoPowerAnalysis._activeEngine.calculate(window._independentBundle || lastBundle);
+      }
+    }
     function setFrameworkButtons(mode){
       primaryFramework = mode === "nonparametric" ? "nonparametric" : "parametric";
+      window._independentPrimaryFramework = primaryFramework;
       syncFrameworkSelectUI(primaryFramework);
       var rp = document.getElementById("fwParametric");
       var rn = document.getElementById("fwNonparametric");
@@ -1347,6 +1354,7 @@
         updateEffectsPanel(ob);
         updatePosthocDisplay();
       }
+      recalculateIndependentPower();
     }
     function notifySettingsChanged(){
       const spec = currentSettingsSpec();
@@ -3133,6 +3141,7 @@
       window._independentBundle = lastBundle;
       window.lastIndependentBundle = lastBundle;
       const s=b.setup||{}, e=b.explore||{}, a=b.assumptions||{}, r=b.results||{}, fx=b.effects||{}, p=b.power||{}, rep=b.report||{};
+      window._independentPrimaryFramework = s.primaryFramework || primaryFramework;
       console.log("Results object:", r);
       console.log("Explore object:", e);
       availableHeaders = Array.isArray(s.headers) ? s.headers.slice() : availableHeaders;
@@ -3344,8 +3353,20 @@
             currentPrimaryTest = el.value || "welch";
             setFrameworkButtons(primaryFramework);
           }
+          if (id === "setAlpha") {
+            var alphaVal = document.getElementById("alphaVal");
+            if (alphaVal) alphaVal.textContent = Number(el.value || 0.05).toFixed(3);
+            recalculateIndependentPower();
+          }
           notifySettingsChanged();
         });
+        if (id === "setAlpha" && el) {
+          el.addEventListener("input", function(){
+            var alphaVal = document.getElementById("alphaVal");
+            if (alphaVal) alphaVal.textContent = Number(el.value || 0.05).toFixed(3);
+            recalculateIndependentPower();
+          });
+        }
       });
       document.querySelectorAll('input[name="h1Orientation"]').forEach(function(el){ el.addEventListener("change", notifySettingsChanged); });
       // Framework custom select wired in initFrameworkSelect()

@@ -217,8 +217,8 @@
         if (custom) {
           el.textContent = custom.text || '';
           el.className = 'pwstd-exec ' + (custom.className || 'pwstd-exec--neutral');
+          return;
         }
-        return;
       }
       if (!ctx) {
         el.textContent = cfg.emptyMessage || 'Run analysis to populate power results.';
@@ -275,7 +275,7 @@
       if (detEl) detEl.textContent = isFinite(detectableEffectVal) ? detectableEffectVal.toFixed(3) : '—';
       if (block) block.hidden = !ctx || !isFinite(detectableEffectVal);
       var tp = isFinite(targetPower) ? targetPower : 0.80;
-      var effectName = ctx.effectName || cfg.effectName || 'effect';
+      var effectName = (ctx && ctx.effectName) || cfg.effectName || 'effect';
       if (interpretEl && ctx && isFinite(detectableEffectVal)) {
         interpretEl.textContent = 'With N=' + ctx.n + ', the study can reliably detect (at ' + Math.round(tp * 100) + '% power) ' + effectName + ' values of at least ' + detectableEffectVal.toFixed(3) + '.';
       }
@@ -413,7 +413,7 @@
         hover.querySelector('.pwstd-curve-hover-dot').setAttribute('cx', x.toFixed(1));
         hover.querySelector('.pwstd-curve-hover-dot').setAttribute('cy', y.toFixed(1));
         tooltip.innerHTML = '<strong>' + (cfg.curveXAxisLabel || 'N') + ' = ' + n + '</strong>Power = ' + (power * 100).toFixed(1) + '%'
-          + (typeof cfg.formatCurveTooltip === 'function' ? cfg.formatCurveTooltip(ctx, n, power) : '');
+          + (typeof cfg.formatCurveTooltip === 'function' ? cfg.formatCurveTooltip(data.ctx, n, power) : '');
         tooltip.hidden = false;
         var wrapRect = wrap.getBoundingClientRect();
         tooltip.style.left = (clientX - wrapRect.left) + 'px';
@@ -1399,6 +1399,6 @@
       if (global.StatisticoPowerAnalysis._activeEngine) global.StatisticoPowerAnalysis._activeEngine.calculateDetectableEffect();
     },
     _activeEngine: null,
-    VERSION: '20260706i'
+    VERSION: '20260706j'
   };
 })(window);

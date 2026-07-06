@@ -13,6 +13,10 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260530a" />  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
   <script src="../shared-header.js?v=20260524t"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
+  <link rel="stylesheet" href="../shared-power-template.css?v=20260706e" />
+  <script src="../shared-power-template.js?v=20260706e"></script>
+  <script src="../shared-power-analysis.js?v=20260706e"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -230,10 +234,19 @@
     .effects-power-btn:hover{background:rgba(46,95,138,.35);}
     #effectsPairwiseTable th{font-size:13px;padding:9px 12px;}
     #effectsPairwiseTable td{font-size:13px;padding:8px 12px;}
-    #tab-power .power-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-    #tab-power .power-input-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);}
-    #tab-power .power-input-row:last-child{border-bottom:none;}
-    #tab-power .power-input-row input,#tab-power .power-input-row select{height:32px;padding:0 10px;border-radius:6px;border:1px solid rgba(148,163,184,.35);background:rgba(15,23,42,.82);color:#fff;font-size:13px;min-width:88px;}
+    #tab-power.tab-panel.active {
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      box-sizing: border-box;
+      min-height: 0;
+      padding: 8px 12px 20px;
+    }
+    #tab-power #sharedPowerTemplateMount {
+      flex: 1 1 0;
+      min-height: 0;
+      width: 100%;
+    }
     .right-col:has(#tab-effects.active) .hero-section{margin-bottom:8px;}
     .right-col:has(#tab-effects.active) .settings-bar{padding:6px 14px 8px;}
     .right-col:has(#tab-posthoc.active) .sb-ai-float-btn{bottom:52px;right:24px;}
@@ -484,7 +497,7 @@
           </button>
           <button class="sb-item" onclick="switchTab('power')" data-tab="power">
             <i class="fa-solid fa-bolt sb-item-icon"></i>
-            <span class="sb-item-label">Power Analysis</span>
+            <span class="sb-item-label">Power &amp; Sample Size</span>
           </button>
         </div>
       </div>
@@ -1096,47 +1109,7 @@
           </div>
         </section>
         <section id="tab-power" class="tab-panel">
-          <div class="stat-panel">
-            <div class="stat-panel-heading">Power Analysis</div>
-            <div class="stat-panel-body">
-              <div class="power-grid">
-                <div class="stat-panel" style="margin:0;">
-                  <div class="stat-panel-heading" style="font-size:.9rem;padding:8px 12px;">Effect Size (from analysis)</div>
-                  <div class="stat-panel-body" style="padding:10px 12px!important;">
-                    <div class="stat-field"><span class="stat-label">η²</span><span class="stat-value" id="powEta">...</span></div>
-                    <div class="stat-field"><span class="stat-label">Cohen's f</span><span class="stat-value" id="powCohenF">...</span></div>
-                    <div class="stat-field"><span class="stat-label">Source</span><span class="stat-value" id="powEffectSource" style="font-size:12px;">Effect Sizes tab</span></div>
-                  </div>
-                </div>
-                <div class="stat-panel" style="margin:0;">
-                  <div class="stat-panel-heading" style="font-size:.9rem;padding:8px 12px;">Study Parameters</div>
-                  <div class="stat-panel-body" style="padding:10px 12px!important;">
-                    <div class="power-input-row">
-                      <span class="stat-label">Target power</span>
-                      <input type="number" id="powTarget" min="0.5" max="0.99" step="0.05" value="0.80" onchange="updatePowerPanel()">
-                    </div>
-                    <div class="power-input-row">
-                      <span class="stat-label">Alpha</span>
-                      <input type="number" id="powAlphaInput" min="0.001" max="0.2" step="0.001" value="0.05" onchange="updatePowerPanel()">
-                    </div>
-                    <div class="power-input-row">
-                      <span class="stat-label">Number of groups</span>
-                      <input type="number" id="powGroups" min="2" max="20" step="1" value="3" onchange="updatePowerPanel()">
-                    </div>
-                    <div class="power-input-row">
-                      <span class="stat-label">Total N</span>
-                      <span class="stat-value" id="powTotalN">...</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="power-grid" style="margin-top:10px;">
-                <div class="stat-field"><span class="stat-label">Observed power</span><span class="stat-value" id="powObserved">...</span></div>
-                <div class="stat-field"><span class="stat-label">Required N (target power)</span><span class="stat-value" id="powRequired">...</span></div>
-              </div>
-              <div id="powStatusMessage" class="section-note" style="margin-top:10px;">Run an analysis to populate effect sizes, then adjust target power and alpha.</div>
-            </div>
-          </div>
+          <div id="sharedPowerTemplateMount"></div>
         </section>
       </div>
     </section>
@@ -1188,7 +1161,7 @@
         'results':     'Test Results',
         'posthoc':     'Pairwise Comparisons',
         'effects':     'Effect Sizes',
-        'power':       'Power Analysis'
+        'power':       'Power & Sample Size'
       };
       if (tabTitles[tab] && typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.updateTitle(tabTitles[tab]);
@@ -1199,6 +1172,9 @@
       if (prevPanel) prevPanel.classList.remove("active");
       if (nextPanel) nextPanel.classList.add("active");
       activeTab = tab;
+      if (tab === 'power' && window.StatisticoPowerAnalysis && window.StatisticoPowerAnalysis._activeEngine) {
+        window.StatisticoPowerAnalysis._activeEngine.calculate(window._independentBundle || lastBundle);
+      }
       requestAnimationFrame(fitIndependentLayout);
     }
     window.switchTab = switchTab;
@@ -2798,15 +2774,6 @@
       updatePosthocDisplay();
     }
 
-    let effectsPowerState = { eta: NaN, cohenF: NaN, totalN: 0, k: 0 };
-
-    function normalCdfLocal(z) {
-      var t = 1 / (1 + 0.2316419 * Math.abs(z));
-      var d = 0.3989423 * Math.exp(-z * z / 2);
-      var p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
-      return z > 0 ? 1 - p : p;
-    }
-
     function omnibusEffectMagnitude(val, kind) {
       var label = 'Negligible';
       var cls = 'small';
@@ -2927,94 +2894,16 @@
         }
       }
 
-      effectsPowerState = {
-        eta: eta,
-        cohenF: cohenF,
-        totalN: totalN,
-        k: k,
-        fStat: parseMaybeNumber(ob.anovaF),
-        df1: parseMaybeNumber(ob.anovaDf1),
-        df2: parseMaybeNumber(ob.anovaDf2)
-      };
-      updatePowerPanel();
+      if (window.StatisticoPowerAnalysis && window.StatisticoPowerAnalysis._activeEngine) {
+        window.StatisticoPowerAnalysis._activeEngine.calculate(window._independentBundle || lastBundle);
+      }
       requestAnimationFrame(function(){ if (typeof fitIndependentLayout === 'function') fitIndependentLayout(); });
     }
 
     function openPowerFromEffects() {
       switchTab('power');
-      updatePowerPanel();
     }
     window.openPowerFromEffects = openPowerFromEffects;
-
-    function estimateKplusRequiredN(effectF, k, targetPower, alpha) {
-      if (!isFinite(effectF) || effectF <= 0 || !k || k < 2) return NaN;
-      var df1 = k - 1;
-      var zCrit = alpha <= 0.05 ? 1.96 : 1.645;
-      var nMin = k, nMax = 500;
-      for (var iter = 0; iter < 50; iter++) {
-        var n = Math.floor((nMin + nMax) / 2);
-        var ncp = n * effectF * effectF * df1;
-        var power = 1 - normalCdfLocal(zCrit - Math.sqrt(Math.max(0, ncp)));
-        if (Math.abs(power - targetPower) < 0.01) return n;
-        if (power < targetPower) nMin = n + 1;
-        else nMax = n - 1;
-      }
-      return nMax;
-    }
-
-    function calculateKplusObservedPower(effectF, k, totalN, alpha) {
-      if (!isFinite(effectF) || effectF <= 0 || !k || k < 2 || !isFinite(totalN) || totalN < k) return NaN;
-      var df1 = k - 1;
-      var zCrit = alpha <= 0.05 ? 1.96 : 1.645;
-      var ncp = totalN * effectF * effectF * df1;
-      return Math.max(0, Math.min(1, 1 - normalCdfLocal(zCrit - Math.sqrt(Math.max(0, ncp)))));
-    }
-
-    function updatePowerPanel() {
-      var st = effectsPowerState || {};
-      var target = parseMaybeNumber((document.getElementById('powTarget') || {}).value) || 0.80;
-      var alpha = parseMaybeNumber((document.getElementById('powAlphaInput') || {}).value);
-      if (!isFinite(alpha) || alpha <= 0 || alpha >= 1) {
-        alpha = 1 - (parseMaybeNumber((document.getElementById('setAlpha') || {}).value) || 0.95);
-        if (!isFinite(alpha) || alpha <= 0 || alpha >= 1) alpha = 0.05;
-        var alphaInput = document.getElementById('powAlphaInput');
-        if (alphaInput) alphaInput.value = alpha.toFixed(3);
-      }
-      var k = parseMaybeNumber((document.getElementById('powGroups') || {}).value) || st.k || 3;
-      var cohenF = isFinite(st.cohenF) ? st.cohenF : (isFinite(st.eta) && st.eta >= 0 && st.eta < 1 ? Math.sqrt(st.eta / Math.max(1e-12, 1 - st.eta)) : NaN);
-      if ((!isFinite(cohenF) || cohenF <= 0) && isFinite(st.fStat) && isFinite(st.totalN) && st.totalN > 0 && isFinite(st.df1)) {
-        cohenF = Math.sqrt(st.fStat * st.df1 / st.totalN);
-      }
-
-      setText('powEta', fmt(st.eta));
-      setText('powCohenF', fmt(cohenF));
-      setText('powTotalN', isFinite(st.totalN) ? String(Math.round(st.totalN)) : '—');
-
-      var groupsInput = document.getElementById('powGroups');
-      if (groupsInput && st.k && !groupsInput.dataset.userEdited) groupsInput.value = String(Math.max(2, Math.round(st.k)));
-
-      var observed = calculateKplusObservedPower(cohenF, k, st.totalN, alpha);
-      var required = estimateKplusRequiredN(cohenF, k, target, alpha);
-      setText('powObserved', isFinite(observed) ? (observed * 100).toFixed(1) + '%' : '—');
-      setText('powRequired', isFinite(required) ? String(required) : '—');
-
-      var status = document.getElementById('powStatusMessage');
-      if (status) {
-        if (!isFinite(cohenF) || cohenF <= 0) {
-          status.textContent = 'Effect size not available yet. Complete an analysis on the Effect Sizes tab first.';
-        } else if (isFinite(observed) && observed >= target) {
-          status.textContent = 'Observed power ' + (observed * 100).toFixed(1) + '% meets or exceeds the ' + (target * 100).toFixed(0) + '% target with N = ' + (st.totalN || '—') + '.';
-        } else {
-          status.textContent = 'Observed power ' + (isFinite(observed) ? (observed * 100).toFixed(1) + '%' : '—') + ' with N = ' + (st.totalN || '—') + '. Approximately N = ' + (isFinite(required) ? required : '—') + ' needed for ' + (target * 100).toFixed(0) + '% power.';
-        }
-      }
-    }
-    window.updatePowerPanel = updatePowerPanel;
-
-    document.addEventListener('DOMContentLoaded', function() {
-      var groupsInput = document.getElementById('powGroups');
-      if (groupsInput) groupsInput.addEventListener('input', function() { groupsInput.dataset.userEdited = '1'; });
-    });
 
     
     // === Descriptive Stats Functions ===
@@ -3233,6 +3122,8 @@
     function populateBundle(b){
       console.log("populateBundle called with:", b);
       lastBundle = b || {};
+      window._independentBundle = lastBundle;
+      window.lastIndependentBundle = lastBundle;
       const s=b.setup||{}, e=b.explore||{}, a=b.assumptions||{}, r=b.results||{}, fx=b.effects||{}, p=b.power||{}, rep=b.report||{};
       console.log("Results object:", r);
       console.log("Explore object:", e);
@@ -3427,6 +3318,10 @@
         });
         StatisticoHeader.initSidebarPage();
         switchTab('results');
+      }
+
+      if (window.StatisticoPowerAnalysis && typeof window.StatisticoPowerAnalysis.mountIndependent === 'function') {
+        window.StatisticoPowerAnalysis.mountIndependent({ mountId: 'sharedPowerTemplateMount' });
       }
 
       // Sidebar navigation — tab switching handled by sidebar onclick handlers

@@ -731,6 +731,72 @@
     return { n: n, k: k, f2: f2, cohenF: cohenF, effect: eta, alpha: alpha, df1: df1, df2: df2, df2Offset: k };
   }
 
+  function independentMeansContext(bundle) {
+    var b = bundle || global._independentBundle || global.lastIndependentBundle;
+    if (!b) return null;
+    var ob = (b.results && b.results.omnibus) || {};
+    var setup = b.setup || {};
+    var fx = b.effects || {};
+    var isNP = setup.primaryFramework === 'nonparametric';
+
+    var n = parseInt(ob.N, 10);
+    if (!n && b.explore && b.explore.kplusSummary) {
+      n = parseInt(b.explore.kplusSummary.totalN, 10);
+    }
+    if (!n && Array.isArray(ob.levels)) {
+      n = ob.levels.reduce(function (sum, lvl) {
+        return sum + (parseInt(lvl.n, 10) || 0);
+      }, 0);
+    }
+
+    var k = parseInt(ob.k, 10);
+    if (!k && Array.isArray(ob.levels)) k = ob.levels.length;
+    if (!k && Array.isArray(setup.selectedColumns)) k = setup.selectedColumns.length;
+
+    var alpha = 0.05;
+    if (setup.confidence != null && isFinite(parseFloat(setup.confidence))) {
+      alpha = 1 - parseFloat(setup.confidence);
+    }
+    if (!isFinite(alpha) || alpha <= 0 || alpha >= 1) alpha = 0.05;
+
+    var eta = parseFloat(fx.eta2 != null ? fx.eta2 : (fx.etaSquared != null ? fx.etaSquared : ob.etaSquared));
+    var epsilon = parseFloat(fx.epsilon2 != null ? fx.epsilon2 : (fx.epsilonSquared != null ? fx.epsilonSquared : ob.epsilonSquared));
+    if (isNP && (!isFinite(eta) || eta < 0) && isFinite(epsilon) && epsilon >= 0) eta = epsilon;
+
+    var cohenF = parseFloat(ob.cohenF);
+    if (!isFinite(cohenF) || cohenF <= 0) {
+      if (isFinite(eta) && eta >= 0 && eta < 1) cohenF = Math.sqrt(eta / Math.max(1e-12, 1 - eta));
+      else {
+        var fStat = parseFloat(ob.anovaF != null ? ob.anovaF : (ob.anova && ob.anova.F));
+        var df1obs = parseFloat(ob.anovaDf1 != null ? ob.anovaDf1 : (ob.anova && ob.anova.df1));
+        if (isFinite(fStat) && n > 0 && isFinite(df1obs) && df1obs > 0) {
+          cohenF = Math.sqrt(Math.max(0, fStat * df1obs / n));
+        }
+      }
+    }
+
+    if (!n || !k || k < 2 || !isFinite(cohenF) || cohenF <= 0) return null;
+
+    var f2 = cohenF * cohenF;
+    var effect = isFinite(eta) && eta >= 0 ? eta : f2FromEffect(f2);
+    var df1 = k - 1;
+    var df2 = n - k;
+    if (df2 < 1) return null;
+
+    return {
+      n: n,
+      k: k,
+      f2: f2,
+      cohenF: cohenF,
+      effect: effect,
+      alpha: alpha,
+      df1: df1,
+      df2: df2,
+      df2Offset: k,
+      isNonparametric: isNP
+    };
+  }
+
   function mixedDesignLabel(ctx) {
     if (!ctx) return '—';
     if (ctx.hasRepeatedMeasures && ctx.hasGroups) return 'Longitudinal / clustered';
@@ -994,6 +1060,52 @@
         }
       }).mount(Object.assign({ getSource: function () { return global._bundle; } }, opts || {}));
     },
+    mountIndependent: function (opts) {
+      return createEngine({
+        variant: 'anova',
+        effectName: 'η²',
+        emptyMessage: 'Run an independent-means analysis to populate power results.',
+        dfFormula: 'df1=k−1 · df2=N−k',
+        labels: {
+          design: 'Independent Means',
+          target: 'Omnibus group test',
+          effectSource: 'Observed η²',
+          effectMetric: 'Observed η²',
+          effectSizeMetric: "Cohen's f",
+          planningEffect: 'η² used',
+          detectableObserved: 'Observed η²',
+          detectableThreshold: 'Detectable η²',
+          minDetectableF: "Min detectable Cohen's f",
+          gpowerField: "Cohen's f (G*Power)"
+        },
+        getContext: function (source) { return independentMeansContext(source); },
+        minN: function (ctx) { return Math.max(ctx.k + 1, 8); },
+        df2AtN: function (ctx, n) { return n - ctx.k; },
+        onCalculate: function (ctx) {
+          if (!ctx) return;
+          var effectLabel = ctx.isNonparametric ? 'Observed ε²' : 'Observed η²';
+          var effectSource = document.getElementById('powEffectSource');
+          var metric = document.getElementById('pwstd-metric-effect-label');
+          var detItems = document.querySelectorAll('#pwstd-card-detectable .pwstd-detectable-item span');
+          if (effectSource) effectSource.textContent = effectLabel;
+          if (metric) metric.textContent = effectLabel;
+          if (detItems.length >= 1) detItems[0].textContent = effectLabel;
+        },
+        engineNote: function (ctx) {
+          var f = isFinite(ctx.cohenF) ? ctx.cohenF : Math.sqrt(ctx.f2);
+          var npNote = ctx.isNonparametric
+            ? ' Nonparametric omnibus test — power uses parametric Cohen\'s f approximation for planning.'
+            : '';
+          return 'Exact noncentral F (G*Power one-way ANOVA / independent groups): Cohen\'s f = ' + f.toFixed(3)
+            + ', k = ' + ctx.k + ' groups, λ = N·f² = ' + (ctx.n * ctx.f2).toFixed(3) + '.' + npNote;
+        }
+      }).mount(Object.assign({
+        getSource: function () { return global._independentBundle || global.lastIndependentBundle; },
+        title: 'Power & Sample Size',
+        variant: 'anova',
+        emptySummary: 'Run an independent-means analysis to populate power results.'
+      }, opts || {}));
+    },
     mountMixed: function (opts) {
       return createEngine({
         variant: 'mixed',
@@ -1094,6 +1206,6 @@
       if (global.StatisticoPowerAnalysis._activeEngine) global.StatisticoPowerAnalysis._activeEngine.calculateDetectableEffect();
     },
     _activeEngine: null,
-    VERSION: '20260706d'
+    VERSION: '20260706e'
   };
 })(window);

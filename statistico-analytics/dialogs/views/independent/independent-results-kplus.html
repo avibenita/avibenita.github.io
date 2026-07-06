@@ -14,9 +14,9 @@
 
   <script src="../shared-header.js?v=20260524t"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
-  <link rel="stylesheet" href="../shared-power-template.css?v=20260706e" />
-  <script src="../shared-power-template.js?v=20260706e"></script>
-  <script src="../shared-power-analysis.js?v=20260706e"></script>
+  <link rel="stylesheet" href="../shared-power-template.css?v=20260706f" />
+  <script src="../shared-power-template.js?v=20260706f"></script>
+  <script src="../shared-power-analysis.js?v=20260706f"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -239,14 +239,17 @@
       flex-direction: column;
       overflow-y: auto;
       box-sizing: border-box;
+      height: 100%;
       min-height: 0;
       padding: 8px 12px 20px;
     }
     #tab-power #sharedPowerTemplateMount {
-      flex: 1 1 0;
+      flex: 1 1 auto;
       min-height: 0;
       width: 100%;
     }
+    .right-col:has(#tab-power.active) .hero-section,
+    .right-col:has(#tab-power.active) .settings-bar { display: none; }
     .right-col:has(#tab-effects.active) .hero-section{margin-bottom:8px;}
     .right-col:has(#tab-effects.active) .settings-bar{padding:6px 14px 8px;}
     .right-col:has(#tab-posthoc.active) .sb-ai-float-btn{bottom:52px;right:24px;}
@@ -1172,8 +1175,13 @@
       if (prevPanel) prevPanel.classList.remove("active");
       if (nextPanel) nextPanel.classList.add("active");
       activeTab = tab;
-      if (tab === 'power' && window.StatisticoPowerAnalysis && window.StatisticoPowerAnalysis._activeEngine) {
-        window.StatisticoPowerAnalysis._activeEngine.calculate(window._independentBundle || lastBundle);
+      if (tab === 'power' && window.StatisticoPowerAnalysis) {
+        var powerMount = document.getElementById('sharedPowerTemplateMount');
+        if (powerMount && !powerMount.querySelector('#pwstd-shell') && typeof window.StatisticoPowerAnalysis.mountIndependent === 'function') {
+          window.StatisticoPowerAnalysis.mountIndependent({ mountId: 'sharedPowerTemplateMount' });
+        } else if (window.StatisticoPowerAnalysis._activeEngine) {
+          window.StatisticoPowerAnalysis._activeEngine.calculate(window._independentBundle || lastBundle);
+        }
       }
       requestAnimationFrame(fitIndependentLayout);
     }
@@ -3270,6 +3278,9 @@
       updateResultsPanels(r, fx, s, 1 - (parseMaybeNumber(s.confidence) || 0.95));
       renderPosthoc(r.posthoc || {}, "k-plus");
       updateEffectsPanel(ob);
+      if (window.StatisticoPowerAnalysis && window.StatisticoPowerAnalysis._activeEngine) {
+        window.StatisticoPowerAnalysis._activeEngine.calculate(window._independentBundle || lastBundle);
+      }
       // Re-run layout AFTER all DOM has been populated (settings-bar now has correct height)
       requestAnimationFrame(() => {
         fitIndependentLayout();
@@ -3711,7 +3722,7 @@
 
       // Scroll-friendly tabs: auto height with max-height; chart tabs: fixed fill height
       const tab = document.querySelector('.tab-panel.active');
-      const scrollTabIds = ['tab-assumptions', 'tab-power'];
+      const scrollTabIds = ['tab-assumptions'];
       if (tab && vc) {
         const maxH = Math.max(60, vc.clientHeight - 12);
         if (scrollTabIds.indexOf(tab.id) >= 0) {

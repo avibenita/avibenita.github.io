@@ -1206,6 +1206,6 @@
       if (global.StatisticoPowerAnalysis._activeEngine) global.StatisticoPowerAnalysis._activeEngine.calculateDetectableEffect();
     },
     _activeEngine: null,
-    VERSION: '20260706e'
+    VERSION: '20260706f'
   };
 })(window);

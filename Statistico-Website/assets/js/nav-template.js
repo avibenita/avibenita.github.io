@@ -71,6 +71,12 @@ const NAV_TEMPLATE = `
         </a>
       </li>
 
+      <li class="nav-item">
+        <a href="javascript:void(0)" class="nav-link" data-page="why" id="link-why">
+          The Paradigm
+        </a>
+      </li>
+
       <!-- Products group — segmented control -->
       <li class="nav-item nav-item--products-group">
         <span class="nav-products-label">Statistico™ Platform</span>
@@ -100,11 +106,6 @@ const NAV_TEMPLATE = `
       </li>
 
       <li class="nav-item nav-item--sep-left">
-        <a href="javascript:void(0)" class="nav-link" data-page="why" id="link-why">
-          Why
-        </a>
-      </li>
-      <li class="nav-item">
         <a href="javascript:void(0)" class="nav-link" data-page="how" id="link-how">
           How It Works
         </a>
@@ -1345,7 +1346,7 @@ const FOOTER_TEMPLATE = `
       </div>
       <div class="footer-section">
         <h4>Resources</h4>
-        <a href="javascript:void(0)" id="footer-link-why">Why Statistico?</a>
+        <a href="javascript:void(0)" id="footer-link-why">The Paradigm</a>
         <a href="javascript:void(0)" id="footer-link-how">How It Works</a>
         <a href="javascript:void(0)" id="footer-link-faq">FAQ</a>
       </div>

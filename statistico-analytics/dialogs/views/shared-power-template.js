@@ -12,6 +12,90 @@
     return esc(label) + termTip(tip);
   }
 
+  var _floatTipEl = null;
+  var _floatTipAnchor = null;
+  var _floatTipScrollBound = false;
+
+  function _ensureFloatingTip() {
+    if (_floatTipEl) return _floatTipEl;
+    _floatTipEl = document.createElement('div');
+    _floatTipEl.id = 'pwstd-floating-term-tip';
+    _floatTipEl.className = 'pwstd-floating-term-tip';
+    _floatTipEl.hidden = true;
+    _floatTipEl.setAttribute('role', 'tooltip');
+    document.body.appendChild(_floatTipEl);
+    return _floatTipEl;
+  }
+
+  function _positionFloatingTip(anchor, tipEl) {
+    if (!anchor || !tipEl) return;
+    tipEl.hidden = false;
+    tipEl.style.visibility = 'hidden';
+    tipEl.style.display = 'block';
+    var rect = anchor.getBoundingClientRect();
+    var tipRect = tipEl.getBoundingClientRect();
+    var pad = 10;
+    var gap = 8;
+    var top = rect.bottom + gap;
+    if (top + tipRect.height > window.innerHeight - pad) {
+      top = rect.top - tipRect.height - gap;
+    }
+    top = Math.max(pad, Math.min(top, window.innerHeight - tipRect.height - pad));
+    var left = rect.left + (rect.width / 2) - (tipRect.width / 2);
+    left = Math.max(pad, Math.min(left, window.innerWidth - tipRect.width - pad));
+    tipEl.style.top = top + 'px';
+    tipEl.style.left = left + 'px';
+    tipEl.style.visibility = 'visible';
+  }
+
+  function _hideFloatingTip() {
+    if (_floatTipEl) {
+      _floatTipEl.hidden = true;
+      _floatTipEl.style.visibility = 'hidden';
+    }
+    _floatTipAnchor = null;
+    if (_floatTipScrollBound) {
+      window.removeEventListener('scroll', _onFloatTipScroll, true);
+      window.removeEventListener('resize', _onFloatTipScroll, true);
+      _floatTipScrollBound = false;
+    }
+  }
+
+  function _onFloatTipScroll() {
+    if (_floatTipAnchor && _floatTipEl && !_floatTipEl.hidden) {
+      _positionFloatingTip(_floatTipAnchor, _floatTipEl);
+    }
+  }
+
+  function _showFloatingTip(anchor) {
+    var tipSource = anchor.querySelector('.pwstd-term-tip');
+    var text = tipSource ? tipSource.textContent : (anchor.getAttribute('aria-label') || '');
+    if (!text) return;
+    var tipEl = _ensureFloatingTip();
+    tipEl.textContent = text;
+    _floatTipAnchor = anchor;
+    _positionFloatingTip(anchor, tipEl);
+    if (!_floatTipScrollBound) {
+      window.addEventListener('scroll', _onFloatTipScroll, true);
+      window.addEventListener('resize', _onFloatTipScroll, true);
+      _floatTipScrollBound = true;
+    }
+  }
+
+  function _initTermTips(root) {
+    var scope = root || document;
+    scope.querySelectorAll('.pwstd-term-help').forEach(function (help) {
+      if (help._pwTipBound) return;
+      help._pwTipBound = true;
+      help.addEventListener('mouseenter', function () { _showFloatingTip(help); });
+      help.addEventListener('mouseleave', _hideFloatingTip);
+      help.addEventListener('focusin', function () { _showFloatingTip(help); });
+      help.addEventListener('focusout', function (e) {
+        if (!help.contains(e.relatedTarget)) _hideFloatingTip();
+      });
+    });
+  }
+
   var _customTimer = null;
 
   var CHIPS = [
@@ -296,6 +380,7 @@
     _updateDfFormulaLabel(o);
     _applyVariant(o);
     _syncDefaultChip();
+    _initTermTips(container);
   }
 
   function render(container, opts){

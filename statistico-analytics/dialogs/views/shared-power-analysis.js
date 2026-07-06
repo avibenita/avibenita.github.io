@@ -154,6 +154,7 @@
       if (labels.design) powSetText('powDesignType', labels.design);
       if (labels.target) powSetText('powTargetWhat', labels.target);
       if (labels.effectSource) powSetText('powEffectSource', labels.effectSource);
+      if (cfg.variant === 'mixed') return;
       var metric = document.getElementById('pwstd-metric-effect-label');
       if (metric && labels.effectMetric) metric.textContent = labels.effectMetric;
       var partial = document.getElementById('pwstd-planning-effect-label');
@@ -764,6 +765,7 @@
       if (!sub) return;
       if (req && isFinite(ctx.measurementsPerSubject)) {
         sub.textContent = '≈' + Math.round(req * ctx.measurementsPerSubject) + ' obs';
+        sub.title = 'Approximate total observations (subjects × measurements per subject)';
       } else {
         sub.textContent = '';
       }
@@ -774,6 +776,7 @@
       var customReq = parseInt(customReqEl.textContent, 10);
       if (customReq > 0 && isFinite(ctx.measurementsPerSubject)) {
         customSub.textContent = '≈' + Math.round(customReq * ctx.measurementsPerSubject) + ' obs';
+        customSub.title = 'Approximate total observations (subjects × measurements per subject)';
       } else {
         customSub.textContent = '';
       }
@@ -1091,6 +1094,6 @@
       if (global.StatisticoPowerAnalysis._activeEngine) global.StatisticoPowerAnalysis._activeEngine.calculateDetectableEffect();
     },
     _activeEngine: null,
-    VERSION: '20260706b'
+    VERSION: '20260706c'
   };
 })(window);

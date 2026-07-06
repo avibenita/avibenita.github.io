@@ -2,6 +2,16 @@
   function esc(v){ return String(v == null ? "" : v); }
   function id(map, key, fallback){ return esc((map && map[key]) || fallback || ""); }
 
+  function termTip(tip) {
+    return '<span class="pwstd-term-help" role="note" aria-label="' + esc(tip) + '">'
+      + '<i class="fa-regular fa-circle-question" aria-hidden="true"></i>'
+      + '<span class="pwstd-term-tip">' + esc(tip) + '</span></span>';
+  }
+
+  function labelWithTip(label, tip) {
+    return esc(label) + termTip(tip);
+  }
+
   var _customTimer = null;
 
   var CHIPS = [
@@ -80,28 +90,56 @@
 
   function buildMixedMetricsHtml(ids) {
     return ''
-      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Achieved Power</div><div class="pwstd-metric-value" id="' + id(ids,'observed','powObserved') + '">—</div></div>'
-      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Subjects</div><div class="pwstd-metric-value" id="powMetricSubjects">—</div></div>'
-      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Observations</div><div class="pwstd-metric-value" id="powMetricObservations">—</div></div>'
-      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label" id="pwstd-metric-effect-label">Partial η²</div><div class="pwstd-metric-value" id="pwstd-metric-r2">—</div></div>'
-      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label" id="pwstd-metric-f-label">Cohen\'s f²</div><div class="pwstd-metric-value" id="' + id(ids,'effectSize','powEffectSize') + '">—</div></div>'
-      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">ICC</div><div class="pwstd-metric-value" id="powMetricICC">—</div></div>'
-      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Meas. / Subject</div><div class="pwstd-metric-value" id="powMetricMeasPerSub">—</div></div>';
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">' + labelWithTip('Achieved Power', 'Estimated probability of detecting the observed effect at the chosen α, given the current number of subjects and design.') + '</div><div class="pwstd-metric-value" id="' + id(ids,'observed','powObserved') + '">—</div></div>'
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">' + labelWithTip('Subjects', 'Independent clustering units (e.g., people). Mixed-model power is planned primarily in subjects, not total observations.') + '</div><div class="pwstd-metric-value" id="powMetricSubjects">—</div></div>'
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">' + labelWithTip('Observations', 'Total analyzed rows, including all repeated measurements across subjects.') + '</div><div class="pwstd-metric-value" id="powMetricObservations">—</div></div>'
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label" id="pwstd-metric-effect-label">' + labelWithTip('Partial η²', 'Proportion of outcome variance explained by the selected fixed effect, adjusting for other predictors. Derived from the Type III F test.') + '</div><div class="pwstd-metric-value" id="pwstd-metric-r2">—</div></div>'
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label" id="pwstd-metric-f-label">' + labelWithTip("Cohen's f²", "Standardized effect size used in power calculations: f² = partial η² / (1 − partial η²). Cohen benchmarks: small ≈ 0.02, medium ≈ 0.15, large ≈ 0.35.") + '</div><div class="pwstd-metric-value" id="' + id(ids,'effectSize','powEffectSize') + '">—</div></div>'
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">' + labelWithTip('ICC', 'Intraclass correlation — the share of variance between clusters (e.g., subjects). High ICC means within-subject observations are similar; adding subjects usually helps more than adding repeats.') + '</div><div class="pwstd-metric-value" id="powMetricICC">—</div></div>'
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">' + labelWithTip('Meas. / Subject', 'Average repeated observations per subject in the current data (total observations ÷ subjects).') + '</div><div class="pwstd-metric-value" id="powMetricMeasPerSub">—</div></div>';
   }
 
   function buildMixedDesignAssumptionsHtml() {
     return ''
       + '  <div class="pwstd-card pwstd-card--design-assumptions" id="pwstd-design-assumptions">'
-      + '    <div class="pwstd-card-h">Design Assumptions</div>'
+      + '    <div class="pwstd-card-h">' + labelWithTip('Design Assumptions', 'Study-design inputs that drive required sample size in mixed models. Values come from the fitted model unless noted.') + '</div>'
       + '    <div class="pwstd-card-b">'
       + '      <div class="pwstd-design-assumptions-grid">'
-      + '        <div class="pwstd-design-assumption"><span>Repeated measurements</span><strong id="powDesignMeas">—</strong></div>'
-      + '        <div class="pwstd-design-assumption"><span>ICC</span><strong id="powDesignICC">—</strong></div>'
-      + '        <div class="pwstd-design-assumption"><span>Dropout</span><strong id="powDesignDropout">0%</strong></div>'
-      + '        <div class="pwstd-design-assumption"><span>Random structure</span><strong id="powDesignRandom">—</strong></div>'
+      + '        <div class="pwstd-design-assumption"><span>Repeated measurements' + termTip('Average number of within-subject measurements used when converting required subjects to total observations.') + '</span><strong id="powDesignMeas">—</strong></div>'
+      + '        <div class="pwstd-design-assumption"><span>ICC' + termTip('Intraclass correlation from the fitted model. Higher ICC increases the value of additional subjects relative to additional repeated measures.') + '</span><strong id="powDesignICC">—</strong></div>'
+      + '        <div class="pwstd-design-assumption"><span>Dropout' + termTip('Assumed proportion of subjects lost before completing all measurements. Currently fixed at 0%; interactive adjustment is planned.') + '</span><strong id="powDesignDropout">0%</strong></div>'
+      + '        <div class="pwstd-design-assumption"><span>Random structure' + termTip('Random effects in the fitted model. Random intercept = unique baseline per subject; adding slopes requires more subjects for stable estimation.') + '</span><strong id="powDesignRandom">—</strong></div>'
       + '      </div>'
       + '    </div>'
       + '  </div>';
+  }
+
+  function buildMixedDetectableHtml() {
+    return ''
+      + '    <div class="pwstd-card pwstd-card--detectable" id="pwstd-card-detectable">'
+      + '      <div class="pwstd-card-h">' + labelWithTip('Minimum Detectable Effect', 'The smallest effect your current design could reliably detect at the selected target power — compare with the observed effect to judge adequacy.') + '</div>'
+      + '      <div class="pwstd-card-b">'
+      + '        <div class="pwstd-detectable-grid">'
+      + '          <div class="pwstd-detectable-item"><span>Observed partial η²' + termTip('Partial η² from the Type III test for the selected fixed effect in the fitted model.') + '</span><strong id="pwstd-r2-observed">—</strong></div>'
+      + '          <div class="pwstd-detectable-item"><span>Minimum detectable partial η²' + termTip('Smallest partial η² detectable with adequate power at the current subject count and design assumptions.') + '</span><strong id="pwstd-r2-detectable">—</strong></div>'
+      + '        </div>'
+      + '        <p class="pwstd-r2-insight" id="pwstd-r2-insight">Detectable threshold appears after analysis runs.</p>'
+      + '      </div>'
+      + '    </div>';
+  }
+
+  function buildDefaultDetectableHtml() {
+    return ''
+      + '    <div class="pwstd-card pwstd-card--detectable" id="pwstd-card-detectable">'
+      + '      <div class="pwstd-card-h">Detectable Effect</div>'
+      + '      <div class="pwstd-card-b">'
+      + '        <div class="pwstd-detectable-grid">'
+      + '          <div class="pwstd-detectable-item"><span>Observed R²</span><strong id="pwstd-r2-observed">—</strong></div>'
+      + '          <div class="pwstd-detectable-item"><span>Detectable R²</span><strong id="pwstd-r2-detectable">—</strong></div>'
+      + '        </div>'
+      + '        <p class="pwstd-r2-insight" id="pwstd-r2-insight">Detectable threshold appears after analysis runs.</p>'
+      + '      </div>'
+      + '    </div>';
   }
 
   function renderAnalysisLayout(container, opts) {
@@ -160,6 +198,13 @@
         + '</div>';
     }).join('\n');
 
+    var planningHeadHtml = variant === 'mixed'
+      ? labelWithTip('Sample Size Planning', 'Required subjects for each power target. Sub-counts show approximate total observations (subjects × measurements per subject).')
+      : 'Sample Size Planning';
+    var detectableCardHtml = variant === 'mixed'
+      ? buildMixedDetectableHtml()
+      : buildDefaultDetectableHtml();
+
     container.innerHTML = [
       '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260705l">',
       '  <header class="pwstd-page-header">',
@@ -190,7 +235,7 @@
       variant === 'mixed' ? buildMixedDesignAssumptionsHtml() : '',
       '  <div class="pwstd-grid pwstd-grid--analysis">',
       '    <div class="pwstd-card pwstd-card--planning pwstd-card--primary" id="pwstd-card-planning">',
-      '      <div class="pwstd-card-h" id="pwstd-head-planning">Sample Size Planning</div>',
+      '      <div class="pwstd-card-h" id="pwstd-head-planning">' + planningHeadHtml + '</div>',
       '      <div class="pwstd-card-b">',
       '        <div class="pwstd-targets">' + chipHtml + '</div>',
       '        <span id="' + id(ids,'customStatus','customPowerStatus') + '" class="pwstd-custom-status"><i class="fa-solid fa-spinner fa-spin"></i> Calculating...</span>',
@@ -209,16 +254,7 @@
       '        </div>',
       '      </div>',
       '    </div>',
-      '    <div class="pwstd-card pwstd-card--detectable" id="pwstd-card-detectable">',
-      '      <div class="pwstd-card-h">Detectable Effect</div>',
-      '      <div class="pwstd-card-b">',
-      '        <div class="pwstd-detectable-grid">',
-      '          <div class="pwstd-detectable-item"><span>Observed R²</span><strong id="pwstd-r2-observed">—</strong></div>',
-      '          <div class="pwstd-detectable-item"><span>Detectable R²</span><strong id="pwstd-r2-detectable">—</strong></div>',
-      '        </div>',
-      '        <p class="pwstd-r2-insight" id="pwstd-r2-insight">Detectable threshold appears after analysis runs.</p>',
-      '      </div>',
-      '    </div>',
+      detectableCardHtml,
       '  </div>',
       '  <div class="pwstd-r2-compare pwstd-for-r2compare" id="pwstd-r2-compare" hidden></div>',
       '  <div class="pwstd-card pwstd-card--curve">',
@@ -466,15 +502,10 @@
       _setRowLabel('powMinDetectableEta', 'Minimum detectable partial η²');
       _setRowLabel('powEffectSize', "Cohen's f²");
       _setRowLabel('powMinDetectableF', 'Minimum detectable f²');
-      var detCardHead = document.querySelector('#pwstd-card-detectable .pwstd-card-h');
-      if (detCardHead) detCardHead.textContent = 'Minimum Detectable Effect';
-      var detItems = document.querySelectorAll('#pwstd-card-detectable .pwstd-detectable-item span');
-      if (detItems.length >= 2) {
-        detItems[0].textContent = 'Observed partial η²';
-        detItems[1].textContent = 'Minimum detectable partial η²';
-      }
       var headPlanning = document.getElementById('pwstd-head-planning');
-      if (headPlanning) headPlanning.textContent = 'Sample Size Planning';
+      if (headPlanning) {
+        headPlanning.innerHTML = labelWithTip('Sample Size Planning', 'Required subjects for each power target. Sub-counts show approximate total observations (subjects × measurements per subject).');
+      }
       var engine = document.getElementById('powEngineNote');
       if (engine) {
         engine.innerHTML = '<i class="fa-solid fa-calculator"></i> Approximate mixed-model power (noncentral F). Observed power is descriptive; use required subjects or detectable effect for planning.';

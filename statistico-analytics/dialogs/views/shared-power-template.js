@@ -433,7 +433,7 @@
     }).join('\n          ');
 
     container.innerHTML = [
-      '<div class="pwstd-shell pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260609e">',
+      '<div class="pwstd-shell pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260707b">',
       '  <h2 class="pwstd-title"><i class="fa-solid fa-bolt"></i> ' + esc(title) + '</h2>',
       '  <div class="pwstd-grid pwstd-grid--top">',
       '    <div class="pwstd-card pwstd-card--context">',
@@ -457,7 +457,7 @@
       '      <div class="pwstd-card-b">',
       '        <div class="pwstd-row"><span class="pwstd-label">Achieved power</span><span class="pwstd-value" id="' + id(ids,'observed','powObserved') + '">...</span></div>',
       '        <div class="pwstd-row"><span class="pwstd-label">Cohen\'s f</span><span class="pwstd-value" id="' + id(ids,'effectSize','powEffectSize') + '">...</span></div>',
-      '        <div class="pwstd-row"><span class="pwstd-label">Current sample size</span><span class="pwstd-value" id="' + id(ids,'sampleSize','powSampleSize') + '">...</span></div>',
+      '        <div class="pwstd-row"><span class="pwstd-label">' + labelWithTip('Current N (subjects)', 'Number of subjects (participants), each measured at every time point — not the total number of measurements.') + '</span><span class="pwstd-value" id="' + id(ids,'sampleSize','powSampleSize') + '">...</span></div>',
       '        <div class="pwstd-row"><span class="pwstd-label">Alpha</span><span class="pwstd-value" id="' + id(ids,'alpha','powAlpha') + '">0.050</span></div>',
       '      </div>',
       '    </div>',
@@ -497,7 +497,7 @@
       '        <div class="pwstd-row"><span class="pwstd-label">df1</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outDf1','powOutDf1') + '">—</span></div>',
       '        <div class="pwstd-row"><span class="pwstd-label">df2</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outDf2','powOutDf2') + '">—</span></div>',
       '        <div class="pwstd-row"><span class="pwstd-label">Critical F</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outCritF','powOutCritF') + '">—</span></div>',
-      '        <div class="pwstd-row"><span class="pwstd-label">Total sample size</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outN','powOutN') + '">—</span></div>',
+      '        <div class="pwstd-row"><span class="pwstd-label">Total N (subjects)</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outN','powOutN') + '">—</span></div>',
       '        <div class="pwstd-row"><span class="pwstd-label">Actual power</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outPower','powOutPower') + '">—</span></div>',
       '        <div class="pwstd-row"><span class="pwstd-label">Pillai V</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outPillaiV','powOutPillaiV') + '">—</span></div>',
       '      </div>',
@@ -526,7 +526,7 @@
       '            <input class="pwstd-select" type="number" id="' + id(ids,'detectableTarget','powDetectableTarget') + '" min="0.5" max="0.99" step="0.05" value="0.80" style="width:72px;">',
       '          </span>',
       '        </div>',
-      '        <div class="pwstd-row pwstd-for-detectable"><span class="pwstd-label">Current sample size</span><span class="pwstd-value" id="pwstd-det-n">...</span></div>',
+      '        <div class="pwstd-row pwstd-for-detectable"><span class="pwstd-label">Current N (subjects)</span><span class="pwstd-value" id="pwstd-det-n">...</span></div>',
       '        <div class="pwstd-row pwstd-for-detectable"><span class="pwstd-label">Min detectable Cohen\'s f</span><span class="pwstd-value" id="' + id(ids,'minF','powMinDetectableF') + '">—</span></div>',
       '        <div class="pwstd-row pwstd-for-detectable"><span class="pwstd-label">Min detectable partial η²</span><span class="pwstd-value" id="' + id(ids,'minEta','powMinDetectableEta') + '">—</span></div>',
       '        <p class="pwstd-det-interpret pwstd-for-detectable" id="pwstd-det-interpret"></p>',
@@ -555,6 +555,7 @@
     _syncTaskUI('fromN');
     _updateDfFormulaLabel(o);
     _applyVariant(o);
+    _initTermTips(container);
   }
 
   function _setRowLabel(valueId, text) {

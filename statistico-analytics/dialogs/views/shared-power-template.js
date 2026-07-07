@@ -789,6 +789,14 @@
     body.hidden = !open;
     if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     if (card) card.classList.toggle('pwstd-tech-panel--open', open);
+    try {
+      document.dispatchEvent(new CustomEvent('pwstd-tech-toggle', { detail: { open: open } }));
+    } catch (e) { /* older engines without CustomEvent constructor */ }
+    if (open && card && typeof card.scrollIntoView === 'function') {
+      requestAnimationFrame(function () {
+        card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+    }
   }
 
   function _setCard(card, isPrimary) {

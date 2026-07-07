@@ -397,6 +397,7 @@
     #tab-power.tab-panel.active{display:flex;flex-direction:column;overflow-y:auto;box-sizing:border-box;height:100%;min-height:0;padding:8px 0 12px;}
     #tab-power #sharedPowerTemplateMount{flex:0 0 auto;}
 #tab-power .stat-panel-heading{font-size:1em !important;}
+    .pow-approx-badge{display:inline-flex;align-items:center;gap:4px;margin-left:10px;padding:2px 8px;border-radius:999px;border:1px solid rgba(251,191,36,.55);background:rgba(251,191,36,.14);color:#fbbf24;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;}
 #tab-power #sharedPowerTemplateMount .stat-label{font-size:13px !important;}
 #tab-power #sharedPowerTemplateMount .stat-value{font-size:14px !important;}
 /* AI Interpretation */
@@ -868,7 +869,7 @@
 
   </style>
 </head>
-<body data-ui-version="20260610x-kplus-posthoc-options-scroll">
+<body data-ui-version="20260707e-kplus-friedman-approx-labels">
   <!-- ── Sidebar Navigation ── -->
   <nav class="sb-nav" id="sidebarNav">
     <div class="sb-logo">
@@ -1974,6 +1975,7 @@
 
       var pwShell = document.getElementById("pwstd-shell");
       if (pwShell) pwShell.classList.toggle("pwstd-shell--nonparametric", primaryFramework === "nonparametric");
+      applyPowerFrameworkLabels(primaryFramework === "nonparametric");
 
       syncFrameworkPanelEmphasis();
       updateEffectMagnitudeSummary((lastBundle && lastBundle.results && lastBundle.results.omnibus) ? lastBundle.results.omnibus : {});
@@ -3940,6 +3942,44 @@
       return (el && el.value === 'gpower_manova') ? 'gpower_manova' : 'univariate';
     }
 
+    function isNonparametricPowerFramework() {
+      const npRadio = document.getElementById('fwNonparametric');
+      if (npRadio) return !!npRadio.checked;
+      return primaryFramework === 'nonparametric';
+    }
+
+    function setPowerRowLabel(valueId, text) {
+      const el = document.getElementById(valueId);
+      if (!el) return;
+      const row = el.closest('.pwstd-row');
+      const lbl = row && row.querySelector('.pwstd-label');
+      if (lbl) lbl.textContent = text;
+    }
+
+    /* Friedman power is approximated via a parametric planning effect — label it honestly */
+    function applyPowerFrameworkLabels(isNP) {
+      const engineSel = document.getElementById('powPowerMethod');
+      if (engineSel) {
+        const row = engineSel.closest('.pwstd-row');
+        const lbl = row && row.querySelector('.pwstd-label');
+        if (lbl) lbl.textContent = isNP ? 'Power engine — approximation from Friedman effect' : 'Power engine';
+      }
+      const toggle = document.getElementById('pwstd-tech-panel-toggle');
+      if (toggle) {
+        let badge = document.getElementById('powApproxBadge');
+        if (isNP && !badge) {
+          badge = document.createElement('span');
+          badge.id = 'powApproxBadge';
+          badge.className = 'pow-approx-badge';
+          badge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Approximate · planning aid';
+          const hint = toggle.querySelector('.pwstd-tech-panel-hint');
+          toggle.insertBefore(badge, hint || null);
+        } else if (!isNP && badge) {
+          badge.remove();
+        }
+      }
+    }
+
     function rmDf(n, k, epsilon, method, numGroups) {
       numGroups = numGroups || 1;
       epsilon = isFinite(epsilon) ? epsilon : 1;
@@ -4257,10 +4297,45 @@
       }
       const powerPct = (displayPower * 100).toFixed(1) + "%";
       setText("powObserved", powerPct);
-      setText("powEffectSize", effect_size_cohen_f ? effect_size_cohen_f.toFixed(3) : "N/A");
       setText("powSampleSize", currentN || "N/A");
       setText("powAlpha", (alpha || 0.05).toFixed(3));
       setText("powPartialEta", (partial_eta_squared || partialEta || 0).toFixed(3));
+
+      /* Effect size row: for Friedman show the rank effect (Kendall's W) as primary,
+         with the converted parametric planning f on its own row */
+      const isNPUI = isNonparametricPowerFramework();
+      const kendallW = parseMaybeNumber(omnibusPow.kendallW || omnibusPow.friedmanW);
+      applyPowerFrameworkLabels(isNPUI);
+      const effectValEl = document.getElementById('powEffectSize');
+      const effectRow = effectValEl ? effectValEl.closest('.pwstd-row') : null;
+      let convRow = document.getElementById('powConvertedFRow');
+      if (isNPUI && isFinite(kendallW)) {
+        setPowerRowLabel('powEffectSize', "Rank effect (Kendall's W)");
+        setText('powEffectSize', kendallW.toFixed(3));
+        if (effectRow && effect_size_cohen_f) {
+          if (!convRow) {
+            convRow = document.createElement('div');
+            convRow.id = 'powConvertedFRow';
+            convRow.className = 'pwstd-row';
+            convRow.innerHTML = '<span class="pwstd-label"></span><span class="pwstd-value" id="powConvertedF">—</span>';
+            effectRow.insertAdjacentElement('afterend', convRow);
+          }
+          const convLbl = convRow.querySelector('.pwstd-label');
+          if (convLbl) {
+            convLbl.textContent = effectSizeSource === 'nonparametric'
+              ? 'Converted planning effect f (from W)'
+              : 'Planning effect f (from partial \u03b7\u00b2)';
+          }
+          const convEl = document.getElementById('powConvertedF');
+          if (convEl) convEl.textContent = effect_size_cohen_f.toFixed(3);
+        } else if (convRow) {
+          convRow.remove();
+        }
+      } else {
+        setPowerRowLabel('powEffectSize', "Cohen's f");
+        setText('powEffectSize', effect_size_cohen_f ? effect_size_cohen_f.toFixed(3) : "N/A");
+        if (convRow) convRow.remove();
+      }
 
       const useCloudReqN = cloudMatches && !fallback && !local;
 
@@ -4335,30 +4410,35 @@
       // Update footer note based on calculation method and effect size source
       const engineNote = document.getElementById('powEngineNote');
       if (engineNote) {
-        let noteText = '';
-        
-        // Determine calculation method
-        if (fallback || local) {
-          noteText = '<i class="fa-solid fa-calculator"></i> Power calculated using local non-central F approximation (cloud unavailable).';
+        const srcIcon = (fallback || local)
+          ? '<i class="fa-solid fa-calculator"></i>'
+          : '<i class="fa-solid fa-cloud"></i>';
+        const noteMethod = results.power_method || getPowerMethod();
+        const engineName = noteMethod === 'gpower_manova' ? 'G*Power MANOVA-style' : 'Univariate RM-ANOVA';
+        let noteText;
+
+        if (isNPUI) {
+          // Friedman: no exact analytic power — say so explicitly
+          noteText = srcIcon + ' <strong>Approximate — planning aid.</strong> Power is approximated by converting the Friedman rank effect to a parametric planning effect'
+            + (effectSizeSource === 'nonparametric'
+              ? ' (Kendall\'s W \u2192 Cohen\'s f)'
+              : ' (Cohen\'s f from partial \u03b7\u00b2; Kendall\'s W shown for reference)')
+            + '. This is useful for sample-size guidance, but it is not an exact Friedman power calculation.'
+            + ' Noncentral-F engine used for the approximation: <strong>' + engineName + '</strong>.';
         } else {
-          noteText = '<i class="fa-solid fa-cloud"></i> Power calculated via Python cloud function.';
+          if (fallback || local) {
+            noteText = srcIcon + ' Power calculated using local non-central F approximation (cloud unavailable).';
+          } else {
+            noteText = srcIcon + ' Power calculated via Python cloud function.';
+          }
+          if (noteMethod === 'gpower_manova') {
+            noteText += ' Engine: <strong>G*Power MANOVA-style</strong> — df1=(k−1)·ε, df2=N−groups−df1+1, λ=N·m·f²/(1−ρ). Matches G*Power “MANOVA: Repeated measures, within factors”.';
+          } else {
+            noteText += ' Engine: <strong>Univariate RM-ANOVA</strong> — df1=(k−1)·ε, df2=(N−1)(k−1)·ε, λ=N·m·f²/(1−ρ). Matches your RM-ANOVA F table.';
+          }
+          noteText += ' Effect size: Cohen\'s f from partial \u03b7\u00b2.';
         }
-        const method = results.power_method || getPowerMethod();
-        if (method === 'gpower_manova') {
-          noteText += ' Engine: <strong>G*Power MANOVA-style</strong> — df1=(k−1)·ε, df2=N−groups−df1+1, λ=N·m·f²/(1−ρ). Matches G*Power “MANOVA: Repeated measures, within factors”.';
-        } else {
-          noteText += ' Engine: <strong>Univariate RM-ANOVA</strong> — df1=(k−1)·ε, df2=(N−1)(k−1)·ε, λ=N·m·f²/(1−ρ). Matches your RM-ANOVA F table.';
-        }
-        
-        // Add effect size source note
-        if (effectSizeSource === 'nonparametric') {
-          noteText += ' <strong>Effect size from Kendall\'s W (no parametric partial \u03b7\u00b2 available).</strong>';
-        } else if (effectSizeSource === 'parametric_with_rank') {
-          noteText += ' Effect size: Cohen\'s f from partial \u03b7\u00b2 (G*Power convention). Kendall W gives a smaller rank-based f; RM/MANOVA power uses the parametric value.';
-        } else {
-          noteText += ' Effect size: Cohen\'s f from partial eta^2.';
-        }
-        
+
         engineNote.innerHTML = noteText;
       }
       

@@ -3905,16 +3905,22 @@
   /* 1 - CDF of F(df1, df2) = P(F > x) */
   function _fSurv(x, df1, df2) { return 1 - _fCdf(x, df1, df2); }
 
-  /* Non-central F CDF — Patnaik 2-moment approximation */
+  /* Non-central F CDF — exact Poisson-weighted incomplete-beta series (matches G*Power / scipy ncf) */
   function _ncfCdf(x, df1, df2, lambda) {
-    /* Approximate non-central F with shifted central F */
-    /* Uses algorithm: scale df1 to match first two moments */
     if (lambda <= 0) return _fCdf(x, df1, df2);
-    var c = 1 + lambda/df1;          /* shift factor */
-    return _fCdf(x/c, df1, df2);
+    if (x <= 0) return 0;
+    var bx = (df1*x) / (df1*x + df2);
+    var sum = 0;
+    var w = Math.exp(-lambda/2);
+    for (var j = 0; j < 1000; j++) {
+      if (j > 0) w *= (lambda/2) / j;
+      sum += w * _betaInc(df1/2 + j, df2/2, bx);
+      if (j > lambda/2 && w < 1e-15) break;
+    }
+    return Math.max(0, Math.min(1, sum));
   }
 
-  /* Power of ANOVA F-test using non-central F approximation */
+  /* Power of ANOVA F-test using exact non-central F */
   function _anovaPower(f, k, N, alpha) {
     /* f = Cohen's f (effect size), k = # groups, N = total n */
     if (!isFinite(f) || f <= 0 || k < 2 || N < k) return 0;
@@ -3924,9 +3930,7 @@
     /* Critical F at alpha */
     var fcrit  = _fInv(1 - alpha, df1, df2);
     /* Power = P(F' > fcrit) where F' ~ noncentral F(df1,df2,lambda) */
-    /* Use Patnaik approximation: scale fcrit by (1 + lambda/df1) */
-    var c = 1 + lambda / df1;
-    var power = _fSurv(fcrit / c, df1, df2);
+    var power = 1 - _ncfCdf(fcrit, df1, df2, lambda);
     return Math.max(0, Math.min(1, power));
   }
 

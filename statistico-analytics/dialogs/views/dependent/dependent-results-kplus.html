@@ -4014,6 +4014,21 @@
       return n * k * f * f / denom;
     }
 
+    /* Exact noncentral F CDF (Poisson-weighted incomplete-beta series, same math as scipy.stats.ncf / G*Power) */
+    function ncfCdfLocal(f, df1, df2, ncp) {
+      if (!isFinite(f) || f <= 0 || !df1 || !df2) return 0;
+      if (!ncp || ncp <= 0) return jStat.centralF.cdf(f, df1, df2);
+      const bx = (f * df1) / (f * df1 + df2);
+      let sum = 0;
+      let w = Math.exp(-ncp / 2);
+      for (let j = 0; j < 1000; j++) {
+        if (j > 0) w *= (ncp / 2) / j;
+        sum += w * jStat.beta.cdf(bx, df1 / 2 + j, df2 / 2);
+        if (j > ncp / 2 && w < 1e-15) break;
+      }
+      return Math.max(0, Math.min(1, sum));
+    }
+
     function rmPowerAtFLocal(n, k, f, alpha, rho, epsilon, method, numGroups) {
       if (!f || f <= 0 || !n || n < 2 || !k || k < 2) return 0;
       method = method || getPowerMethod();
@@ -4022,8 +4037,7 @@
       const dfs = rmDf(n, k, epsilon, method, numGroups);
       if (typeof jStat === 'undefined' || !jStat.centralF || !jStat.centralF.inv) return 0;
       const fcrit = jStat.centralF.inv(1 - (alpha || 0.05), dfs.df1, dfs.df2);
-      const c = 1 + ncp / dfs.df1;
-      const power = 1 - jStat.centralF.cdf(fcrit / c, dfs.df1, dfs.df2);
+      const power = 1 - ncfCdfLocal(fcrit, dfs.df1, dfs.df2, ncp);
       return Math.max(0, Math.min(1, power));
     }
 

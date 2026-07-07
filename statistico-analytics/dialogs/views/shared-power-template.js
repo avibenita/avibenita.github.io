@@ -295,7 +295,7 @@
       : buildDefaultDetectableHtml();
 
     container.innerHTML = [
-      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260705l">',
+      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260707b">',
       '  <header class="pwstd-page-header">',
       '    <h2 class="pwstd-title"><i class="fa-solid fa-bolt"></i> ' + esc(title) + '</h2>',
       '    <p class="pwstd-subtitle">' + esc(subtitle) + '</p>',
@@ -350,7 +350,7 @@
       '    <div class="pwstd-card-h">Power Curve</div>',
       '    <div class="pwstd-card-b pwstd-curve-wrap">',
       '      <div class="pwstd-curve-interactive">',
-      '        <svg id="pwstd-power-curve-svg" class="pwstd-power-curve" viewBox="0 0 640 260" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Power versus sample size curve"></svg>',
+      '        <svg id="pwstd-power-curve-svg" class="pwstd-power-curve" viewBox="0 0 640 200" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Power versus sample size curve"></svg>',
       '        <div id="pwstd-curve-tooltip" class="pwstd-curve-tooltip" hidden></div>',
       '      </div>',
       '      <p class="pwstd-curve-note" id="pwstd-curve-note">Exact noncentral F curve at fixed f² and α — hover to read power at any N.</p>',

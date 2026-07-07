@@ -452,7 +452,7 @@
         if (df2Last >= 1) points.push({ n: maxN, power: powerAtF2(maxN, ctx.df1, df2Last, ctx.f2, ctx.alpha) });
       }
 
-      var W = 640, H = 260, pad = { l: 56, r: 34, t: 22, b: 46 };
+      var W = 640, H = 200, pad = { l: 56, r: 34, t: 20, b: 40 };
       var plotW = W - pad.l - pad.r;
       var plotH = H - pad.t - pad.b;
       var xScale = function (n) { return pad.l + ((n - lo) / (maxN - lo)) * plotW; };
@@ -1402,6 +1402,6 @@
       if (global.StatisticoPowerAnalysis._activeEngine) global.StatisticoPowerAnalysis._activeEngine.calculateDetectableEffect();
     },
     _activeEngine: null,
-    VERSION: '20260707a'
+    VERSION: '20260707b'
   };
 })(window);

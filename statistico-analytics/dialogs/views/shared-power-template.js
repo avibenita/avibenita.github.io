@@ -164,10 +164,11 @@
     }
   }
 
-  function buildDefaultMetricsHtml(ids, effectMetricLabel, effectSizeMetricLabel) {
+  function buildDefaultMetricsHtml(ids, effectMetricLabel, effectSizeMetricLabel, sampleSizeLabel, sampleSizeTip) {
+    var nLabel = sampleSizeTip ? labelWithTip(sampleSizeLabel, sampleSizeTip) : esc(sampleSizeLabel);
     return ''
       + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Achieved Power</div><div class="pwstd-metric-value" id="' + id(ids,'observed','powObserved') + '">—</div></div>'
-      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label">Current N</div><div class="pwstd-metric-value" id="' + id(ids,'sampleSize','powSampleSize') + '">—</div></div>'
+      + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label" id="pwstd-metric-n-label">' + nLabel + '</div><div class="pwstd-metric-value" id="' + id(ids,'sampleSize','powSampleSize') + '">—</div></div>'
       + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label" id="pwstd-metric-effect-label">' + esc(effectMetricLabel) + '</div><div class="pwstd-metric-value" id="pwstd-metric-r2">—</div></div>'
       + '    <div class="pwstd-metric-card"><div class="pwstd-metric-label" id="pwstd-metric-f-label">' + esc(effectSizeMetricLabel) + '</div><div class="pwstd-metric-value" id="' + id(ids,'effectSize','powEffectSize') + '">—</div></div>';
   }
@@ -238,9 +239,13 @@
     var customHandler = esc(o.customHandler || 'window.StatisticoPowerTemplate.runCustomCompute()');
     var effectMetricLabel = o.effectMetric || 'Observed R²';
     var effectSizeMetricLabel = o.effectSizeMetric || "Effect Size f²";
+    var sampleSizeLabel = o.sampleSizeLabel || (variant === 'anova' ? 'Total Sample N' : 'Current N');
+    var sampleSizeTip = o.sampleSizeTip || (variant === 'anova'
+      ? 'Total sample size: all observations across all groups combined (N = n₁ + n₂ + …), not per-group n.'
+      : 'Total number of observations (rows) used in the analysis.');
     var metricsHtml = variant === 'mixed'
       ? buildMixedMetricsHtml(ids)
-      : buildDefaultMetricsHtml(ids, effectMetricLabel, effectSizeMetricLabel);
+      : buildDefaultMetricsHtml(ids, effectMetricLabel, effectSizeMetricLabel, sampleSizeLabel, sampleSizeTip);
     var metricsRowClass = variant === 'mixed' ? 'pwstd-metrics-row pwstd-metrics-row--mixed' : 'pwstd-metrics-row';
     var designChip = variant === 'mixed'
       ? '        <span class="pwstd-meta-chip"><span class="pwstd-meta-k">Design</span><span class="pwstd-meta-v" id="powDesignPattern">—</span></span>\n'
@@ -330,7 +335,7 @@
       '        <p class="pwstd-planning-summary" id="pwstd-planning-summary">Select a target power to see required sample size.</p>',
       '        <div class="pwstd-for-detectable">',
       '          <div class="pwstd-row"><span class="pwstd-label">Target power</span><input class="pwstd-select" type="number" id="' + id(ids,'detectableTarget','powDetectableTarget') + '" min="0.5" max="0.99" step="0.05" value="0.80"></div>',
-      '          <div class="pwstd-row"><span class="pwstd-label">Current N</span><span class="pwstd-value" id="pwstd-det-n">—</span></div>',
+      '          <div class="pwstd-row"><span class="pwstd-label">Current total N</span><span class="pwstd-value" id="pwstd-det-n">—</span></div>',
       '          <div class="pwstd-row"><span class="pwstd-label">Min detectable f²</span><span class="pwstd-value" id="' + id(ids,'minF','powMinDetectableF') + '">—</span></div>',
       '          <div class="pwstd-row"><span class="pwstd-label">Min detectable R²</span><span class="pwstd-value" id="' + id(ids,'minEta','powMinDetectableEta') + '">—</span></div>',
       '          <p class="pwstd-det-interpret pwstd-for-detectable" id="pwstd-det-interpret"></p>',

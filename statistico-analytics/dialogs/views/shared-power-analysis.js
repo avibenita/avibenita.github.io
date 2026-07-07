@@ -277,7 +277,7 @@
       var tp = isFinite(targetPower) ? targetPower : 0.80;
       var effectName = (ctx && ctx.effectName) || cfg.effectName || 'effect';
       if (interpretEl && ctx && isFinite(detectableEffectVal)) {
-        interpretEl.textContent = 'With N=' + ctx.n + ', the study can reliably detect (at ' + Math.round(tp * 100) + '% power) ' + effectName + ' values of at least ' + detectableEffectVal.toFixed(3) + '.';
+        interpretEl.textContent = 'With total N=' + ctx.n + ', the study can reliably detect (at ' + Math.round(tp * 100) + '% power) ' + effectName + ' values of at least ' + detectableEffectVal.toFixed(3) + '.';
       }
       if (insightEl && ctx && isFinite(detectableEffectVal)) {
         if (ctx.effect > detectableEffectVal + 0.001) {
@@ -934,17 +934,18 @@
     var cls = 'pwstd-exec--neutral';
     var text;
     var testPart = ctx.testLabel ? (' for the ' + ctx.testLabel + ' test') : '';
+    var nPart = 'total N = ' + ctx.n + ' (all ' + ctx.k + ' groups combined)';
     if (power >= 0.80) {
       cls = 'pwstd-exec--success';
-      text = 'Current sample size is adequate' + testPart + '. Achieved power is ' + pct + '% with n = ' + ctx.n
+      text = 'Current sample size is adequate' + testPart + '. Achieved power is ' + pct + '% with ' + nPart
         + ', α = ' + ctx.alpha.toFixed(3) + ', and observed ' + effectName + ' = ' + ctx.effect.toFixed(3) + '.';
     } else if (power >= 0.70) {
       cls = 'pwstd-exec--warning';
       text = 'Power is borderline (' + pct + '%)' + testPart + ' for observed ' + effectName + ' = ' + ctx.effect.toFixed(3)
-        + ' with n = ' + ctx.n + '. Consider increasing sample size.';
+        + ' with ' + nPart + '. Consider increasing sample size.';
     } else {
       var f = isFinite(ctx.cohenF) ? ctx.cohenF : Math.sqrt(ctx.f2);
-      text = 'Current sample size appears underpowered (' + pct + '%)' + testPart + ' with n = ' + ctx.n
+      text = 'Current sample size appears underpowered (' + pct + '%)' + testPart + ' with ' + nPart
         + ' (' + effectName + ' = ' + ctx.effect.toFixed(3) + ", Cohen's f = " + f.toFixed(3) + ').';
     }
     if (ctx.isNonparametric) {
@@ -960,11 +961,12 @@
     var reqN = estimateRequiredN(ctx.f2, ctx.df1, Math.max(ctx.k + 1, 8), function (n) { return n - ctx.k; }, target.power, ctx.alpha);
     if (!reqN) return 'Select a target power to see required sample size.';
     var gap = ctx.n >= reqN
-      ? 'Current N = ' + ctx.n + ' meets or exceeds this target.'
-      : 'Current N = ' + ctx.n + ' is below this target by ' + (reqN - ctx.n) + ' observations.';
+      ? 'Current total N = ' + ctx.n + ' meets or exceeds this target.'
+      : 'Current total N = ' + ctx.n + ' is below this target by ' + (reqN - ctx.n) + ' observations.';
     var effectName = ctx.isNonparametric ? 'ε²' : 'η²';
     return 'For ' + target.pct + ' power (' + (ctx.testLabel || 'omnibus test') + ', ' + effectName + ' = '
-      + ctx.effect.toFixed(3) + '), approximately ' + reqN + ' observations are required. ' + gap;
+      + ctx.effect.toFixed(3) + '), approximately ' + reqN + ' total observations (summed across all ' + ctx.k
+      + ' groups) are required. ' + gap;
   }
 
   function independentEngineNote(ctx) {
@@ -1256,6 +1258,7 @@
         effectName: 'η²',
         emptyMessage: 'Run an independent-means analysis to populate power results.',
         dfFormula: 'df1=k−1 · df2=N−k',
+        curveXAxisLabel: 'Total sample size (N)',
         labels: {
           design: 'Independent Means',
           target: 'Omnibus group test',
@@ -1399,6 +1402,6 @@
       if (global.StatisticoPowerAnalysis._activeEngine) global.StatisticoPowerAnalysis._activeEngine.calculateDetectableEffect();
     },
     _activeEngine: null,
-    VERSION: '20260706j'
+    VERSION: '20260707a'
   };
 })(window);

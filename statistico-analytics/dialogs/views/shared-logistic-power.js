@@ -9,6 +9,17 @@
   var _currentMode = "epv";
   var _busy = false;
   var _prefill = null;
+  // Per-mode interpretation + status band, so results computed for one method
+  // survive switching to another method and back.
+  var _modeSummary = {};
+
+  function setModeSummary(mode, interpText, bandMsg, bandType) {
+    _modeSummary[mode] = { interp: interpText, bandMsg: bandMsg, bandType: bandType };
+    if (mode === _currentMode) {
+      setText("logPowInterpretation", interpText);
+      setBand(bandMsg, bandType);
+    }
+  }
 
   var METHOD_INFO = {
     epv: {
@@ -293,10 +304,8 @@
         (r.min_total_n_recommended ? " (about N=" + r.min_total_n_recommended + " total)" : "") +
         ", or reduce the number of predictors.";
     }
-    setText("logPowInterpretation", r.interpretation ? (r.interpretation + " " + action) : action);
-
     var bandType = meta.type === "info" ? "info" : meta.type;
-    setBand(headline + ". " + action, bandType);
+    setModeSummary("epv", r.interpretation ? (r.interpretation + " " + action) : action, headline + ". " + action, bandType);
   }
 
   function renderSingleResults(r) {
@@ -338,8 +347,7 @@
       { label: "Exposure prevalence", value: pct(r.exposure_prevalence, 0) },
       { label: "Method", value: r.method || "Hsieh et al. (1999)" }
     ]);
-    setText("logPowInterpretation", r.interpretation || "");
-    setBand(r.interpretation || meta.headline, meta.type);
+    setModeSummary("single_predictor", r.interpretation || meta.headline, r.interpretation || meta.headline, meta.type);
   }
 
   function renderSimResults(r) {
@@ -364,8 +372,7 @@
       { label: "Assumed ORs", value: ors || "—" },
       { label: "Coefficient tested", value: "#" + (r.coefficient_index || "—") }
     ]);
-    setText("logPowInterpretation", r.interpretation || "");
-    setBand(r.interpretation || meta.headline, meta.type);
+    setModeSummary("multivariable_simulation", r.interpretation || meta.headline, r.interpretation || meta.headline, meta.type);
   }
 
   function renderResults(mode, r) {
@@ -438,12 +445,51 @@
         var local = localEpvFallback(payload);
         renderResults("epv", local);
       } else {
-        setBand("Cloud error: " + err.message + ". Check network or LOGISTIC_POWER_URL.", "error");
+        setModeSummary(_currentMode,
+          "Cloud error: " + err.message + ". Check network or LOGISTIC_POWER_URL.",
+          "Cloud error: " + err.message + ". Check network or LOGISTIC_POWER_URL.",
+          "error");
         setEngine("Cloud unavailable — power methods require the Python service.", false);
       }
     } finally {
       setBusy(false);
     }
+  }
+
+  /**
+   * Compute all three methods at once so every result panel is populated
+   * when the Power view loads — the user can browse methods without
+   * pressing Calculate for each one.
+   */
+  async function runAllMethods() {
+    if (_busy) return;
+    setBusy(true);
+    setBand("Computing all three methods via Python cloud function…", "info");
+    setEngine("Connecting to Python cloud function…", true);
+    var modes = ["epv", "single_predictor", "multivariable_simulation"];
+    await Promise.all(modes.map(async function (mode) {
+      var payload = buildPayload(mode);
+      try {
+        var results = await callCloud(payload);
+        renderResults(mode, results);
+      } catch (err) {
+        if (mode === "epv") {
+          renderResults("epv", localEpvFallback(payload));
+        } else {
+          var info = METHOD_INFO[mode] || {};
+          var verdictId = mode === "single_predictor" ? "logPowSingleVerdict" : "logPowSimVerdict";
+          renderVerdict(verdictId,
+            { type: "error", icon: "fa-circle-xmark" },
+            "Cloud unavailable",
+            (info.name || mode) + " requires the Python service: " + err.message);
+          setModeSummary(mode,
+            "Cloud error: " + err.message + ". Check network or LOGISTIC_POWER_URL, then press Calculate.",
+            "Cloud error: " + err.message,
+            "error");
+        }
+      }
+    }));
+    setBusy(false);
   }
 
   function switchMode(mode) {
@@ -458,7 +504,13 @@
     });
     updateModeExplain(mode);
     var info = METHOD_INFO[mode] || METHOD_INFO.epv;
-    setText("logPowInterpretation", "Click Calculate to get an interpretation for " + info.name + ".");
+    var cached = _modeSummary[mode];
+    if (cached) {
+      setText("logPowInterpretation", cached.interp);
+      setBand(cached.bandMsg, cached.bandType);
+    } else {
+      setText("logPowInterpretation", "Click Calculate to get an interpretation for " + info.name + ".");
+    }
   }
 
   function renderModelDetected(ctx) {
@@ -622,17 +674,21 @@
     switchMode("epv");
     renderModelDetected(prefill);
     if (prefill) applyPrefill(prefill);
+    // Populate all three methods immediately (from model inputs when
+    // available, otherwise the defaults) so results are visible on load.
+    runAllMethods();
   }
 
   global.StatisticoLogisticPower = {
     mount: mount,
     switchMode: switchMode,
     run: runAnalysis,
+    runAll: runAllMethods,
     applyPrefill: applyPrefill,
     prefillFromModel: function () {
       if (typeof global._logisticPowerPrefillFn === "function") {
         applyPrefill(global._logisticPowerPrefillFn());
-        setBand("Inputs updated from current logistic model — click Calculate to refresh results.", "info");
+        runAllMethods();
       }
     },
     setUrl: function (u) { global.LOGISTIC_POWER_URL = u; }

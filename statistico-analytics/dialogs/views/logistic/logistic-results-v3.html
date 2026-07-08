@@ -391,7 +391,9 @@
       opacity: 1;
     }
     .panel:has(.stat-info-tip--wrapped:hover),
-    .panel:has(.stat-info-tip--wrapped:focus-visible) {
+    .panel:has(.stat-info-tip--wrapped:focus-visible),
+    .details-collapse:has(.stat-info-tip--wrapped:hover),
+    .details-collapse:has(.stat-info-tip--wrapped:focus-visible) {
       overflow: visible;
       z-index: 25;
       position: relative;
@@ -493,17 +495,45 @@
 
     /* ── Executive summary + scorecard ─────────────────── */
     .exec-top-grid { align-items: stretch; }
-    .scorecard-grid { display: flex; flex-direction: column; gap: 2px; }
-    .scorecard-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 6px 2px;
-      font-size: 13px;
+    .scorecard-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+
+    /* ── Compact stat row-cards (replace table rows) ───── */
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
     }
-    .scorecard-key { color: var(--text-secondary); font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
-    .scorecard-val { font-weight: 800; color: var(--text-primary); display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .stat-card {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+      padding: 6px 9px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface-0);
+    }
+    .stat-card-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 9.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .stat-card-value {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--text-primary);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    :root[data-theme="light"] .stat-card { background: #f8fafc; }
     .insight-banner--confidence {
       border-color: rgba(234,179,8,.4);
       background: linear-gradient(135deg, rgba(234,179,8,.14), rgba(234,179,8,.04));
@@ -557,9 +587,8 @@
     .adv-metrics > summary::after { content: " ▾"; }
     .adv-metrics[open] > summary::after { content: " ▴"; }
     .adv-metrics > summary:hover { color: var(--text-secondary); }
-    .study-design { font-size: 12px; line-height: 1.7; color: var(--text-secondary); }
-    .study-design b { color: var(--text-primary); font-weight: 700; }
-
+    .adv-metrics > .stat-cards { margin-top: 6px; }
+    .stat-cards--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .sig-summary {
       padding: 8px 10px;
       border-radius: 8px;
@@ -1253,37 +1282,31 @@
                       <div class="panel">
                         <div class="panel-h">Model Performance</div>
                         <div class="panel-b">
-                          <table class="metric-table">
-                            <tbody id="modelQualityBody"></tbody>
-                          </table>
+                          <div class="stat-cards" id="modelQualityBody"></div>
                           <details class="adv-metrics">
                             <summary>Advanced classification metrics</summary>
-                            <table class="metric-table">
-                              <tbody id="modelQualityAdvancedBody"></tbody>
-                            </table>
+                            <div class="stat-cards" id="modelQualityAdvancedBody"></div>
                           </details>
                         </div>
                       </div>
                       <div class="panel">
                         <div class="panel-h">Study Design</div>
                         <div class="panel-b">
-                          <div class="study-design" id="studyDesign">Awaiting sample information...</div>
-                          <div class="sig-summary" id="sigPredictorsSummary" style="margin-top:10px;margin-bottom:0;">Awaiting predictors...</div>
+                          <div class="stat-cards" id="studyDesign">Awaiting sample information...</div>
+                          <div class="sig-summary" id="sigPredictorsSummary" style="margin-top:8px;margin-bottom:0;">Awaiting predictors...</div>
                         </div>
                       </div>
                       <div class="panel">
                         <div class="panel-h">Classification Summary</div>
                         <div class="panel-b">
-                          <table class="metric-table">
-                            <tbody id="classificationSummaryBody"></tbody>
-                          </table>
+                          <div class="stat-cards" id="classificationSummaryBody"></div>
                         </div>
                       </div>
                     </div>
                     <div class="grid two" style="margin-top:12px;">
                       <div class="panel">
                         <div class="panel-h">Outcome Distribution</div>
-                        <div class="panel-b tiny" id="eventBalance">Awaiting event prevalence...</div>
+                        <div class="panel-b"><div class="stat-cards stat-cards--three" id="eventBalance">Awaiting event prevalence...</div></div>
                       </div>
                     </div>
                   </div>
@@ -2320,6 +2343,12 @@
     function metricRow(label, value, tip) {
       return metricRowHtml(label, esc(value), tip);
     }
+    function statCardHtml(label, valueHtml, tip) {
+      return "<div class='stat-card'><span class='stat-card-label'>" + esc(label) + (tip ? infoTip(tip) : "") + "</span><span class='stat-card-value'>" + (valueHtml || "—") + "</span></div>";
+    }
+    function statCard(label, value, tip) {
+      return statCardHtml(label, esc(value), tip);
+    }
     function buildKeyDriversHtml(coef, ctx) {
       ctx = ctx || {};
       var usable = coef.map(function (c) {
@@ -2447,14 +2476,11 @@
 
       var scorecardEl = document.getElementById("modelScorecard");
       if (scorecardEl) {
-        function scoreRow(key, valHtml, tip) {
-          return "<div class='scorecard-row'><span class='scorecard-key'>" + esc(key) + (tip ? infoTip(tip) : "") + "</span><span class='scorecard-val'>" + valHtml + "</span></div>";
-        }
         scorecardEl.innerHTML =
-          scoreRow("AUC", formatAucCell(auc), "Area under the ROC curve — ability to rank events above non-events.") +
-          scoreRow("Accuracy", esc(isFinite(clsM.accuracy) ? formatPctCell(clsM.accuracy) : formatPctCell(r.accuracy)), "Share of cases classified correctly at the default cutoff.") +
-          scoreRow("Model p", esc(isFinite(p) ? p.toFixed(3) : "—"), "Omnibus likelihood-ratio test for the overall model.") +
-          scoreRow("Calibration", trafficCell(cal.level, cal.label), "How closely predicted probabilities match observed event rates (Brier score).");
+          statCardHtml("AUC", formatAucCell(auc), "Area under the ROC curve — ability to rank events above non-events.") +
+          statCard("Accuracy", isFinite(clsM.accuracy) ? formatPctCell(clsM.accuracy) : formatPctCell(r.accuracy), "Share of cases classified correctly at the default cutoff.") +
+          statCard("Model p", isFinite(p) ? p.toFixed(3) : "—", "Omnibus likelihood-ratio test for the overall model.") +
+          statCardHtml("Calibration", trafficCell(cal.level, cal.label), "How closely predicted probabilities match observed event rates (Brier score).");
       }
 
       var prec = isFinite(clsM.precision) ? clsM.precision : toUnit(r.precision || r.ppv);
@@ -2464,28 +2490,28 @@
       var qualityEl = document.getElementById("modelQualityBody");
       if (qualityEl) {
         qualityEl.innerHTML =
-          metricRowHtml("AUC", formatAucCell(auc), "Area under the ROC curve — ability to rank events above non-events.") +
-          metricRow("Accuracy", isFinite(clsM.accuracy) ? formatPctCell(clsM.accuracy) : formatPctCell(r.accuracy), "Share of cases classified correctly at the default cutoff.") +
-          metricRow("Sensitivity", isFinite(clsM.sensitivity) ? formatPctCell(clsM.sensitivity) : formatPctCell(r.sensitivity), "True positive rate — events correctly identified.") +
-          metricRow("Specificity", isFinite(clsM.specificity) ? formatPctCell(clsM.specificity) : formatPctCell(r.specificity), "True negative rate — non-events correctly identified.");
+          statCardHtml("AUC", formatAucCell(auc), "Area under the ROC curve — ability to rank events above non-events.") +
+          statCard("Accuracy", isFinite(clsM.accuracy) ? formatPctCell(clsM.accuracy) : formatPctCell(r.accuracy), "Share of cases classified correctly at the default cutoff.") +
+          statCard("Sensitivity", isFinite(clsM.sensitivity) ? formatPctCell(clsM.sensitivity) : formatPctCell(r.sensitivity), "True positive rate — events correctly identified.") +
+          statCard("Specificity", isFinite(clsM.specificity) ? formatPctCell(clsM.specificity) : formatPctCell(r.specificity), "True negative rate — non-events correctly identified.");
       }
       var qualityAdvEl = document.getElementById("modelQualityAdvancedBody");
       if (qualityAdvEl) {
         qualityAdvEl.innerHTML =
-          metricRow("Precision (PPV)", formatPctCell(prec), "Positive predictive value — share of predicted positives that are true events.") +
-          metricRow("NPV", formatPctCell(npv), "Negative predictive value — share of predicted negatives that are true non-events.") +
-          metricRow("F1-score", formatPctCell(f1), "Harmonic mean of precision and sensitivity.") +
-          metricRow("Balanced accuracy", formatPctCell(balAcc), "Average of sensitivity and specificity — useful when classes are imbalanced.");
+          statCard("Precision (PPV)", formatPctCell(prec), "Positive predictive value — share of predicted positives that are true events.") +
+          statCard("NPV", formatPctCell(npv), "Negative predictive value — share of predicted negatives that are true non-events.") +
+          statCard("F1-score", formatPctCell(f1), "Harmonic mean of precision and sensitivity.") +
+          statCard("Balanced accuracy", formatPctCell(balAcc), "Average of sensitivity and specificity — useful when classes are imbalanced.");
       }
 
       var designEl = document.getElementById("studyDesign");
       if (designEl) {
         designEl.innerHTML =
-          "<b>" + (isFinite(obsCount) ? Math.round(obsCount) : "—") + "</b> observations<br>" +
-          "<b>" + (isFinite(eventCount) ? Math.round(eventCount) : "—") + "</b> positive outcomes<br>" +
-          "<b>" + (isFinite(numPred) ? numPred : (coef.length || "—")) + "</b> predictor" + (numPred === 1 ? "" : "s") + "<br>" +
-          "<b>" + (isFinite(epvAssess.value) ? epvAssess.value.toFixed(1) : "—") + "</b> events/predictor " + formatEpvBadge(epvAssess) + "<br>" +
-          "Model p = <b>" + (isFinite(p) ? p.toFixed(3) : "—") + "</b>";
+          statCard("Observations", isFinite(obsCount) ? String(Math.round(obsCount)) : "—") +
+          statCard("Positive outcomes", isFinite(eventCount) ? String(Math.round(eventCount)) : "—") +
+          statCard("Predictors", isFinite(numPred) ? String(numPred) : String(coef.length || "—")) +
+          statCardHtml("Events/predictor", (isFinite(epvAssess.value) ? epvAssess.value.toFixed(1) : "—") + " " + formatEpvBadge(epvAssess), "Events ÷ predictors — rule-of-thumb for stable logistic estimates (aim for 10–15+).") +
+          statCard("Model p", isFinite(p) ? p.toFixed(3) : "—", "Omnibus likelihood-ratio test for the overall model.");
       }
 
       var classEl = document.getElementById("classificationSummaryBody");
@@ -2494,20 +2520,20 @@
         var actualPos = c.tp + c.fn;
         var actualNeg = c.fp + c.tn;
         classEl.innerHTML =
-          metricRow("Correct positives", actualPos > 0 ? (c.tp + " / " + actualPos) : "—", "True positives at threshold 0.50.") +
-          metricRow("Correct negatives", actualNeg > 0 ? (c.tn + " / " + actualNeg) : "—", "True negatives at threshold 0.50.") +
-          metricRow("False alarms", String(c.fp), "Negative cases incorrectly labeled positive.") +
-          metricRow("Missed positives", String(c.fn), "Positive cases incorrectly labeled negative.") +
-          metricRow("Decision threshold", cls.threshold.toFixed(2), "Probability cutoff used for these counts.");
+          statCard("Correct positives", actualPos > 0 ? (c.tp + " / " + actualPos) : "—", "True positives at threshold 0.50.") +
+          statCard("Correct negatives", actualNeg > 0 ? (c.tn + " / " + actualNeg) : "—", "True negatives at threshold 0.50.") +
+          statCard("False alarms", String(c.fp), "Negative cases incorrectly labeled positive.") +
+          statCard("Missed positives", String(c.fn), "Positive cases incorrectly labeled negative.") +
+          statCard("Decision threshold", cls.threshold.toFixed(2), "Probability cutoff used for these counts.");
       }
 
       var nonEventCount = isFinite(obsCount) && isFinite(eventCount) ? Math.max(0, obsCount - eventCount) : NaN;
       var eventEl = document.getElementById("eventBalance");
       if (eventEl) {
         eventEl.innerHTML =
-          "Events: <b>" + (isFinite(eventCount) ? eventCount : "—") + "</b> / <b>" + (isFinite(obsCount) ? obsCount : "—") + "</b><br>" +
-          "Non-events: <b>" + (isFinite(nonEventCount) ? nonEventCount : "—") + "</b><br>" +
-          "Event prevalence: <b>" + (isFinite(prevalence) ? (prevalence * 100).toFixed(1) + "%" : "—") + "</b>";
+          statCard("Events", isFinite(eventCount) && isFinite(obsCount) ? (eventCount + " / " + obsCount) : "—") +
+          statCard("Non-events", isFinite(nonEventCount) ? String(nonEventCount) : "—") +
+          statCard("Event prevalence", isFinite(prevalence) ? (prevalence * 100).toFixed(1) + "%" : "—");
       }
 
       var conf = buildConfidenceNote(obsCount, eventCount, numPred, p, epvAssess);

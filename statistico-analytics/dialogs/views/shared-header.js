@@ -735,6 +735,36 @@ const StatisticoHeader = {
         'How much power does a multivariable model have for a specific coefficient?',
         'Which planning method fits my design: EPV rule-of-thumb, single-predictor formula, or simulation?'
       ],
+      'regression-power': [
+        'What power did the fitted model have to detect its observed R²?',
+        'How many observations are needed to reach 80/90/95% power?',
+        'What is the smallest effect (f² / R²) this sample can reliably detect?',
+        'How does power change as the sample grows (power curve)?'
+      ],
+      'anova-power': [
+        'What power did the design have to detect the observed group effect?',
+        'How many participants are needed per group to reach 80/90/95% power?',
+        'What is the smallest effect (η² / Cohen\u2019s f) this design can reliably detect?',
+        'How does power change with total N (power curve)?'
+      ],
+      'dependent-power': [
+        'What power did the repeated-measures design have for the observed within-subject effect?',
+        'How many subjects are needed to reach 80/90/95% power?',
+        'What is the smallest within-subject effect this sample can reliably detect?',
+        'How does the effect size (dz / η² / rank effect) translate into planning terms?'
+      ],
+      'independent-power': [
+        'What power did the group comparison have for the observed effect?',
+        'How many participants per group are needed to reach 80/90/95% power?',
+        'What is the smallest group difference (Cohen\u2019s d / f) this sample can reliably detect?',
+        'How does power change as group sizes grow (power curve)?'
+      ],
+      'mixed-model-power': [
+        'What power did the mixed model have for the selected fixed effect?',
+        'How many subjects (not just observations) are needed for 80/90/95% power?',
+        'How do ICC and measurements per subject affect the effective sample size?',
+        'Is it more efficient to add subjects or add repeated measurements?'
+      ],
       'factor analysis': [
         'Which variables define each latent factor?',
         'Are there problematic cross-loadings?',
@@ -5801,6 +5831,9 @@ const StatisticoHeader = {
       'anova-diagnostics': 'Diagnostics',
       'anova-visuals': 'Visuals',
       'anova-report': 'Report',
+      'anova-power': 'Power & Sample Size',
+      'regression-power': 'Power & Sample Size',
+      'mixed-model-power': 'Power & Sample Size',
       'power-sbMeans': 'Means Power',
       'power-sbAnova': 'ANOVA Power',
       'power-sbCorr': 'Correlation Power',
@@ -5839,7 +5872,17 @@ const StatisticoHeader = {
       'dependent-results': 'Read the paired/repeated-measures test statistic, p-value, confidence interval, and decision against alpha.',
       'dependent-posthoc': 'Review pairwise comparisons with correction when the omnibus test is significant.',
       'dependent-effects': 'Use the effect-size panel to distinguish practical magnitude from statistical significance.',
-      'dependent-power': 'Inspect power or required sample size calculations when available.',
+      'dependent-power':
+        'Power & sample-size planning for the repeated-measures / paired design. Read the metric cards (Achieved Power at the current number of subjects, required N, observed effect size), pick a target power with the 80/90/95% chips, and follow the power curve to see how power grows with N. '
+        + 'For nonparametric routes (e.g. Friedman) the engine converts the rank effect (Kendall\u2019s W) to a planning effect f — an approximation for planning, not an exact nonparametric power. Expand Technicals for the formulas, effect-size conversions, and method notes.',
+      'independent-power':
+        'Power & sample-size planning for the between-groups comparison. Read Achieved Power at the current group sizes, the required N per group for the 80/90/95% target chips, and the smallest detectable effect (Cohen\u2019s d or f). The power curve shows how power grows as group sizes increase. Expand Technicals for formulas and assumptions.',
+      'anova-power':
+        'Power & sample-size planning for the ANOVA design. Read Achieved Power for the observed group effect (η² / Cohen\u2019s f), the total N required for the 80/90/95% target chips, and the power curve over sample size. Calculations use the noncentral F distribution. Expand Technicals for formulas and effect-size conversions.',
+      'regression-power':
+        'Power & sample-size planning for the regression model. Read Achieved Power for the observed model R² (converted to Cohen\u2019s f²), the number of observations required for the 80/90/95% target chips, and the smallest detectable R². The power curve shows power versus sample size given the number of predictors. Expand Technicals for formulas.',
+      'mixed-model-power':
+        'Power & sample-size planning for a fixed effect in the mixed model. Power is planned primarily in SUBJECTS (clustering units), not total observations: the ICC and measurements-per-subject cards show how repeated measurements are discounted into an effective sample size. Read Achieved Power for the selected fixed effect (partial η² / f²) and the subjects required for the 80/90/95% targets. Expand Technicals for the method.',
       'dependent-report': 'Use the APA report view for publication-ready wording and consistency checks.',
       'dependent-ai-interpretation': 'Get an AI-assisted interpretation of the repeated-measures analysis.',
       'logistic-model-results': 'Review effect directions, odds ratios, confidence intervals, and model significance together.',
@@ -5854,6 +5897,16 @@ const StatisticoHeader = {
         + '(3) Power for Multiple Predictors (Simulation) — Monte Carlo: simulates datasets under assumed odds ratios and predictor correlation, refits the model repeatedly, and reports the proportion of replications where the tested coefficient reaches significance. '
         + 'When launched from a fitted model, the "Model detected" card auto-fills N, events, predictors, prevalence, and odds ratio.',
       'logistic-correlations': 'Inspect quick correlation-style screening indicators before deeper model interpretation.',
+      'power-sbMeans':
+        'Standalone power calculator for a two-means comparison (t-test). Switch between Compute Power (given N) and Required N (given target power) in the sidebar, set effect size (Cohen\u2019s d), α, and tails, then read achieved power or required sample size and the power curve.',
+      'power-sbAnova':
+        'Standalone power calculator for a one-way ANOVA. Switch between Compute Power and Required N modes, set the effect size (Cohen\u2019s f or η²), number of groups, and α, then read achieved power or required total N and the power curve (noncentral F).',
+      'power-sbCorr':
+        'Standalone power calculator for a correlation test. Set the expected correlation r, α, and tails, then read achieved power at a given N or the N required for target power.',
+      'power-sbProp':
+        'Standalone power calculator for a proportions comparison. Set the two expected proportions and α, then read achieved power at given group sizes or the N required for target power.',
+      'power-sbReg':
+        'Standalone power calculator for multiple regression. Set R² (or f²), the number of predictors, and α, then read achieved power at a given N or the N required for target power.',
       'factor-suitability': 'Check KMO, Bartlett, determinant, and correlation adequacy before trusting factor extraction.',
       'factor-extraction': 'Review eigenvalues, variance explained, communalities, and extraction choice.',
       'factor-rotation': 'Inspect rotated loadings to see whether factors become interpretable and simple.',
@@ -5979,6 +6032,11 @@ const StatisticoHeader = {
     // coefficients table. Inject a per-view nudge that names the chart
     // and tells the model to describe the visual structure, not the
     // numeric estimate cards from a different view.
+    const POWER_PLANNING_GUARD =
+      'This is a power & sample-size PLANNING tool, not a results table: metric cards (Achieved Power, sample size, effect size), 80/90/95% target-power chips, a power-vs-N curve, and a collapsible Technicals panel. '
+      + 'Explain achieved power vs required N, how the target chips and the power curve are read, and what the smallest detectable effect means. '
+      + 'Do not interpret the module\u2019s test results, coefficients, or p-values here — only the power planning question.';
+
     const chartGuards = {
       'regression-viz-partial':
         'Each small chart shows how the predicted outcome changes as a single predictor changes, with the others held at their means. Describe slopes and the spread of points around them, not coefficients / SE / p-values.',
@@ -6016,7 +6074,14 @@ const StatisticoHeader = {
         'This is a planning tool with a Method dropdown (EPV Assessment, Power for One Predictor, Power for Multiple Predictors via simulation), an input panel, a results card, and an interpretation panel. '
         + 'Explain clearly what each of the three methods computes and when to prefer each. '
         + 'Explicitly explain why EPV Assessment shows NO power percentage: it is a rule-of-thumb adequacy check (events per predictor vs a 10-15 target) for coefficient stability — it involves no effect size, no alpha, and no hypothesis test, so a power term is undefined for it; formal power appears only in the other two methods. '
-        + 'Do not describe fitted-model coefficients or classification metrics — those belong to other views.'
+        + 'Do not describe fitted-model coefficients or classification metrics — those belong to other views.',
+      'regression-power': POWER_PLANNING_GUARD,
+      'anova-power': POWER_PLANNING_GUARD,
+      'dependent-power': POWER_PLANNING_GUARD
+        + ' If the analysis is nonparametric (e.g. Friedman), note that power is an approximation obtained by converting the rank effect (Kendall\u2019s W) to a parametric planning effect f.',
+      'independent-power': POWER_PLANNING_GUARD,
+      'mixed-model-power': POWER_PLANNING_GUARD
+        + ' Emphasise that mixed-model power is planned in SUBJECTS, not total observations: ICC and measurements-per-subject determine the effective sample size, so adding subjects usually helps more than adding repeats.'
     };
     const chartGuard = chartGuards[viewKey];
     const partialPlotGuard = chartGuard
@@ -6269,7 +6334,7 @@ STRENGTH: [High, Moderate, or Low - short reason based on p-values, effect size,
       results: 'primary parametric/nonparametric test result, p-value, confidence interval, and decision',
       posthoc: 'pairwise post-hoc comparisons, correction method, and which groups differ',
       effects: 'effect sizes and practical magnitude, not only statistical significance',
-      power: 'power and sample-size information if available; otherwise explain the limitation',
+      power: 'power & sample-size PLANNING: achieved power at the current group sizes, the N required for the 80/90/95% target-power chips, the smallest detectable effect (Cohen\u2019s d / f), and how the power-vs-N curve is read — do not reinterpret the test result or p-values here',
       report: 'publication-ready interpretation and consistency across reported results'
     };
 

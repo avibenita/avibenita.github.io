@@ -491,11 +491,20 @@
     }
     .traffic-row--hero .traffic-item-label { color: rgba(255,255,255,.68); }
     .traffic-row--hero .traffic-item-status { color: #fff; font-size: 13px; }
+    .traffic-item-detail {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .traffic-row--hero .traffic-item-detail { color: rgba(255,255,255,.62); }
     :root[data-theme="light"] .status-hero { background: linear-gradient(135deg, #1e3a8a, #2563eb); }
 
-    /* ── Executive summary + scorecard ─────────────────── */
-    .exec-top-grid { align-items: stretch; }
-    .scorecard-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+    /* ── Model scorecard ───────────────────────────────── */
+    .scorecard-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+    @media (max-width: 900px) {
+      .scorecard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
 
     /* ── Compact stat row-cards (replace table rows) ───── */
     .stat-cards {
@@ -1111,24 +1120,6 @@
     }
     .tab-panel[data-view="power"] #logisticPowerMount { min-height: 0; }
 
-    .exec-questions {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .exec-q-row {
-      display: grid;
-      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-      gap: 10px;
-      align-items: baseline;
-      font-size: 13px;
-      line-height: 1.45;
-    }
-    .exec-q { color: var(--text-muted); font-weight: 600; }
-    .exec-a { color: var(--text-primary); font-weight: 700; text-align: right; }
-    .exec-a--good { color: #86efac; }
-    .exec-a--moderate { color: #fde68a; }
-    .exec-a--weak { color: #fca5a5; }
     .metric-auc-band {
       display: inline-flex;
       align-items: center;
@@ -1190,8 +1181,6 @@
     .key-driver-value--muted { color: var(--text-secondary); font-weight: 600; }
     @media (max-width: 900px) {
       .key-drivers-grid { grid-template-columns: 1fr; }
-      .exec-q-row { grid-template-columns: 1fr; }
-      .exec-a { text-align: left; }
     }
       .grid.kpi{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
       .grid.kpi.perf-kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1237,16 +1226,10 @@
                 </div>
 
                 <div class="exec-section">
-                  <div class="grid two exec-top-grid">
-                    <div class="panel">
-                      <div class="panel-h">Executive Summary</div>
-                      <div class="panel-b" id="modelConclusion">Awaiting model output...</div>
-                    </div>
-                    <div class="panel">
-                      <div class="panel-h">Model Scorecard</div>
-                      <div class="panel-b">
-                        <div class="scorecard-grid" id="modelScorecard"><div class="empty">Awaiting metrics...</div></div>
-                      </div>
+                  <div class="panel">
+                    <div class="panel-h">Model Scorecard</div>
+                    <div class="panel-b">
+                      <div class="scorecard-grid" id="modelScorecard"><div class="empty">Awaiting metrics...</div></div>
                     </div>
                   </div>
                 </div>
@@ -2231,6 +2214,7 @@
     var TRAFFIC_TIPS = {
       discrimination: "How well the model separates events from non-events, based on AUC.",
       significance: "Whether the omnibus likelihood-ratio test supports a real association (overall p-value).",
+      usefulness: "Practical usefulness for prediction, combining AUC with sensitivity and specificity at the current threshold.",
       statistical: "Whether the omnibus likelihood-ratio test supports a real association (overall p-value).",
       sample: "Whether sample size and events-per-predictor (EPV) support stable coefficient estimates.",
       balance: "How evenly events and non-events are represented in the data.",
@@ -2245,11 +2229,12 @@
       var cls = level === "good" ? "good" : (level === "moderate" ? "moderate" : "weak");
       return "<span class='traffic-item-status'><span class='traffic-dot traffic-dot--" + cls + "' aria-hidden='true'></span>" + esc(label) + "</span>";
     }
-    function trafficItem(area, tipKey, level, label) {
+    function trafficItem(area, tipKey, level, label, detail) {
       var tip = TRAFFIC_TIPS[tipKey] || "";
       return "<div class='traffic-item'>" +
         "<span class='traffic-item-label'>" + esc(area) + infoTip(tip) + "</span>" +
         trafficCell(level, label) +
+        (detail ? "<span class='traffic-item-detail'>" + esc(detail) + "</span>" : "") +
         "</div>";
     }
     function assessDiscrimination(auc) {
@@ -2393,9 +2378,6 @@
         "</div>"
       ].join("");
     }
-    function execAnswerClass(level) {
-      return level === "good" ? "exec-a--good" : (level === "moderate" ? "exec-a--moderate" : "exec-a--weak");
-    }
     function renderModelOverview() {
       var r = state.results || {};
       var coef = (state.coefficients || []).filter(function (c) {
@@ -2425,20 +2407,6 @@
       if (!isFinite(brier)) brier = n(firstDefined(r, ["brier", "brierScore"], NaN));
       var cal = assessCalibration(brier);
       var usefulness = assessPredictionUsefulness(auc, clsM.sensitivity, clsM.specificity);
-      var conclusionEl = document.getElementById("modelConclusion");
-      if (conclusionEl) {
-        conclusionEl.innerHTML = [
-          "<div class='exec-questions'>",
-          "  <div class='exec-q-row'><span class='exec-q'>Model discrimination</span><span class='exec-a " + execAnswerClass(disc.level) + "'>" +
-            esc(disc.label) + " (AUC = " + toFixedOrDash(auc, 2) + ")</span></div>",
-          "  <div class='exec-q-row'><span class='exec-q'>Model significance</span><span class='exec-a " + execAnswerClass(stat.level) + "'>" +
-            (isStatSig(p) ? "Statistically significant" : "Not statistically significant") + " (p = " + (isFinite(p) ? p.toFixed(3) : "—") + ")</span></div>",
-          "  <div class='exec-q-row'><span class='exec-q'>Prediction usefulness</span><span class='exec-a " + execAnswerClass(usefulness.level) + "'>" +
-            esc(usefulness.label) + "</span></div>",
-          "</div>"
-        ].join("");
-      }
-
       var practicalEl = document.getElementById("practicalInterpretation");
       if (practicalEl) {
         var discPhrase = disc.level === "good" ? "good" : (disc.level === "moderate" ? "fair" : "limited");
@@ -2467,11 +2435,19 @@
       var trafficEl = document.getElementById("trafficRow");
       if (trafficEl) {
         trafficEl.innerHTML =
-          trafficItem("Discrimination", "discrimination", disc.level, disc.label) +
-          trafficItem("Model Significance", "significance", stat.level, stat.label) +
-          trafficItem("Calibration", "calibration", cal.level, cal.label) +
-          trafficItem("Sample Size", "sample", sample.level, sample.label) +
-          trafficItem("Class Balance", "balance", balance.level, balance.label);
+          trafficItem("Discrimination", "discrimination", disc.level, disc.label,
+            isFinite(auc) ? "AUC = " + toFixedOrDash(auc, 2) : "") +
+          trafficItem("Model Significance", "significance", stat.level,
+            isStatSig(p) ? "Significant" : "Not significant",
+            isFinite(p) ? "p = " + p.toFixed(3) : "") +
+          trafficItem("Calibration", "calibration", cal.level, cal.label,
+            isFinite(brier) ? "Brier = " + brier.toFixed(3) : "") +
+          trafficItem("Sample Size", "sample", sample.level, sample.label,
+            (isFinite(obsCount) ? "N = " + Math.round(obsCount) : "") +
+            (isFinite(epvAssess.value) ? " · EPV " + epvAssess.value.toFixed(1) : "")) +
+          trafficItem("Class Balance", "balance", balance.level, balance.label,
+            isFinite(prevalence) ? (prevalence * 100).toFixed(1) + "% events" : "") +
+          trafficItem("Prediction Usefulness", "usefulness", usefulness.level, usefulness.label);
       }
 
       var scorecardEl = document.getElementById("modelScorecard");

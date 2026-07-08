@@ -598,6 +598,61 @@
     .findings-empty { color: var(--text-muted); font-style: italic; }
     .findings-empty::before { content: "" !important; }
 
+    /* ── Model equation + compact coefficients ─────────── */
+    .equation-box {
+      font-family: "Cambria Math", "STIX Two Math", Georgia, serif;
+      font-size: 13.5px;
+      line-height: 1.7;
+      color: var(--text-primary);
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: var(--surface-0);
+      border: 1px solid var(--border);
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .equation-box .eq-lhs { font-weight: 700; color: var(--accent-2); }
+    .equation-box .eq-term { display: inline-block; }
+    .equation-box .eq-op { color: var(--text-muted); padding: 0 3px; }
+    .equation-box .eq-var { font-style: italic; }
+    .equation-meta {
+      margin-top: 7px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .equation-meta b { color: var(--text-primary); }
+    .coef-mini-table { width: 100%; border-collapse: collapse; }
+    .coef-mini-table th {
+      background: transparent;
+      border-bottom: 1px solid var(--border);
+      padding: 3px 6px;
+      font-size: 10px;
+    }
+    .coef-mini-table td { border-bottom: none; padding: 4px 6px; font-size: 12px; }
+    .coef-mini-table td:first-child { color: var(--text-secondary); font-weight: 600; }
+    .coef-mini-table td:nth-child(2), .coef-mini-table td:nth-child(3),
+    .coef-mini-table th:nth-child(2), .coef-mini-table th:nth-child(3) { text-align: right; white-space: nowrap; }
+    .coef-mini-sig td { color: var(--text-primary); }
+    .coef-mini-sig td:nth-child(3) { color: #86efac; font-weight: 800; }
+    .coef-mini-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 6px;
+      padding: 0;
+      border: none;
+      background: none;
+      color: var(--accent-2);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .coef-mini-link:hover { text-decoration: underline; }
+
     /* ── Performance summary: mini ROC + bars ──────────── */
     .perf-summary-grid { align-items: stretch; }
     .perf-summary-body { display: flex; gap: 14px; align-items: center; }
@@ -1350,6 +1405,28 @@
                 <div class="insight-banner insight-banner--practical ai-interpretation">
                   <div class="insight-title"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> AI Interpretation</div>
                   <div class="insight-body" id="practicalInterpretation">Awaiting interpretation...</div>
+                </div>
+
+                <div class="exec-section">
+                  <div class="grid two">
+                    <div class="panel">
+                      <div class="panel-h">Model Equation</div>
+                      <div class="panel-b">
+                        <div class="equation-box" id="modelEquation"><span class="findings-empty">Awaiting coefficients...</span></div>
+                        <div class="equation-meta" id="equationMeta"></div>
+                      </div>
+                    </div>
+                    <div class="panel">
+                      <div class="panel-h">Top Coefficients</div>
+                      <div class="panel-b">
+                        <table class="coef-mini-table">
+                          <thead><tr><th>Predictor</th><th>OR</th><th>p</th></tr></thead>
+                          <tbody id="coefMiniBody"><tr><td colspan="3" class="findings-empty">Awaiting coefficients...</td></tr></tbody>
+                        </table>
+                        <button type="button" class="coef-mini-link" onclick="switchSub('model-results','technical')">View complete coefficient table <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div class="exec-section">
@@ -2834,6 +2911,76 @@
       renderPerfBars(clsM, cls, r);
       renderRocMini(pairs, auc);
       renderModelFitStats(r, p);
+      renderModelEquation(r, coef);
+      renderCoefMini(coef);
+    }
+
+    function renderModelEquation(r, coef) {
+      var eqEl = document.getElementById("modelEquation");
+      var metaEl = document.getElementById("equationMeta");
+      if (!eqEl) return;
+      var interceptRow = (state.coefficients || []).find(function (c) {
+        return String(c.Variable || "").toLowerCase() === "intercept";
+      });
+      var intercept = n(firstDefined(r, ["intercept"], interceptRow ? firstDefined(interceptRow, ["Beta", "beta"], NaN) : NaN));
+      var terms = coef.map(function (c) {
+        return { name: friendlyVarName(c.Variable), beta: n(firstDefined(c, ["Beta", "beta"], NaN)) };
+      }).filter(function (t) { return isFinite(t.beta); });
+
+      if (!isFinite(intercept) && !terms.length) {
+        eqEl.innerHTML = "<span class='findings-empty'>Awaiting coefficients...</span>";
+        if (metaEl) metaEl.innerHTML = "";
+        return;
+      }
+
+      var MAX_TERMS = 5;
+      var parts = ["<span class='eq-lhs'>logit(P)</span><span class='eq-op'>=</span>"];
+      if (isFinite(intercept)) {
+        parts.push("<span class='eq-term'>" + intercept.toFixed(2) + "</span>");
+      }
+      terms.slice(0, MAX_TERMS).forEach(function (t, i) {
+        var first = !isFinite(intercept) && i === 0;
+        var sign = t.beta >= 0 ? (first ? "" : "+") : "−";
+        parts.push("<span class='eq-op'>" + sign + "</span><span class='eq-term'>" +
+          Math.abs(t.beta).toFixed(2) + " × <span class='eq-var'>" + esc(t.name) + "</span></span>");
+      });
+      if (terms.length > MAX_TERMS) {
+        parts.push("<span class='eq-op'>+</span><span class='eq-term'>… (" + (terms.length - MAX_TERMS) + " more)</span>");
+      }
+      eqEl.innerHTML = parts.join("");
+
+      if (metaEl) {
+        var mcfadden = n(firstDefined(r, ["mcfaddenR2", "mcfadden", "mcfaddenPseudoR2"], NaN));
+        var nagelkerke = n(firstDefined(r, ["nagelkerkeR2", "nagelkerke"], NaN));
+        var bits = ["P(Y=1) = 1 / (1 + e<sup>−logit(P)</sup>)"];
+        if (isFinite(mcfadden)) bits.push("Pseudo R² (McFadden) = <b>" + mcfadden.toFixed(3) + "</b>");
+        else if (isFinite(nagelkerke)) bits.push("Pseudo R² (Nagelkerke) = <b>" + nagelkerke.toFixed(3) + "</b>");
+        metaEl.innerHTML = bits.map(function (t) { return "<span>" + t + "</span>"; }).join("");
+      }
+    }
+
+    function renderCoefMini(coef) {
+      var body = document.getElementById("coefMiniBody");
+      if (!body) return;
+      var rows = coef.map(function (c) {
+        return { name: friendlyVarName(c.Variable), or: n(c.OR), p: n(c.PValue) };
+      }).filter(function (c) { return isFinite(c.or) || isFinite(c.p); });
+      if (!rows.length) {
+        body.innerHTML = "<tr><td colspan='3' class='findings-empty'>Awaiting coefficients...</td></tr>";
+        return;
+      }
+      rows.sort(function (a, b) {
+        var pa = isFinite(a.p) ? a.p : 2, pb = isFinite(b.p) ? b.p : 2;
+        return pa - pb;
+      });
+      function fmtP(p) {
+        if (!isFinite(p)) return "—";
+        return p < 0.001 ? "&lt;0.001" : p.toFixed(3);
+      }
+      body.innerHTML = rows.slice(0, 5).map(function (c) {
+        return "<tr" + (isStatSig(c.p) ? " class='coef-mini-sig'" : "") + "><td>" + esc(c.name) + "</td><td>" +
+          (isFinite(c.or) ? c.or.toFixed(2) : "—") + "</td><td>" + fmtP(c.p) + "</td></tr>";
+      }).join("") + (rows.length > 5 ? "<tr><td colspan='3' class='findings-empty'>… " + (rows.length - 5) + " more predictors</td></tr>" : "");
     }
 
     function switchSub(parent, sub) {

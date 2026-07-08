@@ -729,6 +729,12 @@ const StatisticoHeader = {
         'Which threshold balances sensitivity and specificity?',
         'Which predictors most affect event odds?'
       ],
+      'logistic-power': [
+        'Does my study have enough outcome events per predictor (EPV)?',
+        'What sample size is needed to detect a given odds ratio with 80% power?',
+        'How much power does a multivariable model have for a specific coefficient?',
+        'Which planning method fits my design: EPV rule-of-thumb, single-predictor formula, or simulation?'
+      ],
       'factor analysis': [
         'Which variables define each latent factor?',
         'Are there problematic cross-loadings?',
@@ -5841,7 +5847,12 @@ const StatisticoHeader = {
       'logistic-probabilities': 'Inspect predicted probabilities and risk patterns across observations and scenarios.',
       'logistic-interactions': 'Examine interaction effects on event probability for combined predictor conditions.',
       'logistic-diagnostics': 'Use residual and influence diagnostics to check separation, leverage, and model stability.',
-      'logistic-power': 'Plan sample size with EPV rules, single-predictor Hsieh power (Python/scipy), or multivariable Monte Carlo simulation.',
+      'logistic-power':
+        'Plan sample size for logistic regression with one of three methods, chosen from the Method dropdown. '
+        + '(1) EPV Assessment — a rule-of-thumb adequacy check: EPV = outcome events / predictors, targeting roughly 10-15 events per predictor. It reports adequacy (adequate / borderline / insufficient), NOT a power percentage, because it is a coefficient-stability heuristic (Peduzzi et al. 1996), not a hypothesis test — there is no effect size or alpha, so no power term exists. '
+        + '(2) Power for One Predictor — the Hsieh et al. (1998) formula: given outcome prevalence, exposure prevalence, odds ratio, and alpha, it returns explicit statistical power at your N (or the N needed for target power). '
+        + '(3) Power for Multiple Predictors (Simulation) — Monte Carlo: simulates datasets under assumed odds ratios and predictor correlation, refits the model repeatedly, and reports the proportion of replications where the tested coefficient reaches significance. '
+        + 'When launched from a fitted model, the "Model detected" card auto-fills N, events, predictors, prevalence, and odds ratio.',
       'logistic-correlations': 'Inspect quick correlation-style screening indicators before deeper model interpretation.',
       'factor-suitability': 'Check KMO, Bartlett, determinant, and correlation adequacy before trusting factor extraction.',
       'factor-extraction': 'Review eigenvalues, variance explained, communalities, and extraction choice.',
@@ -6000,7 +6011,12 @@ const StatisticoHeader = {
       'logistic-diagnostics-residuals':
         'These are deviance/Pearson residual plots, often by probability bin. Describe pattern, large residuals, and curvature — not coefficient values.',
       'logistic-diagnostics-influence':
-        'This is per-observation Cook\'s distance + leverage + DFBETAS with thresholds. Describe flagged points and the influence pattern, not coefficient inference.'
+        'This is per-observation Cook\'s distance + leverage + DFBETAS with thresholds. Describe flagged points and the influence pattern, not coefficient inference.',
+      'logistic-power':
+        'This is a planning tool with a Method dropdown (EPV Assessment, Power for One Predictor, Power for Multiple Predictors via simulation), an input panel, a results card, and an interpretation panel. '
+        + 'Explain clearly what each of the three methods computes and when to prefer each. '
+        + 'Explicitly explain why EPV Assessment shows NO power percentage: it is a rule-of-thumb adequacy check (events per predictor vs a 10-15 target) for coefficient stability — it involves no effect size, no alpha, and no hypothesis test, so a power term is undefined for it; formal power appears only in the other two methods. '
+        + 'Do not describe fitted-model coefficients or classification metrics — those belong to other views.'
     };
     const chartGuard = chartGuards[viewKey];
     const partialPlotGuard = chartGuard

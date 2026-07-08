@@ -13,16 +13,19 @@
   var METHOD_INFO = {
     epv: {
       name: "EPV Assessment",
+      short: "Adequacy check: events per predictor vs a 10\u201315 target. No power term \u2014 it tests no effect.",
       computes: "Whether your study has enough outcome events relative to model complexity.",
-      body: "EPV (Events Per Variable) = outcome events ÷ number of predictors. It is a sample-size rule-of-thumb for logistic regression: aim for about 10–15 events per predictor (some use 20 for conservative planning). This method checks event adequacy — it does not compute formal statistical power.",
+      body: "EPV (Events Per Variable) = outcome events ÷ number of predictors. It is a sample-size rule-of-thumb for logistic regression: aim for about 10–15 events per predictor (some use 20 for conservative planning). Note there is no power term here: power requires an effect size, α, and a hypothesis test, none of which enter the EPV rule. EPV only asks whether the data can support the model's complexity — whether coefficients will be stable and unbiased. Use the other two methods when you need formal power for a specific effect.",
       tech: [
         { label: "Formula", value: "EPV = events ÷ predictors; required events = target EPV × predictors; required N = required events ÷ event rate" },
         { label: "Assumptions", value: "Rule-of-thumb heuristic for coefficient stability, not a formal power calculation" },
+        { label: "Why no power term", value: "Power is P(detect a given effect at \u03B1). EPV specifies no effect size and no test — it screens model complexity against event count, so a power percentage is undefined for this method" },
         { label: "References", value: "Peduzzi et al. (1996); Vittinghoff & McCulloch (2007)" }
       ]
     },
     single_predictor: {
       name: "Power for One Predictor",
+      short: "Formal power (Hsieh formula): probability of detecting a given odds ratio at \u03B1, or the N required.",
       computes: "Statistical power (or required N) for detecting one binary predictor's odds ratio.",
       body: "Uses the Hsieh et al. normal approximation for one binary exposure. Enter outcome prevalence, exposure prevalence, odds ratio, and α to get observed power at your N, or the N needed for a target power (e.g. 80%). Best when one predictor is the primary hypothesis.",
       tech: [
@@ -33,6 +36,7 @@
     },
     multivariable_simulation: {
       name: "Power for Multiple Predictors (Simulation)",
+      short: "Formal power by Monte Carlo: share of simulated datasets where the tested coefficient reaches p < \u03B1.",
       computes: "Monte Carlo power for a chosen coefficient in a multivariable logistic model.",
       body: "The engine simulates datasets with your assumed odds ratios and predictor correlation, fits logistic models repeatedly, and estimates the chance of detecting a chosen coefficient at α. Use this when the model has multiple covariates or correlated predictors.",
       tech: [
@@ -48,10 +52,19 @@
     var info = METHOD_INFO[mode] || METHOD_INFO.epv;
     var box = document.getElementById("logPowModeExplain");
     if (box) {
+      var methodList = Object.keys(METHOD_INFO).map(function (key) {
+        var m = METHOD_INFO[key];
+        var isActive = key === mode;
+        return '<li class="logpow-method-item' + (isActive ? ' logpow-method-item--active' : '') + '">' +
+          '<i class="fa-solid ' + (isActive ? 'fa-circle-dot' : 'fa-circle') + '" aria-hidden="true"></i>' +
+          '<span><b>' + esc(m.name) + '</b> \u2014 ' + esc(m.short) + '</span></li>';
+      }).join("");
       box.innerHTML = [
         '<div class="logpow-mode-explain__title"><i class="fa-solid fa-circle-info"></i> ' + esc(info.name) + '</div>',
         '<p class="logpow-mode-explain__computes">Computes: ' + esc(info.computes) + '</p>',
-        '<p class="logpow-mode-explain__body">' + esc(info.body) + '</p>'
+        '<p class="logpow-mode-explain__body">' + esc(info.body) + '</p>',
+        '<div class="logpow-method-list-title">The three methods at a glance</div>',
+        '<ul class="logpow-method-list">' + methodList + '</ul>'
       ].join("");
     }
     var tech = document.getElementById("logPowTechBody");

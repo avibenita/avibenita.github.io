@@ -10,29 +10,56 @@
   var _busy = false;
   var _prefill = null;
 
-  var MODE_EXPLAIN = {
+  var METHOD_INFO = {
     epv: {
-      title: "Mode 1 · EPV planner",
-      body: "EPV (Events Per Variable) = outcome events ÷ number of predictors. It is a sample-size rule-of-thumb for logistic regression: aim for about 10–15 events per predictor (some use 20 for conservative planning). This mode checks whether your study has enough events relative to model complexity — it does not compute formal statistical power."
+      name: "EPV Assessment",
+      computes: "Whether your study has enough outcome events relative to model complexity.",
+      body: "EPV (Events Per Variable) = outcome events ÷ number of predictors. It is a sample-size rule-of-thumb for logistic regression: aim for about 10–15 events per predictor (some use 20 for conservative planning). This method checks event adequacy — it does not compute formal statistical power.",
+      tech: [
+        { label: "Formula", value: "EPV = events ÷ predictors; required events = target EPV × predictors; required N = required events ÷ event rate" },
+        { label: "Assumptions", value: "Rule-of-thumb heuristic for coefficient stability, not a formal power calculation" },
+        { label: "References", value: "Peduzzi et al. (1996); Vittinghoff & McCulloch (2007)" }
+      ]
     },
     single_predictor: {
-      title: "Mode 2 · Single predictor",
-      body: "Uses the Hsieh et al. (1999) normal approximation for one binary exposure. Enter prevalence, odds ratio, and α to get observed power at your N, or the N needed for a target power (e.g. 80%). Best when one predictor is the primary hypothesis."
+      name: "Power for One Predictor",
+      computes: "Statistical power (or required N) for detecting one binary predictor's odds ratio.",
+      body: "Uses the Hsieh et al. normal approximation for one binary exposure. Enter outcome prevalence, exposure prevalence, odds ratio, and α to get observed power at your N, or the N needed for a target power (e.g. 80%). Best when one predictor is the primary hypothesis.",
+      tech: [
+        { label: "Formula", value: "Hsieh normal approximation: n = (z\u2081\u208B\u03B1/\u2082 + z\u2081\u208B\u03B2)\u00B2 / [p(1\u2212p)\u00B7\u03B2*\u00B2\u00B7B(1\u2212B)] with B = exposure prevalence" },
+        { label: "Assumptions", value: "Single binary predictor, two-sided Wald test, no covariate adjustment" },
+        { label: "References", value: "Hsieh, Bloch & Larsen (1998), Statistics in Medicine" }
+      ]
     },
     multivariable_simulation: {
-      title: "Mode 3 · Multivariable simulation",
-      body: "Monte Carlo power for several predictors. The engine simulates datasets with your assumed odds ratios and predictor correlation, fits logistic models repeatedly, and estimates the chance of detecting a chosen coefficient at α. Use this when the model has multiple covariates or correlated predictors."
+      name: "Power for Multiple Predictors (Simulation)",
+      computes: "Monte Carlo power for a chosen coefficient in a multivariable logistic model.",
+      body: "The engine simulates datasets with your assumed odds ratios and predictor correlation, fits logistic models repeatedly, and estimates the chance of detecting a chosen coefficient at α. Use this when the model has multiple covariates or correlated predictors.",
+      tech: [
+        { label: "Method", value: "Simulate correlated predictors, generate outcomes from the assumed logistic model, fit by IRLS, count replications with p < \u03B1 for the tested coefficient" },
+        { label: "Assumptions", value: "Correctly specified logistic model; predictor correlation \u03C1 applies to all pairs; large enough simulation count for a stable estimate" },
+        { label: "Simulation settings", value: "Shown in Inputs: replications, \u03B1, \u03C1, assumed ORs, tested coefficient" },
+        { label: "References", value: "Simulation-based power analysis (e.g. Arnold et al. 2011, BMC Med Res Methodol)" }
+      ]
     }
   };
 
   function updateModeExplain(mode) {
+    var info = METHOD_INFO[mode] || METHOD_INFO.epv;
     var box = document.getElementById("logPowModeExplain");
-    var info = MODE_EXPLAIN[mode] || MODE_EXPLAIN.epv;
-    if (!box) return;
-    box.innerHTML = [
-      '<div class="logpow-mode-explain__title"><i class="fa-solid fa-circle-info"></i> ' + esc(info.title) + '</div>',
-      '<p class="logpow-mode-explain__body">' + esc(info.body) + '</p>'
-    ].join("");
+    if (box) {
+      box.innerHTML = [
+        '<div class="logpow-mode-explain__title"><i class="fa-solid fa-circle-info"></i> ' + esc(info.name) + '</div>',
+        '<p class="logpow-mode-explain__computes">Computes: ' + esc(info.computes) + '</p>',
+        '<p class="logpow-mode-explain__body">' + esc(info.body) + '</p>'
+      ].join("");
+    }
+    var tech = document.getElementById("logPowTechBody");
+    if (tech) {
+      tech.innerHTML = '<ul class="logpow-detail-list">' + info.tech.map(function (t) {
+        return '<li><span class="logpow-label">' + esc(t.label) + '</span><span class="logpow-value logpow-value--wrap">' + esc(t.value) + '</span></li>';
+      }).join("") + '</ul>';
+    }
   }
 
   function url() {
@@ -245,7 +272,7 @@
 
     var action = "";
     if (r.adequacy === "adequate") {
-      action = "Your sample has enough events relative to the number of predictors. EPV is a rule-of-thumb — also check Mode 2 or 3 for formal power.";
+      action = "Your sample has enough events relative to the number of predictors. EPV is a rule-of-thumb — for formal power, also run \u201CPower for One Predictor\u201D or the multivariable simulation.";
     } else if (r.adequacy === "borderline") {
       action = "Consider collecting a few more events or reducing predictors before trusting coefficient estimates.";
     } else {
@@ -253,7 +280,7 @@
         (r.min_total_n_recommended ? " (about N=" + r.min_total_n_recommended + " total)" : "") +
         ", or reduce the number of predictors.";
     }
-    setText("logPowEpvPlain", r.interpretation ? (r.interpretation + " " + action) : action);
+    setText("logPowInterpretation", r.interpretation ? (r.interpretation + " " + action) : action);
 
     var bandType = meta.type === "info" ? "info" : meta.type;
     setBand(headline + ". " + action, bandType);
@@ -298,7 +325,7 @@
       { label: "Exposure prevalence", value: pct(r.exposure_prevalence, 0) },
       { label: "Method", value: r.method || "Hsieh et al. (1999)" }
     ]);
-    setText("logPowSinglePlain", r.interpretation || "");
+    setText("logPowInterpretation", r.interpretation || "");
     setBand(r.interpretation || meta.headline, meta.type);
   }
 
@@ -324,7 +351,7 @@
       { label: "Assumed ORs", value: ors || "—" },
       { label: "Coefficient tested", value: "#" + (r.coefficient_index || "—") }
     ]);
-    setText("logPowSimPlain", r.interpretation || "");
+    setText("logPowInterpretation", r.interpretation || "");
     setBand(r.interpretation || meta.headline, meta.type);
   }
 
@@ -399,7 +426,7 @@
         renderResults("epv", local);
       } else {
         setBand("Cloud error: " + err.message + ". Check network or LOGISTIC_POWER_URL.", "error");
-        setEngine("Cloud unavailable — Modes 2 & 3 require the Python service.", false);
+        setEngine("Cloud unavailable — power methods require the Python service.", false);
       }
     } finally {
       setBusy(false);
@@ -408,9 +435,8 @@
 
   function switchMode(mode) {
     _currentMode = mode;
-    document.querySelectorAll(".logpow-mode-btn").forEach(function (b) {
-      b.classList.toggle("active", b.dataset.mode === mode);
-    });
+    var sel = document.getElementById("logPowMethod");
+    if (sel && sel.value !== mode) sel.value = mode;
     document.querySelectorAll(".logpow-panel").forEach(function (p) {
       p.classList.toggle("active", p.dataset.mode === mode);
     });
@@ -418,11 +444,52 @@
       p.classList.toggle("active", p.dataset.mode === mode);
     });
     updateModeExplain(mode);
+    var info = METHOD_INFO[mode] || METHOD_INFO.epv;
+    setText("logPowInterpretation", "Click Calculate to get an interpretation for " + info.name + ".");
+  }
+
+  function renderModelDetected(ctx) {
+    var host = document.getElementById("logPowModelDetected");
+    if (!host) return;
+    var hasModel = ctx && isFinite(ctx.n_total) && ctx.n_total > 0;
+    if (!hasModel) {
+      host.innerHTML = [
+        '<div class="logpow-model-card logpow-model-card--empty">',
+        '  <i class="fa-solid fa-circle-info"></i>',
+        '  <span>No fitted model detected — enter planning inputs manually, or run a logistic model first.</span>',
+        '</div>'
+      ].join("");
+      return;
+    }
+    function item(label, value) {
+      if (value == null || value === "" || value === "—") return "";
+      return '<span class="logpow-model-item"><i class="fa-solid fa-check" aria-hidden="true"></i> ' +
+        esc(label) + ' = <b>' + esc(String(value)) + '</b></span>';
+    }
+    var prevTxt = isFinite(ctx.prevalence) ? (Math.round(ctx.prevalence * 1000) / 1000) : null;
+    var orTxt = isFinite(ctx.top_odds_ratio) ? (Math.round(ctx.top_odds_ratio * 1000) / 1000) : null;
+    host.innerHTML = [
+      '<div class="logpow-model-card">',
+      '  <div class="logpow-model-head">',
+      '    <span class="logpow-model-title"><i class="fa-solid fa-plug-circle-check" aria-hidden="true"></i> Model detected</span>',
+      '    <span class="logpow-model-badge">Imported automatically</span>',
+      '    <button type="button" class="logpow-model-refresh" onclick="StatisticoLogisticPower.prefillFromModel()"><i class="fa-solid fa-rotate"></i> Re-import</button>',
+      '  </div>',
+      '  <div class="logpow-model-items">',
+      item("N", ctx.n_total),
+      item("Events", ctx.n_events),
+      item("Predictors", ctx.n_predictors),
+      item("Outcome prevalence", prevTxt),
+      item("Odds ratio", orTxt),
+      '  </div>',
+      '</div>'
+    ].join("");
   }
 
   function applyPrefill(ctx) {
     if (!ctx) return;
     _prefill = ctx;
+    renderModelDetected(ctx);
     var setVal = function (id, v) {
       var el = document.getElementById(id);
       if (el && v != null && isFinite(v)) el.value = String(v);
@@ -452,14 +519,22 @@
     if (!host) return;
     host.innerHTML = [
       '<div class="logpow-shell" id="logPowShell">',
-      '  <h2 class="logpow-title"><i class="fa-solid fa-bolt"></i> Logistic Power &amp; Sample Size</h2>',
-      '  <p class="logpow-hint">Choose a mode, adjust inputs, then Calculate. Results use plain-language verdicts plus key numbers.</p>',
-      '  <div class="logpow-modes">',
-      '    <button type="button" class="logpow-mode-btn active" data-mode="epv" onclick="StatisticoLogisticPower.switchMode(\'epv\')">Mode 1 · EPV planner</button>',
-      '    <button type="button" class="logpow-mode-btn" data-mode="single_predictor" onclick="StatisticoLogisticPower.switchMode(\'single_predictor\')">Mode 2 · Single predictor</button>',
-      '    <button type="button" class="logpow-mode-btn" data-mode="multivariable_simulation" onclick="StatisticoLogisticPower.switchMode(\'multivariable_simulation\')">Mode 3 · Multivariable sim</button>',
+      '  <div class="logpow-header">',
+      '    <h2 class="logpow-title"><i class="fa-solid fa-bolt"></i> Power &amp; Sample Size — Logistic Regression</h2>',
+      '    <div class="logpow-method-row">',
+      '      <label class="logpow-method-label" for="logPowMethod">Method</label>',
+      '      <select class="logpow-select logpow-method-select" id="logPowMethod" onchange="StatisticoLogisticPower.switchMode(this.value)">',
+      '        <option value="epv">EPV Assessment</option>',
+      '        <option value="single_predictor">Power for One Predictor</option>',
+      '        <option value="multivariable_simulation">Power for Multiple Predictors (Simulation)</option>',
+      '      </select>',
+      '    </div>',
       '  </div>',
-      '  <div class="logpow-mode-explain" id="logPowModeExplain"></div>',
+      '  <div id="logPowModelDetected"></div>',
+      '  <div class="logpow-card">',
+      '    <div class="logpow-card-h">Overview</div>',
+      '    <div class="logpow-card-b"><div class="logpow-mode-explain" id="logPowModeExplain"></div></div>',
+      '  </div>',
       '  <div class="logpow-grid">',
       '    <div class="logpow-card">',
       '      <div class="logpow-card-h">Inputs</div>',
@@ -491,7 +566,6 @@
       '        <div class="logpow-row"><span class="logpow-label">α (significance)</span><input class="logpow-input" id="logPowAlpha" type="number" min="0.001" max="0.25" step="0.005" value="0.05"></div>',
       '        <div class="logpow-actions">',
       '          <button type="button" class="logpow-btn logpow-btn--primary logpow-btn--run" onclick="StatisticoLogisticPower.run()"><i class="fa-solid fa-calculator"></i> Calculate</button>',
-      '          <button type="button" class="logpow-btn logpow-btn--run" onclick="StatisticoLogisticPower.prefillFromModel()"><i class="fa-solid fa-rotate"></i> From model</button>',
       '        </div>',
       '      </div>',
       '    </div>',
@@ -501,29 +575,39 @@
       resultPanel("epv", [
         '        <div id="logPowEpvVerdict"></div>',
         '        <div id="logPowEpvStats"></div>',
-        '        <div id="logPowEpvBar"></div>',
-        '        <div class="logpow-plain" id="logPowEpvPlain">Click Calculate to see whether your events-per-predictor ratio is adequate.</div>'
+        '        <div id="logPowEpvBar"></div>'
       ].join("\n")),
       resultPanel("single_predictor", [
         '        <div id="logPowSingleVerdict"></div>',
         '        <div id="logPowSingleStats"></div>',
-        '        <div id="logPowSingleDetails"></div>',
-        '        <div class="logpow-plain" id="logPowSinglePlain">Mode 2 uses the Hsieh single-predictor formula (normal approximation).</div>'
+        '        <div id="logPowSingleDetails"></div>'
       ].join("\n")),
       resultPanel("multivariable_simulation", [
         '        <div id="logPowSimVerdict"></div>',
         '        <div id="logPowSimStats"></div>',
-        '        <div id="logPowSimDetails"></div>',
-        '        <div class="logpow-plain" id="logPowSimPlain">Mode 3 simulates datasets and fits logistic models to estimate multivariable power.</div>'
+        '        <div id="logPowSimDetails"></div>'
       ].join("\n")),
       '      </div>',
       '    </div>',
       '  </div>',
-      '  <div class="logpow-band" id="logPowStatus">Run a logistic model, click From model, then Calculate.</div>',
-      '  <div class="logpow-engine" id="logPowEngine"><i class="fa-solid fa-cloud"></i> Python cloud function — scipy.stats.norm + Monte Carlo IRLS</div>',
+      '  <div class="logpow-card">',
+      '    <div class="logpow-card-h">Interpretation</div>',
+      '    <div class="logpow-card-b">',
+      '      <div class="logpow-band" id="logPowStatus">Inputs are imported from the model automatically — press Calculate.</div>',
+      '      <div class="logpow-plain" id="logPowInterpretation">Click Calculate to get a plain-language interpretation.</div>',
+      '    </div>',
+      '  </div>',
+      '  <div class="logpow-card">',
+      '    <div class="logpow-card-h">Technical Details</div>',
+      '    <div class="logpow-card-b">',
+      '      <div id="logPowTechBody"></div>',
+      '      <div class="logpow-engine" id="logPowEngine"><i class="fa-solid fa-cloud"></i> Python cloud function — scipy.stats.norm + Monte Carlo IRLS</div>',
+      '    </div>',
+      '  </div>',
       '</div>'
     ].join("\n");
     switchMode("epv");
+    renderModelDetected(prefill);
     if (prefill) applyPrefill(prefill);
   }
 

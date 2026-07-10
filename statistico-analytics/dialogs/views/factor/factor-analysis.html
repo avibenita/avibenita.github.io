@@ -9,7 +9,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="../shared-header.css?v=20260530a"/>  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
-  <script src="../shared-header.js?v=20260710b"></script>
+  <script src="../shared-header.js?v=20260710c"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -812,6 +812,26 @@
     }
     .interp-ai-disclaimer i{ color:#c4b5fd; margin-top:2px; }
     .interp-ai-disclaimer b{ color:#e9d5ff; }
+
+    /* ── Collapsible AI details on the Interpretation page ── */
+    .ai-details-section{ margin-bottom:12px; }
+    .ai-details-toggle{
+      width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px;
+      background:linear-gradient(135deg, rgba(124,58,237,.2), rgba(168,85,247,.1));
+      border:1px solid rgba(168,85,247,.4); border-radius:10px;
+      padding:10px 14px; cursor:pointer; transition:background .15s;
+      color:#e9d5ff; font-size:.9rem; font-weight:700; text-align:left;
+    }
+    .ai-details-toggle:hover{ background:linear-gradient(135deg, rgba(124,58,237,.3), rgba(168,85,247,.18)); }
+    .ai-details-toggle-label{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+    .ai-details-toggle-sub{
+      font-size:.75rem; font-weight:500; color:rgba(233,213,255,.6); font-style:italic;
+    }
+    .ai-details-chevron{ transition:transform .2s ease; font-size:.85rem; }
+    .ai-details-section.open .ai-details-chevron{ transform:rotate(180deg); }
+    .ai-details-section.open .ai-details-toggle{ border-radius:10px 10px 0 0; border-bottom:none; }
+    .ai-details-body{ display:none; }
+    .ai-details-section.open .ai-details-body{ display:block; }
     .interp-card-body{
       padding:12px 14px;
       display:grid; grid-template-columns:1.4fr 1fr; gap:14px;
@@ -958,10 +978,6 @@
           <button class="sb-item" onclick="switchTab('scores')" data-tab="scores">
             <i class="fa-solid fa-chart-scatter sb-item-icon"></i>
             <span class="sb-item-label">Scores</span>
-          </button>
-          <button class="sb-item" onclick="switchTab('ai')" data-tab="ai">
-            <i class="fa-solid fa-brain sb-item-icon"></i>
-            <span class="sb-item-label">AI Summary</span>
           </button>
           <button class="sb-item" onclick="switchTab('viewdata')" data-tab="viewdata">
             <i class="fa-solid fa-table sb-item-icon"></i>
@@ -1238,7 +1254,58 @@
             </div>
             <div id="interpCrossPanel"></div>
             <div id="interpPhiPanel"></div>
-            <div class="section-note">This page turns the loading pattern into meaning: defining variables per factor, suggested names (from the AI Summary page when available), variance explained, and internal consistency. Cross-loading variables without a clear home are flagged separately.</div>
+
+            <!-- Collapsible AI details (naming rationale, model summary, prompt tools) -->
+            <div class="ai-details-section" id="aiDetailsSection">
+              <button type="button" class="ai-details-toggle" id="aiDetailsToggle" onclick="toggleAiDetails()">
+                <span class="ai-details-toggle-label">
+                  <i class="fa-solid fa-robot"></i> AI Details
+                  <span class="ai-details-toggle-sub">naming rationale, alternatives &amp; model summary</span>
+                </span>
+                <i class="fa-solid fa-chevron-down ai-details-chevron" id="aiDetailsChevron"></i>
+              </button>
+              <div class="ai-details-body" id="aiDetailsBody">
+                <div class="ai-panel" style="border-radius:0 0 10px 10px; border-top:none;">
+                  <!-- Header row -->
+                  <div class="ai-naming-header">
+                    <div class="ai-naming-title">
+                      <i class="fa-solid fa-robot"></i> AI-Suggested Dimension Names
+                    </div>
+                    <div class="ai-naming-actions">
+                      <button class="ai-action-btn ai-btn-copy" onclick="copyFactorNamingPrompt()">
+                        <i class="fa-solid fa-copy"></i> Copy Prompt
+                      </button>
+                      <button class="ai-action-btn ai-btn-send" onclick="requestFactorAI()">
+                        <i class="fa-solid fa-paper-plane"></i> Send to AI
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- System instruction reminder -->
+                  <div class="ai-system-prompt">
+                    <strong>System instruction sent to AI:</strong> You are a psychometric and statistical analysis expert. Suggest meaningful dimension names for factors from exploratory factor analysis. Use item wording, prefer concise 2–4 word scientific labels, avoid vague names, label as <em>AI-Suggested Dimension</em>.
+                  </div>
+
+                  <!-- Per-factor cards (built dynamically) -->
+                  <div id="aiFactorCards" class="ai-factor-cards">
+                    <div class="hint-empty">Run a factor analysis to generate naming suggestions.</div>
+                  </div>
+
+                  <!-- Summary rows (static fields) -->
+                  <div style="margin-top:14px;" class="ai-panel" id="aiSummaryPanel">
+                    <div class="ai-row"><span class="ai-key">Structure Summary:</span> <span id="aiStructure">Awaiting assessment...</span></div>
+                    <div class="ai-row"><span class="ai-key">Variance Story:</span> <span id="aiVariance">Awaiting assessment...</span></div>
+                    <div class="ai-row"><span class="ai-key">Model Quality:</span> <span id="aiQuality">Awaiting assessment...</span></div>
+                    <div class="ai-row"><span class="ai-key">Recommendations:</span> <span id="aiRecommendations">Awaiting assessment...</span></div>
+                  </div>
+
+                  <!-- Prompt preview (shown after "Copy Prompt") -->
+                  <pre id="aiPromptPreview" class="ai-prompt-preview"></pre>
+                </div>
+              </div>
+            </div>
+
+            <div class="section-note">This page turns the loading pattern into meaning: defining variables per factor, AI-suggested names, variance explained, and internal consistency. Cross-loading variables without a clear home are flagged separately; expand AI Details for naming rationale and the full model summary.</div>
           </section>
 
           <section id="tab-diagnostics" class="tab-panel">
@@ -1386,46 +1453,6 @@
             </div>
           </section>
 
-          <section id="tab-ai" class="tab-panel">
-            <div class="ai-panel">
-              <!-- Header row -->
-              <div class="ai-naming-header">
-                <div class="ai-naming-title">
-                  <i class="fa-solid fa-robot"></i> AI-Suggested Dimension Names
-                </div>
-                <div class="ai-naming-actions">
-                  <button class="ai-action-btn ai-btn-copy" onclick="copyFactorNamingPrompt()">
-                    <i class="fa-solid fa-copy"></i> Copy Prompt
-                  </button>
-                  <button class="ai-action-btn ai-btn-send" onclick="requestFactorAI()">
-                    <i class="fa-solid fa-paper-plane"></i> Send to AI
-                  </button>
-                </div>
-              </div>
-
-              <!-- System instruction reminder -->
-              <div class="ai-system-prompt">
-                <strong>System instruction sent to AI:</strong> You are a psychometric and statistical analysis expert. Suggest meaningful dimension names for factors from exploratory factor analysis. Use item wording, prefer concise 2–4 word scientific labels, avoid vague names, label as <em>AI-Suggested Dimension</em>.
-              </div>
-
-              <!-- Per-factor cards (built dynamically) -->
-              <div id="aiFactorCards" class="ai-factor-cards">
-                <div class="hint-empty">Run a factor analysis to generate naming suggestions.</div>
-              </div>
-
-              <!-- Summary rows (static fields) -->
-              <div style="margin-top:14px;" class="ai-panel" id="aiSummaryPanel">
-                <div class="ai-row"><span class="ai-key">Structure Summary:</span> <span id="aiStructure">Awaiting assessment...</span></div>
-                <div class="ai-row"><span class="ai-key">Variance Story:</span> <span id="aiVariance">Awaiting assessment...</span></div>
-                <div class="ai-row"><span class="ai-key">Model Quality:</span> <span id="aiQuality">Awaiting assessment...</span></div>
-                <div class="ai-row"><span class="ai-key">Recommendations:</span> <span id="aiRecommendations">Awaiting assessment...</span></div>
-              </div>
-
-              <!-- Prompt preview (shown after "Copy Prompt") -->
-              <pre id="aiPromptPreview" class="ai-prompt-preview"></pre>
-            </div>
-          </section>
-
           <!-- ══ Tab: View Data ══ -->
           <section id="tab-viewdata" class="tab-panel">
             <div class="stat-panel">
@@ -1475,6 +1502,12 @@
     }
 
     function switchTab(tabKey) {
+      /* The former AI Summary tab now lives inside Interpretation as a collapsible */
+      if (tabKey === "ai") {
+        switchTab("interpretation");
+        expandAiDetails(true);
+        return;
+      }
       const tabTitles = {
         'suitability':    'Suitability',
         'extraction':     'Extraction',
@@ -1482,7 +1515,6 @@
         'interpretation': 'Interpretation',
         'diagnostics':    'Diagnostics',
         'scores':         'Scores',
-        'ai':             'AI Summary',
         'viewdata':       'View Data'
       };
       if (tabTitles[tabKey] && typeof StatisticoHeader !== 'undefined') {
@@ -1500,9 +1532,23 @@
           (Highcharts.charts || []).forEach(function(c) { if (c) { try { c.reflow(); } catch(e) {} } });
         }, 30);
       }
-      /* Lazily fetch AI factor names the first time a naming page is opened */
-      if (tabKey === "interpretation" || tabKey === "ai") {
+      /* Lazily fetch AI factor names the first time the naming page is opened */
+      if (tabKey === "interpretation") {
         if (typeof requestFactorNamingAI === "function") requestFactorNamingAI();
+      }
+    }
+
+    function toggleAiDetails() {
+      var section = document.getElementById("aiDetailsSection");
+      if (section) section.classList.toggle("open");
+    }
+
+    function expandAiDetails(scrollTo) {
+      var section = document.getElementById("aiDetailsSection");
+      if (!section) return;
+      section.classList.add("open");
+      if (scrollTo && typeof section.scrollIntoView === "function") {
+        setTimeout(function() { section.scrollIntoView({ behavior: "smooth", block: "start" }); }, 60);
       }
     }
 
@@ -2371,9 +2417,9 @@
       renderFactorGroups();
       renderInterpretation();
       renderResidualHeatmap();
-      /* If the user is already on a naming page, refresh names right away */
+      /* If the user is already on the naming page, refresh names right away */
       var activePanel = document.querySelector(".tab-panel.active");
-      if (activePanel && (activePanel.id === "tab-interpretation" || activePanel.id === "tab-ai")) {
+      if (activePanel && activePanel.id === "tab-interpretation") {
         requestFactorNamingAI(true);
       }
     };
@@ -3095,6 +3141,8 @@
           panel.classList.add("active");
           panel.style.display = "block";
         });
+        var aiDetailsForExport = document.getElementById("aiDetailsSection");
+        if (aiDetailsForExport) aiDetailsForExport.classList.add("open");
         await new Promise(function(resolve){ setTimeout(resolve, 120); });
 
         var clone = document.documentElement.cloneNode(true);
@@ -3192,6 +3240,8 @@
       _faNamingState = { inFlight: false, done: false };
       var aiDisclaimer = document.getElementById("interpAiDisclaimer");
       if (aiDisclaimer) aiDisclaimer.style.display = "none";
+      var aiDetails = document.getElementById("aiDetailsSection");
+      if (aiDetails) aiDetails.classList.remove("open");
       setText("aiStructure", "Awaiting assessment...");
       setText("aiVariance", "Awaiting assessment...");
       setText("aiQuality", "Awaiting assessment...");

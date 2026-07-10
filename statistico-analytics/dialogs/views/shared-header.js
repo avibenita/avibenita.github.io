@@ -1385,10 +1385,9 @@ const StatisticoHeader = {
             { type: 'tab', tab: 'suitability', icon: 'fa-circle-check', label: 'Suitability', active: true },
             { type: 'tab', tab: 'extraction', icon: 'fa-magnifying-glass-chart', label: 'Extraction' },
             { type: 'tab', tab: 'rotation', icon: 'fa-diagram-project', label: 'Structure', description: 'Interpret the loading pattern.' },
-            { type: 'tab', tab: 'interpretation', icon: 'fa-lightbulb', label: 'Interpretation', description: 'Name factors and spot cross-loadings.' },
+            { type: 'tab', tab: 'interpretation', icon: 'fa-lightbulb', label: 'Interpretation', description: 'Name factors, AI details & cross-loadings.' },
             { type: 'tab', tab: 'diagnostics', icon: 'fa-stethoscope', label: 'Diagnostics' },
             { type: 'tab', tab: 'scores', icon: 'fa-chart-scatter', label: 'Scores' },
-            { type: 'tab', tab: 'ai', icon: 'fa-brain', label: 'AI Summary' },
             { type: 'tab', tab: 'viewdata', icon: 'fa-table', label: 'View Data' }
           ]
         }]

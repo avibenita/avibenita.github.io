@@ -5416,7 +5416,8 @@ const StatisticoHeader = {
     const isDependentKplus = this.module === 'dependent' && this.currentView === 'dependent-results-kplus';
     const supportsIndependentAi = this.module === 'independent';
     const supportsMixedAi = this.module === 'mixed-model';
-    const supportsSharedAi = (this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations' || supportsIndependentAi || supportsMixedAi;
+    const supportsFactorAi = this.module === 'factor';
+    const supportsSharedAi = (this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations' || supportsIndependentAi || supportsMixedAi || supportsFactorAi;
     const supportsFullAiPill = supportsIndependentAi || isDependentKplus;
     if (supportsSharedAi || isDependentKplus) {
       const aiSection = document.createElement('div');
@@ -5429,6 +5430,8 @@ const StatisticoHeader = {
           ? 'StatisticoHeader._sbAiDependentKplusInterpret()'
         : supportsMixedAi
           ? 'requestMixedModelAI()'
+        : supportsFactorAi
+          ? 'requestFactorModuleAI()'
           : 'StatisticoHeader._sbAiGlobalInterpret()';
       const aiTitle = supportsIndependentAi
         ? 'AI statistical summary for this independent means analysis'
@@ -5436,6 +5439,8 @@ const StatisticoHeader = {
           ? 'Full AI interpretation of this repeated-measures analysis'
         : supportsMixedAi
           ? 'AI interpretation of the mixed model results'
+        : supportsFactorAi
+          ? 'Full factor analysis - synthesises suitability, extraction, rotation & diagnostics into one report'
           : (isCorrelation ? 'Full correlation analysis - synthesises all correlation views into one report' : 'Full variable analysis - synthesises all diagnostics into one report');
       const aiLabel = supportsFullAiPill ? 'Full AI Analysis' : 'Full Analysis';
       const aiBadge = supportsFullAiPill ? 'ALL' : 'AI';
@@ -7769,7 +7774,7 @@ Always follow the exact output format requested.` },
     };
     const viewLabel = viewLabels[view] || view;
     const title = mode === 'full'
-      ? (this.module === 'correlations' ? 'Full Correlation Analysis' : (this.module === 'independent' ? 'Independent Means Analysis' : 'Full Variable Analysis'))
+      ? (this.module === 'correlations' ? 'Full Correlation Analysis' : (this.module === 'independent' ? 'Independent Means Analysis' : (this.module === 'factor' ? 'Full Factor Analysis' : 'Full Variable Analysis')))
       : mode === 'per-view' ? `Insight Guide — ${viewLabel}`
       : `AI Insight — ${viewLabel}`;
     const titleIcon = mode === 'full' ? 'fa-brain' : 'fa-compass';

@@ -9,7 +9,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="../shared-header.css?v=20260530a"/>  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
-  <script src="../shared-header.js?v=20260524a"></script>
+  <script src="../shared-header.js?v=20260710a"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -1761,6 +1761,112 @@
       }
       sendToHost("analyzeFactorWithAI", { prompt: prompt, raw: factorPayloadForAI });
     }
+
+    /* ── Sidebar AI pill: full factor analysis interpretation ── */
+    window.requestFactorModuleAI = async function() {
+      if (!factorPayloadForAI) {
+        if (typeof StatisticoHeader !== "undefined" && typeof StatisticoHeader._showAiOverlay === "function") {
+          StatisticoHeader._showAiOverlay(null, "factor-analysis", "full");
+        } else {
+          alert("Run a factor analysis first.");
+        }
+        return;
+      }
+
+      var btn = document.getElementById("sbAiBtn");
+      var origHtml = btn ? btn.innerHTML : "";
+
+      if (typeof StatisticoHeader !== "undefined" &&
+          typeof StatisticoHeader._callAiForSidebar === "function") {
+
+        if (btn) btn.disabled = true;
+
+        var aiViews = ["Suitability", "Extraction", "Rotation", "Diagnostics"];
+        for (var vi = 0; vi < aiViews.length; vi++) {
+          if (btn) btn.innerHTML =
+            '<i class="fa-solid fa-spinner fa-spin"></i><span>' + (vi + 1) + '/' + aiViews.length + ' \u2014 ' + aiViews[vi] + '</span>';
+          await new Promise(function(r){ setTimeout(r, 180); });
+        }
+        if (btn) btn.innerHTML = '<i class="fa-solid fa-brain fa-spin"></i><span>Thinking\u2026</span>';
+
+        try {
+          var s = factorPayloadForAI.suitability || {};
+          var e = factorPayloadForAI.extraction || {};
+          var rot = factorPayloadForAI.rotation || {};
+          var dg = factorPayloadForAI.diagnostics || {};
+
+          /* Top loadings per factor (same grouping as the naming prompt) */
+          var factors = [];
+          if (rot.columns && rot.rows) {
+            factors = rot.columns.slice(1).map(function(factorName, fi) {
+              var items = rot.rows.map(function(r) {
+                return { variable: r["Variable"] || r["variable"] || "-", loading: parseFloat(r[factorName]) || 0 };
+              }).sort(function(a, b) { return Math.abs(b.loading) - Math.abs(a.loading); })
+                .slice(0, 6)
+                .map(function(i) { return { variable: i.variable, loading: Math.round(i.loading * 100) / 100 }; });
+              return { factor: fi + 1, name: factorName, topLoadings: items };
+            });
+          }
+
+          var payload = {
+            suitability: {
+              kmo: s.kmo, bartlettChi2: s.bartlettChi2, bartlettP: s.bartlettP,
+              determinantR: s.determinantR, variables: s.variableCount,
+              cases: s.caseCount, verdict: s.verdict
+            },
+            extraction: {
+              method: e.method, retainedFactors: e.retainedFactors,
+              kaiser: e.kaiser, cumulativeVariancePct: e.cumulativeVariance,
+              eigenvalues: (e.eigenTable || []).slice(0, 10).map(function(r){ return r.eigenvalue; })
+            },
+            rotation: {
+              method: rot.rotationMethod, loadingCutoff: rot.loadingCutoff,
+              crossLoadingCount: rot.crossLoadingCount, maxFactorCorrelation: rot.phiMax,
+              factors: factors
+            },
+            diagnostics: {
+              rmsr: dg.rmsr, fitIndex: dg.fitIndex,
+              heywoodCases: dg.heywoodCases, meanCommunality: dg.meanCommunality,
+              lowCommunalities: (dg.communalities || [])
+                .filter(function(c){ return isFinite(parseFloat(c.extracted)) && parseFloat(c.extracted) < 0.30; })
+                .map(function(c){ return { variable: c.variable, extracted: c.extracted }; })
+            }
+          };
+
+          var prompt =
+'You are interpreting an Exploratory Factor Analysis (EFA) computed by Statistico.\n' +
+'Do NOT recompute any statistic. Use only the values in the JSON below.\n' +
+'Use cautious language ("suggests", "indicates") unless evidence is clear.\n' +
+'If a field is null or missing, do not mention it.\n\n' +
+'JSON:\n' + JSON.stringify(payload, null, 2) + '\n\n' +
+'Reply ONLY in this exact format (no extra lines, no markdown):\n' +
+'CONCLUSION: [One decisive sentence \u2014 the single most important finding about the factor structure]\n' +
+'EVIDENCE: [suitability finding with KMO/Bartlett] | [factor-retention finding with variance explained] | [loading-pattern / simple-structure finding] | [model-fit or communality finding]\n' +
+'INTERPRETATION: [3 sentences \u2014 unified synthesis in plain language: what the factors appear to represent and how trustworthy the solution is]\n' +
+'IMPLICATIONS: [analytical implication 1] | [analytical implication 2] | [analytical implication 3]\n' +
+'ACTION: [next step 1] | [next step 2] | [next step 3]\n' +
+'STRENGTH: [High, Moderate, or Low \u2014 short reason based on KMO, variance explained, communalities, and fit]';
+
+          var raw = await StatisticoHeader._callAiForSidebar(prompt);
+          var sections = StatisticoHeader._parseAiStructured(raw);
+          StatisticoHeader._showAiOverlay(sections, "factor-analysis", "full");
+
+        } catch (err) {
+          StatisticoHeader._showAiOverlay(
+            { error: err.message || "AI request failed." }, "factor-analysis", "full");
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml || '<i class="fa-solid fa-brain"></i><span>Full Analysis</span><sup class="sb-ai-sup">AI</sup>';
+          }
+        }
+
+      } else {
+        /* Fallback: fire to host (VB6 path) */
+        var naming = buildFactorNamingPrompt();
+        sendToHost("analyzeFactorWithAI", { prompt: naming, raw: factorPayloadForAI });
+      }
+    };
 
     function saveCurrentFactorModel() {
       sendToHost("saveFactorModel", window.lastFactorBundle || {});

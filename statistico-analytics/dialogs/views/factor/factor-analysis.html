@@ -305,13 +305,13 @@
       transition:background .15s, color .15s;
     }
     .info-icon:hover{ background:rgba(120,200,255,.35); color:#fff; }
+    /* Tooltip is fixed-positioned by JS so panel overflow:hidden cannot clip it */
     .info-icon .tip{
-      display:none; position:absolute; left:50%; bottom:calc(100% + 6px);
-      transform:translateX(-50%);
+      display:none; position:fixed; left:0; top:0;
       background:rgba(10,15,30,.97); border:1px solid rgba(120,200,255,.35);
       border-radius:7px; padding:7px 10px;
       width:220px; font-size:11px; font-weight:400; line-height:1.45;
-      color:#c8dff5; pointer-events:none; z-index:999; text-align:left;
+      color:#c8dff5; pointer-events:none; z-index:9999; text-align:left;
       box-shadow:0 4px 16px rgba(0,0,0,.5);
     }
     .info-icon:hover .tip{ display:block; }
@@ -1682,6 +1682,38 @@
         node.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     }
+
+    /* ── Info-icon tooltips: fixed positioning, clamped to the viewport ──
+       Panels use overflow:hidden, so an absolutely-positioned tip gets
+       clipped near panel edges. Delegated handler works for tips created
+       dynamically (e.g. Interpretation cards). */
+    document.addEventListener("mouseover", function(e) {
+      var icon = e.target && e.target.closest ? e.target.closest(".info-icon") : null;
+      if (!icon) return;
+      var tip = icon.querySelector(".tip");
+      if (!tip) return;
+      var rect = icon.getBoundingClientRect();
+      /* Measure the tip invisibly to decide above vs. below */
+      tip.style.visibility = "hidden";
+      tip.style.display = "block";
+      var tw = tip.offsetWidth || 220;
+      var th = tip.offsetHeight || 60;
+      var vw = window.innerWidth, vh = window.innerHeight;
+      var left = Math.max(8, Math.min(rect.left + rect.width / 2 - tw / 2, vw - tw - 8));
+      var top = rect.top - th - 8;
+      if (top < 8) top = Math.min(rect.bottom + 8, vh - th - 8);
+      tip.style.left = left + "px";
+      tip.style.top = top + "px";
+      tip.style.visibility = "visible";
+    });
+    document.addEventListener("mouseout", function(e) {
+      var icon = e.target && e.target.closest ? e.target.closest(".info-icon") : null;
+      if (!icon) return;
+      /* Leaving the icon entirely (not moving within it) */
+      if (e.relatedTarget && icon.contains(e.relatedTarget)) return;
+      var tip = icon.querySelector(".tip");
+      if (tip) tip.style.display = "";
+    });
 
     /* ═══════════ Anti-image / MSA helpers ═══════════ */
     var _faCorrMatrix = null;

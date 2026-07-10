@@ -1480,6 +1480,10 @@
           (Highcharts.charts || []).forEach(function(c) { if (c) { try { c.reflow(); } catch(e) {} } });
         }, 30);
       }
+      /* Lazily fetch AI factor names the first time a naming page is opened */
+      if (tabKey === "interpretation" || tabKey === "ai") {
+        if (typeof requestFactorNamingAI === "function") requestFactorNamingAI();
+      }
     }
 
     function wireNavigation() {
@@ -2336,11 +2340,18 @@
         }
       }
       factorPayloadForAI = Object.assign({}, factorPayloadForAI || {}, { rotation: d });
+      /* New solution: previous AI names no longer apply */
+      _faNamingState.done = false;
       /* Rebuild per-factor AI cards whenever rotation data arrives */
       renderAiFactorCards(d);
       renderFactorGroups();
       renderInterpretation();
       renderResidualHeatmap();
+      /* If the user is already on a naming page, refresh names right away */
+      var activePanel = document.querySelector(".tab-panel.active");
+      if (activePanel && (activePanel.id === "tab-interpretation" || activePanel.id === "tab-ai")) {
+        requestFactorNamingAI(true);
+      }
     };
 
     function applyRotationFromResults() {
@@ -2721,6 +2732,81 @@
       };
     }
 
+    /* ── Automatic AI factor naming via the shared Statistico AI worker ── */
+    var _faNamingState = { inFlight: false, done: false };
+
+    function extractAiJson(raw) {
+      if (!raw) return null;
+      var s = raw.indexOf("{"), e = raw.lastIndexOf("}");
+      if (s < 0 || e <= s) return null;
+      try { return JSON.parse(raw.slice(s, e + 1)); } catch (err) { return null; }
+    }
+
+    function setNamingBadgesLoading() {
+      document.querySelectorAll('[id^="interpName_F"], [id^="aiName_F"]').forEach(function(el) {
+        el.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Naming\u2026';
+      });
+    }
+
+    function failNamingBadges() {
+      document.querySelectorAll('[id^="interpName_F"], [id^="aiName_F"]').forEach(function(el) {
+        el.textContent = "AI naming unavailable";
+      });
+    }
+
+    function applyFactorNames(named) {
+      if (!named) return;
+      /* Persist so renderInterpretation() re-renders keep the names */
+      factorPayloadForAI = Object.assign({}, factorPayloadForAI || {}, {
+        ai: Object.assign({}, (factorPayloadForAI && factorPayloadForAI.ai) || {}, { namedFactors: named })
+      });
+      Object.keys(named).forEach(function(key) {
+        var d = named[key];
+        var name = typeof d === "string" ? d : (d && d.name);
+        var interpBadge = document.getElementById("interpName_" + key);
+        if (interpBadge && name) interpBadge.textContent = name;
+        var aiBadge = document.getElementById("aiName_" + key);
+        if (aiBadge && name) aiBadge.textContent = name;
+        var result = document.getElementById("aiResult_" + key);
+        if (result && d && typeof d === "object") {
+          var html = "";
+          if (d.name)         html += "<strong style='color:#e9d5ff'>AI-Suggested Dimension: " + d.name + "</strong><br>";
+          if (d.alternatives) html += "<em>Alternatives: " + (Array.isArray(d.alternatives) ? d.alternatives.join(" \u00B7 ") : d.alternatives) + "</em><br>";
+          if (d.explanation)  html += "<span style='color:var(--text-muted)'>" + d.explanation + "</span>";
+          if (html) result.innerHTML = html;
+        }
+      });
+    }
+
+    function requestFactorNamingAI(force) {
+      if (_faNamingState.inFlight || (_faNamingState.done && !force)) return;
+      var built = buildFactorNamingPrompt();
+      if (!built) return;
+      if (typeof StatisticoHeader === "undefined" || typeof StatisticoHeader._callAiForSidebar !== "function") return;
+      _faNamingState.inFlight = true;
+      setNamingBadgesLoading();
+      var keys = built.payload.factors.map(function(_, i) { return "F" + i; });
+      var prompt = built.system + "\n\n"
+        + "Factors (top loadings per factor):\n" + JSON.stringify(built.payload.factors) + "\n"
+        + "Rotation: " + built.payload.rotation + "\n\n"
+        + "Reply with STRICT JSON only \u2014 no markdown fences, no commentary. Exactly this shape, with keys "
+        + keys.join(", ") + " in the order given:\n"
+        + '{"F0":{"name":"2-4 word dimension name","alternatives":["alt 1","alt 2"],"explanation":"one short sentence"}}';
+      StatisticoHeader._callAiForSidebar(prompt).then(function(raw) {
+        var named = extractAiJson(raw);
+        if (named && Object.keys(named).length) {
+          applyFactorNames(named);
+          _faNamingState.done = true;
+        } else {
+          failNamingBadges();
+        }
+        _faNamingState.inFlight = false;
+      }).catch(function() {
+        failNamingBadges();
+        _faNamingState.inFlight = false;
+      });
+    }
+
     function copyFactorNamingPrompt() {
       var prompt = buildFactorNamingPrompt();
       if (!prompt) { alert("Run a factor analysis first to build the prompt."); return; }
@@ -3066,6 +3152,7 @@
       _faCorrMatrix = null; _faCorrLabels = null;
       _loadingsData = { rows: [], cols: [] };
       _faScoreData = { cols: [], factorCols: [], rows: [] };
+      _faNamingState = { inFlight: false, done: false };
       setText("aiStructure", "Awaiting assessment...");
       setText("aiVariance", "Awaiting assessment...");
       setText("aiQuality", "Awaiting assessment...");

@@ -796,6 +796,22 @@
       border-radius:20px; padding:4px 12px;
       font-size:.82rem; font-weight:700; color:#fff; min-width:130px; text-align:center;
     }
+    .interp-name-badge.ai-named, .ai-factor-name-badge.ai-named{
+      background:linear-gradient(135deg, rgba(124,58,237,.55), rgba(168,85,247,.4));
+      border:1px dashed rgba(233,213,255,.75);
+      cursor:help;
+    }
+    .interp-name-badge.ai-named i, .ai-factor-name-badge.ai-named i{
+      font-size:.72rem; opacity:.85; margin-right:5px; color:#e9d5ff;
+    }
+    .interp-ai-disclaimer{
+      display:none; align-items:flex-start; gap:9px;
+      background:rgba(124,58,237,.1); border:1px dashed rgba(168,85,247,.45);
+      border-radius:10px; padding:9px 14px; margin-bottom:12px;
+      font-size:.82rem; color:var(--text-secondary);
+    }
+    .interp-ai-disclaimer i{ color:#c4b5fd; margin-top:2px; }
+    .interp-ai-disclaimer b{ color:#e9d5ff; }
     .interp-card-body{
       padding:12px 14px;
       display:grid; grid-template-columns:1.4fr 1fr; gap:14px;
@@ -1213,6 +1229,10 @@
 
           <!-- ══ Tab: Interpretation ══ -->
           <section id="tab-interpretation" class="tab-panel">
+            <div class="interp-ai-disclaimer" id="interpAiDisclaimer">
+              <i class="fa-solid fa-robot"></i>
+              <span><b>AI-suggested names.</b> The dashed badges are machine interpretations of the variable wording — not statistical results. Treat them as hypotheses: check each name against the defining variables and your theory before using it in a report.</span>
+            </div>
             <div id="interpFactorCards">
               <div class="hint-empty">Run a factor analysis to build the interpretation view.</div>
             </div>
@@ -2153,7 +2173,11 @@
         var header = document.createElement("div");
         header.className = "interp-card-header";
         header.innerHTML = '<span class="interp-card-title"><i class="fa-solid fa-cube"></i> ' + f.name + '</span>'
-          + '<span class="interp-name-badge" id="interpName_F' + fi + '">' + (aiName || 'Awaiting AI naming\u2026') + '</span>';
+          + '<span class="interp-name-badge" id="interpName_F' + fi + '">Awaiting AI naming\u2026</span>';
+        if (aiName) {
+          setAiNameBadge(header.querySelector("#interpName_F" + fi), aiName);
+          showAiNamingDisclaimer();
+        }
         var body = document.createElement("div");
         body.className = "interp-card-body";
         var listHtml = '<div class="interp-var-list">';
@@ -2614,11 +2638,12 @@
       if (ai.namedFactors && typeof ai.namedFactors === "object" && !Array.isArray(ai.namedFactors)) {
         Object.keys(ai.namedFactors).forEach(function(key) {
           /* Mirror the suggested name onto the Interpretation page badge */
-          var interpBadge = document.getElementById("interpName_" + key);
-          if (interpBadge) {
-            var nameData = ai.namedFactors[key];
-            var suggested = typeof nameData === "string" ? nameData : (nameData && nameData.name);
-            if (suggested) interpBadge.textContent = suggested;
+          var nameData = ai.namedFactors[key];
+          var suggested = typeof nameData === "string" ? nameData : (nameData && nameData.name);
+          if (suggested) {
+            setAiNameBadge(document.getElementById("interpName_" + key), suggested);
+            setAiNameBadge(document.getElementById("aiName_" + key), suggested);
+            showAiNamingDisclaimer();
           }
           var result = document.getElementById("aiResult_" + key);
           if (result) {
@@ -2754,19 +2779,31 @@
       });
     }
 
+    /* Mark a badge as holding an AI-generated interpretation (icon + caution) */
+    function setAiNameBadge(el, name) {
+      if (!el || !name) return;
+      el.innerHTML = '<i class="fa-solid fa-robot"></i>' + name;
+      el.classList.add("ai-named");
+      el.title = "AI-suggested interpretation of the variable wording \u2014 verify against the defining variables and theory before reporting.";
+    }
+
+    function showAiNamingDisclaimer() {
+      var note = document.getElementById("interpAiDisclaimer");
+      if (note) note.style.display = "flex";
+    }
+
     function applyFactorNames(named) {
       if (!named) return;
       /* Persist so renderInterpretation() re-renders keep the names */
       factorPayloadForAI = Object.assign({}, factorPayloadForAI || {}, {
         ai: Object.assign({}, (factorPayloadForAI && factorPayloadForAI.ai) || {}, { namedFactors: named })
       });
+      showAiNamingDisclaimer();
       Object.keys(named).forEach(function(key) {
         var d = named[key];
         var name = typeof d === "string" ? d : (d && d.name);
-        var interpBadge = document.getElementById("interpName_" + key);
-        if (interpBadge && name) interpBadge.textContent = name;
-        var aiBadge = document.getElementById("aiName_" + key);
-        if (aiBadge && name) aiBadge.textContent = name;
+        setAiNameBadge(document.getElementById("interpName_" + key), name);
+        setAiNameBadge(document.getElementById("aiName_" + key), name);
         var result = document.getElementById("aiResult_" + key);
         if (result && d && typeof d === "object") {
           var html = "";
@@ -3153,6 +3190,8 @@
       _loadingsData = { rows: [], cols: [] };
       _faScoreData = { cols: [], factorCols: [], rows: [] };
       _faNamingState = { inFlight: false, done: false };
+      var aiDisclaimer = document.getElementById("interpAiDisclaimer");
+      if (aiDisclaimer) aiDisclaimer.style.display = "none";
       setText("aiStructure", "Awaiting assessment...");
       setText("aiVariance", "Awaiting assessment...");
       setText("aiQuality", "Awaiting assessment...");

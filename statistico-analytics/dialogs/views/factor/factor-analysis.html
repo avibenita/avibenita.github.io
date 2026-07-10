@@ -1370,7 +1370,10 @@
             </div>
             <!-- Residual correlation matrix -->
             <div class="viz-card">
-              <div class="viz-title">Residual Correlation Matrix (Observed − Reproduced)</div>
+              <div class="viz-title" style="display:flex; align-items:center; gap:8px;">
+                Residual Correlation Matrix (Observed − Reproduced)
+                <button class="hl-info-btn" onclick="document.getElementById('residualHelpModal').classList.add('open')" title="What are residual correlations and how do I read them?">?</button>
+              </div>
               <div id="residualHeatmap" class="heatmap-wrap">
                 <div class="hint-empty">Awaiting loadings and correlation matrix...</div>
               </div>
@@ -3353,6 +3356,74 @@
     });
   </script>
   </div><!-- /right-col -->
+
+  <!-- ── Residual Correlation Help Modal ─────────────────────────────── -->
+  <div id="residualHelpModal" class="hrm-modal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="hrm-box" style="width:520px;">
+      <button class="hrm-close" onclick="document.getElementById('residualHelpModal').classList.remove('open')">&#x2715;</button>
+      <h3><i class="fa-solid fa-table-cells" style="color:var(--accent-2);"></i> Residual Correlation Matrix</h3>
+      <p class="hrm-subtitle">How well the factor solution reproduces the observed correlations — cell by cell</p>
+      <hr class="hrm-div">
+
+      <div class="hrm-rule">
+        <div class="hrm-icon" style="background:rgba(120,200,255,.1); color:rgba(120,200,255,.9);">
+          <i class="fa-solid fa-circle-question"></i>
+        </div>
+        <div>
+          <h4>What is a residual correlation?</h4>
+          <p>A factor model claims that variables correlate <b>because they share factors</b>. From the loadings we can compute the correlation the model <b>predicts</b> for every pair of variables, then subtract it from the correlation actually observed in the data:</p>
+          <code class="hrm-formula">residual&#8342;&#8343; = r&#8342;&#8343;(observed) &minus; &Sigma;&#8342; &lambda;&#8342;&#8331; &middot; &lambda;&#8343;&#8331;</code>
+          <p>The reproduced part is the sum over factors of the two variables' loadings multiplied together (<b>LL&prime;</b>). What is left over is correlation the factors <b>cannot explain</b>.</p>
+        </div>
+      </div>
+
+      <div class="hrm-rule">
+        <div class="hrm-icon" style="background:rgba(120,200,255,.1); color:rgba(120,200,255,.9);">
+          <i class="fa-solid fa-eye"></i>
+        </div>
+        <div>
+          <h4>Reading the matrix</h4>
+          <p>Every cell should be <b>close to zero</b> — that means the solution reproduces that pair's correlation well.<br>
+          <span style="color:rgba(120,200,255,1); font-weight:700;">&#9679; Blue</span> = the model <b>under-predicts</b> the correlation (observed &gt; reproduced).<br>
+          <span style="color:rgba(255,165,120,1); font-weight:700;">&#9679; Amber</span> = the model <b>over-predicts</b> it (observed &lt; reproduced).<br>
+          Colour intensity scales with the residual's size; the diagonal is skipped because it compares a variable with itself.</p>
+        </div>
+      </div>
+
+      <div class="hrm-rule">
+        <div class="hrm-icon" style="background:rgba(251,113,133,.1); color:rgba(251,113,133,.9);">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div>
+          <h4>The 0.10 rule of thumb</h4>
+          <p>Cells with <b>|residual| &gt; 0.10</b> get a red outline. A few isolated flags are normal sampling noise. But if <b>many</b> cells are flagged — a common benchmark is more than ~5% of the off-diagonal cells — the model is systematically missing structure, and the summary line under the matrix turns into a warning.</p>
+        </div>
+      </div>
+
+      <div class="hrm-rule">
+        <div class="hrm-icon" style="background:rgba(74,222,128,.1); color:rgba(74,222,128,.9);">
+          <i class="fa-solid fa-list-check"></i>
+        </div>
+        <div>
+          <h4>What large residuals tell you</h4>
+          <p>1&#41; A <b>cluster of flagged cells among the same variables</b> usually means one more factor is hiding there — try extracting an additional factor.<br>
+          2&#41; A <b>single flagged pair</b> often signals a specific relationship (e.g. two nearly-identical items); consider dropping or combining one of them.<br>
+          3&#41; Flags spread <b>evenly everywhere</b> point to a generally poor fit — revisit the extraction method or whether the data suit factor analysis.<br>
+          4&#41; Cross-check with <b>RMSR</b> above: it is the average of these residuals, so a good RMSR with a few local flags is usually acceptable.</p>
+        </div>
+      </div>
+
+      <div class="hrm-rule">
+        <div class="hrm-icon" style="background:rgba(255,165,120,.1); color:rgba(255,165,120,.9);">
+          <i class="fa-solid fa-rotate"></i>
+        </div>
+        <div>
+          <h4>Oblique rotation caveat</h4>
+          <p>With <b>Promax or Oblimin</b>, factors are allowed to correlate, and the exact reproduced matrix would need the factor correlation matrix (&Phi;): <b>L&Phi;L&prime;</b>. This view uses the simpler <b>LL&prime;</b> approximation, so with oblique rotations treat the residuals as <b>indicative</b> — small discrepancies may come from the approximation rather than a bad model.</p>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ── Anti-Image / MSA Help Modal ─────────────────────────────────── -->
   <div id="msaHelpModal" class="hrm-modal" onclick="if(event.target===this)this.classList.remove('open')">

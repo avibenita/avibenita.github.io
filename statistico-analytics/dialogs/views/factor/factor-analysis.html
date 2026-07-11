@@ -1030,6 +1030,18 @@
       font-size:.85rem; color:var(--text-secondary);
     }
 
+    .msa-summary-row{
+      display:flex; gap:12px; align-items:stretch; flex-wrap:wrap; margin-top:10px;
+    }
+    .msa-summary-row .msa-summary-col,
+    .msa-summary-row .msa-refinement-col{
+      flex:1; min-width:300px; display:flex; flex-direction:column;
+    }
+    .msa-summary-row.refinement-hidden .msa-refinement-col{ display:none; }
+    .msa-summary-row.refinement-hidden .msa-summary-col{ flex:1 1 100%; min-width:0; }
+    .msa-refinement-col .refinement-panel{ margin-top:0; flex:1; }
+    .msa-refinement-col .optimize-vars-btn{ align-self:flex-start; margin-top:10px; }
+
     /* ── Extraction: scree + eigenvalues side by side ── */
     .extraction-main-row{
       display:flex; gap:12px; align-items:stretch; flex-wrap:wrap; margin-top:12px;
@@ -1255,20 +1267,32 @@
               </div>
             </div>
             <div class="viz-card">
-              <div class="viz-title-row">
-                <div class="viz-title" style="margin-bottom:0; display:flex; align-items:center; gap:8px;">
-                  MSA Summary
-                  <button class="hl-info-btn" onclick="document.getElementById('msaHelpModal').classList.add('open')" title="What is MSA and how do I use it?">?</button>
+              <div id="msaSummaryRow" class="msa-summary-row refinement-hidden">
+                <div class="msa-summary-col">
+                  <div class="viz-title-row">
+                    <div class="viz-title" style="margin-bottom:0; display:flex; align-items:center; gap:8px;">
+                      MSA Summary
+                      <button class="hl-info-btn" onclick="document.getElementById('msaHelpModal').classList.add('open')" title="What is MSA and how do I use it?">?</button>
+                    </div>
+                  </div>
+                  <div id="msaTableWrap" style="margin-top:8px;">
+                    <div class="hint-empty">Awaiting correlation matrix...</div>
+                  </div>
+                </div>
+                <div class="msa-refinement-col">
+                  <div class="viz-title-row">
+                    <div class="viz-title" style="margin-bottom:0; display:flex; align-items:center; gap:8px;">
+                      Suggested Refinement
+                      <button class="hl-info-btn" onclick="document.getElementById('msaHelpModal').classList.add('open')" title="How to refine the variable set when MSA is weak">?</button>
+                    </div>
+                  </div>
+                  <div id="suggestedRefinementPanel" class="refinement-panel" style="display:none; margin-top:8px;"></div>
+                  <button type="button" class="optimize-vars-btn" id="optimizeVarsBtn" style="display:none;" onclick="openFactorabilityModal()">
+                    <i class="fa-solid fa-chart-line"></i> Improve Factorability
+                  </button>
                 </div>
               </div>
-              <div id="msaTableWrap" style="margin-top:10px;">
-                <div class="hint-empty">Awaiting correlation matrix...</div>
-              </div>
-              <div id="suggestedRefinementPanel" class="refinement-panel" style="display:none;"></div>
-              <button type="button" class="optimize-vars-btn" id="optimizeVarsBtn" style="display:none;" onclick="openFactorabilityModal()">
-                <i class="fa-solid fa-chart-line"></i> Improve Factorability
-              </button>
-              <details class="antiimage-collapse" id="antiImageCollapse">
+              <details class="antiimage-collapse" id="antiImageCollapse" style="margin-top:12px;">
                 <summary><i class="fa-solid fa-table-cells"></i> Anti-image matrix</summary>
                 <div class="antiimage-collapse-body">
                   <div id="antiImageWrap" class="heatmap-wrap"></div>
@@ -2237,6 +2261,7 @@
     function renderRefinementPanel(labels, msa, matrix, caseCount) {
       var panel = document.getElementById("suggestedRefinementPanel");
       var optBtn = document.getElementById("optimizeVarsBtn");
+      var row = document.getElementById("msaSummaryRow");
       if (!panel) return null;
       var low = [];
       msa.forEach(function(v, i) {
@@ -2246,6 +2271,7 @@
       if (!low.length) {
         panel.style.display = "none";
         if (optBtn) optBtn.style.display = "none";
+        if (row) row.classList.add("refinement-hidden");
         return { lowMsaVars: [], estimatedKmo: NaN };
       }
       var removeIdx = low.map(function(x) { return x.index; });
@@ -2256,14 +2282,14 @@
         return '<span class="refinement-chip"><i class="fa-solid fa-xmark"></i> ' + x.label + '</span>';
       }).join("");
       panel.innerHTML =
-        '<h4><i class="fa-solid fa-lightbulb"></i> Suggested refinement</h4>'
-        + '<div style="font-size:.82rem; color:var(--text-secondary);">Remove variables with unacceptable MSA, then re-run factor analysis:</div>'
+        '<div style="font-size:.82rem; color:var(--text-secondary);">Remove variables with unacceptable MSA, then re-run factor analysis:</div>'
         + '<div class="refinement-remove-list">' + chips + '</div>'
         + '<div class="refinement-estimate">Estimated KMO after removal: <b>' + (isFinite(estKmo) ? formatNumber(estKmo) : "—") + '</b>'
         + (isFinite(estKmo) && estKmo >= 0.60 ? ' <span style="color:var(--success);">— may reach acceptable adequacy</span>' : '')
         + ' · Open <b>Improve Factorability</b> to compare strategies and customize removals.</div>';
       panel.style.display = "block";
       if (optBtn) optBtn.style.display = "inline-flex";
+      if (row) row.classList.remove("refinement-hidden");
       return { lowMsaVars: low, estimatedKmo: estKmo };
     }
 
@@ -4517,6 +4543,8 @@
       if (corrStats) corrStats.innerHTML = "";
       var refinePanel = document.getElementById("suggestedRefinementPanel");
       if (refinePanel) { refinePanel.style.display = "none"; refinePanel.innerHTML = ""; }
+      var msaRow = document.getElementById("msaSummaryRow");
+      if (msaRow) msaRow.classList.add("refinement-hidden");
       var optBtn = document.getElementById("optimizeVarsBtn");
       if (optBtn) optBtn.style.display = "none";
       var antiCollapse = document.getElementById("antiImageCollapse");

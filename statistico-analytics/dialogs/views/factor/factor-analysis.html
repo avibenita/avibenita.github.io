@@ -876,6 +876,16 @@
     .extraction-main-row .viz-card{ display:flex; flex-direction:column; }
     .extraction-main-row .scree-wrap{ flex:1; }
 
+    /* ── Factor Scores: distribution + map side by side ── */
+    .scores-viz-row{
+      display:flex; gap:12px; align-items:stretch; flex-wrap:wrap; margin-top:12px;
+    }
+    .scores-viz-row .viz-card{
+      flex:1; min-width:340px; margin-top:0;
+      display:flex; flex-direction:column;
+    }
+    .scores-viz-row .score-chart-container{ flex:1; min-height:300px; height:300px; }
+
     /* ── Scores charts ── */
     .score-chart-container{ width:100%; height:300px; }
     .score-select{
@@ -1449,35 +1459,42 @@
                 </div>
               </div>
             </div>
-            <!-- Section 2: Distribution -->
-            <div class="viz-card">
-              <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-                <div class="viz-title" style="margin-bottom:0;">Score Distribution</div>
-                <select id="scoreHistSelect" class="score-select" onchange="renderScoreHistogram()"></select>
-              </div>
-              <div id="scoreHistChart" class="score-chart-container" style="margin-top:8px;">
-                <div class="hint-empty">Awaiting factor scores...</div>
-              </div>
-            </div>
-            <!-- Section 3: Factor score scatterplot -->
-            <div class="viz-card">
-              <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-                <div class="viz-title" style="margin-bottom:0;">Factor Score Map</div>
-                <div class="score-scatter-controls">
-                  <select id="scoreScatterX" class="score-select" onchange="renderScoreScatter()"></select>
-                  <span style="color:var(--text-muted); font-size:.8rem;">vs</span>
-                  <select id="scoreScatterY" class="score-select" onchange="renderScoreScatter()"></select>
-                  <label class="score-ellipse-toggle" title="Draw a 95% confidence ellipse around the score cloud">
-                    <input type="checkbox" id="scoreShowEllipse" onchange="renderScoreScatter()">
-                    <span>95% ellipse</span>
-                  </label>
+            <!-- Sections 2 + 3: Distribution and Factor Score Map, side by side -->
+            <div class="scores-viz-row">
+              <div class="viz-card">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                  <div class="viz-title" style="margin-bottom:0; display:flex; align-items:center; gap:8px;">
+                    Score Distribution
+                    <button class="hl-info-btn" onclick="document.getElementById('scoreHistHelpModal').classList.add('open')" title="How to read the score distribution histogram">?</button>
+                  </div>
+                  <select id="scoreHistSelect" class="score-select" onchange="renderScoreHistogram()"></select>
+                </div>
+                <div id="scoreHistChart" class="score-chart-container" style="margin-top:8px;">
+                  <div class="hint-empty">Awaiting factor scores...</div>
                 </div>
               </div>
-              <div id="scoreScatterChart" class="score-chart-container" style="margin-top:8px;">
-                <div class="hint-empty">Awaiting factor scores...</div>
+              <div class="viz-card">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                  <div class="viz-title" style="margin-bottom:0; display:flex; align-items:center; gap:8px;">
+                    Factor Score Map
+                    <button class="hl-info-btn" onclick="document.getElementById('scoreMapHelpModal').classList.add('open')" title="How to read the factor score scatter map">?</button>
+                  </div>
+                  <div class="score-scatter-controls">
+                    <select id="scoreScatterX" class="score-select" onchange="renderScoreScatter()"></select>
+                    <span style="color:var(--text-muted); font-size:.8rem;">vs</span>
+                    <select id="scoreScatterY" class="score-select" onchange="renderScoreScatter()"></select>
+                    <label class="score-ellipse-toggle" title="Draw a 95% confidence ellipse around the score cloud">
+                      <input type="checkbox" id="scoreShowEllipse" onchange="renderScoreScatter()">
+                      <span>95% ellipse</span>
+                    </label>
+                  </div>
+                </div>
+                <div id="scoreScatterChart" class="score-chart-container" style="margin-top:8px;">
+                  <div class="hint-empty">Awaiting factor scores...</div>
+                </div>
               </div>
-              <div class="section-note">Each point is a case positioned by its factor scores. Mean reference lines divide quadrants; orange points are statistical outliers (beyond 2 SD on an axis or by Mahalanobis distance). Click a point to highlight its row in the export table below.</div>
             </div>
+            <div class="section-note">Distribution shows how cases spread on each factor; the map plots two factors together. Orange points are outliers; click a point to jump to its row in the export table below.</div>
             <!-- Section 4: Export table -->
             <div class="stat-panel">
               <div class="stat-panel-heading"><i class="fa-solid fa-table-cells-large"></i> Case-wise Factor Scores (Export)</div>
@@ -3693,6 +3710,81 @@
     });
   </script>
   </div><!-- /right-col -->
+
+  <!-- ── Score Distribution Help Modal ───────────────────────────────── -->
+  <div id="scoreHistHelpModal" class="hrm-modal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="hrm-box" style="width:500px;">
+      <button class="hrm-close" onclick="document.getElementById('scoreHistHelpModal').classList.remove('open')">&#x2715;</button>
+      <h3><i class="fa-solid fa-chart-column" style="color:var(--accent-2);"></i> Score Distribution</h3>
+      <p class="hrm-subtitle">How cases are spread on each factor — shape, skew, and overlap between factors</p>
+      <hr class="hrm-div">
+      <div class="hrm-rule">
+        <div class="hrm-icon" style="background:rgba(120,200,255,.1); color:rgba(120,200,255,.9);"><i class="fa-solid fa-circle-question"></i></div>
+        <div>
+          <h4>What this shows</h4>
+          <p>Each bar counts how many cases fall in a score bin for the selected factor. You are looking at the <b>distribution of estimated factor scores</b>, not raw item scores. Switch factors with the dropdown, or choose <b>Overlay both factors</b> to compare Factor 1 and Factor 2 on the same axis with shared bins.</p>
+        </div>
+      </div>
+      <div class="hrm-rule">
+        <div class="hrm-icon" style="background:rgba(120,200,255,.1); color:rgba(120,200,255,.9);"><i class="fa-solid fa-eye"></i></div>
+        <div>
+          <h4>What to look for</h4>
+          <p><b>Approximately bell-shaped</b> — scores behave like a normal latent dimension.<br>
+          <b>Strong skew</b> — many cases pile up at one end; the factor may be ceiling/floor limited or the sample is homogeneous.<br>
+          <b>Bimodal humps</b> — possible subgroups (check the score map for clusters).<br>
+          Compare overlay mode: if two factors have very similar shapes, they may be hard to distinguish at the case level.</p>
+        </div>
+      </div>
+      <div class="hrm-rule">
+        <div class="hrm-icon" style="background:rgba(255,165,120,.1); color:rgba(255,165,120,.9);"><i class="fa-solid fa-ruler"></i></div>
+        <div>
+          <h4>Scaling reminder</h4>
+          <p>Standard factor scores cluster near <b>0</b> (SD ≈ 1). If bins sit around 100–150, read the <b>Scaling</b> field above — those are likely T-scores or another rescaled metric, not z-scores.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Factor Score Map Help Modal ─────────────────────────────────── -->
+  <div id="scoreMapHelpModal" class="hrm-modal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="hrm-box" style="width:520px;">
+      <button class="hrm-close" onclick="document.getElementById('scoreMapHelpModal').classList.remove('open')">&#x2715;</button>
+      <h3><i class="fa-solid fa-chart-scatter" style="color:var(--accent-2);"></i> Factor Score Map</h3>
+      <p class="hrm-subtitle">Two factors at once — clusters, outliers, and case-level profiles</p>
+      <hr class="hrm-div">
+      <div class="hrm-rule">
+        <div class="hrm-icon" style="background:rgba(120,200,255,.1); color:rgba(120,200,255,.9);"><i class="fa-solid fa-circle-question"></i></div>
+        <div>
+          <h4>What this shows</h4>
+          <p>Every point is one case positioned by its scores on the X and Y factors you select. It answers: <b>who is high on both, low on both, or mixed?</b> Dashed blue lines mark each factor's <b>mean</b>, splitting the plot into quadrants. Faint zero lines appear when the mean is far from zero.</p>
+        </div>
+      </div>
+      <div class="hrm-rule">
+        <div class="hrm-icon" style="background:rgba(255,165,120,.1); color:rgba(255,165,120,.9);"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div>
+          <h4>Orange outliers</h4>
+          <p>Points turn <b>orange</b> when they are extreme on either axis (beyond 2 SD from that factor's mean) or by <b>Mahalanobis distance</b> in the 2D score space (multivariate outlier). Inspect these cases — they often drive cross-loadings or distort group comparisons.</p>
+        </div>
+      </div>
+      <div class="hrm-rule">
+        <div class="hrm-icon" style="background:rgba(196,165,255,.15); color:rgba(196,165,255,.9);"><i class="fa-solid fa-ellipsis"></i></div>
+        <div>
+          <h4>95% ellipse &amp; interaction</h4>
+          <p>Toggle <b>95% ellipse</b> to see the bulk of the cloud under a bivariate normal assumption — useful with oblique factors. <b>Hover</b> a point for Case ID and exact scores; <b>click</b> to highlight and scroll to that row in the export table below.</p>
+        </div>
+      </div>
+      <div class="hrm-rule">
+        <div class="hrm-icon" style="background:rgba(74,222,128,.1); color:rgba(74,222,128,.9);"><i class="fa-solid fa-lightbulb"></i></div>
+        <div>
+          <h4>Reading patterns</h4>
+          <p><b>Tight cluster</b> — cases share similar profiles on both factors.<br>
+          <b>Diagonal spread</b> — factors co-vary (check Factor Correlation above).<br>
+          <b>Separate blobs</b> — candidate subgroups worth naming in Interpretation.<br>
+          <b>Isolated points</b> — unusual cases; verify data entry before dropping.</p>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ── Residual Correlation Help Modal ─────────────────────────────── -->
   <div id="residualHelpModal" class="hrm-modal" onclick="if(event.target===this)this.classList.remove('open')">

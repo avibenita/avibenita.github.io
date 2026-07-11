@@ -5913,7 +5913,8 @@ const StatisticoHeader = {
         'Standalone power calculator for a proportions comparison. Set the two expected proportions and α, then read achieved power at given group sizes or the N required for target power.',
       'power-sbReg':
         'Standalone power calculator for multiple regression. Set R² (or f²), the number of predictors, and α, then read achieved power at a given N or the N required for target power.',
-      'factor-suitability': 'Check KMO, Bartlett, determinant, and correlation adequacy before trusting factor extraction.',
+      'factor-suitability':
+        'Read the evidence-driven verdict banner, KMO, Bartlett, determinant, correlation heatmap (Avg |r|), MSA summary bars, suggested refinement panel, and optional Optimize Variables path. Explain whether factor analysis is appropriate and which variables to remove — use exact MSA and KMO values.',
       'factor-extraction': 'Review eigenvalues, variance explained, communalities, and extraction choice.',
       'factor-rotation': 'Inspect rotated loadings to see whether factors become interpretable and simple.',
       'factor-diagnostics': 'Check residuals, model fit, cross-loadings, and problematic variables.',
@@ -6377,11 +6378,17 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
     }
     const viewKey = this._getInsightGuideViewKey();
     try {
-      const prompt = this.module === 'correlations'
-        ? this._buildCorrelationStructuredPrompt(this.currentView, 'per-view')
-        : this.module === 'univariate'
-          ? this._buildStructuredPrompt(viewKey, 'per-view')
-          : this._buildGenericInsightGuidePrompt(viewKey);
+      let prompt;
+      if (this.module === 'factor' && viewKey === 'factor-suitability' &&
+          typeof window.buildFactorSuitabilityAiPrompt === 'function') {
+        prompt = window.buildFactorSuitabilityAiPrompt();
+      } else {
+        prompt = this.module === 'correlations'
+          ? this._buildCorrelationStructuredPrompt(this.currentView, 'per-view')
+          : this.module === 'univariate'
+            ? this._buildStructuredPrompt(viewKey, 'per-view')
+            : this._buildGenericInsightGuidePrompt(viewKey);
+      }
       if (!prompt) { this._showAiOverlay(null, viewKey); return; }
       const raw = await this._callAiForSidebar(prompt);
       const sections = this._parseAiStructured(raw);

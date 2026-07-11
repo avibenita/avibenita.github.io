@@ -260,6 +260,23 @@ function invertMatrix(A) {
   return M.map(row => row.slice(n));
 }
 
+function computeKMOFromR(R) {
+  const Q = invertMatrix(R);
+  if (!Q || !Q.length) return NaN;
+  const n = R.length;
+  let sumR2 = 0;
+  let sumA2 = 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (i === j) continue;
+      const a = -Q[i][j] / Math.sqrt(Q[i][i] * Q[j][j]);
+      sumR2 += R[i][j] * R[i][j];
+      sumA2 += a * a;
+    }
+  }
+  return (sumR2 + sumA2) > 0 ? sumR2 / (sumR2 + sumA2) : NaN;
+}
+
 function varimaxRotate(loadings, maxIter = 30, tol = 1e-6) {
   const p = loadings.length;
   const m = p ? loadings[0].length : 0;
@@ -380,6 +397,7 @@ function buildFactorBundle(headers, rows, modelSpec) {
 
   const R = correlationMatrix(X);
   const detR = determinant(R);
+  const kmo = computeKMOFromR(R);
   const eig = jacobiEigen(R);
   const eigVals = eig.eigenvalues.map(v => Math.max(0, v));
   const total = eigVals.reduce((a, b) => a + b, 0) || 1;
@@ -468,8 +486,10 @@ function buildFactorBundle(headers, rows, modelSpec) {
       variableCount: numericNames.length,
       caseCount: X.length,
       missingPattern: missingRows > 0 ? `${missingRows} rows excluded due to missing/non-numeric` : "No major missing issue",
-      verdict: numericNames.length >= 3 ? "Suitable for exploratory FA" : "Borderline: use with caution",
-      kmo: Math.max(0.45, Math.min(0.92, 0.55 + meanComm * 0.35)),
+      verdict: numericNames.length >= 3
+        ? (kmo >= 0.60 ? "Suitable for exploratory FA" : (kmo >= 0.50 ? "Marginal suitability" : "Not recommended"))
+        : "Borderline: use with caution",
+      kmo: isFinite(kmo) ? kmo : 0,
       bartlettChi2: Math.max(1, X.length * numericNames.length * 0.8),
       bartlettP: 0.001,
       determinantR: detR,

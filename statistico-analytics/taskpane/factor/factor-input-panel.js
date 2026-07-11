@@ -482,6 +482,11 @@ function buildFactorBundle(headers, rows, modelSpec) {
   const rawDataCols = ['#'].concat(numericNames);
 
   return {
+    modelSpec: {
+      variables: numericNames,
+      factors: retained,
+      rotationMethod: (modelSpec && modelSpec.rotationMethod) || "Varimax"
+    },
     suitability: {
       variableCount: numericNames.length,
       caseCount: X.length,
@@ -567,14 +572,22 @@ function openFactorResultsDialog() {
               sendFactorBundle();
             } else if (message.action === "HOST_EVENT") {
               const cmd = message.cmd || "";
-              if (cmd === "factorRotationChanged") {
+              if (cmd === "applyFactorRefinement") {
                 const modelSpec = JSON.parse(sessionStorage.getItem("factorModelSpec") || "{}");
-                if (message.data && message.data.rotationMethod) {
-                  modelSpec.rotationMethod = String(message.data.rotationMethod);
+                if (message.data && Array.isArray(message.data.variables) && message.data.variables.length >= 2) {
+                  modelSpec.variables = message.data.variables.slice();
                   sessionStorage.setItem("factorModelSpec", JSON.stringify(modelSpec));
                 }
+              } else {
+                if (cmd === "factorRotationChanged") {
+                  const modelSpec = JSON.parse(sessionStorage.getItem("factorModelSpec") || "{}");
+                  if (message.data && message.data.rotationMethod) {
+                    modelSpec.rotationMethod = String(message.data.rotationMethod);
+                    sessionStorage.setItem("factorModelSpec", JSON.stringify(modelSpec));
+                  }
+                }
+                sendFactorBundle();
               }
-              sendFactorBundle();
             } else if (message.action === "close") {
               if (window.StatisticoDialogHost) {
                 StatisticoDialogHost.closeFromMessage(factorDialog, function () { factorDialog = null; });

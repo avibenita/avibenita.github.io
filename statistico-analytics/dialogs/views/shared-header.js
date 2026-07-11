@@ -1113,6 +1113,7 @@ const StatisticoHeader = {
       extraction: 'Choose factors and extraction details.',
       rotation: 'Simplify the loading structure.',
       scores: 'Inspect computed factor scores.',
+      'factor scores': 'Distribution, map, and export of case-level factor scores.',
       viewdata: 'Open the analysis data table.',
       summary: 'See the main analysis snapshot.',
       components: 'Review retained components.',
@@ -1387,7 +1388,7 @@ const StatisticoHeader = {
             { type: 'tab', tab: 'rotation', icon: 'fa-diagram-project', label: 'Structure', description: 'Interpret the loading pattern.' },
             { type: 'tab', tab: 'interpretation', icon: 'fa-lightbulb', label: 'Interpretation', description: 'Name factors, AI details & cross-loadings.' },
             { type: 'tab', tab: 'diagnostics', icon: 'fa-stethoscope', label: 'Diagnostics' },
-            { type: 'tab', tab: 'scores', icon: 'fa-chart-scatter', label: 'Scores' },
+            { type: 'tab', tab: 'scores', icon: 'fa-chart-scatter', label: 'Factor Scores', description: 'Distribution, map, and export of case-level factor scores.' },
             { type: 'tab', tab: 'viewdata', icon: 'fa-table', label: 'View Data' }
           ]
         }]

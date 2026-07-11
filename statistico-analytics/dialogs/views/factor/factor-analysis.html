@@ -9,7 +9,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="../shared-header.css?v=20260530a"/>  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
-  <script src="../shared-header.js?v=20260710c"></script>
+  <script src="../shared-header.js?v=20260711a"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -883,6 +883,26 @@
       border:1px solid rgba(120,200,255,0.35); border-radius:8px; padding:5px 8px;
       font-size:.8rem;
     }
+    .score-scatter-controls{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .score-ellipse-toggle{
+      display:inline-flex; align-items:center; gap:6px; font-size:.78rem;
+      color:var(--text-secondary); cursor:pointer; user-select:none;
+    }
+    .score-ellipse-toggle input{ accent-color:var(--accent-2); cursor:pointer; }
+    .scores-export-wrap{ max-height:360px; overflow:auto; }
+    .scores-export-table td:first-child,
+    .scores-export-table th:first-child{
+      position:sticky; left:0; z-index:2;
+      background:rgba(32,37,52,.98);
+      box-shadow:2px 0 6px rgba(0,0,0,.25);
+    }
+    .scores-export-table tr.score-row-highlight td{
+      background:rgba(255,165,120,.18) !important;
+      outline:1px solid rgba(255,165,120,.55);
+    }
+    .score-scaling-note{
+      font-size:.78rem; color:var(--warning); margin-top:6px; line-height:1.45;
+    }
 
     /* ── View Data tab ── */
     .viewdata-toolbar {
@@ -978,7 +998,7 @@
           </button>
           <button class="sb-item" onclick="switchTab('scores')" data-tab="scores">
             <i class="fa-solid fa-chart-scatter sb-item-icon"></i>
-            <span class="sb-item-label">Scores</span>
+            <span class="sb-item-label">Factor Scores</span>
           </button>
           <button class="sb-item" onclick="switchTab('viewdata')" data-tab="viewdata">
             <i class="fa-solid fa-table sb-item-icon"></i>
@@ -1399,7 +1419,20 @@
                     </span>
                     <span class="stat-value" id="scoreDims">...</span>
                   </div>
+                  <div class="stat-field">
+                    <span class="stat-label">Scaling:
+                      <span class="info-icon">i<span class="tip">How scores are scaled. Standard factor scores are usually near <b>0</b> with SD <b>≈ 1</b>. Values like 140–190 suggest <b>T-scores</b> or another rescaled metric — not an error, but check before interpreting.</span></span>
+                    </span>
+                    <span class="stat-value" id="scoreScaling" style="min-width:160px; font-size:.78rem;">...</span>
+                  </div>
+                  <div class="stat-field">
+                    <span class="stat-label">Factor Correlation:
+                      <span class="info-icon">i<span class="tip">Pearson correlation between factor score columns. Especially meaningful with <b>oblique</b> rotations where factors may correlate. Near zero suggests orthogonal factors.</span></span>
+                    </span>
+                    <span class="stat-value" id="scoreFactorCorr">...</span>
+                  </div>
                   <div class="stat-field"><span class="stat-label">Export Ready:</span><span class="stat-value" id="scoreExportReady">...</span></div>
+                  <div class="score-scaling-note" id="scoreScalingNote" style="display:none;"></div>
                 </div>
               </div>
               <div class="stat-panel" style="min-width:340px;">
@@ -1430,23 +1463,27 @@
             <div class="viz-card">
               <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
                 <div class="viz-title" style="margin-bottom:0;">Factor Score Map</div>
-                <div style="display:flex; align-items:center; gap:8px;">
+                <div class="score-scatter-controls">
                   <select id="scoreScatterX" class="score-select" onchange="renderScoreScatter()"></select>
                   <span style="color:var(--text-muted); font-size:.8rem;">vs</span>
                   <select id="scoreScatterY" class="score-select" onchange="renderScoreScatter()"></select>
+                  <label class="score-ellipse-toggle" title="Draw a 95% confidence ellipse around the score cloud">
+                    <input type="checkbox" id="scoreShowEllipse" onchange="renderScoreScatter()">
+                    <span>95% ellipse</span>
+                  </label>
                 </div>
               </div>
               <div id="scoreScatterChart" class="score-chart-container" style="margin-top:8px;">
                 <div class="hint-empty">Awaiting factor scores...</div>
               </div>
-              <div class="section-note">Each point is a case positioned by its factor scores. Clusters suggest subgroups; isolated points are cases with unusual factor-score profiles worth inspecting.</div>
+              <div class="section-note">Each point is a case positioned by its factor scores. Mean reference lines divide quadrants; orange points are statistical outliers (beyond 2 SD on an axis or by Mahalanobis distance). Click a point to highlight its row in the export table below.</div>
             </div>
             <!-- Section 4: Export table -->
             <div class="stat-panel">
               <div class="stat-panel-heading"><i class="fa-solid fa-table-cells-large"></i> Case-wise Factor Scores (Export)</div>
               <div class="stat-panel-body" style="padding:0;">
-                <div class="table-container" style="margin:0;">
-                  <table class="analysis-table">
+                <div class="table-container scores-export-wrap" style="margin:0;">
+                  <table class="analysis-table scores-export-table">
                     <thead id="scoresHead"></thead>
                     <tbody id="scoresBody">
                       <tr><td class="hint-empty">Awaiting factor scores...</td></tr>
@@ -1518,7 +1555,7 @@
         'rotation':       'Structure',
         'interpretation': 'Interpretation',
         'diagnostics':    'Diagnostics',
-        'scores':         'Scores',
+        'scores':         'Factor Scores',
         'viewdata':       'View Data'
       };
       if (tabTitles[tabKey] && typeof StatisticoHeader !== 'undefined') {
@@ -2527,6 +2564,183 @@
     }
 
     var _faScoreData = { cols: [], factorCols: [], rows: [] };
+    var _faScoreHighlightCase = null;
+
+    function scoreMean(vals) {
+      return vals.length ? vals.reduce(function(a, b){ return a + b; }, 0) / vals.length : NaN;
+    }
+
+    function scoreSd(vals, mean) {
+      if (vals.length < 2) return 0;
+      var m = isFinite(mean) ? mean : scoreMean(vals);
+      return Math.sqrt(vals.reduce(function(a, b){ return a + (b - m) * (b - m); }, 0) / (vals.length - 1));
+    }
+
+    function scorePearson(colA, colB) {
+      var xs = [], ys = [];
+      (_faScoreData.rows || []).forEach(function(r) {
+        var x = parseMaybeNumber(r[colA]), y = parseMaybeNumber(r[colB]);
+        if (isFinite(x) && isFinite(y)) { xs.push(x); ys.push(y); }
+      });
+      if (xs.length < 2) return NaN;
+      var mx = scoreMean(xs), my = scoreMean(ys);
+      var num = 0, dx2 = 0, dy2 = 0;
+      for (var i = 0; i < xs.length; i++) {
+        var dx = xs[i] - mx, dy = ys[i] - my;
+        num += dx * dy; dx2 += dx * dx; dy2 += dy * dy;
+      }
+      var den = Math.sqrt(dx2 * dy2);
+      return den > 0 ? num / den : NaN;
+    }
+
+    function inferScoreScaling(d) {
+      if (d && d.scaling) return String(d.scaling);
+      var fCols = _faScoreData.factorCols || [];
+      var all = [];
+      fCols.forEach(function(c) { getScoreColumnValues(c).forEach(function(v){ all.push(v); }); });
+      if (!all.length) return "Unknown";
+      var mean = scoreMean(all), sd = scoreSd(all, mean);
+      var min = Math.min.apply(null, all), max = Math.max.apply(null, all);
+      if (Math.abs(mean) < 0.6 && sd > 0.4 && sd < 2.5 && min >= -6 && max <= 6) {
+        return "Standardized (z-like, mean \u2248 0, SD \u2248 1)";
+      }
+      if (mean > 35 && mean < 65 && sd > 5 && sd < 20) {
+        return "T-scores (mean \u2248 " + formatNumber(mean) + ", SD \u2248 " + formatNumber(sd) + ")";
+      }
+      if (mean > 85 && mean < 115 && sd > 8 && sd < 25) {
+        return "IQ-type scale (mean \u2248 " + formatNumber(mean) + ", SD \u2248 " + formatNumber(sd) + ")";
+      }
+      if (Math.abs(mean) > 2 || sd > 2.5 || min < -8 || max > 8) {
+        return "Rescaled / unstandardized (mean \u2248 " + formatNumber(mean) + ", SD \u2248 " + formatNumber(sd) + ")";
+      }
+      return "Standardized (mean \u2248 " + formatNumber(mean) + ", SD \u2248 " + formatNumber(sd) + ")";
+    }
+
+    function updateScoreScalingDisplay(d) {
+      var scaling = inferScoreScaling(d);
+      setText("scoreScaling", scaling, "...");
+      var note = document.getElementById("scoreScalingNote");
+      if (note) {
+        if (/T-score|Rescaled|IQ-type|unstandardized/i.test(scaling)) {
+          note.style.display = "block";
+          note.textContent = "These values are not typical z-scores (\u22122 to +2). Confirm the scaling with your extraction settings before interpreting individual cases.";
+        } else {
+          note.style.display = "none";
+          note.textContent = "";
+        }
+      }
+    }
+
+    function updateScoreFactorCorrelation() {
+      var el = document.getElementById("scoreFactorCorr");
+      if (!el) return;
+      var fCols = _faScoreData.factorCols || [];
+      if (fCols.length < 2) {
+        el.textContent = "N/A (single factor)";
+        return;
+      }
+      var r = scorePearson(fCols[0], fCols[1]);
+      var rot = factorPayloadForAI && factorPayloadForAI.rotation;
+      var phi = rot ? parseMaybeNumber(rot.phiMax) : NaN;
+      var isOblique = rot && rot.rotationMethod && /promax|oblimin/i.test(String(rot.rotationMethod));
+      var text = isFinite(r) ? formatNumber(r) + " (" + fCols[0] + " \u00D7 " + fCols[1] + ")" : "N/A";
+      if (isOblique && isFinite(phi)) text += " \u00B7 \u03A6 max " + formatNumber(phi);
+      el.textContent = text;
+    }
+
+    function buildHistogramBins(vals, min, max, binCount) {
+      var width = (max - min) / binCount || 1;
+      var bins = [];
+      for (var i = 0; i < binCount; i++) bins.push(0);
+      vals.forEach(function(v) {
+        var idx = Math.min(binCount - 1, Math.floor((v - min) / width));
+        bins[idx]++;
+      });
+      return bins.map(function(count, i) {
+        return { x: min + (i + 0.5) * width, y: count };
+      });
+    }
+
+    function buildConfidenceEllipse(colX, colY) {
+      var xs = [], ys = [];
+      (_faScoreData.rows || []).forEach(function(r) {
+        var x = parseMaybeNumber(r[colX]), y = parseMaybeNumber(r[colY]);
+        if (isFinite(x) && isFinite(y)) { xs.push(x); ys.push(y); }
+      });
+      if (xs.length < 3) return [];
+      var mx = scoreMean(xs), my = scoreMean(ys);
+      var n = xs.length;
+      var sxx = 0, syy = 0, sxy = 0;
+      for (var i = 0; i < n; i++) {
+        var dx = xs[i] - mx, dy = ys[i] - my;
+        sxx += dx * dx; syy += dy * dy; sxy += dx * dy;
+      }
+      sxx /= (n - 1); syy /= (n - 1); sxy /= (n - 1);
+      var trace = sxx + syy;
+      var det = sxx * syy - sxy * sxy;
+      var disc = Math.max(0, trace * trace / 4 - det);
+      var root = Math.sqrt(disc);
+      var l1 = trace / 2 + root, l2 = trace / 2 - root;
+      var v1x = sxy, v1y = l1 - sxx;
+      if (Math.abs(v1x) + Math.abs(v1y) < 1e-9) { v1x = 1; v1y = 0; }
+      var len1 = Math.sqrt(v1x * v1x + v1y * v1y) || 1;
+      v1x /= len1; v1y /= len1;
+      var v2x = -v1y, v2y = v1x;
+      var chi = 5.991;
+      var a1 = Math.sqrt(Math.max(0, l1) * chi), a2 = Math.sqrt(Math.max(0, l2) * chi);
+      var pts = [];
+      for (var t = 0; t <= 64; t++) {
+        var ang = (t / 64) * Math.PI * 2;
+        var ca = Math.cos(ang), sa = Math.sin(ang);
+        pts.push([mx + a1 * v1x * ca + a2 * v2x * sa, my + a1 * v1y * ca + a2 * v2y * sa]);
+      }
+      return pts;
+    }
+
+    function renderScoresTable(cols, rows) {
+      renderSimpleTableHead("scoresHead", cols);
+      var body = document.getElementById("scoresBody");
+      if (!body) return;
+      body.innerHTML = "";
+      if (!rows || !rows.length) {
+        body.innerHTML = '<tr><td colspan="' + cols.length + '" class="hint-empty">Awaiting factor scores...</td></tr>';
+        return;
+      }
+      var caseCol = cols[0];
+      rows.forEach(function(row) {
+        var tr = document.createElement("tr");
+        var caseId = caseCol ? String(row[caseCol]) : "";
+        tr.setAttribute("data-case-id", caseId);
+        if (_faScoreHighlightCase && caseId === _faScoreHighlightCase) tr.classList.add("score-row-highlight");
+        cols.forEach(function(col) {
+          var td = document.createElement("td");
+          var raw = row[col];
+          if (raw === undefined || raw === null || raw === "") td.textContent = "\u2014";
+          else {
+            var parsed = parseMaybeNumber(raw);
+            td.textContent = isFinite(parsed) && (typeof raw === "number" || /^-?\d+([.,]\d+)?([eE]-?\d+)?$/.test(String(raw).trim()))
+              ? formatNumber(parsed) : raw;
+          }
+          tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      });
+    }
+
+    function highlightScoreRow(caseId) {
+      _faScoreHighlightCase = caseId ? String(caseId) : null;
+      var body = document.getElementById("scoresBody");
+      if (!body) return;
+      var target = null;
+      body.querySelectorAll("tr[data-case-id]").forEach(function(tr) {
+        var match = tr.getAttribute("data-case-id") === _faScoreHighlightCase;
+        tr.classList.toggle("score-row-highlight", match);
+        if (match) target = tr;
+      });
+      if (target && typeof target.scrollIntoView === "function") {
+        target.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
 
     window.populateFactorScores = function(data) {
       var d = typeof data === "string" ? JSON.parse(data) : data || {};
@@ -2534,9 +2748,11 @@
       setText("scoreDims", d.dimensions, "...");
       setText("scoreExportReady", d.exportReady ? "Yes" : "No", "...");
       var cols = d.columns || ["Case", "Factor 1"];
-      renderSimpleTableHead("scoresHead", cols);
-      renderSimpleTableBody("scoresBody", d.rows || [], cols);
       _faScoreData = { cols: cols, factorCols: cols.slice(1), rows: d.rows || [] };
+      _faScoreHighlightCase = null;
+      renderScoresTable(cols, d.rows || []);
+      updateScoreScalingDisplay(d);
+      updateScoreFactorCorrelation();
       renderScoreSummary();
       populateScoreSelectors();
       renderScoreHistogram();
@@ -2577,7 +2793,25 @@
 
     function populateScoreSelectors() {
       var fCols = _faScoreData.factorCols || [];
-      [["scoreHistSelect", 0], ["scoreScatterX", 0], ["scoreScatterY", 1]].forEach(function(cfg) {
+      var histSel = document.getElementById("scoreHistSelect");
+      if (histSel) {
+        var prevHist = histSel.value;
+        histSel.innerHTML = "";
+        fCols.forEach(function(c) {
+          var o = document.createElement("option");
+          o.value = o.textContent = c;
+          histSel.appendChild(o);
+        });
+        if (fCols.length >= 2) {
+          var overlay = document.createElement("option");
+          overlay.value = "__overlay__";
+          overlay.textContent = "Overlay both factors";
+          histSel.appendChild(overlay);
+        }
+        if (prevHist && (prevHist === "__overlay__" || fCols.indexOf(prevHist) >= 0)) histSel.value = prevHist;
+        else if (fCols.length) histSel.value = fCols[0];
+      }
+      [["scoreScatterX", 0], ["scoreScatterY", 1]].forEach(function(cfg) {
         var sel = document.getElementById(cfg[0]);
         if (!sel) return;
         var prev = sel.value;
@@ -2600,27 +2834,59 @@
       var host = document.getElementById("scoreHistChart");
       if (!host || typeof Highcharts === "undefined") return;
       var sel = document.getElementById("scoreHistSelect");
-      var col = sel ? sel.value : null;
-      if (!col) { host.innerHTML = '<div class="hint-empty">Awaiting factor scores...</div>'; return; }
-      var vals = getScoreColumnValues(col);
+      var mode = sel ? sel.value : null;
+      var fCols = _faScoreData.factorCols || [];
+      if (!mode || !fCols.length) { host.innerHTML = '<div class="hint-empty">Awaiting factor scores...</div>'; return; }
+
+      var series = [], xTitle = "Factor score";
+      if (mode === "__overlay__" && fCols.length >= 2) {
+        var allVals = [];
+        fCols.slice(0, 2).forEach(function(c) { getScoreColumnValues(c).forEach(function(v){ allVals.push(v); }); });
+        if (!allVals.length) { host.innerHTML = '<div class="hint-empty">Awaiting factor scores...</div>'; return; }
+        var min = Math.min.apply(null, allVals), max = Math.max.apply(null, allVals);
+        var binCount = Math.max(6, Math.min(24, Math.ceil(Math.sqrt(allVals.length))));
+        var width = (max - min) / binCount || 1;
+        fCols.slice(0, 2).forEach(function(c, idx) {
+          var vals = getScoreColumnValues(c);
+          series.push({
+            name: c,
+            type: "column",
+            data: buildHistogramBins(vals, min, max, binCount),
+            color: idx === 0 ? "rgba(120,200,255,.7)" : "rgba(255,165,120,.65)"
+          });
+        });
+        xTitle = "Factor score (shared bins)";
+        Highcharts.chart("scoreHistChart", {
+          chart: { type: "column", backgroundColor: "transparent", animation: false },
+          title: { text: null }, credits: { enabled: false },
+          legend: { enabled: true, itemStyle: { color: "rgba(255,255,255,.78)" } },
+          xAxis: {
+            title: { text: xTitle, style: { color: "rgba(255,255,255,0.85)" } },
+            labels: { style: { color: "rgba(255,255,255,0.78)" } },
+            lineColor: "rgba(255,255,255,0.22)", tickColor: "rgba(255,255,255,0.22)"
+          },
+          yAxis: {
+            title: { text: "Cases", style: { color: "rgba(255,255,255,0.85)" } },
+            labels: { style: { color: "rgba(255,255,255,0.78)" } },
+            gridLineColor: "rgba(255,255,255,0.12)", allowDecimals: false
+          },
+          tooltip: { shared: true, pointFormat: "<span style='color:{series.color}'>\u25CF</span> {series.name}: <b>{point.y}</b><br/>" },
+          plotOptions: { column: { pointPadding: 0.02, groupPadding: 0.08, borderWidth: 0, pointRange: width } },
+          series: series
+        });
+        return;
+      }
+
+      var vals = getScoreColumnValues(mode);
       if (!vals.length) { host.innerHTML = '<div class="hint-empty">Awaiting factor scores...</div>'; return; }
-      var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
-      var binCount = Math.max(6, Math.min(24, Math.ceil(Math.sqrt(vals.length))));
-      var width = (max - min) / binCount || 1;
-      var bins = [];
-      for (var i = 0; i < binCount; i++) bins.push(0);
-      vals.forEach(function(v) {
-        var idx = Math.min(binCount - 1, Math.floor((v - min) / width));
-        bins[idx]++;
-      });
-      var points = bins.map(function(count, i) {
-        return { x: min + (i + 0.5) * width, y: count };
-      });
+      var min1 = Math.min.apply(null, vals), max1 = Math.max.apply(null, vals);
+      var binCount1 = Math.max(6, Math.min(24, Math.ceil(Math.sqrt(vals.length))));
+      var width1 = (max1 - min1) / binCount1 || 1;
       Highcharts.chart("scoreHistChart", {
         chart: { type: "column", backgroundColor: "transparent", animation: false },
         title: { text: null }, credits: { enabled: false }, legend: { enabled: false },
         xAxis: {
-          title: { text: col + " score", style: { color: "rgba(255,255,255,0.85)" } },
+          title: { text: mode + " score", style: { color: "rgba(255,255,255,0.85)" } },
           labels: { style: { color: "rgba(255,255,255,0.78)" } },
           lineColor: "rgba(255,255,255,0.22)", tickColor: "rgba(255,255,255,0.22)"
         },
@@ -2630,8 +2896,8 @@
           gridLineColor: "rgba(255,255,255,0.12)", allowDecimals: false
         },
         tooltip: { pointFormat: "<b>{point.y}</b> cases" },
-        plotOptions: { column: { pointPadding: 0.02, groupPadding: 0.02, borderWidth: 0, pointRange: width } },
-        series: [{ name: col, data: points, color: "rgba(120,200,255,.75)" }]
+        plotOptions: { column: { pointPadding: 0.02, groupPadding: 0.02, borderWidth: 0, pointRange: width1 } },
+        series: [{ name: mode, data: buildHistogramBins(vals, min1, max1, binCount1), color: "rgba(120,200,255,.75)" }]
       });
     }
 
@@ -2642,38 +2908,104 @@
       var selY = document.getElementById("scoreScatterY");
       var colX = selX ? selX.value : null;
       var colY = selY ? selY.value : null;
-      if ((_faScoreData.factorCols || []).length < 2) return; /* placeholder set by populateScoreSelectors */
+      if ((_faScoreData.factorCols || []).length < 2) return;
       if (!colX || !colY) { host.innerHTML = '<div class="hint-empty">Awaiting factor scores...</div>'; return; }
       var caseCol = (_faScoreData.cols || [])[0];
-      var points = (_faScoreData.rows || []).map(function(r) {
+      var xs = [], ys = [], meta = [];
+      (_faScoreData.rows || []).forEach(function(r) {
         var x = parseMaybeNumber(r[colX]), y = parseMaybeNumber(r[colY]);
-        if (!isFinite(x) || !isFinite(y)) return null;
-        return { x: x, y: y, name: caseCol ? String(r[caseCol]) : "" };
-      }).filter(Boolean);
-      if (!points.length) { host.innerHTML = '<div class="hint-empty">Awaiting factor scores...</div>'; return; }
+        if (!isFinite(x) || !isFinite(y)) return;
+        xs.push(x); ys.push(y);
+        meta.push({ x: x, y: y, caseId: caseCol ? String(r[caseCol]) : "" });
+      });
+      if (!meta.length) { host.innerHTML = '<div class="hint-empty">Awaiting factor scores...</div>'; return; }
+
+      var meanX = scoreMean(xs), meanY = scoreMean(ys);
+      var sdX = scoreSd(xs, meanX), sdY = scoreSd(ys, meanY);
+      var n = xs.length, sxx = 0, syy = 0, sxy = 0;
+      for (var i = 0; i < n; i++) {
+        var dx = xs[i] - meanX, dy = ys[i] - meanY;
+        sxx += dx * dx; syy += dy * dy; sxy += dx * dy;
+      }
+      if (n > 1) { sxx /= (n - 1); syy /= (n - 1); sxy /= (n - 1); }
+      var det = sxx * syy - sxy * sxy;
+      var mahFlags = xs.map(function(x, i) {
+        var zOut = (sdX > 0 && Math.abs(x - meanX) > 2 * sdX) || (sdY > 0 && Math.abs(ys[i] - meanY) > 2 * sdY);
+        if (det <= 0) return zOut;
+        var dx = x - meanX, dy = ys[i] - meanY;
+        var d2 = (dy * dy * sxx - 2 * sxy * dx * dy + dx * dx * syy) / det;
+        return zOut || d2 > 5.991;
+      });
+
+      var normalPts = [], outlierPts = [];
+      meta.forEach(function(p, i) {
+        var pt = { x: p.x, y: p.y, name: p.caseId, caseId: p.caseId };
+        if (mahFlags[i]) outlierPts.push(pt); else normalPts.push(pt);
+      });
+
+      var plotLinesX = [
+        { value: meanX, color: "rgba(120,200,255,.55)", width: 1.5, dashStyle: "Dash", zIndex: 3,
+          label: { text: "mean", style: { color: "rgba(120,200,255,.8)", fontSize: "9px" }, align: "right", x: -4 } }
+      ];
+      var plotLinesY = [
+        { value: meanY, color: "rgba(120,200,255,.55)", width: 1.5, dashStyle: "Dash", zIndex: 3,
+          label: { text: "mean", style: { color: "rgba(120,200,255,.8)", fontSize: "9px" }, align: "right", y: -6 } }
+      ];
+      if (Math.abs(meanX) > sdX * 0.5) plotLinesX.push({ value: 0, color: "rgba(255,255,255,0.2)", width: 1, zIndex: 2 });
+      if (Math.abs(meanY) > sdY * 0.5) plotLinesY.push({ value: 0, color: "rgba(255,255,255,0.2)", width: 1, zIndex: 2 });
+
+      var series = [
+        { name: "Cases", type: "scatter", data: normalPts, color: "rgba(120,200,255,.75)",
+          marker: { radius: 4, fillColor: "rgba(120,200,255,.7)", lineColor: "rgba(120,200,255,1)", lineWidth: 1 } },
+        { name: "Outliers", type: "scatter", data: outlierPts, color: "rgba(255,165,120,1)",
+          marker: { radius: 6, fillColor: "rgba(255,165,120,.85)", lineColor: "rgba(255,165,120,1)", lineWidth: 2 } }
+      ];
+
+      var showEllipse = document.getElementById("scoreShowEllipse");
+      if (showEllipse && showEllipse.checked) {
+        var ellipse = buildConfidenceEllipse(colX, colY);
+        if (ellipse.length) {
+          series.push({
+            name: "95% ellipse", type: "line", data: ellipse,
+            color: "rgba(196,165,255,.75)", lineWidth: 1.5, dashStyle: "ShortDot",
+            enableMouseTracking: false, marker: { enabled: false }
+          });
+        }
+      }
+
       Highcharts.chart("scoreScatterChart", {
         chart: { type: "scatter", backgroundColor: "transparent", animation: false, zoomType: "xy" },
-        title: { text: null }, credits: { enabled: false }, legend: { enabled: false },
+        title: { text: null }, credits: { enabled: false },
+        legend: { enabled: outlierPts.length > 0, itemStyle: { color: "rgba(255,255,255,.78)" } },
         xAxis: {
           title: { text: colX, style: { color: "rgba(255,255,255,0.85)" } },
           labels: { style: { color: "rgba(255,255,255,0.78)" } },
           lineColor: "rgba(255,255,255,0.22)", tickColor: "rgba(255,255,255,0.22)",
-          gridLineColor: "rgba(255,255,255,0.08)", gridLineWidth: 1,
-          plotLines: [{ value: 0, color: "rgba(255,255,255,0.3)", width: 1, zIndex: 2 }]
+          gridLineColor: "rgba(255,255,255,0.08)", gridLineWidth: 1, plotLines: plotLinesX
         },
         yAxis: {
           title: { text: colY, style: { color: "rgba(255,255,255,0.85)" } },
           labels: { style: { color: "rgba(255,255,255,0.78)" } },
-          gridLineColor: "rgba(255,255,255,0.12)",
-          plotLines: [{ value: 0, color: "rgba(255,255,255,0.3)", width: 1, zIndex: 2 }]
+          gridLineColor: "rgba(255,255,255,0.12)", plotLines: plotLinesY
         },
         tooltip: {
           pointFormatter: function() {
-            return '<b>' + (this.name || 'Case') + '</b><br>' + colX + ': ' + formatNumber(this.x) + '<br>' + colY + ': ' + formatNumber(this.y);
+            var label = this.caseId ? ("Case " + this.caseId) : "Case";
+            return "<b>" + label + "</b><br>" + colX + ": " + formatNumber(this.x) + "<br>" + colY + ": " + formatNumber(this.y);
           }
         },
-        plotOptions: { scatter: { marker: { radius: 4, fillColor: "rgba(120,200,255,.7)", lineColor: "rgba(120,200,255,1)", lineWidth: 1 } } },
-        series: [{ name: "Cases", data: points }]
+        plotOptions: {
+          scatter: {
+            point: {
+              events: {
+                click: function() {
+                  if (this.caseId) highlightScoreRow(this.caseId);
+                }
+              }
+            }
+          }
+        },
+        series: series
       });
     }
 
@@ -3203,7 +3535,7 @@
         "extractMethod","retainedFactors","kaiserFlag","cumVariance","retentionRule","extractAvgCommunality",
         "rotationMethod","loadingCutoff","crossLoadingCount","phiMax","simpleStructure",
         "rmsrValue","fitIndexValue","heywoodCount","meanCommunality",
-        "scoreMethod","scoreDims","scoreExportReady"
+        "scoreMethod","scoreDims","scoreExportReady","scoreScaling","scoreFactorCorr"
       ].forEach(function(id){ setText(id, "...", "..."); });
       document.getElementById("corrHeatmap").innerHTML = '<div class="hint-empty">Awaiting correlation matrix...</div>';
       document.getElementById("eigenTableBody").innerHTML = '<tr><td colspan="4" class="hint-empty">Awaiting eigenvalue output...</td></tr>';
@@ -3242,6 +3574,11 @@
       _loadingsData = { rows: [], cols: [] };
       _faScoreData = { cols: [], factorCols: [], rows: [] };
       _faNamingState = { inFlight: false, done: false };
+      _faScoreHighlightCase = null;
+      var scoreNote = document.getElementById("scoreScalingNote");
+      if (scoreNote) { scoreNote.style.display = "none"; scoreNote.textContent = ""; }
+      var ellipseChk = document.getElementById("scoreShowEllipse");
+      if (ellipseChk) ellipseChk.checked = false;
       var aiDisclaimer = document.getElementById("interpAiDisclaimer");
       if (aiDisclaimer) aiDisclaimer.style.display = "none";
       var aiDetails = document.getElementById("aiDetailsSection");

@@ -1388,8 +1388,7 @@ const StatisticoHeader = {
             { type: 'tab', tab: 'rotation', icon: 'fa-diagram-project', label: 'Structure and Rotation', description: 'Apply rotation and interpret the loading pattern.' },
             { type: 'tab', tab: 'interpretation', icon: 'fa-lightbulb', label: 'Interpretation', description: 'Name factors, AI details & cross-loadings.' },
             { type: 'tab', tab: 'diagnostics', icon: 'fa-stethoscope', label: 'Diagnostics' },
-            { type: 'tab', tab: 'scores', icon: 'fa-chart-scatter', label: 'Factor Scores', description: 'Distribution, map, and export of case-level factor scores.' },
-            { type: 'tab', tab: 'viewdata', icon: 'fa-table', label: 'View Data' }
+            { type: 'tab', tab: 'scores', icon: 'fa-chart-scatter', label: 'Factor Scores', description: 'Distribution, map, and export of case-level factor scores.' }
           ]
         }]
       };

@@ -496,6 +496,19 @@ const NAV_STYLE = `
 
 .nav-link[data-page="home"]:hover { opacity: 1; }
 
+.nav-link[data-page="contact"],
+#link-contact {
+  opacity: 1 !important;
+  color: rgba(255,255,255,0.92) !important;
+  font-weight: 500;
+  font-size: 0.88rem;
+}
+
+:root[data-theme="light"] .nav-link[data-page="contact"],
+:root[data-theme="light"] #link-contact {
+  color: rgba(15,23,42,0.88) !important;
+}
+
 /* Hidden items (About) — kept in DOM for link wiring */
 .nav-item--hidden {
   display: none !important;
@@ -1408,12 +1421,13 @@ const FOOTER_TEMPLATE = `
   applyTheme(getStoredTheme());
 
   // Inject shared header styles so all pages use the same header.
-  if (!document.getElementById('statistico-shared-nav-style')) {
-    const styleEl = document.createElement('style');
+  let styleEl = document.getElementById('statistico-shared-nav-style');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
     styleEl.id = 'statistico-shared-nav-style';
-    styleEl.textContent = NAV_STYLE;
     document.head.appendChild(styleEl);
   }
+  styleEl.textContent = NAV_STYLE;
 
   // Insert navigation
   const navPlaceholder = document.getElementById('nav-placeholder');

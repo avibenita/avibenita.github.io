@@ -1766,7 +1766,7 @@ const StatisticoHeader = {
       '  color: #0f172a !important;',
       '  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 1) !important;',
       '}',
-      '.ws-mode-bar--attached:not(.ws-mode-bar--slant):not(.ws-mode-bar--connected) .ws-mode-tab.active .ws-tab-label {',
+      '.ws-mode-bar--attached:not(.ws-mode-bar--slant):not(.ws-mode-bar--connected) .ws-mode-tab.active .ws-tab-label,',
       '.ws-mode-bar:not(.ws-mode-bar--slant):not(.ws-mode-bar--connected) .ws-mode-tab.active .ws-tab-label {',
       '  color: #0f172a !important;',
       '}',

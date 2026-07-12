@@ -10,7 +10,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="../shared-header.css?v=20260530a"/>  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
-  <script src="../shared-header.js?v=20260524a"></script>
+  <script src="../shared-header.js?v=20260712a"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -1581,11 +1581,53 @@
       }
     }
 
+    /* Display-only safeguard: if the engine delivers an unscaled Φ (diagonal ≠ 1),
+       rescale it to correlation form (cell r,c ÷ √(diag_r·diag_c)) before rendering.
+       The underlying bundle is never modified. */
+    function normalizePhiForDisplay(phi, n) {
+      if (!phi || !phi.length) return phi;
+      var m = Math.min(n || phi.length, phi.length);
+      var needsScaling = false;
+      for (var i = 0; i < m; i++) {
+        var d = parseMaybeNumber(phi[i] && phi[i][i]);
+        if (isFinite(d) && Math.abs(d - 1) > 1e-6) { needsScaling = true; break; }
+      }
+      if (!needsScaling) return phi;
+      var out = [];
+      for (var r = 0; r < m; r++) {
+        out[r] = [];
+        var dr = parseMaybeNumber(phi[r] && phi[r][r]);
+        for (var c = 0; c < m; c++) {
+          var dc = parseMaybeNumber(phi[c] && phi[c][c]);
+          var v = parseMaybeNumber(phi[r] && phi[r][c]);
+          out[r][c] = (isFinite(v) && isFinite(dr) && isFinite(dc) && dr > 0 && dc > 0)
+            ? v / Math.sqrt(dr * dc)
+            : NaN;
+        }
+      }
+      return out;
+    }
+
+    function maxOffDiagonalAbs(phi, n) {
+      if (!phi || !phi.length) return NaN;
+      var m = Math.min(n || phi.length, phi.length);
+      var mx = NaN;
+      for (var r = 0; r < m; r++) {
+        for (var c = 0; c < m; c++) {
+          if (r === c) continue;
+          var v = Math.abs(parseMaybeNumber(phi[r] && phi[r][c]));
+          if (isFinite(v) && (!isFinite(mx) || v > mx)) mx = v;
+        }
+      }
+      return mx;
+    }
+
     function renderPhiMatrixTable(phi, k) {
       var head = document.getElementById("phiMatrixHead");
       var body = document.getElementById("phiMatrixBody");
       if (!head || !body || !phi || !phi.length) return;
       var n = Math.min(k || phi.length, phi.length);
+      phi = normalizePhiForDisplay(phi, n);
       var labels = [];
       for (var i = 0; i < n; i++) labels.push("PC" + (i + 1));
       var trh = document.createElement("tr");
@@ -1713,6 +1755,26 @@
       updateRotationHintText(method);
 
       var xc = data.crossLoadingCount;
+      /* Guard against the degenerate case: zero cross-loadings caused by nothing
+         loading at all. "Excellent" requires every retained component to have at
+         least one variable with |loading| >= 0.5. */
+      var weakStructure = false;
+      (function() {
+        var sqRows = (data.rows && data.rows.length) ? data.rows
+          : ((bundle.loadings && bundle.loadings.rows) || []);
+        var sqCols = (data.columns && data.columns.length) ? data.columns
+          : ((bundle.loadings && bundle.loadings.columns) || []);
+        var pcCols = sqCols.filter(function(c) { return /^PC\d+$/i.test(String(c)); });
+        if (!sqRows.length || !pcCols.length) return;
+        weakStructure = pcCols.some(function(col) {
+          var maxAbs = 0;
+          sqRows.forEach(function(row) {
+            var v = Math.abs(parseMaybeNumber(row[col]));
+            if (isFinite(v) && v > maxAbs) maxAbs = v;
+          });
+          return maxAbs < 0.5;
+        });
+      })();
       var sq = document.getElementById("structureQualityLine");
       if (sq) {
         if (xc === undefined || xc === null) {
@@ -1721,7 +1783,10 @@
         } else {
           sq.style.display = "";
           sq.className = "structure-quality";
-          if (xc === 0) {
+          if (xc === 0 && weakStructure) {
+            sq.className = "structure-quality warn";
+            sq.textContent = "Structure quality: Weak — no cross-loadings, but not every component has a clearly loading variable (|loading| ≥ 0.5).";
+          } else if (xc === 0) {
             sq.textContent = "Structure quality: Excellent — no cross-loadings (|loading| ≥ 0.4 on multiple components).";
           } else if (xc === 1) {
             sq.className = "structure-quality warn";
@@ -1739,7 +1804,14 @@
       if (methodLower === "none" || methodLower === "varimax" || !isFinite(knum) || knum < 2) {
         setText("pcaPhiMax", (isFinite(knum) && knum < 2) ? "N/A (k < 2)" : "N/A (orthogonal)", "...");
       } else {
+        /* Prefer recomputing from the display-normalized Φ so the value shown is a
+           genuine correlation (≤ 1); fall back to the bundle's phiMax otherwise. */
         var pm = data.phiMax;
+        if (data.phiMatrix && data.phiMatrix.length) {
+          var normPhi = normalizePhiForDisplay(data.phiMatrix, knum);
+          var mx = maxOffDiagonalAbs(normPhi, knum);
+          if (isFinite(mx)) pm = mx;
+        }
         setText("pcaPhiMax", isFinite(parseMaybeNumber(pm)) ? formatNumber(pm) : "...", "...");
       }
 
@@ -1960,13 +2032,89 @@
     };
 
     /* ─── Export HTML ─── */
+    var SNAPSHOT_SECTION_TITLES = {
+      "tab-summary":      "Summary",
+      "tab-components":   "Components (Eigenvalues & Scree)",
+      "tab-loadings":     "Component Loadings",
+      "tab-rotation":     "Rotation",
+      "tab-biplot":       "Biplot",
+      "tab-scoreplot":    "Score Plot",
+      "tab-contribution": "Variable Contributions",
+      "tab-outliers":     "Outlier Map"
+    };
+
     async function exportPcaHtml() {
+      var prevActive = document.querySelector(".tab-panel.active");
+      var prevTabKey = prevActive ? prevActive.id.replace(/^tab-/, "") : "summary";
       try {
         document.querySelectorAll(".tab-panel").forEach(function(p) { p.classList.add("active"); p.style.display = "block"; });
         await new Promise(function(r) { setTimeout(r, 120); });
+
+        /* Serialize widget state so the static clone reflects the current run
+           (cloneNode does not carry selectedIndex / runtime checked state). */
+        var rotSel = document.getElementById("rotationMethodSelect");
+        if (rotSel) {
+          for (var oi = 0; oi < rotSel.options.length; oi++) {
+            if (oi === rotSel.selectedIndex) rotSel.options[oi].setAttribute("selected", "selected");
+            else rotSel.options[oi].removeAttribute("selected");
+          }
+        }
+        document.querySelectorAll('input[name="rotationViewMode"]').forEach(function(r) {
+          if (r.checked) r.setAttribute("checked", "checked");
+          else r.removeAttribute("checked");
+        });
+
         var clone = document.documentElement.cloneNode(true);
         clone.querySelectorAll("script").forEach(function(s) { s.remove(); });
-        ["#sidebarNav","#header-container"].forEach(function(sel) { var el = clone.querySelector(sel); if (el) el.remove(); });
+        ["#sidebarNav", "#header-container"].forEach(function(sel) { var el = clone.querySelector(sel); if (el) el.remove(); });
+
+        /* Strip interactive chrome that is dead without scripts. */
+        ["#sbAiFloatHost", "#uniFilterOverlay", "#uniFilterHelpOverlay",
+         "#statistico-shared-tooltip", "#expandCorrBtn"].forEach(function(sel) {
+          var el = clone.querySelector(sel); if (el) el.remove();
+        });
+
+        /* Replace the live rotation toolbar with a static summary line. */
+        var tb = clone.querySelector(".rotation-toolbar");
+        if (tb) {
+          var methodLabel = rotSel && rotSel.selectedIndex >= 0 ? rotSel.options[rotSel.selectedIndex].text : "None (unrotated)";
+          var kLabel = (document.getElementById("pcaRotatedK") || {}).innerText || "—";
+          var viewSel = document.querySelector('input[name="rotationViewMode"]:checked');
+          var viewLabel = viewSel && viewSel.parentElement ? viewSel.parentElement.textContent.trim() : "Rotated";
+          tb.innerHTML = '<div style="font-size:.85rem;color:var(--text-secondary);">Rotation method: <strong>' + methodLabel +
+            "</strong> &nbsp;·&nbsp; Components rotated: <strong>" + kLabel +
+            "</strong> &nbsp;·&nbsp; View: <strong>" + viewLabel + "</strong></div>";
+        }
+
+        /* Drop hidden duplicate content (full heatmap copy, unused loading-view
+           wraps, raw-data sink) — unreachable in a static document. */
+        ["#pcaViewDataSink", "#corrHeatmapFull"].forEach(function(sel) {
+          var el = clone.querySelector(sel); if (el) el.remove();
+        });
+        clone.querySelectorAll('[style*="display:none"], [style*="display: none"]').forEach(function(el) { el.remove(); });
+
+        /* Give each stacked tab section a visible heading. */
+        clone.querySelectorAll(".tab-panel").forEach(function(panel) {
+          var title = SNAPSHOT_SECTION_TITLES[panel.id];
+          if (!title) return;
+          var h = clone.ownerDocument.createElement("h2");
+          h.className = "snapshot-section-title";
+          h.textContent = title;
+          panel.insertBefore(h, panel.firstChild);
+        });
+
+        /* Snapshot-only styles: section headings + responsive charts. */
+        var snapStyle = clone.ownerDocument.createElement("style");
+        snapStyle.textContent =
+          ".snapshot-section-title{margin:26px 0 10px;padding:8px 12px;font-size:1.05rem;font-weight:800;" +
+          "letter-spacing:.03em;text-transform:uppercase;color:var(--accent-1);" +
+          "border-left:4px solid var(--accent-1);background:rgba(255,165,120,.08);border-radius:4px;}" +
+          ".tab-panel:first-of-type .snapshot-section-title{margin-top:0;}" +
+          ".highcharts-container{width:100% !important;}" +
+          "svg.highcharts-root{max-width:100%;height:auto;}";
+        var headEl = clone.querySelector("head");
+        if (headEl) headEl.appendChild(snapStyle);
+
         var html  = "<!DOCTYPE html>\n" + clone.outerHTML;
         var stamp = new Date().toISOString().replace(/[:.]/g, "-");
         var name  = "pca-snapshot-" + stamp + ".html";
@@ -1979,6 +2127,11 @@
       } catch(e) {
         console.error("Failed to export PCA HTML:", e);
         alert("Failed to export HTML: " + e.message);
+      } finally {
+        /* Restore the live view: clear the forced inline display and re-activate
+           the tab that was open before the export. */
+        document.querySelectorAll(".tab-panel").forEach(function(p) { p.style.display = ""; });
+        switchTab(prevTabKey);
       }
     }
 

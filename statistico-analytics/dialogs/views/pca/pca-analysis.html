@@ -454,6 +454,27 @@
     :root[data-theme="light"] .load-strong{ background:rgba(37,99,235,.14) !important; color:var(--text-primary) !important; }
     :root[data-theme="light"] .load-mod{ color:var(--text-primary) !important; }
     :root[data-theme="light"] .load-weak{ color:rgba(55,65,81,.55) !important; }
+    /* ── Inner (per-view) tabs ── */
+    .inner-tabs{
+      display:flex; flex-wrap:wrap; gap:4px;
+      margin:0 0 14px; padding:4px;
+      background:rgba(255,255,255,.05);
+      border:1px solid var(--border); border-radius:10px;
+      width:max-content; max-width:100%;
+    }
+    .inner-tab{
+      border:none; background:transparent; cursor:pointer;
+      padding:7px 14px; border-radius:7px;
+      font-size:.82rem; font-weight:650; color:var(--text-secondary);
+      display:flex; align-items:center; gap:7px;
+      transition:background .15s, color .15s;
+    }
+    .inner-tab:hover{ background:rgba(255,255,255,.08); color:var(--text-primary); }
+    .inner-tab.active{ background:var(--accent-1); color:#1a1208; }
+    :root[data-theme="light"] .inner-tab.active{ color:#fff; }
+    .inner-pane{ display:none; }
+    .inner-pane.active{ display:block; }
+
     .rotation-toolbar{
       display:flex; flex-wrap:wrap; align-items:center; gap:12px 18px;
       margin-bottom:12px; padding:10px 12px;
@@ -659,47 +680,59 @@
 
             <!-- ══ Tab: Components (eigenvalues + scree) ══ -->
             <section id="tab-components" class="tab-panel">
-              <div id="componentRetentionHint" class="component-retention-hint" style="display:none;"></div>
-
-              <div class="viz-card scree-chart-primary">
-                <div class="viz-title"><i class="fa-solid fa-chart-line"></i> Scree Plot <span style="font-weight:500;color:var(--text-muted);font-size:.78rem;">(Kaiser line at λ = 1)</span></div>
-                <div class="scree-wrap">
-                  <div id="screeChart" class="chart-container"></div>
-                </div>
+              <div class="inner-tabs" role="tablist" aria-label="Components views">
+                <button type="button" class="inner-tab active" data-inner="selection" onclick="switchInnerTab('components','selection')"><i class="fa-solid fa-chart-line"></i> Selection</button>
+                <button type="button" class="inner-tab" data-inner="eigenvalues" onclick="switchInnerTab('components','eigenvalues')"><i class="fa-solid fa-table"></i> Eigenvalues</button>
+                <button type="button" class="inner-tab" data-inner="variance" onclick="switchInnerTab('components','variance')"><i class="fa-solid fa-chart-bar"></i> Variance</button>
               </div>
 
-              <div class="stats-container" style="margin-top:12px;">
-                <div class="stat-panel" style="min-width:100%;">
-                  <div class="stat-panel-heading"><i class="fa-solid fa-table"></i> Eigenvalue Table</div>
-                  <div class="stat-panel-body" style="padding:0;">
-                    <div class="table-container" style="margin:0;">
-                      <table class="analysis-table">
-                        <thead>
-                          <tr>
-                            <th>Component</th>
-                            <th>Eigenvalue</th>
-                            <th>% Variance</th>
-                            <th>Cumulative %</th>
-                            <th>Kaiser (≥1)</th>
-                          </tr>
-                        </thead>
-                        <tbody id="eigenTableBody">
-                          <tr><td colspan="5" class="hint-empty">Awaiting eigenvalue output...</td></tr>
-                        </tbody>
-                      </table>
+              <div class="inner-pane active" data-pane="selection">
+                <div id="componentRetentionHint" class="component-retention-hint" style="display:none;"></div>
+                <div class="viz-card scree-chart-primary">
+                  <div class="viz-title"><i class="fa-solid fa-chart-line"></i> Scree Plot <span style="font-weight:500;color:var(--text-muted);font-size:.78rem;">(Kaiser line at λ = 1)</span></div>
+                  <div class="scree-wrap">
+                    <div id="screeChart" class="chart-container"></div>
+                  </div>
+                </div>
+                <div class="section-note">Use the scree plot for the elbow; the Kaiser line marks λ = 1. Retained components are emphasised. See <strong>Summary</strong> for data checks, adequacy, and retention counts.</div>
+              </div>
+
+              <div class="inner-pane" data-pane="eigenvalues">
+                <div class="stats-container">
+                  <div class="stat-panel" style="min-width:100%;">
+                    <div class="stat-panel-heading"><i class="fa-solid fa-table"></i> Eigenvalue Table</div>
+                    <div class="stat-panel-body" style="padding:0;">
+                      <div class="table-container" style="margin:0;">
+                        <table class="analysis-table">
+                          <thead>
+                            <tr>
+                              <th>Component</th>
+                              <th>Eigenvalue</th>
+                              <th>% Variance</th>
+                              <th>Cumulative %</th>
+                              <th>Kaiser (≥1)</th>
+                            </tr>
+                          </thead>
+                          <tbody id="eigenTableBody">
+                            <tr><td colspan="5" class="hint-empty">Awaiting eigenvalue output...</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
                 </div>
+                <div class="section-note">Hover a scree point in <strong>Selection</strong> to highlight its row here. Retained components are emphasised in the table.</div>
               </div>
 
-              <div class="viz-card">
-                <div class="viz-title"><i class="fa-solid fa-chart-bar"></i> Variance Explained per Component</div>
-                <div class="chart-wrap">
-                  <div id="varianceBarChart" class="chart-container"></div>
+              <div class="inner-pane" data-pane="variance">
+                <div class="viz-card" style="margin-top:0;">
+                  <div class="viz-title"><i class="fa-solid fa-chart-bar"></i> Variance Explained per Component</div>
+                  <div class="chart-wrap">
+                    <div id="varianceBarChart" class="chart-container"></div>
+                  </div>
                 </div>
+                <div class="section-note">Bars show individual variance per component; the line shows the cumulative share.</div>
               </div>
-
-              <div class="section-note">See <strong>Summary</strong> for data checks, adequacy, retention, and the correlation matrix. Use the scree plot for the elbow, then the table; hover a scree point to highlight its row. Retained components are emphasised in the chart and table.</div>
             </section>
 
             <!-- ══ Tab: Interpretation (rotation, loadings, communalities, Φ, contributions) ══ -->
@@ -725,94 +758,116 @@
                 </div>
               </div>
               <div id="rotationHint" class="rotation-hint">Choose a rotation method; results update immediately. Orthogonal rotations keep components uncorrelated; oblique rotations allow correlation (see Φ when using Promax).</div>
-              <div id="structureQualityLine" class="structure-quality" style="display:none;"></div>
-              <div class="stats-container">
-                <div class="stat-panel">
-                  <div class="stat-panel-heading"><i class="fa-solid fa-list-check"></i> Diagnostics</div>
-                  <div class="stat-panel-body">
-                    <div class="stat-field"><span class="stat-label">Cross-loadings (|load| ≥ 0.4 on ≥2 components):</span><span class="stat-value" id="pcaCrossLoadingCount">...</span></div>
-                    <div class="stat-field"><span class="stat-label">Max |correlation| between components (off-diagonal Φ):</span><span class="stat-value" id="pcaPhiMax">...</span></div>
+
+              <div class="inner-tabs" role="tablist" aria-label="Interpretation views">
+                <button type="button" class="inner-tab active" data-inner="loadmatrix" onclick="switchInnerTab('interpretation','loadmatrix')"><i class="fa-solid fa-table-columns"></i> Loading Matrix</button>
+                <button type="button" class="inner-tab" data-inner="communalities" onclick="switchInnerTab('interpretation','communalities')"><i class="fa-solid fa-percentage"></i> Communalities</button>
+                <button type="button" class="inner-tab" data-inner="rotdiag" onclick="switchInnerTab('interpretation','rotdiag')"><i class="fa-solid fa-list-check"></i> Rotation Diagnostics</button>
+                <button type="button" class="inner-tab" data-inner="contributions" onclick="switchInnerTab('interpretation','contributions')"><i class="fa-solid fa-chart-column"></i> Contributions</button>
+              </div>
+
+              <div class="inner-pane active" data-pane="loadmatrix">
+                <div id="rotationTableRotWrap">
+                  <div class="stat-panel">
+                    <div class="stat-panel-heading"><i class="fa-solid fa-table-columns"></i> Loading Matrix <span id="loadingsRotationBadge" style="font-weight:600;opacity:.85;"></span></div>
+                    <div class="stat-panel-body" style="padding:0;">
+                      <div class="table-container" style="margin:0;">
+                        <table class="analysis-table">
+                          <thead id="rotLoadingsHead"></thead>
+                          <tbody id="rotLoadingsBody">
+                            <tr><td class="hint-empty">Awaiting loadings…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div id="phiMatrixPanel" class="stat-panel phi-panel" style="display:none;">
-                <div class="stat-panel-heading"><i class="fa-solid fa-table-cells"></i> Component Correlation Matrix (Φ)</div>
-                <div class="stat-panel-body" style="padding:0;">
-                  <div class="table-container" style="margin:0;">
-                    <table class="analysis-table">
-                      <thead id="phiMatrixHead"></thead>
-                      <tbody id="phiMatrixBody"></tbody>
-                    </table>
+                <div id="rotationTableUnWrap" style="display:none;">
+                  <div class="stat-panel">
+                    <div class="stat-panel-heading"><i class="fa-solid fa-table"></i> Unrotated Loading Matrix</div>
+                    <div class="stat-panel-body" style="padding:0;">
+                      <div class="table-container" style="margin:0;">
+                        <table class="analysis-table">
+                          <thead id="unrotLoadingsHead"></thead>
+                          <tbody id="unrotLoadingsBody">
+                            <tr><td class="hint-empty">Awaiting loadings…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   </div>
                 </div>
+                <div id="rotationTableBothWrap" style="display:none;">
+                  <div class="stat-panel">
+                    <div class="stat-panel-heading"><i class="fa-solid fa-columns"></i> Unrotated vs Rotated</div>
+                    <div class="stat-panel-body" style="padding:0;">
+                      <div class="table-container" style="margin:0;">
+                        <table class="analysis-table">
+                          <thead id="sideBySideHead"></thead>
+                          <tbody id="sideBySideBody">
+                            <tr><td class="hint-empty">Awaiting loadings…</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="section-note" style="margin-top:12px;">|Loading| highlighting: <span class="load-strong" style="padding:2px 6px;border-radius:4px;">≥ 0.5</span> strong · <span class="load-mod">0.3 – 0.5</span> moderate · <span class="load-weak">&lt; 0.3</span> weak. Rotation is applied after the number of components <em>k</em> is fixed (see <strong>Summary</strong> and <strong>Components</strong>).</div>
               </div>
-              <div id="rotationTableRotWrap">
-                <div class="stat-panel">
-                  <div class="stat-panel-heading"><i class="fa-solid fa-table-columns"></i> Loading Matrix <span id="loadingsRotationBadge" style="font-weight:600;opacity:.85;"></span></div>
+
+              <div class="inner-pane" data-pane="communalities">
+                <div class="stats-container">
+                  <div class="stat-panel" style="min-width:100%;">
+                    <div class="stat-panel-heading"><i class="fa-solid fa-percentage"></i> Communalities (Variance Explained per Variable)</div>
+                    <div class="stat-panel-body" style="padding:0;">
+                      <div class="table-container" style="margin:0;">
+                        <table class="analysis-table">
+                          <thead><tr><th>Variable</th><th>Communality (h²)</th><th>Uniqueness</th></tr></thead>
+                          <tbody id="communalityBody">
+                            <tr><td colspan="3" class="hint-empty">Awaiting communalities...</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="section-note">Communality = variance of each variable explained by the retained components (for oblique rotations it is computed from the unrotated solution, not by summing squared pattern loadings).</div>
+              </div>
+
+              <div class="inner-pane" data-pane="rotdiag">
+                <div id="structureQualityLine" class="structure-quality" style="display:none;"></div>
+                <div class="stats-container">
+                  <div class="stat-panel">
+                    <div class="stat-panel-heading"><i class="fa-solid fa-list-check"></i> Diagnostics</div>
+                    <div class="stat-panel-body">
+                      <div class="stat-field"><span class="stat-label">Cross-loadings (|load| ≥ 0.4 on ≥2 components):</span><span class="stat-value" id="pcaCrossLoadingCount">...</span></div>
+                      <div class="stat-field"><span class="stat-label">Max |correlation| between components (off-diagonal Φ):</span><span class="stat-value" id="pcaPhiMax">...</span></div>
+                    </div>
+                  </div>
+                </div>
+                <div id="phiMatrixPanel" class="stat-panel phi-panel" style="display:none;">
+                  <div class="stat-panel-heading"><i class="fa-solid fa-table-cells"></i> Component Correlation Matrix (Φ)</div>
                   <div class="stat-panel-body" style="padding:0;">
                     <div class="table-container" style="margin:0;">
                       <table class="analysis-table">
-                        <thead id="rotLoadingsHead"></thead>
-                        <tbody id="rotLoadingsBody">
-                          <tr><td class="hint-empty">Awaiting loadings…</td></tr>
-                        </tbody>
+                        <thead id="phiMatrixHead"></thead>
+                        <tbody id="phiMatrixBody"></tbody>
                       </table>
                     </div>
                   </div>
                 </div>
+                <div class="section-note">Cross-loadings and structure quality assess simple structure. The Φ matrix appears for oblique rotations (Promax), where components may correlate.</div>
               </div>
-              <div id="rotationTableUnWrap" style="display:none;">
-                <div class="stat-panel">
-                  <div class="stat-panel-heading"><i class="fa-solid fa-table"></i> Unrotated Loading Matrix</div>
-                  <div class="stat-panel-body" style="padding:0;">
-                    <div class="table-container" style="margin:0;">
-                      <table class="analysis-table">
-                        <thead id="unrotLoadingsHead"></thead>
-                        <tbody id="unrotLoadingsBody">
-                          <tr><td class="hint-empty">Awaiting loadings…</td></tr>
-                        </tbody>
-                      </table>
-                    </div>
+
+              <div class="inner-pane" data-pane="contributions">
+                <div class="viz-card" style="margin-top:0;">
+                  <div class="viz-title"><i class="fa-solid fa-chart-column"></i> Variable Contributions to Components (%)</div>
+                  <div class="chart-wrap">
+                    <div id="contributionChart" class="chart-container" style="min-height:320px;"></div>
                   </div>
                 </div>
+                <div class="section-note">Grouped columns: for each component, bar height is that variable's share of the component's variance, 100 × loading² / eigenvalue. Within each component, bars sum to 100% across variables (correlation-based PCA).</div>
               </div>
-              <div id="rotationTableBothWrap" style="display:none;">
-                <div class="stat-panel">
-                  <div class="stat-panel-heading"><i class="fa-solid fa-columns"></i> Unrotated vs Rotated</div>
-                  <div class="stat-panel-body" style="padding:0;">
-                    <div class="table-container" style="margin:0;">
-                      <table class="analysis-table">
-                        <thead id="sideBySideHead"></thead>
-                        <tbody id="sideBySideBody">
-                          <tr><td class="hint-empty">Awaiting loadings…</td></tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="stats-container" style="margin-top:14px;">
-                <div class="stat-panel" style="min-width:100%;">
-                  <div class="stat-panel-heading"><i class="fa-solid fa-percentage"></i> Communalities (Variance Explained per Variable)</div>
-                  <div class="stat-panel-body" style="padding:0;">
-                    <div class="table-container" style="margin:0;">
-                      <table class="analysis-table">
-                        <thead><tr><th>Variable</th><th>Communality (h²)</th><th>Uniqueness</th></tr></thead>
-                        <tbody id="communalityBody">
-                          <tr><td colspan="3" class="hint-empty">Awaiting communalities...</td></tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="viz-card" style="margin-top:14px;">
-                <div class="viz-title"><i class="fa-solid fa-chart-column"></i> Variable Contributions to Components (%)</div>
-                <div class="chart-wrap">
-                  <div id="contributionChart" class="chart-container" style="min-height:320px;"></div>
-                </div>
-              </div>
-              <div class="section-note" style="margin-top:12px;">|Loading| highlighting: <span class="load-strong" style="padding:2px 6px;border-radius:4px;">≥ 0.5</span> strong · <span class="load-mod">0.3 – 0.5</span> moderate · <span class="load-weak">&lt; 0.3</span> weak. Rotation is applied after the number of components <em>k</em> is fixed (see <strong>Summary</strong> and <strong>Components</strong>). Communality = variance of each variable explained by the retained components (for oblique rotations it is computed from the unrotated solution, not by summing squared pattern loadings). Contribution bars: for each component, bar height is that variable's share of the component's variance, 100 × loading² / eigenvalue; within each component, bars sum to 100% (correlation-based PCA).</div>
             </section>
 
             <!-- ══ Tab: Scores (biplot, score plot, case scores) ══ -->
@@ -835,33 +890,49 @@
                   </div>
                 </div>
               </div>
-              <div class="viz-card">
-                <div class="viz-title"><i class="fa-solid fa-circle-dot"></i> PCA Biplot — Scores + Loading Vectors</div>
-                <div class="chart-wrap">
-                  <div id="biplotChart" class="biplot-container"></div>
-                </div>
+
+              <div class="inner-tabs" role="tablist" aria-label="Scores views">
+                <button type="button" class="inner-tab active" data-inner="biplot" onclick="switchInnerTab('scores','biplot')"><i class="fa-solid fa-circle-dot"></i> Biplot</button>
+                <button type="button" class="inner-tab" data-inner="cases" onclick="switchInnerTab('scores','cases')"><i class="fa-solid fa-chart-scatter"></i> Cases</button>
+                <button type="button" class="inner-tab" data-inner="table" onclick="switchInnerTab('scores','table')"><i class="fa-solid fa-table-cells-large"></i> Table</button>
               </div>
-              <div class="section-note">Grey dots = observations projected onto PC1/PC2. Orange lines from the origin (tipped with a marker and label) = variable loading vectors. Direction and length show how each variable contributes to the two components. Observations close together are similar in the PCA space.</div>
-              <div class="viz-card" style="margin-top:14px;">
-                <div class="viz-title"><i class="fa-solid fa-chart-scatter"></i> Score Plot (PC1 vs PC2)</div>
-                <div class="chart-wrap">
-                  <div id="scorePlotChart" class="biplot-container"></div>
-                </div>
-              </div>
-              <div class="stat-panel" style="margin-top:14px;">
-                <div class="stat-panel-heading"><i class="fa-solid fa-table-cells-large"></i> Case-wise Component Scores</div>
-                <div class="stat-panel-body" style="padding:0;">
-                  <div class="table-container" style="margin:0;">
-                    <table class="analysis-table">
-                      <thead id="scoresHead"></thead>
-                      <tbody id="scoresBody">
-                        <tr><td class="hint-empty">Awaiting component scores...</td></tr>
-                      </tbody>
-                    </table>
+
+              <div class="inner-pane active" data-pane="biplot">
+                <div class="viz-card" style="margin-top:0;">
+                  <div class="viz-title"><i class="fa-solid fa-circle-dot"></i> PCA Biplot — Scores + Loading Vectors</div>
+                  <div class="chart-wrap">
+                    <div id="biplotChart" class="biplot-container"></div>
                   </div>
                 </div>
+                <div class="section-note">Grey dots = observations projected onto PC1/PC2. Orange lines from the origin (tipped with a marker and label) = variable loading vectors. Direction and length show how each variable contributes to the two components. Observations close together are similar in the PCA space.</div>
               </div>
-              <div class="section-note">Both charts show each case in the plane of the first two principal components; the biplot adds variable loading vectors on top of the same scores. Scores are computed by projecting standardised observations onto eigenvectors.</div>
+
+              <div class="inner-pane" data-pane="cases">
+                <div class="viz-card" style="margin-top:0;">
+                  <div class="viz-title"><i class="fa-solid fa-chart-scatter"></i> Score Plot (PC1 vs PC2)</div>
+                  <div class="chart-wrap">
+                    <div id="scorePlotChart" class="biplot-container"></div>
+                  </div>
+                </div>
+                <div class="section-note">Each case in the plane of the first two principal components — the same scores as the biplot, without the variable vectors. Scores are computed by projecting standardised observations onto eigenvectors.</div>
+              </div>
+
+              <div class="inner-pane" data-pane="table">
+                <div class="stat-panel">
+                  <div class="stat-panel-heading"><i class="fa-solid fa-table-cells-large"></i> Case-wise Component Scores</div>
+                  <div class="stat-panel-body" style="padding:0;">
+                    <div class="table-container" style="margin:0;">
+                      <table class="analysis-table">
+                        <thead id="scoresHead"></thead>
+                        <tbody id="scoresBody">
+                          <tr><td class="hint-empty">Awaiting component scores...</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+                <div class="section-note">Score values per case for every retained component (PC1, PC2, …).</div>
+              </div>
             </section>
 
             <!-- ══ Tab: Diagnostics (distance in PC space) ══ -->
@@ -996,6 +1067,30 @@
           Highcharts.charts.forEach(function(c) { if (c) c.reflow(); });
         }, 50);
       }
+    }
+
+    /* ─── Inner (per-view) tab switching ─── */
+    function switchInnerTab(sectionKey, paneKey) {
+      var sec = document.getElementById("tab-" + sectionKey);
+      if (!sec) return;
+      sec.querySelectorAll(".inner-tab").forEach(function(btn) {
+        btn.classList.toggle("active", btn.getAttribute("data-inner") === paneKey);
+      });
+      sec.querySelectorAll(".inner-pane").forEach(function(pane) {
+        pane.classList.toggle("active", pane.getAttribute("data-pane") === paneKey);
+      });
+      if (typeof Highcharts !== "undefined") {
+        setTimeout(function() {
+          Highcharts.charts.forEach(function(c) { if (c) c.reflow(); });
+        }, 50);
+      }
+    }
+
+    function resetInnerTabs() {
+      document.querySelectorAll(".tab-panel").forEach(function(sec) {
+        var first = sec.querySelector(".inner-tab");
+        if (first) switchInnerTab(sec.id.replace(/^tab-/, ""), first.getAttribute("data-inner"));
+      });
     }
 
     /* ─── Heatmap ─── */
@@ -2004,8 +2099,8 @@
       if (bundle.scores)        window.populatePcaScores(bundle.scores);
       /* rawData arrives as a separate PCA_RAW_DATA message to keep bundle size small */
 
-      /* Render charts: briefly show all panels so Highcharts gets real dimensions */
-      var panels = document.querySelectorAll(".tab-panel");
+      /* Render charts: briefly show all panels (and inner panes) so Highcharts gets real dimensions */
+      var panels = document.querySelectorAll(".tab-panel, .inner-pane");
       panels.forEach(function(p) { p.style.display = "block"; });
       if (bundle.eigenvalues) {
         renderScreeChart(bundle.eigenvalues);
@@ -2086,6 +2181,7 @@
       var bp = document.getElementById("biplotChart"); if (bp) bp.innerHTML = "";
       var crh = document.getElementById("componentRetentionHint");
       if (crh) { crh.innerHTML = ""; crh.style.display = "none"; }
+      resetInnerTabs();
       switchTab("summary");
     };
 
@@ -2103,6 +2199,7 @@
       var prevTabKey = prevActive ? prevActive.id.replace(/^tab-/, "") : "summary";
       try {
         document.querySelectorAll(".tab-panel").forEach(function(p) { p.classList.add("active"); p.style.display = "block"; });
+        document.querySelectorAll(".inner-pane").forEach(function(p) { p.style.display = "block"; });
         await new Promise(function(r) { setTimeout(r, 120); });
 
         /* Serialize widget state so the static clone reflects the current run
@@ -2140,6 +2237,13 @@
             "</strong> &nbsp;·&nbsp; Components rotated: <strong>" + kLabel +
             "</strong> &nbsp;·&nbsp; View: <strong>" + viewLabel + "</strong></div>";
         }
+
+        /* Flatten inner tabs: drop the dead tab bars and show every pane stacked. */
+        clone.querySelectorAll(".inner-tabs").forEach(function(bar) { bar.remove(); });
+        clone.querySelectorAll(".inner-pane").forEach(function(pane) {
+          pane.classList.add("active");
+          pane.style.display = "block";
+        });
 
         /* Drop hidden duplicate content (full heatmap copy, unused loading-view
            wraps, raw-data sink) — unreachable in a static document. */
@@ -2185,7 +2289,7 @@
       } finally {
         /* Restore the live view: clear the forced inline display and re-activate
            the tab that was open before the export. */
-        document.querySelectorAll(".tab-panel").forEach(function(p) { p.style.display = ""; });
+        document.querySelectorAll(".tab-panel, .inner-pane").forEach(function(p) { p.style.display = ""; });
         switchTab(prevTabKey);
       }
     }

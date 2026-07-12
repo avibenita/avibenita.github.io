@@ -9,8 +9,9 @@
   <script src="https://code.highcharts.com/highcharts-more.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="../shared-header.css?v=20260530a"/>  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
+  <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260602tabsw"/>
 
-  <script src="../shared-header.js?v=20260712b"></script>
+  <script src="../shared-header.js?v=20260712c"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -454,24 +455,9 @@
     :root[data-theme="light"] .load-strong{ background:rgba(37,99,235,.14) !important; color:var(--text-primary) !important; }
     :root[data-theme="light"] .load-mod{ color:var(--text-primary) !important; }
     :root[data-theme="light"] .load-weak{ color:rgba(55,65,81,.55) !important; }
-    /* ── Inner (per-view) tabs ── */
-    .inner-tabs{
-      display:flex; flex-wrap:wrap; gap:4px;
-      margin:0 0 14px; padding:4px;
-      background:rgba(255,255,255,.05);
-      border:1px solid var(--border); border-radius:10px;
-      width:max-content; max-width:100%;
-    }
-    .inner-tab{
-      border:none; background:transparent; cursor:pointer;
-      padding:7px 14px; border-radius:7px;
-      font-size:.82rem; font-weight:650; color:var(--text-secondary);
-      display:flex; align-items:center; gap:7px;
-      transition:background .15s, color .15s;
-    }
-    .inner-tab:hover{ background:rgba(255,255,255,.08); color:var(--text-primary); }
-    .inner-tab.active{ background:var(--accent-1); color:#1a1208; }
-    :root[data-theme="light"] .inner-tab.active{ color:#fff; }
+    /* ── Inner (per-view) tabs — standard connected workspace bar ── */
+    .pca-inner-tabs{ margin:0 0 14px; }
+    .pca-inner-tabs .ws-mode-tab{ min-width:150px; }
     .inner-pane{ display:none; }
     .inner-pane.active{ display:block; }
 
@@ -578,8 +564,8 @@
           <button type="button" class="sb-item sb-item-stack" onclick="switchTab('interpretation')" data-tab="interpretation" title="Rotation, loading matrix, communalities, Φ matrix, contributions, and simple-structure diagnostics.">
             <i class="fa-solid fa-table-columns sb-item-icon"></i>
             <span class="sb-item-label">
-              <span>Interpretation</span>
-              <span class="sb-item-subtitle">Rotation &amp; loadings</span>
+              <span>Loadings &amp; Rotation</span>
+              <span class="sb-item-subtitle">Matrix, Φ &amp; contributions</span>
             </span>
           </button>
           <button type="button" class="sb-item sb-item-stack" onclick="switchTab('scores')" data-tab="scores" title="Biplot, score plot, and the case-wise component score table.">
@@ -680,11 +666,20 @@
 
             <!-- ══ Tab: Components (eigenvalues + scree) ══ -->
             <section id="tab-components" class="tab-panel">
-              <div class="inner-tabs" role="tablist" aria-label="Components views">
-                <button type="button" class="inner-tab active" data-inner="selection" onclick="switchInnerTab('components','selection')"><i class="fa-solid fa-chart-line"></i> Selection</button>
-                <button type="button" class="inner-tab" data-inner="eigenvalues" onclick="switchInnerTab('components','eigenvalues')"><i class="fa-solid fa-table"></i> Eigenvalues</button>
-                <button type="button" class="inner-tab" data-inner="variance" onclick="switchInnerTab('components','variance')"><i class="fa-solid fa-chart-bar"></i> Variance</button>
-              </div>
+              <nav class="ws-mode-bar ws-mode-bar--attached ws-mode-bar--connected pca-inner-tabs" aria-label="Components views">
+                <button type="button" class="ws-mode-tab inner-tab active" data-inner="selection" onclick="switchInnerTab('components','selection')" title="Scree plot and retention recommendation">
+                  <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                  <span class="ws-tab-text"><span class="ws-tab-label">Selection</span><span class="ws-tab-sub">Scree &amp; retention</span></span>
+                </button>
+                <button type="button" class="ws-mode-tab inner-tab" data-inner="eigenvalues" onclick="switchInnerTab('components','eigenvalues')" title="Eigenvalue table with variance shares">
+                  <i class="fa-solid fa-table" aria-hidden="true"></i>
+                  <span class="ws-tab-text"><span class="ws-tab-label">Eigenvalues</span><span class="ws-tab-sub">Full table</span></span>
+                </button>
+                <button type="button" class="ws-mode-tab inner-tab" data-inner="variance" onclick="switchInnerTab('components','variance')" title="Variance explained per component">
+                  <i class="fa-solid fa-chart-bar" aria-hidden="true"></i>
+                  <span class="ws-tab-text"><span class="ws-tab-label">Variance</span><span class="ws-tab-sub">Bar &amp; cumulative</span></span>
+                </button>
+              </nav>
 
               <div class="inner-pane active" data-pane="selection">
                 <div id="componentRetentionHint" class="component-retention-hint" style="display:none;"></div>
@@ -735,7 +730,7 @@
               </div>
             </section>
 
-            <!-- ══ Tab: Interpretation (rotation, loadings, communalities, Φ, contributions) ══ -->
+            <!-- ══ Tab: Loadings & Rotation (rotation, loadings, communalities, Φ, contributions) ══ -->
             <section id="tab-interpretation" class="tab-panel">
               <div class="rotation-toolbar">
                 <div>
@@ -759,12 +754,24 @@
               </div>
               <div id="rotationHint" class="rotation-hint">Choose a rotation method; results update immediately. Orthogonal rotations keep components uncorrelated; oblique rotations allow correlation (see Φ when using Promax).</div>
 
-              <div class="inner-tabs" role="tablist" aria-label="Interpretation views">
-                <button type="button" class="inner-tab active" data-inner="loadmatrix" onclick="switchInnerTab('interpretation','loadmatrix')"><i class="fa-solid fa-table-columns"></i> Loading Matrix</button>
-                <button type="button" class="inner-tab" data-inner="communalities" onclick="switchInnerTab('interpretation','communalities')"><i class="fa-solid fa-percentage"></i> Communalities</button>
-                <button type="button" class="inner-tab" data-inner="rotdiag" onclick="switchInnerTab('interpretation','rotdiag')"><i class="fa-solid fa-list-check"></i> Rotation Diagnostics</button>
-                <button type="button" class="inner-tab" data-inner="contributions" onclick="switchInnerTab('interpretation','contributions')"><i class="fa-solid fa-chart-column"></i> Contributions</button>
-              </div>
+              <nav class="ws-mode-bar ws-mode-bar--attached ws-mode-bar--connected pca-inner-tabs" aria-label="Loadings &amp; Rotation views">
+                <button type="button" class="ws-mode-tab inner-tab active" data-inner="loadmatrix" onclick="switchInnerTab('interpretation','loadmatrix')" title="Pattern/structure matrix for the current rotation">
+                  <i class="fa-solid fa-table-columns" aria-hidden="true"></i>
+                  <span class="ws-tab-text"><span class="ws-tab-label">Loading Matrix</span><span class="ws-tab-sub">Current rotation</span></span>
+                </button>
+                <button type="button" class="ws-mode-tab inner-tab" data-inner="communalities" onclick="switchInnerTab('interpretation','communalities')" title="Communality and uniqueness per variable">
+                  <i class="fa-solid fa-percentage" aria-hidden="true"></i>
+                  <span class="ws-tab-text"><span class="ws-tab-label">Communalities</span><span class="ws-tab-sub">h² &amp; uniqueness</span></span>
+                </button>
+                <button type="button" class="ws-mode-tab inner-tab" data-inner="rotdiag" onclick="switchInnerTab('interpretation','rotdiag')" title="Cross-loadings, structure quality, and Φ matrix">
+                  <i class="fa-solid fa-list-check" aria-hidden="true"></i>
+                  <span class="ws-tab-text"><span class="ws-tab-label">Rotation Diagnostics</span><span class="ws-tab-sub">Cross-loadings &amp; Φ</span></span>
+                </button>
+                <button type="button" class="ws-mode-tab inner-tab" data-inner="contributions" onclick="switchInnerTab('interpretation','contributions')" title="Variable contribution to each component">
+                  <i class="fa-solid fa-chart-column" aria-hidden="true"></i>
+                  <span class="ws-tab-text"><span class="ws-tab-label">Contributions</span><span class="ws-tab-sub">% per component</span></span>
+                </button>
+              </nav>
 
               <div class="inner-pane active" data-pane="loadmatrix">
                 <div id="rotationTableRotWrap">
@@ -891,11 +898,20 @@
                 </div>
               </div>
 
-              <div class="inner-tabs" role="tablist" aria-label="Scores views">
-                <button type="button" class="inner-tab active" data-inner="biplot" onclick="switchInnerTab('scores','biplot')"><i class="fa-solid fa-circle-dot"></i> Biplot</button>
-                <button type="button" class="inner-tab" data-inner="cases" onclick="switchInnerTab('scores','cases')"><i class="fa-solid fa-chart-scatter"></i> Cases</button>
-                <button type="button" class="inner-tab" data-inner="table" onclick="switchInnerTab('scores','table')"><i class="fa-solid fa-table-cells-large"></i> Table</button>
-              </div>
+              <nav class="ws-mode-bar ws-mode-bar--attached ws-mode-bar--connected pca-inner-tabs" aria-label="Scores views">
+                <button type="button" class="ws-mode-tab inner-tab active" data-inner="biplot" onclick="switchInnerTab('scores','biplot')" title="Scores with variable loading vectors">
+                  <i class="fa-solid fa-circle-dot" aria-hidden="true"></i>
+                  <span class="ws-tab-text"><span class="ws-tab-label">Biplot</span><span class="ws-tab-sub">Scores + vectors</span></span>
+                </button>
+                <button type="button" class="ws-mode-tab inner-tab" data-inner="cases" onclick="switchInnerTab('scores','cases')" title="Observation scores on PC1 vs PC2">
+                  <i class="fa-solid fa-chart-scatter" aria-hidden="true"></i>
+                  <span class="ws-tab-text"><span class="ws-tab-label">Cases</span><span class="ws-tab-sub">Score plot</span></span>
+                </button>
+                <button type="button" class="ws-mode-tab inner-tab" data-inner="table" onclick="switchInnerTab('scores','table')" title="Case-wise component score table">
+                  <i class="fa-solid fa-table-cells-large" aria-hidden="true"></i>
+                  <span class="ws-tab-text"><span class="ws-tab-label">Table</span><span class="ws-tab-sub">Case scores</span></span>
+                </button>
+              </nav>
 
               <div class="inner-pane active" data-pane="biplot">
                 <div class="viz-card" style="margin-top:0;">
@@ -1049,7 +1065,7 @@
       var tabTitles = {
         summary:        "Summary",
         components:     "Components",
-        interpretation: "Interpretation",
+        interpretation: "Loadings & Rotation",
         scores:         "Scores",
         diagnostics:    "Diagnostics"
       };
@@ -2189,7 +2205,7 @@
     var SNAPSHOT_SECTION_TITLES = {
       "tab-summary":        "Summary",
       "tab-components":     "Components (Eigenvalues & Scree)",
-      "tab-interpretation": "Interpretation (Rotation, Loadings & Contributions)",
+      "tab-interpretation": "Loadings & Rotation",
       "tab-scores":         "Scores (Biplot & Cases)",
       "tab-diagnostics":    "Diagnostics (Distance in PC Space)"
     };
@@ -2239,7 +2255,7 @@
         }
 
         /* Flatten inner tabs: drop the dead tab bars and show every pane stacked. */
-        clone.querySelectorAll(".inner-tabs").forEach(function(bar) { bar.remove(); });
+        clone.querySelectorAll(".pca-inner-tabs").forEach(function(bar) { bar.remove(); });
         clone.querySelectorAll(".inner-pane").forEach(function(pane) {
           pane.classList.add("active");
           pane.style.display = "block";

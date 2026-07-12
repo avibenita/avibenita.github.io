@@ -1405,7 +1405,7 @@ const StatisticoHeader = {
           items: [
             { type: 'tab', tab: 'summary', icon: 'fa-clipboard-check', label: 'Summary', active: true },
             { type: 'tab', tab: 'components', icon: 'fa-chart-line', label: 'Components' },
-            { type: 'tab', tab: 'interpretation', icon: 'fa-table-columns', label: 'Interpretation' },
+            { type: 'tab', tab: 'interpretation', icon: 'fa-table-columns', label: 'Loadings & Rotation' },
             { type: 'tab', tab: 'scores', icon: 'fa-chart-scatter', label: 'Scores' },
             { type: 'tab', tab: 'diagnostics', icon: 'fa-stethoscope', label: 'Diagnostics' }
           ]
@@ -5822,7 +5822,7 @@ const StatisticoHeader = {
       'factor-viewdata': 'View Data',
       'pca-summary': 'Summary',
       'pca-components': 'Components',
-      'pca-interpretation': 'Interpretation',
+      'pca-interpretation': 'Loadings & Rotation',
       'pca-scores': 'Scores',
       'pca-diagnostics': 'Diagnostics',
       'anova-overview': 'Summary',

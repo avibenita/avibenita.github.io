@@ -1103,6 +1103,155 @@ body {
   border-color: rgba(15,23,42,.18) !important;
 }
 
+/* Shared product / home heroes */
+:root[data-theme="light"] .hero {
+  border-bottom-color: rgba(15, 23, 42, 0.12);
+  background:
+    radial-gradient(1000px 500px at 18% -15%, rgba(255, 165, 120, 0.16), transparent 62%),
+    radial-gradient(900px 480px at 85% 10%, rgba(120, 200, 255, 0.15), transparent 62%),
+    linear-gradient(165deg, #f8fbff 0%, #eef5ff 52%, #e7f0ff 100%) !important;
+}
+
+:root[data-theme="light"] .hero h1 {
+  color: #0f172a !important;
+  text-shadow: none !important;
+}
+
+:root[data-theme="light"] .hero h2,
+:root[data-theme="light"] .hero .subtitle {
+  color: rgba(15, 23, 42, 0.78) !important;
+}
+
+:root[data-theme="light"] .hero-text {
+  color: #0f172a;
+}
+
+:root[data-theme="light"] .hero .hero-lead,
+:root[data-theme="light"] .hero-lead {
+  color: rgba(15, 23, 42, 0.78) !important;
+}
+
+:root[data-theme="light"] .hero-lead-aside {
+  color: rgba(15, 23, 42, 0.58) !important;
+}
+
+:root[data-theme="light"] .hero-kicker,
+:root[data-theme="light"] .hero .kicker,
+:root[data-theme="light"] .kicker {
+  color: rgba(30, 64, 175, 0.92);
+  border-color: rgba(37, 99, 235, 0.3);
+  background: rgba(37, 99, 235, 0.08);
+}
+
+:root[data-theme="light"] .hero-highlight {
+  color: rgba(29, 78, 216, 0.92) !important;
+}
+
+:root[data-theme="light"] .hero-proof,
+:root[data-theme="light"] .hero .signal {
+  color: rgba(15, 23, 42, 0.72);
+  border-color: rgba(15, 23, 42, 0.16);
+  background: rgba(15, 23, 42, 0.06);
+}
+
+:root[data-theme="light"] .hero-promise-card {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(37, 99, 235, 0.22);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+}
+
+:root[data-theme="light"] .hero-promise-copy p {
+  color: rgba(15, 23, 42, 0.82);
+}
+
+:root[data-theme="light"] .hero .cta-secondary {
+  background: rgba(15, 23, 42, 0.05);
+  color: rgba(15, 23, 42, 0.88);
+  border-color: rgba(15, 23, 42, 0.16);
+}
+
+:root[data-theme="light"] .hero .cta-secondary:hover {
+  background: rgba(15, 23, 42, 0.09);
+}
+
+:root[data-theme="light"] .hero-proof-pill {
+  background: rgba(15, 23, 42, 0.05);
+  border-color: rgba(15, 23, 42, 0.14);
+  color: rgba(15, 23, 42, 0.78);
+}
+
+/* Contact + legal heroes */
+:root[data-theme="light"] .contact-hero,
+:root[data-theme="light"] .legal-hero {
+  background:
+    radial-gradient(ellipse at 16% 0%, rgba(255,165,120,.18), transparent 36%),
+    radial-gradient(ellipse at 84% 95%, rgba(120,200,255,.16), transparent 38%),
+    linear-gradient(180deg, #f8fbff 0%, #eef5ff 60%, #e7f0ff 100%) !important;
+}
+
+:root[data-theme="light"] .contact-hero h1,
+:root[data-theme="light"] .legal-hero h1 {
+  color: #0f172a !important;
+  text-shadow: none !important;
+}
+
+:root[data-theme="light"] .contact-hero p,
+:root[data-theme="light"] .legal-hero p {
+  color: rgba(15, 23, 42, 0.72) !important;
+}
+
+:root[data-theme="light"] .contact-card h2 {
+  color: #0f172a;
+}
+
+:root[data-theme="light"] .meta {
+  background: rgba(37, 99, 235, 0.06);
+  border-color: rgba(37, 99, 235, 0.2);
+  color: rgba(15, 23, 42, 0.72);
+}
+
+:root[data-theme="light"] .legal-section h2 {
+  color: rgba(146, 64, 14, 0.95);
+}
+
+/* Analytics path-clarity panel */
+:root[data-theme="light"] .path-clarity-panel {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(237, 245, 255, 0.92));
+  border-color: rgba(37, 99, 235, 0.22);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+}
+
+:root[data-theme="light"] .path-clarity-head {
+  color: rgba(29, 78, 216, 0.92);
+}
+
+:root[data-theme="light"] .path-card {
+  border-color: rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+:root[data-theme="light"] .path-card p,
+:root[data-theme="light"] .path-card ul {
+  color: rgba(15, 23, 42, 0.72);
+}
+
+/* Home shift workflow comparison */
+:root[data-theme="light"] .hero-flow-row--old {
+  background: rgba(15, 23, 42, 0.05);
+  border-color: rgba(15, 23, 42, 0.14);
+  color: rgba(15, 23, 42, 0.62);
+}
+
+:root[data-theme="light"] .hero-flow-row--old .hero-flow-label {
+  color: rgba(15, 23, 42, 0.48);
+}
+
+:root[data-theme="light"] .hero-flow-row--new {
+  background: linear-gradient(135deg, rgba(255, 165, 120, 0.14), rgba(120, 200, 255, 0.1));
+  border-color: rgba(217, 119, 6, 0.35);
+  color: rgba(120, 53, 15, 0.95);
+}
+
 /* Shared footer styles for all pages */
 footer#contact {
   background: var(--site-surface-1, #1a1f2e);
@@ -1149,6 +1298,30 @@ footer#contact .footer-bottom {
   padding-top: 14px;
   text-align: center;
   font-size: 0.95rem;
+}
+
+.linkedin-badge-wrap {
+  margin-top: 8px;
+  line-height: 0;
+}
+
+.linkedin-badge-wrap--inline {
+  margin-top: 18px;
+}
+
+.linkedin-badge-label {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--site-text-muted, rgba(201,212,228,.66));
+}
+
+.contact-linkedin {
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border, rgba(255,255,255,.11));
 }
 
 @media (max-width: 768px) {
@@ -1333,6 +1506,12 @@ const FOOTER_TEMPLATE = `
         <a href="javascript:void(0)" id="footer-link-contact">Contact</a>
         <a href="javascript:void(0)" id="footer-link-terms">Terms & Conditions</a>
       </div>
+      <div class="footer-section footer-section--linkedin">
+        <h4>Connect</h4>
+        <div class="linkedin-badge-wrap">
+          <div class="badge-base LI-profile-badge" data-locale="en_US" data-size="medium" data-theme="dark" data-type="VERTICAL" data-vanity="metricsinstitute" data-version="v1"></div>
+        </div>
+      </div>
     </div>
     <div class="footer-bottom">© 2026 Statistico™ Platform. Revolutionizing statistical computing, one analysis at a time.</div>
   </div>
@@ -1365,6 +1544,24 @@ const FOOTER_TEMPLATE = `
     return 'dark';
   }
 
+  function syncLinkedInBadges(theme) {
+    const badgeTheme = theme === 'light' ? 'light' : 'dark';
+    document.querySelectorAll('.LI-profile-badge').forEach(function(badge) {
+      badge.setAttribute('data-theme', badgeTheme);
+    });
+  }
+
+  function loadLinkedInBadgeScript() {
+    if (window.__statisticoLinkedInBadgeLoaded) return;
+    const script = document.createElement('script');
+    script.src = 'https://platform.linkedin.com/badges/js/profile.js';
+    script.async = true;
+    script.defer = true;
+    script.type = 'text/javascript';
+    document.body.appendChild(script);
+    window.__statisticoLinkedInBadgeLoaded = true;
+  }
+
   function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     try {
@@ -1372,6 +1569,7 @@ const FOOTER_TEMPLATE = `
     } catch (error) {
       // Ignore storage errors.
     }
+    syncLinkedInBadges(theme);
     const themeToggle = document.getElementById('themeToggle');
     if (themeToggle) {
       const isLight = theme === 'light';
@@ -1450,6 +1648,9 @@ const FOOTER_TEMPLATE = `
     if (footerTermsLink) footerTermsLink.href = links.terms;
     if (footerAddinsLink) footerAddinsLink.href = links.addins;
   }
+
+  syncLinkedInBadges(document.documentElement.getAttribute('data-theme') || getStoredTheme());
+  loadLinkedInBadgeScript();
 
   // Initialize navigation functionality
   function initializeNavigation() {

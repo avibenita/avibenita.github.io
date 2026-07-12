@@ -478,6 +478,12 @@
     :root[data-theme="light"] .rotation-method-select{
       background:#fff; color:#1e293b; border-color:#94a3b8;
     }
+    .axis-select{
+      background:rgba(15,23,42,0.95); color:#cde6ff;
+      border:1px solid rgba(120,200,255,0.35); border-radius:6px;
+      padding:4px 8px; font-size:.8rem; min-width:130px;
+    }
+    :root[data-theme="light"] .axis-select{ background:#fff; color:#1e293b; border-color:#94a3b8; }
     .rotation-view-radios{ display:flex; flex-wrap:wrap; align-items:center; gap:14px; font-size:.8rem; color:var(--text-secondary); }
     .rotation-view-radios input{ accent-color:var(--accent-2); }
     .rotation-hint{
@@ -862,10 +868,10 @@
 
               <div class="stats-container">
                 <div class="stat-panel">
-                  <div class="stat-panel-heading"><i class="fa-solid fa-circle-info"></i> Plot Axes</div>
+                  <div class="stat-panel-heading"><i class="fa-solid fa-arrows-up-down-left-right"></i> Plot Axes</div>
                   <div class="stat-panel-body">
-                    <div class="stat-field"><span class="stat-label">X-axis (PC1):</span><span class="stat-value" id="biplotPC1Var">...</span></div>
-                    <div class="stat-field"><span class="stat-label">Y-axis (PC2):</span><span class="stat-value" id="biplotPC2Var">...</span></div>
+                    <div class="stat-field"><span class="stat-label">X-axis:</span><select id="scoreAxisX" class="axis-select" onchange="onScoreAxesChange('x')"></select></div>
+                    <div class="stat-field"><span class="stat-label">Y-axis:</span><select id="scoreAxisY" class="axis-select" onchange="onScoreAxesChange('y')"></select></div>
                     <div class="stat-field"><span class="stat-label">Variables:</span><span class="stat-value" id="biplotP">...</span></div>
                   </div>
                 </div>
@@ -886,17 +892,17 @@
                     <div id="biplotChart" class="biplot-container"></div>
                   </div>
                 </div>
-                <div class="section-note">Grey dots = observations projected onto PC1/PC2. Orange lines from the origin (tipped with a marker and label) = variable loading vectors. Direction and length show how each variable contributes to the two components. Observations close together are similar in the PCA space.</div>
+                <div class="section-note">Grey dots = observations projected onto the two components selected under <strong>Plot Axes</strong>. Orange lines from the origin (tipped with a marker and label) = variable loading vectors. Direction and length show how each variable contributes to the two components. Observations close together are similar in the PCA space.</div>
               </div>
 
               <div class="inner-pane" data-pane="cases">
                 <div class="viz-card" style="margin-top:0;">
-                  <div class="viz-title"><i class="fa-solid fa-chart-scatter"></i> Score Plot (PC1 vs PC2)</div>
+                  <div class="viz-title"><i class="fa-solid fa-chart-scatter"></i> Score Plot</div>
                   <div class="chart-wrap">
                     <div id="scorePlotChart" class="biplot-container"></div>
                   </div>
                 </div>
-                <div class="section-note">Each case in the plane of the first two principal components — the same scores as the biplot, without the variable vectors. Scores are computed by projecting standardised observations onto eigenvectors.</div>
+                <div class="section-note">Each case in the plane of the two components selected under <strong>Plot Axes</strong> — the same scores as the biplot, without the variable vectors. Scores are computed by projecting standardised observations onto eigenvectors.</div>
               </div>
 
               <div class="inner-pane" data-pane="table">
@@ -1234,30 +1240,90 @@
       });
     }
 
+    /* ─── Score-plot / biplot axis selection ─── */
+    var scoreAxes = { x: "PC1", y: "PC2" };
+
+    function getScorePcCols() {
+      var cols = (lastPcaBundle && lastPcaBundle.scores && lastPcaBundle.scores.columns) || [];
+      return cols.filter(function(c) { return /^PC\d+$/i.test(String(c)); }).sort(function(a, b) {
+        return (parseInt(String(a).replace(/\D/g, ""), 10) || 0) - (parseInt(String(b).replace(/\D/g, ""), 10) || 0);
+      });
+    }
+
+    function pcVariancePct(pc) {
+      var table = (lastPcaBundle && lastPcaBundle.eigenvalues && lastPcaBundle.eigenvalues.table) || [];
+      var idx = (parseInt(String(pc).replace(/\D/g, ""), 10) || 0) - 1;
+      var v = table[idx] ? parseMaybeNumber(table[idx].variancePct) : NaN;
+      return isFinite(v) ? v : NaN;
+    }
+
+    function axisTitle(pc) {
+      var v = pcVariancePct(pc);
+      return isFinite(v) ? pc + " (" + formatNumber(v) + "%)" : pc;
+    }
+
+    function populateAxisSelectors() {
+      var selX = document.getElementById("scoreAxisX");
+      var selY = document.getElementById("scoreAxisY");
+      if (!selX || !selY) return;
+      var pcs = getScorePcCols();
+      if (!pcs.length) { selX.innerHTML = ""; selY.innerHTML = ""; return; }
+      if (pcs.indexOf(scoreAxes.x) < 0) scoreAxes.x = pcs[0];
+      if (pcs.indexOf(scoreAxes.y) < 0 || scoreAxes.y === scoreAxes.x) scoreAxes.y = pcs[1] || pcs[0];
+      [selX, selY].forEach(function(sel, i) {
+        sel.innerHTML = "";
+        pcs.forEach(function(pc) {
+          var opt = document.createElement("option");
+          opt.value = pc;
+          opt.textContent = axisTitle(pc);
+          sel.appendChild(opt);
+        });
+        sel.value = i === 0 ? scoreAxes.x : scoreAxes.y;
+      });
+    }
+
+    function onScoreAxesChange(changed) {
+      var selX = document.getElementById("scoreAxisX");
+      var selY = document.getElementById("scoreAxisY");
+      if (!selX || !selY) return;
+      var x = selX.value, y = selY.value;
+      /* Same PC on both axes is useless — swap with the previous value instead. */
+      if (x === y) {
+        if (changed === "x") { y = scoreAxes.x; selY.value = y; }
+        else { x = scoreAxes.y; selX.value = x; }
+      }
+      scoreAxes.x = x;
+      scoreAxes.y = y;
+      if (lastPcaBundle) {
+        if (lastPcaBundle.scores) renderScorePlotChart(lastPcaBundle.scores);
+        renderBiplot(buildBiplotData());
+      }
+    }
+
     function renderScorePlotChart(scoresPayload) {
       if (typeof Highcharts === "undefined") return;
       var rows = (scoresPayload && scoresPayload.rows) || [];
       var cols = (scoresPayload && scoresPayload.columns) || [];
-      var pc1 = cols.indexOf("PC1");
-      var pc2 = cols.indexOf("PC2");
-      if (pc1 < 0 || pc2 < 0 || !rows.length) {
+      var ax = cols.indexOf(scoreAxes.x) >= 0 ? scoreAxes.x : "PC1";
+      var ay = cols.indexOf(scoreAxes.y) >= 0 ? scoreAxes.y : "PC2";
+      if (cols.indexOf(ax) < 0 || cols.indexOf(ay) < 0 || !rows.length) {
         var el = document.getElementById("scorePlotChart");
-        if (el) el.innerHTML = '<div class="hint-empty">Need at least two components for PC1 vs PC2.</div>';
+        if (el) el.innerHTML = '<div class="hint-empty">Need at least two components for a score plot.</div>';
         return;
       }
       var pts = rows.map(function(r) {
-        return { x: parseMaybeNumber(r[cols[pc1]]), y: parseMaybeNumber(r[cols[pc2]]), name: String(r[cols[0]] != null ? r[cols[0]] : "") };
+        return { x: parseMaybeNumber(r[ax]), y: parseMaybeNumber(r[ay]), name: String(r[cols[0]] != null ? r[cols[0]] : "") };
       }).filter(function(p) { return isFinite(p.x) && isFinite(p.y); });
       Highcharts.chart("scorePlotChart", {
         chart: { type: "scatter", backgroundColor: "transparent", animation: false, spacing: [12,10,12,10] },
         title: { text: null },
         credits: { enabled: false },
         legend: { enabled: false },
-        xAxis: { title: { text: "PC1", style: { color: "rgba(255,255,255,.85)" } }, labels: { style: { color: "rgba(255,255,255,.78)" } }, gridLineColor: "rgba(255,255,255,.08)", lineColor: "rgba(255,255,255,.22)", plotLines: [{ value: 0, color: "rgba(255,255,255,.25)", width: 1 }] },
-        yAxis: { title: { text: "PC2", style: { color: "rgba(255,255,255,.85)" } }, labels: { style: { color: "rgba(255,255,255,.78)" } }, gridLineColor: "rgba(255,255,255,.08)", plotLines: [{ value: 0, color: "rgba(255,255,255,.25)", width: 1 }] },
+        xAxis: { title: { text: axisTitle(ax), style: { color: "rgba(255,255,255,.85)" } }, labels: { style: { color: "rgba(255,255,255,.78)" } }, gridLineColor: "rgba(255,255,255,.08)", lineColor: "rgba(255,255,255,.22)", plotLines: [{ value: 0, color: "rgba(255,255,255,.25)", width: 1 }] },
+        yAxis: { title: { text: axisTitle(ay), style: { color: "rgba(255,255,255,.85)" } }, labels: { style: { color: "rgba(255,255,255,.78)" } }, gridLineColor: "rgba(255,255,255,.08)", plotLines: [{ value: 0, color: "rgba(255,255,255,.25)", width: 1 }] },
         tooltip: {
           formatter: function() {
-            return "<b>" + this.point.name + "</b><br>PC1: " + formatNumber(this.x) + "<br>PC2: " + formatNumber(this.y);
+            return "<b>" + this.point.name + "</b><br>" + ax + ": " + formatNumber(this.x) + "<br>" + ay + ": " + formatNumber(this.y);
           }
         },
         plotOptions: { scatter: { marker: { radius: 4, symbol: "circle" } } },
@@ -1362,11 +1428,41 @@
     }
 
     /* ─── Biplot ─── */
+    /* Build biplot input for the currently selected axis pair from the bundle's
+       score and loading tables; fall back to the engine's precomputed PC1/PC2
+       payload when those tables are unavailable. */
+    function buildBiplotData() {
+      var b = lastPcaBundle || {};
+      var sc = b.scores, ld = b.loadings;
+      if (sc && sc.rows && sc.rows.length && ld && ld.rows && ld.rows.length &&
+          (sc.columns || []).indexOf(scoreAxes.x) >= 0 && (sc.columns || []).indexOf(scoreAxes.y) >= 0) {
+        var caseCol = (sc.columns && sc.columns[0]) || "Case";
+        var varCol  = (ld.columns && ld.columns[0]) || "Variable";
+        return {
+          xLabel: scoreAxes.x,
+          yLabel: scoreAxes.y,
+          scores: sc.rows.map(function(r) {
+            return { x: parseMaybeNumber(r[scoreAxes.x]), y: parseMaybeNumber(r[scoreAxes.y]), label: String(r[caseCol] != null ? r[caseCol] : "") };
+          }).filter(function(p) { return isFinite(p.x) && isFinite(p.y); }),
+          vectors: ld.rows.map(function(r) {
+            var vx = parseMaybeNumber(r[scoreAxes.x]);
+            var vy = parseMaybeNumber(r[scoreAxes.y]);
+            return { name: String(r[varCol] != null ? r[varCol] : "—"), x: isFinite(vx) ? vx : 0, y: isFinite(vy) ? vy : 0 };
+          }),
+          pc1Variance: pcVariancePct(scoreAxes.x),
+          pc2Variance: pcVariancePct(scoreAxes.y)
+        };
+      }
+      return b.biplot ? Object.assign({ xLabel: "PC1", yLabel: "PC2" }, b.biplot) : null;
+    }
+
     function renderBiplot(data) {
-      if (typeof Highcharts === "undefined") return;
+      if (typeof Highcharts === "undefined" || !data) return;
       var scores  = data.scores || [];
       var vectors = data.vectors || [];
       if (!scores.length && !vectors.length) return;
+      var xLabel = data.xLabel || "PC1";
+      var yLabel = data.yLabel || "PC2";
 
       /* Scale vectors to fit within score range */
       var maxScore = 0;
@@ -1384,12 +1480,12 @@
         title: { text: null },
         credits: { enabled: false },
         legend: { enabled: false },
-        xAxis: { title: { text: "PC1 (" + pc1var + ")", style: { color: "rgba(255,255,255,.85)" } }, labels: { style: { color: "rgba(255,255,255,.78)" } }, lineColor: "rgba(255,255,255,.22)", gridLineColor: "rgba(255,255,255,.06)", plotLines: [{ value: 0, color: "rgba(255,255,255,.3)", width: 1 }] },
-        yAxis: { title: { text: "PC2 (" + pc2var + ")", style: { color: "rgba(255,255,255,.85)" } }, labels: { style: { color: "rgba(255,255,255,.78)" } }, gridLineColor: "rgba(255,255,255,.06)", plotLines: [{ value: 0, color: "rgba(255,255,255,.3)", width: 1 }] },
+        xAxis: { title: { text: xLabel + (pc1var ? " (" + pc1var + ")" : ""), style: { color: "rgba(255,255,255,.85)" } }, labels: { style: { color: "rgba(255,255,255,.78)" } }, lineColor: "rgba(255,255,255,.22)", gridLineColor: "rgba(255,255,255,.06)", plotLines: [{ value: 0, color: "rgba(255,255,255,.3)", width: 1 }] },
+        yAxis: { title: { text: yLabel + (pc2var ? " (" + pc2var + ")" : ""), style: { color: "rgba(255,255,255,.85)" } }, labels: { style: { color: "rgba(255,255,255,.78)" } }, gridLineColor: "rgba(255,255,255,.06)", plotLines: [{ value: 0, color: "rgba(255,255,255,.3)", width: 1 }] },
         tooltip: {
           formatter: function() {
-            if (this.series.name === "Observations") return "<b>" + this.point.name + "</b><br>PC1: " + formatNumber(this.x) + "<br>PC2: " + formatNumber(this.y);
-            return "<b>" + this.point.varName + "</b><br>Load PC1: " + formatNumber(this.point.lx) + "<br>Load PC2: " + formatNumber(this.point.ly);
+            if (this.series.name === "Observations") return "<b>" + this.point.name + "</b><br>" + xLabel + ": " + formatNumber(this.x) + "<br>" + yLabel + ": " + formatNumber(this.y);
+            return "<b>" + this.point.varName + "</b><br>Load " + xLabel + ": " + formatNumber(this.point.lx) + "<br>Load " + yLabel + ": " + formatNumber(this.point.ly);
           }
         },
         series: [
@@ -1668,8 +1764,6 @@
 
     window.populatePcaBiplot = function(data) {
       var d = typeof data === "string" ? JSON.parse(data) : data || {};
-      setText("biplotPC1Var", isFinite(parseMaybeNumber(d.pc1Variance)) ? formatNumber(d.pc1Variance) + "% variance" : "...", "...");
-      setText("biplotPC2Var", isFinite(parseMaybeNumber(d.pc2Variance)) ? formatNumber(d.pc2Variance) + "% variance" : "...", "...");
       setText("biplotP", (d.vectors || []).length, "...");
     };
 
@@ -2079,6 +2173,7 @@
       if (bundle.communalities) window.populatePcaCommunalities(bundle.communalities);
       if (bundle.biplot)        window.populatePcaBiplot(bundle.biplot);
       if (bundle.scores)        window.populatePcaScores(bundle.scores);
+      populateAxisSelectors();
       /* rawData arrives as a separate PCA_RAW_DATA message to keep bundle size small */
 
       /* Render charts: briefly show all panels (and inner panes) so Highcharts gets real dimensions */
@@ -2088,7 +2183,7 @@
         renderScreeChart(bundle.eigenvalues);
         renderVarianceBarChart(bundle.eigenvalues);
       }
-      if (bundle.biplot)       renderBiplot(bundle.biplot);
+      if (bundle.biplot || bundle.scores) renderBiplot(buildBiplotData());
       if (bundle.scores)       renderScorePlotChart(bundle.scores);
       if (bundle.loadings && bundle.eigenvalues) renderContributionChart(bundle.loadings, bundle.eigenvalues);
       if (bundle.scores && bundle.eigenvalues)    renderOutlierChart(bundle.scores, bundle.eigenvalues);
@@ -2101,7 +2196,7 @@
       ["pcaVarCount","pcaCaseCount","pcaMissingRows",
        "pcaKmo","pcaBartlettChi2","pcaBartlettP",
        "pcaKaiserCount","pcaScreeSuggestion","pcaRetained","pcaCumVariance",
-       "biplotPC1Var","biplotPC2Var","biplotP",
+       "biplotP",
        "scoreTotalCases","scoreDisplayed","scoreComponents"
       ].forEach(function(id) { setText(id, "...", "..."); });
       var av = document.getElementById("pcaAdequacyVerdict");
@@ -2161,6 +2256,9 @@
       setText("viewdataInfo", "—", "—");
       _vdAllRows = []; _vdFilteredRows = []; _vdCols = []; _vdPage = 0;
       var bp = document.getElementById("biplotChart"); if (bp) bp.innerHTML = "";
+      scoreAxes = { x: "PC1", y: "PC2" };
+      var sax = document.getElementById("scoreAxisX"); if (sax) sax.innerHTML = "";
+      var say = document.getElementById("scoreAxisY"); if (say) say.innerHTML = "";
       var crh = document.getElementById("componentRetentionHint");
       if (crh) { crh.innerHTML = ""; crh.style.display = "none"; }
       resetInnerTabs();
@@ -2219,6 +2317,17 @@
             "</strong> &nbsp;·&nbsp; Components rotated: <strong>" + kLabel +
             "</strong> &nbsp;·&nbsp; View: <strong>" + viewLabel + "</strong></div>";
         }
+
+        /* Replace the live axis selectors with their selected value as text. */
+        ["scoreAxisX", "scoreAxisY"].forEach(function(id) {
+          var live = document.getElementById(id);
+          var cl = clone.querySelector("#" + id);
+          if (!live || !cl) return;
+          var span = clone.ownerDocument.createElement("span");
+          span.className = "stat-value";
+          span.textContent = (live.selectedIndex >= 0 && live.options[live.selectedIndex]) ? live.options[live.selectedIndex].text : "—";
+          cl.parentNode.replaceChild(span, cl);
+        });
 
         /* Flatten inner tabs: drop the dead tab bars and show every pane stacked. */
         clone.querySelectorAll(".pca-inner-tabs").forEach(function(bar) { bar.remove(); });

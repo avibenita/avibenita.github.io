@@ -77,15 +77,20 @@ const NAV_TEMPLATE = `
         </a>
       </li>
 
-      <!-- Products group — flat inline cluster (no pill frame) -->
+      <!-- Products group — subtle squared frame -->
       <li class="nav-item nav-item--products-group">
         <div class="nav-products-row" id="nav-products-row">
           <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="analytics" id="link-analytics" title="Statistico Analytics Suite">
-            <img class="nav-suite-favicon" src="/favicon-max.svg?v=2026-05-07-red-contour" width="15" height="15" alt="" aria-hidden="true" decoding="async" />
+            <svg class="nav-product-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="2.5" y1="13" x2="13.5" y2="13"/>
+              <rect x="3" y="8" width="2.5" height="5" rx="0.4"/>
+              <rect x="7" y="5" width="2.5" height="8" rx="0.4"/>
+              <rect x="11" y="2" width="2.5" height="11" rx="0.4"/>
+            </svg>
             Analytics Suite
           </a>
           <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators" title="Statistico Calculators Hub">
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg class="nav-product-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <rect x="2" y="2" width="12" height="12" rx="2"/>
               <line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/>
               <line x1="5" y1="11" x2="8" y2="11"/>
@@ -93,7 +98,7 @@ const NAV_TEMPLATE = `
             Calculators
           </a>
           <a href="javascript:void(0)" class="nav-link nav-link--product-lite" data-page="addins" id="link-addins" title="Statistico Applications Hub">
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg class="nav-product-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <rect x="3" y="1" width="10" height="14" rx="1.5"/>
               <line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/>
               <line x1="6" y1="11" x2="8.5" y2="11"/>
@@ -386,12 +391,17 @@ const NAV_STYLE = `
 
 .nav-products-row {
   display: flex;
-  gap: 2px;
+  gap: 0;
   align-items: center;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  padding: 0;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+
+:root[data-theme="light"] .nav-products-row {
+  background: rgba(15,23,42,0.03);
+  border-color: rgba(15,23,42,0.14);
 }
 
 .nav-products-row .nav-link--product,
@@ -401,8 +411,8 @@ const NAV_STYLE = `
   box-shadow: none !important;
   border-radius: 0;
   position: relative;
-  min-height: 44px;
-  padding: 8px 11px;
+  min-height: 40px;
+  padding: 6px 10px;
   font-size: 0.84rem;
   font-weight: 500;
   color: rgba(255,255,255,0.56);
@@ -415,22 +425,37 @@ const NAV_STYLE = `
 
 .nav-products-row .nav-link--product:not(:first-child),
 .nav-products-row .nav-link--product-lite:not(:first-child) {
-  margin-left: 2px;
-  padding-left: 13px;
-  border-left: 1px solid rgba(255,255,255,0.14);
+  margin-left: 0;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255,255,255,0.12);
 }
 
 :root[data-theme="light"] .nav-products-row .nav-link--product:not(:first-child),
 :root[data-theme="light"] .nav-products-row .nav-link--product-lite:not(:first-child) {
-  border-left-color: rgba(15,23,42,0.12);
+  border-left-color: rgba(15,23,42,0.1);
 }
 
-.nav-products-row .nav-suite-favicon {
-  width: 15px;
-  height: 15px;
+.nav-products-row .nav-product-icon {
+  width: 13px;
+  height: 13px;
   flex-shrink: 0;
   display: block;
-  object-fit: contain;
+  color: rgba(180,210,240,0.82);
+  opacity: 1;
+}
+
+.nav-products-row .nav-link:hover .nav-product-icon,
+.nav-products-row .nav-link.active .nav-product-icon {
+  color: rgba(220,236,255,0.95);
+}
+
+:root[data-theme="light"] .nav-products-row .nav-product-icon {
+  color: rgba(15,23,42,0.52);
+}
+
+:root[data-theme="light"] .nav-products-row .nav-link:hover .nav-product-icon,
+:root[data-theme="light"] .nav-products-row .nav-link.active .nav-product-icon {
+  color: rgba(15,23,42,0.88);
 }
 
 /* Separator before secondary nav cluster */

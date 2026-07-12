@@ -468,6 +468,11 @@
     /* Plot Axes only drives the charts — hide it on the score Table tab. */
     #tab-scores[data-active-pane="table"] #scoresAxesPanel{ display:none; }
 
+    /* Sortable case-score table headers */
+    #scoresHead th{ cursor:pointer; user-select:none; white-space:nowrap; }
+    #scoresHead th:hover{ color:var(--accent-2); }
+    #scoresHead th .sort-ind{ margin-left:6px; font-size:.7em; opacity:.75; }
+
     .rotation-toolbar{
       display:flex; flex-wrap:wrap; align-items:center; gap:12px 18px;
       margin-bottom:12px; padding:10px 12px;
@@ -909,7 +914,7 @@
                     </div>
                   </div>
                 </div>
-                <div class="section-note">Score values per case for every retained component (PC1, PC2, …).</div>
+                <div class="section-note">Score values per case for every retained component (PC1, PC2, …). Click a column header to sort — sorting a PC column descending surfaces the cases that score most strongly on that component.</div>
               </div>
             </section>
 
@@ -1748,9 +1753,61 @@
         dispRow.style.display = (isFinite(tot) && isFinite(disp) && tot === disp) ? "none" : "";
       }
       setText("scoreComponents",  d.columns ? d.columns.length - 1 : "...", "...");
-      renderSimpleTableHead("scoresHead", d.columns || ["Case"]);
-      renderSimpleTableBody("scoresBody", d.rows || [], d.columns || ["Case"]);
+      scoresTable = { columns: d.columns || ["Case"], rows: d.rows || [] };
+      scoresSort = { col: null, dir: 1 };
+      renderScoresTable();
     };
+
+    /* Click-to-sort for the case-wise score table. col:null keeps the original case order. */
+    var scoresTable = null;
+    var scoresSort = { col: null, dir: 1 };
+
+    function onScoresSortClick(col) {
+      if (scoresSort.col === col) {
+        scoresSort.dir = -scoresSort.dir;
+      } else {
+        /* PC columns default to descending (extremes on top); the Case column to ascending. */
+        scoresSort = { col: col, dir: /^(case|#|row|obs)$/i.test(String(col).trim()) ? 1 : -1 };
+      }
+      renderScoresTable();
+    }
+
+    function renderScoresTable() {
+      if (!scoresTable) return;
+      var columns = scoresTable.columns;
+      var head = document.getElementById("scoresHead");
+      if (head) {
+        head.innerHTML = "";
+        var tr = document.createElement("tr");
+        columns.forEach(function(col) {
+          var th = document.createElement("th");
+          th.textContent = col;
+          th.title = "Sort by " + col;
+          if (scoresSort.col === col) {
+            var ind = document.createElement("span");
+            ind.className = "sort-ind";
+            ind.textContent = scoresSort.dir === 1 ? "▲" : "▼";
+            th.appendChild(ind);
+          }
+          th.addEventListener("click", function() { onScoresSortClick(col); });
+          tr.appendChild(th);
+        });
+        head.appendChild(tr);
+      }
+      var rows = scoresTable.rows;
+      if (scoresSort.col) {
+        var col = scoresSort.col, dir = scoresSort.dir;
+        rows = rows.slice().sort(function(a, b) {
+          var av = parseMaybeNumber(a[col]), bv = parseMaybeNumber(b[col]);
+          var aNum = isFinite(av), bNum = isFinite(bv);
+          if (aNum && bNum) return (av - bv) * dir;
+          if (aNum) return -1;            /* non-numeric / missing values sink to the bottom */
+          if (bNum) return 1;
+          return String(a[col] == null ? "" : a[col]).localeCompare(String(b[col] == null ? "" : b[col])) * dir;
+        });
+      }
+      renderSimpleTableBody("scoresBody", rows, columns);
+    }
 
     function updateRotationHintText(method) {
       var el = document.getElementById("rotationHint");
@@ -2211,6 +2268,8 @@
       document.getElementById("communalityBody").innerHTML = '<tr><td colspan="3" class="hint-empty">Awaiting communalities...</td></tr>';
       document.getElementById("scoresHead").innerHTML = "";
       document.getElementById("scoresBody").innerHTML = '<tr><td class="hint-empty">Awaiting component scores...</td></tr>';
+      scoresTable = null;
+      scoresSort = { col: null, dir: 1 };
       var sc = document.getElementById("screeChart"); if (sc) sc.innerHTML = "";
       var vb = document.getElementById("varianceBarChart"); if (vb) vb.innerHTML = "";
       showVectors = true;

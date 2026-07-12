@@ -297,6 +297,32 @@
       border-bottom-color:var(--border);
     }
     .pca-components-summary .stats-container{ margin-bottom:0; }
+
+    /* ── Adequacy verdict line ── */
+    .adequacy-verdict{
+      margin:0 0 12px;
+      padding:8px 12px;
+      border-radius:8px;
+      font-size:.86rem;
+      font-weight:650;
+      line-height:1.45;
+      border:1px solid transparent;
+    }
+    .adequacy-verdict.good{
+      color:var(--success);
+      border-color:rgba(74,222,128,.4);
+      background:rgba(74,222,128,.08);
+    }
+    .adequacy-verdict.warn{
+      color:var(--warning);
+      border-color:rgba(251,191,36,.4);
+      background:rgba(251,191,36,.08);
+    }
+    .adequacy-verdict.bad{
+      color:var(--danger);
+      border-color:rgba(251,113,133,.4);
+      background:rgba(251,113,133,.08);
+    }
     .pca-components-summary .overview-corr-block{ margin-top:14px; margin-bottom:0; }
     #tab-summary .pca-components-summary{ margin-bottom:12px; }
 
@@ -573,6 +599,7 @@
                   <i class="fa-solid fa-clipboard-check" aria-hidden="true"></i>
                   Run summary
                 </div>
+                <div id="pcaAdequacyVerdict" class="adequacy-verdict" style="display:none;"></div>
                 <div class="stats-container">
                   <div class="stat-panel">
                     <div class="stat-panel-heading"><i class="fa-solid fa-database"></i> Data Summary</div>
@@ -586,7 +613,7 @@
                     <div class="stat-panel-heading"><i class="fa-solid fa-shield-halved"></i> Adequacy Tests</div>
                     <div class="stat-panel-body">
                       <div class="stat-field"><span class="stat-label">KMO:</span><span class="stat-value" id="pcaKmo">...</span></div>
-                      <div class="stat-field"><span class="stat-label">Bartlett Chi²:</span><span class="stat-value" id="pcaBartlettChi2">...</span></div>
+                      <div class="stat-field"><span class="stat-label">Bartlett Chi² (df):</span><span class="stat-value" id="pcaBartlettChi2">...</span></div>
                       <div class="stat-field"><span class="stat-label">Bartlett p-value:</span><span class="stat-value" id="pcaBartlettP">...</span></div>
                     </div>
                   </div>
@@ -595,7 +622,7 @@
                     <div class="stat-panel-body">
                       <div class="stat-field"><span class="stat-label">Kaiser (≥ 1):</span><span class="stat-value" id="pcaKaiserCount">...</span></div>
                       <div class="stat-field"><span class="stat-label">Scree Suggestion:</span><span class="stat-value" id="pcaScreeSuggestion">...</span></div>
-                      <div class="stat-field"><span class="stat-label">Retained (Used):</span><span class="stat-value" id="pcaRetained">...</span></div>
+                      <div class="stat-field"><span class="stat-label">Components retained:</span><span class="stat-value" id="pcaRetained">...</span></div>
                       <div class="stat-field"><span class="stat-label">Cumulative Variance:</span><span class="stat-value" id="pcaCumVariance">...</span></div>
                     </div>
                   </div>
@@ -682,7 +709,7 @@
             <section id="tab-loadings" class="tab-panel">
               <div class="stats-container">
                 <div class="stat-panel" style="min-width:100%;">
-                  <div class="stat-panel-heading"><i class="fa-solid fa-table-columns"></i> Component Loading Matrix</div>
+                  <div class="stat-panel-heading"><i class="fa-solid fa-table-columns"></i> Component Loading Matrix <span id="loadingsRotationBadge" style="font-weight:600;opacity:.85;"></span></div>
                   <div class="stat-panel-body" style="padding:0;">
                     <div class="table-container" style="margin:0;">
                       <table class="analysis-table">
@@ -710,7 +737,7 @@
                   </div>
                 </div>
               </div>
-              <div class="section-note">Loadings reflect the current rotation (see <strong>Rotation</strong>). Highlighting: |loading| ≥ 0.5 strong, 0.3–0.5 moderate, &lt; 0.3 weak. Communality = sum of squared loadings across retained components.</div>
+              <div class="section-note">Loadings reflect the current rotation (see <strong>Rotation</strong>). Highlighting: |loading| ≥ 0.5 strong, 0.3–0.5 moderate, &lt; 0.3 weak. Communality = variance of each variable explained by the retained components (for oblique rotations it is computed from the unrotated solution, not by summing squared pattern loadings).</div>
             </section>
 
             <!-- ══ Tab: Rotation ══ -->
@@ -824,7 +851,7 @@
                   <div id="biplotChart" class="biplot-container"></div>
                 </div>
               </div>
-              <div class="section-note">Grey dots = observations projected onto PC1/PC2. Coloured arrows = variable loading vectors. Arrow direction and length show how each variable contributes to the two components. Observations close together are similar in the PCA space.</div>
+              <div class="section-note">Grey dots = observations projected onto PC1/PC2. Orange lines from the origin (tipped with a marker and label) = variable loading vectors. Direction and length show how each variable contributes to the two components. Observations close together are similar in the PCA space.</div>
             </section>
 
             <!-- ══ Tab: Score Plot ══ -->
@@ -834,7 +861,7 @@
                   <div class="stat-panel-heading"><i class="fa-solid fa-calculator"></i> Score Info</div>
                   <div class="stat-panel-body">
                     <div class="stat-field"><span class="stat-label">Total Cases:</span><span class="stat-value" id="scoreTotalCases">...</span></div>
-                    <div class="stat-field"><span class="stat-label">Displayed:</span><span class="stat-value" id="scoreDisplayed">...</span></div>
+                    <div class="stat-field" id="scoreDisplayedRow"><span class="stat-label">Displayed:</span><span class="stat-value" id="scoreDisplayed">...</span></div>
                     <div class="stat-field"><span class="stat-label">Components:</span><span class="stat-value" id="scoreComponents">...</span></div>
                   </div>
                 </div>
@@ -889,7 +916,7 @@
                   <div id="outlierChart" class="chart-container" style="min-height:300px;"></div>
                 </div>
               </div>
-              <div class="section-note">Larger values indicate observations farther from the origin in the space of retained components, relative to each component’s eigenvalue. Use as a visual guide; formal tests may use Hotelling’s T².</div>
+              <div class="section-note">The statistic is the squared Mahalanobis distance in the space of retained components (each score squared, weighted by its component’s eigenvalue). Larger values mean an observation is farther from the centre of the data. Use as a visual guide; formal cut-offs compare against χ² quantiles (Hotelling’s T²).</div>
             </section>
 
             <!-- Hidden: raw data for header “Get data” export (populated via PCA_RAW_DATA) -->
@@ -1014,13 +1041,15 @@
       html += "</tr></thead><tbody>";
       matrix.forEach(function(row, i) {
         html += "<tr><th>" + cols[i] + "</th>";
-        row.forEach(function(v) {
+        row.forEach(function(v, j) {
           var n = parseMaybeNumber(v);
           var alpha = isFinite(n) ? Math.min(0.8, Math.abs(n)) : 0;
           var bg = isFinite(n)
             ? (n >= 0 ? "rgba(120,200,255," + alpha.toFixed(2) + ")" : "rgba(255,120,120," + alpha.toFixed(2) + ")")
             : "transparent";
-          html += '<td style="background:' + bg + ';">' + (isFinite(n) ? formatNumber(n) : "—") + "</td>";
+          /* Diagonal is 1 by definition; avoid "1.0000" from float round-off. */
+          var txt = !isFinite(n) ? "—" : (i === j ? "1.00" : formatNumber(n));
+          html += '<td style="background:' + bg + ';">' + txt + "</td>";
         });
         html += "</tr>";
       });
@@ -1344,16 +1373,20 @@
         ]
       });
 
-      /* Draw vector arrows via SVG renderer after chart renders */
+      /* Draw vector arrows via SVG renderer after chart renders.
+         Look the chart up via its container — charts created later (score plot,
+         contribution, outliers) make "last chart in the registry" the wrong one. */
       setTimeout(function() {
-        var chart = Highcharts.charts[Highcharts.charts.length - 1];
-        if (!chart) return;
+        var container = document.getElementById("biplotChart");
+        var idxAttr = container ? container.getAttribute("data-highcharts-chart") : null;
+        var chart = (idxAttr !== null && idxAttr !== "") ? Highcharts.charts[Number(idxAttr)] : null;
+        if (!chart || !chart.xAxis || !chart.xAxis[0]) return;
         vectors.forEach(function(v) {
           var x2px = chart.xAxis[0].toPixels(v.x * scale, false);
           var y2py = chart.yAxis[0].toPixels(v.y * scale, false);
           var x0px = chart.xAxis[0].toPixels(0, false);
           var y0py = chart.yAxis[0].toPixels(0, false);
-          chart.renderer.path(["M", x0px, y0py, "L", x2px, y2py])
+          chart.renderer.path([["M", x0px, y0py], ["L", x2px, y2py]])
             .attr({ "stroke": "rgba(255,165,120,.65)", "stroke-width": 1.5, "zIndex": 3 })
             .add();
         });
@@ -1387,10 +1420,16 @@
         columns.forEach(function(col) {
           var td = document.createElement("td");
           var raw = row[col];
+          /* Case/row indices are labels, not measurements — never render "1.00". */
+          var isIndexCol = /^(case|#|row|obs)$/i.test(String(col).trim());
           if (raw === undefined || raw === null || raw === "") { td.textContent = "—"; }
           else {
             var parsed = parseMaybeNumber(raw);
-            if (isFinite(parsed) && (typeof raw === "number" || /^-?\d+([.,]\d+)?([eE]-?\d+)?$/.test(String(raw).trim()))) {
+            if (isIndexCol && isFinite(parsed) && Number.isInteger(parsed)) {
+              td.textContent = String(parsed);
+            } else if (isIndexCol && isFinite(parsed)) {
+              td.textContent = String(Math.round(parsed));
+            } else if (isFinite(parsed) && (typeof raw === "number" || /^-?\d+([.,]\d+)?([eE]-?\d+)?$/.test(String(raw).trim()))) {
               td.textContent = formatNumber(parsed);
             } else {
               td.textContent = raw;
@@ -1448,10 +1487,51 @@
       setText("pcaCaseCount",  d.caseCount, "...");
       setText("pcaMissingRows", d.missingRows !== undefined ? d.missingRows : "...", "...");
       setText("pcaKmo",        formatNumber(d.kmo), "...");
-      setText("pcaBartlettChi2", formatNumber(d.bartlettChi2), "...");
-      setText("pcaBartlettP",  d.bartlettP !== undefined ? formatNumber(d.bartlettP) : "...", "...");
+      /* Bartlett: report χ² with df (df = p(p−1)/2 for the sphericity test)
+         and floor tiny p-values as "< 0.001" instead of an exact-looking figure. */
+      var bDf = parseMaybeNumber(d.bartlettDf);
+      if (!isFinite(bDf)) {
+        var pVars = parseMaybeNumber(d.variableCount);
+        if (isFinite(pVars) && pVars >= 2) bDf = pVars * (pVars - 1) / 2;
+      }
+      var chi2Txt = formatNumber(d.bartlettChi2);
+      if (isFinite(parseMaybeNumber(d.bartlettChi2)) && isFinite(bDf)) chi2Txt += " (df = " + bDf + ")";
+      setText("pcaBartlettChi2", chi2Txt, "...");
+      var bP = parseMaybeNumber(d.bartlettP);
+      var pTxt = d.bartlettP !== undefined
+        ? (isFinite(bP) && bP > 0 && bP <= 0.001 ? "< 0.001" : formatNumber(d.bartlettP))
+        : "...";
+      setText("pcaBartlettP", pTxt, "...");
       setMetricClass("pcaKmo", d.kmo, "kmo");
       setMetricClass("pcaBartlettP", d.bartlettP, "p");
+
+      /* One-line adequacy verdict, mirroring the KMO thresholds in setMetricClass. */
+      var verdict = document.getElementById("pcaAdequacyVerdict");
+      if (verdict) {
+        var kmoN = parseMaybeNumber(d.kmo);
+        if (!isFinite(kmoN)) {
+          verdict.style.display = "none";
+          verdict.textContent = "";
+        } else {
+          verdict.style.display = "";
+          var bartlettOk = isFinite(bP) && bP < 0.05;
+          if (kmoN >= 0.8) {
+            verdict.className = "adequacy-verdict good";
+            verdict.textContent = "Good adequacy — KMO " + formatNumber(kmoN) +
+              " indicates the correlation structure is well suited to PCA" +
+              (bartlettOk ? "; Bartlett's test confirms significant correlations." : ".");
+          } else if (kmoN >= 0.6) {
+            verdict.className = "adequacy-verdict warn";
+            verdict.textContent = "Acceptable adequacy — KMO " + formatNumber(kmoN) +
+              " is moderate; interpret components with some caution" +
+              (bartlettOk ? "." : " (Bartlett's test is not significant).");
+          } else {
+            verdict.className = "adequacy-verdict bad";
+            verdict.textContent = "Marginal adequacy — KMO " + formatNumber(kmoN) +
+              " is below 0.6; correlations may be too weak for components to be meaningful.";
+          }
+        }
+      }
       renderHeatmaps(d.correlationMatrix || [], d.variableLabels || []);
 
       if (typeof StatisticoHeader !== "undefined") {
@@ -1561,6 +1641,13 @@
       var d = typeof data === "string" ? JSON.parse(data) : data || {};
       setText("scoreTotalCases",  d.totalCases, "...");
       setText("scoreDisplayed",   d.displayedCases, "...");
+      /* "Displayed" only informs when a subset is shown; hide it when equal to total. */
+      var dispRow = document.getElementById("scoreDisplayedRow");
+      if (dispRow) {
+        var tot = parseMaybeNumber(d.totalCases);
+        var disp = parseMaybeNumber(d.displayedCases);
+        dispRow.style.display = (isFinite(tot) && isFinite(disp) && tot === disp) ? "none" : "";
+      }
       setText("scoreComponents",  d.columns ? d.columns.length - 1 : "...", "...");
       renderSimpleTableHead("scoresHead", d.columns || ["Case"]);
       renderSimpleTableBody("scoresBody", d.rows || [], d.columns || ["Case"]);
@@ -1754,6 +1841,14 @@
       }
       updateRotationHintText(method);
 
+      /* Badge the applied rotation on the Loadings tab so the reader knows which
+         solution that matrix reflects without visiting the Rotation tab. */
+      var loadBadge = document.getElementById("loadingsRotationBadge");
+      if (loadBadge) {
+        var ml = method.toLowerCase();
+        loadBadge.textContent = (ml === "none" || !ml) ? "— Unrotated" : "— " + method;
+      }
+
       var xc = data.crossLoadingCount;
       /* Guard against the degenerate case: zero cross-loadings caused by nothing
          loading at all. "Excellent" requires every retained component to have at
@@ -1893,7 +1988,10 @@
           html += "<tr>";
           _vdCols.forEach(function(c) {
             var v = row[c];
-            var display = (v === null || v === undefined) ? "—" : (typeof v === "number" ? formatNumber(v) : String(v));
+            var isIndexCol = /^(case|#|row|obs)$/i.test(String(c).trim());
+            var display = (v === null || v === undefined) ? "—"
+              : (isIndexCol && isFinite(Number(v))) ? String(Math.round(Number(v)))
+              : (typeof v === "number" ? formatNumber(v) : String(v));
             html += "<td>" + display + "</td>";
           });
           html += "</tr>";
@@ -1971,6 +2069,10 @@
        "biplotPC1Var","biplotPC2Var","biplotN","biplotP",
        "scoreTotalCases","scoreDisplayed","scoreComponents"
       ].forEach(function(id) { setText(id, "...", "..."); });
+      var av = document.getElementById("pcaAdequacyVerdict");
+      if (av) { av.style.display = "none"; av.textContent = ""; }
+      var sdr = document.getElementById("scoreDisplayedRow");
+      if (sdr) sdr.style.display = "";
       var cp = document.getElementById("corrHeatmapPreview");
       if (cp) cp.innerHTML = '<div class="hint-empty">Awaiting correlation matrix...</div>';
       var cf = document.getElementById("corrHeatmapFull");

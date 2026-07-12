@@ -855,13 +855,9 @@
             <!-- ══ Tab: Scores (biplot, score plot, case scores) ══ -->
             <section id="tab-scores" class="tab-panel">
               <nav class="ws-mode-bar ws-mode-bar--attached ws-mode-bar--connected pca-inner-tabs" aria-label="Scores views">
-                <button type="button" class="ws-mode-tab inner-tab active" data-inner="biplot" onclick="switchInnerTab('scores','biplot')" title="Scores with variable loading vectors">
-                  <i class="fa-solid fa-circle-dot" aria-hidden="true"></i>
-                  <span class="ws-tab-text"><span class="ws-tab-label">Biplot</span><span class="ws-tab-sub">Scores + vectors</span></span>
-                </button>
-                <button type="button" class="ws-mode-tab inner-tab" data-inner="cases" onclick="switchInnerTab('scores','cases')" title="Observation scores on PC1 vs PC2">
+                <button type="button" class="ws-mode-tab inner-tab active" data-inner="plot" onclick="switchInnerTab('scores','plot')" title="Case scores with optional loading vectors">
                   <i class="fa-solid fa-chart-scatter" aria-hidden="true"></i>
-                  <span class="ws-tab-text"><span class="ws-tab-label">Cases</span><span class="ws-tab-sub">Score plot</span></span>
+                  <span class="ws-tab-text"><span class="ws-tab-label">Plot</span><span class="ws-tab-sub">Scores &amp; vectors</span></span>
                 </button>
                 <button type="button" class="ws-mode-tab inner-tab" data-inner="table" onclick="switchInnerTab('scores','table')" title="Case-wise component score table">
                   <i class="fa-solid fa-table-cells-large" aria-hidden="true"></i>
@@ -875,6 +871,7 @@
                   <div class="stat-panel-body">
                     <div class="stat-field"><span class="stat-label">X-axis:</span><select id="scoreAxisX" class="axis-select" onchange="onScoreAxesChange('x')"></select></div>
                     <div class="stat-field"><span class="stat-label">Y-axis:</span><select id="scoreAxisY" class="axis-select" onchange="onScoreAxesChange('y')"></select></div>
+                    <div class="stat-field"><span class="stat-label">Loading vectors (biplot):</span><label style="cursor:pointer;"><input type="checkbox" id="showVectorsToggle" checked onchange="onVectorsToggleChange()" style="accent-color:var(--accent-2);"/> Show</label></div>
                     <div class="stat-field"><span class="stat-label">Variables:</span><span class="stat-value" id="biplotP">...</span></div>
                   </div>
                 </div>
@@ -888,24 +885,14 @@
                 </div>
               </div>
 
-              <div class="inner-pane active" data-pane="biplot">
+              <div class="inner-pane active" data-pane="plot">
                 <div class="viz-card" style="margin-top:0;">
-                  <div class="viz-title"><i class="fa-solid fa-circle-dot"></i> PCA Biplot — Scores + Loading Vectors</div>
+                  <div class="viz-title"><i class="fa-solid fa-chart-scatter"></i> <span id="scoresPlotTitle">PCA Biplot — Scores + Loading Vectors</span></div>
                   <div class="chart-wrap">
                     <div id="biplotChart" class="biplot-container"></div>
                   </div>
                 </div>
-                <div class="section-note">Grey dots = observations projected onto the two components selected under <strong>Plot Axes</strong>. Orange lines from the origin (tipped with a marker and label) = variable loading vectors. Direction and length show how each variable contributes to the two components. Observations close together are similar in the PCA space.</div>
-              </div>
-
-              <div class="inner-pane" data-pane="cases">
-                <div class="viz-card" style="margin-top:0;">
-                  <div class="viz-title"><i class="fa-solid fa-chart-scatter"></i> Score Plot</div>
-                  <div class="chart-wrap">
-                    <div id="scorePlotChart" class="biplot-container"></div>
-                  </div>
-                </div>
-                <div class="section-note">Each case in the plane of the two components selected under <strong>Plot Axes</strong> — the same scores as the biplot, without the variable vectors. Scores are computed by projecting standardised observations onto eigenvectors.</div>
+                <div class="section-note">Grey dots = observations projected onto the two components selected under <strong>Plot Axes</strong>. Scores are computed by projecting standardised observations onto eigenvectors; observations close together are similar in the PCA space. With <strong>loading vectors</strong> shown (biplot), orange lines from the origin (tipped with a marker and label) show how each variable contributes to the two components.</div>
               </div>
 
               <div class="inner-pane" data-pane="table">
@@ -1298,41 +1285,16 @@
       }
       scoreAxes.x = x;
       scoreAxes.y = y;
-      if (lastPcaBundle) {
-        if (lastPcaBundle.scores) renderScorePlotChart(lastPcaBundle.scores);
-        renderBiplot(buildBiplotData());
-      }
+      if (lastPcaBundle) renderBiplot(buildBiplotData());
     }
 
-    function renderScorePlotChart(scoresPayload) {
-      if (typeof Highcharts === "undefined") return;
-      var rows = (scoresPayload && scoresPayload.rows) || [];
-      var cols = (scoresPayload && scoresPayload.columns) || [];
-      var ax = cols.indexOf(scoreAxes.x) >= 0 ? scoreAxes.x : "PC1";
-      var ay = cols.indexOf(scoreAxes.y) >= 0 ? scoreAxes.y : "PC2";
-      if (cols.indexOf(ax) < 0 || cols.indexOf(ay) < 0 || !rows.length) {
-        var el = document.getElementById("scorePlotChart");
-        if (el) el.innerHTML = '<div class="hint-empty">Need at least two components for a score plot.</div>';
-        return;
-      }
-      var pts = rows.map(function(r) {
-        return { x: parseMaybeNumber(r[ax]), y: parseMaybeNumber(r[ay]), name: String(r[cols[0]] != null ? r[cols[0]] : "") };
-      }).filter(function(p) { return isFinite(p.x) && isFinite(p.y); });
-      Highcharts.chart("scorePlotChart", {
-        chart: { type: "scatter", backgroundColor: "transparent", animation: false, spacing: [12,10,12,10] },
-        title: { text: null },
-        credits: { enabled: false },
-        legend: { enabled: false },
-        xAxis: { title: { text: axisTitle(ax), style: { color: "rgba(255,255,255,.85)" } }, labels: { style: { color: "rgba(255,255,255,.78)" } }, gridLineColor: "rgba(255,255,255,.08)", lineColor: "rgba(255,255,255,.22)", plotLines: [{ value: 0, color: "rgba(255,255,255,.25)", width: 1 }] },
-        yAxis: { title: { text: axisTitle(ay), style: { color: "rgba(255,255,255,.85)" } }, labels: { style: { color: "rgba(255,255,255,.78)" } }, gridLineColor: "rgba(255,255,255,.08)", plotLines: [{ value: 0, color: "rgba(255,255,255,.25)", width: 1 }] },
-        tooltip: {
-          formatter: function() {
-            return "<b>" + this.point.name + "</b><br>" + ax + ": " + formatNumber(this.x) + "<br>" + ay + ": " + formatNumber(this.y);
-          }
-        },
-        plotOptions: { scatter: { marker: { radius: 4, symbol: "circle" } } },
-        series: [{ name: "Scores", data: pts, color: "rgba(120,200,255,.75)" }]
-      });
+    /* Toggle between plain score plot and biplot (scores + loading vectors). */
+    var showVectors = true;
+
+    function onVectorsToggleChange() {
+      var cb = document.getElementById("showVectorsToggle");
+      showVectors = !cb || cb.checked;
+      if (lastPcaBundle) renderBiplot(buildBiplotData());
     }
 
     function renderContributionChart(loadingsPayload, eigenData) {
@@ -1463,10 +1425,13 @@
     function renderBiplot(data) {
       if (typeof Highcharts === "undefined" || !data) return;
       var scores  = data.scores || [];
-      var vectors = data.vectors || [];
+      var vectors = showVectors ? (data.vectors || []) : [];
       if (!scores.length && !vectors.length) return;
       var xLabel = data.xLabel || "PC1";
       var yLabel = data.yLabel || "PC2";
+
+      var titleEl = document.getElementById("scoresPlotTitle");
+      if (titleEl) titleEl.textContent = showVectors ? "PCA Biplot — Scores + Loading Vectors" : "Score Plot";
 
       /* Scale vectors to fit within score range */
       var maxScore = 0;
@@ -1496,8 +1461,8 @@
           {
             name: "Observations",
             data: scoreData,
-            color: "rgba(180,190,200,.5)",
-            marker: { radius: 3, symbol: "circle" }
+            color: showVectors ? "rgba(180,190,200,.5)" : "rgba(120,200,255,.75)",
+            marker: { radius: showVectors ? 3 : 4, symbol: "circle" }
           },
           {
             name: "Variables",
@@ -2188,7 +2153,6 @@
         renderVarianceBarChart(bundle.eigenvalues);
       }
       if (bundle.biplot || bundle.scores) renderBiplot(buildBiplotData());
-      if (bundle.scores)       renderScorePlotChart(bundle.scores);
       if (bundle.loadings && bundle.eigenvalues) renderContributionChart(bundle.loadings, bundle.eigenvalues);
       if (bundle.scores && bundle.eigenvalues)    renderOutlierChart(bundle.scores, bundle.eigenvalues);
       panels.forEach(function(p) { p.style.display = ""; });
@@ -2249,7 +2213,9 @@
       document.getElementById("scoresBody").innerHTML = '<tr><td class="hint-empty">Awaiting component scores...</td></tr>';
       var sc = document.getElementById("screeChart"); if (sc) sc.innerHTML = "";
       var vb = document.getElementById("varianceBarChart"); if (vb) vb.innerHTML = "";
-      var sp = document.getElementById("scorePlotChart"); if (sp) sp.innerHTML = "";
+      showVectors = true;
+      var svt = document.getElementById("showVectorsToggle"); if (svt) svt.checked = true;
+      var spt = document.getElementById("scoresPlotTitle"); if (spt) spt.textContent = "PCA Biplot — Scores + Loading Vectors";
       var co = document.getElementById("contributionChart"); if (co) co.innerHTML = "";
       var oc = document.getElementById("outlierChart"); if (oc) oc.innerHTML = "";
       setText("outlierCaseCount", "—", "—");
@@ -2299,6 +2265,11 @@
           if (r.checked) r.setAttribute("checked", "checked");
           else r.removeAttribute("checked");
         });
+        var vecToggle = document.getElementById("showVectorsToggle");
+        if (vecToggle) {
+          if (vecToggle.checked) vecToggle.setAttribute("checked", "checked");
+          else vecToggle.removeAttribute("checked");
+        }
 
         var clone = document.documentElement.cloneNode(true);
         clone.querySelectorAll("script").forEach(function(s) { s.remove(); });

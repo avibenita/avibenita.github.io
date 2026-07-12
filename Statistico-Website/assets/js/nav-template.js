@@ -396,15 +396,16 @@ const NAV_STYLE = `
 
 .nav-products-row .nav-link--product,
 .nav-products-row .nav-link--product-lite {
-  border: none;
-  background: transparent;
-  box-shadow: none;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0;
   position: relative;
   min-height: 44px;
   padding: 8px 11px;
   font-size: 0.84rem;
   font-weight: 500;
-  color: rgba(255,255,255,0.58);
+  color: rgba(255,255,255,0.56);
 }
 
 .nav-products-row .nav-link--product[data-page="analytics"] {
@@ -522,9 +523,20 @@ const NAV_STYLE = `
 .nav-products-row .nav-link--product-lite.active {
   color: #ffffff;
   font-weight: 600;
-  background: transparent;
-  border: none;
-  box-shadow: none;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.nav-products-row .nav-link.active::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 5px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgb(255,165,120), rgba(120,200,255,0.95));
 }
 
 :root[data-theme="light"] .nav-logo { background: none; }
@@ -563,18 +575,14 @@ const NAV_STYLE = `
   color: rgba(146, 64, 14, 0.96);
 }
 
-.nav-link--product {
-  font-weight: 700;
-  border: 1px solid rgba(255,165,120,0.28);
-  background: rgba(255,165,120,0.08);
-  box-shadow: inset 0 0 0 1px rgba(255,165,120,0.05);
-}
-
+/* Product link classes — layout only; visual state comes from .nav-link */
+.nav-link--product,
 .nav-link--product-lite {
-  font-weight: 700;
-  background: rgba(255,165,120,0.06);
-  border: 1px solid rgba(255,165,120,0.22);
-  color: rgba(255,239,231,0.9);
+  font-weight: inherit;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
 }
 
 /* ── Analytics animated icon ── */
@@ -606,19 +614,6 @@ const NAV_STYLE = `
   50%   { transform: translate(9.85px,  1px); }
   75%   { transform: translate(13.65px, 5px); }
   100%  { transform: translate(2.25px,  11px); }
-}
-
-.nav-link--product:hover {
-  background: rgba(255,165,120,0.08);
-}
-
-/* active product links outside the flat cluster keep warm emphasis */
-.nav-link--product.active {
-  color: rgba(255,220,200,1);
-}
-
-.nav-link--product-lite.active {
-  color: rgba(255,220,200,1);
 }
 
 .nav-link-tag {
@@ -1511,10 +1506,9 @@ const FOOTER_TEMPLATE = `
   function setActivePage() {
     const currentPath = window.location.pathname.replace(/\\/g, '/');
     const currentFile = currentPath.split('/').pop() || 'index.html';
-    
-    // Determine which page we're on
+
     let activePage = 'home';
-    if (currentFile === 'index.html') {
+    if (currentFile === 'index.html' || currentFile === '' || currentPath === '/' || currentPath.endsWith('/Statistico-Website/')) {
       activePage = 'home';
     } else if (currentFile === 'why-another-package.html') {
       activePage = 'why';

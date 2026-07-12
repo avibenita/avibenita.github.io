@@ -416,13 +416,13 @@ const NAV_STYLE = `
   min-height: 40px;
   padding: 7px 11px;
   font-size: 0.86rem;
-  font-weight: 700;
-  color: rgba(220,236,255,0.82);
+  font-weight: 500;
+  color: rgba(255,255,255,0.56);
 }
 
 .nav-products-row .nav-link--product[data-page="analytics"] {
   font-size: 0.86rem;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .nav-products-row .nav-link--product:not(:first-child),
@@ -442,20 +442,26 @@ const NAV_STYLE = `
   height: 14px;
   flex-shrink: 0;
   display: block;
-  color: rgb(120,200,255);
+  color: rgba(120,200,255,0.62);
   opacity: 1;
 }
 
-.nav-products-row .nav-link:hover .nav-product-icon,
+.nav-products-row .nav-link:hover .nav-product-icon {
+  color: rgba(140,210,255,0.88);
+}
+
 .nav-products-row .nav-link.active .nav-product-icon {
-  color: rgb(160,220,255);
+  color: rgb(120,200,255);
 }
 
 :root[data-theme="light"] .nav-products-row .nav-product-icon {
-  color: rgba(37,99,235,0.82);
+  color: rgba(37,99,235,0.5);
 }
 
-:root[data-theme="light"] .nav-products-row .nav-link:hover .nav-product-icon,
+:root[data-theme="light"] .nav-products-row .nav-link:hover .nav-product-icon {
+  color: rgba(37,99,235,0.78);
+}
+
 :root[data-theme="light"] .nav-products-row .nav-link.active .nav-product-icon {
   color: rgba(29,78,216,0.95);
 }
@@ -529,7 +535,8 @@ const NAV_STYLE = `
   box-shadow: none;
 }
 
-.nav-link.active::after {
+.nav-link.active::after,
+.nav-products-row .nav-link.active::after {
   content: '';
   position: absolute;
   left: 10px;
@@ -542,28 +549,17 @@ const NAV_STYLE = `
 
 .nav-products-row .nav-link--product:hover,
 .nav-products-row .nav-link--product-lite:hover {
-  color: rgba(240,248,255,0.96);
+  color: rgba(255,255,255,0.9);
   background: rgba(120,200,255,0.08);
 }
 
 .nav-products-row .nav-link--product.active,
 .nav-products-row .nav-link--product-lite.active {
   color: #ffffff;
-  font-weight: 700;
+  font-weight: 600;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-}
-
-.nav-products-row .nav-link.active::after {
-  content: '';
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 5px;
-  height: 2px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, rgb(255,165,120), rgba(120,200,255,0.95));
 }
 
 :root[data-theme="light"] .nav-logo { background: none; }
@@ -579,14 +575,17 @@ const NAV_STYLE = `
 
 :root[data-theme="light"] .nav-products-row .nav-link--product,
 :root[data-theme="light"] .nav-products-row .nav-link--product-lite {
-  color: rgba(15, 23, 42, 0.82);
+  color: rgba(15, 23, 42, 0.56);
 }
 
 :root[data-theme="light"] .nav-products-row .nav-link--product:hover,
-:root[data-theme="light"] .nav-products-row .nav-link--product-lite:hover,
+:root[data-theme="light"] .nav-products-row .nav-link--product-lite:hover {
+  color: rgba(15, 23, 42, 0.92);
+}
+
 :root[data-theme="light"] .nav-products-row .nav-link--product.active,
 :root[data-theme="light"] .nav-products-row .nav-link--product-lite.active {
-  color: rgba(15, 23, 42, 0.98);
+  color: #0f172a;
 }
 
 :root[data-theme="light"] .nav-link.active {

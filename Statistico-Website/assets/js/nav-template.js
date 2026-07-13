@@ -987,16 +987,8 @@ body {
   padding-top: 88px;
 }
 
-/* Hero section breathing room — gap between nav and hero, and hero and next section */
-.hiw-hero,
-.faq-hero,
-.about-hero {
-  padding-top: 112px !important;
-  padding-bottom: 100px !important;
-  margin-bottom: 16px !important;
-}
-
-.hero {
+/* Hero section breathing room — home/marketing hero only (Analytics-style grid heroes use compact padding below) */
+.hero:not(.grid):not(.hub-hero) {
   padding-top: 80px !important;
   padding-bottom: 64px !important;
   margin-bottom: 16px !important;
@@ -1250,6 +1242,249 @@ body {
   background: linear-gradient(135deg, rgba(255, 165, 120, 0.14), rgba(120, 200, 255, 0.1));
   border-color: rgba(217, 119, 6, 0.35);
   color: rgba(120, 53, 15, 0.95);
+}
+
+/* ===== Shared hero & content typography (Analytics reference) ===== */
+
+.hero.grid,
+.hero.grid *,
+.about-hero,
+.about-hero *,
+.faq-hero,
+.faq-hero *,
+.hiw-hero,
+.hiw-hero *,
+.contact-hero,
+.contact-hero *,
+.legal-hero,
+.legal-hero *,
+.hero.hub-hero,
+.hero.hub-hero * {
+  text-align: center;
+}
+
+.hero.grid,
+.about-hero,
+.faq-hero,
+.hiw-hero,
+.contact-hero,
+.legal-hero,
+.why-header,
+.hero.hub-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 34px 0 14px !important;
+  margin-bottom: 0 !important;
+  border-bottom: 1px solid rgba(120, 200, 255, 0.2);
+  background:
+    radial-gradient(1000px 500px at 18% -15%, rgba(255, 165, 120, 0.22), transparent 62%),
+    radial-gradient(900px 480px at 85% 10%, rgba(120, 200, 255, 0.2), transparent 62%),
+    linear-gradient(165deg, #0f1d31 0%, #0d1829 50%, #0a1321 100%);
+}
+
+.hero.grid::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255,165,120,.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,165,120,.16) 1px, transparent 1px),
+    linear-gradient(to right, rgba(120,200,255,.22) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(120,200,255,.22) 1px, transparent 1px);
+  background-size:
+    var(--grid-size, 24px) var(--grid-size, 24px),
+    var(--grid-size, 24px) var(--grid-size, 24px),
+    var(--grid-major, 120px) var(--grid-major, 120px),
+    var(--grid-major, 120px) var(--grid-major, 120px);
+  opacity: .56;
+}
+
+.hero-content,
+.about-hero-inner,
+.faq-hero-card,
+.hiw-hero-card,
+.contact-hero-inner,
+.legal-hero-inner,
+.why-header-card,
+.hero.hub-hero .hero-inner {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.hero-kicker,
+.page-kicker,
+.why-eyebrow,
+.kicker,
+.hero.hub-hero .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  color: rgba(120, 200, 255, 0.95);
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(120, 200, 255, 0.35);
+  background: rgba(9, 19, 33, 0.52);
+  margin-bottom: 14px;
+}
+
+.hero.grid h1,
+.about-hero h1,
+.faq-hero h1,
+.hiw-hero h1,
+.contact-hero h1,
+.legal-hero h1,
+.why-header h1,
+.hero.hub-hero h1 {
+  font-size: clamp(1.75rem, 3vw, 2.8rem);
+  margin: 0 0 8px;
+  color: var(--site-text-primary, #ffffff);
+  text-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  background-clip: border-box;
+}
+
+.hero.grid h2,
+.about-hero h2,
+.faq-hero h2,
+.hiw-hero h2,
+.contact-hero h2,
+.legal-hero h2,
+.why-header h2,
+.hiw-hero-sub,
+.hero.hub-hero .subtitle {
+  font-size: clamp(1rem, 1.4vw, 1.2rem);
+  margin: 0 0 10px;
+  color: rgba(255, 255, 255, 0.86);
+  font-weight: 500;
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  line-height: 1.45;
+}
+
+.hero-lead,
+.hiw-hero-intro,
+.about-hero .hero-lead,
+.faq-hero .hero-lead,
+.contact-hero .hero-lead,
+.legal-hero .hero-lead,
+.why-header .hero-lead,
+.hero.hub-hero .lead {
+  max-width: 760px;
+  margin: 0 auto;
+  color: var(--site-text-secondary, rgba(255, 255, 255, 0.8));
+  font-size: clamp(0.9rem, 1.15vw, 1rem);
+  line-height: 1.65;
+}
+
+.hero-lead p,
+.hiw-hero-intro {
+  margin: 0 0 8px;
+}
+
+.hero-highlight,
+.why-hero-emotional,
+.hero.hub-hero .signal {
+  color: rgba(120, 200, 255, 0.96);
+  font-weight: 600;
+  font-size: 0.98rem;
+  margin-top: 10px;
+  font-style: normal;
+  font-family: inherit;
+}
+
+.hero-proof,
+.hiw-badge {
+  margin: 10px auto 0;
+  width: fit-content;
+  font-size: 0.86rem;
+  color: rgba(255, 255, 255, 0.78);
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(15, 23, 38, 0.54);
+}
+
+.section-title,
+.section-head h2,
+.why-section h2,
+.why-closing h2,
+.hiw-section-title,
+.legal-section h2,
+.contact-card h2 {
+  font-size: clamp(1.6rem, 2.5vw, 2.2rem);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.why-section p,
+.why-closing p,
+.section-head p,
+.about-panel p,
+.contact-card p,
+.legal-section p,
+.legal-card > p {
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+main > section:not(.hero):not(.about-hero):not(.hiw-hero):not(.faq-hero) {
+  padding: 62px 0;
+}
+
+.faq-body {
+  padding: 62px 0 80px;
+}
+
+:root[data-theme="light"] .about-hero,
+:root[data-theme="light"] .faq-hero,
+:root[data-theme="light"] .hiw-hero,
+:root[data-theme="light"] .contact-hero,
+:root[data-theme="light"] .legal-hero,
+:root[data-theme="light"] .why-header,
+:root[data-theme="light"] .hero.hub-hero {
+  border-bottom-color: rgba(15, 23, 42, 0.12);
+  background:
+    radial-gradient(1000px 500px at 18% -15%, rgba(255, 165, 120, 0.16), transparent 62%),
+    radial-gradient(900px 480px at 85% 10%, rgba(120, 200, 255, 0.15), transparent 62%),
+    linear-gradient(165deg, #f8fbff 0%, #eef5ff 52%, #e7f0ff 100%);
+}
+
+:root[data-theme="light"] .about-hero h1,
+:root[data-theme="light"] .faq-hero h1,
+:root[data-theme="light"] .hiw-hero h1,
+:root[data-theme="light"] .contact-hero h1,
+:root[data-theme="light"] .legal-hero h1,
+:root[data-theme="light"] .why-header h1,
+:root[data-theme="light"] .hero.hub-hero h1 {
+  color: #0f172a;
+  text-shadow: none;
+}
+
+:root[data-theme="light"] .about-hero h2,
+:root[data-theme="light"] .faq-hero h2,
+:root[data-theme="light"] .hiw-hero h2,
+:root[data-theme="light"] .contact-hero h2,
+:root[data-theme="light"] .legal-hero h2,
+:root[data-theme="light"] .why-header h2,
+:root[data-theme="light"] .hiw-hero-sub,
+:root[data-theme="light"] .hero.hub-hero .subtitle {
+  color: rgba(15, 23, 42, 0.78);
+}
+
+:root[data-theme="light"] .hero-highlight,
+:root[data-theme="light"] .why-hero-emotional,
+:root[data-theme="light"] .hero.hub-hero .signal {
+  color: rgba(29, 78, 216, 0.92);
 }
 
 /* Shared footer styles for all pages */
@@ -1528,6 +1763,13 @@ const FOOTER_TEMPLATE = `
     faLink.rel  = 'stylesheet';
     faLink.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css';
     document.head.appendChild(faLink);
+  }
+
+  if (!document.querySelector('link[href*="Playfair+Display"]')) {
+    const playfairLink = document.createElement('link');
+    playfairLink.rel = 'stylesheet';
+    playfairLink.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,400;1,500;1,600;1,700&display=swap';
+    document.head.appendChild(playfairLink);
   }
 
   const THEME_STORAGE_KEY = 'statistico-theme';

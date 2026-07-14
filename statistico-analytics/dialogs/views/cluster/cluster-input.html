@@ -194,6 +194,27 @@
       background: var(--cfg-surface); flex-shrink: 0;
     }
     .reg-obs-strip .warn { color: #dc2626; font-size: 10px; }
+    /* ── info icon + tooltip (same pattern as Factor Analysis) ────── */
+    .info-icon{
+      display:inline-flex; align-items:center; justify-content:center;
+      width:14px; height:14px; border-radius:50%;
+      background:rgba(120,200,255,.15); border:1px solid rgba(120,200,255,.3);
+      color:rgba(120,200,255,.7); font-size:9px; font-weight:700;
+      cursor:default; position:relative; flex-shrink:0;
+      margin-left:4px; vertical-align:middle;
+      transition:background .15s, color .15s;
+    }
+    .info-icon:hover{ background:rgba(120,200,255,.35); color:#fff; }
+    .info-icon .tip{
+      display:none; position:fixed; left:0; top:0;
+      background:rgba(10,15,30,.97); border:1px solid rgba(120,200,255,.35);
+      border-radius:7px; padding:7px 10px;
+      width:230px; font-size:11px; font-weight:400; line-height:1.45;
+      color:#c8dff5; pointer-events:none; z-index:9999; text-align:left;
+      white-space:normal; text-transform:none;
+      box-shadow:0 4px 16px rgba(0,0,0,.5);
+    }
+    .info-icon:hover .tip{ display:block; }
   </style>
 </head>
 <body>
@@ -271,18 +292,18 @@
             </div>
             <div class="adv-body">
               <div class="opt-row">
-                <label for="clusterMethod">Method</label>
+                <label for="clusterMethod">Method <span class="info-icon">i<span class="tip"><b>K-means</b> partitions cases around k moving centers — fast, suits compact similarly sized groups. <b>Hierarchical</b> builds a merge tree (dendrogram) so you can inspect the structure at several k.</span></span></label>
                 <select id="clusterMethod" class="cfg-select">
                   <option value="kmeans">K-means</option>
                   <option value="hierarchical">Hierarchical</option>
                 </select>
               </div>
               <div class="opt-row">
-                <label for="clusterK">Number of clusters (k)</label>
+                <label for="clusterK">Number of clusters (k) <span class="info-icon">i<span class="tip">How many groups to form. There is no single correct k — try a few values and compare the silhouette and explained variance in the results. Start with 2–5 for most data.</span></span></label>
                 <input id="clusterK" type="number" min="2" max="50" step="1" value="3" class="cfg-select" style="min-height:32px;" />
               </div>
               <div class="opt-row" id="linkageRow">
-                <label for="clusterLinkage">Linkage method</label>
+                <label for="clusterLinkage">Linkage method <span class="info-icon">i<span class="tip">How the distance between two clusters is defined when merging. <b>Average (UPGMA)</b> is a balanced default. <b>Complete</b> (farthest pair) gives compact clusters; <b>single</b> (nearest pair) can chain into elongated clusters.</span></span></label>
                 <select id="clusterLinkage" class="cfg-select">
                   <option value="average">Average (UPGMA)</option>
                   <option value="complete">Complete</option>
@@ -290,7 +311,7 @@
                 </select>
               </div>
               <div class="opt-row">
-                <label for="clusterDistance">Distance measure</label>
+                <label for="clusterDistance">Distance measure <span class="info-icon">i<span class="tip"><b>Euclidean (L2)</b> is the straight-line distance and the usual default. <b>Manhattan (L1)</b> sums absolute differences and is more robust to outliers.</span></span></label>
                 <select id="clusterDistance" class="cfg-select">
                   <option value="euclidean">Euclidean (L2)</option>
                   <option value="manhattan">Manhattan (L1)</option>
@@ -300,6 +321,7 @@
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
                   <input type="checkbox" id="clusterStandardize" checked />
                   Standardise variables (recommended)
+                  <span class="info-icon">i<span class="tip">Rescales every variable to mean 0, SD 1 before computing distances. Strongly recommended when variables use different units — otherwise the largest-scale variable dominates. Untick to match SPSS QUICK CLUSTER, which uses raw values.</span></span>
                 </label>
               </div>
             </div>
@@ -778,6 +800,33 @@
       initUI();
       applyLockedMethodUI();
     }
+
+    /* Info-icon tooltips: fixed positioning clamped to the viewport. */
+    document.addEventListener('mouseover', function(e) {
+      var icon = e.target && e.target.closest ? e.target.closest('.info-icon') : null;
+      if (!icon) return;
+      var tip = icon.querySelector('.tip');
+      if (!tip) return;
+      var rect = icon.getBoundingClientRect();
+      tip.style.visibility = 'hidden';
+      tip.style.display = 'block';
+      var tw = tip.offsetWidth || 230;
+      var th = tip.offsetHeight || 60;
+      var vw = window.innerWidth, vh = window.innerHeight;
+      var left = Math.max(8, Math.min(rect.left + rect.width / 2 - tw / 2, vw - tw - 8));
+      var top = rect.top - th - 8;
+      if (top < 8) top = Math.min(rect.bottom + 8, vh - th - 8);
+      tip.style.left = left + 'px';
+      tip.style.top = top + 'px';
+      tip.style.visibility = 'visible';
+    });
+    document.addEventListener('mouseout', function(e) {
+      var icon = e.target && e.target.closest ? e.target.closest('.info-icon') : null;
+      if (!icon) return;
+      if (e.relatedTarget && icon.contains(e.relatedTarget)) return;
+      var tip = icon.querySelector('.tip');
+      if (tip) tip.style.display = '';
+    });
 
     document.addEventListener('DOMContentLoaded', function() {
       setupDropZone();

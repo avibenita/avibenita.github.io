@@ -1300,7 +1300,7 @@ body {
   opacity: .56;
 }
 
-.hero-content,
+.hero.grid .hero-content,
 .about-hero-inner,
 .faq-hero-card,
 .hiw-hero-card,
@@ -1316,7 +1316,7 @@ body {
   padding: 0 20px;
 }
 
-.hero-kicker,
+.hero.grid .hero-kicker,
 .page-kicker,
 .why-eyebrow,
 .kicker,
@@ -1371,7 +1371,7 @@ body {
   line-height: 1.45;
 }
 
-.hero-lead,
+.hero.grid .hero-lead,
 .hiw-hero-intro,
 .about-hero .hero-lead,
 .faq-hero .hero-lead,
@@ -1386,12 +1386,14 @@ body {
   line-height: 1.65;
 }
 
-.hero-lead p,
+.hero.grid .hero-lead p,
 .hiw-hero-intro {
   margin: 0 0 8px;
 }
 
-.hero-highlight,
+.hero.grid .hero-highlight,
+.about-hero .hero-highlight,
+.faq-hero .hero-highlight,
 .why-hero-emotional,
 .hero.hub-hero .signal {
   color: rgba(120, 200, 255, 0.96);
@@ -1402,7 +1404,7 @@ body {
   font-family: inherit;
 }
 
-.hero-proof,
+.hero.grid .hero-proof,
 .hiw-badge {
   margin: 10px auto 0;
   width: fit-content;

@@ -1130,8 +1130,14 @@
       var yLabel;
       if (usePca) {
         var ex = sc.pcaExplained;
-        xLabel = "PC1" + (ex && isFinite(ex[0]) ? " (" + Math.round(ex[0] * 100) + "%)" : "");
-        yLabel = "PC2" + (ex && isFinite(ex[1]) ? " (" + Math.round(ex[1] * 100) + "%)" : "");
+        // Explained variance is >= 0 by definition; clamp float noise and keep a
+        // decimal for small shares so PC2 never reads as a misleading "0%".
+        var fmtPct = function(v) {
+          var p = Math.max(0, Number(v) * 100);
+          return (p >= 10 ? Math.round(p) : p.toFixed(1)) + "%";
+        };
+        xLabel = "PC1" + (ex && isFinite(ex[0]) ? " (" + fmtPct(ex[0]) + " of variance)" : "");
+        yLabel = "PC2" + (ex && isFinite(ex[1]) ? " (" + fmtPct(ex[1]) + " of variance)" : "");
       } else {
         xLabel = String(sc.varNames[xi] || "X");
         yLabel = String(sc.varNames[yi] || "Y");

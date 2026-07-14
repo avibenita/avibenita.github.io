@@ -783,6 +783,7 @@ function buildClusterBundle(headers, rows, spec) {
 
   return {
     summary: {
+      engineBuild: "20260715a",
       variableCount: p,
       caseCount: n,
       missingRows,

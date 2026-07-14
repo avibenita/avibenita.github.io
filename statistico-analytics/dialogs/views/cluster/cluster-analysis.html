@@ -426,7 +426,13 @@
 
             <section id="tab-km-centers" class="tab-panel">
               <div class="stat-panel">
-                <div class="stat-panel-heading"><i class="fa-solid fa-crosshairs"></i> Cluster centers (K-means)</div>
+                <div class="stat-panel-heading" style="display:flex;align-items:center;gap:10px;">
+                  <span style="flex:1;"><i class="fa-solid fa-crosshairs"></i> Cluster centers (K-means)</span>
+                  <span class="profile-mode-toggle" role="group" aria-label="Centers scale">
+                    <button type="button" class="profile-mode-btn active" data-centers-mode="analysis" onclick="setCentersMode('analysis')">Analysis scaling</button>
+                    <button type="button" class="profile-mode-btn" data-centers-mode="raw" onclick="setCentersMode('raw')">Original units</button>
+                  </span>
+                </div>
                 <div class="stat-panel-body" style="padding:0;">
                   <div class="table-container" style="margin:0;">
                     <table class="analysis-table">
@@ -436,7 +442,7 @@
                   </div>
                 </div>
               </div>
-              <div class="section-note">Values are in the <strong>same scaling as the analysis</strong> (raw or standardised per your setup), after convergence. Cell colour follows the correlation heat map: <span style="color:rgba(120,200,255,.95);font-weight:600;">blue positive</span>, <span style="color:rgba(255,120,120,.95);font-weight:600;">red negative</span>, intensity ∝ magnitude.</div>
+              <div class="section-note" id="kmCentersNote">Values are in the <strong>same scaling as the analysis</strong> (raw or standardised per your setup), after convergence. Cell colour follows the correlation heat map: <span style="color:rgba(120,200,255,.95);font-weight:600;">blue positive</span>, <span style="color:rgba(255,120,120,.95);font-weight:600;">red negative</span>, intensity ∝ magnitude.</div>
             </section>
 
             <section id="tab-km-profiles" class="tab-panel">
@@ -972,7 +978,7 @@
       if (id === "hiProfileChart") _hiProfileChart = chart;
     }
 
-    function renderKmCentersTable(varNames, centroidRows) {
+    function renderKmCentersTable(varNames, centroidRows, plain) {
       var head = document.getElementById("kmCentersHead");
       var body = document.getElementById("kmCentersBody");
       if (!head || !body) return;
@@ -985,6 +991,7 @@
       varNames.forEach(function(nm) { hr += "<th>" + String(nm) + "</th>"; });
       head.innerHTML = hr + "</tr>";
       // Sign colouring like the correlation heat map: blue positive, red negative, alpha ∝ magnitude.
+      // Skipped for original-unit values, where sign carries no meaning.
       var maxAbs = 0;
       centroidRows.forEach(function(row) {
         row.forEach(function(v) {
@@ -997,12 +1004,43 @@
         row.forEach(function(v) {
           var n = Number(v);
           if (!isFinite(n)) { tr += "<td>—</td>"; return; }
+          if (plain) { tr += "<td>" + formatNumber(n) + "</td>"; return; }
           var alpha = maxAbs > 1e-12 ? Math.min(0.75, (Math.abs(n) / maxAbs) * 0.75) : 0;
           var bg = n >= 0 ? "rgba(120,200,255," + alpha.toFixed(2) + ")" : "rgba(255,120,120," + alpha.toFixed(2) + ")";
           tr += '<td style="background:' + bg + ';">' + formatNumber(n) + "</td>";
         });
         return tr + "</tr>";
       }).join("");
+    }
+
+    var _kmCentersMode = "analysis";
+
+    function renderCentersFor() {
+      var b = lastClusterBundle || {};
+      var km = b.kmeans;
+      var labels = (b.summary && b.summary.variableLabels) || [];
+      var note = document.getElementById("kmCentersNote");
+      if (!km || !labels.length) {
+        renderKmCentersTable([], null);
+        return;
+      }
+      if (_kmCentersMode === "raw") {
+        // Raw-space centers = mean of each cluster's members in original units (matches SPSS Final Cluster Centers).
+        var rawRows = (km.profile && km.profile.rawSeries ? km.profile.rawSeries : []).map(function(s) { return s.data || []; });
+        renderKmCentersTable(labels, rawRows.length ? rawRows : null, true);
+        if (note) note.innerHTML = "Values are cluster means in <strong>original units</strong> — comparable to SPSS \u201CFinal Cluster Centers\u201D when SPSS runs on unstandardised data.";
+      } else {
+        renderKmCentersTable(labels, km.centroids && km.centroids.length ? km.centroids : null);
+        if (note) note.innerHTML = "Values are in the <strong>same scaling as the analysis</strong> (raw or standardised per your setup), after convergence. Cell colour follows the correlation heat map: <span style=\"color:rgba(120,200,255,.95);font-weight:600;\">blue positive</span>, <span style=\"color:rgba(255,120,120,.95);font-weight:600;\">red negative</span>, intensity ∝ magnitude.";
+      }
+    }
+
+    function setCentersMode(mode) {
+      _kmCentersMode = mode;
+      document.querySelectorAll(".profile-mode-btn[data-centers-mode]").forEach(function(btn) {
+        btn.classList.toggle("active", btn.getAttribute("data-centers-mode") === mode);
+      });
+      renderCentersFor();
     }
 
     function renderDendrogram(containerId, merges, n) {
@@ -1150,12 +1188,7 @@
         var kcats = (km.sizes || []).map(function(_, i) { return "C" + (i + 1); });
         renderBarChart("kmSizesChart", kcats, km.sizes || [], "K-means");
         renderProfileFor("km");
-        var cents = km.centroids;
-        if (cents && cents.length && labels.length) {
-          renderKmCentersTable(labels, cents);
-        } else {
-          renderKmCentersTable([], null);
-        }
+        renderCentersFor();
       } else {
         setText("kmConverged", "—");
         setText("kmIter", "—");

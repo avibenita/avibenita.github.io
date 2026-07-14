@@ -329,6 +329,12 @@ function hierarchicalCluster(X, linkageMode, kTarget, metric) {
   const kEff = Math.min(Math.max(2, kTarget), n);
   let nextId = n;
 
+  // Cophenetic correlation: each pair (a, b) crosses a merge exactly once, at
+  // the height where their clusters first join. Accumulate Pearson sums on the
+  // fly instead of materialising an n×n cophenetic matrix.
+  const doCoph = n >= 3 && n <= 2000;
+  let cN = 0, cSx = 0, cSy = 0, cSxx = 0, cSyy = 0, cSxy = 0;
+
   function labelFromClusters(clist) {
     const lab = Array(n).fill(0);
     clist.forEach((c, idx) => {
@@ -356,6 +362,16 @@ function hierarchicalCluster(X, linkageMode, kTarget, metric) {
     }
     const A = clusters[bi];
     const B = clusters[bj];
+    if (doCoph) {
+      for (let a = 0; a < A.members.length; a++) {
+        for (let b = 0; b < B.members.length; b++) {
+          const d0 = dist[A.members[a]][B.members[b]];
+          cN++;
+          cSx += d0; cSy += best;
+          cSxx += d0 * d0; cSyy += best * best; cSxy += d0 * best;
+        }
+      }
+    }
     const merged = { members: A.members.concat(B.members), id: nextId++ };
     merges.push({
       step: merges.length + 1,
@@ -372,7 +388,16 @@ function hierarchicalCluster(X, linkageMode, kTarget, metric) {
   }
 
   if (!labelsAtK) labelsAtK = labelFromClusters(clusters);
-  return { merges, labels: labelsAtK, kUsed: kEff };
+
+  let cophenetic = null;
+  if (doCoph && cN > 1) {
+    const covXY = cSxy - (cSx * cSy) / cN;
+    const varX = cSxx - (cSx * cSx) / cN;
+    const varY = cSyy - (cSy * cSy) / cN;
+    if (varX > 1e-12 && varY > 1e-12) cophenetic = covXY / Math.sqrt(varX * varY);
+  }
+
+  return { merges, labels: labelsAtK, kUsed: kEff, cophenetic };
 }
 
 function kmeans(Z, k, maxIter, metric) {
@@ -901,7 +926,7 @@ function buildClusterBundle(headers, rows, spec) {
 
   return {
     summary: {
-      engineBuild: "20260715c",
+      engineBuild: "20260716a",
       variableCount: p,
       caseCount: n,
       missingRows,
@@ -944,6 +969,7 @@ function buildClusterBundle(headers, rows, spec) {
       mergeSteps: mergeShow,
       totalMerges: hi.merges.length,
       dendrogramMerges: hi.merges,
+      cophenetic: hi.cophenetic != null ? hi.cophenetic : null,
       quality: hiQuality,
       centroidDistances: hiCentroidDist,
       scatterLabels: hi.labels.slice(0, scatterN),
@@ -992,6 +1018,20 @@ function openClusterResultsDialogOnly() {
           const message = parseDialogMessage(arg);
           if (!message) return;
           if (message.action === "ready") sendClusterBundle();
+          else if (message.action === "clusterApplyK") {
+            // Interactive dendrogram cut / suggested-k pick: update k in the
+            // saved spec and recompute, so the whole module refreshes.
+            const newK = Number(message.k);
+            if (isFinite(newK) && newK >= 2) {
+              try {
+                const key = sessionStorage.getItem("clusterModelSpec") != null ? "clusterModelSpec" : "clusterSpec";
+                const spec = JSON.parse(sessionStorage.getItem(key) || "{}");
+                spec.k = Math.round(newK);
+                sessionStorage.setItem(key, JSON.stringify(spec));
+              } catch (e) { console.error("clusterApplyK spec update:", e); }
+              sendClusterBundle();
+            }
+          }
           else if (message.action === "close") {
             if (window.StatisticoDialogHost) {
               StatisticoDialogHost.closeFromMessage(clusterDialog, function () { clusterDialog = null; });

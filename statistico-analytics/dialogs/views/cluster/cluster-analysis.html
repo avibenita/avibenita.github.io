@@ -13,7 +13,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="../shared-header.css?v=20260714c"/>  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
-  <script src="../shared-header.js?v=20260714d"></script>
+  <script src="../shared-header.js?v=20260716a"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -169,7 +169,7 @@
     .chart-container{ width:100%; height:280px; }
     .chart-container.chart-profile{ height:340px; }
     .chart-container.chart-dendrogram{ height:320px; min-height:200px; }
-    .chart-container.chart-map{ height:420px; }
+    .chart-container.chart-map{ height:560px; }
     .chart-container.chart-convergence{ height:260px; }
     .map-controls{ display:inline-flex; gap:6px; align-items:center; }
     .map-select{
@@ -360,6 +360,38 @@
     }
     html[data-theme="light"] .profile-mode-toggle{ border-color:rgba(0,0,0,.16); }
     html[data-theme="light"] .profile-mode-btn + .profile-mode-btn{ border-left-color:rgba(0,0,0,.12); }
+    .k-pill-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .k-pill{
+      display:inline-flex; align-items:center; gap:6px;
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:999px;
+      background:transparent;
+      color:var(--text-secondary);
+      padding:4px 12px;
+      font-size:11.5px; font-weight:600;
+      cursor:pointer;
+    }
+    .k-pill:hover{ border-color:rgba(45,212,191,.5); color:var(--text-primary); }
+    .k-pill.suggested{
+      background:rgba(45,212,191,.18);
+      border-color:rgba(45,212,191,.55);
+      color:var(--text-primary);
+    }
+    .k-pill.current{ box-shadow:0 0 0 1.5px rgba(251,191,36,.65); }
+    .k-pill .k-pill-tag{ font-size:10px; font-weight:500; opacity:.75; }
+    html[data-theme="light"] .k-pill{ border-color:rgba(0,0,0,.18); }
+    .cut-apply-btn{
+      border:1px solid rgba(251,191,36,.55);
+      border-radius:8px;
+      background:rgba(251,191,36,.16);
+      color:var(--text-primary);
+      padding:5px 14px;
+      font-size:11.5px; font-weight:700;
+      cursor:pointer;
+      white-space:nowrap;
+    }
+    .cut-apply-btn:disabled{ opacity:.4; cursor:default; }
+    .cut-apply-btn:not(:disabled):hover{ background:rgba(251,191,36,.26); }
   </style>
 </head>
 <body data-cluster-results-ui="shared-sidebar-v3">
@@ -409,11 +441,11 @@
           </button>
           <button type="button" class="sb-item sb-cluster-nav" data-cluster-method="hierarchical" data-nav-key="hi-dendrogram" onclick="switchClusterView('hi-dendrogram')">
             <i class="fa-solid fa-diagram-project sb-item-icon"></i>
-            <span class="sb-item-copy"><span class="sb-item-label">Dendrogram</span><span class="sb-item-description">Merge structure of the hierarchy.</span></span>
+            <span class="sb-item-copy"><span class="sb-item-label">Dendrogram</span><span class="sb-item-description">Merge tree with a draggable cut line to change k.</span></span>
           </button>
           <button type="button" class="sb-item sb-cluster-nav" data-cluster-method="hierarchical" data-nav-key="hi-clusters" onclick="switchClusterView('hi-clusters')">
             <i class="fa-solid fa-sitemap sb-item-icon"></i>
-            <span class="sb-item-copy"><span class="sb-item-label">Clusters</span><span class="sb-item-description">Sizes, merge progression, silhouettes, and assignments at k.</span></span>
+            <span class="sb-item-copy"><span class="sb-item-label">Clusters</span><span class="sb-item-description">Sizes, suggested k, merge progression, and silhouettes.</span></span>
           </button>
           <button type="button" class="sb-item sb-cluster-nav" data-cluster-method="hierarchical" data-nav-key="hi-profiles" onclick="switchClusterView('hi-profiles')">
             <i class="fa-solid fa-chart-line sb-item-icon"></i>
@@ -509,11 +541,15 @@
 
             <section id="tab-km-profiles" class="tab-panel">
               <div class="viz-card">
-                <div class="viz-title" style="display:flex;align-items:center;gap:10px;">
-                  <span style="flex:1;"><i class="fa-solid fa-chart-line"></i> Cluster profiles (K-means)</span>
+                <div class="viz-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                  <span style="flex:1;min-width:180px;"><i class="fa-solid fa-chart-line"></i> Cluster profiles (K-means)</span>
                   <span class="profile-mode-toggle" role="group" aria-label="Profile scale">
                     <button type="button" class="profile-mode-btn active" data-profile-target="km" data-profile-mode="z" onclick="setProfileMode('km','z')">Standardised</button>
                     <button type="button" class="profile-mode-btn" data-profile-target="km" data-profile-mode="raw" onclick="setProfileMode('km','raw')">Raw means</button>
+                  </span>
+                  <span class="profile-mode-toggle" role="group" aria-label="Variable order" title="Order variables by how strongly they separate the clusters (largest spread of cluster means first)">
+                    <button type="button" class="profile-mode-btn active" data-profile-order-target="km" data-profile-order="orig" onclick="setProfileOrder('km','orig')">Original order</button>
+                    <button type="button" class="profile-mode-btn" data-profile-order-target="km" data-profile-order="sep" onclick="setProfileOrder('km','sep')">By separation</button>
                   </span>
                 </div>
                 <div class="chart-wrap"><div id="kmProfileChart" class="chart-container chart-profile"></div></div>
@@ -570,7 +606,7 @@
                   <div id="kmSeparationHeatmap" class="heatmap-wrap"><div class="hint-empty">Awaiting K-means output…</div></div>
                 </div>
               </div>
-              <div class="section-note">Larger distances mean better-separated clusters. Darker cells mark the closest — least distinct — pairs; check those pairs for overlap on the map above.</div>
+              <div class="section-note">Larger distances mean better-separated clusters. Deeper blue marks pairs that are farther apart; the palest cells are the closest — least distinct — pairs, so check those for overlap on the map above.</div>
             </section>
 
             <section id="tab-km-diagnostics" class="tab-panel">
@@ -613,9 +649,13 @@
 
             <section id="tab-hi-dendrogram" class="tab-panel">
               <div class="viz-card">
-                <div class="viz-title"><i class="fa-solid fa-diagram-project"></i> Dendrogram</div>
+                <div class="viz-title"><i class="fa-solid fa-diagram-project"></i> Dendrogram <span class="info-icon">i<span class="tip">The merge tree: leaves are cases, and branches join at the distance (height) where their clusters merged. The dashed <b>cut line</b> is draggable — move it up or down to see how many clusters each level produces, then apply the new k to recompute the whole module.</span></span></div>
                 <div class="chart-wrap"><div id="hiDendrogramChart" class="chart-container chart-dendrogram"></div></div>
-                <div class="section-note" style="margin-top:8px;margin-bottom:0;">Merge height (y-axis) shows distance at which clusters combine. A horizontal cut at height <em>h</em> gives the number of clusters at that level.</div>
+                <div style="display:flex;align-items:center;gap:10px;margin-top:8px;">
+                  <span class="section-note" style="margin:0;flex:1;" id="hiCutReadout">Drag the dashed cut line to explore other cluster counts.</span>
+                  <button type="button" class="cut-apply-btn" id="hiCutApply" onclick="applyDendroCut()" disabled>Apply cut</button>
+                </div>
+                <div class="section-note" style="margin-top:8px;margin-bottom:0;">Merge height (y-axis) shows the distance at which clusters combine. A horizontal cut at height <em>h</em> gives the number of clusters at that level; applying a cut re-runs the analysis at the new <em>k</em> and refreshes every page.</div>
               </div>
             </section>
 
@@ -626,6 +666,7 @@
                   <div class="stat-panel-body">
                     <div class="stat-field"><span class="stat-label">Linkage: <span class="info-icon">i<span class="tip">How the distance between two clusters is defined when merging. <b>Average</b> uses the mean pairwise distance (balanced default), <b>single</b> the nearest pair (chains easily), <b>complete</b> the farthest pair (compact clusters).</span></span></span><span class="stat-value" id="hiLinkDisplay">…</span></div>
                     <div class="stat-field"><span class="stat-label">Merge steps: <span class="info-icon">i<span class="tip">Total number of merges to combine all cases into one cluster (n − 1 steps). The dendrogram shows the height (distance) at which each merge happened.</span></span></span><span class="stat-value" id="hiMergeCount">…</span></div>
+                    <div class="stat-field"><span class="stat-label">Cophenetic correlation: <span class="info-icon">i<span class="tip">How faithfully the dendrogram preserves the original pairwise distances: the correlation between each pair&rsquo;s distance and the height at which they first merge. <b>&ge; 0.75</b> means the tree represents the data well; low values mean the hierarchy distorts the true distances and other linkages may fit better.</span></span></span><span class="stat-value" id="hiCophenetic">…</span></div>
                     <div class="stat-field"><span class="stat-label">Within-cluster SS (WCSS): <span class="info-icon">i<span class="tip">Total squared distance of each case to its cluster centroid at the chosen cut. Lower is tighter, but it always drops as k grows — compare across k rather than reading it in isolation.</span></span></span><span class="stat-value" id="hiWcss">…</span></div>
                     <div class="stat-field"><span class="stat-label">Between-cluster SS: <span class="info-icon">i<span class="tip">Spread of the cluster centroids around the overall mean — the part of total variability the clustering captures. Total SS = between SS + within SS.</span></span></span><span class="stat-value" id="hiBss">…</span></div>
                     <div class="stat-field"><span class="stat-label">Explained variance: <span class="info-icon">i<span class="tip">Between SS as a share of total SS at the chosen cut (like R² for clustering). <b>&ge; 50%</b> is usually a meaningful partition; near 0% means the clusters barely differ from random splits.</span></span></span><span class="stat-value" id="hiExplVar">…</span></div>
@@ -636,6 +677,13 @@
               <div class="viz-card">
                 <div class="viz-title"><i class="fa-solid fa-chart-column"></i> Cluster sizes (cut at <em>k</em>)</div>
                 <div class="chart-wrap"><div id="hiSizesChart" class="chart-container"></div></div>
+              </div>
+              <div class="stat-panel" style="margin-top:12px;">
+                <div class="stat-panel-heading"><i class="fa-solid fa-wand-magic-sparkles"></i> Suggested k <span class="info-icon">i<span class="tip">Candidate cluster counts scored by the <b>largest linkage jump</b>: the best place to stop merging is just before the biggest jump in merge distance, because that jump means two genuinely different groups were forced together. Click a pill to re-run the whole module at that k.</span></span></div>
+                <div class="stat-panel-body">
+                  <div class="k-pill-row" id="hiSuggestedK"><span class="hint-empty">Awaiting hierarchical output…</span></div>
+                  <div class="section-note" style="margin-top:8px;margin-bottom:0;" id="hiSuggestedKNote"></div>
+                </div>
               </div>
               <div class="viz-card" style="margin-top:12px;">
                 <div class="viz-title"><i class="fa-solid fa-wave-square"></i> Merge distance progression <span class="info-icon">i<span class="tip">The hierarchical analogue of a convergence chart: the distance at which each successive merge happened, over the final merges. Flat stretches merge similar groups; a sudden <b>jump</b> means two genuinely different clusters were forced together — the natural place to stop. The marker shows your chosen cut at k.</span></span></div>
@@ -680,11 +728,15 @@
 
             <section id="tab-hi-profiles" class="tab-panel">
               <div class="viz-card">
-                <div class="viz-title" style="display:flex;align-items:center;gap:10px;">
-                  <span style="flex:1;"><i class="fa-solid fa-chart-line"></i> Cluster profiles (hierarchical)</span>
+                <div class="viz-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                  <span style="flex:1;min-width:180px;"><i class="fa-solid fa-chart-line"></i> Cluster profiles (hierarchical)</span>
                   <span class="profile-mode-toggle" role="group" aria-label="Profile scale">
                     <button type="button" class="profile-mode-btn active" data-profile-target="hi" data-profile-mode="z" onclick="setProfileMode('hi','z')">Standardised</button>
                     <button type="button" class="profile-mode-btn" data-profile-target="hi" data-profile-mode="raw" onclick="setProfileMode('hi','raw')">Raw means</button>
+                  </span>
+                  <span class="profile-mode-toggle" role="group" aria-label="Variable order" title="Order variables by how strongly they separate the clusters (largest spread of cluster means first)">
+                    <button type="button" class="profile-mode-btn active" data-profile-order-target="hi" data-profile-order="orig" onclick="setProfileOrder('hi','orig')">Original order</button>
+                    <button type="button" class="profile-mode-btn" data-profile-order-target="hi" data-profile-order="sep" onclick="setProfileOrder('hi','sep')">By separation</button>
                   </span>
                 </div>
                 <div class="chart-wrap"><div id="hiProfileChart" class="chart-container chart-profile"></div></div>
@@ -739,7 +791,7 @@
                   <div id="hiSeparationHeatmap" class="heatmap-wrap"><div class="hint-empty">Awaiting hierarchical output…</div></div>
                 </div>
               </div>
-              <div class="section-note">Larger distances mean better-separated clusters. Darker cells mark the closest — least distinct — pairs; check those pairs for overlap on the map above.</div>
+              <div class="section-note">Larger distances mean better-separated clusters. Deeper blue marks pairs that are farther apart; the palest cells are the closest — least distinct — pairs, so check those for overlap on the map above.</div>
             </section>
 
             <div id="cluViewDataSink" class="visually-hidden" aria-hidden="true">
@@ -764,6 +816,8 @@
     var lastClusterBundle = null;
     var _kmProfileMode = "z";
     var _hiProfileMode = "z";
+    var _kmProfileOrder = "orig";
+    var _hiProfileOrder = "orig";
     var _vdAllRows = [];
     var _vdFilteredRows = [];
     var _vdCols = [];
@@ -975,6 +1029,50 @@
       el.innerHTML = rows.join("");
     }
 
+    /* Generated interpretation for the Overview instead of a static
+       "run complete": strength of structure from the silhouette, separation,
+       explained variance, and size balance in plain language. */
+    function renderVerdict(bundle) {
+      var el = document.getElementById("cluVerdict");
+      if (!el) return;
+      var s = (bundle && bundle.summary) || {};
+      var act = activeMethodBlock(bundle);
+      var blk = act.block;
+      var q = blk && blk.quality;
+      if (!blk || !q) { el.textContent = s.verdict || "—"; return; }
+      var parts = [];
+      var sizes = blk.sizes || [];
+      var k = sizes.length || s.k;
+      var sil = q.silhouette;
+      if (sil != null && isFinite(sil)) {
+        var strength, sep;
+        if (sil >= 0.7) { strength = "Strong cluster structure detected"; sep = "well separated"; }
+        else if (sil >= 0.5) { strength = "Reasonable cluster structure detected"; sep = "reasonably separated"; }
+        else if (sil >= 0.25) { strength = "Weak cluster structure"; sep = "only weakly separated"; }
+        else { strength = "Little evidence of real cluster structure"; sep = "poorly separated"; }
+        parts.push("<strong>" + strength + ".</strong> Average silhouette = " + formatNumber(sil) + " — the " + k + " clusters are " + sep + ".");
+      } else {
+        parts.push("<strong>Clustering run complete.</strong>");
+      }
+      if (q.explainedVariance != null && isFinite(q.explainedVariance)) {
+        parts.push("The partition explains " + formatPercent(q.explainedVariance) + " of total variance.");
+      }
+      var total = sizes.reduce(function(a, b) { return a + b; }, 0);
+      if (sizes.length > 1 && total > 0) {
+        var mx = Math.max.apply(null, sizes);
+        var mn = Math.min.apply(null, sizes);
+        var balance = mn > 0 && mx / mn <= 3 ? "reasonably balanced" : "unbalanced";
+        parts.push("Cluster sizes are " + balance + " — largest " + Math.round((mx / total) * 100) + "%, smallest " + Math.round((mn / total) * 100) + "%.");
+      }
+      if (act.method === "kmeans" && q.converged === false) {
+        parts.push('<span style="color:#fbbf24;">The run hit its iteration cap without converging — treat this solution as provisional.</span>');
+      }
+      if (s.caseCount != null && k && s.caseCount < k * 10) {
+        parts.push("The sample is small relative to k — interpret with caution.");
+      }
+      el.innerHTML = parts.join(" ");
+    }
+
     function dominantProfileLabel(series, categories, clusterIdx) {
       if (!series || !series[clusterIdx] || !categories || !categories.length) return "—";
       var data = series[clusterIdx].data || [];
@@ -1034,10 +1132,12 @@
           if (r === c2) { html += '<td style="opacity:.45;">—</td>'; continue; }
           var v = D[r][c2];
           if (!isFinite(v)) { html += "<td>—</td>"; continue; }
-          // Darker (more red) = closer, i.e. least separated pair.
-          var closeness = maxD > 1e-12 ? 1 - v / maxD : 0;
-          var alpha = Math.min(0.75, closeness * 0.75);
-          html += '<td style="background:rgba(255,120,120,' + alpha.toFixed(2) + ');">' + formatNumber(v) + "</td>";
+          // Deeper blue = farther apart = better separated (large distance is
+          // good here, so avoid a red "warning" palette). Palest cells are the
+          // closest, least distinct pairs.
+          var sep = maxD > 1e-12 ? v / maxD : 0;
+          var alpha = Math.min(0.72, 0.08 + sep * 0.64);
+          html += '<td style="background:rgba(96,165,250,' + alpha.toFixed(2) + ');">' + formatNumber(v) + "</td>";
         }
         html += "</tr>";
       }
@@ -1406,10 +1506,75 @@
       });
     }
 
+    /* Suggested k from the largest linkage jump: the best place to stop
+       merging is just before the biggest jump in merge distance. The jump for
+       a candidate k is (height of the merge that would reduce k to k-1) minus
+       (height of the last merge performed to reach k). */
+    function renderSuggestedK(hi, kCurrent) {
+      var row = document.getElementById("hiSuggestedK");
+      var note = document.getElementById("hiSuggestedKNote");
+      if (!row) return;
+      var merges = hi && hi.dendrogramMerges;
+      if (!merges || merges.length < 2) {
+        row.innerHTML = '<span class="hint-empty">No merge history. Re-run the analysis with the current add-in version.</span>';
+        if (note) note.textContent = "";
+        return;
+      }
+      var n = hi.totalCases != null ? hi.totalCases : merges.length + 1;
+      var heights = merges.map(function(m) { return Number(m.height); });
+      var maxK = Math.min(8, n - 1);
+      var jumps = {};
+      var best = null;
+      for (var k = 2; k <= maxK; k++) {
+        var below = heights[n - k - 1];
+        var above = n - k < heights.length ? heights[n - k] : null;
+        if (below == null || above == null || !isFinite(below) || !isFinite(above)) continue;
+        jumps[k] = above - below;
+        if (best === null || jumps[k] > jumps[best]) best = k;
+      }
+      var pills = [];
+      for (var kk = 2; kk <= maxK; kk++) {
+        if (jumps[kk] == null) continue;
+        var cls = "k-pill" + (kk === best ? " suggested" : "") + (kk === kCurrent ? " current" : "");
+        var tag = kk === best ? '<span class="k-pill-tag">largest jump</span>' : (kk === kCurrent ? '<span class="k-pill-tag">current</span>' : "");
+        var click = kk === kCurrent ? "" : ' onclick="applyClusterK(' + kk + ')"';
+        pills.push('<button type="button" class="' + cls + '"' + click + ' title="Merge-distance jump: ' + formatNumber(jumps[kk]) + '">k = ' + kk + tag + "</button>");
+      }
+      row.innerHTML = pills.length ? pills.join("") : '<span class="hint-empty">Too few cases to score candidate k values.</span>';
+      if (note) {
+        if (best != null) {
+          note.innerHTML = "The largest merge-distance jump occurs between <strong>" + best + "</strong> and <strong>" + (best - 1) + "</strong> clusters, supporting <strong>k = " + best + "</strong>."
+            + (kCurrent != null && kCurrent !== best ? " Your current cut uses k = " + kCurrent + " — click a pill to re-run at another k." : " Click a pill to re-run at another k.");
+        } else {
+          note.textContent = "";
+        }
+      }
+    }
+
     function profileDataFor(target) {
       var b = lastClusterBundle || {};
       var blk = target === "hi" ? b.hierarchical : b.kmeans;
       return blk && blk.profile ? blk.profile : null;
+    }
+
+    /* Discriminatory power per variable: the spread (max − min) of the
+       standardised cluster means. Computed on z-profiles so scale differences
+       between variables cannot distort the ranking. */
+    function separationOrder(prof) {
+      var series = prof && prof.series;
+      var nVars = prof && prof.categories ? prof.categories.length : 0;
+      if (!series || !series.length || !nVars) return null;
+      var idx = [];
+      for (var j = 0; j < nVars; j++) {
+        var mn = Infinity, mx = -Infinity;
+        series.forEach(function(s) {
+          var v = Number((s.data || [])[j]);
+          if (isFinite(v)) { if (v < mn) mn = v; if (v > mx) mx = v; }
+        });
+        idx.push({ j: j, sep: isFinite(mx - mn) ? mx - mn : 0 });
+      }
+      idx.sort(function(a, b) { return b.sep - a.sep; });
+      return idx.map(function(o) { return o.j; });
     }
 
     function renderProfileFor(target) {
@@ -1417,10 +1582,23 @@
       var chartId = target === "hi" ? "hiProfileChart" : "kmProfileChart";
       var noteId = target === "hi" ? "hiProfileNote" : "kmProfileNote";
       var mode = target === "hi" ? _hiProfileMode : _kmProfileMode;
+      var order = target === "hi" ? _hiProfileOrder : _kmProfileOrder;
       var raw = mode === "raw";
       var series = prof ? (raw ? prof.rawSeries : prof.series) : null;
-      if (prof && prof.categories && prof.categories.length && series && series.length) {
-        renderClusterProfileChart(chartId, prof.categories, series, raw ? (prof.rawYLabel || "Mean (raw units)") : prof.yLabel);
+      var categories = prof ? prof.categories : null;
+      var ordered = false;
+      if (order === "sep" && series && series.length && categories && categories.length > 1) {
+        var perm = separationOrder(prof);
+        if (perm) {
+          categories = perm.map(function(j) { return categories[j]; });
+          series = series.map(function(s) {
+            return { name: s.name, data: perm.map(function(j) { return (s.data || [])[j]; }) };
+          });
+          ordered = true;
+        }
+      }
+      if (prof && categories && categories.length && series && series.length) {
+        renderClusterProfileChart(chartId, categories, series, raw ? (prof.rawYLabel || "Mean (raw units)") : prof.yLabel);
       } else {
         if (target === "hi") destroyHiProfileChart(); else destroyKmProfileChart();
         var ep = document.getElementById(chartId);
@@ -1428,13 +1606,14 @@
       }
       var note = document.getElementById(noteId);
       if (note) {
-        note.innerHTML = raw
+        note.innerHTML = (raw
           ? "Each line is the <strong>mean in original units</strong> by variable within that cluster. Variables with different scales are not directly comparable here."
-          : "Each line is the <strong>mean z-score</strong> by variable within that cluster (pooled SDs on the full sample).";
+          : "Each line is the <strong>mean z-score</strong> by variable within that cluster (pooled SDs on the full sample).")
+          + (ordered ? " Variables are ordered by <strong>discriminatory power</strong> — the ones that most separate the clusters come first." : "");
       }
-      // The centers table below the chart shows the same values, driven by the same toggle.
+      // The centers table below the chart shows the same values, driven by the same toggles.
       var tableRows = series && series.length ? series.map(function(s) { return s.data || []; }) : null;
-      renderCentersTable(target, prof ? prof.categories : [], tableRows, raw);
+      renderCentersTable(target, categories || [], tableRows, raw);
       var cNote = document.getElementById(target + "CentersNote");
       if (cNote) {
         cNote.innerHTML = raw
@@ -1447,6 +1626,14 @@
       if (target === "hi") _hiProfileMode = mode; else _kmProfileMode = mode;
       document.querySelectorAll('.profile-mode-btn[data-profile-target="' + target + '"]').forEach(function(btn) {
         btn.classList.toggle("active", btn.getAttribute("data-profile-mode") === mode);
+      });
+      renderProfileFor(target);
+    }
+
+    function setProfileOrder(target, order) {
+      if (target === "hi") _hiProfileOrder = order; else _kmProfileOrder = order;
+      document.querySelectorAll('.profile-mode-btn[data-profile-order-target="' + target + '"]').forEach(function(btn) {
+        btn.classList.toggle("active", btn.getAttribute("data-profile-order") === order);
       });
       renderProfileFor(target);
     }
@@ -1549,7 +1736,7 @@
       }).join("");
     }
 
-    function renderDendrogram(containerId, merges, n) {
+    function renderDendrogram(containerId, merges, n, kCurrent) {
       var el = document.getElementById(containerId);
       if (!el) return;
       if (!merges || !merges.length || n < 2 || merges[0].left === undefined || merges[0].right === undefined) {
@@ -1608,8 +1795,126 @@
         "<rect width=\"100%\" height=\"100%\" fill=\"transparent\"/>" +
         yAxisHtml +
         "<path d=\"" + strokes.join(" ") + "\" fill=\"none\" stroke=\"rgba(45,212,191,.85)\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>" +
+        "<g id=\"dendroCutGroup\" style=\"cursor:ns-resize;\">" +
+        "<line id=\"dendroCutHit\" x1=\"" + pad.left + "\" x2=\"" + (w - pad.right) + "\" y1=\"0\" y2=\"0\" stroke=\"transparent\" stroke-width=\"18\"/>" +
+        "<line id=\"dendroCutLine\" x1=\"" + pad.left + "\" x2=\"" + (w - pad.right) + "\" y1=\"0\" y2=\"0\" stroke=\"rgba(251,191,36,.9)\" stroke-width=\"1.6\" stroke-dasharray=\"7,4\"/>" +
+        "<text id=\"dendroCutLabel\" x=\"" + (w - pad.right - 4) + "\" y=\"0\" fill=\"rgba(251,191,36,.95)\" font-size=\"11\" font-weight=\"700\" text-anchor=\"end\"></text>" +
+        "</g>" +
         "</svg>";
       el.innerHTML = svg;
+      setupDendrogramCut(el, merges, n, kCurrent, scaleY, h, pad, maxH);
+    }
+
+    var _dendroCutK = null;
+
+    /* Interactive cut line: drag anywhere on the dendrogram to move the dashed
+       line; the label tracks how many clusters that level yields. "Apply cut"
+       round-trips the new k to the task pane, which recomputes and refreshes
+       the entire module. */
+    function setupDendrogramCut(container, merges, n, kCurrent, scaleY, h, pad, maxH) {
+      var svg = container.querySelector("svg");
+      var line = container.querySelector("#dendroCutLine");
+      var hit = container.querySelector("#dendroCutHit");
+      var label = container.querySelector("#dendroCutLabel");
+      var readout = document.getElementById("hiCutReadout");
+      var applyBtn = document.getElementById("hiCutApply");
+      if (!svg || !line || !hit || !label) return;
+      _dendroCutK = null;
+
+      var heights = merges.map(function(m) { return m.height; });
+
+      function kAtHeight(v) {
+        var merged = 0;
+        for (var i = 0; i < heights.length; i++) { if (heights[i] <= v) merged++; }
+        return Math.max(1, n - merged);
+      }
+
+      // Initial position: midway inside the gap that produces the current k.
+      function heightForK(k) {
+        var below = n - k - 1 >= 0 ? heights[n - k - 1] : 0;   // last merge already done at k clusters
+        var above = n - k < heights.length ? heights[n - k] : maxH * 1.04; // merge that would reduce to k-1
+        return (below + above) / 2;
+      }
+
+      function setCut(v, fromDrag) {
+        v = Math.max(0, Math.min(maxH * 1.04, v));
+        var k = kAtHeight(v);
+        var y = scaleY(Math.min(v, maxH));
+        // Keep the line inside the plot even for v slightly above maxH.
+        y = Math.max(2, Math.min(h - pad.bottom, y));
+        line.setAttribute("y1", y); line.setAttribute("y2", y);
+        hit.setAttribute("y1", y); hit.setAttribute("y2", y);
+        label.setAttribute("y", Math.max(11, y - 5));
+        label.textContent = "cut \u2192 " + k + " cluster" + (k === 1 ? "" : "s");
+        _dendroCutK = k;
+        if (readout) {
+          readout.innerHTML = k === kCurrent
+            ? "Cut at the current solution (<strong>k = " + k + "</strong>). Drag the dashed line to explore other levels."
+            : "Cut yields <strong>" + k + " cluster" + (k === 1 ? "" : "s") + "</strong> (current k = " + kCurrent + ").";
+        }
+        if (applyBtn) {
+          var can = k >= 2 && k !== kCurrent;
+          applyBtn.disabled = !can;
+          applyBtn.textContent = can ? "Apply k = " + k : "Apply cut";
+        }
+      }
+
+      function svgYFromEvent(evt) {
+        try {
+          var pt = svg.createSVGPoint();
+          pt.x = evt.clientX; pt.y = evt.clientY;
+          var ctm = svg.getScreenCTM();
+          if (!ctm) return null;
+          return pt.matrixTransform(ctm.inverse()).y;
+        } catch (e) { return null; }
+      }
+
+      function heightFromY(y) {
+        return ((h - pad.bottom) - y) / Math.max(1e-9, h - pad.top - pad.bottom) * Math.max(1e-9, maxH);
+      }
+
+      var dragging = false;
+      svg.addEventListener("pointerdown", function(e) {
+        dragging = true;
+        try { svg.setPointerCapture(e.pointerId); } catch (err) {}
+        var y = svgYFromEvent(e);
+        if (y != null) setCut(heightFromY(y), true);
+        e.preventDefault();
+      });
+      svg.addEventListener("pointermove", function(e) {
+        if (!dragging) return;
+        var y = svgYFromEvent(e);
+        if (y != null) setCut(heightFromY(y), true);
+      });
+      function endDrag(e) {
+        dragging = false;
+        try { svg.releasePointerCapture(e.pointerId); } catch (err) {}
+      }
+      svg.addEventListener("pointerup", endDrag);
+      svg.addEventListener("pointercancel", endDrag);
+
+      var k0 = kCurrent != null && kCurrent >= 1 && kCurrent <= n ? kCurrent : Math.min(3, n);
+      setCut(heightForK(k0), false);
+    }
+
+    function applyClusterK(k) {
+      if (!isFinite(k) || k < 2) return;
+      var msg = "Re-running the analysis at k = " + Math.round(k) + "\u2026";
+      var readout = document.getElementById("hiCutReadout");
+      if (readout) readout.textContent = msg;
+      var applyBtn = document.getElementById("hiCutApply");
+      if (applyBtn) { applyBtn.disabled = true; applyBtn.textContent = "Applying\u2026"; }
+      var skNote = document.getElementById("hiSuggestedKNote");
+      if (skNote) skNote.textContent = msg;
+      try {
+        if (typeof Office !== "undefined" && Office.context && Office.context.ui && typeof Office.context.ui.messageParent === "function") {
+          Office.context.ui.messageParent(JSON.stringify({ action: "clusterApplyK", k: Math.round(k) }));
+        }
+      } catch (e) { console.error(e); }
+    }
+
+    function applyDendroCut() {
+      if (_dendroCutK != null && _dendroCutK >= 2) applyClusterK(_dendroCutK);
     }
 
     function renderBarChart(id, categories, values, title) {
@@ -1663,11 +1968,9 @@
       setText("cluK", s.k != null ? String(s.k) : "—");
       setText("cluStd", s.standardize === false ? "No" : "Yes");
       setText("cluLinkage", lk.charAt(0).toUpperCase() + lk.slice(1));
-      var vEl = document.getElementById("cluVerdict");
-      if (vEl) vEl.textContent = s.verdict || "—";
-
       if (s.lockedMethod === "kmeans" || s.lockedMethod === "hierarchical") _lockedMethod = s.lockedMethod;
 
+      renderVerdict(bundle);
       renderQualityPanel(bundle);
       renderClusterSummary(bundle);
 
@@ -1723,6 +2026,7 @@
         var hq = hi.quality || {};
         setText("hiLinkDisplay", hiLk.charAt(0).toUpperCase() + hiLk.slice(1));
         setText("hiMergeCount", hi.totalMerges != null ? String(hi.totalMerges) : "—");
+        setText("hiCophenetic", hi.cophenetic != null && isFinite(hi.cophenetic) ? formatNumber(hi.cophenetic) : "—");
         setText("hiWcss", hq.withinSS != null ? formatNumber(hq.withinSS) : "—");
         setText("hiBss", hq.betweenSS != null ? formatNumber(hq.betweenSS) : "—");
         setText("hiExplVar", formatPercent(hq.explainedVariance));
@@ -1730,6 +2034,7 @@
         renderSilhouetteTable("hiSilBody", hq.silhouettePerCluster);
         renderSeparation("hiSeparationHeatmap", hi.centroidDistances);
         renderMergeProgressionChart(hi, s.k);
+        renderSuggestedK(hi, s.k);
         var hb = document.getElementById("hiMergeBody");
         if (hb) {
           var steps = hi.mergeSteps || [];
@@ -1754,7 +2059,7 @@
         var dm = hi.dendrogramMerges;
         if (dm && dm.length) {
           var nCases = hi.totalCases != null ? hi.totalCases : (lastClusterBundle && lastClusterBundle.summary ? lastClusterBundle.summary.caseCount : 0);
-          renderDendrogram("hiDendrogramChart", dm, nCases);
+          renderDendrogram("hiDendrogramChart", dm, nCases, s.k);
         } else {
           var dendEl = document.getElementById("hiDendrogramChart");
           if (dendEl) dendEl.innerHTML = '<div class="hint-empty">No dendrogram data (upgrade task pane for merge-tree support)</div>';
@@ -1765,6 +2070,7 @@
       } else {
         setText("hiLinkDisplay", "—");
         setText("hiMergeCount", "—");
+        setText("hiCophenetic", "—");
         setText("hiWcss", "—");
         setText("hiBss", "—");
         setText("hiExplVar", "—");
@@ -1772,6 +2078,7 @@
         renderSilhouetteTable("hiSilBody", null);
         renderSeparation("hiSeparationHeatmap", null);
         renderMergeProgressionChart(null);
+        renderSuggestedK(null, null);
         var hb0 = document.getElementById("hiMergeBody");
         if (hb0) hb0.innerHTML = '<tr><td colspan="5" class="hint-empty">No hierarchical output</td></tr>';
         var ab0 = document.getElementById("hiAssignBody");
@@ -1861,6 +2168,16 @@
       setText("hiBss", "…");
       setText("hiExplVar", "…");
       setText("hiSilhouette", "…");
+      setText("hiCophenetic", "…");
+      var skr = document.getElementById("hiSuggestedK");
+      if (skr) skr.innerHTML = '<span class="hint-empty">Awaiting hierarchical output…</span>';
+      var skn = document.getElementById("hiSuggestedKNote");
+      if (skn) skn.textContent = "";
+      var cutR = document.getElementById("hiCutReadout");
+      if (cutR) cutR.textContent = "Drag the dashed cut line to explore other cluster counts.";
+      var cutA = document.getElementById("hiCutApply");
+      if (cutA) { cutA.disabled = true; cutA.textContent = "Apply cut"; }
+      _dendroCutK = null;
       var ks = document.getElementById("kmSilBody");
       if (ks) ks.innerHTML = '<tr><td colspan="3" class="hint-empty">Awaiting K-means output…</td></tr>';
       var hs = document.getElementById("hiSilBody");

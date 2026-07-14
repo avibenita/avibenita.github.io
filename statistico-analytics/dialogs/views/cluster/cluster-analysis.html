@@ -13,7 +13,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="../shared-header.css?v=20260530a"/>  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
-  <script src="../shared-header.js?v=20260524a"></script>
+  <script src="../shared-header.js?v=20260714a"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -1756,6 +1756,113 @@
         }
       }
     }
+
+    /* ── Sidebar AI pill: full cluster analysis interpretation ── */
+    window.requestClusterModuleAI = async function() {
+      var b = lastClusterBundle;
+      var act = b ? activeMethodBlock(b) : null;
+      if (!b || !act || !act.block) {
+        if (typeof StatisticoHeader !== "undefined" && typeof StatisticoHeader._showAiOverlay === "function") {
+          StatisticoHeader._showAiOverlay(null, "cluster-analysis", "full");
+        } else {
+          alert("Run a cluster analysis first.");
+        }
+        return;
+      }
+      var btn = document.getElementById("sbAiBtn");
+      var origHtml = btn ? btn.innerHTML : "";
+      if (typeof StatisticoHeader === "undefined" || typeof StatisticoHeader._callAiForSidebar !== "function") {
+        alert("AI is not available in this session.");
+        return;
+      }
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-brain fa-spin"></i><span>Thinking\u2026</span>';
+      }
+      try {
+        var s = b.summary || {};
+        var blk = act.block;
+        var q = blk.quality || {};
+        var prof = blk.profile || {};
+        var rnd = function(v, dp) {
+          var n = Number(v);
+          if (!isFinite(n)) return null;
+          var f = Math.pow(10, dp == null ? 3 : dp);
+          return Math.round(n * f) / f;
+        };
+        var sizes = blk.sizes || [];
+        var total = sizes.reduce(function(a2, b2) { return a2 + b2; }, 0);
+        var clusters = sizes.map(function(n2, i) {
+          return {
+            cluster: i + 1,
+            cases: n2,
+            sharePct: total > 0 ? Math.round((n2 / total) * 100) : null,
+            dominantProfile: dominantProfileLabel(prof.series, prof.categories, i),
+            avgSilhouette: q.silhouettePerCluster ? rnd(q.silhouettePerCluster[i]) : null
+          };
+        });
+        // Separation summary from the centroid-distance matrix: name the
+        // closest (weakest) and farthest (strongest) pairs for the AI.
+        var D = blk.centroidDistances || [];
+        var closest = null;
+        var farthest = null;
+        for (var i2 = 0; i2 < D.length; i2++) {
+          for (var j2 = i2 + 1; j2 < (D[i2] || []).length; j2++) {
+            var dv = Number(D[i2][j2]);
+            if (!isFinite(dv)) continue;
+            if (!closest || dv < closest.distance) closest = { pair: "C" + (i2 + 1) + "-C" + (j2 + 1), distance: rnd(dv) };
+            if (!farthest || dv > farthest.distance) farthest = { pair: "C" + (i2 + 1) + "-C" + (j2 + 1), distance: rnd(dv) };
+          }
+        }
+        var sc = b.scatter || {};
+        var payload = {
+          setup: {
+            method: act.method === "hierarchical" ? "hierarchical (linkage: " + (s.linkage || "average") + ")" : "k-means",
+            k: s.k, variables: s.variableCount, cases: s.caseCount,
+            excludedRows: s.missingRows,
+            distance: s.distanceMeasure === "manhattan" ? "Manhattan (L1)" : "Euclidean (L2)",
+            standardised: s.standardize !== false,
+            variableNames: (s.variableLabels || []).slice(0, 20)
+          },
+          quality: {
+            converged: q.converged, iterations: q.iterations,
+            withinSS: rnd(q.withinSS), betweenSS: rnd(q.betweenSS),
+            explainedVariance: rnd(q.explainedVariance),
+            averageSilhouette: rnd(q.silhouette)
+          },
+          clusters: clusters,
+          separation: {
+            closestPair: closest, farthestPair: farthest,
+            pcaTop2ExplainedShare: sc.pcaExplained ? sc.pcaExplained.map(function(v) { return rnd(v); }) : null
+          }
+        };
+        var prompt =
+'You are interpreting a cluster analysis (' + (act.method === "hierarchical" ? "agglomerative hierarchical clustering, cut at k" : "K-means") + ') computed by Statistico.\n' +
+'Do NOT recompute any statistic. Use only the values in the JSON below.\n' +
+'Use cautious language ("suggests", "indicates") unless evidence is clear.\n' +
+'If a field is null or missing, do not mention it.\n' +
+'Interpretation anchors: explained variance >= 0.5 marks a meaningful partition; average silhouette >= 0.5 is solid, >= 0.7 strong, < 0.25 weak; a much smaller closest-pair distance than the farthest-pair distance means one cluster boundary is much weaker than the rest; a dominant first PCA share with unstandardised data usually means one variable\u2019s scale drives the clustering.\n\n' +
+'JSON:\n' + JSON.stringify(payload, null, 2) + '\n\n' +
+'Reply ONLY in this exact format (no extra lines, no markdown):\n' +
+'CONCLUSION: [One decisive sentence \u2014 the single most important finding about the cluster structure]\n' +
+'EVIDENCE: [quality finding with explained variance / silhouette] | [size-balance finding with cluster shares] | [separation finding naming the closest and farthest center pairs] | [profile finding naming what distinguishes the clusters]\n' +
+'INTERPRETATION: [3 sentences \u2014 unified synthesis in plain language: what the clusters appear to represent and how trustworthy the partition is]\n' +
+'IMPLICATIONS: [analytical implication 1] | [analytical implication 2] | [analytical implication 3]\n' +
+'ACTION: [next step 1] | [next step 2] | [next step 3]\n' +
+'STRENGTH: [High, Moderate, or Low \u2014 short reason based on silhouette, explained variance, and separation]';
+
+        var raw = await StatisticoHeader._callAiForSidebar(prompt);
+        var sections = StatisticoHeader._parseAiStructured(raw);
+        StatisticoHeader._showAiOverlay(sections, "cluster-analysis", "full");
+      } catch (err) {
+        StatisticoHeader._showAiOverlay({ error: err.message || "AI request failed." }, "cluster-analysis", "full");
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml || '<i class="fa-solid fa-brain"></i><span>Full Analysis</span><sup class="sb-ai-sup">AI</sup>';
+        }
+      }
+    };
 
     function initOfficeBridge() {
       if (officeBridgeReady) return;

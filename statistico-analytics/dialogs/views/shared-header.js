@@ -5415,7 +5415,8 @@ const StatisticoHeader = {
     const supportsIndependentAi = this.module === 'independent';
     const supportsMixedAi = this.module === 'mixed-model';
     const supportsFactorAi = this.module === 'factor';
-    const supportsSharedAi = (this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations' || supportsIndependentAi || supportsMixedAi || supportsFactorAi;
+    const supportsClusterAi = this.module === 'cluster';
+    const supportsSharedAi = (this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations' || supportsIndependentAi || supportsMixedAi || supportsFactorAi || supportsClusterAi;
     const supportsFullAiPill = supportsIndependentAi || isDependentKplus;
     if (supportsSharedAi || isDependentKplus) {
       const aiSection = document.createElement('div');
@@ -5430,6 +5431,8 @@ const StatisticoHeader = {
           ? 'requestMixedModelAI()'
         : supportsFactorAi
           ? 'requestFactorModuleAI()'
+        : supportsClusterAi
+          ? 'requestClusterModuleAI()'
           : 'StatisticoHeader._sbAiGlobalInterpret()';
       const aiTitle = supportsIndependentAi
         ? 'AI statistical summary for this independent means analysis'
@@ -5439,6 +5442,8 @@ const StatisticoHeader = {
           ? 'AI interpretation of the mixed model results'
         : supportsFactorAi
           ? 'Full factor analysis - synthesises suitability, extraction, rotation & diagnostics into one report'
+        : supportsClusterAi
+          ? 'Full cluster analysis - synthesises quality, sizes, profiles & separation into one report'
           : (isCorrelation ? 'Full correlation analysis - synthesises all correlation views into one report' : 'Full variable analysis - synthesises all diagnostics into one report');
       const aiLabel = supportsFullAiPill ? 'Full AI Analysis' : 'Full Analysis';
       const aiBadge = supportsFullAiPill ? 'ALL' : 'AI';
@@ -5699,6 +5704,7 @@ const StatisticoHeader = {
 
   _supportsInsightGuide() {
     if (this.module === 'univariate') return true;
+    if (this.module === 'cluster') return true;
     return this._isSharedSidebarModule();
   },
 
@@ -5728,6 +5734,11 @@ const StatisticoHeader = {
     }
     if (this.module === 'univariate' || this.module === 'correlations') return this.currentView;
     if (this.module === 'independent') return `independent-${this._getIndependentActiveTab()}`;
+    if (this.module === 'cluster') {
+      // The cluster results dialog navigates via data-nav-key (km-map, hi-profiles, ...).
+      const activeNav = document.querySelector('.sb-cluster-nav.active[data-nav-key]');
+      if (activeNav) return `cluster-${activeNav.getAttribute('data-nav-key')}`;
+    }
     const activeSidebar = document.querySelector('.sb-item.active[data-tab], .sb-item.active[id]');
     const tab = activeSidebar?.dataset?.tab || activeSidebar?.id || this._getIndependentActiveTab();
 
@@ -5858,7 +5869,17 @@ const StatisticoHeader = {
       'regression-ix-details':       'Interactions — Technical',
       'regression-ancova-results':     'ANCOVA — Results',
       'regression-ancova-assumptions': 'ANCOVA — Assumptions',
-      'regression-ancova-viz':         'ANCOVA — Visualization'
+      'regression-ancova-viz':         'ANCOVA — Visualization',
+      'cluster-km-overview':    'K-means — Overview',
+      'cluster-km-sizes':       'K-means — Sizes & Assignments',
+      'cluster-km-profiles':    'K-means — Profiles & Centers',
+      'cluster-km-map':         'K-means — Separation & Map',
+      'cluster-km-diagnostics': 'K-means — Diagnostics',
+      'cluster-hi-overview':    'Hierarchical — Overview',
+      'cluster-hi-dendrogram':  'Hierarchical — Dendrogram',
+      'cluster-hi-clusters':    'Hierarchical — Clusters',
+      'cluster-hi-profiles':    'Hierarchical — Profiles & Centroids',
+      'cluster-hi-map':         'Hierarchical — Separation & Map'
     };
   },
 
@@ -5989,7 +6010,30 @@ const StatisticoHeader = {
       'logistic-diagnostics-residuals':
         'Inspect deviance and Pearson residuals, optionally stratified by predicted probability bins. Patterns (curvature, large residuals at the extremes) suggest mis-specification rather than random noise.',
       'logistic-diagnostics-influence':
-        'Read Cook\'s distance, leverage, and DFBETAS per observation against the usual thresholds. Use this view to identify single points that move the coefficients disproportionately and flag them in the table.'
+        'Read Cook\'s distance, leverage, and DFBETAS per observation against the usual thresholds. Use this view to identify single points that move the coefficients disproportionately and flag them in the table.',
+
+      // Cluster (K-means / Hierarchical) — the Separation & Map views get the
+      // most elaborate docs because they carry the visual separation story.
+      'cluster-km-overview':
+        'Read the analysis summary (variables, cases, excluded rows, distance metric, k, standardisation), the Cluster quality panel (convergence, iterations, WCSS, between-cluster SS, explained variance, average silhouette), the verdict, and the Cluster summary table (size, share, dominant profile per cluster). Use this view to judge whether the solution is trustworthy before exploring the clusters.',
+      'cluster-km-sizes':
+        'Read the bar chart of cluster sizes with percentage labels and the Assignments table listing which cluster each case belongs to. Use this view to spot degenerate solutions (one giant cluster, or tiny clusters that may be outlier groups) and to trace individual cases back to the worksheet.',
+      'cluster-km-profiles':
+        'Read the profile line chart (one line per cluster across all variables) together with the centers table below it. The Standardised / Raw means toggle switches BOTH: standardised shows mean z-scores (comparable across variables, colour-coded by sign), raw shows original units (comparable to SPSS Final Cluster Centers). Use this view to characterise what each cluster IS — which variables it sits high or low on.',
+      'cluster-km-map':
+        'This page combines the two separation views. TOP — the cluster map: every case is a dot coloured by its assigned cluster, with larger semi-transparent markers at each cluster center. In PCA (auto) mode the axes are the first two principal components of the analysis matrix (the flattest 2-D view of the full variable space; the axis percentages are each component\u2019s share of total variance — a very dominant PC1 usually means unstandardised variables). In Variables mode any two original variables form the axes in raw units. Drag to zoom; click legend entries to isolate clusters. BOTTOM — the centroid-distance heatmap: pairwise distances between cluster centers in the setup metric; darker cells are the closest, least-distinct pairs. Read the two together: a dark heatmap cell names the suspicious pair, and the map shows whether those clusters actually intermingle or are merely adjacent.',
+      'cluster-km-diagnostics':
+        'Read convergence (converged flag, iterations, WCSS), the variance decomposition (total / within / between SS and explained variance), and the per-cluster silhouette table with plain-language readings. Use this view to quantify solution quality: silhouette above ~0.5 is solid structure, below ~0.25 is weak; low explained variance means clusters capture little of the data\u2019s spread.',
+      'cluster-hi-overview':
+        'Read the analysis summary (variables, cases, distance metric, linkage, k, standardisation), the Cluster quality panel (explained variance, average silhouette), the verdict, and the Cluster summary table. Use this view to judge whether the hierarchical solution is trustworthy before exploring the tree.',
+      'cluster-hi-dendrogram':
+        'Read the dendrogram: leaves are cases, and each join shows the distance (height) at which two groups merge. Long vertical gaps before a merge indicate well-separated groups; cutting the tree where gaps are largest suggests a natural k. Use this view to judge whether the chosen k respects the tree structure.',
+      'cluster-hi-clusters':
+        'Read cluster sizes at the chosen cut, the merge-steps table (which groups merged at what distance), explained variance, average silhouette, and case assignments. Use this view to understand the composition of the k-cluster solution extracted from the tree.',
+      'cluster-hi-profiles':
+        'Read the profile line chart (one line per cluster at the chosen cut) with the centroid table below it. The Standardised / Raw means toggle switches both together: standardised shows mean z-scores colour-coded by sign, raw shows original units. Use this view to characterise what each hierarchical cluster represents.',
+      'cluster-hi-map':
+        'This page combines the two separation views for the hierarchical solution at the chosen cut. TOP — the cluster map: each dot is a case coloured by its cluster, with larger semi-transparent markers at the centroids (mean vectors). PCA (auto) projects all variables onto the two directions preserving the most variance (axis percentages = share of variance; a dominant PC1 usually signals unstandardised inputs); Variables mode plots any two raw variables instead. Drag to zoom; click legend entries to isolate clusters. BOTTOM — the centroid-distance heatmap: pairwise distances between centroids; darker cells mark the closest, least-distinct pairs. Read them together — a dark cell names the weakest pair, the map shows whether their members truly overlap — and cross-check ambiguous cases against the dendrogram\u2019s merge heights.'
     };
     return docs[key] || `This ${moduleName} ${label} view summarizes the active analysis section. Use the visible controls, tables, and plots to understand the current model state and diagnostics.`;
   },
@@ -6073,6 +6117,16 @@ const StatisticoHeader = {
         + 'Explain clearly what each of the three methods computes and when to prefer each. '
         + 'Explicitly explain why EPV Assessment shows NO power percentage: it is a rule-of-thumb adequacy check (events per predictor vs a 10-15 target) for coefficient stability — it involves no effect size, no alpha, and no hypothesis test, so a power term is undefined for it; formal power appears only in the other two methods. '
         + 'Do not describe fitted-model coefficients or classification metrics — those belong to other views.',
+      'cluster-km-map':
+        'This is a two-part visual page: an interactive scatter (cluster map) with a PCA/Variables axis toggle, plus a centroid-distance heatmap below it. '
+        + 'Describe the visual separation story: tightness of same-coloured groups, gaps or overlap between clusters, where the centers sit, what the PCA axis percentages imply, and which heatmap pairs are darkest (closest). '
+        + 'Do not recite WCSS / silhouette / iteration numbers here — those belong to the Diagnostics view.',
+      'cluster-hi-map':
+        'This is a two-part visual page for the hierarchical cut: an interactive scatter (cluster map) with a PCA/Variables axis toggle, plus a centroid-distance heatmap below it. '
+        + 'Describe the visual separation story: cohesion and overlap of the coloured groups, centroid positions, what the PCA axis percentages imply, and which centroid pairs the heatmap flags as closest. '
+        + 'Do not recite merge-step or silhouette numbers here — those belong to the Clusters and Diagnostics views.',
+      'cluster-hi-dendrogram':
+        'This is a dendrogram (merge tree). Describe merge heights, long stems, and where cutting the tree gives well-separated groups — not numeric tables from other views.',
       'regression-power': POWER_PLANNING_GUARD,
       'anova-power': POWER_PLANNING_GUARD,
       'dependent-power': POWER_PLANNING_GUARD

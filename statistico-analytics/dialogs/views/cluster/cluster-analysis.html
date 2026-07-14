@@ -13,7 +13,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="../shared-header.css?v=20260714c"/>  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
-  <script src="../shared-header.js?v=20260714c"></script>
+  <script src="../shared-header.js?v=20260714d"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -413,7 +413,7 @@
           </button>
           <button type="button" class="sb-item sb-cluster-nav" data-cluster-method="hierarchical" data-nav-key="hi-clusters" onclick="switchClusterView('hi-clusters')">
             <i class="fa-solid fa-sitemap sb-item-icon"></i>
-            <span class="sb-item-copy"><span class="sb-item-label">Clusters</span><span class="sb-item-description">Sizes, merge steps, and assignments at k.</span></span>
+            <span class="sb-item-copy"><span class="sb-item-label">Clusters</span><span class="sb-item-description">Sizes, merge progression, silhouettes, and assignments at k.</span></span>
           </button>
           <button type="button" class="sb-item sb-cluster-nav" data-cluster-method="hierarchical" data-nav-key="hi-profiles" onclick="switchClusterView('hi-profiles')">
             <i class="fa-solid fa-chart-line sb-item-icon"></i>
@@ -626,6 +626,8 @@
                   <div class="stat-panel-body">
                     <div class="stat-field"><span class="stat-label">Linkage: <span class="info-icon">i<span class="tip">How the distance between two clusters is defined when merging. <b>Average</b> uses the mean pairwise distance (balanced default), <b>single</b> the nearest pair (chains easily), <b>complete</b> the farthest pair (compact clusters).</span></span></span><span class="stat-value" id="hiLinkDisplay">…</span></div>
                     <div class="stat-field"><span class="stat-label">Merge steps: <span class="info-icon">i<span class="tip">Total number of merges to combine all cases into one cluster (n − 1 steps). The dendrogram shows the height (distance) at which each merge happened.</span></span></span><span class="stat-value" id="hiMergeCount">…</span></div>
+                    <div class="stat-field"><span class="stat-label">Within-cluster SS (WCSS): <span class="info-icon">i<span class="tip">Total squared distance of each case to its cluster centroid at the chosen cut. Lower is tighter, but it always drops as k grows — compare across k rather than reading it in isolation.</span></span></span><span class="stat-value" id="hiWcss">…</span></div>
+                    <div class="stat-field"><span class="stat-label">Between-cluster SS: <span class="info-icon">i<span class="tip">Spread of the cluster centroids around the overall mean — the part of total variability the clustering captures. Total SS = between SS + within SS.</span></span></span><span class="stat-value" id="hiBss">…</span></div>
                     <div class="stat-field"><span class="stat-label">Explained variance: <span class="info-icon">i<span class="tip">Between SS as a share of total SS at the chosen cut (like R² for clustering). <b>&ge; 50%</b> is usually a meaningful partition; near 0% means the clusters barely differ from random splits.</span></span></span><span class="stat-value" id="hiExplVar">…</span></div>
                     <div class="stat-field"><span class="stat-label">Average silhouette: <span class="info-icon">i<span class="tip">Mean silhouette over all cases, from −1 to +1: how much closer each case is to its own cluster than the nearest other cluster. <b>&ge; 0.5</b> reasonable, <b>&ge; 0.7</b> strong, <b>&lt; 0.25</b> little real structure.</span></span></span><span class="stat-value" id="hiSilhouette">…</span></div>
                   </div>
@@ -634,6 +636,22 @@
               <div class="viz-card">
                 <div class="viz-title"><i class="fa-solid fa-chart-column"></i> Cluster sizes (cut at <em>k</em>)</div>
                 <div class="chart-wrap"><div id="hiSizesChart" class="chart-container"></div></div>
+              </div>
+              <div class="viz-card" style="margin-top:12px;">
+                <div class="viz-title"><i class="fa-solid fa-wave-square"></i> Merge distance progression <span class="info-icon">i<span class="tip">The hierarchical analogue of a convergence chart: the distance at which each successive merge happened, over the final merges. Flat stretches merge similar groups; a sudden <b>jump</b> means two genuinely different clusters were forced together — the natural place to stop. The marker shows your chosen cut at k.</span></span></div>
+                <div class="chart-wrap"><div id="hiMergeChart" class="chart-container chart-convergence"></div></div>
+                <div class="section-note" style="margin-top:8px;margin-bottom:0;" id="hiMergeChartNote">Rising slowly then jumping sharply is the classic signature of real structure; if the line rises smoothly with no jump, the data may lack distinct clusters. The dashed marker is the cut that produced your k clusters.</div>
+              </div>
+              <div class="stat-panel" style="margin-top:12px;">
+                <div class="stat-panel-heading"><i class="fa-solid fa-chart-simple"></i> Silhouette by cluster</div>
+                <div class="stat-panel-body" style="padding:0;">
+                  <div class="table-container" style="margin:0;">
+                    <table class="analysis-table">
+                      <thead><tr><th>Cluster</th><th>Average silhouette</th><th>Reading</th></tr></thead>
+                      <tbody id="hiSilBody"><tr><td colspan="3" class="hint-empty">Awaiting hierarchical output…</td></tr></tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
               <div class="stat-panel" style="margin-top:12px;">
                 <div class="stat-panel-heading"><i class="fa-solid fa-code-merge"></i> Recent merge steps</div>
@@ -1324,6 +1342,70 @@
       });
     }
 
+    var _hiMergeChart = null;
+
+    /* Hierarchical analogue of the convergence chart: merge height per step
+       over the final merges, with the chosen cut at k marked. A sharp jump
+       right of the marker means the cut stopped before forcing genuinely
+       different clusters together. */
+    function renderMergeProgressionChart(hi, k) {
+      var el = document.getElementById("hiMergeChart");
+      if (!el) return;
+      if (_hiMergeChart) {
+        try { _hiMergeChart.destroy(); } catch (e) {}
+        _hiMergeChart = null;
+      }
+      var merges = hi && hi.dendrogramMerges;
+      if (!merges || merges.length < 2 || typeof Highcharts === "undefined") {
+        el.innerHTML = '<div class="hint-empty">No merge history. Re-run the analysis with the current add-in version.</div>';
+        return;
+      }
+      var n = hi.totalCases != null ? hi.totalCases : merges.length + 1;
+      var maxShow = 30;
+      var tail = merges.slice(-Math.min(maxShow, merges.length));
+      // X axis counts clusters remaining after each merge (descending to 1).
+      var cats = tail.map(function(mg) { return String(n - mg.step); });
+      var data = tail.map(function(mg) { return Number(mg.height); });
+      var cutIdx = k != null ? cats.indexOf(String(k)) : -1;
+      _hiMergeChart = Highcharts.chart("hiMergeChart", {
+        chart: { type: "line", backgroundColor: "transparent", animation: false },
+        title: { text: null },
+        credits: { enabled: false },
+        xAxis: {
+          categories: cats,
+          title: { text: "Clusters remaining after merge", style: { color: "rgba(255,255,255,.85)" } },
+          labels: { style: { color: "rgba(255,255,255,.7)", fontSize: "10px" } },
+          gridLineColor: "rgba(255,255,255,.06)",
+          plotLines: cutIdx >= 0 ? [{
+            value: cutIdx,
+            width: 2,
+            dashStyle: "ShortDash",
+            color: "rgba(251,191,36,.85)",
+            zIndex: 4,
+            label: { text: "cut at k = " + k, style: { color: "rgba(251,191,36,.9)", fontSize: "10px" }, rotation: 0, y: 14 }
+          }] : []
+        },
+        yAxis: {
+          title: { text: "Merge distance (height)", style: { color: "rgba(255,255,255,.85)" } },
+          labels: { style: { color: "rgba(255,255,255,.7)", fontSize: "10px" } },
+          gridLineColor: "rgba(255,255,255,.08)"
+        },
+        legend: { enabled: false },
+        tooltip: {
+          formatter: function() {
+            return "<b>" + this.x + " clusters remaining</b><br/>Merge distance: " + formatNumber(this.y);
+          }
+        },
+        series: [{
+          name: "Merge distance",
+          data: data,
+          color: "rgba(45,212,191,.95)",
+          lineWidth: 2.5,
+          marker: { enabled: true, radius: 3.5 }
+        }]
+      });
+    }
+
     function profileDataFor(target) {
       var b = lastClusterBundle || {};
       var blk = target === "hi" ? b.hierarchical : b.kmeans;
@@ -1641,9 +1723,13 @@
         var hq = hi.quality || {};
         setText("hiLinkDisplay", hiLk.charAt(0).toUpperCase() + hiLk.slice(1));
         setText("hiMergeCount", hi.totalMerges != null ? String(hi.totalMerges) : "—");
+        setText("hiWcss", hq.withinSS != null ? formatNumber(hq.withinSS) : "—");
+        setText("hiBss", hq.betweenSS != null ? formatNumber(hq.betweenSS) : "—");
         setText("hiExplVar", formatPercent(hq.explainedVariance));
         setText("hiSilhouette", hq.silhouette != null ? formatNumber(hq.silhouette) : "—");
+        renderSilhouetteTable("hiSilBody", hq.silhouettePerCluster);
         renderSeparation("hiSeparationHeatmap", hi.centroidDistances);
+        renderMergeProgressionChart(hi, s.k);
         var hb = document.getElementById("hiMergeBody");
         if (hb) {
           var steps = hi.mergeSteps || [];
@@ -1679,9 +1765,13 @@
       } else {
         setText("hiLinkDisplay", "—");
         setText("hiMergeCount", "—");
+        setText("hiWcss", "—");
+        setText("hiBss", "—");
         setText("hiExplVar", "—");
         setText("hiSilhouette", "—");
+        renderSilhouetteTable("hiSilBody", null);
         renderSeparation("hiSeparationHeatmap", null);
+        renderMergeProgressionChart(null);
         var hb0 = document.getElementById("hiMergeBody");
         if (hb0) hb0.innerHTML = '<tr><td colspan="5" class="hint-empty">No hierarchical output</td></tr>';
         var ab0 = document.getElementById("hiAssignBody");
@@ -1767,10 +1857,20 @@
       setText("kmBss", "…");
       setText("kmExplVar", "…");
       setText("kmSilhouette", "…");
+      setText("hiWcss", "…");
+      setText("hiBss", "…");
       setText("hiExplVar", "…");
       setText("hiSilhouette", "…");
       var ks = document.getElementById("kmSilBody");
       if (ks) ks.innerHTML = '<tr><td colspan="3" class="hint-empty">Awaiting K-means output…</td></tr>';
+      var hs = document.getElementById("hiSilBody");
+      if (hs) hs.innerHTML = '<tr><td colspan="3" class="hint-empty">Awaiting hierarchical output…</td></tr>';
+      if (_hiMergeChart) {
+        try { _hiMergeChart.destroy(); } catch (e) {}
+        _hiMergeChart = null;
+      }
+      var hmc = document.getElementById("hiMergeChart");
+      if (hmc) hmc.innerHTML = '<div class="hint-empty">Awaiting hierarchical output…</div>';
       var ksep = document.getElementById("kmSeparationHeatmap");
       if (ksep) ksep.innerHTML = '<div class="hint-empty">Awaiting K-means output…</div>';
       if (_convChart) {

@@ -6029,7 +6029,7 @@ const StatisticoHeader = {
       'cluster-hi-dendrogram':
         'Read the dendrogram: leaves are cases, and each join shows the distance (height) at which two groups merge. Long vertical gaps before a merge indicate well-separated groups; cutting the tree where gaps are largest suggests a natural k. Use this view to judge whether the chosen k respects the tree structure.',
       'cluster-hi-clusters':
-        'Read cluster sizes at the chosen cut, the merge-steps table (which groups merged at what distance), explained variance, average silhouette, and case assignments. Use this view to understand the composition of the k-cluster solution extracted from the tree.',
+        'Read cluster sizes at the chosen cut, the quality stats (WCSS, between-cluster SS, explained variance, average silhouette), the merge-distance progression chart (merge height over the final merges with the cut at k marked — a sharp jump right of the marker means the cut stopped before forcing genuinely different clusters together, while a smooth rise with no jump suggests weak structure), the per-cluster silhouette table with plain-language readings, the merge-steps table, and case assignments. Use this view to judge whether the chosen k respects the tree structure and to understand the composition of each cluster.',
       'cluster-hi-profiles':
         'Read the profile line chart (one line per cluster at the chosen cut) with the centroid table below it. The Standardised / Raw means toggle switches both together: standardised shows mean z-scores colour-coded by sign, raw shows original units. Use this view to characterise what each hierarchical cluster represents.',
       'cluster-hi-map':

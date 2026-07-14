@@ -22,7 +22,8 @@
     pareto: ['pareto/pareto-input-panel.js']
   };
 
-  var CACHE_BUST = 'v=20260715b';
+  /* Timestamp buster: Office webviews cache ?v= URLs too aggressively across deploys. */
+  var CACHE_BUST = 'live=' + Date.now();
   var loaded = {};
   var loading = {};
   var activeDialog = null;

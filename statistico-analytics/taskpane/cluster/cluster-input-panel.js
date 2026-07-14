@@ -391,8 +391,32 @@ function kmeans(Z, k, maxIter, metric) {
   let labels = Array(n).fill(0);
   let it = 0;
   let changed = true;
+  const currentWcss = () => {
+    let w = 0;
+    for (let i = 0; i < n; i++) {
+      const c = labels[i];
+      if (manhattan) {
+        for (let f = 0; f < p; f++) w += Math.abs(Z[i][f] - centroids[c][f]);
+      } else {
+        for (let f = 0; f < p; f++) {
+          const t = Z[i][f] - centroids[c][f];
+          w += t * t;
+        }
+      }
+    }
+    return w;
+  };
+  // Per-iteration trace for the convergence chart and the map's center trails.
+  // centroidSnapshots[0] holds the random initial seeds; one snapshot follows
+  // each update step. Size stays tiny: iterations x k x p numbers.
+  const history = {
+    reassigned: [],
+    wcss: [],
+    centroidSnapshots: [centroids.map((row) => row.slice())]
+  };
   for (; it < maxIter && changed; it++) {
     changed = false;
+    let moved = 0;
     for (let i = 0; i < n; i++) {
       let best = 0;
       let bestD = Infinity;
@@ -416,6 +440,7 @@ function kmeans(Z, k, maxIter, metric) {
       if (labels[i] !== best) {
         labels[i] = best;
         changed = true;
+        moved++;
       }
     }
     const sums = Array.from({ length: kEff }, () => Array(p).fill(0));
@@ -429,19 +454,11 @@ function kmeans(Z, k, maxIter, metric) {
       if (counts[c] === 0) continue;
       for (let f = 0; f < p; f++) centroids[c][f] = sums[c][f] / counts[c];
     }
+    history.reassigned.push(moved);
+    history.wcss.push(currentWcss());
+    history.centroidSnapshots.push(centroids.map((row) => row.slice()));
   }
-  let wcss = 0;
-  for (let i = 0; i < n; i++) {
-    const c = labels[i];
-    if (manhattan) {
-      for (let f = 0; f < p; f++) wcss += Math.abs(Z[i][f] - centroids[c][f]);
-    } else {
-      for (let f = 0; f < p; f++) {
-        const t = Z[i][f] - centroids[c][f];
-        wcss += t * t;
-      }
-    }
-  }
+  const wcss = currentWcss();
   const sizes = Array(kEff).fill(0);
   labels.forEach((c) => { sizes[c]++; });
   return {
@@ -451,7 +468,8 @@ function kmeans(Z, k, maxIter, metric) {
     kUsed: kEff,
     sizes,
     distanceMetric: manhattan ? "manhattan" : "euclidean",
-    centroids: centroids.map((row) => row.slice())
+    centroids: centroids.map((row) => row.slice()),
+    history
   };
 }
 
@@ -627,7 +645,11 @@ function pcaTop2(X) {
   });
   return {
     scores,
-    explained: totalVar > 1e-12 ? [e1.val / totalVar, e2.val / totalVar] : null
+    explained: totalVar > 1e-12 ? [e1.val / totalVar, e2.val / totalVar] : null,
+    // Basis for projecting other points (e.g. centroid trails) into PC space.
+    means,
+    v1: e1.vec,
+    v2: e2.vec
   };
 }
 
@@ -856,9 +878,30 @@ function buildClusterBundle(headers, rows, spec) {
 
   const profileSeries = km ? computeKmeansProfileSeries(X, km.labels, km.kUsed, p) : [];
 
+  // Center trails for the cluster map: project every per-iteration centroid
+  // snapshot through the same PCA basis as the case scores, transposed to one
+  // path per cluster: trails[c] = [[x,y] at init, [x,y] after iter 1, ...].
+  let kmCentroidTrails = null;
+  if (km && km.history && pca && pca.v1 && pca.v2) {
+    const snaps = km.history.centroidSnapshots || [];
+    if (snaps.length > 1) {
+      kmCentroidTrails = Array.from({ length: km.kUsed }, (_, c) => snaps.map((snap) => {
+        const cen = snap[c];
+        let s1 = 0;
+        let s2 = 0;
+        for (let j = 0; j < p; j++) {
+          const v = cen[j] - pca.means[j];
+          s1 += v * pca.v1[j];
+          s2 += v * pca.v2[j];
+        }
+        return [s1, s2];
+      }));
+    }
+  }
+
   return {
     summary: {
-      engineBuild: "20260715b",
+      engineBuild: "20260715c",
       variableCount: p,
       caseCount: n,
       missingRows,
@@ -880,6 +923,8 @@ function buildClusterBundle(headers, rows, spec) {
       centroids: km.centroids || [],
       quality: kmQuality,
       centroidDistances: kmCentroidDist,
+      convergence: km.history ? { reassigned: km.history.reassigned, wcss: km.history.wcss } : null,
+      centroidTrails: kmCentroidTrails,
       scatterLabels: km.labels.slice(0, scatterN),
       columns: ["Case", "Cluster"],
       rows: kmRows,

@@ -13,7 +13,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="../shared-header.css?v=20260714b"/>  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
-  <script src="../shared-header.js?v=20260714b"></script>
+  <script src="../shared-header.js?v=20260714c"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -170,6 +170,7 @@
     .chart-container.chart-profile{ height:340px; }
     .chart-container.chart-dendrogram{ height:320px; min-height:200px; }
     .chart-container.chart-map{ height:420px; }
+    .chart-container.chart-convergence{ height:260px; }
     .map-controls{ display:inline-flex; gap:6px; align-items:center; }
     .map-select{
       background:rgba(0,0,0,.25);
@@ -543,6 +544,7 @@
                     </span>
                     <select id="kmMapX" class="map-select" onchange="onMapControlChange('km')" disabled title="X axis variable"></select>
                     <select id="kmMapY" class="map-select" onchange="onMapControlChange('km')" disabled title="Y axis variable"></select>
+                    <label class="map-radio" title="Trace how each center moved from its random start to its final position (PCA view only)"><input type="checkbox" id="kmMapTrails" onchange="onMapControlChange('km')"><span>Center trails</span></label>
                     <button type="button" class="map-help-btn" onclick="toggleMapHelp('km')" title="About this chart"><i class="fa-solid fa-circle-question"></i></button>
                   </span>
                 </div>
@@ -555,6 +557,7 @@
                     <li><strong>Variables</strong> lets you plot any two original variables in their raw units instead.</li>
                     <li>Well-separated clusters appear as tight same-coloured groups with clearly apart centers. Heavy overlap suggests weak separation — cross-check the silhouette on the Diagnostics page.</li>
                     <li>The <strong>distance table below the map</strong> gives the exact center-to-center distances behind what you see here.</li>
+                    <li><strong>Center trails</strong> (PCA view) trace each center's walk from its random starting seed to its final position — one dashed line per cluster, ending at the big center marker. Short direct trails mean the solution settled quickly; long meandering ones hint at an unstable start (note the path itself depends on the random seed).</li>
                     <li>Drag to zoom into a region; click a legend entry to hide or show a cluster.</li>
                   </ul>
                 </div>
@@ -588,6 +591,11 @@
                     <div class="stat-field"><span class="stat-label">Average silhouette: <span class="info-icon">i<span class="tip">Mean silhouette over all cases, from −1 to +1: how much closer each case is to its own cluster than the nearest other cluster. <b>&ge; 0.5</b> reasonable, <b>&ge; 0.7</b> strong, <b>&lt; 0.25</b> little real structure.</span></span></span><span class="stat-value" id="kmSilhouette">…</span></div>
                   </div>
                 </div>
+              </div>
+              <div class="viz-card" style="margin-top:12px;">
+                <div class="viz-title"><i class="fa-solid fa-wave-square"></i> Convergence process <span class="info-icon">i<span class="tip">How the run settled, iteration by iteration. The line is <b>WCSS</b> (the objective K-means minimises) after each update; the columns are how many cases <b>switched cluster</b> that round. A steep-then-flat line with columns hitting zero means a clean, stable solution; columns still non-zero at the last iteration mean the run hit its cap before converging.</span></span></div>
+                <div class="chart-wrap"><div id="kmConvChart" class="chart-container chart-convergence"></div></div>
+                <div class="section-note" style="margin-top:8px;margin-bottom:0;" id="kmConvNote">The line tracks WCSS falling as centers settle; the columns count cases reassigned each iteration, reaching zero at convergence. A long tail of small reassignments suggests points oscillating on a weak boundary between two clusters.</div>
               </div>
               <div class="stat-panel" style="margin-top:12px;">
                 <div class="stat-panel-heading"><i class="fa-solid fa-chart-simple"></i> Silhouette by cluster</div>
@@ -1079,6 +1087,14 @@
       var vars = mapMode(target) === "vars";
       // Radio choice dims (not hides) the variable pickers so the option stays discoverable.
       [xSel, ySel].forEach(function(s) { if (s) s.disabled = !vars; });
+      // Center trails live in PC space only, so the toggle dims in Variables mode
+      // (and when the engine sent no trail history).
+      var trailsBox = document.getElementById(target + "MapTrails");
+      if (trailsBox) {
+        var b = lastClusterBundle || {};
+        var hasTrails = !!(b.kmeans && b.kmeans.centroidTrails && b.kmeans.centroidTrails.length);
+        trailsBox.disabled = vars || !hasTrails;
+      }
       if (!skipRender) renderClusterMap(target);
     }
 
@@ -1181,6 +1197,34 @@
         zIndex: 2,
         showInLegend: true
       });
+      // Center trails (K-means, PCA view): each center's walk from its random
+      // seed to its final position, projected through the same PCA basis.
+      var trailsBox = document.getElementById(target + "MapTrails");
+      var trails = target === "km" && b.kmeans ? b.kmeans.centroidTrails : null;
+      if (usePca && trailsBox && trailsBox.checked && trails && trails.length) {
+        var firstTrailAdded = false;
+        trails.forEach(function(path, c) {
+          if (!path || path.length < 2) return;
+          series.push({
+            name: "Center trails",
+            type: "line",
+            color: CLUSTER_PALETTE[c % CLUSTER_PALETTE.length],
+            data: path.map(function(pt, idx) {
+              return { x: pt[0], y: pt[1], custom: { trailCluster: c + 1, trailStep: idx, trailLast: path.length - 1 } };
+            }),
+            dashStyle: "ShortDash",
+            lineWidth: 1.5,
+            opacity: 0.65,
+            marker: { enabled: true, radius: 2.5, symbol: "diamond" },
+            zIndex: 3,
+            // One legend entry toggles every trail together.
+            showInLegend: !firstTrailAdded,
+            linkedTo: firstTrailAdded ? ":previous" : undefined,
+            states: { inactive: { opacity: 0.15 } }
+          });
+          firstTrailAdded = true;
+        });
+      }
       _mapCharts[target] = Highcharts.chart(chartId, {
         chart: { type: "scatter", backgroundColor: "transparent", animation: false, zooming: { type: "xy" } },
         title: { text: null },
@@ -1199,7 +1243,13 @@
         legend: { itemStyle: { color: "rgba(255,255,255,.82)" } },
         tooltip: {
           pointFormatter: function() {
-            var cl = this.custom && this.custom.cluster ? "Center C" + this.custom.cluster : this.series.name;
+            var cl;
+            if (this.custom && this.custom.trailCluster) {
+              var step = this.custom.trailStep;
+              cl = "C" + this.custom.trailCluster + " — " + (step === 0 ? "random start" : (step === this.custom.trailLast ? "final position" : "after iteration " + step));
+            } else {
+              cl = this.custom && this.custom.cluster ? "Center C" + this.custom.cluster : this.series.name;
+            }
             return "<b>" + cl + "</b><br/>" + xLabel + ": " + formatNumber(this.x) + "<br/>" + yLabel + ": " + formatNumber(this.y);
           }
         },
@@ -1216,6 +1266,62 @@
           : "Axes are the selected variables in original units.";
         note.innerHTML = "Each point is a case, coloured by its cluster. Larger semi-transparent markers are the cluster centers. " + axisText + capText + " Drag to zoom.";
       }
+    }
+
+    var _convChart = null;
+
+    function renderConvergenceChart(conv) {
+      var el = document.getElementById("kmConvChart");
+      if (!el) return;
+      if (_convChart) {
+        try { _convChart.destroy(); } catch (e) {}
+        _convChart = null;
+      }
+      if (!conv || !conv.wcss || !conv.wcss.length || typeof Highcharts === "undefined") {
+        el.innerHTML = '<div class="hint-empty">No convergence history. Re-run the analysis with the current add-in version.</div>';
+        return;
+      }
+      var iters = conv.wcss.map(function(_, i) { return i + 1; });
+      _convChart = Highcharts.chart("kmConvChart", {
+        chart: { backgroundColor: "transparent", animation: false },
+        title: { text: null },
+        credits: { enabled: false },
+        xAxis: {
+          categories: iters,
+          title: { text: "Iteration", style: { color: "rgba(255,255,255,.85)" } },
+          labels: { style: { color: "rgba(255,255,255,.7)", fontSize: "10px" } },
+          gridLineColor: "rgba(255,255,255,.06)"
+        },
+        yAxis: [{
+          title: { text: "WCSS", style: { color: "rgba(45,212,191,.9)" } },
+          labels: { style: { color: "rgba(255,255,255,.7)", fontSize: "10px" } },
+          gridLineColor: "rgba(255,255,255,.08)"
+        }, {
+          title: { text: "Cases reassigned", style: { color: "rgba(120,200,255,.9)" } },
+          labels: { style: { color: "rgba(255,255,255,.7)", fontSize: "10px" } },
+          gridLineWidth: 0,
+          opposite: true,
+          min: 0
+        }],
+        legend: { itemStyle: { color: "rgba(255,255,255,.82)" } },
+        tooltip: { shared: true },
+        series: [{
+          name: "Cases reassigned",
+          type: "column",
+          yAxis: 1,
+          data: conv.reassigned || [],
+          color: "rgba(120,200,255,.45)",
+          borderColor: "rgba(120,200,255,.6)",
+          borderWidth: 1
+        }, {
+          name: "WCSS",
+          type: "line",
+          data: conv.wcss,
+          color: "rgba(45,212,191,.95)",
+          lineWidth: 2.5,
+          marker: { enabled: true, radius: 3.5 }
+        }]
+      });
     }
 
     function profileDataFor(target) {
@@ -1494,6 +1600,7 @@
         setText("kmSilhouette", kq.silhouette != null ? formatNumber(kq.silhouette) : "—");
         renderSilhouetteTable("kmSilBody", kq.silhouettePerCluster);
         renderSeparation("kmSeparationHeatmap", km.centroidDistances);
+        renderConvergenceChart(km.convergence);
         var kb = document.getElementById("kmAssignBody");
         if (kb) {
           if (!km.rows || !km.rows.length) kb.innerHTML = '<tr><td colspan="2" class="hint-empty">No assignments</td></tr>';
@@ -1517,6 +1624,7 @@
         setText("kmSilhouette", "—");
         renderSilhouetteTable("kmSilBody", null);
         renderSeparation("kmSeparationHeatmap", null);
+        renderConvergenceChart(null);
         var kb0 = document.getElementById("kmAssignBody");
         if (kb0) kb0.innerHTML = '<tr><td colspan="2" class="hint-empty">No K-means output</td></tr>';
         var elKm = document.getElementById("kmSizesChart");
@@ -1665,6 +1773,12 @@
       if (ks) ks.innerHTML = '<tr><td colspan="3" class="hint-empty">Awaiting K-means output…</td></tr>';
       var ksep = document.getElementById("kmSeparationHeatmap");
       if (ksep) ksep.innerHTML = '<div class="hint-empty">Awaiting K-means output…</div>';
+      if (_convChart) {
+        try { _convChart.destroy(); } catch (e) {}
+        _convChart = null;
+      }
+      var kconv = document.getElementById("kmConvChart");
+      if (kconv) kconv.innerHTML = '<div class="hint-empty">Awaiting K-means output…</div>';
       var hsep = document.getElementById("hiSeparationHeatmap");
       if (hsep) hsep.innerHTML = '<div class="hint-empty">Awaiting hierarchical output…</div>';
       ["km", "hi"].forEach(function(t) {

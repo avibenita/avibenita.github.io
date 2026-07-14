@@ -568,6 +568,69 @@ function centroidDistanceMatrix(centers, metric) {
   return D;
 }
 
+/**
+ * Top-2 principal components of the analysis matrix (power iteration with deflation).
+ * Used by the cluster map for the auto PCA projection.
+ */
+function pcaTop2(X) {
+  const n = X.length;
+  if (!n) return null;
+  const p = X[0].length;
+  if (p < 2) return null;
+  const means = columnMeans(X);
+  const Xc = X.map((r) => r.map((v, j) => v - means[j]));
+  const C = Array.from({ length: p }, () => Array(p).fill(0));
+  for (let i = 0; i < n; i++) {
+    for (let a = 0; a < p; a++) {
+      const xa = Xc[i][a];
+      for (let b = a; b < p; b++) C[a][b] += xa * Xc[i][b];
+    }
+  }
+  for (let a = 0; a < p; a++) {
+    for (let b = a; b < p; b++) {
+      const v = C[a][b] / Math.max(1, n - 1);
+      C[a][b] = v;
+      C[b][a] = v;
+    }
+  }
+  const totalVar = C.reduce((s, row, i) => s + row[i], 0);
+  function powerIter(M) {
+    let v = Array.from({ length: p }, () => Math.random() - 0.5);
+    let lambda = 0;
+    for (let it = 0; it < 200; it++) {
+      const w = Array(p).fill(0);
+      for (let a = 0; a < p; a++) {
+        let s = 0;
+        for (let b = 0; b < p; b++) s += M[a][b] * v[b];
+        w[a] = s;
+      }
+      const norm = Math.sqrt(w.reduce((s, x) => s + x * x, 0)) || 1;
+      const nv = w.map((x) => x / norm);
+      const diff = nv.reduce((s, x, i) => s + Math.abs(x - v[i]), 0);
+      v = nv;
+      lambda = norm;
+      if (diff < 1e-10) break;
+    }
+    return { vec: v, val: lambda };
+  }
+  const e1 = powerIter(C);
+  const C2 = C.map((row, a) => row.map((val, b) => val - e1.val * e1.vec[a] * e1.vec[b]));
+  const e2 = powerIter(C2);
+  const scores = Xc.map((r) => {
+    let s1 = 0;
+    let s2 = 0;
+    for (let j = 0; j < p; j++) {
+      s1 += r[j] * e1.vec[j];
+      s2 += r[j] * e2.vec[j];
+    }
+    return [s1, s2];
+  });
+  return {
+    scores,
+    explained: totalVar > 1e-12 ? [e1.val / totalVar, e2.val / totalVar] : null
+  };
+}
+
 /** Mean of the raw (unstandardised) variables per cluster — for the raw-means profile toggle. */
 function computeRawProfileSeries(X, labels, kUsed, p) {
   if (!X.length || !p || kUsed < 1) return [];
@@ -749,6 +812,18 @@ function buildClusterBundle(headers, rows, spec) {
   const kmRawProfile = km ? computeRawProfileSeries(X, km.labels, km.kUsed, p) : [];
   const hiRawProfile = hi ? computeRawProfileSeries(X, hi.labels, hiK, p) : [];
 
+  const maxScatter = lim.maxScatterPoints != null ? Number(lim.maxScatterPoints) : 2000;
+  const scatterN = Math.min(n, maxScatter);
+  const pca = p >= 2 ? pcaTop2(workX) : null;
+  const scatter = {
+    varNames: names.slice(),
+    points: X.slice(0, scatterN),
+    pcaScores: pca ? pca.scores.slice(0, scatterN) : null,
+    pcaExplained: pca ? pca.explained : null,
+    totalCases: n,
+    displayedCases: scatterN
+  };
+
   let R = [];
   if (p >= 2 && n >= 2) {
     const { Z: Zc } = standardise(X);
@@ -783,7 +858,7 @@ function buildClusterBundle(headers, rows, spec) {
 
   return {
     summary: {
-      engineBuild: "20260715a",
+      engineBuild: "20260715b",
       variableCount: p,
       caseCount: n,
       missingRows,
@@ -797,6 +872,7 @@ function buildClusterBundle(headers, rows, spec) {
       verdict: n >= kReq ? "Clustering run complete" : "Very small sample — interpret with caution",
       correlationMatrix: R
     },
+    scatter,
     kmeans: km ? {
       iterations: km.iterations,
       wcss: km.wcss,
@@ -804,6 +880,7 @@ function buildClusterBundle(headers, rows, spec) {
       centroids: km.centroids || [],
       quality: kmQuality,
       centroidDistances: kmCentroidDist,
+      scatterLabels: km.labels.slice(0, scatterN),
       columns: ["Case", "Cluster"],
       rows: kmRows,
       totalCases: n,
@@ -824,6 +901,7 @@ function buildClusterBundle(headers, rows, spec) {
       dendrogramMerges: hi.merges,
       quality: hiQuality,
       centroidDistances: hiCentroidDist,
+      scatterLabels: hi.labels.slice(0, scatterN),
       columns: ["Case", "Cluster"],
       rows: hiRows,
       totalCases: n,

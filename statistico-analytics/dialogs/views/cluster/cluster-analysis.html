@@ -169,6 +169,22 @@
     .chart-container{ width:100%; height:280px; }
     .chart-container.chart-profile{ height:340px; }
     .chart-container.chart-dendrogram{ height:320px; min-height:200px; }
+    .chart-container.chart-map{ height:420px; }
+    .map-controls{ display:inline-flex; gap:6px; align-items:center; }
+    .map-select{
+      background:rgba(0,0,0,.25);
+      color:var(--text-primary);
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:8px;
+      padding:4px 8px;
+      font-size:11.5px;
+      font-weight:600;
+      cursor:pointer;
+    }
+    html[data-theme="light"] .map-select{
+      background:rgba(255,255,255,.7);
+      border-color:rgba(0,0,0,.16);
+    }
     .section-note{
       margin-top:10px;
       padding:9px;
@@ -322,6 +338,10 @@
             <i class="fa-solid fa-arrows-left-right-to-line sb-item-icon"></i>
             <span class="sb-item-copy"><span class="sb-item-label">Separation</span><span class="sb-item-description">How distinct the clusters are.</span></span>
           </button>
+          <button type="button" class="sb-item sb-cluster-nav" data-cluster-method="kmeans" data-nav-key="km-map" onclick="switchClusterView('km-map')">
+            <i class="fa-solid fa-braille sb-item-icon"></i>
+            <span class="sb-item-copy"><span class="sb-item-label">Cluster map</span><span class="sb-item-description">Cases coloured by cluster, PCA or variable axes.</span></span>
+          </button>
           <button type="button" class="sb-item sb-cluster-nav" data-cluster-method="kmeans" data-nav-key="km-diagnostics" onclick="switchClusterView('km-diagnostics')">
             <i class="fa-solid fa-stethoscope sb-item-icon"></i>
             <span class="sb-item-copy"><span class="sb-item-label">Diagnostics</span><span class="sb-item-description">Convergence, silhouette, and assignments.</span></span>
@@ -350,6 +370,10 @@
           <button type="button" class="sb-item sb-cluster-nav" data-cluster-method="hierarchical" data-nav-key="hi-separation" onclick="switchClusterView('hi-separation')">
             <i class="fa-solid fa-arrows-left-right-to-line sb-item-icon"></i>
             <span class="sb-item-copy"><span class="sb-item-label">Separation</span><span class="sb-item-description">How distinct the clusters are.</span></span>
+          </button>
+          <button type="button" class="sb-item sb-cluster-nav" data-cluster-method="hierarchical" data-nav-key="hi-map" onclick="switchClusterView('hi-map')">
+            <i class="fa-solid fa-braille sb-item-icon"></i>
+            <span class="sb-item-copy"><span class="sb-item-label">Cluster map</span><span class="sb-item-description">Cases coloured by cluster, PCA or variable axes.</span></span>
           </button>
         </div>
       </div>
@@ -469,6 +493,24 @@
               <div class="section-note">Larger distances mean better-separated clusters. Distances use your setup metric on the analysis matrix (raw or standardised). Darker cells mark the closest — least distinct — pairs.</div>
             </section>
 
+            <section id="tab-km-map" class="tab-panel">
+              <div class="viz-card">
+                <div class="viz-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                  <span style="flex:1;"><i class="fa-solid fa-braille"></i> Cluster map (K-means)</span>
+                  <span class="map-controls">
+                    <select id="kmMapMode" class="map-select" onchange="onMapControlChange('km')">
+                      <option value="pca">PCA projection (auto)</option>
+                      <option value="vars">Choose variables</option>
+                    </select>
+                    <select id="kmMapX" class="map-select" onchange="onMapControlChange('km')" style="display:none;"></select>
+                    <select id="kmMapY" class="map-select" onchange="onMapControlChange('km')" style="display:none;"></select>
+                  </span>
+                </div>
+                <div class="chart-wrap"><div id="kmMapChart" class="chart-container chart-map"></div></div>
+                <div class="section-note" style="margin-top:8px;margin-bottom:0;" id="kmMapNote">Each point is a case, coloured by its K-means cluster. Larger semi-transparent markers are the cluster centers.</div>
+              </div>
+            </section>
+
             <section id="tab-km-diagnostics" class="tab-panel">
               <div class="stats-container">
                 <div class="stat-panel">
@@ -586,6 +628,24 @@
               <div class="section-note">Centroids are the mean vectors of each cluster at the chosen cut. Larger distances mean better-separated clusters; darker cells mark the closest pairs.</div>
             </section>
 
+            <section id="tab-hi-map" class="tab-panel">
+              <div class="viz-card">
+                <div class="viz-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                  <span style="flex:1;"><i class="fa-solid fa-braille"></i> Cluster map (hierarchical)</span>
+                  <span class="map-controls">
+                    <select id="hiMapMode" class="map-select" onchange="onMapControlChange('hi')">
+                      <option value="pca">PCA projection (auto)</option>
+                      <option value="vars">Choose variables</option>
+                    </select>
+                    <select id="hiMapX" class="map-select" onchange="onMapControlChange('hi')" style="display:none;"></select>
+                    <select id="hiMapY" class="map-select" onchange="onMapControlChange('hi')" style="display:none;"></select>
+                  </span>
+                </div>
+                <div class="chart-wrap"><div id="hiMapChart" class="chart-container chart-map"></div></div>
+                <div class="section-note" style="margin-top:8px;margin-bottom:0;" id="hiMapNote">Each point is a case, coloured by its hierarchical cluster at <em>k</em>. Larger semi-transparent markers are the cluster centroids.</div>
+              </div>
+            </section>
+
             <div id="cluViewDataSink" class="visually-hidden" aria-hidden="true">
               <table class="analysis-table">
                 <thead id="viewdataHead"></thead>
@@ -624,12 +684,14 @@
       "km-centers": { panelId: "tab-km-centers", title: "K-means · Centers" },
       "km-profiles": { panelId: "tab-km-profiles", title: "K-means · Profiles" },
       "km-separation": { panelId: "tab-km-separation", title: "K-means · Separation" },
+      "km-map": { panelId: "tab-km-map", title: "K-means · Cluster map" },
       "km-diagnostics": { panelId: "tab-km-diagnostics", title: "K-means · Diagnostics" },
       "hi-overview": { panelId: "tab-overview", title: "Hierarchical · Overview" },
       "hi-dendrogram": { panelId: "tab-hi-dendrogram", title: "Hierarchical · Dendrogram" },
       "hi-clusters": { panelId: "tab-hi-clusters", title: "Hierarchical · Clusters" },
       "hi-profiles": { panelId: "tab-hi-profiles", title: "Hierarchical · Profiles" },
-      "hi-separation": { panelId: "tab-hi-separation", title: "Hierarchical · Separation" }
+      "hi-separation": { panelId: "tab-hi-separation", title: "Hierarchical · Separation" },
+      "hi-map": { panelId: "tab-hi-map", title: "Hierarchical · Cluster map" }
     };
 
     function parseMaybeNumber(value) {
@@ -877,6 +939,164 @@
         var val = (v == null || !isFinite(v)) ? "—" : formatNumber(v);
         return "<tr><td>" + (i + 1) + "</td><td>" + val + "</td><td>" + silhouetteReading(v) + "</td></tr>";
       }).join("");
+    }
+
+    var CLUSTER_PALETTE = ["#2dd4bf", "#60a5fa", "#fbbf24", "#fb7185", "#a78bfa", "#4ade80", "#f97316", "#38bdf8", "#e879f9", "#94a3b8"];
+    var _mapCharts = { km: null, hi: null };
+
+    function populateMapControls(target) {
+      var b = lastClusterBundle || {};
+      var sc = b.scatter;
+      var modeSel = document.getElementById(target + "MapMode");
+      var xSel = document.getElementById(target + "MapX");
+      var ySel = document.getElementById(target + "MapY");
+      if (!modeSel || !xSel || !ySel) return;
+      var names = (sc && sc.varNames) || [];
+      var opts = names.map(function(nm, i) { return '<option value="' + i + '">' + String(nm) + "</option>"; }).join("");
+      xSel.innerHTML = opts;
+      ySel.innerHTML = opts;
+      if (names.length > 1) ySel.value = "1";
+      var hasPca = !!(sc && sc.pcaScores && sc.pcaScores.length);
+      modeSel.querySelector('option[value="pca"]').disabled = !hasPca;
+      if (!hasPca) modeSel.value = "vars";
+      onMapControlChange(target, true);
+    }
+
+    function onMapControlChange(target, skipRender) {
+      var modeSel = document.getElementById(target + "MapMode");
+      var xSel = document.getElementById(target + "MapX");
+      var ySel = document.getElementById(target + "MapY");
+      if (!modeSel || !xSel || !ySel) return;
+      var vars = modeSel.value === "vars";
+      xSel.style.display = vars ? "" : "none";
+      ySel.style.display = vars ? "" : "none";
+      if (!skipRender) renderClusterMap(target);
+    }
+
+    function renderClusterMap(target) {
+      var chartId = target + "MapChart";
+      var el = document.getElementById(chartId);
+      if (!el) return;
+      if (_mapCharts[target]) {
+        try { _mapCharts[target].destroy(); } catch (e) {}
+        _mapCharts[target] = null;
+      }
+      var b = lastClusterBundle || {};
+      var sc = b.scatter;
+      var blk = target === "hi" ? b.hierarchical : b.kmeans;
+      var labels = blk && blk.scatterLabels;
+      if (!sc || !sc.points || !sc.points.length || !labels || !labels.length || typeof Highcharts === "undefined") {
+        el.innerHTML = '<div class="hint-empty">No case-level data for the cluster map. Re-run the analysis.</div>';
+        return;
+      }
+      var modeSel = document.getElementById(target + "MapMode");
+      var usePca = modeSel && modeSel.value === "pca" && sc.pcaScores && sc.pcaScores.length;
+      var xi = 0;
+      var yi = Math.min(1, sc.varNames.length - 1);
+      if (!usePca) {
+        var xSel = document.getElementById(target + "MapX");
+        var ySel = document.getElementById(target + "MapY");
+        xi = xSel ? parseInt(xSel.value, 10) || 0 : 0;
+        yi = ySel ? parseInt(ySel.value, 10) || 0 : yi;
+      }
+      var xLabel;
+      var yLabel;
+      if (usePca) {
+        var ex = sc.pcaExplained;
+        xLabel = "PC1" + (ex && isFinite(ex[0]) ? " (" + Math.round(ex[0] * 100) + "%)" : "");
+        yLabel = "PC2" + (ex && isFinite(ex[1]) ? " (" + Math.round(ex[1] * 100) + "%)" : "");
+      } else {
+        xLabel = String(sc.varNames[xi] || "X");
+        yLabel = String(sc.varNames[yi] || "Y");
+      }
+      var k = 0;
+      labels.forEach(function(c) { if (c + 1 > k) k = c + 1; });
+      var byCluster = Array.from({ length: k }, function() { return []; });
+      var m = Math.min(labels.length, usePca ? sc.pcaScores.length : sc.points.length);
+      for (var i = 0; i < m; i++) {
+        var c = labels[i];
+        if (c < 0 || c >= k) continue;
+        var pt = usePca
+          ? [sc.pcaScores[i][0], sc.pcaScores[i][1]]
+          : [Number(sc.points[i][xi]), Number(sc.points[i][yi])];
+        if (isFinite(pt[0]) && isFinite(pt[1])) byCluster[c].push(pt);
+      }
+      var series = [];
+      byCluster.forEach(function(pts, c) {
+        series.push({
+          name: "Cluster " + (c + 1),
+          type: "scatter",
+          color: CLUSTER_PALETTE[c % CLUSTER_PALETTE.length],
+          data: pts,
+          marker: { radius: 3.5, symbol: "circle" },
+          zIndex: 1
+        });
+      });
+      // Cluster centers as larger, semi-transparent markers (mean of the plotted points).
+      var centerPts = [];
+      byCluster.forEach(function(pts, c) {
+        if (!pts.length) return;
+        var sx = 0;
+        var sy = 0;
+        pts.forEach(function(p2) { sx += p2[0]; sy += p2[1]; });
+        centerPts.push({
+          x: sx / pts.length,
+          y: sy / pts.length,
+          color: CLUSTER_PALETTE[c % CLUSTER_PALETTE.length],
+          custom: { cluster: c + 1 }
+        });
+      });
+      series.push({
+        name: "Centers",
+        type: "scatter",
+        data: centerPts,
+        marker: {
+          radius: 11,
+          symbol: "circle",
+          fillOpacity: 0.35,
+          lineWidth: 2,
+          lineColor: "rgba(255,255,255,.85)"
+        },
+        opacity: 0.75,
+        enableMouseTracking: true,
+        zIndex: 2,
+        showInLegend: true
+      });
+      _mapCharts[target] = Highcharts.chart(chartId, {
+        chart: { type: "scatter", backgroundColor: "transparent", animation: false, zooming: { type: "xy" } },
+        title: { text: null },
+        credits: { enabled: false },
+        xAxis: {
+          title: { text: xLabel, style: { color: "rgba(255,255,255,.85)" } },
+          labels: { style: { color: "rgba(255,255,255,.7)", fontSize: "10px" } },
+          gridLineColor: "rgba(255,255,255,.08)",
+          gridLineWidth: 1
+        },
+        yAxis: {
+          title: { text: yLabel, style: { color: "rgba(255,255,255,.85)" } },
+          labels: { style: { color: "rgba(255,255,255,.7)", fontSize: "10px" } },
+          gridLineColor: "rgba(255,255,255,.08)"
+        },
+        legend: { itemStyle: { color: "rgba(255,255,255,.82)" } },
+        tooltip: {
+          pointFormatter: function() {
+            var cl = this.custom && this.custom.cluster ? "Center C" + this.custom.cluster : this.series.name;
+            return "<b>" + cl + "</b><br/>" + xLabel + ": " + formatNumber(this.x) + "<br/>" + yLabel + ": " + formatNumber(this.y);
+          }
+        },
+        plotOptions: { scatter: { states: { inactive: { opacity: 0.25 } } } },
+        series: series
+      });
+      var note = document.getElementById(target + "MapNote");
+      if (note) {
+        var shown = sc.displayedCases != null ? sc.displayedCases : m;
+        var total = sc.totalCases != null ? sc.totalCases : m;
+        var capText = total > shown ? " Showing the first " + shown + " of " + total + " cases." : "";
+        var axisText = usePca
+          ? "Axes are the first two principal components of the analysis matrix — the flattest 2-D view of the full variable space."
+          : "Axes are the selected variables in original units.";
+        note.innerHTML = "Each point is a case, coloured by its cluster. Larger semi-transparent markers are the cluster centers. " + axisText + capText + " Drag to zoom.";
+      }
     }
 
     function profileDataFor(target) {
@@ -1189,6 +1409,8 @@
         renderBarChart("kmSizesChart", kcats, km.sizes || [], "K-means");
         renderProfileFor("km");
         renderCentersFor();
+        populateMapControls("km");
+        renderClusterMap("km");
       } else {
         setText("kmConverged", "—");
         setText("kmIter", "—");
@@ -1247,6 +1469,8 @@
           if (dendEl) dendEl.innerHTML = '<div class="hint-empty">No dendrogram data (upgrade task pane for merge-tree support)</div>';
         }
         renderProfileFor("hi");
+        populateMapControls("hi");
+        renderClusterMap("hi");
       } else {
         setText("hiLinkDisplay", "—");
         setText("hiMergeCount", "—");
@@ -1345,6 +1569,14 @@
       if (ksep) ksep.innerHTML = '<div class="hint-empty">Awaiting K-means output…</div>';
       var hsep = document.getElementById("hiSeparationHeatmap");
       if (hsep) hsep.innerHTML = '<div class="hint-empty">Awaiting hierarchical output…</div>';
+      ["km", "hi"].forEach(function(t) {
+        if (_mapCharts[t]) {
+          try { _mapCharts[t].destroy(); } catch (e) {}
+          _mapCharts[t] = null;
+        }
+        var mc = document.getElementById(t + "MapChart");
+        if (mc) mc.innerHTML = "";
+      });
       document.getElementById("kmAssignBody").innerHTML = '<tr><td colspan="2" class="hint-empty">Awaiting K-means output…</td></tr>';
       document.getElementById("hiMergeBody").innerHTML = '<tr><td colspan="5" class="hint-empty">Awaiting hierarchical output…</td></tr>';
       document.getElementById("hiAssignBody").innerHTML = '<tr><td colspan="2" class="hint-empty">Awaiting hierarchical output…</td></tr>';

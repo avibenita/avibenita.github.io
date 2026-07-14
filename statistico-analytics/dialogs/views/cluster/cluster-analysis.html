@@ -331,6 +331,28 @@
       background:transparent;
       transform:none;
     }
+    .profile-mode-toggle{
+      display:inline-flex;
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:8px;
+      overflow:hidden;
+    }
+    .profile-mode-btn{
+      background:transparent;
+      color:var(--text-secondary);
+      border:none;
+      padding:4px 10px;
+      font-size:11.5px;
+      font-weight:600;
+      cursor:pointer;
+    }
+    .profile-mode-btn + .profile-mode-btn{ border-left:1px solid rgba(255,255,255,.14); }
+    .profile-mode-btn.active{
+      background:rgba(45,212,191,.20);
+      color:var(--text-primary);
+    }
+    html[data-theme="light"] .profile-mode-toggle{ border-color:rgba(0,0,0,.16); }
+    html[data-theme="light"] .profile-mode-btn + .profile-mode-btn{ border-left-color:rgba(0,0,0,.12); }
   </style>
 </head>
 <body data-cluster-results-ui="method-groups-v2">
@@ -356,8 +378,9 @@
               <button type="button" class="sb-item sb-cluster-sub sb-cluster-nav active" data-cluster-method="kmeans" data-nav-key="km-overview" onclick="switchClusterView('km-overview')" title="Data, options, verdict, and correlation heatmap.">Overview</button>
               <button type="button" class="sb-item sb-cluster-sub sb-cluster-nav" data-cluster-method="kmeans" data-nav-key="km-sizes" onclick="switchClusterView('km-sizes')" title="Cluster sizes (K-means).">Sizes</button>
               <button type="button" class="sb-item sb-cluster-sub sb-cluster-nav" data-cluster-method="kmeans" data-nav-key="km-centers" onclick="switchClusterView('km-centers')" title="Final centroids in the analysis scaling.">Centers</button>
-              <button type="button" class="sb-item sb-cluster-sub sb-cluster-nav" data-cluster-method="kmeans" data-nav-key="km-profiles" onclick="switchClusterView('km-profiles')" title="Mean z-score profiles by cluster.">Profiles</button>
-              <button type="button" class="sb-item sb-cluster-sub sb-cluster-nav" data-cluster-method="kmeans" data-nav-key="km-diagnostics" onclick="switchClusterView('km-diagnostics')" title="Iterations, WCSS, and case assignments.">Diagnostics</button>
+              <button type="button" class="sb-item sb-cluster-sub sb-cluster-nav" data-cluster-method="kmeans" data-nav-key="km-profiles" onclick="switchClusterView('km-profiles')" title="Mean profiles by cluster (standardised or raw).">Profiles</button>
+              <button type="button" class="sb-item sb-cluster-sub sb-cluster-nav" data-cluster-method="kmeans" data-nav-key="km-separation" onclick="switchClusterView('km-separation')" title="How distinct the clusters are: distances between centers.">Separation</button>
+              <button type="button" class="sb-item sb-cluster-sub sb-cluster-nav" data-cluster-method="kmeans" data-nav-key="km-diagnostics" onclick="switchClusterView('km-diagnostics')" title="Convergence, variance decomposition, silhouette, and case assignments.">Diagnostics</button>
             </div>
           </div>
           <div class="sb-method-block">
@@ -368,7 +391,8 @@
               <button type="button" class="sb-item sb-cluster-sub sb-cluster-nav" data-cluster-method="hierarchical" data-nav-key="hi-overview" onclick="switchClusterView('hi-overview')" title="Data, options, verdict, and correlation heatmap.">Overview</button>
               <button type="button" class="sb-item sb-cluster-sub sb-cluster-nav" data-cluster-method="hierarchical" data-nav-key="hi-dendrogram" onclick="switchClusterView('hi-dendrogram')" title="Merge structure of the hierarchy.">Dendrogram</button>
               <button type="button" class="sb-item sb-cluster-sub sb-cluster-nav" data-cluster-method="hierarchical" data-nav-key="hi-clusters" onclick="switchClusterView('hi-clusters')" title="Sizes, merge steps, and assignments at k.">Clusters</button>
-              <button type="button" class="sb-item sb-cluster-sub sb-cluster-nav" data-cluster-method="hierarchical" data-nav-key="hi-profiles" onclick="switchClusterView('hi-profiles')" title="Mean z-score profiles by hierarchical cluster.">Profiles</button>
+              <button type="button" class="sb-item sb-cluster-sub sb-cluster-nav" data-cluster-method="hierarchical" data-nav-key="hi-profiles" onclick="switchClusterView('hi-profiles')" title="Mean profiles by hierarchical cluster (standardised or raw).">Profiles</button>
+              <button type="button" class="sb-item sb-cluster-sub sb-cluster-nav" data-cluster-method="hierarchical" data-nav-key="hi-separation" onclick="switchClusterView('hi-separation')" title="How distinct the clusters are: distances between centroids at k.">Separation</button>
             </div>
           </div>
         </div>
@@ -408,34 +432,30 @@
                       <div class="stat-field"><span class="stat-label">Linkage method:</span><span class="stat-value" id="cluLinkage">…</span></div>
                     </div>
                   </div>
+                  <div class="stat-panel">
+                    <div class="stat-panel-heading"><i class="fa-solid fa-gauge-high"></i> Cluster quality</div>
+                    <div class="stat-panel-body" id="cluQualityBody">
+                      <div class="hint-empty">Awaiting results…</div>
+                    </div>
+                  </div>
                 </div>
                 <div class="stat-field" style="border:none;margin-top:4px;">
                   <span class="stat-label" style="flex:1;">Verdict</span>
                 </div>
                 <div id="cluVerdict" class="section-note" style="margin-top:0;">Awaiting results…</div>
 
-                <div class="overview-corr-block">
-                  <div class="overview-corr-header">
-                    <span class="overview-corr-title"><i class="fa-solid fa-table-cells"></i> Correlation structure</span>
-                    <button type="button" class="expand-corr-btn" id="expandCorrBtn" onclick="toggleCorrExpand()">
-                      <i class="fa-solid fa-expand-alt"></i> Expand full matrix
-                    </button>
-                  </div>
-                  <div id="corrHeatmapPreview" class="heatmap-wrap heatmap-preview"></div>
-                  <div id="corrHeatmapFull" class="heatmap-wrap" style="display:none;max-height:420px;"></div>
-                  <div class="heatmap-legend">
-                    <span style="font-weight:600;color:var(--text-secondary);">Colour key:</span>
-                    <div class="legend-swatches">
-                      <span class="legend-tick">−1</span>
-                      <span class="legend-swatch" style="background:rgba(255,120,120,.80)"></span>
-                      <span class="legend-swatch" style="background:transparent;border:1px solid rgba(255,255,255,.15)"></span>
-                      <span class="legend-tick">0</span>
-                      <span class="legend-swatch" style="background:rgba(120,200,255,.80)"></span>
-                      <span class="legend-tick">+1</span>
+                <div class="stat-panel" style="margin-top:12px;">
+                  <div class="stat-panel-heading"><i class="fa-solid fa-table-list"></i> Cluster summary</div>
+                  <div class="stat-panel-body" style="padding:0;">
+                    <div class="table-container" style="margin:0;">
+                      <table class="analysis-table">
+                        <thead id="cluSummaryHead"><tr><th></th></tr></thead>
+                        <tbody id="cluSummaryBody"><tr><td class="hint-empty">Awaiting results…</td></tr></tbody>
+                      </table>
                     </div>
-                    <span style="margin-left:6px;">Negative (red) · Positive (blue) · |r|</span>
                   </div>
                 </div>
+                <div class="section-note" style="margin-top:8px;">The dominant profile flags the variable that most separates each cluster from the overall mean (largest |z|).</div>
               </div>
               <div class="section-note">The menu follows the method selected in setup: <strong>K-means</strong> or <strong>Hierarchical</strong>. Items for the other method stay visible but disabled.</div>
             </section>
@@ -460,29 +480,65 @@
                   </div>
                 </div>
               </div>
-              <div class="section-note">Values are in the <strong>same scaling as the analysis</strong> (raw or standardised per your setup), after convergence.</div>
+              <div class="section-note">Values are in the <strong>same scaling as the analysis</strong> (raw or standardised per your setup), after convergence. Cell colour follows the correlation heat map: <span style="color:rgba(120,200,255,.95);font-weight:600;">blue positive</span>, <span style="color:rgba(255,120,120,.95);font-weight:600;">red negative</span>, intensity ∝ magnitude.</div>
             </section>
 
             <section id="tab-km-profiles" class="tab-panel">
               <div class="viz-card">
-                <div class="viz-title"><i class="fa-solid fa-chart-line"></i> Cluster profiles (K-means)</div>
+                <div class="viz-title" style="display:flex;align-items:center;gap:10px;">
+                  <span style="flex:1;"><i class="fa-solid fa-chart-line"></i> Cluster profiles (K-means)</span>
+                  <span class="profile-mode-toggle" role="group" aria-label="Profile scale">
+                    <button type="button" class="profile-mode-btn active" data-profile-target="km" data-profile-mode="z" onclick="setProfileMode('km','z')">Standardised</button>
+                    <button type="button" class="profile-mode-btn" data-profile-target="km" data-profile-mode="raw" onclick="setProfileMode('km','raw')">Raw means</button>
+                  </span>
+                </div>
                 <div class="chart-wrap"><div id="kmProfileChart" class="chart-container chart-profile"></div></div>
-                <div class="section-note" style="margin-top:8px;margin-bottom:0;">Each line is the <strong>mean z-score</strong> by variable within that cluster (pooled SDs on the full sample).</div>
+                <div class="section-note" style="margin-top:8px;margin-bottom:0;" id="kmProfileNote">Each line is the <strong>mean z-score</strong> by variable within that cluster (pooled SDs on the full sample).</div>
               </div>
+            </section>
+
+            <section id="tab-km-separation" class="tab-panel">
+              <div class="stat-panel">
+                <div class="stat-panel-heading"><i class="fa-solid fa-arrows-left-right-to-line"></i> Distances between cluster centers (K-means)</div>
+                <div class="stat-panel-body">
+                  <div id="kmSeparationHeatmap" class="heatmap-wrap"><div class="hint-empty">Awaiting K-means output…</div></div>
+                </div>
+              </div>
+              <div class="section-note">Larger distances mean better-separated clusters. Distances use your setup metric on the analysis matrix (raw or standardised). Darker cells mark the closest — least distinct — pairs.</div>
             </section>
 
             <section id="tab-km-diagnostics" class="tab-panel">
               <div class="stats-container">
                 <div class="stat-panel">
-                  <div class="stat-panel-heading"><i class="fa-solid fa-bullseye"></i> K-means diagnostics</div>
+                  <div class="stat-panel-heading"><i class="fa-solid fa-bullseye"></i> Convergence</div>
                   <div class="stat-panel-body">
+                    <div class="stat-field"><span class="stat-label">Converged:</span><span class="stat-value" id="kmConverged">…</span></div>
                     <div class="stat-field"><span class="stat-label">Iterations:</span><span class="stat-value" id="kmIter">…</span></div>
                     <div class="stat-field"><span class="stat-label">Within-cluster SS (WCSS):</span><span class="stat-value" id="kmWcss">…</span></div>
                   </div>
                 </div>
+                <div class="stat-panel">
+                  <div class="stat-panel-heading"><i class="fa-solid fa-scale-balanced"></i> Variance decomposition</div>
+                  <div class="stat-panel-body">
+                    <div class="stat-field"><span class="stat-label">Between-cluster SS:</span><span class="stat-value" id="kmBss">…</span></div>
+                    <div class="stat-field"><span class="stat-label">Explained variance:</span><span class="stat-value" id="kmExplVar">…</span></div>
+                    <div class="stat-field"><span class="stat-label">Average silhouette:</span><span class="stat-value" id="kmSilhouette">…</span></div>
+                  </div>
+                </div>
               </div>
               <div class="stat-panel" style="margin-top:12px;">
-                <div class="stat-panel-heading"><i class="fa-solid fa-list"></i> Case assignment (first rows)</div>
+                <div class="stat-panel-heading"><i class="fa-solid fa-chart-simple"></i> Silhouette by cluster</div>
+                <div class="stat-panel-body" style="padding:0;">
+                  <div class="table-container" style="margin:0;">
+                    <table class="analysis-table">
+                      <thead><tr><th>Cluster</th><th>Average silhouette</th><th>Reading</th></tr></thead>
+                      <tbody id="kmSilBody"><tr><td colspan="3" class="hint-empty">Awaiting K-means output…</td></tr></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              <div class="stat-panel" style="margin-top:12px;">
+                <div class="stat-panel-heading"><i class="fa-solid fa-list"></i> Assignments (first rows)</div>
                 <div class="stat-panel-body" style="padding:0;">
                   <div class="table-container" style="margin:0;">
                     <table class="analysis-table">
@@ -492,7 +548,7 @@
                   </div>
                 </div>
               </div>
-              <div class="section-note">Distances follow your setup (Euclidean or Manhattan) on the analysis matrix (raw or standardised).</div>
+              <div class="section-note">Silhouette ranges from −1 to +1; values above 0.5 indicate a solid structure, below 0.25 a weak one. It is computed on samples up to 1,500 cases. Distances follow your setup (Euclidean or Manhattan) on the analysis matrix.</div>
             </section>
 
             <section id="tab-hi-dendrogram" class="tab-panel">
@@ -510,6 +566,8 @@
                   <div class="stat-panel-body">
                     <div class="stat-field"><span class="stat-label">Linkage:</span><span class="stat-value" id="hiLinkDisplay">…</span></div>
                     <div class="stat-field"><span class="stat-label">Merge steps:</span><span class="stat-value" id="hiMergeCount">…</span></div>
+                    <div class="stat-field"><span class="stat-label">Explained variance:</span><span class="stat-value" id="hiExplVar">…</span></div>
+                    <div class="stat-field"><span class="stat-label">Average silhouette:</span><span class="stat-value" id="hiSilhouette">…</span></div>
                   </div>
                 </div>
               </div>
@@ -544,10 +602,26 @@
 
             <section id="tab-hi-profiles" class="tab-panel">
               <div class="viz-card">
-                <div class="viz-title"><i class="fa-solid fa-chart-line"></i> Cluster profiles (hierarchical)</div>
+                <div class="viz-title" style="display:flex;align-items:center;gap:10px;">
+                  <span style="flex:1;"><i class="fa-solid fa-chart-line"></i> Cluster profiles (hierarchical)</span>
+                  <span class="profile-mode-toggle" role="group" aria-label="Profile scale">
+                    <button type="button" class="profile-mode-btn active" data-profile-target="hi" data-profile-mode="z" onclick="setProfileMode('hi','z')">Standardised</button>
+                    <button type="button" class="profile-mode-btn" data-profile-target="hi" data-profile-mode="raw" onclick="setProfileMode('hi','raw')">Raw means</button>
+                  </span>
+                </div>
                 <div class="chart-wrap"><div id="hiProfileChart" class="chart-container chart-profile"></div></div>
-                <div class="section-note" style="margin-top:8px;margin-bottom:0;">Profiles use the <strong>hierarchical assignment at <em>k</em></strong>; each line is mean z-score by variable (pooled SDs).</div>
+                <div class="section-note" style="margin-top:8px;margin-bottom:0;" id="hiProfileNote">Profiles use the <strong>hierarchical assignment at <em>k</em></strong>; each line is mean z-score by variable (pooled SDs).</div>
               </div>
+            </section>
+
+            <section id="tab-hi-separation" class="tab-panel">
+              <div class="stat-panel">
+                <div class="stat-panel-heading"><i class="fa-solid fa-arrows-left-right-to-line"></i> Distances between cluster centroids (hierarchical, cut at <em>k</em>)</div>
+                <div class="stat-panel-body">
+                  <div id="hiSeparationHeatmap" class="heatmap-wrap"><div class="hint-empty">Awaiting hierarchical output…</div></div>
+                </div>
+              </div>
+              <div class="section-note">Centroids are the mean vectors of each cluster at the chosen cut. Larger distances mean better-separated clusters; darker cells mark the closest pairs.</div>
             </section>
 
             <div id="cluViewDataSink" class="visually-hidden" aria-hidden="true">
@@ -570,9 +644,8 @@
     var globalDecimalPrecision = "auto";
     var officeBridgeReady = false;
     var lastClusterBundle = null;
-    var _fullCorrMatrix = null;
-    var _fullCorrLabels = null;
-    var _corrExpanded = false;
+    var _kmProfileMode = "z";
+    var _hiProfileMode = "z";
     var _vdAllRows = [];
     var _vdFilteredRows = [];
     var _vdCols = [];
@@ -588,11 +661,13 @@
       "km-sizes": { panelId: "tab-km-sizes", title: "K-means · Sizes" },
       "km-centers": { panelId: "tab-km-centers", title: "K-means · Centers" },
       "km-profiles": { panelId: "tab-km-profiles", title: "K-means · Profiles" },
+      "km-separation": { panelId: "tab-km-separation", title: "K-means · Separation" },
       "km-diagnostics": { panelId: "tab-km-diagnostics", title: "K-means · Diagnostics" },
       "hi-overview": { panelId: "tab-overview", title: "Hierarchical · Overview" },
       "hi-dendrogram": { panelId: "tab-hi-dendrogram", title: "Hierarchical · Dendrogram" },
       "hi-clusters": { panelId: "tab-hi-clusters", title: "Hierarchical · Clusters" },
-      "hi-profiles": { panelId: "tab-hi-profiles", title: "Hierarchical · Profiles" }
+      "hi-profiles": { panelId: "tab-hi-profiles", title: "Hierarchical · Profiles" },
+      "hi-separation": { panelId: "tab-hi-separation", title: "Hierarchical · Separation" }
     };
 
     function parseMaybeNumber(value) {
@@ -706,65 +781,172 @@
       } catch (e) { console.error(e); }
     }
 
-    function buildHeatmapHtml(matrix, labels) {
-      if (!matrix || !matrix.length) return '<div class="hint-empty">No correlation matrix</div>';
-      var cols = labels && labels.length ? labels : matrix.map(function(_, i) { return "V" + (i + 1); });
+    function activeMethodBlock(bundle) {
+      var b = bundle || lastClusterBundle || {};
+      var s = b.summary || {};
+      var method = _lockedMethod || (s.clusterMethod === "hierarchical" ? "hierarchical" : "kmeans");
+      return method === "hierarchical" ? { method: method, block: b.hierarchical } : { method: method, block: b.kmeans };
+    }
+
+    function formatPercent(v) {
+      return (v == null || !isFinite(v)) ? "—" : Math.round(v * 100) + "%";
+    }
+
+    function renderQualityPanel(bundle) {
+      var el = document.getElementById("cluQualityBody");
+      if (!el) return;
+      var act = activeMethodBlock(bundle);
+      var q = act.block && act.block.quality;
+      if (!q) {
+        el.innerHTML = '<div class="hint-empty">No quality metrics</div>';
+        return;
+      }
+      var rows = [];
+      function push(label, value) {
+        rows.push('<div class="stat-field"><span class="stat-label">' + label + ':</span><span class="stat-value">' + value + "</span></div>");
+      }
+      if (act.method === "kmeans") {
+        push("Converged", q.converged === true ? '<i class="fa-solid fa-check" style="color:rgba(45,212,191,.95);"></i>' : (q.converged === false ? "No" : "—"));
+        push("Iterations", q.iterations != null ? String(q.iterations) : "—");
+      }
+      push("WCSS", q.withinSS != null ? formatNumber(q.withinSS) : "—");
+      push("Between SS", q.betweenSS != null ? formatNumber(q.betweenSS) : "—");
+      push("Explained variance", formatPercent(q.explainedVariance));
+      push("Average silhouette", q.silhouette != null ? formatNumber(q.silhouette) : "—");
+      el.innerHTML = rows.join("");
+    }
+
+    function dominantProfileLabel(series, categories, clusterIdx) {
+      if (!series || !series[clusterIdx] || !categories || !categories.length) return "—";
+      var data = series[clusterIdx].data || [];
+      var bestJ = -1;
+      var bestAbs = 0;
+      for (var j = 0; j < data.length; j++) {
+        var v = Number(data[j]);
+        if (isFinite(v) && Math.abs(v) > bestAbs) { bestAbs = Math.abs(v); bestJ = j; }
+      }
+      if (bestJ < 0) return "—";
+      var dir = Number(data[bestJ]) >= 0 ? "High" : "Low";
+      return dir + " " + String(categories[bestJ]);
+    }
+
+    function renderClusterSummary(bundle) {
+      var head = document.getElementById("cluSummaryHead");
+      var body = document.getElementById("cluSummaryBody");
+      if (!head || !body) return;
+      var act = activeMethodBlock(bundle);
+      var blk = act.block;
+      var sizes = blk && blk.sizes ? blk.sizes : [];
+      if (!sizes.length) {
+        head.innerHTML = "<tr><th></th></tr>";
+        body.innerHTML = '<tr><td class="hint-empty">No cluster summary yet</td></tr>';
+        return;
+      }
+      var total = sizes.reduce(function(a, b) { return a + b; }, 0);
+      var hr = "<tr><th></th>";
+      sizes.forEach(function(_, i) { hr += "<th>C" + (i + 1) + "</th>"; });
+      head.innerHTML = hr + "</tr>";
+      var casesRow = "<tr><td><strong>Cases</strong></td>" + sizes.map(function(n) { return "<td>" + n + "</td>"; }).join("") + "</tr>";
+      var pctRow = "<tr><td><strong>%</strong></td>" + sizes.map(function(n) {
+        return "<td>" + (total > 0 ? Math.round((n / total) * 100) + "%" : "—") + "</td>";
+      }).join("") + "</tr>";
+      var prof = blk.profile || {};
+      var domRow = "<tr><td><strong>Dominant profile</strong></td>" + sizes.map(function(_, i) {
+        return "<td>" + dominantProfileLabel(prof.series, prof.categories, i) + "</td>";
+      }).join("") + "</tr>";
+      body.innerHTML = casesRow + pctRow + domRow;
+    }
+
+    function buildDistanceHeatmapHtml(D) {
+      if (!D || !D.length) return '<div class="hint-empty">No distance data</div>';
+      var k = D.length;
+      var maxD = 0;
+      for (var i = 0; i < k; i++) {
+        for (var j = 0; j < k; j++) {
+          if (i !== j && isFinite(D[i][j])) maxD = Math.max(maxD, D[i][j]);
+        }
+      }
       var html = '<table class="heatmap"><thead><tr><th></th>';
-      cols.forEach(function(c) { html += "<th>" + c + "</th>"; });
+      for (var c = 0; c < k; c++) html += "<th>C" + (c + 1) + "</th>";
       html += "</tr></thead><tbody>";
-      matrix.forEach(function(row, i) {
-        html += "<tr><th>" + cols[i] + "</th>";
-        row.forEach(function(v) {
-          var n = parseMaybeNumber(v);
-          var alpha = isFinite(n) ? Math.min(0.8, Math.abs(n)) : 0;
-          var bg = isFinite(n)
-            ? (n >= 0 ? "rgba(120,200,255," + alpha.toFixed(2) + ")" : "rgba(255,120,120," + alpha.toFixed(2) + ")")
-            : "transparent";
-          html += '<td style="background:' + bg + ';">' + (isFinite(n) ? formatNumber(n) : "—") + "</td>";
-        });
+      for (var r = 0; r < k; r++) {
+        html += "<tr><th>C" + (r + 1) + "</th>";
+        for (var c2 = 0; c2 < k; c2++) {
+          if (r === c2) { html += '<td style="opacity:.45;">—</td>'; continue; }
+          var v = D[r][c2];
+          if (!isFinite(v)) { html += "<td>—</td>"; continue; }
+          // Darker (more red) = closer, i.e. least separated pair.
+          var closeness = maxD > 1e-12 ? 1 - v / maxD : 0;
+          var alpha = Math.min(0.75, closeness * 0.75);
+          html += '<td style="background:rgba(255,120,120,' + alpha.toFixed(2) + ');">' + formatNumber(v) + "</td>";
+        }
         html += "</tr>";
-      });
+      }
       html += "</tbody></table>";
       return html;
     }
 
-    function renderHeatmaps(matrix, labels) {
-      _fullCorrMatrix = matrix;
-      _fullCorrLabels = labels;
-      _corrExpanded = false;
-      var preview = document.getElementById("corrHeatmapPreview");
-      var full = document.getElementById("corrHeatmapFull");
-      var btn = document.getElementById("expandCorrBtn");
-      if (!matrix || !matrix.length) {
-        if (preview) preview.innerHTML = '<div class="hint-empty">No matrix to show</div>';
-        if (full) full.style.display = "none";
-        if (btn) btn.style.display = "none";
+    function renderSeparation(containerId, D) {
+      var el = document.getElementById(containerId);
+      if (!el) return;
+      el.innerHTML = (D && D.length > 1) ? buildDistanceHeatmapHtml(D) : '<div class="hint-empty">Separation needs at least two clusters</div>';
+    }
+
+    function silhouetteReading(v) {
+      if (v == null || !isFinite(v)) return "—";
+      if (v >= 0.7) return "Strong structure";
+      if (v >= 0.5) return "Reasonable structure";
+      if (v >= 0.25) return "Weak structure";
+      return "No substantial structure";
+    }
+
+    function renderSilhouetteTable(bodyId, perCluster) {
+      var body = document.getElementById(bodyId);
+      if (!body) return;
+      if (!perCluster || !perCluster.length) {
+        body.innerHTML = '<tr><td colspan="3" class="hint-empty">Silhouette unavailable (sample too large or too few clusters)</td></tr>';
         return;
       }
-      var previewSize = Math.min(8, labels ? labels.length : matrix.length);
-      var previewMatrix = matrix.slice(0, previewSize).map(function(row) { return row.slice(0, previewSize); });
-      var previewLabels = (labels || []).slice(0, previewSize);
-      if (preview) preview.innerHTML = buildHeatmapHtml(previewMatrix, previewLabels);
-      if (full) {
-        full.innerHTML = buildHeatmapHtml(matrix, labels);
-        full.style.display = "none";
+      body.innerHTML = perCluster.map(function(v, i) {
+        var val = (v == null || !isFinite(v)) ? "—" : formatNumber(v);
+        return "<tr><td>" + (i + 1) + "</td><td>" + val + "</td><td>" + silhouetteReading(v) + "</td></tr>";
+      }).join("");
+    }
+
+    function profileDataFor(target) {
+      var b = lastClusterBundle || {};
+      var blk = target === "hi" ? b.hierarchical : b.kmeans;
+      return blk && blk.profile ? blk.profile : null;
+    }
+
+    function renderProfileFor(target) {
+      var prof = profileDataFor(target);
+      var chartId = target === "hi" ? "hiProfileChart" : "kmProfileChart";
+      var noteId = target === "hi" ? "hiProfileNote" : "kmProfileNote";
+      var mode = target === "hi" ? _hiProfileMode : _kmProfileMode;
+      var raw = mode === "raw";
+      var series = prof ? (raw ? prof.rawSeries : prof.series) : null;
+      if (prof && prof.categories && prof.categories.length && series && series.length) {
+        renderClusterProfileChart(chartId, prof.categories, series, raw ? (prof.rawYLabel || "Mean (raw units)") : prof.yLabel);
+      } else {
+        if (target === "hi") destroyHiProfileChart(); else destroyKmProfileChart();
+        var ep = document.getElementById(chartId);
+        if (ep) ep.innerHTML = '<div class="hint-empty">No profile data</div>';
       }
-      if (btn) {
-        btn.style.display = (matrix.length > 8) ? "" : "none";
-        btn.innerHTML = '<i class="fa-solid fa-expand-alt"></i> Expand full matrix';
+      var note = document.getElementById(noteId);
+      if (note) {
+        note.innerHTML = raw
+          ? "Each line is the <strong>mean in original units</strong> by variable within that cluster. Variables with different scales are not directly comparable here."
+          : "Each line is the <strong>mean z-score</strong> by variable within that cluster (pooled SDs on the full sample).";
       }
     }
 
-    function toggleCorrExpand() {
-      var preview = document.getElementById("corrHeatmapPreview");
-      var full = document.getElementById("corrHeatmapFull");
-      var btn = document.getElementById("expandCorrBtn");
-      _corrExpanded = !_corrExpanded;
-      if (preview) preview.style.display = _corrExpanded ? "none" : "";
-      if (full) full.style.display = _corrExpanded ? "" : "none";
-      if (btn) btn.innerHTML = _corrExpanded
-        ? '<i class="fa-solid fa-compress-alt"></i> Show preview'
-        : '<i class="fa-solid fa-expand-alt"></i> Expand full matrix';
+    function setProfileMode(target, mode) {
+      if (target === "hi") _hiProfileMode = mode; else _kmProfileMode = mode;
+      document.querySelectorAll('.profile-mode-btn[data-profile-target="' + target + '"]').forEach(function(btn) {
+        btn.classList.toggle("active", btn.getAttribute("data-profile-mode") === mode);
+      });
+      renderProfileFor(target);
     }
 
     function destroyKmProfileChart() {
@@ -842,10 +1024,22 @@
       var hr = "<tr><th>Cluster</th>";
       varNames.forEach(function(nm) { hr += "<th>" + String(nm) + "</th>"; });
       head.innerHTML = hr + "</tr>";
+      // Sign colouring like the correlation heat map: blue positive, red negative, alpha ∝ magnitude.
+      var maxAbs = 0;
+      centroidRows.forEach(function(row) {
+        row.forEach(function(v) {
+          var n = Number(v);
+          if (isFinite(n)) maxAbs = Math.max(maxAbs, Math.abs(n));
+        });
+      });
       body.innerHTML = centroidRows.map(function(row, idx) {
         var tr = "<tr><td>" + (idx + 1) + "</td>";
         row.forEach(function(v) {
-          tr += "<td>" + (isFinite(Number(v)) ? formatNumber(v) : "—") + "</td>";
+          var n = Number(v);
+          if (!isFinite(n)) { tr += "<td>—</td>"; return; }
+          var alpha = maxAbs > 1e-12 ? Math.min(0.75, (Math.abs(n) / maxAbs) * 0.75) : 0;
+          var bg = n >= 0 ? "rgba(120,200,255," + alpha.toFixed(2) + ")" : "rgba(255,120,120," + alpha.toFixed(2) + ")";
+          tr += '<td style="background:' + bg + ';">' + formatNumber(n) + "</td>";
         });
         return tr + "</tr>";
       }).join("");
@@ -918,6 +1112,7 @@
       if (typeof Highcharts === "undefined") return;
       var el = document.getElementById(id);
       if (!el || !categories.length) return;
+      var total = (values || []).reduce(function(a, b) { return a + (isFinite(b) ? b : 0); }, 0);
       Highcharts.chart(id, {
         chart: { type: "column", backgroundColor: "transparent", animation: false },
         title: { text: null },
@@ -929,7 +1124,15 @@
           name: "n",
           data: values,
           color: "rgba(45,212,191,.82)",
-          dataLabels: { enabled: true, style: { color: "rgba(230,255,250,.95)", textOutline: "none", fontSize: "10px" } }
+          dataLabels: {
+            enabled: true,
+            useHTML: true,
+            formatter: function() {
+              var pct = total > 0 ? Math.round((this.y / total) * 100) : 0;
+              return '<div style="text-align:center;line-height:1.25;">' + this.y + '<br/><span style="opacity:.75;font-weight:400;">(' + pct + '%)</span></div>';
+            },
+            style: { color: "rgba(230,255,250,.95)", textOutline: "none", fontSize: "10px" }
+          }
         }]
       });
     }
@@ -958,12 +1161,22 @@
       var vEl = document.getElementById("cluVerdict");
       if (vEl) vEl.textContent = s.verdict || "—";
 
-      renderHeatmaps(s.correlationMatrix || [], labels);
+      if (s.lockedMethod === "kmeans" || s.lockedMethod === "hierarchical") _lockedMethod = s.lockedMethod;
+
+      renderQualityPanel(bundle);
+      renderClusterSummary(bundle);
 
       var km = bundle.kmeans;
       if (km) {
+        var kq = km.quality || {};
+        setText("kmConverged", kq.converged === true ? "Yes" : (kq.converged === false ? "No (hit iteration cap)" : "—"));
         setText("kmIter", km.iterations != null ? String(km.iterations) : "—");
         setText("kmWcss", km.wcss != null ? formatNumber(km.wcss) : "—");
+        setText("kmBss", kq.betweenSS != null ? formatNumber(kq.betweenSS) : "—");
+        setText("kmExplVar", formatPercent(kq.explainedVariance));
+        setText("kmSilhouette", kq.silhouette != null ? formatNumber(kq.silhouette) : "—");
+        renderSilhouetteTable("kmSilBody", kq.silhouettePerCluster);
+        renderSeparation("kmSeparationHeatmap", km.centroidDistances);
         var kb = document.getElementById("kmAssignBody");
         if (kb) {
           if (!km.rows || !km.rows.length) kb.innerHTML = '<tr><td colspan="2" class="hint-empty">No assignments</td></tr>';
@@ -975,14 +1188,7 @@
         }
         var kcats = (km.sizes || []).map(function(_, i) { return "C" + (i + 1); });
         renderBarChart("kmSizesChart", kcats, km.sizes || [], "K-means");
-        var prof = km.profile;
-        if (prof && prof.categories && prof.categories.length && prof.series && prof.series.length) {
-          renderClusterProfileChart("kmProfileChart", prof.categories, prof.series, prof.yLabel);
-        } else {
-          destroyKmProfileChart();
-          var ep = document.getElementById("kmProfileChart");
-          if (ep) ep.innerHTML = '<div class="hint-empty">No profile data</div>';
-        }
+        renderProfileFor("km");
         var cents = km.centroids;
         if (cents && cents.length && labels.length) {
           renderKmCentersTable(labels, cents);
@@ -990,8 +1196,14 @@
           renderKmCentersTable([], null);
         }
       } else {
+        setText("kmConverged", "—");
         setText("kmIter", "—");
         setText("kmWcss", "—");
+        setText("kmBss", "—");
+        setText("kmExplVar", "—");
+        setText("kmSilhouette", "—");
+        renderSilhouetteTable("kmSilBody", null);
+        renderSeparation("kmSeparationHeatmap", null);
         var kb0 = document.getElementById("kmAssignBody");
         if (kb0) kb0.innerHTML = '<tr><td colspan="2" class="hint-empty">No K-means output</td></tr>';
         var elKm = document.getElementById("kmSizesChart");
@@ -1005,8 +1217,12 @@
       var hi = bundle.hierarchical;
       if (hi) {
         var hiLk = hi.linkage || lk;
+        var hq = hi.quality || {};
         setText("hiLinkDisplay", hiLk.charAt(0).toUpperCase() + hiLk.slice(1));
         setText("hiMergeCount", hi.totalMerges != null ? String(hi.totalMerges) : "—");
+        setText("hiExplVar", formatPercent(hq.explainedVariance));
+        setText("hiSilhouette", hq.silhouette != null ? formatNumber(hq.silhouette) : "—");
+        renderSeparation("hiSeparationHeatmap", hi.centroidDistances);
         var hb = document.getElementById("hiMergeBody");
         if (hb) {
           var steps = hi.mergeSteps || [];
@@ -1036,17 +1252,13 @@
           var dendEl = document.getElementById("hiDendrogramChart");
           if (dendEl) dendEl.innerHTML = '<div class="hint-empty">No dendrogram data (upgrade task pane for merge-tree support)</div>';
         }
-        var hip = hi.profile;
-        if (hip && hip.categories && hip.categories.length && hip.series && hip.series.length) {
-          renderClusterProfileChart("hiProfileChart", hip.categories, hip.series, hip.yLabel);
-        } else {
-          destroyHiProfileChart();
-          var ehp = document.getElementById("hiProfileChart");
-          if (ehp) ehp.innerHTML = '<div class="hint-empty">No profile data</div>';
-        }
+        renderProfileFor("hi");
       } else {
         setText("hiLinkDisplay", "—");
         setText("hiMergeCount", "—");
+        setText("hiExplVar", "—");
+        setText("hiSilhouette", "—");
+        renderSeparation("hiSeparationHeatmap", null);
         var hb0 = document.getElementById("hiMergeBody");
         if (hb0) hb0.innerHTML = '<tr><td colspan="5" class="hint-empty">No hierarchical output</td></tr>';
         var ab0 = document.getElementById("hiAssignBody");
@@ -1060,7 +1272,6 @@
         if (ehp0) ehp0.innerHTML = '<div class="hint-empty">No hierarchical output</div>';
       }
 
-      if (s.lockedMethod === "kmeans" || s.lockedMethod === "hierarchical") _lockedMethod = s.lockedMethod;
       applyClusterMethodNav(s.clusterMethod);
       ensureNavKeyAllowed();
 
@@ -1114,9 +1325,6 @@
 
     window.resetResultsPanel = function() {
       lastClusterBundle = null;
-      _fullCorrMatrix = null;
-      _fullCorrLabels = null;
-      _corrExpanded = false;
       setText("cluVarCount", "…");
       setText("cluCaseCount", "…");
       setText("cluMissingRows", "…");
@@ -1125,7 +1333,24 @@
       setText("cluLinkage", "…");
       var vEl = document.getElementById("cluVerdict");
       if (vEl) vEl.textContent = "Awaiting results…";
-      renderHeatmaps([], []);
+      var qb = document.getElementById("cluQualityBody");
+      if (qb) qb.innerHTML = '<div class="hint-empty">Awaiting results…</div>';
+      var sh = document.getElementById("cluSummaryHead");
+      if (sh) sh.innerHTML = "<tr><th></th></tr>";
+      var sb = document.getElementById("cluSummaryBody");
+      if (sb) sb.innerHTML = '<tr><td class="hint-empty">Awaiting results…</td></tr>';
+      setText("kmConverged", "…");
+      setText("kmBss", "…");
+      setText("kmExplVar", "…");
+      setText("kmSilhouette", "…");
+      setText("hiExplVar", "…");
+      setText("hiSilhouette", "…");
+      var ks = document.getElementById("kmSilBody");
+      if (ks) ks.innerHTML = '<tr><td colspan="3" class="hint-empty">Awaiting K-means output…</td></tr>';
+      var ksep = document.getElementById("kmSeparationHeatmap");
+      if (ksep) ksep.innerHTML = '<div class="hint-empty">Awaiting K-means output…</div>';
+      var hsep = document.getElementById("hiSeparationHeatmap");
+      if (hsep) hsep.innerHTML = '<div class="hint-empty">Awaiting hierarchical output…</div>';
       document.getElementById("kmAssignBody").innerHTML = '<tr><td colspan="2" class="hint-empty">Awaiting K-means output…</td></tr>';
       document.getElementById("hiMergeBody").innerHTML = '<tr><td colspan="5" class="hint-empty">Awaiting hierarchical output…</td></tr>';
       document.getElementById("hiAssignBody").innerHTML = '<tr><td colspan="2" class="hint-empty">Awaiting hierarchical output…</td></tr>';
@@ -1140,8 +1365,8 @@
       var hipR = document.getElementById("hiProfileChart");
       if (hipR) hipR.innerHTML = "";
       renderKmCentersTable([], null);
-      applyClusterMethodNav("kmeans");
-      switchClusterView("km-overview", true);
+      applyClusterMethodNav(_lockedMethod || "kmeans");
+      switchClusterView(_lockedMethod === "hierarchical" ? "hi-overview" : "km-overview", true);
     };
 
     function wireOfficeDialogMessaging() {

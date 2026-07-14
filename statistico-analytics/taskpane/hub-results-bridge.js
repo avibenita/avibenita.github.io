@@ -22,7 +22,7 @@
     pareto: ['pareto/pareto-input-panel.js']
   };
 
-  var CACHE_BUST = 'v=20260714';
+  var CACHE_BUST = 'v=20260715';
   var loaded = {};
   var loading = {};
   var activeDialog = null;

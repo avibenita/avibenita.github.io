@@ -455,6 +455,141 @@ function kmeans(Z, k, maxIter, metric) {
   };
 }
 
+function squaredEuclidean(a, b) {
+  let s = 0;
+  for (let j = 0; j < a.length; j++) {
+    const t = a[j] - b[j];
+    s += t * t;
+  }
+  return s;
+}
+
+/**
+ * TSS / WCSS / BSS decomposition (squared Euclidean on the analysis matrix)
+ * plus cluster mean vectors — works for any labelling (K-means or tree cut).
+ */
+function varianceDecomposition(workX, labels, k) {
+  const n = workX.length;
+  if (!n || k < 1) return null;
+  const p = workX[0].length;
+  const mean = columnMeans(workX);
+  let tss = 0;
+  for (let i = 0; i < n; i++) tss += squaredEuclidean(workX[i], mean);
+  const sums = Array.from({ length: k }, () => Array(p).fill(0));
+  const counts = Array(k).fill(0);
+  for (let i = 0; i < n; i++) {
+    const c = labels[i];
+    if (c < 0 || c >= k) continue;
+    counts[c]++;
+    for (let j = 0; j < p; j++) sums[c][j] += workX[i][j];
+  }
+  const centers = sums.map((row, c) => row.map((v) => (counts[c] ? v / counts[c] : 0)));
+  let wcss = 0;
+  for (let i = 0; i < n; i++) {
+    const c = labels[i];
+    if (c < 0 || c >= k) continue;
+    wcss += squaredEuclidean(workX[i], centers[c]);
+  }
+  const bss = Math.max(0, tss - wcss);
+  return {
+    totalSS: tss,
+    withinSS: wcss,
+    betweenSS: bss,
+    explainedVariance: tss > 1e-12 ? bss / tss : null,
+    centers,
+    counts
+  };
+}
+
+/** Average silhouette (O(n²)); skipped above maxN cases to keep the task pane responsive. */
+function computeSilhouette(workX, labels, k, metric, maxN) {
+  const n = workX.length;
+  if (n < 3 || k < 2 || n > (maxN || 1500)) return null;
+  const dist = distMatrix(workX, metric);
+  const counts = Array(k).fill(0);
+  labels.forEach((c) => { if (c >= 0 && c < k) counts[c]++; });
+  const sumPer = Array(k).fill(0);
+  const cntPer = Array(k).fill(0);
+  let total = 0;
+  let m = 0;
+  for (let i = 0; i < n; i++) {
+    const ci = labels[i];
+    if (ci < 0 || ci >= k) continue;
+    if (counts[ci] <= 1) {
+      cntPer[ci]++;
+      m++;
+      continue;
+    }
+    const sumsB = Array(k).fill(0);
+    for (let j = 0; j < n; j++) {
+      if (j === i) continue;
+      const cj = labels[j];
+      if (cj < 0 || cj >= k) continue;
+      sumsB[cj] += dist[i][j];
+    }
+    const a = sumsB[ci] / (counts[ci] - 1);
+    let b = Infinity;
+    for (let c = 0; c < k; c++) {
+      if (c === ci || !counts[c]) continue;
+      b = Math.min(b, sumsB[c] / counts[c]);
+    }
+    if (!isFinite(b)) continue;
+    const s = Math.max(a, b) > 1e-12 ? (b - a) / Math.max(a, b) : 0;
+    sumPer[ci] += s;
+    cntPer[ci]++;
+    total += s;
+    m++;
+  }
+  if (!m) return null;
+  return {
+    average: total / m,
+    perCluster: sumPer.map((s, c) => (cntPer[c] ? s / cntPer[c] : null))
+  };
+}
+
+/** Pairwise distances between cluster centers, using the analysis metric. */
+function centroidDistanceMatrix(centers, metric) {
+  if (!centers || !centers.length) return [];
+  const k = centers.length;
+  const manhattan = metric === "manhattan";
+  const D = Array.from({ length: k }, () => Array(k).fill(0));
+  for (let i = 0; i < k; i++) {
+    for (let j = i + 1; j < k; j++) {
+      let v = 0;
+      if (manhattan) {
+        for (let f = 0; f < centers[i].length; f++) v += Math.abs(centers[i][f] - centers[j][f]);
+      } else {
+        v = Math.sqrt(squaredEuclidean(centers[i], centers[j]));
+      }
+      D[i][j] = v;
+      D[j][i] = v;
+    }
+  }
+  return D;
+}
+
+/** Mean of the raw (unstandardised) variables per cluster — for the raw-means profile toggle. */
+function computeRawProfileSeries(X, labels, kUsed, p) {
+  if (!X.length || !p || kUsed < 1) return [];
+  const n = X.length;
+  const sums = Array.from({ length: kUsed }, () => Array(p).fill(0));
+  const counts = Array(kUsed).fill(0);
+  for (let i = 0; i < n; i++) {
+    const c = labels[i];
+    if (c < 0 || c >= kUsed) continue;
+    counts[c]++;
+    for (let j = 0; j < p; j++) sums[c][j] += X[i][j];
+  }
+  const series = [];
+  for (let c = 0; c < kUsed; c++) {
+    const cnt = counts[c];
+    const data = [];
+    for (let j = 0; j < p; j++) data.push(cnt > 0 ? sums[c][j] / cnt : null);
+    series.push({ name: `Cluster ${c + 1}`, data });
+  }
+  return series;
+}
+
 /** Mean z-score profile per K-means cluster (column-wise z on full X; comparable across variables). */
 function computeKmeansProfileSeries(X, labels, kUsed, p) {
   if (!X.length || !p || kUsed < 1) return [];
@@ -586,6 +721,34 @@ function buildClusterBundle(headers, rows, spec) {
 
   const hiProfileSeries = hi ? computeKmeansProfileSeries(X, hi.labels, hiK, p) : [];
 
+  const maxSilhouetteN = lim.maxSilhouetteCases != null ? Number(lim.maxSilhouetteCases) : 1500;
+  const kmDecomp = km ? varianceDecomposition(workX, km.labels, km.kUsed) : null;
+  const hiDecomp = hi ? varianceDecomposition(workX, hi.labels, hiK) : null;
+  const kmSil = km ? computeSilhouette(workX, km.labels, km.kUsed, metric, maxSilhouetteN) : null;
+  const hiSil = hi ? computeSilhouette(workX, hi.labels, hiK, metric, maxSilhouetteN) : null;
+  const kmQuality = km ? {
+    converged: km.iterations < maxKmIter,
+    iterations: km.iterations,
+    withinSS: kmDecomp ? kmDecomp.withinSS : km.wcss,
+    betweenSS: kmDecomp ? kmDecomp.betweenSS : null,
+    totalSS: kmDecomp ? kmDecomp.totalSS : null,
+    explainedVariance: kmDecomp ? kmDecomp.explainedVariance : null,
+    silhouette: kmSil ? kmSil.average : null,
+    silhouettePerCluster: kmSil ? kmSil.perCluster : null
+  } : null;
+  const hiQuality = hi ? {
+    withinSS: hiDecomp ? hiDecomp.withinSS : null,
+    betweenSS: hiDecomp ? hiDecomp.betweenSS : null,
+    totalSS: hiDecomp ? hiDecomp.totalSS : null,
+    explainedVariance: hiDecomp ? hiDecomp.explainedVariance : null,
+    silhouette: hiSil ? hiSil.average : null,
+    silhouettePerCluster: hiSil ? hiSil.perCluster : null
+  } : null;
+  const kmCentroidDist = km ? centroidDistanceMatrix(km.centroids || (kmDecomp ? kmDecomp.centers : []), metric) : [];
+  const hiCentroidDist = hi && hiDecomp ? centroidDistanceMatrix(hiDecomp.centers, metric) : [];
+  const kmRawProfile = km ? computeRawProfileSeries(X, km.labels, km.kUsed, p) : [];
+  const hiRawProfile = hi ? computeRawProfileSeries(X, hi.labels, hiK, p) : [];
+
   let R = [];
   if (p >= 2 && n >= 2) {
     const { Z: Zc } = standardise(X);
@@ -638,6 +801,8 @@ function buildClusterBundle(headers, rows, spec) {
       wcss: km.wcss,
       sizes: km.sizes,
       centroids: km.centroids || [],
+      quality: kmQuality,
+      centroidDistances: kmCentroidDist,
       columns: ["Case", "Cluster"],
       rows: kmRows,
       totalCases: n,
@@ -645,7 +810,9 @@ function buildClusterBundle(headers, rows, spec) {
       profile: {
         categories: names.slice(),
         yLabel: "Mean z-score (pooled SD)",
-        series: profileSeries
+        series: profileSeries,
+        rawSeries: kmRawProfile,
+        rawYLabel: "Mean (raw units)"
       }
     } : null,
     hierarchical: hi ? {
@@ -654,6 +821,8 @@ function buildClusterBundle(headers, rows, spec) {
       mergeSteps: mergeShow,
       totalMerges: hi.merges.length,
       dendrogramMerges: hi.merges,
+      quality: hiQuality,
+      centroidDistances: hiCentroidDist,
       columns: ["Case", "Cluster"],
       rows: hiRows,
       totalCases: n,
@@ -661,7 +830,9 @@ function buildClusterBundle(headers, rows, spec) {
       profile: {
         categories: names.slice(),
         yLabel: "Mean z-score (pooled SD)",
-        series: hiProfileSeries
+        series: hiProfileSeries,
+        rawSeries: hiRawProfile,
+        rawYLabel: "Mean (raw units)"
       }
     } : null,
     rawData: {

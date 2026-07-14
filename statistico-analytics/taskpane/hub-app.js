@@ -98,7 +98,8 @@ const HUB_CATEGORY_TILES = [
     colorDark: "#0f766e",
     subtitle: "Group similar observations",
     modules: [
-      { id: "cluster", label: "Clustering", tip: "K-means and hierarchical clustering to segment observations." }
+      { id: "kmeans", label: "K-means", tip: "Partition cases into k groups around centroids." },
+      { id: "hierarchical", label: "Hierarchical", tip: "Agglomerative merge tree with dendrogram; cut at k." }
     ]
   }
 ];
@@ -263,30 +264,54 @@ let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics", "applications"];
 let ACTIVE_CLUSTER = "analytics";
 let HUB_ACTIONS = {};
 
-/** Ensures Cluster appears even if a cached or older modules.config.json omits it (inserted after PCA). */
-var CLUSTER_MODULE_CARD = {
-  id: "cluster",
-  group: "multivariate",
-  icon: "fa-object-group",
-  color: "#14b8a6",
-  bg: "rgba(20,184,166,.12)",
-  name: "Cluster Analysis",
-  desc: "Partition observations into groups using K-means or hierarchical agglomerative clustering on numeric inputs.",
-  info: [
-    "K-means (Euclidean, standardisation optional)",
-    "Hierarchical: average, complete, single linkage",
-    "Cluster sizes & case assignments",
-    "Correlation heatmap of inputs",
-    "Runs in the task pane — no cloud round-trip"
-  ]
-};
+/** Ensures the clustering cards appear even if a cached or older modules.config.json omits them (inserted after PCA). */
+var CLUSTERING_MODULE_CARDS = [
+  {
+    id: "kmeans",
+    group: "multivariate",
+    icon: "fa-braille",
+    color: "#14b8a6",
+    bg: "rgba(20,184,166,.12)",
+    name: "K-means Clustering",
+    desc: "Partition observations into k groups by iteratively assigning cases to the nearest centroid.",
+    info: [
+      "Euclidean or Manhattan distance",
+      "Standardisation optional",
+      "Cluster sizes, centers & case assignments",
+      "Mean z-score profiles by cluster",
+      "Runs in the task pane — no cloud round-trip"
+    ]
+  },
+  {
+    id: "hierarchical",
+    group: "multivariate",
+    icon: "fa-sitemap",
+    color: "#0ea5e9",
+    bg: "rgba(14,165,233,.12)",
+    name: "Hierarchical Clustering",
+    desc: "Build an agglomerative merge tree and cut it at k to label clusters — with a full dendrogram.",
+    info: [
+      "Average, complete, or single linkage",
+      "Euclidean or Manhattan distance",
+      "Dendrogram of the merge structure",
+      "Sizes, merge steps & assignments at k",
+      "Runs in the task pane — no cloud round-trip"
+    ]
+  }
+];
 
 function ensureClusterModule(list) {
-  var out = list.slice();
-  if (out.some(function(m) { return m.id === "cluster"; })) return out;
-  var pcaIdx = out.findIndex(function(m) { return m.id === "pca"; });
-  if (pcaIdx >= 0) out.splice(pcaIdx + 1, 0, CLUSTER_MODULE_CARD);
-  else out.push(CLUSTER_MODULE_CARD);
+  /* Drop the legacy combined card and make sure both single-method cards exist. */
+  var out = list.filter(function(m) { return m.id !== "cluster"; });
+  var afterId = "pca";
+  CLUSTERING_MODULE_CARDS.forEach(function(card) {
+    if (!out.some(function(m) { return m.id === card.id; })) {
+      var idx = out.findIndex(function(m) { return m.id === afterId; });
+      if (idx >= 0) out.splice(idx + 1, 0, card);
+      else out.push(card);
+    }
+    afterId = card.id;
+  });
   return out;
 }
 
@@ -1343,9 +1368,10 @@ function buildClusterNumericCandidates(gr, threshold) {
   return out;
 }
 
-function openClusterConfigFromHub() {
+function openClusterConfigFromHub(lockedMethod) {
+  var moduleId = lockedMethod === "kmeans" || lockedMethod === "hierarchical" ? lockedMethod : "cluster";
   return openBuilderDialogFromHub({
-    moduleId: "cluster",
+    moduleId: moduleId,
     dialogPath: "cluster/cluster-input.html",
     dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "CLUSTER_DATA",
@@ -1355,16 +1381,18 @@ function openClusterConfigFromHub() {
         headers: gr.values[0] || [],
         rows: gr.values.slice(1),
         address: gr.address || "",
-        savedModelSpec: null
+        savedModelSpec: null,
+        lockedMethod: moduleId === "cluster" ? null : moduleId
       };
     },
     modelActions: ["clusterModel"],
     onModel: function (msg) {
       var spec = msg.payload || msg.data || {};
+      if (moduleId !== "cluster") spec.clusterMethod = moduleId;
       sessionStorage.setItem("clusterModelSpec", JSON.stringify(spec));
       sessionStorage.setItem("clusterSpec", JSON.stringify(spec));
     },
-    hubResultsKey: "cluster",
+    hubResultsKey: moduleId,
     nextDelayMs: 480
   });
 }
@@ -1443,6 +1471,9 @@ function navigateToModuleCore(id) {
   }
   if (id === "cluster") {
     if (openClusterConfigFromHub()) return;
+  }
+  if (id === "kmeans" || id === "hierarchical") {
+    if (openClusterConfigFromHub(id)) return;
   }
   if (id === "pareto2080") {
     if (openParetoFromHub()) return;

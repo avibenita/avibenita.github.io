@@ -92,6 +92,11 @@
   }
 
   function applyClusterModuleConfig(cfg) {
+    /* Method-locked variants (kmeans / hierarchical modules) share this engine. */
+    var locked = window.CLUSTER_LOCKED_METHOD;
+    if (locked === "kmeans" || locked === "hierarchical") {
+      cfg = deepMerge(cfg, { defaults: { clusterMethod: locked } });
+    }
     window.__CLUSTER_MODULE_CONFIG__ = cfg;
     var t = cfg.theme || {};
     var root = document.documentElement;
@@ -118,7 +123,7 @@
 
   applyClusterModuleConfig(CLUSTER_BUILTIN);
 
-  var url = new URL("cluster.module.json", window.location.href);
+  var url = new URL(window.CLUSTER_MODULE_JSON || "cluster.module.json", window.location.href);
   url.searchParams.set("v", String(Date.now()));
   fetch(url.toString(), { cache: "no-store" })
     .then(function(r) {

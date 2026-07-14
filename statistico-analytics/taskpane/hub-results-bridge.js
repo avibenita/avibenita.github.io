@@ -15,12 +15,14 @@
     logistic: ['logistic/logistic-input-panel.js'],
     'meta-analysis': ['meta-analysis/meta-analysis-input-panel.js'],
     cluster: ['cluster/cluster-config.js', 'cluster/cluster-input-panel.js'],
+    kmeans: ['cluster/cluster-config.js', 'cluster/cluster-input-panel.js'],
+    hierarchical: ['cluster/cluster-config.js', 'cluster/cluster-input-panel.js'],
     mixed: ['mixed/mixed-hub-results.js'],
     pareto2080: ['pareto/pareto-input-panel.js'],
     pareto: ['pareto/pareto-input-panel.js']
   };
 
-  var CACHE_BUST = 'v=20260530';
+  var CACHE_BUST = 'v=20260714';
   var loaded = {};
   var loading = {};
   var activeDialog = null;

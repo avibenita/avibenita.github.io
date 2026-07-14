@@ -629,8 +629,29 @@
       el.innerText = (value !== undefined && value !== null && value !== "") ? value : (fallback || "N/A");
     }
 
+    /* "kmeans" | "hierarchical" when opened from a single-method module: the other group is hidden entirely. */
+    var _lockedMethod = (function() {
+      try {
+        var m = new URLSearchParams(window.location.search).get("lockedMethod");
+        return m === "kmeans" || m === "hierarchical" ? m : null;
+      } catch (e) { return null; }
+    })();
+
+    function applyLockedMethodUI() {
+      if (!_lockedMethod) return;
+      document.querySelectorAll(".sb-method-block").forEach(function(block) {
+        var firstBtn = block.querySelector("button.sb-cluster-nav");
+        var m = firstBtn ? firstBtn.getAttribute("data-cluster-method") : null;
+        block.style.display = m === _lockedMethod ? "" : "none";
+      });
+      /* Single-method module: no second group to explain. */
+      document.querySelectorAll(".section-note").forEach(function(note) {
+        if (note.textContent.indexOf("Items for the other method") >= 0) note.style.display = "none";
+      });
+    }
+
     function applyClusterMethodNav(clusterMethod) {
-      _activeClusterMethod = clusterMethod === "hierarchical" ? "hierarchical" : "kmeans";
+      _activeClusterMethod = _lockedMethod || (clusterMethod === "hierarchical" ? "hierarchical" : "kmeans");
       document.querySelectorAll("button.sb-cluster-nav").forEach(function(btn) {
         var m = btn.getAttribute("data-cluster-method");
         var dis = m !== _activeClusterMethod;
@@ -638,6 +659,7 @@
         btn.classList.toggle("sb-nav-disabled", dis);
         btn.setAttribute("aria-disabled", dis ? "true" : "false");
       });
+      applyLockedMethodUI();
       ensureNavKeyAllowed();
     }
 
@@ -1038,6 +1060,7 @@
         if (ehp0) ehp0.innerHTML = '<div class="hint-empty">No hierarchical output</div>';
       }
 
+      if (s.lockedMethod === "kmeans" || s.lockedMethod === "hierarchical") _lockedMethod = s.lockedMethod;
       applyClusterMethodNav(s.clusterMethod);
       ensureNavKeyAllowed();
 
@@ -1221,10 +1244,10 @@
           moduleName: "Cluster analysis"
         });
         StatisticoHeader.initSidebarPage();
-        StatisticoHeader.updateTitle("K-means · Overview");
+        StatisticoHeader.updateTitle(_lockedMethod === "hierarchical" ? "Hierarchical · Overview" : "K-means · Overview");
       }
-      applyClusterMethodNav("kmeans");
-      switchClusterView("km-overview", true);
+      applyClusterMethodNav(_lockedMethod || "kmeans");
+      switchClusterView(_lockedMethod === "hierarchical" ? "hi-overview" : "km-overview", true);
       setDecimalPrecision();
       if (typeof Office !== "undefined" && typeof Office.onReady === "function") {
         Office.onReady(function() { initOfficeBridge(); });

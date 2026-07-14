@@ -12,6 +12,12 @@ function clusterCfg() {
   return {};
 }
 
+/** "kmeans" | "hierarchical" when running as a single-method module, else null. */
+function clusterLockedMethod() {
+  var m = window.CLUSTER_LOCKED_METHOD;
+  return m === "kmeans" || m === "hierarchical" ? m : null;
+}
+
 function onRangeDataLoaded(values, address) {
   const configureBtn = document.getElementById("configureClusterBtn");
   const hint = document.getElementById("hintText");
@@ -66,7 +72,7 @@ function readClusterSpec() {
         if (o.standardize === false) standardize = false;
         if (o.standardize === true) standardize = true;
         const linkage = o.linkage || def.linkage || "average";
-        const clusterMethod = o.clusterMethod === "hierarchical" ? "hierarchical" : "kmeans";
+        const clusterMethod = clusterLockedMethod() || (o.clusterMethod === "hierarchical" ? "hierarchical" : "kmeans");
         const an0 = clusterCfg().analysis || {};
         const distance = o.distance === "manhattan" ? "manhattan" : (o.distance || an0.distance || "euclidean");
         const out = { k, standardize, linkage, clusterMethod, distance };
@@ -83,7 +89,7 @@ function readClusterSpec() {
   k = Math.max(kMin, Math.min(kMax, k));
   const an1 = clusterCfg().analysis || {};
   const d0 = an1.distance === "manhattan" ? "manhattan" : "euclidean";
-  const m0 = String(def.clusterMethod || "kmeans").toLowerCase() === "hierarchical" ? "hierarchical" : "kmeans";
+  const m0 = clusterLockedMethod() || (String(def.clusterMethod || "kmeans").toLowerCase() === "hierarchical" ? "hierarchical" : "kmeans");
   return {
     k,
     standardize: def.standardize !== false,
@@ -113,7 +119,7 @@ function persistClusterSpec(spec) {
   if (spec.standardize === false) standardize = false;
   if (spec.standardize === true) standardize = true;
   const linkage = spec.linkage || def.linkage || "average";
-  const clusterMethod = spec.clusterMethod === "hierarchical" ? "hierarchical" : "kmeans";
+  const clusterMethod = clusterLockedMethod() || (spec.clusterMethod === "hierarchical" ? "hierarchical" : "kmeans");
   const an2 = clusterCfg().analysis || {};
   const distance = spec.distance === "manhattan" ? "manhattan" : (spec.distance || an2.distance || "euclidean");
   const obj = { k, standardize, linkage, clusterMethod, distance };
@@ -150,7 +156,8 @@ function pushClusterSetupPayload() {
         rows: setupRows,
         address: clusterRangeAddress || "",
         // Always open the builder fresh — saved spec is only used by results dialogs.
-        savedModelSpec: null
+        savedModelSpec: null,
+        lockedMethod: clusterLockedMethod()
       }
     }));
   } catch (e) {
@@ -514,7 +521,8 @@ function buildClusterBundle(headers, rows, spec) {
   const standardize = !(spec && spec.standardize === false);
   const linkage = (spec && spec.linkage) || "average";
   const cm = spec && spec.clusterMethod;
-  const clusterMethod = cm === "hierarchical" ? "hierarchical" : "kmeans";
+  const lockedMethod = clusterLockedMethod();
+  const clusterMethod = lockedMethod || (cm === "hierarchical" ? "hierarchical" : "kmeans");
   const an = clusterCfg().analysis || {};
   const distRaw = (spec && spec.distance) || an.distance || "euclidean";
   const metric = distRaw === "manhattan" ? "manhattan" : "euclidean";
@@ -531,6 +539,7 @@ function buildClusterBundle(headers, rows, spec) {
         standardize,
         linkage,
         clusterMethod,
+        lockedMethod,
         distanceMeasure: metric,
         variableLabels: names,
         verdict: "Insufficient numeric data",
@@ -549,26 +558,33 @@ function buildClusterBundle(headers, rows, spec) {
   const maxMergeRows = lim.maxHierarchicalMergeRowsDisplay != null ? Number(lim.maxHierarchicalMergeRowsDisplay) : 40;
 
   const workX = standardize ? standardise(X).Z : X.map((r) => r.slice());
-  const km = kmeans(workX, kReq, maxKmIter, metric);
-  const hi = hierarchicalCluster(workX, linkage, kReq, metric);
+  // Locked single-method modules only compute their own method.
+  const runKm = !lockedMethod || lockedMethod === "kmeans";
+  const runHi = !lockedMethod || lockedMethod === "hierarchical";
+  const km = runKm ? kmeans(workX, kReq, maxKmIter, metric) : null;
+  const hi = runHi ? hierarchicalCluster(workX, linkage, kReq, metric) : null;
 
   const maxShow = Math.min(maxAssign, n);
   const kmRows = [];
-  for (let i = 0; i < maxShow; i++) {
-    kmRows.push({ Case: i + 1, Cluster: km.labels[i] + 1 });
+  if (km) {
+    for (let i = 0; i < maxShow; i++) {
+      kmRows.push({ Case: i + 1, Cluster: km.labels[i] + 1 });
+    }
   }
   const hiRows = [];
-  for (let i = 0; i < maxShow; i++) {
-    hiRows.push({ Case: i + 1, Cluster: hi.labels[i] + 1 });
+  if (hi) {
+    for (let i = 0; i < maxShow; i++) {
+      hiRows.push({ Case: i + 1, Cluster: hi.labels[i] + 1 });
+    }
   }
 
-  const hiSizes = Array(km.kUsed).fill(0);
-  hi.labels.forEach((c) => { hiSizes[c]++; });
+  const hiK = hi && hi.labels.length ? Math.max.apply(null, hi.labels) + 1 : 0;
+  const hiSizes = Array(hiK).fill(0);
+  if (hi) hi.labels.forEach((c) => { hiSizes[c]++; });
 
-  const mergeShow = hi.merges.slice(-Math.min(maxMergeRows, hi.merges.length));
+  const mergeShow = hi ? hi.merges.slice(-Math.min(maxMergeRows, hi.merges.length)) : [];
 
-  const hiK = hi.labels.length ? Math.max.apply(null, hi.labels) + 1 : 0;
-  const hiProfileSeries = computeKmeansProfileSeries(X, hi.labels, hiK, p);
+  const hiProfileSeries = hi ? computeKmeansProfileSeries(X, hi.labels, hiK, p) : [];
 
   let R = [];
   if (p >= 2 && n >= 2) {
@@ -600,23 +616,24 @@ function buildClusterBundle(headers, rows, spec) {
   });
   const rawDataCols = ["#"].concat(names);
 
-  const profileSeries = computeKmeansProfileSeries(X, km.labels, km.kUsed, p);
+  const profileSeries = km ? computeKmeansProfileSeries(X, km.labels, km.kUsed, p) : [];
 
   return {
     summary: {
       variableCount: p,
       caseCount: n,
       missingRows,
-      k: km.kUsed,
+      k: km ? km.kUsed : (hi ? hi.kUsed : kReq),
       standardize,
       linkage,
       clusterMethod,
+      lockedMethod,
       distanceMeasure: metric,
       variableLabels: names,
       verdict: n >= kReq ? "Clustering run complete" : "Very small sample — interpret with caution",
       correlationMatrix: R
     },
-    kmeans: {
+    kmeans: km ? {
       iterations: km.iterations,
       wcss: km.wcss,
       sizes: km.sizes,
@@ -630,8 +647,8 @@ function buildClusterBundle(headers, rows, spec) {
         yLabel: "Mean z-score (pooled SD)",
         series: profileSeries
       }
-    },
-    hierarchical: {
+    } : null,
+    hierarchical: hi ? {
       linkage,
       sizes: hiSizes,
       mergeSteps: mergeShow,
@@ -646,7 +663,7 @@ function buildClusterBundle(headers, rows, spec) {
         yLabel: "Mean z-score (pooled SD)",
         series: hiProfileSeries
       }
-    },
+    } : null,
     rawData: {
       columns: rawDataCols,
       rows: rawDataRows,
@@ -660,7 +677,8 @@ function openClusterResultsDialogOnly() {
   if (!clusterRangeData || clusterRangeData.length < 2) return;
   const dlg = clusterCfg().dialog || {};
   const resultsFile = dlg.resultsFilename || "cluster/cluster-analysis.html";
-  const dialogUrl = `${getDialogsBaseUrl()}${resultsFile}?v=${Date.now()}`;
+  const lockParam = clusterLockedMethod();
+  const dialogUrl = `${getDialogsBaseUrl()}${resultsFile}?v=${Date.now()}${lockParam ? `&lockedMethod=${lockParam}` : ""}`;
   const hPct = dlg.heightPercent != null ? Number(dlg.heightPercent) : DIALOG_SIZES.RESULTS.height;
   const wPct = dlg.widthPercent != null ? Number(dlg.widthPercent) : DIALOG_SIZES.RESULTS.width;
 
@@ -736,15 +754,20 @@ window.openClusterResultsDialog = openClusterResultsDialog;
 window.readClusterSpec = readClusterSpec;
 window.saveClusterSpec = saveClusterSpec;
 
-(function (hubKey, fn) {
+(function () {
   window.StatisticoHubResults = window.StatisticoHubResults || {};
-  window.StatisticoHubResults[hubKey] = function () {
-    var gr = window.StatisticoGlobalRange && window.StatisticoGlobalRange.load();
-    if (!gr || !gr.values || gr.values.length < 2) return false;
-    return fn(gr);
-  };
-})('cluster', function (gr) {
-  onRangeDataLoaded(gr.values, gr.address);
-  openClusterResultsDialog();
-  return true;
-});
+  function makeRunner(lockedMethod) {
+    return function () {
+      var gr = window.StatisticoGlobalRange && window.StatisticoGlobalRange.load();
+      if (!gr || !gr.values || gr.values.length < 2) return false;
+      /* On the hub page this script is shared, so the lock is set per run. */
+      if (lockedMethod !== undefined) window.CLUSTER_LOCKED_METHOD = lockedMethod;
+      onRangeDataLoaded(gr.values, gr.address);
+      openClusterResultsDialog();
+      return true;
+    };
+  }
+  window.StatisticoHubResults.cluster = makeRunner(undefined);
+  window.StatisticoHubResults.kmeans = makeRunner("kmeans");
+  window.StatisticoHubResults.hierarchical = makeRunner("hierarchical");
+})();

@@ -343,6 +343,7 @@
     var _rows = [];
     var _address = '';
     var _saved = null;
+    var _lockedMethod = null; /* "kmeans" | "hierarchical" when opened from a single-method module */
     var columnStats = [];
     var selectedColumns = [];
     var draggedElement = null;
@@ -557,6 +558,29 @@
       renderVariables();
     }
 
+    function currentMethod() {
+      if (_lockedMethod) return _lockedMethod;
+      return qs('clusterMethod') ? qs('clusterMethod').value : 'kmeans';
+    }
+
+    function applyLockedMethodUI() {
+      if (!_lockedMethod) return;
+      var sel = qs('clusterMethod');
+      if (sel) {
+        sel.value = _lockedMethod;
+        sel.disabled = true;
+        var row = sel.closest('.opt-row');
+        if (row) row.style.display = 'none';
+      }
+      var isHi = _lockedMethod === 'hierarchical';
+      var title = qs('headerTitle');
+      if (title) title.textContent = isHi ? 'Hierarchical Clustering' : 'K-means Clustering';
+      var icon = qs('headerIcon');
+      if (icon) icon.className = isHi ? 'fa-solid fa-sitemap' : 'fa-solid fa-braille';
+      document.title = (isHi ? 'Hierarchical Clustering' : 'K-means Clustering') + ' Configuration';
+      updateMethodUI();
+    }
+
     function updateModelSummary() {
       var el = qs('modelSummary');
       if (!el) return;
@@ -565,13 +589,13 @@
         el.textContent = 'Drag numeric variables below — each row is one case, each column a measure';
         return;
       }
-      var method = qs('clusterMethod') ? qs('clusterMethod').value : 'kmeans';
+      var method = currentMethod();
       el.innerHTML = '<strong>' + n + '</strong> variable' + (n === 1 ? '' : 's') + ' selected · ' +
         (method === 'hierarchical' ? 'Hierarchical' : 'K-means') + ' clustering';
     }
 
     function updateMethodUI() {
-      var method = qs('clusterMethod') ? qs('clusterMethod').value : 'kmeans';
+      var method = currentMethod();
       var linkageRow = qs('linkageRow');
       if (linkageRow) linkageRow.style.display = method === 'hierarchical' ? '' : 'none';
       updateModelSummary();
@@ -616,7 +640,7 @@
 
     function applyOptionsFromSpec(spec) {
       if (!spec) return;
-      if (qs('clusterMethod')) qs('clusterMethod').value = spec.clusterMethod === 'hierarchical' ? 'hierarchical' : 'kmeans';
+      if (qs('clusterMethod') && !_lockedMethod) qs('clusterMethod').value = spec.clusterMethod === 'hierarchical' ? 'hierarchical' : 'kmeans';
       if (qs('clusterK')) {
         var k = parseInt(spec.k, 10);
         qs('clusterK').value = isFinite(k) ? String(Math.max(2, Math.min(50, k))) : '3';
@@ -704,7 +728,7 @@
         k: isFinite(kParsed) ? Math.max(2, Math.min(50, kParsed)) : 3,
         standardize: qs('clusterStandardize') ? qs('clusterStandardize').checked : true,
         linkage: qs('clusterLinkage') ? qs('clusterLinkage').value : 'average',
-        clusterMethod: qs('clusterMethod') && qs('clusterMethod').value === 'hierarchical' ? 'hierarchical' : 'kmeans',
+        clusterMethod: currentMethod() === 'hierarchical' ? 'hierarchical' : 'kmeans',
         distance: qs('clusterDistance') && qs('clusterDistance').value === 'manhattan' ? 'manhattan' : 'euclidean'
       };
       return spec;
@@ -750,7 +774,9 @@
       _rows = p.rows || [];
       _address = p.address || '';
       _saved = p.savedModelSpec || p.savedSpec || null;
+      _lockedMethod = (p.lockedMethod === 'kmeans' || p.lockedMethod === 'hierarchical') ? p.lockedMethod : null;
       initUI();
+      applyLockedMethodUI();
     }
 
     document.addEventListener('DOMContentLoaded', function() {

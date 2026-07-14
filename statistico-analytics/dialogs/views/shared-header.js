@@ -1608,7 +1608,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260716a',
+  _TAB_ASSET_VER: '20260716b',
 
   _ensurePlainTabUnderlineStyles() {
     const id = 'statistico-tab-underline-fix';
@@ -6033,7 +6033,7 @@ const StatisticoHeader = {
       'cluster-hi-profiles':
         'Read the profile line chart (one line per cluster at the chosen cut) with the centroid table below it. The Standardised / Raw means toggle switches both together: standardised shows mean z-scores colour-coded by sign, raw shows original units. The Original order / By separation toggle reorders variables by discriminatory power, putting the most cluster-separating variables first. Use this view to characterise what each hierarchical cluster represents.',
       'cluster-hi-map':
-        'This page combines the two separation views for the hierarchical solution at the chosen cut. TOP — the cluster map: each dot is a case coloured by its cluster, with larger semi-transparent markers at the centroids (mean vectors). PCA (auto) projects all variables onto the two directions preserving the most variance (axis percentages = share of variance; a dominant PC1 usually signals unstandardised inputs); Variables mode plots any two raw variables instead. Drag to zoom; click legend entries to isolate clusters. BOTTOM — the centroid-distance heatmap: pairwise distances between centroids on a blue scale, deeper blue meaning farther apart (better separated) and the palest cells marking the closest, least-distinct pairs. Read them together — a pale cell names the weakest pair, the map shows whether their members truly overlap — and cross-check ambiguous cases against the dendrogram\u2019s merge heights.'
+        'This page combines the two separation views for the hierarchical solution at the chosen cut. TOP — the cluster map: each dot is a case coloured by its cluster, with larger semi-transparent markers at the centroids (mean vectors). PCA (auto) projects all variables onto the two directions preserving the most variance (axis percentages = share of variance; a dominant PC1 usually signals unstandardised inputs); Variables mode plots any two raw variables instead. The Merge trails checkbox overlays the hierarchy above the cut: dashed amber connectors run from each pair of clusters to the centroid of their union, in the order the tree would merge them next — short connectors flag pairs that are nearly one group (what a smaller k would fuse), long connectors mean the cut separates genuinely distant groups. Drag to zoom; click legend entries to isolate clusters. BOTTOM — the centroid-distance heatmap: pairwise distances between centroids on a blue scale, deeper blue meaning farther apart (better separated) and the palest cells marking the closest, least-distinct pairs. Read them together — a pale cell names the weakest pair, the map shows whether their members truly overlap — and cross-check ambiguous cases against the dendrogram\u2019s merge heights.'
     };
     return docs[key] || `This ${moduleName} ${label} view summarizes the active analysis section. Use the visible controls, tables, and plots to understand the current model state and diagnostics.`;
   },
@@ -6122,7 +6122,7 @@ const StatisticoHeader = {
         + 'Describe the visual separation story: tightness of same-coloured groups, gaps or overlap between clusters, where the centers sit, what the PCA axis percentages imply, and which heatmap pairs are palest (closest — deeper blue means farther apart). '
         + 'Do not recite WCSS / silhouette / iteration numbers here — those belong to the Diagnostics view.',
       'cluster-hi-map':
-        'This is a two-part visual page for the hierarchical cut: an interactive scatter (cluster map) with a PCA/Variables axis toggle, plus a centroid-distance heatmap below it. '
+        'This is a two-part visual page for the hierarchical cut: an interactive scatter (cluster map) with a PCA/Variables axis toggle and an optional Merge trails overlay (dashed connectors showing which clusters the tree would merge next), plus a centroid-distance heatmap below it. '
         + 'Describe the visual separation story: cohesion and overlap of the coloured groups, centroid positions, what the PCA axis percentages imply, and which centroid pairs the heatmap flags as closest (palest cells — deeper blue means farther apart). '
         + 'Do not recite merge-step or silhouette numbers here — those belong to the Clusters and Diagnostics views.',
       'cluster-hi-dendrogram':

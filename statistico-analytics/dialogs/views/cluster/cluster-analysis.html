@@ -13,7 +13,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="../shared-header.css?v=20260714c"/>  <script src="../shared-brand-logo.js?v=20260601gauss"></script>
 
-  <script src="../shared-header.js?v=20260716a"></script>
+  <script src="../shared-header.js?v=20260716b"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -767,6 +767,7 @@
                     </span>
                     <select id="hiMapX" class="map-select" onchange="onMapControlChange('hi')" disabled title="X axis variable"></select>
                     <select id="hiMapY" class="map-select" onchange="onMapControlChange('hi')" disabled title="Y axis variable"></select>
+                    <label class="map-radio" title="Overlay the hierarchy above your cut: dashed connectors show which clusters would merge next and where their combined centroid lands"><input type="checkbox" id="hiMapTrails" onchange="onMapControlChange('hi')"><span>Merge trails</span></label>
                     <button type="button" class="map-help-btn" onclick="toggleMapHelp('hi')" title="About this chart"><i class="fa-solid fa-circle-question"></i></button>
                   </span>
                 </div>
@@ -777,6 +778,7 @@
                     <li>The larger semi-transparent circles mark each cluster's <strong>centroid</strong>.</li>
                     <li><strong>PCA (auto)</strong> projects all variables onto the two directions that preserve the most variance — the best flat view of the full variable space. The percentages on the axes show how much variance each component captures.</li>
                     <li><strong>Variables</strong> lets you plot any two original variables in their raw units instead.</li>
+                    <li><strong>Merge trails</strong> overlay the hierarchy above your cut: dashed connectors run from each pair of clusters to the centroid of their union, in the order the tree would merge them next. Short connectors between two clusters mean they are nearly one group — exactly the pairs a smaller <em>k</em> would fuse; long connectors mean the cut separates genuinely distant groups.</li>
                     <li>Well-separated clusters appear as tight same-coloured groups with clearly apart centroids. Heavy overlap suggests weak separation — compare with the dendrogram's merge heights.</li>
                     <li>The <strong>distance table below the map</strong> gives the exact centroid-to-centroid distances behind what you see here.</li>
                     <li>Drag to zoom into a region; click a legend entry to hide or show a cluster.</li>
@@ -1205,13 +1207,20 @@
       var vars = mapMode(target) === "vars";
       // Radio choice dims (not hides) the variable pickers so the option stays discoverable.
       [xSel, ySel].forEach(function(s) { if (s) s.disabled = !vars; });
-      // Center trails live in PC space only, so the toggle dims in Variables mode
-      // (and when the engine sent no trail history).
       var trailsBox = document.getElementById(target + "MapTrails");
       if (trailsBox) {
         var b = lastClusterBundle || {};
-        var hasTrails = !!(b.kmeans && b.kmeans.centroidTrails && b.kmeans.centroidTrails.length);
-        trailsBox.disabled = vars || !hasTrails;
+        if (target === "km") {
+          // K-means center trails live in PC space only, so the toggle dims in
+          // Variables mode (and when the engine sent no trail history).
+          var hasTrails = !!(b.kmeans && b.kmeans.centroidTrails && b.kmeans.centroidTrails.length);
+          trailsBox.disabled = vars || !hasTrails;
+        } else {
+          // Hierarchical merge trails are derived from the plotted coordinates,
+          // so they work in both PCA and Variables mode.
+          var hasMerges = !!(b.hierarchical && b.hierarchical.dendrogramMerges && b.hierarchical.dendrogramMerges.length);
+          trailsBox.disabled = !hasMerges;
+        }
       }
       if (!skipRender) renderClusterMap(target);
     }
@@ -1219,6 +1228,78 @@
     function toggleMapHelp(target) {
       var el = document.getElementById(target + "MapHelp");
       if (el) el.style.display = el.style.display === "none" ? "" : "none";
+    }
+
+    /* Hierarchical analogue of the K-means center trails: overlay the last
+       k−1 merges (the hierarchy above the cut) as dashed connectors from each
+       pair of groups to the centroid of their union. Centroids are means of
+       the plotted coordinates, so the overlay is exact for the current view. */
+    function buildMergeTrailSeries(hi, sc, usePca, xi, yi, m) {
+      var merges = hi.dendrogramMerges;
+      var n = hi.totalCases != null ? hi.totalCases : merges.length + 1;
+      var k = hi.sizes ? hi.sizes.length : 0;
+      if (!k || k < 2 || merges.length < k - 1) return [];
+
+      function ptFor(i) {
+        if (i >= m) return null;
+        var p = usePca ? sc.pcaScores[i] : [Number(sc.points[i][xi]), Number(sc.points[i][yi])];
+        return (p && isFinite(p[0]) && isFinite(p[1])) ? p : null;
+      }
+
+      // Mean plotted position of every case under a tree node. Iterative walk:
+      // single-linkage chains can be deep enough to overflow a recursive stack.
+      function centroidOf(nodeId) {
+        var sx = 0, sy = 0, cnt = 0;
+        var stack = [nodeId];
+        while (stack.length) {
+          var id = stack.pop();
+          if (id < n) {
+            var p = ptFor(id);
+            if (p) { sx += p[0]; sy += p[1]; cnt++; }
+          } else {
+            var mg = merges[id - n];
+            if (mg) { stack.push(mg.left); stack.push(mg.right); }
+          }
+        }
+        return cnt ? [sx / cnt, sy / cnt] : null;
+      }
+
+      var out = [];
+      var first = true;
+      for (var j = merges.length - (k - 1); j < merges.length; j++) {
+        if (j < 0) continue;
+        var mg = merges[j];
+        var cL = centroidOf(mg.left);
+        var cR = centroidOf(mg.right);
+        var cM = centroidOf(n + j);
+        if (!cL || !cR || !cM) continue;
+        var custom = { mergeHeight: mg.height, clustersAfter: n - mg.step };
+        [[cL, cM], [cR, cM]].forEach(function(seg) {
+          // Highcharts line series expect ascending x; segment direction is irrelevant.
+          var a = seg[0][0] <= seg[1][0] ? seg[0] : seg[1];
+          var bPt = seg[0][0] <= seg[1][0] ? seg[1] : seg[0];
+          out.push({
+            name: "Merge trails",
+            type: "line",
+            color: "rgba(251,191,36,.7)",
+            data: [
+              { x: a[0], y: a[1], custom: custom },
+              { x: bPt[0], y: bPt[1], custom: custom }
+            ],
+            dashStyle: "ShortDash",
+            lineWidth: 1.5,
+            opacity: 0.75,
+            marker: { enabled: true, radius: 3, symbol: "diamond" },
+            zIndex: 3,
+            // One legend entry toggles every merge connector together.
+            showInLegend: first,
+            linkedTo: first ? undefined : ":previous",
+            states: { inactive: { opacity: 0.15 } }
+          });
+          first = false;
+        });
+      }
+      return out;
     }
 
     function renderClusterMap(target) {
@@ -1318,6 +1399,13 @@
       // Center trails (K-means, PCA view): each center's walk from its random
       // seed to its final position, projected through the same PCA basis.
       var trailsBox = document.getElementById(target + "MapTrails");
+      // Merge trails (hierarchical): the hierarchy ABOVE the cut, drawn on the
+      // map — dashed connectors from each pair of groups to the centroid of
+      // their union, in the order the tree would merge them next. Derived from
+      // the plotted coordinates, so it works in PCA and Variables mode alike.
+      if (target === "hi" && trailsBox && trailsBox.checked && b.hierarchical && b.hierarchical.dendrogramMerges && b.hierarchical.dendrogramMerges.length) {
+        buildMergeTrailSeries(b.hierarchical, sc, usePca, xi, yi, m).forEach(function(s) { series.push(s); });
+      }
       var trails = target === "km" && b.kmeans ? b.kmeans.centroidTrails : null;
       if (usePca && trailsBox && trailsBox.checked && trails && trails.length) {
         var firstTrailAdded = false;
@@ -1362,7 +1450,9 @@
         tooltip: {
           pointFormatter: function() {
             var cl;
-            if (this.custom && this.custom.trailCluster) {
+            if (this.custom && this.custom.mergeHeight != null) {
+              cl = "Next merge \u2192 " + this.custom.clustersAfter + " cluster" + (this.custom.clustersAfter === 1 ? "" : "s") + " (at distance " + formatNumber(this.custom.mergeHeight) + ")";
+            } else if (this.custom && this.custom.trailCluster) {
               var step = this.custom.trailStep;
               cl = "C" + this.custom.trailCluster + " — " + (step === 0 ? "random start" : (step === this.custom.trailLast ? "final position" : "after iteration " + step));
             } else {

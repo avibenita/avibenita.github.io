@@ -22,15 +22,7 @@ const NAV_TEMPLATE = `
 <nav class="sticky-nav" id="stickyNav">
   <div class="nav-container">
     <a href="javascript:void(0)" class="nav-logo" id="nav-logo-link" aria-label="Statistico Interactive">
-      <img class="nav-logo-mark-img" src="/Statistico-Website/assets/statistico-logo-mark.png?v=2026-07-15-neon" alt="" aria-hidden="true" />
-      <span class="nav-logo-text">
-        <span class="nav-logo-name">STATISTICO</span>
-        <span class="nav-logo-subrow">
-          <span class="nav-logo-subline-el"></span>
-          <span class="nav-logo-sub">INTERACTIVE</span>
-          <span class="nav-logo-subline-el nav-logo-subline-el--end"></span>
-        </span>
-      </span>
+      <img class="nav-logo-full-img" src="/Statistico-Website/assets/statistico-logo-nav.png?v=2026-07-15-full" alt="Statistico Interactive" />
     </a>
 
     <ul class="nav-menu" id="navMenu">
@@ -208,102 +200,28 @@ const NAV_STYLE = `
 
 .nav-logo:hover { opacity: 0.88; }
 
-/* The bell-curve scene: framed as a premium badge, brightened for visibility */
-.nav-logo-mark-img {
-  height: 60px;
+/* Full artwork logo: dark canvas melts into the dark nav via screen blend */
+.nav-logo-full-img {
+  height: 64px;
   width: auto;
   display: block;
+  mix-blend-mode: screen;
+  filter: brightness(1.12) contrast(1.04);
+  transition: height 0.3s ease, filter 0.25s ease;
+}
+
+.nav-logo:hover .nav-logo-full-img {
+  filter: brightness(1.28) contrast(1.04);
+}
+
+:root[data-theme="light"] .nav-logo-full-img {
+  /* On light nav, present the artwork as a rounded dark card */
+  mix-blend-mode: normal;
   border-radius: 12px;
-  filter: brightness(1.22) saturate(1.1) contrast(1.04);
   box-shadow:
-    0 0 0 1px rgba(120, 200, 255, 0.32),
-    0 4px 16px rgba(20, 90, 200, 0.4),
-    0 0 22px rgba(45, 160, 255, 0.18);
-  transition: height 0.3s ease, box-shadow 0.25s ease;
-}
-
-.nav-logo:hover .nav-logo-mark-img {
-  box-shadow:
-    0 0 0 1px rgba(140, 212, 255, 0.5),
-    0 4px 18px rgba(20, 90, 200, 0.5),
-    0 0 28px rgba(45, 160, 255, 0.3);
-}
-
-/* Crisp DOM text instead of baked-in raster text */
-.nav-logo-text {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.nav-logo-name {
-  font-size: 1.36rem;
-  font-weight: 700;
-  letter-spacing: 0.27em;
-  line-height: 1;
-  white-space: nowrap;
-  background: linear-gradient(180deg, #ffffff 55%, #dbe9ff 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 2px 3px rgba(0, 10, 30, 0.55));
-  transition: font-size 0.3s ease;
-}
-
-.nav-logo-subrow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.nav-logo-subline-el {
-  flex: 1;
-  min-width: 14px;
-  height: 1px;
-  border-radius: 1px;
-  background: linear-gradient(90deg, transparent, rgba(165, 218, 255, 0.85));
-}
-
-.nav-logo-subline-el--end {
-  background: linear-gradient(90deg, rgba(165, 218, 255, 0.85), transparent);
-}
-
-.nav-logo-sub {
-  font-size: 0.66rem;
-  font-weight: 600;
-  letter-spacing: 0.52em;
-  margin-right: -0.52em; /* offset trailing letter-spacing so the row centers */
-  line-height: 1;
-  white-space: nowrap;
-  color: rgba(214, 233, 255, 0.9);
-  transition: font-size 0.3s ease;
-}
-
-:root[data-theme="light"] .nav-logo-name {
-  background: linear-gradient(180deg, #0f172a 30%, #1e4fa8 130%);
-  -webkit-background-clip: text;
-  background-clip: text;
+    0 0 0 1px rgba(37, 99, 235, 0.25),
+    0 6px 16px rgba(15, 23, 42, 0.24);
   filter: none;
-}
-
-:root[data-theme="light"] .nav-logo-sub {
-  color: rgba(29, 78, 216, 0.88);
-}
-
-:root[data-theme="light"] .nav-logo-subline-el {
-  background: linear-gradient(90deg, transparent, rgba(29, 78, 216, 0.55));
-}
-
-:root[data-theme="light"] .nav-logo-subline-el--end {
-  background: linear-gradient(90deg, rgba(29, 78, 216, 0.55), transparent);
-}
-
-:root[data-theme="light"] .nav-logo-mark-img {
-  box-shadow:
-    0 0 0 1px rgba(37, 99, 235, 0.28),
-    0 6px 16px rgba(15, 23, 42, 0.26);
 }
 
 /* Hide legacy logo remnants */
@@ -940,16 +858,8 @@ const NAV_STYLE = `
   height: 52px;
 }
 
-.sticky-nav.scrolled .nav-logo-mark-img {
-  height: 46px;
-}
-
-.sticky-nav.scrolled .nav-logo-name {
-  font-size: 1.12rem;
-}
-
-.sticky-nav.scrolled .nav-logo-sub {
-  font-size: 0.58rem;
+.sticky-nav.scrolled .nav-logo-full-img {
+  height: 50px;
 }
 
 .mobile-toggle {

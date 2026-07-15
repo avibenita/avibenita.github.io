@@ -22,42 +22,7 @@ const NAV_TEMPLATE = `
 <nav class="sticky-nav" id="stickyNav">
   <div class="nav-container">
     <a href="javascript:void(0)" class="nav-logo" id="nav-logo-link" aria-label="Statistico Interactive">
-      <svg class="nav-logo-svg" viewBox="0 -6 300 96" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Statistico Interactive">
-        <defs>
-          <linearGradient id="navLogoBlue" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stop-color="#2d76ff"/>
-            <stop offset="100%" stop-color="#0ea5e9"/>
-          </linearGradient>
-          <linearGradient id="navLogoTeal" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stop-color="#51f0dc"/>
-            <stop offset="100%" stop-color="#00a8b5"/>
-          </linearGradient>
-          <radialGradient id="navLogoSlider" cx="35%" cy="30%" r="70%">
-            <stop offset="0%" stop-color="#d7f3ff"/>
-            <stop offset="52%" stop-color="#6fb7ff"/>
-            <stop offset="100%" stop-color="#2d76ff"/>
-          </radialGradient>
-        </defs>
-
-        <g class="nav-logo-mark">
-          <path d="M58 15 C58 6 47 2 35 2 C19 2 8 12 8 25 C8 37 19 43 35 43"
-                stroke="url(#navLogoBlue)" stroke-width="10" fill="none" stroke-linecap="round"/>
-          <path d="M35 43 C51 43 64 49 64 61 C64 75 51 82 35 82 C20 82 10 75 9 64"
-                stroke="url(#navLogoBlue)" stroke-width="10" fill="none" stroke-linecap="round"/>
-          <rect class="nav-logo-bar nav-logo-bar--1" x="18" y="51" width="8" height="24" rx="2" fill="url(#navLogoTeal)"/>
-          <rect class="nav-logo-bar nav-logo-bar--2" x="30" y="43" width="8" height="32" rx="2" fill="url(#navLogoTeal)"/>
-          <rect class="nav-logo-bar nav-logo-bar--3" x="42" y="34" width="8" height="41" rx="2" fill="url(#navLogoTeal)"/>
-          <rect class="nav-logo-bar nav-logo-bar--4" x="54" y="25" width="8" height="50" rx="2" fill="url(#navLogoTeal)"/>
-        </g>
-
-        <text x="88" y="37" class="nav-logo-title" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="800" letter-spacing="7">STATISTICO</text>
-        <g class="nav-logo-subtitle-row">
-          <line class="nav-logo-subline" x1="92" y1="63" x2="118" y2="63"/>
-          <text x="191" y="68" class="nav-logo-subtitle" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="800" letter-spacing="4.6" text-anchor="middle">INTERACTIVE</text>
-          <line class="nav-logo-subline" x1="264" y1="63" x2="296" y2="63"/>
-          <circle class="nav-logo-slider-knob" cx="282" cy="63" r="5.2"/>
-        </g>
-      </svg>
+      <img class="nav-logo-img" src="/Statistico-Website/assets/statistico-interactive.svg?v=2026-07-15" alt="Statistico Interactive" />
     </a>
 
     <ul class="nav-menu" id="navMenu">
@@ -224,8 +189,8 @@ const NAV_STYLE = `
   align-items: center;
   justify-content: flex-start;
   margin-right: 22px;
-  width: 230px;
-  height: 58px;
+  width: 170px;
+  height: 66px;
   transition: opacity 0.2s ease;
   flex-shrink: 0;
   position: relative;
@@ -234,96 +199,21 @@ const NAV_STYLE = `
 
 .nav-logo:hover { opacity: 0.85; }
 
-.nav-logo-svg {
+.nav-logo-img {
   position: absolute;
   left: 0;
   top: 50%;
-  width: 230px;
-  height: 70px;
-  max-width: none;
+  height: 66px;
+  width: auto;
   transform: translateY(-50%);
   display: block;
-  overflow: visible;
-  transition: height 0.3s ease, width 0.3s ease;
+  border-radius: 9px;
+  transition: height 0.3s ease;
 }
 
-.nav-logo-title,
-.nav-logo-subtitle {
-  fill: #ffffff;
-}
-
-.nav-logo-subtitle {
-  opacity: 0.96;
-}
-
-.nav-logo-subline {
-  stroke: #ffffff;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  opacity: 0.9;
-}
-
-.nav-logo-slider-knob {
-  fill: url(#navLogoSlider);
-  stroke: rgba(255,255,255,0.74);
-  stroke-width: 1;
-  filter: drop-shadow(0 0 4px rgba(111,183,255,.62));
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-/* Logo mark: bars grow upward on load (ease-out curve, staggered) */
-.nav-logo-bar {
-  transform: scaleY(0);
-  transform-origin: bottom center;
-  transform-box: fill-box;
-  animation: navLogoBarGrow 0.72s cubic-bezier(0.22, 0.82, 0.28, 1) forwards;
-}
-.nav-logo-bar--1 { animation-delay: 0.06s; }
-.nav-logo-bar--2 { animation-delay: 0.14s; }
-.nav-logo-bar--3 { animation-delay: 0.22s; }
-.nav-logo-bar--4 { animation-delay: 0.30s; }
-
-@keyframes navLogoBarGrow {
-  from {
-    transform: scaleY(0);
-    opacity: 0.92;
-  }
-  to {
-    transform: scaleY(1);
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .nav-logo-bar {
-    animation: none !important;
-    transform: scaleY(1) !important;
-    opacity: 1 !important;
-  }
-}
-
-.nav-logo:hover .nav-logo-slider-knob {
-  animation: navLogoSliderNudge .9s ease-in-out;
-}
-
-@keyframes navLogoSliderNudge {
-  0%, 100% { transform: translateX(0); }
-  45% { transform: translateX(7px); }
-}
-
-:root[data-theme="light"] .nav-logo-title,
-:root[data-theme="light"] .nav-logo-subtitle {
-  fill: #06152a;
-}
-
-:root[data-theme="light"] .nav-logo-subline {
-  stroke: #06152a;
-  opacity: 0.82;
-}
-
-:root[data-theme="light"] .nav-logo-slider-knob {
-  stroke: rgba(6,21,42,0.42);
+/* Baked-in navy background: frame it as a badge so it sits well on both themes */
+:root[data-theme="light"] .nav-logo-img {
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.22);
 }
 
 /* Hide legacy logo remnants */
@@ -957,13 +847,12 @@ const NAV_STYLE = `
 
 .sticky-nav.scrolled .nav-logo {
   opacity: 1;
-  width: 190px;
-  height: 46px;
+  width: 135px;
+  height: 52px;
 }
 
-.sticky-nav.scrolled .nav-logo-svg {
-  width: 190px;
-  height: 60px;
+.sticky-nav.scrolled .nav-logo-img {
+  height: 52px;
 }
 
 .mobile-toggle {

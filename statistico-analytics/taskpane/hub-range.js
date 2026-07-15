@@ -188,7 +188,10 @@
     var addrEl = document.getElementById("hubRangeBadgeText");
     var okIcon = document.getElementById("hubRangeOkIcon");
     var bar = document.getElementById("hubWdataBar");
-    if (addrEl) addrEl.textContent = text;
+    if (addrEl) {
+      addrEl.textContent = text;
+      addrEl.title = text;
+    }
     if (okIcon) {
       var pending = /loading|detecting/i.test(text);
       okIcon.style.display = isError || pending ? "none" : "";

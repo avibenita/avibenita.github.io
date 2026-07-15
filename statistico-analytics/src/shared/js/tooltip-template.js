@@ -202,11 +202,14 @@
     node.setAttribute('data-visible', '0');
     node.style.left = '-9999px';
     node.style.top = '-9999px';
+    activeAnchor = anchor;
     requestAnimationFrame(() => {
+      // A hide() may have run since this frame was scheduled (e.g. a modal
+      // opened); showing anyway would strand a tooltip nothing can dismiss.
+      if (activeAnchor !== anchor) return;
       positionTooltip(anchor, node);
       node.setAttribute('data-visible', '1');
     });
-    activeAnchor = anchor;
   }
 
   function hide() {
@@ -243,7 +246,12 @@
   }
 
   function handlePointerMove(ev) {
-    if (!activeAnchor) return;
+    if (!activeAnchor) {
+      // Safety net: a visible tooltip with no active anchor is orphaned.
+      const node = document.getElementById(TOOLTIP_ID);
+      if (node && node.getAttribute('data-visible') === '1') hide();
+      return;
+    }
     if (moveCheckRaf) return;
     moveCheckRaf = requestAnimationFrame(() => {
       moveCheckRaf = null;
@@ -283,6 +291,9 @@
     document.addEventListener('pointerover', handlePointerOver, true);
     document.addEventListener('pointerout', handlePointerOut, true);
     document.addEventListener('pointermove', handlePointerMove, true);
+    // Clicking an anchor triggers its action (often a modal): retire the tooltip.
+    document.addEventListener('pointerdown', hide, true);
+    document.addEventListener('mousedown', hide, true);
 
     // Fallback for environments without reliable pointer events
     document.addEventListener('mouseover', handlePointerOver, true);

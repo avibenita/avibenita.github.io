@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Filter Sandbox (Temporary)</title>
+  <link rel="stylesheet" href="uni-filter-shared.css?v=20260522u" />
+  <style>
+    :root {
+      --surface-0: #0c1624;
+      --surface-1: #1a1f2e;
+      --surface-2: #242938;
+      --border: #3a4458;
+      --accent-1: #ffa578;
+      --text-primary: #e7edf8;
+      --text-secondary: #b7c2d8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: var(--surface-0);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      gap: 12px;
+    }
+    .panel {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .title {
+      font-weight: 700;
+      color: var(--accent-1);
+      letter-spacing: 0.02em;
+    }
+    .btns {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    button {
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-primary);
+      padding: 7px 10px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    button.primary {
+      background: rgba(255, 165, 120, 0.18);
+      border-color: rgba(255, 165, 120, 0.6);
+      color: #ffd9c4;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 8px;
+    }
+    .card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .card .k { font-size: 11px; color: var(--text-secondary); }
+    .card .v { font-size: 18px; font-weight: 700; margin-top: 2px; }
+    .grid-wrap {
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      max-height: 46vh;
+      background: var(--surface-2);
+    }
+    table {
+      border-collapse: collapse;
+      width: max-content;
+      min-width: 100%;
+      font-size: 12px;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 6px 8px;
+      white-space: nowrap;
+      text-align: left;
+    }
+    thead th {
+      position: sticky;
+      top: 0;
+      background: #1d2940;
+      z-index: 1;
+      color: #ffe7d9;
+    }
+    .muted { color: var(--text-secondary); font-size: 12px; }
+
+    .sb-ai-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.52);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+      z-index: 9999;
+    }
+    .sb-ai-overlay.sb-ai-overlay--visible { display: flex; }
+    .sb-ai-panel {
+      width: min(1080px, 97vw);
+      max-height: 90vh;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div class="panel topbar">
+    <div>
+      <div class="title">Temporary Filter Sandbox</div>
+      <div class="muted">Standalone page for filter workflow validation only</div>
+    </div>
+    <div class="btns">
+      <button class="primary" id="openFilterBtn">Open Filter</button>
+      <button id="resetBtn">Reset Dataset</button>
+    </div>
+  </div>
+
+  <div class="panel stats">
+    <div class="card"><div class="k">Total Rows</div><div class="v" id="totalRows">0</div></div>
+    <div class="card"><div class="k">Applied Rows</div><div class="v" id="appliedRows">0</div></div>
+    <div class="card"><div class="k">Columns</div><div class="v" id="totalCols">0</div></div>
+    <div class="card"><div class="k">Last Apply</div><div class="v" id="lastApply" style="font-size:13px;">Never</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="muted" id="statusLine">Press "Open Filter" to filter source rows.</div>
+  </div>
+
+  <div class="panel">
+    <div class="title" style="font-size:13px;margin-bottom:8px;">Applied Dataset (Frozen)</div>
+    <div class="grid-wrap">
+      <table id="appliedTable"></table>
+    </div>
+  </div>
+
+  <div class="sb-ai-overlay" id="uniFilterOverlay" onclick="UniRowFilter.close(event)">
+    <div class="sb-ai-panel" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-1);">
+          Filter Source Range
+        </span>
+        <button type="button" onclick="UniRowFilter.close()">×</button>
+      </div>
+      <div class="uni-filt-help-panel">
+        <h4>Step-by-step</h4>
+        <ol>
+          <li>Click <strong>▼</strong> on any column header.</li>
+          <li>Select values and click <strong>OK</strong> to preview.</li>
+          <li>Click <strong>Finish &amp; Apply</strong> to freeze filtered rows.</li>
+        </ol>
+      </div>
+      <div class="uni-filt-toolbar">
+        <div class="uni-filt-summary" id="uniFilterSummary">Filter rows from the sandbox dataset.</div>
+        <button type="button" class="uni-filt-clear-btn" onclick="UniRowFilter.clearAll()">Clear all filters</button>
+      </div>
+      <div id="uniFilterContent" style="overflow:auto;flex:1;min-height:0;max-height:none;border:1px solid rgba(148,163,184,.25);border-radius:8px;"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">
+        <button type="button" onclick="UniRowFilter.close()">Exit</button>
+        <button type="button" id="uniFilterApplyBtn" class="primary" onclick="UniRowFilter.finishAndClose()">Finish &amp; Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="uni-row-filter.js?v=20260522u"></script>
+  <script>
+    (function () {
+      var headers = [
+        "ID", "Plant", "Family", "Gender", "FDW", "Seniority", "Age",
+        "Department", "SubDept", "Role", "Degree", "Email", "Mobile"
+      ];
+      var allRows = [];
+      var appliedRows = [];
+
+      function buildSeedData() {
+        var plants = ["Jerusalem", "Tel Aviv", "Haifa", "Beer Sheva"];
+        var families = ["Ops", "HR", "Sales", "R&D", "Support"];
+        var genders = ["M", "F"];
+        var depts = ["Logistics", "Finance", "Admin", "Engineering"];
+        var roles = ["Manager", "Analyst", "Coordinator", "Lead"];
+        allRows = [];
+        for (var i = 1; i <= 180; i++) {
+          allRows.push([
+            i,
+            plants[i % plants.length],
+            families[i % families.length],
+            genders[i % genders.length],
+            35000 + (i * 137) % 18000,
+            (i % 30) + 1,
+            22 + (i % 41),
+            depts[i % depts.length],
+            "S" + ((i % 9) + 1),
+            roles[i % roles.length],
+            ["BA", "MA", "PhD"][i % 3],
+            "u" + i + "@company.test",
+            "05" + (10000000 + i)
+          ]);
+        }
+        appliedRows = allRows.slice();
+      }
+
+      function esc(v) {
+        return String(v == null ? "" : v)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      function renderAppliedTable() {
+        var table = document.getElementById("appliedTable");
+        var head = "<thead><tr>" + headers.map(function (h) { return "<th>" + esc(h) + "</th>"; }).join("") + "</tr></thead>";
+        var bodyRows = appliedRows.slice(0, 400).map(function (row) {
+          return "<tr>" + row.map(function (cell) { return "<td>" + esc(cell) + "</td>"; }).join("") + "</tr>";
+        }).join("");
+        var note = appliedRows.length > 400
+          ? "<tr><td colspan='" + headers.length + "' class='muted'>Showing first 400 applied rows.</td></tr>"
+          : "";
+        table.innerHTML = head + "<tbody>" + bodyRows + note + "</tbody>";
+      }
+
+      function renderStats() {
+        document.getElementById("totalRows").textContent = String(allRows.length);
+        document.getElementById("appliedRows").textContent = String(appliedRows.length);
+        document.getElementById("totalCols").textContent = String(headers.length);
+      }
+
+      function stampApplied() {
+        var t = new Date();
+        document.getElementById("lastApply").textContent = t.toLocaleTimeString();
+      }
+
+      function status(text) {
+        document.getElementById("statusLine").textContent = text;
+      }
+
+      function initFilterEngine() {
+        UniRowFilter.init({
+          headers: headers,
+          rows: allRows,
+          columnIndex: 0,
+          onApply: function (rows) {
+            appliedRows = rows.slice();
+            renderStats();
+            renderAppliedTable();
+            stampApplied();
+            status("Applied " + appliedRows.length + " rows from filter.");
+          }
+        });
+      }
+
+      document.getElementById("openFilterBtn").addEventListener("click", function () {
+        status("Filtering in progress. Use Finish & Apply to freeze results.");
+        UniRowFilter.open();
+      });
+
+      document.getElementById("resetBtn").addEventListener("click", function () {
+        buildSeedData();
+        initFilterEngine();
+        renderStats();
+        renderAppliedTable();
+        status("Dataset reset. All rows restored.");
+      });
+
+      buildSeedData();
+      initFilterEngine();
+      renderStats();
+      renderAppliedTable();
+    })();
+  </script>
+</body>
+</html>

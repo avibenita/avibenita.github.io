@@ -35,6 +35,16 @@
     + '<path class="sb-logo-gauss-shadow" d="' + LOGO_GAUSS_CURVE + '" stroke="#001838" stroke-width="6.5" fill="none" stroke-linecap="round" opacity="0.38" transform="translate(2.2,2.8)"/>'
     + '<path class="sb-logo-gauss-curve" d="' + LOGO_GAUSS_CURVE + '" stroke="url(#sbLogoBlue)" stroke-width="4.8" fill="none" stroke-linecap="round" filter="url(#sbLogoCurveShadow)"/>'
     + '<path class="sb-logo-gauss-mean" d="M38 16 V76" stroke="url(#sbLogoBlue)" stroke-width="1.8" stroke-linecap="round" opacity="0.38"/>'
+    /* Subtle human element: a tiny analyst seated at a desk, tucked under the
+       right slope of the curve. Thin strokes + low opacity keep it a quiet
+       detail rather than a second mark. */
+    + '<g class="sb-logo-human" stroke="url(#sbLogoBlue)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.5">'
+    + '<circle cx="45" cy="59.5" r="2.3" fill="url(#sbLogoBlue)" stroke="none"/>'
+    + '<path d="M45 62.2 V68.5 L50 68.5 V76"/>'
+    + '<path d="M45.2 64.2 L51 66.9"/>'
+    + '<path d="M51.5 68.4 H58.5 M57 68.4 V76"/>'
+    + '<path d="M53.5 68.2 L55.8 63.6"/>'
+    + '</g>'
     + '</g>'
     + '<text x="89.5" y="38.5" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="800" letter-spacing="7" fill="#00060f" opacity="0.5">STATISTICO</text>'
     + '<text x="88" y="37" class="sb-logo-title" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="800" letter-spacing="7">STATISTICO</text>'

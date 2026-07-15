@@ -238,12 +238,12 @@ const NAV_STYLE = `
 }
 
 .nav-logo-name {
-  font-size: 1.34rem;
-  font-weight: 800;
-  letter-spacing: 0.2em;
+  font-size: 1.36rem;
+  font-weight: 700;
+  letter-spacing: 0.27em;
   line-height: 1;
   white-space: nowrap;
-  background: linear-gradient(180deg, #ffffff 38%, #b9dcff 100%);
+  background: linear-gradient(180deg, #ffffff 55%, #dbe9ff 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -271,13 +271,13 @@ const NAV_STYLE = `
 }
 
 .nav-logo-sub {
-  font-size: 0.64rem;
-  font-weight: 700;
-  letter-spacing: 0.4em;
-  margin-right: -0.4em; /* offset trailing letter-spacing so the row centers */
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.52em;
+  margin-right: -0.52em; /* offset trailing letter-spacing so the row centers */
   line-height: 1;
   white-space: nowrap;
-  color: rgba(172, 218, 255, 0.94);
+  color: rgba(214, 233, 255, 0.9);
   transition: font-size 0.3s ease;
 }
 

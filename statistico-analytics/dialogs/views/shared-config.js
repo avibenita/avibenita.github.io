@@ -128,6 +128,13 @@
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  // The rich hover tooltip must not linger under modal overlays.
+  function hideTooltip() {
+    if (window.StatisticoTooltip && typeof window.StatisticoTooltip.hide === 'function') {
+      window.StatisticoTooltip.hide();
+    }
+  }
+
   /* ── localStorage helpers ─────────────────────────────────────────────── */
   function getSavedList(storageKey) {
     try { return JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch (_) { return []; }
@@ -182,6 +189,7 @@
   /* ── Prompt dialog (replaces blocked window.prompt) ──────────────────── */
   function showCfgPrompt(title, label, defaultVal, onConfirm) {
     if (document.getElementById('cfgPromptOverlay')) return;
+    hideTooltip();
     var overlay = document.createElement('div');
     overlay.id = 'cfgPromptOverlay';
     overlay.className = 'cfg-prompt-overlay';
@@ -221,6 +229,7 @@
   /* ── Saved-list dialog ────────────────────────────────────────────────── */
   function showCfgSavedList(storageKey, buildMeta, onLoad) {
     if (document.getElementById('cfgSavedOverlay')) return;
+    hideTooltip();
     var saved = getSavedList(storageKey);
     var overlay = document.createElement('div');
     overlay.id = 'cfgSavedOverlay';

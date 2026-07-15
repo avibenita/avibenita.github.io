@@ -22,7 +22,15 @@ const NAV_TEMPLATE = `
 <nav class="sticky-nav" id="stickyNav">
   <div class="nav-container">
     <a href="javascript:void(0)" class="nav-logo" id="nav-logo-link" aria-label="Statistico Interactive">
-      <img class="nav-logo-img" src="/Statistico-Website/assets/statistico-interactive.svg?v=2026-07-15" alt="Statistico Interactive" />
+      <img class="nav-logo-mark-img" src="/Statistico-Website/assets/statistico-logo-mark.png?v=2026-07-15" alt="" aria-hidden="true" />
+      <span class="nav-logo-text">
+        <span class="nav-logo-name">STATISTICO</span>
+        <span class="nav-logo-subrow">
+          <span class="nav-logo-subline-el"></span>
+          <span class="nav-logo-sub">INTERACTIVE</span>
+          <span class="nav-logo-subline-el nav-logo-subline-el--end"></span>
+        </span>
+      </span>
     </a>
 
     <ul class="nav-menu" id="navMenu">
@@ -188,8 +196,9 @@ const NAV_STYLE = `
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  margin-right: 22px;
-  width: 170px;
+  gap: 13px;
+  margin-right: 26px;
+  width: auto;
   height: 66px;
   transition: opacity 0.2s ease;
   flex-shrink: 0;
@@ -197,23 +206,104 @@ const NAV_STYLE = `
   overflow: visible;
 }
 
-.nav-logo:hover { opacity: 0.85; }
+.nav-logo:hover { opacity: 0.88; }
 
-.nav-logo-img {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  height: 66px;
+/* The bell-curve scene: framed as a premium badge, brightened for visibility */
+.nav-logo-mark-img {
+  height: 60px;
   width: auto;
-  transform: translateY(-50%);
   display: block;
-  border-radius: 9px;
-  transition: height 0.3s ease;
+  border-radius: 12px;
+  filter: brightness(1.22) saturate(1.1) contrast(1.04);
+  box-shadow:
+    0 0 0 1px rgba(120, 200, 255, 0.32),
+    0 4px 16px rgba(20, 90, 200, 0.4),
+    0 0 22px rgba(45, 160, 255, 0.18);
+  transition: height 0.3s ease, box-shadow 0.25s ease;
 }
 
-/* Baked-in navy background: frame it as a badge so it sits well on both themes */
-:root[data-theme="light"] .nav-logo-img {
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.22);
+.nav-logo:hover .nav-logo-mark-img {
+  box-shadow:
+    0 0 0 1px rgba(140, 212, 255, 0.5),
+    0 4px 18px rgba(20, 90, 200, 0.5),
+    0 0 28px rgba(45, 160, 255, 0.3);
+}
+
+/* Crisp DOM text instead of baked-in raster text */
+.nav-logo-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.nav-logo-name {
+  font-size: 1.34rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  line-height: 1;
+  white-space: nowrap;
+  background: linear-gradient(180deg, #ffffff 38%, #b9dcff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 3px rgba(0, 10, 30, 0.55));
+  transition: font-size 0.3s ease;
+}
+
+.nav-logo-subrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-logo-subline-el {
+  flex: 1;
+  min-width: 14px;
+  height: 1px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, transparent, rgba(165, 218, 255, 0.85));
+}
+
+.nav-logo-subline-el--end {
+  background: linear-gradient(90deg, rgba(165, 218, 255, 0.85), transparent);
+}
+
+.nav-logo-sub {
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.4em;
+  margin-right: -0.4em; /* offset trailing letter-spacing so the row centers */
+  line-height: 1;
+  white-space: nowrap;
+  color: rgba(172, 218, 255, 0.94);
+  transition: font-size 0.3s ease;
+}
+
+:root[data-theme="light"] .nav-logo-name {
+  background: linear-gradient(180deg, #0f172a 30%, #1e4fa8 130%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: none;
+}
+
+:root[data-theme="light"] .nav-logo-sub {
+  color: rgba(29, 78, 216, 0.88);
+}
+
+:root[data-theme="light"] .nav-logo-subline-el {
+  background: linear-gradient(90deg, transparent, rgba(29, 78, 216, 0.55));
+}
+
+:root[data-theme="light"] .nav-logo-subline-el--end {
+  background: linear-gradient(90deg, rgba(29, 78, 216, 0.55), transparent);
+}
+
+:root[data-theme="light"] .nav-logo-mark-img {
+  box-shadow:
+    0 0 0 1px rgba(37, 99, 235, 0.28),
+    0 6px 16px rgba(15, 23, 42, 0.26);
 }
 
 /* Hide legacy logo remnants */
@@ -847,12 +937,19 @@ const NAV_STYLE = `
 
 .sticky-nav.scrolled .nav-logo {
   opacity: 1;
-  width: 135px;
   height: 52px;
 }
 
-.sticky-nav.scrolled .nav-logo-img {
-  height: 52px;
+.sticky-nav.scrolled .nav-logo-mark-img {
+  height: 46px;
+}
+
+.sticky-nav.scrolled .nav-logo-name {
+  font-size: 1.12rem;
+}
+
+.sticky-nav.scrolled .nav-logo-sub {
+  font-size: 0.58rem;
 }
 
 .mobile-toggle {

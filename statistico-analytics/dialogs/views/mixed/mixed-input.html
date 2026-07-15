@@ -2097,6 +2097,61 @@ function putSavedModels(arr) {
   try { localStorage.setItem(MX_SAVED_KEY, JSON.stringify(arr)); } catch(e) {}
 }
 
+// Analysis options live in the DOM (Advanced panel); snapshot them for save
+// and push them back on load so a config restores the full setup, not just
+// the variable assignments.
+function collectOptionsFromDom() {
+  return {
+    method:       qs('optMethod').value,
+    df:           qs('optDF').value,
+    alpha:        qs('optAlpha').value,
+    covG:         qs('optCovG').value,
+    covR:         qs('optCovR').value,
+    pAdj:         qs('optPAdj').value,
+    typeIII:      qs('chkTypeIII').checked,
+    coefficients: qs('chkCoeffs').checked,
+    varComp:      qs('chkVarComp').checked,
+    emm:          qs('chkEMM').checked,
+    pairwise:     qs('chkPairwise').checked,
+    blup:         qs('chkBLUP').checked,
+    residuals:    qs('chkResid').checked,
+    ic:           qs('chkIC').checked,
+    pseudoR2:     qs('chkPseudoR2').checked
+  };
+}
+
+function applyOptionsToDom(o) {
+  if (!o) return;
+  function setSel(id, v) {
+    var el = qs(id);
+    if (el && v != null && String(v) !== '' &&
+        Array.prototype.some.call(el.options, function(op){ return op.value === String(v); })) {
+      el.value = String(v);
+    }
+  }
+  function setChk(id, v) {
+    var el = qs(id);
+    if (el && typeof v === 'boolean') el.checked = v;
+  }
+  setSel('optMethod', o.method);
+  setSel('optDF', o.df);
+  setSel('optAlpha', o.alpha);
+  setSel('optCovG', o.covG);
+  setSel('optCovR', o.covR);
+  setSel('optPAdj', o.pAdj);
+  setChk('chkTypeIII', o.typeIII);
+  setChk('chkCoeffs', o.coefficients);
+  setChk('chkVarComp', o.varComp);
+  setChk('chkEMM', o.emm);
+  setChk('chkPairwise', o.pairwise);
+  setChk('chkBLUP', o.blup);
+  setChk('chkResid', o.residuals);
+  setChk('chkIC', o.ic);
+  setChk('chkPseudoR2', o.pseudoR2);
+  var pAdjSection = document.getElementById('pAdjSection');
+  if (pAdjSection) pAdjSection.style.display = qs('chkPairwise').checked ? '' : 'none';
+}
+
 function saveModelSpec() {
   var a = STATE.assignments;
   if (!a.dep) { showToast('Choose an outcome variable before saving.', 'warning'); return; }
@@ -2124,7 +2179,8 @@ function saveModelSpec() {
         rep: a.rep,
         interactions:  (a.interactions  || []).map(function(i){ return {v1:i.v1,v2:i.v2}; }),
         randomSlopes:  (a.randomSlopes  || []).slice(),
-        options:       JSON.parse(JSON.stringify(STATE.options || {}))
+        repFixedAuto:  !!a.repFixedAuto,
+        options:       collectOptionsFromDom()
       }
     };
     saved.unshift(entry);
@@ -2283,17 +2339,31 @@ function loadSavedModel(id) {
   if (!item || !item.modelSpec) { showToast('Model not found.', 'error'); return; }
 
   var spec = item.modelSpec;
-  // Reset state
+  // Only restore variables that still exist in the current sheet — a config
+  // saved against an older sheet must not create phantom assignments.
+  function exists(name) { return !!(name && STATE.variableStats && STATE.variableStats[name]); }
+  var dropped = [];
+  function keep(name) {
+    if (exists(name)) return true;
+    if (name) dropped.push(name);
+    return false;
+  }
   STATE.assignments = {
-    dep: spec.dep || null,
-    fix: (spec.fix || []).slice(),
-    cov: (spec.cov || []).slice(),
-    rnd: spec.rnd || null,
-    rep: spec.rep || null,
-    interactions: (spec.interactions || []).map(function(i){ return {v1:i.v1,v2:i.v2}; }),
-    randomSlopes: (spec.randomSlopes || []).slice()
+    dep: keep(spec.dep) ? spec.dep : null,
+    fix: (spec.fix || []).filter(keep),
+    cov: (spec.cov || []).filter(keep),
+    rnd: keep(spec.rnd) ? spec.rnd : null,
+    rep: keep(spec.rep) ? spec.rep : null,
+    interactions: (spec.interactions || [])
+      .filter(function(i){ return exists(i.v1) && exists(i.v2); })
+      .map(function(i){ return {v1:i.v1,v2:i.v2}; }),
+    randomSlopes: (spec.randomSlopes || []).filter(exists),
+    repFixedAuto: !!spec.repFixedAuto
   };
-  if (spec.options) STATE.options = JSON.parse(JSON.stringify(spec.options));
+  applyOptionsToDom(spec.options);
+  if (dropped.length) {
+    showToast('Not in current sheet, skipped: ' + dropped.join(', '), 'warning', 4500);
+  }
 
   refreshAllZones();
   refreshInteractionUI();

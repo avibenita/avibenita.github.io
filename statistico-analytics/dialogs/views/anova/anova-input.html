@@ -718,12 +718,17 @@
 
   function applySpec(spec) {
     if (!spec) return;
+    // Only restore names that still exist in the current sheet, so a config
+    // saved against different data cannot create phantom assignments.
+    function exists(name) {
+      return !!(name && columnStats.some(function(s) { return s.name === name; }));
+    }
     assignments = { dv: null, factors: [], conditions: [], mode: 'between' };
     if (spec.type === 'repeated') assignments.mode = 'repeated';
-    if (spec.dv) assignments.dv = spec.dv;
-    if (spec.factor1) assignments.factors.push(spec.factor1);
-    if (spec.factor2 && assignments.factors.indexOf(spec.factor2) < 0) assignments.factors.push(spec.factor2);
-    if (spec.conditions && spec.conditions.length) assignments.conditions = spec.conditions.slice();
+    if (exists(spec.dv)) assignments.dv = spec.dv;
+    if (exists(spec.factor1)) assignments.factors.push(spec.factor1);
+    if (exists(spec.factor2) && assignments.factors.indexOf(spec.factor2) < 0) assignments.factors.push(spec.factor2);
+    if (spec.conditions && spec.conditions.length) assignments.conditions = spec.conditions.filter(exists);
     refreshLayout();
   }
 

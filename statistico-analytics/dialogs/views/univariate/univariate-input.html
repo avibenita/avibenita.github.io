@@ -885,10 +885,16 @@
         return (s.columnName || '') + (s.transform && s.transform !== 'none' ? '  (' + s.transform + ')' : '');
       }, function(item) {
         const spec = item.spec || {};
-        if (Number.isInteger(spec.columnIndex)) {
-          const stats = STATE.columnStats.find(s => s.idx === spec.columnIndex);
-          if (stats && stats.eligible) STATE.selectedIdx = spec.columnIndex;
+        // Prefer the saved column NAME (robust to reordered/inserted columns);
+        // fall back to the saved index only if the name is gone.
+        let target = null;
+        if (spec.columnName) {
+          target = STATE.columnStats.find(s => STATE.headers[s.idx] === spec.columnName);
         }
+        if (!target && Number.isInteger(spec.columnIndex)) {
+          target = STATE.columnStats.find(s => s.idx === spec.columnIndex);
+        }
+        if (target && target.eligible) STATE.selectedIdx = target.idx;
         if (spec.transform) {
           const tr = document.querySelector(`input[name="transform"][value="${spec.transform}"]`);
           if (tr) tr.checked = true;

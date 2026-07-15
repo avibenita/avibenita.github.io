@@ -390,7 +390,15 @@
         return (s.columnName || '') + (s.transform && s.transform !== 'none' ? '  (' + s.transform + ')' : '');
       }, function(item) {
         const spec = item.spec || {};
-        const radio = document.querySelector(`input[name="selectedColumn"][value="${spec.columnIndex}"]`);
+        // Prefer the saved column NAME (robust to reordered/inserted columns);
+        // fall back to the saved index only if the name is gone.
+        let idx = null;
+        if (spec.columnName && Array.isArray(STATE.headers)) {
+          const byName = STATE.headers.indexOf(spec.columnName);
+          if (byName >= 0) idx = byName;
+        }
+        if (idx === null && Number.isInteger(spec.columnIndex)) idx = spec.columnIndex;
+        const radio = idx === null ? null : document.querySelector(`input[name="selectedColumn"][value="${idx}"]`);
         if (radio && !radio.disabled) radio.checked = true;
         if (spec.transform) {
           const tr = document.querySelector(`input[name="transform"][value="${spec.transform}"]`);

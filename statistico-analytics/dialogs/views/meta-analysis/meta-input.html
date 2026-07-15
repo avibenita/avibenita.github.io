@@ -174,7 +174,7 @@
     <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" style="gap:6px;" disabled title="Load a previously saved configuration">
       <i class="fa-solid fa-clock-rotate-left"></i> Load previous…
     </button>
-    <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" title="Save current configuration">
+    <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" style="gap:6px;" disabled title="Save current configuration">
       <i class="fa-solid fa-floppy-disk"></i> Save configuration
     </button>
     <button class="cfg-btn run" onclick="save()">
@@ -208,6 +208,10 @@
       const headers = payload.headers || [];
       
       populateSelects(headers);
+      
+      // Saving only makes sense once real columns are mapped.
+      const saveBtn = document.getElementById('btnSaveConfig');
+      if (saveBtn) saveBtn.disabled = headers.length === 0;
       
       if (payload.savedSpec){
         restoreSpec(payload.savedSpec);
@@ -262,9 +266,19 @@
       if (spec.effectType) selectEffectType(spec.effectType);
       if (spec.model) selectModel(spec.model);
       
+      const headers = (dataPayload && dataPayload.headers) || [];
+      const names = spec.colNames || {};
       Object.keys(spec).forEach(key => {
+        if (key === 'effectType' || key === 'model' || key === 'colNames') return;
         const el = document.getElementById(key);
-        if (el) el.value = spec[key];
+        if (!el) return;
+        // Restore by header name first (robust to reordered columns); fall
+        // back to the stored index, and only if it is in range.
+        let idx = names[key] ? headers.indexOf(names[key]) : -1;
+        if (idx < 0) idx = parseInt(spec[key], 10);
+        if (Number.isInteger(idx) && idx >= 0 && (headers.length === 0 || idx < headers.length)) {
+          el.value = idx;
+        }
       });
     }
 
@@ -318,19 +332,23 @@
     // ── Save / Load configuration ────────────────────────────────────────────
     var STORAGE_KEY_META = 'meta-config';
     function saveModelSpec() {
+      var headers = (dataPayload && dataPayload.headers) || [];
+      if (!headers.length) return; // no data yet — nothing meaningful to save
       var defaultName = currentEffectType + ' / ' + currentModel;
       CfgSave.showPrompt('Save configuration', 'Configuration name', defaultName, function(name) {
-        var spec = { effectType: currentEffectType, model: currentModel };
-        try {
-          spec.studyCol = parseInt(document.getElementById("studyCol").value);
-          if (currentEffectType === "continuous") {
-            ['mean1Col','sd1Col','n1Col','mean2Col','sd2Col','n2Col'].forEach(function(k){ spec[k]=parseInt(document.getElementById(k).value); });
-          } else if (currentEffectType === "binary") {
-            ['aCol','bCol','cCol','dCol'].forEach(function(k){ spec[k]=parseInt(document.getElementById(k).value); });
-          } else if (currentEffectType === "direct") {
-            ['effectCol','seCol'].forEach(function(k){ spec[k]=parseInt(document.getElementById(k).value); });
+        var spec = { effectType: currentEffectType, model: currentModel, colNames: {} };
+        var keys = ['studyCol'];
+        if (currentEffectType === "continuous")  keys = keys.concat(['mean1Col','sd1Col','n1Col','mean2Col','sd2Col','n2Col']);
+        else if (currentEffectType === "binary") keys = keys.concat(['aCol','bCol','cCol','dCol']);
+        else if (currentEffectType === "direct") keys = keys.concat(['effectCol','seCol']);
+        keys.forEach(function(k) {
+          var el = document.getElementById(k);
+          var idx = el ? parseInt(el.value, 10) : NaN;
+          if (Number.isInteger(idx) && idx >= 0 && idx < headers.length) {
+            spec[k] = idx;
+            spec.colNames[k] = headers[idx]; // names survive column reordering
           }
-        } catch(e) {}
+        });
         CfgSave.saveCfgEntry(STORAGE_KEY_META, name, spec, function() {
           var loadBtn = document.getElementById('btnLoadPrev');
           if (loadBtn) loadBtn.disabled = false;
@@ -351,6 +369,9 @@
       var loadBtn = document.getElementById('btnLoadPrev');
       if (loadBtn && typeof CfgSave !== 'undefined') {
         loadBtn.disabled = CfgSave.getSavedList(STORAGE_KEY_META).length === 0;
+      }
+      if (typeof CfgSave !== 'undefined' && typeof CfgSave.syncConfigButtons === 'function') {
+        CfgSave.syncConfigButtons(STORAGE_KEY_META);
       }
     });
   </script>

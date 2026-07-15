@@ -137,6 +137,42 @@
     } catch (e) {}
   }
 
+  /**
+   * Re-read the range from the LIVE worksheet according to the current mode.
+   * Called right before a module launches so edits made while the hub was open
+   * are picked up — otherwise modules would run on the snapshot captured when
+   * the task pane first loaded.
+   */
+  async function refreshGlobalRange() {
+    try {
+      if (rangeMode === "named") {
+        var sel = document.getElementById("hubNamedRangeSelect");
+        var name = sel && sel.value;
+        if (name) {
+          await Excel.run(async function (ctx) {
+            var rng = ctx.workbook.names.getItem(name).getRange();
+            rng.load(["values", "address"]);
+            await ctx.sync();
+            applyRangeData(rng.values, rng.address);
+          });
+          return true;
+        }
+        // Named mode but no resolvable name (e.g. restored session): keep the
+        // stored snapshot rather than silently switching to the used range.
+        return false;
+      }
+      if (rangeMode === "selection") {
+        await useSelection();
+        return true;
+      }
+      await autoDetectRange();
+      return true;
+    } catch (e) {
+      console.warn("hubRefreshGlobalRange:", e);
+      return false;
+    }
+  }
+
   function applyRangeData(values, address) {
     if (!values || values.length < 2) {
       return showRangeState("Need header row + at least 1 data row", true);
@@ -203,7 +239,13 @@
     if (gr && gr.values && gr.values.length >= 2) {
       rangeMode = gr.mode === "manual" ? "used" : (gr.mode || "used");
       hubSyncRangeModeUI(rangeMode);
-      applyRangeData(gr.values, gr.address);
+      if (rangeMode === "used") {
+        // Re-read the live sheet instead of trusting the stored snapshot,
+        // which may predate edits made since it was captured.
+        await autoDetectRange();
+      } else {
+        applyRangeData(gr.values, gr.address);
+      }
     } else {
       await autoDetectRange();
     }
@@ -211,6 +253,7 @@
 
   window.hubSetRangeMode = setRangeMode;
   window.hubPickRangeMode = pickRangeMode;
+  window.hubRefreshGlobalRange = refreshGlobalRange;
   window.hubLoadFromNamedRange = loadFromNamedRange;
   window.hubToggleRangePicker = toggleRangePicker;
   window.hubToggleRangeInfo = toggleRangeInfo;

@@ -1485,11 +1485,23 @@ function navigateToModuleCore(id) {
 
 function navigateToModule(id) {
   var hadOpenDialog = dismissAllHubDialogs();
-  if (hadOpenDialog) {
-    setTimeout(function () { navigateToModuleCore(id); }, 150);
-    return;
+  var proceed = function () {
+    if (hadOpenDialog) setTimeout(function () { navigateToModuleCore(id); }, 150);
+    else navigateToModuleCore(id);
+  };
+  // Re-read the worksheet before launching: the stored range is a snapshot
+  // from when the hub loaded, so edits made since (even saved ones) would
+  // otherwise feed the module stale data.
+  var refresh = typeof window.hubRefreshGlobalRange === "function" ? window.hubRefreshGlobalRange() : null;
+  if (refresh && typeof refresh.then === "function") {
+    var done = false;
+    var once = function () { if (!done) { done = true; proceed(); } };
+    refresh.then(once, once);
+    // Safety net: never let a stalled Excel.run block the module launch.
+    setTimeout(once, 2500);
+  } else {
+    proceed();
   }
-  navigateToModuleCore(id);
 }
 
 function showAdvisor() {

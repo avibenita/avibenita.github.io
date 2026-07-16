@@ -1608,7 +1608,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260716export',
+  _TAB_ASSET_VER: '20260716export2',
 
   _prepareExportSnapshotBody(bodyClone) {
     bodyClone.querySelectorAll(
@@ -1646,6 +1646,99 @@ const StatisticoHeader = {
       }
     `;
     bodyClone.prepend(snapshotStyle);
+  },
+
+  _getExportDefaultSectionIds(sections) {
+    const current = String(this.currentView || '').toLowerCase();
+    if (!Array.isArray(sections) || !sections.length) return [];
+    const ids = (rows) => rows.map((s) => String(s.id));
+    const exact = sections.filter((s) => String(s.id).toLowerCase() === current);
+    if (exact.length) return ids(exact);
+    const byFile = sections.filter((s) => {
+      if (!s.file || !current) return false;
+      const file = String(s.file).toLowerCase();
+      return file.includes(current) || current.includes(file.replace(/^[^/]+\//, '').replace('.html', ''));
+    });
+    if (byFile.length) return ids(byFile);
+    const loose = sections.filter((s) => {
+      const sid = String(s.id).toLowerCase();
+      return current && (current.includes(sid) || sid.includes(current));
+    });
+    if (loose.length) return ids(loose);
+    return [String(sections[0].id)];
+  },
+
+  _pickReportSections(sections, onConfirm, options = {}) {
+    const defaultIds = Array.isArray(options.defaultIds) && options.defaultIds.length
+      ? options.defaultIds.map(String)
+      : this._getExportDefaultSectionIds(sections);
+    const esc = (value) => String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const existing = document.getElementById('stReportExportOverlay');
+    if (existing) existing.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'stReportExportOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2147483300;display:flex;align-items:center;justify-content:center;padding:16px;';
+
+    const sectionListHtml = sections.map((s) => {
+      const sid = String(s.id);
+      const checked = defaultIds.includes(sid) ? 'checked' : '';
+      return `
+        <label style="display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid #e5e7eb;color:#0f172a;font-size:13px;cursor:pointer;">
+          <input type="checkbox" data-section-id="${esc(sid)}" ${checked} style="cursor:pointer;accent-color:#f97316;" />
+          <span>${esc(s.label)}</span>
+        </label>
+      `;
+    }).join('');
+
+    overlay.innerHTML = `
+      <div style="width:min(560px,95vw);max-height:88vh;background:#fff;border-radius:14px;border:1px solid #cbd5e1;box-shadow:0 16px 40px rgba(15,23,42,.32);display:flex;flex-direction:column;overflow:hidden;">
+        <div style="padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;">
+          <i class="fa-solid fa-file-export" style="color:#f97316;font-size:16px;"></i>
+          <span style="font-size:15px;font-weight:700;color:#0f172a;">Export Report</span>
+        </div>
+        <div style="padding:10px 18px 4px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:6px;">Sections to include</div>
+        </div>
+        <div style="padding:0 18px 8px;overflow-y:auto;flex:1;">${sectionListHtml}</div>
+        <div style="padding:12px 18px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px;">
+          <button id="stReportCancelBtn" style="padding:8px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;">Cancel</button>
+          <button id="stReportExportBtn" style="padding:8px 16px;border:1px solid #f97316;border-radius:8px;background:#f97316;color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
+            <i class="fa-solid fa-file-export"></i> Export HTML
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.querySelector('#stReportCancelBtn').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('#stReportExportBtn').addEventListener('click', () => {
+      const checked = Array.from(overlay.querySelectorAll('input[data-section-id]:checked'))
+        .map((el) => el.getAttribute('data-section-id'));
+      if (!checked.length) return;
+      close();
+      onConfirm(checked);
+    });
+  },
+
+  _buildSuccessfulExportSections(selected, snapshotResults, esc, escAttr) {
+    const included = [];
+    selected.forEach((s, i) => {
+      const snap = snapshotResults[i] || { ok: false, snapshotHtml: '' };
+      if (!s.file || snap.noFile || !snap.ok || !snap.snapshotHtml) return;
+      included.push({ section: s, snap });
+    });
+    const toc = included.map((row, i) => `<li><a href="#sec_${i + 1}">${esc(row.section.label)}</a></li>`).join('');
+    const html = included.map((row, i) => `
+      <section id="sec_${i + 1}">
+        <h2>${i + 1}. ${esc(row.section.label)}</h2>
+        <iframe class="report-frame" srcdoc="${escAttr(row.snap.snapshotHtml)}"></iframe>
+      </section>
+    `).join('');
+    return { included, toc, html };
   },
 
   _ensurePlainTabUnderlineStyles() {
@@ -2776,48 +2869,6 @@ const StatisticoHeader = {
       { id: 'descriptives', label: 'Descriptive Statistics', file: 'correlations/descriptive-stats.html' },
       { id: 'by-group', label: 'Correlations by Group', file: 'correlations/by-group.html' }
     ]);
-    const pickReportSections = (sections, onConfirm) => {
-      const existing = document.getElementById('stReportExportOverlay');
-      if (existing) existing.remove();
-      const overlay = document.createElement('div');
-      overlay.id = 'stReportExportOverlay';
-      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2147483300;display:flex;align-items:center;justify-content:center;padding:16px;';
-      const sectionListHtml = sections.map((s) => `
-        <label style="display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid #e5e7eb;color:#0f172a;font-size:13px;cursor:pointer;">
-          <input type="checkbox" data-section-id="${esc(s.id)}" checked style="cursor:pointer;accent-color:#f97316;" />
-          <span>${esc(s.label)}</span>
-        </label>
-      `).join('');
-      overlay.innerHTML = `
-        <div style="width:min(560px,95vw);max-height:88vh;background:#fff;border-radius:14px;border:1px solid #cbd5e1;box-shadow:0 16px 40px rgba(15,23,42,.32);display:flex;flex-direction:column;overflow:hidden;">
-          <div style="padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;">
-            <i class="fa-solid fa-file-export" style="color:#f97316;font-size:16px;"></i>
-            <span style="font-size:15px;font-weight:700;color:#0f172a;">Export Report</span>
-          </div>
-          <div style="padding:10px 18px 4px;">
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:6px;">Sections to include</div>
-          </div>
-          <div style="padding:0 18px 8px;overflow-y:auto;flex:1;">${sectionListHtml}</div>
-          <div style="padding:12px 18px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px;">
-            <button id="stReportCancelBtn" style="padding:8px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;">Cancel</button>
-            <button id="stReportExportBtn" style="padding:8px 16px;border:1px solid #f97316;border-radius:8px;background:#f97316;color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
-              <i class="fa-solid fa-file-export"></i> Export HTML
-            </button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(overlay);
-      const close = () => overlay.remove();
-      overlay.querySelector('#stReportCancelBtn').addEventListener('click', close);
-      overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-      overlay.querySelector('#stReportExportBtn').addEventListener('click', () => {
-        const checked = Array.from(overlay.querySelectorAll('input[data-section-id]:checked'))
-          .map((el) => el.getAttribute('data-section-id'));
-        if (!checked.length) return;
-        close();
-        onConfirm(checked);
-      });
-    };
     const extractRichSnapshot = (doc, sourceUrl) => {
       const headClone = (doc.head ? doc.head.cloneNode(true) : document.createElement('head'));
       headClone.querySelectorAll('script, noscript').forEach((n) => n.remove());
@@ -2891,9 +2942,8 @@ const StatisticoHeader = {
         const liveData = getCorrelationData();
         if (!data || !liveData) { alert('No correlation data available for export yet.'); return; }
         const sections = getCorrelationMenuItems();
-        pickReportSections(sections, (selectedIds) => {
+        this._pickReportSections(sections, (selectedIds) => {
           const selected = sections.filter((s) => selectedIds.includes(String(s.id)));
-          const toc = selected.map((s, i) => `<li><a href="#sec_${i + 1}">${esc(s.label)}</a></li>`).join('');
 
           const progressOverlay = document.createElement('div');
           progressOverlay.id = 'stExportProgressOverlay';
@@ -2936,18 +2986,14 @@ const StatisticoHeader = {
               snapshotResults.push(await captureSectionSnapshot(url, liveData));
             }
             setProgress(selected.length, selected.length, 'Building report...');
-            const builtSections = selected.map((s, i) => {
-              const snap = snapshotResults[i] || { ok: false, snapshotHtml: '' };
-              return `
-                <section id="sec_${i + 1}">
-                  <h2>${i + 1}. ${esc(s.label)}</h2>
-                  <p class="meta">${snap.ok ? 'Embedded rich page snapshot.' : 'Section preview unavailable in this export.'}</p>
-                  ${snap.ok ? `<iframe class="report-frame" srcdoc="${escAttr(snap.snapshotHtml)}"></iframe>` : ''}
-                </section>
-              `;
-            });
+            const exportSections = this._buildSuccessfulExportSections(selected, snapshotResults, esc, escAttr);
+            if (!exportSections.included.length) {
+              closeProgress();
+              alert('No sections could be captured for export. Try again or pick different sections.');
+              return;
+            }
             const reportCss = `body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:1120px;margin:auto;color:#0f172a}h1{margin-bottom:4px}h2{margin-top:28px}nav{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}section{page-break-inside:avoid;border-top:1px solid #e2e8f0;padding-top:14px}.meta{color:#475569;font-size:13px}.report-frame{width:100%;height:760px;border:1px solid #d1d5db;border-radius:10px;background:#fff}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #d1d5db;padding:6px 8px;text-align:center}th{background:#f1f5f9}a{color:#0ea5e9;text-decoration:none}a:hover{text-decoration:underline}`;
-            const reportBody = `<h1>Correlation Long Report</h1><p class="meta"><strong>Variables:</strong> ${data.headers.length} &nbsp;&middot;&nbsp; <strong>Rows:</strong> ${data.allRows.length} &nbsp;&middot;&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</p><nav><strong>Included sections</strong><ol>${toc}</ol></nav>${builtSections.join('')}${fallbackDataSection(data)}`;
+            const reportBody = `<h1>Correlation Long Report</h1><p class="meta"><strong>Variables:</strong> ${data.headers.length} &nbsp;&middot;&nbsp; <strong>Rows:</strong> ${data.allRows.length} &nbsp;&middot;&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</p><nav><strong>Included sections</strong><ol>${exportSections.toc}</ol></nav>${exportSections.html}${fallbackDataSection(data)}`;
             const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Correlation Long Report</title><style>${reportCss}</style></head><body>${reportBody}</body></html>`;
             closeProgress();
             downloadBlob(
@@ -3211,52 +3257,6 @@ const StatisticoHeader = {
       return items;
     };
 
-    const pickReportSections = (sections, onConfirm) => {
-      const existing = document.getElementById('stReportExportOverlay');
-      if (existing) existing.remove();
-      const overlay = document.createElement('div');
-      overlay.id = 'stReportExportOverlay';
-      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2147483300;display:flex;align-items:center;justify-content:center;padding:16px;';
-
-      const sectionListHtml = sections.map((s) => `
-        <label style="display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid #e5e7eb;color:#0f172a;font-size:13px;cursor:pointer;">
-          <input type="checkbox" data-section-id="${esc(s.id)}" checked style="cursor:pointer;accent-color:#f97316;" />
-          <span>${esc(s.label)}</span>
-        </label>
-      `).join('');
-
-      overlay.innerHTML = `
-        <div style="width:min(560px,95vw);max-height:88vh;background:#fff;border-radius:14px;border:1px solid #cbd5e1;box-shadow:0 16px 40px rgba(15,23,42,.32);display:flex;flex-direction:column;overflow:hidden;">
-          <div style="padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;">
-            <i class="fa-solid fa-file-export" style="color:#f97316;font-size:16px;"></i>
-            <span style="font-size:15px;font-weight:700;color:#0f172a;">Export Report</span>
-          </div>
-          <div style="padding:10px 18px 4px;">
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:6px;">Sections to include</div>
-          </div>
-          <div style="padding:0 18px 8px;overflow-y:auto;flex:1;">${sectionListHtml}</div>
-          <div style="padding:12px 18px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px;">
-            <button id="stReportCancelBtn" style="padding:8px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;">Cancel</button>
-            <button id="stReportExportBtn" style="padding:8px 16px;border:1px solid #f97316;border-radius:8px;background:#f97316;color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
-              <i class="fa-solid fa-file-export"></i> Export HTML
-            </button>
-          </div>
-        </div>
-      `;
-
-      document.body.appendChild(overlay);
-      const close = () => overlay.remove();
-      overlay.querySelector('#stReportCancelBtn').addEventListener('click', close);
-      overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-      overlay.querySelector('#stReportExportBtn').addEventListener('click', () => {
-        const checked = Array.from(overlay.querySelectorAll('input[data-section-id]:checked'))
-                             .map((el) => el.getAttribute('data-section-id'));
-        if (!checked.length) return;
-        close();
-        onConfirm(checked);
-      });
-    };
-
     const percentile = (sorted, p) => {
       if (!sorted.length) return null;
       const pos = (sorted.length - 1) * p;
@@ -3387,10 +3387,9 @@ const StatisticoHeader = {
           alert('No report sections available from the current menu.');
           return;
         }
-        pickReportSections(sections, (selectedIds) => {
+        this._pickReportSections(sections, (selectedIds) => {
           const selected = sections.filter((s) => selectedIds.includes(String(s.id)));
           const escapedVar = esc(data.headers[0]);
-          const toc = selected.map((s, i) => `<li><a href="#sec_${i + 1}">${esc(s.label)}</a></li>`).join('');
 
           // ── Progress overlay ──────────────────────────────────────────────
           const progressOverlay = document.createElement('div');
@@ -3448,27 +3447,15 @@ const StatisticoHeader = {
             }
             setProgress(total, total, 'Building report…');
 
-            const builtSections = selected.map((s, i) => {
-              const snap = snapshotResults[i] || { ok: false, snapshotHtml: '' };
-              if (!s.file || snap.noFile) {
-                return `
-                  <section id="sec_${i + 1}">
-                    <h2>${i + 1}. ${esc(s.label)}</h2>
-                    <p class="meta">No page file mapped for this section.</p>
-                  </section>
-                `;
-              }
-              return `
-                <section id="sec_${i + 1}">
-                  <h2>${i + 1}. ${esc(s.label)}</h2>
-                  <p class="meta">${snap.ok ? 'Embedded rich page snapshot.' : 'Section preview unavailable in this export.'}</p>
-                  ${snap.ok ? `<iframe class="report-frame" srcdoc="${escAttr(snap.snapshotHtml)}"></iframe>` : ''}
-                </section>
-              `;
-            });
+            const exportSections = this._buildSuccessfulExportSections(selected, snapshotResults, esc, escAttr);
+            if (!exportSections.included.length) {
+              closeProgress();
+              alert('No sections could be captured for export. Try again or pick different sections.');
+              return;
+            }
 
             const reportCss = `body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:1120px;margin:auto;color:#0f172a}h1{margin-bottom:4px}h2{margin-top:28px}nav{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}section{page-break-inside:avoid;border-top:1px solid #e2e8f0;padding-top:14px}.meta{color:#475569;font-size:13px}.report-frame{width:100%;height:760px;border:1px solid #d1d5db;border-radius:10px;background:#fff}a{color:#0ea5e9;text-decoration:none}a:hover{text-decoration:underline}`;
-            const reportBody = `<h1>Univariate Long Report</h1><p class="meta"><strong>Variable:</strong> ${escapedVar} &nbsp;&middot;&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</p><nav><strong>Included sections</strong><ol>${toc}</ol></nav>${builtSections.join('')}`;
+            const reportBody = `<h1>Univariate Long Report</h1><p class="meta"><strong>Variable:</strong> ${escapedVar} &nbsp;&middot;&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</p><nav><strong>Included sections</strong><ol>${exportSections.toc}</ol></nav>${exportSections.html}`;
             const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapedVar} - Long Report</title><style>${reportCss}</style></head><body>${reportBody}</body></html>`;
 
             closeProgress();

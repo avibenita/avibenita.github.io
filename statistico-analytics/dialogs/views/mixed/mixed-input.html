@@ -3638,21 +3638,31 @@ window.populateVariableSelectionTable = function(varStats) {
 };
 
 // Alternative entry: full row data (same as regression taskpane sends)
+function normalizeMixedHeaders(rawHeaders) {
+  var seen = {};
+  return (rawHeaders || []).map(function(h, i) {
+    var base = (h === null || h === undefined || String(h).trim() === '') ? ('Column ' + (i + 1)) : String(h).trim();
+    if (!seen[base]) { seen[base] = 1; return base; }
+    seen[base] += 1;
+    return base + ' (' + seen[base] + ')';
+  });
+}
+
 window.loadMixedModelData = function(payload) {
   try {
     var data = typeof payload === 'string' ? JSON.parse(payload) : payload;
     if (!data || !data.headers || !data.rows) { showToast('Invalid data format', 'error'); return; }
 
-    var headers = data.headers;
-    var rows    = data.rows;
+    var headers = normalizeMixedHeaders(data.headers || []);
+    var rows = data.rows;
 
     // Store raw data for the detection engine (row-level analysis)
     STATE.rawHeaders = headers;
-    STATE.rawRows    = rows.map(function(row) {
+    STATE.rawRows = rows.map(function(row) {
       // Normalise each row to an object keyed by header name
       if (Array.isArray(row)) {
         var obj = {};
-        headers.forEach(function(h, i){ obj[h] = row[i]; });
+        headers.forEach(function(h, i) { obj[h] = row[i]; });
         return obj;
       }
       return row;
@@ -3661,27 +3671,34 @@ window.loadMixedModelData = function(payload) {
     // Build varStats — categories stored as [{value, freq}] to match regression modal
     var stats = {};
     headers.forEach(function(h) {
-      stats[h] = { count:0, numeric:0, string:0, missing:0, categories:[], _catFreq:{}, rangeAddress:'' };
+      if (!stats[h]) {
+        stats[h] = { count:0, numeric:0, string:0, missing:0, categories:[], _catFreq:{}, rangeAddress:'' };
+      }
     });
     STATE.rawRows.forEach(function(row) {
       headers.forEach(function(h) {
+        var bucket = stats[h];
+        if (!bucket) return;
         var v = row[h];
-        if (v === null || v === undefined || v === '') { stats[h].missing++; return; }
-        stats[h].count++;
+        if (v === null || v === undefined || v === '') { bucket.missing++; return; }
+        bucket.count++;
         var isNum = (typeof v === 'number') || !isNaN(parseFloat(v));
-        if (isNum) stats[h].numeric++;
-        else       stats[h].string++;
+        if (isNum) bucket.numeric++;
+        else bucket.string++;
         // Track frequency per unique string value
         var str = String(v).trim();
-        stats[h]._catFreq[str] = (stats[h]._catFreq[str] || 0) + 1;
+        if (!bucket._catFreq) bucket._catFreq = {};
+        bucket._catFreq[str] = (bucket._catFreq[str] || 0) + 1;
       });
     });
-    // Convert _catFreq map → [{value, freq}] array
-    headers.forEach(function(h) {
-      stats[h].categories = Object.keys(stats[h]._catFreq).map(function(val) {
-        return { value: val, freq: stats[h]._catFreq[val] };
+    // Convert _catFreq map → [{value, freq}] array (once per unique header key)
+    Object.keys(stats).forEach(function(h) {
+      var bucket = stats[h];
+      var freqMap = bucket._catFreq || {};
+      bucket.categories = Object.keys(freqMap).map(function(val) {
+        return { value: val, freq: freqMap[val] };
       });
-      delete stats[h]._catFreq;
+      delete bucket._catFreq;
     });
 
     if (data.address) {

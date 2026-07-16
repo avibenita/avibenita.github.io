@@ -6408,7 +6408,7 @@ const StatisticoHeader = {
       'regression-pred-scenario':
         'Use the what-if sliders/inputs to generate a single point prediction with confidence and prediction intervals. Reset to means returns a baseline scenario.',
       'regression-viz-partial':
-        'Each small chart shows the partial effect of one predictor on the outcome with the others held at their means. The axes are on the original scale of the outcome and predictor; the slope is the predictor coefficient. Read steeper / flatter lines and the spread of points around them — not standard errors or p-values.',
+        'Read the selected-predictor strip (β, standardised β, SE, t, p, 95% CI), the coefficient table (click a row to switch predictors), and the partial-effect chart (observed data, adjusted prediction line, 95% confidence band). Global fit metrics (R², RMSE) live on Predictions → Overview — interpret the effect of the chosen predictor here.',
       'regression-viz-unique':
         'Each small chart is a partial regression (added-variable) plot: the x-axis shows the predictor after removing the linear influence of all other predictors (e(x | others)), and the y-axis shows the outcome with the same adjustment (e(y | others)). The slope is exactly the multiple-regression coefficient for that predictor. Read whether the line is clearly tilted (unique contribution), whether it is flat (no effect after controlling), and whether points hug the line tightly or scatter widely (how much remains unexplained).',
       'regression-diag-overview':
@@ -6530,7 +6530,7 @@ const StatisticoHeader = {
 
     const chartGuards = {
       'regression-viz-partial':
-        'Each small chart shows how the predicted outcome changes as a single predictor changes, with the others held at their means. Describe slopes and the spread of points around them, not coefficients / SE / p-values.',
+        'This is a partial-effect plot for one selected predictor: observed data, an adjusted prediction line (others at mean), and a 95% confidence band. The strip above shows that predictor\'s β, SE, t, p, and CI. Describe the slope, band width, and scatter — global R² / RMSE belong on Overview.',
       'regression-viz-unique':
         'Axes are residualised: e(x | others) on x and e(y | others) on y. The slope of the fitted line equals the predictor\'s multiple-regression coefficient. Describe slopes and scatter, not coefficients / SE / p-values.',
       'regression-pred-overview':

@@ -1608,7 +1608,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260716export',
+  _TAB_ASSET_VER: '20260716export2',
 
   _prepareExportSnapshotBody(bodyClone) {
     bodyClone.querySelectorAll(
@@ -1913,20 +1913,21 @@ const StatisticoHeader = {
 
     overlay.innerHTML = `
       <div style="width:min(640px,95vw);max-height:90vh;background:#fff;border-radius:14px;border:1px solid #cbd5e1;box-shadow:0 16px 40px rgba(15,23,42,.32);display:flex;flex-direction:column;overflow:hidden;">
-        <div style="padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;">
+        <div style="flex-shrink:0;padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;">
           <i class="fa-solid fa-file-export" style="color:#f97316;font-size:16px;"></i>
           <span style="font-size:15px;font-weight:700;color:#0f172a;">Export Report</span>
         </div>
-        <div style="padding:10px 18px 4px;">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:6px;">Sections to include</div>
-        </div>
-        <div style="padding:0 18px 12px;overflow-y:auto;flex:1;min-height:120px;max-height:42vh;border-bottom:1px solid #e2e8f0;">${sectionListHtml}</div>
-        <div style="padding:0 18px 12px;background:#f8fafc;">
-          <button type="button" id="stExportOptionsToggle" style="width:100%;margin-top:12px;padding:12px 14px;border:2px solid #cbd5e1;border-radius:12px;background:linear-gradient(180deg,#fff 0%,#f1f5f9 100%);color:#0f172a;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;box-shadow:0 2px 8px rgba(15,23,42,.06);">
-            <span style="display:flex;align-items:center;gap:8px;"><i class="fa-solid fa-sliders" style="color:#f97316;"></i> Options</span>
-            <i class="fa-solid fa-chevron-down" id="stExportOptionsChevron" style="color:#64748b;transition:transform .2s ease;transform:${optionsChevronRotate};"></i>
-          </button>
-          <div id="stExportOptionsBody" style="display:${optionsBodyDisplay};margin-top:10px;padding:14px;border:2px solid #e2e8f0;border-radius:12px;background:#fff;">
+        <div style="flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;">
+          <div style="padding:10px 18px 4px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:6px;">Sections to include</div>
+          </div>
+          <div style="padding:0 18px 12px;border-bottom:1px solid #e2e8f0;">${sectionListHtml}</div>
+          <div style="padding:0 18px 12px;background:#f8fafc;">
+            <button type="button" id="stExportOptionsToggle" style="width:100%;margin-top:12px;padding:12px 14px;border:2px solid #cbd5e1;border-radius:12px;background:linear-gradient(180deg,#fff 0%,#f1f5f9 100%);color:#0f172a;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;box-shadow:0 2px 8px rgba(15,23,42,.06);">
+              <span style="display:flex;align-items:center;gap:8px;"><i class="fa-solid fa-sliders" style="color:#f97316;"></i> Options</span>
+              <i class="fa-solid fa-chevron-down" id="stExportOptionsChevron" style="color:#64748b;transition:transform .2s ease;transform:${optionsChevronRotate};"></i>
+            </button>
+            <div id="stExportOptionsBody" style="display:${optionsBodyDisplay};margin-top:10px;margin-bottom:12px;padding:14px;border:2px solid #e2e8f0;border-radius:12px;background:#fff;">
             <div style="display:grid;gap:10px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px dashed #e2e8f0;">
               <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;font-weight:600;">Cover background
                 <select id="stCoverBackground" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;background:#fff;">${bgOptions}</select>
@@ -1996,7 +1997,8 @@ const StatisticoHeader = {
             </div>
           </div>
         </div>
-        <div style="padding:12px 18px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px;background:#fff;">
+        </div>
+        <div style="flex-shrink:0;padding:12px 18px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px;background:#fff;box-shadow:0 -8px 20px rgba(15,23,42,.08);">
           <button id="stReportCancelBtn" style="padding:8px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;">Cancel</button>
           <button id="stReportExportBtn" style="padding:8px 16px;border:1px solid #f97316;border-radius:8px;background:#f97316;color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
             <i class="fa-solid fa-file-export"></i> Export HTML

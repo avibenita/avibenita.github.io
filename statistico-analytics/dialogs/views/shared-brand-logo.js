@@ -55,6 +55,7 @@
 
   global.StatisticoBrandLogo = {
     getSvg: getSvg,
+    getLogoSrc: getLogoSrc,
     getGaussMarkPaths: getGaussMarkPaths,
     mount: mount,
     mountAll: mountAll

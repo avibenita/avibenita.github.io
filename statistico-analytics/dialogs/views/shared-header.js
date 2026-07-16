@@ -1608,7 +1608,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260716export2',
+  _TAB_ASSET_VER: '20260716cover',
 
   _prepareExportSnapshotBody(bodyClone) {
     bodyClone.querySelectorAll(
@@ -1668,10 +1668,121 @@ const StatisticoHeader = {
     return [String(sections[0].id)];
   },
 
+  _getExportDefaultCover(options = {}) {
+    const d = options.coverDefaults || {};
+    const today = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    return {
+      enabled: d.enabled === true,
+      title: d.title || 'Analysis Report',
+      subtitle: d.subtitle || 'Statistico Interactive',
+      subject: d.subject || '',
+      author: d.author || '',
+      organization: d.organization || '',
+      preparedFor: d.preparedFor || '',
+      reportDate: d.reportDate || today,
+      description: d.description || '',
+      includeLogo: d.includeLogo !== false,
+      useBrandLogo: d.useBrandLogo !== false,
+      customLogoDataUrl: d.customLogoDataUrl || ''
+    };
+  },
+
+  _getBrandLogoUrlForExport() {
+    if (typeof StatisticoBrandLogo !== 'undefined' && typeof StatisticoBrandLogo.getLogoSrc === 'function') {
+      return StatisticoBrandLogo.getLogoSrc();
+    }
+    const scripts = document.getElementsByTagName('script');
+    for (let i = scripts.length - 1; i >= 0; i--) {
+      const src = scripts[i].src || '';
+      if (src.indexOf('shared-brand-logo.js') !== -1 || src.indexOf('shared-header.js') !== -1) {
+        return src.replace(/\/[^/]+$/, '/statistico-logo-hub.png?v=20260716pm');
+      }
+    }
+    return '';
+  },
+
+  async _resolveExportLogoDataUrl(cover) {
+    if (!cover || !cover.includeLogo) return '';
+    if (!cover.useBrandLogo && cover.customLogoDataUrl) return cover.customLogoDataUrl;
+    const url = this._getBrandLogoUrlForExport();
+    if (!url) return '';
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return '';
+      const blob = await res.blob();
+      return await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(blob);
+      });
+    } catch (_) {
+      return '';
+    }
+  },
+
+  _buildExportCoverPageHtml(cover, logoDataUrl, esc) {
+    if (!cover || !cover.enabled) return '';
+    const rows = [];
+    if (cover.subject) rows.push(['Subject', cover.subject]);
+    if (cover.author) rows.push(['Author', cover.author]);
+    if (cover.organization) rows.push(['Organization', cover.organization]);
+    if (cover.preparedFor) rows.push(['Prepared for', cover.preparedFor]);
+    if (cover.reportDate) rows.push(['Report date', cover.reportDate]);
+    const metaRows = rows.map(([k, v]) => `<div class="cover-meta-row"><span class="cover-meta-key">${esc(k)}</span><span class="cover-meta-val">${esc(v)}</span></div>`).join('');
+    const logoHtml = (cover.includeLogo && logoDataUrl)
+      ? `<img class="cover-logo" src="${logoDataUrl.replace(/"/g, '&quot;')}" alt="Report logo" />`
+      : '';
+    const descHtml = cover.description
+      ? `<p class="cover-description">${esc(cover.description)}</p>`
+      : '';
+    return `
+      <section class="report-cover" id="report-cover">
+        <div class="cover-inner">
+          ${logoHtml}
+          <p class="cover-eyebrow">${esc(cover.subtitle || 'Statistico Interactive')}</p>
+          <h1 class="cover-title">${esc(cover.title || 'Analysis Report')}</h1>
+          ${descHtml}
+          ${metaRows ? `<div class="cover-meta">${metaRows}</div>` : ''}
+        </div>
+      </section>
+    `;
+  },
+
+  _getExportCoverCss() {
+    return `
+      .report-cover{page-break-after:always;margin:0 0 28px;padding:0;border:none}
+      .cover-inner{
+        min-height:72vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+        text-align:center;padding:48px 36px;border-radius:18px;
+        background:linear-gradient(160deg,#06152a 0%,#0b2540 42%,#123a5c 100%);
+        color:#f8fafc;box-shadow:0 18px 42px rgba(15,23,42,.18)
+      }
+      .cover-logo{max-width:min(420px,88%);height:auto;margin:0 auto 22px;display:block}
+      .cover-eyebrow{margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:.28em;text-transform:uppercase;color:#93c5fd}
+      .cover-title{margin:0 0 14px;font-size:clamp(1.8rem,4vw,2.6rem);font-weight:800;line-height:1.15;color:#fff}
+      .cover-description{max-width:640px;margin:0 auto 20px;font-size:15px;line-height:1.55;color:#dbeafe}
+      .cover-meta{
+        width:min(520px,100%);margin-top:8px;padding-top:18px;border-top:1px solid rgba(148,163,184,.35);
+        display:grid;gap:8px;text-align:left
+      }
+      .cover-meta-row{display:grid;grid-template-columns:130px 1fr;gap:12px;font-size:13px}
+      .cover-meta-key{color:#94a3b8;font-weight:600}
+      .cover-meta-val{color:#f1f5f9}
+    `;
+  },
+
   _pickReportSections(sections, onConfirm, options = {}) {
     const defaultIds = Array.isArray(options.defaultIds) && options.defaultIds.length
       ? options.defaultIds.map(String)
       : this._getExportDefaultSectionIds(sections);
+    const coverDefaults = this._getExportDefaultCover(options);
+    let savedCover = null;
+    try {
+      const raw = localStorage.getItem('statistico-export-cover');
+      if (raw) savedCover = JSON.parse(raw);
+    } catch (_) {}
+    const initialCover = Object.assign({}, coverDefaults, savedCover || {});
     const esc = (value) => String(value == null ? '' : value)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -1692,11 +1803,74 @@ const StatisticoHeader = {
       `;
     }).join('');
 
+    const coverEnabled = initialCover.enabled ? 'checked' : '';
+    const coverPanelDisplay = initialCover.enabled ? 'grid' : 'none';
+    const logoEnabled = initialCover.includeLogo !== false ? 'checked' : '';
+    const brandLogoChecked = initialCover.useBrandLogo !== false ? 'checked' : '';
+    const customLogoChecked = initialCover.useBrandLogo === false ? 'checked' : '';
+    const customLogoWrapStyle = initialCover.useBrandLogo === false ? '' : 'display:none;';
+
     overlay.innerHTML = `
-      <div style="width:min(560px,95vw);max-height:88vh;background:#fff;border-radius:14px;border:1px solid #cbd5e1;box-shadow:0 16px 40px rgba(15,23,42,.32);display:flex;flex-direction:column;overflow:hidden;">
+      <div style="width:min(640px,95vw);max-height:90vh;background:#fff;border-radius:14px;border:1px solid #cbd5e1;box-shadow:0 16px 40px rgba(15,23,42,.32);display:flex;flex-direction:column;overflow:hidden;">
         <div style="padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;">
           <i class="fa-solid fa-file-export" style="color:#f97316;font-size:16px;"></i>
           <span style="font-size:15px;font-weight:700;color:#0f172a;">Export Report</span>
+        </div>
+        <div style="padding:12px 18px 0;border-bottom:1px solid #e2e8f0;">
+          <label style="display:flex;align-items:center;gap:8px;color:#0f172a;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px;">
+            <input type="checkbox" id="stCoverEnabled" ${coverEnabled} style="cursor:pointer;accent-color:#f97316;" />
+            <span>Include cover page</span>
+          </label>
+          <div id="stCoverPanel" style="display:${coverPanelDisplay};gap:10px;padding-bottom:12px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Title
+                <input id="stCoverTitle" type="text" value="${esc(initialCover.title)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
+              </label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Subtitle
+                <input id="stCoverSubtitle" type="text" value="${esc(initialCover.subtitle)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
+              </label>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Subject / variable
+                <input id="stCoverSubject" type="text" value="${esc(initialCover.subject)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
+              </label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Report date
+                <input id="stCoverDate" type="text" value="${esc(initialCover.reportDate)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
+              </label>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Author
+                <input id="stCoverAuthor" type="text" value="${esc(initialCover.author)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
+              </label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Organization
+                <input id="stCoverOrg" type="text" value="${esc(initialCover.organization)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
+              </label>
+            </div>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Prepared for
+              <input id="stCoverPreparedFor" type="text" value="${esc(initialCover.preparedFor)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Summary / notes
+              <textarea id="stCoverDescription" rows="3" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;resize:vertical;">${esc(initialCover.description)}</textarea>
+            </label>
+            <div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;display:grid;gap:8px;">
+              <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#0f172a;cursor:pointer;">
+                <input type="checkbox" id="stCoverIncludeLogo" ${logoEnabled} style="accent-color:#f97316;" />
+                <span>Include logo on cover</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;cursor:pointer;">
+                <input type="radio" name="stCoverLogoMode" value="brand" ${brandLogoChecked} />
+                <span>Use Statistico logo</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;cursor:pointer;">
+                <input type="radio" name="stCoverLogoMode" value="custom" ${customLogoChecked} />
+                <span>Upload custom logo</span>
+              </label>
+              <div id="stCoverCustomLogoWrap" style="${customLogoWrapStyle}">
+                <input type="file" id="stCoverCustomLogo" accept="image/*" style="font-size:12px;color:#475569;" />
+                <div id="stCoverLogoPreview" style="margin-top:6px;"></div>
+              </div>
+            </div>
+          </div>
         </div>
         <div style="padding:10px 18px 4px;">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:6px;">Sections to include</div>
@@ -1712,6 +1886,40 @@ const StatisticoHeader = {
     `;
 
     document.body.appendChild(overlay);
+    let customLogoDataUrl = initialCover.useBrandLogo === false ? (initialCover.customLogoDataUrl || '') : '';
+    const coverPanel = overlay.querySelector('#stCoverPanel');
+    const coverEnabledEl = overlay.querySelector('#stCoverEnabled');
+    const customLogoWrap = overlay.querySelector('#stCoverCustomLogoWrap');
+    const logoPreview = overlay.querySelector('#stCoverLogoPreview');
+    const customLogoInput = overlay.querySelector('#stCoverCustomLogo');
+
+    const syncCoverPanel = () => {
+      if (coverPanel) coverPanel.style.display = coverEnabledEl && coverEnabledEl.checked ? 'grid' : 'none';
+    };
+    const syncLogoMode = () => {
+      const mode = overlay.querySelector('input[name="stCoverLogoMode"]:checked');
+      if (customLogoWrap) customLogoWrap.style.display = mode && mode.value === 'custom' ? 'block' : 'none';
+    };
+    if (coverEnabledEl) coverEnabledEl.addEventListener('change', syncCoverPanel);
+    overlay.querySelectorAll('input[name="stCoverLogoMode"]').forEach((el) => el.addEventListener('change', syncLogoMode));
+    if (customLogoInput) {
+      customLogoInput.addEventListener('change', () => {
+        const file = customLogoInput.files && customLogoInput.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          customLogoDataUrl = String(reader.result || '');
+          if (logoPreview && customLogoDataUrl) {
+            logoPreview.innerHTML = `<img src="${customLogoDataUrl.replace(/"/g, '&quot;')}" alt="" style="max-height:52px;max-width:220px;border-radius:8px;border:1px solid #e2e8f0;" />`;
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    if (customLogoDataUrl && logoPreview) {
+      logoPreview.innerHTML = `<img src="${customLogoDataUrl.replace(/"/g, '&quot;')}" alt="" style="max-height:52px;max-width:220px;border-radius:8px;border:1px solid #e2e8f0;" />`;
+    }
+
     const close = () => overlay.remove();
     overlay.querySelector('#stReportCancelBtn').addEventListener('click', close);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
@@ -1719,8 +1927,24 @@ const StatisticoHeader = {
       const checked = Array.from(overlay.querySelectorAll('input[data-section-id]:checked'))
         .map((el) => el.getAttribute('data-section-id'));
       if (!checked.length) return;
+      const logoMode = overlay.querySelector('input[name="stCoverLogoMode"]:checked');
+      const cover = {
+        enabled: !!(coverEnabledEl && coverEnabledEl.checked),
+        title: (overlay.querySelector('#stCoverTitle') || {}).value || '',
+        subtitle: (overlay.querySelector('#stCoverSubtitle') || {}).value || '',
+        subject: (overlay.querySelector('#stCoverSubject') || {}).value || '',
+        author: (overlay.querySelector('#stCoverAuthor') || {}).value || '',
+        organization: (overlay.querySelector('#stCoverOrg') || {}).value || '',
+        preparedFor: (overlay.querySelector('#stCoverPreparedFor') || {}).value || '',
+        reportDate: (overlay.querySelector('#stCoverDate') || {}).value || '',
+        description: (overlay.querySelector('#stCoverDescription') || {}).value || '',
+        includeLogo: !!(overlay.querySelector('#stCoverIncludeLogo') && overlay.querySelector('#stCoverIncludeLogo').checked),
+        useBrandLogo: !logoMode || logoMode.value !== 'custom',
+        customLogoDataUrl: customLogoDataUrl
+      };
+      try { localStorage.setItem('statistico-export-cover', JSON.stringify(cover)); } catch (_) {}
       close();
-      onConfirm(checked);
+      onConfirm(checked, cover);
     });
   },
 
@@ -2942,7 +3166,7 @@ const StatisticoHeader = {
         const liveData = getCorrelationData();
         if (!data || !liveData) { alert('No correlation data available for export yet.'); return; }
         const sections = getCorrelationMenuItems();
-        this._pickReportSections(sections, (selectedIds) => {
+        this._pickReportSections(sections, (selectedIds, cover) => {
           const selected = sections.filter((s) => selectedIds.includes(String(s.id)));
 
           const progressOverlay = document.createElement('div');
@@ -2992,15 +3216,28 @@ const StatisticoHeader = {
               alert('No sections could be captured for export. Try again or pick different sections.');
               return;
             }
-            const reportCss = `body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:1120px;margin:auto;color:#0f172a}h1{margin-bottom:4px}h2{margin-top:28px}nav{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}section{page-break-inside:avoid;border-top:1px solid #e2e8f0;padding-top:14px}.meta{color:#475569;font-size:13px}.report-frame{width:100%;height:760px;border:1px solid #d1d5db;border-radius:10px;background:#fff}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #d1d5db;padding:6px 8px;text-align:center}th{background:#f1f5f9}a{color:#0ea5e9;text-decoration:none}a:hover{text-decoration:underline}`;
-            const reportBody = `<h1>Correlation Long Report</h1><p class="meta"><strong>Variables:</strong> ${data.headers.length} &nbsp;&middot;&nbsp; <strong>Rows:</strong> ${data.allRows.length} &nbsp;&middot;&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</p><nav><strong>Included sections</strong><ol>${exportSections.toc}</ol></nav>${exportSections.html}${fallbackDataSection(data)}`;
-            const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Correlation Long Report</title><style>${reportCss}</style></head><body>${reportBody}</body></html>`;
+            const logoDataUrl = cover && cover.enabled ? await this._resolveExportLogoDataUrl(cover) : '';
+            const coverHtml = this._buildExportCoverPageHtml(cover, logoDataUrl, esc);
+            const reportCss = `body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:1120px;margin:auto;color:#0f172a}h1{margin-bottom:4px}h2{margin-top:28px}nav{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:18px 0}section{page-break-inside:avoid;border-top:1px solid #e2e8f0;padding-top:14px}.meta{color:#475569;font-size:13px}.report-frame{width:100%;height:760px;border:1px solid #d1d5db;border-radius:10px;background:#fff}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #d1d5db;padding:6px 8px;text-align:center}th{background:#f1f5f9}a{color:#0ea5e9;text-decoration:none}a:hover{text-decoration:underline}${this._getExportCoverCss()}`;
+            const introHtml = cover && cover.enabled
+              ? `<nav><strong>Included sections</strong><ol>${exportSections.toc}</ol></nav>`
+              : `<h1>Correlation Long Report</h1><p class="meta"><strong>Variables:</strong> ${data.headers.length} &nbsp;&middot;&nbsp; <strong>Rows:</strong> ${data.allRows.length} &nbsp;&middot;&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</p><nav><strong>Included sections</strong><ol>${exportSections.toc}</ol></nav>`;
+            const reportBody = `${coverHtml}${introHtml}${exportSections.html}${fallbackDataSection(data)}`;
+            const pageTitle = (cover && cover.enabled && cover.title) ? cover.title : 'Correlation Long Report';
+            const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(pageTitle)}</title><style>${reportCss}</style></head><body>${reportBody}</body></html>`;
             closeProgress();
             downloadBlob(
               new Blob([html], { type: 'text/html' }),
               `Correlation_Report_${safeName(this.currentTitle || 'Correlation')}_${timestamp()}.html`
             );
           })().catch(() => closeProgress());
+        }, {
+          coverDefaults: {
+            title: 'Correlation Analysis Report',
+            subtitle: 'Statistico Interactive',
+            subject: `${data.headers.length} variables · ${data.allRows.length} rows`,
+            description: 'Correlation matrix export generated from the active workbook range.'
+          }
         });
       }
     };
@@ -3387,7 +3624,7 @@ const StatisticoHeader = {
           alert('No report sections available from the current menu.');
           return;
         }
-        this._pickReportSections(sections, (selectedIds) => {
+        this._pickReportSections(sections, (selectedIds, cover) => {
           const selected = sections.filter((s) => selectedIds.includes(String(s.id)));
           const escapedVar = esc(data.headers[0]);
 
@@ -3454,9 +3691,15 @@ const StatisticoHeader = {
               return;
             }
 
-            const reportCss = `body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:1120px;margin:auto;color:#0f172a}h1{margin-bottom:4px}h2{margin-top:28px}nav{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}section{page-break-inside:avoid;border-top:1px solid #e2e8f0;padding-top:14px}.meta{color:#475569;font-size:13px}.report-frame{width:100%;height:760px;border:1px solid #d1d5db;border-radius:10px;background:#fff}a{color:#0ea5e9;text-decoration:none}a:hover{text-decoration:underline}`;
-            const reportBody = `<h1>Univariate Long Report</h1><p class="meta"><strong>Variable:</strong> ${escapedVar} &nbsp;&middot;&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</p><nav><strong>Included sections</strong><ol>${exportSections.toc}</ol></nav>${exportSections.html}`;
-            const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapedVar} - Long Report</title><style>${reportCss}</style></head><body>${reportBody}</body></html>`;
+            const logoDataUrl = cover && cover.enabled ? await this._resolveExportLogoDataUrl(cover) : '';
+            const coverHtml = this._buildExportCoverPageHtml(cover, logoDataUrl, esc);
+            const reportCss = `body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:1120px;margin:auto;color:#0f172a}h1{margin-bottom:4px}h2{margin-top:28px}nav{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:18px 0}section{page-break-inside:avoid;border-top:1px solid #e2e8f0;padding-top:14px}.meta{color:#475569;font-size:13px}.report-frame{width:100%;height:760px;border:1px solid #d1d5db;border-radius:10px;background:#fff}a{color:#0ea5e9;text-decoration:none}a:hover{text-decoration:underline}${this._getExportCoverCss()}`;
+            const introHtml = cover && cover.enabled
+              ? `<nav><strong>Included sections</strong><ol>${exportSections.toc}</ol></nav>`
+              : `<h1>Univariate Long Report</h1><p class="meta"><strong>Variable:</strong> ${escapedVar} &nbsp;&middot;&nbsp; <strong>Generated:</strong> ${new Date().toLocaleString()}</p><nav><strong>Included sections</strong><ol>${exportSections.toc}</ol></nav>`;
+            const reportBody = `${coverHtml}${introHtml}${exportSections.html}`;
+            const pageTitle = (cover && cover.enabled && cover.title) ? cover.title : `${escapedVar} - Long Report`;
+            const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${pageTitle}</title><style>${reportCss}</style></head><body>${reportBody}</body></html>`;
 
             closeProgress();
             downloadBlob(
@@ -3464,6 +3707,13 @@ const StatisticoHeader = {
               `Univariate_Report_${safeName(data.headers[0])}_${timestamp()}.html`
             );
           })().catch(() => closeProgress());
+        }, {
+          coverDefaults: {
+            title: 'Univariate Analysis Report',
+            subtitle: 'Statistico Interactive',
+            subject: data.headers[0],
+            description: `Descriptive and inferential views for ${data.headers[0]} (n=${data.allRows.length}).`
+          }
         });
       }
     };

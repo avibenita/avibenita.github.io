@@ -22,7 +22,7 @@ const NAV_TEMPLATE = `
 <nav class="sticky-nav" id="stickyNav">
   <div class="nav-container">
     <a href="javascript:void(0)" class="nav-logo" id="nav-logo-link" aria-label="Statistico Interactive">
-      <img class="nav-logo-full-img" src="/Statistico-Website/assets/statistico-logo-nav.png?v=2026-07-16-full" alt="Statistico Interactive" />
+      <img class="nav-logo-full-img" src="/Statistico-Website/assets/statistico-logo-nav.png?v=2026-07-16-full2" alt="Statistico Interactive" />
     </a>
 
     <ul class="nav-menu" id="navMenu">

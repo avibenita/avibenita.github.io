@@ -211,6 +211,55 @@
       background: var(--cfg-surface); flex-shrink: 0;
     }
     .reg-obs-strip .warn { color: #dc2626; font-size: 10px; }
+
+    .anova-cat-modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.55); z-index: 9000;
+      align-items: center; justify-content: center;
+    }
+    .anova-cat-modal-overlay.active { display: flex; }
+    .anova-cat-modal {
+      background: var(--cfg-surface, #1e293b);
+      border: 1px solid var(--cfg-border, rgba(255,255,255,.1));
+      border-radius: 12px; width: 420px; max-width: 95vw; max-height: 80vh;
+      display: flex; flex-direction: column; overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    }
+    .anova-cat-modal-header {
+      padding: 14px 18px; border-bottom: 1px solid var(--cfg-border, rgba(255,255,255,.08));
+    }
+    .anova-cat-modal-header h3 {
+      margin: 0; font-size: 14px; font-weight: 700; color: var(--anova-fac);
+    }
+    .anova-cat-modal-body { padding: 14px 18px; overflow-y: auto; flex: 1; }
+    .anova-cat-info {
+      background: var(--cfg-bg, rgba(255,255,255,.03));
+      border: 1px solid var(--cfg-border, rgba(255,255,255,.06));
+      border-radius: 8px; padding: 10px 14px; margin-bottom: 14px;
+    }
+    .anova-cat-info-row {
+      display: flex; justify-content: space-between;
+      font-size: 11px; color: var(--cfg-text2, #94a3b8); padding: 3px 0;
+    }
+    .anova-cat-info-value { font-weight: 700; color: var(--cfg-text1, #e2e8f0); }
+    .anova-cat-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .anova-cat-table th {
+      padding: 6px 8px; font-size: 10px; font-weight: 700;
+      color: var(--cfg-text3, #64748b); text-transform: uppercase;
+      letter-spacing: .04em; border-bottom: 1px solid var(--cfg-border, rgba(255,255,255,.07));
+    }
+    .anova-cat-table td {
+      padding: 6px 8px; border-bottom: 1px solid var(--cfg-border, rgba(255,255,255,.04));
+      color: var(--cfg-text1, #e2e8f0);
+    }
+    .anova-cat-modal-footer {
+      padding: 12px 18px; border-top: 1px solid var(--cfg-border, rgba(255,255,255,.08));
+      display: flex; justify-content: flex-end; gap: 8px;
+    }
+    .reg-chip.factor-chip { cursor: pointer; }
+    .reg-chip.factor-chip .chip-levels {
+      font-size: 9px; font-weight: 600; opacity: .75; margin-left: 2px;
+    }
   </style>
 </head>
 <body>
@@ -343,6 +392,39 @@
 
 </div>
 
+<div class="anova-cat-modal-overlay" id="anovaCatModal">
+  <div class="anova-cat-modal">
+    <div class="anova-cat-modal-header">
+      <h3><i class="fa-solid fa-layer-group"></i> <span id="anovaCatModalTitle">Group levels</span></h3>
+    </div>
+    <div class="anova-cat-modal-body">
+      <div class="anova-cat-info">
+        <div class="anova-cat-info-row"><span>Variable:</span><span class="anova-cat-info-value" id="anovaCatVarName"></span></div>
+        <div class="anova-cat-info-row"><span>Total observations:</span><span class="anova-cat-info-value" id="anovaCatTotalObs"></span></div>
+        <div class="anova-cat-info-row"><span>Included observations:</span><span class="anova-cat-info-value" id="anovaCatIncludedObs" style="color:var(--anova-fac);"></span></div>
+        <div class="anova-cat-info-row"><span>Selected levels:</span><span class="anova-cat-info-value" id="anovaCatSelectedCount"></span></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-size:11px;font-weight:600;color:var(--cfg-text3,#64748b);">Levels to include (need ≥2):</span>
+        <div style="display:flex;gap:6px;">
+          <button type="button" id="anovaBtnSelectAll" style="font-size:10px;padding:3px 7px;border:1px solid var(--cfg-border);border-radius:5px;background:var(--cfg-surface);color:var(--cfg-text3);cursor:pointer;">Select all</button>
+          <button type="button" id="anovaBtnDeselectAll" style="font-size:10px;padding:3px 7px;border:1px solid var(--cfg-border);border-radius:5px;background:var(--cfg-surface);color:var(--cfg-text3);cursor:pointer;">Deselect all</button>
+        </div>
+      </div>
+      <table class="anova-cat-table">
+        <thead><tr><th style="width:40px;text-align:center;">Include</th><th>Level</th><th style="text-align:center;">n</th></tr></thead>
+        <tbody id="anovaCatTableBody"></tbody>
+      </table>
+    </div>
+    <div class="anova-cat-modal-footer">
+      <button type="button" id="anovaBtnCatCancel" style="padding:6px 14px;border:1px solid var(--cfg-border);border-radius:7px;background:var(--cfg-surface);color:var(--cfg-text3);cursor:pointer;font-size:11px;">Cancel</button>
+      <button type="button" id="anovaBtnCatConfirm" style="padding:6px 14px;border:none;border-radius:7px;background:var(--anova-fac);color:#fff;cursor:pointer;font-size:11px;font-weight:700;">
+        <i class="fa-solid fa-check"></i> Add grouping factor
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
   var _headers = [];
   var _rows = [];
@@ -352,6 +434,8 @@
   var draggedElement = null;
 
   var assignments = { dv: null, factors: [], conditions: [], mode: 'between' };
+  var factorCategories = {};
+  var _pendingFactorDrop = null;
 
   var STORAGE_KEY = 'anova-config';
 
@@ -377,6 +461,7 @@
       }
     );
     setupDropZones();
+    wireFactorCategoryModal();
     document.getElementById('btnCancel').addEventListener('click', sendClose);
     document.getElementById('guideToggle').addEventListener('click', function() {
       document.getElementById('guideWrap').classList.toggle('open');
@@ -425,6 +510,7 @@
 
     buildColumnStats();
     assignments = { dv: null, factors: [], conditions: [], mode: 'between' };
+    factorCategories = {};
     if (_saved) applySpec(_saved);
 
     renderVariables();
@@ -558,6 +644,123 @@
     return columnStats.find(function(s) { return s.name === name; });
   }
 
+  function getFactorLevelCounts(varName) {
+    var s = getStats(varName);
+    if (!s) return [];
+    var freq = {};
+    _rows.forEach(function(row) {
+      var value = row[s.idx];
+      if (value === null || value === undefined || value === '') return;
+      var key = String(value).trim();
+      freq[key] = (freq[key] || 0) + 1;
+    });
+    return Object.keys(freq).map(function(value) {
+      return { value: value, freq: freq[value] };
+    }).sort(function(a, b) { return b.freq - a.freq; });
+  }
+
+  function showFactorCategoryModal(varName, isEdit) {
+    var levels = getFactorLevelCounts(varName);
+    if (levels.length < 2) return false;
+    _pendingFactorDrop = { name: varName, isEdit: !!isEdit };
+    document.getElementById('anovaCatModalTitle').textContent = isEdit ? 'Edit group levels' : 'Select group levels';
+    document.getElementById('anovaCatVarName').textContent = varName;
+    document.getElementById('anovaBtnCatConfirm').innerHTML = isEdit
+      ? '<i class="fa-solid fa-check"></i> Update levels'
+      : '<i class="fa-solid fa-check"></i> Add grouping factor';
+    var preselected = factorCategories[varName] || levels.map(function(l) { return l.value; });
+    populateFactorCategoryModal(levels, preselected);
+    document.getElementById('anovaCatModal').classList.add('active');
+    return true;
+  }
+
+  function populateFactorCategoryModal(levels, preselected) {
+    var selectedSet = {};
+    (preselected || []).forEach(function(v) { selectedSet[String(v)] = true; });
+    var totalObs = levels.reduce(function(sum, l) { return sum + l.freq; }, 0);
+    document.getElementById('anovaCatTotalObs').textContent = totalObs;
+    var tbody = document.getElementById('anovaCatTableBody');
+    tbody.innerHTML = '';
+    levels.forEach(function(level) {
+      var tr = document.createElement('tr');
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !!selectedSet[level.value];
+      cb.className = 'anova-cat-checkbox';
+      cb.style.cssText = 'cursor:pointer;width:15px;height:15px;';
+      cb.dataset.value = level.value;
+      cb.dataset.freq = String(level.freq);
+      cb.addEventListener('change', updateFactorCatStats);
+      var td1 = document.createElement('td'); td1.style.textAlign = 'center'; td1.appendChild(cb);
+      var td2 = document.createElement('td'); td2.textContent = level.value === '' ? '(empty)' : level.value;
+      var td3 = document.createElement('td');
+      td3.style.cssText = 'text-align:center;font-weight:700;color:var(--anova-fac);';
+      td3.textContent = level.freq;
+      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+      tbody.appendChild(tr);
+    });
+    updateFactorCatStats();
+  }
+
+  function updateFactorCatStats() {
+    var checkboxes = document.querySelectorAll('.anova-cat-checkbox');
+    var sel = 0, inc = 0;
+    checkboxes.forEach(function(cb) {
+      if (cb.checked) { sel++; inc += parseInt(cb.dataset.freq, 10) || 0; }
+    });
+    document.getElementById('anovaCatSelectedCount').textContent = sel + ' of ' + checkboxes.length;
+    document.getElementById('anovaCatIncludedObs').textContent = inc;
+    var btn = document.getElementById('anovaBtnCatConfirm');
+    if (btn) {
+      btn.disabled = sel < 2;
+      btn.style.opacity = sel < 2 ? '.5' : '1';
+    }
+  }
+
+  function hideFactorCategoryModal() {
+    document.getElementById('anovaCatModal').classList.remove('active');
+    _pendingFactorDrop = null;
+  }
+
+  function confirmFactorCategoryDrop() {
+    if (!_pendingFactorDrop) return;
+    var name = _pendingFactorDrop.name;
+    var isEdit = _pendingFactorDrop.isEdit;
+    var selected = [];
+    var includedObs = 0;
+    document.querySelectorAll('.anova-cat-checkbox').forEach(function(cb) {
+      if (cb.checked) {
+        selected.push(cb.dataset.value);
+        includedObs += parseInt(cb.dataset.freq, 10) || 0;
+      }
+    });
+    if (selected.length < 2) return;
+    factorCategories[name] = selected.slice();
+    if (!isEdit && assignments.factors.indexOf(name) < 0) {
+      assignments.factors.push(name);
+    }
+    hideFactorCategoryModal();
+    renderVariables();
+    renderAssignments();
+    validateModel();
+  }
+
+  function wireFactorCategoryModal() {
+    document.getElementById('anovaBtnCatCancel').addEventListener('click', hideFactorCategoryModal);
+    document.getElementById('anovaBtnCatConfirm').addEventListener('click', confirmFactorCategoryDrop);
+    document.getElementById('anovaBtnSelectAll').addEventListener('click', function() {
+      document.querySelectorAll('.anova-cat-checkbox').forEach(function(cb) { cb.checked = true; });
+      updateFactorCatStats();
+    });
+    document.getElementById('anovaBtnDeselectAll').addEventListener('click', function() {
+      document.querySelectorAll('.anova-cat-checkbox').forEach(function(cb) { cb.checked = false; });
+      updateFactorCatStats();
+    });
+    document.getElementById('anovaCatModal').addEventListener('click', function(e) {
+      if (e.target === document.getElementById('anovaCatModal')) hideFactorCategoryModal();
+    });
+  }
+
   function handleDrop(e) {
     e.stopPropagation();
     e.preventDefault();
@@ -577,7 +780,8 @@
       if (varName === assignments.dv) return false;
       if (assignments.factors.indexOf(varName) >= 0) return false;
       if (assignments.factors.length >= 2) return false;
-      assignments.factors.push(varName);
+      showFactorCategoryModal(varName, false);
+      return false;
     } else if (zoneType === 'cond') {
       if (!s.condEligible) return false;
       if (assignments.conditions.indexOf(varName) < 0) assignments.conditions.push(varName);
@@ -593,6 +797,7 @@
     if (zoneType === 'dv') assignments.dv = null;
     else if (zoneType === 'fac') {
       assignments.factors = assignments.factors.filter(function(n) { return n !== varName; });
+      delete factorCategories[varName];
     } else if (zoneType === 'cond') {
       assignments.conditions = assignments.conditions.filter(function(n) { return n !== varName; });
     }
@@ -611,9 +816,19 @@
     } else {
       assignments.factors.forEach(function(name) {
         var chip = document.createElement('div');
-        chip.className = 'reg-chip';
-        chip.innerHTML = '<span>' + name + '</span><button class="reg-chip-x" title="Remove">✕</button>';
-        chip.querySelector('.reg-chip-x').addEventListener('click', function() { removeFromZone('fac', name); });
+        chip.className = 'reg-chip factor-chip';
+        var sel = factorCategories[name] ? factorCategories[name].length : 0;
+        var total = getFactorLevelCounts(name).length;
+        var levelHint = sel && total ? ' <span class="chip-levels">(' + sel + '/' + total + ')</span>' : '';
+        chip.innerHTML = '<span>' + name + levelHint + '</span><button class="reg-chip-x" title="Remove">✕</button>';
+        chip.addEventListener('click', function(e) {
+          if (e.target.closest('.reg-chip-x')) return;
+          showFactorCategoryModal(name, true);
+        });
+        chip.querySelector('.reg-chip-x').addEventListener('click', function(e) {
+          e.stopPropagation();
+          removeFromZone('fac', name);
+        });
         zoneFac.appendChild(chip);
       });
     }
@@ -698,13 +913,20 @@
       if (!ok) warn = 'Need at least 2 condition columns';
     } else {
       var distinct = factors.length === new Set(factors).size;
-      ok = !!(assignments.dv && factors.length >= 1 && distinct &&
+      var levelsOk = factors.every(function(f) {
+        return !factorCategories[f] || factorCategories[f].length >= 2;
+      });
+      ok = !!(assignments.dv && factors.length >= 1 && distinct && levelsOk &&
         factors.every(function(f) { return f !== assignments.dv; }));
       var design = factors.length >= 2 ? 'Two-way' : 'One-way';
       obsText.textContent = assignments.dv
-        ? design + ' · DV: ' + assignments.dv + ' · Groups: ' + (factors.join(', ') || '—')
+        ? design + ' · DV: ' + assignments.dv + ' · Groups: ' + (factors.map(function(f) {
+            var n = factorCategories[f] ? factorCategories[f].length : getFactorLevelCounts(f).length;
+            return f + (n ? ' (' + n + ' lv)' : '');
+          }).join(', ') || '—')
         : 'Configure the model to continue';
-      if (!ok) warn = 'Assign DV and at least one grouping factor';
+      if (!levelsOk) warn = 'Each grouping factor needs at least 2 levels selected';
+      else if (!ok) warn = 'Assign DV and at least one grouping factor';
     }
 
     document.getElementById('runBtn').disabled = !ok;
@@ -729,18 +951,37 @@
     if (exists(spec.factor1)) assignments.factors.push(spec.factor1);
     if (exists(spec.factor2) && assignments.factors.indexOf(spec.factor2) < 0) assignments.factors.push(spec.factor2);
     if (spec.conditions && spec.conditions.length) assignments.conditions = spec.conditions.filter(exists);
+    factorCategories = {};
+    if (spec.factorCategories && typeof spec.factorCategories === 'object') {
+      assignments.factors.forEach(function(f) {
+        if (Array.isArray(spec.factorCategories[f]) && spec.factorCategories[f].length >= 2) {
+          factorCategories[f] = spec.factorCategories[f].map(String);
+        } else {
+          factorCategories[f] = getFactorLevelCounts(f).map(function(l) { return l.value; });
+        }
+      });
+    } else {
+      assignments.factors.forEach(function(f) {
+        factorCategories[f] = getFactorLevelCounts(f).map(function(l) { return l.value; });
+      });
+    }
     refreshLayout();
   }
 
   function collectSpec() {
     var factors = assignments.factors.slice();
     var type = inferType();
+    var fc = {};
+    factors.forEach(function(f) {
+      if (factorCategories[f] && factorCategories[f].length) fc[f] = factorCategories[f].slice();
+    });
     return {
       type: type,
       dv: assignments.dv,
       factor1: factors[0] || null,
       factor2: factors[1] || null,
       conditions: assignments.conditions.slice(),
+      factorCategories: Object.keys(fc).length ? fc : undefined,
       posthocMethod: 'tukey',
       alpha: 0.05,
       includeDescriptives: true,

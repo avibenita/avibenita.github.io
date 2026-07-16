@@ -371,6 +371,12 @@ function groupDescriptivesFixed(grouped, levels) {
 }
 
 /* ── Master bundle builder ───────────────────────────────────── */
+function factorLevelAllowed(spec, factorName, level) {
+  const map = spec && spec.factorCategories;
+  if (!map || !factorName || !Array.isArray(map[factorName]) || !map[factorName].length) return true;
+  return map[factorName].indexOf(String(level ?? '').trim()) >= 0;
+}
+
 function buildAnovaBundle(headers, rows, spec) {
   const type = spec.type || 'one-way';  // 'one-way' | 'two-way' | 'repeated'
   const posthocMethod = spec.posthocMethod || 'tukey';
@@ -386,6 +392,7 @@ function buildAnovaBundle(headers, rows, spec) {
       const v  = parseNum(r[dvIdx]);
       const lv = String(r[grpIdx] ?? '').trim();
       if (!isFinite(v) || !lv) return;
+      if (!factorLevelAllowed(spec, spec.factor1, lv)) return;
       if (!grouped[lv]) grouped[lv] = [];
       grouped[lv].push(v);
     });
@@ -424,6 +431,8 @@ function buildAnovaBundle(headers, rows, spec) {
       const a  = String(r[aIdx] ?? '').trim();
       const b  = String(r[bIdx] ?? '').trim();
       if (!isFinite(v) || !a || !b) return;
+      if (!factorLevelAllowed(spec, spec.factor1, a)) return;
+      if (!factorLevelAllowed(spec, spec.factor2, b)) return;
       aSet.add(a); bSet.add(b);
       const key = `${a}::${b}`;
       if (!cells[key]) cells[key] = [];

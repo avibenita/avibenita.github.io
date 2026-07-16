@@ -6,7 +6,7 @@
 (function (global) {
   'use strict';
 
-  var LOGO_VER = '20260716am';
+  var LOGO_VER = '20260716pm';
   var LOGO_FILE = 'statistico-logo-hub.png';
 
   /** Compact normal curve kept for legacy callers (e.g. Gauss.html demos). */

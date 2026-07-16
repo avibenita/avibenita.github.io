@@ -1608,7 +1608,45 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260716b',
+  _TAB_ASSET_VER: '20260716export',
+
+  _prepareExportSnapshotBody(bodyClone) {
+    bodyClone.querySelectorAll(
+      '#header-container, .statistico-shell, .sb-nav, #sidebarNav, .statistico-footer,'
+      + '#uniResultsViewTabs, .uni-results-tab-stack, .ws-shell--view-tabs,'
+      + '.navrow-tabs, .sb-facets'
+    ).forEach((n) => n.remove());
+    bodyClone.querySelectorAll('.sb-ai-float-btn, .sb-ai-overlay, .loading-overlay, #dialogLoading').forEach((n) => n.remove());
+    bodyClone.querySelectorAll('button, select, input, textarea').forEach((el) => {
+      el.setAttribute('disabled', 'disabled');
+      el.setAttribute('tabindex', '-1');
+      ['onclick', 'onchange', 'oninput', 'onmousedown', 'onmouseup', 'onfocus', 'onblur', 'onkeydown', 'onkeyup'].forEach((ev) => el.removeAttribute(ev));
+    });
+    const snapshotStyle = document.createElement('style');
+    snapshotStyle.textContent = `
+      button, select, input, textarea {
+        pointer-events: none !important;
+        cursor: default !important;
+        opacity: 0.48 !important;
+        filter: grayscale(30%) !important;
+        user-select: none !important;
+      }
+      button:hover, select:hover, input:hover {
+        background: inherit !important;
+        box-shadow: none !important;
+        transform: none !important;
+      }
+      #uniResultsViewTabs, .uni-results-tab-stack, .ws-shell--view-tabs,
+      .navrow-tabs, .sb-facets, .ws-mode-bar, .uni-view-tabs, .ws-chrome--attached {
+        display: none !important;
+      }
+      .highcharts-exporting-group, .highcharts-button,
+      .sb-ai-float-btn, .sb-ai-overlay, .loading-overlay, #dialogLoading {
+        display: none !important;
+      }
+    `;
+    bodyClone.prepend(snapshotStyle);
+  },
 
   _ensurePlainTabUnderlineStyles() {
     const id = 'statistico-tab-underline-fix';
@@ -2781,21 +2819,13 @@ const StatisticoHeader = {
       });
     };
     const extractRichSnapshot = (doc, sourceUrl) => {
-      const headClone = doc.head ? doc.head.cloneNode(true) : document.createElement('head');
+      const headClone = (doc.head ? doc.head.cloneNode(true) : document.createElement('head'));
       headClone.querySelectorAll('script, noscript').forEach((n) => n.remove());
       normalizeAssetUrls(headClone, sourceUrl);
-      const bodyClone = doc.body ? doc.body.cloneNode(true) : document.createElement('body');
+      const bodyClone = (doc.body ? doc.body.cloneNode(true) : document.createElement('body'));
       bodyClone.querySelectorAll('script, noscript').forEach((n) => n.remove());
       normalizeAssetUrls(bodyClone, sourceUrl);
-      bodyClone.querySelectorAll('#header-container, .statistico-shell, .sb-nav, #sidebarNav, .statistico-footer, .sb-ai-float-btn, .sb-ai-overlay, .loading-overlay, #dialogLoading').forEach((n) => n.remove());
-      bodyClone.querySelectorAll('button, select, input, textarea').forEach((el) => {
-        el.setAttribute('disabled', 'disabled');
-        el.setAttribute('tabindex', '-1');
-        ['onclick','onchange','oninput','onmousedown','onmouseup','onfocus','onblur','onkeydown','onkeyup'].forEach((ev) => el.removeAttribute(ev));
-      });
-      const snapshotStyle = document.createElement('style');
-      snapshotStyle.textContent = 'button,select,input,textarea{pointer-events:none!important;cursor:default!important;opacity:.55!important;filter:grayscale(25%)!important}.highcharts-exporting-group,.highcharts-button,.sb-ai-float-btn,.sb-ai-overlay,.loading,#loadingMessage{display:none!important}';
-      bodyClone.prepend(snapshotStyle);
+      this._prepareExportSnapshotBody(bodyClone);
       const primary = bodyClone.querySelector('.right-col') || bodyClone.querySelector('.container') || bodyClone;
       const payload = primary === bodyClone ? bodyClone.innerHTML : primary.outerHTML;
       return `<!DOCTYPE html><html><head><meta charset="utf-8">${headClone.innerHTML}</head><body>${payload}</body></html>`;
@@ -2817,6 +2847,7 @@ const StatisticoHeader = {
         try {
           const doc = iframe.contentDocument;
           if (!doc) return finish('', false);
+          doc.querySelectorAll('#uniResultsViewTabs, .uni-results-tab-stack, .navrow-tabs').forEach((n) => n.remove());
           const hasRenderable = !!doc.querySelector('svg, canvas, .highcharts-root, .highcharts-container, table');
           if (hasRenderable || (Date.now() - startedAt) > 9000) {
             finish(extractRichSnapshot(doc, url), true);
@@ -3054,45 +3085,7 @@ const StatisticoHeader = {
       const bodyClone = (doc.body ? doc.body.cloneNode(true) : document.createElement('body'));
       bodyClone.querySelectorAll('script, noscript').forEach((n) => n.remove());
       normalizeAssetUrls(bodyClone, sourceUrl);
-
-      // Remove navigation / shell chrome (these have no place in a static report)
-      bodyClone.querySelectorAll('#header-container, .statistico-shell, .sb-nav, #sidebarNav, .statistico-footer').forEach((n) => n.remove());
-
-      // Remove overlays that don't belong in a static snapshot
-      bodyClone.querySelectorAll('.sb-ai-float-btn, .sb-ai-overlay, .loading-overlay, #dialogLoading').forEach((n) => n.remove());
-
-      // Disable all interactive form elements so they look & act frozen
-      bodyClone.querySelectorAll('button, select, input, textarea').forEach((el) => {
-        el.setAttribute('disabled', 'disabled');
-        el.setAttribute('tabindex', '-1');
-        // Strip live event attributes so nothing fires if JS somehow runs
-        ['onclick','onchange','oninput','onmousedown','onmouseup','onfocus','onblur','onkeydown','onkeyup'].forEach((ev) => el.removeAttribute(ev));
-      });
-
-      // Inject snapshot stylesheet: visually disable controls, block all pointer events
-      const snapshotStyle = document.createElement('style');
-      snapshotStyle.textContent = `
-        /* Snapshot: interactive elements are visible but frozen */
-        button, select, input, textarea {
-          pointer-events: none !important;
-          cursor: default !important;
-          opacity: 0.48 !important;
-          filter: grayscale(30%) !important;
-          user-select: none !important;
-        }
-        button:hover, select:hover, input:hover {
-          background: inherit !important;
-          box-shadow: none !important;
-          transform: none !important;
-        }
-        /* Hide Highcharts export / context-menu button */
-        .highcharts-exporting-group, .highcharts-button { display: none !important; }
-        /* Hide the AI floating button and any open overlay */
-        .sb-ai-float-btn, .sb-ai-overlay { display: none !important; }
-        /* Loading screen */
-        .loading-overlay, #dialogLoading { display: none !important; }
-      `;
-      bodyClone.prepend(snapshotStyle);
+      this._prepareExportSnapshotBody(bodyClone);
 
       const primary =
         bodyClone.querySelector('.right-col') ||
@@ -3121,6 +3114,19 @@ const StatisticoHeader = {
         try {
           const doc = iframe.contentDocument;
           if (!doc) return finish('', false);
+          doc.querySelectorAll('#uniResultsViewTabs, .uni-results-tab-stack').forEach((n) => n.remove());
+          if (url.indexOf('boxplot-standalone') !== -1) {
+            const main = doc.getElementById('boxplotPanel-main');
+            const outliers = doc.getElementById('boxplotPanel-outliers');
+            if (main) {
+              main.classList.add('is-active');
+              main.style.display = '';
+            }
+            if (outliers) {
+              outliers.classList.remove('is-active');
+              outliers.style.display = 'none';
+            }
+          }
           const hasRenderable = !!doc.querySelector('svg, canvas, .highcharts-root, .highcharts-container, .chart, table');
           if (hasRenderable || (Date.now() - startedAt) > 9000) {
             const snapshot = extractRichSnapshot(doc, url);
@@ -3178,13 +3184,30 @@ const StatisticoHeader = {
       const cfg = this._getSharedSidebarConfig ? this._getSharedSidebarConfig() : null;
       const groups = (cfg && Array.isArray(cfg.groups)) ? cfg.groups : [];
       const items = [];
+      const pushNavigate = (entry) => {
+        if (!entry || !entry.label) return;
+        items.push({
+          id: entry.view || entry.file || entry.label,
+          label: entry.label,
+          file: entry.file || null
+        });
+      };
       groups.forEach((group) => {
         (group.items || []).forEach((item) => {
-          if (item.type === 'navigate' && item.label) {
-            items.push({ id: item.view || item.file || item.label, label: item.label, file: item.file || null });
+          if (item.type !== 'navigate' || !item.label) return;
+          if (Array.isArray(item.facets) && item.facets.length) {
+            item.facets.forEach((facet) => pushNavigate(facet));
+          } else {
+            pushNavigate(item);
           }
         });
       });
+      const pinned = cfg && cfg.pinnedNav && cfg.pinnedNav.items;
+      if (Array.isArray(pinned)) {
+        pinned.forEach((item) => {
+          if (item.type === 'navigate') pushNavigate(item);
+        });
+      }
       return items;
     };
 

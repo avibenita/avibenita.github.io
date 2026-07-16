@@ -233,7 +233,7 @@ let HUB_CLUSTER_META = {
     name: "Interactive Analytics",
     tagline: "Core statistical modeling, comparisons, and discovery tools",
     color: "#22c55e",
-    colorDark: "#15803d",
+    colorDark: "#34d399",
     icon: "fa-chart-line",
     brandFrom: "#22c55e",
     brandTo: "#15803d"

@@ -1608,7 +1608,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260716cover',
+  _TAB_ASSET_VER: '20260716export',
 
   _prepareExportSnapshotBody(bodyClone) {
     bodyClone.querySelectorAll(
@@ -1683,8 +1683,54 @@ const StatisticoHeader = {
       description: d.description || '',
       includeLogo: d.includeLogo !== false,
       useBrandLogo: d.useBrandLogo !== false,
-      customLogoDataUrl: d.customLogoDataUrl || ''
+      customLogoDataUrl: d.customLogoDataUrl || '',
+      coverBackground: d.coverBackground || 'statistico-dark',
+      aiDescriptionPerSection: d.aiDescriptionPerSection === true,
+      aiInterpretationPerSection: d.aiInterpretationPerSection === true,
+      optionsExpanded: d.optionsExpanded === true
     };
+  },
+
+  _extractStatInsightFromSnapshot(snapshotHtml) {
+    if (!snapshotHtml) return '';
+    try {
+      const doc = new DOMParser().parseFromString(snapshotHtml, 'text/html');
+      const el = doc.getElementById('stat-insight') || doc.getElementById('statInsight');
+      return el ? String(el.textContent || '').trim() : '';
+    } catch (_) {
+      return '';
+    }
+  },
+
+  async _fetchExportSectionAiContent(section, snap, moduleName, wantDesc, wantInterp) {
+    const fallbackDesc = this._getSidebarItemDescription(section);
+    const fallbackInterp = this._extractStatInsightFromSnapshot(snap && snap.snapshotHtml);
+    if (!wantDesc && !wantInterp) return { description: '', interpretation: '' };
+
+    let description = '';
+    let interpretation = '';
+
+    try {
+      const viewId = String(section.id || section.view || '');
+      let prompt = null;
+      if (moduleName === 'correlations') {
+        prompt = this._buildCorrelationStructuredPrompt(viewId, 'per-view');
+      } else if (moduleName === 'univariate') {
+        prompt = this._buildStructuredPrompt(viewId, 'per-view', null, {
+          viewDataOverride: snap && snap.viewData ? snap.viewData : null
+        });
+      }
+      if (prompt) {
+        const raw = await this._callAiForSidebar(prompt);
+        const parsed = this._parseAiStructured(raw) || {};
+        if (wantDesc) description = parsed.ABOUT || fallbackDesc;
+        if (wantInterp) interpretation = parsed.READING || fallbackInterp;
+      }
+    } catch (_) {}
+
+    if (wantDesc && !description) description = fallbackDesc;
+    if (wantInterp && !interpretation) interpretation = fallbackInterp;
+    return { description, interpretation };
   },
 
   _getBrandLogoUrlForExport() {
@@ -1736,9 +1782,10 @@ const StatisticoHeader = {
     const descHtml = cover.description
       ? `<p class="cover-description">${esc(cover.description)}</p>`
       : '';
+    const bgClass = `cover-bg--${String(cover.coverBackground || 'statistico-dark').replace(/[^a-z0-9-]/gi, '')}`;
     return `
       <section class="report-cover" id="report-cover">
-        <div class="cover-inner">
+        <div class="cover-inner ${bgClass}">
           ${logoHtml}
           <p class="cover-eyebrow">${esc(cover.subtitle || 'Statistico Interactive')}</p>
           <h1 class="cover-title">${esc(cover.title || 'Analysis Report')}</h1>
@@ -1755,9 +1802,42 @@ const StatisticoHeader = {
       .cover-inner{
         min-height:72vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
         text-align:center;padding:48px 36px;border-radius:18px;
-        background:linear-gradient(160deg,#06152a 0%,#0b2540 42%,#123a5c 100%);
         color:#f8fafc;box-shadow:0 18px 42px rgba(15,23,42,.18)
       }
+      .cover-inner.cover-bg--statistico-dark{
+        background:linear-gradient(160deg,#06152a 0%,#0b2540 42%,#123a5c 100%);
+        color:#f8fafc
+      }
+      .cover-inner.cover-bg--statistico-light{
+        background:linear-gradient(160deg,#e0f2fe 0%,#f0f9ff 48%,#fff 100%);
+        color:#0f172a;box-shadow:0 18px 42px rgba(15,23,42,.1)
+      }
+      .cover-inner.cover-bg--warm-sunset{
+        background:linear-gradient(155deg,#7c2d12 0%,#ea580c 45%,#fdba74 100%);
+        color:#fff7ed
+      }
+      .cover-inner.cover-bg--brand-purple{
+        background:linear-gradient(155deg,#312e81 0%,#6d28d9 42%,#a78bfa 100%);
+        color:#f5f3ff
+      }
+      .cover-inner.cover-bg--clean-white{
+        background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);
+        color:#0f172a;border:1px solid #e2e8f0;box-shadow:0 12px 28px rgba(15,23,42,.08)
+      }
+      .cover-inner.cover-bg--statistico-light .cover-eyebrow,
+      .cover-inner.cover-bg--clean-white .cover-eyebrow{color:#0369a1}
+      .cover-inner.cover-bg--statistico-light .cover-title,
+      .cover-inner.cover-bg--clean-white .cover-title{color:#0f172a}
+      .cover-inner.cover-bg--statistico-light .cover-description,
+      .cover-inner.cover-bg--clean-white .cover-description{color:#334155}
+      .cover-inner.cover-bg--statistico-light .cover-meta-key,
+      .cover-inner.cover-bg--clean-white .cover-meta-key{color:#64748b}
+      .cover-inner.cover-bg--statistico-light .cover-meta-val,
+      .cover-inner.cover-bg--clean-white .cover-meta-val{color:#0f172a}
+      .cover-inner.cover-bg--statistico-light .cover-meta,
+      .cover-inner.cover-bg--clean-white .cover-meta{border-top-color:rgba(100,116,139,.35)}
+      .cover-inner.cover-bg--warm-sunset .cover-eyebrow{color:#ffedd5}
+      .cover-inner.cover-bg--brand-purple .cover-eyebrow{color:#ddd6fe}
       .cover-logo{max-width:min(420px,88%);height:auto;margin:0 auto 22px;display:block}
       .cover-eyebrow{margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:.28em;text-transform:uppercase;color:#93c5fd}
       .cover-title{margin:0 0 14px;font-size:clamp(1.8rem,4vw,2.6rem);font-weight:800;line-height:1.15;color:#fff}
@@ -1769,6 +1849,14 @@ const StatisticoHeader = {
       .cover-meta-row{display:grid;grid-template-columns:130px 1fr;gap:12px;font-size:13px}
       .cover-meta-key{color:#94a3b8;font-weight:600}
       .cover-meta-val{color:#f1f5f9}
+      .export-section-ai{margin:0 0 14px;display:grid;gap:10px}
+      .export-ai-block{
+        padding:12px 14px;border-radius:10px;border:1px solid #e2e8f0;background:#f8fafc;
+        font-size:14px;line-height:1.55;color:#334155
+      }
+      .export-ai-block strong{
+        display:block;margin-bottom:6px;font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:#64748b
+      }
     `;
   },
 
@@ -1809,6 +1897,19 @@ const StatisticoHeader = {
     const brandLogoChecked = initialCover.useBrandLogo !== false ? 'checked' : '';
     const customLogoChecked = initialCover.useBrandLogo === false ? 'checked' : '';
     const customLogoWrapStyle = initialCover.useBrandLogo === false ? '' : 'display:none;';
+    const aiDescChecked = initialCover.aiDescriptionPerSection ? 'checked' : '';
+    const aiInterpChecked = initialCover.aiInterpretationPerSection ? 'checked' : '';
+    const optionsExpanded = initialCover.optionsExpanded === true;
+    const optionsBodyDisplay = optionsExpanded ? 'block' : 'none';
+    const optionsChevronRotate = optionsExpanded ? 'rotate(180deg)' : 'rotate(0deg)';
+    const bg = String(initialCover.coverBackground || 'statistico-dark');
+    const bgOptions = [
+      ['statistico-dark', 'Statistico dark'],
+      ['statistico-light', 'Statistico light'],
+      ['warm-sunset', 'Warm sunset'],
+      ['brand-purple', 'Brand purple'],
+      ['clean-white', 'Clean white']
+    ].map(([value, label]) => `<option value="${value}"${bg === value ? ' selected' : ''}>${label}</option>`).join('');
 
     overlay.innerHTML = `
       <div style="width:min(640px,95vw);max-height:90vh;background:#fff;border-radius:14px;border:1px solid #cbd5e1;box-shadow:0 16px 40px rgba(15,23,42,.32);display:flex;flex-direction:column;overflow:hidden;">
@@ -1816,67 +1917,86 @@ const StatisticoHeader = {
           <i class="fa-solid fa-file-export" style="color:#f97316;font-size:16px;"></i>
           <span style="font-size:15px;font-weight:700;color:#0f172a;">Export Report</span>
         </div>
-        <div style="padding:12px 18px 0;border-bottom:1px solid #e2e8f0;">
-          <label style="display:flex;align-items:center;gap:8px;color:#0f172a;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px;">
-            <input type="checkbox" id="stCoverEnabled" ${coverEnabled} style="cursor:pointer;accent-color:#f97316;" />
-            <span>Include cover page</span>
-          </label>
-          <div id="stCoverPanel" style="display:${coverPanelDisplay};gap:10px;padding-bottom:12px;">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Title
-                <input id="stCoverTitle" type="text" value="${esc(initialCover.title)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
+        <div style="padding:10px 18px 4px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:6px;">Sections to include</div>
+        </div>
+        <div style="padding:0 18px 12px;overflow-y:auto;flex:1;min-height:120px;max-height:42vh;border-bottom:1px solid #e2e8f0;">${sectionListHtml}</div>
+        <div style="padding:0 18px 12px;background:#f8fafc;">
+          <button type="button" id="stExportOptionsToggle" style="width:100%;margin-top:12px;padding:12px 14px;border:2px solid #cbd5e1;border-radius:12px;background:linear-gradient(180deg,#fff 0%,#f1f5f9 100%);color:#0f172a;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;box-shadow:0 2px 8px rgba(15,23,42,.06);">
+            <span style="display:flex;align-items:center;gap:8px;"><i class="fa-solid fa-sliders" style="color:#f97316;"></i> Options</span>
+            <i class="fa-solid fa-chevron-down" id="stExportOptionsChevron" style="color:#64748b;transition:transform .2s ease;transform:${optionsChevronRotate};"></i>
+          </button>
+          <div id="stExportOptionsBody" style="display:${optionsBodyDisplay};margin-top:10px;padding:14px;border:2px solid #e2e8f0;border-radius:12px;background:#fff;">
+            <div style="display:grid;gap:10px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px dashed #e2e8f0;">
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;font-weight:600;">Cover background
+                <select id="stCoverBackground" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;background:#fff;">${bgOptions}</select>
               </label>
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Subtitle
-                <input id="stCoverSubtitle" type="text" value="${esc(initialCover.subtitle)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
+              <label style="display:flex;align-items:center;gap:8px;color:#0f172a;font-size:13px;font-weight:600;cursor:pointer;">
+                <input type="checkbox" id="stAiDescription" ${aiDescChecked} style="cursor:pointer;accent-color:#f97316;" />
+                <span>AI description for each section</span>
               </label>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Subject / variable
-                <input id="stCoverSubject" type="text" value="${esc(initialCover.subject)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
-              </label>
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Report date
-                <input id="stCoverDate" type="text" value="${esc(initialCover.reportDate)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
-              </label>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Author
-                <input id="stCoverAuthor" type="text" value="${esc(initialCover.author)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
-              </label>
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Organization
-                <input id="stCoverOrg" type="text" value="${esc(initialCover.organization)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
+              <label style="display:flex;align-items:center;gap:8px;color:#0f172a;font-size:13px;font-weight:600;cursor:pointer;">
+                <input type="checkbox" id="stAiInterpretation" ${aiInterpChecked} style="cursor:pointer;accent-color:#f97316;" />
+                <span>AI interpretation for each section</span>
               </label>
             </div>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Prepared for
-              <input id="stCoverPreparedFor" type="text" value="${esc(initialCover.preparedFor)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
+            <label style="display:flex;align-items:center;gap:8px;color:#0f172a;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px;">
+              <input type="checkbox" id="stCoverEnabled" ${coverEnabled} style="cursor:pointer;accent-color:#f97316;" />
+              <span>Include cover page</span>
             </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Summary / notes
-              <textarea id="stCoverDescription" rows="3" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;resize:vertical;">${esc(initialCover.description)}</textarea>
-            </label>
-            <div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;display:grid;gap:8px;">
-              <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#0f172a;cursor:pointer;">
-                <input type="checkbox" id="stCoverIncludeLogo" ${logoEnabled} style="accent-color:#f97316;" />
-                <span>Include logo on cover</span>
+            <div id="stCoverPanel" style="display:${coverPanelDisplay};gap:10px;">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Title
+                  <input id="stCoverTitle" type="text" value="${esc(initialCover.title)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
+                </label>
+                <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Subtitle
+                  <input id="stCoverSubtitle" type="text" value="${esc(initialCover.subtitle)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
+                </label>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Subject / variable
+                  <input id="stCoverSubject" type="text" value="${esc(initialCover.subject)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
+                </label>
+                <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Report date
+                  <input id="stCoverDate" type="text" value="${esc(initialCover.reportDate)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
+                </label>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Author
+                  <input id="stCoverAuthor" type="text" value="${esc(initialCover.author)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
+                </label>
+                <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Organization
+                  <input id="stCoverOrg" type="text" value="${esc(initialCover.organization)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
+                </label>
+              </div>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Prepared for
+                <input id="stCoverPreparedFor" type="text" value="${esc(initialCover.preparedFor)}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;" />
               </label>
-              <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;cursor:pointer;">
-                <input type="radio" name="stCoverLogoMode" value="brand" ${brandLogoChecked} />
-                <span>Use Statistico logo</span>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#475569;">Summary / notes
+                <textarea id="stCoverDescription" rows="3" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;resize:vertical;">${esc(initialCover.description)}</textarea>
               </label>
-              <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;cursor:pointer;">
-                <input type="radio" name="stCoverLogoMode" value="custom" ${customLogoChecked} />
-                <span>Upload custom logo</span>
-              </label>
-              <div id="stCoverCustomLogoWrap" style="${customLogoWrapStyle}">
-                <input type="file" id="stCoverCustomLogo" accept="image/*" style="font-size:12px;color:#475569;" />
-                <div id="stCoverLogoPreview" style="margin-top:6px;"></div>
+              <div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;display:grid;gap:8px;background:#f8fafc;">
+                <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#0f172a;cursor:pointer;">
+                  <input type="checkbox" id="stCoverIncludeLogo" ${logoEnabled} style="accent-color:#f97316;" />
+                  <span>Include logo on cover</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;cursor:pointer;">
+                  <input type="radio" name="stCoverLogoMode" value="brand" ${brandLogoChecked} />
+                  <span>Use Statistico logo</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;cursor:pointer;">
+                  <input type="radio" name="stCoverLogoMode" value="custom" ${customLogoChecked} />
+                  <span>Upload custom logo</span>
+                </label>
+                <div id="stCoverCustomLogoWrap" style="${customLogoWrapStyle}">
+                  <input type="file" id="stCoverCustomLogo" accept="image/*" style="font-size:12px;color:#475569;" />
+                  <div id="stCoverLogoPreview" style="margin-top:6px;"></div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-        <div style="padding:10px 18px 4px;">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:6px;">Sections to include</div>
-        </div>
-        <div style="padding:0 18px 8px;overflow-y:auto;flex:1;">${sectionListHtml}</div>
-        <div style="padding:12px 18px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px;">
+        <div style="padding:12px 18px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px;background:#fff;">
           <button id="stReportCancelBtn" style="padding:8px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;">Cancel</button>
           <button id="stReportExportBtn" style="padding:8px 16px;border:1px solid #f97316;border-radius:8px;background:#f97316;color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
             <i class="fa-solid fa-file-export"></i> Export HTML
@@ -1892,6 +2012,9 @@ const StatisticoHeader = {
     const customLogoWrap = overlay.querySelector('#stCoverCustomLogoWrap');
     const logoPreview = overlay.querySelector('#stCoverLogoPreview');
     const customLogoInput = overlay.querySelector('#stCoverCustomLogo');
+    const optionsToggle = overlay.querySelector('#stExportOptionsToggle');
+    const optionsBody = overlay.querySelector('#stExportOptionsBody');
+    const optionsChevron = overlay.querySelector('#stExportOptionsChevron');
 
     const syncCoverPanel = () => {
       if (coverPanel) coverPanel.style.display = coverEnabledEl && coverEnabledEl.checked ? 'grid' : 'none';
@@ -1900,7 +2023,14 @@ const StatisticoHeader = {
       const mode = overlay.querySelector('input[name="stCoverLogoMode"]:checked');
       if (customLogoWrap) customLogoWrap.style.display = mode && mode.value === 'custom' ? 'block' : 'none';
     };
+    const syncOptionsPanel = () => {
+      if (!optionsBody || !optionsChevron) return;
+      const open = optionsBody.style.display !== 'none';
+      optionsBody.style.display = open ? 'none' : 'block';
+      optionsChevron.style.transform = open ? 'rotate(0deg)' : 'rotate(180deg)';
+    };
     if (coverEnabledEl) coverEnabledEl.addEventListener('change', syncCoverPanel);
+    if (optionsToggle) optionsToggle.addEventListener('click', syncOptionsPanel);
     overlay.querySelectorAll('input[name="stCoverLogoMode"]').forEach((el) => el.addEventListener('change', syncLogoMode));
     if (customLogoInput) {
       customLogoInput.addEventListener('change', () => {
@@ -1940,7 +2070,11 @@ const StatisticoHeader = {
         description: (overlay.querySelector('#stCoverDescription') || {}).value || '',
         includeLogo: !!(overlay.querySelector('#stCoverIncludeLogo') && overlay.querySelector('#stCoverIncludeLogo').checked),
         useBrandLogo: !logoMode || logoMode.value !== 'custom',
-        customLogoDataUrl: customLogoDataUrl
+        customLogoDataUrl: customLogoDataUrl,
+        coverBackground: (overlay.querySelector('#stCoverBackground') || {}).value || 'statistico-dark',
+        aiDescriptionPerSection: !!(overlay.querySelector('#stAiDescription') && overlay.querySelector('#stAiDescription').checked),
+        aiInterpretationPerSection: !!(overlay.querySelector('#stAiInterpretation') && overlay.querySelector('#stAiInterpretation').checked),
+        optionsExpanded: optionsBody ? optionsBody.style.display !== 'none' : false
       };
       try { localStorage.setItem('statistico-export-cover', JSON.stringify(cover)); } catch (_) {}
       close();
@@ -1948,7 +2082,10 @@ const StatisticoHeader = {
     });
   },
 
-  _buildSuccessfulExportSections(selected, snapshotResults, esc, escAttr) {
+  _buildSuccessfulExportSections(selected, snapshotResults, esc, escAttr, exportOptions = {}) {
+    const wantDesc = !!(exportOptions.cover && exportOptions.cover.aiDescriptionPerSection);
+    const wantInterp = !!(exportOptions.cover && exportOptions.cover.aiInterpretationPerSection);
+    const sectionAi = exportOptions.sectionAi || {};
     const included = [];
     selected.forEach((s, i) => {
       const snap = snapshotResults[i] || { ok: false, snapshotHtml: '' };
@@ -1956,12 +2093,25 @@ const StatisticoHeader = {
       included.push({ section: s, snap });
     });
     const toc = included.map((row, i) => `<li><a href="#sec_${i + 1}">${esc(row.section.label)}</a></li>`).join('');
-    const html = included.map((row, i) => `
+    const html = included.map((row, i) => {
+      const sid = String(row.section.id);
+      const ai = sectionAi[sid] || {};
+      const aiBlocks = [];
+      if (wantDesc && ai.description) {
+        aiBlocks.push(`<div class="export-ai-block"><strong>AI Description</strong>${esc(ai.description)}</div>`);
+      }
+      if (wantInterp && ai.interpretation) {
+        aiBlocks.push(`<div class="export-ai-block"><strong>AI Interpretation</strong>${esc(ai.interpretation)}</div>`);
+      }
+      const aiHtml = aiBlocks.length ? `<div class="export-section-ai">${aiBlocks.join('')}</div>` : '';
+      return `
       <section id="sec_${i + 1}">
         <h2>${i + 1}. ${esc(row.section.label)}</h2>
+        ${aiHtml}
         <iframe class="report-frame" srcdoc="${escAttr(row.snap.snapshotHtml)}"></iframe>
       </section>
-    `).join('');
+    `;
+    }).join('');
     return { included, toc, html };
   },
 
@@ -3105,18 +3255,18 @@ const StatisticoHeader = {
       const payload = primary === bodyClone ? bodyClone.innerHTML : primary.outerHTML;
       return `<!DOCTYPE html><html><head><meta charset="utf-8">${headClone.innerHTML}</head><body>${payload}</body></html>`;
     };
-    const captureSectionSnapshot = (url, liveData) => new Promise((resolve) => {
+    const captureSectionSnapshot = (url, liveData, viewId) => new Promise((resolve) => {
       const iframe = document.createElement('iframe');
       iframe.style.cssText = 'position:fixed;left:-99999px;top:-99999px;width:1360px;height:900px;opacity:0;pointer-events:none;';
       iframe.setAttribute('aria-hidden', 'true');
       let settled = false;
       let timer = null;
-      const finish = (snapshotHtml, ok) => {
+      const finish = (snapshotHtml, ok, viewData) => {
         if (settled) return;
         settled = true;
         if (timer) clearTimeout(timer);
         try { iframe.remove(); } catch (e) {}
-        resolve({ snapshotHtml, ok });
+        resolve({ snapshotHtml, ok, viewData: viewData || null });
       };
       const tryCapture = (startedAt) => {
         try {
@@ -3125,7 +3275,8 @@ const StatisticoHeader = {
           doc.querySelectorAll('#uniResultsViewTabs, .uni-results-tab-stack, .navrow-tabs').forEach((n) => n.remove());
           const hasRenderable = !!doc.querySelector('svg, canvas, .highcharts-root, .highcharts-container, table');
           if (hasRenderable || (Date.now() - startedAt) > 9000) {
-            finish(extractRichSnapshot(doc, url), true);
+            const viewData = viewId ? this._extractViewDataFromIframe(doc, iframe.contentWindow, viewId) : null;
+            finish(extractRichSnapshot(doc, url), true, viewData);
           } else {
             setTimeout(() => tryCapture(startedAt), 250);
           }
@@ -3207,10 +3358,30 @@ const StatisticoHeader = {
               const s = selected[i];
               setProgress(i, selected.length, `Capturing: ${esc(s.label)}...`);
               const url = appendQueryParam(this.resolveDialogUrl(s.file), 'embed', '1');
-              snapshotResults.push(await captureSectionSnapshot(url, liveData));
+              snapshotResults.push(await captureSectionSnapshot(url, liveData, String(s.id)));
             }
             setProgress(selected.length, selected.length, 'Building report...');
-            const exportSections = this._buildSuccessfulExportSections(selected, snapshotResults, esc, escAttr);
+            const preliminary = this._buildSuccessfulExportSections(selected, snapshotResults, esc, escAttr, { cover });
+            if (!preliminary.included.length) {
+              closeProgress();
+              alert('No sections could be captured for export. Try again or pick different sections.');
+              return;
+            }
+            const sectionAi = {};
+            if (cover.aiDescriptionPerSection || cover.aiInterpretationPerSection) {
+              for (let i = 0; i < preliminary.included.length; i += 1) {
+                const row = preliminary.included[i];
+                setProgress(i, preliminary.included.length, `AI content: ${row.section.label}...`);
+                sectionAi[String(row.section.id)] = await this._fetchExportSectionAiContent(
+                  row.section,
+                  row.snap,
+                  'correlations',
+                  cover.aiDescriptionPerSection,
+                  cover.aiInterpretationPerSection
+                );
+              }
+            }
+            const exportSections = this._buildSuccessfulExportSections(selected, snapshotResults, esc, escAttr, { cover, sectionAi });
             if (!exportSections.included.length) {
               closeProgress();
               alert('No sections could be captured for export. Try again or pick different sections.');
@@ -3380,18 +3551,18 @@ const StatisticoHeader = {
       const payload = primary === bodyClone ? bodyClone.innerHTML : primary.outerHTML;
       return `<!DOCTYPE html><html><head><meta charset="utf-8">${headClone.innerHTML}</head><body>${payload}</body></html>`;
     };
-    const captureSectionSnapshot = (url, liveData) => new Promise((resolve) => {
+    const captureSectionSnapshot = (url, liveData, viewId) => new Promise((resolve) => {
       const iframe = document.createElement('iframe');
       iframe.style.cssText = 'position:fixed;left:-99999px;top:-99999px;width:1360px;height:900px;opacity:0;pointer-events:none;';
       iframe.setAttribute('aria-hidden', 'true');
       let settled = false;
       let timer = null;
-      const finish = (snapshotHtml, ok) => {
+      const finish = (snapshotHtml, ok, viewData) => {
         if (settled) return;
         settled = true;
         if (timer) clearTimeout(timer);
         try { iframe.remove(); } catch (e) {}
-        resolve({ snapshotHtml, ok });
+        resolve({ snapshotHtml, ok, viewData: viewData || null });
       };
       const tryCapture = (startedAt) => {
         try {
@@ -3413,7 +3584,8 @@ const StatisticoHeader = {
           const hasRenderable = !!doc.querySelector('svg, canvas, .highcharts-root, .highcharts-container, .chart, table');
           if (hasRenderable || (Date.now() - startedAt) > 9000) {
             const snapshot = extractRichSnapshot(doc, url);
-            finish(snapshot, true);
+            const viewData = viewId ? this._extractViewDataFromIframe(doc, iframe.contentWindow, viewId) : null;
+            finish(snapshot, true, viewData);
             return;
           }
           setTimeout(() => tryCapture(startedAt), 250);
@@ -3679,17 +3851,32 @@ const StatisticoHeader = {
                 snapshotResults.push({ ok: false, snapshotHtml: '', noFile: true });
               } else {
                 const url = appendQueryParam(this.resolveDialogUrl(s.file), 'embed', '1');
-                snapshotResults.push(await captureSectionSnapshot(url, liveData));
+                snapshotResults.push(await captureSectionSnapshot(url, liveData, String(s.id)));
               }
             }
             setProgress(total, total, 'Building report…');
 
-            const exportSections = this._buildSuccessfulExportSections(selected, snapshotResults, esc, escAttr);
-            if (!exportSections.included.length) {
+            const preliminary = this._buildSuccessfulExportSections(selected, snapshotResults, esc, escAttr, { cover });
+            if (!preliminary.included.length) {
               closeProgress();
               alert('No sections could be captured for export. Try again or pick different sections.');
               return;
             }
+            const sectionAi = {};
+            if (cover.aiDescriptionPerSection || cover.aiInterpretationPerSection) {
+              for (let i = 0; i < preliminary.included.length; i += 1) {
+                const row = preliminary.included[i];
+                setProgress(i, preliminary.included.length, `AI content: ${row.section.label}…`);
+                sectionAi[String(row.section.id)] = await this._fetchExportSectionAiContent(
+                  row.section,
+                  row.snap,
+                  'univariate',
+                  cover.aiDescriptionPerSection,
+                  cover.aiInterpretationPerSection
+                );
+              }
+            }
+            const exportSections = this._buildSuccessfulExportSections(selected, snapshotResults, esc, escAttr, { cover, sectionAi });
 
             const logoDataUrl = cover && cover.enabled ? await this._resolveExportLogoDataUrl(cover) : '';
             const coverHtml = this._buildExportCoverPageHtml(cover, logoDataUrl, esc);
@@ -7802,7 +7989,7 @@ READING: [1-2 sentences about what the current correlation results suggest, usin
    * Per-view mode produces two-part output: HOW TO USE + RESULTS.
    * Full-analysis mode produces the five-section structured report.
    */
-  _buildStructuredPrompt(view, mode, preCollectedData = null) {
+  _buildStructuredPrompt(view, mode, preCollectedData = null, promptOpts = {}) {
     if (view === 'by-group' || (typeof view === 'string' && view.startsWith('by-group-'))) {
       return this._buildByGroupStructuredPrompt(view, mode);
     }
@@ -7844,7 +8031,7 @@ READING: [1-2 sentences about what the current correlation results suggest, usin
       (dispersion === 'high' && middleSpread === 'wide') ? 'possible' : 'unlikely';
 
     // Normality status — only "confirmed" or "rejected" if formal tests were run
-    const viewData = this._collectViewData(view);
+    const viewData = promptOpts.viewDataOverride || this._collectViewData(view);
     let normalityStatus = 'not_tested';
     if (viewData && typeof viewData === 'object' && viewData.normalityTests) {
       const tests = Object.values(viewData.normalityTests).filter((r) => r?.pValue !== undefined);

@@ -6,7 +6,7 @@
 (function (global) {
   'use strict';
 
-  var LOGO_VER = '20260717c';
+  var LOGO_VER = '20260717e';
   var LOGO_FILES = {
     default: 'statistico-logo-hub.png',
     analytics: 'statistico-logo-hub.png',

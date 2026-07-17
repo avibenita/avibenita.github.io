@@ -6,8 +6,13 @@
 (function (global) {
   'use strict';
 
-  var LOGO_VER = '20260716pm';
-  var LOGO_FILE = 'statistico-logo-hub.png';
+  var LOGO_VER = '20260717c';
+  var LOGO_FILES = {
+    default: 'statistico-logo-hub.png',
+    analytics: 'statistico-logo-hub.png',
+    calculators: 'statistico-logo-hub-yellow.png',
+    applications: 'statistico-logo-hub-green.png'
+  };
 
   /** Compact normal curve kept for legacy callers (e.g. Gauss.html demos). */
   var LOGO_GAUSS_CURVE = 'M8 76 C20 76 24 12 38 12 C52 12 56 76 68 76';
@@ -24,12 +29,13 @@
     return '';
   }
 
-  function getLogoSrc() {
-    return getAssetBase() + LOGO_FILE + '?v=' + LOGO_VER;
+  function getLogoSrc(cluster) {
+    var file = LOGO_FILES[cluster] || LOGO_FILES.default;
+    return getAssetBase() + file + '?v=' + LOGO_VER;
   }
 
-  function getLogoHtml() {
-    return '<img class="sb-logo-img sb-logo-full-img" src="' + getLogoSrc() + '" alt="Statistico Interactive" />';
+  function getLogoHtml(cluster) {
+    return '<img class="sb-logo-img sb-logo-full-img" src="' + getLogoSrc(cluster) + '" alt="Statistico Interactive" />';
   }
 
   function getSvg() {
@@ -40,9 +46,19 @@
     return { curve: LOGO_GAUSS_CURVE, fill: LOGO_GAUSS_FILL };
   }
 
-  function mount(host) {
+  function mount(host, cluster) {
     if (!host) return;
-    host.innerHTML = getLogoHtml();
+    var clusterId = cluster || host.getAttribute('data-logo-cluster') || 'default';
+    if (clusterId === 'default') clusterId = undefined;
+    host.innerHTML = getLogoHtml(clusterId);
+  }
+
+  function setCluster(cluster, root) {
+    var scope = root || document;
+    var nodes = scope.querySelectorAll('[data-statistico-brand-logo]');
+    for (var i = 0; i < nodes.length; i++) {
+      mount(nodes[i], cluster);
+    }
   }
 
   function mountAll(root) {
@@ -58,7 +74,8 @@
     getLogoSrc: getLogoSrc,
     getGaussMarkPaths: getGaussMarkPaths,
     mount: mount,
-    mountAll: mountAll
+    mountAll: mountAll,
+    setCluster: setCluster
   };
 
   function autoMount() {

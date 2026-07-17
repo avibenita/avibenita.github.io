@@ -232,11 +232,11 @@ let HUB_CLUSTER_META = {
     eyebrow: "Statistico flagship",
     name: "Interactive Analytics",
     tagline: "Core statistical modeling, comparisons, and discovery tools",
-    color: "#c7b6ff",
-    colorDark: "#4b3a86",
+    color: "#c4b5fd",
+    colorDark: "#6d28d9",
     icon: "fa-chart-line",
-    brandFrom: "#c7b6ff",
-    brandTo: "#7d6bc7"
+    brandFrom: "#c4b5fd",
+    brandTo: "#a78bfa"
   },
   calculators: {
     eyebrow: "Statistico flagship",

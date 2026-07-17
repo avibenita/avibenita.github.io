@@ -6,12 +6,12 @@
 (function (global) {
   'use strict';
 
-  var LOGO_VER = '20260717f';
+  var LOGO_VER = '20260717g';
   var LOGO_FILES = {
     default: 'statistico-logo-hub.png',
     analytics: 'statistico-logo-hub.png',
-    calculators: 'statistico-logo-hub-yellow.png',
-    applications: 'statistico-logo-hub-green.png'
+    calculators: 'statistico-logo-hub-calculators.png',
+    applications: 'statistico-logo-hub-applications.png'
   };
 
   /** Compact normal curve kept for legacy callers (e.g. Gauss.html demos). */
@@ -50,7 +50,14 @@
     if (!host) return;
     var clusterId = cluster || host.getAttribute('data-logo-cluster') || 'default';
     if (clusterId === 'default') clusterId = undefined;
+    var src = getLogoSrc(clusterId);
     host.innerHTML = getLogoHtml(clusterId);
+    var img = host.querySelector('.sb-logo-img');
+    if (img) {
+      img.loading = 'eager';
+      img.decoding = 'sync';
+      img.src = src;
+    }
   }
 
   function setCluster(cluster, root) {

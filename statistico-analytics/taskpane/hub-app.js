@@ -232,11 +232,11 @@ let HUB_CLUSTER_META = {
     eyebrow: "Statistico flagship",
     name: "Interactive Analytics",
     tagline: "Core statistical modeling, comparisons, and discovery tools",
-    color: "#22c55e",
-    colorDark: "#34d399",
+    color: "#c7b6ff",
+    colorDark: "#4b3a86",
     icon: "fa-chart-line",
-    brandFrom: "#22c55e",
-    brandTo: "#15803d"
+    brandFrom: "#c7b6ff",
+    brandTo: "#7d6bc7"
   },
   calculators: {
     eyebrow: "Statistico flagship",
@@ -252,11 +252,11 @@ let HUB_CLUSTER_META = {
     eyebrow: "Statistico flagship",
     name: "Interactive Applications",
     tagline: "Workflow-ready product clusters for operational use cases",
-    color: "#c7b6ff",
-    colorDark: "#4b3a86",
+    color: "#22c55e",
+    colorDark: "#34d399",
     icon: "fa-layer-group",
-    brandFrom: "#c7b6ff",
-    brandTo: "#7d6bc7"
+    brandFrom: "#22c55e",
+    brandTo: "#15803d"
   }
 };
 let HUB_VISIBLE_CLUSTERS = ["analytics", "calculators", "applications"];

@@ -1505,8 +1505,12 @@ function navigateToModule(id) {
 }
 
 function showAdvisor() {
+  if (window.StatisticoProcedureAdvisor && typeof window.StatisticoProcedureAdvisor.open === "function") {
+    window.StatisticoProcedureAdvisor.open();
+    return;
+  }
   window.alert(
-    "AI Test Advisor coming soon!\n\nIt will guide you to the right analysis based on your data type and research goal."
+    "AI Procedure Advisor is loading.\n\nPlease refresh the hub and try again."
   );
 }
 
@@ -1526,6 +1530,7 @@ window.filterModules = filterModules;
 window.showAdvisor = showAdvisor;
 window.setHubCluster = setHubCluster;
 window.runHubModuleAction = runHubModuleAction;
+window.setSelectedModuleCard = setSelectedModuleCard;
 
 Office.onReady(function(info) {
   if (info.host !== Office.HostType.Excel) {

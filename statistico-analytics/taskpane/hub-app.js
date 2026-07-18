@@ -30,11 +30,11 @@ let hubBuilderDialog = null;
 const HUB_CATEGORY_TILES = [
   {
     id: "explore-data",
-    title: "Explore data",
+    title: "Explore Data",
     icon: "fa-chart-bar",
     color: "#f97316",
     colorDark: "#c2410c",
-    subtitle: "Inspect distributions and associations",
+    subtitle: "Distributions, correlations, and patterns",
     modules: [
       { id: "univariate", label: "Univariate", tip: "Distribution summaries, outliers, and normality checks for single variables." },
       { id: "correlations", label: "Correlation", tip: "Pairwise associations and correlation matrix between numeric variables." }
@@ -42,11 +42,11 @@ const HUB_CATEGORY_TILES = [
   },
   {
     id: "analyze-groups",
-    title: "Analyze Groups",
+    title: "Compare Groups",
     icon: "fa-scale-balanced",
     color: "#10b981",
     colorDark: "#0f766e",
-    subtitle: "Compare groups using statistical models",
+    subtitle: "ANOVA and mixed models for group comparisons",
     modules: [
       { id: "anova", label: "ANOVA", tip: "Compare means across 3+ groups with post-hoc support." },
       { id: "mixed", label: "Mixed", tip: "Mixed-effects models for grouped or repeated-measures style data." }
@@ -58,20 +58,20 @@ const HUB_CATEGORY_TILES = [
     icon: "fa-arrows-left-right",
     color: "#06b6d4",
     colorDark: "#0e7490",
-    subtitle: "Compare means between conditions",
+    subtitle: "Independent, paired, and repeated measures",
     modules: [
-      { id: "independent", label: "Independent Means", tip: "Compare two independent groups on a numeric outcome." },
-      { id: "dependent", label: "Repeated Means", tip: "Compare paired/repeated measurements for the same cases." }
+      { id: "independent", label: "Independent", tip: "Compare two independent groups on a numeric outcome." },
+      { id: "dependent", label: "Repeated", tip: "Compare paired or repeated measurements for the same cases." }
     ]
   },
   {
     id: "model-relationships",
-    title: "Model relationships",
+    title: "Build Models",
     icon: "fa-chart-line",
     color: "#0ea5e9",
     colorDark: "#0369a1",
     tabStyle: "soft",
-    subtitle: "Predict outcomes and estimate effects",
+    subtitle: "Regression and logistic prediction",
     modules: [
       { id: "regression", label: "Regression", tip: "Linear regression with coefficients, intervals, and diagnostics." },
       { id: "logistic", label: "Logistic", tip: "Binary outcome modeling with odds ratios and model fit metrics." }
@@ -79,12 +79,12 @@ const HUB_CATEGORY_TILES = [
   },
   {
     id: "reduce-dimensions",
-    title: "Reduce dimensions",
+    title: "Discover Structure",
     icon: "fa-layer-group",
     color: "#ec4899",
     colorDark: "#be185d",
     tabStyle: "soft",
-    subtitle: "Compress and reveal latent structure",
+    subtitle: "PCA and factor analysis for latent structure",
     modules: [
       { id: "factor", label: "Factor", tip: "Latent factor extraction and rotation for construct discovery." },
       { id: "pca", label: "PCA", tip: "Principal component reduction for compact feature representation." }
@@ -92,13 +92,13 @@ const HUB_CATEGORY_TILES = [
   },
   {
     id: "segment-data",
-    title: "Segment data",
+    title: "Find Segments",
     icon: "fa-object-group",
     color: "#14b8a6",
     colorDark: "#0f766e",
-    subtitle: "Group similar observations",
+    subtitle: "K-means and hierarchical clustering",
     modules: [
-      { id: "kmeans", label: "K-means", tip: "Partition cases into k groups around centroids." },
+      { id: "kmeans", label: "K-Means", tip: "Partition cases into k groups around centroids." },
       { id: "hierarchical", label: "Hierarchical", tip: "Agglomerative merge tree with dendrogram; cut at k." }
     ]
   }

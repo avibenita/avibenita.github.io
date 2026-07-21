@@ -14,6 +14,7 @@ function getNavLinks() {
     calculators: '/Statistico-Website/index-Calculators.html',
     analytics: '/Statistico-Website/index-Analytics.html',
     addins: '/Statistico-Website/index-Addins.html',
+    ezpaste: '/Statistico-Website/index-EzPaste.html',
     faq: '/Statistico-Website/faq.html',
   };
 }
@@ -1887,7 +1888,7 @@ const FOOTER_TEMPLATE = `
       activePage = 'calculators';
     } else if (currentFile === 'index-Analytics.html') {
       activePage = 'analytics';
-    } else if (currentFile === 'index-Addins.html') {
+    } else if (currentFile === 'index-Addins.html' || currentFile === 'index-EzPaste.html') {
       activePage = 'addins';
     } else if (currentFile === 'about-us.html') {
       activePage = 'about';

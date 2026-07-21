@@ -1890,6 +1890,8 @@ const FOOTER_TEMPLATE = `
       activePage = 'analytics';
     } else if (currentFile === 'index-Addins.html' || currentFile === 'index-EzPaste.html') {
       activePage = 'addins';
+    } else if (currentPath.indexOf('/ezpaste-help/') >= 0) {
+      activePage = 'addins';
     } else if (currentFile === 'about-us.html') {
       activePage = 'about';
     } else if (currentFile === 'contact.html') {

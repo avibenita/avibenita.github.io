@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EzPaste — Batch Paste Automation for Excel</title>
+  <style>
+    :root{
+      --brand:#005A9E;
+      --ink:#2b2b2b;
+      --card:#fff;
+      --muted:#e8eef4;
+      --zone:#0a6fbc;
+    }
+    *{box-sizing:border-box}
+    body { font-family: 'Segoe UI',sans-serif; margin:0; padding:0; color:var(--ink); background:#f4f6f8; }
+    html { scroll-padding-top: 60px; }
+    .hero { background:var(--brand); color:#fff; padding:3.5rem 1.5rem; text-align:center; }
+    .hero h1 { margin:0; font-size:2.25rem; }
+    .hero p { font-size:1.1rem; margin-top:.75rem; opacity:.95; }
+
+    .container { max-width:1000px; margin:2rem auto; padding:0 1rem; }
+    h2 { border-bottom:2px solid #e0e0e0; padding-bottom:.5rem; color:var(--brand); margin-top:0; }
+    p { line-height:1.6; margin:1rem 0; }
+    .features { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:1rem; margin:2rem 0; }
+    .feature { background:var(--card); padding:1rem; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,0.08); }
+    .feature h3 { margin-top:0; font-size:1.05rem; }
+
+    /* ===== Interactive overview ===== */
+    .overview-card{
+      background:var(--card);
+      border-radius:12px;
+      box-shadow:0 8px 24px rgba(0,0,0,.08), 0 4px 8px rgba(0,0,0,.05);
+      padding:1rem;
+      margin:2rem 0 2.5rem;
+      transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      transform:translateY(0);
+      border:1px solid rgba(0,0,0,.02);
+    }
+    .overview-card:hover{
+      box-shadow:0 20px 40px rgba(0,0,0,.12), 0 8px 16px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+      transform:translateY(-4px);
+      border-color:rgba(0,90,158,.1);
+    }
+    .ui-stage{
+      position:relative;
+      width:100%;
+      overflow:hidden;
+      border-radius:10px;
+      background:#fff;
+      border:1px solid var(--muted);
+      user-select:none;
+    }
+    .ui-stage img{
+      display:block;
+      width:100%;
+      height:auto;
+      pointer-events:none;
+    }
+
+    /* Visible click zones */
+    .zone{position:absolute;border:none;background:transparent;box-shadow:none;outline:none;cursor:pointer;transition:transform .08s ease;}
+    .zone:hover, .zone:focus{transform:none;}
+     .zone .tag{position:relative;top:0;left:0;background:var(--zone);color:#fff;padding:.2rem .6rem;border-radius:999px;font-size:.8rem;font-weight:700;display:inline-flex;align-items:center;gap:.4rem;box-shadow:0 8px 18px rgba(0,0,0,.18);border:2px solid #fff;white-space:nowrap;}
+    .tag .num{
+      background:rgba(255,255,255,.18);
+      width:1.25rem; height:1.25rem; display:inline-grid; place-items:center;
+      border-radius:50%;
+      font-variant-numeric:tabular-nums;
+    }
+
+    /* Modal */
+    .overlay{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.6);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:2vw;
+      z-index:9999;
+    }
+    .overlay.open{ display:flex; }
+    .modal{
+      width:min(1000px,95vw);
+      height:min(700px,86vh);
+      background:#1e2a36;
+      border-radius:14px;
+      box-shadow:0 16px 48px rgba(0,0,0,.45);
+      overflow:hidden;
+      position:relative;
+      border:2px solid #357ec7;
+    }
+    .modal header{
+      height:44px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      background:#357ec7;
+      color:#fff;
+      padding:0 12px 0 14px;
+      font-weight:600;
+    }
+    .modal header .title{ display:flex; align-items:center; gap:.5rem; }
+    .modal header button{
+      background:transparent; border:0; color:#fff; font-size:22px; cursor:pointer;
+      width:36px; height:36px; border-radius:8px;
+    }
+    .modal header button:hover{ background:rgba(255,255,255,.14); }
+    .modal iframe{ border:0; width:100%; height:calc(100% - 44px); background:#2c3e50; }
+
+    .legend{ margin-top:.5rem; font-size:.9rem; color:#4b5b6b; }
+    .legend span{ display:inline-block; margin-right:10px; }
+    .legend b{
+      display:inline-block; width:18px; height:18px; line-height:18px; text-align:center;
+      border-radius:50%; background:#0a6fbc; color:#fff; font-size:.8rem; margin-right:6px;
+      border:2px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,.15);
+    }
+
+    /* Help text for keyboard users */
+    .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
+
+    /* Sticky section menu */
+    .toc{
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      background: #ffffffee;
+      backdrop-filter: blur(6px);
+      border-bottom:1px solid #e5e7eb;
+      display:flex;
+      justify-content:center;
+      gap:.75rem;
+      padding:.6rem 1rem;
+      overflow:auto;
+    }
+    .toc a{
+      color:var(--brand);
+      text-decoration:none;
+      font-weight:600;
+      padding:.35rem .7rem;
+      border-radius:999px;
+      border:1px solid transparent;
+      white-space:nowrap;
+    }
+    .toc a:hover{ background:#f0f6ff; border-color:#e0ecff; }
+
+    /* Normalize imported Word HTML blocks */
+    .imported{
+      all: revert;
+      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+      color:#2b2b2b;
+    }
+    .imported h1, .imported h2, .imported h3{
+      color:var(--brand);
+      font-family: inherit;
+    }
+    .install-content img, .faq-content img{ max-width:100%; height:auto; }
+
+    /* ===== Licensing / Registration ===== */
+    .license-badge{
+      display:inline-flex; align-items:center; gap:.5rem;
+      margin-top:1.1rem; padding:.5rem 1.1rem;
+      background:rgba(255,255,255,.14);
+      border:1px solid rgba(255,255,255,.35);
+      border-radius:999px;
+      color:#fff; text-decoration:none; font-weight:600; font-size:.9rem;
+      transition:background .15s ease;
+    }
+    .license-badge:hover{ background:rgba(255,255,255,.24); }
+    .license-badge .dot{ width:.5rem; height:.5rem; border-radius:50%; background:#4ade80; box-shadow:0 0 0 3px rgba(74,222,128,.25); }
+
+    .hero-actions{ display:flex; flex-wrap:wrap; justify-content:center; gap:.75rem; margin-top:1.25rem; }
+    .btn-download{
+      display:inline-flex; align-items:center; gap:.5rem;
+      background:#fff; color:var(--brand); font-weight:700; font-size:.95rem;
+      padding:.65rem 1.3rem; border-radius:999px; text-decoration:none;
+      box-shadow:0 6px 16px rgba(0,0,0,.18);
+      transition:transform .12s ease, box-shadow .12s ease;
+    }
+    .btn-download:hover{ transform:translateY(-1px); box-shadow:0 10px 20px rgba(0,0,0,.22); }
+    .btn-download .ver{ font-weight:500; opacity:.65; font-size:.85em; }
+
+    .license-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:1.25rem; margin:1.5rem 0; }
+    .license-plan{
+      background:var(--card); border:1px solid #e5e9ee; border-radius:12px;
+      padding:1.5rem; position:relative; box-shadow:0 1px 4px rgba(0,0,0,.05);
+    }
+    .license-plan.featured{ border-color:var(--brand); box-shadow:0 8px 24px rgba(0,90,158,.12); }
+    .license-plan .plan-badge{
+      position:absolute; top:-.7rem; right:1.2rem; background:var(--brand); color:#fff;
+      font-size:.7rem; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
+      padding:.25rem .6rem; border-radius:999px;
+    }
+    .license-plan h3{ margin:0 0 .35rem; color:var(--brand); font-size:1.1rem; }
+    .license-plan .price{ font-size:2rem; font-weight:700; color:var(--ink); margin:.25rem 0 .75rem; }
+    .license-plan .price small{ font-size:.9rem; font-weight:500; color:#6b7684; }
+    .license-plan ul{ margin:0 0 1.1rem; padding-left:1.15rem; }
+    .license-plan li{ margin:.35rem 0; line-height:1.5; }
+    .license-btn{
+      display:inline-block; width:100%; text-align:center; box-sizing:border-box;
+      padding:.7rem 1rem; border-radius:8px; font-weight:700; text-decoration:none; font-size:.95rem;
+      transition:opacity .15s ease, transform .1s ease;
+    }
+    .license-btn:hover{ opacity:.92; }
+    .license-btn:active{ transform:translateY(1px); }
+    .license-btn.primary{ background:var(--brand); color:#fff; }
+    .license-btn.ghost{ background:#eef3f8; color:var(--brand); }
+
+    .activate-steps{
+      background:#f8fafc; border:1px solid #e5e9ee; border-radius:12px;
+      padding:1.25rem 1.5rem; margin-top:1.5rem;
+    }
+    .activate-steps h3{ margin-top:0; color:var(--brand); font-size:1rem; }
+    .activate-steps ol{ margin:.5rem 0 0; padding-left:1.25rem; }
+    .activate-steps li{ margin:.5rem 0; line-height:1.55; }
+    .activate-steps code{ background:#e8eef4; padding:.1rem .4rem; border-radius:4px; font-size:.9em; }
+
+    /* ===== FAQ accordion ===== */
+    .faq-toolbar{ display:flex; justify-content:flex-end; gap:.75rem; margin:-.25rem 0 1rem; }
+    .faq-toolbar button{
+      background:none; border:1px solid #d7dee6; color:var(--brand); font-weight:600;
+      font-size:.85rem; padding:.35rem .8rem; border-radius:999px; cursor:pointer;
+      transition:background .15s ease;
+    }
+    .faq-toolbar button:hover{ background:#f0f6ff; }
+
+    .faq-item{ border-bottom:1px solid #e5e9ee; }
+    .faq-item:last-child{ border-bottom:none; }
+    .faq-question{
+      width:100%; display:flex; align-items:center; justify-content:space-between; gap:1rem;
+      background:none; border:0; text-align:left; cursor:pointer;
+      padding:1rem .25rem; font:inherit; color:var(--ink);
+    }
+    .faq-question h3{ margin:0; font-size:1.05rem; color:var(--brand); font-weight:600; }
+    .faq-question .chevron{
+      flex:none; width:1.6rem; height:1.6rem; border-radius:50%; background:#eef3f8; color:var(--brand);
+      display:grid; place-items:center; transition:transform .25s ease, background .2s ease;
+      font-size:.85rem; line-height:1;
+    }
+    .faq-item.open .faq-question .chevron{ transform:rotate(180deg); background:var(--brand); color:#fff; }
+    .faq-question:hover .chevron{ background:#dcebfa; }
+    .faq-item.open .faq-question:hover .chevron{ background:var(--brand); }
+    .faq-answer{
+      max-height:0; overflow:hidden;
+      transition:max-height .3s ease, padding .3s ease, opacity .25s ease;
+      opacity:0; padding:0 .25rem;
+    }
+    .faq-item.open .faq-answer{ opacity:1; padding:0 .25rem 1.1rem; }
+    .faq-answer p{ margin:.5rem 0; }
+    .faq-answer ul{ margin:.5rem 0; padding-left:1.3rem; }
+    .faq-answer li{ margin:.3rem 0; }
+
+  </style>
+</head>
+<body>
+
+  <section class="hero">
+    <h1>EzPaste</h1>
+    <p><em>“Easy Paste”</em> automates bulk copy‑paste of Excel objects—charts, tables, ranges—into PowerPoint, Word, PDF, HTML or images.</p>
+    <div class="hero-actions">
+      <a class="btn-download" href="https://statistico.live/Statistico-Website/assets/downloads/EzPaste2027-Setup.exe">⬇ Download EzPaste <span class="ver">v4.2</span></a>
+      <a class="license-badge" href="#licensing"><span class="dot"></span> Free to try · $49 one‑time lifetime license</a>
+    </div>
+  </section>
+
+  <nav class="toc" aria-label="Section menu">
+    <a href="#overview">What Is EzPaste?</a>
+    <a href="#interactive">How does it work?</a>
+    <a href="#installation">Installation</a>
+    <a href="#strengths">Key Strengths</a>
+    <a href="#licensing">Licensing</a>
+    <a href="#faqs">FAQs</a>
+  </nav>
+
+  <div class="container">
+
+    
+
+    <section id="overview" class="overview-card">
+      <h2>What Is EzPaste?</h2>
+      <p>Let's say that your workbook contains <b>50 charts and named ranges</b> and that you want to copy <b>35 of them at once</b> to a new PowerPoint while each of the selected items should be copied to a new slide in a certain order and in a certain format.</p>
+      <p>When you click on the <b>Control Center</b> on the EzPaste toolbar, a form will be loaded which will automatically display the list of all the 50 charts and named ranges found in the workbook.</p>
+      <p>You check the items to paste and set them in the required pasting order. You select the application destination (<b>PowerPoint</b> in our case), the pasting format and the PowerPoint mode (<b>to new created slides</b> or <b>to predefined slides numbers</b> in an existing presentation) then click <b>Continue</b>.</p>
+      <p>EzPaste is a lightweight Excel add‑in that lets you select any number of charts and tables and paste them all at once, in one click.</p>
+    </section>
+<section id="interactive" class="overview-card">
+      <h2>How does it work?</h2>
+
+
+
+       <p>This is the main interface the user gets when they load <b>EzPaste</b> from the actual workbook.</p>
+
+      <div class="ui-stage" id="uiStage" aria-describedby="kbd-hint">
+        <span id="kbd-hint" class="sr-only">Use Tab to focus a highlighted area, then press Enter to open its help.</span>
+        <img src="MainInterface.png" alt="EzPaste Main Interface" />
+
+        <!-- Visible Click Zones (sizes/positions are percentages relative to the image) -->
+        <!-- 1. Select Items to Export — top band spanning across -->
+        <a class="zone" role="button" tabindex="0"
+           style="top:7%; left:3%"
+           data-file="help_popup_html101.html" data-label="1. Select Items">
+          <span class="tag"><span class="num">1</span> Select Items</span>
+        </a>
+
+        <!-- 2. Select destination — middle card with destination icons -->
+        <a class="zone" role="button" tabindex="0"
+           style="top:57%; left:22%"
+           data-file="help_popup_html102.html" data-label="2. Destination">
+          <span class="tag"><span class="num">2</span> Destination</span>
+        </a>
+
+        <!-- 3. Output Format — bottom-left panel -->
+        <a class="zone" role="button" tabindex="0"
+           style="top:79%; left:5%"
+           data-file="help_popup_html103.html" data-label="3. Output Format">
+          <span class="tag"><span class="num">3</span> Output Format</span>
+        </a>
+
+        <!-- 4. Slide insertion mode — bottom-right panel -->
+        <a class="zone" role="button" tabindex="0"
+           style="top:77%; left:55%"
+           data-file="help_popup_html104.html" data-label="4. Slide Mode">
+          <span class="tag"><span class="num">4</span> Slide Mode</span>
+        </a>
+      </div>
+
+      <div class="legend" aria-hidden="true">
+        <span><b>1</b> Select Items</span>
+        <span><b>2</b> Destination</span>
+        <span><b>3</b> Output Format</span>
+        <span><b>4</b> Slide Mode</span>
+      </div>
+    </section>
+
+    <section id="installation" class="overview-card">
+      <h2>Installation</h2>
+      <p>Once installed, EzPaste features are immediately available for any Excel workbook, from the new EzPaste tab created within Excel.</p>
+
+      <div style="text-align:center; margin:1.25rem 0;">
+        <a class="license-btn primary" style="display:inline-block; width:auto;" href="https://statistico.live/Statistico-Website/assets/downloads/EzPaste2027-Setup.exe">⬇ Download EzPaste Setup (v4.2)</a>
+      </div>
+
+      <div style="text-align: center; margin: 1.5rem 0;">
+        <img src="EzPasteMenu.png" alt="EzPaste Excel Menu" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+      </div>
+      
+      <p>EzPaste package will usually be installed in the Users directory under the following path:</p>
+      <p><code>"C:\Users\<i>User</i>\AppData\Roaming\Microsoft\AddIns\EzPaste"</code></p>
+      
+      <p>Uninstalling EzPaste may be done from Windows control panel "add/remove programs" or by clicking on the Uninstall file created in:</p>
+      <p><code>"C:\Users\<i>User</i>\AppData\Roaming\Microsoft\AddIns\EzPaste\uninstall\unins000.exe"</code></p>
+      
+      <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 1rem; margin: 1rem 0;">
+        <p style="margin: 0;"><strong>⚠️ Important:</strong> It is highly recommended to close Excel and uninstall older versions of EzPaste, before installing EzPaste new version.</p>
+      </div>
+
+    </section>
+
+<section id="strengths" class="overview-card">
+      <h2>Key Strengths</h2>
+      <div class="features">
+        <div class="feature">
+          <h3>Zero‑Config Persistence</h3>
+          <p>Your selections, captions, and ordering are stored in a hidden sheet—reopen your workbook and settings load automatically.</p>
+        </div>
+        <div class="feature">
+          <h3>Precision Layout</h3>
+          <p>Two PowerPoint modes: new slides auto‑added, or paste into predefined slides with full control over position and size.</p>
+        </div>
+        <div class="feature">
+          <h3>Flexible Output</h3>
+          <p>Choose from images, native Office shapes, embedded worksheets, or linked Excel objects.</p>
+        </div>
+
+      </div>
+    </section>
+
+    <section id="licensing" class="overview-card">
+      <h2>Licensing &amp; Registration</h2>
+      <p>Try every feature for free. When you're ready, unlock unlimited exports with a single one‑time purchase — no subscriptions, no renewals.</p>
+
+      <div class="license-grid">
+        <div class="license-plan">
+          <h3>Free Evaluation</h3>
+          <div class="price">$0</div>
+          <ul>
+            <li>All destinations enabled — PowerPoint, Word, PDF, HTML, images and Outlook</li>
+            <li>Up to <strong>4 objects</strong> per export</li>
+            <li>No time limit — use it for as long as you like</li>
+            <li>Great for testing EzPaste on your own workbooks</li>
+          </ul>
+          <a class="license-btn ghost" href="https://statistico.live/Statistico-Website/assets/downloads/EzPaste2027-Setup.exe">Download Free Trial</a>
+        </div>
+
+        <div class="license-plan featured">
+          <span class="plan-badge">Recommended</span>
+          <h3>Lifetime License</h3>
+          <div class="price">$49 <small>one‑time / seat</small></div>
+          <ul>
+            <li><strong>Unlimited</strong> objects per export</li>
+            <li>All current and future feature updates included</li>
+            <li><strong>Deactivate &amp; move</strong> your license to a new PC anytime, in seconds</li>
+            <li>Priority email support</li>
+          </ul>
+          <a class="license-btn primary" href="https://www.metrics-institute.net/contact" target="_blank" rel="noopener">Buy License</a>
+        </div>
+      </div>
+
+      <div class="activate-steps">
+        <h3>How to register EzPaste</h3>
+        <ol>
+          <li>Purchase a license — you'll receive a key by email in the format <code>EZP7-XXXX-XXXX-XXXX</code>.</li>
+          <li>In Excel, open the <strong>EzPaste</strong> ribbon tab and click <strong>License</strong> (or <strong>Register</strong> from the Control Center).</li>
+          <li>Paste your key into the <strong>Activate</strong> field and click <strong>Activate</strong>. An internet connection is required for the initial activation.</li>
+        </ol>
+        <h3 style="margin-top:1.1rem;">Moving to a new computer?</h3>
+        <ol>
+          <li>On the old PC, open the <strong>License</strong> panel and click <strong>Deactivate</strong> — this instantly frees up your seat.</li>
+          <li>On the new PC, activate EzPaste with the <strong>same license key</strong>. No need to contact support or wait — it's entirely self‑service.</li>
+        </ol>
+      </div>
+
+      <p style="margin-bottom:0;">Need multiple seats or a company‑wide license? <a href="https://www.metrics-institute.net/contact" target="_blank" rel="noopener">Get in touch</a> for volume pricing.</p>
+    </section>
+
+    <section id="faqs" class="overview-card">
+      <h2>EzPaste — F.A.Qs</h2>
+      <div class="faq-toolbar">
+        <button type="button" id="faqExpandAll">Expand all</button>
+        <button type="button" id="faqCollapseAll">Collapse all</button>
+      </div>
+      <div class="faq-content" id="faqContent">
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: What EzPaste (to be pronounced "Easy Paste") can do for me?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer"><p><strong>A:</strong> EzPaste is intended for completely automating and managing the otherwise manual and tedious process of copying and pasting objects from Excel to 6 main destinations (PowerPoint, Word, PDF, Web page, picture files and Outlook). EzPaste identifies automatically all the objects in the active Excel file. With a click of a button, hundreds of charts and tables from the active Excel file could be copied to their intended destination.</p></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: What if I want to paste only the current selection in Excel?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer"><p><strong>A:</strong> A nice feature in EzPaste is the ability to swiftly paste the active selection (chart or table) from the EzPaste toolbar, thus overriding the usual 3-4 steps (copy selection, go to application, paste special…). The feature is available for PowerPoint, Word, picture file and Outlook. It justifies by itself the adoption of EzPaste as a standard.</p></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: Which objects in the Excel file does EzPaste identify as potential for pasting?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer">
+            <p><strong>A:</strong> EzPaste identifies automatically 3 types of objects:</p>
+            <ul>
+              <li>Embedded charts within data Excel sheets</li>
+              <li>Charts located in separate Chart-Sheet</li>
+              <li>Tables (rectangular range of data)</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: In what format are Excel objects pasted?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer">
+            <p><strong>A:</strong> Objects from Excel may be pasted as:</p>
+            <ul>
+              <li>Flat Pictures (that could not be edited within the target application). In Office2010/2013, various styles are available (Shadow, reflection...) from EzPaste</li>
+              <li>Excel objects (that could be edited within PowerPoint or Word)</li>
+              <li>Linked objects (That update themselves when data or format in the Excel source file changes)</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: How do I know which objects have been identified by EzPaste?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer"><p><strong>A:</strong> EzPaste shows the list of the detected charts and tables in its Main Form. A preview window in the Form displays the picture of each selected object in the list when it is selected. Items could be checked/unchecked for controlling which objects will be actually pasted.</p></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: Should I have to redefine the EzPaste settings, each time I reopen the same Excel file?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer"><p><strong>A:</strong> Not at all! Each time EzPaste is closed, all the settings are saved along with the Excel file to which it refers. Reopening the Excel file will automatically make its settings available to EzPaste.</p></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: How do I get to EzPaste features?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer"><p><strong>A:</strong> EzPaste is installed as a regular Excel Add-In. Once installed, a new tab <strong>"EzPaste"</strong> is created in the regular Excel tabs row.</p></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: How does EzPaste know to what file to paste the Excel Objects?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer">
+            <p><strong>A:</strong> EzPaste monitors which files are open and active. In PowerPoint the objects will be pasted in 2 possible modes:</p>
+            <ul>
+              <li>To new slides automatically added to the active PowerPoint file</li>
+              <li>To predefined slide numbers in the active PowerPoint file</li>
+            </ul>
+            <p>Before pasting takes place, EzPaste will indicate you how many objects will be pasted and to what file, and ask for confirmation.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: Is there a limit to the number of objects that could be pasted with EzPaste?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer"><p><strong>A:</strong> Not once registered — a licensed copy of EzPaste has no limit on the number of objects pasted per export.</p></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: What other information could be inserted in the slide?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer"><p><strong>A:</strong> Apart from the main object (chart/table), you may insert the slide title (entered and edited within EzPaste main form) and the path of the Excel sheet.</p></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: May I paste many objects at once to the same slide?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer"><p><strong>A:</strong> Yes. You simply create the structure you want on a sheet, then define the according range containing the structure as a defined name that will appear for EzPaste as a single object.</p></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: How does EzPaste know in what order to paste objects to the destination file?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer"><p><strong>A:</strong> Objects are pasted according to their order of appearance in the Main Form list. This order could be controlled by sorting the list according to 3 keys (order of appearance in Excel, objects names and worksheets names). In addition, each item could be moved up and down in the list.</p></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: How does EzPaste identify which tables of data are relevant for pasting?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer"><p><strong>A:</strong> EzPaste provides a built-in utility for creating Tables of data in Excel. EzPaste identifies tables according to the name they have been assigned by the user. Only tables of data with a specific name are identified by EzPaste. The name serves as a fixed reference address for that table, regardless of the data inside the table. Names could be also allocated through the built Excel naming process.</p></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: How does EzPaste know how to position pasted objects in the PowerPoint slides?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer"><p><strong>A:</strong> EzPaste enables you to control the exact positioning of the objects in the target PowerPoint slides. It provides a visual utility in order to set the slides layout.</p></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: Why does the pasting process sometimes take more time than usual?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer"><p><strong>A:</strong> The probable reason is that the pasting format mode is "<em>Excel editable objects</em>" which takes longer time than the format mode "<em>Picture</em>", due to the fact that not only the object is pasted but also a lot of information about the spreadsheet that contains it.</p></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: What kind of license is provided?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer"><p><strong>A:</strong> A one‑time, lifetime license for <strong>$49</strong> — no subscription and no renewal fees. Each key activates <strong>one computer</strong>. Businesses needing several seats can purchase additional licenses; see the <a href="#licensing">Licensing &amp; Registration</a> section above for volume pricing.</p></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: What is the difference between the unregistered and the registered version?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer"><p><strong>A:</strong> The unregistered (evaluation) version lets you try every destination and feature for as long as you like, but each export is limited to <strong>4 objects</strong>. Registering removes that limit entirely, so you can paste any number of charts and tables in a single export.</p></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: How do I register / activate my license key?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer"><p><strong>A:</strong> After purchasing, open the <strong>EzPaste</strong> ribbon tab in Excel, click <strong>License</strong> (or <strong>Register</strong> from the Control Center), paste in your key (format <code>EZP7-XXXX-XXXX-XXXX</code>) and click <strong>Activate</strong>. An internet connection is required the first time you activate.</p></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false"><h3>Q: Can I move my license to a new or different computer?</h3><span class="chevron">▾</span></button>
+          <div class="faq-answer"><p><strong>A:</strong> Yes — your license isn't locked to a single machine forever. Open the <strong>License</strong> panel on your current PC and click <strong>Deactivate</strong> to instantly free up your seat, then activate with the same key on the new computer. It's entirely self‑service and takes seconds — no need to contact support, wait for approval, or buy a new key. This is handy when you get a new laptop, reinstall Windows, or switch between a work and home PC.</p></div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Modal -->
+  <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal">
+      <header>
+        <div class="title" id="modalTitle">Help</div>
+        <button id="closeModal" title="Close">×</button>
+      </header>
+      <iframe id="helpFrame" src="" title="EzPaste Help"></iframe>
+    </div>
+  </div>
+
+  <script>
+    const overlay = document.getElementById('overlay');
+    const helpFrame = document.getElementById('helpFrame');
+    const modalTitle = document.getElementById('modalTitle');
+    const closeBtn = document.getElementById('closeModal');
+
+    function openHelp(file, title){
+      helpFrame.src = file;
+      modalTitle.textContent = title || 'Help';
+      overlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeHelp(){
+      overlay.classList.remove('open');
+      helpFrame.src = '';
+      document.body.style.overflow = '';
+    }
+    closeBtn.addEventListener('click', closeHelp);
+    overlay.addEventListener('click', (e)=>{
+      if(e.target === overlay) closeHelp();
+    });
+
+    function wireZone(el){
+      const open = () => openHelp(el.getAttribute('data-file'), el.getAttribute('data-label'));
+      el.addEventListener('click', (e)=>{ e.preventDefault(); open(); });
+      el.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); open(); }
+      });
+    }
+    document.querySelectorAll('.zone').forEach(wireZone);
+
+    /* ===== FAQ accordion ===== */
+    function setFaqState(item, open){
+      const question = item.querySelector('.faq-question');
+      const answer = item.querySelector('.faq-answer');
+      item.classList.toggle('open', open);
+      question.setAttribute('aria-expanded', open ? 'true' : 'false');
+      answer.style.maxHeight = open ? answer.scrollHeight + 'px' : '0px';
+    }
+
+    const faqItems = Array.from(document.querySelectorAll('#faqContent .faq-item'));
+    faqItems.forEach((item)=>{
+      const question = item.querySelector('.faq-question');
+      question.addEventListener('click', ()=> setFaqState(item, !item.classList.contains('open')));
+    });
+
+    const expandAllBtn = document.getElementById('faqExpandAll');
+    const collapseAllBtn = document.getElementById('faqCollapseAll');
+    if(expandAllBtn) expandAllBtn.addEventListener('click', ()=> faqItems.forEach(i => setFaqState(i, true)));
+    if(collapseAllBtn) collapseAllBtn.addEventListener('click', ()=> faqItems.forEach(i => setFaqState(i, false)));
+
+    // Open the FAQ referenced by the URL hash (e.g. #faqs) and keep answers correctly
+    // sized if the window is resized while expanded.
+    window.addEventListener('resize', ()=>{
+      faqItems.forEach((item)=>{
+        if(item.classList.contains('open')){
+          item.querySelector('.faq-answer').style.maxHeight = item.querySelector('.faq-answer').scrollHeight + 'px';
+        }
+      });
+    });
+  </script>
+
+</body>
+</html>

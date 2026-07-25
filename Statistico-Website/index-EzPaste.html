@@ -620,6 +620,55 @@
       padding: 12px 16px 18px;
     }
 
+    .download-toast{
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      max-width: 360px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: rgba(20, 31, 49, 0.98);
+      border: 1px solid rgba(120, 200, 255, 0.3);
+      border-radius: 14px;
+      padding: 14px 16px;
+      box-shadow: 0 16px 40px rgba(0,0,0,.35);
+      z-index: 10000;
+      opacity: 0;
+      transform: translateY(16px);
+      pointer-events: none;
+      transition: opacity .25s ease, transform .25s ease;
+    }
+    .download-toast.is-visible{
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .download-toast .toast-icon{
+      flex-shrink: 0;
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: rgba(255, 200, 100, .12);
+      color: rgba(255, 200, 100, .95);
+      display: grid; place-items: center;
+      font-size: 1rem;
+    }
+    .download-toast .toast-body{ flex: 1; font-size: .87rem; line-height: 1.5; color: rgba(228,236,248,.9); }
+    .download-toast .toast-body strong{ color: #fff; }
+    .download-toast .toast-body p{ margin: 0 0 .4rem; }
+    .download-toast .toast-close{
+      flex-shrink: 0;
+      width: 26px; height: 26px;
+      border: none; border-radius: 8px;
+      background: transparent; color: rgba(228,236,248,.6);
+      cursor: pointer; font-size: .85rem;
+      transition: background .15s ease, color .15s ease;
+    }
+    .download-toast .toast-close:hover{ background: rgba(255,255,255,.08); color: #fff; }
+    @media (max-width: 520px){
+      .download-toast{ left: 16px; right: 16px; max-width: none; bottom: 16px; }
+    }
+
     .faq-item{
       border: 1px solid rgba(255, 255, 255, 0.1);
       background: rgba(255, 255, 255, 0.02);
@@ -897,17 +946,11 @@
             Windows installer for EzPaste™. Close Excel before installing.
             Uninstall any older trial before installing a registered build.
           </p>
-          <a class="btn btn-primary" id="downloadBtn" href="ezpaste/downloads/EzPaste2027-Setup.exe" download>
+          <a class="btn btn-primary" id="downloadBtn" data-download-trigger href="ezpaste/downloads/EzPaste2027-Setup.exe" download>
             <i class="fa-solid fa-file-arrow-down"></i> Download trial
           </a>
           <p class="get-meta">
             Install location: <code style="color:rgba(200,230,255,.9);">%AppData%\Microsoft\AddIns\EzPaste</code>
-          </p>
-          <p class="get-meta" style="margin-top:10px;">
-            <i class="fa-solid fa-shield-halved" style="color:rgba(255,200,100,.9);"></i>
-            Windows may show a blue <strong>"Windows protected your PC"</strong> SmartScreen notice —
-            this appears for new installers that aren't yet widely downloaded, not because of a security
-            problem. Click <strong>More info</strong>, then <strong>Run anyway</strong> to continue installing.
           </p>
         </div>
 
@@ -1032,6 +1075,15 @@
     </div>
   </div>
 
+  <div class="download-toast" id="downloadToast" role="status" aria-live="polite">
+    <div class="toast-icon"><i class="fa-solid fa-shield-halved"></i></div>
+    <div class="toast-body">
+      <p><strong>Your download should start now.</strong></p>
+      <p>If Windows shows <strong>"Windows protected your PC"</strong>, click <strong>More info</strong>, then <strong>Run anyway</strong> — this is normal for new installers and doesn't mean it's unsafe.</p>
+    </div>
+    <button type="button" class="toast-close" id="downloadToastClose" aria-label="Dismiss"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+
   <div id="footer-placeholder"></div>
 
   <script src="assets/js/nav-template.js?v=2026-07-21-ezpaste"></script>
@@ -1092,6 +1144,30 @@
 
       var hash = (window.location.hash || "").toLowerCase();
       if (hash === "#faqs" || hash === "#faq") openFaq();
+
+      var toast = document.getElementById("downloadToast");
+      var toastClose = document.getElementById("downloadToastClose");
+      var toastTimer = null;
+
+      function showDownloadToast() {
+        if (!toast) return;
+        toast.classList.add("is-visible");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () {
+          toast.classList.remove("is-visible");
+        }, 12000);
+      }
+
+      document.querySelectorAll("[data-download-trigger]").forEach(function (link) {
+        link.addEventListener("click", showDownloadToast);
+      });
+
+      if (toastClose) {
+        toastClose.addEventListener("click", function () {
+          clearTimeout(toastTimer);
+          toast.classList.remove("is-visible");
+        });
+      }
     });
   </script>
 </body>

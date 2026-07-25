@@ -246,13 +246,54 @@
     }
     .callout-warning strong{ color:#ffce54; }
 
-    .callout-info{
-      background:rgba(120,200,255,.08); border:1px solid rgba(120,200,255,.3); border-radius:10px;
-      padding:1rem; margin:1rem 0; color:var(--text-2);
+    .download-toast{
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      max-width: 360px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: rgba(20, 31, 49, 0.98);
+      border: 1px solid rgba(120, 200, 255, 0.3);
+      border-radius: 14px;
+      padding: 14px 16px;
+      box-shadow: 0 16px 40px rgba(0,0,0,.35);
+      z-index: 10000;
+      opacity: 0;
+      transform: translateY(16px);
+      pointer-events: none;
+      transition: opacity .25s ease, transform .25s ease;
     }
-    .callout-info strong{ color:var(--accent-2); }
-    .callout-info ol{ margin:.5rem 0 0; padding-left:1.25rem; }
-    .callout-info li{ margin:.3rem 0; }
+    .download-toast.is-visible{
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .download-toast .toast-icon{
+      flex-shrink: 0;
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: rgba(255, 200, 100, .12);
+      color: rgba(255, 200, 100, .95);
+      display: grid; place-items: center;
+      font-size: 1rem;
+    }
+    .download-toast .toast-body{ flex: 1; font-size: .87rem; line-height: 1.5; color: var(--text-2); }
+    .download-toast .toast-body strong{ color: var(--text-1); }
+    .download-toast .toast-body p{ margin: 0 0 .4rem; }
+    .download-toast .toast-close{
+      flex-shrink: 0;
+      width: 26px; height: 26px;
+      border: none; border-radius: 8px;
+      background: transparent; color: var(--text-muted);
+      cursor: pointer; font-size: .85rem;
+      transition: background .15s ease, color .15s ease;
+    }
+    .download-toast .toast-close:hover{ background: rgba(255,255,255,.08); color: var(--text-1); }
+    @media (max-width: 520px){
+      .download-toast{ left: 16px; right: 16px; max-width: none; bottom: 16px; }
+    }
 
     /* ===== FAQ accordion ===== */
     .faq-toolbar{ display:flex; justify-content:flex-end; gap:.75rem; margin:-.25rem 0 1rem; }
@@ -372,15 +413,7 @@
       <p>Once installed, EzPaste features are immediately available for any Excel workbook, from the new EzPaste tab created within Excel.</p>
 
       <div style="text-align:center; margin:1.25rem 0;">
-        <a class="license-btn primary" style="display:inline-block; width:auto;" href="https://statistico.live/Statistico-Website/ezpaste/downloads/EzPaste2027-Setup.exe">⬇ Download EzPaste Setup (v4.3)</a>
-      </div>
-
-      <div class="callout-info">
-        <p style="margin:0;"><strong>🛡️ Seeing a "Windows protected your PC" message?</strong> This is Windows SmartScreen's standard warning for new installers that haven't yet built up a download history — it doesn't mean the file is unsafe.</p>
-        <ol>
-          <li>Click <strong>More info</strong> on the blue SmartScreen dialog.</li>
-          <li>Click <strong>Run anyway</strong> to continue installing EzPaste.</li>
-        </ol>
+        <a class="license-btn primary" style="display:inline-block; width:auto;" data-download-trigger href="https://statistico.live/Statistico-Website/ezpaste/downloads/EzPaste2027-Setup.exe">⬇ Download EzPaste Setup (v4.3)</a>
       </div>
 
       <div style="text-align: center; margin: 1.5rem 0;">
@@ -432,7 +465,7 @@
             <li>No time limit — use it for as long as you like</li>
             <li>Great for testing EzPaste on your own workbooks</li>
           </ul>
-          <a class="license-btn ghost" href="https://statistico.live/Statistico-Website/ezpaste/downloads/EzPaste2027-Setup.exe">Download Free Trial</a>
+          <a class="license-btn ghost" data-download-trigger href="https://statistico.live/Statistico-Website/ezpaste/downloads/EzPaste2027-Setup.exe">Download Free Trial</a>
         </div>
 
         <div class="license-plan featured">
@@ -593,6 +626,15 @@
 
   </div>
 
+  <div class="download-toast" id="downloadToast" role="status" aria-live="polite">
+    <div class="toast-icon"><i class="fa-solid fa-shield-halved"></i></div>
+    <div class="toast-body">
+      <p><strong>Your download should start now.</strong></p>
+      <p>If Windows shows <strong>"Windows protected your PC"</strong>, click <strong>More info</strong>, then <strong>Run anyway</strong> — this is normal for new installers and doesn't mean it's unsafe.</p>
+    </div>
+    <button type="button" class="toast-close" id="downloadToastClose" aria-label="Dismiss"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+
   <!-- Modal -->
   <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal">
@@ -625,6 +667,31 @@
     overlay.addEventListener('click', (e)=>{
       if(e.target === overlay) closeHelp();
     });
+
+    /* ===== Download toast (SmartScreen guidance) ===== */
+    (function(){
+      const toast = document.getElementById('downloadToast');
+      const toastClose = document.getElementById('downloadToastClose');
+      let toastTimer = null;
+      if(!toast) return;
+
+      function showDownloadToast(){
+        toast.classList.add('is-visible');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(()=> toast.classList.remove('is-visible'), 12000);
+      }
+
+      document.querySelectorAll('[data-download-trigger]').forEach((link)=>{
+        link.addEventListener('click', showDownloadToast);
+      });
+
+      if(toastClose){
+        toastClose.addEventListener('click', ()=>{
+          clearTimeout(toastTimer);
+          toast.classList.remove('is-visible');
+        });
+      }
+    })();
 
     function wireZone(el){
       const open = () => openHelp(el.getAttribute('data-file'), el.getAttribute('data-label'));

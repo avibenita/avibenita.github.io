@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Logistic Regression case study data</title>
+</head>
+<body>
+  <!--
+    Isolated worker page: generates a fixed representative "Customer Churn" data set
+    and runs it through the real Statistico logistic regression fitting engine
+    (taskpane/logistic/logistic-input-panel.js — the same computeLogisticBundle /
+    fitLogisticIRLS code used when a customer analyzes their own Excel data).
+
+    Kept in its own document (loaded in a hidden iframe by logistic-results-v3.html)
+    so the taskpane script's globals never touch the results page's own scope.
+  -->
+  <script src="../../../taskpane/logistic/logistic-input-panel.js"></script>
+  <script>
+    (function () {
+      function createLogisticCaseStudyData() {
+        // Fixed seed: same case study renders identically on every visit.
+        let seed = 20260726;
+        function rnd() {
+          seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
+          return (seed >>> 0) / 0xFFFFFFFF;
+        }
+        function normal(mean, sd) {
+          const u1 = Math.max(1e-10, rnd()), u2 = rnd();
+          return mean + sd * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        }
+
+        const contracts = ['Month-to-month', 'One year', 'Two year'];
+        const headers = ['Tenure Months', 'Monthly Charges', 'Support Tickets', 'Contract Type', 'Churned'];
+        const n = 240;
+        const rows = [];
+
+        for (let i = 0; i < n; i++) {
+          const tenure = Math.max(1, Math.min(72, Math.round(normal(30, 20))));
+          const charges = Math.max(20, Math.min(150, Math.round(normal(70, 25))));
+          const tickets = Math.max(0, Math.min(9, Math.round(Math.abs(normal(1.6, 1.7)))));
+          const contractRoll = rnd();
+          const contract = contractRoll < 0.55 ? contracts[0] : (contractRoll < 0.85 ? contracts[1] : contracts[2]);
+          const contractEffect = contract === contracts[0] ? 0.9 : (contract === contracts[1] ? -0.2 : -1.1);
+
+          const logit = -1.0 - (0.04 * tenure) + (0.02 * charges) + (0.35 * tickets) + contractEffect;
+          const p = 1 / (1 + Math.exp(-logit));
+          const churned = rnd() < p ? 'Yes' : 'No';
+
+          rows.push([tenure, charges, tickets, contract, churned]);
+        }
+
+        return {
+          headers,
+          rows,
+          modelSpec: {
+            y: 'Churned',
+            xn: ['Tenure Months', 'Monthly Charges', 'Support Tickets'],
+            xc: ['Contract Type'],
+            intercept: true,
+            yRecode: { level0: 'No', level1: 'Yes' }
+          },
+          meta: {
+            title: 'Customer Churn — Logistic Regression',
+            story: 'Does tenure, monthly charges, support-ticket volume, and contract type predict churn?'
+          }
+        };
+      }
+
+      function run() {
+        try {
+          const demo = createLogisticCaseStudyData();
+          const computed = computeLogisticBundle(demo.headers, demo.rows, demo.modelSpec, 0.5);
+          const bundle = computed.bundle;
+          bundle.dataContext = {
+            headers: demo.headers,
+            rows: demo.rows,
+            address: 'Case Study Data',
+            modelSpec: demo.modelSpec
+          };
+          window.parent.postMessage({ type: 'LOGISTIC_CASE_STUDY_BUNDLE', payload: bundle, meta: demo.meta }, '*');
+        } catch (err) {
+          window.parent.postMessage({
+            type: 'LOGISTIC_CASE_STUDY_ERROR',
+            error: String((err && err.message) || err)
+          }, '*');
+        }
+      }
+
+      if (document.readyState === 'complete') run();
+      else window.addEventListener('load', run);
+    })();
+  </script>
+</body>
+</html>

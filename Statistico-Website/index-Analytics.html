@@ -2065,6 +2065,32 @@
       transition: all .15s; font-family: inherit; backdrop-filter: blur(8px);
     }
     .ws-modal-close:hover { background: rgba(255,80,60,.18); border-color: rgba(255,80,60,.4); color: #fff; }
+    .ws-modal-cta {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 6;
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px 10px 16px;
+      border-radius: 999px;
+      background: rgba(7,14,24,.88);
+      border: 1px solid rgba(120,200,255,.35);
+      backdrop-filter: blur(8px);
+      font-size: .82rem;
+      color: rgba(255,255,255,.88);
+      box-shadow: 0 10px 26px rgba(0,0,0,.35);
+      max-width: 92%;
+    }
+    .ws-modal-cta[hidden] { display: none; }
+    .ws-modal-cta a {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border-radius: 999px;
+      background: rgba(120,200,255,.18); border: 1px solid rgba(120,200,255,.5);
+      color: #e8f6ff; font-weight: 800; font-size: .78rem; white-space: nowrap;
+    }
     .ws-device-frame {
       position: relative;
       width: 100%;
@@ -2348,6 +2374,10 @@
         <div class="ws-screen">
           <iframe class="ws-modal-frame" id="wsModalFrame" title="Statistico workspace preview" allowfullscreen></iframe>
           <div class="ws-demo-watermark" aria-hidden="true"></div>
+          <div class="ws-modal-cta" id="wsModalCta" hidden>
+            <span>Want to analyze your own Excel workbook?</span>
+            <a href="/Statistico-Website/index-Addins.html">Get Statistico <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+          </div>
         </div>
       </section>
     </div>
@@ -3162,6 +3192,8 @@
     const modalFrame = document.getElementById('wsModalFrame');
     const modalTitle = document.getElementById('wsModalTitle');
     const modalClose = document.getElementById('wsModalClose');
+    const modalCta   = document.getElementById('wsModalCta');
+    const LOGISTIC_CASE_STUDY_URL = 'https://statistico.live/statistico-analytics/dialogs/views/logistic/logistic-results-v3.html';
     const slideBackdrop = document.getElementById('viewSlideBackdrop');
     const slideClose = document.getElementById('viewSlideClose');
     const slideTitle = document.getElementById('viewSlideTitle');
@@ -3194,10 +3226,11 @@
     }
 
     function openWorkspaceWindow(url, title, moduleKey) {
-      const fullUrl = moduleKey === 'correlations' || moduleKey === 'univariate'
+      const fullUrl = moduleKey === 'correlations' || moduleKey === 'univariate' || moduleKey === 'logistic'
         ? moduleEmbedUrl(url)
         : (url.indexOf('?') >= 0 ? url + '&embed=1' : url + '?embed=1');
       modalTitle.textContent = title || 'Workspace Preview';
+      if (modalCta) modalCta.hidden = moduleKey !== 'logistic';
       modalFrame.src = '';
       backdrop.classList.add('open');
       document.body.style.overflow = 'hidden';
@@ -3209,6 +3242,7 @@
     function closeModal() {
       backdrop.classList.remove('open');
       document.body.style.overflow = '';
+      if (modalCta) modalCta.hidden = true;
       setTimeout(() => { modalFrame.src = ''; }, 300);
     }
     if (modalClose) modalClose.addEventListener('click', closeModal);
@@ -3328,6 +3362,21 @@
           </div>`;
         const demoBtn = document.getElementById('capRealDemoBtn');
         if (demoBtn) demoBtn.addEventListener('click', () => openWorkspaceWindow(m.url, `${m.title} Demo`, key));
+        return;
+      }
+      if (key === 'logistic') {
+        capDemoLaunch.innerHTML = `
+          <div class="cap-slide-launch-card">
+            <button type="button" class="cap-cta cap-cta--real-demo" id="capLogisticCaseStudyBtn">
+              Interactive Case Study <i class="fa-solid fa-play"></i>
+            </button>
+            <a class="cap-cta" href="/Statistico-Website/analytics/logistic-regression.html">
+              Explore Module <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            </a>
+            <p>“Customer Churn — Logistic Regression”: a real fitted model on a fixed representative data set, not a synthetic walkthrough. Explore Module opens the full product page with screens, ROC/threshold detail, and diagnostics.</p>
+          </div>`;
+        const caseStudyBtn = document.getElementById('capLogisticCaseStudyBtn');
+        if (caseStudyBtn) caseStudyBtn.addEventListener('click', () => openWorkspaceWindow(LOGISTIC_CASE_STUDY_URL, 'Customer Churn — Logistic Regression', key));
         return;
       }
       capDemoLaunch.innerHTML = `

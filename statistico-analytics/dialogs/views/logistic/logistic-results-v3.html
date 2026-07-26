@@ -1833,7 +1833,7 @@
         }
       } catch (_e) {}
     }
-    function n(v) { var x = Number(String(v).replace("%", "")); return isFinite(x) ? x : NaN; }
+    function n(v) { var x = Number(String(v).replace("%", "").replace(/^[<>]\s*/, "")); return isFinite(x) ? x : NaN; }
     function pct(v) { return isFinite(v) ? (v * 100).toFixed(1) + "%" : "N/A"; }
     function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c])); }
     function firstDefined(obj, keys, fallback) {
@@ -4060,7 +4060,48 @@
     });
 
     window.switchTab = switchTab;
+    window.applyMessage = applyMessage;
   })();
+  </script>
+  <script>
+    (function () {
+      // Interactive Case Study demo bootstrap: fixed, seeded "Customer Churn" data set
+      // computed by the real fitting engine in an isolated worker iframe (see
+      // logistic-demo-worker.html), then fed into the normal LOGISTIC_BUNDLE
+      // rendering path — no Excel host or real customer data involved.
+      var params = new URLSearchParams(window.location.search);
+      var isEmbedMode = params.get('embed') === '1';
+      var isCaseStudyDemo = isEmbedMode && params.get('demo') === '1';
+      if (!isCaseStudyDemo) return;
+
+      function boot() {
+        document.body.classList.add('demo-embed');
+        if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader.updateTitle === 'function') {
+          try { StatisticoHeader.updateTitle('Customer Churn — Logistic Regression'); } catch (_e) {}
+        }
+
+        var worker = document.createElement('iframe');
+        worker.src = 'logistic-demo-worker.html';
+        worker.style.display = 'none';
+        worker.setAttribute('aria-hidden', 'true');
+        worker.title = 'Case study data preparation';
+        document.body.appendChild(worker);
+
+        window.addEventListener('message', function (event) {
+          var data = event.data;
+          if (!data) return;
+          if (data.type === 'LOGISTIC_CASE_STUDY_BUNDLE' && typeof window.applyMessage === 'function') {
+            window.applyMessage({ type: 'LOGISTIC_BUNDLE', payload: data.payload });
+            if (worker && worker.parentNode) worker.parentNode.removeChild(worker);
+          } else if (data.type === 'LOGISTIC_CASE_STUDY_ERROR') {
+            console.error('Logistic case study data failed:', data.error);
+          }
+        });
+      }
+
+      if (document.readyState === 'complete' || document.readyState === 'interactive') boot();
+      else document.addEventListener('DOMContentLoaded', boot);
+    })();
   </script>
 </body>
 </html>

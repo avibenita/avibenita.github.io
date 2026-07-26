@@ -635,14 +635,37 @@
       box-shadow: 0 16px 40px rgba(0,0,0,.35);
       z-index: 10000;
       opacity: 0;
-      transform: translateY(16px);
+      transform: translateY(8px);
       pointer-events: none;
-      transition: opacity .25s ease, transform .25s ease;
+      transition: opacity .2s ease, transform .2s ease;
     }
     .download-toast.is-visible{
       opacity: 1;
       transform: translateY(0);
       pointer-events: auto;
+    }
+    .download-toast::before{
+      content: "";
+      position: absolute;
+      right: var(--toast-arrow-right, 28px);
+      width: 14px;
+      height: 14px;
+      background: rgba(20, 31, 49, 0.98);
+      border: 1px solid rgba(120, 200, 255, 0.3);
+      transform: rotate(45deg);
+      display: none;
+    }
+    .download-toast[data-anchor="below"]::before{
+      display: block;
+      top: -8px;
+      border-right: none;
+      border-bottom: none;
+    }
+    .download-toast[data-anchor="above"]::before{
+      display: block;
+      bottom: -8px;
+      border-left: none;
+      border-top: none;
     }
     .download-toast .toast-icon{
       flex-shrink: 0;
@@ -666,7 +689,8 @@
     }
     .download-toast .toast-close:hover{ background: rgba(255,255,255,.08); color: #fff; }
     @media (max-width: 520px){
-      .download-toast{ left: 16px; right: 16px; max-width: none; bottom: 16px; }
+      .download-toast{ max-width: calc(100vw - 32px); }
+      .download-toast::before{ display: none; }
     }
 
     .faq-item{
@@ -1149,8 +1173,49 @@
       var toastClose = document.getElementById("downloadToastClose");
       var toastTimer = null;
 
-      function showDownloadToast() {
+      function positionToastNear(anchorEl) {
+        if (!anchorEl || window.innerWidth <= 520) {
+          toast.removeAttribute("data-anchor");
+          toast.style.top = "";
+          toast.style.left = "";
+          toast.style.right = "20px";
+          toast.style.bottom = "20px";
+          return;
+        }
+        var margin = 16;
+        var gap = 14;
+        var rect = anchorEl.getBoundingClientRect();
+        var toastWidth = Math.min(360, window.innerWidth - margin * 2);
+        var estHeight = toast.offsetHeight || 110;
+
+        var left = rect.right - toastWidth;
+        if (left < margin) left = margin;
+        if (left + toastWidth > window.innerWidth - margin) left = window.innerWidth - toastWidth - margin;
+
+        var placeBelow = (rect.bottom + gap + estHeight) <= window.innerHeight - margin;
+        var top, anchor;
+        if (placeBelow) {
+          top = rect.bottom + gap;
+          anchor = "below";
+        } else {
+          top = rect.top - gap - estHeight;
+          anchor = "above";
+        }
+
+        toast.style.left = left + "px";
+        toast.style.top = top + "px";
+        toast.style.right = "auto";
+        toast.style.bottom = "auto";
+        toast.style.maxWidth = toastWidth + "px";
+        toast.setAttribute("data-anchor", anchor);
+        // Point the arrow at the anchor's horizontal center, clamped to stay on the toast.
+        var arrowRight = Math.max(16, Math.min(toastWidth - 30, (left + toastWidth) - (rect.left + rect.width / 2) - 7));
+        toast.style.setProperty("--toast-arrow-right", arrowRight + "px");
+      }
+
+      function showDownloadToast(event) {
         if (!toast) return;
+        positionToastNear(event && event.currentTarget);
         toast.classList.add("is-visible");
         clearTimeout(toastTimer);
         toastTimer = setTimeout(function () {

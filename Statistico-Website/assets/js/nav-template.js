@@ -316,7 +316,7 @@ const NAV_STYLE = `
   padding: 7px 11px;
   font-size: 0.86rem;
   font-weight: 500;
-  color: rgba(255,255,255,0.56);
+  color: #C8D2E2;
 }
 
 .nav-products-row .nav-link--product[data-page="analytics"] {
@@ -341,12 +341,12 @@ const NAV_STYLE = `
   height: 14px;
   flex-shrink: 0;
   display: block;
-  color: rgba(120,200,255,0.62);
+  color: rgba(140,210,255,0.88);
   opacity: 1;
 }
 
 .nav-products-row .nav-link:hover .nav-product-icon {
-  color: rgba(140,210,255,0.88);
+  color: rgba(170,220,255,1);
 }
 
 .nav-products-row .nav-link.active .nav-product-icon {
@@ -354,7 +354,7 @@ const NAV_STYLE = `
 }
 
 :root[data-theme="light"] .nav-products-row .nav-product-icon {
-  color: rgba(37,99,235,0.5);
+  color: rgba(37,99,235,0.7);
 }
 
 :root[data-theme="light"] .nav-products-row .nav-link:hover .nav-product-icon {
@@ -474,7 +474,7 @@ const NAV_STYLE = `
 
 :root[data-theme="light"] .nav-products-row .nav-link--product,
 :root[data-theme="light"] .nav-products-row .nav-link--product-lite {
-  color: rgba(15, 23, 42, 0.56);
+  color: rgba(15, 23, 42, 0.72);
 }
 
 :root[data-theme="light"] .nav-products-row .nav-link--product:hover,

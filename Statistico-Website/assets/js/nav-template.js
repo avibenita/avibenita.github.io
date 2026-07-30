@@ -390,7 +390,7 @@ const NAV_STYLE = `
   gap: 8px;
   min-height: 44px;
   padding: 8px 12px;
-  color: rgba(255,255,255,0.56);
+  color: #C8D2E2;
   text-decoration: none;
   font-weight: 500;
   font-size: 0.88rem;
@@ -420,8 +420,8 @@ const NAV_STYLE = `
 }
 
 .nav-link:hover {
-  color: rgba(255,255,255,0.9);
-  background: rgba(255,255,255,0.05);
+  color: #FFFFFF;
+  background: rgba(120,200,255,0.08);
   transform: none;
   box-shadow: none;
 }
@@ -464,7 +464,7 @@ const NAV_STYLE = `
 :root[data-theme="light"] .nav-logo { background: none; }
 
 :root[data-theme="light"] .nav-link {
-  color: rgba(15, 23, 42, 0.56);
+  color: rgba(15, 23, 42, 0.72);
 }
 
 :root[data-theme="light"] .nav-link:hover {

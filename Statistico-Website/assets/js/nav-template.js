@@ -1875,7 +1875,7 @@ const FOOTER_TEMPLATE = `
     const currentPath = window.location.pathname.replace(/\\/g, '/');
     const currentFile = currentPath.split('/').pop() || 'index.html';
 
-    let activePage = 'home';
+    let activePage = '';
     if (currentFile === 'index.html' || currentFile === '' || currentPath === '/' || currentPath.endsWith('/Statistico-Website/')) {
       activePage = 'home';
     } else if (currentFile === 'why-another-package.html') {
@@ -1884,9 +1884,9 @@ const FOOTER_TEMPLATE = `
       activePage = 'how';
     } else if (currentFile === 'faq.html') {
       activePage = 'faq';
-    } else if (currentFile === 'index-Calculators.html') {
+    } else if (currentFile === 'index-Calculators.html' || currentPath.indexOf('/calculators/') >= 0) {
       activePage = 'calculators';
-    } else if (currentFile === 'index-Analytics.html') {
+    } else if (currentFile === 'index-Analytics.html' || currentPath.indexOf('/analytics/') >= 0) {
       activePage = 'analytics';
     } else if (currentFile === 'index-Addins.html' || currentFile === 'index-EzPaste.html') {
       activePage = 'addins';

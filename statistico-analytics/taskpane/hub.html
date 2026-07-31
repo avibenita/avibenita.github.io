@@ -727,40 +727,110 @@
     }
 
     /* ── First-run welcome popup (overlay, doesn't shift layout) ──── */
+    @keyframes hubWelcomeOverlayFadeIn {
+      from { background: rgba(8, 15, 28, 0); backdrop-filter: blur(0); -webkit-backdrop-filter: blur(0); }
+      to   { background: rgba(5, 10, 20, 0.74); backdrop-filter: blur(3px) saturate(115%); -webkit-backdrop-filter: blur(3px) saturate(115%); }
+    }
+    @keyframes hubWelcomePopIn {
+      0%   { opacity: 0; transform: translateY(18px) scale(.92); }
+      70%  { opacity: 1; transform: translateY(-2px) scale(1.015); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes hubWelcomeRingPulse {
+      0%, 100% { transform: scale(1); opacity: .65; }
+      50%      { transform: scale(1.18); opacity: 0; }
+    }
+    @keyframes hubWelcomeSheen {
+      0%   { transform: translateX(-130%) rotate(8deg); }
+      100% { transform: translateX(230%) rotate(8deg); }
+    }
     #hubWelcomeOverlay {
       display: none;
       position: fixed;
       inset: 0;
       z-index: 10001;
-      background: rgba(8, 15, 28, 0.6);
+      background: rgba(5, 10, 20, 0.74);
+      backdrop-filter: blur(3px) saturate(115%);
+      -webkit-backdrop-filter: blur(3px) saturate(115%);
       align-items: center;
       justify-content: center;
       padding: 16px;
     }
-    #hubWelcomeOverlay.open { display: flex; }
+    #hubWelcomeOverlay.open {
+      display: flex;
+      animation: hubWelcomeOverlayFadeIn .3s ease both;
+    }
     .hub-welcome-banner {
       position: relative;
       width: min(100%, 340px);
       margin: 0;
-      padding: 18px 36px 16px 18px;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,.1);
-      background: linear-gradient(160deg, #1e324a, #16283c);
-      box-shadow: 0 20px 50px rgba(0,0,0,.45);
+      animation: hubWelcomePopIn .38s cubic-bezier(.22,.9,.32,1.15) both;
+    }
+    .hub-welcome-inner {
+      position: relative;
+      padding: 22px 36px 18px 20px;
+      border-radius: 16px;
+      border: 1px solid rgba(167,139,250,.32);
+      background: linear-gradient(160deg, #26314f 0%, #1e324a 45%, #16283c 100%);
+      box-shadow:
+        0 26px 60px rgba(0,0,0,.55),
+        0 0 0 1px rgba(167,139,250,.10),
+        0 0 44px rgba(124,92,255,.22);
+      overflow: hidden;
+    }
+    .hub-welcome-inner::after {
+      content: "";
+      position: absolute;
+      top: 0; left: 0;
+      width: 60%;
+      height: 100%;
+      background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.10) 48%, transparent 66%);
+      animation: hubWelcomeSheen 2.6s ease-in-out .5s 1;
+      pointer-events: none;
+    }
+    .hub-welcome-badge {
+      position: absolute;
+      top: -18px;
+      left: 20px;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 15px;
+      background: linear-gradient(135deg, #b49cff, #6142e7);
+      box-shadow: 0 8px 20px rgba(97,66,231,.55), 0 0 0 4px #1c2c42;
+      z-index: 2;
+    }
+    .hub-welcome-badge::before {
+      content: "";
+      position: absolute;
+      inset: -7px;
+      border-radius: 50%;
+      border: 2px solid rgba(167,139,250,.55);
+      animation: hubWelcomeRingPulse 2.4s ease-out infinite;
     }
     .hub-welcome-title {
       font-size: 13px;
       font-weight: 700;
       color: #ffffff;
-      margin-bottom: 3px;
+      margin: 6px 0 3px;
+      position: relative;
+      z-index: 1;
     }
     .hub-welcome-sub {
+      position: relative;
+      z-index: 1;
       font-size: 11px;
       color: #b8c5d2;
       line-height: 1.5;
       margin-bottom: 8px;
     }
     .hub-welcome-list {
+      position: relative;
+      z-index: 1;
       display: flex;
       flex-wrap: wrap;
       gap: 6px 14px;
@@ -776,11 +846,37 @@
     }
     .hub-welcome-item i { color: #22c55e; font-size: 10px; }
     .hub-welcome-cta {
+      position: relative;
+      z-index: 1;
       font-size: 10.5px;
       color: #b8c5d2;
       line-height: 1.5;
     }
     .hub-welcome-cta strong { color: #ffffff; }
+    .hub-welcome-primary-btn {
+      position: relative;
+      z-index: 1;
+      display: block;
+      width: 100%;
+      margin-top: 12px;
+      padding: 9px 14px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #7c5cff, #6142e7);
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .01em;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(97,66,231,.35);
+      transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+    }
+    .hub-welcome-primary-btn:hover {
+      background: linear-gradient(135deg, #8a6cff, #6f4bf0);
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px rgba(97,66,231,.45);
+    }
+    .hub-welcome-primary-btn:active { transform: translateY(0); }
     .hub-welcome-close {
       position: absolute;
       top: 8px;
@@ -1517,18 +1613,22 @@
   <!-- First-run welcome popup: shown once on first launch, closable, doesn't shift layout -->
   <div id="hubWelcomeOverlay" aria-hidden="true" role="dialog" aria-labelledby="hubWelcomeTitle">
     <div class="hub-welcome-banner" id="hubWelcomeBanner">
-      <button type="button" class="hub-welcome-close" id="hubWelcomeClose" aria-label="Dismiss">
-        <i class="fa-solid fa-xmark"></i>
-      </button>
-      <div class="hub-welcome-title" id="hubWelcomeTitle">Welcome to Statistico Analytics</div>
-      <div class="hub-welcome-sub">Professional statistical computing for Microsoft Excel — no scripting or add-on software required.</div>
-      <div class="hub-welcome-list">
-        <span class="hub-welcome-item"><i class="fa-solid fa-check"></i> Interactive analyses</span>
-        <span class="hub-welcome-item"><i class="fa-solid fa-check"></i> AI-assisted interpretation</span>
-        <span class="hub-welcome-item"><i class="fa-solid fa-check"></i> 50+ statistical procedures</span>
-        <span class="hub-welcome-item"><i class="fa-solid fa-check"></i> Works directly on Excel worksheets</span>
+      <div class="hub-welcome-badge"><i class="fa-solid fa-rocket"></i></div>
+      <div class="hub-welcome-inner">
+        <button type="button" class="hub-welcome-close" id="hubWelcomeClose" aria-label="Dismiss">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <div class="hub-welcome-title" id="hubWelcomeTitle">Welcome to Statistico Analytics</div>
+        <div class="hub-welcome-sub">Professional statistical analysis directly in Microsoft Excel—no scripting or separate statistical software required.</div>
+        <div class="hub-welcome-list">
+          <span class="hub-welcome-item"><i class="fa-solid fa-check"></i> Interactive analyses</span>
+          <span class="hub-welcome-item"><i class="fa-solid fa-check"></i> AI-assisted interpretation</span>
+          <span class="hub-welcome-item"><i class="fa-solid fa-check"></i> 50+ statistical procedures</span>
+          <span class="hub-welcome-item"><i class="fa-solid fa-check"></i> Works directly with your Excel data</span>
+        </div>
+        <div class="hub-welcome-cta"><strong>Get started:</strong> select a worksheet range containing a header row and at least one data row, then choose an analysis.</div>
+        <button type="button" class="hub-welcome-primary-btn" id="hubWelcomeStart">Start exploring</button>
       </div>
-      <div class="hub-welcome-cta"><strong>Get started:</strong> select a worksheet range with a header row and at least one data row, then choose an analysis below.</div>
     </div>
   </div>
 
@@ -1562,9 +1662,10 @@
   <script>
     /* ── First-run welcome popup: show once on start, remember dismissal ──── */
     (function initHubWelcomePopup() {
-      var STORAGE_KEY = "statisticoWelcomeDismissed_v2";
+      var STORAGE_KEY = "statisticoWelcomeDismissed_v3";
       var overlay = document.getElementById("hubWelcomeOverlay");
       var closeBtn = document.getElementById("hubWelcomeClose");
+      var startBtn = document.getElementById("hubWelcomeStart");
       if (!overlay || !closeBtn) return;
 
       function dismiss() {
@@ -1584,6 +1685,7 @@
       }
 
       closeBtn.addEventListener("click", dismiss);
+      if (startBtn) startBtn.addEventListener("click", dismiss);
       overlay.addEventListener("click", function (e) {
         if (e.target === overlay) dismiss();
       });

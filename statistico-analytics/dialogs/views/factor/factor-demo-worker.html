@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Factor Analysis case study data</title>
+</head>
+<body>
+  <!--
+    Isolated worker page: generates a fixed representative "Employee Engagement Survey"
+    data set and runs it through the real Statistico factor analysis fitting engine
+    (taskpane/factor/factor-input-panel.js — the same buildFactorBundle code used when
+    a customer analyzes their own Excel data).
+
+    Kept in its own document (loaded in a hidden iframe by factor-results-v3.html)
+    so the taskpane script's globals never touch the results page's own scope.
+  -->
+  <script src="../../../taskpane/factor/factor-input-panel.js"></script>
+  <script>
+    (function () {
+      function createFactorCaseStudyData() {
+        // Fixed seed: same case study renders identically on every visit.
+        let seed = 20260731;
+        function rnd() {
+          seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
+          return (seed >>> 0) / 0xFFFFFFFF;
+        }
+        function normal() {
+          const u1 = Math.max(1e-10, rnd()), u2 = rnd();
+          return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        }
+        function clampLikert(v) {
+          return Math.max(1, Math.min(7, Math.round(v)));
+        }
+
+        // Three latent engagement dimensions with a plausible cross-loading pattern.
+        const headers = [
+          'Career Growth Opportunities',
+          'Manager Support',
+          'Recognition for Good Work',
+          'Team Collaboration',
+          'Company Culture Fit',
+          'Work-Life Balance',
+          'Compensation Fairness',
+          'Job Security'
+        ];
+        // [loadingGrowth, loadingCulture, loadingCompensation] per item.
+        const loadings = [
+          [0.78, 0.00, 0.00],
+          [0.70, 0.15, 0.00],
+          [0.74, 0.10, 0.00],
+          [0.00, 0.75, 0.00],
+          [0.12, 0.68, 0.00],
+          [0.00, 0.55, 0.25],
+          [0.00, 0.00, 0.80],
+          [0.10, 0.00, 0.72]
+        ];
+        const noiseSd = 0.55;
+        const n = 220;
+        const rows = [];
+
+        for (let i = 0; i < n; i++) {
+          const fGrowth = normal();
+          const fCulture = normal();
+          const fComp = normal();
+          const row = loadings.map(([lg, lc, lp]) => {
+            const raw = 4.4 + lg * fGrowth * 1.6 + lc * fCulture * 1.6 + lp * fComp * 1.6 + normal() * noiseSd;
+            return clampLikert(raw);
+          });
+          rows.push(row);
+        }
+
+        return {
+          headers,
+          rows,
+          modelSpec: {
+            variables: headers.slice(),
+            factors: 3,
+            rotationMethod: 'Varimax'
+          },
+          meta: {
+            title: 'Employee Engagement Survey — Factor Analysis',
+            story: 'Do eight engagement survey items reduce to a small set of underlying dimensions — and which items define each one?'
+          }
+        };
+      }
+
+      function run() {
+        try {
+          const demo = createFactorCaseStudyData();
+          const bundle = buildFactorBundle(demo.headers, demo.rows, demo.modelSpec);
+          bundle.dataContext = {
+            headers: demo.headers,
+            rows: demo.rows,
+            address: 'Case Study Data',
+            modelSpec: demo.modelSpec
+          };
+          window.parent.postMessage({ type: 'FACTOR_CASE_STUDY_BUNDLE', payload: bundle, meta: demo.meta }, '*');
+        } catch (err) {
+          window.parent.postMessage({
+            type: 'FACTOR_CASE_STUDY_ERROR',
+            error: String((err && err.message) || err)
+          }, '*');
+        }
+      }
+
+      if (document.readyState === 'complete') run();
+      else window.addEventListener('load', run);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Publication Tables — Configuration</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+
+  <!-- Shared Config -->
+  <link rel="stylesheet" href="../shared-config.css?v=20260715a" />
+  <script src="../shared-config.js?v=20260715b"></script>
+
+  <style>
+    .pt-mode-toggle .cfg-radio-label .radio-icon { font-size: 16px; }
+
+    .pt-role-col { width: 60px; text-align: center; }
+    .pt-role-col input[type="radio"],
+    .pt-role-col input[type="checkbox"] { transform: scale(1.15); accent-color: var(--cfg-check-acc); cursor: pointer; }
+    .pt-var-row.is-disabled { opacity: .38; pointer-events: none; }
+
+    .pt-style-extra {
+      display: none;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--cfg-border);
+    }
+    .pt-style-extra.is-visible { display: block; }
+    .pt-check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--cfg-text2);
+      margin-bottom: 8px;
+    }
+    .pt-check-row input[type="checkbox"] { accent-color: var(--cfg-check-acc); transform: scale(1.1); }
+    .pt-hide { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="cfg-shell">
+    <header class="cfg-header">
+      <div class="cfg-header-icon"><i class="fa-solid fa-table-list"></i></div>
+      <span class="cfg-header-title">Publication Tables</span>
+      <span class="cfg-meta-badge" id="ptRangeBadge">No range loaded</span>
+      <button class="cfg-theme-toggle" id="cfgThemeToggle" type="button">
+        <span class="cfg-toggle-icon">🌙</span>
+        <span class="cfg-toggle-track"><span class="cfg-toggle-thumb"></span></span>
+        <span class="cfg-toggle-label">Dark</span>
+      </button>
+    </header>
+
+    <div class="cfg-body">
+
+      <!-- Data range summary -->
+      <section class="cfg-panel">
+        <div class="cfg-panel-head"><i class="fa-solid fa-table-cells"></i> Data Range</div>
+        <div class="cfg-panel-body">
+          <div class="cfg-range-strip">
+            <span class="cfg-range-item">Address: <strong id="ptAddress">—</strong></span>
+            <span class="cfg-range-item">Rows: <strong id="ptRows">0</strong></span>
+            <span class="cfg-range-item">Columns: <strong id="ptCols">0</strong></span>
+          </div>
+          <p class="cfg-hint">Select a range with a header row in Excel, then reopen this dialog if you need a different selection.</p>
+        </div>
+      </section>
+
+      <!-- Table type -->
+      <section class="cfg-panel">
+        <div class="cfg-panel-head"><i class="fa-solid fa-shapes"></i> Table Type</div>
+        <div class="cfg-panel-body">
+          <div class="cfg-radio-group pt-mode-toggle" id="ptModeGroup">
+            <div class="cfg-radio-option">
+              <input type="radio" name="ptMode" id="ptModeDescriptives" value="descriptives" checked />
+              <label class="cfg-radio-label" for="ptModeDescriptives">
+                <span class="radio-icon"><i class="fa-solid fa-table-cells"></i></span>
+                <span class="radio-text">Descriptive Statistics</span>
+              </label>
+            </div>
+            <div class="cfg-radio-option">
+              <input type="radio" name="ptMode" id="ptModeRegression" value="regression" />
+              <label class="cfg-radio-label" for="ptModeRegression">
+                <span class="radio-icon"><i class="fa-solid fa-chart-line"></i></span>
+                <span class="radio-text">Regression Coefficients</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Variables -->
+      <section class="cfg-panel">
+        <div class="cfg-panel-head"><i class="fa-solid fa-list-check"></i> Variables</div>
+        <div class="cfg-panel-body">
+          <div class="cfg-tbl-wrap">
+            <div class="cfg-tbl-scroll">
+              <table class="cfg-tbl">
+                <thead>
+                  <tr>
+                    <th>Variable</th>
+                    <th class="center">Type</th>
+                    <th class="center pt-role-col pt-col-include">Include</th>
+                    <th class="center pt-role-col pt-col-dv pt-hide">Dependent</th>
+                    <th class="center pt-role-col pt-col-iv pt-hide">Predictor</th>
+                  </tr>
+                </thead>
+                <tbody id="ptVarBody">
+                  <tr><td colspan="5" style="text-align:center;color:var(--cfg-text3);padding:18px;">Waiting for data…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p class="cfg-note" id="ptVarNote" style="display:none;"></p>
+        </div>
+      </section>
+
+      <!-- Style & formatting -->
+      <section class="cfg-panel">
+        <div class="cfg-panel-head"><i class="fa-solid fa-swatchbook"></i> Style &amp; Formatting</div>
+        <div class="cfg-panel-body">
+          <div class="cfg-radio-group" id="ptStyleGroup">
+            <div class="cfg-radio-option">
+              <input type="radio" name="ptStyle" id="ptStyleApa" value="apa7" checked />
+              <label class="cfg-radio-label" for="ptStyleApa">
+                <span class="radio-icon"><i class="fa-solid fa-graduation-cap"></i></span>
+                <span class="radio-text">APA 7th Edition</span>
+              </label>
+            </div>
+            <div class="cfg-radio-option">
+              <input type="radio" name="ptStyle" id="ptStyleVancouver" value="vancouver" />
+              <label class="cfg-radio-label" for="ptStyleVancouver">
+                <span class="radio-icon"><i class="fa-solid fa-staff-snake"></i></span>
+                <span class="radio-text">Vancouver</span>
+              </label>
+            </div>
+            <div class="cfg-radio-option">
+              <input type="radio" name="ptStyle" id="ptStyleCustom" value="custom" />
+              <label class="cfg-radio-label" for="ptStyleCustom">
+                <span class="radio-icon"><i class="fa-solid fa-sliders"></i></span>
+                <span class="radio-text">Custom</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="cfg-2col" style="margin-top:12px;">
+            <div>
+              <label class="cfg-label" for="ptDecimals">Decimal places</label>
+              <input class="cfg-input" type="number" id="ptDecimals" min="0" max="6" step="1" value="2" />
+            </div>
+            <div class="pt-check-row" style="align-self:end;">
+              <input type="checkbox" id="ptShowStars" checked />
+              <label for="ptShowStars">Significance stars (regression)</label>
+            </div>
+          </div>
+
+          <div class="pt-style-extra" id="ptCustomExtra">
+            <div class="pt-check-row">
+              <input type="checkbox" id="ptLeadingZero" />
+              <label for="ptLeadingZero">Show leading zero in p-values (0.032 instead of .032)</label>
+            </div>
+            <div class="pt-check-row">
+              <input type="checkbox" id="ptMergeMeanSd" />
+              <label for="ptMergeMeanSd">Merge Mean ± SD into one column (descriptives)</label>
+            </div>
+            <div class="pt-check-row">
+              <input type="checkbox" id="ptItalicCaption" checked />
+              <label for="ptItalicCaption">Italicize table title</label>
+            </div>
+            <label class="cfg-label" for="ptCaptionPrefix">Caption label</label>
+            <input class="cfg-input" type="text" id="ptCaptionPrefix" value="Table 1" style="margin-bottom:8px;" />
+            <label class="cfg-label" for="ptNoteText">Note text (leave blank for the default note)</label>
+            <input class="cfg-input" type="text" id="ptNoteText" placeholder="Note. Custom note text for this table." />
+          </div>
+
+          <p class="cfg-hint" style="margin-top:10px;">Style controls the caption format, p-value convention, and column layout. You can also adjust everything live once the table is generated.</p>
+        </div>
+      </section>
+
+    </div>
+
+    <footer class="cfg-footer">
+      <button class="cfg-btn cancel" id="btnCancel"><i class="fa-solid fa-times"></i> Cancel</button>
+      <button class="cfg-btn run" id="btnRun" disabled><i class="fa-solid fa-table-list"></i> Generate Table</button>
+    </footer>
+  </div>
+
+  <script>
+    'use strict';
+
+    var ptHeaders = [];
+    var ptRows = [];
+    var ptAddress = '';
+    var ptColumns = []; // { index, name, isNumeric, numericCount, total }
+
+    function qs(id) { return document.getElementById(id); }
+
+    function sendToHost(cmd, data) {
+      try {
+        if (window.Office && Office.context && Office.context.ui) {
+          Office.context.ui.messageParent(JSON.stringify({ action: cmd, data: data || null }));
+        }
+      } catch (e) { console.error('Error sending to parent:', e); }
+    }
+
+    function isNumericValue(v) {
+      if (v === null || v === undefined || v === '') return false;
+      var n = Number(v);
+      return isFinite(n);
+    }
+
+    function analyzeColumns() {
+      var cols = [];
+      var nCols = ptHeaders.length;
+      for (var j = 0; j < nCols; j++) {
+        var total = 0, numeric = 0;
+        for (var i = 0; i < ptRows.length; i++) {
+          var v = ptRows[i][j];
+          if (v === null || v === undefined || v === '') continue;
+          total++;
+          if (isNumericValue(v)) numeric++;
+        }
+        var isNumeric = total > 0 && (numeric / total) >= 0.7;
+        cols.push({
+          index: j,
+          name: String(ptHeaders[j] || ('Column ' + (j + 1))),
+          isNumeric: isNumeric,
+          numericCount: numeric,
+          total: total
+        });
+      }
+      ptColumns = cols;
+    }
+
+    function currentMode() {
+      var el = document.querySelector('input[name="ptMode"]:checked');
+      return el ? el.value : 'descriptives';
+    }
+
+    function renderVarTable() {
+      var body = qs('ptVarBody');
+      if (!ptColumns.length) {
+        body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--cfg-text3);padding:18px;">Select a range with data, then reopen this dialog.</td></tr>';
+        return;
+      }
+      var mode = currentMode();
+      var rowsHtml = ptColumns.map(function (col) {
+        var disabled = !col.isNumeric;
+        var badge = col.isNumeric ? '<span class="cfg-badge-num">Numeric</span>' : '<span class="cfg-badge-str">Non-numeric</span>';
+        return (
+          '<tr class="pt-var-row' + (disabled ? ' is-disabled' : '') + '" data-index="' + col.index + '">' +
+            '<td>' + escHtml(col.name) + '</td>' +
+            '<td class="center">' + badge + '</td>' +
+            '<td class="center pt-role-col pt-col-include' + (mode !== 'descriptives' ? ' pt-hide' : '') + '">' +
+              '<input type="checkbox" class="pt-include" data-index="' + col.index + '" ' + (disabled ? 'disabled' : '') + ' />' +
+            '</td>' +
+            '<td class="center pt-role-col pt-col-dv' + (mode !== 'regression' ? ' pt-hide' : '') + '">' +
+              '<input type="radio" name="ptDependent" class="pt-dv" data-index="' + col.index + '" ' + (disabled ? 'disabled' : '') + ' />' +
+            '</td>' +
+            '<td class="center pt-role-col pt-col-iv' + (mode !== 'regression' ? ' pt-hide' : '') + '">' +
+              '<input type="checkbox" class="pt-iv" data-index="' + col.index + '" ' + (disabled ? 'disabled' : '') + ' />' +
+            '</td>' +
+          '</tr>'
+        );
+      }).join('');
+      body.innerHTML = rowsHtml;
+
+      // Header visibility follows mode too
+      document.querySelector('.pt-col-include').classList.toggle('pt-hide', mode !== 'descriptives');
+      document.querySelector('.pt-col-dv').classList.toggle('pt-hide', mode !== 'regression');
+      document.querySelector('.pt-col-iv').classList.toggle('pt-hide', mode !== 'regression');
+
+      body.querySelectorAll('.pt-include, .pt-dv, .pt-iv').forEach(function (el) {
+        el.addEventListener('change', onSelectionChanged);
+      });
+      // A variable picked as Dependent cannot also be an Independent predictor.
+      body.querySelectorAll('.pt-dv').forEach(function (el) {
+        el.addEventListener('change', function () {
+          var idx = this.getAttribute('data-index');
+          var ivBox = body.querySelector('.pt-iv[data-index="' + idx + '"]');
+          if (ivBox) { ivBox.checked = false; ivBox.disabled = true; }
+          body.querySelectorAll('.pt-iv').forEach(function (box) {
+            if (box.getAttribute('data-index') !== idx) box.disabled = false;
+          });
+        });
+      });
+      onSelectionChanged();
+    }
+
+    function escHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function onSelectionChanged() {
+      var mode = currentMode();
+      var note = qs('ptVarNote');
+      var runBtn = qs('btnRun');
+      var valid = false;
+
+      if (mode === 'descriptives') {
+        var count = document.querySelectorAll('.pt-include:checked').length;
+        valid = count >= 1;
+        note.style.display = valid ? 'none' : 'block';
+        note.textContent = 'Select at least one numeric variable to include in the table.';
+      } else {
+        var dv = document.querySelector('.pt-dv:checked');
+        var ivCount = document.querySelectorAll('.pt-iv:checked').length;
+        valid = !!dv && ivCount >= 1;
+        note.style.display = valid ? 'none' : 'block';
+        note.textContent = 'Choose one dependent variable and at least one predictor.';
+      }
+      runBtn.disabled = !valid;
+    }
+
+    document.querySelectorAll('input[name="ptMode"]').forEach(function (el) {
+      el.addEventListener('change', renderVarTable);
+    });
+
+    document.querySelectorAll('input[name="ptStyle"]').forEach(function (el) {
+      el.addEventListener('change', function () {
+        qs('ptCustomExtra').classList.toggle('is-visible', this.value === 'custom');
+      });
+    });
+
+    function updateRangeSummary() {
+      qs('ptAddress').textContent = ptAddress || '—';
+      qs('ptRows').textContent = String(ptRows.length);
+      qs('ptCols').textContent = String(ptHeaders.length);
+      qs('ptRangeBadge').textContent = ptRows.length ? (ptRows.length + ' rows × ' + ptHeaders.length + ' cols') : 'No range loaded';
+    }
+
+    function applyPublicationTablesPayload(payload) {
+      if (!payload) return;
+      ptHeaders = payload.headers || [];
+      ptRows = payload.rows || [];
+      ptAddress = payload.address || '';
+      analyzeColumns();
+      updateRangeSummary();
+      renderVarTable();
+    }
+
+    function buildModelSpec() {
+      var mode = currentMode();
+      var style = document.querySelector('input[name="ptStyle"]:checked').value;
+      var decimals = Math.max(0, Math.min(6, parseInt(qs('ptDecimals').value, 10) || 2));
+      var showStars = qs('ptShowStars').checked;
+
+      var spec = {
+        tableType: mode,
+        address: ptAddress,
+        headers: ptHeaders,
+        style: {
+          name: style,
+          decimalPlaces: decimals,
+          showStars: showStars,
+          leadingZero: style === 'vancouver' ? true : (style === 'custom' ? qs('ptLeadingZero').checked : false),
+          mergeMeanSd: style === 'vancouver' ? true : (style === 'custom' ? qs('ptMergeMeanSd').checked : false),
+          italicCaption: style === 'apa7' ? true : (style === 'custom' ? qs('ptItalicCaption').checked : false),
+          captionPrefix: (style === 'custom' && qs('ptCaptionPrefix').value.trim()) ? qs('ptCaptionPrefix').value.trim() : 'Table 1',
+          noteText: (style === 'custom' && qs('ptNoteText').value.trim()) ? qs('ptNoteText').value.trim() : ''
+        }
+      };
+
+      if (mode === 'descriptives') {
+        var indices = Array.from(document.querySelectorAll('.pt-include:checked')).map(function (el) { return parseInt(el.getAttribute('data-index'), 10); });
+        spec.variableIndices = indices;
+      } else {
+        var dvEl = document.querySelector('.pt-dv:checked');
+        spec.dependentIndex = dvEl ? parseInt(dvEl.getAttribute('data-index'), 10) : -1;
+        spec.independentIndices = Array.from(document.querySelectorAll('.pt-iv:checked')).map(function (el) { return parseInt(el.getAttribute('data-index'), 10); });
+      }
+
+      spec.rows = ptRows;
+      return spec;
+    }
+
+    qs('btnRun').addEventListener('click', function () {
+      var spec = buildModelSpec();
+      sendToHost('publicationTablesModel', spec);
+    });
+    qs('btnCancel').addEventListener('click', function () { sendToHost('close', null); });
+
+    function onMessageFromParent(arg) {
+      try {
+        var message = JSON.parse(arg.message || '{}');
+        if (message.type === 'PUBLICATION_TABLES_DATA' && message.payload) {
+          applyPublicationTablesPayload(message.payload);
+        }
+      } catch (e) { console.error('Error parsing parent message:', e); }
+    }
+
+    if (typeof Office !== 'undefined') {
+      Office.onReady(function () {
+        Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, onMessageFromParent);
+        sendToHost('requestData', null);
+        sendToHost('ready', null);
+      });
+    }
+  </script>
+</body>
+</html>

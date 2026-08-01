@@ -26,6 +26,10 @@ let hubParetoFlowActive = false;
 let hubParetoConfigDialog = null;
 let hubParetoResultsDialog = null;
 let hubBuilderDialog = null;
+let hubPublicationTablesFlowActive = false;
+let hubPublicationTablesConfigDialog = null;
+let hubPublicationTablesResultsDialog = null;
+let hubPublicationTablesModelSpec = null;
 // Dialog dimensions are defined in dialog-sizes.js (DIALOG_SIZES)
 const HUB_CATEGORY_TILES = [
   {
@@ -100,6 +104,17 @@ const HUB_CATEGORY_TILES = [
     modules: [
       { id: "kmeans", label: "K-Means", tip: "Partition cases into k groups around centroids." },
       { id: "hierarchical", label: "Hierarchical", tip: "Agglomerative merge tree with dendrogram; cut at k." }
+    ]
+  },
+  {
+    id: "report-tables",
+    title: "Report Tables",
+    icon: "fa-table-list",
+    color: "#eab308",
+    colorDark: "#a16207",
+    subtitle: "Publication-ready tables from your data",
+    modules: [
+      { id: "publication-tables", label: "Publication Tables", tip: "Descriptive statistics or regression coefficients, formatted APA / Vancouver / custom, ready to copy into Word." }
     ]
   }
 ];
@@ -327,7 +342,7 @@ async function loadModulesConfig() {
 }
 
 function renderModules(list) {
-  ["descriptive", "comparisons", "multivariate"].forEach(function(g) {
+  ["descriptive", "comparisons", "multivariate", "reporting"].forEach(function(g) {
     const block = document.querySelector('.group-block[data-group="' + g + '"]');
     if (!block) return;
     block.querySelectorAll(".module-card").forEach(function(c) { c.remove(); });
@@ -413,7 +428,8 @@ function renderCategoryModuleBtn(m, tabStyle, scopePrefix) {
 var GROUP_COLORS = {
   descriptive: { color: "#f97316", bg: "rgba(249,115,22,.1)" },
   comparisons: { color: "#10b981", bg: "rgba(16,185,129,.1)" },
-  multivariate: { color: "#8b5cf6", bg: "rgba(139,92,246,.1)" }
+  multivariate: { color: "#8b5cf6", bg: "rgba(139,92,246,.1)" },
+  reporting: { color: "#eab308", bg: "rgba(234,179,8,.1)" }
 };
 
 function makeCard(m) {
@@ -1217,6 +1233,112 @@ function openBuilderDialogFromHub(options) {
   return true;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   PUBLICATION TABLES — flow
+   ═══════════════════════════════════════════════════════════════════════════ */
+function finishHubPublicationTablesFlow() {
+  hubPublicationTablesFlowActive = false;
+  hubPublicationTablesModelSpec = null;
+  if (!hubPublicationTablesConfigDialog && !hubPublicationTablesResultsDialog) setSelectedModuleCard("publication-tables", false);
+}
+
+function sendPublicationTablesBuilderDataFromHub() {
+  var gr = getGlobalRangePayload() || { values: [], address: "" };
+  if (!hubPublicationTablesConfigDialog) return;
+  hubPublicationTablesConfigDialog.messageChild(JSON.stringify({
+    type: "PUBLICATION_TABLES_DATA",
+    payload: {
+      headers: gr.values[0] || [],
+      rows: gr.values.slice(1),
+      address: gr.address || ""
+    }
+  }));
+}
+
+function sendPublicationTablesResultsDataFromHub() {
+  if (!hubPublicationTablesResultsDialog || !hubPublicationTablesModelSpec) return;
+  hubPublicationTablesResultsDialog.messageChild(JSON.stringify({
+    type: "PUBLICATION_TABLES_RESULTS",
+    payload: hubPublicationTablesModelSpec
+  }));
+}
+
+function openPublicationTablesResultsFromHub() {
+  Office.context.ui.displayDialogAsync(
+    getDialogsBaseUrl() + "publication-tables/publication-tables-results.html?cb=" + Date.now(),
+    DIALOG_SIZES.RESULTS,
+    function (res) {
+      if (res.status === Office.AsyncResultStatus.Failed) {
+        console.error("Could not open publication tables results:", res.error && res.error.message);
+        finishHubPublicationTablesFlow();
+        return;
+      }
+      hubPublicationTablesResultsDialog = res.value;
+      if (window.HubResultsBridge) HubResultsBridge.registerDialog(hubPublicationTablesResultsDialog);
+      hubPublicationTablesResultsDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+        try {
+          var msg = JSON.parse(arg.message || "{}");
+          if (msg.action === "ready" || msg.action === "requestData") {
+            sendPublicationTablesResultsDataFromHub();
+          } else if (msg.action === "close") {
+            hubPublicationTablesResultsDialog.close();
+            hubPublicationTablesResultsDialog = null;
+            finishHubPublicationTablesFlow();
+          }
+        } catch (e) {}
+      });
+      hubPublicationTablesResultsDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
+        hubPublicationTablesResultsDialog = null;
+        finishHubPublicationTablesFlow();
+      });
+      setTimeout(sendPublicationTablesResultsDataFromHub, 700);
+      setTimeout(sendPublicationTablesResultsDataFromHub, 1400);
+    }
+  );
+}
+
+function openPublicationTablesConfigFromHub() {
+  hubPublicationTablesFlowActive = true;
+  setSelectedModuleCard("publication-tables", true);
+  Office.context.ui.displayDialogAsync(
+    getDialogsBaseUrl() + "publication-tables/publication-tables-input.html?v=" + Date.now(),
+    DIALOG_SIZES.REGRESSION_BUILDER,
+    function (res) {
+      if (res.status === Office.AsyncResultStatus.Failed) {
+        console.error("Could not open publication tables config:", res.error && res.error.message);
+        finishHubPublicationTablesFlow();
+        return;
+      }
+      hubPublicationTablesConfigDialog = res.value;
+      setTimeout(sendPublicationTablesBuilderDataFromHub, 600);
+      setTimeout(sendPublicationTablesBuilderDataFromHub, 1200);
+      setTimeout(sendPublicationTablesBuilderDataFromHub, 2000);
+      hubPublicationTablesConfigDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+        try {
+          var msg = JSON.parse(arg.message || "{}");
+          if (msg.action === "ready" || msg.action === "requestData") {
+            sendPublicationTablesBuilderDataFromHub();
+          } else if (msg.action === "publicationTablesModel") {
+            hubPublicationTablesModelSpec = msg.data || msg.payload || {};
+            hubPublicationTablesConfigDialog.close();
+            hubPublicationTablesConfigDialog = null;
+            setTimeout(openPublicationTablesResultsFromHub, 450);
+          } else if (msg.action === "close") {
+            hubPublicationTablesConfigDialog.close();
+            hubPublicationTablesConfigDialog = null;
+            finishHubPublicationTablesFlow();
+          }
+        } catch (e) {}
+      });
+      hubPublicationTablesConfigDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
+        hubPublicationTablesConfigDialog = null;
+        if (!hubPublicationTablesResultsDialog) finishHubPublicationTablesFlow();
+      });
+    }
+  );
+  return true;
+}
+
 function nextModuleResultUrl(moduleId) {
   return "./" + moduleId + "/" + moduleId + ".html?v=" + Date.now() + "&fromHub=1&autoConfig=1&directDialog=1&openResults=1";
 }
@@ -1409,7 +1531,9 @@ function dismissAllHubDialogs() {
     hubCorrelationResultsDialog,
     hubParetoConfigDialog,
     hubParetoResultsDialog,
-    hubBuilderDialog
+    hubBuilderDialog,
+    hubPublicationTablesConfigDialog,
+    hubPublicationTablesResultsDialog
   ].forEach(function (dlg) {
     if (dlg) {
       hadOpen = true;
@@ -1429,6 +1553,9 @@ function dismissAllHubDialogs() {
   hubParetoConfigDialog = null;
   hubParetoResultsDialog = null;
   hubBuilderDialog = null;
+  hubPublicationTablesConfigDialog = null;
+  hubPublicationTablesResultsDialog = null;
+  hubPublicationTablesModelSpec = null;
   if (window.HubResultsBridge) HubResultsBridge.dismissAll();
   if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
   return hadOpen;
@@ -1477,6 +1604,9 @@ function navigateToModuleCore(id) {
   }
   if (id === "pareto2080") {
     if (openParetoFromHub()) return;
+  }
+  if (id === "publication-tables") {
+    if (openPublicationTablesConfigFromHub()) return;
   }
   var url = "./" + id + "/" + id + ".html?v=" + Date.now() + "&fromHub=1";
   if (gr && gr.values && gr.values.length >= 2) url += "&autoConfig=1&directDialog=1";

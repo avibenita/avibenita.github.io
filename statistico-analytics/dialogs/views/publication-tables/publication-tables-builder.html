@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Publication Tables — Builder</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared-config.css?v=20260802a" />
+  <script src="../shared-config.js?v=20260802a"></script>
+  <style>
+    /* Header + tabs */
+    .pt2-tabs { display: flex; gap: 6px; padding: 0 14px; height: 44px; align-items: center; flex-shrink: 0;
+      background: rgba(255,255,255,.03); border-bottom: 1px solid var(--cfg-border); }
+    .pt2-tab-btn {
+      padding: 7px 16px; border-radius: 8px; border: 1px solid transparent;
+      background: transparent; color: var(--cfg-text2); font-size: 12.5px; font-weight: 700;
+      cursor: pointer; font-family: var(--cfg-font); transition: all .15s;
+    }
+    .pt2-tab-btn:hover { background: rgba(255,255,255,.06); color: var(--cfg-text); }
+    .pt2-tab-btn.active { background: rgba(249,115,22,.14); border-color: rgba(249,115,22,.4); color: #fff; }
+    .pt2-tab-spacer { flex: 1 1 auto; }
+    .pt2-close-btn {
+      width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.06); color: var(--cfg-text); cursor: pointer; font-size: 13px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .pt2-close-btn:hover { background: rgba(248,113,113,.22); border-color: rgba(248,113,113,.5); color: #fff; }
+
+    /* Views */
+    .pt2-view { display: none; flex: 1; min-height: 0; overflow: hidden; }
+    .pt2-view.active { display: flex; }
+    .pt2-layout { display: flex; gap: 12px; flex: 1; min-height: 0; padding: 12px; overflow: hidden; }
+    .pt2-sidebar { flex: 0 0 300px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding-right: 4px; }
+    .pt2-main { flex: 1 1 0; min-width: 0; overflow-y: auto; }
+    .pt2-details-scroll { flex: 1; overflow-y: auto; padding: 16px; }
+
+    /* Variable grid */
+    .pt2-grid-wrap { overflow-x: auto; border: 1px solid var(--cfg-border); border-radius: 8px; }
+    table.pt2-grid { border-collapse: collapse; width: 100%; min-width: 980px; font-size: 12px; }
+    table.pt2-grid thead th {
+      background: rgba(255,255,255,.04); color: rgba(255,255,255,.62); font-size: 10.5px;
+      text-transform: uppercase; letter-spacing: .5px; font-weight: 700; padding: 8px 8px;
+      border-bottom: 1px solid var(--cfg-border); text-align: left; white-space: nowrap; position: sticky; top: 0;
+    }
+    table.pt2-grid tbody td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.05); vertical-align: middle; }
+    table.pt2-grid tbody tr.pt2-row-disabled { opacity: .4; }
+    table.pt2-grid tbody tr:hover { background: rgba(249,115,22,.05); }
+    table.pt2-grid input[type="text"], table.pt2-grid input[type="number"], table.pt2-grid select {
+      width: 100%; padding: 4px 6px; border-radius: 5px; border: 1px solid var(--cfg-border);
+      background: var(--cfg-input-bg); color: var(--cfg-input-text); font-family: var(--cfg-font); font-size: 11.5px;
+    }
+    table.pt2-grid input[type="number"] { width: 54px; }
+    table.pt2-grid input[type="checkbox"] { transform: scale(1.15); accent-color: var(--cfg-check-acc); cursor: pointer; }
+    .pt2-type-badge {
+      display: inline-block; font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px;
+      padding: 2px 7px; border-radius: 999px; white-space: nowrap;
+    }
+    .pt2-type-continuous { background: rgba(96,165,250,.16); color: #60a5fa; }
+    .pt2-type-categorical { background: rgba(74,222,128,.16); color: #4ade80; }
+    .pt2-type-ordinal { background: rgba(167,139,250,.16); color: #a78bfa; }
+    .pt2-type-binary { background: rgba(251,191,36,.16); color: #fbbf24; }
+
+    /* Toolbar (export/copy buttons) */
+    .pt2-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .pt2-btn {
+      display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 8px;
+      border: 1px solid var(--cfg-border); background: var(--cfg-surface2); color: var(--cfg-text);
+      font-size: 11.5px; font-weight: 700; cursor: pointer; white-space: nowrap; font-family: var(--cfg-font);
+      transition: all .15s;
+    }
+    .pt2-btn:hover { border-color: var(--cfg-run-from); background: rgba(249,115,22,.12); }
+    .pt2-btn.primary { background: var(--od-run,#F2711C); border-color: var(--od-run-bdr,#E8590C); color: #fff; }
+    .pt2-btn.primary:hover { background: #ff8c42; }
+    .pt2-copy-flash { color: #4ade80 !important; }
+
+    /* Preview paper */
+    .pt2-paper-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 6px 6px 24px; }
+    .pt2-source-chip {
+      font-size: 11px; color: var(--cfg-text2); background: rgba(255,255,255,.04);
+      border: 1px solid var(--cfg-border); border-radius: 999px; padding: 4px 12px; align-self: flex-start;
+    }
+    .pt2-paper {
+      width: 100%; max-width: 760px; background: #ffffff; color: #111111; padding: 34px 38px;
+      border-radius: 4px; box-shadow: 0 10px 40px rgba(0,0,0,.45);
+    }
+    .pt2-error {
+      max-width: 640px; padding: 14px 16px; border-radius: 10px; border: 1px solid rgba(248,113,113,.4);
+      background: rgba(248,113,113,.1); color: #fecaca; font-size: 12.5px; line-height: 1.5;
+    }
+
+    /* Details tab */
+    .pt2-details-prose { font-size: 13px; line-height: 1.7; color: var(--cfg-text2); margin-bottom: 14px; }
+    table.pt2-audit { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table.pt2-audit thead th {
+      background: var(--cfg-surface2); color: var(--cfg-text2); font-size: 10.5px; text-transform: uppercase;
+      letter-spacing: .4px; padding: 7px 9px; text-align: left; border-bottom: 1px solid var(--cfg-border);
+    }
+    table.pt2-audit tbody td { padding: 6px 9px; border-bottom: 1px solid rgba(255,255,255,.05); color: var(--cfg-text); }
+    table.pt2-audit tbody tr:nth-child(even) { background: rgba(255,255,255,.02); }
+
+    .pt2-hint-row { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--cfg-text3); margin-top: 4px; }
+    .pt2-inline-check { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--cfg-text2); margin-bottom: 6px; }
+    .pt2-inline-check input { accent-color: var(--cfg-check-acc); transform: scale(1.05); cursor: pointer; }
+    .pt2-custom-extra { display: none; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--cfg-border); }
+    .pt2-custom-extra.visible { display: block; }
+    textarea.cfg-input { min-height: 56px; resize: vertical; font-family: var(--cfg-font); }
+  </style>
+</head>
+<body>
+  <div class="cfg-shell">
+    <header class="cfg-header">
+      <div class="cfg-header-icon"><i class="fa-solid fa-table-list"></i></div>
+      <span class="cfg-header-title">Publication Tables — Builder</span>
+      <span class="cfg-meta-badge" id="pt2SourceBadge">Demo dataset · N=240</span>
+      <button class="cfg-theme-toggle" id="cfgThemeToggle" type="button">
+        <span class="cfg-toggle-icon">🌙</span>
+        <span class="cfg-toggle-track"><span class="cfg-toggle-thumb"></span></span>
+        <span class="cfg-toggle-label">Dark</span>
+      </button>
+    </header>
+
+    <nav class="pt2-tabs">
+      <button class="pt2-tab-btn active" data-tab="build" id="pt2TabBuild"><i class="fa-solid fa-sliders"></i> Build</button>
+      <button class="pt2-tab-btn" data-tab="preview" id="pt2TabPreview"><i class="fa-solid fa-file-lines"></i> Preview</button>
+      <button class="pt2-tab-btn" data-tab="details" id="pt2TabDetails"><i class="fa-solid fa-magnifying-glass-chart"></i> Details</button>
+      <div class="pt2-tab-spacer"></div>
+      <button class="pt2-close-btn" id="pt2CloseBtn" title="Close"><i class="fa-solid fa-times"></i></button>
+    </nav>
+
+    <!-- ══════════════════════════ BUILD ══════════════════════════ -->
+    <div class="pt2-view active" id="pt2ViewBuild">
+      <div class="pt2-layout">
+        <div class="pt2-sidebar">
+
+          <section class="cfg-panel">
+            <div class="cfg-panel-head"><i class="fa-solid fa-shapes"></i> Table Type</div>
+            <div class="cfg-panel-body">
+              <div class="cfg-radio-group" id="pt2TypeGroup" style="flex-direction:column;">
+                <div class="cfg-radio-option">
+                  <input type="radio" name="pt2Type" id="pt2TypeDescriptive" value="descriptive" />
+                  <label class="cfg-radio-label" for="pt2TypeDescriptive" style="text-align:left;padding:9px 12px;">
+                    <span class="radio-text"><i class="fa-solid fa-table-cells" style="margin-right:6px;"></i>Descriptive Summary</span>
+                  </label>
+                </div>
+                <div class="cfg-radio-option">
+                  <input type="radio" name="pt2Type" id="pt2TypeFrequency" value="frequency" />
+                  <label class="cfg-radio-label" for="pt2TypeFrequency" style="text-align:left;padding:9px 12px;">
+                    <span class="radio-text"><i class="fa-solid fa-list-ol" style="margin-right:6px;"></i>Frequency Table</span>
+                  </label>
+                </div>
+                <div class="cfg-radio-option">
+                  <input type="radio" name="pt2Type" id="pt2TypeTable1" value="table1" checked />
+                  <label class="cfg-radio-label" for="pt2TypeTable1" style="text-align:left;padding:9px 12px;">
+                    <span class="radio-text"><i class="fa-solid fa-hospital" style="margin-right:6px;"></i>Baseline Characteristics / Table 1</span>
+                  </label>
+                </div>
+                <div class="cfg-radio-option">
+                  <input type="radio" name="pt2Type" id="pt2TypeGroupCompare" value="groupcompare" />
+                  <label class="cfg-radio-label" for="pt2TypeGroupCompare" style="text-align:left;padding:9px 12px;">
+                    <span class="radio-text"><i class="fa-solid fa-arrows-left-right" style="margin-right:6px;"></i>Group Comparison</span>
+                  </label>
+                </div>
+              </div>
+              <p class="cfg-hint">Switching table type resets grouping/comparison defaults below — your variable settings are kept.</p>
+            </div>
+          </section>
+
+          <section class="cfg-panel">
+            <div class="cfg-panel-head"><i class="fa-solid fa-diagram-project"></i> Structure</div>
+            <div class="cfg-panel-body">
+              <label class="cfg-label" for="pt2GroupVar">Group variable</label>
+              <select class="cfg-select" id="pt2GroupVar" style="margin-bottom:10px;">
+                <option value="">None</option>
+              </select>
+
+              <label class="cfg-label" for="pt2StratVar">Stratification variable</label>
+              <select class="cfg-select" id="pt2StratVar" style="margin-bottom:10px;">
+                <option value="">None</option>
+              </select>
+
+              <label class="cfg-label" for="pt2WeightVar">Weight variable</label>
+              <select class="cfg-select" id="pt2WeightVar" style="margin-bottom:10px;">
+                <option value="">None (unweighted)</option>
+              </select>
+
+              <div class="pt2-inline-check"><input type="checkbox" id="pt2ShowOverall" /> <label for="pt2ShowOverall">Show Overall column</label></div>
+              <div class="pt2-inline-check"><input type="checkbox" id="pt2ShowPValue" /> <label for="pt2ShowPValue">Show P value column</label></div>
+              <div class="pt2-inline-check"><input type="checkbox" id="pt2ShowSMD" /> <label for="pt2ShowSMD">Show standardized difference (SMD)</label></div>
+            </div>
+          </section>
+
+          <section class="cfg-panel">
+            <div class="cfg-panel-head"><i class="fa-solid fa-circle-question"></i> Missing Data</div>
+            <div class="cfg-panel-body">
+              <div class="pt2-inline-check"><input type="checkbox" id="pt2CompleteCase" /> <label for="pt2CompleteCase">Complete-case analysis (drop rows missing any displayed variable)</label></div>
+              <div class="pt2-inline-check"><input type="checkbox" id="pt2ShowMissingCat" /> <label for="pt2ShowMissingCat">Show "Missing" as its own category by default</label></div>
+              <label class="cfg-label" for="pt2MissingLabel">Missing-category label</label>
+              <input class="cfg-input" type="text" id="pt2MissingLabel" value="Missing" />
+            </div>
+          </section>
+
+        </div>
+
+        <div class="pt2-main">
+          <section class="cfg-panel">
+            <div class="cfg-panel-head"><i class="fa-solid fa-list-check"></i> Variables to Summarize</div>
+            <div class="cfg-panel-body" style="padding:10px;">
+              <div class="pt2-grid-wrap">
+                <table class="pt2-grid">
+                  <thead>
+                    <tr>
+                      <th>Include</th>
+                      <th>Display label</th>
+                      <th>Detected</th>
+                      <th>Type override</th>
+                      <th>Summary format</th>
+                      <th>Decimals</th>
+                      <th>Missing rule</th>
+                      <th>Category order (edit to re-order / rename)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="pt2VarGridBody"></tbody>
+                </table>
+              </div>
+              <p class="cfg-hint" id="pt2FreqHint" style="display:none;">Frequency tables summarize categorical/ordinal/binary variables — continuous variables are excluded (override their type below to include them).</p>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════ PREVIEW ══════════════════════════ -->
+    <div class="pt2-view" id="pt2ViewPreview">
+      <div class="pt2-layout">
+        <div class="pt2-sidebar">
+
+          <section class="cfg-panel">
+            <div class="cfg-panel-head"><i class="fa-solid fa-heading"></i> Caption &amp; Notes</div>
+            <div class="cfg-panel-body">
+              <label class="cfg-label" for="pt2TableNumber">Table number</label>
+              <input class="cfg-input" type="number" id="pt2TableNumber" min="1" value="1" style="margin-bottom:10px;" />
+              <label class="cfg-label" for="pt2Title">Title</label>
+              <input class="cfg-input" type="text" id="pt2Title" style="margin-bottom:10px;" />
+              <label class="cfg-label" for="pt2Subtitle">Subtitle (optional)</label>
+              <input class="cfg-input" type="text" id="pt2Subtitle" style="margin-bottom:10px;" />
+              <label class="cfg-label" for="pt2Notes">Notes (leave blank for an auto-generated note)</label>
+              <textarea class="cfg-input" id="pt2Notes" style="margin-bottom:10px;"></textarea>
+              <label class="cfg-label" for="pt2Abbrev">Abbreviations</label>
+              <textarea class="cfg-input" id="pt2Abbrev"></textarea>
+            </div>
+          </section>
+
+          <section class="cfg-panel">
+            <div class="cfg-panel-head"><i class="fa-solid fa-swatchbook"></i> Style &amp; Formatting</div>
+            <div class="cfg-panel-body">
+              <label class="cfg-label" for="pt2StylePreset">Style preset</label>
+              <select class="cfg-select" id="pt2StylePreset" style="margin-bottom:10px;">
+                <option value="clinical">Clinical Table 1</option>
+                <option value="apa7">APA descriptive</option>
+                <option value="journal">Journal minimal</option>
+                <option value="compact">Compact report</option>
+                <option value="custom">Custom</option>
+              </select>
+
+              <div class="cfg-2col" style="margin-bottom:6px;">
+                <div>
+                  <label class="cfg-label" for="pt2DefaultDecimals">Default decimals</label>
+                  <input class="cfg-input" type="number" id="pt2DefaultDecimals" min="0" max="6" value="1" />
+                </div>
+                <div>
+                  <label class="cfg-label" for="pt2DefaultPctDecimals">Default % decimals</label>
+                  <input class="cfg-input" type="number" id="pt2DefaultPctDecimals" min="0" max="6" value="1" />
+                </div>
+              </div>
+              <button class="cfg-btn" id="pt2ApplyDecimalsBtn" style="width:100%;margin-bottom:4px;"><i class="fa-solid fa-arrow-down-to-line"></i> Apply to all variables</button>
+
+              <div class="pt2-custom-extra" id="pt2CustomExtra">
+                <div class="pt2-inline-check"><input type="checkbox" id="pt2CustomItalic" /> <label for="pt2CustomItalic">Italic title</label></div>
+                <div class="pt2-inline-check"><input type="checkbox" id="pt2CustomBoldCaption" checked /> <label for="pt2CustomBoldCaption">Bold caption label</label></div>
+                <div class="pt2-inline-check"><input type="checkbox" id="pt2CustomLeadingZero" /> <label for="pt2CustomLeadingZero">Leading zero in p-values</label></div>
+                <label class="cfg-label" for="pt2CustomFont">Font</label>
+                <select class="cfg-select" id="pt2CustomFont" style="margin-bottom:8px;">
+                  <option value="serif">Serif (Times New Roman)</option>
+                  <option value="sans">Sans (Arial)</option>
+                </select>
+                <label class="cfg-label" for="pt2CustomDensity">Row density</label>
+                <select class="cfg-select" id="pt2CustomDensity" style="margin-bottom:8px;">
+                  <option value="normal">Normal</option>
+                  <option value="compact">Compact</option>
+                </select>
+                <label class="cfg-label" for="pt2CustomHeaderStyle">Header style</label>
+                <select class="cfg-select" id="pt2CustomHeaderStyle">
+                  <option value="rule">Horizontal rule</option>
+                  <option value="shade">Shaded background</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <section class="cfg-panel">
+            <div class="cfg-panel-head"><i class="fa-solid fa-share-nodes"></i> Copy &amp; Export</div>
+            <div class="cfg-panel-body">
+              <div class="pt2-toolbar" style="flex-direction:column;align-items:stretch;">
+                <button class="pt2-btn" id="pt2CopyTextBtn"><i class="fa-solid fa-copy"></i> Copy as Text</button>
+                <button class="pt2-btn primary" id="pt2CopyHtmlBtn"><i class="fa-solid fa-clipboard"></i> Copy Table</button>
+                <button class="pt2-btn" id="pt2CopySourceBtn"><i class="fa-solid fa-code"></i> Copy as HTML</button>
+                <button class="pt2-btn" id="pt2ExportExcelBtn"><i class="fa-solid fa-file-excel"></i> Export to Excel</button>
+                <button class="pt2-btn" id="pt2ExportWordBtn"><i class="fa-solid fa-file-word"></i> Export to Word</button>
+              </div>
+            </div>
+          </section>
+
+        </div>
+
+        <div class="pt2-main">
+          <div class="pt2-paper-wrap" id="pt2PaperWrap">
+            <div class="pt2-source-chip" id="pt2SourceChip"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════ DETAILS ══════════════════════════ -->
+    <div class="pt2-view" id="pt2ViewDetails">
+      <div class="pt2-details-scroll">
+        <section class="cfg-panel" style="margin-bottom:14px;">
+          <div class="cfg-panel-head"><i class="fa-solid fa-book-open"></i> Methods (auto-generated)</div>
+          <div class="cfg-panel-body">
+            <p class="pt2-details-prose" id="pt2MethodsProse"></p>
+          </div>
+        </section>
+
+        <section class="cfg-panel" style="margin-bottom:14px;">
+          <div class="cfg-panel-head"><i class="fa-solid fa-flask"></i> Per-Variable Test Audit</div>
+          <div class="cfg-panel-body" style="padding:0;">
+            <div class="pt2-grid-wrap" style="border:none;border-radius:0;">
+              <table class="pt2-audit">
+                <thead>
+                  <tr><th>Variable</th><th>Type used</th><th>Test</th><th>Statistic</th><th>df</th><th>P value</th><th>SMD</th></tr>
+                </thead>
+                <tbody id="pt2AuditBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="cfg-panel">
+          <div class="cfg-panel-head"><i class="fa-solid fa-database"></i> Data Dictionary (demo dataset)</div>
+          <div class="cfg-panel-body" style="padding:0;">
+            <div class="pt2-grid-wrap" style="border:none;border-radius:0;">
+              <table class="pt2-audit">
+                <thead><tr><th>Variable</th><th>Role</th><th>Type</th><th>Categories / Range</th></tr></thead>
+                <tbody id="pt2DictBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="./publication-tables-engine.js?v=20260802a"></script>
+</body>
+</html>

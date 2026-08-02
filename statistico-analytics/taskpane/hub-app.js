@@ -27,9 +27,7 @@ let hubParetoConfigDialog = null;
 let hubParetoResultsDialog = null;
 let hubBuilderDialog = null;
 let hubPublicationTablesFlowActive = false;
-let hubPublicationTablesConfigDialog = null;
 let hubPublicationTablesResultsDialog = null;
-let hubPublicationTablesModelSpec = null;
 // Dialog dimensions are defined in dialog-sizes.js (DIALOG_SIZES)
 const HUB_CATEGORY_TILES = [
   {
@@ -1224,41 +1222,23 @@ function openBuilderDialogFromHub(options) {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PUBLICATION TABLES — flow
+   The builder is a single self-contained dialog (Build / Preview / Details
+   tabs, own demo dataset + stats engine) — no data hand-off from the host.
    ═══════════════════════════════════════════════════════════════════════════ */
 function finishHubPublicationTablesFlow() {
   hubPublicationTablesFlowActive = false;
-  hubPublicationTablesModelSpec = null;
-  if (!hubPublicationTablesConfigDialog && !hubPublicationTablesResultsDialog) setSelectedModuleCard("publication-tables", false);
+  if (!hubPublicationTablesResultsDialog) setSelectedModuleCard("publication-tables", false);
 }
 
-function sendPublicationTablesBuilderDataFromHub() {
-  var gr = getGlobalRangePayload() || { values: [], address: "" };
-  if (!hubPublicationTablesConfigDialog) return;
-  hubPublicationTablesConfigDialog.messageChild(JSON.stringify({
-    type: "PUBLICATION_TABLES_DATA",
-    payload: {
-      headers: gr.values[0] || [],
-      rows: gr.values.slice(1),
-      address: gr.address || ""
-    }
-  }));
-}
-
-function sendPublicationTablesResultsDataFromHub() {
-  if (!hubPublicationTablesResultsDialog || !hubPublicationTablesModelSpec) return;
-  hubPublicationTablesResultsDialog.messageChild(JSON.stringify({
-    type: "PUBLICATION_TABLES_RESULTS",
-    payload: hubPublicationTablesModelSpec
-  }));
-}
-
-function openPublicationTablesResultsFromHub() {
+function openPublicationTablesConfigFromHub() {
+  hubPublicationTablesFlowActive = true;
+  setSelectedModuleCard("publication-tables", true);
   Office.context.ui.displayDialogAsync(
-    getDialogsBaseUrl() + "publication-tables/publication-tables-results.html?cb=" + Date.now(),
-    DIALOG_SIZES.RESULTS,
+    getDialogsBaseUrl() + "publication-tables/publication-tables-builder.html?v=" + Date.now(),
+    DIALOG_SIZES.RESULTS_HUB,
     function (res) {
       if (res.status === Office.AsyncResultStatus.Failed) {
-        console.error("Could not open publication tables results:", res.error && res.error.message);
+        console.error("Could not open publication tables builder:", res.error && res.error.message);
         finishHubPublicationTablesFlow();
         return;
       }
@@ -1267,9 +1247,7 @@ function openPublicationTablesResultsFromHub() {
       hubPublicationTablesResultsDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
         try {
           var msg = JSON.parse(arg.message || "{}");
-          if (msg.action === "ready" || msg.action === "requestData") {
-            sendPublicationTablesResultsDataFromHub();
-          } else if (msg.action === "close") {
+          if (msg.action === "close") {
             hubPublicationTablesResultsDialog.close();
             hubPublicationTablesResultsDialog = null;
             finishHubPublicationTablesFlow();
@@ -1279,49 +1257,6 @@ function openPublicationTablesResultsFromHub() {
       hubPublicationTablesResultsDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
         hubPublicationTablesResultsDialog = null;
         finishHubPublicationTablesFlow();
-      });
-      setTimeout(sendPublicationTablesResultsDataFromHub, 700);
-      setTimeout(sendPublicationTablesResultsDataFromHub, 1400);
-    }
-  );
-}
-
-function openPublicationTablesConfigFromHub() {
-  hubPublicationTablesFlowActive = true;
-  setSelectedModuleCard("publication-tables", true);
-  Office.context.ui.displayDialogAsync(
-    getDialogsBaseUrl() + "publication-tables/publication-tables-input.html?v=" + Date.now(),
-    DIALOG_SIZES.REGRESSION_BUILDER,
-    function (res) {
-      if (res.status === Office.AsyncResultStatus.Failed) {
-        console.error("Could not open publication tables config:", res.error && res.error.message);
-        finishHubPublicationTablesFlow();
-        return;
-      }
-      hubPublicationTablesConfigDialog = res.value;
-      setTimeout(sendPublicationTablesBuilderDataFromHub, 600);
-      setTimeout(sendPublicationTablesBuilderDataFromHub, 1200);
-      setTimeout(sendPublicationTablesBuilderDataFromHub, 2000);
-      hubPublicationTablesConfigDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
-        try {
-          var msg = JSON.parse(arg.message || "{}");
-          if (msg.action === "ready" || msg.action === "requestData") {
-            sendPublicationTablesBuilderDataFromHub();
-          } else if (msg.action === "publicationTablesModel") {
-            hubPublicationTablesModelSpec = msg.data || msg.payload || {};
-            hubPublicationTablesConfigDialog.close();
-            hubPublicationTablesConfigDialog = null;
-            setTimeout(openPublicationTablesResultsFromHub, 450);
-          } else if (msg.action === "close") {
-            hubPublicationTablesConfigDialog.close();
-            hubPublicationTablesConfigDialog = null;
-            finishHubPublicationTablesFlow();
-          }
-        } catch (e) {}
-      });
-      hubPublicationTablesConfigDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
-        hubPublicationTablesConfigDialog = null;
-        if (!hubPublicationTablesResultsDialog) finishHubPublicationTablesFlow();
       });
     }
   );
@@ -1521,7 +1456,6 @@ function dismissAllHubDialogs() {
     hubParetoConfigDialog,
     hubParetoResultsDialog,
     hubBuilderDialog,
-    hubPublicationTablesConfigDialog,
     hubPublicationTablesResultsDialog
   ].forEach(function (dlg) {
     if (dlg) {
@@ -1542,9 +1476,7 @@ function dismissAllHubDialogs() {
   hubParetoConfigDialog = null;
   hubParetoResultsDialog = null;
   hubBuilderDialog = null;
-  hubPublicationTablesConfigDialog = null;
   hubPublicationTablesResultsDialog = null;
-  hubPublicationTablesModelSpec = null;
   if (window.HubResultsBridge) HubResultsBridge.dismissAll();
   if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
   return hadOpen;

@@ -106,12 +106,69 @@ const HUB_CATEGORY_TILES = [
   }
 ];
 const TOOLS_CATEGORY_TILES = [
+  /* ── Cluster 1: Data-Driven Tools ─────────────────────────────────────
+     Specialized modules that work on the Excel range/selection itself. */
+  {
+    id: "report-tables",
+    section: "Data-Driven Tools",
+    sectionSubtitle: "Specialized modules using your selected Excel data",
+    title: "Report Tables",
+    icon: "fa-table-list",
+    accent: "#10b981",
+    accentDark: "#0f766e",
+    color: "#eab308",
+    colorDark: "#a16207",
+    subtitle: "Publication-ready tables from your data",
+    modules: [
+      { id: "publication-tables", label: "Publication Tables", tip: "Descriptive statistics or regression coefficients, formatted APA / Vancouver / custom, ready to copy into Word." }
+    ]
+  },
+  {
+    id: "quality-ops",
+    title: "Identify the Vital Few",
+    icon: "fa-chart-column",
+    iconSvg: '<svg viewBox="0 0 22 19" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" style="display:block"><rect x="0.5" y="5" width="4" height="13" fill="currentColor" opacity="0.9" rx="0.4"/><rect x="5.5" y="8.5" width="4" height="9.5" fill="currentColor" opacity="0.75" rx="0.4"/><rect x="10.5" y="12" width="4" height="6" fill="currentColor" opacity="0.6" rx="0.4"/><rect x="15.5" y="15" width="4" height="3" fill="currentColor" opacity="0.45" rx="0.4"/><path d="M 2.5 18 C 5 7, 12 2, 21 1.5" stroke="rgba(251,146,60,0.95)" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>',
+    accent: "#10b981",
+    accentDark: "#0f766e",
+    color: "#f97316",
+    colorDark: "#c2410c",
+    subtitle: "Reveal the small number of contributors driving most outcomes.",
+    modules: [
+      {
+        id: "pareto2080",
+        label: "Pareto 80/20",
+        tip: "Identify the vital few contributors using interactive Pareto analysis with the 80/20 rule."
+      }
+    ]
+  },
+  {
+    id: "qc-family",
+    title: "QC",
+    icon: "fa-chart-line",
+    accent: "#10b981",
+    accentDark: "#0f766e",
+    color: "#14b8a6",
+    colorDark: "#0f766e",
+    subtitle: "Quality control and process capability tools",
+    modules: [
+      {
+        id: "calc-qc",
+        label: "QC Tools",
+        tip: "Open the QC calculator family.",
+        dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=qc"
+      }
+    ]
+  },
+  /* ── Cluster 2: Calculators & Planning ────────────────────────────────
+     Standalone tools driven by entered parameters, not a worksheet range. */
   {
     id: "distribution-tools",
-    section: "Planning & Statistical Utilities",
-    sectionSubtitle: "Supporting calculations for research design and statistical interpretation",
+    section: "Calculators & Planning",
+    sectionSubtitle: "Standalone calculations, study design, and simulation tools",
     title: "Distribution calculators",
     icon: "fa-chart-area",
+    accent: "#eab308",
+    accentDark: "#a16207",
     color: "#2563eb",
     colorDark: "#1d4ed8",
     subtitle: "Probability, quantiles, and tails for common distributions",
@@ -128,6 +185,8 @@ const TOOLS_CATEGORY_TILES = [
     id: "sample-planning",
     title: "Sample planning",
     icon: "fa-ruler-combined",
+    accent: "#eab308",
+    accentDark: "#a16207",
     color: "#0ea5e9",
     colorDark: "#0369a1",
     subtitle: "Precision and power oriented sample size tools",
@@ -150,6 +209,8 @@ const TOOLS_CATEGORY_TILES = [
     id: "effect-size-family",
     title: "Effect size converter",
     icon: "fa-right-left",
+    accent: "#eab308",
+    accentDark: "#a16207",
     color: "#a855f7",
     colorDark: "#7e22ce",
     subtitle: "Translate effect metrics across test families",
@@ -163,56 +224,11 @@ const TOOLS_CATEGORY_TILES = [
     ]
   },
   {
-    id: "report-tables",
-    section: "Reporting & Publication",
-    sectionSubtitle: "Turn your results into presentation- and manuscript-ready output",
-    title: "Report Tables",
-    icon: "fa-table-list",
-    color: "#eab308",
-    colorDark: "#a16207",
-    subtitle: "Publication-ready tables from your data",
-    modules: [
-      { id: "publication-tables", label: "Publication Tables", tip: "Descriptive statistics or regression coefficients, formatted APA / Vancouver / custom, ready to copy into Word." }
-    ]
-  },
-  {
-    id: "quality-ops",
-    section: "Operational & Quality Tools",
-    sectionSubtitle: "Purpose-built workflows for operational and process-quality problems",
-    title: "Identify the Vital Few",
-    icon: "fa-chart-column",
-    iconSvg: '<svg viewBox="0 0 22 19" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" style="display:block"><rect x="0.5" y="5" width="4" height="13" fill="currentColor" opacity="0.9" rx="0.4"/><rect x="5.5" y="8.5" width="4" height="9.5" fill="currentColor" opacity="0.75" rx="0.4"/><rect x="10.5" y="12" width="4" height="6" fill="currentColor" opacity="0.6" rx="0.4"/><rect x="15.5" y="15" width="4" height="3" fill="currentColor" opacity="0.45" rx="0.4"/><path d="M 2.5 18 C 5 7, 12 2, 21 1.5" stroke="rgba(251,146,60,0.95)" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>',
-    color: "#f97316",
-    colorDark: "#c2410c",
-    subtitle: "Reveal the small number of contributors driving most outcomes.",
-    modules: [
-      {
-        id: "pareto2080",
-        label: "Pareto 80/20",
-        tip: "Identify the vital few contributors using interactive Pareto analysis with the 80/20 rule."
-      }
-    ]
-  },
-  {
-    id: "qc-family",
-    title: "QC",
-    icon: "fa-chart-line",
-    color: "#14b8a6",
-    colorDark: "#0f766e",
-    subtitle: "Quality control and process capability tools",
-    modules: [
-      {
-        id: "calc-qc",
-        label: "QC Tools",
-        tip: "Open the QC calculator family.",
-        dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=qc"
-      }
-    ]
-  },
-  {
     id: "erlang-family",
     title: "Call center staffing",
     icon: "fa-headset",
+    accent: "#eab308",
+    accentDark: "#a16207",
     color: "#f59e0b",
     colorDark: "#b45309",
     subtitle: "Erlang C and operational staffing design",
@@ -349,8 +365,12 @@ function renderCategoryTiles(query) {
     return mods.some(function (m) { return m.label.toLowerCase().indexOf(q) >= 0; });
   });
   holder.innerHTML = list.map(function (c, idx) {
-    var color = clusterColor;
-    var colorDark = clusterColorDark;
+    // Most clusters use one flat accent for every card. A tile may opt out
+    // with its own accent/accentDark (e.g. the Specialized Tools tab's two
+    // sub-clusters — Data-Driven Tools in green vs. Calculators & Planning
+    // in the tab's usual peach/yellow).
+    var color = c.accent || clusterColor;
+    var colorDark = c.accentDark || clusterColorDark;
     var icon = c.icon || "fa-table-cells-large";
     var iconContent = c.iconSvg
       ? c.iconSvg
@@ -1222,28 +1242,12 @@ function openBuilderDialogFromHub(options) {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PUBLICATION TABLES — flow
-   The builder is a single dialog (Data / Build / Preview / Details tabs) with
-   its own built-in demo dataset + stats engine, so it never NEEDS host data.
-   It optionally receives the current global-range snapshot (headers/rows/
-   address) via messageChild so the user can build tables from their own
-   worksheet data instead — see sendPublicationTablesDataFromHub() below.
+   The builder is a single self-contained dialog (Build / Preview / Details
+   tabs, own demo dataset + stats engine) — no data hand-off from the host.
    ═══════════════════════════════════════════════════════════════════════════ */
 function finishHubPublicationTablesFlow() {
   hubPublicationTablesFlowActive = false;
   if (!hubPublicationTablesResultsDialog) setSelectedModuleCard("publication-tables", false);
-}
-
-/* Sends the current global-range snapshot (headers/rows/address) into the
-   Publication Tables builder dialog, which uses it to build a "My Excel
-   data" dataset alongside its own built-in demo dataset. Mirrors the
-   UNIVARIATE_DATA / REGRESSION_DATA hand-off pattern used elsewhere. */
-function sendPublicationTablesDataFromHub() {
-  if (!hubPublicationTablesResultsDialog) return;
-  var gr = getGlobalRangePayload();
-  var payload = gr
-    ? { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "" }
-    : { headers: [], rows: [], address: "" };
-  hubPublicationTablesResultsDialog.messageChild(JSON.stringify({ type: "PUBTABLES_DATA", payload: payload }));
 }
 
 function openPublicationTablesConfigFromHub() {
@@ -1260,7 +1264,6 @@ function openPublicationTablesConfigFromHub() {
       }
       hubPublicationTablesResultsDialog = res.value;
       if (window.HubResultsBridge) HubResultsBridge.registerDialog(hubPublicationTablesResultsDialog);
-      setTimeout(sendPublicationTablesDataFromHub, 550);
       hubPublicationTablesResultsDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
         try {
           var msg = JSON.parse(arg.message || "{}");
@@ -1268,19 +1271,6 @@ function openPublicationTablesConfigFromHub() {
             hubPublicationTablesResultsDialog.close();
             hubPublicationTablesResultsDialog = null;
             finishHubPublicationTablesFlow();
-          } else if (msg.action === "ready" || msg.action === "requestData") {
-            sendPublicationTablesDataFromHub();
-          } else if (msg.action === "refreshData") {
-            if (typeof window.hubRefreshGlobalRange === "function") {
-              var refreshed = window.hubRefreshGlobalRange();
-              if (refreshed && typeof refreshed.then === "function") {
-                refreshed.then(sendPublicationTablesDataFromHub, sendPublicationTablesDataFromHub);
-              } else {
-                sendPublicationTablesDataFromHub();
-              }
-            } else {
-              sendPublicationTablesDataFromHub();
-            }
           }
         } catch (e) {}
       });

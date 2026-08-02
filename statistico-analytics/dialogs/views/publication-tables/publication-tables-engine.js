@@ -1087,6 +1087,19 @@
     $("pt2CustomExtra").classList.toggle("visible", state.report.stylePreset === "custom");
   }
 
+  function wireTypeHelpModal() {
+    var overlay = $("pt2TypeHelpOverlay");
+    var openBtn = $("pt2TypeHelpBtn");
+    var closeBtn = $("pt2TypeHelpCloseBtn");
+    if (!overlay || !openBtn) return;
+    function open() { overlay.classList.add("open"); }
+    function close() { overlay.classList.remove("open"); }
+    openBtn.addEventListener("click", open);
+    closeBtn.addEventListener("click", close);
+    overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") close(); });
+  }
+
   function wireTabs() {
     var btns = document.querySelectorAll(".pt2-tab-btn");
     btns.forEach(function (btn) {
@@ -1249,6 +1262,7 @@
     wirePreviewControls();
     wireExportControls();
     wireVarGridDragDrop();
+    wireTypeHelpModal();
     syncControlsFromState();
     renderAll();
 

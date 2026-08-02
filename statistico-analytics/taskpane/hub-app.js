@@ -269,7 +269,11 @@ let HUB_CLUSTER_META = {
   }
 };
 let HUB_VISIBLE_CLUSTERS = ["analytics", "tools"];
-let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics"];
+/* Active Range governs every card ahead of the first section divider. On the
+   Specialized Tools tab that's the Data-Driven Tools cluster (Report Tables,
+   Pareto, QC) — Calculators & Planning, after the divider, doesn't use it. */
+let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics", "tools"];
+let HUB_ADVISOR_VISIBLE_CLUSTERS = ["analytics"];
 let ACTIVE_CLUSTER = "analytics";
 let HUB_ACTIONS = {};
 
@@ -588,9 +592,10 @@ function syncClusterHeader() {
   });
   var range = document.getElementById("hubRangeSection");
   var advisor = document.getElementById("advisorStrip");
-  var showAnalyticsOnly = HUB_RANGE_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) >= 0;
-  if (range) range.style.display = showAnalyticsOnly ? "" : "none";
-  if (advisor) advisor.style.display = showAnalyticsOnly ? "" : "none";
+  var showRange = HUB_RANGE_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) >= 0;
+  var showAdvisor = HUB_ADVISOR_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) >= 0;
+  if (range) range.style.display = showRange ? "" : "none";
+  if (advisor) advisor.style.display = showAdvisor ? "" : "none";
 }
 
 function setHubCluster(clusterId) {

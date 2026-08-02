@@ -105,51 +105,13 @@ const HUB_CATEGORY_TILES = [
       { id: "kmeans", label: "K-Means", tip: "Partition cases into k groups around centroids." },
       { id: "hierarchical", label: "Hierarchical", tip: "Agglomerative merge tree with dendrogram; cut at k." }
     ]
-  },
-  {
-    id: "report-tables",
-    title: "Report Tables",
-    icon: "fa-table-list",
-    color: "#eab308",
-    colorDark: "#a16207",
-    subtitle: "Publication-ready tables from your data",
-    modules: [
-      { id: "publication-tables", label: "Publication Tables", tip: "Descriptive statistics or regression coefficients, formatted APA / Vancouver / custom, ready to copy into Word." }
-    ]
-  },
-  {
-    id: "quality-ops",
-    title: "Identify the Vital Few",
-    icon: "fa-chart-column",
-    iconSvg: '<svg viewBox="0 0 22 19" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" style="display:block"><rect x="0.5" y="5" width="4" height="13" fill="currentColor" opacity="0.9" rx="0.4"/><rect x="5.5" y="8.5" width="4" height="9.5" fill="currentColor" opacity="0.75" rx="0.4"/><rect x="10.5" y="12" width="4" height="6" fill="currentColor" opacity="0.6" rx="0.4"/><rect x="15.5" y="15" width="4" height="3" fill="currentColor" opacity="0.45" rx="0.4"/><path d="M 2.5 18 C 5 7, 12 2, 21 1.5" stroke="rgba(251,146,60,0.95)" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>',
-    color: "#f97316",
-    colorDark: "#c2410c",
-    subtitle: "Reveal the small number of contributors driving most outcomes.",
-    modules: [
-      {
-        id: "pareto2080",
-        label: "Pareto 80/20",
-        tip: "Identify the vital few contributors using interactive Pareto analysis with the 80/20 rule."
-      }
-    ]
-  },
-  {
-    id: "application-clusters",
-    title: "Coming Soon",
-    icon: "fa-grid-2",
-    color: "#64748b",
-    colorDark: "#334155",
-    subtitle: "More applications expanding the Statistico ecosystem",
-    modules: [
-      { id: "app-reports",    label: "Reports",    tip: "Coming soon: reporting workspace.",    comingSoon: true },
-      { id: "app-automation", label: "Automation", tip: "Coming soon: automation workspace.", comingSoon: true },
-      { id: "app-insights",   label: "Insights",   tip: "Coming soon: insights workspace.",   comingSoon: true }
-    ]
   }
 ];
 const TOOLS_CATEGORY_TILES = [
   {
     id: "distribution-tools",
+    section: "Planning & Statistical Utilities",
+    sectionSubtitle: "Supporting calculations for research design and statistical interpretation",
     title: "Distribution calculators",
     icon: "fa-chart-area",
     color: "#2563eb",
@@ -187,18 +149,49 @@ const TOOLS_CATEGORY_TILES = [
     ]
   },
   {
-    id: "erlang-family",
-    title: "Call center staffing",
-    icon: "fa-headset",
-    color: "#f59e0b",
-    colorDark: "#b45309",
-    subtitle: "Erlang C and operational staffing design",
+    id: "effect-size-family",
+    title: "Effect size converter",
+    icon: "fa-right-left",
+    color: "#a855f7",
+    colorDark: "#7e22ce",
+    subtitle: "Translate effect metrics across test families",
     modules: [
       {
-        id: "calc-erlang",
-        label: "Erlang C & Simulation",
-        tip: "Open call-center staffing and simulation tools.",
-        dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=erlang"
+        id: "calc-effect-size",
+        label: "Effect Size",
+        tip: "Open the effect-size conversion family.",
+        dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=effect"
+      }
+    ]
+  },
+  {
+    id: "report-tables",
+    section: "Reporting & Publication",
+    sectionSubtitle: "Turn your results into presentation- and manuscript-ready output",
+    title: "Report Tables",
+    icon: "fa-table-list",
+    color: "#eab308",
+    colorDark: "#a16207",
+    subtitle: "Publication-ready tables from your data",
+    modules: [
+      { id: "publication-tables", label: "Publication Tables", tip: "Descriptive statistics or regression coefficients, formatted APA / Vancouver / custom, ready to copy into Word." }
+    ]
+  },
+  {
+    id: "quality-ops",
+    section: "Operational & Quality Tools",
+    sectionSubtitle: "Purpose-built workflows for operational and process-quality problems",
+    title: "Identify the Vital Few",
+    icon: "fa-chart-column",
+    iconSvg: '<svg viewBox="0 0 22 19" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" style="display:block"><rect x="0.5" y="5" width="4" height="13" fill="currentColor" opacity="0.9" rx="0.4"/><rect x="5.5" y="8.5" width="4" height="9.5" fill="currentColor" opacity="0.75" rx="0.4"/><rect x="10.5" y="12" width="4" height="6" fill="currentColor" opacity="0.6" rx="0.4"/><rect x="15.5" y="15" width="4" height="3" fill="currentColor" opacity="0.45" rx="0.4"/><path d="M 2.5 18 C 5 7, 12 2, 21 1.5" stroke="rgba(251,146,60,0.95)" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>',
+    color: "#f97316",
+    colorDark: "#c2410c",
+    subtitle: "Reveal the small number of contributors driving most outcomes.",
+    modules: [
+      {
+        id: "pareto2080",
+        label: "Pareto 80/20",
+        tip: "Identify the vital few contributors using interactive Pareto analysis with the 80/20 rule."
       }
     ]
   },
@@ -219,18 +212,18 @@ const TOOLS_CATEGORY_TILES = [
     ]
   },
   {
-    id: "effect-size-family",
-    title: "Effect size converter",
-    icon: "fa-right-left",
-    color: "#a855f7",
-    colorDark: "#7e22ce",
-    subtitle: "Translate effect metrics across test families",
+    id: "erlang-family",
+    title: "Call center staffing",
+    icon: "fa-headset",
+    color: "#f59e0b",
+    colorDark: "#b45309",
+    subtitle: "Erlang C and operational staffing design",
     modules: [
       {
-        id: "calc-effect-size",
-        label: "Effect Size",
-        tip: "Open the effect-size conversion family.",
-        dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=effect"
+        id: "calc-erlang",
+        label: "Erlang C & Simulation",
+        tip: "Open call-center staffing and simulation tools.",
+        dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=erlang"
       }
     ]
   }
@@ -242,8 +235,8 @@ let HUB_CLUSTER_TILES = {
 let HUB_CLUSTER_META = {
   analytics: {
     eyebrow: "Statistico flagship",
-    name: "Interactive Analytics",
-    tagline: "Core statistical modeling, comparisons, discovery, and applied workflow tools",
+    name: "Statistical Analysis",
+    tagline: "Core statistical modeling, comparisons, and discovery tools",
     color: "#c4b5fd",
     colorDark: "#6d28d9",
     icon: "fa-chart-line",
@@ -252,8 +245,8 @@ let HUB_CLUSTER_META = {
   },
   tools: {
     eyebrow: "Statistico flagship",
-    name: "Interactive Tools",
-    tagline: "Standalone calculators for probability, planning, and conversion",
+    name: "Specialized Tools",
+    tagline: "Goal-oriented planning, reporting, and operational workflows",
     color: "#f4b183",
     colorDark: "#8a4f1c",
     icon: "fa-toolbox",
@@ -357,14 +350,23 @@ function renderCategoryTiles(query) {
     if (c.title.toLowerCase().indexOf(q) >= 0) return true;
     return mods.some(function (m) { return m.label.toLowerCase().indexOf(q) >= 0; });
   });
-  holder.innerHTML = list.map(function (c) {
+  holder.innerHTML = list.map(function (c, idx) {
     var color = clusterColor;
     var colorDark = clusterColorDark;
     var icon = c.icon || "fa-table-cells-large";
     var iconContent = c.iconSvg
       ? c.iconSvg
       : '<i class="fa-solid ' + escapeHtml(icon) + '"></i>';
+    var sectionHtml = "";
+    if (c.section) {
+      sectionHtml =
+        '<div class="category-section-header' + (idx > 0 ? " with-divider" : "") + '">' +
+        '<div class="category-section-title">' + escapeHtml(c.section) + "</div>" +
+        (c.sectionSubtitle ? '<div class="category-section-subtitle">' + escapeHtml(c.sectionSubtitle) + "</div>" : "") +
+        "</div>";
+    }
     return (
+      sectionHtml +
       '<div class="category-tile" style="--cat-color:' + escapeHtml(color) + ";--cat-color-dark:" + escapeHtml(colorDark) + ';">' +
       '<div class="category-title-row">' +
       '<div class="category-icon">' + iconContent + '</div>' +

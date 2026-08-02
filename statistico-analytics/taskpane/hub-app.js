@@ -116,9 +116,38 @@ const HUB_CATEGORY_TILES = [
     modules: [
       { id: "publication-tables", label: "Publication Tables", tip: "Descriptive statistics or regression coefficients, formatted APA / Vancouver / custom, ready to copy into Word." }
     ]
+  },
+  {
+    id: "quality-ops",
+    title: "Identify the Vital Few",
+    icon: "fa-chart-column",
+    iconSvg: '<svg viewBox="0 0 22 19" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" style="display:block"><rect x="0.5" y="5" width="4" height="13" fill="currentColor" opacity="0.9" rx="0.4"/><rect x="5.5" y="8.5" width="4" height="9.5" fill="currentColor" opacity="0.75" rx="0.4"/><rect x="10.5" y="12" width="4" height="6" fill="currentColor" opacity="0.6" rx="0.4"/><rect x="15.5" y="15" width="4" height="3" fill="currentColor" opacity="0.45" rx="0.4"/><path d="M 2.5 18 C 5 7, 12 2, 21 1.5" stroke="rgba(251,146,60,0.95)" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>',
+    color: "#f97316",
+    colorDark: "#c2410c",
+    subtitle: "Reveal the small number of contributors driving most outcomes.",
+    modules: [
+      {
+        id: "pareto2080",
+        label: "Pareto 80/20",
+        tip: "Identify the vital few contributors using interactive Pareto analysis with the 80/20 rule."
+      }
+    ]
+  },
+  {
+    id: "application-clusters",
+    title: "Coming Soon",
+    icon: "fa-grid-2",
+    color: "#64748b",
+    colorDark: "#334155",
+    subtitle: "More applications expanding the Statistico ecosystem",
+    modules: [
+      { id: "app-reports",    label: "Reports",    tip: "Coming soon: reporting workspace.",    comingSoon: true },
+      { id: "app-automation", label: "Automation", tip: "Coming soon: automation workspace.", comingSoon: true },
+      { id: "app-insights",   label: "Insights",   tip: "Coming soon: insights workspace.",   comingSoon: true }
+    ]
   }
 ];
-const CALCULATOR_CATEGORY_TILES = [
+const TOOLS_CATEGORY_TILES = [
   {
     id: "distribution-tools",
     title: "Distribution calculators",
@@ -206,76 +235,34 @@ const CALCULATOR_CATEGORY_TILES = [
     ]
   }
 ];
-const APPLICATION_CATEGORY_TILES = [
-  {
-    id: "quality-ops",
-    title: "Identify the Vital Few",
-    icon: "fa-chart-column",
-    iconSvg: '<svg viewBox="0 0 22 19" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" style="display:block"><rect x="0.5" y="5" width="4" height="13" fill="currentColor" opacity="0.9" rx="0.4"/><rect x="5.5" y="8.5" width="4" height="9.5" fill="currentColor" opacity="0.75" rx="0.4"/><rect x="10.5" y="12" width="4" height="6" fill="currentColor" opacity="0.6" rx="0.4"/><rect x="15.5" y="15" width="4" height="3" fill="currentColor" opacity="0.45" rx="0.4"/><path d="M 2.5 18 C 5 7, 12 2, 21 1.5" stroke="rgba(251,146,60,0.95)" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>',
-    color: "#f97316",
-    colorDark: "#c2410c",
-    subtitle: "Reveal the small number of contributors driving most outcomes.",
-    modules: [
-      {
-        id: "pareto2080",
-        label: "Pareto 80/20",
-        tip: "Identify the vital few contributors using interactive Pareto analysis with the 80/20 rule."
-      }
-    ]
-  },
-  {
-    id: "application-clusters",
-    title: "Coming Soon",
-    icon: "fa-grid-2",
-    color: "#64748b",
-    colorDark: "#334155",
-    subtitle: "More applications expanding the Statistico ecosystem",
-    modules: [
-      { id: "app-reports",    label: "Reports",    tip: "Coming soon: reporting workspace.",    comingSoon: true },
-      { id: "app-automation", label: "Automation", tip: "Coming soon: automation workspace.", comingSoon: true },
-      { id: "app-insights",   label: "Insights",   tip: "Coming soon: insights workspace.",   comingSoon: true }
-    ]
-  }
-];
 let HUB_CLUSTER_TILES = {
   analytics: HUB_CATEGORY_TILES,
-  calculators: CALCULATOR_CATEGORY_TILES,
-  applications: APPLICATION_CATEGORY_TILES
+  tools: TOOLS_CATEGORY_TILES
 };
 let HUB_CLUSTER_META = {
   analytics: {
     eyebrow: "Statistico flagship",
     name: "Interactive Analytics",
-    tagline: "Core statistical modeling, comparisons, and discovery tools",
+    tagline: "Core statistical modeling, comparisons, discovery, and applied workflow tools",
     color: "#c4b5fd",
     colorDark: "#6d28d9",
     icon: "fa-chart-line",
     brandFrom: "#c4b5fd",
     brandTo: "#a78bfa"
   },
-  calculators: {
+  tools: {
     eyebrow: "Statistico flagship",
-    name: "Interactive Calculators",
-    tagline: "Purpose-built families for probability, planning, and conversion",
+    name: "Interactive Tools",
+    tagline: "Standalone calculators for probability, planning, and conversion",
     color: "#f4b183",
     colorDark: "#8a4f1c",
-    icon: "fa-calculator",
+    icon: "fa-toolbox",
     brandFrom: "#f4b183",
     brandTo: "#c97a32"
-  },
-  applications: {
-    eyebrow: "Statistico flagship",
-    name: "Interactive Applications",
-    tagline: "Workflow-ready product clusters for operational use cases",
-    color: "#22c55e",
-    colorDark: "#34d399",
-    icon: "fa-layer-group",
-    brandFrom: "#22c55e",
-    brandTo: "#15803d"
   }
 };
-let HUB_VISIBLE_CLUSTERS = ["analytics", "calculators", "applications"];
-let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics", "applications"];
+let HUB_VISIBLE_CLUSTERS = ["analytics", "tools"];
+let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics"];
 let ACTIVE_CLUSTER = "analytics";
 let HUB_ACTIONS = {};
 

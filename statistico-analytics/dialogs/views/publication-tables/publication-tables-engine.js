@@ -794,6 +794,19 @@
     order.splice(before ? toIdx : toIdx + 1, 0, key);
   }
 
+  /* Click-based fallback for environments where native HTML5 drag-and-drop
+     is unreliable (e.g. some embedded/webview hosts). */
+  function moveVarByOffset(key, offset) {
+    var order = state.varOrder;
+    var idx = order.indexOf(key);
+    if (idx === -1) return;
+    var target = idx + offset;
+    if (target < 0 || target >= order.length) return;
+    order.splice(idx, 1);
+    order.splice(target, 0, key);
+    renderAll();
+  }
+
   function clearDropIndicators(body) {
     body.querySelectorAll("tr.pt2-drop-before, tr.pt2-drop-after").forEach(function (r) {
       r.classList.remove("pt2-drop-before", "pt2-drop-after");
@@ -811,6 +824,7 @@
       var rect = targetRow.getBoundingClientRect();
       var before = (e.clientY - rect.top) < rect.height / 2;
       targetRow.classList.add(before ? "pt2-drop-before" : "pt2-drop-after");
+      try { e.dataTransfer.dropEffect = "move"; } catch (err) {}
     });
     body.addEventListener("drop", function (e) {
       if (!dragVarKey) return;
@@ -868,8 +882,25 @@
         clearDropIndicators(body);
         dragVarKey = null;
       });
+      var orderBtns = document.createElement("span");
+      orderBtns.className = "pt2-order-btns";
+      var idxInOrder = state.varOrder.indexOf(v.key);
+      var upBtn = document.createElement("button");
+      upBtn.type = "button"; upBtn.className = "pt2-order-btn"; upBtn.title = "Move up";
+      upBtn.innerHTML = '<i class="fa-solid fa-caret-up"></i>';
+      upBtn.disabled = idxInOrder <= 0;
+      upBtn.addEventListener("click", function () { moveVarByOffset(v.key, -1); });
+      var downBtn = document.createElement("button");
+      downBtn.type = "button"; downBtn.className = "pt2-order-btn"; downBtn.title = "Move down";
+      downBtn.innerHTML = '<i class="fa-solid fa-caret-down"></i>';
+      downBtn.disabled = idxInOrder >= state.varOrder.length - 1;
+      downBtn.addEventListener("click", function () { moveVarByOffset(v.key, 1); });
+      orderBtns.appendChild(upBtn);
+      orderBtns.appendChild(downBtn);
+
       dragCell.appendChild(orderNum);
       dragCell.appendChild(handle);
+      dragCell.appendChild(orderBtns);
       tdDrag.appendChild(dragCell);
       tr.appendChild(tdDrag);
 

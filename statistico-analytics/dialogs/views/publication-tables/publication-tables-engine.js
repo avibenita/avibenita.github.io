@@ -377,6 +377,7 @@
     completeCase: false,
     showMissingCategory: true,
     missingLabel: "Missing",
+    varOrder: VAR_DEFS.map(function (v) { return v.key; }),
     varCfg: {},
     report: {
       tableNumber: 1,
@@ -425,13 +426,19 @@
 
   /* ═══════════════════════════ 6. TABLE MODEL BUILDER ═══════════════════════════ */
 
+  var VAR_DEFS_BY_KEY = {};
+  VAR_DEFS.forEach(function (v) { VAR_DEFS_BY_KEY[v.key] = v; });
+  /* state.varOrder controls the row order of the grid AND the published table;
+     drag-and-drop in the Build tab reorders this array directly. */
+  function orderedVarDefs() { return state.varOrder.map(function (k) { return VAR_DEFS_BY_KEY[k]; }); }
+
   function effectiveType(v, cfg) { return (cfg.typeOverride && cfg.typeOverride !== "auto") ? cfg.typeOverride : v.type; }
   function isVariableEligible(v, cfg) {
     if (!cfg.include) return false;
     if (state.tableType === "frequency" && effectiveType(v, cfg) === "continuous") return false;
     return true;
   }
-  function eligibleVarDefs() { return VAR_DEFS.filter(function (v) { return isVariableEligible(v, state.varCfg[v.key]); }); }
+  function eligibleVarDefs() { return orderedVarDefs().filter(function (v) { return isVariableEligible(v, state.varCfg[v.key]); }); }
 
   function categoriesFor(v, cfg) {
     var effType = effectiveType(v, cfg);
@@ -775,20 +782,96 @@
   /* ═══════════════════════════ 8. UI WIRING ═══════════════════════════ */
 
   var $ = function (id) { return document.getElementById(id); };
+  var dragVarKey = null;
+
+  function moveVarOrder(key, targetKey, before) {
+    var order = state.varOrder;
+    var fromIdx = order.indexOf(key);
+    if (fromIdx === -1) return;
+    order.splice(fromIdx, 1);
+    var toIdx = order.indexOf(targetKey);
+    if (toIdx === -1) toIdx = order.length;
+    order.splice(before ? toIdx : toIdx + 1, 0, key);
+  }
+
+  function clearDropIndicators(body) {
+    body.querySelectorAll("tr.pt2-drop-before, tr.pt2-drop-after").forEach(function (r) {
+      r.classList.remove("pt2-drop-before", "pt2-drop-after");
+    });
+  }
+
+  function wireVarGridDragDrop() {
+    var body = $("pt2VarGridBody");
+    body.addEventListener("dragover", function (e) {
+      if (!dragVarKey) return;
+      e.preventDefault();
+      var targetRow = e.target.closest("tr");
+      if (!targetRow || targetRow.dataset.varKey === dragVarKey) return;
+      clearDropIndicators(body);
+      var rect = targetRow.getBoundingClientRect();
+      var before = (e.clientY - rect.top) < rect.height / 2;
+      targetRow.classList.add(before ? "pt2-drop-before" : "pt2-drop-after");
+    });
+    body.addEventListener("drop", function (e) {
+      if (!dragVarKey) return;
+      e.preventDefault();
+      var targetRow = e.target.closest("tr");
+      clearDropIndicators(body);
+      if (!targetRow || targetRow.dataset.varKey === dragVarKey) return;
+      var rect = targetRow.getBoundingClientRect();
+      var before = (e.clientY - rect.top) < rect.height / 2;
+      moveVarOrder(dragVarKey, targetRow.dataset.varKey, before);
+      dragVarKey = null;
+      renderAll();
+    });
+  }
 
   function renderVarGrid() {
     var body = $("pt2VarGridBody");
     body.innerHTML = "";
     $("pt2FreqHint").style.display = state.tableType === "frequency" ? "" : "none";
-    VAR_DEFS.forEach(function (v) {
+    var tableRowCounter = 0;
+    orderedVarDefs().forEach(function (v) {
       var cfg = state.varCfg[v.key];
       var effType = effectiveType(v, cfg);
       var disabledForType = state.tableType === "frequency" && effType === "continuous";
       var isCatLike = effType !== "continuous";
       var formats = effType === "continuous" ? CONTINUOUS_FORMATS : CATEGORICAL_FORMATS;
+      var willAppearInTable = isVariableEligible(v, cfg);
+      if (willAppearInTable) tableRowCounter += 1;
 
       var tr = document.createElement("tr");
+      tr.dataset.varKey = v.key;
       if (disabledForType) tr.className = "pt2-row-disabled";
+
+      var tdDrag = document.createElement("td");
+      tdDrag.className = "pt2-drag-col";
+      var dragCell = document.createElement("span");
+      dragCell.className = "pt2-drag-cell";
+      var orderNum = document.createElement("span");
+      orderNum.className = "pt2-drag-order";
+      orderNum.textContent = willAppearInTable ? String(tableRowCounter) : "\u2014";
+      orderNum.title = willAppearInTable ? "Row " + tableRowCounter + " in the published table" : "Not currently included in the table";
+      var handle = document.createElement("span");
+      handle.className = "pt2-drag-handle";
+      handle.setAttribute("draggable", "true");
+      handle.title = "Drag to change the order this variable appears in the table";
+      handle.innerHTML = '<i class="fa-solid fa-grip-vertical"></i>';
+      handle.addEventListener("dragstart", function (e) {
+        dragVarKey = v.key;
+        tr.classList.add("pt2-dragging");
+        e.dataTransfer.effectAllowed = "move";
+        try { e.dataTransfer.setData("text/plain", v.key); } catch (err) {}
+      });
+      handle.addEventListener("dragend", function () {
+        tr.classList.remove("pt2-dragging");
+        clearDropIndicators(body);
+        dragVarKey = null;
+      });
+      dragCell.appendChild(orderNum);
+      dragCell.appendChild(handle);
+      tdDrag.appendChild(dragCell);
+      tr.appendChild(tdDrag);
 
       var tdInclude = document.createElement("td");
       var chk = document.createElement("input");
@@ -1137,6 +1220,7 @@
     wireBuildControls();
     wirePreviewControls();
     wireExportControls();
+    wireVarGridDragDrop();
     syncControlsFromState();
     renderAll();
 

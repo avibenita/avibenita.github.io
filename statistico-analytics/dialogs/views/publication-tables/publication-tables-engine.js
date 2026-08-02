@@ -782,20 +782,9 @@
   /* ═══════════════════════════ 8. UI WIRING ═══════════════════════════ */
 
   var $ = function (id) { return document.getElementById(id); };
-  var dragVarKey = null;
 
-  function moveVarOrder(key, targetKey, before) {
-    var order = state.varOrder;
-    var fromIdx = order.indexOf(key);
-    if (fromIdx === -1) return;
-    order.splice(fromIdx, 1);
-    var toIdx = order.indexOf(targetKey);
-    if (toIdx === -1) toIdx = order.length;
-    order.splice(before ? toIdx : toIdx + 1, 0, key);
-  }
-
-  /* Click-based fallback for environments where native HTML5 drag-and-drop
-     is unreliable (e.g. some embedded/webview hosts). */
+  /* Click-based fallback for environments where dragging is inconvenient
+     (e.g. touch, accessibility, or a host that blocks pointer capture). */
   function moveVarByOffset(key, offset) {
     var order = state.varOrder;
     var idx = order.indexOf(key);
@@ -807,37 +796,57 @@
     renderAll();
   }
 
-  function clearDropIndicators(body) {
-    body.querySelectorAll("tr.pt2-drop-before, tr.pt2-drop-after").forEach(function (r) {
-      r.classList.remove("pt2-drop-before", "pt2-drop-after");
-    });
-  }
+  /* Reordering is implemented with raw pointer events (not the native HTML5
+     drag-and-drop API). Native DnD depends on the OS's drag session, which
+     is frequently broken inside remote-desktop sessions, VMs, and some
+     embedded/webview hosts (shows a "not-allowed" cursor and silently does
+     nothing). Tracking pointerdown/move/up ourselves and moving the <tr>
+     directly works everywhere the mouse itself works. */
+  var pointerDrag = null;
 
   function wireVarGridDragDrop() {
     var body = $("pt2VarGridBody");
-    body.addEventListener("dragover", function (e) {
-      if (!dragVarKey) return;
+
+    body.addEventListener("pointerdown", function (e) {
+      if (e.button !== undefined && e.button !== 0) return;
+      var handle = e.target.closest(".pt2-drag-handle");
+      if (!handle) return;
+      var tr = handle.closest("tr");
+      if (!tr) return;
       e.preventDefault();
-      var targetRow = e.target.closest("tr");
-      if (!targetRow || targetRow.dataset.varKey === dragVarKey) return;
-      clearDropIndicators(body);
-      var rect = targetRow.getBoundingClientRect();
-      var before = (e.clientY - rect.top) < rect.height / 2;
-      targetRow.classList.add(before ? "pt2-drop-before" : "pt2-drop-after");
-      try { e.dataTransfer.dropEffect = "move"; } catch (err) {}
+      pointerDrag = { pointerId: e.pointerId, tr: tr, handle: handle };
+      tr.classList.add("pt2-dragging");
+      document.body.classList.add("pt2-noselect");
+      try { handle.setPointerCapture(e.pointerId); } catch (err) {}
     });
-    body.addEventListener("drop", function (e) {
-      if (!dragVarKey) return;
-      e.preventDefault();
-      var targetRow = e.target.closest("tr");
-      clearDropIndicators(body);
-      if (!targetRow || targetRow.dataset.varKey === dragVarKey) return;
-      var rect = targetRow.getBoundingClientRect();
-      var before = (e.clientY - rect.top) < rect.height / 2;
-      moveVarOrder(dragVarKey, targetRow.dataset.varKey, before);
-      dragVarKey = null;
+
+    body.addEventListener("pointermove", function (e) {
+      if (!pointerDrag || e.pointerId !== pointerDrag.pointerId) return;
+      var tr = pointerDrag.tr;
+      var rows = Array.prototype.slice.call(body.children);
+      for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        if (r === tr) continue;
+        var rect = r.getBoundingClientRect();
+        if (e.clientY < rect.top || e.clientY > rect.bottom) continue;
+        var before = e.clientY < (rect.top + rect.height / 2);
+        body.insertBefore(tr, before ? r : r.nextSibling);
+        break;
+      }
+    });
+
+    function endDrag(e) {
+      if (!pointerDrag || (e && e.pointerId !== pointerDrag.pointerId)) return;
+      pointerDrag.tr.classList.remove("pt2-dragging");
+      document.body.classList.remove("pt2-noselect");
+      try { pointerDrag.handle.releasePointerCapture(pointerDrag.pointerId); } catch (err) {}
+      var newOrder = Array.prototype.slice.call(body.children).map(function (r) { return r.dataset.varKey; });
+      pointerDrag = null;
+      if (newOrder.length === state.varOrder.length) state.varOrder = newOrder;
       renderAll();
-    });
+    }
+    body.addEventListener("pointerup", endDrag);
+    body.addEventListener("pointercancel", endDrag);
   }
 
   function renderVarGrid() {
@@ -868,20 +877,8 @@
       orderNum.title = willAppearInTable ? "Row " + tableRowCounter + " in the published table" : "Not currently included in the table";
       var handle = document.createElement("span");
       handle.className = "pt2-drag-handle";
-      handle.setAttribute("draggable", "true");
       handle.title = "Drag to change the order this variable appears in the table";
       handle.innerHTML = '<i class="fa-solid fa-grip-vertical"></i>';
-      handle.addEventListener("dragstart", function (e) {
-        dragVarKey = v.key;
-        tr.classList.add("pt2-dragging");
-        e.dataTransfer.effectAllowed = "move";
-        try { e.dataTransfer.setData("text/plain", v.key); } catch (err) {}
-      });
-      handle.addEventListener("dragend", function () {
-        tr.classList.remove("pt2-dragging");
-        clearDropIndicators(body);
-        dragVarKey = null;
-      });
       var orderBtns = document.createElement("span");
       orderBtns.className = "pt2-order-btns";
       var idxInOrder = state.varOrder.indexOf(v.key);

@@ -64,7 +64,7 @@
 
   var DEMO_DATA = buildDemoData();
 
-  var VAR_DEFS = [
+  var DEMO_VAR_DEFS = [
     { key: "age", label: "Age, years", type: "continuous" },
     { key: "sex", label: "Sex", type: "categorical", categories: ["Male", "Female", "Other"] },
     { key: "bmi", label: "BMI, kg/m\u00B2", type: "continuous" },
@@ -75,10 +75,20 @@
     { key: "priorMI", label: "Prior myocardial infarction", type: "binary", categories: ["No", "Yes"] },
     { key: "egfr", label: "eGFR, mL/min/1.73m\u00B2", type: "continuous" }
   ];
-  var GROUP_VAR_DEFS = [{ key: "treatment", label: "Treatment group", categories: ["Placebo", "Treatment A", "Treatment B"] }];
-  var STRAT_VAR_DEFS = [{ key: "region", label: "Region", categories: ["North", "South"] }];
-  var WEIGHT_VAR_DEFS = [{ key: "sampleWeight", label: "Sample weight" }];
-  var DEFAULT_SELECTED = ["age", "sex", "bmi", "diabetesDuration", "sbp", "smoking", "priorMI"];
+  var DEMO_GROUP_VAR_DEFS = [{ key: "treatment", label: "Treatment group", categories: ["Placebo", "Treatment A", "Treatment B"] }];
+  var DEMO_STRAT_VAR_DEFS = [{ key: "region", label: "Region", categories: ["North", "South"] }];
+  var DEMO_WEIGHT_VAR_DEFS = [{ key: "sampleWeight", label: "Sample weight" }];
+  var DEMO_DEFAULT_SELECTED = ["age", "sex", "bmi", "diabetesDuration", "sbp", "smoking", "priorMI"];
+
+  /* ── Active dataset (mutable) ─────────────────────────────────────────────
+     Starts pointed at the built-in demo dataset. setDataset() swaps these
+     bindings wholesale when the user switches to real Excel data (or back). */
+  var ACTIVE_DATA = DEMO_DATA;
+  var VAR_DEFS = DEMO_VAR_DEFS;
+  var GROUP_VAR_DEFS = DEMO_GROUP_VAR_DEFS;
+  var STRAT_VAR_DEFS = DEMO_STRAT_VAR_DEFS;
+  var WEIGHT_VAR_DEFS = DEMO_WEIGHT_VAR_DEFS;
+  var VAR_DEFS_BY_KEY = {};
 
   /* ═══════════════════════════ 2. MATH HELPERS ═══════════════════════════ */
 
@@ -312,6 +322,123 @@
     return sp.pLeadingZero ? s : s.replace(/^0\./, ".");
   }
 
+  /* ═══════════════════════════ 4b. EXCEL DATA IMPORT ═══════════════════════════
+     Converts a raw headers/rows payload (as received from the Excel host)
+     into the same { key, label, type, categories } shape used by the built-in
+     demo variables, so the rest of the engine never needs to know whether it
+     is looking at demo or real data. */
+
+  function sanitizeHeaderKey(header, idx, used) {
+    var base = String(header == null ? "" : header).trim() || ("Column " + (idx + 1));
+    var key = base, n = 2;
+    while (used[key]) { key = base + " (" + n + ")"; n++; }
+    used[key] = true;
+    return { key: key, label: base };
+  }
+
+  function inferColumnType(values) {
+    var nonMissing = values.filter(function (v) { return !isMissing(v); });
+    var n = nonMissing.length;
+    var numericCount = 0;
+    var distinctSet = {};
+    nonMissing.forEach(function (v) {
+      var isNum = typeof v === "number" ? isFinite(v) : (String(v).trim() !== "" && isFinite(Number(v)));
+      if (isNum) numericCount++;
+      distinctSet[String(v).trim()] = true;
+    });
+    var distinctVals = Object.keys(distinctSet);
+    var numericRatio = n ? numericCount / n : 0;
+    var isContinuous = n > 0 && numericRatio >= 0.85 && distinctVals.length > 8;
+    if (isContinuous) return { type: "continuous", missing: values.length - n };
+    var allNum = distinctVals.length > 0 && distinctVals.every(function (s) { return isFinite(Number(s)); });
+    distinctVals.sort(function (a, b) { return allNum ? Number(a) - Number(b) : a.localeCompare(b); });
+    return {
+      type: distinctVals.length === 2 ? "binary" : "categorical",
+      categories: distinctVals,
+      missing: values.length - n
+    };
+  }
+
+  /* Builds { rows, varDefs } from raw headers[] + rows[][] exactly as received
+     over messageParent/messageChild from the Excel host. */
+  function buildExcelDataset(headers, rowArrays) {
+    var used = {};
+    var cols = headers.map(function (h, i) { return sanitizeHeaderKey(h, i, used); });
+    var rows = rowArrays.map(function (arr) {
+      var obj = {};
+      cols.forEach(function (c, i) {
+        var raw = arr ? arr[i] : undefined;
+        obj[c.key] = (raw === "" || raw === undefined) ? null : raw;
+      });
+      return obj;
+    });
+    var varDefs = cols.map(function (c) {
+      var vals = rows.map(function (r) { return r[c.key]; });
+      var inferred = inferColumnType(vals);
+      var def = { key: c.key, label: c.label, type: inferred.type };
+      if (inferred.categories) def.categories = inferred.categories;
+      return def;
+    });
+    return { rows: rows, varDefs: varDefs };
+  }
+
+  /* Group/stratification candidates: any categorical-ish column with a
+     manageable number of levels. Weight candidates: any continuous column. */
+  function computeAuxVarDefs(varDefs) {
+    var groupish = varDefs.filter(function (v) {
+      return v.type !== "continuous" && v.categories && v.categories.length >= 2 && v.categories.length <= 12;
+    }).map(function (v) { return { key: v.key, label: v.label, categories: v.categories }; });
+    var weightish = varDefs.filter(function (v) { return v.type === "continuous"; })
+      .map(function (v) { return { key: v.key, label: v.label }; });
+    return { groupDefs: groupish, stratDefs: groupish.slice(), weightDefs: weightish };
+  }
+
+  /* Per-dataset memory of variable config, so toggling Demo <-> Excel (or
+     re-fetching the same Excel range) doesn't discard the user's edits. */
+  var savedDatasetConfigs = { demo: null, excel: null };
+
+  function setDataset(kind, rows, varDefs, groupDefs, stratDefs, weightDefs) {
+    if (state.dataSource && state.varCfg) {
+      savedDatasetConfigs[state.dataSource] = {
+        order: state.varOrder, cfg: state.varCfg,
+        groupVar: state.groupVar, stratVar: state.stratVar, weightVar: state.weightVar
+      };
+    }
+
+    ACTIVE_DATA = rows;
+    VAR_DEFS = varDefs;
+    GROUP_VAR_DEFS = groupDefs;
+    STRAT_VAR_DEFS = stratDefs;
+    WEIGHT_VAR_DEFS = weightDefs;
+    VAR_DEFS_BY_KEY = {};
+    VAR_DEFS.forEach(function (v) { VAR_DEFS_BY_KEY[v.key] = v; });
+
+    var saved = savedDatasetConfigs[kind];
+    var newOrder = [], newCfg = {};
+    (saved ? saved.order : []).forEach(function (k) {
+      if (VAR_DEFS_BY_KEY[k]) { newOrder.push(k); newCfg[k] = saved.cfg[k]; }
+    });
+    VAR_DEFS.forEach(function (v, idx) {
+      if (!newCfg[v.key]) {
+        var includeDefault = kind === "demo" ? (DEMO_DEFAULT_SELECTED.indexOf(v.key) >= 0) : (idx < 15);
+        newCfg[v.key] = makeDefaultVarCfg(v, includeDefault);
+        newOrder.push(v.key);
+      }
+    });
+    state.varOrder = newOrder;
+    state.varCfg = newCfg;
+    state.groupVar = (saved && saved.groupVar && GROUP_VAR_DEFS.some(function (g) { return g.key === saved.groupVar; })) ? saved.groupVar : "";
+    state.stratVar = (saved && saved.stratVar && STRAT_VAR_DEFS.some(function (s) { return s.key === saved.stratVar; })) ? saved.stratVar : "";
+    state.weightVar = (saved && saved.weightVar && WEIGHT_VAR_DEFS.some(function (w) { return w.key === saved.weightVar; })) ? saved.weightVar : "";
+    state.dataSource = kind;
+
+    // Preserve the user's show-overall/p-value/SMD/title choices across a
+    // dataset switch — only make sure a group var is picked if the current
+    // table type needs one and none survived the switch.
+    var td = TABLE_TYPE_DEFAULTS[state.tableType];
+    if (td && td.wantsGroup && !state.groupVar) state.groupVar = pickFallbackGroupVar(td.preferredGroupKey);
+  }
+
   /* ═══════════════════════════ 5. APP STATE ═══════════════════════════ */
 
   var CONTINUOUS_FORMATS = [
@@ -337,7 +464,7 @@
 
   function deriveCategories(key) {
     var set = {};
-    DEMO_DATA.forEach(function (r) { var v = r[key]; if (!isMissing(v)) set[String(v)] = true; });
+    ACTIVE_DATA.forEach(function (r) { var v = r[key]; if (!isMissing(v)) set[String(v)] = true; });
     var arr = Object.keys(set);
     var allNum = arr.every(function (s) { return isFinite(Number(s)); });
     arr.sort(function (a, b) { return allNum ? Number(a) - Number(b) : a.localeCompare(b); });
@@ -345,7 +472,7 @@
   }
   function defaultCategoriesFor(v) { return v.categories ? v.categories.slice() : deriveCategories(v.key); }
 
-  function makeDefaultVarCfg(v) {
+  function makeDefaultVarCfg(v, includeDefault) {
     var isCont = v.type === "continuous";
     return {
       label: v.label,
@@ -354,15 +481,15 @@
       decimals: 1,
       missingRule: "inherit",
       orderText: isCont ? "" : defaultCategoriesFor(v).join(", "),
-      include: DEFAULT_SELECTED.indexOf(v.key) >= 0
+      include: !!includeDefault
     };
   }
 
   var TABLE_TYPE_DEFAULTS = {
-    descriptive: { groupVar: "", showOverall: true, showPValue: false, showSMD: false, title: "Descriptive Summary of Study Variables" },
-    frequency: { groupVar: "", showOverall: true, showPValue: false, showSMD: false, title: "Frequency Distribution of Study Variables" },
-    table1: { groupVar: "treatment", showOverall: true, showPValue: true, showSMD: true, title: "Baseline Characteristics of Study Participants" },
-    groupcompare: { groupVar: "treatment", showOverall: false, showPValue: true, showSMD: true, title: "Comparison of Participant Characteristics by Treatment Group" }
+    descriptive: { wantsGroup: false, showOverall: true, showPValue: false, showSMD: false, title: "Descriptive Summary of Study Variables" },
+    frequency: { wantsGroup: false, showOverall: true, showPValue: false, showSMD: false, title: "Frequency Distribution of Study Variables" },
+    table1: { wantsGroup: true, preferredGroupKey: "treatment", showOverall: true, showPValue: true, showSMD: true, title: "Baseline Characteristics of Study Participants" },
+    groupcompare: { wantsGroup: true, preferredGroupKey: "treatment", showOverall: false, showPValue: true, showSMD: true, title: "Comparison of Participant Characteristics by Treatment Group" }
   };
 
   var state = {
@@ -377,8 +504,11 @@
     completeCase: false,
     showMissingCategory: true,
     missingLabel: "Missing",
-    varOrder: VAR_DEFS.map(function (v) { return v.key; }),
+    varOrder: [],
     varCfg: {},
+    dataChoice: "demo",
+    dataSource: null,
+    excelDataset: null,
     report: {
       tableNumber: 1,
       title: "Baseline Characteristics of Study Participants",
@@ -391,12 +521,20 @@
       custom: { italicTitle: false, captionBold: true, font: "serif", density: "normal", headerStyle: "rule", pLeadingZero: false, indentEm: 1.4 }
     }
   };
-  VAR_DEFS.forEach(function (v) { state.varCfg[v.key] = makeDefaultVarCfg(v); });
   var lastAppliedDefaultTitle = state.report.title;
+
+  /* Populate varOrder/varCfg/VAR_DEFS_BY_KEY for the initial demo dataset. */
+  setDataset("demo", DEMO_DATA, DEMO_VAR_DEFS, DEMO_GROUP_VAR_DEFS, DEMO_STRAT_VAR_DEFS, DEMO_WEIGHT_VAR_DEFS);
+
+  function pickFallbackGroupVar(preferredKey) {
+    if (state.groupVar && GROUP_VAR_DEFS.some(function (g) { return g.key === state.groupVar; })) return state.groupVar;
+    if (preferredKey && GROUP_VAR_DEFS.some(function (g) { return g.key === preferredKey; })) return preferredKey;
+    return GROUP_VAR_DEFS.length ? GROUP_VAR_DEFS[0].key : "";
+  }
 
   function applyTableTypeDefaults(type) {
     var d = TABLE_TYPE_DEFAULTS[type];
-    state.groupVar = d.groupVar;
+    state.groupVar = d.wantsGroup ? pickFallbackGroupVar(d.preferredGroupKey) : "";
     state.showOverall = d.showOverall;
     state.showPValue = d.showPValue;
     state.showSMD = d.showSMD;
@@ -426,8 +564,6 @@
 
   /* ═══════════════════════════ 6. TABLE MODEL BUILDER ═══════════════════════════ */
 
-  var VAR_DEFS_BY_KEY = {};
-  VAR_DEFS.forEach(function (v) { VAR_DEFS_BY_KEY[v.key] = v; });
   /* state.varOrder controls the row order of the grid AND the published table;
      drag-and-drop in the Build tab reorders this array directly. */
   function orderedVarDefs() { return state.varOrder.map(function (k) { return VAR_DEFS_BY_KEY[k]; }); }
@@ -450,7 +586,7 @@
   }
 
   function getWorkingRows() {
-    var rows = DEMO_DATA;
+    var rows = ACTIVE_DATA;
     if (state.completeCase) {
       var required = eligibleVarDefs().map(function (v) { return v.key; });
       if (state.groupVar) required.push(state.groupVar);
@@ -471,7 +607,9 @@
   }
   function rowsForColumn(baseRows, col) {
     if (col.key === "__overall__") return baseRows;
-    return baseRows.filter(function (r) { return r[state.groupVar] === col.key; });
+    // String-coerce: Excel-sourced group columns may hold numbers (e.g. 0/1)
+    // while category keys are always strings.
+    return baseRows.filter(function (r) { return !isMissing(r[state.groupVar]) && String(r[state.groupVar]) === col.key; });
   }
 
   function continuousStats(values, weights) {
@@ -641,7 +779,7 @@
     if (!state.stratVar) return { strata: [{ label: null, block: buildTableBlock(baseRows) }] };
     var sdef = STRAT_VAR_DEFS.filter(function (s) { return s.key === state.stratVar; })[0];
     var strata = sdef.categories.map(function (level) {
-      var subRows = baseRows.filter(function (r) { return r[state.stratVar] === level; });
+      var subRows = baseRows.filter(function (r) { return !isMissing(r[state.stratVar]) && String(r[state.stratVar]) === level; });
       return { label: sdef.label + ": " + level, block: buildTableBlock(subRows) };
     });
     return { strata: strata };
@@ -1001,7 +1139,7 @@
     var model = buildModel();
     var wrap = $("pt2PaperWrap");
     var chip = $("pt2SourceChip");
-    chip.textContent = "Demo dataset · N=" + DEMO_DATA.length + " · " + eligibleVarDefs().length + " variable(s) summarized" +
+    chip.textContent = (state.dataSource === "excel" ? "Your Excel data" : "Demo dataset") + " · N=" + ACTIVE_DATA.length + " · " + eligibleVarDefs().length + " variable(s) summarized" +
       (state.groupVar ? " · grouped by " + GROUP_VAR_DEFS.filter(function (g) { return g.key === state.groupVar; })[0].label : "") +
       (state.stratVar ? " · stratified by " + STRAT_VAR_DEFS.filter(function (s) { return s.key === state.stratVar; })[0].label : "");
 
@@ -1050,13 +1188,19 @@
     });
     GROUP_VAR_DEFS.forEach(function (g) { dictRow(g.key, g.label, state.groupVar === g.key ? "Group variable (active)" : "Available group variable", "categorical", g.categories.join(", ")); });
     STRAT_VAR_DEFS.forEach(function (s) { dictRow(s.key, s.label, state.stratVar === s.key ? "Stratification variable (active)" : "Available stratification variable", "categorical", s.categories.join(", ")); });
-    WEIGHT_VAR_DEFS.forEach(function (w) { dictRow(w.key, w.label, state.weightVar === w.key ? "Weight variable (active)" : "Available weight variable", "continuous", "\u2248 0.35\u20132.1"); });
+    WEIGHT_VAR_DEFS.forEach(function (w) {
+      var vals = ACTIVE_DATA.map(function (r) { return Number(r[w.key]); }).filter(function (x) { return isFinite(x); });
+      var range = vals.length ? ("\u2248 " + Math.min.apply(null, vals).toFixed(2) + "\u2013" + Math.max.apply(null, vals).toFixed(2)) : "continuous";
+      dictRow(w.key, w.label, state.weightVar === w.key ? "Weight variable (active)" : "Available weight variable", "continuous", range);
+    });
   }
 
   function renderAll() {
     renderVarGrid();
     renderPreview();
     if (state.tab === "details") renderDetails();
+    var badge = $("pt2SourceBadge");
+    if (badge) badge.textContent = (state.dataSource === "excel" ? "Your Excel data" : "Demo dataset") + " \u00B7 N=" + ACTIVE_DATA.length;
   }
 
   function syncControlsFromState() {
@@ -1107,13 +1251,141 @@
         var tab = btn.getAttribute("data-tab");
         state.tab = tab;
         btns.forEach(function (b) { b.classList.toggle("active", b === btn); });
-        ["build", "preview", "details"].forEach(function (t) {
+        ["data", "build", "preview", "details"].forEach(function (t) {
           $("pt2View" + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle("active", t === tab);
         });
         if (tab === "details") renderDetails();
         if (tab === "preview") renderPreview();
+        if (tab === "data") renderDataTab();
       });
     });
+  }
+
+  /* ═══════════════════════════ 8b. DATA TAB (real Excel data) ═══════════════════════════ */
+
+  function officeHostAvailable() { return typeof Office !== "undefined" && !!Office.context && !!Office.context.ui; }
+
+  function chooseDataSource(kind) {
+    state.dataChoice = kind;
+    if (kind === "demo") {
+      setDataset("demo", DEMO_DATA, DEMO_VAR_DEFS, DEMO_GROUP_VAR_DEFS, DEMO_STRAT_VAR_DEFS, DEMO_WEIGHT_VAR_DEFS);
+      syncControlsFromState();
+      renderAll();
+    } else if (kind === "excel" && state.excelDataset) {
+      var ed = state.excelDataset;
+      setDataset("excel", ed.rows, ed.varDefs, ed.groupDefs, ed.stratDefs, ed.weightDefs);
+      syncControlsFromState();
+      renderAll();
+    }
+    renderDataTab();
+  }
+
+  function onExcelDataReceived(payload) {
+    var headers = payload.headers || [];
+    var rowArrays = payload.rows || [];
+    if (!headers.length || !rowArrays.length) {
+      renderDataTab();
+      return;
+    }
+    var built = buildExcelDataset(headers, rowArrays);
+    var aux = computeAuxVarDefs(built.varDefs);
+    state.excelDataset = {
+      rows: built.rows, varDefs: built.varDefs,
+      groupDefs: aux.groupDefs, stratDefs: aux.stratDefs, weightDefs: aux.weightDefs,
+      address: payload.address || "", n: built.rows.length
+    };
+    if (state.dataChoice === "excel") {
+      setDataset("excel", built.rows, built.varDefs, aux.groupDefs, aux.stratDefs, aux.weightDefs);
+      syncControlsFromState();
+      renderAll();
+    }
+    renderDataTab();
+  }
+
+  function renderDataTab() {
+    var statusEl = $("pt2ExcelStatus");
+    var previewPanel = $("pt2ExcelPreviewPanel");
+    var previewBody = $("pt2ExcelPreviewBody");
+    if (!statusEl) return;
+    statusEl.className = "pt2-excel-status";
+
+    if (!officeHostAvailable()) {
+      statusEl.classList.add("is-nohost");
+      statusEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Real Excel data is only available when this module is opened from the Statistico Hub inside Excel. Using the demo dataset here.';
+      if (previewPanel) previewPanel.style.display = "none";
+      return;
+    }
+
+    var ed = state.excelDataset;
+    if (!ed) {
+      statusEl.classList.add("is-waiting");
+      statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Waiting for data from Excel\u2026 make sure a range with header names is selected (or the active sheet has a used range), then try \u201cRefresh from sheet\u201d.';
+      if (previewPanel) previewPanel.style.display = "none";
+      return;
+    }
+
+    statusEl.classList.add("is-ready");
+    statusEl.innerHTML = '<i class="fa-solid fa-circle-check"></i> ' + (ed.address ? "<strong>" + esc(ed.address) + "</strong> \u2014 " : "") +
+      ed.n + " row(s) \u00d7 " + ed.varDefs.length + " column(s) detected." +
+      (state.dataChoice === "excel" ? " Currently in use for the table below." : ' Select \u201cMy Excel data\u201d above to use it.');
+
+    if (previewPanel) previewPanel.style.display = "";
+    if (previewBody) {
+      previewBody.innerHTML = "";
+      ed.varDefs.forEach(function (v) {
+        var vals = ed.rows.map(function (r) { return r[v.key]; });
+        var missing = vals.filter(isMissing).length;
+        var distinct = v.categories ? v.categories.length : "\u2014";
+        var tr = document.createElement("tr");
+        tr.innerHTML = "<td>" + esc(v.label) + "</td><td><span class=\"pt2-type-badge pt2-type-" + v.type + "\">" + esc(v.type) + "</span></td><td>" + esc(String(distinct)) + "</td><td>" + missing + "</td>";
+        previewBody.appendChild(tr);
+      });
+    }
+  }
+
+  function wireDataSourceControls() {
+    var demoRadio = $("pt2DataSourceDemo");
+    var excelRadio = $("pt2DataSourceExcel");
+    if (demoRadio) demoRadio.addEventListener("change", function () { if (demoRadio.checked) chooseDataSource("demo"); });
+    if (excelRadio) excelRadio.addEventListener("change", function () { if (excelRadio.checked) chooseDataSource("excel"); });
+    var refreshBtn = $("pt2RefreshExcelBtn");
+    if (refreshBtn) refreshBtn.addEventListener("click", function () {
+      flashButton(refreshBtn, "Requesting\u2026");
+      sendToHost({ action: "refreshData" });
+    });
+  }
+
+  var excelRequestRetryTimer = null;
+
+  function stopExcelRequestRetry() {
+    if (excelRequestRetryTimer) { clearInterval(excelRequestRetryTimer); excelRequestRetryTimer = null; }
+  }
+
+  function handleHostMessage(rawMessage) {
+    try {
+      var msg = JSON.parse(rawMessage || "{}");
+      if (msg.type === "PUBTABLES_DATA" && msg.payload) {
+        stopExcelRequestRetry();
+        onExcelDataReceived(msg.payload);
+      }
+    } catch (e) {}
+  }
+
+  function wireHostMessaging() {
+    if (!officeHostAvailable()) { renderDataTab(); return; }
+    try {
+      Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function (arg) {
+        handleHostMessage(arg.message);
+      });
+    } catch (e) {}
+    sendToHost({ action: "ready" });
+    sendToHost({ action: "requestData" });
+    var attempts = 0;
+    excelRequestRetryTimer = setInterval(function () {
+      attempts += 1;
+      if (state.excelDataset || attempts > 20) { stopExcelRequestRetry(); return; }
+      sendToHost({ action: "requestData" });
+    }, 700);
   }
 
   function wireBuildControls() {
@@ -1263,8 +1535,10 @@
     wireExportControls();
     wireVarGridDragDrop();
     wireTypeHelpModal();
+    wireDataSourceControls();
     syncControlsFromState();
     renderAll();
+    renderDataTab();
 
     var closeBtn = $("pt2CloseBtn");
     if (closeBtn) closeBtn.addEventListener("click", function () { sendToHost({ action: "close" }); });
@@ -1273,7 +1547,13 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
 
+  /* Office.context isn't guaranteed to exist until Office.onReady() resolves,
+     so the host-messaging handshake (which needs Office.context.ui) waits for
+     that instead of running unconditionally inside init(). Everything else in
+     init() runs immediately so the demo table shows up without delay. */
   if (typeof Office !== "undefined" && Office.onReady) {
-    Office.onReady().catch(function () {});
+    Office.onReady().then(wireHostMessaging).catch(function () { renderDataTab(); });
+  } else {
+    renderDataTab();
   }
 })();

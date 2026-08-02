@@ -1222,12 +1222,28 @@ function openBuilderDialogFromHub(options) {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PUBLICATION TABLES — flow
-   The builder is a single self-contained dialog (Build / Preview / Details
-   tabs, own demo dataset + stats engine) — no data hand-off from the host.
+   The builder is a single dialog (Data / Build / Preview / Details tabs) with
+   its own built-in demo dataset + stats engine, so it never NEEDS host data.
+   It optionally receives the current global-range snapshot (headers/rows/
+   address) via messageChild so the user can build tables from their own
+   worksheet data instead — see sendPublicationTablesDataFromHub() below.
    ═══════════════════════════════════════════════════════════════════════════ */
 function finishHubPublicationTablesFlow() {
   hubPublicationTablesFlowActive = false;
   if (!hubPublicationTablesResultsDialog) setSelectedModuleCard("publication-tables", false);
+}
+
+/* Sends the current global-range snapshot (headers/rows/address) into the
+   Publication Tables builder dialog, which uses it to build a "My Excel
+   data" dataset alongside its own built-in demo dataset. Mirrors the
+   UNIVARIATE_DATA / REGRESSION_DATA hand-off pattern used elsewhere. */
+function sendPublicationTablesDataFromHub() {
+  if (!hubPublicationTablesResultsDialog) return;
+  var gr = getGlobalRangePayload();
+  var payload = gr
+    ? { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "" }
+    : { headers: [], rows: [], address: "" };
+  hubPublicationTablesResultsDialog.messageChild(JSON.stringify({ type: "PUBTABLES_DATA", payload: payload }));
 }
 
 function openPublicationTablesConfigFromHub() {
@@ -1244,6 +1260,7 @@ function openPublicationTablesConfigFromHub() {
       }
       hubPublicationTablesResultsDialog = res.value;
       if (window.HubResultsBridge) HubResultsBridge.registerDialog(hubPublicationTablesResultsDialog);
+      setTimeout(sendPublicationTablesDataFromHub, 550);
       hubPublicationTablesResultsDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
         try {
           var msg = JSON.parse(arg.message || "{}");
@@ -1251,6 +1268,19 @@ function openPublicationTablesConfigFromHub() {
             hubPublicationTablesResultsDialog.close();
             hubPublicationTablesResultsDialog = null;
             finishHubPublicationTablesFlow();
+          } else if (msg.action === "ready" || msg.action === "requestData") {
+            sendPublicationTablesDataFromHub();
+          } else if (msg.action === "refreshData") {
+            if (typeof window.hubRefreshGlobalRange === "function") {
+              var refreshed = window.hubRefreshGlobalRange();
+              if (refreshed && typeof refreshed.then === "function") {
+                refreshed.then(sendPublicationTablesDataFromHub, sendPublicationTablesDataFromHub);
+              } else {
+                sendPublicationTablesDataFromHub();
+              }
+            } else {
+              sendPublicationTablesDataFromHub();
+            }
           }
         } catch (e) {}
       });

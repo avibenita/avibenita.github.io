@@ -390,9 +390,9 @@
   function computeAuxVarDefs(varDefs) {
     var groupish = varDefs.filter(function (v) {
       return v.type !== "continuous" && v.categories && v.categories.length >= 2 && v.categories.length <= 12;
-    }).map(function (v) { return { key: v.key, label: v.label, categories: v.categories }; });
+    }).map(function (v) { return { key: v.key, label: humanizeLabel(v.label), categories: v.categories }; });
     var weightish = varDefs.filter(function (v) { return v.type === "continuous"; })
-      .map(function (v) { return { key: v.key, label: v.label }; });
+      .map(function (v) { return { key: v.key, label: humanizeLabel(v.label) }; });
     return { groupDefs: groupish, stratDefs: groupish.slice(), weightDefs: weightish };
   }
 
@@ -430,15 +430,17 @@
     });
     state.varOrder = newOrder;
     state.varCfg = newCfg;
-    state.groupVar = (saved && saved.groupVar && GROUP_VAR_DEFS.some(function (g) { return g.key === saved.groupVar; })) ? saved.groupVar : "";
     state.stratVar = (saved && saved.stratVar && STRAT_VAR_DEFS.some(function (s) { return s.key === saved.stratVar; })) ? saved.stratVar : "";
     state.weightVar = (saved && saved.weightVar && WEIGHT_VAR_DEFS.some(function (w) { return w.key === saved.weightVar; })) ? saved.weightVar : "";
     state.dataSource = kind;
 
     // Make sure a group var is picked if the current table type needs one
-    // and none survived the switch.
+    // and none survived the switch — then auto-exclude it from body rows.
     var td = TABLE_TYPE_DEFAULTS[state.tableType];
-    if (td && td.wantsGroup && !state.groupVar) state.groupVar = pickFallbackGroupVar(td.preferredGroupKey);
+    var nextGroup = (saved && saved.groupVar && GROUP_VAR_DEFS.some(function (g) { return g.key === saved.groupVar; })) ? saved.groupVar : "";
+    if (td && td.wantsGroup && !nextGroup) nextGroup = pickFallbackGroupVar(td.preferredGroupKey);
+    state.groupVar = "";
+    applyGroupVarSelection(nextGroup);
 
     // Drop demo-only caption/abbreviation leftovers when the real range loads.
     syncReportDefaultsForSource(kind);
@@ -477,15 +479,35 @@
   }
   function defaultCategoriesFor(v) { return v.categories ? v.categories.slice() : deriveCategories(v.key); }
 
+  /* Turn technical Excel headers into publication-ready labels:
+     Analytical_Thinking → Analytical thinking, camelCase → spaced words. */
+  function humanizeLabel(raw) {
+    var s = String(raw == null ? "" : raw).trim();
+    if (!s) return s;
+    s = s.replace(/[_\-.]+/g, " ");
+    s = s.replace(/([a-z])([A-Z])/g, "$1 $2");
+    s = s.replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2");
+    s = s.replace(/\s+/g, " ").trim().toLowerCase();
+    s = s.charAt(0).toUpperCase() + s.slice(1);
+    s = s.replace(/\b(bmi|bp|sd|smd|iqr|ldl|egfr)\b/gi, function (m) { return m.toUpperCase(); });
+    return s;
+  }
+
   function makeDefaultVarCfg(v, includeDefault) {
     var isCont = v.type === "continuous";
+    var cats = isCont ? [] : defaultCategoriesFor(v);
     return {
-      label: v.label,
+      label: humanizeLabel(v.label),
+      sourceName: v.label,
       typeOverride: "auto",
       format: isCont ? "mean-sd" : "n-percent",
       decimals: 1,
       missingRule: "inherit",
-      orderText: isCont ? "" : defaultCategoriesFor(v).join(", "),
+      orderText: isCont ? "" : cats.join(", "),
+      categoryMeta: isCont ? null : cats.map(function (c, i) {
+        return { value: c, label: String(c), include: true, order: i };
+      }),
+      expanded: false,
       include: !!includeDefault
     };
   }
@@ -509,6 +531,9 @@
     completeCase: false,
     showMissingCategory: true,
     missingLabel: "Missing",
+    /* overall-only | exclude | missing-column — how to treat rows missing the group var */
+    missingGroupMode: "overall-only",
+    previewZoom: 100,
     varOrder: [],
     varCfg: {},
     dataSource: null,
@@ -589,10 +614,10 @@
 
   function applyTableTypeDefaults(type) {
     var d = TABLE_TYPE_DEFAULTS[type];
-    state.groupVar = d.wantsGroup ? pickFallbackGroupVar(d.preferredGroupKey) : "";
+    applyGroupVarSelection(d.wantsGroup ? pickFallbackGroupVar(d.preferredGroupKey) : "");
     state.showOverall = d.showOverall;
     state.showPValue = d.showPValue;
-    state.showSMD = d.showSMD;
+    state.showSMD = d.showSMD && countGroupLevels() === 2;
     if (!state.report.title || state.report.title === lastAppliedDefaultTitle) {
       state.report.title = state.dataSource === "excel" ? "Summary of Study Variables" : d.title;
       lastAppliedDefaultTitle = state.report.title;
@@ -631,27 +656,73 @@
   function orderedVarDefs() { return state.varOrder.map(function (k) { return VAR_DEFS_BY_KEY[k]; }); }
 
   function effectiveType(v, cfg) { return (cfg.typeOverride && cfg.typeOverride !== "auto") ? cfg.typeOverride : v.type; }
+  function isRoleVariable(key) {
+    return !!key && (key === state.groupVar || key === state.stratVar || key === state.weightVar);
+  }
   function isVariableEligible(v, cfg) {
-    if (!cfg.include) return false;
+    if (!cfg || !cfg.include) return false;
+    // Group / strat / weight columns belong in the table structure, not as body rows
+    // (unless the user explicitly re-includes the group variable as a row).
+    if (v.key === state.groupVar && !cfg.forceIncludeGroupRow) return false;
+    if (v.key === state.stratVar || v.key === state.weightVar) return false;
     if (state.tableType === "frequency" && effectiveType(v, cfg) === "continuous") return false;
     return true;
   }
   function eligibleVarDefs() { return orderedVarDefs().filter(function (v) { return isVariableEligible(v, state.varCfg[v.key]); }); }
 
+  function ensureCategoryMeta(v, cfg) {
+    if (cfg.categoryMeta && cfg.categoryMeta.length) return cfg.categoryMeta;
+    var cats = defaultCategoriesFor(v);
+    cfg.categoryMeta = cats.map(function (c, i) {
+      return { value: String(c), label: String(c), include: true, order: i };
+    });
+    return cfg.categoryMeta;
+  }
+
+  /* Returns [{ value, label }] for included categories in display order. */
   function categoriesFor(v, cfg) {
     var effType = effectiveType(v, cfg);
     if (effType === "continuous") return null;
-    if (cfg.orderText && cfg.orderText.trim()) {
-      return cfg.orderText.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+    var meta = ensureCategoryMeta(v, cfg).slice().sort(function (a, b) { return a.order - b.order; });
+    return meta.filter(function (m) { return m.include !== false; });
+  }
+
+  function groupAvailability() {
+    if (!state.groupVar) return { total: ACTIVE_DATA.length, valid: ACTIVE_DATA.length, missing: 0 };
+    var valid = 0, missing = 0;
+    ACTIVE_DATA.forEach(function (r) {
+      if (isMissing(r[state.groupVar])) missing++; else valid++;
+    });
+    return { total: ACTIVE_DATA.length, valid: valid, missing: missing };
+  }
+
+  function applyGroupVarSelection(newKey) {
+    var prev = state.groupVar;
+    if (prev && state.varCfg[prev] && state.varCfg[prev]._autoExcludedForGroup) {
+      state.varCfg[prev].include = true;
+      state.varCfg[prev].forceIncludeGroupRow = false;
+      delete state.varCfg[prev]._autoExcludedForGroup;
     }
-    return defaultCategoriesFor(v);
+    state.groupVar = newKey || "";
+    if (state.groupVar && state.varCfg[state.groupVar]) {
+      var cfg = state.varCfg[state.groupVar];
+      if (cfg.include && !cfg.forceIncludeGroupRow) {
+        cfg.include = false;
+        cfg._autoExcludedForGroup = true;
+      }
+    }
+    // SMD is only meaningful for two-group comparisons in v1
+    if (countGroupLevels() !== 2) state.showSMD = false;
   }
 
   function getWorkingRows() {
     var rows = ACTIVE_DATA;
+    if (state.groupVar && state.missingGroupMode === "exclude") {
+      rows = rows.filter(function (r) { return !isMissing(r[state.groupVar]); });
+    }
     if (state.completeCase) {
       var required = eligibleVarDefs().map(function (v) { return v.key; });
-      if (state.groupVar) required.push(state.groupVar);
+      if (state.groupVar && state.missingGroupMode !== "overall-only") required.push(state.groupVar);
       if (state.stratVar) required.push(state.stratVar);
       rows = rows.filter(function (r) { return required.every(function (k) { return !isMissing(r[k]); }); });
     }
@@ -663,12 +734,20 @@
     if (state.showOverall || !state.groupVar) cols.push({ key: "__overall__", label: "Overall" });
     if (state.groupVar) {
       var gdef = GROUP_VAR_DEFS.filter(function (g) { return g.key === state.groupVar; })[0];
-      gdef.categories.forEach(function (lv) { cols.push({ key: lv, label: lv, isGroup: true }); });
+      if (gdef) {
+        gdef.categories.forEach(function (lv) { cols.push({ key: lv, label: String(lv), isGroup: true }); });
+        if (state.missingGroupMode === "missing-column" && groupAvailability().missing > 0) {
+          cols.push({ key: "__missing_group__", label: "Missing group", isGroup: true, isMissingGroup: true });
+        }
+      }
     }
     return cols;
   }
   function rowsForColumn(baseRows, col) {
     if (col.key === "__overall__") return baseRows;
+    if (col.key === "__missing_group__") {
+      return baseRows.filter(function (r) { return isMissing(r[state.groupVar]); });
+    }
     // String-coerce: Excel-sourced group columns may hold numbers (e.g. 0/1)
     // while category keys are always strings.
     return baseRows.filter(function (r) { return !isMissing(r[state.groupVar]) && String(r[state.groupVar]) === col.key; });
@@ -725,7 +804,7 @@
     });
     var test = null, smd = null;
     if (state.groupVar) {
-      var groupCols = columns.filter(function (c) { return c.isGroup; });
+      var groupCols = columns.filter(function (c) { return c.isGroup && !c.isMissingGroup; });
       var groupsVals = groupCols.map(function (col) {
         return rowsForColumn(baseRows, col).map(function (r) { return r[v.key]; }).filter(function (x) { return !isMissing(x); }).map(Number);
       });
@@ -733,17 +812,10 @@
       if (validGroups.length >= 2) {
         if (validGroups.length === 2) {
           test = welchTTest(validGroups[0], validGroups[1]);
-          smd = continuousSMD(validGroups[0], validGroups[1]);
+          if (state.showSMD) smd = continuousSMD(validGroups[0], validGroups[1]);
         } else {
           test = anovaFTest(validGroups);
-          var maxSmd = 0;
-          for (var i = 0; i < validGroups.length; i++) {
-            for (var j = i + 1; j < validGroups.length; j++) {
-              var d = Math.abs(continuousSMD(validGroups[i], validGroups[j]));
-              if (isFinite(d) && d > maxSmd) maxSmd = d;
-            }
-          }
-          smd = maxSmd;
+          // Multi-group SMD is disabled in v1 (ambiguous single number).
         }
       }
     }
@@ -751,14 +823,14 @@
   }
 
   function buildCategoricalRow(v, cfg, baseRows, columns) {
-    var cats = categoriesFor(v, cfg);
+    var cats = categoriesFor(v, cfg) || [];
     var pdecimals = cfg.decimals;
-    var counts = {}; cats.forEach(function (c) { counts[c] = {}; });
+    var counts = {}; cats.forEach(function (c) { counts[c.value] = {}; });
     var colTotalN = {}, colValidN = {}, colMissing = {};
     columns.forEach(function (col) {
       var subRows = rowsForColumn(baseRows, col);
       var totalW = 0, validW = 0, missW = 0;
-      var local = {}; cats.forEach(function (c) { local[c] = 0; });
+      var local = {}; cats.forEach(function (c) { local[c.value] = 0; });
       subRows.forEach(function (r) {
         var w = state.weightVar ? (Number(r[state.weightVar]) || 0) : 1;
         totalW += w;
@@ -768,7 +840,7 @@
         if (!(sval in local)) return;
         local[sval] += w; validW += w;
       });
-      cats.forEach(function (c) { counts[c][col.key] = local[c]; });
+      cats.forEach(function (c) { counts[c.value][col.key] = local[c.value]; });
       colTotalN[col.key] = totalW; colValidN[col.key] = validW; colMissing[col.key] = missW;
     });
 
@@ -778,11 +850,11 @@
     var anyMissing = columns.some(function (col) { return colMissing[col.key] > 0; });
     var showMissingRow = effectiveMissingRule === "category" && !state.completeCase && anyMissing;
 
-    var groupCols = columns.filter(function (c) { return c.isGroup; });
-    function cellFor(cat, col) {
-      var n = counts[cat][col.key];
+    var groupCols = columns.filter(function (c) { return c.isGroup && !c.isMissingGroup; });
+    function cellFor(catValue, col) {
+      var n = counts[catValue][col.key];
       var colN = colTotalN[col.key], validN = colValidN[col.key];
-      var rowTotal = groupCols.length ? groupCols.reduce(function (s, c) { return s + counts[cat][c.key]; }, 0) : colN;
+      var rowTotal = groupCols.length ? groupCols.reduce(function (s, c) { return s + counts[catValue][c.key]; }, 0) : colN;
       switch (cfg.format) {
         case "n-percent": return n + " (" + fmtNum(validN > 0 ? (n / validN) * 100 : 0, pdecimals) + "%)";
         case "n-over-N-percent": return n + "/" + colN + " (" + fmtNum(colN > 0 ? (n / colN) * 100 : 0, pdecimals) + "%)";
@@ -794,30 +866,21 @@
       }
     }
 
-    var categoryRows = cats.map(function (cat) { return { catLabel: cat, cells: columns.map(function (col) { return cellFor(cat, col); }) }; });
+    var categoryRows = cats.map(function (cat) {
+      return { catLabel: cat.label, cells: columns.map(function (col) { return cellFor(cat.value, col); }) };
+    });
     if (showMissingRow) {
       categoryRows.push({ catLabel: state.missingLabel || "Missing", cells: columns.map(function (col) { return String(colMissing[col.key]); }) });
     }
 
     var test = null, smd = null;
     if (state.groupVar && groupCols.length >= 2) {
-      var table = cats.map(function (cat) { return groupCols.map(function (col) { return counts[cat][col.key]; }); });
+      var table = cats.map(function (cat) { return groupCols.map(function (col) { return counts[cat.value][col.key]; }); });
       test = chiSquareTest(table);
-      if (groupCols.length === 2) {
-        var cA = cats.map(function (cat) { return counts[cat][groupCols[0].key]; });
-        var cB = cats.map(function (cat) { return counts[cat][groupCols[1].key]; });
+      if (state.showSMD && groupCols.length === 2) {
+        var cA = cats.map(function (cat) { return counts[cat.value][groupCols[0].key]; });
+        var cB = cats.map(function (cat) { return counts[cat.value][groupCols[1].key]; });
         smd = categoricalSMD(cA, cB);
-      } else {
-        var maxS = 0;
-        for (var i = 0; i < groupCols.length; i++) {
-          for (var j = i + 1; j < groupCols.length; j++) {
-            var cA2 = cats.map(function (cat) { return counts[cat][groupCols[i].key]; });
-            var cB2 = cats.map(function (cat) { return counts[cat][groupCols[j].key]; });
-            var d2 = categoricalSMD(cA2, cB2);
-            if (isFinite(d2) && Math.abs(d2) > maxS) maxS = Math.abs(d2);
-          }
-        }
-        smd = maxS;
       }
     }
 
@@ -847,7 +910,7 @@
     return { strata: strata };
   }
 
-  function countGroupLevels() { return getColumns().filter(function (c) { return c.isGroup; }).length; }
+  function countGroupLevels() { return getColumns().filter(function (c) { return c.isGroup && !c.isMissingGroup; }).length; }
 
   /* ═══════════════════════════ 7. HTML / TEXT RENDERING ═══════════════════════════ */
 
@@ -886,7 +949,19 @@
       }
     }
     if (state.weightVar) pieces.push("Estimates are weighted; unweighted N is shown in each column header.");
-    if (state.completeCase) pieces.push("Analysis restricted to cases with complete data on all displayed variables.");
+    if (state.completeCase) pieces.push("Analysis restricted to a common sample with complete data on all displayed variables.");
+    if (state.groupVar) {
+      var avail = groupAvailability();
+      if (avail.missing > 0) {
+        if (state.missingGroupMode === "exclude") {
+          pieces.push("Records missing the group variable (n=" + avail.missing + ") were excluded from the table.");
+        } else if (state.missingGroupMode === "missing-column") {
+          pieces.push("Group variable available for " + avail.valid + " of " + avail.total + " records; missing group shown as its own column.");
+        } else {
+          pieces.push("Group variable available for " + avail.valid + " of " + avail.total + " records; " + avail.missing + " records are included in Overall only.");
+        }
+      }
+    }
     pieces.push("N = " + getWorkingRows().length + ".");
     return pieces.join(" ");
   }
@@ -930,17 +1005,17 @@
 
   function renderModelHtml(model) {
     var sp = effectiveStyle();
-    var rowPad = sp.density === "compact" ? "3px 8px" : "6px 10px";
-    var fontSize = sp.density === "compact" ? "11.5px" : "13px";
-    var headerBorderBottom = sp.headerStyle === "rule" ? "border-bottom:1px solid #111;" : "";
+    var rowPad = sp.density === "compact" ? "5px 10px" : "8px 12px";
+    var fontSize = sp.density === "compact" ? "12.5px" : "14px";
+    var headerBorderBottom = sp.headerStyle === "rule" ? "border-bottom:1.5px solid #111;" : "";
     var headerBg = sp.headerStyle === "shade" ? "background:#f0f0f0;" : "";
 
     var html = '<div style="font-family:' + sp.font + ';color:#111;">';
-    html += '<div style="font-weight:' + (sp.captionBold ? "700" : "400") + ';font-size:14px;margin-bottom:2px;">Table ' + esc(state.report.tableNumber) + ".</div>";
-    html += '<div style="font-size:14px;margin-bottom:4px;' + (sp.italicTitle ? "font-style:italic;" : "") + '">' + esc(state.report.title) + "</div>";
+    html += '<div style="font-weight:' + (sp.captionBold ? "700" : "400") + ';font-size:13px;margin-bottom:2px;letter-spacing:.01em;">Table ' + esc(state.report.tableNumber) + ".</div>";
+    html += '<div style="font-size:15px;margin-bottom:6px;font-weight:600;' + (sp.italicTitle ? "font-style:italic;font-weight:500;" : "") + '">' + esc(state.report.title) + "</div>";
     html += state.report.subtitle
-      ? '<div style="font-size:12.5px;color:#333;margin-bottom:10px;">' + esc(state.report.subtitle) + "</div>"
-      : '<div style="margin-bottom:10px;"></div>';
+      ? '<div style="font-size:12.5px;color:#444;margin-bottom:12px;">' + esc(state.report.subtitle) + "</div>"
+      : '<div style="margin-bottom:12px;"></div>';
 
     var model2 = model || buildModel();
     model2.strata.forEach(function (stratum, sIdx) {
@@ -950,7 +1025,8 @@
 
     var noteLines = [state.report.notes ? state.report.notes : autoNoteText()];
     if (state.report.abbreviations) noteLines.push(state.report.abbreviations);
-    html += '<div style="font-size:11.5px;margin-top:10px;line-height:1.5;">' + noteLines.map(esc).join("<br>") + "</div>";
+    html += '<div class="pt2-footnote" style="font-size:11px;margin-top:12px;line-height:1.55;color:#333;padding-left:1.2em;text-indent:-1.2em;">' +
+      noteLines.map(esc).join("<br>") + "</div>";
     html += "</div>";
     return html;
   }
@@ -1036,14 +1112,17 @@
     body.addEventListener("pointermove", function (e) {
       if (!pointerDrag || e.pointerId !== pointerDrag.pointerId) return;
       var tr = pointerDrag.tr;
-      var rows = Array.prototype.slice.call(body.children);
+      var rows = Array.prototype.slice.call(body.querySelectorAll("tr[data-var-key]"));
       for (var i = 0; i < rows.length; i++) {
         var r = rows[i];
         if (r === tr) continue;
         var rect = r.getBoundingClientRect();
         if (e.clientY < rect.top || e.clientY > rect.bottom) continue;
         var before = e.clientY < (rect.top + rect.height / 2);
+        // Keep any expanded detail row glued under its parent variable row.
+        var expand = body.querySelector('tr.pt2-expand-row[data-expand-for="' + tr.dataset.varKey + '"]');
         body.insertBefore(tr, before ? r : r.nextSibling);
+        if (expand) body.insertBefore(expand, tr.nextSibling);
         break;
       }
     });
@@ -1053,13 +1132,78 @@
       pointerDrag.tr.classList.remove("pt2-dragging");
       document.body.classList.remove("pt2-noselect");
       try { pointerDrag.handle.releasePointerCapture(pointerDrag.pointerId); } catch (err) {}
-      var newOrder = Array.prototype.slice.call(body.children).map(function (r) { return r.dataset.varKey; });
+      var newOrder = Array.prototype.slice.call(body.querySelectorAll("tr[data-var-key]")).map(function (r) { return r.dataset.varKey; });
       pointerDrag = null;
       if (newOrder.length === state.varOrder.length) state.varOrder = newOrder;
       renderAll();
     }
     body.addEventListener("pointerup", endDrag);
     body.addEventListener("pointercancel", endDrag);
+  }
+
+  var catEditKey = null;
+
+  function formatLabelFor(formatCode, formats) {
+    for (var i = 0; i < formats.length; i++) if (formats[i].value === formatCode) return formats[i].label;
+    return formatCode;
+  }
+
+  function openCategoryEditor(varKey) {
+    var v = VAR_DEFS_BY_KEY[varKey];
+    var cfg = state.varCfg[varKey];
+    if (!v || !cfg) return;
+    catEditKey = varKey;
+    var meta = ensureCategoryMeta(v, cfg).slice().sort(function (a, b) { return a.order - b.order; });
+    var body = $("pt2CatEditBody");
+    body.innerHTML = "";
+    $("pt2CatEditTitle").textContent = "Edit categories — " + (cfg.label || v.label);
+    meta.forEach(function (m, idx) {
+      var tr = document.createElement("tr");
+      tr.dataset.idx = String(idx);
+      tr.innerHTML =
+        '<td><input type="checkbox" class="pt2-cat-inc"' + (m.include !== false ? " checked" : "") + " /></td>" +
+        "<td><code>" + esc(m.value) + "</code></td>" +
+        '<td><input type="text" class="pt2-cat-label" value="' + esc(m.label) + '" /></td>' +
+        '<td><span class="pt2-cat-move">' +
+        '<button type="button" class="pt2-cfg-btn pt2-cat-up" title="Move up"><i class="fa-solid fa-caret-up"></i></button>' +
+        '<button type="button" class="pt2-cfg-btn pt2-cat-down" title="Move down"><i class="fa-solid fa-caret-down"></i></button>' +
+        "</span></td>";
+      body.appendChild(tr);
+    });
+    body.querySelectorAll(".pt2-cat-up").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var tr = btn.closest("tr");
+        if (tr && tr.previousElementSibling) body.insertBefore(tr, tr.previousElementSibling);
+      });
+    });
+    body.querySelectorAll(".pt2-cat-down").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var tr = btn.closest("tr");
+        if (tr && tr.nextElementSibling) body.insertBefore(tr.nextElementSibling, tr);
+      });
+    });
+    $("pt2CatEditOverlay").classList.add("open");
+  }
+
+  function applyCategoryEditor() {
+    if (!catEditKey) return;
+    var cfg = state.varCfg[catEditKey];
+    var v = VAR_DEFS_BY_KEY[catEditKey];
+    if (!cfg || !v) return;
+    var rows = Array.prototype.slice.call($("pt2CatEditBody").children);
+    cfg.categoryMeta = rows.map(function (tr, i) {
+      var valueCell = tr.querySelector("code");
+      return {
+        value: valueCell ? valueCell.textContent : "",
+        label: (tr.querySelector(".pt2-cat-label") || {}).value || "",
+        include: !!(tr.querySelector(".pt2-cat-inc") || {}).checked,
+        order: i
+      };
+    });
+    cfg.orderText = cfg.categoryMeta.filter(function (m) { return m.include; }).map(function (m) { return m.label; }).join(", ");
+    $("pt2CatEditOverlay").classList.remove("open");
+    catEditKey = null;
+    renderAll();
   }
 
   function renderVarGrid() {
@@ -1069,12 +1213,14 @@
     var tableRowCounter = 0;
     orderedVarDefs().forEach(function (v) {
       var cfg = state.varCfg[v.key];
+      if (!cfg) return;
       var effType = effectiveType(v, cfg);
       var disabledForType = state.tableType === "frequency" && effType === "continuous";
       var isCatLike = effType !== "continuous";
       var formats = effType === "continuous" ? CONTINUOUS_FORMATS : CATEGORICAL_FORMATS;
       var willAppearInTable = isVariableEligible(v, cfg);
       if (willAppearInTable) tableRowCounter += 1;
+      var isGroupRow = v.key === state.groupVar;
 
       var tr = document.createElement("tr");
       tr.dataset.varKey = v.key;
@@ -1087,115 +1233,154 @@
       var orderNum = document.createElement("span");
       orderNum.className = "pt2-drag-order";
       orderNum.textContent = willAppearInTable ? String(tableRowCounter) : "\u2014";
-      orderNum.title = willAppearInTable ? "Row " + tableRowCounter + " in the published table" : "Not currently included in the table";
       var handle = document.createElement("span");
       handle.className = "pt2-drag-handle";
-      handle.title = "Drag to change the order this variable appears in the table";
+      handle.title = "Drag to reorder";
       handle.innerHTML = '<i class="fa-solid fa-grip-vertical"></i>';
-      var orderBtns = document.createElement("span");
-      orderBtns.className = "pt2-order-btns";
-      var idxInOrder = state.varOrder.indexOf(v.key);
-      var upBtn = document.createElement("button");
-      upBtn.type = "button"; upBtn.className = "pt2-order-btn"; upBtn.title = "Move up";
-      upBtn.innerHTML = '<i class="fa-solid fa-caret-up"></i>';
-      upBtn.disabled = idxInOrder <= 0;
-      upBtn.addEventListener("click", function () { moveVarByOffset(v.key, -1); });
-      var downBtn = document.createElement("button");
-      downBtn.type = "button"; downBtn.className = "pt2-order-btn"; downBtn.title = "Move down";
-      downBtn.innerHTML = '<i class="fa-solid fa-caret-down"></i>';
-      downBtn.disabled = idxInOrder >= state.varOrder.length - 1;
-      downBtn.addEventListener("click", function () { moveVarByOffset(v.key, 1); });
-      orderBtns.appendChild(upBtn);
-      orderBtns.appendChild(downBtn);
-
       dragCell.appendChild(orderNum);
       dragCell.appendChild(handle);
-      dragCell.appendChild(orderBtns);
       tdDrag.appendChild(dragCell);
       tr.appendChild(tdDrag);
 
       var tdInclude = document.createElement("td");
       var chk = document.createElement("input");
-      chk.type = "checkbox"; chk.checked = cfg.include;
-      chk.addEventListener("change", function () { cfg.include = chk.checked; renderAll(); });
+      chk.type = "checkbox";
+      chk.checked = isGroupRow ? !!cfg.forceIncludeGroupRow : !!cfg.include;
+      chk.title = isGroupRow
+        ? "Group variable is omitted from the table body by default. Check to include it as a row anyway."
+        : "Include in the published table";
+      chk.addEventListener("change", function () {
+        if (isGroupRow) {
+          cfg.forceIncludeGroupRow = chk.checked;
+          cfg.include = chk.checked;
+          delete cfg._autoExcludedForGroup;
+        } else {
+          cfg.include = chk.checked;
+        }
+        renderAll();
+      });
       tdInclude.appendChild(chk);
       tr.appendChild(tdInclude);
 
-      var tdLabel = document.createElement("td");
+      var tdVar = document.createElement("td");
       var labelInput = document.createElement("input");
-      labelInput.type = "text"; labelInput.value = cfg.label;
+      labelInput.type = "text";
+      labelInput.value = cfg.label;
+      labelInput.title = cfg.sourceName && cfg.sourceName !== cfg.label ? ("Original: " + cfg.sourceName) : "";
       labelInput.addEventListener("input", function () { cfg.label = labelInput.value; renderPreview(); });
-      tdLabel.appendChild(labelInput);
-      tr.appendChild(tdLabel);
+      tdVar.appendChild(labelInput);
+      if (isGroupRow) {
+        var tag = document.createElement("span");
+        tag.className = "pt2-role-tag";
+        tag.textContent = "group";
+        tdVar.appendChild(tag);
+      }
+      tr.appendChild(tdVar);
 
-      var tdDetected = document.createElement("td");
-      var badge = document.createElement("span");
-      badge.className = "pt2-type-badge pt2-type-" + v.type;
-      badge.textContent = v.type;
-      tdDetected.appendChild(badge);
-      tr.appendChild(tdDetected);
+      var tdSummary = document.createElement("td");
+      var summary = document.createElement("div");
+      summary.className = "pt2-var-summary";
+      summary.innerHTML = '<span class="pt2-type-badge pt2-type-' + esc(v.type) + '">' + esc(v.type) + "</span> · <strong>" +
+        esc(formatLabelFor(cfg.format, formats)) + "</strong> · " + esc(String(cfg.decimals)) + " decimal" + (cfg.decimals === 1 ? "" : "s");
+      tdSummary.appendChild(summary);
+      tr.appendChild(tdSummary);
 
-      var tdOverride = document.createElement("td");
-      var overrideSel = document.createElement("select");
-      ["auto", "continuous", "categorical", "ordinal", "binary"].forEach(function (opt) {
-        var o = document.createElement("option"); o.value = opt;
-        o.textContent = opt === "auto" ? "Auto (" + v.type + ")" : opt.charAt(0).toUpperCase() + opt.slice(1);
-        if (cfg.typeOverride === opt) o.selected = true;
-        overrideSel.appendChild(o);
-      });
-      overrideSel.addEventListener("change", function () {
-        var wasContinuous = effectiveType(v, cfg) === "continuous";
-        cfg.typeOverride = overrideSel.value;
-        var nowContinuous = effectiveType(v, cfg) === "continuous";
-        if (wasContinuous !== nowContinuous) {
-          cfg.format = nowContinuous ? "mean-sd" : "n-percent";
-          if (!nowContinuous && !cfg.orderText) cfg.orderText = deriveCategories(v.key).join(", ");
-        }
-        renderVarGrid(); renderAll();
-      });
-      tdOverride.appendChild(overrideSel);
-      tr.appendChild(tdOverride);
-
-      var tdFormat = document.createElement("td");
-      var formatSel = document.createElement("select");
-      formats.forEach(function (f) {
-        var o = document.createElement("option"); o.value = f.value; o.textContent = f.label;
-        if (cfg.format === f.value) o.selected = true;
-        formatSel.appendChild(o);
-      });
-      formatSel.addEventListener("change", function () { cfg.format = formatSel.value; renderPreview(); });
-      tdFormat.appendChild(formatSel);
-      tr.appendChild(tdFormat);
-
-      var tdDecimals = document.createElement("td");
-      var decInput = document.createElement("input");
-      decInput.type = "number"; decInput.min = "0"; decInput.max = "6"; decInput.value = cfg.decimals;
-      decInput.addEventListener("input", function () { cfg.decimals = parseInt(decInput.value, 10) || 0; renderPreview(); });
-      tdDecimals.appendChild(decInput);
-      tr.appendChild(tdDecimals);
-
-      var tdMissing = document.createElement("td");
-      var missSel = document.createElement("select");
-      [["inherit", "Use global setting"], ["category", "Show as category"], ["exclude", "Exclude"]].forEach(function (pair) {
-        var o = document.createElement("option"); o.value = pair[0]; o.textContent = pair[1];
-        if (cfg.missingRule === pair[0]) o.selected = true;
-        missSel.appendChild(o);
-      });
-      missSel.addEventListener("change", function () { cfg.missingRule = missSel.value; renderPreview(); });
-      tdMissing.appendChild(missSel);
-      tr.appendChild(tdMissing);
-
-      var tdOrder = document.createElement("td");
-      var orderInput = document.createElement("input");
-      orderInput.type = "text";
-      orderInput.value = isCatLike ? (cfg.orderText || defaultCategoriesFor(v).join(", ")) : "";
-      orderInput.placeholder = isCatLike ? "" : "N/A for continuous";
-      orderInput.disabled = !isCatLike;
-      orderInput.addEventListener("input", function () { cfg.orderText = orderInput.value; renderPreview(); });
-      tdOrder.appendChild(orderInput);
-      tr.appendChild(tdOrder);
-
+      var tdCfg = document.createElement("td");
+      var cfgBtn = document.createElement("button");
+      cfgBtn.type = "button";
+      cfgBtn.className = "pt2-cfg-btn" + (cfg.expanded ? " open" : "");
+      cfgBtn.textContent = cfg.expanded ? "Hide" : "Configure";
+      cfgBtn.addEventListener("click", function () { cfg.expanded = !cfg.expanded; renderVarGrid(); });
+      tdCfg.appendChild(cfgBtn);
+      tr.appendChild(tdCfg);
       body.appendChild(tr);
+
+      if (cfg.expanded) {
+        var exp = document.createElement("tr");
+        exp.className = "pt2-expand-row";
+        exp.dataset.expandFor = v.key;
+        var expTd = document.createElement("td");
+        expTd.colSpan = 5;
+        var grid = document.createElement("div");
+        grid.className = "pt2-expand-grid";
+
+        function field(label, node) {
+          var wrap = document.createElement("div");
+          var lab = document.createElement("label");
+          lab.className = "cfg-label";
+          lab.textContent = label;
+          wrap.appendChild(lab);
+          wrap.appendChild(node);
+          grid.appendChild(wrap);
+        }
+
+        var overrideSel = document.createElement("select");
+        overrideSel.className = "cfg-select";
+        ["auto", "continuous", "categorical", "ordinal", "binary"].forEach(function (opt) {
+          var o = document.createElement("option"); o.value = opt;
+          o.textContent = opt === "auto" ? "Auto (" + v.type + ")" : opt.charAt(0).toUpperCase() + opt.slice(1);
+          if (cfg.typeOverride === opt) o.selected = true;
+          overrideSel.appendChild(o);
+        });
+        overrideSel.addEventListener("change", function () {
+          var wasContinuous = effectiveType(v, cfg) === "continuous";
+          cfg.typeOverride = overrideSel.value;
+          var nowContinuous = effectiveType(v, cfg) === "continuous";
+          if (wasContinuous !== nowContinuous) {
+            cfg.format = nowContinuous ? "mean-sd" : "n-percent";
+            if (!nowContinuous) ensureCategoryMeta(v, cfg);
+          }
+          renderAll();
+        });
+        field("Type override", overrideSel);
+
+        var formatSel = document.createElement("select");
+        formatSel.className = "cfg-select";
+        formats.forEach(function (f) {
+          var o = document.createElement("option"); o.value = f.value; o.textContent = f.label;
+          if (cfg.format === f.value) o.selected = true;
+          formatSel.appendChild(o);
+        });
+        formatSel.addEventListener("change", function () { cfg.format = formatSel.value; renderAll(); });
+        field("Summary format", formatSel);
+
+        var decInput = document.createElement("input");
+        decInput.className = "cfg-input";
+        decInput.type = "number"; decInput.min = "0"; decInput.max = "6"; decInput.value = cfg.decimals;
+        decInput.addEventListener("input", function () { cfg.decimals = parseInt(decInput.value, 10) || 0; renderPreview(); renderVarGrid(); });
+        field("Decimals", decInput);
+
+        var missSel = document.createElement("select");
+        missSel.className = "cfg-select";
+        [["inherit", "Use global setting"], ["category", "Show as category"], ["exclude", "Exclude"]].forEach(function (pair) {
+          var o = document.createElement("option"); o.value = pair[0]; o.textContent = pair[1];
+          if (cfg.missingRule === pair[0]) o.selected = true;
+          missSel.appendChild(o);
+        });
+        missSel.addEventListener("change", function () { cfg.missingRule = missSel.value; renderPreview(); });
+        field("Missing rule", missSel);
+
+        if (isCatLike) {
+          var catBtn = document.createElement("button");
+          catBtn.type = "button";
+          catBtn.className = "pt2-cfg-btn";
+          var nCats = ensureCategoryMeta(v, cfg).filter(function (m) { return m.include !== false; }).length;
+          catBtn.innerHTML = '<i class="fa-solid fa-list-ol"></i> Edit categories (' + nCats + ")";
+          catBtn.addEventListener("click", function () { openCategoryEditor(v.key); });
+          field("Categories", catBtn);
+        }
+
+        if (cfg.sourceName) {
+          var src = document.createElement("div");
+          src.className = "cfg-hint";
+          src.textContent = "Excel name: " + cfg.sourceName;
+          grid.appendChild(src);
+        }
+
+        expTd.appendChild(grid);
+        exp.appendChild(expTd);
+        body.appendChild(exp);
+      }
     });
   }
 
@@ -1214,18 +1399,22 @@
     var model = buildModel();
     var wrap = $("pt2PaperWrap");
     var chip = $("pt2SourceChip");
+    var gDef = state.groupVar ? GROUP_VAR_DEFS.filter(function (g) { return g.key === state.groupVar; })[0] : null;
+    var sDef = state.stratVar ? STRAT_VAR_DEFS.filter(function (s) { return s.key === state.stratVar; })[0] : null;
     chip.textContent = sourceLabel() + " · N=" + ACTIVE_DATA.length + " · " + eligibleVarDefs().length + " variable(s) summarized" +
-      (state.groupVar ? " · grouped by " + GROUP_VAR_DEFS.filter(function (g) { return g.key === state.groupVar; })[0].label : "") +
-      (state.stratVar ? " · stratified by " + STRAT_VAR_DEFS.filter(function (s) { return s.key === state.stratVar; })[0].label : "");
+      (gDef ? " · grouped by " + gDef.label : "") +
+      (sDef ? " · stratified by " + sDef.label : "");
 
     var existingPaper = wrap.querySelector(".pt2-paper");
     if (!existingPaper) { existingPaper = document.createElement("div"); existingPaper.className = "pt2-paper"; wrap.appendChild(existingPaper); }
 
     if (!eligibleVarDefs().length) {
       existingPaper.innerHTML = '<div class="pt2-error">No variables are currently included in this table. Go to the Build tab and include at least one variable.</div>';
+      applyPreviewZoom();
       return;
     }
     existingPaper.innerHTML = renderModelHtml(model);
+    applyPreviewZoom();
   }
 
   function renderDetails() {
@@ -1291,11 +1480,72 @@
 
   function renderAll() {
     refreshDefaultAbbreviations();
+    syncStructureHints();
     renderVarGrid();
     renderPreview();
     if (state.tab === "details") renderDetails();
     var badge = $("pt2SourceBadge");
     if (badge) badge.textContent = sourceLabel() + " \u00B7 N=" + ACTIVE_DATA.length;
+  }
+
+  function syncStructureHints() {
+    var levels = countGroupLevels();
+    var smdEl = $("pt2ShowSMD");
+    var smdHint = $("pt2SmdHint");
+    var smdAllowed = !!state.groupVar && levels === 2;
+    if (smdEl) {
+      smdEl.disabled = !smdAllowed;
+      if (!smdAllowed) { state.showSMD = false; smdEl.checked = false; }
+    }
+    if (smdHint) smdHint.style.display = state.groupVar && levels !== 2 ? "" : "none";
+
+    var pEl = $("pt2ShowPValue");
+    if (pEl) pEl.disabled = !state.groupVar || levels < 2;
+
+    var warn = $("pt2GroupWarn");
+    if (warn) {
+      if (state.groupVar && state.varCfg[state.groupVar] && !state.varCfg[state.groupVar].forceIncludeGroupRow) {
+        var gLabel = (GROUP_VAR_DEFS.filter(function (g) { return g.key === state.groupVar; })[0] || {}).label || state.groupVar;
+        warn.style.display = "";
+        warn.textContent = gLabel + " is used as the group variable and has been removed from the table body.";
+      } else {
+        warn.style.display = "none";
+      }
+    }
+
+    var mgBlock = $("pt2MissingGroupBlock");
+    var mgHint = $("pt2MissingGroupHint");
+    var mgMode = $("pt2MissingGroupMode");
+    if (mgBlock && mgMode) {
+      var avail = groupAvailability();
+      var showMg = !!state.groupVar && avail.missing > 0;
+      mgBlock.style.display = showMg ? "" : "none";
+      mgMode.value = state.missingGroupMode;
+      if (mgHint && showMg) {
+        mgHint.textContent = "Group variable available for " + avail.valid + " of " + avail.total +
+          " records; " + avail.missing + " records are missing the group value.";
+      }
+    }
+  }
+
+  function applyPreviewZoom() {
+    var wrap = $("pt2PaperWrap");
+    var paper = wrap && wrap.querySelector(".pt2-paper");
+    if (!wrap || !paper) return;
+    var zoom = state.previewZoom;
+    wrap.classList.toggle("fit-width", zoom === "fit");
+    if (zoom === "fit") {
+      paper.style.transform = "none";
+      paper.style.width = "100%";
+      paper.style.maxWidth = "none";
+    } else {
+      paper.style.maxWidth = "";
+      paper.style.width = "";
+      paper.style.transform = "scale(" + (Number(zoom) / 100) + ")";
+    }
+    document.querySelectorAll(".pt2-zoom-bar [data-zoom]").forEach(function (btn) {
+      btn.classList.toggle("active", String(btn.getAttribute("data-zoom")) === String(zoom));
+    });
   }
 
   function syncControlsFromState() {
@@ -1308,6 +1558,7 @@
     $("pt2CompleteCase").checked = state.completeCase;
     $("pt2ShowMissingCat").checked = state.showMissingCategory;
     $("pt2MissingLabel").value = state.missingLabel;
+    syncStructureHints();
 
     $("pt2TableNumber").value = state.report.tableNumber;
     $("pt2Title").value = state.report.title;
@@ -1339,6 +1590,16 @@
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") close(); });
   }
 
+  function wireCategoryEditor() {
+    var overlay = $("pt2CatEditOverlay");
+    if (!overlay) return;
+    function close() { overlay.classList.remove("open"); catEditKey = null; }
+    $("pt2CatEditCloseBtn").addEventListener("click", close);
+    $("pt2CatEditCancelBtn").addEventListener("click", close);
+    $("pt2CatEditApplyBtn").addEventListener("click", applyCategoryEditor);
+    overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
+  }
+
   function wireTabs() {
     var btns = document.querySelectorAll(".pt2-tab-btn");
     btns.forEach(function (btn) {
@@ -1365,7 +1626,11 @@
         renderAll();
       });
     });
-    $("pt2GroupVar").addEventListener("change", function (e) { state.groupVar = e.target.value; renderAll(); });
+    $("pt2GroupVar").addEventListener("change", function (e) {
+      applyGroupVarSelection(e.target.value);
+      syncControlsFromState();
+      renderAll();
+    });
     $("pt2StratVar").addEventListener("change", function (e) { state.stratVar = e.target.value; renderAll(); });
     $("pt2WeightVar").addEventListener("change", function (e) { state.weightVar = e.target.value; renderAll(); });
     $("pt2ShowOverall").addEventListener("change", function (e) { state.showOverall = e.target.checked; renderAll(); });
@@ -1374,6 +1639,8 @@
     $("pt2CompleteCase").addEventListener("change", function (e) { state.completeCase = e.target.checked; renderAll(); });
     $("pt2ShowMissingCat").addEventListener("change", function (e) { state.showMissingCategory = e.target.checked; renderAll(); });
     $("pt2MissingLabel").addEventListener("input", function (e) { state.missingLabel = e.target.value; renderPreview(); });
+    var mgMode = $("pt2MissingGroupMode");
+    if (mgMode) mgMode.addEventListener("change", function (e) { state.missingGroupMode = e.target.value; renderAll(); });
   }
 
   function wirePreviewControls() {
@@ -1402,6 +1669,13 @@
     $("pt2CustomFont").addEventListener("change", function (e) { state.report.custom.font = e.target.value; renderPreview(); });
     $("pt2CustomDensity").addEventListener("change", function (e) { state.report.custom.density = e.target.value; renderPreview(); });
     $("pt2CustomHeaderStyle").addEventListener("change", function (e) { state.report.custom.headerStyle = e.target.value; renderPreview(); });
+    document.querySelectorAll(".pt2-zoom-bar [data-zoom]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var z = btn.getAttribute("data-zoom");
+        state.previewZoom = z === "fit" ? "fit" : parseInt(z, 10) || 100;
+        applyPreviewZoom();
+      });
+    });
   }
 
   /* ═══════════════════════════ 8b. LOAD THE CURRENTLY SELECTED RANGE ═══════════════════════════
@@ -1575,6 +1849,7 @@
     wireExportControls();
     wireVarGridDragDrop();
     wireTypeHelpModal();
+    wireCategoryEditor();
     syncControlsFromState();
     renderAll();
 

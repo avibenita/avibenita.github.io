@@ -1580,17 +1580,171 @@
     $("pt2CustomExtra").classList.toggle("visible", state.report.stylePreset === "custom");
   }
 
-  function wireTypeHelpModal() {
-    var overlay = $("pt2TypeHelpOverlay");
-    var openBtn = $("pt2TypeHelpBtn");
-    var closeBtn = $("pt2TypeHelpCloseBtn");
-    if (!overlay || !openBtn) return;
-    function open() { overlay.classList.add("open"); }
+  function helpItem(title, bodyHtml) {
+    return '<div class="pt2-help-item"><h4>' + title + "</h4><p>" + bodyHtml + "</p></div>";
+  }
+
+  var PANEL_HELP = {
+    "table-type": {
+      title: "Table Type",
+      icon: "fa-shapes",
+      html:
+        helpItem("Descriptive Summary",
+          "A single-column overview of every selected variable — no grouping or comparison. Continuous variables show a summary statistic (mean \u00B1 SD, median, etc.); categorical variables show category counts and percentages.") +
+        helpItem("Frequency Distribution",
+          "Counts and percentages for categorical / ordinal / binary variables only. Continuous variables are hidden unless you override their type in Configure.") +
+        helpItem("Baseline Characteristics — Table 1",
+          "The classic clinical Table 1: an Overall column plus one column per group level, with optional P values and standardized differences (SMD) to describe balance between groups.") +
+        helpItem("Group Comparison",
+          "Like Table 1, but focused on between-group differences — Overall is off by default so attention stays on how groups differ.") +
+        helpItem("Switching types",
+          "Changing the table type resets grouping / comparison defaults (group variable, Overall, P value, SMD). Your per-variable settings (include, labels, formats) are kept.")
+    },
+    structure: {
+      title: "Structure",
+      icon: "fa-diagram-project",
+      html:
+        helpItem("Group variable",
+          "Splits the table into columns — one for each level of this categorical variable (e.g. treatment arm, sex). The group variable is automatically removed from the table body so it is not summarized as a row; you can override that in the Variables list.") +
+        helpItem("Stratification variable",
+          "Optional second split. When set, the table is repeated within each stratum (e.g. Region: North, Region: South), each with its own block of columns.") +
+        helpItem("Weight variable",
+          "Optional sampling or analysis weight. Continuous summaries become weighted means / medians; categorical percentages use weighted counts. Column headers still show the unweighted N.") +
+        helpItem("Show Overall column",
+          "Adds a combined column across all groups. Usually on for Table 1; often off for Group Comparison.") +
+        helpItem("Show P value column",
+          "Adds a column with the automatic group test for each row. Available when at least two valid group levels exist. Continuous variables use Welch\u2019s t-test (2 groups) or one-way ANOVA (3+); categorical variables use the chi-square test.") +
+        helpItem("Show standardized difference (SMD)",
+          "Adds an absolute standardized mean difference column. Enabled only for two-group comparisons in this version (multi-group SMD is ambiguous as a single number). Values above about 0.1 often suggest meaningful imbalance.")
+    },
+    missing: {
+      title: "Missing Data",
+      icon: "fa-circle-question",
+      html:
+        helpItem("Use a common analysis sample for all rows",
+          "When on, any record missing at least one displayed variable is dropped from the whole table, so every row shares the same N. When off (default), each row uses all observations available for that variable — the usual approach for Table 1.") +
+        helpItem("Show \"Missing\" as its own category",
+          "Default rule for categorical variables: if any values are blank, a Missing row is added under that variable. Per-variable Configure can override this (inherit / show as category / exclude).") +
+        helpItem("Missing-category label",
+          "The text used for that Missing row (default: Missing). Change it for another language or journal style.") +
+        helpItem("Records missing the group variable",
+          "Appears only when some rows lack the group value. <strong>Include in Overall only</strong> (default) keeps them in Overall but out of group columns. <strong>Exclude from the entire table</strong> drops them everywhere. <strong>Add a Missing group column</strong> shows them as their own column. The preview note reports how many records were affected.")
+    },
+    variables: {
+      title: "Variables to Summarize",
+      icon: "fa-list-check",
+      html:
+        helpItem("Row order (# and drag handle)",
+          "The number is the row position in the published table. Drag the grip handle to reorder. Variables that are not included show an em dash instead of a number.") +
+        helpItem("Include",
+          "Checked variables appear in the table. The group / stratification / weight variables are omitted from the body by default; for the group variable you can re-check Include to force it back in as a row.") +
+        helpItem("Variable (display label)",
+          "Editable publication label. Excel names like Analytical_Thinking are cleaned automatically to Analytical thinking. Hover the field to see the original column name.") +
+        helpItem("Summary",
+          "Shows detected type, current summary format, and decimals at a glance.") +
+        helpItem("Configure",
+          "Opens advanced settings for that variable: <strong>Type override</strong> (force continuous / categorical / ordinal / binary), <strong>Summary format</strong> (Mean \u00B1 SD, Median (Q1, Q3), n (%), etc.), <strong>Decimals</strong>, <strong>Missing rule</strong>, and for categorical variables an <strong>Edit categories</strong> dialog to rename, reorder, or hide levels.") +
+        helpItem("Category editor",
+          "Each level has: Include (hide empty or unwanted levels), Original value (linked to the data), Display label (what readers see), and Order (up / down). Prefer this over typing comma-separated codes.")
+    },
+    caption: {
+      title: "Caption &amp; Notes",
+      icon: "fa-heading",
+      html:
+        helpItem("Table number",
+          "Printed as \u201CTable N.\u201D above the title. Use the same numbering as your manuscript.") +
+        helpItem("Title",
+          "Main caption under the table number. Switching table type may refresh the default title if you have not customized it.") +
+        helpItem("Subtitle",
+          "Optional second line (population, time point, or data source).") +
+        helpItem("Notes",
+          "Footnote under the table. Leave blank to use the auto-generated methods note (summary formats, tests, missing-group handling, N). Type your own text to replace it entirely.") +
+        helpItem("Abbreviations",
+          "Second footnote line for expansions (SD, SMD, BMI, \u2026). With Excel data this is built from terms that actually appear in the table; edit freely for your journal.")
+    },
+    style: {
+      title: "Style &amp; Formatting",
+      icon: "fa-swatchbook",
+      html:
+        helpItem("Style preset",
+          "<strong>Clinical Table 1</strong> — Times, bold caption, horizontal rules. <strong>APA descriptive</strong> — italic title. <strong>Journal minimal</strong> — shaded header, leading zero in p-values. <strong>Compact report</strong> — denser Arial layout. <strong>Custom</strong> — unlocks the extra options below.") +
+        helpItem("Default decimals / % decimals",
+          "Defaults for continuous values and percentages. Click <strong>Apply to all variables</strong> to push these into every variable\u2019s Decimals setting; individual Configure values can still differ afterward.") +
+        helpItem("Custom options",
+          "Italic title, bold caption label, leading zero in p-values (0.05 vs .05), serif vs sans font, row density, and header style (rule vs shaded).") +
+        helpItem("Preview zoom",
+          "Use 75% / 100% / 125% / Fit width above the manuscript page to inspect wide grouped tables.")
+    },
+    export: {
+      title: "Copy &amp; Export",
+      icon: "fa-share-nodes",
+      html:
+        helpItem("Copy as Text",
+          "Tab-delimited plain text (characteristics and columns separated by tabs). Best for pasting into plain editors or regenerating a table elsewhere.") +
+        helpItem("Copy Table",
+          "Formatted HTML table placed on the clipboard for rich paste into Word, Outlook, or Google Docs — this is usually what you want for the manuscript.") +
+        helpItem("Copy as HTML",
+          "Raw HTML source as plain text, for embedding in a webpage or inspecting markup.") +
+        helpItem("Export to Excel / Word",
+          "Downloads an .xls or .doc file wrapping the HTML table so Excel / Word can open it. Formatting is preserved as far as those formats allow; for final production many journals still prefer Copy Table into a native Word table.")
+    },
+    methods: {
+      title: "Methods",
+      icon: "fa-book-open",
+      html:
+        helpItem("What this panel shows",
+          "A prose summary of the analysis decisions currently driving the table: how continuous and categorical variables are presented, which tests are used, weighting, missing-data policy, and N. It updates live as you change Build options.") +
+        helpItem("How to use it",
+          "Copy into your manuscript Methods or table footnote, or leave the Preview Notes field blank so a similar auto-note is printed under the table.")
+    },
+    audit: {
+      title: "Per-Variable Test Audit",
+      icon: "fa-flask",
+      html:
+        helpItem("Purpose",
+          "A diagnostic view of every summarized row: the type used, the test name, the test statistic, degrees of freedom, P value, and SMD (when applicable). Use it to verify that automatic test selection matches your analysis plan.") +
+        helpItem("Reading the columns",
+          "<strong>Statistic</strong> is t, F, or \u03C7\u00B2 depending on the test. <strong>df</strong> is Welch\u2019s approximate degrees of freedom (2 decimals), ANOVA df as \u201Cbetween, within\u201D, or chi-square df. <strong>SMD</strong> is blank when not shown or not defined (e.g. more than two groups).")
+    },
+    dictionary: {
+      title: "Data Dictionary",
+      icon: "fa-database",
+      html:
+        helpItem("Purpose",
+          "Lists every column available from the current dataset (Excel range or demo), its role in the table, detected type, and categories or numeric range.") +
+        helpItem("Roles",
+          "<strong>Summarized</strong> — included in the table body. <strong>Available (not summarized)</strong> — present in the data but unchecked. <strong>Group / stratification / weight variable</strong> — used in Structure rather than as a body row.")
+    }
+  };
+
+  function wirePanelHelp() {
+    var overlay = $("pt2PanelHelpOverlay");
+    var titleEl = $("pt2PanelHelpTitle");
+    var bodyEl = $("pt2PanelHelpBody");
+    var iconEl = $("pt2PanelHelpIcon");
+    var closeBtn = $("pt2PanelHelpCloseBtn");
+    if (!overlay || !bodyEl) return;
     function close() { overlay.classList.remove("open"); }
-    openBtn.addEventListener("click", open);
-    closeBtn.addEventListener("click", close);
+    function openTopic(topic) {
+      var help = PANEL_HELP[topic];
+      if (!help) return;
+      titleEl.textContent = help.title;
+      bodyEl.innerHTML = help.html;
+      if (iconEl) iconEl.className = "fa-solid " + (help.icon || "fa-circle-info");
+      overlay.classList.add("open");
+    }
+    document.querySelectorAll(".pt2-help-btn[data-help]").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        openTopic(btn.getAttribute("data-help"));
+      });
+    });
+    if (closeBtn) closeBtn.addEventListener("click", close);
     overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
-    document.addEventListener("keydown", function (e) { if (e.key === "Escape") close(); });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && overlay.classList.contains("open")) close();
+    });
   }
 
   function wireCategoryEditor() {
@@ -1851,7 +2005,7 @@
     wirePreviewControls();
     wireExportControls();
     wireVarGridDragDrop();
-    wireTypeHelpModal();
+    wirePanelHelp();
     wireCategoryEditor();
     syncControlsFromState();
     renderAll();

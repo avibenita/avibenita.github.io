@@ -1707,8 +1707,10 @@
           "Formatted HTML table placed on the clipboard for rich paste into Word, Outlook, or Google Docs — this is usually what you want for the manuscript.") +
         helpItem("Copy as HTML",
           "Raw HTML source as plain text, for embedding in a webpage or inspecting markup.") +
-        helpItem("Export to Excel / Word",
-          "Downloads an .xls or .doc file wrapping the HTML table so Excel / Word can open it. Formatting is preserved as far as those formats allow; for final production many journals still prefer Copy Table into a native Word table.")
+        helpItem("View as HTML table",
+          "Opens a full viewer of the table as styled HTML. Choose a theme (Manuscript, Journal, Compact, Striped, Slate), then Copy, Download HTML, Print, or export to Word from that view.") +
+        helpItem("Export to Word",
+          "Downloads a Word-compatible .doc file wrapping the HTML table. For final production many journals still prefer Copy Table into a native Word table.")
     },
     methods: {
       title: "Methods",
@@ -1985,6 +1987,201 @@
     return "<html " + xmlns + "><head><meta charset='utf-8'><title>Publication Table</title></head><body>" + bodyHtml + "</body></html>";
   }
 
+  var HTML_VIEW_THEMES = {
+    manuscript: {
+      label: "Manuscript",
+      font: "'Times New Roman', Times, serif",
+      pageBg: "#ffffff", text: "#111", muted: "#333",
+      border: "#111", headerBg: "transparent", headerBorder: "1.5px solid #111",
+      rowBorder: "none", stripe: "transparent", accent: "#111",
+      captionWeight: "700", titleItalic: false, density: "normal"
+    },
+    journal: {
+      label: "Journal",
+      font: "Georgia, 'Times New Roman', serif",
+      pageBg: "#ffffff", text: "#1a1a1a", muted: "#444",
+      border: "#333", headerBg: "#f0f0f0", headerBorder: "1px solid #333",
+      rowBorder: "1px solid #e5e5e5", stripe: "transparent", accent: "#1a1a1a",
+      captionWeight: "400", titleItalic: false, density: "normal"
+    },
+    compact: {
+      label: "Compact",
+      font: "Arial, Helvetica, sans-serif",
+      pageBg: "#ffffff", text: "#111", muted: "#444",
+      border: "#222", headerBg: "transparent", headerBorder: "1px solid #222",
+      rowBorder: "1px solid #eee", stripe: "transparent", accent: "#222",
+      captionWeight: "700", titleItalic: false, density: "compact"
+    },
+    striped: {
+      label: "Striped",
+      font: "Segoe UI, Arial, sans-serif",
+      pageBg: "#ffffff", text: "#0f172a", muted: "#475569",
+      border: "#cbd5e1", headerBg: "#0f766e", headerBorder: "none",
+      rowBorder: "1px solid #e2e8f0", stripe: "#f0fdfa", accent: "#0f766e",
+      captionWeight: "700", titleItalic: false, density: "normal", headerColor: "#ffffff"
+    },
+    slate: {
+      label: "Slate",
+      font: "Segoe UI, Arial, sans-serif",
+      pageBg: "#ffffff", text: "#0f172a", muted: "#475569",
+      border: "#334155", headerBg: "#1e293b", headerBorder: "none",
+      rowBorder: "1px solid #e2e8f0", stripe: "#f8fafc", accent: "#334155",
+      captionWeight: "700", titleItalic: false, density: "normal", headerColor: "#f8fafc"
+    }
+  };
+
+  var htmlViewerTheme = "manuscript";
+
+  function renderThemedHtmlDocument(themeId, model) {
+    var th = HTML_VIEW_THEMES[themeId] || HTML_VIEW_THEMES.manuscript;
+    var rowPad = th.density === "compact" ? "4px 8px" : "8px 12px";
+    var fontSize = th.density === "compact" ? "12px" : "13.5px";
+    var headerColor = th.headerColor || th.text;
+    var showTest = state.showPValue;
+    var showSmdCol = state.showSMD;
+    var m = model || buildModel();
+
+    var css =
+      "body{margin:0;padding:24px;background:#f1f5f9;color:" + th.text + ";font-family:" + th.font + ";}" +
+      ".page{max-width:860px;margin:0 auto;background:" + th.pageBg + ";padding:28px 32px;box-shadow:0 4px 24px rgba(15,23,42,.08);}" +
+      ".caption{font-weight:" + th.captionWeight + ";font-size:13px;margin-bottom:2px;}" +
+      ".title{font-size:15px;margin-bottom:6px;font-weight:600;" + (th.titleItalic ? "font-style:italic;" : "") + "}" +
+      ".subtitle{font-size:12.5px;color:" + th.muted + ";margin-bottom:14px;}" +
+      "table{width:100%;border-collapse:collapse;font-size:" + fontSize + ";border-top:2px solid " + th.border + ";border-bottom:2px solid " + th.border + ";}" +
+      "th{text-align:center;padding:" + rowPad + ";border-bottom:" + th.headerBorder + ";background:" + th.headerBg + ";color:" + headerColor + ";font-weight:700;}" +
+      "th:first-child,td:first-child{text-align:left;}" +
+      "td{padding:" + rowPad + ";text-align:center;border-bottom:" + th.rowBorder + ";color:" + th.text + ";}" +
+      "tbody tr:nth-child(even) td{background:" + th.stripe + ";}" +
+      ".varhead{font-weight:600;text-align:left;}" +
+      ".cat{padding-left:1.4em;text-align:left;}" +
+      ".note{font-size:11px;margin-top:12px;line-height:1.55;color:" + th.muted + ";padding-left:1.2em;text-indent:-1.2em;}" +
+      "@media print{body{background:#fff;padding:0;}.page{box-shadow:none;max-width:none;}}";
+
+    var body = '<div class="page">';
+    body += '<div class="caption">Table ' + esc(state.report.tableNumber) + ".</div>";
+    body += '<div class="title">' + esc(state.report.title) + "</div>";
+    body += state.report.subtitle ? '<div class="subtitle">' + esc(state.report.subtitle) + "</div>" : "";
+
+    m.strata.forEach(function (stratum, sIdx) {
+      if (stratum.label) body += '<div style="font-weight:700;font-size:12.5px;margin:' + (sIdx ? "16px" : "0") + ' 0 6px;">' + esc(stratum.label) + "</div>";
+      var block = stratum.block;
+      var hasTest = showTest && block.rows.some(function (r) { return r.test; });
+      var hasSmd = showSmdCol && block.rows.some(function (r) { return r.smd != null && isFinite(r.smd); });
+      body += "<table><thead><tr><th>Characteristic</th>";
+      block.columns.forEach(function (col) {
+        body += "<th>" + esc(col.label) + "<br><span style=\"font-weight:400;font-size:.82em;\">(N=" + block.columnN[col.key] + ")</span></th>";
+      });
+      if (hasTest) body += "<th>P value</th>";
+      if (hasSmd) body += "<th>SMD</th>";
+      body += "</tr></thead><tbody>";
+      block.rows.forEach(function (row) {
+        if (row.type === "continuous") {
+          body += "<tr><td>" + esc(row.label) + "</td>";
+          row.cells.forEach(function (c) { body += "<td>" + esc(c) + "</td>"; });
+          if (hasTest) body += "<td>" + (row.test ? fmtP(row.test.p, { pLeadingZero: true }) : "\u2014") + "</td>";
+          if (hasSmd) body += "<td>" + (row.smd != null && isFinite(row.smd) ? Math.abs(row.smd).toFixed(2) : "\u2014") + "</td>";
+          body += "</tr>";
+        } else {
+          var colspan = 1 + block.columns.length + (hasTest ? 1 : 0) + (hasSmd ? 1 : 0);
+          body += '<tr><td class="varhead" colspan="' + colspan + '">' + esc(row.label) + "</td></tr>";
+          row.categoryRows.forEach(function (cr, idx) {
+            body += '<tr><td class="cat">' + esc(cr.catLabel) + "</td>";
+            cr.cells.forEach(function (c) { body += "<td>" + esc(c) + "</td>"; });
+            if (hasTest) body += "<td>" + (idx === 0 && row.test ? fmtP(row.test.p, { pLeadingZero: true }) : "") + "</td>";
+            if (hasSmd) body += "<td>" + (idx === 0 && row.smd != null && isFinite(row.smd) ? Math.abs(row.smd).toFixed(2) : "") + "</td>";
+            body += "</tr>";
+          });
+        }
+      });
+      body += "</tbody></table>";
+    });
+
+    var noteLines = [state.report.notes ? state.report.notes : autoNoteText()];
+    if (state.report.abbreviations) noteLines.push(state.report.abbreviations);
+    body += '<div class="note">' + noteLines.map(esc).join("<br>") + "</div></div>";
+
+    return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Publication Table</title><style>" + css + "</style></head><body>" + body + "</body></html>";
+  }
+
+  function renderHtmlViewerFrame() {
+    var frame = $("pt2HtmlViewerFrame");
+    if (!frame) return;
+    var th = HTML_VIEW_THEMES[htmlViewerTheme] || HTML_VIEW_THEMES.manuscript;
+    var doc = renderThemedHtmlDocument(htmlViewerTheme, buildModel());
+    var match = doc.match(/<div class="page">([\s\S]*)<\/div>\s*<\/body>/i);
+    var pageInner = match ? match[1] : "";
+    var rowPad = th.density === "compact" ? "4px 8px" : "8px 12px";
+    var fontSize = th.density === "compact" ? "12px" : "13.5px";
+    var headerColor = th.headerColor || th.text;
+    var css =
+      "#pt2HtmlViewerFrame{font-family:" + th.font + ";color:" + th.text + ";background:" + th.pageBg + ";}" +
+      "#pt2HtmlViewerFrame .caption{font-weight:" + th.captionWeight + ";font-size:13px;margin-bottom:2px;}" +
+      "#pt2HtmlViewerFrame .title{font-size:15px;margin-bottom:6px;font-weight:600;" + (th.titleItalic ? "font-style:italic;" : "") + "}" +
+      "#pt2HtmlViewerFrame .subtitle{font-size:12.5px;color:" + th.muted + ";margin-bottom:14px;}" +
+      "#pt2HtmlViewerFrame table{width:100%;border-collapse:collapse;font-size:" + fontSize + ";border-top:2px solid " + th.border + ";border-bottom:2px solid " + th.border + ";}" +
+      "#pt2HtmlViewerFrame th{text-align:center;padding:" + rowPad + ";border-bottom:" + th.headerBorder + ";background:" + th.headerBg + ";color:" + headerColor + ";font-weight:700;}" +
+      "#pt2HtmlViewerFrame th:first-child,#pt2HtmlViewerFrame td:first-child{text-align:left;}" +
+      "#pt2HtmlViewerFrame td{padding:" + rowPad + ";text-align:center;border-bottom:" + th.rowBorder + ";}" +
+      "#pt2HtmlViewerFrame tbody tr:nth-child(even) td{background:" + th.stripe + ";}" +
+      "#pt2HtmlViewerFrame .varhead{font-weight:600;text-align:left;}" +
+      "#pt2HtmlViewerFrame .cat{padding-left:1.4em;text-align:left;}" +
+      "#pt2HtmlViewerFrame .note{font-size:11px;margin-top:12px;line-height:1.55;color:" + th.muted + ";padding-left:1.2em;text-indent:-1.2em;}";
+    frame.innerHTML = "<style>" + css + "</style>" + pageInner;
+  }
+
+  function openHtmlViewer() {
+    var overlay = $("pt2HtmlViewerOverlay");
+    var themeSel = $("pt2HtmlTheme");
+    if (!overlay) return;
+    if (themeSel) themeSel.value = htmlViewerTheme;
+    renderHtmlViewerFrame();
+    overlay.classList.add("open");
+  }
+
+  function wireHtmlViewer() {
+    var overlay = $("pt2HtmlViewerOverlay");
+    if (!overlay) return;
+    function close() { overlay.classList.remove("open"); }
+    var openBtn = $("pt2ViewHtmlBtn");
+    if (openBtn) openBtn.addEventListener("click", openHtmlViewer);
+    var closeBtn = $("pt2HtmlViewerCloseBtn");
+    if (closeBtn) closeBtn.addEventListener("click", close);
+    overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
+    var themeSel = $("pt2HtmlTheme");
+    if (themeSel) themeSel.addEventListener("change", function () {
+      htmlViewerTheme = themeSel.value;
+      renderHtmlViewerFrame();
+    });
+    $("pt2HtmlCopyBtn").addEventListener("click", function () {
+      var doc = renderThemedHtmlDocument(htmlViewerTheme, buildModel());
+      var match = doc.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+      var fragment = match ? match[1] : doc;
+      copyHtmlToClipboard(fragment, buildPlainTextExport(buildModel()));
+      flashButton($("pt2HtmlCopyBtn"), "Copied");
+    });
+    $("pt2HtmlDownloadBtn").addEventListener("click", function () {
+      var doc = renderThemedHtmlDocument(htmlViewerTheme, buildModel());
+      downloadBlob(doc, "text/html;charset=utf-8", "publication-table.html");
+      flashButton($("pt2HtmlDownloadBtn"), "Downloaded");
+    });
+    $("pt2HtmlPrintBtn").addEventListener("click", function () {
+      var doc = renderThemedHtmlDocument(htmlViewerTheme, buildModel());
+      var w = window.open("", "_blank");
+      if (!w) return;
+      w.document.open();
+      w.document.write(doc);
+      w.document.close();
+      setTimeout(function () { try { w.focus(); w.print(); } catch (e) {} }, 250);
+    });
+    $("pt2HtmlWordBtn").addEventListener("click", function () {
+      var doc = renderThemedHtmlDocument(htmlViewerTheme, buildModel());
+      var match = doc.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+      var fragment = match ? match[1] : doc;
+      downloadBlob(officeWrapper(fragment, "word"), "application/msword", "publication-table.doc");
+      flashButton($("pt2HtmlWordBtn"), "Exported");
+    });
+  }
+
   function wireExportControls() {
     $("pt2CopyTextBtn").addEventListener("click", function () {
       var text = buildPlainTextExport(buildModel());
@@ -2003,11 +2200,7 @@
       copyPlainText(pretty);
       flashButton($("pt2CopySourceBtn"), "Copied");
     });
-    $("pt2ExportExcelBtn").addEventListener("click", function () {
-      var html = renderModelHtml(buildModel());
-      downloadBlob(officeWrapper(html, "excel"), "application/vnd.ms-excel", "publication-table.xls");
-      flashButton($("pt2ExportExcelBtn"), "Exported");
-    });
+    wireHtmlViewer();
     $("pt2ExportWordBtn").addEventListener("click", function () {
       var html = renderModelHtml(buildModel());
       downloadBlob(officeWrapper(html, "word"), "application/msword", "publication-table.doc");

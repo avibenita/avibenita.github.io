@@ -439,6 +439,9 @@
     // and none survived the switch.
     var td = TABLE_TYPE_DEFAULTS[state.tableType];
     if (td && td.wantsGroup && !state.groupVar) state.groupVar = pickFallbackGroupVar(td.preferredGroupKey);
+
+    // Drop demo-only caption/abbreviation leftovers when the real range loads.
+    syncReportDefaultsForSource(kind);
   }
 
   /* ═══════════════════════════ 5. APP STATE ═══════════════════════════ */
@@ -515,14 +518,16 @@
       title: "Baseline Characteristics of Study Participants",
       subtitle: "",
       notes: "",
-      abbreviations: "BMI, body mass index; BP, blood pressure; eGFR, estimated glomerular filtration rate; LDL, low-density lipoprotein; SD, standard deviation; SMD, standardized mean difference.",
+      abbreviations: "",
       stylePreset: "clinical",
       decimals: 1,
       percentDecimals: 1,
       custom: { italicTitle: false, captionBold: true, font: "serif", density: "normal", headerStyle: "rule", pLeadingZero: false, indentEm: 1.4 }
     }
   };
+  var DEMO_ABBREVIATIONS = "BMI, body mass index; BP, blood pressure; eGFR, estimated glomerular filtration rate; LDL, low-density lipoprotein; SD, standard deviation; SMD, standardized mean difference.";
   var lastAppliedDefaultTitle = state.report.title;
+  var lastAppliedDefaultAbbrev = "";
 
   /* Populate varOrder/varCfg/VAR_DEFS_BY_KEY for the initial demo dataset;
      wireHostMessaging() may swap this out for the currently selected Excel
@@ -535,6 +540,53 @@
     return GROUP_VAR_DEFS.length ? GROUP_VAR_DEFS[0].key : "";
   }
 
+  /* Abbreviations that actually appear in the current table — never the
+     leftover clinical glossary from the demo dataset. */
+  function buildContextAbbreviations() {
+    var labelBlob = eligibleVarDefs().map(function (v) {
+      return (state.varCfg[v.key] && state.varCfg[v.key].label) || v.label || "";
+    }).join(" ") + " " + (state.report.title || "");
+    var contFormats = {};
+    eligibleVarDefs().forEach(function (v) {
+      var cfg = state.varCfg[v.key];
+      if (effectiveType(v, cfg) === "continuous") contFormats[cfg.format] = true;
+    });
+    var known = [
+      { abbr: "BMI", expand: "body mass index" },
+      { abbr: "BP", expand: "blood pressure" },
+      { abbr: "eGFR", expand: "estimated glomerular filtration rate" },
+      { abbr: "LDL", expand: "low-density lipoprotein" },
+      { abbr: "IQR", expand: "interquartile range" },
+      { abbr: "SD", expand: "standard deviation" },
+      { abbr: "SMD", expand: "standardized mean difference" }
+    ];
+    var parts = [];
+    known.forEach(function (item) {
+      var inLabels = new RegExp("\\b" + item.abbr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i").test(labelBlob);
+      var inFormats = false;
+      if (item.abbr === "SD") inFormats = !!(contFormats["mean-sd"] || contFormats["mean-sd-paren"]);
+      if (item.abbr === "IQR") inFormats = !!(contFormats["median-iqr-paren"] || contFormats["median-iqr-bracket"]);
+      if (item.abbr === "SMD") inFormats = !!(state.showSMD && state.groupVar);
+      if (inLabels || inFormats) parts.push(item.abbr + ", " + item.expand);
+    });
+    return parts.length ? parts.join("; ") + "." : "";
+  }
+
+  function syncReportDefaultsForSource(kind) {
+    var nextTitle = kind === "demo"
+      ? (TABLE_TYPE_DEFAULTS[state.tableType] || TABLE_TYPE_DEFAULTS.table1).title
+      : "Summary of Study Variables";
+    if (!state.report.title || state.report.title === lastAppliedDefaultTitle) {
+      state.report.title = nextTitle;
+      lastAppliedDefaultTitle = nextTitle;
+    }
+    var nextAbbrev = kind === "demo" ? DEMO_ABBREVIATIONS : buildContextAbbreviations();
+    if (!state.report.abbreviations || state.report.abbreviations === lastAppliedDefaultAbbrev || state.report.abbreviations === DEMO_ABBREVIATIONS) {
+      state.report.abbreviations = nextAbbrev;
+      lastAppliedDefaultAbbrev = nextAbbrev;
+    }
+  }
+
   function applyTableTypeDefaults(type) {
     var d = TABLE_TYPE_DEFAULTS[type];
     state.groupVar = d.wantsGroup ? pickFallbackGroupVar(d.preferredGroupKey) : "";
@@ -542,8 +594,15 @@
     state.showPValue = d.showPValue;
     state.showSMD = d.showSMD;
     if (!state.report.title || state.report.title === lastAppliedDefaultTitle) {
-      state.report.title = d.title;
-      lastAppliedDefaultTitle = d.title;
+      state.report.title = state.dataSource === "excel" ? "Summary of Study Variables" : d.title;
+      lastAppliedDefaultTitle = state.report.title;
+    }
+    if (state.dataSource === "excel") {
+      var nextAbbrev = buildContextAbbreviations();
+      if (!state.report.abbreviations || state.report.abbreviations === lastAppliedDefaultAbbrev || state.report.abbreviations === DEMO_ABBREVIATIONS) {
+        state.report.abbreviations = nextAbbrev;
+        lastAppliedDefaultAbbrev = nextAbbrev;
+      }
     }
   }
 
@@ -794,27 +853,40 @@
 
   function autoNoteText() {
     var contFormats = {}, catFormats = {};
+    var hasContinuous = false, hasCategorical = false;
     eligibleVarDefs().forEach(function (v) {
       var cfg = state.varCfg[v.key], t = effectiveType(v, cfg);
-      if (t === "continuous") contFormats[cfg.format] = true; else catFormats[cfg.format] = true;
+      if (t === "continuous") { hasContinuous = true; contFormats[cfg.format] = true; }
+      else { hasCategorical = true; catFormats[cfg.format] = true; }
     });
     var cParts = [];
     if (contFormats["mean-sd"] || contFormats["mean-sd-paren"]) cParts.push("mean \u00B1 SD");
     if (contFormats["median-iqr-paren"] || contFormats["median-iqr-bracket"]) cParts.push("median (IQR)");
     if (contFormats["median-minmax"] || contFormats.range) cParts.push("median (range)");
     var pieces = [];
-    if (cParts.length) pieces.push("Continuous variables are presented as " + cParts.join(" or ") + ".");
-    if (Object.keys(catFormats).length) pieces.push("Categorical variables are presented as n (%) unless otherwise noted.");
-    if (state.groupVar) {
+    if (hasContinuous && cParts.length) pieces.push("Continuous variables are presented as " + cParts.join(" or ") + ".");
+    if (hasCategorical) pieces.push("Categorical variables are presented as n (%) unless otherwise noted.");
+    if (state.groupVar && state.showPValue && (hasContinuous || hasCategorical)) {
       var levels = countGroupLevels();
-      pieces.push(levels === 2
-        ? "Group comparisons used Welch's t-test for continuous variables and the chi-square test for categorical variables."
-        : "Group comparisons used one-way ANOVA for continuous variables and the chi-square test for categorical variables.");
-      if (state.showSMD) pieces.push("SMD = standardized mean difference" + (levels > 2 ? " (maximum pairwise value shown)" : "") + "; values above 0.1 suggest meaningful imbalance.");
+      if (levels >= 2) {
+        if (hasContinuous && hasCategorical) {
+          pieces.push(levels === 2
+            ? "Group comparisons used Welch's t-test for continuous variables and the chi-square test for categorical variables."
+            : "Group comparisons used one-way ANOVA for continuous variables and the chi-square test for categorical variables.");
+        } else if (hasContinuous) {
+          pieces.push(levels === 2
+            ? "Group comparisons used Welch's t-test."
+            : "Group comparisons used one-way ANOVA.");
+        } else {
+          pieces.push("Group comparisons used the chi-square test.");
+        }
+        if (state.showSMD) {
+          pieces.push("SMD = standardized mean difference" + (levels > 2 ? " (maximum pairwise value shown)" : "") + "; values above 0.1 suggest meaningful imbalance.");
+        }
+      }
     }
     if (state.weightVar) pieces.push("Estimates are weighted; unweighted N is shown in each column header.");
-    if (state.completeCase) pieces.push("Analysis restricted to participants with complete data on all displayed variables.");
-    else if (state.showMissingCategory) pieces.push("Missing values are shown as a separate category where present.");
+    if (state.completeCase) pieces.push("Analysis restricted to cases with complete data on all displayed variables.");
     pieces.push("N = " + getWorkingRows().length + ".");
     return pieces.join(" ");
   }
@@ -1205,7 +1277,20 @@
     return "Demo dataset";
   }
 
+  function refreshDefaultAbbreviations() {
+    if (state.dataSource !== "excel") return;
+    if (state.report.abbreviations && state.report.abbreviations !== lastAppliedDefaultAbbrev && state.report.abbreviations !== DEMO_ABBREVIATIONS) return;
+    var next = buildContextAbbreviations();
+    if (next !== state.report.abbreviations) {
+      state.report.abbreviations = next;
+      lastAppliedDefaultAbbrev = next;
+      var el = $("pt2Abbrev");
+      if (el) el.value = next;
+    }
+  }
+
   function renderAll() {
+    refreshDefaultAbbreviations();
     renderVarGrid();
     renderPreview();
     if (state.tab === "details") renderDetails();

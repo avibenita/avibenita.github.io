@@ -729,16 +729,38 @@
     return rows;
   }
 
+  /* Group columns follow the group variable's category editor (Include /
+     Display label / Order). Unchecked levels are omitted as columns; those
+     rows still contribute to Overall when that column is shown. */
+  function groupLevelsForColumns() {
+    if (!state.groupVar) return [];
+    var gdef = GROUP_VAR_DEFS.filter(function (g) { return g.key === state.groupVar; })[0];
+    if (!gdef) return [];
+    var cfg = state.varCfg[state.groupVar];
+    var v = VAR_DEFS_BY_KEY[state.groupVar];
+    if (cfg && v) {
+      var meta = ensureCategoryMeta(v, cfg).slice().sort(function (a, b) { return a.order - b.order; });
+      var included = meta.filter(function (m) { return m.include !== false; });
+      if (included.length) {
+        return included.map(function (m) {
+          return { key: String(m.value), label: String(m.label != null && m.label !== "" ? m.label : m.value) };
+        });
+      }
+    }
+    return (gdef.categories || []).map(function (lv) {
+      return { key: String(lv), label: String(lv) };
+    });
+  }
+
   function getColumns() {
     var cols = [];
     if (state.showOverall || !state.groupVar) cols.push({ key: "__overall__", label: "Overall" });
     if (state.groupVar) {
-      var gdef = GROUP_VAR_DEFS.filter(function (g) { return g.key === state.groupVar; })[0];
-      if (gdef) {
-        gdef.categories.forEach(function (lv) { cols.push({ key: lv, label: String(lv), isGroup: true }); });
-        if (state.missingGroupMode === "missing-column" && groupAvailability().missing > 0) {
-          cols.push({ key: "__missing_group__", label: "Missing group", isGroup: true, isMissingGroup: true });
-        }
+      groupLevelsForColumns().forEach(function (lv) {
+        cols.push({ key: lv.key, label: lv.label, isGroup: true });
+      });
+      if (state.missingGroupMode === "missing-column" && groupAvailability().missing > 0) {
+        cols.push({ key: "__missing_group__", label: "Missing group", isGroup: true, isMissingGroup: true });
       }
     }
     return cols;
@@ -1605,7 +1627,7 @@
       icon: "fa-diagram-project",
       html:
         helpItem("Group variable",
-          "Splits the table into columns — one for each level of this categorical variable (e.g. treatment arm, sex). The group variable is automatically removed from the table body so it is not summarized as a row; you can override that in the Variables list.") +
+          "Splits the table into columns — one for each included level of this categorical variable (e.g. treatment arm, sex). Use <strong>Edit categories</strong> on that variable to hide a level (uncheck Include) or rename column headers. The group variable is automatically removed from the table body; you can override that in the Variables list.") +
         helpItem("Stratification variable",
           "Optional second split. When set, the table is repeated within each stratum (e.g. Region: North, Region: South), each with its own block of columns.") +
         helpItem("Weight variable",
@@ -1645,7 +1667,7 @@
         helpItem("Configure",
           "Opens advanced settings for that variable: <strong>Type override</strong> (force continuous / categorical / ordinal / binary), <strong>Summary format</strong> (Mean \u00B1 SD, Median (Q1, Q3), n (%), etc.), <strong>Decimals</strong>, <strong>Missing rule</strong>, and for categorical variables an <strong>Edit categories</strong> dialog to rename, reorder, or hide levels.") +
         helpItem("Category editor",
-          "Each level has: Include (hide empty or unwanted levels), Original value (linked to the data), Display label (what readers see), and Order (up / down). Prefer this over typing comma-separated codes.")
+          "Each level has: Include (hide empty or unwanted levels), Original value (linked to the data), Display label (what readers see), and Order (up / down). When the variable is also the group variable, Include controls which group columns appear in the table (not only body-row categories).")
     },
     caption: {
       title: "Caption &amp; Notes",

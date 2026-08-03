@@ -114,8 +114,8 @@ const TOOLS_CATEGORY_TILES = [
     sectionSubtitle: "Specialized modules using your selected Excel data",
     title: "Report Tables",
     icon: "fa-table-list",
-    accent: "#10b981",
-    accentDark: "#0f766e",
+    accent: "#eab308",
+    accentDark: "#a16207",
     color: "#eab308",
     colorDark: "#a16207",
     subtitle: "Publication-ready tables from your data",
@@ -128,8 +128,8 @@ const TOOLS_CATEGORY_TILES = [
     title: "Identify the Vital Few",
     icon: "fa-chart-column",
     iconSvg: '<svg viewBox="0 0 22 19" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" style="display:block"><rect x="0.5" y="5" width="4" height="13" fill="currentColor" opacity="0.9" rx="0.4"/><rect x="5.5" y="8.5" width="4" height="9.5" fill="currentColor" opacity="0.75" rx="0.4"/><rect x="10.5" y="12" width="4" height="6" fill="currentColor" opacity="0.6" rx="0.4"/><rect x="15.5" y="15" width="4" height="3" fill="currentColor" opacity="0.45" rx="0.4"/><path d="M 2.5 18 C 5 7, 12 2, 21 1.5" stroke="rgba(251,146,60,0.95)" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>',
-    accent: "#10b981",
-    accentDark: "#0f766e",
+    accent: "#eab308",
+    accentDark: "#a16207",
     color: "#f97316",
     colorDark: "#c2410c",
     subtitle: "Reveal the small number of contributors driving most outcomes.",
@@ -145,8 +145,8 @@ const TOOLS_CATEGORY_TILES = [
     id: "qc-family",
     title: "QC",
     icon: "fa-chart-line",
-    accent: "#10b981",
-    accentDark: "#0f766e",
+    accent: "#eab308",
+    accentDark: "#a16207",
     color: "#14b8a6",
     colorDark: "#0f766e",
     subtitle: "Quality control and process capability tools",
@@ -269,9 +269,9 @@ let HUB_CLUSTER_META = {
   }
 };
 let HUB_VISIBLE_CLUSTERS = ["analytics", "tools"];
-/* Active Range governs every card ahead of the first section divider. On the
-   Specialized Tools tab that's the Data-Driven Tools cluster (Report Tables,
-   Pareto, QC) — Calculators & Planning, after the divider, doesn't use it. */
+/* Active Range is shown on Specialized Tools parked under the Data-Driven
+   Tools section header (immediately above Report Tables). Calculators &
+   Planning, after the next divider, doesn't use it. */
 let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics", "tools"];
 let HUB_ADVISOR_VISIBLE_CLUSTERS = ["analytics"];
 let ACTIVE_CLUSTER = "analytics";
@@ -352,10 +352,34 @@ function renderModules(list) {
   if (noResults) noResults.style.display = list.length ? "none" : "block";
 }
 
+/* Park the Active Range bar under the Data-Driven Tools section header
+   (immediately above Report Tables) on the Specialized Tools tab; restore it
+   above the tile list on Statistical Analysis. Must run after every tile
+   re-render, and before wiping #categoryTiles (or the node is destroyed). */
+function placeHubRangeSection() {
+  var range = document.getElementById("hubRangeSection");
+  var holder = document.getElementById("categoryTiles");
+  if (!range || !holder || !holder.parentElement) return;
+  if (ACTIVE_CLUSTER === "tools") {
+    var firstTile = holder.querySelector(".category-tile");
+    if (firstTile) {
+      holder.insertBefore(range, firstTile);
+      return;
+    }
+  }
+  holder.parentElement.insertBefore(range, holder);
+}
+
 function renderCategoryTiles(query) {
   var holder = document.getElementById("categoryTiles");
   var noResults = document.getElementById("noResults");
   if (!holder) return;
+  var range = document.getElementById("hubRangeSection");
+  // Rescue the range node if a previous tools-tab render parked it inside
+  // #categoryTiles — innerHTML replacement would otherwise delete it.
+  if (range && holder.contains(range)) {
+    holder.parentElement.insertBefore(range, holder);
+  }
   HUB_ACTIONS = {};
   var source = HUB_CLUSTER_TILES[ACTIVE_CLUSTER] || [];
   var clusterMeta = HUB_CLUSTER_META[ACTIVE_CLUSTER] || HUB_CLUSTER_META.analytics;
@@ -370,9 +394,8 @@ function renderCategoryTiles(query) {
   });
   holder.innerHTML = list.map(function (c, idx) {
     // Most clusters use one flat accent for every card. A tile may opt out
-    // with its own accent/accentDark (e.g. the Specialized Tools tab's two
-    // sub-clusters — Data-Driven Tools in green vs. Calculators & Planning
-    // in the tab's usual peach/yellow).
+    // with its own accent/accentDark (e.g. yellow accents throughout the
+    // Specialized Tools tab).
     var color = c.accent || clusterColor;
     var colorDark = c.accentDark || clusterColorDark;
     var icon = c.icon || "fa-table-cells-large";
@@ -400,6 +423,7 @@ function renderCategoryTiles(query) {
     );
   }).join("");
   if (noResults) noResults.style.display = list.length ? "none" : "block";
+  placeHubRangeSection();
 }
 
 function getCategoryModules(category) {
@@ -596,6 +620,8 @@ function syncClusterHeader() {
   var showAdvisor = HUB_ADVISOR_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) >= 0;
   if (range) range.style.display = showRange ? "" : "none";
   if (advisor) advisor.style.display = showAdvisor ? "" : "none";
+  // Range placement is handled by renderCategoryTiles (called via filterModules
+  // after every cluster switch) so the node isn't parked against stale tiles.
 }
 
 function setHubCluster(clusterId) {
@@ -1248,11 +1274,28 @@ function openBuilderDialogFromHub(options) {
 /* ═══════════════════════════════════════════════════════════════════════════
    PUBLICATION TABLES — flow
    The builder is a single self-contained dialog (Build / Preview / Details
-   tabs, own demo dataset + stats engine) — no data hand-off from the host.
+   tabs, own demo dataset + stats engine). On open we push it the currently
+   selected Active Range (if any) so it can build the table from real data
+   instead of the built-in demo set; the builder falls back to the demo
+   dataset on its own if no usable range is selected.
    ═══════════════════════════════════════════════════════════════════════════ */
 function finishHubPublicationTablesFlow() {
   hubPublicationTablesFlowActive = false;
   if (!hubPublicationTablesResultsDialog) setSelectedModuleCard("publication-tables", false);
+}
+
+function sendPublicationTablesDataFromHub() {
+  if (!hubPublicationTablesResultsDialog) return;
+  var gr = getGlobalRangePayload();
+  if (!gr) return;
+  hubPublicationTablesResultsDialog.messageChild(JSON.stringify({
+    type: "PUBTABLES_DATA",
+    payload: {
+      headers: gr.values[0] || [],
+      rows: gr.values.slice(1),
+      address: gr.address || ""
+    }
+  }));
 }
 
 function openPublicationTablesConfigFromHub() {
@@ -1269,10 +1312,17 @@ function openPublicationTablesConfigFromHub() {
       }
       hubPublicationTablesResultsDialog = res.value;
       if (window.HubResultsBridge) HubResultsBridge.registerDialog(hubPublicationTablesResultsDialog);
+      // Same multi-shot pattern as Regression/ANOVA: the dialog's handler
+      // may not be registered on the first ready ping.
+      setTimeout(sendPublicationTablesDataFromHub, 550);
+      setTimeout(sendPublicationTablesDataFromHub, 1200);
+      setTimeout(sendPublicationTablesDataFromHub, 2000);
       hubPublicationTablesResultsDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
         try {
           var msg = JSON.parse(arg.message || "{}");
-          if (msg.action === "close") {
+          if (msg.action === "ready" || msg.action === "requestData" || msg.action === "refreshData") {
+            sendPublicationTablesDataFromHub();
+          } else if (msg.action === "close") {
             hubPublicationTablesResultsDialog.close();
             hubPublicationTablesResultsDialog = null;
             finishHubPublicationTablesFlow();

@@ -1428,11 +1428,14 @@
         var tr = document.createElement("tr");
         var label = (stratum.label ? stratum.label + " \u2013 " : "") + row.label;
         var stat = row.test ? fmtNum(row.test.stat, 2) : "\u2014";
-        var df = row.test ? row.test.df : "\u2014";
+        var df = "\u2014";
+        if (row.test && row.test.df != null) {
+          df = typeof row.test.df === "number" ? fmtNum(row.test.df, 2) : String(row.test.df);
+        }
         var p = row.test ? fmtP(row.test.p, { pLeadingZero: true }) : "\u2014";
         var testName = row.test ? row.test.name : "\u2014";
         var smd = row.smd != null && isFinite(row.smd) ? Math.abs(row.smd).toFixed(2) : "\u2014";
-        tr.innerHTML = "<td>" + esc(label) + "</td><td>" + esc(row.type) + "</td><td>" + esc(testName) + "</td><td>" + esc(stat) + "</td><td>" + esc(String(df)) + "</td><td>" + esc(p) + "</td><td>" + esc(smd) + "</td>";
+        tr.innerHTML = "<td>" + esc(label) + "</td><td>" + esc(row.type) + "</td><td>" + esc(testName) + "</td><td>" + esc(stat) + "</td><td>" + esc(df) + "</td><td>" + esc(p) + "</td><td>" + esc(smd) + "</td>";
         auditBody.appendChild(tr);
       });
     });

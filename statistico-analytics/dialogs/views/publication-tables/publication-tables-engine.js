@@ -2208,7 +2208,481 @@
     });
   }
 
-  /* ═══════════════════════════ 10. INIT ═══════════════════════════ */
+  /* ═══════════════════════════ 10. AI ASSISTANT ═══════════════════════════
+     Suggestions only — every analytical change needs Accept. Uses the same
+     Cloudflare Groq proxy as other Statistico modules. */
+
+  var AI_PROXY_URL = "https://statistico-ai.statistico.workers.dev/";
+  var aiSession = { action: null, payload: null, busy: false };
+
+  function extractAiJson(raw) {
+    if (!raw) return null;
+    var cleaned = String(raw).replace(/```json|```/gi, "").trim();
+    var s = cleaned.indexOf("{"), e = cleaned.lastIndexOf("}");
+    if (s < 0 || e <= s) return null;
+    try { return JSON.parse(cleaned.slice(s, e + 1)); } catch (err) { return null; }
+  }
+
+  function callPublicationAi(prompt, maxTokens) {
+    var models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-8b-8192"];
+    var lastErr = null;
+    function tryModel(i) {
+      if (i >= models.length) return Promise.reject(lastErr || new Error("No AI model available"));
+      return fetch(AI_PROXY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: models[i],
+          messages: [
+            {
+              role: "system",
+              content: "You are a senior biostatistics editor helping researchers build publication-ready tables inside Statistico. Propose recommendations only. Never claim clinical importance from p-values alone. Reply with STRICT JSON only — no markdown fences, no commentary outside JSON."
+            },
+            { role: "user", content: prompt }
+          ],
+          max_tokens: maxTokens || 1400,
+          temperature: 0.25
+        })
+      }).then(function (r) {
+        if (!r.ok) {
+          return r.json().catch(function () { return {}; }).then(function (e) {
+            lastErr = new Error((e && e.error && e.error.message) || ("HTTP " + r.status));
+            if (r.status === 404) return tryModel(i + 1);
+            throw lastErr;
+          });
+        }
+        return r.json().then(function (d) {
+          var text = d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
+          text = text && String(text).trim();
+          if (!text) { lastErr = new Error("Empty response"); return tryModel(i + 1); }
+          return text;
+        });
+      }).catch(function (err) {
+        lastErr = err;
+        if (err && /not found/i.test(err.message || "")) return tryModel(i + 1);
+        throw err;
+      });
+    }
+    return tryModel(0);
+  }
+
+  function columnProfile(key) {
+    var vals = ACTIVE_DATA.map(function (r) { return r[key]; });
+    var nonMiss = vals.filter(function (v) { return !isMissing(v); });
+    var distinct = {};
+    nonMiss.forEach(function (v) { distinct[String(v)] = (distinct[String(v)] || 0) + 1; });
+    var levels = Object.keys(distinct).sort(function (a, b) { return distinct[b] - distinct[a]; });
+    var sample = levels.slice(0, 8).map(function (lv) { return { value: lv, n: distinct[lv] }; });
+    var nums = nonMiss.map(Number).filter(isFinite);
+    var skewHint = null;
+    if (nums.length >= 8) {
+      var sorted = nums.slice().sort(function (a, b) { return a - b; });
+      var m = mean(sorted);
+      var med = percentileSorted(sorted, 50);
+      var sd = sampleSd(sorted, m);
+      if (isFinite(sd) && sd > 0) {
+        var g1 = sorted.reduce(function (a, x) { return a + Math.pow((x - m) / sd, 3); }, 0) / sorted.length;
+        skewHint = Math.abs(g1) > 1 ? "skewed" : (Math.abs(g1) > 0.5 ? "mild_skew" : "approx_symmetric");
+        if (Math.abs(m - med) > 0.35 * sd) skewHint = "skewed";
+      }
+    }
+    return {
+      n: ACTIVE_DATA.length,
+      nonMissing: nonMiss.length,
+      missing: ACTIVE_DATA.length - nonMiss.length,
+      nDistinct: levels.length,
+      topLevels: sample,
+      skewHint: skewHint
+    };
+  }
+
+  function buildAiVariableSnapshot() {
+    return state.varOrder.map(function (key) {
+      var v = VAR_DEFS_BY_KEY[key];
+      var cfg = state.varCfg[key];
+      if (!v || !cfg) return null;
+      var profile = columnProfile(key);
+      var cats = null;
+      if (effectiveType(v, cfg) !== "continuous") {
+        cats = ensureCategoryMeta(v, cfg).slice().sort(function (a, b) { return a.order - b.order; }).map(function (m) {
+          return { value: m.value, label: m.label, include: m.include !== false };
+        });
+      }
+      return {
+        key: key,
+        sourceName: cfg.sourceName || v.label,
+        currentLabel: cfg.label,
+        inferredType: v.type,
+        typeOverride: cfg.typeOverride || "auto",
+        format: cfg.format,
+        include: !!cfg.include,
+        isGroupVar: key === state.groupVar,
+        categories: cats,
+        profile: profile
+      };
+    }).filter(Boolean);
+  }
+
+  function buildAiTableSignals() {
+    var model = buildModel();
+    var block = model.strata[0] && model.strata[0].block;
+    var avail = groupAvailability();
+    var audit = [];
+    if (block) {
+      block.rows.forEach(function (row) {
+        audit.push({
+          variable: row.label,
+          type: row.type,
+          p: row.test && isFinite(row.test.p) ? Number(row.test.p.toPrecision(4)) : null,
+          test: row.test && row.test.name ? row.test.name : null,
+          smd: isFinite(row.smd) ? Number(row.smd.toFixed(3)) : null
+        });
+      });
+    }
+    return {
+      tableType: state.tableType,
+      nTotal: ACTIVE_DATA.length,
+      groupVar: state.groupVar || null,
+      groupAvailability: avail,
+      missingGroupMode: state.missingGroupMode,
+      showOverall: state.showOverall,
+      showPValue: state.showPValue,
+      showSMD: state.showSMD,
+      completeCase: state.completeCase,
+      title: state.report.title,
+      notes: state.report.notes || autoNoteText(),
+      abbreviations: state.report.abbreviations || "",
+      columnN: block ? block.columnN : {},
+      columns: block ? block.columns.map(function (c) { return { key: c.key, label: c.label, n: block.columnN[c.key] }; }) : [],
+      audit: audit,
+      plainPreview: buildPlainTextExport(model).slice(0, 3500)
+    };
+  }
+
+  function setAiBusy(busy) {
+    aiSession.busy = busy;
+    var btn = $("pt2AiBtn");
+    if (btn) btn.disabled = busy;
+    document.querySelectorAll("[data-ai-action]").forEach(function (b) { b.disabled = busy; });
+  }
+
+  function showAiHome() {
+    aiSession.action = null;
+    aiSession.payload = null;
+    $("pt2AiHome").style.display = "";
+    $("pt2AiWork").style.display = "none";
+    $("pt2AiFooter").style.display = "none";
+    $("pt2AiResult").innerHTML = "";
+    $("pt2AiStatus").textContent = "";
+    $("pt2AiStatus").classList.remove("error");
+    $("pt2AiTitle").textContent = "AI Assistant";
+  }
+
+  function showAiWork(title) {
+    $("pt2AiHome").style.display = "none";
+    $("pt2AiWork").style.display = "";
+    $("pt2AiWorkTitle").textContent = title;
+    $("pt2AiFooter").style.display = "none";
+    $("pt2AiResult").innerHTML = "";
+    $("pt2AiStatus").classList.remove("error");
+    $("pt2AiStatus").innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Thinking\u2026';
+  }
+
+  function renderAiProposalList(items) {
+    if (!items || !items.length) {
+      $("pt2AiResult").innerHTML = '<p class="cfg-hint">No changes suggested.</p>';
+      $("pt2AiFooter").style.display = "none";
+      return;
+    }
+    var html = '<div class="pt2-ai-list">';
+    items.forEach(function (it, idx) {
+      html += '<div class="pt2-ai-item">' +
+        '<input type="checkbox" class="pt2-ai-check" data-idx="' + idx + '" id="pt2AiChk' + idx + '" checked />' +
+        '<label for="pt2AiChk' + idx + '"><strong>' + esc(it.title || it.key || ("Suggestion " + (idx + 1))) + "</strong>" +
+        (it.change ? '<span class="chg">' + esc(it.change) + "</span>" : "") +
+        (it.reason ? '<span class="why">' + esc(it.reason) + "</span>" : "") +
+        "</label></div>";
+    });
+    html += "</div>";
+    $("pt2AiResult").innerHTML = html;
+    $("pt2AiFooter").style.display = "flex";
+    $("pt2AiAcceptBtn").textContent = "Accept selected";
+  }
+
+  function selectedAiIndexes() {
+    var idxs = [];
+    document.querySelectorAll(".pt2-ai-check").forEach(function (cb) {
+      if (cb.checked) idxs.push(parseInt(cb.getAttribute("data-idx"), 10));
+    });
+    return idxs;
+  }
+
+  function runAiSetup() {
+    showAiWork("Set up my table");
+    setAiBusy(true);
+    var snap = buildAiVariableSnapshot();
+    var prompt =
+      "Task: propose an initial publication-table setup.\n" +
+      "Current table type: " + state.tableType + "\n" +
+      "Current group variable: " + (state.groupVar || "none") + "\n" +
+      "Variables JSON:\n" + JSON.stringify(snap) + "\n\n" +
+      "Return JSON:\n" +
+      '{"suggestions":[{"kind":"groupVar|include|exclude|type|format","key":"varKey","value":"proposed value","title":"short title","change":"from → to","reason":"why","consequence":"statistical effect"}]}\n' +
+      "Rules: suggest at most one groupVar; mark ID-like columns for exclude; prefer median-iqr-paren when skewHint is skewed; do not invent keys; keep suggestions actionable.";
+    return callPublicationAi(prompt, 1600).then(function (raw) {
+      var parsed = extractAiJson(raw) || {};
+      var suggestions = (parsed.suggestions || []).filter(function (s) {
+        return s && s.kind && (s.kind === "groupVar" || snap.some(function (v) { return v.key === s.key; }));
+      }).map(function (s) {
+        return {
+          kind: s.kind,
+          key: s.key || "",
+          value: s.value,
+          title: s.title || (s.kind + (s.key ? ": " + s.key : "")),
+          change: s.change || String(s.value == null ? "" : s.value),
+          reason: [s.reason, s.consequence].filter(Boolean).join(" ")
+        };
+      });
+      aiSession.action = "setup";
+      aiSession.payload = suggestions;
+      $("pt2AiStatus").textContent = suggestions.length
+        ? "Review each suggestion, then accept those you want."
+        : "AI found no layout changes to propose.";
+      renderAiProposalList(suggestions);
+    });
+  }
+
+  function runAiLabels() {
+    showAiWork("Improve labels & categories");
+    setAiBusy(true);
+    var snap = buildAiVariableSnapshot();
+    var prompt =
+      "Task: improve publication-friendly variable labels and category display labels.\n" +
+      "Variables JSON:\n" + JSON.stringify(snap) + "\n\n" +
+      "Return JSON:\n" +
+      '{"suggestions":[{"kind":"label|categoryLabel|type","key":"varKey","value":"new label or type","categoryValue":"original category if kind=categoryLabel","title":"...","change":"...","reason":"..."}]}\n' +
+      "Rules: keep clinical units when present; map coded 0/1 to readable labels when obvious; do not merge/drop categories; do not invent new category values; suggest type only when clearly wrong.";
+    return callPublicationAi(prompt, 1600).then(function (raw) {
+      var parsed = extractAiJson(raw) || {};
+      var suggestions = (parsed.suggestions || []).filter(function (s) {
+        return s && s.key && state.varCfg[s.key] && (s.kind === "label" || s.kind === "categoryLabel" || s.kind === "type");
+      }).map(function (s) {
+        return {
+          kind: s.kind,
+          key: s.key,
+          value: s.value,
+          categoryValue: s.categoryValue,
+          title: s.title || (s.key + " — " + s.kind),
+          change: s.change || String(s.value == null ? "" : s.value),
+          reason: s.reason || ""
+        };
+      });
+      aiSession.action = "labels";
+      aiSession.payload = suggestions;
+      $("pt2AiStatus").textContent = suggestions.length
+        ? "Select label/category updates to apply."
+        : "Labels already look publication-ready.";
+      renderAiProposalList(suggestions);
+    });
+  }
+
+  function runAiReview() {
+    showAiWork("Review this table");
+    setAiBusy(true);
+    var signals = buildAiTableSignals();
+    var prompt =
+      "Task: quality-control review of a finished publication table. Identify concrete problems.\n" +
+      "Signals JSON:\n" + JSON.stringify(signals) + "\n\n" +
+      "Return JSON:\n" +
+      '{"findings":[{"severity":"high|medium|low","title":"...","detail":"specific issue and what to consider","topic":"missingness|denominators|labels|tests|smd|sparse|format|other"}]}\n' +
+      "Rules: be specific with Ns and variable names from the signals; do not recompute p-values; do not declare clinical importance; if nothing serious, return an empty findings array or one low informational note.";
+    return callPublicationAi(prompt, 1400).then(function (raw) {
+      var parsed = extractAiJson(raw) || {};
+      var findings = parsed.findings || [];
+      aiSession.action = "review";
+      aiSession.payload = findings;
+      if (!findings.length) {
+        $("pt2AiStatus").textContent = "No major publication issues flagged.";
+        $("pt2AiResult").innerHTML = '<p class="cfg-hint">The automated review did not find high-priority inconsistencies. Still verify denominators and footnotes before submission.</p>';
+        $("pt2AiFooter").style.display = "none";
+        return;
+      }
+      $("pt2AiStatus").textContent = findings.length + " finding" + (findings.length === 1 ? "" : "s") + " — informational only (nothing auto-applied).";
+      var html = "";
+      findings.forEach(function (f) {
+        var sev = (f.severity || "medium").toLowerCase();
+        if (sev !== "high" && sev !== "low") sev = "medium";
+        html += '<div class="pt2-ai-finding ' + sev + '"><strong>' + esc(f.title || "Finding") +
+          '</strong><p>' + esc(f.detail || "") + "</p></div>";
+      });
+      $("pt2AiResult").innerHTML = html;
+      $("pt2AiFooter").style.display = "none";
+    });
+  }
+
+  function runAiDraft() {
+    showAiWork("Draft title, notes & Results");
+    setAiBusy(true);
+    var signals = buildAiTableSignals();
+    var prompt =
+      "Task: draft table caption elements and a short Results paragraph.\n" +
+      "Signals JSON:\n" + JSON.stringify(signals) + "\n\n" +
+      "Return JSON:\n" +
+      '{"tableNumber":1,"title":"...","subtitle":"...","notes":"...","abbreviations":"...","resultsDraft":"...","disclaimer":"Draft for author review"}\n' +
+      "Rules: concise journal style; notes should mention summary formats and comparison tests actually used; Results draft must be cautious and avoid claiming clinical/statistical importance from p alone; label it as a draft.";
+    return callPublicationAi(prompt, 1200).then(function (raw) {
+      var parsed = extractAiJson(raw);
+      if (!parsed) throw new Error("Could not parse AI draft");
+      aiSession.action = "draft";
+      aiSession.payload = parsed;
+      $("pt2AiStatus").textContent = "Edit the draft below, then accept to fill Caption & Notes.";
+      $("pt2AiResult").innerHTML =
+        '<div class="pt2-ai-draft-block"><label>Table number</label><input id="pt2AiDraftNum" type="number" min="1" value="' + esc(parsed.tableNumber || state.report.tableNumber) + '" /></div>' +
+        '<div class="pt2-ai-draft-block"><label>Title</label><input id="pt2AiDraftTitle" type="text" value="' + esc(parsed.title || "") + '" /></div>' +
+        '<div class="pt2-ai-draft-block"><label>Subtitle</label><input id="pt2AiDraftSubtitle" type="text" value="' + esc(parsed.subtitle || "") + '" /></div>' +
+        '<div class="pt2-ai-draft-block"><label>Notes / footnotes</label><textarea id="pt2AiDraftNotes">' + esc(parsed.notes || "") + "</textarea></div>" +
+        '<div class="pt2-ai-draft-block"><label>Abbreviations</label><textarea id="pt2AiDraftAbbrev">' + esc(parsed.abbreviations || "") + "</textarea></div>" +
+        '<div class="pt2-ai-draft-block"><label>Results draft (not inserted into the table)</label><textarea id="pt2AiDraftResults">' + esc(parsed.resultsDraft || "") + "</textarea></div>" +
+        '<p class="cfg-hint">' + esc(parsed.disclaimer || "Draft for author review — verify against the table before use.") + "</p>";
+      $("pt2AiFooter").style.display = "flex";
+      $("pt2AiAcceptBtn").textContent = "Apply to Caption & Notes";
+    });
+  }
+
+  function applyAiSetup(selected) {
+    selected.forEach(function (s) {
+      if (s.kind === "groupVar" && s.value) {
+        if (GROUP_VAR_DEFS.some(function (g) { return g.key === s.value; })) {
+          applyGroupVarSelection(s.value);
+        }
+        return;
+      }
+      var cfg = state.varCfg[s.key];
+      if (!cfg) return;
+      if (s.kind === "include") cfg.include = true;
+      else if (s.kind === "exclude") {
+        cfg.include = false;
+        if (s.key === state.groupVar) cfg.forceIncludeGroupRow = false;
+      } else if (s.kind === "type" && s.value) {
+        var allowed = { auto: 1, continuous: 1, categorical: 1, ordinal: 1, binary: 1 };
+        if (allowed[s.value]) cfg.typeOverride = s.value;
+      } else if (s.kind === "format" && s.value) {
+        var formats = CONTINUOUS_FORMATS.concat(CATEGORICAL_FORMATS).map(function (f) { return f.value; });
+        if (formats.indexOf(s.value) >= 0) cfg.format = s.value;
+      }
+    });
+  }
+
+  function applyAiLabels(selected) {
+    selected.forEach(function (s) {
+      var cfg = state.varCfg[s.key];
+      var v = VAR_DEFS_BY_KEY[s.key];
+      if (!cfg || !v) return;
+      if (s.kind === "label" && s.value) {
+        cfg.label = String(s.value);
+      } else if (s.kind === "type" && s.value) {
+        var allowed = { auto: 1, continuous: 1, categorical: 1, ordinal: 1, binary: 1 };
+        if (allowed[s.value]) cfg.typeOverride = s.value;
+      } else if (s.kind === "categoryLabel" && s.categoryValue != null && s.value != null) {
+        var meta = ensureCategoryMeta(v, cfg);
+        meta.forEach(function (m) {
+          if (String(m.value) === String(s.categoryValue)) m.label = String(s.value);
+        });
+        cfg.orderText = meta.slice().sort(function (a, b) { return a.order - b.order; })
+          .map(function (m) { return m.label; }).join(", ");
+      }
+    });
+  }
+
+  function applyAiDraftFromForm() {
+    var num = parseInt(($("pt2AiDraftNum") || {}).value, 10);
+    state.report.tableNumber = isFinite(num) && num > 0 ? num : state.report.tableNumber;
+    state.report.title = ($("pt2AiDraftTitle") || {}).value || state.report.title;
+    state.report.subtitle = ($("pt2AiDraftSubtitle") || {}).value || "";
+    state.report.notes = ($("pt2AiDraftNotes") || {}).value || "";
+    state.report.abbreviations = ($("pt2AiDraftAbbrev") || {}).value || "";
+    lastAppliedDefaultTitle = state.report.title;
+    lastAppliedDefaultAbbrev = state.report.abbreviations;
+    var draft = ($("pt2AiDraftResults") || {}).value || "";
+    if (draft) {
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(draft);
+      } catch (e) {}
+    }
+  }
+
+  function acceptAiSession() {
+    if (!aiSession.action || !aiSession.payload) return;
+    if (aiSession.action === "draft") {
+      applyAiDraftFromForm();
+      syncControlsFromState();
+      renderAll();
+      state.tab = "preview";
+      document.querySelectorAll(".pt2-tab-btn").forEach(function (b) {
+        b.classList.toggle("active", b.getAttribute("data-tab") === "preview");
+      });
+      ["build", "preview", "details"].forEach(function (t) {
+        $("pt2View" + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle("active", t === "preview");
+      });
+      renderPreview();
+      $("pt2AiStatus").textContent = "Caption & Notes updated. Results draft copied to clipboard when available.";
+      return;
+    }
+    var idxs = selectedAiIndexes();
+    var selected = idxs.map(function (i) { return aiSession.payload[i]; }).filter(Boolean);
+    if (!selected.length) {
+      $("pt2AiStatus").textContent = "Select at least one suggestion to accept.";
+      $("pt2AiStatus").classList.add("error");
+      return;
+    }
+    if (aiSession.action === "setup") applyAiSetup(selected);
+    if (aiSession.action === "labels") applyAiLabels(selected);
+    syncControlsFromState();
+    renderAll();
+    $("pt2AiStatus").classList.remove("error");
+    $("pt2AiStatus").textContent = "Applied " + selected.length + " suggestion" + (selected.length === 1 ? "" : "s") + ".";
+    $("pt2AiFooter").style.display = "none";
+    $("pt2AiResult").innerHTML = '<p class="cfg-hint">Changes applied. You can run AI again or close this panel.</p>';
+  }
+
+  function runAiAction(action) {
+    if (aiSession.busy) return;
+    var runner = {
+      setup: runAiSetup,
+      labels: runAiLabels,
+      review: runAiReview,
+      draft: runAiDraft
+    }[action];
+    if (!runner) return;
+    runner().catch(function (err) {
+      $("pt2AiStatus").classList.add("error");
+      $("pt2AiStatus").textContent = (err && err.message) ? err.message : "AI request failed.";
+      $("pt2AiResult").innerHTML = '<p class="cfg-hint">Check your network connection and try again.</p>';
+      $("pt2AiFooter").style.display = "none";
+    }).then(function () { setAiBusy(false); });
+  }
+
+  function wireAiAssistant() {
+    var overlay = $("pt2AiOverlay");
+    var openBtn = $("pt2AiBtn");
+    if (!overlay || !openBtn) return;
+    function open() { showAiHome(); overlay.classList.add("open"); }
+    function close() { if (!aiSession.busy) { overlay.classList.remove("open"); showAiHome(); } }
+    openBtn.addEventListener("click", open);
+    $("pt2AiCloseBtn").addEventListener("click", close);
+    $("pt2AiBackBtn").addEventListener("click", function () { if (!aiSession.busy) showAiHome(); });
+    $("pt2AiDiscardBtn").addEventListener("click", function () { if (!aiSession.busy) showAiHome(); });
+    $("pt2AiAcceptBtn").addEventListener("click", acceptAiSession);
+    overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
+    document.querySelectorAll("[data-ai-action]").forEach(function (btn) {
+      btn.addEventListener("click", function () { runAiAction(btn.getAttribute("data-ai-action")); });
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && overlay.classList.contains("open") && !aiSession.busy) close();
+    });
+  }
+
+  /* ═══════════════════════════ 11. INIT ═══════════════════════════ */
 
   function sendToHost(payload) {
     try { if (Office && Office.context && Office.context.ui) Office.context.ui.messageParent(JSON.stringify(payload)); } catch (e) {}
@@ -2222,6 +2696,7 @@
     wireVarGridDragDrop();
     wirePanelHelp();
     wireCategoryEditor();
+    wireAiAssistant();
     syncControlsFromState();
     renderAll();
 

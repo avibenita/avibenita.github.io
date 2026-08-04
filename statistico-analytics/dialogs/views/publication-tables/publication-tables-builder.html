@@ -226,6 +226,63 @@
     .pt2-custom-extra { display: none; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--cfg-border); }
     .pt2-custom-extra.visible { display: block; }
     textarea.cfg-input { min-height: 56px; resize: vertical; font-family: var(--cfg-font); }
+
+    /* AI Assistant */
+    .pt2-ai-btn {
+      padding: 7px 12px; border-radius: 8px; border: 1px solid rgba(249,115,22,.45);
+      background: rgba(249,115,22,.14); color: #fb923c; font-size: 12px; font-weight: 700;
+      cursor: pointer; font-family: var(--cfg-font); display: inline-flex; align-items: center; gap: 6px;
+      margin-right: 6px; transition: all .15s;
+    }
+    .pt2-ai-btn:hover { background: rgba(249,115,22,.22); color: #fff; border-color: rgba(249,115,22,.65); }
+    .pt2-ai-btn:disabled { opacity: .55; cursor: wait; }
+    .pt2-ai-modal { max-width: 720px; }
+    .pt2-ai-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .pt2-ai-action {
+      text-align: left; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--cfg-border);
+      background: var(--cfg-surface2); color: var(--cfg-text); cursor: pointer; font-family: var(--cfg-font);
+      transition: border-color .15s, background .15s;
+    }
+    .pt2-ai-action:hover { border-color: rgba(249,115,22,.45); background: rgba(249,115,22,.10); }
+    .pt2-ai-action:disabled { opacity: .5; cursor: wait; }
+    .pt2-ai-action strong { display: block; font-size: 12.5px; margin-bottom: 4px; }
+    .pt2-ai-action span { display: block; font-size: 11px; color: var(--cfg-text2); line-height: 1.4; }
+    .pt2-ai-action i { color: #fb923c; margin-right: 6px; }
+    .pt2-ai-disclaimer {
+      margin-top: 12px; padding: 8px 10px; border-radius: 8px; font-size: 11px; line-height: 1.45;
+      background: rgba(148,163,184,.12); border: 1px solid rgba(148,163,184,.28); color: var(--cfg-text2);
+    }
+    .pt2-ai-status { font-size: 12px; color: var(--cfg-text2); margin-bottom: 10px; min-height: 18px; }
+    .pt2-ai-status.error { color: #f87171; }
+    .pt2-ai-result-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .pt2-ai-result-head strong { font-size: 13px; color: var(--cfg-text); }
+    .pt2-ai-back { padding: 4px 8px; font-size: 11px; }
+    .pt2-ai-list { display: flex; flex-direction: column; gap: 8px; max-height: 46vh; overflow-y: auto; }
+    .pt2-ai-item {
+      display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 10px 12px; border-radius: 8px;
+      border: 1px solid var(--cfg-border); background: rgba(255,255,255,.03);
+    }
+    [data-theme="light"] .pt2-ai-item { background: rgba(0,0,0,.02); }
+    .pt2-ai-item label { font-size: 12px; color: var(--cfg-text); line-height: 1.4; cursor: pointer; }
+    .pt2-ai-item .why { display: block; margin-top: 3px; font-size: 11px; color: var(--cfg-text2); }
+    .pt2-ai-item .chg { display: block; margin-top: 2px; font-size: 11.5px; color: #fb923c; }
+    .pt2-ai-finding {
+      padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(251,191,36,.35);
+      background: rgba(251,191,36,.10); margin-bottom: 8px;
+    }
+    .pt2-ai-finding.high { border-color: rgba(248,113,113,.45); background: rgba(248,113,113,.10); }
+    .pt2-ai-finding.low { border-color: var(--cfg-border); background: rgba(255,255,255,.03); }
+    .pt2-ai-finding strong { display: block; font-size: 12px; color: var(--cfg-text); margin-bottom: 3px; }
+    .pt2-ai-finding p { margin: 0; font-size: 11.5px; color: var(--cfg-text2); line-height: 1.45; }
+    .pt2-ai-draft-block { margin-bottom: 12px; }
+    .pt2-ai-draft-block label { display: block; font-size: 11px; font-weight: 700; color: var(--cfg-text3); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; }
+    .pt2-ai-draft-block textarea, .pt2-ai-draft-block input {
+      width: 100%; padding: 7px 8px; border-radius: 6px; border: 1px solid var(--cfg-border);
+      background: var(--cfg-input-bg); color: var(--cfg-input-text); font-family: var(--cfg-font); font-size: 12px;
+    }
+    .pt2-ai-draft-block textarea { min-height: 72px; resize: vertical; }
+    .pt2-ai-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    @media (max-width: 560px) { .pt2-ai-actions { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -246,6 +303,9 @@
       <button class="pt2-tab-btn" data-tab="preview" id="pt2TabPreview"><i class="fa-solid fa-file-lines"></i> Preview</button>
       <button class="pt2-tab-btn" data-tab="details" id="pt2TabDetails"><i class="fa-solid fa-magnifying-glass-chart"></i> Details</button>
       <div class="pt2-tab-spacer"></div>
+      <button type="button" class="pt2-ai-btn" id="pt2AiBtn" title="AI Assistant — suggestions you review before applying">
+        <i class="fa-solid fa-robot"></i> AI Assistant
+      </button>
       <button class="pt2-close-btn" id="pt2CloseBtn" title="Close"><i class="fa-solid fa-times"></i></button>
     </nav>
 
@@ -581,8 +641,57 @@
       </div>
     </div>
 
+    <!-- ══════════════════════════ AI ASSISTANT MODAL ══════════════════════════ -->
+    <div class="pt2-modal-overlay" id="pt2AiOverlay">
+      <div class="pt2-modal-box pt2-ai-modal" role="dialog" aria-modal="true" aria-labelledby="pt2AiTitle">
+        <div class="pt2-modal-head">
+          <i class="fa-solid fa-robot" style="color:#fb923c;"></i>
+          <span id="pt2AiTitle">AI Assistant</span>
+          <button type="button" class="pt2-modal-close" id="pt2AiCloseBtn" title="Close"><i class="fa-solid fa-times"></i></button>
+        </div>
+        <div class="pt2-modal-body">
+          <div id="pt2AiHome">
+            <p class="cfg-hint" style="margin-bottom:12px;">AI proposes changes for you to review. Nothing is applied until you accept.</p>
+            <div class="pt2-ai-actions">
+              <button type="button" class="pt2-ai-action" data-ai-action="setup">
+                <strong><i class="fa-solid fa-wand-magic-sparkles"></i>Set up my table</strong>
+                <span>Suggest group variable, exclusions, types, and summary formats.</span>
+              </button>
+              <button type="button" class="pt2-ai-action" data-ai-action="labels">
+                <strong><i class="fa-solid fa-font"></i>Improve labels &amp; categories</strong>
+                <span>Clean variable names and readable category labels.</span>
+              </button>
+              <button type="button" class="pt2-ai-action" data-ai-action="review">
+                <strong><i class="fa-solid fa-clipboard-check"></i>Review this table</strong>
+                <span>Flag inconsistencies, missingness, and publication issues.</span>
+              </button>
+              <button type="button" class="pt2-ai-action" data-ai-action="draft">
+                <strong><i class="fa-solid fa-pen-to-square"></i>Draft title, notes &amp; Results</strong>
+                <span>Caption, footnotes, abbreviations, and a short Results draft.</span>
+              </button>
+            </div>
+            <div class="pt2-ai-disclaimer">
+              Recommendations only — AI does not decide exclusions, merges, or scientific appropriateness without your confirmation.
+            </div>
+          </div>
+          <div id="pt2AiWork" style="display:none;">
+            <div class="pt2-ai-result-head">
+              <button type="button" class="pt2-btn pt2-ai-back" id="pt2AiBackBtn"><i class="fa-solid fa-arrow-left"></i> Back</button>
+              <strong id="pt2AiWorkTitle">Working…</strong>
+            </div>
+            <div class="pt2-ai-status" id="pt2AiStatus"></div>
+            <div id="pt2AiResult"></div>
+            <div class="pt2-ai-footer" id="pt2AiFooter" style="display:none;">
+              <button type="button" class="pt2-btn" id="pt2AiDiscardBtn">Discard</button>
+              <button type="button" class="pt2-btn primary" id="pt2AiAcceptBtn">Accept selected</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
-  <script src="./publication-tables-engine.js?v=20260803h"></script>
+  <script src="./publication-tables-engine.js?v=20260804a"></script>
 </body>
 </html>

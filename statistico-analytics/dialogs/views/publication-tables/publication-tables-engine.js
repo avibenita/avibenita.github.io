@@ -2209,12 +2209,16 @@
   }
 
   /* ═══════════════════════════ 10. AI ASSISTANT ═══════════════════════════
-     Suggestions only — every analytical change needs Accept. Uses the same
-     Cloudflare Groq proxy as other Statistico modules. */
+     Suggestions only — every analytical change needs Accept.
+     Excel WebView often ignores AbortController on hung fetch, so every call
+     uses Promise.race with a hard deadline and a local fallback. */
 
   var AI_PROXY_URL = "https://statistico-ai.statistico.workers.dev/";
-  var AI_TIMEOUT_MS = 12000;
-  var aiSession = { action: null, payload: null, busy: false, abort: null, statusTimer: null };
+  var AI_HARD_TIMEOUT_MS = 10000;
+  var aiSession = {
+    action: null, payload: null, busy: false,
+    abort: null, statusTimer: null, timeoutHandle: null, requestId: 0
+  };
 
   function extractAiJson(raw) {
     if (!raw) return null;
@@ -2228,108 +2232,93 @@
     if (aiSession.statusTimer) { clearInterval(aiSession.statusTimer); aiSession.statusTimer = null; }
   }
 
+  function clearAiTimeoutHandle() {
+    if (aiSession.timeoutHandle) { clearTimeout(aiSession.timeoutHandle); aiSession.timeoutHandle = null; }
+  }
+
   function beginAiStatus(label) {
     clearAiStatusTimer();
     var started = Date.now();
+    var hardSec = Math.round(AI_HARD_TIMEOUT_MS / 1000);
     function tick() {
       var el = $("pt2AiStatus");
       if (!el || !aiSession.busy) return;
       var sec = Math.round((Date.now() - started) / 1000);
       el.classList.remove("error");
       el.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + (label || "Thinking") +
-        "\u2026" + (sec >= 3 ? " (" + sec + "s)" : "");
+        "\u2026" + (sec >= 2 ? " (" + sec + "s / " + hardSec + "s)" : "");
     }
     tick();
-    aiSession.statusTimer = setInterval(tick, 1000);
+    aiSession.statusTimer = setInterval(tick, 500);
   }
 
   function abortAiRequest() {
+    clearAiTimeoutHandle();
     if (aiSession.abort) {
       try { aiSession.abort.abort(); } catch (e) {}
       aiSession.abort = null;
     }
+    aiSession.requestId += 1; /* invalidate any late responses */
   }
 
   function callPublicationAi(prompt, maxTokens) {
-    /* Prefer the fast model — 70B often stalls in the Excel WebView. */
-    var models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"];
-    var lastErr = null;
+    var requestId = ++aiSession.requestId;
     var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
     aiSession.abort = controller;
+    clearAiTimeoutHandle();
 
-    function withTimeout(promise, ms) {
-      if (!controller) {
-        return new Promise(function (resolve, reject) {
-          var t = setTimeout(function () { reject(new Error("AI request timed out after " + Math.round(ms / 1000) + "s")); }, ms);
-          promise.then(function (v) { clearTimeout(t); resolve(v); }, function (e) { clearTimeout(t); reject(e); });
+    var fetchPromise = fetch(AI_PROXY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        messages: [
+          {
+            role: "system",
+            content: "You are a senior biostatistics editor helping researchers build publication-ready tables inside Statistico. Propose recommendations only. Never claim clinical importance from p-values alone. Reply with STRICT JSON only — no markdown fences, no commentary outside JSON. Keep replies short."
+          },
+          { role: "user", content: prompt }
+        ],
+        max_tokens: maxTokens || 500,
+        temperature: 0.2
+      }),
+      signal: controller ? controller.signal : undefined
+    }).then(function (r) {
+      if (!r.ok) {
+        return r.json().catch(function () { return {}; }).then(function (e) {
+          throw new Error((e && e.error && (e.error.message || e.error)) || ("HTTP " + r.status));
         });
       }
-      var timer = setTimeout(function () {
-        try { controller.abort(); } catch (e) {}
-      }, ms);
-      return promise.then(function (v) { clearTimeout(timer); return v; }, function (e) {
-        clearTimeout(timer);
-        throw e;
+      return r.json().then(function (d) {
+        var text = d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
+        text = text && String(text).trim();
+        if (!text) throw new Error("Empty AI response");
+        return text;
       });
-    }
+    });
 
-    function tryModel(i) {
-      if (i >= models.length) return Promise.reject(lastErr || new Error("No AI model available"));
-      var fetchOpts = {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: models[i],
-          messages: [
-            {
-              role: "system",
-              content: "You are a senior biostatistics editor helping researchers build publication-ready tables inside Statistico. Propose recommendations only. Never claim clinical importance from p-values alone. Reply with STRICT JSON only — no markdown fences, no commentary outside JSON. Keep replies short."
-            },
-            { role: "user", content: prompt }
-          ],
-          max_tokens: maxTokens || 700,
-          temperature: 0.2
-        })
-      };
-      if (controller) fetchOpts.signal = controller.signal;
+    var timeoutPromise = new Promise(function (_resolve, reject) {
+      aiSession.timeoutHandle = setTimeout(function () {
+        if (controller) {
+          try { controller.abort(); } catch (e) {}
+        }
+        reject(new Error("AI timed out after " + Math.round(AI_HARD_TIMEOUT_MS / 1000) + "s"));
+      }, AI_HARD_TIMEOUT_MS);
+    });
 
-      return withTimeout(fetch(AI_PROXY_URL, fetchOpts), AI_TIMEOUT_MS).then(function (r) {
-        if (!r.ok) {
-          return r.json().catch(function () { return {}; }).then(function (e) {
-            lastErr = new Error((e && e.error && e.error.message) || ("HTTP " + r.status));
-            /* Retry other models on missing model / overload / rate limit */
-            if (r.status === 404 || r.status === 429 || r.status === 503 || r.status >= 500) return tryModel(i + 1);
-            throw lastErr;
-          });
-        }
-        return r.json().then(function (d) {
-          var text = d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
-          text = text && String(text).trim();
-          if (!text) { lastErr = new Error("Empty response"); return tryModel(i + 1); }
-          return text;
-        });
-      }).catch(function (err) {
-        if (err && (err.name === "AbortError" || /timed out/i.test(err.message || ""))) {
-          lastErr = new Error("AI request timed out. Try again, or use a smaller table.");
-          /* One retry on a different model if we still have attempts and user didn't cancel intentionally via close */
-          if (i + 1 < models.length && aiSession.busy) {
-            controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-            aiSession.abort = controller;
-            return tryModel(i + 1);
-          }
-          throw lastErr;
-        }
-        lastErr = err;
-        if (err && /not found|unavailable|overloaded/i.test(err.message || "")) return tryModel(i + 1);
-        throw err;
-      });
-    }
-    return tryModel(0).then(function (text) {
+    /* Promise.race is required: AbortController alone does not always settle hung fetches in Excel WebView. */
+    return Promise.race([fetchPromise, timeoutPromise]).then(function (text) {
+      clearAiTimeoutHandle();
+      if (requestId !== aiSession.requestId) throw new Error("AI request cancelled");
       aiSession.abort = null;
       return text;
     }, function (err) {
+      clearAiTimeoutHandle();
       aiSession.abort = null;
-      throw err;
+      if (requestId !== aiSession.requestId) throw new Error("AI request cancelled");
+      var msg = (err && err.message) || "AI request failed";
+      if (err && err.name === "AbortError") msg = "AI timed out after " + Math.round(AI_HARD_TIMEOUT_MS / 1000) + "s";
+      throw new Error(msg);
     });
   }
 
@@ -2364,8 +2353,7 @@
   }
 
   function buildAiVariableSnapshot() {
-    /* Cap payload size — large category lists made the Excel WebView hang. */
-    return state.varOrder.slice(0, 30).map(function (key) {
+    return state.varOrder.slice(0, 24).map(function (key) {
       var v = VAR_DEFS_BY_KEY[key];
       var cfg = state.varCfg[key];
       if (!v || !cfg) return null;
@@ -2373,14 +2361,14 @@
       var cats = null;
       if (effectiveType(v, cfg) !== "continuous") {
         cats = ensureCategoryMeta(v, cfg).slice().sort(function (a, b) { return a.order - b.order; })
-          .slice(0, 10).map(function (m) {
-            return { value: String(m.value).slice(0, 40), label: String(m.label).slice(0, 40), include: m.include !== false };
+          .slice(0, 8).map(function (m) {
+            return { value: String(m.value).slice(0, 32), label: String(m.label).slice(0, 32), include: m.include !== false };
           });
       }
       return {
         key: key,
-        sourceName: String(cfg.sourceName || v.label || "").slice(0, 60),
-        currentLabel: String(cfg.label || "").slice(0, 60),
+        sourceName: String(cfg.sourceName || v.label || "").slice(0, 48),
+        currentLabel: String(cfg.label || "").slice(0, 48),
         inferredType: v.type,
         typeOverride: cfg.typeOverride || "auto",
         format: cfg.format,
@@ -2390,7 +2378,7 @@
         profile: {
           missing: profile.missing,
           nDistinct: profile.nDistinct,
-          topLevels: (profile.topLevels || []).slice(0, 5),
+          topLevels: (profile.topLevels || []).slice(0, 4),
           skewHint: profile.skewHint
         }
       };
@@ -2403,7 +2391,7 @@
     var avail = groupAvailability();
     var audit = [];
     if (block) {
-      block.rows.slice(0, 24).forEach(function (row) {
+      block.rows.slice(0, 20).forEach(function (row) {
         audit.push({
           variable: row.label,
           type: row.type,
@@ -2418,7 +2406,7 @@
       var gdef = GROUP_VAR_DEFS.filter(function (g) { return g.key === state.groupVar; })[0];
       gLabel = (gdef && gdef.label) || state.groupVar;
     }
-    var varNames = eligibleVarDefs().slice(0, 20).map(function (v) {
+    var varNames = eligibleVarDefs().slice(0, 16).map(function (v) {
       return (state.varCfg[v.key] && state.varCfg[v.key].label) || v.label;
     });
     return {
@@ -2434,7 +2422,7 @@
       completeCase: state.completeCase,
       title: state.report.title,
       notes: state.report.notes || autoNoteText(),
-      abbreviations: (state.report.abbreviations || "").slice(0, 400),
+      abbreviations: (state.report.abbreviations || "").slice(0, 300),
       columns: block ? block.columns.map(function (c) { return { label: c.label, n: block.columnN[c.key] }; }) : [],
       variables: varNames,
       audit: audit
@@ -2448,7 +2436,10 @@
     document.querySelectorAll("[data-ai-action]").forEach(function (b) { b.disabled = busy; });
     var cancelBtn = $("pt2AiCancelBtn");
     if (cancelBtn) cancelBtn.style.display = busy ? "" : "none";
-    if (!busy) clearAiStatusTimer();
+    if (!busy) {
+      clearAiStatusTimer();
+      clearAiTimeoutHandle();
+    }
   }
 
   function showAiHome() {
@@ -2456,6 +2447,7 @@
     clearAiStatusTimer();
     aiSession.action = null;
     aiSession.payload = null;
+    aiSession.busy = false;
     $("pt2AiHome").style.display = "";
     $("pt2AiWork").style.display = "none";
     $("pt2AiFooter").style.display = "none";
@@ -2465,6 +2457,9 @@
     $("pt2AiTitle").textContent = "AI Assistant";
     var cancelBtn = $("pt2AiCancelBtn");
     if (cancelBtn) cancelBtn.style.display = "none";
+    var openBtn = $("pt2AiBtn");
+    if (openBtn) openBtn.disabled = false;
+    document.querySelectorAll("[data-ai-action]").forEach(function (b) { b.disabled = false; });
   }
 
   function showAiWork(title) {
@@ -2506,6 +2501,196 @@
     return idxs;
   }
 
+  function showReviewFindings(findings, statusMsg) {
+    clearAiStatusTimer();
+    aiSession.action = "review";
+    aiSession.payload = findings || [];
+    if (!findings || !findings.length) {
+      $("pt2AiStatus").textContent = statusMsg || "No major publication issues flagged.";
+      $("pt2AiResult").innerHTML = '<p class="cfg-hint">The review did not find high-priority inconsistencies. Still verify denominators and footnotes before submission.</p>';
+      $("pt2AiFooter").style.display = "none";
+      return;
+    }
+    $("pt2AiStatus").textContent = statusMsg || (findings.length + " finding" + (findings.length === 1 ? "" : "s") + " — informational only (nothing auto-applied).");
+    var html = "";
+    findings.forEach(function (f) {
+      var sev = (f.severity || "medium").toLowerCase();
+      if (sev !== "high" && sev !== "low") sev = "medium";
+      html += '<div class="pt2-ai-finding ' + sev + '"><strong>' + esc(f.title || "Finding") +
+        '</strong><p>' + esc(f.detail || "") + "</p></div>";
+    });
+    $("pt2AiResult").innerHTML = html;
+    $("pt2AiFooter").style.display = "none";
+  }
+
+  function localReviewFallback(signals) {
+    var findings = [];
+    if ((signals.tableType === "table1" || signals.tableType === "groupcompare") && !signals.groupVar) {
+      findings.push({
+        severity: "high",
+        title: "No group variable selected",
+        detail: "This table type normally compares groups, but Group variable is None. Choose a grouping variable or switch to Descriptive Summary.",
+        topic: "other"
+      });
+    }
+    if (signals.groupAvailability && signals.groupAvailability.missing > 0) {
+      findings.push({
+        severity: "high",
+        title: "Missing group values affect denominators",
+        detail: "Group variable available for " + signals.groupAvailability.valid + " of " +
+          signals.groupAvailability.total + " records (" + signals.groupAvailability.missing +
+          " missing). Current mode: " + signals.missingGroupMode +
+          ". Consider Exclude missing group rows or add a Missing-group column so Overall and group Ns stay coherent.",
+        topic: "missingness"
+      });
+    }
+    if (signals.columns && signals.columns.length) {
+      var ns = signals.columns.map(function (c) { return c.n; }).filter(function (n) { return n != null; });
+      if (ns.length >= 2) {
+        var maxN = Math.max.apply(null, ns), minN = Math.min.apply(null, ns);
+        if (maxN - minN >= Math.max(5, Math.round(0.1 * maxN))) {
+          findings.push({
+            severity: "medium",
+            title: "Column sample sizes differ",
+            detail: "Column Ns range from " + minN + " to " + maxN +
+              ". Check missing data handling and whether Overall should include rows lacking a group value.",
+            topic: "denominators"
+          });
+        }
+      }
+    }
+    if (signals.showSMD && signals.columns) {
+      var groupCols = signals.columns.filter(function (c) {
+        return c.label && !/overall/i.test(c.label) && !/missing/i.test(c.label);
+      });
+      if (groupCols.length !== 2) {
+        findings.push({
+          severity: "medium",
+          title: "SMD is intended for two groups",
+          detail: "SMD is on, but the table does not clearly have exactly two group columns. Turn SMD off or use a two-level group variable.",
+          topic: "smd"
+        });
+      }
+    }
+    if (signals.audit) {
+      signals.audit.forEach(function (row) {
+        if (row.smd != null && Math.abs(row.smd) >= 0.2) {
+          findings.push({
+            severity: "low",
+            title: "Possible imbalance: " + row.variable,
+            detail: "SMD = " + row.smd + ". Values around 0.2 or higher often warrant a note about group imbalance; do not treat this as clinical importance by itself.",
+            topic: "smd"
+          });
+        }
+      });
+    }
+    var longLabels = (signals.variables || []).filter(function (n) { return String(n).length > 48; });
+    if (longLabels.length) {
+      findings.push({
+        severity: "low",
+        title: "Long variable labels",
+        detail: longLabels.length + " included label(s) exceed 48 characters. Shorten for journal tables.",
+        topic: "labels"
+      });
+    }
+    if (!findings.length) {
+      findings.push({
+        severity: "low",
+        title: "Local review complete",
+        detail: "No high-priority structural issues detected offline. Re-check footnotes, decimal precision, and category coding before publication.",
+        topic: "other"
+      });
+    }
+    return findings.slice(0, 6);
+  }
+
+  function localSetupFallback(snap) {
+    var suggestions = [];
+    if ((state.tableType === "table1" || state.tableType === "groupcompare") && !state.groupVar && GROUP_VAR_DEFS.length) {
+      var g = GROUP_VAR_DEFS[0];
+      suggestions.push({
+        kind: "groupVar", key: "", value: g.key,
+        title: "Set group variable",
+        change: "None → " + (g.label || g.key),
+        reason: "Table type expects a grouping variable. Candidate chosen from available categorical fields."
+      });
+    }
+    snap.forEach(function (v) {
+      if (!v.include) return;
+      var src = String(v.sourceName || v.key).toLowerCase();
+      if (/(^id$|_id$|uuid|subject|participant.?id|record.?id)/i.test(src) || (v.profile && v.profile.nDistinct >= Math.max(50, ACTIVE_DATA.length * 0.9))) {
+        suggestions.push({
+          kind: "exclude", key: v.key, value: false,
+          title: "Exclude likely ID: " + v.currentLabel,
+          change: "Include → Exclude",
+          reason: "High cardinality / ID-like name — usually omitted from descriptive tables."
+        });
+      }
+      if (v.profile && v.profile.skewHint === "skewed" && v.format && v.format.indexOf("mean") === 0) {
+        suggestions.push({
+          kind: "format", key: v.key, value: "median-iqr-paren",
+          title: "Prefer median for " + v.currentLabel,
+          change: v.format + " → median-iqr-paren",
+          reason: "Distribution looks skewed; median (Q1, Q3) is often more appropriate than mean ± SD."
+        });
+      }
+      var nicer = humanizeLabel(v.sourceName || v.key);
+      if (nicer && nicer !== v.currentLabel && /_|[a-z][A-Z]/.test(String(v.sourceName || ""))) {
+        suggestions.push({
+          kind: "label", key: v.key, value: nicer,
+          title: "Clean label: " + v.key,
+          change: v.currentLabel + " → " + nicer,
+          reason: "Publication-friendly label from the source field name."
+        });
+      }
+    });
+    return suggestions.slice(0, 8);
+  }
+
+  function localLabelsFallback(snap) {
+    var suggestions = [];
+    snap.forEach(function (v) {
+      var nicer = humanizeLabel(v.sourceName || v.key);
+      if (nicer && nicer !== v.currentLabel) {
+        suggestions.push({
+          kind: "label", key: v.key, value: nicer,
+          title: v.key + " — label",
+          change: v.currentLabel + " → " + nicer,
+          reason: "Cleaner publication label."
+        });
+      }
+      if (v.categories && v.categories.length === 2) {
+        var vals = v.categories.map(function (c) { return String(c.value); });
+        if (vals.indexOf("0") >= 0 && vals.indexOf("1") >= 0) {
+          suggestions.push({
+            kind: "categoryLabel", key: v.key, categoryValue: "0", value: "No",
+            title: v.currentLabel + " — code 0",
+            change: "0 → No",
+            reason: "Binary code mapped to a readable label (review before accepting)."
+          });
+          suggestions.push({
+            kind: "categoryLabel", key: v.key, categoryValue: "1", value: "Yes",
+            title: v.currentLabel + " — code 1",
+            change: "1 → Yes",
+            reason: "Binary code mapped to a readable label (review before accepting)."
+          });
+        }
+      }
+    });
+    return suggestions.slice(0, 10);
+  }
+
+  function finishProposal(action, suggestions, statusMsg) {
+    clearAiStatusTimer();
+    aiSession.action = action;
+    aiSession.payload = suggestions;
+    $("pt2AiStatus").classList.remove("error");
+    $("pt2AiStatus").textContent = statusMsg || (suggestions.length
+      ? "Review each suggestion, then accept those you want."
+      : "No changes suggested.");
+    renderAiProposalList(suggestions);
+  }
+
   function runAiSetup() {
     showAiWork("Set up my table");
     setAiBusy(true);
@@ -2517,29 +2702,25 @@
       "Current group variable: " + (state.groupVar || "none") + "\n" +
       "Variables JSON:\n" + JSON.stringify(snap) + "\n\n" +
       "Return JSON:\n" +
-      '{"suggestions":[{"kind":"groupVar|include|exclude|type|format","key":"varKey","value":"proposed value","title":"short title","change":"from → to","reason":"why","consequence":"statistical effect"}]}\n' +
-      "Rules: at most 8 suggestions; at most one groupVar; mark ID-like columns for exclude; prefer median-iqr-paren when skewHint is skewed; do not invent keys.";
-    return callPublicationAi(prompt, 700).then(function (raw) {
+      '{"suggestions":[{"kind":"groupVar|include|exclude|type|format|label","key":"varKey","value":"proposed value","title":"short title","change":"from → to","reason":"why"}]}\n' +
+      "Rules: at most 6 suggestions; at most one groupVar; mark ID-like columns for exclude; prefer median-iqr-paren when skewHint is skewed.";
+    return callPublicationAi(prompt, 500).then(function (raw) {
       var parsed = extractAiJson(raw) || {};
       var suggestions = (parsed.suggestions || []).filter(function (s) {
         return s && s.kind && (s.kind === "groupVar" || snap.some(function (v) { return v.key === s.key; }));
       }).map(function (s) {
         return {
-          kind: s.kind,
-          key: s.key || "",
-          value: s.value,
+          kind: s.kind, key: s.key || "", value: s.value,
           title: s.title || (s.kind + (s.key ? ": " + s.key : "")),
           change: s.change || String(s.value == null ? "" : s.value),
-          reason: [s.reason, s.consequence].filter(Boolean).join(" ")
+          reason: s.reason || ""
         };
       });
-      clearAiStatusTimer();
-      aiSession.action = "setup";
-      aiSession.payload = suggestions;
-      $("pt2AiStatus").textContent = suggestions.length
-        ? "Review each suggestion, then accept those you want."
-        : "AI found no layout changes to propose.";
-      renderAiProposalList(suggestions);
+      finishProposal("setup", suggestions);
+    }).catch(function (err) {
+      if (!aiSession.busy) return;
+      finishProposal("setup", localSetupFallback(snap),
+        "AI unavailable (" + ((err && err.message) || "error") + "). Showing local setup suggestions.");
     });
   }
 
@@ -2553,29 +2734,27 @@
       "Variables JSON:\n" + JSON.stringify(snap) + "\n\n" +
       "Return JSON:\n" +
       '{"suggestions":[{"kind":"label|categoryLabel|type","key":"varKey","value":"new label or type","categoryValue":"original category if kind=categoryLabel","title":"...","change":"...","reason":"..."}]}\n' +
-      "Rules: at most 10 suggestions; keep units; map coded 0/1 when obvious; do not merge/drop categories; do not invent category values.";
-    return callPublicationAi(prompt, 700).then(function (raw) {
+      "Rules: at most 8 suggestions; keep units; map coded 0/1 when obvious; do not merge/drop categories.";
+    return callPublicationAi(prompt, 500).then(function (raw) {
       var parsed = extractAiJson(raw) || {};
       var suggestions = (parsed.suggestions || []).filter(function (s) {
         return s && s.key && state.varCfg[s.key] && (s.kind === "label" || s.kind === "categoryLabel" || s.kind === "type");
       }).map(function (s) {
         return {
-          kind: s.kind,
-          key: s.key,
-          value: s.value,
-          categoryValue: s.categoryValue,
+          kind: s.kind, key: s.key, value: s.value, categoryValue: s.categoryValue,
           title: s.title || (s.key + " — " + s.kind),
           change: s.change || String(s.value == null ? "" : s.value),
           reason: s.reason || ""
         };
       });
-      clearAiStatusTimer();
-      aiSession.action = "labels";
-      aiSession.payload = suggestions;
-      $("pt2AiStatus").textContent = suggestions.length
+      finishProposal("labels", suggestions, suggestions.length
         ? "Select label/category updates to apply."
-        : "Labels already look publication-ready.";
-      renderAiProposalList(suggestions);
+        : "Labels already look publication-ready.");
+    }).catch(function (err) {
+      if (!aiSession.busy) return;
+      var local = localLabelsFallback(snap);
+      finishProposal("labels", local,
+        "AI unavailable (" + ((err && err.message) || "error") + "). Showing local label suggestions.");
     });
   }
 
@@ -2583,35 +2762,30 @@
     showAiWork("Review this table");
     setAiBusy(true);
     beginAiStatus("Reviewing table");
-    var signals = buildAiTableSignals();
+    var signals;
+    try { signals = buildAiTableSignals(); }
+    catch (buildErr) {
+      return Promise.resolve().then(function () {
+        showReviewFindings([{
+          severity: "high",
+          title: "Could not build table signals",
+          detail: (buildErr && buildErr.message) || "Unexpected error while preparing the review."
+        }], "Local review only — table signals failed.");
+      });
+    }
     var prompt =
       "Task: quality-control review of a finished publication table. Identify concrete problems.\n" +
       "Signals JSON:\n" + JSON.stringify(signals) + "\n\n" +
       "Return JSON:\n" +
       '{"findings":[{"severity":"high|medium|low","title":"...","detail":"specific issue and what to consider","topic":"missingness|denominators|labels|tests|smd|sparse|format|other"}]}\n' +
-      "Rules: at most 6 findings; be specific with Ns; do not recompute p-values; do not declare clinical importance.";
-    return callPublicationAi(prompt, 700).then(function (raw) {
+      "Rules: at most 5 findings; be specific with Ns; do not recompute p-values.";
+    return callPublicationAi(prompt, 500).then(function (raw) {
       var parsed = extractAiJson(raw) || {};
-      var findings = parsed.findings || [];
-      clearAiStatusTimer();
-      aiSession.action = "review";
-      aiSession.payload = findings;
-      if (!findings.length) {
-        $("pt2AiStatus").textContent = "No major publication issues flagged.";
-        $("pt2AiResult").innerHTML = '<p class="cfg-hint">The automated review did not find high-priority inconsistencies. Still verify denominators and footnotes before submission.</p>';
-        $("pt2AiFooter").style.display = "none";
-        return;
-      }
-      $("pt2AiStatus").textContent = findings.length + " finding" + (findings.length === 1 ? "" : "s") + " — informational only (nothing auto-applied).";
-      var html = "";
-      findings.forEach(function (f) {
-        var sev = (f.severity || "medium").toLowerCase();
-        if (sev !== "high" && sev !== "low") sev = "medium";
-        html += '<div class="pt2-ai-finding ' + sev + '"><strong>' + esc(f.title || "Finding") +
-          '</strong><p>' + esc(f.detail || "") + "</p></div>";
-      });
-      $("pt2AiResult").innerHTML = html;
-      $("pt2AiFooter").style.display = "none";
+      showReviewFindings(parsed.findings || []);
+    }).catch(function (err) {
+      if (!aiSession.busy) return;
+      showReviewFindings(localReviewFallback(signals),
+        "AI unavailable (" + ((err && err.message) || "error") + "). Showing local review findings.");
     });
   }
 
@@ -2662,21 +2836,23 @@
     showAiWork("Draft title, notes & Results");
     setAiBusy(true);
     beginAiStatus("Drafting");
-    var signals = buildAiTableSignals();
+    var signals;
+    try { signals = buildAiTableSignals(); }
+    catch (e) { signals = { nTotal: ACTIVE_DATA.length, groupLabel: null, groupAvailability: groupAvailability(), notes: autoNoteText(), abbreviations: state.report.abbreviations || "" }; }
     var prompt =
       "Task: draft table caption elements and a short Results paragraph.\n" +
       "Signals JSON:\n" + JSON.stringify(signals) + "\n\n" +
       "Return JSON:\n" +
       '{"tableNumber":1,"title":"...","subtitle":"...","notes":"...","abbreviations":"...","resultsDraft":"...","disclaimer":"Draft for author review"}\n' +
-      "Rules: concise; notes must reflect formats/tests in signals; Results draft cautious, no importance claims from p alone; keep each field under 400 characters.";
-    return callPublicationAi(prompt, 650).then(function (raw) {
+      "Rules: concise; keep each field under 300 characters; Results draft cautious.";
+    return callPublicationAi(prompt, 500).then(function (raw) {
       var parsed = extractAiJson(raw);
       if (!parsed) throw new Error("Could not parse AI draft");
       showDraftForm(parsed);
     }).catch(function (err) {
       if (!aiSession.busy) return;
       showDraftForm(localDraftFallback(signals),
-        "AI was slow or unavailable (" + ((err && err.message) || "error") + "). Showing a local draft you can edit.");
+        "AI unavailable (" + ((err && err.message) || "error") + "). Showing a local draft you can edit.");
     });
   }
 
@@ -2700,6 +2876,8 @@
       } else if (s.kind === "format" && s.value) {
         var formats = CONTINUOUS_FORMATS.concat(CATEGORICAL_FORMATS).map(function (f) { return f.value; });
         if (formats.indexOf(s.value) >= 0) cfg.format = s.value;
+      } else if (s.kind === "label" && s.value) {
+        cfg.label = String(s.value);
       }
     });
   }
@@ -2759,6 +2937,7 @@
       $("pt2AiStatus").textContent = "Caption & Notes updated. Results draft copied to clipboard when available.";
       return;
     }
+    if (aiSession.action === "review") return;
     var idxs = selectedAiIndexes();
     var selected = idxs.map(function (i) { return aiSession.payload[i]; }).filter(Boolean);
     if (!selected.length) {
@@ -2785,14 +2964,25 @@
       draft: runAiDraft
     }[action];
     if (!runner) return;
-    runner().catch(function (err) {
+    var p;
+    try { p = runner(); }
+    catch (syncErr) {
       clearAiStatusTimer();
-      if (!aiSession.busy) return; /* cancelled */
+      $("pt2AiStatus").classList.add("error");
+      $("pt2AiStatus").textContent = (syncErr && syncErr.message) || "AI action failed.";
+      setAiBusy(false);
+      return;
+    }
+    Promise.resolve(p).catch(function (err) {
+      clearAiStatusTimer();
+      if (!aiSession.busy) return;
       $("pt2AiStatus").classList.add("error");
       $("pt2AiStatus").textContent = (err && err.message) ? err.message : "AI request failed.";
-      $("pt2AiResult").innerHTML = '<p class="cfg-hint">Check your network connection and try again. You can also Cancel and retry.</p>';
+      $("pt2AiResult").innerHTML = '<p class="cfg-hint">Network or AI proxy issue. Cancel and retry, or continue editing the table manually.</p>';
       $("pt2AiFooter").style.display = "none";
-    }).then(function () { setAiBusy(false); });
+    }).then(function () {
+      setAiBusy(false);
+    });
   }
 
   function wireAiAssistant() {

@@ -2213,7 +2213,8 @@
      Cloudflare Groq proxy as other Statistico modules. */
 
   var AI_PROXY_URL = "https://statistico-ai.statistico.workers.dev/";
-  var aiSession = { action: null, payload: null, busy: false };
+  var AI_TIMEOUT_MS = 12000;
+  var aiSession = { action: null, payload: null, busy: false, abort: null, statusTimer: null };
 
   function extractAiJson(raw) {
     if (!raw) return null;
@@ -2223,12 +2224,58 @@
     try { return JSON.parse(cleaned.slice(s, e + 1)); } catch (err) { return null; }
   }
 
+  function clearAiStatusTimer() {
+    if (aiSession.statusTimer) { clearInterval(aiSession.statusTimer); aiSession.statusTimer = null; }
+  }
+
+  function beginAiStatus(label) {
+    clearAiStatusTimer();
+    var started = Date.now();
+    function tick() {
+      var el = $("pt2AiStatus");
+      if (!el || !aiSession.busy) return;
+      var sec = Math.round((Date.now() - started) / 1000);
+      el.classList.remove("error");
+      el.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + (label || "Thinking") +
+        "\u2026" + (sec >= 3 ? " (" + sec + "s)" : "");
+    }
+    tick();
+    aiSession.statusTimer = setInterval(tick, 1000);
+  }
+
+  function abortAiRequest() {
+    if (aiSession.abort) {
+      try { aiSession.abort.abort(); } catch (e) {}
+      aiSession.abort = null;
+    }
+  }
+
   function callPublicationAi(prompt, maxTokens) {
-    var models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-8b-8192"];
+    /* Prefer the fast model — 70B often stalls in the Excel WebView. */
+    var models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"];
     var lastErr = null;
+    var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    aiSession.abort = controller;
+
+    function withTimeout(promise, ms) {
+      if (!controller) {
+        return new Promise(function (resolve, reject) {
+          var t = setTimeout(function () { reject(new Error("AI request timed out after " + Math.round(ms / 1000) + "s")); }, ms);
+          promise.then(function (v) { clearTimeout(t); resolve(v); }, function (e) { clearTimeout(t); reject(e); });
+        });
+      }
+      var timer = setTimeout(function () {
+        try { controller.abort(); } catch (e) {}
+      }, ms);
+      return promise.then(function (v) { clearTimeout(timer); return v; }, function (e) {
+        clearTimeout(timer);
+        throw e;
+      });
+    }
+
     function tryModel(i) {
       if (i >= models.length) return Promise.reject(lastErr || new Error("No AI model available"));
-      return fetch(AI_PROXY_URL, {
+      var fetchOpts = {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2236,18 +2283,22 @@
           messages: [
             {
               role: "system",
-              content: "You are a senior biostatistics editor helping researchers build publication-ready tables inside Statistico. Propose recommendations only. Never claim clinical importance from p-values alone. Reply with STRICT JSON only — no markdown fences, no commentary outside JSON."
+              content: "You are a senior biostatistics editor helping researchers build publication-ready tables inside Statistico. Propose recommendations only. Never claim clinical importance from p-values alone. Reply with STRICT JSON only — no markdown fences, no commentary outside JSON. Keep replies short."
             },
             { role: "user", content: prompt }
           ],
-          max_tokens: maxTokens || 1400,
-          temperature: 0.25
+          max_tokens: maxTokens || 700,
+          temperature: 0.2
         })
-      }).then(function (r) {
+      };
+      if (controller) fetchOpts.signal = controller.signal;
+
+      return withTimeout(fetch(AI_PROXY_URL, fetchOpts), AI_TIMEOUT_MS).then(function (r) {
         if (!r.ok) {
           return r.json().catch(function () { return {}; }).then(function (e) {
             lastErr = new Error((e && e.error && e.error.message) || ("HTTP " + r.status));
-            if (r.status === 404) return tryModel(i + 1);
+            /* Retry other models on missing model / overload / rate limit */
+            if (r.status === 404 || r.status === 429 || r.status === 503 || r.status >= 500) return tryModel(i + 1);
             throw lastErr;
           });
         }
@@ -2258,12 +2309,28 @@
           return text;
         });
       }).catch(function (err) {
+        if (err && (err.name === "AbortError" || /timed out/i.test(err.message || ""))) {
+          lastErr = new Error("AI request timed out. Try again, or use a smaller table.");
+          /* One retry on a different model if we still have attempts and user didn't cancel intentionally via close */
+          if (i + 1 < models.length && aiSession.busy) {
+            controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+            aiSession.abort = controller;
+            return tryModel(i + 1);
+          }
+          throw lastErr;
+        }
         lastErr = err;
-        if (err && /not found/i.test(err.message || "")) return tryModel(i + 1);
+        if (err && /not found|unavailable|overloaded/i.test(err.message || "")) return tryModel(i + 1);
         throw err;
       });
     }
-    return tryModel(0);
+    return tryModel(0).then(function (text) {
+      aiSession.abort = null;
+      return text;
+    }, function (err) {
+      aiSession.abort = null;
+      throw err;
+    });
   }
 
   function columnProfile(key) {
@@ -2297,28 +2364,35 @@
   }
 
   function buildAiVariableSnapshot() {
-    return state.varOrder.map(function (key) {
+    /* Cap payload size — large category lists made the Excel WebView hang. */
+    return state.varOrder.slice(0, 30).map(function (key) {
       var v = VAR_DEFS_BY_KEY[key];
       var cfg = state.varCfg[key];
       if (!v || !cfg) return null;
       var profile = columnProfile(key);
       var cats = null;
       if (effectiveType(v, cfg) !== "continuous") {
-        cats = ensureCategoryMeta(v, cfg).slice().sort(function (a, b) { return a.order - b.order; }).map(function (m) {
-          return { value: m.value, label: m.label, include: m.include !== false };
-        });
+        cats = ensureCategoryMeta(v, cfg).slice().sort(function (a, b) { return a.order - b.order; })
+          .slice(0, 10).map(function (m) {
+            return { value: String(m.value).slice(0, 40), label: String(m.label).slice(0, 40), include: m.include !== false };
+          });
       }
       return {
         key: key,
-        sourceName: cfg.sourceName || v.label,
-        currentLabel: cfg.label,
+        sourceName: String(cfg.sourceName || v.label || "").slice(0, 60),
+        currentLabel: String(cfg.label || "").slice(0, 60),
         inferredType: v.type,
         typeOverride: cfg.typeOverride || "auto",
         format: cfg.format,
         include: !!cfg.include,
         isGroupVar: key === state.groupVar,
         categories: cats,
-        profile: profile
+        profile: {
+          missing: profile.missing,
+          nDistinct: profile.nDistinct,
+          topLevels: (profile.topLevels || []).slice(0, 5),
+          skewHint: profile.skewHint
+        }
       };
     }).filter(Boolean);
   }
@@ -2329,7 +2403,7 @@
     var avail = groupAvailability();
     var audit = [];
     if (block) {
-      block.rows.forEach(function (row) {
+      block.rows.slice(0, 24).forEach(function (row) {
         audit.push({
           variable: row.label,
           type: row.type,
@@ -2339,10 +2413,19 @@
         });
       });
     }
+    var gLabel = "";
+    if (state.groupVar) {
+      var gdef = GROUP_VAR_DEFS.filter(function (g) { return g.key === state.groupVar; })[0];
+      gLabel = (gdef && gdef.label) || state.groupVar;
+    }
+    var varNames = eligibleVarDefs().slice(0, 20).map(function (v) {
+      return (state.varCfg[v.key] && state.varCfg[v.key].label) || v.label;
+    });
     return {
       tableType: state.tableType,
       nTotal: ACTIVE_DATA.length,
       groupVar: state.groupVar || null,
+      groupLabel: gLabel || null,
       groupAvailability: avail,
       missingGroupMode: state.missingGroupMode,
       showOverall: state.showOverall,
@@ -2351,11 +2434,10 @@
       completeCase: state.completeCase,
       title: state.report.title,
       notes: state.report.notes || autoNoteText(),
-      abbreviations: state.report.abbreviations || "",
-      columnN: block ? block.columnN : {},
-      columns: block ? block.columns.map(function (c) { return { key: c.key, label: c.label, n: block.columnN[c.key] }; }) : [],
-      audit: audit,
-      plainPreview: buildPlainTextExport(model).slice(0, 3500)
+      abbreviations: (state.report.abbreviations || "").slice(0, 400),
+      columns: block ? block.columns.map(function (c) { return { label: c.label, n: block.columnN[c.key] }; }) : [],
+      variables: varNames,
+      audit: audit
     };
   }
 
@@ -2364,9 +2446,14 @@
     var btn = $("pt2AiBtn");
     if (btn) btn.disabled = busy;
     document.querySelectorAll("[data-ai-action]").forEach(function (b) { b.disabled = busy; });
+    var cancelBtn = $("pt2AiCancelBtn");
+    if (cancelBtn) cancelBtn.style.display = busy ? "" : "none";
+    if (!busy) clearAiStatusTimer();
   }
 
   function showAiHome() {
+    abortAiRequest();
+    clearAiStatusTimer();
     aiSession.action = null;
     aiSession.payload = null;
     $("pt2AiHome").style.display = "";
@@ -2376,6 +2463,8 @@
     $("pt2AiStatus").textContent = "";
     $("pt2AiStatus").classList.remove("error");
     $("pt2AiTitle").textContent = "AI Assistant";
+    var cancelBtn = $("pt2AiCancelBtn");
+    if (cancelBtn) cancelBtn.style.display = "none";
   }
 
   function showAiWork(title) {
@@ -2385,7 +2474,7 @@
     $("pt2AiFooter").style.display = "none";
     $("pt2AiResult").innerHTML = "";
     $("pt2AiStatus").classList.remove("error");
-    $("pt2AiStatus").innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Thinking\u2026';
+    beginAiStatus("Thinking");
   }
 
   function renderAiProposalList(items) {
@@ -2420,6 +2509,7 @@
   function runAiSetup() {
     showAiWork("Set up my table");
     setAiBusy(true);
+    beginAiStatus("Setting up");
     var snap = buildAiVariableSnapshot();
     var prompt =
       "Task: propose an initial publication-table setup.\n" +
@@ -2428,8 +2518,8 @@
       "Variables JSON:\n" + JSON.stringify(snap) + "\n\n" +
       "Return JSON:\n" +
       '{"suggestions":[{"kind":"groupVar|include|exclude|type|format","key":"varKey","value":"proposed value","title":"short title","change":"from → to","reason":"why","consequence":"statistical effect"}]}\n' +
-      "Rules: suggest at most one groupVar; mark ID-like columns for exclude; prefer median-iqr-paren when skewHint is skewed; do not invent keys; keep suggestions actionable.";
-    return callPublicationAi(prompt, 1600).then(function (raw) {
+      "Rules: at most 8 suggestions; at most one groupVar; mark ID-like columns for exclude; prefer median-iqr-paren when skewHint is skewed; do not invent keys.";
+    return callPublicationAi(prompt, 700).then(function (raw) {
       var parsed = extractAiJson(raw) || {};
       var suggestions = (parsed.suggestions || []).filter(function (s) {
         return s && s.kind && (s.kind === "groupVar" || snap.some(function (v) { return v.key === s.key; }));
@@ -2443,6 +2533,7 @@
           reason: [s.reason, s.consequence].filter(Boolean).join(" ")
         };
       });
+      clearAiStatusTimer();
       aiSession.action = "setup";
       aiSession.payload = suggestions;
       $("pt2AiStatus").textContent = suggestions.length
@@ -2455,14 +2546,15 @@
   function runAiLabels() {
     showAiWork("Improve labels & categories");
     setAiBusy(true);
+    beginAiStatus("Improving labels");
     var snap = buildAiVariableSnapshot();
     var prompt =
       "Task: improve publication-friendly variable labels and category display labels.\n" +
       "Variables JSON:\n" + JSON.stringify(snap) + "\n\n" +
       "Return JSON:\n" +
       '{"suggestions":[{"kind":"label|categoryLabel|type","key":"varKey","value":"new label or type","categoryValue":"original category if kind=categoryLabel","title":"...","change":"...","reason":"..."}]}\n' +
-      "Rules: keep clinical units when present; map coded 0/1 to readable labels when obvious; do not merge/drop categories; do not invent new category values; suggest type only when clearly wrong.";
-    return callPublicationAi(prompt, 1600).then(function (raw) {
+      "Rules: at most 10 suggestions; keep units; map coded 0/1 when obvious; do not merge/drop categories; do not invent category values.";
+    return callPublicationAi(prompt, 700).then(function (raw) {
       var parsed = extractAiJson(raw) || {};
       var suggestions = (parsed.suggestions || []).filter(function (s) {
         return s && s.key && state.varCfg[s.key] && (s.kind === "label" || s.kind === "categoryLabel" || s.kind === "type");
@@ -2477,6 +2569,7 @@
           reason: s.reason || ""
         };
       });
+      clearAiStatusTimer();
       aiSession.action = "labels";
       aiSession.payload = suggestions;
       $("pt2AiStatus").textContent = suggestions.length
@@ -2489,16 +2582,18 @@
   function runAiReview() {
     showAiWork("Review this table");
     setAiBusy(true);
+    beginAiStatus("Reviewing table");
     var signals = buildAiTableSignals();
     var prompt =
       "Task: quality-control review of a finished publication table. Identify concrete problems.\n" +
       "Signals JSON:\n" + JSON.stringify(signals) + "\n\n" +
       "Return JSON:\n" +
       '{"findings":[{"severity":"high|medium|low","title":"...","detail":"specific issue and what to consider","topic":"missingness|denominators|labels|tests|smd|sparse|format|other"}]}\n' +
-      "Rules: be specific with Ns and variable names from the signals; do not recompute p-values; do not declare clinical importance; if nothing serious, return an empty findings array or one low informational note.";
-    return callPublicationAi(prompt, 1400).then(function (raw) {
+      "Rules: at most 6 findings; be specific with Ns; do not recompute p-values; do not declare clinical importance.";
+    return callPublicationAi(prompt, 700).then(function (raw) {
       var parsed = extractAiJson(raw) || {};
       var findings = parsed.findings || [];
+      clearAiStatusTimer();
       aiSession.action = "review";
       aiSession.payload = findings;
       if (!findings.length) {
@@ -2520,32 +2615,68 @@
     });
   }
 
+  function localDraftFallback(signals) {
+    var gPart = signals.groupLabel ? (" by " + signals.groupLabel) : "";
+    var title = state.tableType === "frequency"
+      ? "Frequency Distribution of Study Variables"
+      : (signals.groupLabel
+        ? ("Baseline characteristics" + gPart)
+        : (state.report.title || "Summary of Study Variables"));
+    var nLine = "The sample included " + signals.nTotal + " observations";
+    if (signals.groupAvailability && signals.groupAvailability.missing > 0) {
+      nLine += "; the grouping variable was available for " + signals.groupAvailability.valid +
+        " observations (" + signals.groupAvailability.missing + " missing)";
+    }
+    nLine += ".";
+    return {
+      tableNumber: state.report.tableNumber || 1,
+      title: title.charAt(0).toUpperCase() + title.slice(1),
+      subtitle: signals.groupLabel ? ("Grouped by " + signals.groupLabel) : "",
+      notes: signals.notes || autoNoteText(),
+      abbreviations: signals.abbreviations || buildContextAbbreviations(),
+      resultsDraft: nLine + " Values are summarized in Table " + (state.report.tableNumber || 1) +
+        ". This paragraph is a draft for author review and does not claim statistical or clinical importance.",
+      disclaimer: "Local draft (AI unavailable) — edit before use."
+    };
+  }
+
+  function showDraftForm(parsed, statusMsg) {
+    clearAiStatusTimer();
+    aiSession.action = "draft";
+    aiSession.payload = parsed;
+    $("pt2AiStatus").classList.remove("error");
+    $("pt2AiStatus").textContent = statusMsg || "Edit the draft below, then accept to fill Caption & Notes.";
+    $("pt2AiResult").innerHTML =
+      '<div class="pt2-ai-draft-block"><label>Table number</label><input id="pt2AiDraftNum" type="number" min="1" value="' + esc(parsed.tableNumber || state.report.tableNumber) + '" /></div>' +
+      '<div class="pt2-ai-draft-block"><label>Title</label><input id="pt2AiDraftTitle" type="text" value="' + esc(parsed.title || "") + '" /></div>' +
+      '<div class="pt2-ai-draft-block"><label>Subtitle</label><input id="pt2AiDraftSubtitle" type="text" value="' + esc(parsed.subtitle || "") + '" /></div>' +
+      '<div class="pt2-ai-draft-block"><label>Notes / footnotes</label><textarea id="pt2AiDraftNotes">' + esc(parsed.notes || "") + "</textarea></div>" +
+      '<div class="pt2-ai-draft-block"><label>Abbreviations</label><textarea id="pt2AiDraftAbbrev">' + esc(parsed.abbreviations || "") + "</textarea></div>" +
+      '<div class="pt2-ai-draft-block"><label>Results draft (not inserted into the table)</label><textarea id="pt2AiDraftResults">' + esc(parsed.resultsDraft || "") + "</textarea></div>" +
+      '<p class="cfg-hint">' + esc(parsed.disclaimer || "Draft for author review — verify against the table before use.") + "</p>";
+    $("pt2AiFooter").style.display = "flex";
+    $("pt2AiAcceptBtn").textContent = "Apply to Caption & Notes";
+  }
+
   function runAiDraft() {
     showAiWork("Draft title, notes & Results");
     setAiBusy(true);
+    beginAiStatus("Drafting");
     var signals = buildAiTableSignals();
     var prompt =
       "Task: draft table caption elements and a short Results paragraph.\n" +
       "Signals JSON:\n" + JSON.stringify(signals) + "\n\n" +
       "Return JSON:\n" +
       '{"tableNumber":1,"title":"...","subtitle":"...","notes":"...","abbreviations":"...","resultsDraft":"...","disclaimer":"Draft for author review"}\n' +
-      "Rules: concise journal style; notes should mention summary formats and comparison tests actually used; Results draft must be cautious and avoid claiming clinical/statistical importance from p alone; label it as a draft.";
-    return callPublicationAi(prompt, 1200).then(function (raw) {
+      "Rules: concise; notes must reflect formats/tests in signals; Results draft cautious, no importance claims from p alone; keep each field under 400 characters.";
+    return callPublicationAi(prompt, 650).then(function (raw) {
       var parsed = extractAiJson(raw);
       if (!parsed) throw new Error("Could not parse AI draft");
-      aiSession.action = "draft";
-      aiSession.payload = parsed;
-      $("pt2AiStatus").textContent = "Edit the draft below, then accept to fill Caption & Notes.";
-      $("pt2AiResult").innerHTML =
-        '<div class="pt2-ai-draft-block"><label>Table number</label><input id="pt2AiDraftNum" type="number" min="1" value="' + esc(parsed.tableNumber || state.report.tableNumber) + '" /></div>' +
-        '<div class="pt2-ai-draft-block"><label>Title</label><input id="pt2AiDraftTitle" type="text" value="' + esc(parsed.title || "") + '" /></div>' +
-        '<div class="pt2-ai-draft-block"><label>Subtitle</label><input id="pt2AiDraftSubtitle" type="text" value="' + esc(parsed.subtitle || "") + '" /></div>' +
-        '<div class="pt2-ai-draft-block"><label>Notes / footnotes</label><textarea id="pt2AiDraftNotes">' + esc(parsed.notes || "") + "</textarea></div>" +
-        '<div class="pt2-ai-draft-block"><label>Abbreviations</label><textarea id="pt2AiDraftAbbrev">' + esc(parsed.abbreviations || "") + "</textarea></div>" +
-        '<div class="pt2-ai-draft-block"><label>Results draft (not inserted into the table)</label><textarea id="pt2AiDraftResults">' + esc(parsed.resultsDraft || "") + "</textarea></div>" +
-        '<p class="cfg-hint">' + esc(parsed.disclaimer || "Draft for author review — verify against the table before use.") + "</p>";
-      $("pt2AiFooter").style.display = "flex";
-      $("pt2AiAcceptBtn").textContent = "Apply to Caption & Notes";
+      showDraftForm(parsed);
+    }).catch(function (err) {
+      if (!aiSession.busy) return;
+      showDraftForm(localDraftFallback(signals),
+        "AI was slow or unavailable (" + ((err && err.message) || "error") + "). Showing a local draft you can edit.");
     });
   }
 
@@ -2655,9 +2786,11 @@
     }[action];
     if (!runner) return;
     runner().catch(function (err) {
+      clearAiStatusTimer();
+      if (!aiSession.busy) return; /* cancelled */
       $("pt2AiStatus").classList.add("error");
       $("pt2AiStatus").textContent = (err && err.message) ? err.message : "AI request failed.";
-      $("pt2AiResult").innerHTML = '<p class="cfg-hint">Check your network connection and try again.</p>';
+      $("pt2AiResult").innerHTML = '<p class="cfg-hint">Check your network connection and try again. You can also Cancel and retry.</p>';
       $("pt2AiFooter").style.display = "none";
     }).then(function () { setAiBusy(false); });
   }
@@ -2667,10 +2800,24 @@
     var openBtn = $("pt2AiBtn");
     if (!overlay || !openBtn) return;
     function open() { showAiHome(); overlay.classList.add("open"); }
-    function close() { if (!aiSession.busy) { overlay.classList.remove("open"); showAiHome(); } }
+    function forceClose() {
+      abortAiRequest();
+      setAiBusy(false);
+      overlay.classList.remove("open");
+      showAiHome();
+    }
+    function close() {
+      if (aiSession.busy) forceClose();
+      else { overlay.classList.remove("open"); showAiHome(); }
+    }
     openBtn.addEventListener("click", open);
     $("pt2AiCloseBtn").addEventListener("click", close);
-    $("pt2AiBackBtn").addEventListener("click", function () { if (!aiSession.busy) showAiHome(); });
+    var cancelBtn = $("pt2AiCancelBtn");
+    if (cancelBtn) cancelBtn.addEventListener("click", forceClose);
+    $("pt2AiBackBtn").addEventListener("click", function () {
+      if (aiSession.busy) forceClose();
+      else showAiHome();
+    });
     $("pt2AiDiscardBtn").addEventListener("click", function () { if (!aiSession.busy) showAiHome(); });
     $("pt2AiAcceptBtn").addEventListener("click", acceptAiSession);
     overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
@@ -2678,7 +2825,7 @@
       btn.addEventListener("click", function () { runAiAction(btn.getAttribute("data-ai-action")); });
     });
     document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && overlay.classList.contains("open") && !aiSession.busy) close();
+      if (e.key === "Escape" && overlay.classList.contains("open")) close();
     });
   }
 

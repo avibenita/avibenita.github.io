@@ -1702,15 +1702,15 @@
       icon: "fa-share-nodes",
       html:
         helpItem("Copy as Text",
-          "Tab-delimited plain text (characteristics and columns separated by tabs). Best for pasting into plain editors or regenerating a table elsewhere.") +
-        helpItem("Copy Table",
+          "Tab-delimited plain text for Excel, text editors, or unformatted paste.") +
+        helpItem("Copy Formatted Table",
           "Formatted HTML table placed on the clipboard for rich paste into Word, Outlook, or Google Docs — this is usually what you want for the manuscript.") +
         helpItem("Copy as HTML",
           "Raw HTML source as plain text, for embedding in a webpage or inspecting markup.") +
         helpItem("View as HTML table",
           "Opens a full viewer of the table as styled HTML. Choose a theme (Manuscript, Journal, Compact, Striped, Slate), then Copy, Download HTML, Print, or export to Word from that view.") +
-        helpItem("Export to Word",
-          "Downloads a Word-compatible .doc file wrapping the HTML table. For final production many journals still prefer Copy Table into a native Word table.")
+        helpItem("Export Word Document",
+          "Downloads a Word-compatible .doc file wrapping the HTML table. For final production many journals still prefer Copy Formatted Table into a native Word table.")
     },
     methods: {
       title: "Methods",

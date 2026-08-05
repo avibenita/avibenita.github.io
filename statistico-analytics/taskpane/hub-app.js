@@ -143,20 +143,20 @@ const TOOLS_CATEGORY_TILES = [
     ]
   },
   {
-    id: "qc-family",
-    title: "QC",
-    icon: "fa-chart-line",
+    id: "ezpaste",
+    title: "EzPaste",
+    icon: "fa-bullseye",
     accent: "#eab308",
     accentDark: "#a16207",
     color: "#14b8a6",
     colorDark: "#0f766e",
-    subtitle: "Quality control and process capability tools",
+    subtitle: "Batch-export Excel charts and ranges to PowerPoint, Word, and more",
     modules: [
       {
-        id: "calc-qc",
-        label: "QC Tools",
-        tip: "Open the QC calculator family.",
-        dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=qc"
+        id: "ezpaste-open",
+        label: "Open EzPaste",
+        tip: "Open EzPaste — automate Excel charts and tables into PowerPoint, Word, PDF, and HTML.",
+        dialogUrl: "https://statistico.live/Statistico-Website/index-EzPaste.html"
       }
     ]
   },

@@ -1886,6 +1886,9 @@ const FOOTER_TEMPLATE = `
       activePage = 'faq';
     } else if (currentFile === 'index-Calculators.html' || currentPath.indexOf('/calculators/') >= 0) {
       activePage = 'calculators';
+    } else if (currentFile === 'publication-tables.html') {
+      /* Lives under /analytics/ path but belongs to Applications Hub */
+      activePage = 'addins';
     } else if (currentFile === 'index-Analytics.html' || currentPath.indexOf('/analytics/') >= 0) {
       activePage = 'analytics';
     } else if (currentFile === 'index-Addins.html' || currentFile === 'index-EzPaste.html') {

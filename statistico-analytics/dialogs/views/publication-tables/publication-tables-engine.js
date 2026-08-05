@@ -3049,7 +3049,8 @@
      for that instead of running unconditionally inside init(). Everything
      else in init() runs immediately so the demo table shows up without
      delay if no range is selected (or this opens outside Excel). */
-  if (typeof Office !== "undefined" && Office.onReady) {
+  /* Skip Office host handshake on website demos — office.js is not loaded. */
+  if (!window.__PT2_WEB_DEMO__ && typeof Office !== "undefined" && Office.onReady) {
     Office.onReady().then(wireHostMessaging).catch(function () {});
   }
 })();

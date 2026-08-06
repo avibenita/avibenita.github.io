@@ -61,10 +61,14 @@ jobs:
         continue-on-error: true
 
       - name: Retry deploy on transient Pages failure
-        if: steps.deployment.conclusion == 'failure'
+        if: steps.deployment.conclusion != 'success'
         id: deployment_retry
         uses: actions/deploy-pages@v4
+        continue-on-error: true
 
-      - name: Fail if both deploy attempts failed
-        if: steps.deployment.conclusion == 'failure' && steps.deployment_retry.conclusion != 'success'
-        run: exit 1
+      - name: Fail if deploy did not succeed
+        if: steps.deployment.conclusion != 'success' && steps.deployment_retry.conclusion != 'success'
+        run: |
+          echo "Deploy conclusion: ${{ steps.deployment.conclusion }}"
+          echo "Retry conclusion: ${{ steps.deployment_retry.conclusion }}"
+          exit 1

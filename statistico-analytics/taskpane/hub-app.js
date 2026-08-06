@@ -624,6 +624,7 @@ function escapeHtml(s) {
 }
 
 const popup = document.getElementById("infoPopup");
+const popupScrim = document.getElementById("infoPopupScrim");
 const ptitle = document.getElementById("popupTitle");
 const plist = document.getElementById("popupList");
 let _activeBtn = null;
@@ -646,24 +647,40 @@ function showPopup(m, btn) {
   if (popup && btn) {
     const r = btn.getBoundingClientRect();
     const vw = window.innerWidth;
-    const W = 248;
+    const W = 260;
     let left = r.right - W;
     if (left < 6) left = 6;
     if (left + W > vw - 6) left = vw - W - 6;
     popup.style.left = left + "px";
     popup.style.top = r.bottom + 5 + "px";
     popup.classList.add("open");
+    if (popupScrim) {
+      popupScrim.classList.add("open");
+      popupScrim.setAttribute("aria-hidden", "false");
+    }
   }
 }
 
 function closePopup() {
   if (popup) popup.classList.remove("open");
+  if (popupScrim) {
+    popupScrim.classList.remove("open");
+    popupScrim.setAttribute("aria-hidden", "true");
+  }
   _activeBtn = null;
 }
 
 document.addEventListener("click", function(e) {
-  if (popup && !popup.contains(e.target)) closePopup();
+  if (!popup || !popup.classList.contains("open")) return;
+  if (popup.contains(e.target)) return;
+  if (e.target && e.target.closest && (
+    e.target.closest(".category-info-btn") || e.target.closest(".mod-info-btn")
+  )) return;
+  closePopup();
 });
+if (popupScrim) {
+  popupScrim.addEventListener("click", function () { closePopup(); });
+}
 
 function filterModules(q) {
   renderCategoryTiles(q || "");

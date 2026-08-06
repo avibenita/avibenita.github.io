@@ -252,7 +252,7 @@
       display: none; position: fixed; z-index: 9999;
       background: #fff; border: 1.5px solid var(--border-dark);
       border-radius: 10px; padding: 12px 14px;
-      width: 220px;
+      width: 248px;
       box-shadow: 0 8px 28px rgba(0,0,0,.16);
       font-size: 11px; line-height: 1.55; color: var(--text-secondary);
       pointer-events: auto;
@@ -340,6 +340,34 @@
       font-size: 12.5px;
       font-weight: 700;
       color: #0f172a;
+      min-width: 0;
+      flex: 1;
+    }
+    .category-info-btn {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      margin-left: auto;
+      border-radius: 50%;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(255, 255, 255, 0.92);
+      color: #64748b;
+      font-size: 10px;
+      font-weight: 700;
+      font-style: normal;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      transition: background .15s, border-color .15s, color .15s;
+      user-select: none;
+    }
+    .category-info-btn:hover {
+      background: var(--cat-color, #64748b);
+      border-color: var(--cat-color, #64748b);
+      color: #fff;
     }
     .category-subtitle {
       font-size: 10.5px;
@@ -770,6 +798,9 @@
       position: fixed;
       inset: 0;
       z-index: 10001;
+      /* Solid base styles — never rely on animation fill-mode for visibility.
+         Excel WebView2 can skip/disable CSS animations, and `both` would then
+         leave the overlay stuck on the transparent `from` keyframe. */
       background: rgba(5, 10, 20, 0.74);
       backdrop-filter: blur(3px) saturate(115%);
       -webkit-backdrop-filter: blur(3px) saturate(115%);
@@ -779,13 +810,23 @@
     }
     #hubWelcomeOverlay.open {
       display: flex;
-      animation: hubWelcomeOverlayFadeIn .3s ease both;
+      animation: hubWelcomeOverlayFadeIn .3s ease forwards;
     }
     .hub-welcome-banner {
       position: relative;
       width: min(100%, 340px);
       margin: 0;
-      animation: hubWelcomePopIn .38s cubic-bezier(.22,.9,.32,1.15) both;
+      opacity: 1;
+      transform: none;
+      animation: hubWelcomePopIn .38s cubic-bezier(.22,.9,.32,1.15) forwards;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #hubWelcomeOverlay.open,
+      .hub-welcome-banner,
+      .hub-welcome-inner::after,
+      .hub-welcome-badge::before {
+        animation: none !important;
+      }
     }
     .hub-welcome-inner {
       position: relative;
@@ -1307,6 +1348,16 @@
     transform:  translateY(-1px);
   }
   .category-title           { color: #ffffff !important; }
+  .category-info-btn {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.18) !important;
+    color: #9fb3c8 !important;
+  }
+  .category-info-btn:hover {
+    background: var(--cat-color, #a78bfa) !important;
+    border-color: var(--cat-color, #a78bfa) !important;
+    color: #ffffff !important;
+  }
   .category-subtitle        { color: #b8c5d2 !important; }
   .category-subgroup-label  { color: #b8c5d2 !important; }
   .category-subgroup.with-divider { border-top-color: rgba(255,255,255,.08) !important; }
@@ -1660,7 +1711,7 @@
     <ul id="popupList"></ul>
   </div>
 
-  <!-- First-run welcome popup: shown once on first launch, closable, doesn't shift layout -->
+  <!-- Welcome popup: shown every time the hub taskpane loads; closable for this session -->
   <div id="hubWelcomeOverlay" aria-hidden="true" role="dialog" aria-labelledby="hubWelcomeTitle">
     <div class="hub-welcome-banner" id="hubWelcomeBanner">
       <div class="hub-welcome-badge"><i class="fa-solid fa-rocket"></i></div>
@@ -1708,11 +1759,10 @@
   <script src="hub-results-bridge.js?v=20260715b"></script>
   <script src="univariate/univariate-dialog-payload.js?v=20260519e"></script>
   <script src="hub-procedure-advisor.js?v=20260718e"></script>
-  <script src="hub-app.js?v=20260803c"></script>
+  <script src="hub-app.js?v=20260806a"></script>
   <script>
-    /* ── First-run welcome popup: show once on start, remember dismissal ──── */
+    /* ── Welcome popup: show every time the hub taskpane loads ──── */
     (function initHubWelcomePopup() {
-      var STORAGE_KEY = "statisticoWelcomeDismissed_v3";
       var overlay = document.getElementById("hubWelcomeOverlay");
       var closeBtn = document.getElementById("hubWelcomeClose");
       var startBtn = document.getElementById("hubWelcomeStart");
@@ -1721,18 +1771,14 @@
       function dismiss() {
         overlay.classList.remove("open");
         overlay.setAttribute("aria-hidden", "true");
-        try { window.localStorage && window.localStorage.setItem(STORAGE_KEY, "1"); } catch (e) {}
       }
 
-      var alreadyDismissed = false;
-      try {
-        alreadyDismissed = !!(window.localStorage && window.localStorage.getItem(STORAGE_KEY) === "1");
-      } catch (e) { /* storage unavailable — show popup anyway */ }
-
-      if (!alreadyDismissed) {
+      function show() {
         overlay.classList.add("open");
         overlay.setAttribute("aria-hidden", "false");
       }
+
+      show();
 
       closeBtn.addEventListener("click", dismiss);
       if (startBtn) startBtn.addEventListener("click", dismiss);

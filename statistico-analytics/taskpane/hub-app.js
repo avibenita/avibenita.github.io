@@ -37,6 +37,13 @@ const HUB_CATEGORY_TILES = [
     color: "#f97316",
     colorDark: "#c2410c",
     subtitle: "Distributions, correlations, and patterns",
+    desc: "Start here when you need to understand individual variables or how they relate — before modeling or group tests.",
+    info: [
+      "Univariate: distribution summaries, normality, and outliers",
+      "Correlation: pairwise associations and matrices",
+      "Works from your Active Range in Excel",
+      "Useful first pass before regression or group comparisons"
+    ],
     modules: [
       { id: "univariate", label: "Univariate", tip: "Distribution summaries, outliers, and normality checks for single variables." },
       { id: "correlations", label: "Correlation", tip: "Pairwise associations and correlation matrix between numeric variables." }
@@ -49,6 +56,13 @@ const HUB_CATEGORY_TILES = [
     color: "#10b981",
     colorDark: "#0f766e",
     subtitle: "ANOVA and mixed models for group comparisons",
+    desc: "Test whether outcomes differ across groups, including designs with nesting or repeated structure.",
+    info: [
+      "ANOVA: compare means across 3+ groups with post-hoc options",
+      "Mixed models: fixed effects plus random subject variation",
+      "Supports factorial and longitudinal-style setups",
+      "Effect sizes and model diagnostics included"
+    ],
     modules: [
       { id: "anova", label: "ANOVA", tip: "Compare means across 3+ groups with post-hoc support." },
       { id: "mixed", label: "Mixed", tip: "Mixed-effects models for grouped or repeated-measures style data." }
@@ -61,6 +75,13 @@ const HUB_CATEGORY_TILES = [
     color: "#06b6d4",
     colorDark: "#0e7490",
     subtitle: "Independent, paired, and repeated measures",
+    desc: "Compare means for two independent groups, or for the same cases measured more than once.",
+    info: [
+      "Independent: two-group mean comparison",
+      "Repeated: paired / within-subject designs",
+      "Parametric and non-parametric alternatives",
+      "Effect sizes and assumption checks"
+    ],
     modules: [
       { id: "independent", label: "Independent", tip: "Compare two independent groups on a numeric outcome." },
       { id: "dependent", label: "Repeated", tip: "Compare paired or repeated measurements for the same cases." }
@@ -74,6 +95,13 @@ const HUB_CATEGORY_TILES = [
     colorDark: "#0369a1",
     tabStyle: "soft",
     subtitle: "Regression and logistic prediction",
+    desc: "Predict continuous or binary outcomes from one or more predictors, with coefficients and fit diagnostics.",
+    info: [
+      "Regression: continuous outcomes, coefficients, and diagnostics",
+      "Logistic: binary outcomes with odds ratios and classification",
+      "Model fit, residual checks, and interpretation aids",
+      "Built for publication-ready reporting from Excel data"
+    ],
     modules: [
       { id: "regression", label: "Regression", tip: "Linear regression with coefficients, intervals, and diagnostics." },
       { id: "logistic", label: "Logistic", tip: "Binary outcome modeling with odds ratios and model fit metrics." }
@@ -87,6 +115,13 @@ const HUB_CATEGORY_TILES = [
     colorDark: "#be185d",
     tabStyle: "soft",
     subtitle: "PCA and factor analysis for latent structure",
+    desc: "Reduce many correlated variables into fewer components or latent factors that capture shared structure.",
+    info: [
+      "Factor analysis: latent constructs and rotations",
+      "PCA: variance-maximizing dimension reduction",
+      "Scree plots, loadings, and adequacy checks",
+      "Useful for scale development and data compression"
+    ],
     modules: [
       { id: "factor", label: "Factor", tip: "Latent factor extraction and rotation for construct discovery." },
       { id: "pca", label: "PCA", tip: "Principal component reduction for compact feature representation." }
@@ -99,6 +134,13 @@ const HUB_CATEGORY_TILES = [
     color: "#14b8a6",
     colorDark: "#0f766e",
     subtitle: "K-means and hierarchical clustering",
+    desc: "Group cases into segments based on similarity — either by partitioning into k clusters or by building a merge tree.",
+    info: [
+      "K-means: partition cases around centroids",
+      "Hierarchical: agglomerative tree with dendrogram",
+      "Distance metrics and optional standardisation",
+      "Cluster sizes, profiles, and case assignments"
+    ],
     modules: [
       { id: "kmeans", label: "K-Means", tip: "Partition cases into k groups around centroids." },
       { id: "hierarchical", label: "Hierarchical", tip: "Agglomerative merge tree with dendrogram; cut at k." }
@@ -120,6 +162,14 @@ const TOOLS_CATEGORY_TILES = [
     color: "#eab308",
     colorDark: "#a16207",
     subtitle: "Turn raw data into polished, journal-ready tables",
+    desc: "Build Table 1 / baseline-characteristics, frequency, and group-comparison tables — with p-values, standardized differences, and manuscript-ready styling.",
+    info: [
+      "Table 1 / baseline characteristics",
+      "Group comparisons with p-values & SMD",
+      "Mixed continuous + hierarchical categorical rows",
+      "Clinical, APA, journal & compact styles",
+      "Copy to Word/Excel or export .doc/.xls"
+    ],
     modules: [
       { id: "publication-tables", label: "Create a Table", tip: "Build a publication-ready Table 1 or descriptive summary from your Excel data — formatted for Word and journals." }
     ]
@@ -134,6 +184,13 @@ const TOOLS_CATEGORY_TILES = [
     color: "#f97316",
     colorDark: "#c2410c",
     subtitle: "Reveal the small number of contributors driving most outcomes.",
+    desc: "Use Pareto (80/20) analysis to find the few categories that account for most of the total — ideal for quality, operations, and prioritization.",
+    info: [
+      "Interactive Pareto chart with cumulative curve",
+      "80/20 vital-few highlighting",
+      "Works from your Active Range in Excel",
+      "Useful for defects, costs, volume, and similar counts"
+    ],
     modules: [
       {
         id: "pareto2080",
@@ -151,6 +208,13 @@ const TOOLS_CATEGORY_TILES = [
     color: "#14b8a6",
     colorDark: "#0f766e",
     subtitle: "Batch-export Excel charts and ranges to PowerPoint, Word, and more",
+    desc: "Automate exporting Excel charts and tables into PowerPoint, Word, PDF, and HTML — instead of copying one object at a time.",
+    info: [
+      "Batch-export charts and ranges",
+      "Targets PowerPoint, Word, PDF, and HTML",
+      "Keeps layout and formatting consistent",
+      "Opens the EzPaste workflow from the hub"
+    ],
     modules: [
       {
         id: "ezpaste-open",
@@ -173,6 +237,13 @@ const TOOLS_CATEGORY_TILES = [
     color: "#2563eb",
     colorDark: "#1d4ed8",
     subtitle: "Probability, quantiles, and tails for common distributions",
+    desc: "Look up probabilities, critical values, and tail areas for common statistical distributions — no worksheet range required.",
+    info: [
+      "Normal, t, chi-square, F, and related families",
+      "PDF / CDF and quantile calculations",
+      "Left-, right-, and two-tailed probabilities",
+      "Standalone calculator — enter parameters directly"
+    ],
     modules: [
       {
         id: "calc-distribution-hub",
@@ -191,6 +262,13 @@ const TOOLS_CATEGORY_TILES = [
     color: "#0ea5e9",
     colorDark: "#0369a1",
     subtitle: "Precision and power oriented sample size tools",
+    desc: "Plan how large a sample you need — either for a target precision (margin of error) or for a desired statistical power.",
+    info: [
+      "Precision-based sample size estimation",
+      "Power-based sample size calculation",
+      "Common test families and effect-size inputs",
+      "Standalone planning tools — no Active Range needed"
+    ],
     modules: [
       {
         id: "calc-precision",
@@ -215,6 +293,13 @@ const TOOLS_CATEGORY_TILES = [
     color: "#a855f7",
     colorDark: "#7e22ce",
     subtitle: "Translate effect metrics across test families",
+    desc: "Convert between common effect-size metrics so you can compare or reuse results across different statistical tests.",
+    info: [
+      "Convert between common effect-size families",
+      "Useful when planning studies or pooling literature",
+      "Supports metrics used across t-tests, ANOVA, and correlations",
+      "Standalone converter — enter values directly"
+    ],
     modules: [
       {
         id: "calc-effect-size",
@@ -233,6 +318,13 @@ const TOOLS_CATEGORY_TILES = [
     color: "#f59e0b",
     colorDark: "#b45309",
     subtitle: "Erlang C and operational staffing design",
+    desc: "Estimate how many agents you need to meet service-level targets using Erlang C and related staffing simulations.",
+    info: [
+      "Erlang C staffing calculations",
+      "Service level, wait time, and occupancy trade-offs",
+      "Simulation support for operational scenarios",
+      "Standalone planning tool for call-center design"
+    ],
     modules: [
       {
         id: "calc-erlang",
@@ -413,10 +505,11 @@ function renderCategoryTiles(query) {
     }
     return (
       sectionHtml +
-      '<div class="category-tile" style="--cat-color:' + escapeHtml(color) + ";--cat-color-dark:" + escapeHtml(colorDark) + ';">' +
+      '<div class="category-tile" data-tile-id="' + escapeHtml(c.id) + '" style="--cat-color:' + escapeHtml(color) + ";--cat-color-dark:" + escapeHtml(colorDark) + ';">' +
       '<div class="category-title-row">' +
       '<div class="category-icon">' + iconContent + '</div>' +
       '<div class="category-title">' + escapeHtml(c.title) + "</div>" +
+      '<button type="button" class="category-info-btn" data-tile-info="' + escapeHtml(c.id) + '" title="About this module" aria-label="About ' + escapeHtml(c.title) + '">!</button>' +
       "</div>" +
       '<div class="category-subtitle">' + escapeHtml(c.subtitle) + "</div>" +
       renderCategoryGroups(c, ACTIVE_CLUSTER + ":" + c.id) +
@@ -425,6 +518,36 @@ function renderCategoryTiles(query) {
   }).join("");
   if (noResults) noResults.style.display = list.length ? "none" : "block";
   placeHubRangeSection();
+  bindCategoryInfoButtons(list);
+}
+
+function findHubCategoryTile(tileId) {
+  var clusters = [HUB_CATEGORY_TILES, TOOLS_CATEGORY_TILES];
+  for (var i = 0; i < clusters.length; i++) {
+    var found = (clusters[i] || []).find(function (c) { return c.id === tileId; });
+    if (found) return found;
+  }
+  return null;
+}
+
+function bindCategoryInfoButtons(list) {
+  var holder = document.getElementById("categoryTiles");
+  if (!holder) return;
+  holder.querySelectorAll(".category-info-btn").forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var tileId = btn.getAttribute("data-tile-info");
+      var tile = (list || []).find(function (c) { return c.id === tileId; }) || findHubCategoryTile(tileId);
+      if (!tile) return;
+      showPopup({
+        icon: tile.icon || "fa-circle-info",
+        name: tile.title,
+        desc: tile.desc || tile.subtitle || "",
+        info: tile.info || []
+      }, btn);
+    });
+  });
 }
 
 function getCategoryModules(category) {
@@ -524,7 +647,7 @@ function showPopup(m, btn) {
   if (popup && btn) {
     const r = btn.getBoundingClientRect();
     const vw = window.innerWidth;
-    const W = 220;
+    const W = 248;
     let left = r.right - W;
     if (left < 6) left = 6;
     if (left + W > vw - 6) left = vw - W - 6;
@@ -1217,6 +1340,17 @@ function openBuilderDialogFromHub(options) {
     function (res) {
       if (res.status === Office.AsyncResultStatus.Failed) {
         setSelectedModuleCard(options.moduleId, false);
+        var err = res.error || {};
+        var code = err.code != null ? " (code " + err.code + ")" : "";
+        var detail = err.message || "Unknown error";
+        console.error("Failed to open module dialog:", detail, err);
+        try {
+          window.alert(
+            "Could not open the analysis popup" + code + ".\n\n" +
+            detail + "\n\n" +
+            "Try closing any other Statistico dialogs, then click the module again."
+          );
+        } catch (e) {}
         return;
       }
       hubBuilderDialog = res.value;

@@ -21,6 +21,29 @@ console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
 
   sanitizeDialogHostInfoParam();
 
+  // Hub / marketing embeds (?embed=1): mark the document and keep the 300px
+  // sidebar from swallowing narrow modal iframes before page-specific CSS runs.
+  try {
+    const embedParams = new URLSearchParams(window.location.search);
+    if (embedParams.get('embed') === '1') {
+      document.documentElement.setAttribute('data-hub-embed', '1');
+      if (embedParams.get('demo') === '1') {
+        document.documentElement.classList.add('demo-embed-root');
+      }
+      const compactSidebar = () => {
+        const nav = document.getElementById('sidebarNav') || document.querySelector('.sb-nav');
+        if (!nav) return;
+        if (window.innerWidth < 1100) nav.classList.add('collapsed');
+      };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', compactSidebar, { once: true });
+      } else {
+        compactSidebar();
+      }
+      window.addEventListener('resize', compactSidebar);
+    }
+  } catch (_embedInitErr) {}
+
   function resolveAssetUrl(relPath) {
     const { origin, pathname } = window.location;
     if (pathname.includes('/dialogs/views/')) {

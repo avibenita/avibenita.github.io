@@ -2136,6 +2136,18 @@
       border: 0;
       background: #1b2439;
     }
+    /* Narrow phones crush the Excel dialogs (300px sidebar). Scale a desktop
+       viewport into the modal so case studies stay readable. */
+    .ws-screen.ws-screen--scaled .ws-modal-frame {
+      inset: auto;
+      top: 0;
+      left: 0;
+      width: 1280px;
+      height: 800px;
+      max-width: none;
+      transform-origin: top left;
+      will-change: transform;
+    }
     .ws-demo-watermark {
       display: none;
       position: absolute;
@@ -3314,6 +3326,28 @@
       return showcase && showcase.items && showcase.items.length ? showcase : null;
     }
 
+    const modalScreen = modalFrame ? modalFrame.closest('.ws-screen') : null;
+    const MODAL_DESKTOP_W = 1280;
+    const MODAL_DESKTOP_H = 800;
+    function fitWorkspaceModalFrame() {
+      if (!modalFrame || !modalScreen || !backdrop || !backdrop.classList.contains('open')) return;
+      const sw = modalScreen.clientWidth || 1;
+      const sh = modalScreen.clientHeight || 1;
+      const needsScale = sw < 980 || sh < 640;
+      modalScreen.classList.toggle('ws-screen--scaled', needsScale);
+      if (!needsScale) {
+        modalFrame.style.transform = '';
+        modalFrame.style.width = '';
+        modalFrame.style.height = '';
+        return;
+      }
+      const scale = Math.min(sw / MODAL_DESKTOP_W, sh / MODAL_DESKTOP_H);
+      const ox = Math.max(0, (sw - MODAL_DESKTOP_W * scale) / 2);
+      const oy = Math.max(0, (sh - MODAL_DESKTOP_H * scale) / 2);
+      modalFrame.style.width = MODAL_DESKTOP_W + 'px';
+      modalFrame.style.height = MODAL_DESKTOP_H + 'px';
+      modalFrame.style.transform = 'translate(' + ox + 'px,' + oy + 'px) scale(' + scale + ')';
+    }
     function openWorkspaceWindow(url, title, moduleKey) {
       const fullUrl = moduleEmbedUrl(url);
       modalTitle.textContent = title || 'Workspace Preview';
@@ -3321,20 +3355,32 @@
       modalFrame.src = '';
       backdrop.classList.add('open');
       document.body.style.overflow = 'hidden';
-      modalFrame.onload = null;
+      fitWorkspaceModalFrame();
+      modalFrame.onload = function () { fitWorkspaceModalFrame(); };
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => { modalFrame.src = fullUrl; });
+        requestAnimationFrame(() => {
+          modalFrame.src = fullUrl;
+          fitWorkspaceModalFrame();
+        });
       });
     }
     function closeModal() {
       backdrop.classList.remove('open');
       document.body.style.overflow = '';
       if (modalCta) modalCta.hidden = true;
+      if (modalScreen) modalScreen.classList.remove('ws-screen--scaled');
+      if (modalFrame) {
+        modalFrame.style.transform = '';
+        modalFrame.style.width = '';
+        modalFrame.style.height = '';
+        modalFrame.onload = null;
+      }
       setTimeout(() => { modalFrame.src = ''; }, 300);
     }
     if (modalClose) modalClose.addEventListener('click', closeModal);
     if (backdrop)   backdrop.addEventListener('click', e => { if (e.target === backdrop) closeModal(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+    window.addEventListener('resize', fitWorkspaceModalFrame);
     window._wsOpen = btn => openWorkspaceWindow(btn.dataset.wsUrl, btn.dataset.wsTitle, btn.dataset.wsModule);
 
     // ── Render helpers ────────────────────────────────────────────────

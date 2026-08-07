@@ -8,7 +8,14 @@
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <title id="page-title">Cluster Analysis — Statistico-Interactive (TM)</title>
   <!-- Results UI: method-group sidebar (K-means / Hierarchical submenus). If you still see Summary/K-means/Hierarchical as three equal rows, this file is not what the add-in loaded. -->
-  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script>
+    // Public demo/case-study embeds (embed=1) never run inside an Office host.
+    // Skipping office.js avoids its dialog/parent-frame handshake blanking the
+    // nested marketing-site modal iframe (page -> wsModalFrame -> this page).
+    if (!/(?:^|[?&])embed=1(?:&|$)/.test(window.location.search)) {
+      document.write('<scr' + 'ipt src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></scr' + 'ipt>');
+    }
+  </script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="../shared-header.css?v=20260714c"/>  <script src="../shared-brand-logo.js?v=20260716cover"></script>
@@ -2529,8 +2536,6 @@
       setDecimalPrecision();
       if (typeof Office !== "undefined" && typeof Office.onReady === "function") {
         Office.onReady(function() { initOfficeBridge(); });
-      } else {
-        setTimeout(initOfficeBridge, 0);
       }
     });
   </script>
@@ -2554,7 +2559,6 @@
         worker.src = 'cluster-demo-worker.html?lockedMethod=' + encodeURIComponent(locked);
         worker.style.display = 'none';
         worker.setAttribute('aria-hidden', 'true');
-        document.body.appendChild(worker);
         window.addEventListener('message', function (event) {
           var data = event.data;
           if (!data) return;
@@ -2565,9 +2569,11 @@
             console.error('Cluster case study failed:', data.error);
           }
         });
+        document.body.appendChild(worker);
       }
-      if (document.readyState === 'complete' || document.readyState === 'interactive') boot();
-      else document.addEventListener('DOMContentLoaded', boot);
+      function start() { setTimeout(boot, 50); }
+      if (document.readyState === 'complete' || document.readyState === 'interactive') start();
+      else document.addEventListener('DOMContentLoaded', start);
     })();
   </script>
 

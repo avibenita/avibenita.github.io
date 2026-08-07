@@ -4,7 +4,14 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Independent Means Results (2 Variables)</title>
-  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script>
+    // Public demo/case-study embeds (embed=1) never run inside an Office host.
+    // Skipping office.js avoids its dialog/parent-frame handshake blanking the
+    // nested marketing-site modal iframe (page -> wsModalFrame -> this page).
+    if (!/(?:^|[?&])embed=1(?:&|$)/.test(window.location.search)) {
+      document.write('<scr' + 'ipt src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></scr' + 'ipt>');
+    }
+  </script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <script src="https://code.highcharts.com/highcharts-more.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
@@ -1891,6 +1898,7 @@
         console.log("[FILTER] bridge installed for independent (rows=" + allRows.length + ")");
       }
 
+      if (typeof Office === "undefined" || typeof Office.onReady !== "function") return;
       Office.onReady(function(){
         Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function(arg){
           const msg = JSON.parse(arg.message||"{}");
@@ -1991,7 +1999,6 @@
         worker.src = 'independent-demo-worker.html';
         worker.style.display = 'none';
         worker.setAttribute('aria-hidden', 'true');
-        document.body.appendChild(worker);
         window.addEventListener('message', function (event) {
           var data = event.data;
           if (!data) return;
@@ -2006,9 +2013,11 @@
             console.error('Independent case study failed:', data.error);
           }
         });
+        document.body.appendChild(worker);
       }
-      if (document.readyState === 'complete' || document.readyState === 'interactive') boot();
-      else document.addEventListener('DOMContentLoaded', boot);
+      function start() { setTimeout(boot, 50); }
+      if (document.readyState === 'complete' || document.readyState === 'interactive') start();
+      else document.addEventListener('DOMContentLoaded', start);
     })();
   </script>
 

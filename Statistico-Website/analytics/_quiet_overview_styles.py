@@ -35,6 +35,21 @@ def patch_file(path: Path) -> bool:
     a1, a2 = accents
     quiet = css_block(a1, a2)
     new_text = text[: m.start()] + m.group(1) + quiet + m.group(3) + text[m.end() :]
+    # Warm grid hero class (keep any existing attributes)
+    new_text2, n_hero = re.subn(
+        r'<header class="hero(?![\w-])([^"]*)">',
+        lambda mm: '<header class="hero grid">' if "grid" not in mm.group(1) else mm.group(0),
+        new_text,
+        count=1,
+    )
+    if n_hero == 0:
+        new_text2, n_hero = re.subn(
+            r"<header class='hero(?![\w-])([^']*)'>",
+            lambda mm: "<header class='hero grid'>" if "grid" not in mm.group(1) else mm.group(0),
+            new_text,
+            count=1,
+        )
+    new_text = new_text2
     if new_text == text:
         print(f"unchanged {path.name}")
         return False

@@ -992,7 +992,7 @@
       });
     }
 
-    function populateBundle(b){
+    window.populateBundle = function populateBundle(b){
       lastBundle = b || {};
       const s=b.setup||{}, e=b.explore||{}, a=b.assumptions||{}, r=b.results||{}, fx=b.effects||{}, p=b.power||{}, rep=b.report||{};
       if ((s.compareMode === "k-plus" || s.mode === "k-plus") && window.location.pathname.indexOf("dependent-results-kplus.html") === -1) {
@@ -1816,5 +1816,43 @@
     </div>
   </div>
   </div><!-- /right-col -->
+
+  <script>
+    (function () {
+      /* __STATISTICO_CASE_STUDY_BOOTSTRAP__ */
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('embed') !== '1' || params.get('demo') !== '1') return;
+      function boot() {
+        document.body.classList.add('demo-embed');
+        try {
+          if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateTitle) {
+            StatisticoHeader.updateTitle('Before–After Intervention — Paired Means');
+          }
+        } catch (_e) {}
+        var worker = document.createElement('iframe');
+        worker.src = 'dependent-demo-worker.html';
+        worker.style.display = 'none';
+        worker.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(worker);
+        window.addEventListener('message', function (event) {
+          var data = event.data;
+          if (!data) return;
+          if (data.type === 'DEPENDENT_CASE_STUDY_BUNDLE') {
+            if (data.rawData) {
+              window.dependentRangeData = data.rawData;
+              window.dependentAnalysisRows = data.rawData;
+            }
+            if (typeof window.populateBundle === 'function') window.populateBundle(data.payload || {});
+            if (worker.parentNode) worker.parentNode.removeChild(worker);
+          } else if (data.type === 'DEPENDENT_CASE_STUDY_ERROR') {
+            console.error('Dependent case study failed:', data.error);
+          }
+        });
+      }
+      if (document.readyState === 'complete' || document.readyState === 'interactive') boot();
+      else document.addEventListener('DOMContentLoaded', boot);
+    })();
+  </script>
+
 </body>
 </html>

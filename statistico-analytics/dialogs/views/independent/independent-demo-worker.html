@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Independent Means case study data</title>
+</head>
+<body>
+  <script src="../../../taskpane/independent/independent-input-panel.js"></script>
+  <script>
+    (function () {
+
+      function createData() {
+
+        let seed = 20260807;
+        function rnd() {
+          seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
+          return (seed >>> 0) / 0xFFFFFFFF;
+        }
+        function normal(mean, sd) {
+          const u1 = Math.max(1e-10, rnd()), u2 = rnd();
+          return mean + sd * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        }
+
+        const headers = ['Control Score', 'Treatment Score'];
+        const n = 40;
+        const rows = [];
+        for (let i = 0; i < n; i++) {
+          rows.push([
+            Math.round(normal(68, 10) * 10) / 10,
+            Math.round(normal(74, 11) * 10) / 10
+          ]);
+        }
+        return {
+          headers, rows,
+          modelSpec: {
+            compareMode: 'two-vars',
+            selectedColumns: headers.slice(),
+            primaryFramework: 'parametric',
+            primaryTest: 'welch'
+          },
+          meta: {
+            title: 'Treatment vs Control — Independent Means',
+            story: 'Does a new coaching program raise assessment scores versus a control group?'
+          }
+        };
+      }
+      function run() {
+        try {
+          const demo = createData();
+          const bundle = buildIndependentBundle(demo.headers, demo.rows, demo.modelSpec);
+          const rawData = [demo.headers].concat(demo.rows);
+          window.parent.postMessage({
+            type: 'INDEPENDENT_CASE_STUDY_BUNDLE',
+            payload: bundle,
+            rawData: rawData,
+            meta: demo.meta
+          }, '*');
+        } catch (err) {
+          window.parent.postMessage({ type: 'INDEPENDENT_CASE_STUDY_ERROR', error: String((err && err.message) || err) }, '*');
+        }
+      }
+
+      if (document.readyState === 'complete') run();
+      else window.addEventListener('load', run);
+    })();
+  </script>
+</body>
+</html>

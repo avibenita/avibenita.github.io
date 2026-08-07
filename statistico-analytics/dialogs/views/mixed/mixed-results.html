@@ -7649,7 +7649,52 @@ STRENGTH: [High, Moderate, or Low — short reason based on p-values, ICC, conve
       document.body.appendChild(btn);
     }
   })();
-  </script>
+  
+  (function () {
+    /* __STATISTICO_CASE_STUDY_BOOTSTRAP__ */
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('embed') !== '1' || params.get('demo') !== '1') return;
+    function boot() {
+      document.body.classList.add('demo-embed');
+      try {
+        if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateTitle) {
+          StatisticoHeader.updateTitle('Clinic Visits — Mixed Model');
+        }
+      } catch (_e) {}
+      var worker = document.createElement('iframe');
+      worker.src = 'mixed-demo-worker.html';
+      worker.style.display = 'none';
+      worker.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(worker);
+      window.addEventListener('message', function (event) {
+        var data = event.data;
+        if (!data) return;
+        if (data.type === 'MIXED_CASE_STUDY_BUNDLE' && data.payload) {
+          try {
+            var p2 = data.payload;
+            var headers = p2.headers || [];
+            var rows = p2.rows || [];
+            var spec = p2.modelSpec || {};
+            _modelSpec = spec;
+            _sourceHeaders = headers.slice();
+            _sourceRows = rows.slice();
+            var results = computeMixedModel(headers, rows, spec);
+            receiveMixedModelResults(results);
+            if (typeof wirePostResultsData === 'function') setTimeout(function () { wirePostResultsData(results); }, 400);
+          } catch (e) {
+            console.error('Mixed case study compute failed:', e);
+          }
+          if (worker.parentNode) worker.parentNode.removeChild(worker);
+        } else if (data.type === 'MIXED_CASE_STUDY_ERROR') {
+          console.error('Mixed case study failed:', data.error);
+        }
+      });
+    }
+    if (document.readyState === 'complete' || document.readyState === 'interactive') boot();
+    else document.addEventListener('DOMContentLoaded', boot);
+  })();
+
+</script>
 
 </body>
 </html>

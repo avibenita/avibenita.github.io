@@ -1944,7 +1944,7 @@
   }
 
   /* ── Master populate ─────────────────────────────────────── */
-  function populateAll(b) {
+  window.populateAll = function populateAll(b) {
     if (!b || b.error) {
       document.getElementById('overviewDecisionBody').innerHTML =
         '<p style="color:var(--danger)">' + (b && b.error ? b.error : 'No results available.') + '</p>';
@@ -4374,6 +4374,44 @@
   });
   </script>
   </div><!-- /right-col -->
+
+
+  <script>
+    (function () {
+      /* __STATISTICO_CASE_STUDY_BOOTSTRAP__ */
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('embed') !== '1' || params.get('demo') !== '1') return;
+      function boot() {
+        document.body.classList.add('demo-embed');
+        try {
+          if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateTitle) {
+            StatisticoHeader.updateTitle('Dose Groups — One-Way ANOVA');
+          }
+        } catch (_e) {}
+        var worker = document.createElement('iframe');
+        worker.src = 'anova-demo-worker.html';
+        worker.style.display = 'none';
+        worker.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(worker);
+        window.addEventListener('message', function (event) {
+          var data = event.data;
+          if (!data) return;
+          if (data.type === 'ANOVA_CASE_STUDY_BUNDLE') {
+            window._bundle = data.payload;
+            if (typeof window.populateAll === 'function') window.populateAll(data.payload || {});
+            if (data.rawData && typeof populateViewData === 'function') {
+              try { populateViewData(data.rawData); } catch (_e) {}
+            }
+            if (worker.parentNode) worker.parentNode.removeChild(worker);
+          } else if (data.type === 'ANOVA_CASE_STUDY_ERROR') {
+            console.error('ANOVA case study failed:', data.error);
+          }
+        });
+      }
+      if (document.readyState === 'complete' || document.readyState === 'interactive') boot();
+      else document.addEventListener('DOMContentLoaded', boot);
+    })();
+  </script>
 
 </body>
 </html>

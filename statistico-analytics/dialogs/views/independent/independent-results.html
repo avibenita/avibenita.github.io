@@ -1068,7 +1068,7 @@
       });
     }
 
-    function populateBundle(b){
+    window.populateBundle = function populateBundle(b){
       lastBundle = b || {};
       window._independentBundle = lastBundle;
       window.lastIndependentBundle = lastBundle;
@@ -1974,5 +1974,43 @@
     </div>
   </div>
   </div><!-- /right-col -->
+
+  <script>
+    (function () {
+      /* __STATISTICO_CASE_STUDY_BOOTSTRAP__ */
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('embed') !== '1' || params.get('demo') !== '1') return;
+      function boot() {
+        document.body.classList.add('demo-embed');
+        try {
+          if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateTitle) {
+            StatisticoHeader.updateTitle('Treatment vs Control — Independent Means');
+          }
+        } catch (_e) {}
+        var worker = document.createElement('iframe');
+        worker.src = 'independent-demo-worker.html';
+        worker.style.display = 'none';
+        worker.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(worker);
+        window.addEventListener('message', function (event) {
+          var data = event.data;
+          if (!data) return;
+          if (data.type === 'INDEPENDENT_CASE_STUDY_BUNDLE') {
+            if (data.rawData) {
+              window.independentRangeData = data.rawData;
+              window.independentAnalysisRows = data.rawData;
+            }
+            if (typeof window.populateBundle === 'function') window.populateBundle(data.payload || {});
+            if (worker.parentNode) worker.parentNode.removeChild(worker);
+          } else if (data.type === 'INDEPENDENT_CASE_STUDY_ERROR') {
+            console.error('Independent case study failed:', data.error);
+          }
+        });
+      }
+      if (document.readyState === 'complete' || document.readyState === 'interactive') boot();
+      else document.addEventListener('DOMContentLoaded', boot);
+    })();
+  </script>
+
 </body>
 </html>

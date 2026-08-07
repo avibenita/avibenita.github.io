@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Linear Regression case study data</title>
+</head>
+<body>
+  <script>
+    (function () {
+
+      function createData() {
+
+        let seed = 20260812;
+        function rnd() {
+          seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
+          return (seed >>> 0) / 0xFFFFFFFF;
+        }
+        function normal(mean, sd) {
+          const u1 = Math.max(1e-10, rnd()), u2 = rnd();
+          return mean + sd * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        }
+
+        const headers = ['Sales', 'Ad Spend', 'Store Size', 'Region'];
+        const regions = ['North', 'South', 'West'];
+        const rows = [];
+        for (let i = 0; i < 120; i++) {
+          const ad = Math.max(5, normal(40, 15));
+          const size = Math.max(800, normal(2200, 500));
+          const region = regions[Math.floor(rnd() * regions.length)];
+          const regionEffect = region === 'North' ? 8 : (region === 'South' ? 0 : 4);
+          const sales = Math.max(10, 20 + 1.8 * ad + 0.012 * size + regionEffect + normal(0, 18));
+          rows.push([
+            Math.round(sales * 10) / 10,
+            Math.round(ad * 10) / 10,
+            Math.round(size),
+            region
+          ]);
+        }
+        return {
+          headers, rows,
+          modelSpec: {
+            y: 'Sales',
+            xn: ['Ad Spend', 'Store Size'],
+            xc: ['Region'],
+            intercept: true
+          },
+          meta: {
+            title: 'Sales Drivers — Linear Regression',
+            story: 'How do advertising spend, store size, and region relate to sales?'
+          }
+        };
+      }
+      function run() {
+        try {
+          const demo = createData();
+          window.parent.postMessage({
+            type: 'REGRESSION_CASE_STUDY_BUNDLE',
+            payload: {
+              headers: demo.headers,
+              rows: demo.rows,
+              address: 'Case Study Data',
+              modelSpec: demo.modelSpec
+            },
+            meta: demo.meta
+          }, '*');
+        } catch (err) {
+          window.parent.postMessage({ type: 'REGRESSION_CASE_STUDY_ERROR', error: String((err && err.message) || err) }, '*');
+        }
+      }
+
+      if (document.readyState === 'complete') run();
+      else window.addEventListener('load', run);
+    })();
+  </script>
+</body>
+</html>

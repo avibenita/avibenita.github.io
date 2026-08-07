@@ -2036,7 +2036,7 @@
       });
     }
 
-    function populateClusterBundle(data) {
+    window.populateClusterBundle = function populateClusterBundle(data) {
       var bundle = typeof data === "string" ? JSON.parse(data) : data || {};
       lastClusterBundle = bundle;
       var s = bundle.summary || {};
@@ -2534,5 +2534,42 @@
       }
     });
   </script>
+
+  <script>
+    (function () {
+      /* __STATISTICO_CASE_STUDY_BOOTSTRAP__ */
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('embed') !== '1' || params.get('demo') !== '1') return;
+      function boot() {
+        document.body.classList.add('demo-embed');
+        var locked = params.get('lockedMethod') === 'hierarchical' ? 'hierarchical' : 'kmeans';
+        try {
+          if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateTitle) {
+            StatisticoHeader.updateTitle(locked === 'hierarchical'
+              ? 'Customer Taxonomy — Hierarchical Clustering'
+              : 'Customer Segments — K-Means Clustering');
+          }
+        } catch (_e) {}
+        var worker = document.createElement('iframe');
+        worker.src = 'cluster-demo-worker.html?lockedMethod=' + encodeURIComponent(locked);
+        worker.style.display = 'none';
+        worker.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(worker);
+        window.addEventListener('message', function (event) {
+          var data = event.data;
+          if (!data) return;
+          if (data.type === 'CLUSTER_CASE_STUDY_BUNDLE') {
+            if (typeof window.populateClusterBundle === 'function') window.populateClusterBundle(data.payload || {});
+            if (worker.parentNode) worker.parentNode.removeChild(worker);
+          } else if (data.type === 'CLUSTER_CASE_STUDY_ERROR') {
+            console.error('Cluster case study failed:', data.error);
+          }
+        });
+      }
+      if (document.readyState === 'complete' || document.readyState === 'interactive') boot();
+      else document.addEventListener('DOMContentLoaded', boot);
+    })();
+  </script>
+
 </body>
 </html>

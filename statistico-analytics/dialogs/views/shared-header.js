@@ -1764,7 +1764,7 @@ const StatisticoHeader = {
     for (let i = scripts.length - 1; i >= 0; i--) {
       const src = scripts[i].src || '';
       if (src.indexOf('shared-brand-logo.js') !== -1 || src.indexOf('shared-header.js') !== -1) {
-        return src.replace(/\/[^/]+$/, '/statistico-logo-hub.png?v=20260716pm');
+        return src.replace(/\/[^/]+$/, '/statistico-logo-hub.png?v=20260808blue');
       }
     }
     return '';

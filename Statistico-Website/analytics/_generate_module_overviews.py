@@ -1196,7 +1196,7 @@ def render_page(m: dict) -> str:
 
   <nav class="lr-breadcrumb container" aria-label="Breadcrumb">
     <ol>
-      <li><a href="/Statistico-Website/index-Analytics.html">Analytics Suite</a></li>
+      <li><a href="/Statistico-Website/index-Analytics.html?module={m['key']}#module-cap-section">Analytics Suite</a></li>
       <li><a href="/Statistico-Website/index-Analytics.html?module={m['key']}#module-cap-section">{m['family']}</a></li>
       <li aria-current="page">{m['title']}</li>
     </ol>
@@ -1211,7 +1211,7 @@ def render_page(m: dict) -> str:
       <p class="hero-sub">Designed for serious statistical analysis inside Excel.</p>
       <div class="hero-cta">
         <a class="btn btn-primary" href="#gallery">Explore Module Screens <i class="fa-solid fa-arrow-down" aria-hidden="true"></i></a>
-        <a class="btn btn-ghost" href="/Statistico-Website/index-Analytics.html">View Analytics Suite</a>
+        <a class="btn btn-ghost" href="/Statistico-Website/index-Analytics.html?module={m['key']}#module-cap-section">View Analytics Suite</a>
       </div>
     </div>
   </header>
@@ -1343,7 +1343,7 @@ def render_page(m: dict) -> str:
           <h2 id="final-cta-heading">{m['final_cta']}</h2>
           <div class="hero-cta">
             <a class="btn btn-primary" href="#gallery">Explore Module Screens</a>
-            <a class="btn btn-ghost" href="/Statistico-Website/index-Analytics.html">Return to Analytics Suite</a>
+            <a class="btn btn-ghost" href="/Statistico-Website/index-Analytics.html?module={m['key']}#module-cap-section">Return to Analytics Suite</a>
           </div>
         </div>
       </div>

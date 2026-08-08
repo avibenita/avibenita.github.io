@@ -5,7 +5,7 @@
 // Navigation links - dynamically adjusted based on page location
 function getNavLinks() {
   return {
-    home: '/index.html',
+    home: '/',
     about: '/Statistico-Website/about-us.html',
     contact: '/Statistico-Website/contact.html',
     terms: '/Statistico-Website/terms-and-conditions.html',
@@ -22,13 +22,13 @@ function getNavLinks() {
 const NAV_TEMPLATE = `
 <nav class="sticky-nav" id="stickyNav">
   <div class="nav-container">
-    <a href="javascript:void(0)" class="nav-logo" id="nav-logo-link" aria-label="Statistico Interactive">
-      <img class="nav-logo-full-img" src="/Statistico-Website/assets/statistico-logo-nav.png?v=2026-08-08-blue" alt="Statistico Interactive" />
+    <a href="/" class="nav-logo" id="nav-logo-link" aria-label="Statistico">
+      <img class="nav-logo-full-img" src="/Statistico-Website/assets/statistico-logo-nav.png?v=2026-08-08-blue" alt="Statistico" />
     </a>
 
     <ul class="nav-menu" id="navMenu">
       <li class="nav-item">
-        <a href="javascript:void(0)" class="nav-link" data-page="home" id="link-home">
+        <a href="/" class="nav-link" data-page="home" id="link-home">
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M2 7.5L8 2.5L14 7.5"/>
             <path d="M3.5 7V14H12.5V7"/>
@@ -38,7 +38,7 @@ const NAV_TEMPLATE = `
       </li>
 
       <li class="nav-item">
-        <a href="javascript:void(0)" class="nav-link" data-page="why" id="link-why">
+        <a href="/Statistico-Website/why-another-package.html" class="nav-link" data-page="why" id="link-why">
           The Paradigm
         </a>
       </li>
@@ -46,16 +46,16 @@ const NAV_TEMPLATE = `
       <!-- Products group — subtle squared frame -->
       <li class="nav-item nav-item--products-group">
         <div class="nav-products-row" id="nav-products-row">
-          <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="analytics" id="link-analytics" title="Statistico Analytics Suite">
+          <a href="/Statistico-Website/index-Analytics.html" class="nav-link nav-link--product" data-page="analytics" id="link-analytics" title="Statistico Analytics">
             <svg class="nav-product-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <line x1="2.5" y1="13" x2="13.5" y2="13"/>
               <rect x="3" y="8" width="2.5" height="5" rx="0.4"/>
               <rect x="7" y="5" width="2.5" height="8" rx="0.4"/>
               <rect x="11" y="2" width="2.5" height="11" rx="0.4"/>
             </svg>
-            Analytics Suite
+            Analytics
           </a>
-          <a href="javascript:void(0)" class="nav-link nav-link--product" data-page="calculators" id="link-calculators" title="Statistico Calculators Hub">
+          <a href="/Statistico-Website/index-Calculators.html" class="nav-link nav-link--product" data-page="calculators" id="link-calculators" title="Statistico Calculators">
             <svg class="nav-product-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <rect x="2" y="2" width="12" height="12" rx="2"/>
               <line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/>
@@ -63,7 +63,7 @@ const NAV_TEMPLATE = `
             </svg>
             Calculators
           </a>
-          <a href="javascript:void(0)" class="nav-link nav-link--product-lite" data-page="addins" id="link-addins" title="Statistico Applications Hub">
+          <a href="/Statistico-Website/index-Addins.html" class="nav-link nav-link--product-lite" data-page="addins" id="link-addins" title="Statistico Applications">
             <svg class="nav-product-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <rect x="3" y="1" width="10" height="14" rx="1.5"/>
               <line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/>
@@ -75,17 +75,17 @@ const NAV_TEMPLATE = `
       </li>
 
       <li class="nav-item nav-item--sep-left">
-        <a href="javascript:void(0)" class="nav-link" data-page="how" id="link-how">
+        <a href="/Statistico-Website/how-it-works.html" class="nav-link" data-page="how" id="link-how">
           How It Works
         </a>
       </li>
       <li class="nav-item">
-        <a href="javascript:void(0)" class="nav-link" data-page="faq" id="link-faq">
+        <a href="/Statistico-Website/faq.html" class="nav-link" data-page="faq" id="link-faq">
           FAQ
         </a>
       </li>
       <li class="nav-item">
-        <a href="javascript:void(0)" class="nav-link" data-page="contact" id="link-contact">
+        <a href="/Statistico-Website/contact.html" class="nav-link" data-page="contact" id="link-contact">
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <rect x="1" y="3" width="14" height="10" rx="1.5"/>
             <polyline points="1,4 8,9 15,4"/>
@@ -96,7 +96,7 @@ const NAV_TEMPLATE = `
 
       <!-- Hidden from main nav; kept for routing/ -->
       <li class="nav-item nav-item--hidden" aria-hidden="true">
-        <a href="javascript:void(0)" class="nav-link" data-page="about" id="link-about" tabindex="-1">About Us</a>
+        <a href="/Statistico-Website/about-us.html" class="nav-link" data-page="about" id="link-about" tabindex="-1">About Us</a>
       </li>
     </ul>
 
@@ -1624,21 +1624,21 @@ const FOOTER_TEMPLATE = `
     <div class="footer-grid">
       <div class="footer-section">
         <h4>Products</h4>
-        <a href="javascript:void(0)" id="footer-link-analytics">Statistico-Analytics-Suite™</a>
-        <a href="javascript:void(0)" id="footer-link-calculators">Statistico-Calculators-Hub™</a>
-        <a href="javascript:void(0)" id="footer-link-addins">Statistico-Applications-Hub™</a>
+        <a href="/Statistico-Website/index-Analytics.html" id="footer-link-analytics">Statistico Analytics</a>
+        <a href="/Statistico-Website/index-Calculators.html" id="footer-link-calculators">Statistico Calculators</a>
+        <a href="/Statistico-Website/index-Addins.html" id="footer-link-addins">Statistico Applications</a>
       </div>
       <div class="footer-section">
         <h4>Resources</h4>
-        <a href="javascript:void(0)" id="footer-link-why">The Paradigm</a>
-        <a href="javascript:void(0)" id="footer-link-how">How It Works</a>
-        <a href="javascript:void(0)" id="footer-link-faq">FAQ</a>
+        <a href="/Statistico-Website/why-another-package.html" id="footer-link-why">The Paradigm</a>
+        <a href="/Statistico-Website/how-it-works.html" id="footer-link-how">How It Works</a>
+        <a href="/Statistico-Website/faq.html" id="footer-link-faq">FAQ</a>
       </div>
       <div class="footer-section">
         <h4>Company</h4>
-        <a href="javascript:void(0)" id="footer-link-about">About Us</a>
-        <a href="javascript:void(0)" id="footer-link-contact">Contact</a>
-        <a href="javascript:void(0)" id="footer-link-terms">Terms & Conditions</a>
+        <a href="/Statistico-Website/about-us.html" id="footer-link-about">About Us</a>
+        <a href="/Statistico-Website/contact.html" id="footer-link-contact">Contact</a>
+        <a href="/Statistico-Website/terms-and-conditions.html" id="footer-link-terms">Terms & Conditions</a>
       </div>
       <div class="footer-section footer-section--linkedin">
         <h4>Connect</h4>

@@ -123,7 +123,16 @@
       backdrop.classList.add('open');
       document.body.style.overflow = 'hidden';
       fitFrame();
-      modalFrame.onload = function () { fitFrame(); };
+      modalFrame.onload = function () {
+        fitFrame();
+        // Keep product demos dark even when the marketing site is in light theme.
+        try {
+          modalFrame.contentWindow && modalFrame.contentWindow.postMessage(
+            { type: 'THEME_CHANGE', theme: 'dark' },
+            '*'
+          );
+        } catch (e) {}
+      };
       requestAnimationFrame(function () {
         requestAnimationFrame(function () {
           modalFrame.src = fullUrl;

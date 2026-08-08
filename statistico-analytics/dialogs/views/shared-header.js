@@ -23,11 +23,16 @@ console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
 
   // Hub / marketing embeds (?embed=1): mark the document and keep the 300px
   // sidebar from swallowing narrow modal iframes before page-specific CSS runs.
+  // Demos always stay dark so they don't inherit the marketing site's light theme.
   try {
     const embedParams = new URLSearchParams(window.location.search);
-    if (embedParams.get('embed') === '1') {
+    const isHubEmbed = embedParams.get('embed') === '1';
+    const isDemoEmbed = embedParams.get('demo') === '1';
+    if (isHubEmbed || isDemoEmbed) {
       document.documentElement.setAttribute('data-hub-embed', '1');
-      if (embedParams.get('demo') === '1') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.documentElement.classList.add('demo-force-dark');
+      if (isDemoEmbed) {
         document.documentElement.classList.add('demo-embed-root');
       }
       const compactSidebar = () => {
@@ -129,9 +134,29 @@ const StatisticoHeader = {
 
   /* ── Theme helpers ──────────────────────────────────────────── */
   /**
+   * Marketing / case-study embeds must stay dark even if the website
+   * light theme is stored in the shared localStorage key.
+   */
+  isForcedDarkEmbed() {
+    try {
+      const root = document.documentElement;
+      if (root.classList.contains('demo-force-dark') ||
+          root.classList.contains('demo-embed-root') ||
+          root.getAttribute('data-hub-embed') === '1') {
+        return true;
+      }
+      const p = new URLSearchParams(window.location.search);
+      return p.get('demo') === '1' || p.get('embed') === '1';
+    } catch (e) {
+      return false;
+    }
+  },
+
+  /**
    * Read persisted theme preference (default: dark)
    */
   getTheme() {
+    if (this.isForcedDarkEmbed()) return 'dark';
     try { return localStorage.getItem('statistico-theme') || 'dark'; } catch(e) { return 'dark'; }
   },
 
@@ -142,6 +167,9 @@ const StatisticoHeader = {
    * @param {'dark'|'light'} theme
    */
   applyTheme(theme) {
+    const forcedDark = this.isForcedDarkEmbed();
+    if (forcedDark) theme = 'dark';
+
     const root = document.documentElement;
     root.setAttribute('data-theme', theme);
 
@@ -178,7 +206,10 @@ const StatisticoHeader = {
       root.style.setProperty('--header-color',   'rgb(255,165,120)');
     }
 
-    try { localStorage.setItem('statistico-theme', theme); } catch(e) {}
+    // Never overwrite the website theme preference from demo/embed sessions.
+    if (!forcedDark) {
+      try { localStorage.setItem('statistico-theme', theme); } catch(e) {}
+    }
 
     // Update compact header theme control (if present)
     const headerThemeIcon = document.getElementById('headerThemeIcon');
@@ -193,6 +224,7 @@ const StatisticoHeader = {
       const label = btn.querySelector('.toggle-label');
       if (icon)  icon.textContent  = theme === 'light' ? '☀️' : '🌙';
       if (label) label.textContent = theme === 'light' ? 'Light' : 'Dark';
+      if (forcedDark) btn.style.display = 'none';
     }
     // Update sidebar utility theme button (if present)
     const sidebarThemeBtn = document.getElementById('sbThemeToggleBtn');
@@ -201,15 +233,34 @@ const StatisticoHeader = {
       const label = sidebarThemeBtn.querySelector('.sb-utility-theme-label');
       if (icon) icon.textContent = theme === 'light' ? '☀️' : '🌙';
       if (label) label.textContent = theme === 'light' ? 'Light' : 'Dark';
+      if (forcedDark) sidebarThemeBtn.style.display = 'none';
     }
+    const headerThemeBtn = document.getElementById('headerThemeBtn');
+    if (headerThemeBtn && forcedDark) headerThemeBtn.style.display = 'none';
+
     // Fire an event so individual pages can react (e.g. reflow Highcharts)
     document.dispatchEvent(new CustomEvent('statistico-theme-changed', { detail: { theme } }));
+
+    // Keep nested view iframes aligned with the forced dark demo theme.
+    if (forcedDark) {
+      try {
+        document.querySelectorAll('iframe').forEach((iframe) => {
+          try {
+            iframe.contentWindow && iframe.contentWindow.postMessage(
+              { type: 'THEME_CHANGE', theme: 'dark' },
+              '*'
+            );
+          } catch (_e) {}
+        });
+      } catch (_e) {}
+    }
   },
 
   /**
    * Toggle between light and dark themes.
    */
   toggleTheme() {
+    if (this.isForcedDarkEmbed()) return;
     const next = this.getTheme() === 'dark' ? 'light' : 'dark';
     this.applyTheme(next);
   },

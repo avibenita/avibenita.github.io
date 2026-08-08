@@ -59,7 +59,7 @@ for name, (title, url) in CASE.items():
     path = base / name
     text = path.read_text(encoding="utf-8")
     case_btn = (
-        f'<a class="btn btn-primary" href="{url}" target="_blank" rel="noopener noreferrer" '
+        f'<a class="btn btn-primary js-case-study" href="{url}" '
         f'title="{title}">Start Case Study <i class="fa-solid fa-play" aria-hidden="true"></i></a>'
     )
     gallery_btn = (

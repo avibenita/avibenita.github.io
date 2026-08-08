@@ -133,16 +133,16 @@ const NAV_STYLE = `
 }
 
 :root[data-theme="light"] {
-  --site-surface-0: #f3f7fc;
+  --site-surface-0: #f5f8fc;
   --site-surface-1: #ffffff;
-  --site-surface-2: #eaf1fb;
-  --site-border: rgba(15, 23, 42, 0.14);
-  --site-text-primary: #0f172a;
-  --site-text-secondary: rgba(15, 23, 42, 0.82);
-  --site-text-muted: rgba(15, 23, 42, 0.6);
-  --site-shadow-xl: 0px 10px 26px rgba(15, 23, 42, 0.1);
-  --site-bg-glow-warm: rgba(255,165,120,.12);
-  --site-bg-glow-cool: rgba(120,200,255,.1);
+  --site-surface-2: #e8f0fa;
+  --site-border: rgba(15, 23, 42, 0.12);
+  --site-text-primary: #0b1220;
+  --site-text-secondary: rgba(15, 23, 42, 0.86);
+  --site-text-muted: rgba(15, 23, 42, 0.68);
+  --site-shadow-xl: 0 12px 32px rgba(15, 23, 42, 0.08);
+  --site-bg-glow-warm: rgba(255,165,120,.10);
+  --site-bg-glow-cool: rgba(120,200,255,.09);
 }
 
 .sticky-nav,
@@ -1069,6 +1069,149 @@ body {
   color: rgba(15, 23, 42, 0.78);
 }
 
+:root[data-theme="light"] .hero-subline,
+:root[data-theme="light"] .hero .hero-subline {
+  color: rgba(15, 23, 42, 0.78) !important;
+}
+
+:root[data-theme="light"] .hero-promise {
+  color: rgba(15, 23, 42, 0.88) !important;
+}
+
+:root[data-theme="light"] .hero-brand .hero-by,
+:root[data-theme="light"] .hero-by {
+  color: rgba(15, 23, 42, 0.62) !important;
+}
+
+:root[data-theme="light"] .hero.grid::after {
+  opacity: 0.28;
+  background-image:
+    linear-gradient(to right, rgba(37,99,235,.10) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(37,99,235,.10) 1px, transparent 1px),
+    linear-gradient(to right, rgba(217,119,6,.10) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(217,119,6,.10) 1px, transparent 1px);
+}
+
+/* Breadcrumbs */
+:root[data-theme="light"] .lr-breadcrumb a,
+:root[data-theme="light"] .pt-breadcrumb a,
+:root[data-theme="light"] .hub-breadcrumb a {
+  color: rgba(180, 83, 9, 0.88) !important;
+}
+:root[data-theme="light"] .lr-breadcrumb a:hover,
+:root[data-theme="light"] .pt-breadcrumb a:hover,
+:root[data-theme="light"] .hub-breadcrumb a:hover {
+  color: rgba(146, 64, 14, 0.98) !important;
+}
+:root[data-theme="light"] .lr-breadcrumb li[aria-current],
+:root[data-theme="light"] .pt-breadcrumb li[aria-current],
+:root[data-theme="light"] .hub-breadcrumb li[aria-current],
+:root[data-theme="light"] .lr-breadcrumb,
+:root[data-theme="light"] .pt-breadcrumb,
+:root[data-theme="light"] .hub-breadcrumb {
+  color: rgba(15, 23, 42, 0.62);
+}
+:root[data-theme="light"] .lr-breadcrumb li:not(:last-child)::after,
+:root[data-theme="light"] .pt-breadcrumb li:not(:last-child)::after,
+:root[data-theme="light"] .hub-breadcrumb li:not(:last-child)::after {
+  color: rgba(15, 23, 42, 0.28);
+}
+
+/* Analytics / module content panels on light page surfaces */
+:root[data-theme="light"] .why-panel,
+:root[data-theme="light"] .gallery-copy,
+:root[data-theme="light"] .related-card,
+:root[data-theme="light"] a.related-card,
+:root[data-theme="light"] .final-cta,
+:root[data-theme="light"] .ai-caution,
+:root[data-theme="light"] .content-panel {
+  background:
+    radial-gradient(480px 200px at 8% 0%, rgba(255,165,120,.08), transparent 65%),
+    #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.10) !important;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+}
+
+:root[data-theme="light"] .why-panel h2,
+:root[data-theme="light"] .gallery-copy h3,
+:root[data-theme="light"] .related-card h4,
+:root[data-theme="light"] .final-cta h2,
+:root[data-theme="light"] .content-panel h3,
+:root[data-theme="light"] .section-title {
+  color: #0b1220 !important;
+}
+
+:root[data-theme="light"] .why-panel p,
+:root[data-theme="light"] .why-panel .why-position,
+:root[data-theme="light"] .gallery-copy p,
+:root[data-theme="light"] .related-card p,
+:root[data-theme="light"] .final-cta p,
+:root[data-theme="light"] .content-panel p,
+:root[data-theme="light"] .content-panel ul,
+:root[data-theme="light"] .ai-caution {
+  color: rgba(15, 23, 42, 0.78) !important;
+}
+
+:root[data-theme="light"] .why-chain,
+:root[data-theme="light"] .why-brand {
+  color: rgba(15, 23, 42, 0.72) !important;
+}
+
+:root[data-theme="light"] .why-chain span {
+  background: rgba(37, 99, 235, 0.06);
+  border-color: rgba(37, 99, 235, 0.16);
+  color: rgba(30, 64, 175, 0.88);
+}
+
+:root[data-theme="light"] .why-chain i {
+  color: rgba(15, 23, 42, 0.28) !important;
+}
+
+:root[data-theme="light"] .live-step span,
+:root[data-theme="light"] .lr-flow-step span,
+:root[data-theme="light"] .shot-missing span,
+:root[data-theme="light"] .shot-missing p {
+  color: rgba(15, 23, 42, 0.72) !important;
+}
+
+:root[data-theme="light"] .live-arrow,
+:root[data-theme="light"] .lr-flow-arrow {
+  color: rgba(15, 23, 42, 0.28) !important;
+}
+
+:root[data-theme="light"] .goldish {
+  color: rgba(146, 64, 14, 0.95) !important;
+  text-shadow: none !important;
+}
+
+/* Homepage / hub dark bands that keep token text */
+:root[data-theme="light"] .ecosystem-centerpiece,
+:root[data-theme="light"] .compare-section,
+:root[data-theme="light"] .how-it-works,
+:root[data-theme="light"] .use-cases {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255,165,120,.08), transparent 28%),
+    linear-gradient(180deg, #f7faff 0%, #eef4fb 100%) !important;
+}
+
+:root[data-theme="light"] .ecosystem-shell {
+  background:
+    linear-gradient(160deg, rgba(255,255,255,.96) 0%, rgba(237,245,255,.94) 100%) !important;
+  border-color: rgba(37, 99, 235, 0.16) !important;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08) !important;
+}
+
+:root[data-theme="light"] .ecosystem-lead,
+:root[data-theme="light"] .ecosystem-centerpiece .section-sub,
+:root[data-theme="light"] .compare-intro p {
+  color: rgba(15, 23, 42, 0.78) !important;
+}
+
+:root[data-theme="light"] .ecosystem-centerpiece .section-title,
+:root[data-theme="light"] .compare-section .section-title {
+  color: #0b1220 !important;
+}
+
 /* Contact + legal heroes */
 :root[data-theme="light"] .contact-hero,
 :root[data-theme="light"] .legal-hero {
@@ -1460,6 +1603,12 @@ footer#contact .footer-bottom {
 
 @media (max-width: 768px) {
   .theme-toggle {
+    display: inline-flex;
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .theme-toggle-label {
     display: none;
   }
 
@@ -1483,6 +1632,21 @@ footer#contact .footer-bottom {
     opacity: 0;
     visibility: hidden;
     transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  :root[data-theme="light"] .nav-menu {
+    background: linear-gradient(180deg, rgba(248, 251, 255, 0.98) 0%, rgba(238, 245, 255, 0.98) 100%);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+    border-top: 1px solid rgba(15, 23, 42, 0.10);
+  }
+
+  :root[data-theme="light"] .nav-item--products-group {
+    border-top-color: rgba(15, 23, 42, 0.10);
+  }
+
+  :root[data-theme="light"] .nav-products-row .nav-link--product:not(:first-child),
+  :root[data-theme="light"] .nav-products-row .nav-link--product-lite:not(:first-child) {
+    border-top-color: rgba(15, 23, 42, 0.08);
   }
 
   .nav-menu.active {

@@ -1633,8 +1633,13 @@ function openMetaConfigFromHub() {
     dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "META_DATA",
     payloadBuilder: function (gr) {
-      // Always open the builder fresh.
-      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", savedSpec: null };
+      // Always open the builder fresh from the Active Range.
+      return {
+        headers: gr.values[0] || [],
+        rows: gr.values.slice(1),
+        address: gr.address || "",
+        savedSpec: null
+      };
     },
     modelActions: ["metaModel"],
     onModel: function (msg) {
@@ -1644,6 +1649,8 @@ function openMetaConfigFromHub() {
     },
     hubResultsKey: "meta-analysis",
     nextDelayMs: 450,
+    initialDelayMs: 400,
+    retryDelayMs: 1200,
     closeActions: ["close", "cancel"]
   });
 }

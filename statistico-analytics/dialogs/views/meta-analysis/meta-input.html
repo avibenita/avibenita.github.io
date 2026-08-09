@@ -5,21 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Meta-Analysis Configuration</title>
   <script>
-    /* office.js blanks / throws outside Excel. Load it only for real Office hosts. */
+    /* Website demos pass demo=1/embed=1. Excel dialogs must load office.js. */
     (function () {
       var q = (location.search || '').toLowerCase();
-      var webDemo = q.indexOf('demo=1') >= 0 || q.indexOf('embed=1') >= 0;
-      window.__META_WEB_DEMO__ = webDemo;
-      if (webDemo) {
+      window.__META_WEB_DEMO__ = q.indexOf('demo=1') >= 0 || q.indexOf('embed=1') >= 0;
+      if (window.__META_WEB_DEMO__) {
         document.documentElement.setAttribute('data-hub-embed', '1');
         document.documentElement.setAttribute('data-theme', 'dark');
-        return;
       }
-      var s = document.createElement('script');
-      s.src = 'https://appsforoffice.microsoft.com/lib/1/hosted/office.js';
-      document.head.appendChild(s);
     })();
   </script>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <link rel="stylesheet" href="../shared-config.css?v=20260715a"/>
   <script src="../shared-config.js?v=2026-08-09-embed-dark"></script>
@@ -574,33 +570,47 @@
     }
 
     function autoDetectColumns() {
-      var lower = _headers.map(function (h) { return String(h || '').toLowerCase(); });
-      function find(preds) {
-        for (var i = 0; i < lower.length; i++) {
-          for (var p = 0; p < preds.length; p++) if (lower[i].indexOf(preds[p]) >= 0) return _headers[i];
+      var lower = _headers.map(function (h) { return String(h || '').toLowerCase().replace(/\s+/g, ''); });
+      // Exact / token match — never let "n1" match inside "mean1".
+      function findExact(preds) {
+        for (var p = 0; p < preds.length; p++) {
+          var needle = String(preds[p] || '').toLowerCase().replace(/\s+/g, '');
+          for (var i = 0; i < lower.length; i++) if (lower[i] === needle) return _headers[i];
         }
         return null;
       }
-      assignments.studyCol = find(['study', 'author', 'name', 'trial']) ||
+      function findToken(preds) {
+        for (var p = 0; p < preds.length; p++) {
+          var needle = String(preds[p] || '').toLowerCase().replace(/\s+/g, '');
+          var re = new RegExp('(^|[^a-z0-9])' + needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z0-9]|$)');
+          for (var i = 0; i < lower.length; i++) if (re.test(lower[i])) return _headers[i];
+        }
+        return null;
+      }
+      function find(preds) { return findExact(preds) || findToken(preds); }
+
+      assignments.studyCol = find(['study', 'author', 'trial', 'studyname']) ||
         (columnStats.find(function (s) { return !s.isNumeric; }) || {}).name || null;
 
-      var mean1 = find(['mean1', 'mean_t', 'm1', 'mean t']);
+      var mean1 = find(['mean1', 'mean_t', 'meant', 'm1']);
       var effect = find(['effect', 'smd', 'hedges', 'yi']);
-      var se = find(['se', 'stderr', 'std.err']);
+      var se = find(['se', 'stderr', 'std.err', 'stderror']);
       if (mean1) {
         setEffectType('continuous', true);
         assignments.mean1Col = mean1;
-        assignments.sd1Col = find(['sd1', 'sd_t', 's1']);
-        assignments.n1Col = find(['n1', 'n_t']);
-        assignments.mean2Col = find(['mean2', 'mean_c', 'm2', 'mean c']);
-        assignments.sd2Col = find(['sd2', 'sd_c', 's2']);
-        assignments.n2Col = find(['n2', 'n_c']);
+        assignments.sd1Col = find(['sd1', 'sd_t', 'sdt', 's1']);
+        assignments.n1Col = find(['n1', 'n_t', 'nt', 'samplesize1', 'size1']);
+        assignments.mean2Col = find(['mean2', 'mean_c', 'meanc', 'm2']);
+        assignments.sd2Col = find(['sd2', 'sd_c', 'sdc', 's2']);
+        assignments.n2Col = find(['n2', 'n_c', 'nc', 'samplesize2', 'size2']);
       } else if (effect && se) {
         setEffectType('direct', true);
         assignments.effectCol = effect;
         assignments.seCol = se;
       } else {
-        var nums = columnStats.filter(function (s) { return s.isNumeric; }).map(function (s) { return s.name; });
+        var used = {};
+        Object.keys(assignments).forEach(function (k) { if (assignments[k]) used[assignments[k]] = true; });
+        var nums = columnStats.filter(function (s) { return s.isNumeric && !used[s.name]; }).map(function (s) { return s.name; });
         if (effectType === 'continuous') {
           ['mean1Col', 'sd1Col', 'n1Col', 'mean2Col', 'sd2Col', 'n2Col'].forEach(function (k, i) {
             if (!assignments[k] && nums[i]) assignments[k] = nums[i];
@@ -664,7 +674,19 @@
 
     function runAnalysis() {
       if (qs('btnRun') && qs('btnRun').disabled) return;
-      send('metaModel', buildModelSpec());
+      var spec = buildModelSpec();
+      var btn = qs('btnRun');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Running…';
+      }
+      send('metaModel', spec);
+      // If the parent never closes us (demo / orphan dialog), re-enable shortly.
+      setTimeout(function () {
+        if (!btn || !document.body.contains(btn)) return;
+        validateModel();
+        btn.innerHTML = '<i class="fa-solid fa-play"></i> Run Analysis';
+      }, 2500);
     }
 
     function applyPayload(p) {
@@ -689,6 +711,53 @@
       validateModel();
     }
 
+    function startOfficeDialogBridge() {
+      if (typeof Office === 'undefined' || typeof Office.onReady !== 'function') {
+        // Still loading office.js — retry briefly before giving up.
+        var tries = 0;
+        var t = setInterval(function () {
+          tries++;
+          if (typeof Office !== 'undefined' && typeof Office.onReady === 'function') {
+            clearInterval(t);
+            startOfficeDialogBridge();
+          } else if (tries >= 40) {
+            clearInterval(t);
+            // Only website/dev fallback — never replace a pending Excel payload silently.
+            if (window.__META_WEB_DEMO__) applyPayload(buildDemoPayload());
+            else if (qs('loadingSpinner')) {
+              qs('loadingSpinner').innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Waiting for Excel data…';
+            }
+          }
+        }, 100);
+        return;
+      }
+
+      Office.onReady(function () {
+        try {
+          var canDialog = Office.context && Office.context.ui &&
+            typeof Office.context.ui.addHandlerAsync === 'function' &&
+            typeof Office.context.ui.messageParent === 'function';
+          if (!canDialog) {
+            if (window.__META_WEB_DEMO__) applyPayload(buildDemoPayload());
+            return;
+          }
+          Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function (arg) {
+            try {
+              var msg = JSON.parse(arg.message || '{}');
+              if ((msg.type === 'META_DATA' || msg.action === 'META_DATA') && msg.payload) {
+                applyPayload(msg.payload);
+              }
+            } catch (_e) {}
+          });
+          send('ready', null);
+          send('requestData', null);
+          setInterval(function () { if (!_headers.length) send('requestData', null); }, 500);
+        } catch (_err) {
+          if (window.__META_WEB_DEMO__) applyPayload(buildDemoPayload());
+        }
+      });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
       qs('btnCancel').addEventListener('click', function () { send('close', null); });
       qs('btnRun').addEventListener('click', runAnalysis);
@@ -711,32 +780,7 @@
         return;
       }
 
-      if (typeof Office === 'undefined' || typeof Office.onReady !== 'function') {
-        applyPayload(buildDemoPayload());
-        return;
-      }
-
-      Office.onReady(function () {
-        try {
-          if (!Office.context || !Office.context.ui ||
-              typeof Office.context.ui.addHandlerAsync !== 'function') {
-            applyPayload(buildDemoPayload());
-            return;
-          }
-          Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function (arg) {
-            try {
-              var msg = JSON.parse(arg.message || '{}');
-              if ((msg.type === 'META_DATA' || msg.action === 'META_DATA') && msg.payload) {
-                applyPayload(msg.payload);
-              }
-            } catch (_e) {}
-          });
-          send('ready', null);
-          setInterval(function () { if (!_headers.length) send('requestData', null); }, 500);
-        } catch (_err) {
-          applyPayload(buildDemoPayload());
-        }
-      });
+      startOfficeDialogBridge();
     });
   </script>
 </body>

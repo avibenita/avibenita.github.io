@@ -1098,14 +1098,20 @@ body {
 .pt-breadcrumb.si-trail,
 .hub-breadcrumb.si-trail {
   position: relative;
-  padding: 12px 0 2px;
+  width: 100%;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 10px 24px 6px !important;
+  box-sizing: border-box;
   z-index: 2;
+  text-align: left;
 }
 
 .si-trail ol {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-start;
   gap: 0;
   list-style: none;
   margin: 0;
@@ -1125,37 +1131,37 @@ body {
 
 .si-trail li:not(:last-child)::after {
   content: "" !important;
-  width: 18px;
+  width: 16px;
   height: 10px;
-  margin: 0 5px;
+  margin: 0 4px;
   flex: 0 0 auto;
   background:
-    linear-gradient(90deg, rgba(255,165,120,.55), rgba(120,200,255,.55)) center / 12px 2px no-repeat,
-    radial-gradient(circle at 100% 50%, rgba(120,200,255,.95) 0 2px, transparent 2.5px);
-  filter: drop-shadow(0 0 4px rgba(120,200,255,.28));
+    linear-gradient(90deg, rgba(255,165,120,.5), rgba(120,200,255,.5)) center / 10px 1.5px no-repeat,
+    radial-gradient(circle at 100% 50%, rgba(120,200,255,.9) 0 1.5px, transparent 2px);
+  filter: drop-shadow(0 0 3px rgba(120,200,255,.22));
 }
 
 .si-trail-chip {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   max-width: 100%;
-  padding: 6px 11px;
-  border-radius: 10px;
-  font-size: 0.72rem;
-  font-weight: 650;
+  padding: 4px 2px 5px;
+  border-radius: 0;
+  font-size: 0.74rem;
+  font-weight: 600;
   letter-spacing: 0.02em;
   line-height: 1.2;
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.045);
-  color: rgba(228,236,248,.86);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
-  transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: rgba(228,236,248,.78);
+  transition: color .18s ease, opacity .18s ease;
 }
 
 .si-trail-chip i {
-  font-size: 0.74rem;
-  opacity: 0.92;
+  font-size: 0.72rem;
+  opacity: 0.88;
   flex: 0 0 auto;
 }
 
@@ -1167,89 +1173,68 @@ body {
 }
 
 .si-trail-chip--root {
-  border-color: rgba(255,165,120,.48);
-  background: linear-gradient(135deg, rgba(255,165,120,.18), rgba(255,165,120,.05));
-  color: rgba(255,214,178,.96);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.06),
-    0 0 18px rgba(255,165,120,.12);
+  color: rgba(255,210,170,.88);
 }
 
 .si-trail-chip--hub {
-  border-color: rgba(120,200,255,.42);
-  background: linear-gradient(135deg, rgba(120,200,255,.16), rgba(120,200,255,.04));
-  color: rgba(186,224,255,.96);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.05),
-    0 0 16px rgba(120,200,255,.10);
+  color: rgba(186,224,255,.9);
 }
 
 .si-trail-chip--node {
-  border-color: rgba(255,255,255,.14);
-  background: rgba(255,255,255,.05);
+  color: rgba(228,236,248,.78);
 }
 
 .si-trail-chip--current {
-  border-color: rgba(255,255,255,.20);
-  background:
-    linear-gradient(135deg, rgba(255,255,255,.10), rgba(255,255,255,.03));
   color: #f4f8ff;
-  font-weight: 750;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.04);
+  font-weight: 700;
+  box-shadow: inset 0 -1.5px 0 rgba(255,165,120,.72);
 }
 
 .si-trail a:hover .si-trail-chip {
-  transform: translateY(-1px);
-  border-color: rgba(255,210,170,.55);
-  box-shadow: 0 6px 16px rgba(0,0,0,.22);
-}
-
-.si-trail a:hover .si-trail-chip--hub {
-  border-color: rgba(150,214,255,.65);
+  color: #fff;
+  opacity: 1;
 }
 
 :root[data-theme="light"] .si-trail li:not(:last-child)::after {
   background:
-    linear-gradient(90deg, rgba(180,83,9,.45), rgba(37,99,235,.45)) center / 12px 2px no-repeat,
-    radial-gradient(circle at 100% 50%, rgba(37,99,235,.85) 0 2px, transparent 2.5px);
+    linear-gradient(90deg, rgba(180,83,9,.4), rgba(37,99,235,.4)) center / 10px 1.5px no-repeat,
+    radial-gradient(circle at 100% 50%, rgba(37,99,235,.8) 0 1.5px, transparent 2px);
   filter: none;
 }
 
 :root[data-theme="light"] .si-trail-chip {
-  border-color: rgba(15,23,42,.12);
-  background: rgba(255,255,255,.82);
-  color: rgba(15,23,42,.72);
-  box-shadow: 0 1px 2px rgba(15,23,42,.04);
+  color: rgba(15,23,42,.62);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 :root[data-theme="light"] .si-trail-chip--root {
-  border-color: rgba(180,83,9,.38);
-  background: linear-gradient(135deg, rgba(255,165,120,.18), rgba(255,255,255,.9));
-  color: rgba(146,64,14,.92);
-  box-shadow: 0 1px 3px rgba(180,83,9,.08);
+  color: rgba(146,64,14,.88);
 }
 
 :root[data-theme="light"] .si-trail-chip--hub {
-  border-color: rgba(37,99,235,.34);
-  background: linear-gradient(135deg, rgba(120,200,255,.16), rgba(255,255,255,.92));
-  color: rgba(29,78,216,.9);
-  box-shadow: 0 1px 3px rgba(37,99,235,.08);
+  color: rgba(29,78,216,.88);
 }
 
 :root[data-theme="light"] .si-trail-chip--current {
-  border-color: rgba(15,23,42,.16);
-  background: #ffffff;
   color: #0f172a;
-  box-shadow: 0 2px 8px rgba(15,23,42,.06);
+  box-shadow: inset 0 -1.5px 0 rgba(180,83,9,.55);
 }
 
 :root[data-theme="light"] .si-trail a:hover .si-trail-chip {
-  box-shadow: 0 4px 12px rgba(15,23,42,.08);
+  color: #0f172a;
 }
 
 @media (max-width: 640px) {
+  .si-trail,
+  .lr-breadcrumb.si-trail,
+  .pt-breadcrumb.si-trail,
+  .hub-breadcrumb.si-trail {
+    padding: 10px 16px 6px !important;
+  }
   .si-trail-label { max-width: 9.5rem; }
-  .si-trail-chip { padding: 5px 9px; font-size: 0.68rem; }
+  .si-trail-chip { font-size: 0.7rem; }
   .si-trail li:not(:last-child)::after { width: 12px; margin: 0 3px; }
 }
 

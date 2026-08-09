@@ -53,12 +53,32 @@
 
   const STORAGE_KEY = 'statistico-config-theme';
 
+  function isHubDemoEmbed() {
+    try {
+      const p = new URLSearchParams(window.location.search || '');
+      return p.get('demo') === '1' || p.get('embed') === '1';
+    } catch (_) {
+      return false;
+    }
+  }
+
   // ── Apply theme to <html> and sync button visuals ──────────────────────
   function applyTheme(theme) {
+    if (isHubDemoEmbed()) theme = 'dark';
     document.documentElement.setAttribute('data-theme', theme);
+    if (isHubDemoEmbed()) {
+      document.documentElement.setAttribute('data-hub-embed', '1');
+      document.documentElement.classList.add('demo-force-dark', 'demo-embed-root');
+    }
 
     const btn = document.getElementById('cfgThemeToggle');
     if (!btn) return;
+
+    if (isHubDemoEmbed()) {
+      btn.hidden = true;
+      btn.style.display = 'none';
+      return;
+    }
 
     const icon  = btn.querySelector('.cfg-toggle-icon');
     const label = btn.querySelector('.cfg-toggle-label');
@@ -70,14 +90,17 @@
   }
 
   function getSaved() {
+    if (isHubDemoEmbed()) return 'dark';
     try { return localStorage.getItem(STORAGE_KEY) || 'light'; } catch (_) { return 'light'; }
   }
 
   function saveTheme(t) {
+    if (isHubDemoEmbed()) return;
     try { localStorage.setItem(STORAGE_KEY, t); } catch (_) {}
   }
 
   function toggleTheme() {
+    if (isHubDemoEmbed()) return;
     const current = document.documentElement.getAttribute('data-theme') || 'dark';
     const next = current === 'dark' ? 'light' : 'dark';
     saveTheme(next);
@@ -91,7 +114,7 @@
   document.addEventListener('DOMContentLoaded', function () {
     applyTheme(getSaved());
     const btn = document.getElementById('cfgThemeToggle');
-    if (btn) btn.addEventListener('click', toggleTheme);
+    if (btn && !isHubDemoEmbed()) btn.addEventListener('click', toggleTheme);
     if (!document.getElementById('statistico-minimal-css')) {
       const link = document.createElement('link');
       link.id = 'statistico-minimal-css';

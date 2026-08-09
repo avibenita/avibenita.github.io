@@ -69,7 +69,7 @@
       <i class="fa-solid fa-chart-simple"></i> Forest Plot
     </button>
     <button class="tab-btn" onclick="switchTab('heterogeneity')">
-      <i class="fa-solid fa-chart-scatter"></i> Heterogeneity
+      <i class="fa-solid fa-chart-pie"></i> Heterogeneity
     </button>
     <button class="tab-btn" onclick="switchTab('bias')">
       <i class="fa-solid fa-triangle-exclamation"></i> Publication Bias
@@ -181,6 +181,31 @@
 
   <div id="tab-bias" class="tab-panel">
     <div class="stat-panel">
+      <div class="stat-panel-heading">Egger's Regression Test</div>
+      <div class="stat-grid">
+        <div class="stat-field">
+          <span class="stat-label">Intercept</span>
+          <span class="stat-value" id="eggerIntercept">—</span>
+        </div>
+        <div class="stat-field">
+          <span class="stat-label">SE</span>
+          <span class="stat-value" id="eggerSE">—</span>
+        </div>
+        <div class="stat-field">
+          <span class="stat-label">t</span>
+          <span class="stat-value" id="eggerT">—</span>
+        </div>
+        <div class="stat-field">
+          <span class="stat-label">p-value</span>
+          <span class="stat-value" id="eggerP">—</span>
+        </div>
+      </div>
+      <div class="interpretation" style="margin-top:12px;">
+        <div class="interpretation-title"><i class="fa-solid fa-lightbulb"></i> Bias interpretation</div>
+        <div class="interpretation-text" id="biasInterpretation">—</div>
+      </div>
+    </div>
+    <div class="stat-panel">
       <div class="stat-panel-heading">Funnel Plot</div>
       <div id="funnelPlot"></div>
       <div style="margin-top:12px;font-size:12px;color:#6b7280;">
@@ -270,11 +295,29 @@
       hetText += bundle.heterogeneity.pQ < 0.05 ? "is significant, confirming heterogeneity." : "is not significant.";
       document.getElementById("hetInterpretation").innerHTML = hetText;
       
+      // Publication bias / Egger
+      const bias = bundle.bias || {};
+      if (bias.available) {
+        document.getElementById("eggerIntercept").textContent = bias.intercept.toFixed(3);
+        document.getElementById("eggerSE").textContent = bias.se.toFixed(3);
+        document.getElementById("eggerT").textContent = bias.t.toFixed(3);
+        document.getElementById("eggerP").textContent = bias.p < 0.001 ? "< 0.001" : bias.p.toFixed(3);
+        document.getElementById("biasInterpretation").innerHTML = bias.p < 0.05
+          ? `Egger's test is <strong>significant</strong> (p ${bias.p < 0.001 ? "< 0.001" : "= " + bias.p.toFixed(3)}), suggesting possible small-study / publication bias. Inspect the funnel plot carefully.`
+          : `Egger's test is <strong>not significant</strong> (p = ${bias.p.toFixed(3)}). No strong evidence of funnel-plot asymmetry from this test alone.`;
+      } else {
+        document.getElementById("eggerIntercept").textContent = "—";
+        document.getElementById("eggerSE").textContent = "—";
+        document.getElementById("eggerT").textContent = "—";
+        document.getElementById("eggerP").textContent = "—";
+        document.getElementById("biasInterpretation").textContent = bias.reason || "Egger's test unavailable.";
+      }
+
       // Studies table
       const tbody = document.getElementById("studiesTableBody");
       tbody.innerHTML = bundle.studies.map(s => `
         <tr>
-          <td>${s.name}</td>
+          <td>${escapeHtml(s.name)}</td>
           <td>${s.yi.toFixed(3)}</td>
           <td>${s.vi.toFixed(4)}</td>
           <td>${s.weight.toFixed(2)}</td>
@@ -285,6 +328,12 @@
       // Render plots
       renderForestPlot(bundle);
       renderFunnelPlot(bundle);
+    }
+
+    function escapeHtml(str) {
+      return String(str == null ? "" : str)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
     }
 
     function renderForestPlot(bundle){
@@ -349,13 +398,42 @@
     function switchTab(tabName){
       document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
       document.querySelectorAll(".tab-panel").forEach(panel => panel.classList.remove("active"));
-      
-      event.target.closest(".tab-btn").classList.add("active");
+      var btn = document.querySelector('.tab-btn[onclick*="' + tabName + '"]');
+      if (btn) btn.classList.add("active");
       document.getElementById("tab-" + tabName).classList.add("active");
     }
 
     function exportResults(){
-      alert("Export feature coming soon!");
+      if (!metaBundle) return;
+      var lines = [];
+      lines.push("Meta-Analysis Results");
+      lines.push("Model," + (metaBundle.model === "random" ? "Random-Effects (DL)" : "Fixed-Effects"));
+      lines.push("Effect type," + (metaBundle.spec && metaBundle.spec.effectType ? metaBundle.spec.effectType : ""));
+      lines.push("k," + metaBundle.k);
+      lines.push("Pooled effect," + metaBundle.pooled.effect);
+      lines.push("SE," + metaBundle.pooled.se);
+      lines.push("CI lower," + metaBundle.pooled.ciLower);
+      lines.push("CI upper," + metaBundle.pooled.ciUpper);
+      lines.push("Z," + metaBundle.pooled.z);
+      lines.push("p," + metaBundle.pooled.p);
+      lines.push("Q," + metaBundle.heterogeneity.Q);
+      lines.push("I2," + metaBundle.heterogeneity.I2);
+      lines.push("tau2," + metaBundle.heterogeneity.tau2);
+      if (metaBundle.bias && metaBundle.bias.available) {
+        lines.push("Egger intercept," + metaBundle.bias.intercept);
+        lines.push("Egger p," + metaBundle.bias.p);
+      }
+      lines.push("");
+      lines.push("Study,Effect,Variance,Weight,WeightPct");
+      (metaBundle.studies || []).forEach(function (s) {
+        lines.push([s.name, s.yi, s.vi, s.weight, s.weightPct].join(","));
+      });
+      var blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "meta-analysis-results.csv";
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
     }
 
     function closeDialog(){

@@ -199,6 +199,30 @@ const TOOLS_CATEGORY_TILES = [
     ]
   },
   {
+    id: "meta-analysis-tools",
+    title: "Meta-Analysis",
+    icon: "fa-layer-group",
+    accent: "#eab308",
+    accentDark: "#a16207",
+    color: "#6366f1",
+    colorDark: "#4338ca",
+    subtitle: "Pool study-level effect sizes into an overall estimate",
+    desc: "Combine continuous, binary, or precomputed study effects with fixed or random-effects models — including forest plots, heterogeneity, and publication-bias checks.",
+    info: [
+      "Continuous (Hedges' g), binary (log OR), or direct effect + SE",
+      "Fixed-effects and DerSimonian–Laird random-effects models",
+      "Forest plot, I² / Q heterogeneity, and funnel / Egger bias checks",
+      "Works from study-level rows in your Active Range"
+    ],
+    modules: [
+      {
+        id: "meta-analysis",
+        label: "Run Meta-Analysis",
+        tip: "Pool study effect sizes with fixed/random effects, forest plot, and heterogeneity diagnostics."
+      }
+    ]
+  },
+  {
     id: "ezpaste",
     title: "EzPaste",
     icon: "fa-bullseye",
@@ -1602,6 +1626,7 @@ function openMixedConfigFromHub() {
 }
 
 function openMetaConfigFromHub() {
+  try { sessionStorage.removeItem("metaModelSpec"); } catch (e) {}
   return openBuilderDialogFromHub({
     moduleId: "meta-analysis",
     dialogPath: "meta-analysis/meta-input.html",
@@ -1613,9 +1638,13 @@ function openMetaConfigFromHub() {
     },
     modelActions: ["metaModel"],
     onModel: function (msg) {
-      sessionStorage.setItem("metaModelSpec", JSON.stringify(msg.spec || msg.payload || msg.data || {}));
+      var data = msg.payload || msg.data || {};
+      var spec = (data && data.spec) ? data.spec : data;
+      sessionStorage.setItem("metaModelSpec", JSON.stringify(spec || {}));
     },
-    hubResultsKey: "meta-analysis"
+    hubResultsKey: "meta-analysis",
+    nextDelayMs: 450,
+    closeActions: ["close", "cancel"]
   });
 }
 

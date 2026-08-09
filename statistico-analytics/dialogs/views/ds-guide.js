@@ -199,6 +199,25 @@
         ['Widget B', '3100'],
         ['Widget C', '1800']
       ]
+    },
+
+    meta: {
+      badge: 'Study-level  one row per study',
+      rule:  'Each row is a study. Map a study label plus either mean/SD/N for two groups, 2×2 counts, or a precomputed effect + SE.',
+      note:  'Continuous outcomes use Hedges’ g; binary outcomes use log odds ratios; direct mode pools supplied effects.',
+      cols: [
+        { label: 'Study', role: 'cat', roleLabel: 'Study' },
+        { label: 'Mean1', role: 'meas', roleLabel: 'G1 mean' },
+        { label: 'SD1', role: 'meas', roleLabel: 'G1 SD' },
+        { label: 'N1', role: 'meas', roleLabel: 'G1 N' },
+        { label: 'Mean2', role: 'meas', roleLabel: 'G2 mean' },
+        { label: 'SD2', role: 'meas', roleLabel: 'G2 SD' },
+        { label: 'N2', role: 'meas', roleLabel: 'G2 N' }
+      ],
+      rows: [
+        ['Smith 2019', '12.4', '3.1', '40', '10.1', '2.8', '38'],
+        ['Lee 2021', '11.8', '2.9', '55', '10.6', '3.0', '52']
+      ]
     }
   };
 

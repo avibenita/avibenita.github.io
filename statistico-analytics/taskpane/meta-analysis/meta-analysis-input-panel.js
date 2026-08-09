@@ -25,8 +25,36 @@ function onRangeDataLoaded(values, address) {
   updateButtonState();
 }
 
+function getMetaRangeValues() {
+  if (window.StatisticoGlobalRange) {
+    var gr = StatisticoGlobalRange.load();
+    if (gr && gr.values && gr.values.length >= 2) {
+      return { values: gr.values, address: gr.address || "" };
+    }
+  }
+  var dataPanel = window.dataInputPanelInstance;
+  if (dataPanel && dataPanel.values && dataPanel.values.length >= 2) {
+    return { values: dataPanel.values, address: dataPanel.address || "" };
+  }
+  return null;
+}
+
+function getMetaDialogsBaseUrl() {
+  if (typeof getDialogsBaseUrl === "function") return getDialogsBaseUrl();
+  const href = window.location.href;
+  if (href.includes("/taskpane/")) return `${href.split("/taskpane/")[0]}/dialogs/views/`;
+  return `${window.location.origin}/dialogs/views/`;
+}
+
+function unwrapMetaModelSpec(msg) {
+  if (!msg) return {};
+  var data = msg.payload || msg.data || msg;
+  if (data && data.spec) return data.spec;
+  return data || {};
+}
+
 function openMetaBuilder() {
-  const url = window.location.origin + window.location.pathname.replace("meta-analysis.html", "../../dialogs/views/meta-analysis/meta-input.html");
+  const url = `${getMetaDialogsBaseUrl()}meta-analysis/meta-input.html?v=${Date.now()}`;
   
   Office.context.ui.displayDialogAsync(url, DIALOG_SIZES.REGRESSION_BUILDER, (result) => {
     if (result.status === Office.AsyncResultStatus.Failed) {
@@ -39,13 +67,14 @@ function openMetaBuilder() {
     metaDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
       const msg = JSON.parse(arg.message || "{}");
       
-      if (msg.action === "requestData") {
-        sendDialogData();
-      } else if (msg.action === "ready") {
+      if (msg.action === "requestData" || msg.action === "ready") {
         sendDialogData();
       } else if (msg.action === "metaModel") {
-        handleMetaModel(msg.spec);
+        handleMetaModel(unwrapMetaModelSpec(msg));
         metaDialog.close();
+        metaDialog = null;
+      } else if (msg.action === "close" || msg.action === "cancel") {
+        try { metaDialog.close(); } catch (_e) {}
         metaDialog = null;
       }
     });
@@ -60,16 +89,16 @@ function openMetaBuilder() {
 function sendDialogData() {
   if (!metaDialog) return;
   
-  const dataPanel = window.dataInputPanelInstance;
-  if (!dataPanel || !dataPanel.values || dataPanel.values.length < 2) {
+  const range = getMetaRangeValues();
+  if (!range) {
     console.warn("No data loaded");
     return;
   }
   
   const payload = {
-    headers: dataPanel.values[0],
-    rows: dataPanel.values.slice(1),
-    address: dataPanel.address,
+    headers: range.values[0],
+    rows: range.values.slice(1),
+    address: range.address,
     // Always open the builder fresh — saved spec is only used by results dialogs.
     savedSpec: null
   };
@@ -81,15 +110,15 @@ function sendDialogData() {
 }
 
 function handleMetaModel(spec) {
-  sessionStorage.setItem("metaModelSpec", JSON.stringify(spec));
+  sessionStorage.setItem("metaModelSpec", JSON.stringify(spec || {}));
   updateButtonState();
   
   // Build the meta-analysis bundle
-  const dataPanel = window.dataInputPanelInstance;
-  if (!dataPanel || !dataPanel.values) return;
+  const range = getMetaRangeValues();
+  if (!range) return;
   
-  const headers = dataPanel.values[0];
-  const rows = dataPanel.values.slice(1);
+  const headers = range.values[0];
+  const rows = range.values.slice(1);
   
   const bundle = buildMetaBundle(headers, rows, spec);
   
@@ -138,15 +167,20 @@ function buildMetaBundle(headers, rows, spec) {
         vi = ((n1 + n2) / (n1 * n2) + (yi * yi) / (2 * (n1 + n2))) * j * j;
         
       } else if (effectType === "binary") {
-        // 2x2 table: a, b, c, d
-        const a = parseInt(row[spec.aCol]);
-        const b = parseInt(row[spec.bCol]);
-        const c = parseInt(row[spec.cCol]);
-        const d = parseInt(row[spec.dCol]);
+        // 2x2 table: a, b, c, d (Haldane–Anscombe 0.5 continuity if any cell is 0)
+        let a = parseFloat(row[spec.aCol]);
+        let b = parseFloat(row[spec.bCol]);
+        let c = parseFloat(row[spec.cCol]);
+        let d = parseFloat(row[spec.dCol]);
         
-        if (!isFinite(a) || !isFinite(b) || !isFinite(c) || !isFinite(d) || 
-            a + b === 0 || c + d === 0 || a + c === 0 || b + d === 0) {
+        if (!isFinite(a) || !isFinite(b) || !isFinite(c) || !isFinite(d) ||
+            a < 0 || b < 0 || c < 0 || d < 0 ||
+            a + b === 0 || c + d === 0) {
           return; // Skip invalid rows
+        }
+
+        if (a === 0 || b === 0 || c === 0 || d === 0) {
+          a += 0.5; b += 0.5; c += 0.5; d += 0.5;
         }
         
         // Log odds ratio
@@ -163,7 +197,7 @@ function buildMetaBundle(headers, rows, spec) {
       }
       
       if (yi !== null && vi !== null && isFinite(yi) && isFinite(vi) && vi > 0) {
-        studies.push({ name: studyName, yi, vi });
+        studies.push({ name: String(studyName), yi: yi, vi: vi, se: Math.sqrt(vi) });
       }
     });
     
@@ -171,48 +205,47 @@ function buildMetaBundle(headers, rows, spec) {
       return { error: "Need at least 2 valid studies for meta-analysis" };
     }
     
-    // Compute weights and pooled effect
-    let tau2 = 0; // Between-study variance
-    
-    if (model === "random") {
-      // DerSimonian-Laird estimator for tau²
-      const wi_fixed = studies.map(s => 1 / s.vi);
-      const sumWi = wi_fixed.reduce((a, b) => a + b, 0);
-      const sumWiYi = studies.reduce((sum, s, i) => sum + wi_fixed[i] * s.yi, 0);
-      const theta_fixed = sumWiYi / sumWi;
-      
-      const Q = studies.reduce((sum, s, i) => {
-        return sum + wi_fixed[i] * Math.pow(s.yi - theta_fixed, 2);
-      }, 0);
-      
-      const df = studies.length - 1;
-      const C = sumWi - studies.reduce((sum, w) => sum + w * w, 0) / sumWi;
-      
+    // Fixed-effect weights for Q / DL tau² / I²
+    const wiFixed = studies.map(function (s) { return 1 / s.vi; });
+    const sumWiFixed = wiFixed.reduce(function (a, b) { return a + b; }, 0);
+    const thetaFixed = studies.reduce(function (sum, s, i) {
+      return sum + wiFixed[i] * s.yi;
+    }, 0) / sumWiFixed;
+    const Q = studies.reduce(function (sum, s, i) {
+      return sum + wiFixed[i] * Math.pow(s.yi - thetaFixed, 2);
+    }, 0);
+    const df = studies.length - 1;
+    const sumWiFixedSq = wiFixed.reduce(function (sum, w) { return sum + w * w; }, 0);
+    const C = sumWiFixed - (sumWiFixedSq / sumWiFixed);
+    let tau2 = 0;
+    if (model === "random" && C > 0) {
       tau2 = Math.max(0, (Q - df) / C);
     }
     
-    // Compute final pooled estimate
-    const wi = studies.map(s => 1 / (s.vi + tau2));
-    const sumWi = wi.reduce((a, b) => a + b, 0);
-    const theta = studies.reduce((sum, s, i) => sum + wi[i] * s.yi, 0) / sumWi;
+    // Compute final pooled estimate (fixed or DL random)
+    const wi = studies.map(function (s) { return 1 / (s.vi + tau2); });
+    const sumWi = wi.reduce(function (a, b) { return a + b; }, 0);
+    const theta = studies.reduce(function (sum, s, i) { return sum + wi[i] * s.yi; }, 0) / sumWi;
     const se_theta = Math.sqrt(1 / sumWi);
     const ciLower = theta - 1.96 * se_theta;
     const ciUpper = theta + 1.96 * se_theta;
     const z = theta / se_theta;
     const p = 2 * (1 - approximateNormalCDF(Math.abs(z)));
     
-    // Heterogeneity statistics
-    const Q = studies.reduce((sum, s, i) => sum + wi[i] * Math.pow(s.yi - theta, 2), 0);
-    const df = studies.length - 1;
     const pQ = approximateChiSquare(Q, df);
-    const I2 = df > 0 ? Math.max(0, 100 * (Q - df) / Q) : 0;
+    const I2 = Q > 0 ? Math.max(0, Math.min(100, 100 * (Q - df) / Q)) : 0;
     const H2 = df > 0 ? Q / df : 1;
     
     // Add weights to studies
-    studies.forEach((s, i) => {
+    studies.forEach(function (s, i) {
       s.weight = wi[i];
       s.weightPct = (wi[i] / sumWi) * 100;
+      s.ciLower = s.yi - 1.96 * s.se;
+      s.ciUpper = s.yi + 1.96 * s.se;
     });
+
+    // Egger's regression test (precision vs standardized effect)
+    const bias = computeEggersTest(studies);
     
     return {
       spec: spec,
@@ -235,7 +268,9 @@ function buildMetaBundle(headers, rows, spec) {
         tau2: tau2,
         tau: Math.sqrt(tau2)
       },
-      model: model
+      bias: bias,
+      model: model,
+      effectType: effectType
     };
     
   } catch (err) {
@@ -249,6 +284,44 @@ function approximateNormalCDF(z) {
   const d = 0.3989423 * Math.exp(-z * z / 2);
   const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
   return z > 0 ? 1 - p : p;
+}
+
+function computeEggersTest(studies) {
+  // Regress SND = yi/se on precision = 1/se; Egger's intercept tests asymmetry.
+  if (!studies || studies.length < 3) {
+    return { available: false, reason: "Need at least 3 studies for Egger's test" };
+  }
+  const n = studies.length;
+  let sumX = 0, sumY = 0, sumXX = 0, sumXY = 0, sumYY = 0;
+  for (let i = 0; i < n; i++) {
+    const se = studies[i].se || Math.sqrt(studies[i].vi);
+    if (!(se > 0)) continue;
+    const x = 1 / se;
+    const y = studies[i].yi / se;
+    sumX += x; sumY += y; sumXX += x * x; sumXY += x * y; sumYY += y * y;
+  }
+  const denom = n * sumXX - sumX * sumX;
+  if (!(Math.abs(denom) > 1e-12)) {
+    return { available: false, reason: "Egger's test could not be estimated" };
+  }
+  const slope = (n * sumXY - sumX * sumY) / denom;
+  const intercept = (sumY - slope * sumX) / n;
+  const yHatVar = (sumYY - intercept * sumY - slope * sumXY) / Math.max(1, n - 2);
+  const seIntercept = Math.sqrt(Math.max(0, yHatVar) * (sumXX / denom));
+  if (!(seIntercept > 0)) {
+    return { available: false, reason: "Egger's test could not be estimated" };
+  }
+  const t = intercept / seIntercept;
+  const p = 2 * (1 - approximateNormalCDF(Math.abs(t)));
+  return {
+    available: true,
+    intercept: intercept,
+    se: seIntercept,
+    t: t,
+    p: p,
+    slope: slope,
+    n: n
+  };
 }
 
 function approximateChiSquare(chiSq, df) {
@@ -299,8 +372,12 @@ function openMetaResultsDialog(bundle) {
     metaResultsDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
       const msg = JSON.parse(arg.message || "{}");
       
-      if (msg.action === "ready") {
+      if (msg.action === "ready" || msg.action === "requestData") {
         sendMetaBundle();
+      } else if (msg.action === "close" || msg.action === "closeDialog") {
+        try { metaResultsDialog.close(); } catch (_e) {}
+        metaResultsDialog = null;
+        if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
       }
     });
     

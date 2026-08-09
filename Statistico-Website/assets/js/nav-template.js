@@ -1092,29 +1092,165 @@ body {
     linear-gradient(to bottom, rgba(217,119,6,.10) 1px, transparent 1px);
 }
 
-/* Breadcrumbs */
-:root[data-theme="light"] .lr-breadcrumb a,
-:root[data-theme="light"] .pt-breadcrumb a,
-:root[data-theme="light"] .hub-breadcrumb a {
-  color: rgba(180, 83, 9, 0.88) !important;
+/* ===== Visual hierarchy trail (site breadcrumbs) ===== */
+.si-trail,
+.lr-breadcrumb.si-trail,
+.pt-breadcrumb.si-trail,
+.hub-breadcrumb.si-trail {
+  position: relative;
+  padding: 12px 0 2px;
+  z-index: 2;
 }
-:root[data-theme="light"] .lr-breadcrumb a:hover,
-:root[data-theme="light"] .pt-breadcrumb a:hover,
-:root[data-theme="light"] .hub-breadcrumb a:hover {
-  color: rgba(146, 64, 14, 0.98) !important;
+
+.si-trail ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
-:root[data-theme="light"] .lr-breadcrumb li[aria-current],
-:root[data-theme="light"] .pt-breadcrumb li[aria-current],
-:root[data-theme="light"] .hub-breadcrumb li[aria-current],
-:root[data-theme="light"] .lr-breadcrumb,
-:root[data-theme="light"] .pt-breadcrumb,
-:root[data-theme="light"] .hub-breadcrumb {
-  color: rgba(15, 23, 42, 0.62);
+
+.si-trail li {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
 }
-:root[data-theme="light"] .lr-breadcrumb li:not(:last-child)::after,
-:root[data-theme="light"] .pt-breadcrumb li:not(:last-child)::after,
-:root[data-theme="light"] .hub-breadcrumb li:not(:last-child)::after {
-  color: rgba(15, 23, 42, 0.28);
+
+.si-trail a {
+  text-decoration: none !important;
+  color: inherit;
+}
+
+.si-trail li:not(:last-child)::after {
+  content: "" !important;
+  width: 18px;
+  height: 10px;
+  margin: 0 5px;
+  flex: 0 0 auto;
+  background:
+    linear-gradient(90deg, rgba(255,165,120,.55), rgba(120,200,255,.55)) center / 12px 2px no-repeat,
+    radial-gradient(circle at 100% 50%, rgba(120,200,255,.95) 0 2px, transparent 2.5px);
+  filter: drop-shadow(0 0 4px rgba(120,200,255,.28));
+}
+
+.si-trail-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 6px 11px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.045);
+  color: rgba(228,236,248,.86);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+  transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+
+.si-trail-chip i {
+  font-size: 0.74rem;
+  opacity: 0.92;
+  flex: 0 0 auto;
+}
+
+.si-trail-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 16rem;
+}
+
+.si-trail-chip--root {
+  border-color: rgba(255,165,120,.48);
+  background: linear-gradient(135deg, rgba(255,165,120,.18), rgba(255,165,120,.05));
+  color: rgba(255,214,178,.96);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.06),
+    0 0 18px rgba(255,165,120,.12);
+}
+
+.si-trail-chip--hub {
+  border-color: rgba(120,200,255,.42);
+  background: linear-gradient(135deg, rgba(120,200,255,.16), rgba(120,200,255,.04));
+  color: rgba(186,224,255,.96);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.05),
+    0 0 16px rgba(120,200,255,.10);
+}
+
+.si-trail-chip--node {
+  border-color: rgba(255,255,255,.14);
+  background: rgba(255,255,255,.05);
+}
+
+.si-trail-chip--current {
+  border-color: rgba(255,255,255,.20);
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.10), rgba(255,255,255,.03));
+  color: #f4f8ff;
+  font-weight: 750;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.04);
+}
+
+.si-trail a:hover .si-trail-chip {
+  transform: translateY(-1px);
+  border-color: rgba(255,210,170,.55);
+  box-shadow: 0 6px 16px rgba(0,0,0,.22);
+}
+
+.si-trail a:hover .si-trail-chip--hub {
+  border-color: rgba(150,214,255,.65);
+}
+
+:root[data-theme="light"] .si-trail li:not(:last-child)::after {
+  background:
+    linear-gradient(90deg, rgba(180,83,9,.45), rgba(37,99,235,.45)) center / 12px 2px no-repeat,
+    radial-gradient(circle at 100% 50%, rgba(37,99,235,.85) 0 2px, transparent 2.5px);
+  filter: none;
+}
+
+:root[data-theme="light"] .si-trail-chip {
+  border-color: rgba(15,23,42,.12);
+  background: rgba(255,255,255,.82);
+  color: rgba(15,23,42,.72);
+  box-shadow: 0 1px 2px rgba(15,23,42,.04);
+}
+
+:root[data-theme="light"] .si-trail-chip--root {
+  border-color: rgba(180,83,9,.38);
+  background: linear-gradient(135deg, rgba(255,165,120,.18), rgba(255,255,255,.9));
+  color: rgba(146,64,14,.92);
+  box-shadow: 0 1px 3px rgba(180,83,9,.08);
+}
+
+:root[data-theme="light"] .si-trail-chip--hub {
+  border-color: rgba(37,99,235,.34);
+  background: linear-gradient(135deg, rgba(120,200,255,.16), rgba(255,255,255,.92));
+  color: rgba(29,78,216,.9);
+  box-shadow: 0 1px 3px rgba(37,99,235,.08);
+}
+
+:root[data-theme="light"] .si-trail-chip--current {
+  border-color: rgba(15,23,42,.16);
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 2px 8px rgba(15,23,42,.06);
+}
+
+:root[data-theme="light"] .si-trail a:hover .si-trail-chip {
+  box-shadow: 0 4px 12px rgba(15,23,42,.08);
+}
+
+@media (max-width: 640px) {
+  .si-trail-label { max-width: 9.5rem; }
+  .si-trail-chip { padding: 5px 9px; font-size: 0.68rem; }
+  .si-trail li:not(:last-child)::after { width: 12px; margin: 0 3px; }
 }
 
 /* Analytics / module content panels on light page surfaces */
@@ -1926,6 +2062,9 @@ const FOOTER_TEMPLATE = `
     initializeThemeToggle();
   }
 
+  // Visual hierarchy trail on product + content pages
+  ensureSiteTrail();
+
   // Insert footer
   const footerPlaceholder = document.getElementById('footer-placeholder');
   if (footerPlaceholder) {
@@ -2075,4 +2214,242 @@ const FOOTER_TEMPLATE = `
   }
 
 })();
+
+function trailIconForLabel(label) {
+  const t = String(label || '').trim().toLowerCase();
+  if (t === 'statistico') return 'fa-house';
+  if (t === 'analytics') return 'fa-chart-column';
+  if (t === 'applications') return 'fa-puzzle-piece';
+  if (t === 'calculators') return 'fa-calculator';
+  if (t === 'ezpaste' || t.indexOf('ezpaste') === 0) return 'fa-bullseye';
+  if (t === 'the paradigm') return 'fa-lightbulb';
+  if (t === 'how it works') return 'fa-route';
+  if (t === 'faq') return 'fa-circle-question';
+  if (t === 'about' || t === 'about us') return 'fa-building';
+  if (t === 'contact') return 'fa-envelope';
+  if (t === 'terms' || t.indexOf('terms') === 0) return 'fa-file-contract';
+  if (t === 'privacy' || t.indexOf('privacy') === 0) return 'fa-shield-halved';
+  if (t === 'platform' || t === 'launcher') return 'fa-sitemap';
+  if (t.indexOf('publication') >= 0) return 'fa-graduation-cap';
+  if (t.indexOf('regression') >= 0) return 'fa-chart-line';
+  if (t.indexOf('anova') >= 0) return 'fa-table-cells';
+  if (t.indexOf('factor') >= 0) return 'fa-diagram-project';
+  if (t.indexOf('cluster') >= 0 || t.indexOf('k-means') >= 0 || t.indexOf('hierarchical') >= 0) return 'fa-circle-nodes';
+  if (t.indexOf('pca') >= 0 || t.indexOf('principal') >= 0) return 'fa-compass';
+  if (t.indexOf('correlation') >= 0) return 'fa-grip';
+  if (t.indexOf('univariate') >= 0) return 'fa-chart-simple';
+  if (t.indexOf('mixed') >= 0) return 'fa-layer-group';
+  if (t.indexOf('independent') >= 0 || t.indexOf('paired') >= 0) return 'fa-not-equal';
+  return 'fa-file-lines';
+}
+
+function enhanceTrailNav(nav) {
+  if (!nav || nav.dataset.siTrailEnhanced === '1') return;
+  nav.classList.add('si-trail');
+  const items = Array.from(nav.querySelectorAll(':scope > ol > li'));
+  items.forEach(function(li, i) {
+    if (li.querySelector('.si-trail-chip')) return;
+    const link = li.querySelector('a');
+    const isCurrent = li.hasAttribute('aria-current') || (!link && i === items.length - 1);
+    const label = ((link ? link.textContent : li.textContent) || '').replace(/\s+/g, ' ').trim();
+    if (!label) return;
+
+    let role = 'node';
+    if (i === 0) role = 'root';
+    else if (i === 1 && items.length > 2) role = 'hub';
+    else if (isCurrent || !link) role = 'current';
+    else if (i === 1) role = 'hub';
+
+    const chip = document.createElement('span');
+    chip.className = 'si-trail-chip si-trail-chip--' + role;
+    chip.innerHTML = '<i class="fa-solid ' + trailIconForLabel(label) + '" aria-hidden="true"></i><span class="si-trail-label"></span>';
+    chip.querySelector('.si-trail-label').textContent = label;
+
+    if (link) {
+      link.textContent = '';
+      link.appendChild(chip);
+    } else {
+      li.textContent = '';
+      if (!li.hasAttribute('aria-current') && isCurrent) li.setAttribute('aria-current', 'page');
+      li.appendChild(chip);
+    }
+  });
+  nav.dataset.siTrailEnhanced = '1';
+}
+
+function resolveTrailCrumbs() {
+  const links = getNavLinks();
+  const path = window.location.pathname.replace(/\\/g, '/');
+  const file = path.split('/').pop() || '';
+
+  const isHome =
+    path === '/' ||
+    path.endsWith('/Statistico-Website/') ||
+    path.endsWith('/Statistico-Website') ||
+    ((file === 'index.html' || file === '') && path.indexOf('/analytics/') < 0 && path.indexOf('/ezpaste/') < 0 && path.indexOf('/demos/') < 0);
+
+  if (isHome) return null;
+
+  // Skip standalone demos / legacy help shells
+  if (path.indexOf('/demos/') >= 0 || path.indexOf('/legacy-help/') >= 0 || path.indexOf('/docs/') >= 0) {
+    return null;
+  }
+
+  const analyticsModules = {
+    'univariate.html': 'Univariate Analysis',
+    'correlation.html': 'Correlation Analysis',
+    'linear-regression.html': 'Linear Regression',
+    'logistic-regression.html': 'Logistic Regression',
+    'anova.html': 'ANOVA',
+    'independent-means.html': 'Independent Means',
+    'paired-repeated.html': 'Paired / Repeated Means',
+    'mixed-models.html': 'Mixed Models',
+    'factor-analysis.html': 'Factor Analysis',
+    'pca.html': 'Principal Component Analysis',
+    'k-means.html': 'K-Means Clustering',
+    'hierarchical.html': 'Hierarchical Clustering'
+  };
+
+  if (analyticsModules[file]) {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'Analytics', href: links.analytics },
+      { label: analyticsModules[file] }
+    ];
+  }
+
+  if (file === 'publication-tables.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'Applications', href: links.addins },
+      { label: 'Publication Tables' }
+    ];
+  }
+
+  if (file === 'index-Analytics.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'Analytics' }
+    ];
+  }
+
+  if (file === 'index-Analytics-launcher.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'Analytics', href: links.analytics },
+      { label: 'Platform' }
+    ];
+  }
+
+  if (file === 'index-Calculators.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'Calculators' }
+    ];
+  }
+
+  if (file === 'index-Addins.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'Applications' }
+    ];
+  }
+
+  if (file === 'index-EzPaste.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'Applications', href: links.addins },
+      { label: 'EzPaste' }
+    ];
+  }
+
+  if (file === 'why-another-package.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'The Paradigm' }
+    ];
+  }
+
+  if (file === 'how-it-works.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'How It Works' }
+    ];
+  }
+
+  if (file === 'faq.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'FAQ' }
+    ];
+  }
+
+  if (file === 'about-us.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'About' }
+    ];
+  }
+
+  if (file === 'contact.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'Contact' }
+    ];
+  }
+
+  if (file === 'terms-and-conditions.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'Terms' }
+    ];
+  }
+
+  if (file === 'privacy-policy.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'Privacy' }
+    ];
+  }
+
+  return null;
+}
+
+function ensureSiteTrail() {
+  let nav = document.querySelector('.hub-breadcrumb, .lr-breadcrumb, .pt-breadcrumb, nav.si-trail[aria-label="Breadcrumb"]');
+  if (!nav) {
+    const crumbs = resolveTrailCrumbs();
+    if (!crumbs || crumbs.length < 2) return;
+
+    nav = document.createElement('nav');
+    nav.className = 'si-trail container';
+    nav.setAttribute('aria-label', 'Breadcrumb');
+
+    const ol = document.createElement('ol');
+    crumbs.forEach(function(crumb, i) {
+      const li = document.createElement('li');
+      const isLast = i === crumbs.length - 1;
+      if (isLast || !crumb.href) {
+        li.setAttribute('aria-current', 'page');
+        li.textContent = crumb.label;
+      } else {
+        const a = document.createElement('a');
+        a.href = crumb.href;
+        a.textContent = crumb.label;
+        li.appendChild(a);
+      }
+      ol.appendChild(li);
+    });
+    nav.appendChild(ol);
+
+    const placeholder = document.getElementById('nav-placeholder');
+    if (placeholder) {
+      placeholder.insertAdjacentElement('afterend', nav);
+    } else {
+      document.body.insertBefore(nav, document.body.firstChild);
+    }
+  }
+
+  enhanceTrailNav(nav);
+}
 

@@ -137,13 +137,30 @@
     }
 
     .meta-zones-grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex-shrink: 0;
+      display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
     }
     .meta-zones-grid .zone-wide {
-      grid-column: 1 / -1;
       width: min(52%, 280px);
       max-width: 100%;
-      justify-self: center;
+      align-self: center;
+    }
+    .meta-arms-row {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    .meta-arm-col {
+      display: flex; flex-direction: column; gap: 8px; min-width: 0;
+    }
+    .meta-arm-title {
+      font-size: 10px; font-weight: 800; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--cfg-text3);
+      padding: 0 2px 2px;
+    }
+    .meta-arm-col.arm-treat .meta-arm-title { color: #38bdf8; }
+    .meta-arm-col.arm-ctrl .meta-arm-title { color: #a78bfa; }
+    [data-theme="light"] .meta-arm-col.arm-treat .meta-arm-title { color: #0284c7; }
+    [data-theme="light"] .meta-arm-col.arm-ctrl .meta-arm-title { color: #7c3aed; }
+    .meta-zones-flat {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
     }
 
     .reg-zone-card {
@@ -602,17 +619,17 @@
       if (effectType === 'continuous') {
         return [
           study,
-          { key: 'mean1Col', label: 'Treatment mean', hint: 'Intervention arm', kind: 'num',
+          { key: 'mean1Col', label: 'Mean', hint: 'Intervention arm', kind: 'num', arm: 'treat',
             tip: 'Mean outcome in the <b>treatment / intervention</b> arm. Must use the same units as the control mean.' },
-          { key: 'sd1Col', label: 'Treatment SD', hint: 'Intervention arm', kind: 'num',
+          { key: 'sd1Col', label: 'SD', hint: 'Intervention arm', kind: 'num', arm: 'treat',
             tip: 'Standard deviation of the treatment arm (not SE). Must be &gt; 0.' },
-          { key: 'n1Col', label: 'Treatment N', hint: 'Intervention arm', kind: 'num',
+          { key: 'n1Col', label: 'N', hint: 'Intervention arm', kind: 'num', arm: 'treat',
             tip: 'Sample size of the treatment arm. Must be a positive integer.' },
-          { key: 'mean2Col', label: 'Control mean', hint: 'Reference arm', kind: 'num',
+          { key: 'mean2Col', label: 'Mean', hint: 'Reference arm', kind: 'num', arm: 'ctrl',
             tip: 'Mean outcome in the <b>control / reference</b> arm. Swapping arms reverses the effect sign.' },
-          { key: 'sd2Col', label: 'Control SD', hint: 'Reference arm', kind: 'num',
+          { key: 'sd2Col', label: 'SD', hint: 'Reference arm', kind: 'num', arm: 'ctrl',
             tip: 'Standard deviation of the control arm (not SE). Must be &gt; 0.' },
-          { key: 'n2Col', label: 'Control N', hint: 'Reference arm', kind: 'num',
+          { key: 'n2Col', label: 'N', hint: 'Reference arm', kind: 'num', arm: 'ctrl',
             tip: 'Sample size of the control arm. Must be a positive integer.' }
         ];
       }
@@ -620,25 +637,25 @@
         if (binaryFormat === 'events_nonevents') {
           return [
             study,
-            { key: 'aCol', label: 'Treatment events', hint: 'Events in treatment', kind: 'num',
+            { key: 'aCol', label: 'Events', hint: 'Events in treatment', kind: 'num', arm: 'treat',
               tip: 'Number of events in the treatment arm (cell a). Must be ≥ 0 and ≤ treatment total.' },
-            { key: 'bCol', label: 'Treatment non-events', hint: 'Non-events in treatment', kind: 'num',
+            { key: 'bCol', label: 'Non-events', hint: 'Non-events in treatment', kind: 'num', arm: 'treat',
               tip: 'Non-events in treatment (cell b). Treatment N = events + non-events.' },
-            { key: 'cCol', label: 'Control events', hint: 'Events in control', kind: 'num',
+            { key: 'cCol', label: 'Events', hint: 'Events in control', kind: 'num', arm: 'ctrl',
               tip: 'Number of events in the control arm (cell c). Zero cells may need continuity correction.' },
-            { key: 'dCol', label: 'Control non-events', hint: 'Non-events in control', kind: 'num',
+            { key: 'dCol', label: 'Non-events', hint: 'Non-events in control', kind: 'num', arm: 'ctrl',
               tip: 'Non-events in control (cell d). Control N = events + non-events.' }
           ];
         }
         return [
           study,
-          { key: 'aCol', label: 'Treatment events', hint: 'Events in treatment', kind: 'num',
+          { key: 'aCol', label: 'Events', hint: 'Events in treatment', kind: 'num', arm: 'treat',
             tip: 'Number of events in the treatment arm. Must be ≥ 0 and ≤ treatment total N.' },
-          { key: 'n1Col', label: 'Treatment total', hint: 'Total N in treatment', kind: 'num',
+          { key: 'n1Col', label: 'Total N', hint: 'Total N in treatment', kind: 'num', arm: 'treat',
             tip: 'Total sample size of the treatment arm. Must be ≥ treatment events.' },
-          { key: 'cCol', label: 'Control events', hint: 'Events in control', kind: 'num',
+          { key: 'cCol', label: 'Events', hint: 'Events in control', kind: 'num', arm: 'ctrl',
             tip: 'Number of events in the control arm. Zero cells may need continuity correction.' },
-          { key: 'n2Col', label: 'Control total', hint: 'Total N in control', kind: 'num',
+          { key: 'n2Col', label: 'Total N', hint: 'Total N in control', kind: 'num', arm: 'ctrl',
             tip: 'Total sample size of the control arm. Must be ≥ control events.' }
         ];
       }
@@ -915,21 +932,41 @@
         (cat ? '<span class="reg-vars-badge reg-vb-cat">' + cat + ' cat</span>' : '');
     }
 
+    function zoneCardHtml(z) {
+      var filled = !!assignments[z.key];
+      return '<div class="reg-zone-card zone-' + z.kind + (z.wide ? ' zone-wide' : '') +
+        (filled ? ' zone-filled' : ' zone-empty') + '" data-card-zone="' + z.key + '">' +
+        '<div class="reg-zone-head"><div class="dot"></div><div class="zone-head-main"><div class="lbl-with-tip">' +
+        z.label + tipIconHtml(z.tip) +
+        '</div><div class="zone-hint">' + z.hint + '</div></div>' +
+        '<span class="zone-req" title="Required">*</span></div>' +
+        '<div class="reg-zone-body drop-zone" data-zone="' + z.key + '" data-kind="' + z.kind + '" id="zone_' + z.key + '">' +
+        '<div class="reg-zone-placeholder">Drag column here</div></div></div>';
+    }
+
     function renderZones() {
       var grid = qs('zonesGrid');
       if (!grid) return;
       var defs = zoneDefsForType();
-      grid.innerHTML = defs.map(function (z) {
-        var filled = !!assignments[z.key];
-        return '<div class="reg-zone-card zone-' + z.kind + (z.wide ? ' zone-wide' : '') +
-          (filled ? ' zone-filled' : ' zone-empty') + '" data-card-zone="' + z.key + '">' +
-          '<div class="reg-zone-head"><div class="dot"></div><div class="zone-head-main"><div class="lbl-with-tip">' +
-          z.label + tipIconHtml(z.tip) +
-          '</div><div class="zone-hint">' + z.hint + '</div></div>' +
-          '<span class="zone-req" title="Required">*</span></div>' +
-          '<div class="reg-zone-body drop-zone" data-zone="' + z.key + '" data-kind="' + z.kind + '" id="zone_' + z.key + '">' +
-          '<div class="reg-zone-placeholder">Drag column here</div></div></div>';
-      }).join('');
+      var top = defs.filter(function (z) { return !z.arm; });
+      var treat = defs.filter(function (z) { return z.arm === 'treat'; });
+      var ctrl = defs.filter(function (z) { return z.arm === 'ctrl'; });
+      var html = top.map(zoneCardHtml).join('');
+      if (treat.length || ctrl.length) {
+        html += '<div class="meta-arms-row">' +
+          '<div class="meta-arm-col arm-treat"><div class="meta-arm-title">Treatment</div>' +
+          treat.map(zoneCardHtml).join('') + '</div>' +
+          '<div class="meta-arm-col arm-ctrl"><div class="meta-arm-title">Control</div>' +
+          ctrl.map(zoneCardHtml).join('') + '</div>' +
+          '</div>';
+      } else {
+        var rest = defs.filter(function (z) { return !z.wide; });
+        if (rest.length) {
+          html = defs.filter(function (z) { return z.wide; }).map(zoneCardHtml).join('') +
+            '<div class="meta-zones-flat">' + rest.map(zoneCardHtml).join('') + '</div>';
+        }
+      }
+      grid.innerHTML = html;
       setupDropZones();
       renderAssignments();
     }

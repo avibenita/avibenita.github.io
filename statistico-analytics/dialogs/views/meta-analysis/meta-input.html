@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <link rel="stylesheet" href="../shared-config.css?v=20260715a"/>
   <script src="../shared-config.js?v=2026-08-09-embed-dark"></script>
-  <script src="../ds-guide.js?v=20260330g"></script>
+  <script src="../ds-guide.js?v=20260810meta"></script>
   <style>
     :root {
       --meta-acc: #6366f1;
@@ -150,20 +150,56 @@
       font-size: 9px; font-weight: 400; text-transform: none; opacity: .8; line-height: 1.2;
     }
     .zone-req { font-size: 12px; font-weight: 900; color: #dc2626; opacity: .85; margin-left: 2px; }
-    .zone-single-badge {
-      display: inline-flex; align-items: center;
-      font-size: 9px; font-weight: 700; padding: 1px 5px;
-      border-radius: 4px; opacity: .7; background: currentColor;
+    .req-legend {
+      font-size: 10px; color: var(--cfg-text3); padding: 0 2px; flex-shrink: 0;
     }
-    .zone-single-badge span { color: var(--cfg-bg, #1e1e2e); }
+    .req-legend strong { color: #dc2626; font-weight: 800; }
     .reg-zone-body {
       padding: 4px 6px; min-height: 36px; max-height: 36px;
       display: flex; flex-wrap: nowrap; align-items: center; gap: 4px;
-      overflow: hidden; transition: background .2s;
+      overflow: hidden; transition: background .2s, border-color .15s;
     }
+    .reg-zone-card.zone-empty { border-color: var(--cfg-border); opacity: .92; }
+    .reg-zone-card.zone-empty .reg-zone-head { background: rgba(148,163,184,.06); color: var(--cfg-text3); }
+    .reg-zone-card.zone-empty .dot { background: var(--cfg-text3); opacity: .55; }
+    .reg-zone-card.zone-empty .reg-zone-body { background: transparent; }
+    .reg-zone-card.zone-filled.zone-cat { border-color: rgba(167,139,250,.55); }
+    .reg-zone-card.zone-filled.zone-num { border-color: rgba(56,189,248,.55); }
     .reg-zone-card.zone-cat .reg-zone-body { background: rgba(167,139,250,.04); }
     .reg-zone-card.zone-num .reg-zone-body { background: rgba(56,189,248,.04); }
+    .reg-zone-card.zone-filled.zone-cat .reg-zone-body { background: rgba(167,139,250,.10); }
+    .reg-zone-card.zone-filled.zone-num .reg-zone-body { background: rgba(56,189,248,.10); }
     .reg-zone-body.drag-over { filter: brightness(1.08); }
+    .meta-measure-row, .meta-subopt-row {
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap;
+    }
+    .meta-measure-row label, .meta-subopt-row label {
+      font-size: 10.5px; font-weight: 700; color: var(--cfg-text2); white-space: nowrap;
+    }
+    .meta-select {
+      flex: 1; min-width: 140px; padding: 6px 8px; border-radius: 7px;
+      border: 1px solid var(--cfg-border); background: var(--cfg-surface);
+      color: var(--cfg-text); font-size: 11.5px; font-weight: 600;
+    }
+    .meta-check {
+      display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--cfg-text2);
+      padding: 6px 8px; border: 1px solid var(--cfg-border); border-radius: 8px;
+      background: var(--cfg-surface); cursor: pointer;
+    }
+    .meta-check input { accent-color: var(--meta-acc); }
+    .meta-check.active {
+      border-color: rgba(99,102,241,.45);
+      background: rgba(99,102,241,.08); color: var(--meta-acc); font-weight: 600;
+    }
+    .run-hint {
+      font-size: 10.5px; color: var(--cfg-text3); margin-right: auto; padding: 0 6px;
+      max-width: 42%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .cfg-btn.run:not(:disabled) {
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      border-color: transparent; color: #fff; font-weight: 700;
+    }
+    .cfg-btn.save-config { opacity: .92; }
     .reg-zone-placeholder {
       width: 100%; text-align: center; font-size: 10.5px; font-style: italic;
       color: var(--cfg-text3); padding: 2px 0;
@@ -242,12 +278,33 @@
           </div>
           <div class="reg-equation-strip" id="modelSummary">Choose effect type, then drag study and outcome columns</div>
 
-          <div class="meta-seg" id="effectTypeSeg" role="group" aria-label="Effect type">
-            <button type="button" data-type="continuous" class="active">Continuous</button>
-            <button type="button" data-type="binary">Binary</button>
-            <button type="button" data-type="direct">Direct</button>
+          <div class="meta-seg" id="effectTypeSeg" role="group" aria-label="Data structure">
+            <button type="button" data-type="continuous" class="active" title="Two-group means, SDs and sample sizes">Continuous outcomes</button>
+            <button type="button" data-type="binary" title="Event counts for two groups">Binary outcomes</button>
+            <button type="button" data-type="direct" title="Study-level effect already computed">Precomputed effect</button>
           </div>
 
+          <div class="meta-measure-row">
+            <label for="effectMeasure">Effect measure</label>
+            <select id="effectMeasure" class="meta-select" aria-label="Effect measure"></select>
+          </div>
+          <div class="meta-subopt-row" id="binaryFormatRow" style="display:none;">
+            <label>Count format</label>
+            <select id="binaryFormat" class="meta-select" aria-label="Binary count format">
+              <option value="events_total" selected>Events + total N</option>
+              <option value="events_nonevents">Events + non-events</option>
+            </select>
+          </div>
+          <div class="meta-subopt-row" id="uncertaintyRow" style="display:none;">
+            <label for="uncertaintyType">Uncertainty</label>
+            <select id="uncertaintyType" class="meta-select" aria-label="Uncertainty type">
+              <option value="se" selected>Standard error</option>
+              <option value="variance">Variance</option>
+              <option value="ci">Lower &amp; upper CI</option>
+            </select>
+          </div>
+
+          <div class="req-legend"><strong>*</strong> Required</div>
           <div class="meta-zones-grid" id="zonesGrid"></div>
 
           <div class="adv-wrap" id="optionsWrap">
@@ -262,11 +319,43 @@
                 <div class="opt-radio-row">
                   <label class="opt-radio" id="modelFixedLabel">
                     <input type="radio" name="model" value="fixed" />
-                    Fixed effects
+                    Fixed-effect
                   </label>
                   <label class="opt-radio active" id="modelRandomLabel">
                     <input type="radio" name="model" value="random" checked />
-                    Random (DL)
+                    Random-effects
+                  </label>
+                </div>
+              </div>
+              <div class="opt-row" id="tauEstimatorRow">
+                <label>Between-study variance (τ²)</label>
+                <div class="opt-radio-row">
+                  <label class="opt-radio active" id="tauRemlLabel">
+                    <input type="radio" name="tauEstimator" value="reml" checked />
+                    REML
+                  </label>
+                  <label class="opt-radio" id="tauDlLabel">
+                    <input type="radio" name="tauEstimator" value="dl" />
+                    DerSimonian–Laird
+                  </label>
+                </div>
+              </div>
+              <div class="opt-row" id="hkRow">
+                <label class="meta-check active" id="hkLabel">
+                  <input type="checkbox" id="hartungKnapp" checked />
+                  Hartung–Knapp adjustment (recommended for random-effects)
+                </label>
+              </div>
+              <div class="opt-row">
+                <label>Positive values favor</label>
+                <div class="opt-radio-row">
+                  <label class="opt-radio active" id="dirTreatLabel">
+                    <input type="radio" name="effectDirection" value="treatment" checked />
+                    Treatment
+                  </label>
+                  <label class="opt-radio" id="dirCtrlLabel">
+                    <input type="radio" name="effectDirection" value="control" />
+                    Control
                   </label>
                 </div>
               </div>
@@ -286,8 +375,9 @@
     </div>
     <div class="cfg-footer">
       <button class="cfg-btn cancel" id="btnCancel"><i class="fa-solid fa-times"></i> Cancel</button>
-      <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" disabled><i class="fa-solid fa-clock-rotate-left"></i> Load previous&hellip;</button>
-      <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" disabled><i class="fa-solid fa-floppy-disk"></i> Save configuration</button>
+      <span class="run-hint" id="runHint">Assign required columns to continue</span>
+      <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" disabled title="Saved configurations"><i class="fa-solid fa-clock-rotate-left"></i> Configs</button>
+      <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" disabled><i class="fa-solid fa-floppy-disk"></i> Save</button>
       <button class="cfg-btn run" id="btnRun" disabled><i class="fa-solid fa-play"></i> Run Analysis</button>
     </div>
   </div>
@@ -296,33 +386,89 @@
     var _headers = [], _rows = [], _address = '', _saved = null;
     var columnStats = [];
     var effectType = 'continuous';
+    var effectMeasure = 'smd';
+    var binaryFormat = 'events_total';
+    var uncertaintyType = 'se';
     var modelType = 'random';
+    var tauEstimator = 'reml';
+    var hartungKnapp = true;
+    var effectDirection = 'treatment';
     var assignments = {};
     var draggedElement = null;
 
-    var ZONE_DEFS = {
+    var MEASURES = {
       continuous: [
-        { key: 'studyCol', label: 'Study name', hint: 'Author / study label', kind: 'cat', wide: true },
-        { key: 'mean1Col', label: 'Group 1 mean', hint: 'Treatment / exposed', kind: 'num' },
-        { key: 'sd1Col', label: 'Group 1 SD', hint: 'Treatment / exposed', kind: 'num' },
-        { key: 'n1Col', label: 'Group 1 N', hint: 'Treatment / exposed', kind: 'num' },
-        { key: 'mean2Col', label: 'Group 2 mean', hint: 'Control / reference', kind: 'num' },
-        { key: 'sd2Col', label: 'Group 2 SD', hint: 'Control / reference', kind: 'num' },
-        { key: 'n2Col', label: 'Group 2 N', hint: 'Control / reference', kind: 'num' }
+        { value: 'smd', label: "Hedges' g (SMD)" },
+        { value: 'md', label: 'Mean difference' },
+        { value: 'rom', label: 'Ratio of means (log)' }
       ],
       binary: [
-        { key: 'studyCol', label: 'Study name', hint: 'Author / study label', kind: 'cat', wide: true },
-        { key: 'aCol', label: 'a · Tx events', hint: 'Treatment events', kind: 'num' },
-        { key: 'bCol', label: 'b · Tx non-events', hint: 'Treatment non-events', kind: 'num' },
-        { key: 'cCol', label: 'c · Ctrl events', hint: 'Control events', kind: 'num' },
-        { key: 'dCol', label: 'd · Ctrl non-events', hint: 'Control non-events', kind: 'num' }
+        { value: 'or', label: 'Odds ratio' },
+        { value: 'rr', label: 'Risk ratio' },
+        { value: 'rd', label: 'Risk difference' }
       ],
       direct: [
-        { key: 'studyCol', label: 'Study name', hint: 'Author / study label', kind: 'cat', wide: true },
-        { key: 'effectCol', label: 'Effect size', hint: 'yi / SMD / log OR', kind: 'num' },
-        { key: 'seCol', label: 'Standard error', hint: 'SE of effect', kind: 'num' }
+        { value: 'generic', label: 'Generic effect' },
+        { value: 'logor', label: 'Log odds ratio' },
+        { value: 'logrr', label: 'Log risk ratio' },
+        { value: 'smd', label: "Standardized mean difference" },
+        { value: 'fisherz', label: "Fisher's z" }
       ]
     };
+
+    function zoneDefsForType() {
+      var study = { key: 'studyCol', label: 'Study label', hint: 'Author / study label', kind: 'cat', wide: true };
+      if (effectType === 'continuous') {
+        return [
+          study,
+          { key: 'mean1Col', label: 'Treatment mean', hint: 'Intervention arm', kind: 'num' },
+          { key: 'sd1Col', label: 'Treatment SD', hint: 'Intervention arm', kind: 'num' },
+          { key: 'n1Col', label: 'Treatment N', hint: 'Intervention arm', kind: 'num' },
+          { key: 'mean2Col', label: 'Control mean', hint: 'Reference arm', kind: 'num' },
+          { key: 'sd2Col', label: 'Control SD', hint: 'Reference arm', kind: 'num' },
+          { key: 'n2Col', label: 'Control N', hint: 'Reference arm', kind: 'num' }
+        ];
+      }
+      if (effectType === 'binary') {
+        if (binaryFormat === 'events_nonevents') {
+          return [
+            study,
+            { key: 'aCol', label: 'Treatment events', hint: 'Events in treatment', kind: 'num' },
+            { key: 'bCol', label: 'Treatment non-events', hint: 'Non-events in treatment', kind: 'num' },
+            { key: 'cCol', label: 'Control events', hint: 'Events in control', kind: 'num' },
+            { key: 'dCol', label: 'Control non-events', hint: 'Non-events in control', kind: 'num' }
+          ];
+        }
+        return [
+          study,
+          { key: 'aCol', label: 'Treatment events', hint: 'Events in treatment', kind: 'num' },
+          { key: 'n1Col', label: 'Treatment total', hint: 'Total N in treatment', kind: 'num' },
+          { key: 'cCol', label: 'Control events', hint: 'Events in control', kind: 'num' },
+          { key: 'n2Col', label: 'Control total', hint: 'Total N in control', kind: 'num' }
+        ];
+      }
+      // Precomputed
+      var effectHint = {
+        generic: 'Study-level effect estimate',
+        logor: 'Log odds ratio',
+        logrr: 'Log risk ratio',
+        smd: 'SMD / Hedges g',
+        fisherz: "Fisher's z"
+      }[effectMeasure] || 'Effect estimate';
+      var zones = [
+        study,
+        { key: 'effectCol', label: effectHint, hint: 'On the selected scale', kind: 'num' }
+      ];
+      if (uncertaintyType === 'variance') {
+        zones.push({ key: 'varCol', label: 'Variance', hint: 'Sampling variance of effect', kind: 'num' });
+      } else if (uncertaintyType === 'ci') {
+        zones.push({ key: 'loCol', label: 'CI lower', hint: 'Lower confidence limit', kind: 'num' });
+        zones.push({ key: 'hiCol', label: 'CI upper', hint: 'Upper confidence limit', kind: 'num' });
+      } else {
+        zones.push({ key: 'seCol', label: 'Standard error', hint: 'SE of the effect', kind: 'num' });
+      }
+      return zones;
+    }
 
     function qs(id) { return document.getElementById(id); }
 
@@ -360,13 +506,69 @@
     }
 
     function activeZoneKeys() {
-      return (ZONE_DEFS[effectType] || []).map(function (z) { return z.key; });
+      return zoneDefsForType().map(function (z) { return z.key; });
     }
 
     function resetAssignmentsForType() {
       var next = {};
       activeZoneKeys().forEach(function (k) { next[k] = assignments[k] || null; });
       assignments = next;
+    }
+
+    function refreshMeasureOptions() {
+      var sel = qs('effectMeasure');
+      if (!sel) return;
+      var opts = MEASURES[effectType] || [];
+      var keep = opts.some(function (o) { return o.value === effectMeasure; });
+      if (!keep) {
+        effectMeasure = opts[0] ? opts[0].value : 'smd';
+      }
+      sel.innerHTML = opts.map(function (o) {
+        return '<option value="' + o.value + '"' + (o.value === effectMeasure ? ' selected' : '') + '>' + o.label + '</option>';
+      }).join('');
+      var binRow = qs('binaryFormatRow');
+      var uncRow = qs('uncertaintyRow');
+      if (binRow) binRow.style.display = effectType === 'binary' ? 'flex' : 'none';
+      if (uncRow) uncRow.style.display = effectType === 'direct' ? 'flex' : 'none';
+      syncModelOptionVisibility();
+    }
+
+    function syncModelOptionVisibility() {
+      var isRandom = modelType === 'random';
+      var tauRow = qs('tauEstimatorRow');
+      var hkRow = qs('hkRow');
+      if (tauRow) tauRow.style.display = isRandom ? '' : 'none';
+      if (hkRow) hkRow.style.display = isRandom ? '' : 'none';
+    }
+
+    function formatSheetContext() {
+      var addr = String(_address || '').trim();
+      if (!addr) return _rows.length + ' studies';
+      // Prefer "Sheet: Name · Rows a–b · k studies" when address looks like Sheet!A1:B10
+      var m = addr.match(/^([^!]+)!(?:\$?)([A-Z]+)\$?(\d+):(?:\$?)([A-Z]+)\$?(\d+)$/i);
+      if (m) {
+        return 'Sheet: ' + m[1] + ' · Rows ' + m[3] + '–' + m[5] + ' · ' + _rows.length + ' studies';
+      }
+      return 'Sheet: ' + addr + ' · ' + _rows.length + ' studies';
+    }
+
+    function measureLabel() {
+      var opts = MEASURES[effectType] || [];
+      for (var i = 0; i < opts.length; i++) if (opts[i].value === effectMeasure) return opts[i].label;
+      return effectMeasure;
+    }
+
+    function typeLabel() {
+      if (effectType === 'continuous') return 'Two-group continuous outcomes';
+      if (effectType === 'binary') return 'Binary outcomes';
+      return 'Precomputed effects';
+    }
+
+    function modelStatusLabel() {
+      if (modelType === 'fixed') return 'Fixed-effect model';
+      var bits = ['Random-effects model', tauEstimator === 'dl' ? 'DL' : 'REML'];
+      if (hartungKnapp) bits.push('Hartung–Knapp');
+      return bits.join(' · ');
     }
 
     function buildColumnStats() {
@@ -411,12 +613,14 @@
     function renderZones() {
       var grid = qs('zonesGrid');
       if (!grid) return;
-      var defs = ZONE_DEFS[effectType] || [];
+      var defs = zoneDefsForType();
       grid.innerHTML = defs.map(function (z) {
-        return '<div class="reg-zone-card zone-' + z.kind + (z.wide ? ' zone-wide' : '') + '">' +
+        var filled = !!assignments[z.key];
+        return '<div class="reg-zone-card zone-' + z.kind + (z.wide ? ' zone-wide' : '') +
+          (filled ? ' zone-filled' : ' zone-empty') + '" data-card-zone="' + z.key + '">' +
           '<div class="reg-zone-head"><div class="dot"></div><div class="zone-head-main"><div>' + z.label +
           '</div><div class="zone-hint">' + z.hint + '</div></div>' +
-          '<span class="zone-req">*</span><span class="zone-single-badge"><span>×1</span></span></div>' +
+          '<span class="zone-req" title="Required">*</span></div>' +
           '<div class="reg-zone-body drop-zone" data-zone="' + z.key + '" data-kind="' + z.kind + '" id="zone_' + z.key + '">' +
           '<div class="reg-zone-placeholder">Drag column here</div></div></div>';
       }).join('');
@@ -467,12 +671,17 @@
     }
 
     function renderAssignments() {
-      (ZONE_DEFS[effectType] || []).forEach(function (z) {
+      zoneDefsForType().forEach(function (z) {
         var zoneEl = qs('zone_' + z.key);
         if (!zoneEl) return;
         var name = assignments[z.key];
         zoneEl.innerHTML = name ? '' : '<div class="reg-zone-placeholder">Drag column here</div>';
         if (name) zoneEl.appendChild(createChip(name, z.key, z.kind));
+        var card = zoneEl.closest('.reg-zone-card');
+        if (card) {
+          card.classList.toggle('zone-filled', !!name);
+          card.classList.toggle('zone-empty', !name);
+        }
       });
       updateSummary();
       validateModel();
@@ -481,20 +690,32 @@
     function updateSummary() {
       var el = qs('modelSummary');
       if (!el) return;
-      var labels = { continuous: "Continuous (Hedges' g)", binary: 'Binary (log OR)', direct: 'Direct effect + SE' };
       var study = assignments.studyCol;
       if (!study) {
-        el.textContent = 'Choose effect type, then drag study and outcome columns';
+        el.textContent = 'Choose data structure and effect measure, then assign required columns';
         return;
       }
-      el.innerHTML = labels[effectType] + ' · <strong>' + study + '</strong> · ' +
-        (modelType === 'random' ? 'random effects (DL)' : 'fixed effects');
+      var unc = '';
+      if (effectType === 'direct') {
+        unc = uncertaintyType === 'variance' ? ' + variance'
+          : uncertaintyType === 'ci' ? ' + CI'
+          : ' + SE';
+      }
+      el.innerHTML = typeLabel() + ' · <strong>' + measureLabel() + unc + '</strong> · ' + modelStatusLabel();
     }
 
     function validateModel() {
-      var ok = activeZoneKeys().every(function (k) { return !!assignments[k]; });
+      var keys = activeZoneKeys();
+      var missing = keys.filter(function (k) { return !assignments[k]; }).length;
+      var ok = missing === 0 && keys.length > 0;
       if (qs('btnRun')) qs('btnRun').disabled = !ok;
       if (qs('btnSaveConfig')) qs('btnSaveConfig').disabled = !ok || !_headers.length;
+      var hint = qs('runHint');
+      if (hint) {
+        hint.textContent = ok
+          ? 'Ready to run'
+          : ('Assign ' + missing + ' required column' + (missing === 1 ? '' : 's') + ' to continue');
+      }
       var hasSaved = typeof CfgSave !== 'undefined' && CfgSave.getSavedList(STORAGE_KEY).length > 0;
       if (qs('btnLoadPrev')) qs('btnLoadPrev').disabled = !hasSaved;
       if (typeof CfgSave !== 'undefined' && typeof CfgSave.syncConfigButtons === 'function') {
@@ -535,7 +756,17 @@
     }
 
     function buildModelSpec() {
-      var spec = { effectType: effectType, model: modelType, colNames: {} };
+      var spec = {
+        effectType: effectType,
+        effectMeasure: effectMeasure,
+        binaryFormat: effectType === 'binary' ? binaryFormat : undefined,
+        uncertaintyType: effectType === 'direct' ? uncertaintyType : undefined,
+        model: modelType,
+        tauEstimator: modelType === 'random' ? tauEstimator : undefined,
+        hartungKnapp: modelType === 'random' ? !!hartungKnapp : false,
+        effectDirection: effectDirection,
+        colNames: {}
+      };
       activeZoneKeys().forEach(function (k) {
         var name = assignments[k];
         var idx = colIndex(name);
@@ -549,8 +780,21 @@
 
     function applySpec(spec) {
       if (!spec) return;
-      if (spec.effectType) setEffectType(spec.effectType, true);
-      if (spec.model) setModelType(spec.model);
+      if (spec.effectType) effectType = spec.effectType;
+      if (spec.effectMeasure) effectMeasure = spec.effectMeasure;
+      if (spec.binaryFormat) binaryFormat = spec.binaryFormat;
+      if (spec.uncertaintyType) uncertaintyType = spec.uncertaintyType;
+      if (spec.model) modelType = spec.model === 'fixed' ? 'fixed' : 'random';
+      if (spec.tauEstimator) tauEstimator = spec.tauEstimator === 'dl' ? 'dl' : 'reml';
+      hartungKnapp = spec.hartungKnapp !== false && modelType === 'random';
+      if (spec.effectDirection) effectDirection = spec.effectDirection === 'control' ? 'control' : 'treatment';
+      // Legacy: a/b/c/d without format → non-events layout
+      if (effectType === 'binary' && !spec.binaryFormat && (spec.bCol != null || (spec.colNames && spec.colNames.bCol))) {
+        binaryFormat = 'events_nonevents';
+      }
+      syncOptionControls();
+      refreshMeasureOptions();
+      resetAssignmentsForType();
       var names = spec.colNames || {};
       activeZoneKeys().forEach(function (k) {
         assignments[k] = null;
@@ -562,11 +806,41 @@
         var idx = parseInt(spec[k], 10);
         if (Number.isInteger(idx) && idx >= 0 && _headers[idx]) {
           var candidate = _headers[idx];
-          var def = (ZONE_DEFS[effectType] || []).find(function (z) { return z.key === k; });
+          var def = zoneDefsForType().find(function (z) { return z.key === k; });
           var st = getStat(candidate);
           if (!def || def.kind !== 'num' || (st && st.isNumeric)) assignments[k] = candidate;
         }
       });
+    }
+
+    function syncOptionControls() {
+      document.querySelectorAll('#effectTypeSeg button').forEach(function (btn) {
+        btn.classList.toggle('active', btn.dataset.type === effectType);
+      });
+      document.querySelectorAll('input[name="model"]').forEach(function (r) {
+        r.checked = r.value === modelType;
+        var lab = r.closest('.opt-radio');
+        if (lab) lab.classList.toggle('active', r.checked);
+      });
+      document.querySelectorAll('input[name="tauEstimator"]').forEach(function (r) {
+        r.checked = r.value === tauEstimator;
+        var lab = r.closest('.opt-radio');
+        if (lab) lab.classList.toggle('active', r.checked);
+      });
+      document.querySelectorAll('input[name="effectDirection"]').forEach(function (r) {
+        r.checked = r.value === effectDirection;
+        var lab = r.closest('.opt-radio');
+        if (lab) lab.classList.toggle('active', r.checked);
+      });
+      var hk = qs('hartungKnapp');
+      if (hk) hk.checked = !!hartungKnapp;
+      var hkLab = qs('hkLabel');
+      if (hkLab) hkLab.classList.toggle('active', !!hartungKnapp);
+      var bf = qs('binaryFormat');
+      if (bf) bf.value = binaryFormat;
+      var ut = qs('uncertaintyType');
+      if (ut) ut.value = uncertaintyType;
+      syncModelOptionVisibility();
     }
 
     function autoDetectColumns() {
@@ -589,49 +863,63 @@
       }
       function find(preds) { return findExact(preds) || findToken(preds); }
 
-      assignments.studyCol = find(['study', 'author', 'trial', 'studyname']) ||
+      assignments.studyCol = find(['study', 'author', 'trial', 'studyname', 'studylabel', 'study_id']) ||
         (columnStats.find(function (s) { return !s.isNumeric; }) || {}).name || null;
 
-      var mean1 = find(['mean1', 'mean_t', 'meant', 'm1']);
-      var effect = find(['effect', 'smd', 'hedges', 'yi']);
-      var se = find(['se', 'stderr', 'std.err', 'stderror']);
+      var mean1 = find(['mean1', 'mean_t', 'meant', 'mean_treat', 'meantreat', 'treatmentmean', 'm1']);
+      var eventsTx = find(['events_t', 'event_t', 'eventst', 'a', 'treatmentevents', 'txevents']);
+      var totalTx = find(['n1', 'n_t', 'nt', 'n_treat', 'treatmentn', 'treatmenttotal']);
+      var effect = find(['effect', 'smd', 'hedges', 'yi', 'logor', 'lor', 'estimate']);
+      var se = find(['se', 'stderr', 'std.err', 'stderror', 'standarderror']);
+      var variance = find(['vi', 'variance', 'var']);
       if (mean1) {
-        setEffectType('continuous', true);
+        effectType = 'continuous';
+        effectMeasure = 'smd';
         assignments.mean1Col = mean1;
-        assignments.sd1Col = find(['sd1', 'sd_t', 'sdt', 's1']);
-        assignments.n1Col = find(['n1', 'n_t', 'nt', 'samplesize1', 'size1']);
-        assignments.mean2Col = find(['mean2', 'mean_c', 'meanc', 'm2']);
-        assignments.sd2Col = find(['sd2', 'sd_c', 'sdc', 's2']);
-        assignments.n2Col = find(['n2', 'n_c', 'nc', 'samplesize2', 'size2']);
-      } else if (effect && se) {
-        setEffectType('direct', true);
+        assignments.sd1Col = find(['sd1', 'sd_t', 'sdt', 'sd_treat', 'treatmentsd', 's1']);
+        assignments.n1Col = find(['n1', 'n_t', 'nt', 'n_treat', 'treatmentn', 'samplesize1', 'size1']);
+        assignments.mean2Col = find(['mean2', 'mean_c', 'meanc', 'mean_ctrl', 'meancontrol', 'controlmean', 'm2']);
+        assignments.sd2Col = find(['sd2', 'sd_c', 'sdc', 'sd_ctrl', 'controlsd', 's2']);
+        assignments.n2Col = find(['n2', 'n_c', 'nc', 'n_ctrl', 'controln', 'samplesize2', 'size2']);
+      } else if (eventsTx && totalTx) {
+        effectType = 'binary';
+        effectMeasure = 'or';
+        binaryFormat = 'events_total';
+        assignments.aCol = eventsTx;
+        assignments.n1Col = totalTx;
+        assignments.cCol = find(['events_c', 'event_c', 'eventsc', 'c', 'controlevents']);
+        assignments.n2Col = find(['n2', 'n_c', 'nc', 'n_ctrl', 'controln', 'controltotal']);
+      } else if (effect && (se || variance)) {
+        effectType = 'direct';
+        effectMeasure = 'generic';
+        uncertaintyType = variance && !se ? 'variance' : 'se';
         assignments.effectCol = effect;
-        assignments.seCol = se;
+        if (uncertaintyType === 'variance') assignments.varCol = variance;
+        else assignments.seCol = se;
       } else {
         var used = {};
         Object.keys(assignments).forEach(function (k) { if (assignments[k]) used[assignments[k]] = true; });
         var nums = columnStats.filter(function (s) { return s.isNumeric && !used[s.name]; }).map(function (s) { return s.name; });
-        if (effectType === 'continuous') {
-          ['mean1Col', 'sd1Col', 'n1Col', 'mean2Col', 'sd2Col', 'n2Col'].forEach(function (k, i) {
-            if (!assignments[k] && nums[i]) assignments[k] = nums[i];
-          });
-        } else if (effectType === 'binary') {
-          ['aCol', 'bCol', 'cCol', 'dCol'].forEach(function (k, i) {
-            if (!assignments[k] && nums[i]) assignments[k] = nums[i];
-          });
-        } else {
-          if (!assignments.effectCol && nums[0]) assignments.effectCol = nums[0];
-          if (!assignments.seCol && nums[1]) assignments.seCol = nums[1];
-        }
+        zoneDefsForType().forEach(function (z) {
+          if (z.kind !== 'num' || assignments[z.key]) return;
+          var pick = nums.shift();
+          if (pick) assignments[z.key] = pick;
+        });
       }
+      syncOptionControls();
+      refreshMeasureOptions();
     }
 
     function setEffectType(type, skipRender) {
-      if (!ZONE_DEFS[type]) return;
+      if (!MEASURES[type]) return;
       effectType = type;
-      document.querySelectorAll('#effectTypeSeg button').forEach(function (btn) {
-        btn.classList.toggle('active', btn.dataset.type === type);
-      });
+      if (type === 'continuous' && !['smd', 'md', 'rom'].includes(effectMeasure)) effectMeasure = 'smd';
+      if (type === 'binary' && !['or', 'rr', 'rd'].includes(effectMeasure)) effectMeasure = 'or';
+      if (type === 'direct' && !MEASURES.direct.some(function (m) { return m.value === effectMeasure; })) {
+        effectMeasure = 'generic';
+      }
+      syncOptionControls();
+      refreshMeasureOptions();
       resetAssignmentsForType();
       if (!skipRender) {
         renderZones();
@@ -643,18 +931,14 @@
 
     function setModelType(model) {
       modelType = model === 'fixed' ? 'fixed' : 'random';
-      document.querySelectorAll('input[name="model"]').forEach(function (r) {
-        r.checked = r.value === modelType;
-        var lab = r.closest('.opt-radio');
-        if (lab) lab.classList.toggle('active', r.checked);
-      });
+      syncOptionControls();
       updateSummary();
     }
 
     function saveModelSpec() {
       if (qs('btnSaveConfig') && qs('btnSaveConfig').disabled) return;
       var spec = buildModelSpec();
-      var defaultName = effectType + ' / ' + modelType;
+      var defaultName = typeLabel() + ' / ' + measureLabel();
       CfgSave.showPrompt('Save configuration', 'Configuration name', defaultName, function (name) {
         CfgSave.saveCfgEntry(STORAGE_KEY, name, spec, function () { validateModel(); });
       });
@@ -663,11 +947,12 @@
     function showSavedList() {
       CfgSave.showSavedList(STORAGE_KEY, function (item) {
         var s = item.spec || {};
-        return (s.effectType || '') + (s.model ? ' / ' + s.model : '');
+        return (s.effectType || '') + (s.effectMeasure ? ' · ' + s.effectMeasure : '') + (s.model ? ' / ' + s.model : '');
       }, function (item) {
         applySpec(item.spec || {});
         renderZones();
         renderVariables();
+        updateSummary();
         validateModel();
       });
     }
@@ -697,16 +982,27 @@
       _saved = p.savedSpec || p.savedModelSpec || null;
       qs('loadingSpinner').style.display = 'none';
       qs('mainContent').style.display = 'flex';
-      qs('tbRange').textContent = (_address ? _address + ' · ' : '') + _rows.length + ' studies';
+      qs('tbRange').textContent = formatSheetContext();
       qs('metaBadge').textContent = _rows.length + ' studies · ' + _headers.length + ' cols';
       buildColumnStats();
       assignments = {};
-      setEffectType('continuous', true);
-      setModelType('random');
+      effectType = 'continuous';
+      effectMeasure = 'smd';
+      binaryFormat = 'events_total';
+      uncertaintyType = 'se';
+      modelType = 'random';
+      tauEstimator = 'reml';
+      hartungKnapp = true;
+      effectDirection = 'treatment';
       if (_saved) applySpec(_saved);
-      else autoDetectColumns();
+      else {
+        syncOptionControls();
+        refreshMeasureOptions();
+        autoDetectColumns();
+      }
       renderZones();
       renderVariables();
+      updateSummary();
       if (typeof DsGuide !== 'undefined') DsGuide.render('meta', 'dsGuideContainer', { collapsed: false });
       validateModel();
     }
@@ -771,6 +1067,53 @@
       document.querySelectorAll('input[name="model"]').forEach(function (r) {
         r.addEventListener('change', function () { setModelType(r.value); });
       });
+      document.querySelectorAll('input[name="tauEstimator"]').forEach(function (r) {
+        r.addEventListener('change', function () {
+          tauEstimator = r.value === 'dl' ? 'dl' : 'reml';
+          syncOptionControls();
+          updateSummary();
+        });
+      });
+      document.querySelectorAll('input[name="effectDirection"]').forEach(function (r) {
+        r.addEventListener('change', function () {
+          effectDirection = r.value === 'control' ? 'control' : 'treatment';
+          syncOptionControls();
+          updateSummary();
+        });
+      });
+      var hk = qs('hartungKnapp');
+      if (hk) {
+        hk.addEventListener('change', function () {
+          hartungKnapp = !!hk.checked;
+          syncOptionControls();
+          updateSummary();
+        });
+      }
+      qs('effectMeasure').addEventListener('change', function () {
+        effectMeasure = qs('effectMeasure').value;
+        if (effectType === 'direct') renderZones();
+        updateSummary();
+        validateModel();
+      });
+      qs('binaryFormat').addEventListener('change', function () {
+        binaryFormat = qs('binaryFormat').value === 'events_nonevents' ? 'events_nonevents' : 'events_total';
+        resetAssignmentsForType();
+        renderZones();
+        renderVariables();
+        updateSummary();
+        validateModel();
+      });
+      qs('uncertaintyType').addEventListener('change', function () {
+        uncertaintyType = qs('uncertaintyType').value;
+        resetAssignmentsForType();
+        renderZones();
+        renderVariables();
+        updateSummary();
+        validateModel();
+      });
+
+      refreshMeasureOptions();
+      syncOptionControls();
 
       if (typeof DsGuide !== 'undefined') DsGuide.render('meta', 'dsGuideContainer', { collapsed: true });
 

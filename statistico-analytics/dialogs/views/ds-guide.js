@@ -203,16 +203,16 @@
 
     meta: {
       badge: 'Study-level  one row per study',
-      rule:  'Each row is a study. Map a study label plus either mean/SD/N for two groups, 2×2 counts, or a precomputed effect + SE.',
-      note:  'Continuous outcomes use Hedges’ g; binary outcomes use log odds ratios; direct mode pools supplied effects.',
+      rule:  'Each row is a study. Map a study label plus treatment/control means (or events + totals), or a precomputed effect with SE/variance/CI.',
+      note:  'Choose Continuous / Binary / Precomputed, then the effect measure. Random-effects defaults to REML with Hartung–Knapp.',
       cols: [
         { label: 'Study', role: 'cat', roleLabel: 'Study' },
-        { label: 'Mean1', role: 'meas', roleLabel: 'G1 mean' },
-        { label: 'SD1', role: 'meas', roleLabel: 'G1 SD' },
-        { label: 'N1', role: 'meas', roleLabel: 'G1 N' },
-        { label: 'Mean2', role: 'meas', roleLabel: 'G2 mean' },
-        { label: 'SD2', role: 'meas', roleLabel: 'G2 SD' },
-        { label: 'N2', role: 'meas', roleLabel: 'G2 N' }
+        { label: 'Mean_T', role: 'meas', roleLabel: 'Tx mean' },
+        { label: 'SD_T', role: 'meas', roleLabel: 'Tx SD' },
+        { label: 'N_T', role: 'meas', roleLabel: 'Tx N' },
+        { label: 'Mean_C', role: 'meas', roleLabel: 'Ctrl mean' },
+        { label: 'SD_C', role: 'meas', roleLabel: 'Ctrl SD' },
+        { label: 'N_C', role: 'meas', roleLabel: 'Ctrl N' }
       ],
       rows: [
         ['Smith 2019', '12.4', '3.1', '40', '10.1', '2.8', '38'],

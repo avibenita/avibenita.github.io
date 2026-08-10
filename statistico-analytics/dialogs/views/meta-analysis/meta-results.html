@@ -396,9 +396,33 @@
     }
     function effectTypeLabel(spec) {
       var t = (spec && spec.effectType) || 'continuous';
-      if (t === 'binary') return 'Log Odds Ratio';
-      if (t === 'direct') return 'Direct Effect';
+      var m = (spec && spec.effectMeasure) || '';
+      if (t === 'binary') {
+        if (m === 'rr') return 'Risk ratio (log)';
+        if (m === 'rd') return 'Risk difference';
+        return 'Odds ratio (log)';
+      }
+      if (t === 'direct') {
+        if (m === 'logor') return 'Log odds ratio';
+        if (m === 'logrr') return 'Log risk ratio';
+        if (m === 'smd') return 'SMD';
+        if (m === 'fisherz') return "Fisher's z";
+        return 'Precomputed effect';
+      }
+      if (m === 'md') return 'Mean difference';
+      if (m === 'rom') return 'Ratio of means (log)';
       return "SMD (Hedges' g)";
+    }
+
+    function modelLabel(bundle) {
+      if (!bundle || bundle.model === 'fixed') return 'Fixed-effect';
+      var est = (bundle.heterogeneity && bundle.heterogeneity.tauEstimator) ||
+        (bundle.spec && bundle.spec.tauEstimator) || 'reml';
+      var bits = ['Random-effects', est === 'dl' ? 'DL' : 'REML'];
+      if (bundle.hartungKnapp || (bundle.spec && bundle.spec.hartungKnapp !== false && bundle.model === 'random')) {
+        bits.push('HK');
+      }
+      return bits.join(' · ');
     }
 
     function switchTab(tabName) {
@@ -451,9 +475,9 @@
     function syncHeaderMeta(bundle) {
       if (!window.StatisticoHeader) return;
       var et = effectTypeLabel(bundle.spec);
-      var modelLabel = bundle.model === 'random' ? 'Random-Effects' : 'Fixed-Effects';
+      var ml = modelLabel(bundle);
       if (typeof StatisticoHeader.updateVariable === 'function') {
-        StatisticoHeader.updateVariable(et + ' · ' + modelLabel, bundle.k);
+        StatisticoHeader.updateVariable(et + ' · ' + ml, bundle.k);
       }
       var nEl = document.getElementById('headerSampleSize');
       if (nEl) nEl.textContent = '(k=' + bundle.k + ')';
@@ -540,9 +564,9 @@
       document.getElementById('loadingState').style.display = 'none';
       document.getElementById('tab-summary').classList.add('active');
 
-      var modelLabel = bundle.model === 'random' ? 'Random-Effects (DL)' : 'Fixed-Effects';
+      var ml = modelLabel(bundle);
       var et = effectTypeLabel(bundle.spec);
-      document.getElementById('cfgModel').textContent = modelLabel;
+      document.getElementById('cfgModel').textContent = ml;
       document.getElementById('cfgK').textContent = bundle.k;
       document.getElementById('cfgEffectType').textContent = et;
 
@@ -713,7 +737,7 @@
       if (!metaBundle) return null;
       var lines = [];
       lines.push('Meta-Analysis Results');
-      lines.push('Model,' + (metaBundle.model === 'random' ? 'Random-Effects (DL)' : 'Fixed-Effects'));
+      lines.push('Model,' + modelLabel(metaBundle));
       lines.push('Effect type,' + ((metaBundle.spec && metaBundle.spec.effectType) || ''));
       lines.push('k,' + metaBundle.k);
       lines.push('Pooled effect,' + metaBundle.pooled.effect);

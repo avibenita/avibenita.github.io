@@ -131,112 +131,224 @@ function handleMetaModel(spec) {
   openMetaResultsDialog(bundle);
 }
 
+function _metaNum(v) {
+  const n = parseFloat(v);
+  return isFinite(n) ? n : NaN;
+}
+
+function _metaExtractStudyEffect(row, spec) {
+  const effectType = spec.effectType || "continuous";
+  const measure = spec.effectMeasure || (effectType === "binary" ? "or" : effectType === "direct" ? "generic" : "smd");
+  let yi = null, vi = null;
+
+  if (effectType === "continuous") {
+    const mean1 = _metaNum(row[spec.mean1Col]);
+    const sd1 = _metaNum(row[spec.sd1Col]);
+    const n1 = _metaNum(row[spec.n1Col]);
+    const mean2 = _metaNum(row[spec.mean2Col]);
+    const sd2 = _metaNum(row[spec.sd2Col]);
+    const n2 = _metaNum(row[spec.n2Col]);
+    if (![mean1, sd1, n1, mean2, sd2, n2].every(isFinite) || n1 < 2 || n2 < 2 || sd1 < 0 || sd2 < 0) {
+      return null;
+    }
+    if (measure === "md") {
+      yi = mean1 - mean2;
+      vi = (sd1 * sd1) / n1 + (sd2 * sd2) / n2;
+    } else if (measure === "rom") {
+      if (!(mean1 > 0 && mean2 > 0)) return null;
+      yi = Math.log(mean1 / mean2);
+      vi = (sd1 * sd1) / (n1 * mean1 * mean1) + (sd2 * sd2) / (n2 * mean2 * mean2);
+    } else {
+      // Hedges' g
+      const pooledSD = Math.sqrt(((n1 - 1) * sd1 * sd1 + (n2 - 1) * sd2 * sd2) / (n1 + n2 - 2));
+      if (!(pooledSD > 0)) return null;
+      const d = (mean1 - mean2) / pooledSD;
+      const j = 1 - (3 / (4 * (n1 + n2 - 2) - 1));
+      yi = j * d;
+      vi = ((n1 + n2) / (n1 * n2) + (yi * yi) / (2 * (n1 + n2))) * j * j;
+    }
+  } else if (effectType === "binary") {
+    let a = _metaNum(row[spec.aCol]);
+    let c = _metaNum(row[spec.cCol]);
+    let b, d;
+    const fmt = spec.binaryFormat || ((spec.bCol != null && spec.dCol != null) ? "events_nonevents" : "events_total");
+    if (fmt === "events_nonevents") {
+      b = _metaNum(row[spec.bCol]);
+      d = _metaNum(row[spec.dCol]);
+    } else {
+      const n1 = _metaNum(row[spec.n1Col]);
+      const n2 = _metaNum(row[spec.n2Col]);
+      if (![a, c, n1, n2].every(isFinite) || a < 0 || c < 0 || n1 <= 0 || n2 <= 0 || a > n1 || c > n2) {
+        return null;
+      }
+      b = n1 - a;
+      d = n2 - c;
+    }
+    if (![a, b, c, d].every(isFinite) || a < 0 || b < 0 || c < 0 || d < 0 || a + b === 0 || c + d === 0) {
+      return null;
+    }
+    // Continuity correction for zero cells on ratio measures
+    let aa = a, bb = b, cc = c, dd = d;
+    if (measure !== "rd" && (aa === 0 || bb === 0 || cc === 0 || dd === 0)) {
+      aa += 0.5; bb += 0.5; cc += 0.5; dd += 0.5;
+    }
+    const n1t = aa + bb, n2t = cc + dd;
+    if (measure === "rr") {
+      const p1 = aa / n1t, p2 = cc / n2t;
+      if (!(p1 > 0 && p2 > 0)) return null;
+      yi = Math.log(p1 / p2);
+      vi = (1 / aa - 1 / n1t) + (1 / cc - 1 / n2t);
+    } else if (measure === "rd") {
+      const p1 = a / (a + b), p2 = c / (c + d);
+      yi = p1 - p2;
+      vi = p1 * (1 - p1) / (a + b) + p2 * (1 - p2) / (c + d);
+      if (!(vi > 0)) vi = 1e-12;
+    } else {
+      // log OR
+      yi = Math.log((aa * dd) / (bb * cc));
+      vi = 1 / aa + 1 / bb + 1 / cc + 1 / dd;
+    }
+  } else if (effectType === "direct") {
+    yi = _metaNum(row[spec.effectCol]);
+    const unc = spec.uncertaintyType || "se";
+    if (unc === "variance") {
+      vi = _metaNum(row[spec.varCol]);
+    } else if (unc === "ci") {
+      const lo = _metaNum(row[spec.loCol]);
+      const hi = _metaNum(row[spec.hiCol]);
+      if (![yi, lo, hi].every(isFinite) || !(hi > lo)) return null;
+      // Assume 95% CI → SE = (hi - lo) / (2 * 1.96)
+      const se = (hi - lo) / (2 * 1.96);
+      vi = se * se;
+    } else {
+      const se = _metaNum(row[spec.seCol]);
+      vi = se * se;
+    }
+    if (!isFinite(yi) || !isFinite(vi) || !(vi > 0)) return null;
+  } else {
+    return null;
+  }
+
+  if (spec.effectDirection === "control" && isFinite(yi)) yi = -yi;
+  if (!(isFinite(yi) && isFinite(vi) && vi > 0)) return null;
+  return { yi: yi, vi: vi, se: Math.sqrt(vi) };
+}
+
+function _metaTau2DL(yi, vi) {
+  const k = yi.length;
+  const wi = vi.map(function (v) { return 1 / v; });
+  const sw = wi.reduce(function (a, b) { return a + b; }, 0);
+  const theta = yi.reduce(function (s, y, i) { return s + wi[i] * y; }, 0) / sw;
+  const Q = yi.reduce(function (s, y, i) { return s + wi[i] * Math.pow(y - theta, 2); }, 0);
+  const sw2 = wi.reduce(function (s, w) { return s + w * w; }, 0);
+  const C = sw - sw2 / sw;
+  const df = k - 1;
+  return { tau2: C > 0 ? Math.max(0, (Q - df) / C) : 0, Q: Q, df: df, thetaFixed: theta, sw: sw };
+}
+
+function _metaTau2REML(yi, vi) {
+  // Iterative REML (Fisher scoring), seeded with DL.
+  const k = yi.length;
+  let tau2 = _metaTau2DL(yi, vi).tau2;
+  for (let iter = 0; iter < 80; iter++) {
+    const wi = vi.map(function (v) { return 1 / (v + tau2); });
+    const sw = wi.reduce(function (a, b) { return a + b; }, 0);
+    const theta = yi.reduce(function (s, y, i) { return s + wi[i] * y; }, 0) / sw;
+    let A = 0, B = 0, R = 0;
+    for (let i = 0; i < k; i++) {
+      const w = wi[i];
+      const r = yi[i] - theta;
+      A += w * w;
+      B += w * w * w;
+      R += w * w * r * r;
+    }
+    // Score & information for REML restricted likelihood
+    const dll = -0.5 * sw + 0.5 * R + 0.5 * (A / sw);
+    const d2ll = 0.5 * A - B / sw + 0.5 * (A * A) / (sw * sw);
+    if (!(d2ll > 1e-14)) break;
+    const step = dll / d2ll;
+    const next = Math.max(0, tau2 + step);
+    if (Math.abs(next - tau2) < 1e-10) { tau2 = next; break; }
+    tau2 = next;
+  }
+  return tau2;
+}
+
+function _metaTCritApprox(df, alphaHalf) {
+  // Approximate two-sided t critical (α/2) for common df; falls back to 1.96.
+  if (!(df > 0)) return 1.959964;
+  // Rough Cornish-Fisher style for 0.025 (95% CI)
+  const z = 1.959964;
+  const g1 = (Math.pow(z, 3) + z) / (4 * df);
+  const g2 = (5 * Math.pow(z, 5) + 16 * Math.pow(z, 3) + 3 * z) / (96 * df * df);
+  return z + g1 + g2;
+}
+
 function buildMetaBundle(headers, rows, spec) {
   // Core meta-analysis computation
   try {
     const effectType = spec.effectType || "continuous";
     const model = spec.model || "random";
+    const tauEstimator = spec.tauEstimator === "dl" ? "dl" : "reml";
+    const useHK = model === "random" && spec.hartungKnapp !== false;
     const studyCol = spec.studyCol;
-    
-    // Extract studies
-    const studies = [];
-    
-    rows.forEach((row, idx) => {
-      const studyName = row[studyCol] || `Study ${idx + 1}`;
-      let yi = null, vi = null;
-      
-      if (effectType === "continuous") {
-        // Extract Mean/SD/N for both groups
-        const mean1 = parseFloat(row[spec.mean1Col]);
-        const sd1 = parseFloat(row[spec.sd1Col]);
-        const n1 = parseInt(row[spec.n1Col]);
-        const mean2 = parseFloat(row[spec.mean2Col]);
-        const sd2 = parseFloat(row[spec.sd2Col]);
-        const n2 = parseFloat(row[spec.n2Col]);
-        
-        if (!isFinite(mean1) || !isFinite(sd1) || !isFinite(n1) || 
-            !isFinite(mean2) || !isFinite(sd2) || !isFinite(n2)) {
-          return; // Skip invalid rows
-        }
-        
-        // Compute Hedges' g (standardized mean difference)
-        const pooledSD = Math.sqrt(((n1 - 1) * sd1 * sd1 + (n2 - 1) * sd2 * sd2) / (n1 + n2 - 2));
-        const d = (mean1 - mean2) / pooledSD;
-        const j = 1 - (3 / (4 * (n1 + n2 - 2) - 1)); // Hedges correction
-        yi = j * d;
-        vi = ((n1 + n2) / (n1 * n2) + (yi * yi) / (2 * (n1 + n2))) * j * j;
-        
-      } else if (effectType === "binary") {
-        // 2x2 table: a, b, c, d (Haldane–Anscombe 0.5 continuity if any cell is 0)
-        let a = parseFloat(row[spec.aCol]);
-        let b = parseFloat(row[spec.bCol]);
-        let c = parseFloat(row[spec.cCol]);
-        let d = parseFloat(row[spec.dCol]);
-        
-        if (!isFinite(a) || !isFinite(b) || !isFinite(c) || !isFinite(d) ||
-            a < 0 || b < 0 || c < 0 || d < 0 ||
-            a + b === 0 || c + d === 0) {
-          return; // Skip invalid rows
-        }
+    const effectMeasure = spec.effectMeasure || (effectType === "binary" ? "or" : effectType === "direct" ? "generic" : "smd");
 
-        if (a === 0 || b === 0 || c === 0 || d === 0) {
-          a += 0.5; b += 0.5; c += 0.5; d += 0.5;
-        }
-        
-        // Log odds ratio
-        yi = Math.log((a * d) / (b * c));
-        vi = 1/a + 1/b + 1/c + 1/d;
-        
-      } else if (effectType === "direct") {
-        // Direct effect + SE
-        yi = parseFloat(row[spec.effectCol]);
-        const se = parseFloat(row[spec.seCol]);
-        vi = se * se;
-        
-        if (!isFinite(yi) || !isFinite(vi)) return;
-      }
-      
-      if (yi !== null && vi !== null && isFinite(yi) && isFinite(vi) && vi > 0) {
-        studies.push({ name: String(studyName), yi: yi, vi: vi, se: Math.sqrt(vi) });
-      }
+    const studies = [];
+    rows.forEach(function (row, idx) {
+      const studyName = row[studyCol] || ("Study " + (idx + 1));
+      const extracted = _metaExtractStudyEffect(row, spec);
+      if (!extracted) return;
+      studies.push({
+        name: String(studyName),
+        yi: extracted.yi,
+        vi: extracted.vi,
+        se: extracted.se
+      });
     });
-    
+
     if (studies.length < 2) {
       return { error: "Need at least 2 valid studies for meta-analysis" };
     }
-    
-    // Fixed-effect weights for Q / DL tau² / I²
-    const wiFixed = studies.map(function (s) { return 1 / s.vi; });
-    const sumWiFixed = wiFixed.reduce(function (a, b) { return a + b; }, 0);
-    const thetaFixed = studies.reduce(function (sum, s, i) {
-      return sum + wiFixed[i] * s.yi;
-    }, 0) / sumWiFixed;
-    const Q = studies.reduce(function (sum, s, i) {
-      return sum + wiFixed[i] * Math.pow(s.yi - thetaFixed, 2);
-    }, 0);
-    const df = studies.length - 1;
-    const sumWiFixedSq = wiFixed.reduce(function (sum, w) { return sum + w * w; }, 0);
-    const C = sumWiFixed - (sumWiFixedSq / sumWiFixed);
+
+    const yi = studies.map(function (s) { return s.yi; });
+    const vi = studies.map(function (s) { return s.vi; });
+    const dl = _metaTau2DL(yi, vi);
+    const Q = dl.Q;
+    const df = dl.df;
     let tau2 = 0;
-    if (model === "random" && C > 0) {
-      tau2 = Math.max(0, (Q - df) / C);
+    if (model === "random") {
+      tau2 = tauEstimator === "dl" ? dl.tau2 : _metaTau2REML(yi, vi);
     }
-    
-    // Compute final pooled estimate (fixed or DL random)
+
     const wi = studies.map(function (s) { return 1 / (s.vi + tau2); });
     const sumWi = wi.reduce(function (a, b) { return a + b; }, 0);
     const theta = studies.reduce(function (sum, s, i) { return sum + wi[i] * s.yi; }, 0) / sumWi;
-    const se_theta = Math.sqrt(1 / sumWi);
-    const ciLower = theta - 1.96 * se_theta;
-    const ciUpper = theta + 1.96 * se_theta;
-    const z = theta / se_theta;
-    const p = 2 * (1 - approximateNormalCDF(Math.abs(z)));
-    
+
+    let se_theta = Math.sqrt(1 / sumWi);
+    let crit = 1.959964;
+    let p, zOrT;
+    if (useHK && df > 0) {
+      // Hartung–Knapp–Sidik–Jonkman
+      const q = studies.reduce(function (sum, s, i) {
+        return sum + wi[i] * Math.pow(s.yi - theta, 2);
+      }, 0) / df;
+      se_theta = Math.sqrt(Math.max(q, 0) / sumWi);
+      crit = _metaTCritApprox(df, 0.025);
+      zOrT = se_theta > 0 ? theta / se_theta : 0;
+      // Approximate two-sided p with normal for display (t p without full t-CDF)
+      p = 2 * (1 - approximateNormalCDF(Math.abs(zOrT) * (1 - 1 / (4 * df))));
+    } else {
+      zOrT = se_theta > 0 ? theta / se_theta : 0;
+      p = 2 * (1 - approximateNormalCDF(Math.abs(zOrT)));
+    }
+    const ciLower = theta - crit * se_theta;
+    const ciUpper = theta + crit * se_theta;
+
     const pQ = approximateChiSquare(Q, df);
     const I2 = Q > 0 ? Math.max(0, Math.min(100, 100 * (Q - df) / Q)) : 0;
     const H2 = df > 0 ? Q / df : 1;
-    
-    // Add weights to studies
+
     studies.forEach(function (s, i) {
       s.weight = wi[i];
       s.weightPct = (wi[i] / sumWi) * 100;
@@ -244,9 +356,8 @@ function buildMetaBundle(headers, rows, spec) {
       s.ciUpper = s.yi + 1.96 * s.se;
     });
 
-    // Egger's regression test (precision vs standardized effect)
     const bias = computeEggersTest(studies);
-    
+
     return {
       spec: spec,
       studies: studies,
@@ -256,8 +367,10 @@ function buildMetaBundle(headers, rows, spec) {
         se: se_theta,
         ciLower: ciLower,
         ciUpper: ciUpper,
-        z: z,
-        p: p
+        z: zOrT,
+        p: p,
+        method: useHK ? "hartung-knapp" : "wald",
+        crit: crit
       },
       heterogeneity: {
         Q: Q,
@@ -266,13 +379,16 @@ function buildMetaBundle(headers, rows, spec) {
         I2: I2,
         H2: H2,
         tau2: tau2,
-        tau: Math.sqrt(tau2)
+        tau: Math.sqrt(tau2),
+        tauEstimator: model === "random" ? tauEstimator : null
       },
       bias: bias,
       model: model,
-      effectType: effectType
+      effectType: effectType,
+      effectMeasure: effectMeasure,
+      hartungKnapp: useHK
     };
-    
+
   } catch (err) {
     return { error: err.message };
   }

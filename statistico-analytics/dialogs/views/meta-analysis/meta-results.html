@@ -126,20 +126,16 @@
       margin-bottom: 10px;
       flex-shrink: 0;
     }
-    .config-row { display: flex; gap: 12px; flex-wrap: wrap; }
-    .config-section {
-      flex: 1; min-width: 180px;
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 12px 14px;
+    .config-row {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
     }
+    .config-section { display: contents; }
     .section-title {
       font-size: 11px; font-weight: 700; letter-spacing: .5px;
-      text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;
+      text-transform: uppercase; color: var(--text-muted);
     }
     .meta-kv {
-      display: flex; flex-wrap: wrap; gap: 8px 14px;
+      display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
       font-size: 13px; color: var(--text-secondary);
     }
     .meta-kv strong { color: var(--accent-1); font-weight: 700; }
@@ -149,6 +145,9 @@
       border: 1px solid rgba(129,140,248,.35);
       background: rgba(129,140,248,.12);
       font-size: 12px; font-weight: 700; color: var(--accent-meta);
+    }
+    .config-sep {
+      width: 1px; height: 22px; background: var(--border); flex-shrink: 0;
     }
 
     .results-panel {
@@ -168,13 +167,18 @@
     .result-sub {
       text-align: center;
       font-size: 12px; color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .result-direction {
+      text-align: center;
+      font-size: 11px; font-weight: 600;
+      color: var(--text-secondary);
       margin-bottom: 6px;
     }
-    .plus-minus { color: var(--text-secondary); margin: 0 8px; }
 
     .confidence-bar-container {
       position: relative;
-      flex: 0 0 90px;
+      flex: 0 0 72px;
       margin: 12px 0 8px;
       background: rgba(255,255,255,.05);
       border-radius: 6px;
@@ -182,19 +186,21 @@
     }
     :root[data-theme="light"] .confidence-bar-container { background: rgba(37,99,235,.06); }
     .confidence-bar {
-      position: absolute; height: 100%;
-      background: linear-gradient(90deg, rgba(120,200,255,.2), rgba(120,200,255,.4), rgba(120,200,255,.2));
-      border: 2px solid var(--accent-2);
+      position: absolute; top: 0; bottom: 0; left: 0;
+      background: linear-gradient(90deg, rgba(120,200,255,.22), rgba(120,200,255,.42), rgba(120,200,255,.22));
+      box-shadow: inset 0 0 0 2px var(--accent-2);
       border-radius: 4px;
     }
     .confidence-marker {
-      position: absolute; width: 3px; height: 100%;
-      background: var(--accent-1); left: 50%; transform: translateX(-50%);
+      position: absolute; top: 0; bottom: 0; width: 3px;
+      background: var(--accent-1); left: 50%;
+      transform: translateX(-50%); z-index: 2;
     }
     .bar-label {
       position: absolute; top: 50%; transform: translateY(-50%);
       font-size: 12px; font-weight: 600; color: #fff;
       background: rgba(0,0,0,.7); padding: 4px 8px; border-radius: 3px;
+      z-index: 3; pointer-events: none;
     }
     .bar-label.left { left: 8px; }
     .bar-label.right { right: 8px; }
@@ -342,25 +348,19 @@
       <div id="tab-summary" class="tab-panel">
         <div class="config-panel">
           <div class="config-row">
-            <div class="config-section">
-              <div class="section-title">Model</div>
-              <div class="meta-kv">
-                <span class="pill" id="cfgModel">—</span>
-                <span>k = <strong id="cfgK">—</strong> studies</span>
-              </div>
-            </div>
-            <div class="config-section">
-              <div class="section-title">Effect type</div>
-              <div class="meta-kv">
-                <span class="pill" id="cfgEffectType">—</span>
-              </div>
-            </div>
+            <span class="section-title">Model</span>
+            <span class="pill" id="cfgModel">—</span>
+            <span class="meta-kv">k = <strong id="cfgK">—</strong></span>
+            <span class="config-sep" aria-hidden="true"></span>
+            <span class="section-title">Effect</span>
+            <span class="pill" id="cfgEffectType">—</span>
           </div>
         </div>
 
         <div class="results-panel">
           <div class="result-main" id="resultMain">—</div>
           <div class="result-sub" id="resultSub">Pooled effect · 95% CI</div>
+          <div class="result-direction" id="resultDirection"></div>
           <div class="confidence-bar-container" id="ciBarWrap">
             <div class="zero-line" id="zeroLine" style="display:none;"></div>
             <div class="confidence-bar" id="ciBar"></div>
@@ -369,11 +369,11 @@
             <div class="bar-label right" id="ciRight">—</div>
           </div>
           <div class="stats-grid">
-            <div class="stat-box"><div class="label">Lower limit</div><div class="value" id="tileLCL">—</div></div>
-            <div class="stat-box"><div class="label">Point estimate</div><div class="value" id="tilePoint">—</div></div>
-            <div class="stat-box"><div class="label">Upper limit</div><div class="value" id="tileUCL">—</div></div>
-            <div class="stat-box"><div class="label">Z / p</div><div class="value" id="tileZP">—</div></div>
+            <div class="stat-box"><div class="label">95% CI</div><div class="value" id="tileCI" style="font-size:15px;">—</div></div>
+            <div class="stat-box"><div class="label">95% PI</div><div class="value" id="tilePI" style="font-size:15px;">—</div></div>
+            <div class="stat-box"><div class="label" id="tileTestLabel">t / p</div><div class="value" id="tileZP">—</div></div>
             <div class="stat-box"><div class="label">I²</div><div class="value" id="tileI2">—</div></div>
+            <div class="stat-box"><div class="label">τ²</div><div class="value" id="tileTau2">—</div></div>
             <div class="stat-box"><div class="label">Studies (k)</div><div class="value" id="tileK">—</div></div>
           </div>
           <div class="interpretation" id="interpretationText">—</div>
@@ -496,6 +496,51 @@
         bits.push('HK');
       }
       return bits.join(' · ');
+    }
+
+    function effectFavorLabel(bundle) {
+      var dir = (bundle.spec && bundle.spec.effectDirection) || 'treatment';
+      return dir === 'control' ? 'control' : 'treatment';
+    }
+
+    function buildInterpretation(bundle, et, favor) {
+      var k = bundle.k;
+      var g = fmt(bundle.pooled.effect);
+      var lo = fmt(bundle.pooled.ciLower);
+      var hi = fmt(bundle.pooled.ciUpper);
+      var i2 = bundle.heterogeneity.I2;
+      var sig = bundle.pooled.p < 0.05;
+      var e = bundle.pooled.effect;
+      // favor = arm that positive values favor
+      var favors;
+      if (!e) favors = 'was near no difference';
+      else if (favor === 'treatment') favors = e > 0 ? 'favored treatment' : 'favored control';
+      else if (favor === 'control') favors = e > 0 ? 'favored control' : 'favored treatment';
+      else favors = e > 0 ? 'was positive' : 'was negative';
+
+      var absG = Math.abs(e);
+      var mag;
+      if (et.indexOf('SMD') >= 0 || et.indexOf('Hedges') >= 0) {
+        var band = absG < 0.2 ? 'small' : absG < 0.5 ? 'small-to-moderate' : absG < 0.8 ? 'moderate' : 'large';
+        mag = ' a ' + band + ' standardized difference';
+      } else {
+        mag = ' a pooled ' + et;
+      }
+      var html = 'Across ' + k + ' studies, the pooled effect ' + favors + ', with' + mag +
+        ' of ' + g + ' (95% CI [' + lo + ', ' + hi + ']). ';
+      html += sig
+        ? 'The confidence interval excludes no effect (<strong>p ' + fmtP(bundle.pooled.p) + '</strong>). '
+        : 'The confidence interval includes no effect (<strong>p = ' + fmt(bundle.pooled.p) + '</strong>). ';
+      if (i2 < 25) {
+        html += 'No between-study heterogeneity was detected (I² = ' + fmt(i2, 1) +
+          '%), although this estimate is uncertain with only ' + k + ' studies.';
+      } else if (i2 < 50) {
+        html += 'Heterogeneity was moderate (I² = ' + fmt(i2, 1) + '%).';
+      } else {
+        html += 'Heterogeneity was substantial (I² = ' + fmt(i2, 1) +
+          '%) — interpret the average effect cautiously.';
+      }
+      return html;
     }
 
     function switchTab(tabName) {
@@ -643,30 +688,37 @@
       document.getElementById('cfgK').textContent = bundle.k;
       document.getElementById('cfgEffectType').textContent = et;
 
-      var seMargin = Math.abs(bundle.pooled.effect - bundle.pooled.ciLower);
-      document.getElementById('resultMain').innerHTML =
-        fmt(bundle.pooled.effect) + '<span class="plus-minus">±</span>' + fmt(seMargin);
+      var favor = effectFavorLabel(bundle);
+      document.getElementById('resultMain').textContent = fmt(bundle.pooled.effect);
       document.getElementById('resultSub').textContent =
-        et + ' · 95% CI [' + fmt(bundle.pooled.ciLower) + ', ' + fmt(bundle.pooled.ciUpper) + ']';
+        et + ' = ' + fmt(bundle.pooled.effect) +
+        ' · 95% CI [' + fmt(bundle.pooled.ciLower) + ', ' + fmt(bundle.pooled.ciUpper) + ']';
+      document.getElementById('resultDirection').textContent =
+        'Positive values favor ' + favor;
 
       updateCiBar(bundle);
 
-      document.getElementById('tileLCL').textContent = fmt(bundle.pooled.ciLower);
-      document.getElementById('tilePoint').textContent = fmt(bundle.pooled.effect);
-      document.getElementById('tileUCL').textContent = fmt(bundle.pooled.ciUpper);
+      document.getElementById('tileCI').textContent =
+        '[' + fmt(bundle.pooled.ciLower) + ', ' + fmt(bundle.pooled.ciUpper) + ']';
+      if (bundle.pooled.piLower != null && bundle.pooled.piUpper != null) {
+        document.getElementById('tilePI').textContent =
+          '[' + fmt(bundle.pooled.piLower) + ', ' + fmt(bundle.pooled.piUpper) + ']';
+      } else {
+        document.getElementById('tilePI').textContent = 'n/a';
+      }
+      var useHK = !!(bundle.hartungKnapp || (bundle.pooled && bundle.pooled.method === 'hartung-knapp'));
+      var testDf = (bundle.pooled && bundle.pooled.df != null)
+        ? bundle.pooled.df
+        : (bundle.heterogeneity && bundle.heterogeneity.df);
+      document.getElementById('tileTestLabel').textContent = useHK
+        ? ('t(' + testDf + ') / p')
+        : 'z / p';
       document.getElementById('tileZP').textContent = fmt(bundle.pooled.z) + ' / ' + fmtP(bundle.pooled.p);
       document.getElementById('tileI2').textContent = fmt(bundle.heterogeneity.I2, 1) + '%';
+      document.getElementById('tileTau2').textContent = fmt(bundle.heterogeneity.tau2);
       document.getElementById('tileK').textContent = String(bundle.k);
 
-      var sig = bundle.pooled.p < 0.05;
-      var direction = bundle.pooled.effect > 0 ? 'positive' : 'negative';
-      var interpretation = 'The ' + bundle.model + '-effects meta-analysis of ' + bundle.k +
-        ' studies shows a ' + direction + ' pooled effect of ' + fmt(bundle.pooled.effect) +
-        ' (95% CI [' + fmt(bundle.pooled.ciLower) + ', ' + fmt(bundle.pooled.ciUpper) + ']). ';
-      interpretation += sig
-        ? 'This effect is <strong>statistically significant</strong> (p ' + fmtP(bundle.pooled.p) + ').'
-        : 'This effect is <strong>not statistically significant</strong> (p = ' + fmt(bundle.pooled.p) + ').';
-      document.getElementById('interpretationText').innerHTML = interpretation;
+      document.getElementById('interpretationText').innerHTML = buildInterpretation(bundle, et, favor);
 
       document.getElementById('qStat').textContent = fmt(bundle.heterogeneity.Q, 2);
       document.getElementById('qDf').textContent = String(bundle.heterogeneity.df);

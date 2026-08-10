@@ -345,6 +345,16 @@ function buildMetaBundle(headers, rows, spec) {
     const ciLower = theta - crit * se_theta;
     const ciUpper = theta + crit * se_theta;
 
+    // 95% prediction interval (random-effects): θ ± t √(SE² + τ²)
+    let piLower = null;
+    let piUpper = null;
+    if (model === "random" && df > 0) {
+      const piCrit = useHK ? crit : _metaTCritApprox(df, 0.025);
+      const piSe = Math.sqrt(se_theta * se_theta + tau2);
+      piLower = theta - piCrit * piSe;
+      piUpper = theta + piCrit * piSe;
+    }
+
     const pQ = approximateChiSquare(Q, df);
     const I2 = Q > 0 ? Math.max(0, Math.min(100, 100 * (Q - df) / Q)) : 0;
     const H2 = df > 0 ? Q / df : 1;
@@ -367,8 +377,11 @@ function buildMetaBundle(headers, rows, spec) {
         se: se_theta,
         ciLower: ciLower,
         ciUpper: ciUpper,
+        piLower: piLower,
+        piUpper: piUpper,
         z: zOrT,
         p: p,
+        df: useHK ? df : null,
         method: useHK ? "hartung-knapp" : "wald",
         crit: crit
       },

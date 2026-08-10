@@ -176,38 +176,93 @@
       margin-bottom: 6px;
     }
 
-    .confidence-bar-container {
+    .ci-viz {
+      margin: 10px 0 8px;
+      padding: 10px 12px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,.14);
+      flex-shrink: 0;
+    }
+    :root[data-theme="light"] .ci-viz { background: rgba(15,23,42,.03); }
+    .ci-viz-head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 10px; margin-bottom: 8px; flex-wrap: wrap;
+    }
+    .ci-viz-title {
+      font-size: 11px; font-weight: 800; letter-spacing: .05em;
+      text-transform: uppercase; color: var(--text-muted);
+    }
+    .ci-viz-caption {
+      font-size: 12px; font-weight: 600; color: var(--text-secondary);
+    }
+    .ci-viz-caption strong { color: var(--accent-1); }
+    .ci-track-wrap {
       position: relative;
-      flex: 0 0 72px;
-      margin: 12px 0 8px;
-      background: rgba(255,255,255,.05);
+      height: 64px;
+      margin: 4px 0 2px;
+    }
+    .ci-track {
+      position: absolute; left: 0; right: 0; top: 28px; height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+    :root[data-theme="light"] .ci-track {
+      background: rgba(15,23,42,.06);
+      border-color: var(--border);
+    }
+    .ci-band {
+      position: absolute; top: 22px; height: 22px;
       border-radius: 6px;
-      overflow: hidden;
+      background: rgba(120,200,255,.28);
+      box-shadow: inset 0 0 0 1.5px var(--accent-2);
+      z-index: 2;
     }
-    :root[data-theme="light"] .confidence-bar-container { background: rgba(37,99,235,.06); }
-    .confidence-bar {
-      position: absolute; top: 0; bottom: 0; left: 0;
-      background: linear-gradient(90deg, rgba(120,200,255,.22), rgba(120,200,255,.42), rgba(120,200,255,.22));
-      box-shadow: inset 0 0 0 2px var(--accent-2);
-      border-radius: 4px;
+    .ci-null {
+      position: absolute; top: 12px; bottom: 8px; width: 0;
+      border-left: 1.5px dashed rgba(255,255,255,.45);
+      z-index: 1;
     }
-    .confidence-marker {
-      position: absolute; top: 0; bottom: 0; width: 3px;
-      background: var(--accent-1); left: 50%;
-      transform: translateX(-50%); z-index: 2;
+    :root[data-theme="light"] .ci-null { border-left-color: rgba(15,23,42,.35); }
+    .ci-null-tag {
+      position: absolute; top: 0; transform: translateX(-50%);
+      font-size: 9px; font-weight: 700; letter-spacing: .03em;
+      color: var(--text-muted); white-space: nowrap;
     }
-    .bar-label {
-      position: absolute; top: 50%; transform: translateY(-50%);
-      font-size: 12px; font-weight: 600; color: #fff;
-      background: rgba(0,0,0,.7); padding: 4px 8px; border-radius: 3px;
-      z-index: 3; pointer-events: none;
+    .ci-marker {
+      position: absolute; top: 18px; width: 3px; height: 30px;
+      background: var(--accent-1);
+      transform: translateX(-50%);
+      border-radius: 2px;
+      z-index: 3;
+      box-shadow: 0 0 0 2px rgba(0,0,0,.25);
     }
-    .bar-label.left { left: 8px; }
-    .bar-label.right { right: 8px; }
-    .zero-line {
-      position: absolute; top: 0; bottom: 0; width: 1px;
-      background: rgba(255,255,255,.35); z-index: 1;
+    .ci-end {
+      position: absolute; top: 48px; transform: translateX(-50%);
+      font-size: 11px; font-weight: 700; color: var(--accent-2);
+      white-space: nowrap; z-index: 4;
     }
+    .ci-est {
+      position: absolute; top: 0; transform: translateX(-50%);
+      font-size: 11px; font-weight: 800; color: var(--accent-1);
+      white-space: nowrap; z-index: 4;
+    }
+    .ci-legend {
+      display: flex; flex-wrap: wrap; gap: 10px 14px;
+      margin-top: 6px;
+      font-size: 10.5px; color: var(--text-muted);
+    }
+    .ci-legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .ci-swatch {
+      width: 12px; height: 8px; border-radius: 2px; flex-shrink: 0;
+    }
+    .ci-swatch.band { background: rgba(120,200,255,.45); box-shadow: inset 0 0 0 1px var(--accent-2); }
+    .ci-swatch.est { width: 3px; height: 12px; background: var(--accent-1); border-radius: 1px; }
+    .ci-swatch.null {
+      width: 10px; height: 0; border-top: 1.5px dashed rgba(255,255,255,.5);
+    }
+    :root[data-theme="light"] .ci-swatch.null { border-top-color: rgba(15,23,42,.4); }
 
     .stats-grid {
       display: grid;
@@ -428,12 +483,25 @@
             </div>
           </div>
 
-          <div class="confidence-bar-container" id="ciBarWrap">
-            <div class="zero-line" id="zeroLine" style="display:none;"></div>
-            <div class="confidence-bar" id="ciBar"></div>
-            <div class="confidence-marker" id="ciMarker"></div>
-            <div class="bar-label left" id="ciLeft">—</div>
-            <div class="bar-label right" id="ciRight">—</div>
+          <div class="ci-viz" id="ciViz">
+            <div class="ci-viz-head">
+              <div class="ci-viz-title">95% confidence interval</div>
+              <div class="ci-viz-caption" id="ciCaption">—</div>
+            </div>
+            <div class="ci-track-wrap" id="ciTrackWrap">
+              <div class="ci-track"></div>
+              <div class="ci-null" id="ciNull"><span class="ci-null-tag">0 · no effect</span></div>
+              <div class="ci-band" id="ciBand"></div>
+              <div class="ci-marker" id="ciMarker"></div>
+              <div class="ci-est" id="ciEst">—</div>
+              <div class="ci-end" id="ciLo">—</div>
+              <div class="ci-end" id="ciHi">—</div>
+            </div>
+            <div class="ci-legend">
+              <span><i class="ci-swatch band"></i> 95% CI range</span>
+              <span><i class="ci-swatch est"></i> Pooled estimate</span>
+              <span><i class="ci-swatch null"></i> Null (0)</span>
+            </div>
           </div>
           <div class="stats-grid">
             <div class="stat-box"><div class="label">95% CI</div><div class="value" id="tileCI" style="font-size:15px;">—</div></div>
@@ -670,21 +738,49 @@
       var lo = bundle.pooled.ciLower;
       var hi = bundle.pooled.ciUpper;
       var mid = bundle.pooled.effect;
-      var span = Math.max(Math.abs(lo), Math.abs(hi), Math.abs(mid), 0.01) * 1.25;
-      var minX = -span, maxX = span;
-      var toPct = function (x) { return ((x - minX) / (maxX - minX)) * 100; };
-      var left = toPct(lo);
-      var right = toPct(hi);
-      var bar = document.getElementById('ciBar');
+      var pad = Math.max(Math.abs(hi - lo) * 0.35, Math.abs(mid) * 0.15, 0.05);
+      var minX = Math.min(lo, mid, 0) - pad;
+      var maxX = Math.max(hi, mid, 0) + pad;
+      if (maxX <= minX) { minX -= 0.1; maxX += 0.1; }
+      var toPct = function (x) {
+        return Math.max(2, Math.min(98, ((x - minX) / (maxX - minX)) * 100));
+      };
+      var left = toPct(Math.min(lo, hi));
+      var right = toPct(Math.max(lo, hi));
+      var midPct = toPct(mid);
+      var nullPct = toPct(0);
+
+      var band = document.getElementById('ciBand');
       var marker = document.getElementById('ciMarker');
-      var zero = document.getElementById('zeroLine');
-      bar.style.left = Math.min(left, right) + '%';
-      bar.style.width = Math.abs(right - left) + '%';
-      marker.style.left = toPct(mid) + '%';
-      zero.style.display = 'block';
-      zero.style.left = toPct(0) + '%';
-      document.getElementById('ciLeft').textContent = fmt(lo);
-      document.getElementById('ciRight').textContent = fmt(hi);
+      var nullEl = document.getElementById('ciNull');
+      band.style.left = left + '%';
+      band.style.width = Math.max(1.5, right - left) + '%';
+      marker.style.left = midPct + '%';
+      nullEl.style.left = nullPct + '%';
+
+      var loEl = document.getElementById('ciLo');
+      var hiEl = document.getElementById('ciHi');
+      var estEl = document.getElementById('ciEst');
+      loEl.textContent = fmt(lo);
+      hiEl.textContent = fmt(hi);
+      estEl.textContent = fmt(mid);
+      loEl.style.left = left + '%';
+      hiEl.style.left = right + '%';
+      estEl.style.left = midPct + '%';
+
+      // Keep endpoint labels from colliding when the CI is narrow
+      if (right - left < 14) {
+        loEl.style.transform = 'translateX(-100%)';
+        hiEl.style.transform = 'translateX(0)';
+      } else {
+        loEl.style.transform = 'translateX(-50%)';
+        hiEl.style.transform = 'translateX(-50%)';
+      }
+
+      var excludes = lo > 0 || hi < 0;
+      document.getElementById('ciCaption').innerHTML =
+        '<strong>[' + fmt(lo) + ', ' + fmt(hi) + ']</strong>' +
+        (excludes ? ' · excludes 0' : ' · includes 0');
     }
 
     function chartTheme() {

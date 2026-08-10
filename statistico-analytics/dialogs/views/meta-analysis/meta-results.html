@@ -8,9 +8,9 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
   <script src="https://code.highcharts.com/highcharts.js"></script>
-  <link rel="stylesheet" href="../shared-header.css?v=20260808-demodark"/>
+  <link rel="stylesheet" href="../shared-header.css?v=20260810-metaai"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260808-demodark"></script>
+  <script src="../shared-header.js?v=20260810-metaai"></script>
   <style>
     :root {
       --surface-0: #0c1624;
@@ -448,8 +448,95 @@
       };
     }
 
+    function syncHeaderMeta(bundle) {
+      if (!window.StatisticoHeader) return;
+      var et = effectTypeLabel(bundle.spec);
+      var modelLabel = bundle.model === 'random' ? 'Random-Effects' : 'Fixed-Effects';
+      if (typeof StatisticoHeader.updateVariable === 'function') {
+        StatisticoHeader.updateVariable(et + ' · ' + modelLabel, bundle.k);
+      }
+      var nEl = document.getElementById('headerSampleSize');
+      if (nEl) nEl.textContent = '(k=' + bundle.k + ')';
+      if (typeof StatisticoHeader.setAiReady === 'function') {
+        StatisticoHeader.setAiReady(true);
+      }
+    }
+
+    window.buildAIPayload = function () {
+      if (!metaBundle) return null;
+      var b = metaBundle;
+      var bias = b.bias || {};
+      return {
+        model: b.model,
+        effectType: effectTypeLabel(b.spec),
+        k: b.k,
+        pooled: b.pooled,
+        heterogeneity: b.heterogeneity,
+        bias: bias.available ? {
+          available: true,
+          intercept: bias.intercept,
+          se: bias.se,
+          t: bias.t,
+          p: bias.p,
+          n: bias.n
+        } : { available: false, reason: bias.reason || null },
+        studies: (b.studies || []).slice(0, 40).map(function (s) {
+          return { name: s.name, yi: s.yi, vi: s.vi, weightPct: s.weightPct };
+        })
+      };
+    };
+
+    window.requestMetaModuleAI = async function () {
+      var btn = document.getElementById('sbAiBtn');
+      var origHtml = btn ? btn.innerHTML : '';
+      if (!metaBundle) {
+        if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader._showAiOverlay === 'function') {
+          StatisticoHeader._showAiOverlay(null, 'meta-analysis', 'full');
+        } else {
+          alert('Run a meta-analysis first.');
+        }
+        return;
+      }
+      if (typeof StatisticoHeader === 'undefined' || typeof StatisticoHeader._callAiForSidebar !== 'function') {
+        alert('AI is not available in this session.');
+        return;
+      }
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-brain fa-spin"></i><span>Thinking…</span>';
+      }
+      try {
+        var payload = window.buildAIPayload();
+        var prompt =
+'You are interpreting a meta-analysis computed by Statistico.\n' +
+'Do NOT recompute any statistic. Use only the values in the JSON below.\n' +
+'Use cautious language ("suggests", "indicates") unless evidence is clear.\n' +
+'If a field is null or missing, do not mention it.\n\n' +
+'JSON:\n' + JSON.stringify(payload, null, 2) + '\n\n' +
+'Reply ONLY in this exact format (no extra lines, no markdown):\n' +
+'CONCLUSION: [One decisive sentence — the single most important finding about the pooled effect]\n' +
+'EVIDENCE: [pooled effect with CI and p] | [heterogeneity finding with I²/Q] | [publication-bias finding from Egger/funnel when available] | [study-weight or consistency note]\n' +
+'INTERPRETATION: [3 sentences — unified synthesis in plain language: what the pooled estimate means and how trustworthy it is given heterogeneity/bias]\n' +
+'IMPLICATIONS: [analytical implication 1] | [analytical implication 2] | [analytical implication 3]\n' +
+'ACTION: [next step 1] | [next step 2] | [next step 3]\n' +
+'STRENGTH: [High, Moderate, or Low — short reason based on k, CI width, I², and bias diagnostics]';
+        var raw = await StatisticoHeader._callAiForSidebar(prompt);
+        var sections = StatisticoHeader._parseAiStructured(raw);
+        StatisticoHeader._showAiOverlay(sections, 'meta-analysis', 'full');
+      } catch (err) {
+        StatisticoHeader._showAiOverlay(
+          { error: (err && err.message) || 'AI request failed.' }, 'meta-analysis', 'full');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml || '<i class="fa-solid fa-brain"></i><span>Full Analysis</span><sup class="sb-ai-sup">AI</sup>';
+        }
+      }
+    };
+
     function populateResults(bundle) {
       metaBundle = bundle;
+      window.metaBundle = bundle;
       document.getElementById('loadingState').style.display = 'none';
       document.getElementById('tab-summary').classList.add('active');
 
@@ -525,6 +612,8 @@
         return '<tr><td>' + escapeHtml(s.name) + '</td><td>' + fmt(s.yi) + '</td><td>' +
           fmt(s.vi, 4) + '</td><td>' + fmt(s.weight, 2) + '</td><td>' + fmt(s.weightPct, 1) + '%</td></tr>';
       }).join('') || '<tr><td colspan="5">No studies</td></tr>';
+
+      syncHeaderMeta(bundle);
     }
 
     function renderForestPlot(bundle) {
@@ -680,6 +769,9 @@
           downloadText('meta-analysis-results.json', JSON.stringify(metaBundle, null, 2), 'application/json');
         }
       });
+      if (typeof StatisticoHeader.setAiReady === 'function') {
+        StatisticoHeader.setAiReady(!!metaBundle);
+      }
     }
 
     document.addEventListener('DOMContentLoaded', function () {

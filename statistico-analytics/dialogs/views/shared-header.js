@@ -415,7 +415,8 @@ const StatisticoHeader = {
       'cluster': 'Cluster Analysis',
       'anova': 'ANOVA',
       'power': 'Power & Sample Size',
-      'mixed-model': 'Linear Mixed Model'
+      'mixed-model': 'Linear Mixed Model',
+      'meta-analysis': 'Meta-Analysis'
     };
     return moduleNames[this.module] || this.module || 'Analytics';
   },
@@ -531,7 +532,8 @@ const StatisticoHeader = {
       'cluster': 'Cluster Analysis',
       'anova': 'ANOVA',
       'power': 'Power & Sample Size',
-      'mixed-model': 'Linear Mixed Model'
+      'mixed-model': 'Linear Mixed Model',
+      'meta-analysis': 'Meta-Analysis'
     };
     const moduleName = moduleNames[this.module] || this._getModuleDisplayName();
     
@@ -540,7 +542,7 @@ const StatisticoHeader = {
     const questionsAnsweredHtml = this._renderQuestionsAnsweredControl();
 
     // All sidebar-based modules hide the shared-header navrow to avoid duplicate navigation.
-    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate' || this.module === 'mixed-model');
+    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate' || this.module === 'mixed-model' || this.module === 'meta-analysis');
 
     const topHeader = `
       <div class="statistico-header">
@@ -3140,7 +3142,7 @@ const StatisticoHeader = {
   },
 
   _isHeaderRowFilterSuppressed() {
-    return this.module === 'mixed-model' || this.module === 'independent' || this.module === 'dependent' || this.module === 'regression';
+    return this.module === 'mixed-model' || this.module === 'independent' || this.module === 'dependent' || this.module === 'regression' || this.module === 'meta-analysis';
   },
 
   _mergeActionsWithFallback(actions) {
@@ -5939,7 +5941,8 @@ const StatisticoHeader = {
     const supportsMixedAi = this.module === 'mixed-model';
     const supportsFactorAi = this.module === 'factor';
     const supportsClusterAi = this.module === 'cluster';
-    const supportsSharedAi = (this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations' || supportsIndependentAi || supportsMixedAi || supportsFactorAi || supportsClusterAi;
+    const supportsMetaAi = this.module === 'meta-analysis';
+    const supportsSharedAi = (this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations' || supportsIndependentAi || supportsMixedAi || supportsFactorAi || supportsClusterAi || supportsMetaAi;
     const supportsFullAiPill = supportsIndependentAi || isDependentKplus;
     if (supportsSharedAi || isDependentKplus) {
       const aiSection = document.createElement('div');
@@ -5956,6 +5959,8 @@ const StatisticoHeader = {
           ? 'requestFactorModuleAI()'
         : supportsClusterAi
           ? 'requestClusterModuleAI()'
+        : supportsMetaAi
+          ? 'requestMetaModuleAI()'
           : 'StatisticoHeader._sbAiGlobalInterpret()';
       const aiTitle = supportsIndependentAi
         ? 'AI statistical summary for this independent means analysis'
@@ -5967,6 +5972,8 @@ const StatisticoHeader = {
           ? 'Full factor analysis - synthesises suitability, extraction, rotation & diagnostics into one report'
         : supportsClusterAi
           ? 'Full cluster analysis - synthesises quality, sizes, profiles & separation into one report'
+        : supportsMetaAi
+          ? 'Full meta-analysis — synthesises pooled effect, heterogeneity, and publication bias into one report'
           : (isCorrelation ? 'Full correlation analysis - synthesises all correlation views into one report' : 'Full variable analysis - synthesises all diagnostics into one report');
       const aiLabel = supportsFullAiPill ? 'Full AI Analysis' : 'Full Analysis';
       const aiBadge = supportsFullAiPill ? 'ALL' : 'AI';
@@ -6228,6 +6235,7 @@ const StatisticoHeader = {
   _supportsInsightGuide() {
     if (this.module === 'univariate') return true;
     if (this.module === 'cluster') return true;
+    if (this.module === 'meta-analysis') return true;
     return this._isSharedSidebarModule();
   },
 
@@ -6257,6 +6265,11 @@ const StatisticoHeader = {
     }
     if (this.module === 'univariate' || this.module === 'correlations') return this.currentView;
     if (this.module === 'independent') return `independent-${this._getIndependentActiveTab()}`;
+    if (this.module === 'meta-analysis') {
+      const active = document.querySelector('.sb-item.active[data-tab]');
+      if (active) return `meta-${active.getAttribute('data-tab')}`;
+      return 'meta-summary';
+    }
     if (this.module === 'cluster') {
       // The cluster results dialog navigates via data-nav-key (km-map, hi-profiles, ...).
       const activeNav = document.querySelector('.sb-cluster-nav.active[data-nav-key]');
@@ -6316,6 +6329,11 @@ const StatisticoHeader = {
 
   _genericModuleViewLabels() {
     return {
+      'meta-summary': 'Summary',
+      'meta-forest': 'Forest Plot',
+      'meta-heterogeneity': 'Heterogeneity',
+      'meta-bias': 'Publication Bias',
+      'meta-studies': 'Study Details',
       'dependent-explore': 'Descriptives',
       'dependent-trajectories': 'Trajectories',
       'dependent-assumptions': 'Assumptions',
@@ -6451,6 +6469,16 @@ const StatisticoHeader = {
         'Standalone power calculator for a proportions comparison. Set the two expected proportions and α, then read achieved power at given group sizes or the N required for target power.',
       'power-sbReg':
         'Standalone power calculator for multiple regression. Set R² (or f²), the number of predictors, and α, then read achieved power at a given N or the N required for target power.',
+      'meta-summary':
+        'Read the model setup (fixed vs random-effects), effect type, pooled effect with ± and 95% CI bar, KPI tiles (LCL / point / UCL / z·p / I² / k), and the plain-language interpretation. Use this view to decide whether the pooled estimate is significant and practically meaningful before drilling into forest, heterogeneity, or bias.',
+      'meta-forest':
+        'This is a forest plot: each study is a point with a horizontal 95% CI, and the pooled effect is usually marked as a diamond or vertical reference. Describe study-to-study consistency, which studies pull left/right, and how the pooled estimate sits relative to the null (0 or 1 depending on scale). Do not recite Egger statistics here — those belong on Publication Bias.',
+      'meta-heterogeneity':
+        'Read Q, df, p(Q), I², H², and τ²/τ together with the heterogeneity interpretation. Explain whether between-study variance is low/moderate/substantial and what that implies for fixed vs random-effects interpretation. Do not re-interpret the pooled CI here except as context for heterogeneity.',
+      'meta-bias':
+        'This combines Egger\'s regression test (intercept, SE, t, p, n) with a funnel plot of effect size vs precision. Describe funnel asymmetry and whether Egger\'s p suggests small-study / publication bias. With few studies, emphasise uncertainty. Do not re-walk the full pooled-effect narrative from Summary.',
+      'meta-studies':
+        'Read the study table (study id, effect, variance, weight, weight %). Use this view to identify influential or heavily weighted studies and to verify the inputs feeding the pooled estimate — not to restate I² or Egger results.',
       'factor-suitability':
         'Read the evidence-driven verdict banner, KMO, Bartlett, determinant, correlation heatmap (Avg |r|), MSA summary bars, suggested refinement panel, and optional Optimize Variables path. Explain whether factor analysis is appropriate and which variables to remove — use exact MSA and KMO values.',
       'factor-extraction': 'Review eigenvalues, variance explained, communalities, and extraction choice.',
@@ -6650,6 +6678,10 @@ const StatisticoHeader = {
         + 'Do not recite merge-step or silhouette numbers here — those belong to the Clusters and Diagnostics views.',
       'cluster-hi-dendrogram':
         'This is a dendrogram (merge tree) with a draggable cut line the user can apply to re-run at a new k. Describe merge heights, long stems, and where cutting the tree gives well-separated groups — and, if the current cut looks suboptimal, say where a better cut would fall — not numeric tables from other views.',
+      'meta-forest':
+        'This is a forest plot of study effects with CIs and the pooled estimate. Describe study consistency, outliers, and where the pooled effect sits relative to the null — not Egger funnel statistics.',
+      'meta-bias':
+        'This is a funnel plot plus Egger\'s test. Describe asymmetry / small-study effects and the Egger p-value — not the full Summary narrative.',
       'regression-power': POWER_PLANNING_GUARD,
       'anova-power': POWER_PLANNING_GUARD,
       'dependent-power': POWER_PLANNING_GUARD

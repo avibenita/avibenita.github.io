@@ -235,6 +235,10 @@
       font-size: 14px; color: var(--text-secondary);
       margin-bottom: 8px;
     }
+    .result-meta-lines {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      margin-top: 2px;
+    }
     .result-direction {
       display: inline-flex; align-items: center; gap: 6px;
       text-align: center;
@@ -248,6 +252,9 @@
     }
     :root[data-theme="light"] .result-direction {
       background: rgba(15,23,42,.04);
+    }
+    .result-favor {
+      font-size: 13.5px; font-weight: 700; color: var(--accent-1);
     }
 
     .ci-viz {
@@ -577,7 +584,11 @@
             <div class="pooled-card-title">Pooled effect</div>
             <div class="result-main" id="resultMain">—</div>
             <div class="result-sub" id="resultSub">Pooled effect · 95% CI</div>
-            <div class="result-direction" id="resultDirection"></div>
+            <div class="result-meta-lines">
+              <div class="result-direction" id="resultContrast">Contrast: Treatment − Control</div>
+              <div class="result-direction" id="resultDirection"></div>
+              <div class="result-favor" id="resultFavor"></div>
+            </div>
           </div>
 
           <div class="interp-card" id="interpCard">
@@ -841,16 +852,19 @@
       return bits.join(' · ');
     }
 
-    function effectFavorLabel(bundle) {
-      var dir = (bundle.spec && bundle.spec.effectDirection) || 'treatment';
-      return dir === 'control' ? 'control' : 'treatment';
+    function outcomeBetterOf(bundle) {
+      var spec = (bundle && bundle.spec) || {};
+      if (spec.outcomeBetter === 'lower' || spec.outcomeBetter === 'higher') return spec.outcomeBetter;
+      // Legacy mapping: old “positive favors control” ≈ lower-is-better intent
+      if (spec.effectDirection === 'control') return 'lower';
+      return 'higher';
     }
 
-    function favoredArm(effect, positiveFavors) {
+    function favoredArm(effect, outcomeBetter) {
       if (!effect) return null;
-      if (positiveFavors === 'treatment') return effect > 0 ? 'treatment' : 'control';
-      if (positiveFavors === 'control') return effect > 0 ? 'control' : 'treatment';
-      return effect > 0 ? 'positive' : 'negative';
+      // Contrast is always Treatment − Control. Labels only.
+      if (outcomeBetter === 'lower') return effect < 0 ? 'treatment' : 'control';
+      return effect > 0 ? 'treatment' : 'control';
     }
 
     function magnitudeBand(bundle, et) {
@@ -869,7 +883,7 @@
       return { key: 'effect', label: nice.charAt(0).toLowerCase() + nice.slice(1) };
     }
 
-    function buildInterpretationCard(bundle, et, positiveFavors) {
+    function buildInterpretationCard(bundle, et, outcomeBetter) {
       var k = bundle.k;
       var e = bundle.pooled.effect;
       var g = fmt(e);
@@ -878,8 +892,9 @@
       var i2 = bundle.heterogeneity.I2;
       var tau2 = bundle.heterogeneity.tau2;
       var excludesNull = bundle.pooled.ciLower > 0 || bundle.pooled.ciUpper < 0;
-      var arm = favoredArm(e, positiveFavors);
+      var arm = favoredArm(e, outcomeBetter);
       var mag = magnitudeBand(bundle, et);
+      var betterPhrase = outcomeBetter === 'lower' ? 'lower values are better' : 'higher values are better';
 
       var magLine;
       if (arm === 'treatment' || arm === 'control') {
@@ -906,13 +921,13 @@
       // Narrative: interpret, don't just restate numbers; stay causal-cautious
       var narrative;
       if (arm === 'treatment' || arm === 'control') {
-        narrative = 'Across ' + k + ' studies, the pooled effect favored <strong>' + arm +
-          '</strong>, with a ' + mag.label + ' of ' + g +
-          ' (95% CI ' + lo + ' to ' + hi + '). ';
+        narrative = 'Across ' + k + ' studies, Treatment − Control = ' + g +
+          ' (95% CI ' + lo + ' to ' + hi + '). Because ' + betterPhrase +
+          ', the pooled effect favored <strong>' + arm + '</strong>' +
+          (mag.key === 'effect' ? '' : ', a ' + mag.label) + '. ';
       } else {
-        narrative = 'Across ' + k + ' studies, the pooled standardized mean difference was ' + g +
-          ' (95% CI ' + lo + ' to ' + hi + '), indicating a ' + mag.label +
-          ' in the ' + (e < 0 ? 'negative' : 'positive') + ' direction. ';
+        narrative = 'Across ' + k + ' studies, the pooled effect was ' + g +
+          ' (95% CI ' + lo + ' to ' + hi + '), with ' + betterPhrase + '. ';
       }
       narrative += excludesNull
         ? 'The evidence indicates a non-zero average effect (<strong>p ' + fmtP(bundle.pooled.p) + '</strong>). '
@@ -1230,13 +1245,21 @@
       document.getElementById('cfgK').textContent = bundle.k;
       syncEffectMeasureControl(bundle);
 
-      var favor = effectFavorLabel(bundle);
+      var better = outcomeBetterOf(bundle);
+      var arm = favoredArm(bundle.pooled.effect, better);
       document.getElementById('resultMain').textContent = fmt(bundle.pooled.effect);
       document.getElementById('resultSub').textContent =
         et + ' = ' + fmt(bundle.pooled.effect) +
         ' · 95% CI [' + fmt(bundle.pooled.ciLower) + ', ' + fmt(bundle.pooled.ciUpper) + ']';
+      document.getElementById('resultContrast').textContent = 'Contrast: Treatment − Control';
       document.getElementById('resultDirection').textContent =
-        'Positive values favor ' + favor;
+        better === 'lower' ? 'Better outcomes: Lower values' : 'Better outcomes: Higher values';
+      var favorEl = document.getElementById('resultFavor');
+      if (favorEl) {
+        favorEl.textContent = arm
+          ? ('Result favors ' + arm)
+          : 'Result near no difference';
+      }
 
       updateCiBar(bundle);
 
@@ -1260,7 +1283,7 @@
       document.getElementById('tileTau2').textContent = fmt(bundle.heterogeneity.tau2);
       document.getElementById('tileK').textContent = String(bundle.k);
 
-      var interp = buildInterpretationCard(bundle, et, favor);
+      var interp = buildInterpretationCard(bundle, et, better);
       document.getElementById('interpNarrative').innerHTML = interp.narrative;
       document.getElementById('interpMag').textContent = interp.mag;
       document.getElementById('interpCert').textContent = interp.cert;

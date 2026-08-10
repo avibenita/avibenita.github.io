@@ -105,7 +105,7 @@ function _metaExtractStudyEffect(row, spec) {
     return null;
   }
 
-  if (spec.effectDirection === "control" && isFinite(yi)) yi = -yi;
+  // outcomeBetter / legacy effectDirection affect interpretation labels only — never flip yi.
   if (!(isFinite(yi) && isFinite(vi) && vi > 0)) return null;
   return { yi: yi, vi: vi, se: Math.sqrt(vi) };
 }

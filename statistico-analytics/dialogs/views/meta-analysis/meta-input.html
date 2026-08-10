@@ -530,17 +530,17 @@
                 </label>
               </div>
               <div class="opt-row">
-                <label class="lbl-with-tip">Positive values favor
-                  <span class="info-icon" tabindex="0">i<span class="tip">Sets which arm a positive continuous contrast favors. Binary effects keep Treatment vs Control as mapped in the roles below.</span></span>
+                <label class="lbl-with-tip">For this outcome, better results are
+                  <span class="info-icon" tabindex="0">i<span class="tip">Does <b>not</b> change the numbers. Contrast stays Treatment − Control. This only affects labels such as “favors treatment” vs “favors control.” Choose <b>Lower values</b> when smaller scores are better (e.g. symptoms, pain).</span></span>
                 </label>
                 <div class="opt-radio-row">
-                  <label class="opt-radio active" id="dirTreatLabel">
-                    <input type="radio" name="effectDirection" value="treatment" checked />
-                    Treatment
+                  <label class="opt-radio" id="dirLowerLabel">
+                    <input type="radio" name="outcomeBetter" value="lower" />
+                    Lower values
                   </label>
-                  <label class="opt-radio" id="dirCtrlLabel">
-                    <input type="radio" name="effectDirection" value="control" />
-                    Control
+                  <label class="opt-radio active" id="dirHigherLabel">
+                    <input type="radio" name="outcomeBetter" value="higher" checked />
+                    Higher values
                   </label>
                 </div>
               </div>
@@ -592,7 +592,7 @@
     var modelType = 'random';
     var tauEstimator = 'reml';
     var hartungKnapp = true;
-    var effectDirection = 'treatment';
+    var outcomeBetter = 'higher';
     var assignments = {};
     var draggedElement = null;
 
@@ -740,7 +740,7 @@
           '<li><b>Mean difference</b> — when all studies share the same units</li>' +
           '<li><b>Ratio of means (log)</b> — relative change; means should be positive</li>' +
           '</ul>' +
-          '<div class="tipbox"><b>Tip:</b> Map Treatment and Control consistently across studies. Use “Positive values favor” if you need the opposite contrast.</div>' +
+          '<div class="tipbox"><b>Tip:</b> Map Treatment and Control consistently. Contrast is always Treatment − Control; use “better results are lower/higher” only for interpretation labels.</div>' +
           '<div class="warn"><b>Warning:</b> Enter SDs, not SEs. Zero or negative SDs are invalid. Very small Ns make SMD unstable.</div>'
       },
       binary: {
@@ -1135,7 +1135,7 @@
         model: modelType,
         tauEstimator: modelType === 'random' ? tauEstimator : undefined,
         hartungKnapp: modelType === 'random' ? !!hartungKnapp : false,
-        effectDirection: effectDirection,
+        outcomeBetter: outcomeBetter,
         colNames: {}
       };
       activeZoneKeys().forEach(function (k) {
@@ -1158,7 +1158,14 @@
       if (spec.model) modelType = spec.model === 'fixed' ? 'fixed' : 'random';
       if (spec.tauEstimator) tauEstimator = spec.tauEstimator === 'dl' ? 'dl' : 'reml';
       hartungKnapp = spec.hartungKnapp !== false && modelType === 'random';
-      if (spec.effectDirection) effectDirection = spec.effectDirection === 'control' ? 'control' : 'treatment';
+      if (spec.outcomeBetter === 'lower' || spec.outcomeBetter === 'higher') {
+        outcomeBetter = spec.outcomeBetter;
+      } else if (spec.effectDirection === 'control') {
+        // Legacy: old “positive favors control” ≈ lower-is-better coding intent
+        outcomeBetter = 'lower';
+      } else {
+        outcomeBetter = 'higher';
+      }
       // Legacy: a/b/c/d without format → non-events layout
       if (effectType === 'binary' && !spec.binaryFormat && (spec.bCol != null || (spec.colNames && spec.colNames.bCol))) {
         binaryFormat = 'events_nonevents';
@@ -1198,8 +1205,8 @@
         var lab = r.closest('.opt-radio');
         if (lab) lab.classList.toggle('active', r.checked);
       });
-      document.querySelectorAll('input[name="effectDirection"]').forEach(function (r) {
-        r.checked = r.value === effectDirection;
+      document.querySelectorAll('input[name="outcomeBetter"]').forEach(function (r) {
+        r.checked = r.value === outcomeBetter;
         var lab = r.closest('.opt-radio');
         if (lab) lab.classList.toggle('active', r.checked);
       });
@@ -1364,7 +1371,7 @@
       modelType = 'random';
       tauEstimator = 'reml';
       hartungKnapp = true;
-      effectDirection = 'treatment';
+      outcomeBetter = 'higher';
       if (_saved) applySpec(_saved);
       else {
         syncOptionControls();
@@ -1493,9 +1500,9 @@
           updateSummary();
         });
       });
-      document.querySelectorAll('input[name="effectDirection"]').forEach(function (r) {
+      document.querySelectorAll('input[name="outcomeBetter"]').forEach(function (r) {
         r.addEventListener('change', function () {
-          effectDirection = r.value === 'control' ? 'control' : 'treatment';
+          outcomeBetter = r.value === 'lower' ? 'lower' : 'higher';
           syncOptionControls();
           updateSummary();
         });

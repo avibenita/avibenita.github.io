@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260810-metachrome4"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
   <script src="../shared-header.js?v=20260810-metachrome4"></script>
+  <script src="meta-engine.js?v=20260810measure1"></script>
   <style>
     :root {
       /* Deeper page vs lighter panels for clearer separation */
@@ -149,6 +150,29 @@
     }
     .config-sep {
       width: 1px; height: 22px; background: var(--border); flex-shrink: 0;
+    }
+    .cfg-measure-select {
+      appearance: none; -webkit-appearance: none;
+      padding: 5px 28px 5px 12px; border-radius: 999px;
+      border: 1px solid rgba(165,180,252,.5);
+      background: rgba(129,140,248,.22)
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23a5b4fc' d='M1 1l5 5 5-5'/%3E%3C/svg%3E")
+        no-repeat right 10px center;
+      color: var(--accent-meta); font-size: 13.5px; font-weight: 700;
+      cursor: pointer; max-width: min(260px, 100%);
+    }
+    .cfg-measure-select:disabled {
+      opacity: .85; cursor: default;
+      padding-right: 12px;
+      background-image: none;
+    }
+    :root[data-theme="light"] .cfg-measure-select {
+      background-color: rgba(67,56,202,.1);
+      border-color: rgba(67,56,202,.35);
+      color: #4338ca;
+    }
+    .cfg-measure-locked {
+      font-size: 12px; color: var(--text-muted); font-weight: 600;
     }
 
     .results-panel {
@@ -511,10 +535,13 @@
           <div class="config-row">
             <span class="section-title">Model</span>
             <span class="pill" id="cfgModel">—</span>
-            <span class="meta-kv">k = <strong id="cfgK">—</strong></span>
             <span class="config-sep" aria-hidden="true"></span>
-            <span class="section-title">Effect</span>
-            <span class="pill" id="cfgEffectType">—</span>
+            <span class="section-title">Effect measure</span>
+            <select class="cfg-measure-select" id="cfgEffectMeasure" aria-label="Effect measure"></select>
+            <span class="cfg-measure-locked" id="cfgEffectLocked" style="display:none;"></span>
+            <span class="config-sep" aria-hidden="true"></span>
+            <span class="section-title">Studies</span>
+            <span class="meta-kv">k = <strong id="cfgK">—</strong></span>
           </div>
         </div>
 
@@ -770,7 +797,8 @@
       }
       if (m === 'md') return 'Mean difference';
       if (m === 'rom') return 'Ratio of means (log)';
-      return "SMD (Hedges' g)";
+      if (m === 'cohend') return "Cohen's d";
+      return "Hedges' g (SMD)";
     }
 
     function modelLabel(bundle) {
@@ -798,16 +826,18 @@
 
     function magnitudeBand(bundle, et) {
       var absG = Math.abs(bundle.pooled.effect);
-      var isSmd = et.indexOf('SMD') >= 0 || et.indexOf('Hedges') >= 0 ||
-        (bundle.spec && bundle.spec.effectMeasure === 'smd');
+      var m = (bundle.spec && bundle.spec.effectMeasure) || '';
+      var isSmd = m === 'smd' || m === 'cohend' ||
+        et.indexOf('SMD') >= 0 || et.indexOf('Hedges') >= 0 || et.indexOf("Cohen") >= 0;
       if (isSmd) {
-        // Cohen-ish bands; ~0.4 reads as moderate in this module
         if (absG < 0.2) return { key: 'small', label: 'small standardized difference' };
         if (absG < 0.5) return { key: 'moderate', label: 'moderate standardized difference' };
         if (absG < 0.8) return { key: 'moderate-large', label: 'moderate-to-large standardized difference' };
         return { key: 'large', label: 'large standardized difference' };
       }
-      return { key: 'effect', label: et + ' of ' + fmt(bundle.pooled.effect) };
+      // Phrase only — value is appended once in the narrative ("… of −2.186")
+      var nice = (et || 'effect').replace(/\s*\(log\)\s*$/i, '').trim();
+      return { key: 'effect', label: nice.charAt(0).toLowerCase() + nice.slice(1) };
     }
 
     function buildInterpretationCard(bundle, et, positiveFavors) {
@@ -1033,6 +1063,88 @@
       }
     };
 
+    function sendParent(action, data) {
+      try {
+        if (typeof Office !== 'undefined' && Office.context && Office.context.ui &&
+            typeof Office.context.ui.messageParent === 'function') {
+          Office.context.ui.messageParent(JSON.stringify(Object.assign({ action: action }, data || {})));
+        }
+      } catch (_e) {}
+    }
+
+    function syncEffectMeasureControl(bundle) {
+      var sel = document.getElementById('cfgEffectMeasure');
+      var locked = document.getElementById('cfgEffectLocked');
+      if (!sel) return;
+      var spec = (bundle && bundle.spec) || {};
+      var t = spec.effectType || bundle.effectType || 'continuous';
+      var m = spec.effectMeasure || bundle.effectMeasure || '';
+      var opts = (typeof MetaEngine !== 'undefined' && MetaEngine.measuresFor)
+        ? MetaEngine.measuresFor(t)
+        : [];
+
+      if (t === 'direct' || !opts.length) {
+        sel.style.display = 'none';
+        sel.disabled = true;
+        if (locked) {
+          locked.style.display = '';
+          locked.textContent = effectTypeLabel(spec) + ' — supplied by user';
+        }
+        return;
+      }
+
+      if (locked) locked.style.display = 'none';
+      sel.style.display = '';
+      sel.disabled = false;
+      sel.innerHTML = opts.map(function (o) {
+        return '<option value="' + o.value + '"' + (o.value === m ? ' selected' : '') + '>' + o.label + '</option>';
+      }).join('');
+      if (!opts.some(function (o) { return o.value === m; }) && opts[0]) {
+        sel.value = opts[0].value;
+      } else {
+        sel.value = m;
+      }
+    }
+
+    function changeEffectMeasure(nextMeasure) {
+      if (!metaBundle || !nextMeasure) return;
+      var spec = Object.assign({}, metaBundle.spec || {}, { effectMeasure: nextMeasure });
+      var source = metaBundle.source;
+      if (!source || !source.headers || !source.rows) {
+        try {
+          source = JSON.parse(sessionStorage.getItem('metaSource') || 'null');
+        } catch (_e) { source = null; }
+      }
+      if (!source || !source.headers || !source.rows) {
+        // Ask parent (Excel host) to rebuild from the active range
+        sendParent('changeEffectMeasure', { effectMeasure: nextMeasure });
+        return;
+      }
+      if (typeof MetaEngine === 'undefined' || typeof MetaEngine.buildMetaBundle !== 'function') {
+        sendParent('changeEffectMeasure', { effectMeasure: nextMeasure });
+        return;
+      }
+      var next = MetaEngine.buildMetaBundle(source.headers, source.rows, spec);
+      if (next.error) {
+        alert(next.error);
+        syncEffectMeasureControl(metaBundle);
+        return;
+      }
+      next.source = source;
+      try {
+        sessionStorage.setItem('metaBundle', JSON.stringify(next));
+        sessionStorage.setItem('metaModelSpec', JSON.stringify(spec));
+        sessionStorage.setItem('metaSource', JSON.stringify(source));
+      } catch (_e2) {}
+      sendParent('syncMetaSpec', { spec: spec });
+      populateResults(next);
+      // Refresh open charts if user is on those tabs
+      var active = document.querySelector('.sb-item.active');
+      var tab = active && active.getAttribute('data-tab');
+      if (tab === 'forest') setTimeout(function () { renderForestPlot(next); }, 40);
+      if (tab === 'bias') setTimeout(function () { renderFunnelPlot(next); }, 40);
+    }
+
     function populateResults(bundle) {
       metaBundle = bundle;
       window.metaBundle = bundle;
@@ -1043,7 +1155,7 @@
       var et = effectTypeLabel(bundle.spec);
       document.getElementById('cfgModel').textContent = ml;
       document.getElementById('cfgK').textContent = bundle.k;
-      document.getElementById('cfgEffectType').textContent = et;
+      syncEffectMeasureControl(bundle);
 
       var favor = effectFavorLabel(bundle);
       document.getElementById('resultMain').textContent = fmt(bundle.pooled.effect);
@@ -1323,6 +1435,13 @@
       if (!ok) {
         setTimeout(bootHeader, 120);
         setTimeout(bootHeader, 600);
+      }
+
+      var measureSel = document.getElementById('cfgEffectMeasure');
+      if (measureSel) {
+        measureSel.addEventListener('change', function () {
+          changeEffectMeasure(measureSel.value);
+        });
       }
 
       /* Fixed-position tips so overflow:hidden panels do not clip them */

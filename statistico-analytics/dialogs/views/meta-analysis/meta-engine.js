@@ -1,142 +1,6 @@
-// meta-analysis-input-panel.js
-// Handles the taskpane logic for meta-analysis module
-
-let metaDialog = null;
-let metaResultsDialog = null;
-
-function onRangeDataLoaded(values, address) {
-  const panel = document.getElementById("metaPanel");
-  if (!panel) return;
-  
-  panel.style.display = "block";
-  
-  const numRows = values.length;
-  const numCols = values[0] ? values[0].length : 0;
-  
-  document.getElementById("metaRange").textContent = address || "—";
-  document.getElementById("metaStudies").textContent = numRows > 1 ? numRows - 1 : 0; // Exclude header
-  document.getElementById("metaCols").textContent = numCols;
-  
-  const btn = document.getElementById("openMetaBuilder");
-  if (btn) {
-    btn.disabled = numRows < 2 || numCols < 3; // Need at least study + effect + SE/variance
-  }
-  
-  updateButtonState();
-}
-
-function getMetaRangeValues() {
-  if (window.StatisticoGlobalRange) {
-    var gr = StatisticoGlobalRange.load();
-    if (gr && gr.values && gr.values.length >= 2) {
-      return { values: gr.values, address: gr.address || "" };
-    }
-  }
-  var dataPanel = window.dataInputPanelInstance;
-  if (dataPanel && dataPanel.values && dataPanel.values.length >= 2) {
-    return { values: dataPanel.values, address: dataPanel.address || "" };
-  }
-  return null;
-}
-
-function getMetaDialogsBaseUrl() {
-  if (typeof getDialogsBaseUrl === "function") return getDialogsBaseUrl();
-  const href = window.location.href;
-  if (href.includes("/taskpane/")) return `${href.split("/taskpane/")[0]}/dialogs/views/`;
-  return `${window.location.origin}/dialogs/views/`;
-}
-
-function unwrapMetaModelSpec(msg) {
-  if (!msg) return {};
-  var data = msg.payload || msg.data || msg;
-  if (data && data.spec) return data.spec;
-  return data || {};
-}
-
-function openMetaBuilder() {
-  const url = `${getMetaDialogsBaseUrl()}meta-analysis/meta-input.html?v=${Date.now()}`;
-  
-  Office.context.ui.displayDialogAsync(url, DIALOG_SIZES.REGRESSION_BUILDER, (result) => {
-    if (result.status === Office.AsyncResultStatus.Failed) {
-      console.error("Failed to open meta builder dialog:", result.error.message);
-      return;
-    }
-    
-    metaDialog = result.value;
-    
-    metaDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
-      const msg = JSON.parse(arg.message || "{}");
-      
-      if (msg.action === "requestData" || msg.action === "ready") {
-        sendDialogData();
-      } else if (msg.action === "metaModel") {
-        handleMetaModel(unwrapMetaModelSpec(msg));
-        metaDialog.close();
-        metaDialog = null;
-      } else if (msg.action === "close" || msg.action === "cancel") {
-        try { metaDialog.close(); } catch (_e) {}
-        metaDialog = null;
-      }
-    });
-    
-    metaDialog.addEventHandler(Office.EventType.DialogEventReceived, (arg) => {
-      if (arg.error === 12006) metaDialog = null;
-      if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
-    });
-  });
-}
-
-function sendDialogData() {
-  if (!metaDialog) return;
-  
-  const range = getMetaRangeValues();
-  if (!range) {
-    console.warn("No data loaded");
-    return;
-  }
-  
-  const payload = {
-    headers: range.values[0],
-    rows: range.values.slice(1),
-    address: range.address,
-    // Always open the builder fresh — saved spec is only used by results dialogs.
-    savedSpec: null
-  };
-  
-  metaDialog.messageChild(JSON.stringify({
-    type: "META_DATA",
-    payload: payload
-  }));
-}
-
-function handleMetaModel(spec) {
-  sessionStorage.setItem("metaModelSpec", JSON.stringify(spec || {}));
-  updateButtonState();
-  
-  // Build the meta-analysis bundle
-  const range = getMetaRangeValues();
-  if (!range) return;
-  
-  const headers = range.values[0];
-  const rows = range.values.slice(1);
-  
-  const bundle = buildMetaBundle(headers, rows, spec);
-  
-  if (bundle.error) {
-    alert("Error: " + bundle.error);
-    return;
-  }
-
-  // Keep raw data on the bundle so Results can switch effect measures interactively.
-  bundle.source = { headers: headers, rows: rows };
-  try {
-    sessionStorage.setItem("metaSource", JSON.stringify(bundle.source));
-  } catch (_e) {}
-  
-  // Open results dialog
-  openMetaResultsDialog(bundle);
-}
-
+﻿/* Shared meta-analysis engine — used by Results for interactive measure switching */
+(function (global) {
+'use strict';
 function _metaNum(v) {
   const n = parseFloat(v);
   return isFinite(n) ? n : NaN;
@@ -165,6 +29,7 @@ function _metaExtractStudyEffect(row, spec) {
       yi = Math.log(mean1 / mean2);
       vi = (sd1 * sd1) / (n1 * mean1 * mean1) + (sd2 * sd2) / (n2 * mean2 * mean2);
     } else if (measure === "cohend") {
+      // Cohen's d (uncorrected)
       const pooledSD = Math.sqrt(((n1 - 1) * sd1 * sd1 + (n2 - 1) * sd2 * sd2) / (n1 + n2 - 2));
       if (!(pooledSD > 0)) return null;
       yi = (mean1 - mean2) / pooledSD;
@@ -228,7 +93,7 @@ function _metaExtractStudyEffect(row, spec) {
       const lo = _metaNum(row[spec.loCol]);
       const hi = _metaNum(row[spec.hiCol]);
       if (![yi, lo, hi].every(isFinite) || !(hi > lo)) return null;
-      // Assume 95% CI → SE = (hi - lo) / (2 * 1.96)
+      // Assume 95% CI ג†’ SE = (hi - lo) / (2 * 1.96)
       const se = (hi - lo) / (2 * 1.96);
       vi = se * se;
     } else {
@@ -286,7 +151,7 @@ function _metaTau2REML(yi, vi) {
 }
 
 function _metaTCritApprox(df, alphaHalf) {
-  // Approximate two-sided t critical (α/2) for common df; falls back to 1.96.
+  // Approximate two-sided t critical (־±/2) for common df; falls back to 1.96.
   if (!(df > 0)) return 1.959964;
   // Rough Cornish-Fisher style for 0.025 (95% CI)
   const z = 1.959964;
@@ -340,7 +205,7 @@ function buildMetaBundle(headers, rows, spec) {
     let crit = 1.959964;
     let p, zOrT;
     if (useHK && df > 0) {
-      // Hartung–Knapp–Sidik–Jonkman
+      // Hartungג€“Knappג€“Sidikג€“Jonkman
       const q = studies.reduce(function (sum, s, i) {
         return sum + wi[i] * Math.pow(s.yi - theta, 2);
       }, 0) / df;
@@ -356,7 +221,7 @@ function buildMetaBundle(headers, rows, spec) {
     const ciLower = theta - crit * se_theta;
     const ciUpper = theta + crit * se_theta;
 
-    // 95% prediction interval (random-effects): θ ± t √(SE² + τ²)
+    // 95% prediction interval (random-effects): ־¸ ֲ± t גˆ(SEֲ² + ֿ„ֲ²)
     let piLower = null;
     let piUpper = null;
     if (model === "random" && df > 0) {
@@ -488,131 +353,30 @@ function approximateChiSquare(chiSq, df) {
   }
   return 0.05;
 }
-
-function openMetaResultsDialog(bundle) {
-  sessionStorage.setItem("metaBundle", JSON.stringify(bundle));
-
-  function getDialogsBaseUrl() {
-    const href = window.location.href;
-    if (href.includes("/taskpane/")) return `${href.split("/taskpane/")[0]}/dialogs/views/`;
-    return `${window.location.origin}/dialogs/views/`;
-  }
-
-  const url = `${getDialogsBaseUrl()}meta-analysis/meta-results.html?v=${Date.now()}`;
-  
-  Office.context.ui.displayDialogAsync(url, DIALOG_SIZES.RESULTS, (result) => {
-    if (result.status === Office.AsyncResultStatus.Failed) {
-      console.error("Failed to open results dialog:", result.error.message);
-      return;
+global.MetaEngine = {
+  buildMetaBundle: buildMetaBundle,
+  defaultMeasure: function (effectType) {
+    if (effectType === 'binary') return 'rr';
+    if (effectType === 'direct') return null;
+    return 'smd';
+  },
+  measuresFor: function (effectType) {
+    if (effectType === 'continuous') {
+      return [
+        { value: 'smd', label: "Hedges' g (SMD)" },
+        { value: 'cohend', label: "Cohen's d" },
+        { value: 'md', label: 'Mean difference' },
+        { value: 'rom', label: 'Ratio of means (log)' }
+      ];
     }
-    
-    metaResultsDialog = result.value;
-    if (window.HubResultsBridge) HubResultsBridge.registerDialog(metaResultsDialog);
-    
-    metaResultsDialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
-      const msg = JSON.parse(arg.message || "{}");
-      
-      if (msg.action === "ready" || msg.action === "requestData") {
-        sendMetaBundle();
-      } else if (msg.action === "changeEffectMeasure") {
-        var nextM = msg.effectMeasure || (msg.data && msg.data.effectMeasure);
-        recalculateMetaWithMeasure(nextM);
-      } else if (msg.action === "syncMetaSpec" && msg.spec) {
-        try { sessionStorage.setItem("metaModelSpec", JSON.stringify(msg.spec)); } catch (_e) {}
-      } else if (msg.action === "close" || msg.action === "closeDialog") {
-        try { metaResultsDialog.close(); } catch (_e) {}
-        metaResultsDialog = null;
-        if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
-      }
-    });
-    
-    metaResultsDialog.addEventHandler(Office.EventType.DialogEventReceived, (arg) => {
-      if (arg.error === 12006) metaResultsDialog = null;
-      if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
-    });
-  });
-}
-
-function sendMetaBundle() {
-  if (!metaResultsDialog) return;
-  
-  const bundleStr = sessionStorage.getItem("metaBundle");
-  if (!bundleStr) return;
-  
-  metaResultsDialog.messageChild(JSON.stringify({
-    type: "META_BUNDLE",
-    payload: JSON.parse(bundleStr)
-  }));
-}
-
-function recalculateMetaWithMeasure(effectMeasure) {
-  if (!effectMeasure) return;
-  let spec = {};
-  try { spec = JSON.parse(sessionStorage.getItem("metaModelSpec") || "{}"); } catch (_e) {}
-  spec = Object.assign({}, spec, { effectMeasure: effectMeasure });
-  sessionStorage.setItem("metaModelSpec", JSON.stringify(spec));
-
-  let headers = null, rows = null;
-  try {
-    const src = JSON.parse(sessionStorage.getItem("metaSource") || "null");
-    if (src && src.headers && src.rows) { headers = src.headers; rows = src.rows; }
-  } catch (_e2) {}
-  if (!headers) {
-    const range = getMetaRangeValues();
-    if (!range) return;
-    headers = range.values[0];
-    rows = range.values.slice(1);
+    if (effectType === 'binary') {
+      return [
+        { value: 'rr', label: 'Risk ratio' },
+        { value: 'or', label: 'Odds ratio' },
+        { value: 'rd', label: 'Risk difference' }
+      ];
+    }
+    return [];
   }
-
-  const bundle = buildMetaBundle(headers, rows, spec);
-  if (bundle.error) {
-    alert("Error: " + bundle.error);
-    return;
-  }
-  bundle.source = { headers: headers, rows: rows };
-  try { sessionStorage.setItem("metaSource", JSON.stringify(bundle.source)); } catch (_e3) {}
-  sessionStorage.setItem("metaBundle", JSON.stringify(bundle));
-  sendMetaBundle();
-}
-
-function resetMetaModel() {
-  sessionStorage.removeItem("metaModelSpec");
-  updateButtonState();
-}
-
-function updateButtonState() {
-  const spec = sessionStorage.getItem("metaModelSpec");
-  const hasSpec = !!spec;
-  
-  const openBtn = document.getElementById("openMetaBuilder");
-  const resetBtn = document.getElementById("resetMetaModelBtn");
-  
-  if (openBtn) {
-    openBtn.textContent = hasSpec ? "✓ Reconfigure Meta-Analysis" : "Configure Meta-Analysis";
-  }
-  
-  if (resetBtn) {
-    resetBtn.style.display = hasSpec ? "inline-block" : "none";
-  }
-}
-
-(function (hubKey, fn) {
-  window.StatisticoHubResults = window.StatisticoHubResults || {};
-  window.StatisticoHubResults[hubKey] = function () {
-    var gr = window.StatisticoGlobalRange && window.StatisticoGlobalRange.load();
-    if (!gr || !gr.values || gr.values.length < 2) return false;
-    return fn(gr);
-  };
-})('meta-analysis', function (gr) {
-  var spec = {};
-  try { spec = JSON.parse(sessionStorage.getItem('metaModelSpec') || '{}'); } catch (_e) {}
-  var bundle = buildMetaBundle(gr.values[0], gr.values.slice(1), spec);
-  if (bundle.error) {
-    alert('Error: ' + bundle.error);
-    return false;
-  }
-  bundle.source = { headers: gr.values[0], rows: gr.values.slice(1) };
-  try { sessionStorage.setItem('metaSource', JSON.stringify(bundle.source)); } catch (_e) {}
-  openMetaResultsDialog(bundle);
-  return true;
-});
+};
+})(typeof window !== 'undefined' ? window : this);

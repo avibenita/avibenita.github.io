@@ -214,6 +214,10 @@
     .meta-measure-row label, .meta-subopt-row label {
       font-size: 10.5px; font-weight: 700; color: var(--cfg-text2); white-space: nowrap;
     }
+    .meta-measure-hint {
+      font-size: 10.5px; line-height: 1.4; color: var(--cfg-text3);
+      padding: 0 2px 2px; flex-shrink: 0;
+    }
     .meta-select {
       flex: 1; min-width: 140px; padding: 6px 8px; border-radius: 7px;
       border: 1px solid var(--cfg-border); background: var(--cfg-surface2, #1c2333);
@@ -451,10 +455,11 @@
 
           <div class="meta-measure-row">
             <label for="effectMeasure" class="lbl-with-tip">Effect measure
-              <span class="info-icon" tabindex="0">i<span class="tip">How each study’s result is expressed. Continuous: Hedges’ g, mean difference, or ratio of means. Binary: OR, RR, or RD. Precomputed: paste an already-computed effect on the chosen scale.</span></span>
+              <span class="info-icon" tabindex="0">i<span class="tip"><b>Hedges’ g:</b> same construct, different scales (default for continuous).<br/><b>Mean difference:</b> every study shares the same measurement scale.<br/><b>Cohen’s d:</b> uncorrected SMD.<br/><b>Binary default:</b> risk ratio (easier to interpret than OR).</span></span>
             </label>
             <select id="effectMeasure" class="meta-select" aria-label="Effect measure"></select>
           </div>
+          <div class="meta-measure-hint" id="effectMeasureHint"></div>
           <div class="meta-subopt-row" id="binaryFormatRow" style="display:none;">
             <label class="lbl-with-tip">Count format
               <span class="info-icon" tabindex="0">i<span class="tip"><b>Events + total N</b> is preferred when you have group sizes. <b>Events + non-events</b> is equivalent if totals are complete (events + non-events = N).</span></span>
@@ -594,12 +599,13 @@
     var MEASURES = {
       continuous: [
         { value: 'smd', label: "Hedges' g (SMD)" },
+        { value: 'cohend', label: "Cohen's d" },
         { value: 'md', label: 'Mean difference' },
         { value: 'rom', label: 'Ratio of means (log)' }
       ],
       binary: [
-        { value: 'or', label: 'Odds ratio' },
         { value: 'rr', label: 'Risk ratio' },
+        { value: 'or', label: 'Odds ratio' },
         { value: 'rd', label: 'Risk difference' }
       ],
       direct: [
@@ -609,6 +615,20 @@
         { value: 'smd', label: "Standardized mean difference" },
         { value: 'fisherz', label: "Fisher's z" }
       ]
+    };
+
+    var MEASURE_HINTS = {
+      continuous: {
+        smd: "Hedges’ g: use when studies measure the same construct on different scales (default).",
+        cohend: "Cohen’s d: uncorrected standardized mean difference (no small-sample correction).",
+        md: "Mean difference: use when every study uses the same measurement scale.",
+        rom: "Ratio of means (log): relative change; means should be positive."
+      },
+      binary: {
+        rr: "Risk ratio: default — usually easiest to interpret for trials and cohorts.",
+        or: "Odds ratio: common for case–control designs and logistic settings.",
+        rd: "Risk difference: absolute difference in event rates."
+      }
     };
 
     function zoneDefsForType() {
@@ -843,11 +863,19 @@
       var opts = MEASURES[effectType] || [];
       var keep = opts.some(function (o) { return o.value === effectMeasure; });
       if (!keep) {
-        effectMeasure = opts[0] ? opts[0].value : 'smd';
+        if (effectType === 'binary') effectMeasure = 'rr';
+        else if (effectType === 'continuous') effectMeasure = 'smd';
+        else effectMeasure = opts[0] ? opts[0].value : 'generic';
       }
       sel.innerHTML = opts.map(function (o) {
         return '<option value="' + o.value + '"' + (o.value === effectMeasure ? ' selected' : '') + '>' + o.label + '</option>';
       }).join('');
+      var hint = qs('effectMeasureHint');
+      if (hint) {
+        var map = MEASURE_HINTS[effectType] || {};
+        hint.textContent = map[effectMeasure] || '';
+        hint.style.display = hint.textContent ? '' : 'none';
+      }
       var binRow = qs('binaryFormatRow');
       var uncRow = qs('uncertaintyRow');
       if (binRow) binRow.style.display = effectType === 'binary' ? 'flex' : 'none';
@@ -1226,7 +1254,7 @@
         assignments.n2Col = find(['n2', 'n_c', 'nc', 'n_ctrl', 'controln', 'samplesize2', 'size2']);
       } else if (eventsTx && totalTx) {
         effectType = 'binary';
-        effectMeasure = 'or';
+        effectMeasure = 'rr';
         binaryFormat = 'events_total';
         assignments.aCol = eventsTx;
         assignments.n1Col = totalTx;
@@ -1256,8 +1284,8 @@
     function setEffectType(type, skipRender) {
       if (!MEASURES[type]) return;
       effectType = type;
-      if (type === 'continuous' && !['smd', 'md', 'rom'].includes(effectMeasure)) effectMeasure = 'smd';
-      if (type === 'binary' && !['or', 'rr', 'rd'].includes(effectMeasure)) effectMeasure = 'or';
+      if (type === 'continuous' && !['smd', 'cohend', 'md', 'rom'].includes(effectMeasure)) effectMeasure = 'smd';
+      if (type === 'binary' && !['or', 'rr', 'rd'].includes(effectMeasure)) effectMeasure = 'rr';
       if (type === 'direct' && !MEASURES.direct.some(function (m) { return m.value === effectMeasure; })) {
         effectMeasure = 'generic';
       }
@@ -1482,6 +1510,12 @@
       }
       qs('effectMeasure').addEventListener('change', function () {
         effectMeasure = qs('effectMeasure').value;
+        var hint = qs('effectMeasureHint');
+        if (hint) {
+          var map = MEASURE_HINTS[effectType] || {};
+          hint.textContent = map[effectMeasure] || '';
+          hint.style.display = hint.textContent ? '' : 'none';
+        }
         if (effectType === 'direct') renderZones();
         updateSummary();
         validateModel();

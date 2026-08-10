@@ -120,6 +120,55 @@
     .tab-panel { display: none; flex: 1; min-height: 0; flex-direction: column; }
     .tab-panel.active { display: flex; }
 
+    /* Persistent analysis-context bar shared by all views (fixed height; sits above scroll) */
+    .meta-context-bar {
+      flex: 0 0 52px;
+      height: 52px;
+      box-sizing: border-box;
+      display: flex; align-items: center;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-1);
+      position: relative;
+      z-index: 30;
+    }
+    .meta-context-inner {
+      display: flex; flex-wrap: nowrap; align-items: center; gap: 8px 10px;
+      width: 100%; min-width: 0; overflow: hidden;
+    }
+    .meta-context-bar.is-updating .meta-context-inner { opacity: .35; pointer-events: none; }
+    .meta-context-updating {
+      display: none;
+      position: absolute; inset: 0;
+      align-items: center; justify-content: center; gap: 8px;
+      font-size: 13px; font-weight: 650; color: var(--accent-meta);
+      background: rgba(15, 23, 42, .55);
+      z-index: 2;
+    }
+    .meta-context-bar.is-updating .meta-context-updating { display: flex; }
+    :root[data-theme="light"] .meta-context-updating {
+      background: rgba(248, 250, 252, .72); color: #3730a3;
+    }
+    .meta-context-warn {
+      display: none;
+      flex-shrink: 0;
+      margin: 0; padding: 8px 12px;
+      font-size: 12.5px; line-height: 1.4; color: #fde68a;
+      background: rgba(251,191,36,.12); border-bottom: 1px solid rgba(251,191,36,.35);
+    }
+    .meta-context-warn.show { display: block; }
+    .cfg-contrast-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      margin-left: auto; flex-shrink: 1; min-width: 0;
+      font-size: 12px; font-weight: 600; color: var(--text-muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      cursor: help;
+    }
+    .cfg-studies {
+      font-size: 14.5px; color: var(--text-secondary); white-space: nowrap;
+    }
+    .cfg-studies strong { color: var(--accent-1); font-weight: 700; }
+
     .config-panel {
       background: var(--surface-1);
       border: 1px solid var(--border);
@@ -128,9 +177,10 @@
       margin-bottom: 10px;
       flex-shrink: 0;
     }
-    .config-row {
+    .config-row, .meta-context-inner {
       display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
     }
+    .meta-context-inner { flex-wrap: nowrap; }
     .config-section { display: contents; }
     .section-title {
       font-size: 12.5px; font-weight: 700; letter-spacing: .5px;
@@ -194,7 +244,11 @@
       background: rgba(67,56,202,.12); color: #1e1b4b;
     }
     .cfg-measure-locked {
-      font-size: 12px; color: var(--text-muted); font-weight: 600;
+      display: inline-flex; align-items: center;
+      padding: 6px 12px; border-radius: 999px;
+      border: 1px solid rgba(148,163,184,.45);
+      background: rgba(148,163,184,.16);
+      font-size: 13px; font-weight: 700; color: var(--text-secondary);
     }
 
     .results-panel {
@@ -554,31 +608,39 @@
 
   <div class="right-col">
     <div id="header-container"></div>
+
+    <div class="meta-context-bar" id="metaContextBar">
+      <div class="meta-context-updating" id="metaUpdating" aria-live="polite">
+        <i class="fa-solid fa-spinner fa-spin"></i> Updating analysis…
+      </div>
+      <div class="meta-context-inner">
+        <span class="section-title">Model</span>
+        <span class="pill" id="cfgModel">—</span>
+        <span class="config-sep" aria-hidden="true"></span>
+        <span class="section-title">Effect measure</span>
+        <div class="cfg-measure-dd" id="cfgEffectMeasureWrap">
+          <button type="button" class="cfg-measure-btn" id="cfgEffectMeasureBtn" aria-haspopup="listbox" aria-expanded="false">
+            <span id="cfgEffectMeasureLabel">—</span><span class="caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="cfg-measure-menu" id="cfgEffectMeasureMenu" role="listbox"></div>
+        </div>
+        <span class="cfg-measure-locked" id="cfgEffectLocked" style="display:none;"></span>
+        <span class="config-sep" aria-hidden="true"></span>
+        <span class="cfg-studies">Studies: <strong id="cfgK">—</strong></span>
+        <span class="cfg-contrast-chip" id="cfgContrastChip" title="Treatment − Control; outcome direction from Input">
+          <span id="cfgContrastLabel">Treatment − Control</span>
+          <span class="info-icon" tabindex="0">i<span class="tip" id="cfgContrastTip">Treatment − Control; lower values indicate treatment benefit when the outcome is coded lower-is-better.</span></span>
+        </span>
+      </div>
+    </div>
+    <div class="meta-context-warn" id="metaContextWarn" role="status"></div>
+
     <div class="results-container">
       <div id="loadingState" class="loading-state">
         <i class="fa-solid fa-spinner fa-spin"></i> Loading meta-analysis results…
       </div>
 
       <div id="tab-summary" class="tab-panel">
-        <div class="config-panel">
-          <div class="config-row">
-            <span class="section-title">Model</span>
-            <span class="pill" id="cfgModel">—</span>
-            <span class="config-sep" aria-hidden="true"></span>
-            <span class="section-title">Effect measure</span>
-            <div class="cfg-measure-dd" id="cfgEffectMeasureWrap">
-              <button type="button" class="cfg-measure-btn" id="cfgEffectMeasureBtn" aria-haspopup="listbox" aria-expanded="false">
-                <span id="cfgEffectMeasureLabel">—</span><span class="caret" aria-hidden="true">▾</span>
-              </button>
-              <div class="cfg-measure-menu" id="cfgEffectMeasureMenu" role="listbox"></div>
-            </div>
-            <span class="cfg-measure-locked" id="cfgEffectLocked" style="display:none;"></span>
-            <span class="config-sep" aria-hidden="true"></span>
-            <span class="section-title">Studies</span>
-            <span class="meta-kv">k = <strong id="cfgK">—</strong></span>
-          </div>
-        </div>
-
         <div class="results-panel">
           <div class="pooled-card" id="pooledCard">
             <div class="pooled-card-title">Pooled effect</div>
@@ -799,6 +861,8 @@
     var metaBundle = null;
     var metaSourceCache = null;
     var measureMenuOpen = false;
+    var activeTabName = 'summary';
+    var pendingKeepTab = null;
     var TITLE_MAP = {
       summary: 'Summary',
       forest: 'Forest Plot',
@@ -947,17 +1011,56 @@
     }
 
     function switchTab(tabName) {
+      activeTabName = tabName || 'summary';
       document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
       document.querySelectorAll('.sb-item[data-tab]').forEach(function (btn) {
-        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === activeTabName);
       });
-      var panel = document.getElementById('tab-' + tabName);
+      var panel = document.getElementById('tab-' + activeTabName);
       if (panel) panel.classList.add('active');
       if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader.updateTitle === 'function') {
-        StatisticoHeader.updateTitle(TITLE_MAP[tabName] || 'Meta-Analysis');
+        StatisticoHeader.updateTitle(TITLE_MAP[activeTabName] || 'Meta-Analysis');
       }
-      if (tabName === 'forest' && metaBundle) setTimeout(function () { renderForestPlot(metaBundle); }, 40);
-      if (tabName === 'bias' && metaBundle) setTimeout(function () { renderFunnelPlot(metaBundle); }, 40);
+      if (activeTabName === 'forest' && metaBundle) setTimeout(function () { renderForestPlot(metaBundle); }, 40);
+      if (activeTabName === 'bias' && metaBundle) setTimeout(function () { renderFunnelPlot(metaBundle); }, 40);
+    }
+
+    function setUpdating(on) {
+      var bar = document.getElementById('metaContextBar');
+      if (bar) bar.classList.toggle('is-updating', !!on);
+    }
+
+    function setContextWarn(msg) {
+      var el = document.getElementById('metaContextWarn');
+      if (!el) return;
+      if (msg) {
+        el.textContent = msg;
+        el.classList.add('show');
+      } else {
+        el.textContent = '';
+        el.classList.remove('show');
+      }
+    }
+
+    function syncContrastChip(bundle) {
+      var tip = document.getElementById('cfgContrastTip');
+      var label = document.getElementById('cfgContrastLabel');
+      var chip = document.getElementById('cfgContrastChip');
+      if (!tip || !label) return;
+      var better = outcomeBetterOf(bundle);
+      var short = better === 'lower'
+        ? 'Treatment − Control; lower values indicate treatment benefit'
+        : 'Treatment − Control; higher values indicate treatment benefit';
+      label.textContent = short;
+      tip.textContent = short +
+        '. Outcome direction is set in Input and affects favor labels only — effect sizes are never sign-flipped.';
+      if (chip) chip.title = short;
+    }
+
+    function countDroppedStudies(source, bundle) {
+      if (!source || !source.rows || !bundle) return 0;
+      var used = (bundle.studies && bundle.studies.length) || bundle.k || 0;
+      return Math.max(0, source.rows.length - used);
     }
 
     function updateCiBar(bundle) {
@@ -1191,12 +1294,18 @@
         syncEffectMeasureControl(metaBundle);
         return;
       }
+      var keepTab = activeTabName || 'summary';
+      pendingKeepTab = keepTab;
       var spec = Object.assign({}, metaBundle.spec || {}, { effectMeasure: nextMeasure });
       var source = resolveSource(metaBundle);
+      setUpdating(true);
+      setContextWarn('');
 
       function applyBundle(next) {
+        setUpdating(false);
         if (!next || next.error) {
-          alert((next && next.error) || 'Could not recalculate with that effect measure.');
+          pendingKeepTab = null;
+          setContextWarn((next && next.error) || 'Could not recalculate with that effect measure.');
           syncEffectMeasureControl(metaBundle);
           return;
         }
@@ -1208,21 +1317,28 @@
           if (metaSourceCache) sessionStorage.setItem('metaSource', JSON.stringify(metaSourceCache));
         } catch (_e2) {}
         sendParent('syncMetaSpec', { spec: spec });
-        populateResults(next);
-        var active = document.querySelector('.sb-item.active');
-        var tab = active && active.getAttribute('data-tab');
-        if (tab === 'forest') setTimeout(function () { renderForestPlot(next); }, 40);
-        if (tab === 'bias') setTimeout(function () { renderFunnelPlot(next); }, 40);
+        var dropped = countDroppedStudies(source, next);
+        populateResults(next, { keepTab: keepTab });
+        pendingKeepTab = null;
+        if (dropped > 0) {
+          setContextWarn(dropped + ' stud' + (dropped === 1 ? 'y was' : 'ies were') +
+            ' excluded for this effect measure (missing or invalid inputs).');
+        } else if (next.k < 2) {
+          setContextWarn('Fewer than 2 studies remain for this effect measure — pooled results may be unreliable.');
+        }
+        if (keepTab === 'forest') setTimeout(function () { renderForestPlot(next); }, 40);
+        if (keepTab === 'bias') setTimeout(function () { renderFunnelPlot(next); }, 40);
       }
 
       if (source && typeof MetaEngine !== 'undefined' && typeof MetaEngine.buildMetaBundle === 'function') {
-        applyBundle(MetaEngine.buildMetaBundle(source.headers, source.rows, spec));
+        setTimeout(function () {
+          applyBundle(MetaEngine.buildMetaBundle(source.headers, source.rows, spec));
+        }, 120);
         return;
       }
 
       // Fallback: ask Excel host / taskpane to rebuild and push META_BUNDLE
       sendParent('changeEffectMeasure', { effectMeasure: nextMeasure, spec: spec });
-      // Optimistic label update while waiting for parent reply
       var lbl = document.getElementById('cfgEffectMeasureLabel');
       if (lbl) {
         var opts = (typeof MetaEngine !== 'undefined' && MetaEngine.measuresFor)
@@ -1230,20 +1346,35 @@
         var hit = opts.find(function (o) { return o.value === nextMeasure; });
         if (hit) lbl.textContent = hit.label;
       }
+      setTimeout(function () {
+        if (pendingKeepTab) {
+          setUpdating(false);
+          pendingKeepTab = null;
+        }
+      }, 4000);
     }
 
-    function populateResults(bundle) {
+    function populateResults(bundle, opts) {
+      opts = opts || {};
       metaBundle = bundle;
       window.metaBundle = bundle;
       resolveSource(bundle);
       document.getElementById('loadingState').style.display = 'none';
-      document.getElementById('tab-summary').classList.add('active');
+      setUpdating(false);
 
       var ml = modelLabel(bundle);
       var et = effectTypeLabel(bundle.spec);
       document.getElementById('cfgModel').textContent = ml;
-      document.getElementById('cfgK').textContent = bundle.k;
+      document.getElementById('cfgK').textContent = String(bundle.k);
       syncEffectMeasureControl(bundle);
+      syncContrastChip(bundle);
+
+      var keepTab = opts.keepTab || pendingKeepTab || activeTabName;
+      if (!document.querySelector('.tab-panel.active') && !opts.keepTab && !pendingKeepTab) {
+        keepTab = 'summary';
+      }
+      pendingKeepTab = null;
+      switchTab(keepTab);
 
       var better = outcomeBetterOf(bundle);
       var arm = favoredArm(bundle.pooled.effect, better);

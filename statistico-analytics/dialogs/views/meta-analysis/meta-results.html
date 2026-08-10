@@ -261,6 +261,53 @@
     }
     .interpretation strong { color: var(--accent-1); }
 
+    .interp-card {
+      margin: 10px 0 8px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(129,140,248,.35);
+      background: linear-gradient(180deg, rgba(129,140,248,.12), rgba(129,140,248,.05));
+    }
+    :root[data-theme="light"] .interp-card {
+      background: linear-gradient(180deg, rgba(79,70,229,.08), rgba(79,70,229,.03));
+      border-color: rgba(79,70,229,.28);
+    }
+    .interp-card-title {
+      font-size: 11px; font-weight: 800; letter-spacing: .06em;
+      text-transform: uppercase; color: var(--accent-meta);
+      margin-bottom: 8px;
+    }
+    .interp-narrative {
+      font-size: 13px; line-height: 1.55; color: var(--text-secondary);
+      margin-bottom: 10px;
+    }
+    .interp-narrative strong { color: var(--accent-1); }
+    .interp-triad {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    }
+    @media (max-width: 720px) {
+      .interp-triad { grid-template-columns: 1fr; }
+    }
+    .interp-item {
+      background: rgba(0,0,0,.18);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+    :root[data-theme="light"] .interp-item {
+      background: rgba(15,23,42,.03);
+      border-color: var(--border);
+    }
+    .interp-k {
+      font-size: 9.5px; font-weight: 700; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .interp-v {
+      font-size: 12px; font-weight: 600; line-height: 1.35;
+      color: var(--text-primary);
+    }
+
     #forestPlot, #funnelPlot { min-height: 420px; width: 100%; }
 
     .studies-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -361,6 +408,26 @@
           <div class="result-main" id="resultMain">—</div>
           <div class="result-sub" id="resultSub">Pooled effect · 95% CI</div>
           <div class="result-direction" id="resultDirection"></div>
+
+          <div class="interp-card" id="interpCard">
+            <div class="interp-card-title">Interpretation</div>
+            <div class="interp-narrative" id="interpNarrative">—</div>
+            <div class="interp-triad">
+              <div class="interp-item">
+                <div class="interp-k">Magnitude &amp; direction</div>
+                <div class="interp-v" id="interpMag">—</div>
+              </div>
+              <div class="interp-item">
+                <div class="interp-k">Certainty</div>
+                <div class="interp-v" id="interpCert">—</div>
+              </div>
+              <div class="interp-item">
+                <div class="interp-k">Consistency</div>
+                <div class="interp-v" id="interpCons">—</div>
+              </div>
+            </div>
+          </div>
+
           <div class="confidence-bar-container" id="ciBarWrap">
             <div class="zero-line" id="zeroLine" style="display:none;"></div>
             <div class="confidence-bar" id="ciBar"></div>
@@ -376,7 +443,6 @@
             <div class="stat-box"><div class="label">τ²</div><div class="value" id="tileTau2">—</div></div>
             <div class="stat-box"><div class="label">Studies (k)</div><div class="value" id="tileK">—</div></div>
           </div>
-          <div class="interpretation" id="interpretationText">—</div>
         </div>
       </div>
 
@@ -503,44 +569,87 @@
       return dir === 'control' ? 'control' : 'treatment';
     }
 
-    function buildInterpretation(bundle, et, favor) {
+    function favoredArm(effect, positiveFavors) {
+      if (!effect) return null;
+      if (positiveFavors === 'treatment') return effect > 0 ? 'treatment' : 'control';
+      if (positiveFavors === 'control') return effect > 0 ? 'control' : 'treatment';
+      return effect > 0 ? 'positive' : 'negative';
+    }
+
+    function magnitudeBand(bundle, et) {
+      var absG = Math.abs(bundle.pooled.effect);
+      var isSmd = et.indexOf('SMD') >= 0 || et.indexOf('Hedges') >= 0 ||
+        (bundle.spec && bundle.spec.effectMeasure === 'smd');
+      if (isSmd) {
+        // Cohen-ish bands; ~0.4 reads as moderate in this module
+        if (absG < 0.2) return { key: 'small', label: 'small standardized difference' };
+        if (absG < 0.5) return { key: 'moderate', label: 'moderate standardized difference' };
+        if (absG < 0.8) return { key: 'moderate-large', label: 'moderate-to-large standardized difference' };
+        return { key: 'large', label: 'large standardized difference' };
+      }
+      return { key: 'effect', label: et + ' of ' + fmt(bundle.pooled.effect) };
+    }
+
+    function buildInterpretationCard(bundle, et, positiveFavors) {
       var k = bundle.k;
-      var g = fmt(bundle.pooled.effect);
+      var e = bundle.pooled.effect;
+      var g = fmt(e);
       var lo = fmt(bundle.pooled.ciLower);
       var hi = fmt(bundle.pooled.ciUpper);
       var i2 = bundle.heterogeneity.I2;
-      var sig = bundle.pooled.p < 0.05;
-      var e = bundle.pooled.effect;
-      // favor = arm that positive values favor
-      var favors;
-      if (!e) favors = 'was near no difference';
-      else if (favor === 'treatment') favors = e > 0 ? 'favored treatment' : 'favored control';
-      else if (favor === 'control') favors = e > 0 ? 'favored control' : 'favored treatment';
-      else favors = e > 0 ? 'was positive' : 'was negative';
+      var tau2 = bundle.heterogeneity.tau2;
+      var excludesNull = bundle.pooled.ciLower > 0 || bundle.pooled.ciUpper < 0;
+      var arm = favoredArm(e, positiveFavors);
+      var mag = magnitudeBand(bundle, et);
 
-      var absG = Math.abs(e);
-      var mag;
-      if (et.indexOf('SMD') >= 0 || et.indexOf('Hedges') >= 0) {
-        var band = absG < 0.2 ? 'small' : absG < 0.5 ? 'small-to-moderate' : absG < 0.8 ? 'moderate' : 'large';
-        mag = ' a ' + band + ' standardized difference';
+      var magLine;
+      if (arm === 'treatment' || arm === 'control') {
+        if (mag.key === 'moderate-large') magLine = 'moderate-to-large effect favoring ' + arm;
+        else if (mag.key === 'effect') magLine = 'pooled effect favoring ' + arm;
+        else magLine = mag.key + ' effect favoring ' + arm;
       } else {
-        mag = ' a pooled ' + et;
+        magLine = mag.label + ' in the ' + (e < 0 ? 'negative' : e > 0 ? 'positive' : 'null') + ' direction';
       }
-      var html = 'Across ' + k + ' studies, the pooled effect ' + favors + ', with' + mag +
-        ' of ' + g + ' (95% CI [' + lo + ', ' + hi + ']). ';
-      html += sig
-        ? 'The confidence interval excludes no effect (<strong>p ' + fmtP(bundle.pooled.p) + '</strong>). '
-        : 'The confidence interval includes no effect (<strong>p = ' + fmt(bundle.pooled.p) + '</strong>). ';
+
+      var certLine = excludesNull
+        ? '95% CI excludes no effect'
+        : '95% CI includes no effect';
+
+      var consLine;
       if (i2 < 25) {
-        html += 'No between-study heterogeneity was detected (I² = ' + fmt(i2, 1) +
-          '%), although this estimate is uncertain with only ' + k + ' studies.';
+        consLine = 'no heterogeneity detected; only ' + k + ' studies';
       } else if (i2 < 50) {
-        html += 'Heterogeneity was moderate (I² = ' + fmt(i2, 1) + '%).';
+        consLine = 'moderate between-study variation (I² = ' + fmt(i2, 1) + '%); k = ' + k;
       } else {
-        html += 'Heterogeneity was substantial (I² = ' + fmt(i2, 1) +
-          '%) — interpret the average effect cautiously.';
+        consLine = 'substantial between-study variation (I² = ' + fmt(i2, 1) + '%); interpret the average cautiously';
       }
-      return html;
+
+      // Narrative: interpret, don't just restate numbers; stay causal-cautious
+      var narrative;
+      if (arm === 'treatment' || arm === 'control') {
+        narrative = 'Across ' + k + ' studies, the pooled effect favored <strong>' + arm +
+          '</strong>, with a ' + mag.label + ' of ' + g +
+          ' (95% CI ' + lo + ' to ' + hi + '). ';
+      } else {
+        narrative = 'Across ' + k + ' studies, the pooled standardized mean difference was ' + g +
+          ' (95% CI ' + lo + ' to ' + hi + '), indicating a ' + mag.label +
+          ' in the ' + (e < 0 ? 'negative' : 'positive') + ' direction. ';
+      }
+      narrative += excludesNull
+        ? 'The evidence indicates a non-zero average effect (<strong>p ' + fmtP(bundle.pooled.p) + '</strong>). '
+        : 'The average effect is compatible with no difference (<strong>p = ' + fmt(bundle.pooled.p) + '</strong>). ';
+      if (i2 < 25) {
+        narrative += 'No between-study heterogeneity was detected (I² = ' + fmt(i2, 1) +
+          '%, τ² = ' + fmt(tau2) + '), although this estimate remains uncertain with only ' + k + ' studies.';
+      } else if (i2 < 50) {
+        narrative += 'Between-study variation was moderate (I² = ' + fmt(i2, 1) +
+          '%); the random-effects average should be read with that dispersion in mind.';
+      } else {
+        narrative += 'Between-study variation was substantial (I² = ' + fmt(i2, 1) +
+          '%); the pooled average may not describe every study well.';
+      }
+
+      return { narrative: narrative, mag: magLine, cert: certLine, cons: consLine };
     }
 
     function switchTab(tabName) {
@@ -718,7 +827,11 @@
       document.getElementById('tileTau2').textContent = fmt(bundle.heterogeneity.tau2);
       document.getElementById('tileK').textContent = String(bundle.k);
 
-      document.getElementById('interpretationText').innerHTML = buildInterpretation(bundle, et, favor);
+      var interp = buildInterpretationCard(bundle, et, favor);
+      document.getElementById('interpNarrative').innerHTML = interp.narrative;
+      document.getElementById('interpMag').textContent = interp.mag;
+      document.getElementById('interpCert').textContent = interp.cert;
+      document.getElementById('interpCons').textContent = interp.cons;
 
       document.getElementById('qStat').textContent = fmt(bundle.heterogeneity.Q, 2);
       document.getElementById('qDf').textContent = String(bundle.heterogeneity.df);
@@ -729,13 +842,17 @@
         fmt(bundle.heterogeneity.tau2) + ' / ' + fmt(bundle.heterogeneity.tau);
 
       var i2 = bundle.heterogeneity.I2;
-      var hetLevel = i2 < 25 ? 'low' : i2 < 50 ? 'moderate' : i2 < 75 ? 'substantial' : 'considerable';
-      var hetText = '<strong>I² = ' + fmt(i2, 1) + '%</strong> indicates <strong>' + hetLevel + ' heterogeneity</strong>. ';
-      if (i2 < 25) hetText += 'Studies are relatively homogeneous.';
-      else if (i2 < 50) hetText += 'Moderate variability across studies; random-effects is appropriate.';
-      else hetText += 'Substantial heterogeneity — consider moderators or subgroups.';
-      hetText += ' Q = ' + fmt(bundle.heterogeneity.Q, 2) + ' (df = ' + bundle.heterogeneity.df +
-        ', p ' + fmtP(bundle.heterogeneity.pQ) + ').';
+      var hetText = '<strong>I² = ' + fmt(i2, 1) + '%</strong> summarizes observed between-study variation. ';
+      if (i2 < 25) {
+        hetText += 'Little excess dispersion was detected — this does <strong>not</strong> prove the studies are homogeneous, especially with only ' +
+          bundle.k + ' studies. ';
+      } else if (i2 < 50) {
+        hetText += 'Moderate excess dispersion is present; a random-effects average is appropriate. ';
+      } else {
+        hetText += 'Substantial excess dispersion — consider moderators or subgroups; the average may not fit every study. ';
+      }
+      hetText += 'Q = ' + fmt(bundle.heterogeneity.Q, 2) + ' (df = ' + bundle.heterogeneity.df +
+        ', p ' + fmtP(bundle.heterogeneity.pQ) + '); τ² = ' + fmt(bundle.heterogeneity.tau2) + '.';
       document.getElementById('hetInterpretation').innerHTML = hetText;
 
       var bias = bundle.bias || {};
@@ -745,10 +862,13 @@
         document.getElementById('eggerT').textContent = fmt(bias.t);
         document.getElementById('eggerP').textContent = fmtP(bias.p);
         document.getElementById('eggerN').textContent = String(bias.n || bundle.k);
-        document.getElementById('eggerStatus').textContent = bias.p < 0.05 ? 'Asymmetry' : 'OK';
+        document.getElementById('eggerStatus').textContent = bias.p < 0.05 ? 'Asymmetry' : 'Inconclusive';
         document.getElementById('biasInterpretation').innerHTML = bias.p < 0.05
-          ? "Egger's test is <strong>significant</strong> (p " + fmtP(bias.p) + '), suggesting possible small-study / publication bias.'
-          : "Egger's test is <strong>not significant</strong> (p = " + fmt(bias.p) + '). No strong funnel asymmetry from this test alone.';
+          ? "Egger's test is <strong>significant</strong> (p " + fmtP(bias.p) +
+            '), suggesting possible small-study effects. This does not prove publication bias.'
+          : "Egger's test is <strong>not significant</strong> (p = " + fmt(bias.p) +
+            '). With ' + (bias.n || bundle.k) +
+            ' studies this test is often inconclusive — do not treat a non-significant result as “no publication bias.”';
       } else {
         ['eggerIntercept', 'eggerSE', 'eggerT', 'eggerP', 'eggerN'].forEach(function (id) {
           document.getElementById(id).textContent = '—';

@@ -516,7 +516,8 @@ function openMetaResultsDialog(bundle) {
         sendMetaBundle();
       } else if (msg.action === "changeEffectMeasure") {
         var nextM = msg.effectMeasure || (msg.data && msg.data.effectMeasure);
-        recalculateMetaWithMeasure(nextM);
+        var nextSpec = msg.spec || (msg.data && msg.data.spec) || null;
+        recalculateMetaWithMeasure(nextM, nextSpec);
       } else if (msg.action === "syncMetaSpec" && msg.spec) {
         try { sessionStorage.setItem("metaModelSpec", JSON.stringify(msg.spec)); } catch (_e) {}
       } else if (msg.action === "close" || msg.action === "closeDialog") {
@@ -538,18 +539,29 @@ function sendMetaBundle() {
   
   const bundleStr = sessionStorage.getItem("metaBundle");
   if (!bundleStr) return;
+  let payload = null;
+  try { payload = JSON.parse(bundleStr); } catch (_e) { return; }
+  if (!payload.source) {
+    try {
+      const src = JSON.parse(sessionStorage.getItem("metaSource") || "null");
+      if (src && src.headers && src.rows) payload.source = src;
+    } catch (_e2) {}
+  }
   
   metaResultsDialog.messageChild(JSON.stringify({
     type: "META_BUNDLE",
-    payload: JSON.parse(bundleStr)
+    payload: payload
   }));
 }
 
-function recalculateMetaWithMeasure(effectMeasure) {
-  if (!effectMeasure) return;
+function recalculateMetaWithMeasure(effectMeasure, incomingSpec) {
+  if (!effectMeasure && !(incomingSpec && incomingSpec.effectMeasure)) return;
   let spec = {};
   try { spec = JSON.parse(sessionStorage.getItem("metaModelSpec") || "{}"); } catch (_e) {}
-  spec = Object.assign({}, spec, { effectMeasure: effectMeasure });
+  if (incomingSpec && typeof incomingSpec === "object") {
+    spec = Object.assign({}, spec, incomingSpec);
+  }
+  if (effectMeasure) spec.effectMeasure = effectMeasure;
   sessionStorage.setItem("metaModelSpec", JSON.stringify(spec));
 
   let headers = null, rows = null;
@@ -558,8 +570,20 @@ function recalculateMetaWithMeasure(effectMeasure) {
     if (src && src.headers && src.rows) { headers = src.headers; rows = src.rows; }
   } catch (_e2) {}
   if (!headers) {
+    try {
+      const prev = JSON.parse(sessionStorage.getItem("metaBundle") || "null");
+      if (prev && prev.source && prev.source.headers && prev.source.rows) {
+        headers = prev.source.headers;
+        rows = prev.source.rows;
+      }
+    } catch (_e2b) {}
+  }
+  if (!headers) {
     const range = getMetaRangeValues();
-    if (!range) return;
+    if (!range) {
+      console.warn("[meta] recalculateMetaWithMeasure: no source data");
+      return;
+    }
     headers = range.values[0];
     rows = range.values.slice(1);
   }

@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260810-metachrome4"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
   <script src="../shared-header.js?v=20260810-metachrome4"></script>
-  <script src="meta-engine.js?v=20260810measure1"></script>
+  <script src="meta-engine.js?v=20260810measure2"></script>
   <style>
     :root {
       /* Deeper page vs lighter panels for clearer separation */
@@ -151,25 +151,47 @@
     .config-sep {
       width: 1px; height: 22px; background: var(--border); flex-shrink: 0;
     }
-    .cfg-measure-select {
-      appearance: none; -webkit-appearance: none;
-      padding: 5px 28px 5px 12px; border-radius: 999px;
-      border: 1px solid rgba(165,180,252,.5);
-      background: rgba(129,140,248,.22)
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23a5b4fc' d='M1 1l5 5 5-5'/%3E%3C/svg%3E")
-        no-repeat right 10px center;
-      color: var(--accent-meta); font-size: 13.5px; font-weight: 700;
-      cursor: pointer; max-width: min(260px, 100%);
+    .cfg-measure-dd { position: relative; flex-shrink: 0; }
+    .cfg-measure-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 12px; border-radius: 999px;
+      border: 1px solid rgba(165,180,252,.55);
+      background: rgba(129,140,248,.28);
+      color: #e0e7ff; font-size: 13.5px; font-weight: 700;
+      cursor: pointer; max-width: min(280px, 100%);
     }
-    .cfg-measure-select:disabled {
-      opacity: .85; cursor: default;
-      padding-right: 12px;
-      background-image: none;
+    .cfg-measure-btn:hover { background: rgba(129,140,248,.4); color: #fff; }
+    .cfg-measure-btn .caret { font-size: 10px; opacity: .85; }
+    .cfg-measure-btn[disabled] { opacity: .75; cursor: default; }
+    .cfg-measure-menu {
+      display: none; position: absolute; left: 0; top: calc(100% + 6px);
+      min-width: 100%; width: max-content; max-width: 320px;
+      background: #0f172a; border: 1px solid rgba(165,180,252,.45);
+      border-radius: 10px; padding: 6px; z-index: 80;
+      box-shadow: 0 12px 28px rgba(0,0,0,.55);
     }
-    :root[data-theme="light"] .cfg-measure-select {
-      background-color: rgba(67,56,202,.1);
-      border-color: rgba(67,56,202,.35);
-      color: #4338ca;
+    .cfg-measure-menu.open { display: block; }
+    .cfg-measure-opt {
+      display: block; width: 100%; text-align: left;
+      border: none; background: transparent; color: #f1f5f9;
+      font-size: 13.5px; font-weight: 600; padding: 8px 10px;
+      border-radius: 7px; cursor: pointer;
+    }
+    .cfg-measure-opt:hover { background: rgba(129,140,248,.28); color: #fff; }
+    .cfg-measure-opt.active {
+      background: rgba(129,140,248,.4); color: #fff;
+    }
+    :root[data-theme="light"] .cfg-measure-btn {
+      background: rgba(67,56,202,.12); border-color: rgba(67,56,202,.4); color: #312e81;
+    }
+    :root[data-theme="light"] .cfg-measure-menu {
+      background: #ffffff; border-color: #94a3b8;
+      box-shadow: 0 10px 24px rgba(15,23,42,.18);
+    }
+    :root[data-theme="light"] .cfg-measure-opt { color: #0f172a; }
+    :root[data-theme="light"] .cfg-measure-opt:hover,
+    :root[data-theme="light"] .cfg-measure-opt.active {
+      background: rgba(67,56,202,.12); color: #1e1b4b;
     }
     .cfg-measure-locked {
       font-size: 12px; color: var(--text-muted); font-weight: 600;
@@ -537,7 +559,12 @@
             <span class="pill" id="cfgModel">—</span>
             <span class="config-sep" aria-hidden="true"></span>
             <span class="section-title">Effect measure</span>
-            <select class="cfg-measure-select" id="cfgEffectMeasure" aria-label="Effect measure"></select>
+            <div class="cfg-measure-dd" id="cfgEffectMeasureWrap">
+              <button type="button" class="cfg-measure-btn" id="cfgEffectMeasureBtn" aria-haspopup="listbox" aria-expanded="false">
+                <span id="cfgEffectMeasureLabel">—</span><span class="caret" aria-hidden="true">▾</span>
+              </button>
+              <div class="cfg-measure-menu" id="cfgEffectMeasureMenu" role="listbox"></div>
+            </div>
             <span class="cfg-measure-locked" id="cfgEffectLocked" style="display:none;"></span>
             <span class="config-sep" aria-hidden="true"></span>
             <span class="section-title">Studies</span>
@@ -759,6 +786,8 @@
 
   <script>
     var metaBundle = null;
+    var metaSourceCache = null;
+    var measureMenuOpen = false;
     var TITLE_MAP = {
       summary: 'Summary',
       forest: 'Forest Plot',
@@ -1072,10 +1101,21 @@
       } catch (_e) {}
     }
 
+    function closeMeasureMenu() {
+      measureMenuOpen = false;
+      var menu = document.getElementById('cfgEffectMeasureMenu');
+      var btn = document.getElementById('cfgEffectMeasureBtn');
+      if (menu) menu.classList.remove('open');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    }
+
     function syncEffectMeasureControl(bundle) {
-      var sel = document.getElementById('cfgEffectMeasure');
+      var wrap = document.getElementById('cfgEffectMeasureWrap');
+      var btn = document.getElementById('cfgEffectMeasureBtn');
+      var label = document.getElementById('cfgEffectMeasureLabel');
+      var menu = document.getElementById('cfgEffectMeasureMenu');
       var locked = document.getElementById('cfgEffectLocked');
-      if (!sel) return;
+      if (!wrap || !btn || !menu || !label) return;
       var spec = (bundle && bundle.spec) || {};
       var t = spec.effectType || bundle.effectType || 'continuous';
       var m = spec.effectMeasure || bundle.effectMeasure || '';
@@ -1084,70 +1124,103 @@
         : [];
 
       if (t === 'direct' || !opts.length) {
-        sel.style.display = 'none';
-        sel.disabled = true;
+        wrap.style.display = 'none';
+        btn.disabled = true;
         if (locked) {
           locked.style.display = '';
           locked.textContent = effectTypeLabel(spec) + ' — supplied by user';
         }
+        closeMeasureMenu();
         return;
       }
 
       if (locked) locked.style.display = 'none';
-      sel.style.display = '';
-      sel.disabled = false;
-      sel.innerHTML = opts.map(function (o) {
-        return '<option value="' + o.value + '"' + (o.value === m ? ' selected' : '') + '>' + o.label + '</option>';
+      wrap.style.display = '';
+      btn.disabled = false;
+      if (!opts.some(function (o) { return o.value === m; }) && opts[0]) m = opts[0].value;
+      var current = opts.find(function (o) { return o.value === m; });
+      label.textContent = current ? current.label : effectTypeLabel(spec);
+      menu.innerHTML = opts.map(function (o) {
+        return '<button type="button" class="cfg-measure-opt' + (o.value === m ? ' active' : '') +
+          '" role="option" data-value="' + o.value + '">' + o.label + '</button>';
       }).join('');
-      if (!opts.some(function (o) { return o.value === m; }) && opts[0]) {
-        sel.value = opts[0].value;
-      } else {
-        sel.value = m;
+      menu.querySelectorAll('.cfg-measure-opt').forEach(function (optBtn) {
+        optBtn.addEventListener('click', function () {
+          var val = optBtn.getAttribute('data-value');
+          closeMeasureMenu();
+          if (val) changeEffectMeasure(val);
+        });
+      });
+    }
+
+    function resolveSource(bundle) {
+      if (bundle && bundle.source && bundle.source.headers && bundle.source.rows) {
+        metaSourceCache = bundle.source;
+        return bundle.source;
       }
+      if (metaSourceCache && metaSourceCache.headers && metaSourceCache.rows) return metaSourceCache;
+      try {
+        var fromSs = JSON.parse(sessionStorage.getItem('metaSource') || 'null');
+        if (fromSs && fromSs.headers && fromSs.rows) {
+          metaSourceCache = fromSs;
+          return fromSs;
+        }
+      } catch (_e) {}
+      return null;
     }
 
     function changeEffectMeasure(nextMeasure) {
       if (!metaBundle || !nextMeasure) return;
-      var spec = Object.assign({}, metaBundle.spec || {}, { effectMeasure: nextMeasure });
-      var source = metaBundle.source;
-      if (!source || !source.headers || !source.rows) {
-        try {
-          source = JSON.parse(sessionStorage.getItem('metaSource') || 'null');
-        } catch (_e) { source = null; }
-      }
-      if (!source || !source.headers || !source.rows) {
-        // Ask parent (Excel host) to rebuild from the active range
-        sendParent('changeEffectMeasure', { effectMeasure: nextMeasure });
-        return;
-      }
-      if (typeof MetaEngine === 'undefined' || typeof MetaEngine.buildMetaBundle !== 'function') {
-        sendParent('changeEffectMeasure', { effectMeasure: nextMeasure });
-        return;
-      }
-      var next = MetaEngine.buildMetaBundle(source.headers, source.rows, spec);
-      if (next.error) {
-        alert(next.error);
+      var current = (metaBundle.spec && metaBundle.spec.effectMeasure) || metaBundle.effectMeasure;
+      if (current === nextMeasure) {
         syncEffectMeasureControl(metaBundle);
         return;
       }
-      next.source = source;
-      try {
-        sessionStorage.setItem('metaBundle', JSON.stringify(next));
-        sessionStorage.setItem('metaModelSpec', JSON.stringify(spec));
-        sessionStorage.setItem('metaSource', JSON.stringify(source));
-      } catch (_e2) {}
-      sendParent('syncMetaSpec', { spec: spec });
-      populateResults(next);
-      // Refresh open charts if user is on those tabs
-      var active = document.querySelector('.sb-item.active');
-      var tab = active && active.getAttribute('data-tab');
-      if (tab === 'forest') setTimeout(function () { renderForestPlot(next); }, 40);
-      if (tab === 'bias') setTimeout(function () { renderFunnelPlot(next); }, 40);
+      var spec = Object.assign({}, metaBundle.spec || {}, { effectMeasure: nextMeasure });
+      var source = resolveSource(metaBundle);
+
+      function applyBundle(next) {
+        if (!next || next.error) {
+          alert((next && next.error) || 'Could not recalculate with that effect measure.');
+          syncEffectMeasureControl(metaBundle);
+          return;
+        }
+        if (source) next.source = source;
+        metaSourceCache = next.source || source || metaSourceCache;
+        try {
+          sessionStorage.setItem('metaBundle', JSON.stringify(next));
+          sessionStorage.setItem('metaModelSpec', JSON.stringify(spec));
+          if (metaSourceCache) sessionStorage.setItem('metaSource', JSON.stringify(metaSourceCache));
+        } catch (_e2) {}
+        sendParent('syncMetaSpec', { spec: spec });
+        populateResults(next);
+        var active = document.querySelector('.sb-item.active');
+        var tab = active && active.getAttribute('data-tab');
+        if (tab === 'forest') setTimeout(function () { renderForestPlot(next); }, 40);
+        if (tab === 'bias') setTimeout(function () { renderFunnelPlot(next); }, 40);
+      }
+
+      if (source && typeof MetaEngine !== 'undefined' && typeof MetaEngine.buildMetaBundle === 'function') {
+        applyBundle(MetaEngine.buildMetaBundle(source.headers, source.rows, spec));
+        return;
+      }
+
+      // Fallback: ask Excel host / taskpane to rebuild and push META_BUNDLE
+      sendParent('changeEffectMeasure', { effectMeasure: nextMeasure, spec: spec });
+      // Optimistic label update while waiting for parent reply
+      var lbl = document.getElementById('cfgEffectMeasureLabel');
+      if (lbl) {
+        var opts = (typeof MetaEngine !== 'undefined' && MetaEngine.measuresFor)
+          ? MetaEngine.measuresFor(spec.effectType || 'continuous') : [];
+        var hit = opts.find(function (o) { return o.value === nextMeasure; });
+        if (hit) lbl.textContent = hit.label;
+      }
     }
 
     function populateResults(bundle) {
       metaBundle = bundle;
       window.metaBundle = bundle;
+      resolveSource(bundle);
       document.getElementById('loadingState').style.display = 'none';
       document.getElementById('tab-summary').classList.add('active');
 
@@ -1437,11 +1510,18 @@
         setTimeout(bootHeader, 600);
       }
 
-      var measureSel = document.getElementById('cfgEffectMeasure');
-      if (measureSel) {
-        measureSel.addEventListener('change', function () {
-          changeEffectMeasure(measureSel.value);
+      var measureBtn = document.getElementById('cfgEffectMeasureBtn');
+      var measureMenu = document.getElementById('cfgEffectMeasureMenu');
+      if (measureBtn && measureMenu) {
+        measureBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (measureBtn.disabled) return;
+          measureMenuOpen = !measureMenuOpen;
+          measureMenu.classList.toggle('open', measureMenuOpen);
+          measureBtn.setAttribute('aria-expanded', measureMenuOpen ? 'true' : 'false');
         });
+        document.addEventListener('click', function () { closeMeasureMenu(); });
+        measureMenu.addEventListener('click', function (e) { e.stopPropagation(); });
       }
 
       /* Fixed-position tips so overflow:hidden panels do not clip them */

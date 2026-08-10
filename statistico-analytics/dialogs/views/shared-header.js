@@ -517,7 +517,9 @@ const StatisticoHeader = {
       'marginal-means': 'Marginal Means',
       'diagnostics': 'Diagnostics',
       'advanced': 'Advanced',
-      'model-structure': 'Model Structure'
+      'model-structure': 'Model Structure',
+      // Meta-analysis
+      'meta-analysis': 'Meta-Analysis'
     };
 
     const moduleNames = {

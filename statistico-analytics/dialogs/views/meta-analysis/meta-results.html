@@ -8,9 +8,9 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
   <script src="https://code.highcharts.com/highcharts.js"></script>
-  <link rel="stylesheet" href="../shared-header.css?v=20260810-metaai"/>
+  <link rel="stylesheet" href="../shared-header.css?v=20260810-metachrome2"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260810-metaai"></script>
+  <script src="../shared-header.js?v=20260810-metachrome2"></script>
   <style>
     :root {
       --surface-0: #0c1624;
@@ -44,15 +44,35 @@
       color: var(--text-primary);
       font-family: 'Segoe UI', system-ui, sans-serif;
       display: flex;
-      flex-direction: row;
+      flex-direction: column;
     }
 
     .sb-nav { --sb-accent: #818cf8; --sb-accent-soft: rgba(129,140,248,.16); }
+    .sb-layout {
+      display: flex; flex-direction: row;
+      flex: 1; min-height: 0; overflow: hidden; width: 100%;
+    }
     .right-col {
       flex: 1; min-width: 0;
       display: flex; flex-direction: column;
       overflow: hidden;
     }
+    /* Shared MODULE / title / Theme bar — must stay visible above Summary cards */
+    #header-container {
+      flex: 0 0 auto !important;
+      display: block !important;
+      min-height: 64px;
+      position: relative;
+      z-index: 20;
+    }
+    #header-container .statistico-shell,
+    #header-container .statistico-header {
+      display: flex !important;
+      visibility: visible !important;
+    }
+    /* Keep Full Analysis + Utilities pinned to sidebar bottom */
+    #sidebarNav { height: 100%; min-height: 0; }
+    #sbNavFooter { margin-top: auto; flex-shrink: 0; }
 
     .results-container {
       flex: 1; min-height: 0; overflow-y: auto;
@@ -220,6 +240,7 @@
   </style>
 </head>
 <body>
+  <div class="sb-layout" id="metaLayout">
   <nav class="sb-nav" id="sidebarNav">
     <div class="sb-logo">
       <div class="sb-logo-icon" data-statistico-brand-logo></div>
@@ -237,23 +258,38 @@
         <div class="sb-items-rail">
           <button class="sb-item active" onclick="switchTab('summary')" data-tab="summary">
             <i class="fa-solid fa-chart-bar sb-item-icon"></i>
-            <span class="sb-item-label">Summary</span>
+            <span class="sb-item-copy">
+              <span class="sb-item-label">Summary</span>
+              <span class="sb-item-description">Pooled effect, CI, and interpretation.</span>
+            </span>
           </button>
           <button class="sb-item" onclick="switchTab('forest')" data-tab="forest">
             <i class="fa-solid fa-chart-simple sb-item-icon"></i>
-            <span class="sb-item-label">Forest Plot</span>
+            <span class="sb-item-copy">
+              <span class="sb-item-label">Forest Plot</span>
+              <span class="sb-item-description">Study effects with confidence intervals.</span>
+            </span>
           </button>
           <button class="sb-item" onclick="switchTab('heterogeneity')" data-tab="heterogeneity">
             <i class="fa-solid fa-chart-pie sb-item-icon"></i>
-            <span class="sb-item-label">Heterogeneity</span>
+            <span class="sb-item-copy">
+              <span class="sb-item-label">Heterogeneity</span>
+              <span class="sb-item-description">Q, I², τ² and between-study variance.</span>
+            </span>
           </button>
           <button class="sb-item" onclick="switchTab('bias')" data-tab="bias">
             <i class="fa-solid fa-triangle-exclamation sb-item-icon"></i>
-            <span class="sb-item-label">Publication Bias</span>
+            <span class="sb-item-copy">
+              <span class="sb-item-label">Publication Bias</span>
+              <span class="sb-item-description">Funnel plot and Egger's test.</span>
+            </span>
           </button>
           <button class="sb-item" onclick="switchTab('studies')" data-tab="studies">
             <i class="fa-solid fa-table sb-item-icon"></i>
-            <span class="sb-item-label">Study Details</span>
+            <span class="sb-item-copy">
+              <span class="sb-item-label">Study Details</span>
+              <span class="sb-item-description">Per-study effects, variance, and weights.</span>
+            </span>
           </button>
         </div>
       </div>
@@ -368,8 +404,9 @@
           </table>
         </div>
       </div>
-    </div>
-  </div>
+    </div><!-- /.results-container -->
+  </div><!-- /.right-col -->
+  </div><!-- /.sb-layout -->
 
   <script>
     var metaBundle = null;
@@ -770,12 +807,8 @@
       setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
     }
 
-    function bootHeader() {
-      if (!window.StatisticoHeader) return;
-      StatisticoHeader.init('meta-analysis', '', 0, 'meta-analysis');
-      StatisticoHeader.initSidebarPage();
-      StatisticoHeader.updateTitle('Summary');
-      StatisticoHeader.registerActions({
+    function metaActions() {
+      return {
         getData: function () {
           return metaBundle ? {
             headers: ['Study', 'Effect', 'Variance', 'Weight', 'WeightPct'],
@@ -792,14 +825,45 @@
           if (!metaBundle) return;
           downloadText('meta-analysis-results.json', JSON.stringify(metaBundle, null, 2), 'application/json');
         }
-      });
-      if (typeof StatisticoHeader.setAiReady === 'function') {
-        StatisticoHeader.setAiReady(!!metaBundle);
+      };
+    }
+
+    function bootHeader() {
+      if (!window.StatisticoHeader) {
+        console.warn('[meta-results] StatisticoHeader missing — shared chrome not mounted');
+        return false;
+      }
+      try {
+        // Match factor/cluster order: actions first, then sidebar page mount.
+        StatisticoHeader.init('meta-analysis', '', 0, 'meta-analysis');
+        StatisticoHeader.registerActions(metaActions());
+        StatisticoHeader.initSidebarPage();
+        StatisticoHeader.updateTitle('Summary');
+        if (typeof StatisticoHeader.setAiReady === 'function') {
+          StatisticoHeader.setAiReady(!!metaBundle);
+        }
+        // Re-assert utilities if a race cleared the footer.
+        if (!document.getElementById('sbNavFooter') &&
+            typeof StatisticoHeader._mountSidebarUtilities === 'function') {
+          StatisticoHeader._mountSidebarUtilities();
+        }
+        if (!document.getElementById('headerViewName') &&
+            typeof StatisticoHeader.render === 'function') {
+          StatisticoHeader.render();
+        }
+        return !!(document.getElementById('headerViewName') && document.getElementById('sbNavFooter'));
+      } catch (err) {
+        console.error('[meta-results] bootHeader failed', err);
+        return false;
       }
     }
 
     document.addEventListener('DOMContentLoaded', function () {
-      bootHeader();
+      var ok = bootHeader();
+      if (!ok) {
+        setTimeout(bootHeader, 120);
+        setTimeout(bootHeader, 600);
+      }
       if (typeof Office !== 'undefined' && Office.onReady) {
         Office.onReady(function () {
           try {

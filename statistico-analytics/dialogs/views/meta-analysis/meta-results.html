@@ -130,11 +130,14 @@
       border-bottom: 1px solid var(--border);
       background: var(--surface-1);
       position: relative;
-      z-index: 30;
+      z-index: 40;
+      overflow: visible;
     }
     .meta-context-inner {
       display: flex; flex-wrap: nowrap; align-items: center; gap: 8px 10px;
-      width: 100%; min-width: 0; overflow: hidden;
+      width: 100%; min-width: 0;
+      /* visible so the effect-measure menu is not clipped */
+      overflow: visible;
     }
     .meta-context-bar.is-updating .meta-context-inner { opacity: .35; pointer-events: none; }
     .meta-context-updating {
@@ -201,7 +204,7 @@
     .config-sep {
       width: 1px; height: 22px; background: var(--border); flex-shrink: 0;
     }
-    .cfg-measure-dd { position: relative; flex-shrink: 0; }
+    .cfg-measure-dd { position: relative; flex-shrink: 0; z-index: 50; }
     .cfg-measure-btn {
       display: inline-flex; align-items: center; gap: 8px;
       padding: 6px 12px; border-radius: 999px;
@@ -214,10 +217,12 @@
     .cfg-measure-btn .caret { font-size: 10px; opacity: .85; }
     .cfg-measure-btn[disabled] { opacity: .75; cursor: default; }
     .cfg-measure-menu {
-      display: none; position: absolute; left: 0; top: calc(100% + 6px);
-      min-width: 100%; width: max-content; max-width: 320px;
+      display: none;
+      /* fixed: parent columns use overflow:hidden and would clip an absolute menu */
+      position: fixed; left: 0; top: 0;
+      min-width: 180px; width: max-content; max-width: 320px;
       background: #0f172a; border: 1px solid rgba(165,180,252,.45);
-      border-radius: 10px; padding: 6px; z-index: 80;
+      border-radius: 10px; padding: 6px; z-index: 10060;
       box-shadow: 0 12px 28px rgba(0,0,0,.55);
     }
     .cfg-measure-menu.open { display: block; }
@@ -1219,11 +1224,44 @@
       } catch (_e) {}
     }
 
+    function positionMeasureMenu() {
+      var menu = document.getElementById('cfgEffectMeasureMenu');
+      var btn = document.getElementById('cfgEffectMeasureBtn');
+      if (!menu || !btn || !menu.classList.contains('open')) return;
+      var rect = btn.getBoundingClientRect();
+      menu.style.visibility = 'hidden';
+      menu.style.display = 'block';
+      var mw = menu.offsetWidth || 200;
+      var mh = menu.offsetHeight || 160;
+      var vw = window.innerWidth;
+      var vh = window.innerHeight;
+      var left = Math.max(8, Math.min(rect.left, vw - mw - 8));
+      var top = rect.bottom + 6;
+      if (top + mh > vh - 8) top = Math.max(8, rect.top - mh - 6);
+      menu.style.left = left + 'px';
+      menu.style.top = top + 'px';
+      menu.style.visibility = 'visible';
+    }
+
+    function openMeasureMenu() {
+      var menu = document.getElementById('cfgEffectMeasureMenu');
+      var btn = document.getElementById('cfgEffectMeasureBtn');
+      if (!menu || !btn || btn.disabled) return;
+      measureMenuOpen = true;
+      menu.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+      positionMeasureMenu();
+    }
+
     function closeMeasureMenu() {
       measureMenuOpen = false;
       var menu = document.getElementById('cfgEffectMeasureMenu');
       var btn = document.getElementById('cfgEffectMeasureBtn');
-      if (menu) menu.classList.remove('open');
+      if (menu) {
+        menu.classList.remove('open');
+        menu.style.display = '';
+        menu.style.visibility = '';
+      }
       if (btn) btn.setAttribute('aria-expanded', 'false');
     }
 
@@ -1668,14 +1706,21 @@
       var measureMenu = document.getElementById('cfgEffectMeasureMenu');
       if (measureBtn && measureMenu) {
         measureBtn.addEventListener('click', function (e) {
+          e.preventDefault();
           e.stopPropagation();
           if (measureBtn.disabled) return;
-          measureMenuOpen = !measureMenuOpen;
-          measureMenu.classList.toggle('open', measureMenuOpen);
-          measureBtn.setAttribute('aria-expanded', measureMenuOpen ? 'true' : 'false');
+          if (measureMenuOpen) closeMeasureMenu();
+          else openMeasureMenu();
         });
-        document.addEventListener('click', function () { closeMeasureMenu(); });
+        document.addEventListener('click', function (e) {
+          var wrap = document.getElementById('cfgEffectMeasureWrap');
+          if (wrap && wrap.contains(e.target)) return;
+          closeMeasureMenu();
+        });
         measureMenu.addEventListener('click', function (e) { e.stopPropagation(); });
+        window.addEventListener('resize', function () {
+          if (measureMenuOpen) positionMeasureMenu();
+        });
       }
 
       /* Fixed-position tips so overflow:hidden panels do not clip them */

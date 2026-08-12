@@ -70,9 +70,16 @@
     .panel {
       min-height: 0; height: 100%; max-height: 100%;
       border-right: 1px solid var(--border); background: var(--surface-1);
-      overflow: hidden;
+      overflow-x: hidden; overflow-y: auto;
       padding: 10px;
       display: flex; flex-direction: column; gap: 8px;
+      align-content: flex-start;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(56,189,248,.45) rgba(15,23,42,.35);
+    }
+    .panel::-webkit-scrollbar { width: 8px; }
+    .panel::-webkit-scrollbar-thumb {
+      background: rgba(56,189,248,.4); border-radius: 999px;
     }
     .acc {
       border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2);
@@ -80,17 +87,18 @@
       flex: 0 0 auto;
       display: flex; flex-direction: column;
       min-height: 0;
+      max-height: none;
     }
     .acc.open {
-      flex: 1 1 0;
-      min-height: 120px;
+      flex: 0 1 auto;
+      /* Cap height so a single open section does not leave a huge empty void */
+      max-height: var(--acc-max, 48vh);
     }
     .acc-h {
       width: 100%; display: flex; align-items: center; gap: 8px;
       padding: 8px 10px; border: 0; background: var(--surface-2); color: var(--text-secondary);
       font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; text-align: left;
       flex: 0 0 auto;
-      position: sticky; top: 0; z-index: 2;
       border-bottom: 1px solid transparent;
     }
     .acc.open .acc-h { border-bottom-color: var(--border); }
@@ -104,6 +112,8 @@
       overflow-x: hidden;
       overflow-y: auto;
       padding: 8px 8px 10px 10px;
+      /* Only scroll when this section is capped; otherwise hug content */
+      max-height: none;
       scrollbar-gutter: stable;
       scrollbar-width: thin;
       scrollbar-color: rgba(56,189,248,.5) rgba(15,23,42,.4);
@@ -125,6 +135,10 @@
       background-clip: padding-box;
     }
     .acc.hidden-mode { display: none; }
+    .hint-mini {
+      font-size: 10px; color: var(--text-muted); line-height: 1.35;
+      margin: 6px 0 0;
+    }
 
     .role-row, .ctrl-row {
       display: grid; grid-template-columns: 92px 1fr; gap: 8px; align-items: center; margin-bottom: 7px;
@@ -132,7 +146,6 @@
     .role-row:last-child, .ctrl-row:last-child { margin-bottom: 0; }
     .role-label, .ctrl-row label { font-size: 11px; font-weight: 700; color: var(--text-secondary); }
     .role-label .req { color: #fb7185; }
-    .hint-mini { font-size: 10px; color: var(--text-muted); grid-column: 1 / -1; margin-top: -4px; margin-bottom: 6px; }
     select, input[type="search"], input[type="number"], input[type="text"] {
       width: 100%; background: var(--surface-0); color: var(--text-primary);
       border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px; font-size: 12px;
@@ -215,7 +228,6 @@
         <button class="acc-h" type="button" data-acc="accVars">Variables <i class="fa-solid fa-chevron-down chev"></i></button>
         <div class="acc-b">
           <div id="roleMap"></div>
-          <div class="hint-mini">Color paints points. Series splits the legend. Same field is fine - series wins for grouping.</div>
         </div>
       </div>
 
@@ -260,7 +272,7 @@
               <button type="button" data-on="0">Off</button>
             </div>
           </div>
-          <div class="hint-mini">Shading tints each of the four zones with a different color so Leaders / Opportunities / Monitor / Low priority are easier to tell apart. Turn Off for a plain plot with only the divider lines.</div>
+          <div class="hint-mini">Tints each zone a different color. Off = lines only.</div>
           <div class="q-grid">
             <div><label>High X / High Y</label><input type="text" id="qNE" value="Leaders" /></div>
             <div><label>Low X / High Y</label><input type="text" id="qNW" value="Opportunities" /></div>
@@ -335,7 +347,7 @@
               <button type="button" data-sizeby="width">Width</button>
             </div>
           </div>
-          <div class="hint-mini">Area (recommended): value scales bubble area ? same as Excel ?Area of bubbles.? Width: value scales diameter ? Excel?s ?Width of bubbles,? which exaggerates large values.</div>
+          <div class="hint-mini">Area (default) matches Excel "Area of bubbles." Width matches Excel "Width of bubbles" and exaggerates large values.</div>
           <div class="ctrl-row">
             <label>Size scale</label>
             <input id="sizeScale" type="range" min="0.4" max="2.2" step="0.05" value="1" />
@@ -409,9 +421,9 @@
     { id: "x", label: "X position", req: true, num: true },
     { id: "y", label: "Y position", req: true, num: true },
     { id: "size", label: "Bubble size", req: true, num: true },
-    { id: "color", label: "Color by", req: false, num: false },
+    { id: "color", label: "Color by", req: false, num: false, tip: "Paints points by category or value" },
     { id: "label", label: "Label", req: false, num: false },
-    { id: "group", label: "Series by", req: false, num: false }
+    { id: "group", label: "Series by", req: false, num: false, tip: "Splits the legend into series" }
   ];
 
   var run = null;
@@ -501,7 +513,8 @@
     syncModeTabs();
     syncQuadVisibility();
     buildRoleMap();
-    render();
+    layoutPanels();
+    requestAnimationFrame(function () { layoutPanels(); render(); });
   }
 
   function fieldMeta(key) {
@@ -524,6 +537,7 @@
       var lab = document.createElement("div");
       lab.className = "role-label";
       lab.innerHTML = role.label + (role.req ? ' <span class="req">*</span>' : "");
+      if (role.tip) lab.title = role.tip;
       var sel = document.createElement("select");
       if (!role.req) {
         var empty = document.createElement("option");
@@ -776,6 +790,7 @@
     if (!el) return;
     el.classList.toggle("hidden-mode", state.mode !== "quadrant");
     if (state.mode === "quadrant") el.classList.add("open");
+    layoutPanels();
   }
 
   function showChartError(msg) {
@@ -1036,12 +1051,34 @@
     });
   }
 
+  function layoutPanels() {
+    var panel = document.querySelector(".panel");
+    if (!panel) return;
+    var open = Array.prototype.slice.call(panel.querySelectorAll(".acc.open:not(.hidden-mode)"));
+    var closed = Array.prototype.slice.call(panel.querySelectorAll(".acc:not(.open):not(.hidden-mode)"));
+    var gap = 8;
+    var pad = 20;
+    var closedH = 0;
+    closed.forEach(function (el) { closedH += el.offsetHeight || 36; });
+    var avail = Math.max(160, panel.clientHeight - pad - closedH - gap * Math.max(0, open.length + closed.length - 1));
+    var each = open.length ? Math.floor(avail / open.length) : avail;
+    // Prefer content height: do not force a tall empty body when only one section is open
+    each = Math.max(140, Math.min(each, open.length <= 1 ? Math.min(avail, 520) : each));
+    open.forEach(function (el) {
+      el.style.setProperty("--acc-max", each + "px");
+    });
+    panel.querySelectorAll(".acc:not(.open)").forEach(function (el) {
+      el.style.removeProperty("--acc-max");
+    });
+  }
+
   function bindControls() {
     document.querySelectorAll(".acc-h").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var id = btn.getAttribute("data-acc");
         var el = document.getElementById(id);
         if (el) el.classList.toggle("open");
+        layoutPanels();
       });
     });
 
@@ -1162,6 +1199,7 @@
     });
 
     window.addEventListener("resize", function () {
+      layoutPanels();
       if (state.chart && typeof state.chart.reflow === "function") state.chart.reflow();
     });
   }

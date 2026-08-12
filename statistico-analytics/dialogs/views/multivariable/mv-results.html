@@ -309,6 +309,14 @@
             </div>
           </div>
           <div class="ctrl-row">
+            <label>Size by</label>
+            <div class="seg" id="sizeBy">
+              <button type="button" data-sizeby="area" class="active">Area</button>
+              <button type="button" data-sizeby="width">Width</button>
+            </div>
+          </div>
+          <div class="hint-mini">Area (recommended): value scales bubble area ? same as Excel ?Area of bubbles.? Width: value scales diameter ? Excel?s ?Width of bubbles,? which exaggerates large values.</div>
+          <div class="ctrl-row">
             <label>Size scale</label>
             <input id="sizeScale" type="range" min="0.4" max="2.2" step="0.05" value="1" />
           </div>
@@ -316,7 +324,7 @@
             <label>Opacity</label>
             <input id="bubbleOpacity" type="range" min="0.35" max="1" step="0.05" value="0.9" />
           </div>
-          <div class="hint">Size uses <strong>area</strong> (not diameter). Sphere adds a radial highlight so bubbles look dimensional (not true 3D rotation).</div>
+          <div class="hint">Sphere adds a radial highlight so bubbles look dimensional (not true 3D rotation).</div>
         </div>
       </div>
 
@@ -393,6 +401,7 @@
     mode: "bubble",
     map: { x: null, y: null, size: null, color: null, label: null, group: null },
     sizeScale: 1,
+    sizeBy: "area",
     bubbleStyle: "sphere",
     bubbleOpacity: 0.9,
     xScale: "linear",
@@ -702,9 +711,15 @@
     var max = Math.max.apply(null, zs);
     var vals = min === max ? [max] : [min, (min + max) / 2, max];
     var maxPx = 28 * state.sizeScale;
-    el.innerHTML = "<strong>Size represents<br/>" + (sizeField ? sizeField.label : "size") + " (area)</strong>";
+    el.innerHTML = "<strong>Size represents<br/>" + (sizeField ? sizeField.label : "size") +
+      " (" + (state.sizeBy === "width" ? "width" : "area") + ")</strong>";
     vals.forEach(function (v) {
-      var px = Math.max(6, Math.sqrt(v / max) * maxPx);
+      var px;
+      if (state.sizeBy === "width") {
+        px = Math.max(6, (v / max) * maxPx);
+      } else {
+        px = Math.max(6, Math.sqrt(v / max) * maxPx);
+      }
       var row = document.createElement("div");
       row.className = "size-legend-row";
       row.innerHTML =
@@ -888,6 +903,7 @@
           bubble: {
             minSize: minSize,
             maxSize: maxSize,
+            sizeBy: state.sizeBy === "width" ? "width" : "area",
             cursor: "pointer",
             stickyTracking: false,
             marker: state.bubbleStyle === "sphere" ? {
@@ -1018,6 +1034,13 @@
       btn.addEventListener("click", function () {
         setSegActive(document.getElementById("bubbleStyle"), "data-style", btn.dataset.style);
         state.bubbleStyle = btn.dataset.style;
+        render();
+      });
+    });
+    document.querySelectorAll("#sizeBy button").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        setSegActive(document.getElementById("sizeBy"), "data-sizeby", btn.dataset.sizeby);
+        state.sizeBy = btn.dataset.sizeby;
         render();
       });
     });

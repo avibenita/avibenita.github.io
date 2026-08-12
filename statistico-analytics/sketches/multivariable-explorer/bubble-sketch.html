@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Multivariable Explorer — Bubble (Sketch) · Statistico</title>
+  <!--
+    Sketch only — not wired to the hub yet.
+    Product concept: Cursor100.html / Multivariable Explorer
+    v1 engine: Bubble + Quadrant (shared mapping + Highcharts-more bubble series)
+    Size encoding: area ∝ value (not diameter)
+  -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://code.highcharts.com/highcharts-more.js"></script>
+  <script src="https://code.highcharts.com/modules/exporting.js"></script>
+  <style>
+    :root {
+      --bg: #0c1624;
+      --surface: #1a1f2e;
+      --surface-2: #242938;
+      --border: #2d3748;
+      --text: #f1f5f9;
+      --text2: rgba(255,255,255,.78);
+      --text3: rgba(255,255,255,.52);
+      --accent: #38bdf8;
+      --accent-2: #a78bfa;
+      --warn: #fbbf24;
+      --ok: #4ade80;
+      --danger: #fb7185;
+      --panel-w: 300px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .topbar {
+      display: flex; align-items: center; gap: 14px;
+      height: 54px; padding: 0 16px; flex-shrink: 0;
+      background: linear-gradient(180deg, #171f35 0%, #1b2540 100%);
+      border-bottom: 1px solid rgba(56,189,248,.22);
+    }
+    .brand-frame {
+      display: flex; flex-direction: column; gap: 1px;
+      padding: 5px 10px; border-radius: 8px;
+      border: 1px solid rgba(56,189,248,.35);
+      border-left: 2px solid rgba(56,189,248,.75);
+      background: rgba(56,189,248,.08);
+    }
+    .brand-kicker {
+      font-size: 9px; font-weight: 800; letter-spacing: .16em;
+      text-transform: uppercase; color: rgba(125,211,252,.85);
+    }
+    .brand-name {
+      font-size: 12px; font-weight: 900; letter-spacing: .1em;
+      text-transform: uppercase; color: #e0f2fe;
+    }
+    .topbar h1 {
+      margin: 0; flex: 1; text-align: center;
+      font-size: 16px; font-weight: 800;
+    }
+    .sketch-badge {
+      font-size: 11px; font-weight: 700;
+      padding: 3px 10px; border-radius: 999px;
+      color: #fde68a;
+      background: rgba(251,191,36,.14);
+      border: 1px solid rgba(251,191,36,.4);
+    }
+
+    .mode-tabs {
+      display: flex; gap: 4px; margin-left: auto;
+    }
+    .mode-tab {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text2);
+      font-size: 11px; font-weight: 700;
+      padding: 5px 10px; border-radius: 999px;
+      cursor: pointer;
+    }
+    .mode-tab.active {
+      color: #0c1624;
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .mode-tab:disabled {
+      opacity: .35; cursor: not-allowed;
+    }
+
+    .shell {
+      flex: 1; min-height: 0;
+      display: grid;
+      grid-template-columns: var(--panel-w) 1fr;
+    }
+
+    .panel {
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+      overflow-y: auto;
+      padding: 12px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .panel-section-title {
+      font-size: 10px; font-weight: 800;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: var(--text3);
+      margin-bottom: 6px;
+    }
+    .map-card, .ctrl-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-2);
+      padding: 10px;
+    }
+    .role-row {
+      display: grid;
+      grid-template-columns: 88px 1fr;
+      gap: 8px; align-items: center;
+      margin-bottom: 7px;
+    }
+    .role-row:last-child { margin-bottom: 0; }
+    .role-label {
+      font-size: 11px; font-weight: 700; color: var(--text2);
+    }
+    .role-label .req { color: var(--danger); margin-left: 2px; }
+    .role-label .opt { color: var(--text3); font-weight: 600; }
+    select, input[type="search"] {
+      width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+    select:focus, input:focus { outline: 1px solid rgba(56,189,248,.5); }
+
+    .ctrl-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; margin-bottom: 8px;
+      font-size: 12px; color: var(--text2);
+    }
+    .ctrl-row:last-child { margin-bottom: 0; }
+    .ctrl-row label { font-weight: 600; }
+    .seg {
+      display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden;
+    }
+    .seg button {
+      border: 0; background: transparent; color: var(--text3);
+      font-size: 11px; font-weight: 700; padding: 4px 8px; cursor: pointer;
+    }
+    .seg button.active { background: rgba(56,189,248,.2); color: var(--accent); }
+    input[type="range"] { width: 120px; accent-color: var(--accent); }
+
+    .hint {
+      font-size: 11px; line-height: 1.4; color: var(--text3);
+      padding: 8px 9px; border-radius: 8px;
+      background: rgba(56,189,248,.08);
+      border: 1px solid rgba(56,189,248,.2);
+    }
+    .hint strong { color: var(--accent); }
+
+    .main {
+      min-width: 0; min-height: 0;
+      display: flex; flex-direction: column;
+      padding: 12px;
+      gap: 10px;
+    }
+    .status-strip {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      font-size: 12px; color: var(--text2);
+    }
+    .pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 9px; border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      font-size: 11px; font-weight: 700;
+    }
+    .pill i { color: var(--accent); }
+    .chart-wrap {
+      flex: 1; min-height: 0;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #111827;
+      position: relative;
+      overflow: hidden;
+    }
+    #chart { width: 100%; height: 100%; }
+    .size-legend {
+      position: absolute; left: 14px; bottom: 14px;
+      background: rgba(15,23,42,.88);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 11px; color: var(--text2);
+      pointer-events: none;
+      z-index: 2;
+    }
+    .size-legend strong {
+      display: block; margin-bottom: 6px;
+      font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--text3);
+    }
+    .size-legend-row {
+      display: flex; align-items: center; gap: 8px; margin: 4px 0;
+    }
+    .size-dot {
+      border-radius: 50%;
+      background: rgba(56,189,248,.35);
+      border: 1px solid rgba(56,189,248,.8);
+      flex-shrink: 0;
+    }
+
+    .roadmap {
+      display: flex; gap: 6px; flex-wrap: wrap;
+      padding-top: 2px;
+    }
+    .roadmap span {
+      font-size: 10px; font-weight: 700;
+      padding: 3px 7px; border-radius: 999px;
+      border: 1px dashed var(--border);
+      color: var(--text3);
+    }
+    .roadmap span.now {
+      border-style: solid;
+      border-color: rgba(56,189,248,.45);
+      color: var(--accent);
+      background: rgba(56,189,248,.1);
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-frame">
+      <div class="brand-kicker">Statistico™ · Sketch</div>
+      <div class="brand-name">Multivariable Explorer</div>
+    </div>
+    <h1>Explore relationships through position, size, color, groups, and time</h1>
+    <div class="mode-tabs" role="tablist" aria-label="Chart mode">
+      <button class="mode-tab active" data-mode="bubble" type="button">Bubble</button>
+      <button class="mode-tab" data-mode="quadrant" type="button">Quadrant</button>
+      <button class="mode-tab" data-mode="connected" type="button" disabled title="Later">Connected</button>
+      <button class="mode-tab" data-mode="slope" type="button" disabled title="Later">Slope</button>
+    </div>
+    <span class="sketch-badge">Prototype</span>
+  </header>
+
+  <div class="shell">
+    <aside class="panel">
+      <div>
+        <div class="panel-section-title">Variable mapping</div>
+        <div class="map-card" id="roleMap"></div>
+      </div>
+
+      <div>
+        <div class="panel-section-title">Chart controls</div>
+        <div class="ctrl-card">
+          <div class="ctrl-row">
+            <label>Size scale</label>
+            <input id="sizeScale" type="range" min="0.4" max="2.2" step="0.05" value="1" />
+          </div>
+          <div class="ctrl-row">
+            <label>X scale</label>
+            <div class="seg" data-axis="x">
+              <button type="button" data-scale="linear" class="active">Linear</button>
+              <button type="button" data-scale="logarithmic">Log</button>
+            </div>
+          </div>
+          <div class="ctrl-row">
+            <label>Y scale</label>
+            <div class="seg" data-axis="y">
+              <button type="button" data-scale="linear" class="active">Linear</button>
+              <button type="button" data-scale="logarithmic">Log</button>
+            </div>
+          </div>
+          <div class="ctrl-row">
+            <label>Labels</label>
+            <div class="seg" id="labelMode">
+              <button type="button" data-labels="none">None</button>
+              <button type="button" data-labels="hover" class="active">Hover</button>
+              <button type="button" data-labels="all">All</button>
+            </div>
+          </div>
+          <div class="ctrl-row">
+            <label for="searchBox">Find</label>
+            <input id="searchBox" type="search" placeholder="Country / ID…" />
+          </div>
+        </div>
+      </div>
+
+      <div class="hint">
+        <strong>Size = area, not diameter.</strong>
+        Bubble area is proportional to the size variable — the usual Excel trap this tool avoids.
+      </div>
+
+      <div>
+        <div class="panel-section-title">Module roadmap</div>
+        <div class="roadmap">
+          <span class="now">Bubble</span>
+          <span class="now">Quadrant</span>
+          <span>Connected scatter</span>
+          <span>Slope / dumbbell</span>
+          <span>Bump / rank</span>
+          <span>Parallel coords</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="status-strip" id="statusStrip"></div>
+      <div class="chart-wrap">
+        <div id="chart"></div>
+        <div class="size-legend" id="sizeLegend"></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+(function () {
+  "use strict";
+
+  /** Demo dataset — stand-in for an Excel Active Range */
+  var ROWS = [
+    { id: "Norway", region: "Europe", gdp: 89, life: 83.2, pop: 5.4, co2: 7.2, year: 2023 },
+    { id: "Germany", region: "Europe", gdp: 54, life: 81.1, pop: 83.8, co2: 8.1, year: 2023 },
+    { id: "France", region: "Europe", gdp: 46, life: 82.5, pop: 67.8, co2: 4.6, year: 2023 },
+    { id: "Italy", region: "Europe", gdp: 39, life: 83.0, pop: 58.9, co2: 5.4, year: 2023 },
+    { id: "Spain", region: "Europe", gdp: 33, life: 83.3, pop: 47.4, co2: 5.1, year: 2023 },
+    { id: "USA", region: "Americas", gdp: 76, life: 77.3, pop: 333, co2: 14.9, year: 2023 },
+    { id: "Canada", region: "Americas", gdp: 55, life: 82.0, pop: 39, co2: 14.2, year: 2023 },
+    { id: "Brazil", region: "Americas", gdp: 10, life: 75.9, pop: 215, co2: 2.2, year: 2023 },
+    { id: "Mexico", region: "Americas", gdp: 12, life: 75.1, pop: 128, co2: 3.6, year: 2023 },
+    { id: "Chile", region: "Americas", gdp: 17, life: 80.2, pop: 19.5, co2: 4.4, year: 2023 },
+    { id: "Japan", region: "Asia", gdp: 34, life: 84.5, pop: 125, co2: 8.5, year: 2023 },
+    { id: "South Korea", region: "Asia", gdp: 35, life: 83.7, pop: 51.7, co2: 11.6, year: 2023 },
+    { id: "China", region: "Asia", gdp: 13, life: 78.2, pop: 1412, co2: 8.0, year: 2023 },
+    { id: "India", region: "Asia", gdp: 2.6, life: 70.8, pop: 1428, co2: 2.0, year: 2023 },
+    { id: "Indonesia", region: "Asia", gdp: 5.0, life: 71.3, pop: 277, co2: 2.3, year: 2023 },
+    { id: "Australia", region: "Oceania", gdp: 65, life: 83.4, pop: 26.3, co2: 15.0, year: 2023 },
+    { id: "New Zealand", region: "Oceania", gdp: 49, life: 82.5, pop: 5.2, co2: 6.6, year: 2023 },
+    { id: "Nigeria", region: "Africa", gdp: 2.2, life: 54.5, pop: 223, co2: 0.6, year: 2023 },
+    { id: "South Africa", region: "Africa", gdp: 6.5, life: 62.3, pop: 60, co2: 7.4, year: 2023 },
+    { id: "Egypt", region: "Africa", gdp: 4.0, life: 71.8, pop: 112, co2: 2.4, year: 2023 },
+    { id: "Kenya", region: "Africa", gdp: 2.1, life: 63.5, pop: 55, co2: 0.4, year: 2023 },
+    { id: "Morocco", region: "Africa", gdp: 3.9, life: 74.3, pop: 37.5, co2: 1.9, year: 2023 }
+  ];
+
+  var FIELDS = [
+    { key: "id", label: "Country", kind: "id" },
+    { key: "region", label: "Region", kind: "cat" },
+    { key: "gdp", label: "GDP / capita (k$)", kind: "num" },
+    { key: "life", label: "Life expectancy", kind: "num" },
+    { key: "pop", label: "Population (M)", kind: "num" },
+    { key: "co2", label: "CO₂ / capita (t)", kind: "num" },
+    { key: "year", label: "Year", kind: "time" }
+  ];
+
+  var ROLES = [
+    { id: "x", label: "X position", req: true, kinds: ["num"] },
+    { id: "y", label: "Y position", req: true, kinds: ["num"] },
+    { id: "size", label: "Bubble size", req: true, kinds: ["num"] },
+    { id: "color", label: "Bubble color", req: false, kinds: ["cat", "num"] },
+    { id: "label", label: "Label", req: false, kinds: ["id", "cat"] },
+    { id: "group", label: "Group", req: false, kinds: ["cat"] }
+  ];
+
+  var state = {
+    mode: "bubble",
+    map: { x: "gdp", y: "life", size: "pop", color: "region", label: "id", group: "region" },
+    sizeScale: 1,
+    xScale: "linear",
+    yScale: "linear",
+    labels: "hover",
+    search: "",
+    chart: null
+  };
+
+  var PALETTE = ["#38bdf8", "#a78bfa", "#34d399", "#fbbf24", "#fb7185", "#94a3b8"];
+
+  function fieldMeta(key) {
+    return FIELDS.find(function (f) { return f.key === key; });
+  }
+
+  function optionsForRole(role) {
+    return FIELDS.filter(function (f) {
+      return role.kinds.indexOf(f.kind) >= 0 || (role.id === "label" && f.kind === "id");
+    });
+  }
+
+  function buildRoleMap() {
+    var host = document.getElementById("roleMap");
+    host.innerHTML = "";
+    ROLES.forEach(function (role) {
+      var row = document.createElement("div");
+      row.className = "role-row";
+      var lab = document.createElement("div");
+      lab.className = "role-label";
+      lab.innerHTML = role.label + (role.req
+        ? ' <span class="req">*</span>'
+        : ' <span class="opt">opt</span>');
+      var sel = document.createElement("select");
+      sel.dataset.role = role.id;
+      if (!role.req) {
+        var empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = "— none —";
+        sel.appendChild(empty);
+      }
+      optionsForRole(role).forEach(function (f) {
+        var opt = document.createElement("option");
+        opt.value = f.key;
+        opt.textContent = f.label;
+        if (state.map[role.id] === f.key) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.addEventListener("change", function () {
+        state.map[role.id] = sel.value || null;
+        render();
+      });
+      row.appendChild(lab);
+      row.appendChild(sel);
+      host.appendChild(row);
+    });
+  }
+
+  function median(vals) {
+    var a = vals.slice().sort(function (x, y) { return x - y; });
+    var m = Math.floor(a.length / 2);
+    return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+  }
+
+  function colorFor(value, categories) {
+    if (value == null || value === "") return "#64748b";
+    var i = categories.indexOf(value);
+    if (i < 0) i = categories.push(value) - 1;
+    return PALETTE[i % PALETTE.length];
+  }
+
+  /** Highcharts bubble `z` drives area; we keep raw size values and use maxSize/minSize. */
+  function buildSeries() {
+    var mx = state.map.x, my = state.map.y, mz = state.map.size;
+    var mColor = state.map.color, mLabel = state.map.label, mGroup = state.map.group;
+    var q = (state.search || "").trim().toLowerCase();
+
+    var categories = [];
+    var grouped = {};
+
+    ROWS.forEach(function (r) {
+      var x = +r[mx], y = +r[my], z = +r[mz];
+      if (!isFinite(x) || !isFinite(y) || !isFinite(z) || z < 0) return;
+      if ((state.xScale === "logarithmic" && x <= 0) || (state.yScale === "logarithmic" && y <= 0)) return;
+
+      var groupKey = mGroup ? String(r[mGroup]) : (mColor && fieldMeta(mColor).kind === "cat" ? String(r[mColor]) : "All");
+      if (!grouped[groupKey]) grouped[groupKey] = [];
+
+      var label = mLabel ? String(r[mLabel]) : r.id;
+      var hit = !q || label.toLowerCase().indexOf(q) >= 0 || String(r.id).toLowerCase().indexOf(q) >= 0;
+
+      var colorVal = mColor ? r[mColor] : groupKey;
+      var fill = fieldMeta(mColor) && fieldMeta(mColor).kind === "num"
+        ? null
+        : colorFor(colorVal, categories);
+
+      grouped[groupKey].push({
+        x: x,
+        y: y,
+        z: z,
+        name: label,
+        color: fill || undefined,
+        opacity: hit ? 0.85 : 0.12,
+        marker: { lineWidth: hit && q ? 2 : 1, lineColor: hit && q ? "#fff" : "rgba(255,255,255,.25)" },
+        custom: {
+          row: r,
+          sizeField: mz,
+          colorField: mColor
+        }
+      });
+    });
+
+    return Object.keys(grouped).map(function (g, i) {
+      return {
+        type: "bubble",
+        name: g,
+        color: PALETTE[i % PALETTE.length],
+        data: grouped[g],
+        dataLabels: {
+          enabled: state.labels === "all",
+          format: "{point.name}",
+          style: { color: "#e2e8f0", textOutline: "none", fontSize: "10px", fontWeight: "600" }
+        }
+      };
+    });
+  }
+
+  function sizeLegendValues(zs) {
+    if (!zs.length) return [];
+    var min = Math.min.apply(null, zs);
+    var max = Math.max.apply(null, zs);
+    if (min === max) return [max];
+    return [min, (min + max) / 2, max];
+  }
+
+  function updateSizeLegend(zs) {
+    var el = document.getElementById("sizeLegend");
+    var sizeField = fieldMeta(state.map.size);
+    var vals = sizeLegendValues(zs);
+    var max = vals[vals.length - 1] || 1;
+    var maxPx = 28 * state.sizeScale;
+
+    el.innerHTML = "<strong>Size represents · " + (sizeField ? sizeField.label : "size") + " (area)</strong>";
+    vals.forEach(function (v) {
+      var px = Math.max(6, Math.sqrt(v / max) * maxPx);
+      var row = document.createElement("div");
+      row.className = "size-legend-row";
+      row.innerHTML =
+        '<span class="size-dot" style="width:' + px + "px;height:" + px + 'px"></span>' +
+        "<span>" + (v >= 100 ? Math.round(v) : Math.round(v * 10) / 10) + "</span>";
+      el.appendChild(row);
+    });
+  }
+
+  function updateStatus(nPoints, nSeries) {
+    var strip = document.getElementById("statusStrip");
+    var bits = [
+      ["fa-circle", state.mode === "quadrant" ? "Quadrant mode" : "Bubble mode"],
+      ["fa-database", nPoints + " points"],
+      ["fa-layer-group", nSeries + " series"],
+      ["fa-ruler-combined", "area ∝ " + (fieldMeta(state.map.size) || {}).label]
+    ];
+    strip.innerHTML = bits.map(function (b) {
+      return '<span class="pill"><i class="fa ' + b[0] + '"></i>' + b[1] + "</span>";
+    }).join("");
+  }
+
+  function render() {
+    var series = buildSeries();
+    var zs = [];
+    series.forEach(function (s) {
+      s.data.forEach(function (p) { zs.push(p.z); });
+    });
+    var nPoints = zs.length;
+    updateStatus(nPoints, series.length);
+    updateSizeLegend(zs);
+
+    var xField = fieldMeta(state.map.x);
+    var yField = fieldMeta(state.map.y);
+    var plotLines = [];
+
+    if (state.mode === "quadrant" && nPoints) {
+      var xs = [], ys = [];
+      series.forEach(function (s) {
+        s.data.forEach(function (p) { xs.push(p.x); ys.push(p.y); });
+      });
+      var xCut = median(xs);
+      var yCut = median(ys);
+      plotLines = [
+        {
+          axis: "x",
+          value: xCut,
+          color: "rgba(251,191,36,.75)",
+          width: 1.5,
+          dashStyle: "Dash",
+          label: { text: "Median X", style: { color: "#fbbf24", fontSize: "10px" } }
+        },
+        {
+          axis: "y",
+          value: yCut,
+          color: "rgba(251,191,36,.75)",
+          width: 1.5,
+          dashStyle: "Dash",
+          label: { text: "Median Y", style: { color: "#fbbf24", fontSize: "10px" } }
+        }
+      ];
+    }
+
+    var maxSize = Math.round(48 * state.sizeScale);
+    var minSize = Math.max(4, Math.round(6 * state.sizeScale));
+
+    state.chart = Highcharts.chart("chart", {
+      chart: {
+        type: "bubble",
+        backgroundColor: "transparent",
+        style: { fontFamily: "'Segoe UI', system-ui, sans-serif" },
+        zoomType: "xy"
+      },
+      title: { text: null },
+      credits: { enabled: false },
+      legend: {
+        itemStyle: { color: "#cbd5e1" },
+        itemHoverStyle: { color: "#fff" }
+      },
+      xAxis: {
+        type: state.xScale,
+        title: { text: xField ? xField.label : "X", style: { color: "#94a3b8" } },
+        gridLineColor: "rgba(148,163,184,.15)",
+        lineColor: "#334155",
+        tickColor: "#334155",
+        labels: { style: { color: "#94a3b8" } },
+        plotLines: plotLines.filter(function (p) { return p.axis === "x"; }).map(function (p) {
+          return { value: p.value, color: p.color, width: p.width, dashStyle: p.dashStyle, label: p.label };
+        })
+      },
+      yAxis: {
+        type: state.yScale,
+        title: { text: yField ? yField.label : "Y", style: { color: "#94a3b8" } },
+        gridLineColor: "rgba(148,163,184,.15)",
+        lineColor: "#334155",
+        tickColor: "#334155",
+        labels: { style: { color: "#94a3b8" } },
+        plotLines: plotLines.filter(function (p) { return p.axis === "y"; }).map(function (p) {
+          return { value: p.value, color: p.color, width: p.width, dashStyle: p.dashStyle, label: p.label };
+        })
+      },
+      tooltip: {
+        useHTML: true,
+        backgroundColor: "rgba(15,23,42,.95)",
+        borderColor: "#334155",
+        style: { color: "#e2e8f0" },
+        pointFormatter: function () {
+          var r = this.custom.row;
+          var lines = [
+            "<b>" + this.name + "</b>",
+            (xField ? xField.label : "X") + ": <b>" + this.x + "</b>",
+            (yField ? yField.label : "Y") + ": <b>" + this.y + "</b>",
+            (fieldMeta(state.map.size) || {}).label + ": <b>" + this.z + "</b>"
+          ];
+          if (state.map.color) lines.push((fieldMeta(state.map.color) || {}).label + ": <b>" + r[state.map.color] + "</b>");
+          if (state.map.group) lines.push("Group: <b>" + r[state.map.group] + "</b>");
+          return lines.join("<br/>");
+        }
+      },
+      plotOptions: {
+        bubble: {
+          minSize: minSize,
+          maxSize: maxSize,
+          cursor: "pointer",
+          stickyTracking: false
+        },
+        series: {
+          states: { inactive: { opacity: 0.35 } }
+        }
+      },
+      series: series
+    });
+  }
+
+  function bindControls() {
+    document.getElementById("sizeScale").addEventListener("input", function (e) {
+      state.sizeScale = +e.target.value;
+      render();
+    });
+    document.getElementById("searchBox").addEventListener("input", function (e) {
+      state.search = e.target.value;
+      render();
+    });
+    document.querySelectorAll(".seg[data-axis]").forEach(function (seg) {
+      seg.querySelectorAll("button").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          seg.querySelectorAll("button").forEach(function (b) { b.classList.remove("active"); });
+          btn.classList.add("active");
+          if (seg.dataset.axis === "x") state.xScale = btn.dataset.scale;
+          else state.yScale = btn.dataset.scale;
+          render();
+        });
+      });
+    });
+    document.querySelectorAll("#labelMode button").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        document.querySelectorAll("#labelMode button").forEach(function (b) { b.classList.remove("active"); });
+        btn.classList.add("active");
+        state.labels = btn.dataset.labels;
+        render();
+      });
+    });
+    document.querySelectorAll(".mode-tab:not(:disabled)").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        document.querySelectorAll(".mode-tab").forEach(function (t) { t.classList.remove("active"); });
+        tab.classList.add("active");
+        state.mode = tab.dataset.mode;
+        render();
+      });
+    });
+  }
+
+  buildRoleMap();
+  bindControls();
+  render();
+})();
+  </script>
+</body>
+</html>

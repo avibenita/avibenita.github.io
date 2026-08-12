@@ -257,6 +257,19 @@
       background: rgba(148,163,184,.16);
       font-size: 13px; font-weight: 700; color: var(--text-secondary);
     }
+    .cfg-benefit-btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 5px 11px; border-radius: 999px;
+      border: 1px solid rgba(148,163,184,.5);
+      background: rgba(148,163,184,.14);
+      color: var(--text-primary); font-size: 12.5px; font-weight: 700;
+      cursor: pointer; max-width: min(220px, 100%);
+    }
+    .cfg-benefit-btn:hover { background: rgba(148,163,184,.28); }
+    .cfg-benefit-btn .caret { font-size: 10px; opacity: .85; }
+    :root[data-theme="light"] .cfg-benefit-btn {
+      background: rgba(15,23,42,.06); border-color: #94a3b8; color: #0f172a;
+    }
 
     .results-panel {
       background: var(--surface-1);
@@ -635,9 +648,21 @@
         <span class="cfg-measure-locked" id="cfgEffectLocked" style="display:none;"></span>
         <span class="config-sep" aria-hidden="true"></span>
         <span class="cfg-studies">Studies: <strong id="cfgK">—</strong></span>
-        <span class="cfg-contrast-chip" id="cfgContrastChip" title="Treatment − Control; outcome direction from Input">
+        <span class="config-sep" aria-hidden="true"></span>
+        <span class="section-title">Benefit</span>
+        <div class="cfg-measure-dd" id="cfgBenefitWrap">
+          <button type="button" class="cfg-benefit-btn" id="cfgBenefitBtn" aria-haspopup="listbox" aria-expanded="false">
+            <span id="cfgBenefitLabel">Lower values better</span><span class="caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="cfg-measure-menu" id="cfgBenefitMenu" role="listbox">
+            <button type="button" class="cfg-measure-opt" role="option" data-value="lower">Lower values are better</button>
+            <button type="button" class="cfg-measure-opt" role="option" data-value="higher">Higher values are better</button>
+            <button type="button" class="cfg-measure-opt" role="option" data-value="none">Do not display favour labels</button>
+          </div>
+        </div>
+        <span class="cfg-contrast-chip" id="cfgContrastChip" title="Contrast is always Treatment − Control">
           <span id="cfgContrastLabel">Treatment − Control</span>
-          <span class="info-icon" tabindex="0">i<span class="tip" id="cfgContrastTip">Treatment − Control; lower values indicate treatment benefit when the outcome is coded lower-is-better.</span></span>
+          <span class="info-icon" tabindex="0">i<span class="tip" id="cfgContrastTip">Contrast is always Treatment − Control. Beneficial direction changes favour labels only — effect sizes are never sign-flipped.</span></span>
         </span>
       </div>
     </div>
@@ -873,6 +898,12 @@
     var pendingKeepTab = null;
     var forestChart = null;
     var forestDrawCtx = null;
+    var benefitMenuOpen = false;
+    var BENEFIT_OPTIONS = [
+      { value: 'lower', label: 'Lower values better', full: 'Lower values are better' },
+      { value: 'higher', label: 'Higher values better', full: 'Higher values are better' },
+      { value: 'none', label: 'No favour labels', full: 'Do not display favour labels' }
+    ];
     var TITLE_MAP = {
       summary: 'Summary',
       forest: 'Forest Plot',
@@ -928,14 +959,17 @@
 
     function outcomeBetterOf(bundle) {
       var spec = (bundle && bundle.spec) || {};
-      if (spec.outcomeBetter === 'lower' || spec.outcomeBetter === 'higher') return spec.outcomeBetter;
+      if (spec.outcomeBetter === 'lower' || spec.outcomeBetter === 'higher' || spec.outcomeBetter === 'none') {
+        return spec.outcomeBetter;
+      }
       // Legacy mapping: old “positive favors control” ≈ lower-is-better intent
       if (spec.effectDirection === 'control') return 'lower';
-      return 'higher';
+      return 'lower';
     }
 
     function favoredArm(effect, outcomeBetter) {
-      if (!effect) return null;
+      if (effect == null || !isFinite(effect) || outcomeBetter === 'none') return null;
+      if (effect === 0) return null;
       // Contrast is always Treatment − Control. Labels only.
       if (outcomeBetter === 'lower') return effect < 0 ? 'treatment' : 'control';
       return effect > 0 ? 'treatment' : 'control';
@@ -968,13 +1002,19 @@
       var excludesNull = bundle.pooled.ciLower > 0 || bundle.pooled.ciUpper < 0;
       var arm = favoredArm(e, outcomeBetter);
       var mag = magnitudeBand(bundle, et);
-      var betterPhrase = outcomeBetter === 'lower' ? 'lower values are better' : 'higher values are better';
+      var betterPhrase = outcomeBetter === 'lower'
+        ? 'lower values are better'
+        : outcomeBetter === 'higher'
+          ? 'higher values are better'
+          : 'favour labels are hidden';
 
       var magLine;
       if (arm === 'treatment' || arm === 'control') {
         if (mag.key === 'moderate-large') magLine = 'moderate-to-large effect favoring ' + arm;
         else if (mag.key === 'effect') magLine = 'pooled effect favoring ' + arm;
         else magLine = mag.key + ' effect favoring ' + arm;
+      } else if (outcomeBetter === 'none') {
+        magLine = mag.label + ' (Treatment − Control = ' + g + ')';
       } else {
         magLine = mag.label + ' in the ' + (e < 0 ? 'negative' : e > 0 ? 'positive' : 'null') + ' direction';
       }
@@ -999,6 +1039,9 @@
           ' (95% CI ' + lo + ' to ' + hi + '). Because ' + betterPhrase +
           ', the pooled effect favored <strong>' + arm + '</strong>' +
           (mag.key === 'effect' ? '' : ', a ' + mag.label) + '. ';
+      } else if (outcomeBetter === 'none') {
+        narrative = 'Across ' + k + ' studies, Treatment − Control = ' + g +
+          ' (95% CI ' + lo + ' to ' + hi + '). Favour labels are hidden; interpret the signed contrast on the analysis scale. ';
       } else {
         narrative = 'Across ' + k + ' studies, the pooled effect was ' + g +
           ' (95% CI ' + lo + ' to ' + hi + '), with ' + betterPhrase + '. ';
@@ -1052,19 +1095,70 @@
       }
     }
 
-    function syncContrastChip(bundle) {
-      var tip = document.getElementById('cfgContrastTip');
-      var label = document.getElementById('cfgContrastLabel');
-      var chip = document.getElementById('cfgContrastChip');
-      if (!tip || !label) return;
+    function syncBenefitControl(bundle) {
       var better = outcomeBetterOf(bundle);
-      var short = better === 'lower'
-        ? 'Treatment − Control; lower values indicate treatment benefit'
-        : 'Treatment − Control; higher values indicate treatment benefit';
-      label.textContent = short;
-      tip.textContent = short +
-        '. Outcome direction is set in Input and affects favor labels only — effect sizes are never sign-flipped.';
-      if (chip) chip.title = short;
+      var label = document.getElementById('cfgBenefitLabel');
+      var menu = document.getElementById('cfgBenefitMenu');
+      var tip = document.getElementById('cfgContrastTip');
+      var contrastLabel = document.getElementById('cfgContrastLabel');
+      var chip = document.getElementById('cfgContrastChip');
+      var hit = BENEFIT_OPTIONS.find(function (o) { return o.value === better; }) || BENEFIT_OPTIONS[0];
+      if (label) label.textContent = hit.label;
+      if (menu) {
+        menu.querySelectorAll('.cfg-measure-opt').forEach(function (btn) {
+          btn.classList.toggle('active', btn.getAttribute('data-value') === better);
+        });
+      }
+      if (contrastLabel) contrastLabel.textContent = 'Treatment − Control';
+      var tipText =
+        'Contrast is always Treatment − Control (numbers never flip). ' +
+        (better === 'lower'
+          ? 'Lower values are better → negative effects favour treatment.'
+          : better === 'higher'
+            ? 'Higher values are better → positive effects favour treatment.'
+            : 'Favour labels are hidden.');
+      if (tip) tip.textContent = tipText;
+      if (chip) chip.title = tipText;
+    }
+
+    function applyOutcomeBetterLabels(bundle) {
+      if (!bundle) return;
+      syncBenefitControl(bundle);
+      var better = outcomeBetterOf(bundle);
+      var arm = favoredArm(bundle.pooled && bundle.pooled.effect, better);
+      var dirEl = document.getElementById('resultDirection');
+      var favorEl = document.getElementById('resultFavor');
+      if (dirEl) {
+        if (better === 'none') dirEl.textContent = 'Favour labels: hidden';
+        else if (better === 'lower') dirEl.textContent = 'Better outcomes: Lower values';
+        else dirEl.textContent = 'Better outcomes: Higher values';
+      }
+      if (favorEl) {
+        if (better === 'none') favorEl.textContent = '';
+        else favorEl.textContent = arm ? ('Result favors ' + arm) : 'Result near no difference';
+      }
+      var et = effectTypeLabel(bundle.spec);
+      var interp = buildInterpretationCard(bundle, et, better);
+      var nEl = document.getElementById('interpNarrative');
+      var mEl = document.getElementById('interpMag');
+      if (nEl) nEl.innerHTML = interp.narrative;
+      if (mEl) mEl.textContent = interp.mag;
+      if (activeTabName === 'forest') renderForestPlot(bundle);
+    }
+
+    function changeOutcomeBetter(next) {
+      if (!metaBundle || !next) return;
+      if (outcomeBetterOf(metaBundle) === next) {
+        syncBenefitControl(metaBundle);
+        return;
+      }
+      metaBundle.spec = Object.assign({}, metaBundle.spec || {}, { outcomeBetter: next });
+      try {
+        sessionStorage.setItem('metaBundle', JSON.stringify(metaBundle));
+        sessionStorage.setItem('metaModelSpec', JSON.stringify(metaBundle.spec));
+      } catch (_e) {}
+      sendParent('syncMetaSpec', { spec: metaBundle.spec });
+      applyOutcomeBetterLabels(metaBundle);
     }
 
     function countDroppedStudies(source, bundle) {
@@ -1229,9 +1323,7 @@
       } catch (_e) {}
     }
 
-    function positionMeasureMenu() {
-      var menu = document.getElementById('cfgEffectMeasureMenu');
-      var btn = document.getElementById('cfgEffectMeasureBtn');
+    function positionFixedMenu(menu, btn) {
       if (!menu || !btn || !menu.classList.contains('open')) return;
       var rect = btn.getBoundingClientRect();
       menu.style.visibility = 'hidden';
@@ -1248,10 +1340,41 @@
       menu.style.visibility = 'visible';
     }
 
+    function positionMeasureMenu() {
+      positionFixedMenu(
+        document.getElementById('cfgEffectMeasureMenu'),
+        document.getElementById('cfgEffectMeasureBtn')
+      );
+    }
+
+    function closeBenefitMenu() {
+      benefitMenuOpen = false;
+      var menu = document.getElementById('cfgBenefitMenu');
+      var btn = document.getElementById('cfgBenefitBtn');
+      if (menu) {
+        menu.classList.remove('open');
+        menu.style.display = '';
+        menu.style.visibility = '';
+      }
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    }
+
+    function openBenefitMenu() {
+      var menu = document.getElementById('cfgBenefitMenu');
+      var btn = document.getElementById('cfgBenefitBtn');
+      if (!menu || !btn) return;
+      closeMeasureMenu();
+      benefitMenuOpen = true;
+      menu.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+      positionFixedMenu(menu, btn);
+    }
+
     function openMeasureMenu() {
       var menu = document.getElementById('cfgEffectMeasureMenu');
       var btn = document.getElementById('cfgEffectMeasureBtn');
       if (!menu || !btn || btn.disabled) return;
+      closeBenefitMenu();
       measureMenuOpen = true;
       menu.classList.add('open');
       btn.setAttribute('aria-expanded', 'true');
@@ -1408,7 +1531,7 @@
       document.getElementById('cfgModel').textContent = ml;
       document.getElementById('cfgK').textContent = String(bundle.k);
       syncEffectMeasureControl(bundle);
-      syncContrastChip(bundle);
+      syncBenefitControl(bundle);
 
       var keepTab = opts.keepTab || pendingKeepTab || activeTabName;
       if (!document.querySelector('.tab-panel.active') && !opts.keepTab && !pendingKeepTab) {
@@ -1425,12 +1548,13 @@
         ' · 95% CI [' + fmt(bundle.pooled.ciLower) + ', ' + fmt(bundle.pooled.ciUpper) + ']';
       document.getElementById('resultContrast').textContent = 'Contrast: Treatment − Control';
       document.getElementById('resultDirection').textContent =
-        better === 'lower' ? 'Better outcomes: Lower values' : 'Better outcomes: Higher values';
+        better === 'none' ? 'Favour labels: hidden'
+          : better === 'lower' ? 'Better outcomes: Lower values'
+            : 'Better outcomes: Higher values';
       var favorEl = document.getElementById('resultFavor');
       if (favorEl) {
-        favorEl.textContent = arm
-          ? ('Result favors ' + arm)
-          : 'Result near no difference';
+        if (better === 'none') favorEl.textContent = '';
+        else favorEl.textContent = arm ? ('Result favors ' + arm) : 'Result near no difference';
       }
 
       updateCiBar(bundle);
@@ -1533,7 +1657,9 @@
 
     function forestFavorLabels(bundle) {
       // Contrast is Treatment − Control. Labels follow outcome coding only.
-      if (outcomeBetterOf(bundle) === 'lower') {
+      var better = outcomeBetterOf(bundle);
+      if (better === 'none') return null;
+      if (better === 'lower') {
         return { left: 'Favours treatment', right: 'Favours control' };
       }
       return { left: 'Favours control', right: 'Favours treatment' };
@@ -1700,10 +1826,12 @@
 
       var effectX = plotRight + 12;
       var weightX = plotRight + 12 + ctx.rightColW;
-      chart.renderer.text('Effect [95% CI]', effectX, plotTop - 10)
+      // Headers sit in marginTop (not clipped above the chart box)
+      var headerY = Math.max(16, plotTop - 12);
+      chart.renderer.text('Effect [95% CI]', effectX, headerY)
         .css({ color: ctx.headerCol, fontSize: '12px', fontWeight: '800' })
         .attr({ zIndex: 8 }).add(g);
-      chart.renderer.text('Weight', weightX, plotTop - 10)
+      chart.renderer.text('Weight', weightX, headerY)
         .css({ color: ctx.headerCol, fontSize: '12px', fontWeight: '800' })
         .attr({ zIndex: 8 }).add(g);
 
@@ -1727,19 +1855,21 @@
         .css({ color: t.orange, fontSize: '12.5px', fontWeight: '800' })
         .attr({ zIndex: 8 }).add(g);
 
-      var dirY = plotTop + plotHeight + 36;
-      var zeroX = xPx(0);
-      if (!isFinite(zeroX)) zeroX = plotLeft + plotWidth / 2;
-      zeroX = Math.max(plotLeft + 48, Math.min(plotRight - 48, zeroX));
-      chart.renderer.text(fav.left + '  ←', plotLeft, dirY)
-        .css({ color: ctx.labelMuted, fontSize: '12.5px', fontWeight: '700' })
-        .attr({ zIndex: 8 }).add(g);
-      chart.renderer.text('0', zeroX, dirY)
-        .css({ color: ctx.labelBright, fontSize: '12.5px', fontWeight: '800' })
-        .attr({ align: 'center', zIndex: 8 }).add(g);
-      chart.renderer.text('→  ' + fav.right, plotRight, dirY)
-        .css({ color: ctx.labelMuted, fontSize: '12.5px', fontWeight: '700' })
-        .attr({ align: 'right', zIndex: 8 }).add(g);
+      if (fav) {
+        var dirY = plotTop + plotHeight + 36;
+        var zeroX = xPx(0);
+        if (!isFinite(zeroX)) zeroX = plotLeft + plotWidth / 2;
+        zeroX = Math.max(plotLeft + 48, Math.min(plotRight - 48, zeroX));
+        chart.renderer.text(fav.left + '  ←', plotLeft, dirY)
+          .css({ color: ctx.labelMuted, fontSize: '12.5px', fontWeight: '700' })
+          .attr({ zIndex: 8 }).add(g);
+        chart.renderer.text('0', zeroX, dirY)
+          .css({ color: ctx.labelBright, fontSize: '12.5px', fontWeight: '800' })
+          .attr({ align: 'center', zIndex: 8 }).add(g);
+        chart.renderer.text('→  ' + fav.right, plotRight, dirY)
+          .css({ color: ctx.labelMuted, fontSize: '12.5px', fontWeight: '700' })
+          .attr({ align: 'right', zIndex: 8 }).add(g);
+      }
     }
 
     function forestPlotLines(vm) {
@@ -1800,6 +1930,7 @@
           chart: {
             height: vm.height,
             backgroundColor: vm.t.bg,
+            marginTop: 36,
             marginRight: vm.marginRight,
             animation: anim
           },
@@ -1856,6 +1987,7 @@
           height: vm.height,
           backgroundColor: vm.t.bg,
           style: { fontFamily: 'Segoe UI, system-ui, sans-serif' },
+          marginTop: 36,
           marginRight: vm.marginRight,
           marginBottom: 68,
           marginLeft: 136,
@@ -2112,16 +2244,43 @@
           if (measureMenuOpen) closeMeasureMenu();
           else openMeasureMenu();
         });
-        document.addEventListener('click', function (e) {
-          var wrap = document.getElementById('cfgEffectMeasureWrap');
-          if (wrap && wrap.contains(e.target)) return;
-          closeMeasureMenu();
-        });
         measureMenu.addEventListener('click', function (e) { e.stopPropagation(); });
-        window.addEventListener('resize', function () {
-          if (measureMenuOpen) positionMeasureMenu();
-        });
       }
+
+      var benefitBtn = document.getElementById('cfgBenefitBtn');
+      var benefitMenu = document.getElementById('cfgBenefitMenu');
+      if (benefitBtn && benefitMenu) {
+        benefitBtn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (benefitMenuOpen) closeBenefitMenu();
+          else openBenefitMenu();
+        });
+        benefitMenu.querySelectorAll('.cfg-measure-opt').forEach(function (optBtn) {
+          optBtn.addEventListener('click', function () {
+            var val = optBtn.getAttribute('data-value');
+            closeBenefitMenu();
+            if (val) changeOutcomeBetter(val);
+          });
+        });
+        benefitMenu.addEventListener('click', function (e) { e.stopPropagation(); });
+      }
+
+      document.addEventListener('click', function (e) {
+        var mWrap = document.getElementById('cfgEffectMeasureWrap');
+        var bWrap = document.getElementById('cfgBenefitWrap');
+        if (!(mWrap && mWrap.contains(e.target))) closeMeasureMenu();
+        if (!(bWrap && bWrap.contains(e.target))) closeBenefitMenu();
+      });
+      window.addEventListener('resize', function () {
+        if (measureMenuOpen) positionMeasureMenu();
+        if (benefitMenuOpen) {
+          positionFixedMenu(
+            document.getElementById('cfgBenefitMenu'),
+            document.getElementById('cfgBenefitBtn')
+          );
+        }
+      });
 
       /* Fixed-position tips so overflow:hidden panels do not clip them */
       document.addEventListener('mouseover', function (e) {

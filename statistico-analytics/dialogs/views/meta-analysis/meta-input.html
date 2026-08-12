@@ -288,6 +288,7 @@
     .opt-row:last-child { margin-bottom: 0; }
     .opt-row label { font-size: 11px; font-weight: 600; color: var(--cfg-text2); }
     .opt-radio-row { display: flex; gap: 6px; }
+    .opt-radio-col { display: flex; flex-direction: column; gap: 6px; }
     .opt-radio {
       flex: 1; display: flex; align-items: center; gap: 6px;
       padding: 7px 8px; border: 1px solid var(--cfg-border); border-radius: 8px;
@@ -530,17 +531,21 @@
                 </label>
               </div>
               <div class="opt-row">
-                <label class="lbl-with-tip">For this outcome, better results are
-                  <span class="info-icon" tabindex="0">i<span class="tip">Does <b>not</b> change the numbers. Contrast stays Treatment − Control. This only affects labels such as “favors treatment” vs “favors control.” Choose <b>Lower values</b> when smaller scores are better (e.g. symptoms, pain).</span></span>
+                <label class="lbl-with-tip">Beneficial outcome direction
+                  <span class="info-icon" tabindex="0">i<span class="tip">Does <b>not</b> change effect sizes or CIs. Contrast stays <b>Treatment − Control</b>. This only sets favour labels and interpretation (e.g. forest-plot axis).<br/><b>Lower values are better</b> — pain, symptoms, recovery time, blood pressure.<br/><b>Higher values are better</b> — function, survival probability, test scores.<br/><b>Do not display favour labels</b> — show the numeric contrast only.</span></span>
                 </label>
-                <div class="opt-radio-row">
+                <div class="opt-radio-col" id="outcomeBetterGroup">
                   <label class="opt-radio" id="dirLowerLabel">
-                    <input type="radio" name="outcomeBetter" value="lower" />
-                    Lower values
+                    <input type="radio" name="outcomeBetter" value="lower" checked />
+                    Lower values are better
                   </label>
-                  <label class="opt-radio active" id="dirHigherLabel">
-                    <input type="radio" name="outcomeBetter" value="higher" checked />
-                    Higher values
+                  <label class="opt-radio" id="dirHigherLabel">
+                    <input type="radio" name="outcomeBetter" value="higher" />
+                    Higher values are better
+                  </label>
+                  <label class="opt-radio" id="dirNoneLabel">
+                    <input type="radio" name="outcomeBetter" value="none" />
+                    Do not display favour labels
                   </label>
                 </div>
               </div>
@@ -592,7 +597,7 @@
     var modelType = 'random';
     var tauEstimator = 'reml';
     var hartungKnapp = true;
-    var outcomeBetter = 'higher';
+    var outcomeBetter = 'lower';
     var assignments = {};
     var draggedElement = null;
 
@@ -1158,13 +1163,13 @@
       if (spec.model) modelType = spec.model === 'fixed' ? 'fixed' : 'random';
       if (spec.tauEstimator) tauEstimator = spec.tauEstimator === 'dl' ? 'dl' : 'reml';
       hartungKnapp = spec.hartungKnapp !== false && modelType === 'random';
-      if (spec.outcomeBetter === 'lower' || spec.outcomeBetter === 'higher') {
+      if (spec.outcomeBetter === 'lower' || spec.outcomeBetter === 'higher' || spec.outcomeBetter === 'none') {
         outcomeBetter = spec.outcomeBetter;
       } else if (spec.effectDirection === 'control') {
         // Legacy: old “positive favors control” ≈ lower-is-better coding intent
         outcomeBetter = 'lower';
       } else {
-        outcomeBetter = 'higher';
+        outcomeBetter = 'lower';
       }
       // Legacy: a/b/c/d without format → non-events layout
       if (effectType === 'binary' && !spec.binaryFormat && (spec.bCol != null || (spec.colNames && spec.colNames.bCol))) {
@@ -1371,7 +1376,7 @@
       modelType = 'random';
       tauEstimator = 'reml';
       hartungKnapp = true;
-      outcomeBetter = 'higher';
+      outcomeBetter = 'lower';
       if (_saved) applySpec(_saved);
       else {
         syncOptionControls();
@@ -1502,7 +1507,7 @@
       });
       document.querySelectorAll('input[name="outcomeBetter"]').forEach(function (r) {
         r.addEventListener('change', function () {
-          outcomeBetter = r.value === 'lower' ? 'lower' : 'higher';
+          outcomeBetter = (r.value === 'higher' || r.value === 'none') ? r.value : 'lower';
           syncOptionControls();
           updateSummary();
         });

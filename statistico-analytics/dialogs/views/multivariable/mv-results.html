@@ -56,6 +56,7 @@
     }
     .mode-tab.active { color: #0c1624; background: var(--accent); border-color: var(--accent); }
     .shell { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--panel-w) 1fr; }
+    .shell.is-ready { display: grid; }
     .panel {
       border-right: 1px solid var(--border); background: var(--surface-1);
       overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px;
@@ -104,10 +105,18 @@
     }
     .pill i { color: var(--accent); }
     .chart-wrap {
-      flex: 1; min-height: 0; border: 1px solid var(--border); border-radius: 12px;
+      flex: 1 1 auto; min-height: 360px; height: 100%;
+      border: 1px solid var(--border); border-radius: 12px;
       background: #111827; position: relative; overflow: hidden;
     }
-    #chart { width: 100%; height: 100%; }
+    #chart { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 360px; }
+    #chartError {
+      display: none; position: absolute; inset: 0; z-index: 3;
+      align-items: center; justify-content: center; text-align: center;
+      padding: 24px; color: #fda4af; font-size: 13px; line-height: 1.45;
+      background: rgba(17,24,39,.92);
+    }
+    #chartError.is-visible { display: flex; }
     .size-legend {
       position: absolute; left: 14px; bottom: 14px;
       background: rgba(15,23,42,.88); border: 1px solid var(--border);
@@ -192,6 +201,7 @@
       <div class="status-strip" id="statusStrip"></div>
       <div class="chart-wrap">
         <div id="chart"></div>
+        <div id="chartError"></div>
         <div class="size-legend" id="sizeLegend"></div>
       </div>
     </main>
@@ -450,6 +460,99 @@
     });
   }
 
+  function showChartError(msg) {
+    var el = document.getElementById("chartError");
+    if (!el) return;
+    el.innerHTML = msg;
+    el.classList.add("is-visible");
+  }
+
+  function hideChartError() {
+    var el = document.getElementById("chartError");
+    if (!el) return;
+    el.classList.remove("is-visible");
+    el.innerHTML = "";
+  }
+
+  function destroyChart() {
+    if (state.chart && typeof state.chart.destroy === "function") {
+      try { state.chart.destroy(); } catch (e) {}
+    }
+    state.chart = null;
+  }
+
+  function drawChart(series, xField, yField, xPlot, yPlot, minSize, maxSize) {
+    hideChartError();
+    if (typeof Highcharts === "undefined") {
+      showChartError("Highcharts did not load.<br/>This page needs network access to <code>code.highcharts.com</code> (or a local Highcharts copy).");
+      return;
+    }
+    if (!Highcharts.seriesTypes || !Highcharts.seriesTypes.bubble) {
+      showChartError("Bubble series unavailable.<br/>Check that <code>highcharts-more.js</code> loaded.");
+      return;
+    }
+
+    var wrap = document.querySelector(".chart-wrap");
+    var height = wrap ? Math.max(wrap.clientHeight || 0, 360) : 420;
+    destroyChart();
+
+    try {
+      state.chart = Highcharts.chart("chart", {
+        chart: {
+          type: "bubble",
+          backgroundColor: "transparent",
+          zoomType: "xy",
+          height: height,
+          reflow: true,
+          style: { fontFamily: "'Segoe UI', system-ui, sans-serif" }
+        },
+        title: { text: null },
+        credits: { enabled: false },
+        legend: { itemStyle: { color: "#cbd5e1" }, itemHoverStyle: { color: "#fff" } },
+        xAxis: {
+          type: state.xScale,
+          title: { text: xField ? xField.label : "X", style: { color: "#94a3b8" } },
+          gridLineColor: "rgba(148,163,184,.15)", lineColor: "#334155", tickColor: "#334155",
+          labels: { style: { color: "#94a3b8" } }, plotLines: xPlot
+        },
+        yAxis: {
+          type: state.yScale,
+          title: { text: yField ? yField.label : "Y", style: { color: "#94a3b8" } },
+          gridLineColor: "rgba(148,163,184,.15)", lineColor: "#334155", tickColor: "#334155",
+          labels: { style: { color: "#94a3b8" } }, plotLines: yPlot
+        },
+        tooltip: {
+          useHTML: true,
+          backgroundColor: "rgba(15,23,42,.95)",
+          borderColor: "#334155",
+          style: { color: "#e2e8f0" },
+          pointFormatter: function () {
+            var r = this.custom.row;
+            var lines = [
+              "<b>" + this.name + "</b>",
+              (xField ? xField.label : "X") + ": <b>" + this.x + "</b>",
+              (yField ? yField.label : "Y") + ": <b>" + this.y + "</b>",
+              ((fieldMeta(state.map.size) || {}).label || "Size") + ": <b>" + this.z + "</b>"
+            ];
+            if (state.map.color) lines.push((fieldMeta(state.map.color) || {}).label + ": <b>" + r[state.map.color] + "</b>");
+            if (state.map.group) lines.push("Group: <b>" + r[state.map.group] + "</b>");
+            return lines.join("<br/>");
+          }
+        },
+        plotOptions: {
+          bubble: { minSize: minSize, maxSize: maxSize, cursor: "pointer", stickyTracking: false },
+          series: { states: { inactive: { opacity: 0.35 } } }
+        },
+        series: series
+      });
+      setTimeout(function () {
+        if (state.chart && typeof state.chart.reflow === "function") state.chart.reflow();
+      }, 50);
+    } catch (err) {
+      showChartError("Chart failed to render.<br/>" + ((err && err.message) || String(err)));
+    }
+  }
+
   function render() {
     if (!state.map.x || !state.map.y || !state.map.size) return;
     var series = buildSeries();
@@ -475,47 +578,11 @@
     var maxSize = Math.round(48 * state.sizeScale);
     var minSize = Math.max(4, Math.round(6 * state.sizeScale));
 
-    state.chart = Highcharts.chart("chart", {
-      chart: { type: "bubble", backgroundColor: "transparent", zoomType: "xy",
-        style: { fontFamily: "'Segoe UI', system-ui, sans-serif" } },
-      title: { text: null },
-      credits: { enabled: false },
-      legend: { itemStyle: { color: "#cbd5e1" }, itemHoverStyle: { color: "#fff" } },
-      xAxis: {
-        type: state.xScale,
-        title: { text: xField ? xField.label : "X", style: { color: "#94a3b8" } },
-        gridLineColor: "rgba(148,163,184,.15)", lineColor: "#334155", tickColor: "#334155",
-        labels: { style: { color: "#94a3b8" } }, plotLines: xPlot
-      },
-      yAxis: {
-        type: state.yScale,
-        title: { text: yField ? yField.label : "Y", style: { color: "#94a3b8" } },
-        gridLineColor: "rgba(148,163,184,.15)", lineColor: "#334155", tickColor: "#334155",
-        labels: { style: { color: "#94a3b8" } }, plotLines: yPlot
-      },
-      tooltip: {
-        useHTML: true,
-        backgroundColor: "rgba(15,23,42,.95)",
-        borderColor: "#334155",
-        style: { color: "#e2e8f0" },
-        pointFormatter: function () {
-          var r = this.custom.row;
-          var lines = [
-            "<b>" + this.name + "</b>",
-            (xField ? xField.label : "X") + ": <b>" + this.x + "</b>",
-            (yField ? yField.label : "Y") + ": <b>" + this.y + "</b>",
-            ((fieldMeta(state.map.size) || {}).label || "Size") + ": <b>" + this.z + "</b>"
-          ];
-          if (state.map.color) lines.push((fieldMeta(state.map.color) || {}).label + ": <b>" + r[state.map.color] + "</b>");
-          if (state.map.group) lines.push("Group: <b>" + r[state.map.group] + "</b>");
-          return lines.join("<br/>");
-        }
-      },
-      plotOptions: {
-        bubble: { minSize: minSize, maxSize: maxSize, cursor: "pointer", stickyTracking: false },
-        series: { states: { inactive: { opacity: 0.35 } } }
-      },
-      series: series
+    // Wait for layout after unhiding the shell — otherwise Highcharts paints at 0 height.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        drawChart(series, xField, yField, xPlot, yPlot, minSize, maxSize);
+      });
     });
   }
 
@@ -552,21 +619,36 @@
         render();
       });
     });
+    window.addEventListener("resize", function () {
+      if (state.chart && typeof state.chart.reflow === "function") state.chart.reflow();
+    });
   }
 
   bindControls();
 
   var gotData = false;
-  function tryDemoFallback() {
+  function startDemo() {
     if (gotData) return;
-    var q = window.location.search || "";
-    if (q.indexOf("demo=1") >= 0 || !(Office && Office.context && Office.context.ui)) {
-      ingest(DEMO);
-      gotData = true;
+    gotData = true;
+    ingest(DEMO);
+  }
+
+  function isBrowserPreview() {
+    try {
+      if (typeof Office === "undefined") return true;
+      if (!Office.context) return true;
+      if (!Office.context.ui || typeof Office.context.ui.messageParent !== "function") return true;
+      return false;
+    } catch (e) {
+      return true;
     }
   }
 
-  Office.onReady(function () {
+  function boot() {
+    if (isBrowserPreview() || /[?&]demo=1/.test(window.location.search || "")) {
+      startDemo();
+      return;
+    }
     try {
       Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function (arg) {
         try {
@@ -579,16 +661,15 @@
       });
     } catch (e) {}
     send("ready", null);
-    setTimeout(tryDemoFallback, 1200);
-  });
-
-  // Browser preview without Office
-  if (typeof Office === "undefined") {
-    ingest(DEMO);
-  } else {
     setTimeout(function () {
-      if (!gotData && /[?&]demo=1/.test(window.location.search || "")) ingest(DEMO);
-    }, 100);
+      if (!gotData) startDemo();
+    }, 1200);
+  }
+
+  if (typeof Office !== "undefined" && Office.onReady) {
+    Office.onReady(function () { boot(); });
+  } else {
+    boot();
   }
 })();
   </script>

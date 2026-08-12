@@ -551,6 +551,34 @@
 
     #forestPlot, #funnelPlot { min-height: 420px; width: 100%; }
     #forestPlot { min-height: 480px; }
+    .forest-wrap { position: relative; flex: 1; min-height: 0; width: 100%; }
+    .forest-col-headers {
+      position: absolute; z-index: 6; pointer-events: none;
+      display: flex; align-items: center; gap: 0;
+      font-size: 12px; font-weight: 800; color: var(--text-primary);
+      white-space: nowrap;
+    }
+    .forest-col-headers .forest-h-effect,
+    .forest-col-headers .forest-h-weight {
+      pointer-events: auto;
+      display: inline-flex; align-items: center; gap: 5px;
+      cursor: pointer; user-select: none;
+      color: var(--text-primary);
+      padding: 2px 4px; border-radius: 5px;
+    }
+    .forest-col-headers .forest-h-effect:hover,
+    .forest-col-headers .forest-h-weight:hover {
+      background: rgba(129,140,248,.18);
+    }
+    .forest-col-headers .forest-h-effect.active,
+    .forest-col-headers .forest-h-weight.active {
+      color: var(--accent-meta);
+    }
+    .forest-col-headers .sort-ind {
+      font-size: 10px; opacity: .55; font-weight: 700;
+    }
+    .forest-col-headers .active .sort-ind { opacity: 1; color: var(--accent-meta); }
+    .forest-col-headers .forest-h-weight .info-icon { margin-left: 1px; }
 
     .studies-table { width: 100%; border-collapse: collapse; font-size: 14px; }
     .studies-table th {
@@ -769,7 +797,10 @@
       <div id="tab-forest" class="tab-panel">
         <div class="panel-card" style="flex:1;display:flex;flex-direction:column;">
           <div class="panel-heading">Forest Plot</div>
-          <div id="forestPlot"></div>
+          <div class="forest-wrap" id="forestWrap">
+            <div id="forestColHeaders" class="forest-col-headers" hidden></div>
+            <div id="forestPlot"></div>
+          </div>
         </div>
       </div>
 
@@ -898,6 +929,7 @@
     var pendingKeepTab = null;
     var forestChart = null;
     var forestDrawCtx = null;
+    var forestSort = { key: 'input', dir: 'asc' };
     var benefitMenuOpen = false;
     var BENEFIT_OPTIONS = [
       { value: 'lower', label: 'Lower values better', full: 'Lower values are better' },
@@ -1673,10 +1705,65 @@
       return 0;
     }
 
+    function forestSortIndicator(key) {
+      if (forestSort.key !== key) return '↕';
+      return forestSort.dir === 'asc' ? '▲' : '▼';
+    }
+
+    function studiesForForest(bundle) {
+      var studies = (bundle.studies || []).slice();
+      var dir = forestSort.dir === 'desc' ? -1 : 1;
+      if (forestSort.key === 'effect') {
+        studies.sort(function (a, b) {
+          var d = (a.yi || 0) - (b.yi || 0);
+          return d === 0 ? String(a.name || '').localeCompare(String(b.name || '')) : d * dir;
+        });
+      } else if (forestSort.key === 'weight') {
+        studies.sort(function (a, b) {
+          var d = (a.weightPct || 0) - (b.weightPct || 0);
+          return d === 0 ? String(a.name || '').localeCompare(String(b.name || '')) : d * dir;
+        });
+      } else if (forestSort.key === 'input' && forestSort.dir === 'desc') {
+        studies.reverse();
+      }
+      return studies;
+    }
+
+    function setForestSort(key) {
+      if (!key) return;
+      if (forestSort.key === key) {
+        forestSort.dir = forestSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        forestSort.key = key;
+        // Effect: ascending (most negative first); Weight: descending (largest first)
+        forestSort.dir = key === 'weight' ? 'desc' : 'asc';
+      }
+      if (metaBundle) renderForestPlot(metaBundle);
+    }
+
+    function syncForestColHeaders(chart, ctx) {
+      var el = document.getElementById('forestColHeaders');
+      if (!el || !chart || !ctx) return;
+      var effectW = ctx.rightColW;
+      var weightActive = forestSort.key === 'weight' ? ' active' : '';
+      var effectActive = forestSort.key === 'effect' ? ' active' : '';
+      el.hidden = false;
+      el.style.left = (chart.plotLeft + chart.plotWidth + 8) + 'px';
+      el.style.top = Math.max(6, chart.plotTop - 22) + 'px';
+      el.style.width = (effectW + ctx.weightColW + 24) + 'px';
+      el.innerHTML =
+        '<span class="forest-h-effect' + effectActive + '" data-forest-sort="effect" title="Sort by effect size">' +
+          'Effect [95% CI] <span class="sort-ind">' + forestSortIndicator('effect') + '</span></span>' +
+        '<span class="forest-h-weight' + weightActive + '" data-forest-sort="weight" title="Sort by weight" style="margin-left:' +
+          Math.max(8, effectW - 8) + 'px">' +
+          'Weight <span class="sort-ind">' + forestSortIndicator('weight') + '</span>' +
+          '<span class="info-icon" tabindex="0">i<span class="tip"><b>Weight</b> — relative contribution of each study to the pooled estimate under the current model (random-effects weights use 1/(v<sub>i</sub>+τ²)). Larger markers correspond to higher weight. Column totals 100% across studies.</span></span></span>';
+    }
+
     function buildForestViewModel(bundle) {
       var t = chartTheme();
       var light = document.documentElement.getAttribute('data-theme') === 'light';
-      var studies = bundle.studies;
+      var studies = studiesForForest(bundle);
       var k = studies.length;
       var pooledY = k;
       var modelTxt = modelLabel(bundle);
@@ -1754,8 +1841,8 @@
         }],
         fav: forestFavorLabels(bundle),
         rightColW: 178,
-        weightColW: 58,
-        marginRight: 178 + 58 + 22,
+        weightColW: 72,
+        marginRight: 178 + 72 + 22,
         labelBright: labelBright,
         labelMuted: labelMuted,
         headerCol: headerCol,
@@ -1826,14 +1913,7 @@
 
       var effectX = plotRight + 12;
       var weightX = plotRight + 12 + ctx.rightColW;
-      // Headers sit in marginTop (not clipped above the chart box)
-      var headerY = Math.max(16, plotTop - 12);
-      chart.renderer.text('Effect [95% CI]', effectX, headerY)
-        .css({ color: ctx.headerCol, fontSize: '12px', fontWeight: '800' })
-        .attr({ zIndex: 8 }).add(g);
-      chart.renderer.text('Weight', weightX, headerY)
-        .css({ color: ctx.headerCol, fontSize: '12px', fontWeight: '800' })
-        .attr({ zIndex: 8 }).add(g);
+      syncForestColHeaders(chart, ctx);
 
       rows.forEach(function (r) {
         var y = yPx(r.i) + 4;
@@ -2249,6 +2329,17 @@
       if (!ok) {
         setTimeout(bootHeader, 120);
         setTimeout(bootHeader, 600);
+      }
+
+      var forestHeaders = document.getElementById('forestColHeaders');
+      if (forestHeaders) {
+        forestHeaders.addEventListener('click', function (e) {
+          if (e.target && e.target.closest && e.target.closest('.info-icon')) return;
+          var hit = e.target && e.target.closest ? e.target.closest('[data-forest-sort]') : null;
+          if (!hit) return;
+          e.preventDefault();
+          setForestSort(hit.getAttribute('data-forest-sort'));
+        });
       }
 
       var measureBtn = document.getElementById('cfgEffectMeasureBtn');

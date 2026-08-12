@@ -535,6 +535,7 @@
     }
 
     #forestPlot, #funnelPlot { min-height: 420px; width: 100%; }
+    #forestPlot { min-height: 480px; }
 
     .studies-table { width: 100%; border-collapse: collapse; font-size: 14px; }
     .studies-table th {
@@ -1510,66 +1511,324 @@
       syncHeaderMeta(bundle);
     }
 
+    function studyCi(s) {
+      var lo = s.ciLower;
+      var hi = s.ciUpper;
+      if (lo == null || hi == null || !isFinite(lo) || !isFinite(hi)) {
+        var se = (s.se != null && isFinite(s.se)) ? s.se : Math.sqrt(s.vi);
+        lo = s.yi - 1.96 * se;
+        hi = s.yi + 1.96 * se;
+      }
+      return { lo: lo, hi: hi };
+    }
+
+    function weightMarkerRadius(weightPct, maxPct) {
+      var minR = 3.5;
+      var maxR = 11;
+      var t = Math.sqrt(Math.max(0, weightPct || 0) / Math.max(maxPct || 1, 1e-9));
+      return minR + t * (maxR - minR);
+    }
+
+    function forestFavorLabels(bundle) {
+      // Contrast is Treatment − Control. Labels follow outcome coding only.
+      if (outcomeBetterOf(bundle) === 'lower') {
+        return { left: 'Favours treatment', right: 'Favours control' };
+      }
+      return { left: 'Favours control', right: 'Favours treatment' };
+    }
+
     function renderForestPlot(bundle) {
-      if (!bundle || !window.Highcharts) return;
+      if (!bundle || !window.Highcharts || !bundle.studies) return;
       var t = chartTheme();
-      var categories = bundle.studies.map(function (s) { return s.name; });
-      var cis = bundle.studies.map(function (s) {
-        var se = Math.sqrt(s.vi);
-        return [s.yi - 1.96 * se, s.yi + 1.96 * se];
+      var studies = bundle.studies;
+      var k = studies.length;
+      var pooledY = k;
+      var modelTxt = modelLabel(bundle);
+      var categories = studies.map(function (s) { return s.name || 'Study'; })
+        .concat(['Random-effects model']);
+      if (bundle.model === 'fixed') {
+        categories[categories.length - 1] = 'Fixed-effect model';
+        modelTxt = 'Fixed-effect';
+      }
+
+      var rows = studies.map(function (s, i) {
+        var ci = studyCi(s);
+        return {
+          i: i,
+          name: s.name || ('Study ' + (i + 1)),
+          yi: s.yi,
+          lo: ci.lo,
+          hi: ci.hi,
+          weightPct: s.weightPct != null ? s.weightPct : 0
+        };
       });
+      var maxW = rows.reduce(function (m, r) { return Math.max(m, r.weightPct); }, 0);
+
+      var xVals = [0, bundle.pooled.effect, bundle.pooled.ciLower, bundle.pooled.ciUpper];
+      rows.forEach(function (r) { xVals.push(r.lo, r.hi, r.yi); });
+      var xMin = Math.min.apply(null, xVals.filter(isFinite));
+      var xMax = Math.max.apply(null, xVals.filter(isFinite));
+      if (!isFinite(xMin) || !isFinite(xMax)) { xMin = -1; xMax = 1; }
+      if (xMin === xMax) { xMin -= 0.5; xMax += 0.5; }
+      var pad = (xMax - xMin) * 0.12;
+      xMin -= pad;
+      xMax += pad;
+
+      // Disconnected CI segments (native series — not clipped full-width grid lines)
+      var ciLineData = [];
+      rows.forEach(function (r) {
+        ciLineData.push([r.lo, r.i], [r.hi, r.i], null);
+      });
+
+      var fav = forestFavorLabels(bundle);
+      var rightColW = 168;
+      var weightColW = 56;
+      var marginRight = rightColW + weightColW + 18;
+
+      function clearForestLayer(chart) {
+        if (chart.forestLayer) {
+          chart.forestLayer.destroy();
+          chart.forestLayer = null;
+        }
+      }
+
+      function drawForestLayer(chart) {
+        clearForestLayer(chart);
+        var g = chart.renderer.g('forest-extras').attr({ zIndex: 7 }).add();
+        chart.forestLayer = g;
+        var xa = chart.xAxis[0];
+        var ya = chart.yAxis[0];
+        var plotLeft = chart.plotLeft;
+        var plotTop = chart.plotTop;
+        var plotWidth = chart.plotWidth;
+        var plotHeight = chart.plotHeight;
+        var plotRight = plotLeft + plotWidth;
+
+        function xPx(v) { return xa.toPixels(v, false); }
+        function yPx(v) { return ya.toPixels(v, false); }
+
+        // CI end caps
+        rows.forEach(function (r) {
+          var y = yPx(r.i);
+          var x0 = xPx(r.lo);
+          var x1 = xPx(r.hi);
+          var cap = 5;
+          chart.renderer.path(['M', x0, y - cap, 'L', x0, y + cap]).attr({
+            stroke: t.muted, 'stroke-width': 1.5, zIndex: 6
+          }).add(g);
+          chart.renderer.path(['M', x1, y - cap, 'L', x1, y + cap]).attr({
+            stroke: t.muted, 'stroke-width': 1.5, zIndex: 6
+          }).add(g);
+        });
+
+        // Pooled diamond: centre at effect, width = CI
+        var dY = yPx(pooledY);
+        var dL = xPx(bundle.pooled.ciLower);
+        var dR = xPx(bundle.pooled.ciUpper);
+        var dC = xPx(bundle.pooled.effect);
+        var dH = Math.min(10, Math.max(7, plotHeight / (k + 3) * 0.35));
+        chart.renderer.path([
+          'M', dL, dY,
+          'L', dC, dY - dH,
+          'L', dR, dY,
+          'L', dC, dY + dH,
+          'Z'
+        ]).attr({
+          fill: t.orange,
+          stroke: t.orange,
+          'stroke-width': 1,
+          zIndex: 8
+        }).add(g);
+
+        // Column headers + per-row Effect [CI] and Weight (always visible)
+        var effectX = plotRight + 10;
+        var weightX = plotRight + 10 + rightColW;
+        chart.renderer.text('Effect [95% CI]', effectX, plotTop - 8)
+          .css({ color: t.muted, fontSize: '11px', fontWeight: '700' })
+          .attr({ zIndex: 8 }).add(g);
+        chart.renderer.text('Weight', weightX, plotTop - 8)
+          .css({ color: t.muted, fontSize: '11px', fontWeight: '700' })
+          .attr({ zIndex: 8 }).add(g);
+
+        rows.forEach(function (r) {
+          var y = yPx(r.i) + 4;
+          var effectTxt = fmt(r.yi) + ' [' + fmt(r.lo) + ', ' + fmt(r.hi) + ']';
+          chart.renderer.text(effectTxt, effectX, y)
+            .css({ color: t.text, fontSize: '11.5px', fontWeight: '600' })
+            .attr({ zIndex: 8 }).add(g);
+          chart.renderer.text(fmt(r.weightPct, 1) + '%', weightX, y)
+            .css({ color: t.text, fontSize: '11.5px', fontWeight: '600' })
+            .attr({ zIndex: 8 }).add(g);
+        });
+
+        var pooledEffectTxt = fmt(bundle.pooled.effect) + ' [' +
+          fmt(bundle.pooled.ciLower) + ', ' + fmt(bundle.pooled.ciUpper) + ']';
+        chart.renderer.text(pooledEffectTxt, effectX, dY + 4)
+          .css({ color: t.orange, fontSize: '11.5px', fontWeight: '700' })
+          .attr({ zIndex: 8 }).add(g);
+        chart.renderer.text('100%', weightX, dY + 4)
+          .css({ color: t.orange, fontSize: '11.5px', fontWeight: '700' })
+          .attr({ zIndex: 8 }).add(g);
+
+        // Direction labels under the plot: Favours … ← 0 → Favours …
+        var dirY = plotTop + plotHeight + 34;
+        var zeroX = xPx(0);
+        if (!isFinite(zeroX)) zeroX = plotLeft + plotWidth / 2;
+        zeroX = Math.max(plotLeft + 40, Math.min(plotRight - 40, zeroX));
+        chart.renderer.text(fav.left + '  ←', plotLeft, dirY)
+          .css({ color: t.muted, fontSize: '11.5px', fontWeight: '650' })
+          .attr({ zIndex: 8 }).add(g);
+        chart.renderer.text('0', zeroX, dirY)
+          .css({ color: t.muted, fontSize: '11.5px', fontWeight: '700' })
+          .attr({ align: 'center', zIndex: 8 }).add(g);
+        chart.renderer.text('→  ' + fav.right, plotRight, dirY)
+          .css({ color: t.muted, fontSize: '11.5px', fontWeight: '650' })
+          .attr({ align: 'right', zIndex: 8 }).add(g);
+      }
+
       Highcharts.chart('forestPlot', {
         chart: {
           type: 'scatter',
-          height: Math.max(420, bundle.k * 42 + 120),
+          height: Math.max(480, (k + 1) * 44 + 150),
           backgroundColor: t.bg,
-          style: { fontFamily: 'Segoe UI, system-ui, sans-serif' }
+          style: { fontFamily: 'Segoe UI, system-ui, sans-serif' },
+          marginRight: marginRight,
+          marginBottom: 64,
+          marginLeft: 130,
+          events: {
+            render: function () { drawForestLayer(this); }
+          }
         },
         title: { text: null },
         credits: { enabled: false },
         xAxis: {
-          title: { text: 'Effect Size', style: { color: t.muted } },
-          gridLineColor: t.grid,
+          min: xMin,
+          max: xMax,
+          startOnTick: false,
+          endOnTick: false,
+          title: { text: null },
+          gridLineWidth: 0,
           lineColor: t.grid,
           tickColor: t.grid,
-          labels: { style: { color: t.muted } },
+          labels: { style: { color: t.muted, fontSize: '11px' } },
           plotLines: [
-            { value: 0, color: t.muted, width: 1, dashStyle: 'Dash' },
-            { value: bundle.pooled.effect, color: t.orange, width: 2,
-              label: { text: 'Pooled', style: { color: t.orange, fontWeight: '700' } } }
+            {
+              value: 0,
+              color: t.muted,
+              width: 1.5,
+              dashStyle: 'Dash',
+              zIndex: 4,
+              label: {
+                text: 'No effect',
+                align: 'left',
+                style: { color: t.muted, fontSize: '10px', fontWeight: '600' }
+              }
+            },
+            {
+              value: bundle.pooled.effect,
+              color: t.orange,
+              width: 1,
+              dashStyle: 'Dot',
+              zIndex: 3,
+              label: {
+                text: 'Pooled',
+                style: { color: t.orange, fontSize: '10px', fontWeight: '700' }
+              }
+            }
           ]
         },
         yAxis: {
-          categories: categories, reversed: true, title: { text: null },
-          gridLineColor: t.grid, labels: { style: { color: t.text } }
+          categories: categories,
+          reversed: true,
+          title: { text: null },
+          min: -0.5,
+          max: k + 0.5,
+          gridLineWidth: 0,
+          lineWidth: 0,
+          tickWidth: 0,
+          labels: {
+            style: { color: t.text, fontSize: '12px', fontWeight: '600' },
+            useHTML: false
+          },
+          plotBands: [{
+            from: pooledY - 0.45,
+            to: pooledY + 0.45,
+            color: 'rgba(255,165,120,0.07)'
+          }]
         },
         legend: { enabled: false },
         tooltip: {
-          backgroundColor: t.bg, borderColor: t.grid,
+          backgroundColor: t.bg,
+          borderColor: t.grid,
           style: { color: t.text },
           formatter: function () {
-            var i = this.point.index;
-            return '<b>' + this.point.category + '</b><br/>Effect: ' + fmt(this.x) +
-              '<br/>95% CI: [' + fmt(cis[i][0]) + ', ' + fmt(cis[i][1]) + ']';
+            if (this.point && this.point.isPooled) {
+              return '<b>' + modelTxt + '</b><br/>' +
+                'Pooled: ' + fmt(bundle.pooled.effect) +
+                '<br/>95% CI: [' + fmt(bundle.pooled.ciLower) + ', ' +
+                fmt(bundle.pooled.ciUpper) + ']';
+            }
+            var r = this.point && this.point.row;
+            if (!r) return false;
+            return '<b>' + r.name + '</b><br/>' +
+              'Effect: ' + fmt(r.yi) +
+              '<br/>95% CI: [' + fmt(r.lo) + ', ' + fmt(r.hi) + ']' +
+              '<br/>Weight: ' + fmt(r.weightPct, 1) + '%';
           }
         },
-        series: [{
-          name: 'Study Effects',
-          data: bundle.studies.map(function (s, i) {
-            return {
-              y: i, x: s.yi,
-              marker: { radius: 5 + (s.weightPct || 0) / 8, fillColor: t.accent, symbol: 'square' }
-            };
-          }),
-          color: t.accent
-        }]
-      }, function (chart) {
-        cis.forEach(function (ci, i) {
-          chart.renderer.path([
-            'M', chart.xAxis[0].toPixels(ci[0]), chart.yAxis[0].toPixels(i),
-            'L', chart.xAxis[0].toPixels(ci[1]), chart.yAxis[0].toPixels(i)
-          ]).attr({ 'stroke-width': 2, stroke: t.muted }).add();
-        });
+        plotOptions: {
+          series: { animation: false },
+          line: { marker: { enabled: false }, states: { hover: { lineWidthPlus: 0 } } },
+          scatter: {
+            tooltip: { headerFormat: '', pointFormat: '' }
+          }
+        },
+        series: [
+          {
+            type: 'line',
+            name: '95% CI',
+            data: ciLineData,
+            color: t.muted,
+            lineWidth: 2,
+            enableMouseTracking: false,
+            showInLegend: false,
+            zIndex: 2
+          },
+          {
+            type: 'scatter',
+            name: 'Study effects',
+            color: t.accent,
+            data: rows.map(function (r) {
+              return {
+                x: r.yi,
+                y: r.i,
+                row: r,
+                marker: {
+                  symbol: 'square',
+                  radius: weightMarkerRadius(r.weightPct, maxW),
+                  fillColor: t.accent,
+                  lineColor: t.accent,
+                  lineWidth: 1
+                }
+              };
+            }),
+            zIndex: 5
+          },
+          {
+            // Invisible anchor so pooled row participates in hover/layout
+            type: 'scatter',
+            name: 'Pooled',
+            data: [{
+              x: bundle.pooled.effect,
+              y: pooledY,
+              isPooled: true,
+              marker: { enabled: false }
+            }],
+            enableMouseTracking: true,
+            showInLegend: false,
+            zIndex: 1
+          }
+        ]
       });
     }
 

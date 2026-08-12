@@ -4,19 +4,22 @@
  */
 (function () {
   var rangeMode = "used";
+  var lastPromptBindingId = null;
 
   var MODE_LABELS = {
+    prompt: "Sheet picker",
     used: "Active region",
-    selection: "Selected range",
+    selection: "Current selection",
     named: "Named range"
   };
 
   function hubSyncRangeModeUI(mode) {
     mode = mode || "used";
-    ["hubPickSelection", "hubPickUsed", "hubPickNamed"].forEach(function (id) {
+    ["hubPickPrompt", "hubPickSelection", "hubPickUsed", "hubPickNamed"].forEach(function (id) {
       var btn = document.getElementById(id);
       if (!btn) return;
       var active =
+        (id === "hubPickPrompt" && mode === "prompt") ||
         (id === "hubPickSelection" && mode === "selection") ||
         (id === "hubPickUsed" && mode === "used") ||
         (id === "hubPickNamed" && mode === "named");
@@ -43,6 +46,7 @@
     hubSyncRangeModeUI(mode);
     if (mode === "used") autoDetectRange();
     else if (mode === "selection") useSelection();
+    else if (mode === "prompt") pickRangeOnSheet();
   }
 
   function pickRangeMode(mode) {
@@ -56,6 +60,166 @@
     }
     closeRangePicker();
     setRangeMode(mode);
+  }
+
+  function releasePromptBinding(bindingId) {
+    if (!bindingId || !Office.context.document.bindings) return;
+    try {
+      Office.context.document.bindings.releaseByIdAsync(bindingId, function () {});
+    } catch (e) {}
+  }
+
+  /**
+   * Opens Excel’s built-in Select Data prompt so the user can drag/type a range.
+   * Reads address + values via the Excel binding API, then releases the binding.
+   */
+  function pickRangeOnSheet() {
+    if (!Office.context.document || !Office.context.document.bindings) {
+      showRangeState("Range picker unavailable in this host", true);
+      return;
+    }
+    closeRangePicker();
+    showRangeState("Select a range in Excel…", false);
+
+    if (lastPromptBindingId) {
+      releasePromptBinding(lastPromptBindingId);
+      lastPromptBindingId = null;
+    }
+
+    var bindingId = "statisticoRange_" + Date.now();
+    Office.context.document.bindings.addFromPromptAsync(
+      Office.BindingType.Matrix,
+      {
+        id: bindingId,
+        promptText: "Select the data range for Statistico (header row + data)."
+      },
+      function (result) {
+        if (result.status !== Office.AsyncResultStatus.Succeeded) {
+          var msg =
+            (result.error && result.error.message) ||
+            "Range selection cancelled";
+          console.error("addFromPromptAsync:", msg);
+          /* User cancel should not wipe a previously valid range. */
+          var gr = window.StatisticoGlobalRange && StatisticoGlobalRange.load();
+          if (gr && gr.values && gr.values.length >= 2) {
+            rangeMode = gr.mode || rangeMode;
+            hubSyncRangeModeUI(rangeMode);
+            applyRangeData(gr.values, gr.address);
+          } else {
+            showRangeState(msg, true);
+          }
+          return;
+        }
+
+        var id = (result.value && result.value.id) || bindingId;
+        lastPromptBindingId = id;
+
+        Excel.run(function (ctx) {
+          var binding = ctx.workbook.bindings.getItem(id);
+          var rng = binding.getRange();
+          rng.load(["values", "address"]);
+          return ctx.sync().then(function () {
+            rangeMode = "prompt";
+            hubSyncRangeModeUI("prompt");
+            applyRangeData(rng.values, rng.address);
+          });
+        })
+          .catch(function (e) {
+            console.warn("prompt binding read failed, trying getDataAsync:", e);
+            return readPromptBindingViaCommonApi(id);
+          })
+          .then(function () {
+            releasePromptBinding(id);
+            if (lastPromptBindingId === id) lastPromptBindingId = null;
+          });
+      }
+    );
+  }
+
+  function readPromptBindingViaCommonApi(id) {
+    return new Promise(function (resolve) {
+      Office.context.document.bindings.getByIdAsync(id, function (getRes) {
+        if (getRes.status !== Office.AsyncResultStatus.Succeeded) {
+          showRangeState("Could not read prompted range", true);
+          resolve();
+          return;
+        }
+        getRes.value.getDataAsync(
+          { coercionType: Office.CoercionType.Matrix },
+          function (dataRes) {
+            if (dataRes.status !== Office.AsyncResultStatus.Succeeded) {
+              showRangeState("Could not read prompted range", true);
+              resolve();
+              return;
+            }
+            Excel.run(function (ctx2) {
+              var sel = ctx2.workbook.getSelectedRange();
+              sel.load("address");
+              return ctx2.sync().then(function () {
+                rangeMode = "prompt";
+                hubSyncRangeModeUI("prompt");
+                applyRangeData(dataRes.value, sel.address);
+              });
+            })
+              .catch(function () {
+                rangeMode = "prompt";
+                hubSyncRangeModeUI("prompt");
+                applyRangeData(dataRes.value, "");
+              })
+              .then(resolve);
+          }
+        );
+      });
+    });
+  }
+
+  /** Parse Sheet1!A1:B2 / 'My Sheet'!A1:B2 into worksheet + local A1. */
+  function resolveAddressParts(address) {
+    var raw = (address || "").trim();
+    var bang = raw.lastIndexOf("!");
+    if (bang <= 0) {
+      return { sheetName: null, local: raw };
+    }
+    var sheetPart = raw.substring(0, bang);
+    var local = raw.substring(bang + 1);
+    var sheetName = sheetPart;
+    if (sheetName.charAt(0) === "'" && sheetName.charAt(sheetName.length - 1) === "'") {
+      sheetName = sheetName.slice(1, -1).replace(/''/g, "'");
+    }
+    return { sheetName: sheetName, local: local };
+  }
+
+  /** Re-load a previously prompted range by its stored A1 address. */
+  async function loadFromStoredAddress() {
+    var gr = window.StatisticoGlobalRange && StatisticoGlobalRange.load();
+    var address = gr && gr.address;
+    if (!address) {
+      showRangeState("No stored sheet range — pick again", true);
+      return false;
+    }
+    showRangeState("Loading…", false);
+    try {
+      await Excel.run(async function (ctx) {
+        var parts = resolveAddressParts(address);
+        var rng;
+        if (parts.sheetName) {
+          rng = ctx.workbook.worksheets.getItem(parts.sheetName).getRange(parts.local);
+        } else {
+          rng = ctx.workbook.worksheets.getActiveWorksheet().getRange(parts.local);
+        }
+        rng.load(["values", "address"]);
+        await ctx.sync();
+        applyRangeData(rng.values, rng.address);
+      });
+      return true;
+    } catch (e) {
+      console.warn("loadFromStoredAddress:", e);
+      /* Fallback: current selection (prompt usually leaves it selected). */
+      await useSelection();
+      rangeMode = "prompt";
+      hubSyncRangeModeUI("prompt");
+      return true;
+    }
   }
 
   async function loadNamedRanges() {
@@ -161,6 +325,9 @@
         // stored snapshot rather than silently switching to the used range.
         return false;
       }
+      if (rangeMode === "prompt") {
+        return await loadFromStoredAddress();
+      }
       if (rangeMode === "selection") {
         await useSelection();
         return true;
@@ -193,7 +360,7 @@
       addrEl.title = text;
     }
     if (okIcon) {
-      var pending = /loading|detecting/i.test(text);
+      var pending = /loading|detecting|select a range/i.test(text);
       okIcon.style.display = isError || pending ? "none" : "";
     }
     if (bar) bar.classList.toggle("is-error", !!isError);
@@ -246,6 +413,8 @@
         // Re-read the live sheet instead of trusting the stored snapshot,
         // which may predate edits made since it was captured.
         await autoDetectRange();
+      } else if (rangeMode === "prompt") {
+        await loadFromStoredAddress();
       } else {
         applyRangeData(gr.values, gr.address);
       }

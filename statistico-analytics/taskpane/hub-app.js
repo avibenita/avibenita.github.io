@@ -1373,6 +1373,7 @@ function openParetoFromHub() {
 
 function openBuilderDialogFromHub(options) {
   var gr = getGlobalRangePayload() || { values: [], address: "", mode: "used" };
+  var handedOffToResults = false;
   setSelectedModuleCard(options.moduleId, true);
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + options.dialogPath + (options.dialogPath.indexOf("?") >= 0 ? "&" : "?") + "v=" + Date.now(),
@@ -1414,15 +1415,19 @@ function openBuilderDialogFromHub(options) {
           var modelActions = options.modelActions || [];
           if (modelActions.indexOf(msg.action) >= 0) {
             if (typeof options.onModel === "function") options.onModel(msg);
+            handedOffToResults = !!(options.hubResultsKey && window.HubResultsBridge);
             try { dlg.close(); } catch (e) {}
             dlg = null;
             hubBuilderDialog = null;
-            if (options.hubResultsKey && window.HubResultsBridge) {
+            if (handedOffToResults) {
               HubResultsBridge.open(options.hubResultsKey, options.nextDelayMs || 380);
             } else if (typeof options.nextUrl === "function") {
+              setSelectedModuleCard(options.moduleId, false);
               setTimeout(function () {
                 window.location.href = options.nextUrl();
               }, options.nextDelayMs || 380);
+            } else {
+              setSelectedModuleCard(options.moduleId, false);
             }
             return;
           }
@@ -1438,7 +1443,8 @@ function openBuilderDialogFromHub(options) {
       dlg.addEventHandler(Office.EventType.DialogEventReceived, function () {
         dlg = null;
         hubBuilderDialog = null;
-        if (options.hubResultsKey) return;
+        /* Keep selected only while handing off to results; X-close clears. */
+        if (handedOffToResults) return;
         setSelectedModuleCard(options.moduleId, false);
       });
     }

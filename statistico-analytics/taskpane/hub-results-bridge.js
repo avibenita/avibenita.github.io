@@ -27,6 +27,7 @@
   var loaded = {};
   var loading = {};
   var activeDialog = null;
+  var activeModuleKey = null;
 
   function getDialogsBaseUrl() {
     var href = global.location.href;
@@ -34,11 +35,21 @@
     return global.location.origin + '/dialogs/views/';
   }
 
+  function clearModuleSelection(moduleKey) {
+    if (!moduleKey) return;
+    if (typeof global.setSelectedModuleCard === 'function') {
+      try { global.setSelectedModuleCard(moduleKey, false); } catch (_e) {}
+    }
+  }
+
   function registerDialog(dialog) {
     activeDialog = dialog || null;
+    var moduleKey = activeModuleKey;
     if (dialog && global.StatisticoDialogHost) {
       global.StatisticoDialogHost.onUserClosed(dialog, function () {
         if (activeDialog === dialog) activeDialog = null;
+        clearModuleSelection(moduleKey);
+        if (activeModuleKey === moduleKey) activeModuleKey = null;
       });
     }
   }
@@ -48,6 +59,8 @@
       try { activeDialog.close(); } catch (_e) {}
       activeDialog = null;
     }
+    clearModuleSelection(activeModuleKey);
+    activeModuleKey = null;
   }
 
   function hasActive() {
@@ -95,10 +108,26 @@
 
   function open(key, delayMs) {
     delayMs = typeof delayMs === 'number' ? delayMs : 500;
+    activeModuleKey = key || null;
     global.setTimeout(function () {
-      ensurePanel(key, function () {
+      ensurePanel(key, function (err) {
+        if (err) {
+          clearModuleSelection(key);
+          if (activeModuleKey === key) activeModuleKey = null;
+          return;
+        }
         var runner = global.StatisticoHubResults && global.StatisticoHubResults[key];
-        if (typeof runner === 'function') runner();
+        if (typeof runner !== 'function') {
+          clearModuleSelection(key);
+          if (activeModuleKey === key) activeModuleKey = null;
+          return;
+        }
+        var opened = false;
+        try { opened = runner() !== false; } catch (_e) { opened = false; }
+        if (!opened) {
+          clearModuleSelection(key);
+          if (activeModuleKey === key) activeModuleKey = null;
+        }
       });
     }, delayMs);
   }

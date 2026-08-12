@@ -216,6 +216,7 @@
               <button type="button" data-on="0">Off</button>
             </div>
           </div>
+          <div class="hint-mini">Shading tints each of the four zones with a different color so Leaders / Opportunities / Monitor / Low priority are easier to tell apart. Turn Off for a plain plot with only the divider lines.</div>
           <div class="q-grid">
             <div><label>High X / High Y</label><input type="text" id="qNE" value="Leaders" /></div>
             <div><label>Low X / High Y</label><input type="text" id="qNW" value="Opportunities" /></div>
@@ -277,10 +278,21 @@
         <button class="acc-h" type="button" data-acc="accBubbles">Bubbles <i class="fa-solid fa-chevron-down chev"></i></button>
         <div class="acc-b">
           <div class="ctrl-row">
+            <label>Look</label>
+            <div class="seg" id="bubbleStyle">
+              <button type="button" data-style="flat">Flat</button>
+              <button type="button" data-style="sphere" class="active">Sphere (3D)</button>
+            </div>
+          </div>
+          <div class="ctrl-row">
             <label>Size scale</label>
             <input id="sizeScale" type="range" min="0.4" max="2.2" step="0.05" value="1" />
           </div>
-          <div class="hint">Size uses <strong>area</strong> (not diameter) by default.</div>
+          <div class="ctrl-row">
+            <label>Opacity</label>
+            <input id="bubbleOpacity" type="range" min="0.35" max="1" step="0.05" value="0.9" />
+          </div>
+          <div class="hint">Size uses <strong>area</strong> (not diameter). Sphere adds a radial highlight so bubbles look dimensional (not true 3D rotation).</div>
         </div>
       </div>
 
@@ -357,6 +369,8 @@
     mode: "bubble",
     map: { x: null, y: null, size: null, color: null, label: null, group: null },
     sizeScale: 1,
+    bubbleStyle: "sphere",
+    bubbleOpacity: 0.9,
     xScale: "linear",
     yScale: "linear",
     xFormat: "auto",
@@ -533,6 +547,24 @@
     return String(p.name) + "|" + p.x + "|" + p.y + "|" + p.z;
   }
 
+  function sphereFill(baseColor, opacity) {
+    var c = (typeof Highcharts !== "undefined" && Highcharts.color)
+      ? Highcharts.color(baseColor || "#38bdf8")
+      : null;
+    if (!c) {
+      return baseColor || "#38bdf8";
+    }
+    var op = opacity == null ? 0.9 : opacity;
+    return {
+      radialGradient: { cx: 0.32, cy: 0.28, r: 0.78 },
+      stops: [
+        [0, c.brighten(0.55).setOpacity(Math.min(1, op + 0.05)).get("rgba")],
+        [0.4, c.setOpacity(op).get("rgba")],
+        [1, c.brighten(-0.35).setOpacity(op).get("rgba")]
+      ]
+    };
+  }
+
   function buildSeries() {
     var mx = state.map.x, my = state.map.y, mz = state.map.size;
     var mColor = state.map.color, mLabel = state.map.label, mGroup = state.map.group;
@@ -540,6 +572,7 @@
     var categories = [];
     var grouped = {};
     var hasSelection = Object.keys(state.selected).length > 0;
+    var seriesColors = {};
 
     records.forEach(function (r) {
       var x = num(r[mx]), y = num(r[my]), z = num(r[mz]);
@@ -548,6 +581,10 @@
 
       var seriesKey = mGroup ? String(r[mGroup]) : "All";
       if (!grouped[seriesKey]) grouped[seriesKey] = [];
+      if (!seriesColors[seriesKey]) {
+        var si = Object.keys(seriesColors).length;
+        seriesColors[seriesKey] = PALETTE[si % PALETTE.length];
+      }
 
       var label = mLabel ? String(r[mLabel]) : ("#" + (r.__i + 1));
       var hit = !q || label.toLowerCase().indexOf(q) >= 0;
@@ -556,23 +593,30 @@
 
       var colorVal = mColor ? r[mColor] : seriesKey;
       var fill = mColor && fieldMeta(mColor) && fieldMeta(mColor).kind === "num"
-        ? undefined
+        ? seriesColors[seriesKey]
         : colorFor(colorVal, categories);
 
-      var opacity = 0.82;
+      var opacity = state.bubbleOpacity;
       if (q && !hit) opacity = 0.1;
       else if (hasSelection && !isSel) opacity = 0.14;
       else if (isSel) opacity = 1;
 
+      var marker = {
+        lineWidth: isSel ? 2.5 : (hit && q ? 2 : 1),
+        lineColor: isSel ? "#fff" : (hit && q ? "#fff" : "rgba(255,255,255,.28)")
+      };
+      if (state.bubbleStyle === "sphere") {
+        marker.fillColor = sphereFill(fill || seriesColors[seriesKey], opacity);
+        marker.fillOpacity = 1;
+      }
+
       grouped[seriesKey].push({
-        x: x, y: y, z: z, name: label, color: fill,
-        opacity: opacity,
-        marker: {
-          lineWidth: isSel ? 2.5 : (hit && q ? 2 : 1),
-          lineColor: isSel ? "#fff" : (hit && q ? "#fff" : "rgba(255,255,255,.25)")
-        },
+        x: x, y: y, z: z, name: label,
+        color: state.bubbleStyle === "sphere" ? undefined : fill,
+        opacity: state.bubbleStyle === "sphere" ? 1 : opacity,
+        marker: marker,
         dataLabels: { enabled: false },
-        custom: { row: r, key: key, selected: isSel }
+        custom: { row: r, key: key, selected: isSel, baseColor: fill || seriesColors[seriesKey] }
       });
     });
 
@@ -580,7 +624,7 @@
       return {
         type: "bubble",
         name: g,
-        color: PALETTE[i % PALETTE.length],
+        color: seriesColors[g] || PALETTE[i % PALETTE.length],
         data: grouped[g],
         dataLabels: { enabled: false }
       };
@@ -652,11 +696,11 @@
     var modeTxt = state.mode === "quadrant" ? "Quadrant" : "Bubble";
     var cutTxt = "";
     if (state.mode === "quadrant" && cuts && cuts.x != null) {
-      cutTxt = " � X=" + formatNumber(cuts.x, state.xFormat) + ", Y=" + formatNumber(cuts.y, state.yFormat);
+      cutTxt = " ? X=" + formatNumber(cuts.x, state.xFormat) + ", Y=" + formatNumber(cuts.y, state.yFormat);
     }
     document.getElementById("statusStrip").innerHTML =
-      "<div><strong>" + modeTxt + "</strong> � " + nPoints + " points � " + nSeries + " series � area ~ " + sizeLabel + cutTxt + "</div>" +
-      "<div class=\"meta\">" + (nSel ? '<span class="sel">' + nSel + " selected</span> � click to select � Ctrl+click multi" : "click a bubble to select") + "</div>";
+      "<div><strong>" + modeTxt + "</strong> ? " + nPoints + " points ? " + nSeries + " series ? area ~ " + sizeLabel + cutTxt + "</div>" +
+      "<div class=\"meta\">" + (nSel ? '<span class="sel">' + nSel + " selected</span> ? click to select ? Ctrl+click multi" : "click a bubble to select") + "</div>";
     document.getElementById("chartTitle").textContent =
       state.mode === "quadrant" ? "Quadrant chart" : "Bubble chart";
   }
@@ -695,13 +739,32 @@
     state.chart = null;
   }
 
-  function quadrantBands(xCut, yCut, xMin, xMax, yMin, yMax) {
-    if (!state.quadShade) return [];
-    var names = state.qNames;
-    return [
-      { from: yCut, to: yMax, color: "rgba(52,211,153,.06)", label: { text: names.NE + " / " + names.NW, style: { color: "rgba(148,163,184,.55)", fontSize: "10px" }, align: "left", x: 8 } },
-      { from: yMin, to: yCut, color: "rgba(251,191,36,.05)", label: { text: names.SE + " / " + names.SW, style: { color: "rgba(148,163,184,.55)", fontSize: "10px" }, align: "left", x: 8 } }
+  function drawQuadrantShading(chart, cuts) {
+    if (!state.quadShade || !chart || cuts.x == null) return;
+    var xAxis = chart.xAxis[0];
+    var yAxis = chart.yAxis[0];
+    var xExt = xAxis.getExtremes();
+    var yExt = yAxis.getExtremes();
+    var left = xAxis.toPixels(xExt.min);
+    var midX = xAxis.toPixels(cuts.x);
+    var right = xAxis.toPixels(xExt.max);
+    var top = yAxis.toPixels(yExt.max);
+    var midY = yAxis.toPixels(cuts.y);
+    var bottom = yAxis.toPixels(yExt.min);
+    var ren = chart.renderer;
+    // Distinct tint per zone (NW / NE / SW / SE)
+    var zones = [
+      { x: left, y: top, w: midX - left, h: midY - top, fill: "rgba(56,189,248,0.14)", key: "NW" },
+      { x: midX, y: top, w: right - midX, h: midY - top, fill: "rgba(52,211,153,0.14)", key: "NE" },
+      { x: left, y: midY, w: midX - left, h: bottom - midY, fill: "rgba(148,163,184,0.12)", key: "SW" },
+      { x: midX, y: midY, w: right - midX, h: bottom - midY, fill: "rgba(251,191,36,0.13)", key: "SE" }
     ];
+    zones.forEach(function (z) {
+      if (z.w <= 0 || z.h <= 0) return;
+      ren.rect(z.x, z.y, z.w, z.h, 0)
+        .attr({ fill: z.fill, zIndex: 0, "pointer-events": "none", class: "mv-quad-shade mv-quad-" + z.key })
+        .add();
+    });
   }
 
   function drawChart(series, xField, yField, cuts, xs, ys, minSize, maxSize) {
@@ -721,7 +784,7 @@
     var height = wrap ? Math.max(wrap.clientHeight || 0, 360) : 420;
     destroyChart();
 
-    var xPlot = [], yPlot = [], yBands = [];
+    var xPlot = [], yPlot = [];
     if (state.mode === "quadrant" && state.showCuts && cuts.x != null) {
       var xLab = (state.xCutMode === "mean" ? "Mean" : state.xCutMode === "custom" ? "Custom" : "Median") +
         " X = " + formatNumber(cuts.x, state.xFormat);
@@ -735,11 +798,6 @@
         value: cuts.y, color: "rgba(251,191,36,.8)", width: 1.5, dashStyle: "Dash", zIndex: 5,
         label: { text: yLab, style: { color: "#fbbf24", fontSize: "10px" }, align: "left", x: 6, y: -4 }
       }];
-      var xMin = Math.min.apply(null, xs), xMax = Math.max.apply(null, xs);
-      var yMin = Math.min.apply(null, ys), yMax = Math.max.apply(null, ys);
-      yBands = quadrantBands(cuts.x, cuts.y, xMin, xMax, yMin, yMax);
-
-      // Corner name annotations via labels on plot bands is limited; add text labels as plotLines at corners via subtitle-like labels.
     }
 
     var xTitle = state.xTitle || (xField ? xField.label : "X");
@@ -753,12 +811,7 @@
           zoomType: "xy",
           height: height,
           reflow: true,
-          style: { fontFamily: '"Segoe UI", system-ui, sans-serif' },
-          events: {
-            click: function () {
-              // background click clears when not multi
-            }
-          }
+          style: { fontFamily: '"Segoe UI", system-ui, sans-serif' }
         },
         title: { text: null },
         credits: { enabled: false },
@@ -781,8 +834,7 @@
             style: { color: "#94a3b8" },
             formatter: function () { return formatNumber(this.value, state.yFormat); }
           },
-          plotLines: yPlot,
-          plotBands: yBands
+          plotLines: yPlot
         },
         tooltip: {
           useHTML: true,
@@ -814,6 +866,12 @@
             maxSize: maxSize,
             cursor: "pointer",
             stickyTracking: false,
+            marker: state.bubbleStyle === "sphere" ? {
+              lineWidth: 1,
+              lineColor: "rgba(255,255,255,.25)"
+            } : {
+              fillOpacity: state.bubbleOpacity
+            },
             point: {
               events: {
                 click: function (e) {
@@ -823,7 +881,6 @@
                   if (!multi) {
                     var only = {};
                     only[key] = true;
-                    // toggle off if already sole selection
                     if (state.selected[key] && Object.keys(state.selected).length === 1) state.selected = {};
                     else state.selected = only;
                   } else {
@@ -840,17 +897,17 @@
         series: series
       });
 
-      // Quadrant corner name labels
-      if (state.mode === "quadrant" && state.showCuts && cuts.x != null && state.chart) {
+      if (state.mode === "quadrant" && cuts.x != null && state.chart) {
+        drawQuadrantShading(state.chart, cuts);
+
         var xExt = state.chart.xAxis[0].getExtremes();
         var yExt = state.chart.yAxis[0].getExtremes();
         var corners = [
-          { name: state.qNames.NE, x: (cuts.x + xExt.max) / 2, y: (cuts.y + yExt.max) / 2 },
-          { name: state.qNames.NW, x: (xExt.min + cuts.x) / 2, y: (cuts.y + yExt.max) / 2 },
-          { name: state.qNames.SE, x: (cuts.x + xExt.max) / 2, y: (yExt.min + cuts.y) / 2 },
-          { name: state.qNames.SW, x: (xExt.min + cuts.x) / 2, y: (yExt.min + cuts.y) / 2 }
+          { key: "NE", x: (cuts.x + xExt.max) / 2, y: (cuts.y + yExt.max) / 2 },
+          { key: "NW", x: (xExt.min + cuts.x) / 2, y: (cuts.y + yExt.max) / 2 },
+          { key: "SE", x: (cuts.x + xExt.max) / 2, y: (yExt.min + cuts.y) / 2 },
+          { key: "SW", x: (xExt.min + cuts.x) / 2, y: (yExt.min + cuts.y) / 2 }
         ];
-        // counts
         var counts = { NE: 0, NW: 0, SE: 0, SW: 0 };
         series.forEach(function (s) {
           s.data.forEach(function (p) {
@@ -862,40 +919,12 @@
           });
         });
         var total = Math.max(1, counts.NE + counts.NW + counts.SE + counts.SW);
-        var ann = [
-          { key: "NE", c: counts.NE }, { key: "NW", c: counts.NW },
-          { key: "SE", c: counts.SE }, { key: "SW", c: counts.SW }
-        ].map(function (item, idx) {
-          var pt = corners[idx];
-          var pct = Math.round(100 * item.c / total);
-          return {
-            point: { x: pt.x, y: pt.y },
-            text: state.qNames[item.key] + "<br/>" + item.c + " (" + pct + "%)",
-            backgroundColor: "rgba(15,23,42,.55)",
-            borderColor: "rgba(148,163,184,.25)",
-            borderRadius: 6,
-            borderWidth: 1,
-            padding: 5,
-            style: { color: "rgba(226,232,240,.8)", fontSize: "10px", fontWeight: "700", textAlign: "center" },
-            useHTML: true
-          };
-        });
-        state.chart.addSeries({
-          type: "scatter",
-          name: "_quadlabels",
-          data: [],
-          enableMouseTracking: false,
-          showInLegend: false,
-          marker: { enabled: false }
-        }, false);
-        if (state.chart.annotations) {
-          /* annotations module not loaded - use renderer text */
-        }
         var ren = state.chart.renderer;
-        ann.forEach(function (a) {
-          var xy = state.chart.xAxis[0].toPixels(a.point.x);
-          var yy = state.chart.yAxis[0].toPixels(a.point.y);
-          ren.label(a.text, xy - 36, yy - 18, "rect", 0, 0, true)
+        corners.forEach(function (pt) {
+          var pct = Math.round(100 * counts[pt.key] / total);
+          var xy = state.chart.xAxis[0].toPixels(pt.x);
+          var yy = state.chart.yAxis[0].toPixels(pt.y);
+          ren.label(state.qNames[pt.key] + "<br/>" + counts[pt.key] + " (" + pct + "%)", xy - 36, yy - 18, "rect", 0, 0, true)
             .attr({ fill: "rgba(15,23,42,.55)", stroke: "rgba(148,163,184,.25)", "stroke-width": 1, r: 6, padding: 5, zIndex: 6 })
             .css({ color: "rgba(226,232,240,.85)", fontSize: "10px", fontWeight: "700" })
             .add();
@@ -957,6 +986,16 @@
 
     document.getElementById("sizeScale").addEventListener("input", function (e) {
       state.sizeScale = +e.target.value; render();
+    });
+    document.getElementById("bubbleOpacity").addEventListener("input", function (e) {
+      state.bubbleOpacity = +e.target.value; render();
+    });
+    document.querySelectorAll("#bubbleStyle button").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        setSegActive(document.getElementById("bubbleStyle"), "data-style", btn.dataset.style);
+        state.bubbleStyle = btn.dataset.style;
+        render();
+      });
     });
     document.getElementById("searchBox").addEventListener("input", function (e) {
       state.search = e.target.value; render();

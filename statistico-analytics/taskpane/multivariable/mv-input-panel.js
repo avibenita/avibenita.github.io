@@ -1,4 +1,4 @@
-/* global Office, DIALOG_SIZES */
+/* global Office, Excel, DIALOG_SIZES, MvSampleData */
 
 function getDialogsBaseUrl() {
   const href = window.location.href;
@@ -54,10 +54,27 @@ function openMvResultsDialog(runData) {
 }
 
 function runMultivariableFromHub(gr) {
-  const headers = gr.values[0] || [];
-  const rows = gr.values.slice(1);
-  const spec = readMvModelSpec();
-  if (!spec || (!spec.xColName && spec.xColIndex == null)) return false;
+  let headers;
+  let rows;
+  let spec = readMvModelSpec();
+
+  if (gr && gr.values && gr.values.length >= 2) {
+    headers = gr.values[0] || [];
+    rows = gr.values.slice(1);
+  } else if (window.MvSampleData) {
+    const t = MvSampleData.getTable();
+    headers = t.headers;
+    rows = t.rows;
+    if (!spec) spec = Object.assign({}, MvSampleData.defaultSpec);
+  } else {
+    return false;
+  }
+
+  if (!spec || (!spec.xColName && spec.xColIndex == null)) {
+    if (window.MvSampleData) spec = Object.assign({}, MvSampleData.defaultSpec);
+    else return false;
+  }
+
   const runData = buildMvRunData(headers, rows, spec);
   try {
     sessionStorage.setItem("mvHubRunData", JSON.stringify(runData));
@@ -66,14 +83,74 @@ function runMultivariableFromHub(gr) {
   return true;
 }
 
+/**
+ * Write the bubble sample to a worksheet named "MV Sample", select it,
+ * and store it as the hub Active Range.
+ */
+async function insertMvSampleSheet() {
+  if (!window.MvSampleData || typeof Excel === "undefined") {
+    return { ok: false, error: "Sample data unavailable" };
+  }
+  const table = MvSampleData.getTable();
+  const sheetName = MvSampleData.SHEET_NAME || "MV Sample";
+  const values = table.values;
+
+  try {
+    let address = sheetName + "!A1";
+    await Excel.run(async (ctx) => {
+      const sheets = ctx.workbook.worksheets;
+      sheets.load("items/name");
+      await ctx.sync();
+
+      let sheet = null;
+      for (let i = 0; i < sheets.items.length; i++) {
+        if (sheets.items[i].name === sheetName) {
+          sheet = sheets.items[i];
+          break;
+        }
+      }
+      if (!sheet) sheet = sheets.add(sheetName);
+
+      sheet.activate();
+      const used = sheet.getUsedRangeOrNullObject();
+      used.load("address");
+      await ctx.sync();
+      if (!used.isNullObject) used.clear();
+
+      const range = sheet.getRangeByIndexes(0, 0, values.length, values[0].length);
+      range.values = values;
+      range.format.autofitColumns();
+      range.getRow(0).format.font.bold = true;
+      sheet.getRangeByIndexes(0, 0, values.length, values[0].length).select();
+      range.load("address");
+      await ctx.sync();
+      address = range.address;
+    });
+
+    if (window.StatisticoGlobalRange) {
+      StatisticoGlobalRange.save(values, address, "used");
+    }
+    if (typeof window.hubRefreshGlobalRange === "function") {
+      try { await window.hubRefreshGlobalRange(); } catch (e) {}
+    }
+    return { ok: true, address: address, values: values };
+  } catch (e) {
+    console.warn("insertMvSampleSheet", e);
+    return { ok: false, error: (e && e.message) || String(e) };
+  }
+}
+
 (function (hubKey, fn) {
   window.StatisticoHubResults = window.StatisticoHubResults || {};
   window.StatisticoHubResults[hubKey] = function () {
     const gr = window.StatisticoGlobalRange && window.StatisticoGlobalRange.load();
-    if (!gr || !gr.values || gr.values.length < 2) return false;
     return fn(gr);
   };
 })("multivariable", runMultivariableFromHub);
 
 window.StatisticoHubResults = window.StatisticoHubResults || {};
 window.StatisticoHubResults.mv = runMultivariableFromHub;
+window.StatisticoMvSample = {
+  insertSheet: insertMvSampleSheet,
+  runFromHub: runMultivariableFromHub
+};

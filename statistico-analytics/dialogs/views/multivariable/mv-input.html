@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <link rel="stylesheet" href="../shared-config.css?v=20260812mv"/>
   <script src="../shared-config.js?v=20260812mv"></script>
+  <script src="mv-sample-data.js?v=20260812mv2"></script>
   <style>
     :root { --mv-num: #38bdf8; --mv-cat: #a78bfa; --mv-req: #f97316; }
     body.cfg-embed .cfg-header { display: none; }
@@ -166,6 +167,7 @@
     </div>
     <div class="cfg-footer">
       <button class="cfg-btn cancel" id="btnCancel"><i class="fa-solid fa-times"></i> Cancel</button>
+      <button class="cfg-btn load-prev" id="btnLoadSample" type="button" title="Load built-in country bubble dataset"><i class="fa-solid fa-flask"></i> Load sample</button>
       <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" disabled><i class="fa-solid fa-clock-rotate-left"></i> Load previous&hellip;</button>
       <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" disabled><i class="fa-solid fa-floppy-disk"></i> Save configuration</button>
       <button class="cfg-btn run" id="btnRun" disabled><i class="fa-solid fa-play"></i> Run Explorer</button>
@@ -438,7 +440,7 @@
       qs('loadingSpinner').style.display = 'none';
       qs('mainContent').style.display = 'flex';
       qs('tbRange').textContent = (_address ? _address + ' · ' : '') + _rows.length + ' rows';
-      qs('metaBadge').textContent = _rows.length + ' rows · ' + _headers.length + ' cols';
+      qs('metaBadge').textContent = (_rows.length + ' rows · ' + _headers.length + ' cols') + (p.isSample ? ' · sample' : '');
       buildColumnStats();
       assignments = { x: null, y: null, size: null, color: null, label: null, group: null };
       if (_saved) applySpec(_saved);
@@ -446,10 +448,16 @@
       renderVariables(); renderAssignments(); syncModeSeg(); validateModel();
     }
 
+    function loadSampleData() {
+      if (!window.MvSampleData) return;
+      applyPayload(MvSampleData.getConfigPayload('MV Sample (built-in)'));
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
       setupDropZones();
       qs('btnCancel').addEventListener('click', function() { send('close', null); });
       qs('btnRun').addEventListener('click', runAnalysis);
+      if (qs('btnLoadSample')) qs('btnLoadSample').addEventListener('click', loadSampleData);
       document.querySelectorAll('#modeSeg button').forEach(function(btn) {
         btn.addEventListener('click', function() {
           chartMode = btn.dataset.mode;
@@ -457,6 +465,10 @@
           updateSummary();
         });
       });
+      var wantDemo = /[?&]demo=1/.test(window.location.search || '');
+      if (wantDemo && window.MvSampleData) {
+        loadSampleData();
+      }
       Office.onReady(function() {
         Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function(arg) {
           try {
@@ -465,7 +477,15 @@
           } catch (_e) {}
         });
         send('ready', null);
-        setInterval(function() { if (!_headers.length) send('requestData', null); }, 500);
+        setInterval(function() {
+          if (!_headers.length) {
+            if (wantDemo && window.MvSampleData) loadSampleData();
+            else send('requestData', null);
+          }
+        }, 500);
+        setTimeout(function() {
+          if (!_headers.length && window.MvSampleData) loadSampleData();
+        }, 1800);
       });
     });
   </script>

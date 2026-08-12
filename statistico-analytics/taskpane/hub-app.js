@@ -48,7 +48,8 @@ const HUB_CATEGORY_TILES = [
     modules: [
       { id: "univariate", label: "Univariate", tip: "Distribution summaries, outliers, and normality checks for single variables." },
       { id: "correlations", label: "Correlation", tip: "Pairwise associations and correlation matrix between numeric variables." },
-      { id: "multivariable", label: "Multivariable Explorer", tip: "Interactive bubble and quadrant charts — map X, Y, size, color, labels, and groups." }
+      { id: "multivariable", label: "Multivariable Explorer", tip: "Interactive bubble and quadrant charts — map X, Y, size, color, labels, and groups. Uses a built-in country sample if no range is selected." },
+      { id: "multivariable-sample", label: "Load bubble sample…", tip: "Write a 26-country bubble dataset to an Excel sheet named “MV Sample”, set it as the Active Range, and open Multivariable Explorer." }
     ]
   },
   {
@@ -1380,10 +1381,14 @@ function openMultivariableFromHub() {
     dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "MV_DATA",
     payloadBuilder: function (gr) {
+      var hasData = gr && gr.values && gr.values.length >= 2 && (gr.values[0] || []).length >= 3;
+      if (!hasData && window.MvSampleData) {
+        return MvSampleData.getConfigPayload("MV Sample (built-in)");
+      }
       return {
-        headers: gr.values[0] || [],
-        rows: gr.values.slice(1),
-        address: gr.address || "",
+        headers: (gr && gr.values && gr.values[0]) || [],
+        rows: (gr && gr.values && gr.values.slice(1)) || [],
+        address: (gr && gr.address) || "",
         savedModelSpec: null
       };
     },
@@ -1394,6 +1399,54 @@ function openMultivariableFromHub() {
     hubResultsKey: "multivariable",
     nextDelayMs: 500
   });
+}
+
+function openMultivariableSampleFromHub() {
+  setSelectedModuleCard("multivariable-sample", true);
+  var finish = function () { setSelectedModuleCard("multivariable-sample", false); };
+
+  function afterInsert(result) {
+    if (!result || !result.ok) {
+      try {
+        window.alert("Could not write the sample sheet.\n\n" + ((result && result.error) || "Unknown error") +
+          "\n\nOpening Multivariable Explorer with built-in sample data instead.");
+      } catch (e) {}
+      finish();
+      openMultivariableFromHub();
+      return;
+    }
+    finish();
+    openMultivariableFromHub();
+  }
+
+  // Panel script may not be loaded yet — load bridge then insert.
+  if (window.HubResultsBridge && typeof HubResultsBridge.ensureLoaded === "function") {
+    HubResultsBridge.ensureLoaded("multivariable", function () {
+      if (window.StatisticoMvSample && typeof StatisticoMvSample.insertSheet === "function") {
+        StatisticoMvSample.insertSheet().then(afterInsert, function (err) {
+          afterInsert({ ok: false, error: (err && err.message) || String(err) });
+        });
+      } else if (window.MvSampleData) {
+        // Fallback: seed global range only (no worksheet write).
+        var t = MvSampleData.getTable();
+        if (window.StatisticoGlobalRange) StatisticoGlobalRange.save(t.values, "MV Sample (built-in)", "used");
+        afterInsert({ ok: true, values: t.values });
+      } else {
+        afterInsert({ ok: false, error: "Sample module not loaded" });
+      }
+    });
+    return true;
+  }
+
+  if (window.StatisticoMvSample && typeof StatisticoMvSample.insertSheet === "function") {
+    StatisticoMvSample.insertSheet().then(afterInsert, function (err) {
+      afterInsert({ ok: false, error: (err && err.message) || String(err) });
+    });
+    return true;
+  }
+
+  afterInsert({ ok: false, error: "Hub results bridge unavailable" });
+  return true;
 }
 
 function openBuilderDialogFromHub(options) {
@@ -1821,6 +1874,9 @@ function navigateToModuleCore(id) {
   }
   if (id === "multivariable") {
     if (openMultivariableFromHub()) return;
+  }
+  if (id === "multivariable-sample") {
+    if (openMultivariableSampleFromHub()) return;
   }
   if (id === "publication-tables") {
     if (openPublicationTablesConfigFromHub()) return;

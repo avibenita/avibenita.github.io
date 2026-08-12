@@ -19,7 +19,8 @@
     hierarchical: ['cluster/cluster-config.js', 'cluster/cluster-input-panel.js'],
     mixed: ['mixed/mixed-hub-results.js'],
     pareto2080: ['pareto/pareto-input-panel.js'],
-    pareto: ['pareto/pareto-input-panel.js']
+    pareto: ['pareto/pareto-input-panel.js'],
+    multivariable: ['multivariable/mv-input-panel.js']
   };
 
   /* Timestamp buster: Office webviews cache ?v= URLs too aggressively across deploys. */

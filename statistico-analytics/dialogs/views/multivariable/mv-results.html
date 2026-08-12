@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multivariable Explorer</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" />
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://code.highcharts.com/highcharts-more.js"></script>
+  <script src="https://code.highcharts.com/modules/exporting.js"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260812mv" />
+  <script src="../shared-brand-logo.js?v=20260812mv"></script>
+  <script src="../shared-header.js?v=20260812mv"></script>
+  <style>
+    :root {
+      --surface-0: #0c1624;
+      --surface-1: #1a1f2e;
+      --surface-2: #242938;
+      --border: #2d3748;
+      --accent: #38bdf8;
+      --text-primary: #fff;
+      --text-secondary: rgba(255,255,255,.80);
+      --text-muted: rgba(255,255,255,.55);
+      --panel-w: 280px;
+    }
+    html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }
+    body {
+      background: var(--surface-0);
+      color: var(--text-primary);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex; flex-direction: column;
+    }
+    .mv-topbar {
+      display: flex; align-items: center; gap: 12px;
+      background: linear-gradient(180deg, #171f35 0%, #1b2540 100%);
+      border-bottom: 1px solid rgba(56,189,248,.22);
+      padding: 0 16px; height: 56px; flex-shrink: 0;
+    }
+    .mv-module-frame {
+      display: flex; flex-direction: column; gap: 1px;
+      padding: 5px 10px; border-radius: 8px;
+      border: 1px solid rgba(56,189,248,.35);
+      border-left: 2px solid rgba(56,189,248,.75);
+      background: rgba(56,189,248,.08);
+    }
+    .mv-module-kicker { font-size: 9px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: rgba(125,211,252,.85); }
+    .mv-module-name { font-size: 12px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: #e0f2fe; }
+    .mv-topbar-title { flex: 1; text-align: center; font-size: 16px; font-weight: 800; }
+    .mode-tabs { display: flex; gap: 4px; }
+    .mode-tab {
+      border: 1px solid var(--border); background: transparent; color: var(--text-secondary);
+      font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 999px; cursor: pointer;
+    }
+    .mode-tab.active { color: #0c1624; background: var(--accent); border-color: var(--accent); }
+    .shell { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--panel-w) 1fr; }
+    .panel {
+      border-right: 1px solid var(--border); background: var(--surface-1);
+      overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px;
+    }
+    .panel-section-title {
+      font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+      color: var(--text-muted); margin-bottom: 6px;
+    }
+    .map-card, .ctrl-card {
+      border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); padding: 10px;
+    }
+    .role-row {
+      display: grid; grid-template-columns: 88px 1fr; gap: 8px; align-items: center; margin-bottom: 7px;
+    }
+    .role-row:last-child { margin-bottom: 0; }
+    .role-label { font-size: 11px; font-weight: 700; color: var(--text-secondary); }
+    .role-label .req { color: #fb7185; }
+    select, input[type="search"] {
+      width: 100%; background: var(--surface-0); color: var(--text-primary);
+      border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px; font-size: 12px;
+    }
+    .ctrl-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      margin-bottom: 8px; font-size: 12px; color: var(--text-secondary);
+    }
+    .ctrl-row:last-child { margin-bottom: 0; }
+    .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+    .seg button {
+      border: 0; background: transparent; color: var(--text-muted);
+      font-size: 11px; font-weight: 700; padding: 4px 8px; cursor: pointer;
+    }
+    .seg button.active { background: rgba(56,189,248,.2); color: var(--accent); }
+    input[type="range"] { width: 110px; accent-color: var(--accent); }
+    .hint {
+      font-size: 11px; line-height: 1.4; color: var(--text-muted);
+      padding: 8px 9px; border-radius: 8px;
+      background: rgba(56,189,248,.08); border: 1px solid rgba(56,189,248,.2);
+    }
+    .hint strong { color: var(--accent); }
+    .main { min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 12px; gap: 10px; }
+    .status-strip { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--text-secondary); }
+    .pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border);
+      background: rgba(255,255,255,.03); font-size: 11px; font-weight: 700;
+    }
+    .pill i { color: var(--accent); }
+    .chart-wrap {
+      flex: 1; min-height: 0; border: 1px solid var(--border); border-radius: 12px;
+      background: #111827; position: relative; overflow: hidden;
+    }
+    #chart { width: 100%; height: 100%; }
+    .size-legend {
+      position: absolute; left: 14px; bottom: 14px;
+      background: rgba(15,23,42,.88); border: 1px solid var(--border);
+      border-radius: 10px; padding: 8px 10px; font-size: 11px; color: var(--text-secondary);
+      pointer-events: none; z-index: 2;
+    }
+    .size-legend strong {
+      display: block; margin-bottom: 6px;
+      font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted);
+    }
+    .size-legend-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+    .size-dot {
+      border-radius: 50%; background: rgba(56,189,248,.35);
+      border: 1px solid rgba(56,189,248,.8); flex-shrink: 0;
+    }
+    .waiting {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      color: var(--text-muted); font-size: 13px; gap: 10px;
+    }
+  </style>
+</head>
+<body>
+  <header class="mv-topbar">
+    <div class="mv-module-frame">
+      <div class="mv-module-kicker">Statistico™</div>
+      <div class="mv-module-name">Multivariable Explorer</div>
+    </div>
+    <div class="mv-topbar-title" id="chartTitle">Bubble chart</div>
+    <div class="mode-tabs">
+      <button class="mode-tab active" data-mode="bubble" type="button">Bubble</button>
+      <button class="mode-tab" data-mode="quadrant" type="button">Quadrant</button>
+    </div>
+  </header>
+
+  <div class="shell" id="appShell" style="display:none;">
+    <aside class="panel">
+      <div>
+        <div class="panel-section-title">Variable mapping</div>
+        <div class="map-card" id="roleMap"></div>
+      </div>
+      <div>
+        <div class="panel-section-title">Chart controls</div>
+        <div class="ctrl-card">
+          <div class="ctrl-row">
+            <label>Size scale</label>
+            <input id="sizeScale" type="range" min="0.4" max="2.2" step="0.05" value="1" />
+          </div>
+          <div class="ctrl-row">
+            <label>X scale</label>
+            <div class="seg" data-axis="x">
+              <button type="button" data-scale="linear" class="active">Linear</button>
+              <button type="button" data-scale="logarithmic">Log</button>
+            </div>
+          </div>
+          <div class="ctrl-row">
+            <label>Y scale</label>
+            <div class="seg" data-axis="y">
+              <button type="button" data-scale="linear" class="active">Linear</button>
+              <button type="button" data-scale="logarithmic">Log</button>
+            </div>
+          </div>
+          <div class="ctrl-row">
+            <label>Labels</label>
+            <div class="seg" id="labelMode">
+              <button type="button" data-labels="none">None</button>
+              <button type="button" data-labels="hover" class="active">Hover</button>
+              <button type="button" data-labels="all">All</button>
+            </div>
+          </div>
+          <div class="ctrl-row">
+            <label for="searchBox">Find</label>
+            <input id="searchBox" type="search" placeholder="Label / ID…" />
+          </div>
+        </div>
+      </div>
+      <div class="hint">
+        <strong>Size = area, not diameter.</strong>
+        Bubble area is proportional to the size variable.
+      </div>
+    </aside>
+    <main class="main">
+      <div class="status-strip" id="statusStrip"></div>
+      <div class="chart-wrap">
+        <div id="chart"></div>
+        <div class="size-legend" id="sizeLegend"></div>
+      </div>
+    </main>
+  </div>
+  <div class="waiting" id="waiting"><i class="fa-solid fa-spinner fa-spin"></i> Waiting for data…</div>
+
+  <script>
+(function () {
+  "use strict";
+
+  var DEMO = {
+    headers: ["Country", "Region", "GDP", "LifeExp", "Population", "CO2"],
+    rows: [
+      ["Norway", "Europe", 89, 83.2, 5.4, 7.2],
+      ["Germany", "Europe", 54, 81.1, 83.8, 8.1],
+      ["France", "Europe", 46, 82.5, 67.8, 4.6],
+      ["Italy", "Europe", 39, 83.0, 58.9, 5.4],
+      ["Spain", "Europe", 33, 83.3, 47.4, 5.1],
+      ["USA", "Americas", 76, 77.3, 333, 14.9],
+      ["Canada", "Americas", 55, 82.0, 39, 14.2],
+      ["Brazil", "Americas", 10, 75.9, 215, 2.2],
+      ["Mexico", "Americas", 12, 75.1, 128, 3.6],
+      ["Japan", "Asia", 34, 84.5, 125, 8.5],
+      ["South Korea", "Asia", 35, 83.7, 51.7, 11.6],
+      ["China", "Asia", 13, 78.2, 1412, 8.0],
+      ["India", "Asia", 2.6, 70.8, 1428, 2.0],
+      ["Australia", "Oceania", 65, 83.4, 26.3, 15.0],
+      ["Nigeria", "Africa", 2.2, 54.5, 223, 0.6],
+      ["South Africa", "Africa", 6.5, 62.3, 60, 7.4],
+      ["Egypt", "Africa", 4.0, 71.8, 112, 2.4],
+      ["Kenya", "Africa", 2.1, 63.5, 55, 0.4]
+    ],
+    spec: {
+      chartMode: "bubble",
+      xColName: "GDP", yColName: "LifeExp", sizeColName: "Population",
+      colorColName: "Region", labelColName: "Country", groupColName: "Region",
+      xColIndex: 2, yColIndex: 3, sizeColIndex: 4,
+      colorColIndex: 1, labelColIndex: 0, groupColIndex: 1
+    }
+  };
+
+  var PALETTE = ["#38bdf8", "#a78bfa", "#34d399", "#fbbf24", "#fb7185", "#94a3b8"];
+  var ROLES = [
+    { id: "x", label: "X position", req: true, num: true },
+    { id: "y", label: "Y position", req: true, num: true },
+    { id: "size", label: "Bubble size", req: true, num: true },
+    { id: "color", label: "Bubble color", req: false, num: false },
+    { id: "label", label: "Label", req: false, num: false },
+    { id: "group", label: "Group", req: false, num: false }
+  ];
+
+  var run = null;
+  var fields = [];
+  var records = [];
+  var state = {
+    mode: "bubble",
+    map: { x: null, y: null, size: null, color: null, label: null, group: null },
+    sizeScale: 1,
+    xScale: "linear",
+    yScale: "linear",
+    labels: "hover",
+    search: "",
+    chart: null
+  };
+
+  function send(action, data) {
+    try {
+      if (Office && Office.context && Office.context.ui) {
+        Office.context.ui.messageParent(JSON.stringify({ action: action, data: data || null }));
+      }
+    } catch (e) {}
+  }
+
+  function colKind(idx) {
+    var numeric = 0, string = 0;
+    records.forEach(function (r) {
+      var v = r.__raw[idx];
+      if (v === null || v === undefined || v === "") return;
+      var n = parseFloat(String(v).replace(",", "."));
+      if (!isNaN(n) && isFinite(n)) numeric++; else string++;
+    });
+    return numeric >= string && numeric > 0 ? "num" : "cat";
+  }
+
+  function ingest(payload) {
+    run = payload || DEMO;
+    var headers = run.headers || [];
+    var rows = run.rows || (run.rawValues ? run.rawValues.slice(1) : []);
+    var spec = run.spec || {};
+
+    records = rows.map(function (row, i) {
+      var o = { __raw: row, __i: i };
+      headers.forEach(function (h, j) { o[h] = row[j]; });
+      return o;
+    });
+
+    fields = headers.map(function (h, idx) {
+      return { key: h, label: h, kind: colKind(idx), idx: idx };
+    });
+
+    function resolve(nameKey, idxKey) {
+      if (spec[nameKey] && headers.indexOf(spec[nameKey]) >= 0) return spec[nameKey];
+      if (spec[idxKey] != null && spec[idxKey] >= 0 && headers[spec[idxKey]]) return headers[spec[idxKey]];
+      return null;
+    }
+
+    state.map = {
+      x: resolve("xColName", "xColIndex"),
+      y: resolve("yColName", "yColIndex"),
+      size: resolve("sizeColName", "sizeColIndex"),
+      color: resolve("colorColName", "colorColIndex"),
+      label: resolve("labelColName", "labelColIndex"),
+      group: resolve("groupColName", "groupColIndex")
+    };
+    state.mode = spec.chartMode === "quadrant" ? "quadrant" : "bubble";
+
+    document.getElementById("waiting").style.display = "none";
+    document.getElementById("appShell").style.display = "grid";
+    syncModeTabs();
+    buildRoleMap();
+    render();
+  }
+
+  function fieldMeta(key) {
+    return fields.find(function (f) { return f.key === key; });
+  }
+
+  function optionsForRole(role) {
+    return fields.filter(function (f) {
+      if (role.num) return f.kind === "num";
+      return true;
+    });
+  }
+
+  function buildRoleMap() {
+    var host = document.getElementById("roleMap");
+    host.innerHTML = "";
+    ROLES.forEach(function (role) {
+      var row = document.createElement("div");
+      row.className = "role-row";
+      var lab = document.createElement("div");
+      lab.className = "role-label";
+      lab.innerHTML = role.label + (role.req ? ' <span class="req">*</span>' : "");
+      var sel = document.createElement("select");
+      if (!role.req) {
+        var empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = "— none —";
+        sel.appendChild(empty);
+      }
+      optionsForRole(role).forEach(function (f) {
+        var opt = document.createElement("option");
+        opt.value = f.key;
+        opt.textContent = f.label;
+        if (state.map[role.id] === f.key) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.addEventListener("change", function () {
+        state.map[role.id] = sel.value || null;
+        render();
+      });
+      row.appendChild(lab);
+      row.appendChild(sel);
+      host.appendChild(row);
+    });
+  }
+
+  function median(vals) {
+    var a = vals.slice().sort(function (x, y) { return x - y; });
+    var m = Math.floor(a.length / 2);
+    return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+  }
+
+  function colorFor(value, categories) {
+    if (value == null || value === "") return "#64748b";
+    var i = categories.indexOf(String(value));
+    if (i < 0) i = categories.push(String(value)) - 1;
+    return PALETTE[i % PALETTE.length];
+  }
+
+  function num(v) {
+    var n = parseFloat(String(v == null ? "" : v).replace(",", "."));
+    return isFinite(n) ? n : NaN;
+  }
+
+  function buildSeries() {
+    var mx = state.map.x, my = state.map.y, mz = state.map.size;
+    var mColor = state.map.color, mLabel = state.map.label, mGroup = state.map.group;
+    var q = (state.search || "").trim().toLowerCase();
+    var categories = [];
+    var grouped = {};
+
+    records.forEach(function (r) {
+      var x = num(r[mx]), y = num(r[my]), z = num(r[mz]);
+      if (!isFinite(x) || !isFinite(y) || !isFinite(z) || z < 0) return;
+      if ((state.xScale === "logarithmic" && x <= 0) || (state.yScale === "logarithmic" && y <= 0)) return;
+
+      var groupKey = mGroup ? String(r[mGroup]) : "All";
+      if (!grouped[groupKey]) grouped[groupKey] = [];
+
+      var label = mLabel ? String(r[mLabel]) : ("#" + (r.__i + 1));
+      var hit = !q || label.toLowerCase().indexOf(q) >= 0;
+
+      var colorVal = mColor ? r[mColor] : groupKey;
+      var fill = mColor && fieldMeta(mColor) && fieldMeta(mColor).kind === "num"
+        ? undefined
+        : colorFor(colorVal, categories);
+
+      grouped[groupKey].push({
+        x: x, y: y, z: z, name: label, color: fill,
+        opacity: hit ? 0.85 : 0.12,
+        marker: { lineWidth: hit && q ? 2 : 1, lineColor: hit && q ? "#fff" : "rgba(255,255,255,.25)" },
+        custom: { row: r }
+      });
+    });
+
+    return Object.keys(grouped).map(function (g, i) {
+      return {
+        type: "bubble",
+        name: g,
+        color: PALETTE[i % PALETTE.length],
+        data: grouped[g],
+        dataLabels: {
+          enabled: state.labels === "all",
+          format: "{point.name}",
+          style: { color: "#e2e8f0", textOutline: "none", fontSize: "10px", fontWeight: "600" }
+        }
+      };
+    });
+  }
+
+  function updateSizeLegend(zs) {
+    var el = document.getElementById("sizeLegend");
+    var sizeField = fieldMeta(state.map.size);
+    if (!zs.length) { el.innerHTML = ""; return; }
+    var min = Math.min.apply(null, zs);
+    var max = Math.max.apply(null, zs);
+    var vals = min === max ? [max] : [min, (min + max) / 2, max];
+    var maxPx = 28 * state.sizeScale;
+    el.innerHTML = "<strong>Size represents · " + (sizeField ? sizeField.label : "size") + " (area)</strong>";
+    vals.forEach(function (v) {
+      var px = Math.max(6, Math.sqrt(v / max) * maxPx);
+      var row = document.createElement("div");
+      row.className = "size-legend-row";
+      row.innerHTML =
+        '<span class="size-dot" style="width:' + px + "px;height:" + px + 'px"></span>' +
+        "<span>" + (v >= 100 ? Math.round(v) : Math.round(v * 10) / 10) + "</span>";
+      el.appendChild(row);
+    });
+  }
+
+  function updateStatus(nPoints, nSeries) {
+    var sizeLabel = (fieldMeta(state.map.size) || {}).label || "size";
+    document.getElementById("statusStrip").innerHTML = [
+      ["fa-circle", state.mode === "quadrant" ? "Quadrant mode" : "Bubble mode"],
+      ["fa-database", nPoints + " points"],
+      ["fa-layer-group", nSeries + " series"],
+      ["fa-ruler-combined", "area ∝ " + sizeLabel]
+    ].map(function (b) {
+      return '<span class="pill"><i class="fa ' + b[0] + '"></i>' + b[1] + "</span>";
+    }).join("");
+    document.getElementById("chartTitle").textContent =
+      state.mode === "quadrant" ? "Quadrant chart" : "Bubble chart";
+  }
+
+  function syncModeTabs() {
+    document.querySelectorAll(".mode-tab").forEach(function (t) {
+      t.classList.toggle("active", t.dataset.mode === state.mode);
+    });
+  }
+
+  function render() {
+    if (!state.map.x || !state.map.y || !state.map.size) return;
+    var series = buildSeries();
+    var zs = [];
+    series.forEach(function (s) { s.data.forEach(function (p) { zs.push(p.z); }); });
+    updateStatus(zs.length, series.length);
+    updateSizeLegend(zs);
+
+    var xField = fieldMeta(state.map.x);
+    var yField = fieldMeta(state.map.y);
+    var xPlot = [], yPlot = [];
+
+    if (state.mode === "quadrant" && zs.length) {
+      var xs = [], ys = [];
+      series.forEach(function (s) { s.data.forEach(function (p) { xs.push(p.x); ys.push(p.y); }); });
+      var xCut = median(xs), yCut = median(ys);
+      xPlot = [{ value: xCut, color: "rgba(251,191,36,.75)", width: 1.5, dashStyle: "Dash",
+        label: { text: "Median X", style: { color: "#fbbf24", fontSize: "10px" } } }];
+      yPlot = [{ value: yCut, color: "rgba(251,191,36,.75)", width: 1.5, dashStyle: "Dash",
+        label: { text: "Median Y", style: { color: "#fbbf24", fontSize: "10px" } } }];
+    }
+
+    var maxSize = Math.round(48 * state.sizeScale);
+    var minSize = Math.max(4, Math.round(6 * state.sizeScale));
+
+    state.chart = Highcharts.chart("chart", {
+      chart: { type: "bubble", backgroundColor: "transparent", zoomType: "xy",
+        style: { fontFamily: "'Segoe UI', system-ui, sans-serif" } },
+      title: { text: null },
+      credits: { enabled: false },
+      legend: { itemStyle: { color: "#cbd5e1" }, itemHoverStyle: { color: "#fff" } },
+      xAxis: {
+        type: state.xScale,
+        title: { text: xField ? xField.label : "X", style: { color: "#94a3b8" } },
+        gridLineColor: "rgba(148,163,184,.15)", lineColor: "#334155", tickColor: "#334155",
+        labels: { style: { color: "#94a3b8" } }, plotLines: xPlot
+      },
+      yAxis: {
+        type: state.yScale,
+        title: { text: yField ? yField.label : "Y", style: { color: "#94a3b8" } },
+        gridLineColor: "rgba(148,163,184,.15)", lineColor: "#334155", tickColor: "#334155",
+        labels: { style: { color: "#94a3b8" } }, plotLines: yPlot
+      },
+      tooltip: {
+        useHTML: true,
+        backgroundColor: "rgba(15,23,42,.95)",
+        borderColor: "#334155",
+        style: { color: "#e2e8f0" },
+        pointFormatter: function () {
+          var r = this.custom.row;
+          var lines = [
+            "<b>" + this.name + "</b>",
+            (xField ? xField.label : "X") + ": <b>" + this.x + "</b>",
+            (yField ? yField.label : "Y") + ": <b>" + this.y + "</b>",
+            ((fieldMeta(state.map.size) || {}).label || "Size") + ": <b>" + this.z + "</b>"
+          ];
+          if (state.map.color) lines.push((fieldMeta(state.map.color) || {}).label + ": <b>" + r[state.map.color] + "</b>");
+          if (state.map.group) lines.push("Group: <b>" + r[state.map.group] + "</b>");
+          return lines.join("<br/>");
+        }
+      },
+      plotOptions: {
+        bubble: { minSize: minSize, maxSize: maxSize, cursor: "pointer", stickyTracking: false },
+        series: { states: { inactive: { opacity: 0.35 } } }
+      },
+      series: series
+    });
+  }
+
+  function bindControls() {
+    document.getElementById("sizeScale").addEventListener("input", function (e) {
+      state.sizeScale = +e.target.value; render();
+    });
+    document.getElementById("searchBox").addEventListener("input", function (e) {
+      state.search = e.target.value; render();
+    });
+    document.querySelectorAll(".seg[data-axis]").forEach(function (seg) {
+      seg.querySelectorAll("button").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          seg.querySelectorAll("button").forEach(function (b) { b.classList.remove("active"); });
+          btn.classList.add("active");
+          if (seg.dataset.axis === "x") state.xScale = btn.dataset.scale;
+          else state.yScale = btn.dataset.scale;
+          render();
+        });
+      });
+    });
+    document.querySelectorAll("#labelMode button").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        document.querySelectorAll("#labelMode button").forEach(function (b) { b.classList.remove("active"); });
+        btn.classList.add("active");
+        state.labels = btn.dataset.labels;
+        render();
+      });
+    });
+    document.querySelectorAll(".mode-tab").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        state.mode = tab.dataset.mode;
+        syncModeTabs();
+        render();
+      });
+    });
+  }
+
+  bindControls();
+
+  var gotData = false;
+  function tryDemoFallback() {
+    if (gotData) return;
+    var q = window.location.search || "";
+    if (q.indexOf("demo=1") >= 0 || !(Office && Office.context && Office.context.ui)) {
+      ingest(DEMO);
+      gotData = true;
+    }
+  }
+
+  Office.onReady(function () {
+    try {
+      Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function (arg) {
+        try {
+          var msg = JSON.parse(arg.message || "{}");
+          if (msg.type === "MV_RUN_DATA" && msg.payload) {
+            gotData = true;
+            ingest(msg.payload);
+          }
+        } catch (e) {}
+      });
+    } catch (e) {}
+    send("ready", null);
+    setTimeout(tryDemoFallback, 1200);
+  });
+
+  // Browser preview without Office
+  if (typeof Office === "undefined") {
+    ingest(DEMO);
+  } else {
+    setTimeout(function () {
+      if (!gotData && /[?&]demo=1/.test(window.location.search || "")) ingest(DEMO);
+    }, 100);
+  }
+})();
+  </script>
+</body>
+</html>

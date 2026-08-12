@@ -41,12 +41,14 @@ const HUB_CATEGORY_TILES = [
     info: [
       "Univariate: distribution summaries, normality, and outliers",
       "Correlation: pairwise associations and matrices",
+      "Multivariable Explorer: bubble & quadrant charts (X, Y, size, color)",
       "Works from your Active Range in Excel",
       "Useful first pass before regression or group comparisons"
     ],
     modules: [
       { id: "univariate", label: "Univariate", tip: "Distribution summaries, outliers, and normality checks for single variables." },
-      { id: "correlations", label: "Correlation", tip: "Pairwise associations and correlation matrix between numeric variables." }
+      { id: "correlations", label: "Correlation", tip: "Pairwise associations and correlation matrix between numeric variables." },
+      { id: "multivariable", label: "Multivariable Explorer", tip: "Interactive bubble and quadrant charts — map X, Y, size, color, labels, and groups." }
     ]
   },
   {
@@ -1371,6 +1373,29 @@ function openParetoFromHub() {
   });
 }
 
+function openMultivariableFromHub() {
+  return openBuilderDialogFromHub({
+    moduleId: "multivariable",
+    dialogPath: "multivariable/mv-input.html",
+    dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
+    dataType: "MV_DATA",
+    payloadBuilder: function (gr) {
+      return {
+        headers: gr.values[0] || [],
+        rows: gr.values.slice(1),
+        address: gr.address || "",
+        savedModelSpec: null
+      };
+    },
+    modelActions: ["mvModel"],
+    onModel: function (msg) {
+      sessionStorage.setItem("mvModelSpec", JSON.stringify(msg.payload || msg.data || {}));
+    },
+    hubResultsKey: "multivariable",
+    nextDelayMs: 500
+  });
+}
+
 function openBuilderDialogFromHub(options) {
   var gr = getGlobalRangePayload() || { values: [], address: "", mode: "used" };
   var handedOffToResults = false;
@@ -1793,6 +1818,9 @@ function navigateToModuleCore(id) {
   }
   if (id === "pareto2080") {
     if (openParetoFromHub()) return;
+  }
+  if (id === "multivariable") {
+    if (openMultivariableFromHub()) return;
   }
   if (id === "publication-tables") {
     if (openPublicationTablesConfigFromHub()) return;

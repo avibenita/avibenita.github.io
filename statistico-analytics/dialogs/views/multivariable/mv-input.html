@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Multivariable Explorer — Configuration</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="../shared-config.css?v=20260812mv"/>
+  <script src="../shared-config.js?v=20260812mv"></script>
+  <style>
+    :root { --mv-num: #38bdf8; --mv-cat: #a78bfa; --mv-req: #f97316; }
+    body.cfg-embed .cfg-header { display: none; }
+    body.cfg-embed .cfg-shell { min-height: 100%; }
+    .reg-layout {
+      display: flex; gap: 10px; flex: 1 1 0; min-height: 0;
+      padding: 8px 10px; overflow: hidden;
+    }
+    .reg-vars-col { flex: 0 0 220px; display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow: hidden; }
+    .reg-model-col { flex: 1 1 0; display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; padding-right: 4px; }
+    .reg-vars-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 2px 6px; border-bottom: 1px solid var(--cfg-border); flex-shrink: 0;
+    }
+    .reg-vars-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .55px; color: var(--cfg-text); }
+    .reg-vars-summary { display: flex; gap: 5px; flex-wrap: wrap; }
+    .reg-vars-badge { font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px; white-space: nowrap; }
+    .reg-vb-num { background: rgba(56,189,248,.12); color: #0369a1; border: 1px solid rgba(56,189,248,.3); }
+    .reg-vb-cat { background: rgba(167,139,250,.12); color: #6d28d9; border: 1px solid rgba(167,139,250,.3); }
+    .reg-vars-box { flex: 1 1 0; min-height: 0; overflow-y: auto; border: 1px solid var(--cfg-border); border-radius: 8px; background: var(--cfg-surface); }
+    .reg-var-row { display: flex; align-items: center; gap: 6px; padding: 5px 8px; cursor: grab; border-bottom: 1px solid var(--cfg-border); user-select: none; }
+    .reg-var-row:last-child { border-bottom: none; }
+    .reg-var-row:hover:not(.used) { background: var(--cfg-tbl-hover); }
+    .reg-var-row.dragging { opacity: .4; }
+    .reg-var-row.used { opacity: .38; cursor: not-allowed; pointer-events: none; }
+    .reg-var-icon { width: 16px; height: 16px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; flex-shrink: 0; }
+    .reg-var-icon.num { background: rgba(56,189,248,.2); color: var(--mv-num); }
+    .reg-var-icon.cat { background: rgba(167,139,250,.2); color: var(--mv-cat); }
+    .reg-var-body { flex: 1; min-width: 0; }
+    .reg-var-name { font-size: 12px; font-weight: 600; color: var(--cfg-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .reg-var-stats { font-size: 9.5px; color: var(--cfg-text3); }
+    .reg-model-title { display: flex; align-items: center; gap: 10px; padding: 0 2px 6px; border-bottom: 1px solid var(--cfg-border); flex-shrink: 0; }
+    .reg-model-title > span:first-child { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; }
+    .reg-model-meta { font-size: 10px; color: var(--cfg-text3); margin-left: auto; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .reg-equation-strip { font-size: 11.5px; color: var(--cfg-text3); padding: 5px 8px; background: var(--cfg-surface); border: 1px dashed var(--cfg-border); border-radius: 6px; flex-shrink: 0; }
+    .reg-equation-strip strong { color: var(--mv-num); }
+    .zones-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex-shrink: 0;
+    }
+    .reg-zone-card { border-radius: 8px; overflow: hidden; border: 1px solid var(--cfg-border); }
+    .reg-zone-card.zone-num { border-color: rgba(56,189,248,.35); }
+    .reg-zone-card.zone-cat { border-color: rgba(167,139,250,.35); }
+    .reg-zone-card.zone-any { border-color: rgba(148,163,184,.35); }
+    .reg-zone-head { display: flex; align-items: center; gap: 7px; padding: 7px 10px; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .45px; border-bottom: 1px solid var(--cfg-border); }
+    .reg-zone-card.zone-num .reg-zone-head { background: rgba(56,189,248,.08); color: var(--mv-num); }
+    .reg-zone-card.zone-cat .reg-zone-head { background: rgba(167,139,250,.08); color: var(--mv-cat); }
+    .reg-zone-card.zone-any .reg-zone-head { background: rgba(148,163,184,.08); color: #94a3b8; }
+    .reg-zone-head .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: currentColor; }
+    .zone-head-main { flex: 1; min-width: 0; }
+    .zone-hint { font-size: 9.5px; font-weight: 400; text-transform: none; opacity: .8; }
+    .zone-req { font-size: 13px; font-weight: 900; color: #dc2626; opacity: .85; margin-left: 3px; }
+    .zone-single-badge {
+      display: inline-flex; align-items: center;
+      font-size: 9px; font-weight: 700; padding: 1px 5px;
+      border-radius: 4px; opacity: .7; background: currentColor;
+    }
+    .zone-single-badge span { color: var(--cfg-bg, #1e1e2e); }
+    .reg-zone-body {
+      padding: 6px; min-height: 42px; display: flex; flex-wrap: wrap;
+      gap: 4px; align-content: flex-start; transition: background .2s;
+    }
+    .reg-zone-card.zone-num .reg-zone-body { background: rgba(56,189,248,.04); }
+    .reg-zone-card.zone-cat .reg-zone-body { background: rgba(167,139,250,.04); }
+    .reg-zone-card.zone-any .reg-zone-body { background: rgba(148,163,184,.04); }
+    .reg-zone-body.drag-over { filter: brightness(1.08); }
+    .reg-zone-placeholder { width: 100%; text-align: center; font-size: 11px; font-style: italic; color: var(--cfg-text3); padding: 6px 0; }
+    .reg-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; border: 1px solid; white-space: nowrap; }
+    .reg-chip.num { background: rgba(56,189,248,.15); border-color: rgba(56,189,248,.4); color: var(--mv-num); }
+    .reg-chip.cat { background: rgba(167,139,250,.15); border-color: rgba(167,139,250,.4); color: var(--mv-cat); }
+    .reg-chip.any { background: rgba(148,163,184,.15); border-color: rgba(148,163,184,.4); color: #94a3b8; }
+    .reg-chip-x { background: none; border: none; cursor: pointer; padding: 0 1px; opacity: .7; font-size: 12px; color: inherit; }
+    .mode-row {
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+      padding: 6px 8px; border: 1px solid var(--cfg-border); border-radius: 8px; background: var(--cfg-surface);
+    }
+    .mode-row > span { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--cfg-text2); }
+    .mode-seg { display: inline-flex; border: 1px solid var(--cfg-border); border-radius: 7px; overflow: hidden; margin-left: auto; }
+    .mode-seg button {
+      border: 0; background: transparent; color: var(--cfg-text3);
+      font-size: 11px; font-weight: 700; padding: 5px 10px; cursor: pointer;
+    }
+    .mode-seg button.active { background: rgba(56,189,248,.2); color: var(--mv-num); }
+    .mv-hint {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 8px 10px; border-radius: 8px; flex-shrink: 0;
+      background: rgba(56,189,248,.08); border: 1px solid rgba(56,189,248,.22);
+      font-size: 10.5px; color: var(--cfg-text2); line-height: 1.4;
+    }
+    .mv-hint i { color: #38bdf8; margin-top: 1px; flex-shrink: 0; }
+    .mv-hint strong { color: #38bdf8; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="cfg-shell">
+    <header class="cfg-header">
+      <div class="cfg-header-icon"><i class="fa-solid fa-circle-nodes"></i></div>
+      <span class="cfg-header-title">Multivariable Explorer</span>
+      <span class="cfg-meta-badge" id="metaBadge">—</span>
+      <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch theme"><span class="cfg-toggle-icon">&#x1F319;</span><div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div><span class="cfg-toggle-label">Dark</span></button>
+    </header>
+    <div id="loadingSpinner" class="cfg-spinner"><i class="fa-solid fa-spinner fa-spin"></i> Loading data&hellip;</div>
+    <div id="mainContent" style="display:none;flex:1;min-height:0;overflow:hidden;">
+      <div class="reg-layout">
+        <div class="reg-vars-col">
+          <div class="reg-vars-header">
+            <span class="reg-vars-title">Available Columns</span>
+            <span class="reg-vars-summary" id="varsSummary"></span>
+          </div>
+          <div class="reg-vars-box" id="variablesListBox"></div>
+        </div>
+        <div class="reg-model-col">
+          <div class="reg-model-title">
+            <span>Assign Roles</span>
+            <span class="reg-model-meta" id="tbRange">—</span>
+          </div>
+          <div class="reg-equation-strip" id="modelSummary">Map X, Y, and Size — Color / Label / Group are optional</div>
+          <div class="mode-row">
+            <span>Chart</span>
+            <div class="mode-seg" id="modeSeg">
+              <button type="button" data-mode="bubble" class="active">Bubble</button>
+              <button type="button" data-mode="quadrant">Quadrant</button>
+            </div>
+          </div>
+          <div class="zones-grid">
+            <div class="reg-zone-card zone-num">
+              <div class="reg-zone-head"><div class="dot"></div><div class="zone-head-main"><div>X position</div><div class="zone-hint">Numeric</div></div><span class="zone-req">*</span><span class="zone-single-badge"><span>×1</span></span></div>
+              <div class="reg-zone-body drop-zone" data-zone="x" id="zoneX"><div class="reg-zone-placeholder">Drag numeric column</div></div>
+            </div>
+            <div class="reg-zone-card zone-num">
+              <div class="reg-zone-head"><div class="dot"></div><div class="zone-head-main"><div>Y position</div><div class="zone-hint">Numeric</div></div><span class="zone-req">*</span><span class="zone-single-badge"><span>×1</span></span></div>
+              <div class="reg-zone-body drop-zone" data-zone="y" id="zoneY"><div class="reg-zone-placeholder">Drag numeric column</div></div>
+            </div>
+            <div class="reg-zone-card zone-num">
+              <div class="reg-zone-head"><div class="dot"></div><div class="zone-head-main"><div>Bubble size</div><div class="zone-hint">Numeric · area ∝ value</div></div><span class="zone-req">*</span><span class="zone-single-badge"><span>×1</span></span></div>
+              <div class="reg-zone-body drop-zone" data-zone="size" id="zoneSize"><div class="reg-zone-placeholder">Drag numeric column</div></div>
+            </div>
+            <div class="reg-zone-card zone-cat">
+              <div class="reg-zone-head"><div class="dot"></div><div class="zone-head-main"><div>Color</div><div class="zone-hint">Category or numeric</div></div><span class="zone-single-badge"><span>×1</span></span></div>
+              <div class="reg-zone-body drop-zone" data-zone="color" id="zoneColor"><div class="reg-zone-placeholder">Optional</div></div>
+            </div>
+            <div class="reg-zone-card zone-any">
+              <div class="reg-zone-head"><div class="dot"></div><div class="zone-head-main"><div>Label</div><div class="zone-hint">Name / ID</div></div><span class="zone-single-badge"><span>×1</span></span></div>
+              <div class="reg-zone-body drop-zone" data-zone="label" id="zoneLabel"><div class="reg-zone-placeholder">Optional</div></div>
+            </div>
+            <div class="reg-zone-card zone-cat">
+              <div class="reg-zone-head"><div class="dot"></div><div class="zone-head-main"><div>Group</div><div class="zone-hint">Series / legend</div></div><span class="zone-single-badge"><span>×1</span></span></div>
+              <div class="reg-zone-body drop-zone" data-zone="group" id="zoneGroup"><div class="reg-zone-placeholder">Optional</div></div>
+            </div>
+          </div>
+          <div class="mv-hint">
+            <i class="fa-solid fa-circle-info"></i>
+            <span>Bubble <strong>area</strong> (not diameter) is proportional to Size — avoiding Excel’s common scaling trap. Roles can also be adjusted in results.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cfg-footer">
+      <button class="cfg-btn cancel" id="btnCancel"><i class="fa-solid fa-times"></i> Cancel</button>
+      <button class="cfg-btn load-prev" id="btnLoadPrev" onclick="showSavedList()" disabled><i class="fa-solid fa-clock-rotate-left"></i> Load previous&hellip;</button>
+      <button class="cfg-btn save-config" id="btnSaveConfig" onclick="saveModelSpec()" disabled><i class="fa-solid fa-floppy-disk"></i> Save configuration</button>
+      <button class="cfg-btn run" id="btnRun" disabled><i class="fa-solid fa-play"></i> Run Explorer</button>
+    </div>
+  </div>
+  <script>
+    var _headers = [], _rows = [], _address = '', _saved = null;
+    var columnStats = [];
+    var assignments = { x: null, y: null, size: null, color: null, label: null, group: null };
+    var chartMode = 'bubble';
+    var draggedElement = null;
+    var ZONE_META = {
+      x: { el: 'zoneX', kind: 'num', req: true, accept: 'num' },
+      y: { el: 'zoneY', kind: 'num', req: true, accept: 'num' },
+      size: { el: 'zoneSize', kind: 'num', req: true, accept: 'num' },
+      color: { el: 'zoneColor', kind: 'cat', req: false, accept: 'any' },
+      label: { el: 'zoneLabel', kind: 'any', req: false, accept: 'any' },
+      group: { el: 'zoneGroup', kind: 'cat', req: false, accept: 'any' }
+    };
+
+    function qs(id) { return document.getElementById(id); }
+    function send(action, data) {
+      if (Office && Office.context && Office.context.ui) {
+        Office.context.ui.messageParent(JSON.stringify({ action: action, data: data || null, payload: data || null }));
+      }
+    }
+
+    function buildColumnStats() {
+      columnStats = _headers.map(function(name, colIdx) {
+        var numeric = 0, string = 0, missing = 0;
+        _rows.forEach(function(row) {
+          var value = row[colIdx];
+          if (value === null || value === undefined || value === '') { missing++; return; }
+          var num = parseFloat(String(value).replace(',', '.'));
+          if (!isNaN(num) && isFinite(num)) numeric++; else string++;
+        });
+        return {
+          name: name || ('Col ' + (colIdx + 1)),
+          idx: colIdx,
+          numeric: numeric,
+          string: string,
+          missing: missing,
+          isNumeric: numeric > string
+        };
+      });
+    }
+
+    function getStat(name) {
+      for (var i = 0; i < columnStats.length; i++) if (columnStats[i].name === name) return columnStats[i];
+      return null;
+    }
+
+    function isAssigned(name) {
+      return Object.keys(assignments).some(function(k) { return assignments[k] === name; });
+    }
+
+    function updateVarsSummary() {
+      var el = qs('varsSummary');
+      if (!el) return;
+      var num = 0, cat = 0;
+      columnStats.forEach(function(s) { if (s.isNumeric) num++; else if (s.string > 0) cat++; });
+      el.innerHTML = (num ? '<span class="reg-vars-badge reg-vb-num">' + num + ' num</span>' : '') +
+        (cat ? '<span class="reg-vars-badge reg-vb-cat">' + cat + ' cat</span>' : '');
+    }
+
+    function renderVariables() {
+      var box = qs('variablesListBox');
+      box.innerHTML = '';
+      if (!columnStats.length) {
+        box.innerHTML = '<div style="color:var(--cfg-text3);font-style:italic;font-size:11px;text-align:center;padding:20px;">No columns loaded</div>';
+        updateVarsSummary(); return;
+      }
+      columnStats.forEach(function(s) {
+        var used = isAssigned(s.name);
+        var row = document.createElement('div');
+        row.className = 'reg-var-row' + (used ? ' used' : '');
+        row.draggable = !used;
+        row.dataset.varName = s.name;
+        row.innerHTML = '<div class="reg-var-icon ' + (s.isNumeric ? 'num' : 'cat') + '">' + (s.isNumeric ? 'N' : 'C') + '</div>' +
+          '<div class="reg-var-body"><div class="reg-var-name">' + s.name + '</div><div class="reg-var-stats">' +
+          s.numeric + ' num' + (s.string ? ' · ' + s.string + ' cat' : '') + '</div></div>';
+        if (!used) {
+          row.addEventListener('dragstart', function(e) { draggedElement = row; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+          row.addEventListener('dragend', function() { row.classList.remove('dragging'); });
+        }
+        box.appendChild(row);
+      });
+      updateVarsSummary();
+    }
+
+    function chipClass(zone) {
+      if (zone === 'x' || zone === 'y' || zone === 'size') return 'num';
+      if (zone === 'color' || zone === 'group') return 'cat';
+      return 'any';
+    }
+
+    function createChip(name, zone) {
+      var chip = document.createElement('div');
+      chip.className = 'reg-chip ' + chipClass(zone);
+      chip.innerHTML = '<span>' + name + '</span><button class="reg-chip-x" title="Remove">&times;</button>';
+      chip.querySelector('.reg-chip-x').addEventListener('click', function() {
+        assignments[zone] = null;
+        renderAssignments(); renderVariables(); validateModel();
+      });
+      return chip;
+    }
+
+    function renderAssignments() {
+      Object.keys(ZONE_META).forEach(function(zone) {
+        var meta = ZONE_META[zone];
+        var el = qs(meta.el);
+        var ph = zone === 'x' || zone === 'y' || zone === 'size'
+          ? 'Drag numeric column'
+          : 'Optional';
+        el.innerHTML = assignments[zone] ? '' : '<div class="reg-zone-placeholder">' + ph + '</div>';
+        if (assignments[zone]) el.appendChild(createChip(assignments[zone], zone));
+      });
+      updateSummary();
+      validateModel();
+    }
+
+    function updateSummary() {
+      var el = qs('modelSummary');
+      if (!el) return;
+      if (!assignments.x || !assignments.y || !assignments.size) {
+        el.textContent = 'Map X, Y, and Size — Color / Label / Group are optional';
+        return;
+      }
+      var bits = [
+        '<strong>' + assignments.x + '</strong> × <strong>' + assignments.y + '</strong>',
+        'size <strong>' + assignments.size + '</strong>'
+      ];
+      if (assignments.color) bits.push('color <strong>' + assignments.color + '</strong>');
+      if (assignments.group) bits.push('group <strong>' + assignments.group + '</strong>');
+      el.innerHTML = (chartMode === 'quadrant' ? 'Quadrant: ' : 'Bubble: ') + bits.join(' · ');
+    }
+
+    function validateModel() {
+      var ok = !!(assignments.x && assignments.y && assignments.size);
+      if (qs('btnRun')) qs('btnRun').disabled = !ok;
+      if (qs('btnSaveConfig')) qs('btnSaveConfig').disabled = !ok;
+      var hasSaved = typeof CfgSave !== 'undefined' && CfgSave.getSavedList('mv-config').length > 0;
+      if (qs('btnLoadPrev')) qs('btnLoadPrev').disabled = !hasSaved;
+      if (typeof CfgSave !== 'undefined' && typeof CfgSave.syncConfigButtons === 'function') {
+        CfgSave.syncConfigButtons('mv-config');
+      }
+    }
+
+    function clearNameFromOthers(name, keepZone) {
+      Object.keys(assignments).forEach(function(z) {
+        if (z !== keepZone && assignments[z] === name) assignments[z] = null;
+      });
+    }
+
+    function handleDrop(zoneType) {
+      if (!draggedElement) return;
+      var name = draggedElement.dataset.varName;
+      var stat = getStat(name);
+      var meta = ZONE_META[zoneType];
+      if (!stat || !meta) return;
+      if (meta.accept === 'num' && !stat.isNumeric) return;
+      clearNameFromOthers(name, zoneType);
+      assignments[zoneType] = name;
+      renderAssignments(); renderVariables();
+    }
+
+    function setupDropZones() {
+      document.querySelectorAll('.drop-zone').forEach(function(zone) {
+        zone.addEventListener('dragover', function(e) { e.preventDefault(); zone.classList.add('drag-over'); });
+        zone.addEventListener('dragleave', function(e) { if (!zone.contains(e.relatedTarget)) zone.classList.remove('drag-over'); });
+        zone.addEventListener('drop', function(e) {
+          e.preventDefault(); zone.classList.remove('drag-over');
+          handleDrop(zone.dataset.zone);
+        });
+      });
+    }
+
+    function colIndex(name) {
+      if (!name) return null;
+      var i = _headers.indexOf(name);
+      return i >= 0 ? i : null;
+    }
+
+    function buildModelSpec() {
+      return {
+        chartMode: chartMode,
+        xColName: assignments.x,
+        yColName: assignments.y,
+        sizeColName: assignments.size,
+        colorColName: assignments.color || null,
+        labelColName: assignments.label || null,
+        groupColName: assignments.group || null,
+        xColIndex: colIndex(assignments.x),
+        yColIndex: colIndex(assignments.y),
+        sizeColIndex: colIndex(assignments.size),
+        colorColIndex: colIndex(assignments.color),
+        labelColIndex: colIndex(assignments.label),
+        groupColIndex: colIndex(assignments.group),
+        includedIndices: _headers.map(function(_, i) { return i; })
+      };
+    }
+
+    function applySpec(spec) {
+      if (!spec) return;
+      assignments = { x: null, y: null, size: null, color: null, label: null, group: null };
+      chartMode = spec.chartMode === 'quadrant' ? 'quadrant' : 'bubble';
+      function pick(nameKey, idxKey, requireNum) {
+        if (spec[nameKey] && getStat(spec[nameKey]) && (!requireNum || getStat(spec[nameKey]).isNumeric)) return spec[nameKey];
+        if (spec[idxKey] != null && spec[idxKey] >= 0 && _headers[spec[idxKey]]) {
+          var n = _headers[spec[idxKey]];
+          if (!requireNum || (getStat(n) && getStat(n).isNumeric)) return n;
+        }
+        return null;
+      }
+      assignments.x = pick('xColName', 'xColIndex', true);
+      assignments.y = pick('yColName', 'yColIndex', true);
+      assignments.size = pick('sizeColName', 'sizeColIndex', true);
+      assignments.color = pick('colorColName', 'colorColIndex', false);
+      assignments.label = pick('labelColName', 'labelColIndex', false);
+      assignments.group = pick('groupColName', 'groupColIndex', false);
+      syncModeSeg();
+    }
+
+    function syncModeSeg() {
+      document.querySelectorAll('#modeSeg button').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.mode === chartMode);
+      });
+    }
+
+    function saveModelSpec() {
+      if (!assignments.x || !assignments.y || !assignments.size) return;
+      var spec = buildModelSpec();
+      var defaultName = [spec.xColName, spec.yColName, spec.sizeColName].join(' · ');
+      CfgSave.showPrompt('Save configuration', 'Configuration name', defaultName, function(name) {
+        CfgSave.saveCfgEntry('mv-config', name, spec, function() { validateModel(); });
+      });
+    }
+
+    function showSavedList() {
+      CfgSave.showSavedList('mv-config', function(item) {
+        var s = item.spec || {};
+        return [s.xColName, s.yColName, s.sizeColName].filter(Boolean).join(' · ');
+      }, function(item) {
+        applySpec(item.spec || {}); renderAssignments(); renderVariables(); validateModel();
+      });
+    }
+
+    function runAnalysis() {
+      if (!assignments.x || !assignments.y || !assignments.size) return;
+      send('mvModel', buildModelSpec());
+    }
+
+    function autoDetect() {
+      var nums = columnStats.filter(function(s) { return s.isNumeric; });
+      var cats = columnStats.filter(function(s) { return !s.isNumeric; });
+      if (nums[0]) assignments.x = nums[0].name;
+      if (nums[1]) assignments.y = nums[1].name;
+      if (nums[2]) assignments.size = nums[2].name;
+      else if (nums[0] && !assignments.size) assignments.size = nums[0].name;
+      if (cats[0]) { assignments.color = cats[0].name; assignments.group = cats[0].name; }
+      if (cats[0] || nums.length) assignments.label = (cats[0] && cats[0].name) || (columnStats[0] && columnStats[0].name) || null;
+    }
+
+    function applyPayload(p) {
+      if (!p || !p.headers) return;
+      _headers = p.headers || [];
+      _rows = p.rows || [];
+      _address = p.address || '';
+      _saved = p.savedModelSpec || null;
+      qs('loadingSpinner').style.display = 'none';
+      qs('mainContent').style.display = 'flex';
+      qs('tbRange').textContent = (_address ? _address + ' · ' : '') + _rows.length + ' rows';
+      qs('metaBadge').textContent = _rows.length + ' rows · ' + _headers.length + ' cols';
+      buildColumnStats();
+      assignments = { x: null, y: null, size: null, color: null, label: null, group: null };
+      if (_saved) applySpec(_saved);
+      if (!assignments.x) autoDetect();
+      renderVariables(); renderAssignments(); syncModeSeg(); validateModel();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      setupDropZones();
+      qs('btnCancel').addEventListener('click', function() { send('close', null); });
+      qs('btnRun').addEventListener('click', runAnalysis);
+      document.querySelectorAll('#modeSeg button').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          chartMode = btn.dataset.mode;
+          syncModeSeg();
+          updateSummary();
+        });
+      });
+      Office.onReady(function() {
+        Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function(arg) {
+          try {
+            var msg = JSON.parse(arg.message || '{}');
+            if (msg.type === 'MV_DATA' && msg.payload) applyPayload(msg.payload);
+          } catch (_e) {}
+        });
+        send('ready', null);
+        setInterval(function() { if (!_headers.length) send('requestData', null); }, 500);
+      });
+    });
+  </script>
+</body>
+</html>

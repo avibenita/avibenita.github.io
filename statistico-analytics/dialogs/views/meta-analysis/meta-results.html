@@ -472,7 +472,14 @@
       box-shadow: 0 6px 20px rgba(0,0,0,.55);
     }
     .info-icon .tip b { color: #a5b4fc; }
-    .info-icon:hover .tip { display: block; }
+    /* Shown via JS after portaling to body — avoids overflow clipping in forest headers */
+    .info-icon:hover .tip { display: none; }
+    .tip.tip-portal {
+      display: block !important;
+      position: fixed !important;
+      z-index: 10060 !important;
+      max-width: min(280px, calc(100vw - 16px));
+    }
     :root[data-theme="light"] .info-icon {
       background: rgba(67,56,202,.12); border-color: rgba(67,56,202,.4); color: #4338ca;
     }
@@ -2427,32 +2434,68 @@
         }
       });
 
-      /* Fixed-position tips so overflow:hidden panels do not clip them */
-      document.addEventListener('mouseover', function (e) {
-        var icon = e.target && e.target.closest ? e.target.closest('.info-icon') : null;
+      /* Portal tips to body so forest scroll / overflow parents cannot trim them */
+      function hidePortaledTip(icon) {
         if (!icon) return;
-        var tip = icon.querySelector('.tip');
+        var tip = icon._portedTip || icon.querySelector('.tip');
         if (!tip) return;
-        var rect = icon.getBoundingClientRect();
+        tip.classList.remove('tip-portal');
+        tip.style.display = 'none';
+        tip.style.visibility = '';
+        tip.style.left = '';
+        tip.style.top = '';
+        if (icon._tipHome && tip.parentNode !== icon._tipHome) {
+          icon._tipHome.appendChild(tip);
+        }
+        icon._portedTip = null;
+        icon._tipHome = null;
+      }
+
+      function showPortaledTip(icon) {
+        var tip = icon._portedTip || icon.querySelector('.tip');
+        if (!tip) return;
+        if (tip.parentNode !== document.body) {
+          icon._tipHome = tip.parentNode;
+          icon._portedTip = tip;
+          document.body.appendChild(tip);
+        }
+        tip.classList.add('tip-portal');
         tip.style.visibility = 'hidden';
         tip.style.display = 'block';
+        var rect = icon.getBoundingClientRect();
         var tw = tip.offsetWidth || 250;
         var th = tip.offsetHeight || 60;
-        var vw = window.innerWidth, vh = window.innerHeight;
-        var left = Math.max(8, Math.min(rect.left + rect.width / 2 - tw / 2, vw - tw - 8));
+        var vw = window.innerWidth;
+        var vh = window.innerHeight;
+        // Prefer aligning to icon; if near the right edge, keep the whole tip on-screen
+        var left = rect.left + rect.width / 2 - tw / 2;
+        if (left + tw > vw - 8) left = rect.right - tw;
+        if (left < 8) left = 8;
+        if (left + tw > vw - 8) left = Math.max(8, vw - tw - 8);
         var top = rect.top - th - 8;
         if (top < 8) top = Math.min(rect.bottom + 8, vh - th - 8);
         tip.style.left = left + 'px';
         tip.style.top = top + 'px';
         tip.style.visibility = 'visible';
+      }
+
+      document.addEventListener('mouseover', function (e) {
+        var icon = e.target && e.target.closest ? e.target.closest('.info-icon') : null;
+        if (!icon) return;
+        showPortaledTip(icon);
       });
       document.addEventListener('mouseout', function (e) {
         var icon = e.target && e.target.closest ? e.target.closest('.info-icon') : null;
         if (!icon) return;
         if (e.relatedTarget && icon.contains(e.relatedTarget)) return;
-        var tip = icon.querySelector('.tip');
-        if (tip) tip.style.display = '';
+        // Tip is on body — relatedTarget won't be inside icon when moving onto tip (pointer-events none)
+        hidePortaledTip(icon);
       });
+      document.addEventListener('scroll', function () {
+        document.querySelectorAll('.info-icon').forEach(function (icon) {
+          if (icon._portedTip) hidePortaledTip(icon);
+        });
+      }, true);
 
       if (typeof Office !== 'undefined' && Office.onReady) {
         Office.onReady(function () {

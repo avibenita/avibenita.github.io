@@ -551,12 +551,17 @@
 
     #forestPlot, #funnelPlot { min-height: 420px; width: 100%; }
     #forestPlot { min-height: 480px; }
-    .forest-wrap { position: relative; flex: 1; min-height: 0; width: 100%; }
+    .forest-wrap {
+      position: relative; flex: 1; min-height: 0; width: 100%;
+      overflow-x: auto; overflow-y: visible;
+    }
+    #tab-forest .panel-card { overflow: visible; min-width: 0; }
+    #forestPlot { min-width: 860px; }
     .forest-col-headers {
       position: absolute; z-index: 6; pointer-events: none;
-      display: flex; align-items: center; gap: 0;
+      display: grid; align-items: center;
       font-size: 12px; font-weight: 800; color: var(--text-primary);
-      white-space: nowrap;
+      white-space: nowrap; box-sizing: border-box;
     }
     .forest-col-headers .forest-h-effect,
     .forest-col-headers .forest-h-weight {
@@ -565,6 +570,7 @@
       cursor: pointer; user-select: none;
       color: var(--text-primary);
       padding: 2px 4px; border-radius: 5px;
+      min-width: 0;
     }
     .forest-col-headers .forest-h-effect:hover,
     .forest-col-headers .forest-h-weight:hover {
@@ -1745,17 +1751,19 @@
       var el = document.getElementById('forestColHeaders');
       if (!el || !chart || !ctx) return;
       var effectW = ctx.rightColW;
+      var weightW = ctx.weightColW;
       var weightActive = forestSort.key === 'weight' ? ' active' : '';
       var effectActive = forestSort.key === 'effect' ? ' active' : '';
       el.hidden = false;
-      el.style.left = (chart.plotLeft + chart.plotWidth + 8) + 'px';
+      // Align with the SVG value columns (plotRight + 12)
+      el.style.left = (chart.plotLeft + chart.plotWidth + 12) + 'px';
       el.style.top = Math.max(6, chart.plotTop - 22) + 'px';
-      el.style.width = (effectW + ctx.weightColW + 24) + 'px';
+      el.style.width = (effectW + weightW) + 'px';
+      el.style.gridTemplateColumns = effectW + 'px ' + weightW + 'px';
       el.innerHTML =
         '<span class="forest-h-effect' + effectActive + '" data-forest-sort="effect" title="Sort by effect size">' +
           'Effect [95% CI] <span class="sort-ind">' + forestSortIndicator('effect') + '</span></span>' +
-        '<span class="forest-h-weight' + weightActive + '" data-forest-sort="weight" title="Sort by weight" style="margin-left:' +
-          Math.max(8, effectW - 8) + 'px">' +
+        '<span class="forest-h-weight' + weightActive + '" data-forest-sort="weight" title="Sort by weight">' +
           'Weight <span class="sort-ind">' + forestSortIndicator('weight') + '</span>' +
           '<span class="info-icon" tabindex="0">i<span class="tip"><b>Weight</b> — relative contribution of each study to the pooled estimate under the current model (random-effects weights use 1/(v<sub>i</sub>+τ²)). Larger markers correspond to higher weight. Column totals 100% across studies.</span></span></span>';
     }
@@ -1840,9 +1848,10 @@
           marker: { enabled: false }
         }],
         fav: forestFavorLabels(bundle),
-        rightColW: 178,
-        weightColW: 72,
-        marginRight: 178 + 72 + 22,
+        rightColW: 188,
+        weightColW: 92,
+        // Extra pad so "Weight" + sort + info icon are never clipped
+        marginRight: 188 + 92 + 28,
         labelBright: labelBright,
         labelMuted: labelMuted,
         headerCol: headerCol,

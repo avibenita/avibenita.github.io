@@ -597,9 +597,27 @@
       color: var(--accent-meta);
     }
     .forest-col-headers .sort-ind {
-      font-size: 10px; opacity: .55; font-weight: 700;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 20px; height: 20px; border-radius: 5px;
+      font-size: 12px; line-height: 1;
+      background: rgba(148,163,184,.28);
+      color: #f1f5f9;
+      flex-shrink: 0;
     }
-    .forest-col-headers .active .sort-ind { opacity: 1; color: var(--accent-meta); }
+    .forest-col-headers .sort-ind i { font-size: 12px; }
+    .forest-col-headers .active .sort-ind,
+    .forest-col-headers .sort-ind.sort-ind-active {
+      background: rgba(129,140,248,.45);
+      color: #e0e7ff;
+      box-shadow: inset 0 0 0 1px rgba(165,180,252,.55);
+    }
+    :root[data-theme="light"] .forest-col-headers .sort-ind {
+      background: rgba(15,23,42,.1); color: #1e293b;
+    }
+    :root[data-theme="light"] .forest-col-headers .active .sort-ind,
+    :root[data-theme="light"] .forest-col-headers .sort-ind.sort-ind-active {
+      background: rgba(67,56,202,.18); color: #312e81;
+    }
     .forest-col-headers .forest-h-weight .info-icon { margin-left: 1px; }
 
     .studies-table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -1734,8 +1752,13 @@
     }
 
     function forestSortIndicator(key) {
-      if (forestSort.key !== key) return '↕';
-      return forestSort.dir === 'asc' ? '▲' : '▼';
+      if (forestSort.key !== key) {
+        return '<span class="sort-ind" title="Click to sort" aria-hidden="true"><i class="fa-solid fa-sort"></i></span>';
+      }
+      if (forestSort.dir === 'asc') {
+        return '<span class="sort-ind sort-ind-active" title="Sorted ascending — click to reverse" aria-hidden="true"><i class="fa-solid fa-sort-up"></i></span>';
+      }
+      return '<span class="sort-ind sort-ind-active" title="Sorted descending — click to reverse" aria-hidden="true"><i class="fa-solid fa-sort-down"></i></span>';
     }
 
     function studiesForForest(bundle) {
@@ -1784,9 +1807,9 @@
       el.style.gridTemplateColumns = effectW + 'px ' + weightW + 'px';
       el.innerHTML =
         '<span class="forest-h-effect' + effectActive + '" data-forest-sort="effect" title="Sort by effect size">' +
-          'Effect [95% CI] <span class="sort-ind">' + forestSortIndicator('effect') + '</span></span>' +
+          'Effect [95% CI] ' + forestSortIndicator('effect') + '</span>' +
         '<span class="forest-h-weight' + weightActive + '" data-forest-sort="weight" title="Sort by weight">' +
-          'Weight <span class="sort-ind">' + forestSortIndicator('weight') + '</span>' +
+          'Weight ' + forestSortIndicator('weight') +
           '<span class="info-icon" tabindex="0">i<span class="tip"><b>Weight</b> — relative contribution of each study to the pooled estimate under the current model (random-effects weights use 1/(v<sub>i</sub>+τ²)). Larger markers correspond to higher weight. Column totals 100% across studies.</span></span></span>';
     }
 
@@ -1825,11 +1848,6 @@
       xMin -= pad;
       xMax += pad;
 
-      var ciLineData = [];
-      rows.forEach(function (r) {
-        ciLineData.push([r.lo, r.i], [r.hi, r.i], null);
-      });
-
       var scatterData = rows.map(function (r) {
         return {
           x: r.yi,
@@ -1861,7 +1879,6 @@
         xMin: xMin,
         xMax: xMax,
         xDecimals: forestXLabelDecimals(xMin, xMax),
-        ciLineData: ciLineData,
         scatterData: scatterData,
         pooledPoint: [{
           x: bundle.pooled.effect,
@@ -1911,16 +1928,20 @@
       function xPx(v) { return xa.toPixels(v, false); }
       function yPx(v) { return ya.toPixels(v, false); }
 
+      // Discrete CI bars only — never a connecting line series (avoids zigzag artefacts)
       rows.forEach(function (r) {
         var y = yPx(r.i);
         var x0 = xPx(r.lo);
         var x1 = xPx(r.hi);
         var cap = 5;
+        chart.renderer.path(['M', x0, y, 'L', x1, y]).attr({
+          stroke: t.muted, 'stroke-width': 2.25, zIndex: 6
+        }).add(g);
         chart.renderer.path(['M', x0, y - cap, 'L', x0, y + cap]).attr({
-          stroke: t.muted, 'stroke-width': 1.5, zIndex: 6
+          stroke: t.muted, 'stroke-width': 2, zIndex: 6
         }).add(g);
         chart.renderer.path(['M', x1, y - cap, 'L', x1, y + cap]).attr({
-          stroke: t.muted, 'stroke-width': 1.5, zIndex: 6
+          stroke: t.muted, 'stroke-width': 2, zIndex: 6
         }).add(g);
       });
 
@@ -2034,7 +2055,9 @@
     }
 
     function forestChartAlive() {
-      return !!(forestChart && forestChart.series && forestChart.series.length >= 3 &&
+      // Require scatter-first chart (legacy builds used a line series that zigzagged across rows)
+      return !!(forestChart && forestChart.series && forestChart.series.length >= 2 &&
+        forestChart.series[0] && forestChart.series[0].type === 'scatter' &&
         forestChart.xAxis && forestChart.xAxis[0] && !forestChart.renderer.forExport);
     }
 
@@ -2095,11 +2118,9 @@
           }
         }, false);
 
-        forestChart.series[0].update({ color: vm.t.muted }, false);
-        forestChart.series[1].update({ color: vm.t.accent }, false);
-        forestChart.series[0].setData(vm.ciLineData, false, anim, true);
-        forestChart.series[1].setData(vm.scatterData, false, anim, true);
-        forestChart.series[2].setData(vm.pooledPoint, false, anim, true);
+        forestChart.series[0].update({ color: vm.t.accent }, false);
+        forestChart.series[0].setData(vm.scatterData, false, anim, true);
+        forestChart.series[1].setData(vm.pooledPoint, false, anim, true);
         forestChart.redraw();
         return;
       }
@@ -2193,27 +2214,12 @@
         },
         plotOptions: {
           series: { animation: anim },
-          line: {
-            animation: anim,
-            marker: { enabled: false },
-            states: { hover: { lineWidthPlus: 0 } }
-          },
           scatter: {
             animation: anim,
             tooltip: { headerFormat: '', pointFormat: '' }
           }
         },
         series: [
-          {
-            type: 'line',
-            name: '95% CI',
-            data: vm.ciLineData,
-            color: vm.t.muted,
-            lineWidth: 2,
-            enableMouseTracking: false,
-            showInLegend: false,
-            zIndex: 2
-          },
           {
             type: 'scatter',
             name: 'Study effects',
